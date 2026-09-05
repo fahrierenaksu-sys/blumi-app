@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "assetId": "blumi-onboarding-arrival-v2-candidate",
+  "status": "candidate",
+  "runtimePromoted": false,
+  "userApproved": false,
+  "framesPerRole": 16,
+  "canvas": [256, 384],
+  "playback": {
+    "mode": "authored-frame-sequence",
+    "crossfade": false,
+    "targetFps": 12
+  },
+  "roles": ["female", "male"],
+  "sourceSheets": {
+    "female": {
+      "path": "source/female-sheet-magenta.png",
+      "sha256": "2a87d2d89d0c12866317b46b49bc64340b7f916a4f5abbd29486c1e3f65b8ab5"
+    },
+    "male": {
+      "path": "source/male-sheet-magenta.png",
+      "sha256": "eabf70cb6a9f5ce629571e15b3f63684e9ab0b4ed3678b93cf1ac137c2ab02c5"
+    }
+  },
+  "promotionBlockers": [
+    "native_composite_review",
+    "independent_visual_review",
+    "explicit_user_approval"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "project_id": "blumi-onboarding-intro",
+  "version": "v6-smooth",
+  "created_at": "2026-08-29",
+  "runtime_contract": {
+    "canvas": "256x384 RGBA",
+    "frame_count": 17,
+    "frame_duration_ms": 72,
+    "loop_duration_ms": 1224,
+    "center_x": 130,
+    "bottoms": [360, 360, 360, 360, 357, 352, 346, 350, 354, 357, 360, 360, 360, 357, 352, 346, 354],
+    "direction": "right",
+    "role": "chaser"
+  },
+  "asset_manifest": [
+    { "asset_id": "blumi-run-male-v6-f01", "status": "approved", "file_path": "blumi_intro_run_male_f01.png", "sha256": "8f805c978241ecc552bd449f5cf5952c039866bc39308e07d7d388c5b3ab7896" },
+    { "asset_id": "blumi-run-male-v6-f02", "status": "approved", "file_path": "blumi_intro_run_male_f02.png", "sha256": "ba5c1c4de45461741139be97a7b3171973b9c320885e962703b1b3b5c979efd3" },
+    { "asset_id": "blumi-run-male-v6-f03", "status": "approved", "file_path": "blumi_intro_run_male_f03.png", "sha256": "8d8f141e952875756bacdb92564969e3c4bf100d05af5e05de91ecd70fc973f5" },
+    { "asset_id": "blumi-run-male-v6-f04", "status": "approved", "file_path": "blumi_intro_run_male_f04.png", "sha256": "63b9a0e0f3ff11447b652d6f0b6f9f432585fc461021530be1706de05bcb0c8d" },
+    { "asset_id": "blumi-run-male-v6-f05", "status": "approved", "file_path": "blumi_intro_run_male_f05.png", "sha256": "bfd2640067fa8e55c60429506fc2bc6cf6a74b38d44611ecbc181be90d997f4d" },
+    { "asset_id": "blumi-run-male-v6-f06", "status": "approved", "file_path": "blumi_intro_run_male_f06.png", "sha256": "b0aca62c2872b3d95d0e54eaaf4310834cab38cfa22a4ff8d836aa77b34ab137" },
+    { "asset_id": "blumi-run-male-v6-f07", "status": "approved", "file_path": "blumi_intro_run_male_f07.png", "sha256": "83d56a8a4a3960d6aad4fb0b8d06ff81232b56e1d26726ae4d128791d1dcd600" },
+    { "asset_id": "blumi-run-male-v6-f08", "status": "approved", "file_path": "blumi_intro_run_male_f08.png", "sha256": "17e2d12c8faea755529f640ee6d2abd4d721e2a7d262acb14f597348a901da21" },
+    { "asset_id": "blumi-run-male-v6-f09", "status": "approved", "file_path": "blumi_intro_run_male_f09.png", "sha256": "1bc17ee3445222c439f7702af79ddb171d392759f11fef013445140b731252b4" },
+    { "asset_id": "blumi-run-male-v6-f10", "status": "approved", "file_path": "blumi_intro_run_male_f10.png", "sha256": "dbbc4e85fb8669d8676b9c694aca593b5fa1239580d14d6be6e9a67e61bf7804" },
+    { "asset_id": "blumi-run-male-v6-f11", "status": "approved", "file_path": "blumi_intro_run_male_f11.png", "sha256": "a416fb77f5d66f449b2cba04f2ea82c8e68a566b23c15f0561a9e917152ee591" },
+    { "asset_id": "blumi-run-male-v6-f12", "status": "approved", "file_path": "blumi_intro_run_male_f12.png", "sha256": "2170f8b00e80662b5c45e93bfda5505034e65d6e241e88e14b70ab4ae8196dac" },
+    { "asset_id": "blumi-run-male-v6-f13", "status": "approved", "file_path": "blumi_intro_run_male_f13.png", "sha256": "45b8405f8e552d89e366160f1b961218e5673ed7016fa69e447a7b2885c3e87f" },
+    { "asset_id": "blumi-run-male-v6-f14", "status": "approved", "file_path": "blumi_intro_run_male_f14.png", "sha256": "90c9c839a765f783e0c80687a0253ed62e7dafb3c07de3033b8a480a3e3b2f1e" },
+    { "asset_id": "blumi-run-male-v6-f15", "status": "approved", "file_path": "blumi_intro_run_male_f15.png", "sha256": "cc2ad86382eb0db667c00def6700a51d451de38cb1910b8a697f32b4798843c8" },
+    { "asset_id": "blumi-run-male-v6-f16", "status": "approved", "file_path": "blumi_intro_run_male_f16.png", "sha256": "c436158216f3c66583c6e6e5d921ca31ea513b5d6b264c01f84e5551f8949de3" },
+    { "asset_id": "blumi-run-male-v6-f17", "status": "approved", "file_path": "blumi_intro_run_male_f17.png", "sha256": "dbea970afb28f3917907f48e83222f37ce9001fd3dc7309b305d289489a5d238" }
+  ],
+  "continuity_bible": {
+    "character_id": "blumi-male-onboarding-v1",
+    "invariants": [
+      "locked male identity and clothing",
+      "five real midpoint poses only at measured high-motion transitions",
+      "constant travel speed and chase gap",
+      "registered center and interpolated foot baseline",
+      "immediate landing-to-run handoff"
+    ],
+    "rejected_variants": [
+      "generated 21-cell sheet",
+      "generated repeated-phase 24-cell sheet",
+      "optical-flow magenta artifact sequence"
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE blumi_notification_preferences ADD COLUMN quiet_hours_time_zone TEXT;

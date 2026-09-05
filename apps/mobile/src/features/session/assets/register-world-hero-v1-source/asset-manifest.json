@@ -1,0 +1,19 @@
+{
+  "id": "blumi_register_world_hero_v1",
+  "generator": "built-in-imagegen",
+  "sourceFile": "blumi_register_world_hero_v1_raw.png",
+  "sourceSha256": "d58d391a812b5754e692d6cf3962a11abdfacf4c951195aaa11bf010526c91a4",
+  "sourceDimensions": "1597x985",
+  "runtimeDimensions": "1024x632",
+  "runtimeFormat": "PNG RGBA",
+  "promptSummary": "One premium Blumi couple hero: the established woman and man sit together holding hands on a compact blush miniature world with a tiny home and restrained star details. The composition is landscape, complete, centered, and designed for native transform motion rather than sprite-frame playback.",
+  "runtimeMotion": "One immutable illustration; native-driver translate and sub-degree rotate only. No scale animation, frame swapping, crossfade, or generated clip seam.",
+  "avoid": [
+    "sprite sheet",
+    "cropping",
+    "extra characters",
+    "identity or outfit drift",
+    "plastic 3D render",
+    "text or UI chrome"
+  ]
+}

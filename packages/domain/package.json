@@ -1,0 +1,27 @@
+{
+  "name": "@blumi/domain",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure business rules for the mobile MVP",
+  "main": "./dist/index.js",
+  "react-native": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test dist/avatar/avatarLoadoutRules.test.js dist/economy/universalCoreRoomEconomy.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "Blumi",
+  "license": "ISC",
+  "dependencies": {
+    "@blumi/contracts": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~6.0.3"
+  },
+  "files": [
+    "src",
+    "dist"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v3",
+  "status": "candidate",
+  "runtimePromoted": false,
+  "userApproved": false,
+  "independentReviewApproved": false,
+  "createdAtUtc": "2026-08-27T13:30:00Z",
+  "tool": {
+    "provider": "OpenAI",
+    "toolName": "image_gen",
+    "model": "not_provided",
+    "requestIds": [
+      "call_sSknm4lUctos0nyqqdPIIiIp",
+      "call_cbEJz7eTymCniSD1i5MAWLEb"
+    ]
+  },
+  "lockedReferences": [
+    {
+      "assetId": "blumi-intro-wave-female-f01",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_female_f01.png",
+      "sha256": "27f61bf6c68ccb784bc71506393e6d4ec13e046237cae1cd0c26fffb311ee9b1"
+    },
+    {
+      "assetId": "blumi-intro-wave-male-f01",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_male_f01.png",
+      "sha256": "3fede846f137efc6655c5a29b176daa8e671daf2fb7c604e298e9e5d78a0645a"
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "blumi-profile-twirling-female-v3",
+      "path": "blumi_profile_twirling_female_atlas_v3_final.png",
+      "sha256": "25bf08d397a79b5c9f7082aaff43c9703c3f08a66f07ac2fc1db852cc83404b2",
+      "dimensions": "1024x768",
+      "frameGrid": "4x2",
+      "frameCanvas": "256x384",
+      "frameCount": 8,
+      "frameRateHint": "10-12 fps one-shot",
+      "footAnchor": "[128,372]",
+      "promptId": "blumi-profile-twirling-female-v3"
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v3",
+      "path": "blumi_profile_collar_male_atlas_v3_final.png",
+      "sha256": "0ef1da0a9f2288ef9208521a210cc245189f204dfa67ffd116d0ea371f7b3582",
+      "dimensions": "1024x768",
+      "frameGrid": "4x2",
+      "frameCanvas": "256x384",
+      "frameCount": 8,
+      "frameRateHint": "10-12 fps one-shot",
+      "footAnchor": "[128,372]",
+      "promptId": "blumi-profile-collar-male-v3"
+    }
+  ],
+  "qaBlockers": [
+    "Native iPhone 17 Pro Max visual review",
+    "Independent identity and alpha or baseline review",
+    "Explicit user approval"
+  ]
+}

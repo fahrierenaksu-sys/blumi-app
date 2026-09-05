@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "blumi-room-v3-candidate-asset-v1",
+  "id": "cocoa_navy_dining_table_a",
+  "name": "Cocoa Navy Oval Dining Table A",
+  "collectionId": "cocoa_navy_modern_studio",
+  "homeTheme": "cocoa_navy_modern_studio",
+  "category": "dining_table",
+  "sourceStatus": "candidate",
+  "qaStatus": "blocked_pending_runtime_promotion",
+  "runtimeReady": false,
+  "promotionEligible": false,
+  "assetsByRotation": {
+    "front": "cocoa_dining_table_a_front_runtime_v2.png",
+    "back": "cocoa_dining_table_a_back_runtime_v2.png",
+    "left": "cocoa_dining_table_a_left_runtime_v2.png",
+    "right": "cocoa_dining_table_a_right_runtime_v2.png"
+  },
+  "canvasByRotation": {
+    "front": { "width": 1719, "height": 1000 },
+    "back": { "width": 1710, "height": 1000 },
+    "left": { "width": 1123, "height": 1000 },
+    "right": { "width": 1135, "height": 1000 }
+  },
+  "anchor": { "x": 0.5, "y": 0.976, "convention": "bottom_center_normalized" },
+  "anchorByRotation": {
+    "front": { "x": 0.5, "y": 0.976 },
+    "back": { "x": 0.5, "y": 0.976 },
+    "left": { "x": 0.5, "y": 0.976 },
+    "right": { "x": 0.5, "y": 0.976 },
+    "convention": "explicit_rotation_anchor_after_common_floor_contact_normalization"
+  },
+  "footprint": {
+    "width": 0.3,
+    "height": 0.18,
+    "blocksMovement": true,
+    "rotationAware": true,
+    "byRotation": {
+      "front": { "width": 0.3, "height": 0.18 },
+      "back": { "width": 0.3, "height": 0.18 },
+      "left": { "width": 0.18, "height": 0.3 },
+      "right": { "width": 0.18, "height": 0.3 }
+    }
+  },
+  "interaction": { "interactionType": "none", "capacity": 0, "seatSpec": null, "needsRuntimeFitReview": true },
+  "placement": {
+    "surface": "floor",
+    "rule": "free_floor",
+    "tabletopSupport": {
+      "surface": "tabletop",
+      "localBounds": { "minX": 0.16, "maxX": 0.84, "minY": 0.18, "maxY": 0.4 }
+    }
+  },
+  "review": {
+    "transparentCorners": true,
+    "duplicateRotationHashes": false,
+    "independentReviewStatus": "PASS_EVIDENCE_ONLY_WITH_RUNTIME_HOLD",
+    "reviewer": "/root/room_integration_test_plan",
+    "reviewedAssetVersion": "pilot_v1_and_runtime_v2",
+    "rotationContactSheet": "docs/room-v3-qa/2026-07-20-cocoa-pilot-wave/cocoa_runtime_pilot_rotation_sheet.jpg",
+    "reviewNotes": [
+      "Independent visual review passed: clean alpha, readable oval top, physically distinct front/back/side details, and consistent grounding.",
+      "Front/back detail readability and dominant width must be checked in My Room and match composites.",
+      "Room V2 scale, tabletop support, collision, depth, and Simulator evidence remain required before promotion."
+    ]
+  },
+  "sha256ByRotation": {
+    "front": "d5c92ec2dd2c18bc692e97d9cf4351691e52ac247f28b8c17240f0c6d44c2b07",
+    "back": "c41ce677b0d16b7f5e253fec7e85153244a86110df3914d28e7306837be90125",
+    "left": "2ab1718fc35d699be48a85074ae1f6d968cc9f3aebac966602d3ac2b7f52ac5f",
+    "right": "d147987ce71f5f7fc1686d667d07bd6dd6b6592eccc206b2f662158267c3d2f1"
+  },
+  "alphaBoundsByRotation": {
+    "front": { "minX": 24, "minY": 24, "maxXInclusive": 1694, "maxYInclusive": 975 },
+    "back": { "minX": 24, "minY": 24, "maxXInclusive": 1685, "maxYInclusive": 975 },
+    "left": { "minX": 24, "minY": 24, "maxXInclusive": 1098, "maxYInclusive": 975 },
+    "right": { "minX": 24, "minY": 24, "maxXInclusive": 1110, "maxYInclusive": 975 }
+  }
+}

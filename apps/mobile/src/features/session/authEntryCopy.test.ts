@@ -1,0 +1,50 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { getAuthEntryCopy } from "./authEntryCopy"
+
+test("auth entry copy gives Turkish users a coherent sign-in journey", () => {
+  const copy = getAuthEntryCopy("tr")
+
+  assert.equal(copy.welcomeBack, "Tekrar hoş geldin.")
+  assert.equal(copy.identityStartsHere, "Kimliğin burada başlıyor")
+  assert.equal(copy.createAccount, "Hesap oluştur")
+  assert.equal(copy.alreadyHaveAccount, "Zaten hesabım var")
+  assert.equal(copy.sendCode, "Kod gönder")
+  assert.equal(copy.openPrivacyPolicy, "Gizlilik Politikasını aç")
+  assert.equal(copy.introGreeting, "Selam, biz Blumi!")
+  assert.equal(copy.worldPopulationValue, "8.000.000.000+")
+  assert.match(copy.worldPopulationAccessibilityLabel, /8 milyardan fazla insan/i)
+  assert.equal(copy.whoa, "Whoa!")
+  assert.equal(copy.letsGetStarted, "Hadi başlayalım.")
+  assert.equal(copy.skipWorldAnimation, "Animasyonu atla")
+  assert.equal(copy.registerHeroTitle, "Blumi profilini oluştur.")
+  assert.match(copy.registerHeroMessage, /Dünyan kaybolmasın/i)
+  assert.match(copy.registrationProgressLabel(2, 4), /2\. adımı/)
+  assert.match(copy.worldArrivalAccessibilityLabel, /dünyaya iniş/i)
+  assert.match(copy.worldSceneAccessibilityLabel, /dönen dünyanın üzerinde koşuyor/i)
+  assert.match(copy.phonePrivacy, /başka kişilere gösterilmez/i)
+  assert.match(copy.termsConsent, /Kullanım Koşulları/i)
+  assert.match(copy.termsConsent, /Gizlilik Politikası.*kabul/i)
+})
+
+test("auth entry copy retains a clear English journey", () => {
+  const copy = getAuthEntryCopy("en")
+
+  assert.equal(copy.welcomeBack, "Welcome back.")
+  assert.equal(copy.identityStartsHere, "Your identity starts here")
+  assert.equal(copy.createAccount, "Create account")
+  assert.equal(copy.sendCode, "Send code")
+  assert.equal(copy.openTerms, "Open Terms of Service")
+  assert.equal(copy.introGreeting, "Hey, I’m Blumi!")
+  assert.equal(copy.worldPopulationValue, "8,000,000,000+")
+  assert.match(copy.worldPopulationAccessibilityLabel, /8 billion people/i)
+  assert.equal(copy.whoa, "Whoa!")
+  assert.equal(copy.letsGetStarted, "Let’s get started.")
+  assert.equal(copy.skipWorldAnimation, "Skip animation")
+  assert.equal(copy.registerHeroTitle, "Create your Blumi profile.")
+  assert.match(copy.registerHeroMessage, /Keep your world close/i)
+  assert.match(copy.registrationProgressLabel(2, 4), /step 2 of 4/i)
+  assert.match(copy.worldArrivalAccessibilityLabel, /lands on the world/i)
+  assert.match(copy.termsConsent, /Terms of Service/i)
+  assert.match(copy.termsConsent, /Privacy Policy/i)
+})

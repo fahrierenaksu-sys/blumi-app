@@ -1,0 +1,23 @@
+{
+  "name": "@blumi/realtime-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime client boundary for the mobile MVP",
+  "main": "./src/index.ts",
+  "react-native": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "Blumi",
+  "license": "ISC",
+  "dependencies": {
+    "@blumi/contracts": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  },
+  "files": [
+    "src"
+  ]
+}

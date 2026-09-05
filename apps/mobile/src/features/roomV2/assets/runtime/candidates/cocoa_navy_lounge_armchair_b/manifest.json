@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "blumi-room-v3-candidate-asset-v1",
+  "id": "cocoa_navy_lounge_armchair_b",
+  "name": "Cocoa Navy Frame Lounge Armchair",
+  "collectionId": "cocoa_navy_modern_studio",
+  "homeTheme": "male_collection_a",
+  "category": "lounge_armchair",
+  "sourceStatus": "candidate",
+  "qaStatus": "blocked_pending_runtime_promotion",
+  "runtimeReady": false,
+  "promotionEligible": false,
+  "assetsByRotation": {
+    "front": "cocoa_navy_lounge_armchair_b_front_runtime_v2.png",
+    "back": "cocoa_navy_lounge_armchair_b_back_runtime_v2.png",
+    "left": "cocoa_navy_lounge_armchair_b_left_runtime_v2.png",
+    "right": "cocoa_navy_lounge_armchair_b_right_runtime_v2.png"
+  },
+  "canvas": {
+    "width": 1254,
+    "height": 1254,
+    "alphaCorners": true
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 0.874,
+    "convention": "bottom_center_normalized"
+  },
+  "anchorByRotation": {
+    "front": { "x": 0.5, "y": 0.874 },
+    "back": { "x": 0.5, "y": 0.874 },
+    "left": { "x": 0.5, "y": 0.874 },
+    "right": { "x": 0.5, "y": 0.874 },
+    "convention": "explicit_rotation_anchor_after_common_floor_contact_normalization"
+  },
+  "footprint": {
+    "width": 0.24,
+    "height": 0.16,
+    "blocksMovement": true,
+    "rotationAware": true
+  },
+  "floorContactByRotation": {
+    "front": 1102,
+    "back": 1102,
+    "left": 1102,
+    "right": 1102,
+    "convention": "opaque_max_y_inclusive_pixels_after_v2_normalization"
+  },
+  "interaction": {
+    "interactionType": "seat",
+    "capacity": 1,
+    "seatSpec": {
+      "capacity": 1,
+      "seatPoints": [
+        {
+          "id": "primary",
+          "x": 0,
+          "y": -0.34,
+          "seatHeight": 0.09,
+          "facing": "front",
+          "approachPoint": { "x": 0, "y": 0.29 },
+          "exitPoint": { "x": 0, "y": 0.34 }
+        }
+      ]
+    },
+    "needsRuntimeFitReview": true
+  },
+  "review": {
+    "transparentCorners": true,
+    "duplicateRotationHashes": false,
+    "independentReviewStatus": "PASS_EVIDENCE_ONLY_WITH_RUNTIME_HOLD",
+    "independentReviewer": "/root/room_integration_test_plan",
+    "reviewedAssetVersion": "v2",
+    "rotationContactSheet": "tmp/imagegen/cocoa_navy_lounge_armchair_b_contact_sheet_v2.png",
+    "reviewNotes": [
+      "Four genuinely different directional renders generated from one canonical design.",
+      "v2 derivatives normalize the opaque floor contact to y=1102 across all rotations without mirroring or cropping.",
+      "Independent review found no P0; the historical evidence-path drift was corrected and the single-anchor contact risk was removed by v2 normalization.",
+      "Back silhouette remains slightly shorter than front/side views; live Room V2 fit review is still required.",
+      "Seat height, avatar fit, collision, depth and sitting metadata still require Room V2 runtime QA.",
+      "This candidate is not imported into the production or Universal Core catalog yet."
+    ]
+  },
+  "sha256ByRotation": {
+    "front": "d67c1f60a7572cea3196cecab7a6d28c8640584e85e35acdef441bdb5055ebf2",
+    "back": "d95462f1bbcdeaa0a193db2fbac2434603c674467a41d3e658f5ebe1edebcd1c",
+    "left": "e7cb59b8652e91117a76a40dd76c33dcdf7a7e5e7d440777a93cf484b3ce422c",
+    "right": "392ad727fb6789ca89b125ec98dceb0b794fe005cb23b5eb0bb53e79de501d93"
+  }
+}

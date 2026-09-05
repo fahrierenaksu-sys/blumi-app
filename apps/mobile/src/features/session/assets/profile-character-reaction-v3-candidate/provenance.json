@@ -1,0 +1,62 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v3",
+  "status": "candidate",
+  "continuityBible": {
+    "femaleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-candidate/blumi_intro_wave_female_f01.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same brown curly hair and pink bow",
+        "same white top with pink trim and tiny chest bow",
+        "same blue denim shorts",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    },
+    "maleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-candidate/blumi_intro_wave_male_f01.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same dark layered hair",
+        "same sky-blue t-shirt",
+        "same navy trousers",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    }
+  },
+  "generation": [
+    {
+      "assetId": "blumi-profile-twirling-female-v3",
+      "promptId": "blumi-profile-twirling-female-v3",
+      "requestId": "call_sSknm4lUctos0nyqqdPIIiIp",
+      "sourcePrompt": "Create a clean 4x2 full-body sprite atlas for the exact same Blumi girl from the reference image, preserving exact face geometry, hairstyle volume, outfit colors, and feet baseline while showing one smooth in-place selection reaction that reads as a cute twirl and cheerful settle."
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v3",
+      "promptId": "blumi-profile-collar-male-v3",
+      "requestId": "call_cbEJz7eTymCniSD1i5MAWLEb",
+      "sourcePrompt": "Create a clean 4x2 full-body sprite atlas for the exact same Blumi boy from the reference image, preserving exact face geometry, hairstyle shape, outfit colors, and feet baseline while showing one smooth in-place selection reaction that reads as a cool collar-clean gesture and confident settle."
+    }
+  ],
+  "postProcess": [
+    "sheet snapped to nearest centered 4x2 grid when the generator output is off by a few pixels",
+    "edge checker pixels keyed to alpha",
+    "largest connected component kept per frame to remove detached hallucinated islands",
+    "cell-normalized into 256x384 frame canvases",
+    "feet aligned to shared visible baseline y=372",
+    "candidate only; no production promotion"
+  ],
+  "sources": [
+    {
+      "assetId": "blumi-profile-twirling-female-v3-raw",
+      "path": "source/blumi_profile_twirling_female_atlas_v3_raw.png",
+      "sha256": "d4446f250da51a5e9f8be2a24b4868a7702c9ff97d2b2c35dd8575674be05194"
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v3-raw",
+      "path": "source/blumi_profile_collar_male_atlas_v3_raw.png",
+      "sha256": "ef3ac8cdf5c966780f68602127e6d78d2e0501d91babfa87940dc98b251d410f"
+    }
+  ]
+}

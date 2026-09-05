@@ -1,0 +1,45 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v4",
+  "status": "candidate",
+  "continuityBible": {
+    "femaleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-candidate/blumi_intro_wave_female_f03.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same brown wavy hair and pink bow",
+        "same cream top with pink trim",
+        "same blue denim shorts",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    },
+    "maleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-candidate/blumi_intro_wave_male_f03.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same dark layered hair",
+        "same sky-blue t-shirt",
+        "same navy trousers",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    }
+  },
+  "generation": [
+    {
+      "assetId": "blumi-profile-twirling-female-v4",
+      "promptIntent": "16-frame gentle in-place twirl with exact canonical female identity and 4x4 atlas"
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v4",
+      "promptIntent": "16-frame natural collar-adjusting selection reaction with exact canonical male identity and 4x4 atlas"
+    }
+  ],
+  "postProcess": [
+    "Pillow RGBA normalization",
+    "low-alpha fringe removal",
+    "fixed 256x384 frame canvas",
+    "feet baseline y=372",
+    "candidate QA only"
+  ]
+}

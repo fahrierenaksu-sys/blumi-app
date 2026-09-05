@@ -1,0 +1,130 @@
+{
+  "version": "v7-normalized",
+  "master": "female-v3-runtime",
+  "source": "onboarding-runners-v4-runtime",
+  "normalized_visible_height": 258,
+  "normalized_center_x": 130,
+  "normalized_bottom": 360,
+  "frames": [
+    {
+      "frame": 1,
+      "source_bounds": {
+        "minX": 49,
+        "minY": 105,
+        "maxX": 203,
+        "maxY": 360,
+        "width": 155,
+        "height": 256
+      },
+      "scale": 1.0078125,
+      "target": {
+        "width": 156,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 52,
+        "top": 103
+      }
+    },
+    {
+      "frame": 2,
+      "source_bounds": {
+        "minX": 54,
+        "minY": 98,
+        "maxX": 212,
+        "maxY": 360,
+        "width": 159,
+        "height": 263
+      },
+      "scale": 0.9809885931558935,
+      "target": {
+        "width": 156,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 52,
+        "top": 103
+      }
+    },
+    {
+      "frame": 3,
+      "source_bounds": {
+        "minX": 47,
+        "minY": 101,
+        "maxX": 205,
+        "maxY": 360,
+        "width": 159,
+        "height": 260
+      },
+      "scale": 0.9923076923076923,
+      "target": {
+        "width": 158,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 51,
+        "top": 103
+      }
+    },
+    {
+      "frame": 4,
+      "source_bounds": {
+        "minX": 60,
+        "minY": 113,
+        "maxX": 203,
+        "maxY": 360,
+        "width": 144,
+        "height": 248
+      },
+      "scale": 1.0403225806451613,
+      "target": {
+        "width": 150,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 55,
+        "top": 103
+      }
+    },
+    {
+      "frame": 5,
+      "source_bounds": {
+        "minX": 58,
+        "minY": 102,
+        "maxX": 209,
+        "maxY": 360,
+        "width": 152,
+        "height": 259
+      },
+      "scale": 0.9961389961389961,
+      "target": {
+        "width": 152,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 54,
+        "top": 103
+      }
+    },
+    {
+      "frame": 6,
+      "source_bounds": {
+        "minX": 60,
+        "minY": 104,
+        "maxX": 202,
+        "maxY": 360,
+        "width": 143,
+        "height": 257
+      },
+      "scale": 1.0038910505836576,
+      "target": {
+        "width": 144,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 58,
+        "top": 103
+      }
+    }
+  ]
+}

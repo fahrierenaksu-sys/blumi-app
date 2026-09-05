@@ -1,0 +1,58 @@
+{
+  "assetId": "blumi-onboarding-arrival-v3",
+  "status": "candidate",
+  "runtimePromoted": false,
+  "userApproved": false,
+  "createdAt": "2026-08-25",
+  "parent": "onboarding-arrival-v2-candidate",
+  "useCase": "world impact, forward somersault, landing and run handoff",
+  "generation": {
+    "tool": "OpenAI image generation",
+    "model": "not_provided",
+    "seed": null,
+    "referenceAssets": [
+      "onboarding-wave-v3-runtime/blumi_intro_wave_female_f01.png",
+      "onboarding-wave-v3-runtime/blumi_intro_wave_male_f01.png",
+      "onboarding-runners-v3-runtime/blumi_intro_run_female_f01.png",
+      "onboarding-runners-v3-runtime/blumi_intro_run_male_f01.png"
+    ],
+    "sourceHashes": {
+      "female": "a053a4286690f91c41135e4d4b8dbdd202ab53f50c7374c52d333aa806508540",
+      "male": "9bfe4ceb44fd600b02d5ac0dee424ec750b8cac29feb3e8aa120dae9ad40e345"
+    }
+  },
+  "packaging": {
+    "script": "apps/mobile/scripts/package_onboarding_arrival_v3.py",
+    "framesPerRole": 30,
+    "frameSize": [256, 384],
+    "format": "RGBA PNG",
+    "runtimeLayout": "single 6x5 atlas per role",
+    "atlasSize": [1536, 1920],
+    "playback": "hard-cut authored sequence",
+    "targetFps": 30,
+    "durationMs": 1000,
+    "runHandoff": {
+      "tailFrames": "23-30",
+      "baselineY": 380,
+      "femaleRunFrame": 4,
+      "maleRunFrame": 1
+    },
+    "outputHashes": {
+      "femaleSequence": "787f41e8f891936ddd78e5ab781c7955dfddd552ca246e40f113e256ab68ef63",
+      "maleSequence": "0de13f1a00be9f8d9b2c6499a9dfa582002366428b7b309a8ff10643fdcb8930",
+      "femaleAtlas": "026c76d2d6960c935d39ca2b53cb12edc9913212b365e714cb63423d2bff26b3",
+      "maleAtlas": "c8ef58238d115867f6b81812c35784d4bb94a396a6b3c6023c05e6348968b76c"
+    }
+  },
+  "continuityInvariants": [
+    "canonical face, hair, clothing and palette remain recognizable",
+    "female and male use distinct body mechanics",
+    "root trajectory is runtime-owned while body orientation is frame-authored",
+    "landing frames hand directly into the existing run cycle"
+  ],
+  "promotionBlockers": [
+    "independent visual review",
+    "native iPhone 17 Pro Max scene composite",
+    "explicit user approval"
+  ]
+}

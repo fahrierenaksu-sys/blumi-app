@@ -1,0 +1,61 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v4",
+  "status": "candidate",
+  "runtimePromoted": false,
+  "userApproved": false,
+  "independentReviewApproved": false,
+  "createdAtUtc": "2026-08-27T00:00:00Z",
+  "tool": {
+    "provider": "OpenAI",
+    "toolName": "image_gen",
+    "model": "not_provided",
+    "generationDirectory": "/Users/evrenevren/.codex/generated_images/01a00000-2bc6-7043-808b-93403cd5581d"
+  },
+  "lockedReferences": [
+    {
+      "assetId": "blumi-intro-wave-female-f03",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_female_f03.png"
+    },
+    {
+      "assetId": "blumi-intro-wave-male-f03",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_male_f03.png"
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "blumi-profile-twirling-female-v4",
+      "path": "blumi_profile_twirling_female_atlas_v4_final.png",
+      "sha256": "fab9949461c4dc2a5534e70294ba7a04556a6ba42aa196d6ee71f0148cdef011",
+      "dimensions": "1024x1536",
+      "frameGrid": "4x4",
+      "frameCanvas": "256x384",
+      "frameCount": 16,
+      "frameRateHint": "8.9-9.3 fps one-shot",
+      "footAnchor": "[128,372]",
+      "sourceGeneration": "exec-917e687b-8062-48be-a538-cf75b9fb1654"
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v4",
+      "path": "blumi_profile_collar_male_atlas_v4_final.png",
+      "sha256": "635b85a05ed87741b8f9e1c013e1266ec147c201ada86218bda2dc00af66d808",
+      "dimensions": "1024x1536",
+      "frameGrid": "4x4",
+      "frameCanvas": "256x384",
+      "frameCount": 16,
+      "frameRateHint": "8.5-8.9 fps one-shot",
+      "footAnchor": "[128,372]",
+      "sourceGeneration": "exec-90756b76-be5e-4a99-a967-2e6b02983d79"
+    }
+  ],
+  "postProcess": [
+    "alpha-safe cell normalization into 4x4 grid",
+    "low-alpha generation halo removal at threshold 16",
+    "feet aligned to shared baseline y=372",
+    "candidate only; no production promotion"
+  ],
+  "qaBlockers": [
+    "Native iPhone 17 Pro Max visual review",
+    "Independent identity, alpha and motion review",
+    "Explicit user approval"
+  ]
+}

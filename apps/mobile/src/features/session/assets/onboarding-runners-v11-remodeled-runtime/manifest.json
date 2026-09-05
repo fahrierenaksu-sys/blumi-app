@@ -1,0 +1,44 @@
+{
+  "version": "v11-remodeled",
+  "identity_reference": "male-v3-candidate-f01",
+  "motion_reference": "female-v3-runtime-six-pose-cycle",
+  "frame_count": 6,
+  "runtime_ticks": 12,
+  "frame_duration_ms": 60,
+  "loop_duration_ms": 720,
+  "normalized_visible_height": 258,
+  "normalized_center_x": 130,
+  "normalized_bottom": 360,
+  "frames": [
+    {
+      "frame": 1,
+      "file": "blumi_intro_run_male_f01.png",
+      "sha256": "f899867226b2733908a1ebde42e298d9f1e0cfd4efd5852337a189d9b3194c22"
+    },
+    {
+      "frame": 2,
+      "file": "blumi_intro_run_male_f02.png",
+      "sha256": "6d0498f125c2c16b2c8b2679aedb8e9bbc1da8f2387ebd1709b6f9058d3b2f19"
+    },
+    {
+      "frame": 3,
+      "file": "blumi_intro_run_male_f03.png",
+      "sha256": "95650a76af998eb6d11e65672dd338d3e2851558d6d02168f1b5fcd97b0b1253"
+    },
+    {
+      "frame": 4,
+      "file": "blumi_intro_run_male_f04.png",
+      "sha256": "3b74a4d0b52bac2787a69a3a56a527d0b627eeda7a380469996e31bbb29473ae"
+    },
+    {
+      "frame": 5,
+      "file": "blumi_intro_run_male_f05.png",
+      "sha256": "e1f6f063804a011e5aee09f14d3fdfa292255074d66631b9873e426d33be495f"
+    },
+    {
+      "frame": 6,
+      "file": "blumi_intro_run_male_f06.png",
+      "sha256": "b46ea771b76cb1d676bbdd27560d9025ca60dea9093fc8dc16a27d94c3d10f9d"
+    }
+  ]
+}

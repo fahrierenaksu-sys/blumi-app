@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "blumi-release-catalog-v1",
+  "catalogId": "blumi-r1-core-catalog",
+  "releaseLine": "r1",
+  "publishedItems": [],
+  "heldScopes": [
+    {
+      "scope": "room-v3-shell-and-furniture-candidates",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^(?:universal_|room_v3_)",
+        "^room_v2_(?:qa_|candidate_)"
+      ]
+    },
+    {
+      "scope": "male-wardrobe-redesign",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^avatar_v2_(?:top|bottom|shoes|hair|accessory)_male_"
+      ]
+    },
+    {
+      "scope": "development-and-qa-flags",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^(?:qa_|dev_|test_)"
+      ]
+    }
+  ],
+  "productionPolicy": {
+    "allowedBuildProfiles": ["preview", "production"],
+    "forbiddenRuntimeFlags": [
+      "EXPO_PUBLIC_BLUMI_ENABLE_DEMO",
+      "EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS",
+      "EXPO_PUBLIC_BLUMI_ROOM_V3_DRAFT_PREVIEW",
+      "EXPO_PUBLIC_BLUMI_UNIVERSAL_CORE_QA",
+      "EXPO_PUBLIC_BLUMI_FOCUS_12_QA",
+      "EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE"
+    ]
+  }
+}

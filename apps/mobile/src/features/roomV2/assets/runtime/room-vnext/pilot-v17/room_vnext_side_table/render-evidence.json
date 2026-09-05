@@ -1,0 +1,261 @@
+{
+  "schemaVersion": "room-vnext-pilot-render-evidence-v1",
+  "status": "candidate_validated",
+  "skuId": "room_vnext_side_table",
+  "assetVersion": 17,
+  "artDirectionVersion": "blumi-room-world-kit-art-direction-v5.2",
+  "cameraRigVersion": "calibration-candidate-v2",
+  "lightRigVersion": "blumi-room-light-rig-v2",
+  "materialLibraryVersion": "blumi-room-materials-v2",
+  "sourceMaster": {
+    "path": "art/room-vnext/pilot-v17-raw/masters/room_vnext_side_table-v17.blend",
+    "assetVersion": 17,
+    "sha256": "79396bf4015968bcf7b6495c4b077e4c949696f549c352477bfcba6d8b3cba36"
+  },
+  "physicalSizeCm": {
+    "width": 46,
+    "depth": 46,
+    "height": 50
+  },
+  "renderClass": "upright",
+  "placementSurface": "floor",
+  "sharedCrop": {
+    "left": 456,
+    "top": 430,
+    "width": 111,
+    "height": 111
+  },
+  "floorPivot": {
+    "x": 0.5045045045045045,
+    "y": 0.7387387387387387
+  },
+  "buildIdentity": {
+    "gitCommit": "58905be8bd6e4f1cf967d2183c0f5422e5b425b4",
+    "candidateBuildId": "pilot-v17-hero-cute-refined"
+  },
+  "producer": "room-vnext-3d-world-kit-producer",
+  "independentReviewer": "pending_independent_visual_review_v5",
+  "supersedes": {
+    "assetVersion": 16,
+    "status": "archived_previous_candidate"
+  },
+  "supersededBy": "pending_final_approval",
+  "directions": {
+    "front": {
+      "rootRotationDegrees": 0,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/front_body.png",
+          "sha256": "d26e7b688ed9c08f81752e5f78806d21e1bedfaf46b2882e3c64d696d1d7967e",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 256,
+            "top": 236,
+            "right": 756,
+            "bottom": 803,
+            "width": 501,
+            "height": 568
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/front_contact_shadow.png",
+          "sha256": "b258c54da56e6a6a180bf84c42364acd397b808375a703ce680952fad84c40ac",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 257,
+            "top": 702,
+            "right": 784,
+            "bottom": 872,
+            "width": 528,
+            "height": 171
+          },
+          "centerX": 0.5200416340296353
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/front_thumbnail.png",
+          "sha256": "675350aa8979c6726f589e8d557052357eca4b3ef48fcd41bc424f86cf5b2032",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 61,
+            "top": 57,
+            "right": 197,
+            "bottom": 221,
+            "width": 137,
+            "height": 165
+          }
+        }
+      }
+    },
+    "right": {
+      "rootRotationDegrees": 90,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/right_body.png",
+          "sha256": "157337e4335412697bd269e057695c4ef53326fd13542dbb6753baf5c0e9ec5c",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 277,
+            "top": 236,
+            "right": 782,
+            "bottom": 807,
+            "width": 506,
+            "height": 572
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/right_contact_shadow.png",
+          "sha256": "f112a7707a83487a9911abb044c429a9d400e8450af2e5e3020b9b76a9ef9be6",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 252,
+            "top": 702,
+            "right": 786,
+            "bottom": 856,
+            "width": 535,
+            "height": 155
+          },
+          "centerX": 0.5054927481770719
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/right_thumbnail.png",
+          "sha256": "9d8e5ef136ff61a6b02b220f5a8f447105b826556e2d5799fa7598e75aed8cee",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 60,
+            "top": 57,
+            "right": 198,
+            "bottom": 218,
+            "width": 139,
+            "height": 162
+          }
+        }
+      }
+    },
+    "back": {
+      "rootRotationDegrees": 180,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/back_body.png",
+          "sha256": "47bbf707bb3989bfb937991be4fc2172e700e7546889c1a1f9e3522d293765a7",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 277,
+            "top": 236,
+            "right": 779,
+            "bottom": 803,
+            "width": 503,
+            "height": 568
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/back_contact_shadow.png",
+          "sha256": "30c1d2d14f8933c850209fbbd8a076277eacd5b3e6da80d384c61c9644172b15",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 258,
+            "top": 702,
+            "right": 785,
+            "bottom": 850,
+            "width": 528,
+            "height": 149
+          },
+          "centerX": 0.5141139920448068
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/back_thumbnail.png",
+          "sha256": "cbae4d06d7d643a4612e943019c0ae040f65e99c02dde0712382729c73f1062f",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 60,
+            "top": 57,
+            "right": 197,
+            "bottom": 216,
+            "width": 138,
+            "height": 160
+          }
+        }
+      }
+    },
+    "left": {
+      "rootRotationDegrees": 270,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/left_body.png",
+          "sha256": "0facf7bb0b58daf61ee7542e59734f9d7ac19e275b86f2a3c4e8a41397e64502",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 254,
+            "top": 236,
+            "right": 756,
+            "bottom": 807,
+            "width": 503,
+            "height": 572
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/left_contact_shadow.png",
+          "sha256": "8cd80a2bd5749876202b318399460c2fb18e85bc5d1deebb7ecddc52111f0bc3",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 253,
+            "top": 702,
+            "right": 785,
+            "bottom": 852,
+            "width": 533,
+            "height": 151
+          },
+          "centerX": 0.5072335616971547
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_side_table/normalized/left_thumbnail.png",
+          "sha256": "5932c7bbb9427b5c313272aac6afdc4d7113b6806214795fcde38acb28994963",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 60,
+            "top": 57,
+            "right": 197,
+            "bottom": 216,
+            "width": 138,
+            "height": 160
+          }
+        }
+      }
+    }
+  }
+}

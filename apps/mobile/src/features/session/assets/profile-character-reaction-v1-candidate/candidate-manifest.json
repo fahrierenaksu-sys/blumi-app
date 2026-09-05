@@ -1,0 +1,55 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v1",
+  "status": "candidate",
+  "runtimePromoted": false,
+  "userApproved": false,
+  "independentReviewApproved": false,
+  "createdAtUtc": "2026-08-27T00:00:00Z",
+  "tool": {
+    "provider": "OpenAI",
+    "toolName": "image_gen",
+    "model": "not_provided",
+    "requestIds": ["not_provided", "not_provided"]
+  },
+  "lockedReferences": [
+    {
+      "assetId": "blumi-intro-wave-female-f01",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_female_f01.png",
+      "sha256": "27f61bf6c68ccb784bc71506393e6d4ec13e046237cae1cd0c26fffb311ee9b1"
+    },
+    {
+      "assetId": "blumi-intro-wave-male-f01",
+      "path": "../onboarding-wave-v3-candidate/blumi_intro_wave_male_f01.png",
+      "sha256": "3fede846f137efc6655c5a29b176daa8e671daf2fb7c604e298e9e5d78a0645a"
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "blumi-profile-twirling-female-v1",
+      "path": "blumi_profile_twirling_female_atlas.png",
+      "sha256": "7356b4fcf3e39f2e798cf8ad27b4ea0d9a465fe33c5e463a6fa570097eb89a86",
+      "dimensions": "1024x768",
+      "frameGrid": "4x2",
+      "frameCanvas": "256x384",
+      "frameCount": 8,
+      "footAnchor": "[128,372]",
+      "promptId": "blumi-profile-twirling-female-v1"
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v1",
+      "path": "blumi_profile_collar_male_atlas.png",
+      "sha256": "3994de558630cb6b6e5b0a9da3f3022783341f9585a8ae389c8fe6e5aaa52b84",
+      "dimensions": "1024x768",
+      "frameGrid": "4x2",
+      "frameCanvas": "256x384",
+      "frameCount": 8,
+      "footAnchor": "[128,372]",
+      "promptId": "blumi-profile-collar-male-v1"
+    }
+  ],
+  "qaBlockers": [
+    "Native iPhone 17 Pro Max visual review",
+    "Independent identity and alpha/baseline review",
+    "Explicit user approval"
+  ]
+}

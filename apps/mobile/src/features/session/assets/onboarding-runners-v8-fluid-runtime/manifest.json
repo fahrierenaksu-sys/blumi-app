@@ -1,0 +1,406 @@
+{
+  "version": "v8-fluid",
+  "master": "female-v3-runtime",
+  "source": "onboarding-runners-v6-smooth-runtime",
+  "frame_count": 17,
+  "frame_durations_ms": [
+    27,
+    51,
+    26,
+    31,
+    50,
+    54,
+    45,
+    67,
+    42,
+    54,
+    43,
+    34,
+    41,
+    29,
+    30,
+    52,
+    44
+  ],
+  "loop_duration_ms": 720,
+  "normalized_visible_height": 258,
+  "normalized_center_x": 130,
+  "normalized_bottom": 360,
+  "alpha_transition": "hard-cut",
+  "frames": [
+    {
+      "frame": 1,
+      "file": "blumi_intro_run_male_f01.png",
+      "sha256": "12c2158f9194b2d704efbbe067fc36cc520f9f8013af78b11ec2d75a8cc2dc7f",
+      "source_bounds": {
+        "minX": 51,
+        "minY": 103,
+        "maxX": 210,
+        "maxY": 360,
+        "width": 160,
+        "height": 258
+      },
+      "scale": 1,
+      "target": {
+        "width": 160,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 50,
+        "top": 103
+      }
+    },
+    {
+      "frame": 2,
+      "file": "blumi_intro_run_male_f02.png",
+      "sha256": "10cbf61ff1595ada3bfd0fc4fe0f8aa42aa1f042c73c0986b4a98fc78558514c",
+      "source_bounds": {
+        "minX": 55,
+        "minY": 102,
+        "maxX": 204,
+        "maxY": 359,
+        "width": 150,
+        "height": 258
+      },
+      "scale": 1,
+      "target": {
+        "width": 150,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 55,
+        "top": 103
+      }
+    },
+    {
+      "frame": 3,
+      "file": "blumi_intro_run_male_f03.png",
+      "sha256": "b94eaafd847157373a885bb649b2a4597da7a2d9d0e49a5b29155668556020b7",
+      "source_bounds": {
+        "minX": 52,
+        "minY": 104,
+        "maxX": 208,
+        "maxY": 360,
+        "width": 157,
+        "height": 257
+      },
+      "scale": 1.0038910505836576,
+      "target": {
+        "width": 158,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 51,
+        "top": 103
+      }
+    },
+    {
+      "frame": 4,
+      "file": "blumi_intro_run_male_f04.png",
+      "sha256": "0c169f103eeabc7ca3f48d37261764709a33fc23836c51297629a7c74985f277",
+      "source_bounds": {
+        "minX": 53,
+        "minY": 106,
+        "maxX": 207,
+        "maxY": 360,
+        "width": 155,
+        "height": 255
+      },
+      "scale": 1.011764705882353,
+      "target": {
+        "width": 157,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 52,
+        "top": 103
+      }
+    },
+    {
+      "frame": 5,
+      "file": "blumi_intro_run_male_f05.png",
+      "sha256": "c01e33dd2ee361dee3796a1b48c963f53fa6bba54042eb6ca5ea6cac12564dbc",
+      "source_bounds": {
+        "minX": 54,
+        "minY": 107,
+        "maxX": 207,
+        "maxY": 357,
+        "width": 154,
+        "height": 251
+      },
+      "scale": 1.0278884462151394,
+      "target": {
+        "width": 158,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 51,
+        "top": 103
+      }
+    },
+    {
+      "frame": 6,
+      "file": "blumi_intro_run_male_f06.png",
+      "sha256": "9202236dcc850d2108956e9d77683a15052bddd878fe979b0a4c0797808c4641",
+      "source_bounds": {
+        "minX": 52,
+        "minY": 102,
+        "maxX": 207,
+        "maxY": 351,
+        "width": 156,
+        "height": 250
+      },
+      "scale": 1.032,
+      "target": {
+        "width": 161,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 50,
+        "top": 103
+      }
+    },
+    {
+      "frame": 7,
+      "file": "blumi_intro_run_male_f07.png",
+      "sha256": "e9645543851a167baa815d3f9977d00e7620757eb68544929b2228c752f9f80e",
+      "source_bounds": {
+        "minX": 43,
+        "minY": 99,
+        "maxX": 218,
+        "maxY": 346,
+        "width": 176,
+        "height": 248
+      },
+      "scale": 1.0403225806451613,
+      "target": {
+        "width": 183,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 39,
+        "top": 103
+      }
+    },
+    {
+      "frame": 8,
+      "file": "blumi_intro_run_male_f08.png",
+      "sha256": "27b17862ee2334fe5f2846ac4e3501f5b7045da444192fa2af7c8a5bfe092a9c",
+      "source_bounds": {
+        "minX": 49,
+        "minY": 100,
+        "maxX": 210,
+        "maxY": 349,
+        "width": 162,
+        "height": 250
+      },
+      "scale": 1.032,
+      "target": {
+        "width": 167,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 47,
+        "top": 103
+      }
+    },
+    {
+      "frame": 9,
+      "file": "blumi_intro_run_male_f09.png",
+      "sha256": "2d31a5d40a1b18746ae4bbc93a07cf5124ce9be16f70e01f27aff1dbc29bcd0b",
+      "source_bounds": {
+        "minX": 61,
+        "minY": 103,
+        "maxX": 199,
+        "maxY": 354,
+        "width": 139,
+        "height": 252
+      },
+      "scale": 1.0238095238095237,
+      "target": {
+        "width": 142,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 59,
+        "top": 103
+      }
+    },
+    {
+      "frame": 10,
+      "file": "blumi_intro_run_male_f10.png",
+      "sha256": "81a6d49539886a95f2567d90d3cab63ada088ac06f4c0b3c4bbd729f9b65230e",
+      "source_bounds": {
+        "minX": 60,
+        "minY": 106,
+        "maxX": 199,
+        "maxY": 356,
+        "width": 140,
+        "height": 251
+      },
+      "scale": 1.0278884462151394,
+      "target": {
+        "width": 144,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 58,
+        "top": 103
+      }
+    },
+    {
+      "frame": 11,
+      "file": "blumi_intro_run_male_f11.png",
+      "sha256": "7dffed3797d97a989bb57d51cd8d44848dc899173824769ca45746e236b783fa",
+      "source_bounds": {
+        "minX": 50,
+        "minY": 111,
+        "maxX": 210,
+        "maxY": 360,
+        "width": 161,
+        "height": 250
+      },
+      "scale": 1.032,
+      "target": {
+        "width": 166,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 47,
+        "top": 103
+      }
+    },
+    {
+      "frame": 12,
+      "file": "blumi_intro_run_male_f12.png",
+      "sha256": "d215e9b518d75206f653b89a733f234155a1b70fb0bbf04970b7dad51d4a0760",
+      "source_bounds": {
+        "minX": 52,
+        "minY": 108,
+        "maxX": 208,
+        "maxY": 360,
+        "width": 157,
+        "height": 253
+      },
+      "scale": 1.0197628458498025,
+      "target": {
+        "width": 160,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 50,
+        "top": 103
+      }
+    },
+    {
+      "frame": 13,
+      "file": "blumi_intro_run_male_f13.png",
+      "sha256": "01bc1433c612cdfdbea43f21e397fe357b704eecb6234608d65bbc8fe45273ba",
+      "source_bounds": {
+        "minX": 55,
+        "minY": 106,
+        "maxX": 205,
+        "maxY": 360,
+        "width": 151,
+        "height": 255
+      },
+      "scale": 1.011764705882353,
+      "target": {
+        "width": 153,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 54,
+        "top": 103
+      }
+    },
+    {
+      "frame": 14,
+      "file": "blumi_intro_run_male_f14.png",
+      "sha256": "52ba5a105b848563d72ddcf5448e22dd31b054d41ef3a2fc81bfc3395430d59b",
+      "source_bounds": {
+        "minX": 54,
+        "minY": 110,
+        "maxX": 206,
+        "maxY": 357,
+        "width": 153,
+        "height": 248
+      },
+      "scale": 1.0403225806451613,
+      "target": {
+        "width": 159,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 51,
+        "top": 103
+      }
+    },
+    {
+      "frame": 15,
+      "file": "blumi_intro_run_male_f15.png",
+      "sha256": "8c4b96a7adbf69a2626b781ba71ce4afca8e6313343fc04200741c9b0bb22d44",
+      "source_bounds": {
+        "minX": 57,
+        "minY": 102,
+        "maxX": 202,
+        "maxY": 351,
+        "width": 146,
+        "height": 250
+      },
+      "scale": 1.032,
+      "target": {
+        "width": 151,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 55,
+        "top": 103
+      }
+    },
+    {
+      "frame": 16,
+      "file": "blumi_intro_run_male_f16.png",
+      "sha256": "a046bae3997d30e08c054f88e4dbca0a1e71b13c5dbe81706b716e8b19118491",
+      "source_bounds": {
+        "minX": 54,
+        "minY": 95,
+        "maxX": 206,
+        "maxY": 346,
+        "width": 153,
+        "height": 252
+      },
+      "scale": 1.0238095238095237,
+      "target": {
+        "width": 157,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 52,
+        "top": 103
+      }
+    },
+    {
+      "frame": 17,
+      "file": "blumi_intro_run_male_f17.png",
+      "sha256": "4fb2c7126255ca2171595e0cbc578a0906d78b50c78e1b949fe75756c4904c78",
+      "source_bounds": {
+        "minX": 61,
+        "minY": 98,
+        "maxX": 200,
+        "maxY": 354,
+        "width": 140,
+        "height": 257
+      },
+      "scale": 1.0038910505836576,
+      "target": {
+        "width": 141,
+        "height": 258,
+        "centerX": 130,
+        "bottom": 360,
+        "left": 60,
+        "top": 103
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "assetSetId": "blumi-profile-character-reaction-v2",
+  "status": "candidate",
+  "continuityBible": {
+    "femaleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-runtime/blumi_intro_wave_female_f03.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same brown curly hair and pink bow",
+        "same white top with pink trim",
+        "same blue denim shorts",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    },
+    "maleCharacter": {
+      "referenceAsset": "../onboarding-wave-v3-runtime/blumi_intro_wave_male_f03.png",
+      "lockedInvariants": [
+        "same face geometry",
+        "same dark layered hair",
+        "same sky-blue t-shirt",
+        "same navy trousers",
+        "same cream-yellow shoes",
+        "same childlike painterly Blumi illustration language"
+      ]
+    }
+  },
+  "generation": [
+    {
+      "assetId": "blumi-profile-twirling-female-v2",
+      "promptId": "blumi-profile-twirling-female-v2",
+      "requestId": "call_nGL3gBmQudfksafz0oh7Dnor",
+      "sourcePrompt": "Create a 4 by 3 full-body sprite atlas for the exact same canonical Blumi girl, using pure #FF00FF chroma-key background only, showing a smooth in-place twirl selection animation across 12 frames while preserving exact identity, outfit, scale, and feet baseline."
+    },
+    {
+      "assetId": "blumi-profile-collar-male-v2",
+      "promptId": "blumi-profile-collar-male-v2",
+      "requestId": "call_0JFy3nfq96OMrfZ0GSXRCM35",
+      "sourcePrompt": "Create a 4 by 3 full-body sprite atlas for the exact same canonical Blumi boy, using pure #FF00FF chroma-key background only, showing a smooth collar-adjusting confident selection animation across 12 frames while preserving exact identity, outfit, scale, and feet baseline."
+    }
+  ],
+  "postProcess": [
+    "magenta chroma-keyed to alpha",
+    "cell-normalized to 4x3 grid",
+    "rescaled into 256x384 frame canvases",
+    "feet aligned to shared baseline y=380",
+    "candidate only; no production promotion"
+  ]
+}

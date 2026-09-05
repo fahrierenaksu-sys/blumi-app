@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "blumi-room-v3-candidate-asset-v1",
+  "id": "cocoa_navy_dining_table_b",
+  "name": "Cocoa Navy Round Dining Table",
+  "collectionId": "cocoa_navy_modern_studio",
+  "homeTheme": "male_collection_a",
+  "category": "dining_table",
+  "sourceStatus": "candidate",
+  "qaStatus": "blocked_pending_runtime_promotion",
+  "runtimeReady": false,
+  "promotionEligible": false,
+  "assetsByRotation": {
+    "front": "cocoa_navy_dining_table_b_front_runtime_v2.png",
+    "back": "cocoa_navy_dining_table_b_back_runtime_v2.png",
+    "left": "cocoa_navy_dining_table_b_left_runtime_v2.png",
+    "right": "cocoa_navy_dining_table_b_right_runtime_v2.png"
+  },
+  "canvas": {
+    "width": 1402,
+    "height": 1122,
+    "alphaCorners": true
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 0.881,
+    "convention": "bottom_center_normalized"
+  },
+  "anchorByRotation": {
+    "front": { "x": 0.5, "y": 0.881 },
+    "back": { "x": 0.5, "y": 0.881 },
+    "left": { "x": 0.5, "y": 0.881 },
+    "right": { "x": 0.5, "y": 0.881 },
+    "convention": "explicit_rotation_anchor_after_common_floor_contact_normalization"
+  },
+  "footprint": {
+    "width": 0.3,
+    "height": 0.18,
+    "blocksMovement": true,
+    "rotationAware": true,
+    "byRotation": {
+      "front": { "width": 0.3, "height": 0.18 },
+      "back": { "width": 0.3, "height": 0.18 },
+      "left": { "width": 0.18, "height": 0.3 },
+      "right": { "width": 0.18, "height": 0.3 }
+    }
+  },
+  "interaction": {
+    "interactionType": "none",
+    "capacity": 0,
+    "seatSpec": null,
+    "needsRuntimeFitReview": true
+  },
+  "placement": {
+    "surface": "floor",
+    "rule": "free_floor",
+    "tabletopSupport": null
+  },
+  "review": {
+    "transparentCorners": true,
+    "duplicateRotationHashes": false,
+    "independentReviewStatus": "PASS_EVIDENCE_ONLY_WITH_RUNTIME_HOLD",
+    "reviewer": "/root/room_integration_test_plan",
+    "reviewedAssetVersion": "v2",
+    "rotationContactSheet": "tmp/imagegen/cocoa_navy_dining_table_b_contact_sheet_v2.png",
+    "reviewNotes": [
+      "Four genuinely different directional renders generated from one canonical Cocoa Navy design.",
+      "v2 derivatives normalize opaque floor contact to y=988 across all rotations.",
+      "Painterly conversion preserves the cocoa-walnut pedestal and dusty-navy inset tabletop language.",
+      "Independent review: visual asset pass; front/back contrast is subtle at mobile scale and right-side bbox is narrower, so runtime readability and scale remain held.",
+      "Runtime scale, collision, depth and Room V2 placement still require independent review."
+    ]
+  },
+  "sha256ByRotation": {
+    "front": "115c11cdad6e9e4d4015b1551ddcdcd93c5139b2d335dec504c8fce504ed26c8",
+    "back": "0b7fbc8635adff0efe6db308e5ec26254f5c7938b4eaaf1519f34704c5110cf6",
+    "left": "d48601454f188b8b67381bef013be3ea8642c2ded97dc1030761936adb0db018",
+    "right": "3ff1a6e663fea8ea1ff5f7b3e6a425d42091bd77fdc340dfa7e1dcc20252287b"
+  },
+  "alphaBoundsByRotation": {
+    "front": { "minX": 189, "minY": 135, "maxXInclusive": 1208, "maxYInclusive": 988 },
+    "back": { "minX": 190, "minY": 167, "maxXInclusive": 1200, "maxYInclusive": 988 },
+    "left": { "minX": 181, "minY": 129, "maxXInclusive": 1219, "maxYInclusive": 988 },
+    "right": { "minX": 222, "minY": 162, "maxXInclusive": 1179, "maxYInclusive": 988 }
+  }
+}

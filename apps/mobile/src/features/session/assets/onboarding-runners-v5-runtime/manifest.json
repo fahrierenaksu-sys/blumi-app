@@ -1,0 +1,73 @@
+{
+  "project_id": "blumi-onboarding-intro",
+  "version": "v5",
+  "created_at": "2026-08-29",
+  "runtime_contract": {
+    "canvas": "256x384 RGBA",
+    "frame_count": 12,
+    "frame_duration_ms": 84,
+    "loop_duration_ms": 1008,
+    "center_x": 130,
+    "bottoms": [360, 360, 360, 357, 346, 354, 360, 360, 360, 357, 346, 354],
+    "direction": "right",
+    "role": "chaser"
+  },
+  "asset_manifest": [
+    { "asset_id": "blumi-run-male-v5-f01", "status": "approved", "file_path": "blumi_intro_run_male_f01.png", "sha256": "8f805c978241ecc552bd449f5cf5952c039866bc39308e07d7d388c5b3ab7896" },
+    { "asset_id": "blumi-run-male-v5-f02", "status": "approved", "file_path": "blumi_intro_run_male_f02.png", "sha256": "8d8f141e952875756bacdb92564969e3c4bf100d05af5e05de91ecd70fc973f5" },
+    { "asset_id": "blumi-run-male-v5-f03", "status": "approved", "file_path": "blumi_intro_run_male_f03.png", "sha256": "63b9a0e0f3ff11447b652d6f0b6f9f432585fc461021530be1706de05bcb0c8d" },
+    { "asset_id": "blumi-run-male-v5-f04", "status": "approved", "file_path": "blumi_intro_run_male_f04.png", "sha256": "bfd2640067fa8e55c60429506fc2bc6cf6a74b38d44611ecbc181be90d997f4d" },
+    { "asset_id": "blumi-run-male-v5-f05", "status": "approved", "file_path": "blumi_intro_run_male_f05.png", "sha256": "83d56a8a4a3960d6aad4fb0b8d06ff81232b56e1d26726ae4d128791d1dcd600" },
+    { "asset_id": "blumi-run-male-v5-f06", "status": "approved", "file_path": "blumi_intro_run_male_f06.png", "sha256": "1bc17ee3445222c439f7702af79ddb171d392759f11fef013445140b731252b4" },
+    { "asset_id": "blumi-run-male-v5-f07", "status": "approved", "file_path": "blumi_intro_run_male_f07.png", "sha256": "a416fb77f5d66f449b2cba04f2ea82c8e68a566b23c15f0561a9e917152ee591" },
+    { "asset_id": "blumi-run-male-v5-f08", "status": "approved", "file_path": "blumi_intro_run_male_f08.png", "sha256": "2170f8b00e80662b5c45e93bfda5505034e65d6e241e88e14b70ab4ae8196dac" },
+    { "asset_id": "blumi-run-male-v5-f09", "status": "approved", "file_path": "blumi_intro_run_male_f09.png", "sha256": "45b8405f8e552d89e366160f1b961218e5673ed7016fa69e447a7b2885c3e87f" },
+    { "asset_id": "blumi-run-male-v5-f10", "status": "approved", "file_path": "blumi_intro_run_male_f10.png", "sha256": "90c9c839a765f783e0c80687a0253ed62e7dafb3c07de3033b8a480a3e3b2f1e" },
+    { "asset_id": "blumi-run-male-v5-f11", "status": "approved", "file_path": "blumi_intro_run_male_f11.png", "sha256": "c436158216f3c66583c6e6e5d921ca31ea513b5d6b264c01f84e5551f8949de3" },
+    { "asset_id": "blumi-run-male-v5-f12", "status": "approved", "file_path": "blumi_intro_run_male_f12.png", "sha256": "dbea970afb28f3917907f48e83222f37ce9001fd3dc7309b305d289489a5d238" }
+  ],
+  "source_reference_ledger": [
+    {
+      "source_id": "blumi-run-male-v5-source-sheet-v2",
+      "origin": "generated-in-project",
+      "file_path": "../../../../../artifacts/onboarding-intro-v5/source/blumi-male-run-12-source-v2.png",
+      "sha256": "c9cb46da26d970d31a36838ca13d9ae9d3f2bf5705c4df7964b9e9337d996c5a",
+      "tool": "built-in image generation",
+      "model": "not_provided",
+      "seed": "not_provided",
+      "references": ["male-v4-runtime", "female-v3-runtime"],
+      "prompt_id": "blumi-run-male-v5-alternating-gait-v2"
+    },
+    {
+      "source_id": "blumi-run-male-interpolation-v1",
+      "status": "rejected",
+      "reason": "optical-flow ghost limbs and alpha trails"
+    },
+    {
+      "source_id": "blumi-run-male-generated-v1",
+      "status": "rejected",
+      "reason": "baked checkerboard and repeated gait poses"
+    }
+  ],
+  "continuity_bible": {
+    "character_id": "blumi-male-onboarding-v1",
+    "locked_references": ["male-v4-runtime", "female-v3-runtime-motion-master"],
+    "invariants": [
+      "dark brown side-swept hair",
+      "light blue T-shirt",
+      "navy trousers",
+      "cream sneakers",
+      "right-facing relaxed chase",
+      "stable head and torso volume",
+      "shared travel tempo with female leader and a calmer 1008 ms male pose cycle",
+      "registered 256x384 canvas and globe-surface axis"
+    ],
+    "forbidden_variations": [
+      "sprint cadence",
+      "duplicate or ghost limbs",
+      "horizontal seams",
+      "frame-local scale drift",
+      "delay between landing and first run pose"
+    ]
+  }
+}

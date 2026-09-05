@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "frameDurationMs": 120,
+  "walkingStates": [
+    "walking_front_f01",
+    "walking_front_f02",
+    "walking_front_f03",
+    "walking_front_f04"
+  ],
+  "sittingState": "sitting_front_f01",
+  "quarantinedFemaleItemIds": [
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2",
+    "room_avatar_top_female_cream_knit_v2",
+    "room_avatar_bottom_female_denim_straight_v2"
+  ],
+  "pantsOverShoeUpperIds": [
+    "room_avatar_bottom_female_black_palm_embellished_pants_v2",
+    "room_avatar_bottom_female_coral_embellished_laceup_pants_v2",
+    "room_avatar_bottom_female_smoky_floral_mesh_pants_v2",
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2",
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2"
+  ]
+}

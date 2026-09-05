@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "blumi-room-v3-candidate-asset-v1",
+  "id": "cocoa_navy_lounge_armchair_a",
+  "name": "Cocoa Navy Frame Lounge Armchair A",
+  "collectionId": "cocoa_navy_modern_studio",
+  "homeTheme": "cocoa_navy_modern_studio",
+  "category": "lounge_armchair",
+  "sourceStatus": "candidate",
+  "qaStatus": "blocked_pending_runtime_promotion",
+  "runtimeReady": false,
+  "promotionEligible": false,
+  "assetsByRotation": {
+    "front": "cocoa_lounge_armchair_b_front_runtime_v1.png",
+    "back": "cocoa_lounge_armchair_b_back_runtime_v1.png",
+    "left": "cocoa_lounge_armchair_b_left_runtime_v1.png",
+    "right": "cocoa_lounge_armchair_b_right_runtime_v1.png"
+  },
+  "canvasByRotation": {
+    "front": { "width": 1081, "height": 1000 },
+    "back": { "width": 1172, "height": 1000 },
+    "left": { "width": 994, "height": 1000 },
+    "right": { "width": 889, "height": 1000 }
+  },
+  "anchor": { "x": 0.5, "y": 0.976, "convention": "bottom_center_normalized" },
+  "anchorByRotation": {
+    "front": { "x": 0.5, "y": 0.976 },
+    "back": { "x": 0.5, "y": 0.976 },
+    "left": { "x": 0.5, "y": 0.976 },
+    "right": { "x": 0.5, "y": 0.976 },
+    "convention": "explicit_rotation_anchor_after_common_floor_contact_normalization"
+  },
+  "footprint": {
+    "width": 0.15,
+    "height": 0.1,
+    "blocksMovement": true,
+    "rotationAware": true,
+    "byRotation": {
+      "front": { "width": 0.15, "height": 0.1 },
+      "back": { "width": 0.15, "height": 0.1 },
+      "left": { "width": 0.1, "height": 0.15 },
+      "right": { "width": 0.1, "height": 0.15 }
+    }
+  },
+  "interaction": {
+    "interactionType": "seat",
+    "capacity": 1,
+    "seatSpec": {
+      "seatPoints": [
+        {
+          "id": "primary",
+          "x": 0,
+          "y": -0.34,
+          "seatHeight": 0.09,
+          "facing": "front",
+          "approachPoint": { "x": 0, "y": 0.29 },
+          "exitPoint": { "x": 0, "y": 0.34 }
+        }
+      ]
+    },
+    "needsRuntimeFitReview": true
+  },
+  "placement": { "surface": "floor", "rule": "free_floor", "tabletopSupport": null },
+  "review": {
+    "transparentCorners": true,
+    "duplicateRotationHashes": false,
+    "independentReviewStatus": "PASS_EVIDENCE_ONLY_WITH_RUNTIME_HOLD",
+    "reviewer": "/root/lounge_asset_review_retry",
+    "reviewedAssetVersion": "historical_pilot_v1_and_runtime_v1",
+    "rotationContactSheet": "docs/room-v3-qa/2026-07-16-cocoa-pilot-furniture/evidence.md",
+    "reviewNotes": [
+      "Historical independent visual review found four genuine directions and a suitable rounded Cocoa lounge silhouette.",
+      "This manifest promotes the visual candidate into the Cocoa Navy A slot only as an evidence-bound candidate; the older folder name is preserved for provenance.",
+      "Avatar fit, collision, depth, sitting, persistence, and Simulator evidence remain required before promotion."
+    ]
+  },
+  "sha256ByRotation": {
+    "front": "e74941bf49cb81537e72666c311ca32b5f1b58c95ba956861a90689332af331a",
+    "back": "242ed72e47a4c77aefcbb05128b7eeb7bb2dc30f2e1eca9eab5edff4d218d0c9",
+    "left": "b9a19d784eb0f1ae38b173b8a9dd554ac3ca5ba2ad7c54c626651fd4a83a3aa4",
+    "right": "ce6d1fc616fbc519d8cfebeefb5a3b48cc50ce691d37c2b772912dcddfd6b50e"
+  },
+  "alphaBoundsByRotation": {
+    "front": { "minX": 24, "minY": 24, "maxXInclusive": 1056, "maxYInclusive": 975 },
+    "back": { "minX": 24, "minY": 24, "maxXInclusive": 1147, "maxYInclusive": 975 },
+    "left": { "minX": 24, "minY": 24, "maxXInclusive": 969, "maxYInclusive": 975 },
+    "right": { "minX": 24, "minY": 24, "maxXInclusive": 864, "maxYInclusive": 975 }
+  }
+}

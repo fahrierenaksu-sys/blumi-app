@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "room-vnext-pilot-render-evidence-v1",
+  "status": "candidate_validated",
+  "skuId": "room_vnext_lounge_chair",
+  "assetVersion": 17,
+  "artDirectionVersion": "blumi-room-world-kit-art-direction-v5.2",
+  "cameraRigVersion": "calibration-candidate-v2",
+  "lightRigVersion": "blumi-room-light-rig-v2",
+  "materialLibraryVersion": "blumi-room-materials-v2",
+  "sourceMaster": {
+    "path": "art/room-vnext/pilot-v17-raw/masters/room_vnext_lounge_chair-v17.blend",
+    "assetVersion": 17,
+    "sha256": "5163c93053a49903c73e1a4a3a7d1c90be3dba3bed128f3e71a61fb59d3013a5"
+  },
+  "physicalSizeCm": {
+    "width": 82,
+    "depth": 80,
+    "height": 92
+  },
+  "renderClass": "upright",
+  "placementSurface": "floor",
+  "sharedCrop": {
+    "left": 426,
+    "top": 384,
+    "width": 170,
+    "height": 170
+  },
+  "floorPivot": {
+    "x": 0.5058823529411764,
+    "y": 0.7529411764705882
+  },
+  "buildIdentity": {
+    "gitCommit": "58905be8bd6e4f1cf967d2183c0f5422e5b425b4",
+    "candidateBuildId": "pilot-v17-hero-cute-refined"
+  },
+  "producer": "room-vnext-3d-world-kit-producer",
+  "independentReviewer": "pending_independent_visual_review_v5",
+  "supersedes": {
+    "assetVersion": 16,
+    "status": "archived_previous_candidate"
+  },
+  "supersededBy": "pending_final_approval",
+  "directions": {
+    "front": {
+      "rootRotationDegrees": 0,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/front_body.png",
+          "sha256": "ef7060b09b0da5ccf8408308dcae85529cfa836500d836db61666c83f1d41513",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 208,
+            "top": 157,
+            "right": 826,
+            "bottom": 882,
+            "width": 619,
+            "height": 726
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/front_contact_shadow.png",
+          "sha256": "84fdf6cc8c05e89602a987124ad0a0bb115ae3f34ceaddb7fbb7fd8a4f4c85fc",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 198,
+            "top": 701,
+            "right": 849,
+            "bottom": 905,
+            "width": 652,
+            "height": 205
+          },
+          "centerX": 0.49875473778371315
+        },
+        "foregroundOcclusion": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/front_foreground_occlusion.png",
+          "sha256": "da698c352cc7d0aed76ca7a804d18f7c33dad6ebeea7ea28cdf4b03f89f63c11",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 208,
+            "top": 631,
+            "right": 543,
+            "bottom": 850,
+            "width": 336,
+            "height": 220
+          }
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/front_thumbnail.png",
+          "sha256": "4cdb9ae79467be1a4b2db4c1588f4afa50a3aea94ebbae179ab41132f549ab57",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 45,
+            "top": 37,
+            "right": 214,
+            "bottom": 228,
+            "width": 170,
+            "height": 192
+          }
+        }
+      }
+    },
+    "right": {
+      "rootRotationDegrees": 90,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/right_body.png",
+          "sha256": "02fe718457edae40050020f2ecaf7baaf55113b926fb36bfc5f8c30e36db582f",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 214,
+            "top": 154,
+            "right": 831,
+            "bottom": 882,
+            "width": 618,
+            "height": 729
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/right_contact_shadow.png",
+          "sha256": "bbe709ece94e31008ddf3b0298fff909f89f9dfeae68faa2c849074e42258c92",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 195,
+            "top": 700,
+            "right": 843,
+            "bottom": 908,
+            "width": 649,
+            "height": 209
+          },
+          "centerX": 0.5113953441625816
+        },
+        "foregroundOcclusion": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/right_foreground_occlusion.png",
+          "sha256": "9ca61b6bca88de6e2605dc0b8c1e42009a62a20358938fd23f8af0161c912665",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 511,
+            "top": 624,
+            "right": 831,
+            "bottom": 850,
+            "width": 321,
+            "height": 227
+          }
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/right_thumbnail.png",
+          "sha256": "0295b56961b6b4d21c61401986a2112383987c170a45fe04a2e1e68f97abc55b",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 45,
+            "top": 36,
+            "right": 214,
+            "bottom": 229,
+            "width": 170,
+            "height": 194
+          }
+        }
+      }
+    },
+    "back": {
+      "rootRotationDegrees": 180,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/back_body.png",
+          "sha256": "89e05e0edf79e7c9820c72a3a2708d6c7fa1ad9dc5390aa794cd3bd07a2ca72f",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 211,
+            "top": 199,
+            "right": 828,
+            "bottom": 832,
+            "width": 618,
+            "height": 634
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/back_contact_shadow.png",
+          "sha256": "a4ffa3fe295f0ff93be2b656cb4e22bdaa357f12abd27e7389896ded0a9c67ed",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 199,
+            "top": 709,
+            "right": 848,
+            "bottom": 902,
+            "width": 650,
+            "height": 194
+          },
+          "centerX": 0.5143184680401462
+        },
+        "foregroundOcclusion": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/back_foreground_occlusion.png",
+          "sha256": "ac814e025463d5971b7472e54109bd73a60288ab07fca456b8c4992f3d18e489",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 493,
+            "top": 499,
+            "right": 828,
+            "bottom": 717,
+            "width": 336,
+            "height": 219
+          }
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/back_thumbnail.png",
+          "sha256": "b036a84ae60797c84ed7835890e5943e050816a557c9cbb71b823b147558f646",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 45,
+            "top": 47,
+            "right": 214,
+            "bottom": 226,
+            "width": 170,
+            "height": 180
+          }
+        }
+      }
+    },
+    "left": {
+      "rootRotationDegrees": 270,
+      "layers": {
+        "body": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/left_body.png",
+          "sha256": "5873dc9d9940f485767b44cbab61bc84b5570f382b70cc521fdc656ab3650058",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 206,
+            "top": 194,
+            "right": 822,
+            "bottom": 831,
+            "width": 617,
+            "height": 638
+          }
+        },
+        "contactShadow": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/left_contact_shadow.png",
+          "sha256": "093d12ad2109f97f35a45a921d1b8ecc8164b770aade78fae139aff956d929c4",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 195,
+            "top": 709,
+            "right": 847,
+            "bottom": 906,
+            "width": 653,
+            "height": 198
+          },
+          "centerX": 0.5013721578813144
+        },
+        "foregroundOcclusion": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/left_foreground_occlusion.png",
+          "sha256": "cf63cdeb539c8c2a73af30a9e1ce1f57a235a798c58c73d3bcf3e6b4a93a0512",
+          "canvas": {
+            "width": 1024,
+            "height": 1024
+          },
+          "alphaBounds": {
+            "left": 206,
+            "top": 499,
+            "right": 525,
+            "bottom": 724,
+            "width": 320,
+            "height": 226
+          }
+        },
+        "thumbnail": {
+          "path": "/Users/evrenevren/blumiv2/art/room-vnext/pilot-v17-refined-final/room_vnext_lounge_chair/normalized/left_thumbnail.png",
+          "sha256": "14bf97cd0351f3239ebbb9194d7fdd196d34a3d339fd79bd66eb797790c8676f",
+          "canvas": {
+            "width": 256,
+            "height": 256
+          },
+          "alphaBounds": {
+            "left": 45,
+            "top": 46,
+            "right": 214,
+            "bottom": 227,
+            "width": 170,
+            "height": 182
+          }
+        }
+      }
+    }
+  }
+}

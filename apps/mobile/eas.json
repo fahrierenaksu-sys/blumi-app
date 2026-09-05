@@ -1,0 +1,46 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "node": "22.22.2",
+      "distribution": "internal",
+      "env": {
+        "EAS_BUILD_PROFILE": "development",
+        "EXPO_PUBLIC_BLUMI_BUILD_PROFILE": "development",
+        "EXPO_PUBLIC_BLUMI_MEDIA_MODE": "demo",
+        "EXPO_PUBLIC_BLUMI_ENABLE_DEMO": "1",
+        "EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS": "0"
+      }
+    },
+    "preview": {
+      "node": "22.22.2",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EAS_BUILD_PROFILE": "preview",
+        "EXPO_PUBLIC_BLUMI_BUILD_PROFILE": "preview",
+        "EXPO_PUBLIC_BLUMI_MEDIA_MODE": "native",
+        "EXPO_PUBLIC_BLUMI_ENABLE_DEMO": "0",
+        "EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS": "0"
+      }
+    },
+    "production": {
+      "node": "22.22.2",
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EAS_BUILD_PROFILE": "production",
+        "EXPO_PUBLIC_BLUMI_BUILD_PROFILE": "production",
+        "EXPO_PUBLIC_BLUMI_MEDIA_MODE": "native",
+        "EXPO_PUBLIC_BLUMI_ENABLE_DEMO": "0",
+        "EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS": "0"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

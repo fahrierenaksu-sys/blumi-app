@@ -1,47 +1,49 @@
 {
-  "name": "blumi-sdk54",
-  "main": "expo-router/entry",
+  "name": "blumi",
   "version": "1.0.0",
-  "scripts": {
-    "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
+  "private": true,
+  "engines": {
+    "node": ">=22.22.2 <23"
   },
-  "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
-    "@react-navigation/bottom-tabs": "^7.4.0",
-    "@react-navigation/elements": "^2.6.3",
-    "@react-navigation/native": "^7.1.8",
-    "expo": "~54.0.36",
-    "expo-constants": "~18.0.13",
-    "expo-font": "~14.0.12",
-    "expo-haptics": "~15.0.8",
-    "expo-image": "~3.0.11",
-    "expo-linking": "~8.0.12",
-    "expo-router": "~6.0.24",
-    "expo-splash-screen": "~31.0.13",
-    "expo-status-bar": "~3.0.9",
-    "expo-symbols": "~1.0.8",
-    "expo-system-ui": "~6.0.9",
-    "expo-web-browser": "~15.0.11",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-gesture-handler": "~2.28.0",
-    "react-native-worklets": "0.5.1",
-    "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-web": "~0.21.0"
+  "workspaces": [
+    "apps/mobile",
+    "apps/server",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "patch-package --error-on-fail",
+    "verify:source-hygiene": "node --test scripts/security/source-hygiene.test.mjs scripts/security/navigation-dependency.test.mjs scripts/security/legal-preflight.test.mjs apps/mobile/scripts/sentry-debug-plugin.test.mjs",
+    "verify:postgres": "node scripts/security/postgres-gate.mjs",
+    "start": "npm run dev:mobile",
+    "dev:mobile": "npm --workspace @blumi/mobile run start",
+    "dev:server": "node --env-file-if-exists=.env.local --import tsx apps/server/src/index.ts",
+    "server:qa": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.qa.local --import tsx apps/server/src/index.ts",
+    "db:migrate": "node --env-file-if-exists=.env.local --import tsx apps/server/src/db/migrate.ts",
+    "build:packages": "npm --workspace @blumi/contracts run build && npm --workspace @blumi/domain run build && npm --workspace @blumi/realtime-client run build",
+    "typecheck": "npm --workspaces --if-present run typecheck",
+    "lint": "npm --workspace @blumi/mobile run lint",
+    "doctor": "expo-doctor apps/mobile",
+    "test": "npm --workspaces --if-present run test",
+    "audit:release": "node scripts/security/run-audit.mjs",
+    "verify": "npm run verify:source-hygiene && node --test scripts/security/audit-policy.test.mjs && npm run build:packages && npm run typecheck && npm run lint && npm run test && npm run verify:postgres && npm run audit:release && npm run doctor",
+    "clean-clone:verify": "npm ci && npm run verify"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "typescript": "~5.9.2",
-    "eslint": "^9.25.0",
-    "eslint-config-expo": "~10.0.0"
+    "@types/node": "^24.10.1",
+    "expo-doctor": "^1.18.2",
+    "patch-package": "8.0.1",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.3"
   },
-  "private": true
+  "overrides": {
+    "@react-navigation/core": {
+      "query-string": "9.5.1"
+    },
+    "@expo/metro-config": {
+      "postcss": "8.5.26"
+    },
+    "xcode": {
+      "uuid": "11.1.1"
+    }
+  }
 }

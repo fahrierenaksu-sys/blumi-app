@@ -1,0 +1,268 @@
+{
+  "version": "v9-natural",
+  "recovered_from": "onboarding-runners-v8-fluid-runtime",
+  "geometry_source": "v8 manifest source_bounds recorded from v6-smooth-runtime",
+  "frame_count": 17,
+  "frame_durations_ms": [
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72,
+    72
+  ],
+  "loop_duration_ms": 1224,
+  "natural_bottoms": [
+    360,
+    359,
+    360,
+    360,
+    357,
+    351,
+    346,
+    349,
+    354,
+    356,
+    360,
+    360,
+    360,
+    357,
+    351,
+    346,
+    354
+  ],
+  "frames": [
+    {
+      "frame": 1,
+      "file": "blumi_intro_run_male_f01.png",
+      "sha256": "f9459069f7bf1bc23de8ce4cb1f4877314634fd6560faa55952dceaec67be12b",
+      "natural_bounds": {
+        "minX": 51,
+        "minY": 103,
+        "maxX": 210,
+        "maxY": 360,
+        "width": 160,
+        "height": 258
+      }
+    },
+    {
+      "frame": 2,
+      "file": "blumi_intro_run_male_f02.png",
+      "sha256": "d3a308ef524056f9443b605bc57b39d7ed43e653fa1f9a139898ad84bb9048b6",
+      "natural_bounds": {
+        "minX": 55,
+        "minY": 102,
+        "maxX": 204,
+        "maxY": 359,
+        "width": 150,
+        "height": 258
+      }
+    },
+    {
+      "frame": 3,
+      "file": "blumi_intro_run_male_f03.png",
+      "sha256": "43557d82b9f3052cbd8cd9e6935ad751aee8627ff5602831b0950b22150a36b1",
+      "natural_bounds": {
+        "minX": 52,
+        "minY": 104,
+        "maxX": 208,
+        "maxY": 360,
+        "width": 157,
+        "height": 257
+      }
+    },
+    {
+      "frame": 4,
+      "file": "blumi_intro_run_male_f04.png",
+      "sha256": "ca7d0a6ee4592e776450646d21d45e54a62f88204806dc9258132156408cb806",
+      "natural_bounds": {
+        "minX": 53,
+        "minY": 106,
+        "maxX": 207,
+        "maxY": 360,
+        "width": 155,
+        "height": 255
+      }
+    },
+    {
+      "frame": 5,
+      "file": "blumi_intro_run_male_f05.png",
+      "sha256": "b4e8cc1cfdd6230c3d775c49f87f240169125d6dc611a7c8c03c0f70a5eb892b",
+      "natural_bounds": {
+        "minX": 54,
+        "minY": 107,
+        "maxX": 207,
+        "maxY": 357,
+        "width": 154,
+        "height": 251
+      }
+    },
+    {
+      "frame": 6,
+      "file": "blumi_intro_run_male_f06.png",
+      "sha256": "eb74cda528c4dece07977c829f7313f2e23532b8c921bf647fd3991ff1d308dc",
+      "natural_bounds": {
+        "minX": 52,
+        "minY": 102,
+        "maxX": 207,
+        "maxY": 351,
+        "width": 156,
+        "height": 250
+      }
+    },
+    {
+      "frame": 7,
+      "file": "blumi_intro_run_male_f07.png",
+      "sha256": "87896ca2adc5d9036e9808fdc402d20289c4f4b86f98baf1bb48f6ab1c86bbaf",
+      "natural_bounds": {
+        "minX": 43,
+        "minY": 99,
+        "maxX": 218,
+        "maxY": 346,
+        "width": 176,
+        "height": 248
+      }
+    },
+    {
+      "frame": 8,
+      "file": "blumi_intro_run_male_f08.png",
+      "sha256": "14150ae64f828202fbf8895813fccbfb9112b53fd1d17f81b2ed279708924678",
+      "natural_bounds": {
+        "minX": 49,
+        "minY": 100,
+        "maxX": 210,
+        "maxY": 349,
+        "width": 162,
+        "height": 250
+      }
+    },
+    {
+      "frame": 9,
+      "file": "blumi_intro_run_male_f09.png",
+      "sha256": "eee6370abd0aef7519f0776cebf2ed1a68e2cf09aed5c8d890f39f5fc111cae5",
+      "natural_bounds": {
+        "minX": 61,
+        "minY": 103,
+        "maxX": 199,
+        "maxY": 354,
+        "width": 139,
+        "height": 252
+      }
+    },
+    {
+      "frame": 10,
+      "file": "blumi_intro_run_male_f10.png",
+      "sha256": "806178d06942102df0deb9601790d4489e8e7e69e8ec6110d01facde37a80071",
+      "natural_bounds": {
+        "minX": 60,
+        "minY": 106,
+        "maxX": 199,
+        "maxY": 356,
+        "width": 140,
+        "height": 251
+      }
+    },
+    {
+      "frame": 11,
+      "file": "blumi_intro_run_male_f11.png",
+      "sha256": "fb677be06a1b831e3a7ece4b6e1c6f8d80484fb79d9205cfb0afe11e1770c198",
+      "natural_bounds": {
+        "minX": 50,
+        "minY": 111,
+        "maxX": 210,
+        "maxY": 360,
+        "width": 161,
+        "height": 250
+      }
+    },
+    {
+      "frame": 12,
+      "file": "blumi_intro_run_male_f12.png",
+      "sha256": "a6ac81bbad885b55124e92fc03258cb8c71ba8b3a3b9778463daeacb518ebf57",
+      "natural_bounds": {
+        "minX": 52,
+        "minY": 108,
+        "maxX": 208,
+        "maxY": 360,
+        "width": 157,
+        "height": 253
+      }
+    },
+    {
+      "frame": 13,
+      "file": "blumi_intro_run_male_f13.png",
+      "sha256": "b59ede9e02c43525e6dc516bf34a9eef8c49d81773c8ed5b6fc78b171fc8783f",
+      "natural_bounds": {
+        "minX": 55,
+        "minY": 106,
+        "maxX": 205,
+        "maxY": 360,
+        "width": 151,
+        "height": 255
+      }
+    },
+    {
+      "frame": 14,
+      "file": "blumi_intro_run_male_f14.png",
+      "sha256": "728fbdac23455d1e4c3cd0d3f990e2091a23fb81d62fa431699e734799de6b3d",
+      "natural_bounds": {
+        "minX": 54,
+        "minY": 110,
+        "maxX": 206,
+        "maxY": 357,
+        "width": 153,
+        "height": 248
+      }
+    },
+    {
+      "frame": 15,
+      "file": "blumi_intro_run_male_f15.png",
+      "sha256": "0f1aae7b9be4f7928c21cdd25011bbf549048d45ff7d1f8110f5e1e25d6ecc5d",
+      "natural_bounds": {
+        "minX": 57,
+        "minY": 102,
+        "maxX": 202,
+        "maxY": 351,
+        "width": 146,
+        "height": 250
+      }
+    },
+    {
+      "frame": 16,
+      "file": "blumi_intro_run_male_f16.png",
+      "sha256": "a3c231ec57b3d17fbbb3a66d7c8ebce9f1911a8e8239320c614a03be2fc8d20d",
+      "natural_bounds": {
+        "minX": 54,
+        "minY": 95,
+        "maxX": 206,
+        "maxY": 346,
+        "width": 153,
+        "height": 252
+      }
+    },
+    {
+      "frame": 17,
+      "file": "blumi_intro_run_male_f17.png",
+      "sha256": "6aea6d4e22c3effcb1fba01bca19ea7298057556d6c637bf7e8f650e3acb76c2",
+      "natural_bounds": {
+        "minX": 61,
+        "minY": 98,
+        "maxX": 200,
+        "maxY": 354,
+        "width": 140,
+        "height": 257
+      }
+    }
+  ]
+}

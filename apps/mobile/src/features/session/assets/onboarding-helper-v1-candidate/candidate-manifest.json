@@ -1,0 +1,23 @@
+{
+  "blockingReason": "Female edge spill repair, identity continuity review, native motion evidence, independent review and explicit user approval are required before runtime promotion.",
+  "canvas": [
+    256,
+    384
+  ],
+  "contract": "blumi-onboarding-helper-candidate-v1",
+  "frameCountPerRole": 6,
+  "roles": {
+    "female": {
+      "footBaselineY": 360,
+      "frames": 6,
+      "source": "artifacts/onboarding-intro-v4/helper-candidates/female-helper-candidate-v1-alpha.png"
+    },
+    "male": {
+      "footBaselineY": 360,
+      "frames": 6,
+      "source": "artifacts/onboarding-intro-v4/helper-candidates/male-helper-candidate-v2-alpha.png"
+    }
+  },
+  "runtimePromotionAllowed": false,
+  "status": "candidate-only"
+}

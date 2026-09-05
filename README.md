@@ -1,50 +1,61 @@
-# Welcome to your Expo app 👋
+# Blumi
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Blumi'nin Expo SDK 57 mobil uygulamasını, API/realtime sunucusunu ve paylaşılan iş kurallarını içeren bağımsız monorepo.
 
-## Get started
+## Gereksinimler
 
-1. Install dependencies
+- Node.js 22.22.2 (`nvm use`)
+- npm 10+
+- iOS geliştirme için Xcode ve CocoaPods
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Kurulum
 
 ```bash
-npm run reset-project
+npm ci
+cp .env.example .env.local
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Kurulumun tek otoritesi kökteki npm workspace ve package-lock.json dosyasıdır; alt workspace içinde ayrı lockfile üretilmez. Kurulum sonrası sürüme bağlı navigation uyumluluk yaması otomatik uygulanır: query-string 9 ile düzeltilmiş decode-uri-component kullanılır; upstream namespace importları default importa uyarlanır. Yama ve gerçek deep-link regresyonu verify kapısındadır.
 
-## Learn more
+`npm run verify` native build almadan kaynak kontrollerini ve zorunlu, izole PostgreSQL kapısını çalıştırır. PostgreSQL araçları (`initdb`, `pg_ctl`) PATH içinde bulunmalıdır. Kapı kendi geçici, yalnız yerel Unix soketinden erişilen cluster'ını oluşturur; mevcut DATABASE_URL kullanılmaz. Araç/DB eksikliği veya atlanan test başarılı sayılmaz. Test cluster'ı durdurulur ve üretilen veriler silinir; inceleme logları bırakılır. Yalnız bilinçli teşhis için `BLUMI_PG_KEEP_TEST_DATA=1` veriyi korur.
 
-To learn more about developing your project with Expo, look at the following resources:
+Production legal önkoşulları EAS kurulum sonrası, native hazırlıktan önce kontrol edilir; preview kontrolü gerçek legal yayın kanıtının yerine geçmez. Oluşturulmuş Xcode dosyalarının cihaz doğrulaması kaynak testlerinden ayrıdır.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Yerel sunucu varsayılan olarak bellek deposu ve geliştirme sağlayıcılarıyla çalışır; gerçek secret'ları yalnız ignore edilen env dosyalarında veya deployment secret yöneticisinde tutun.
 
-## Join the community
+## Çalıştırma
 
-Join our community of developers creating universal apps.
+Expo Go (telefon testi için varsayılan):
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm start
+```
+
+Bu komut Metro'yu her zaman `apps/mobile` projesinden, LAN'da `8081` portundan başlatır. Temiz Metro önbelleği gerektiğinde `npm --workspace @blumi/mobile run start:clear` kullanılır.
+
+API ve realtime sunucusu ayrı terminalde çalıştırılır:
+
+```bash
+npm run dev:server
+```
+
+iOS development build gerektiğinde:
+
+```bash
+npm --workspace @blumi/mobile run start:dev-client
+```
+
+Native iOS build:
+
+```bash
+cd apps/mobile
+SENTRY_DISABLE_AUTO_UPLOAD=true npm run ios
+```
+
+## Doğrulama
+
+```bash
+npm run verify
+```
+
+Android native doğrulaması bu SDK 57 geçiş fazının kapsamında değildir.

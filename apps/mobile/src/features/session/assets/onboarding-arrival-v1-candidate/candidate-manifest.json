@@ -1,0 +1,24 @@
+{
+  "assetId": "blumi-onboarding-arrival-v1.0",
+  "status": "candidate-only",
+  "runtimePromotionAllowed": false,
+  "roles": ["female", "male"],
+  "frameCountPerRole": 8,
+  "canvas": [256, 384],
+  "layout": "individual-rgba-frames",
+  "anchor": "centered-flight-with-authored-landing-settle",
+  "source": {
+    "tool": "built-in-imagegen",
+    "model": "not_provided",
+    "seed": "not_provided",
+    "femaleMatteSha256": "2e39beabb2c7420ef6b68db3e92fadaa48ef43d36ba5ee0c447a7f1fe880e647",
+    "maleMatteSha256": "50c9d793a4b12286cdb8f78926893c55967228ebd9249172eaa35d2b3042a01f"
+  },
+  "continuityLocks": [
+    "canonical face and hair",
+    "canonical outfit and palette",
+    "female and male use distinct body mechanics",
+    "landing frame hands off to approved run cycle"
+  ],
+  "blockingReason": "Native composite, edge decontamination review, independent visual review and explicit user approval are required before production promotion."
+}
