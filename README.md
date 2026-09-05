@@ -1,6 +1,44 @@
 # Blumi
 
-Blumi'nin Expo SDK 57 mobil uygulamasını, API/realtime sunucusunu ve paylaşılan iş kurallarını içeren bağımsız monorepo.
+### Önce bir merhaba. Sonra birlikte kurduğunuz bir dünya.
+
+Blumi, insanların avatarlarıyla kendilerini ifade ettiği, karşılıklı ilgiyle sohbet başlattığı ve tanışmayı ortak bir odaya taşıyabildiği sosyal bir mobil uygulama.
+
+Fotoğraf merkezli tanışma yerine kişiliğe, sohbete ve birlikte geçirilen zamana alan açıyoruz. Kendine benzeyen bir avatar oluştur, tarzını yansıtan bir oda tasarla ve yeni insanlarla kendi hızında tanış.
+
+## Blumi'de seni neler bekliyor?
+
+- **Kendini yansıtan bir avatar.** Görünümünü, kıyafetlerini ve aksesuarlarını seç; tarzını kendi karakterinle anlat.
+- **Sana ait bir oda.** Mobilyalar ve dekorlarla kişisel alanını oluştur, zamanla kendine göre düzenle.
+- **Yeni insanları keşfet.** Profilleri, ilgi alanlarını ve tercihlerini keşfet; karşılıklı eşleşmeyle sohbete başla.
+- **Birlikte vakit geçirebileceğin bir alan.** Sohbetten oda daveti gönder. Kabul edildiğinde davet sahibinin dekorunu paylaşan ortak bir odada buluş.
+- **İstediğin zaman sesli sohbet.** Ortak odada yazışmaya devam et veya hazır olduğunda isteğe bağlı canlı sesi aç.
+- **Kendi sınırlarını belirle.** Engelleme, bildirme, bildirim tercihleri ve hesap kontrolleriyle deneyimini yönet.
+
+**Avatarını oluştur → İnsanları keşfet → Karşılıklı eşleş → Sohbet et → Ortak odada buluş**
+
+## Geliştirme durumu
+
+Blumi aktif geliştirme ve kapalı test hazırlığı aşamasında. Bu depo mobil uygulamayı, API ve gerçek zamanlı iletişim sunucusunu, ortak veri sözleşmelerini ve iş kurallarını içerir.
+
+| Katman | Teknoloji |
+| --- | --- |
+| Mobil uygulama | Expo SDK 57, React Native, TypeScript |
+| API ve gerçek zamanlı iletişim | Node.js, Fastify, WebSocket |
+| Kalıcı veri | PostgreSQL |
+| Proje yapısı | npm workspaces monorepo |
+
+Gerçek cihaz ve dış servis doğrulamaları geliştirme sürecinin bir parçası olarak sürüyor.
+
+## Depo yapısı
+
+```text
+apps/mobile/             Mobil uygulama ve kullanıcı deneyimi
+apps/server/             API, gerçek zamanlı iletişim ve veri katmanı
+packages/contracts/      Mobil ve sunucu arasında ortak veri sözleşmeleri
+packages/domain/         Paylaşılan iş kuralları
+packages/realtime-client/ Gerçek zamanlı istemci
+```
 
 ## Gereksinimler
 
