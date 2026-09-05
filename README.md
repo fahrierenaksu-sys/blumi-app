@@ -18,6 +18,32 @@ This repository contains the React Native application, backend API, real-time se
 
 [Product experience](#product-experience) · [Engineering highlights](#engineering-highlights) · [Explore the code](#explore-the-code) · [Run locally](#run-locally)
 
+<br />
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <br />
+      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f04.png" width="160" alt="Blumi's smiling female avatar waving hello" />
+      <br /><strong>A little personality.</strong><br />
+      <sub>Your style. Your character.</sub><br /><br />
+    </td>
+    <td align="center" width="34%">
+      <img src="apps/mobile/assets/brand/blumi-app-icon-1024.png" width="80" alt="Blumi app icon" />
+      <br /><br /><strong>Good connections<br />start with a hello.</strong><br /><br />
+      <sub>Express yourself.<br />Meet someone.<br />Make room for a connection.</sub>
+    </td>
+    <td align="center" width="33%">
+      <br />
+      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f04.png" width="160" alt="Blumi's smiling male avatar waving hello" />
+      <br /><strong>A new possibility.</strong><br />
+      <sub>A conversation worth starting.</sub><br /><br />
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Characters from Blumi's onboarding artwork.</sub></p>
+
 <a id="product-experience"></a>
 
 ## ✦ Product experience
