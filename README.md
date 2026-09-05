@@ -1,6 +1,16 @@
-# Blumi
+<p align="center">
+  <img src=".github/assets/blumi-cover.svg" alt="Blumi — Start with a conversation. Build a shared world." width="100%" />
+</p>
 
-**Start with a conversation. Build a shared world.**
+<p align="center">
+  <img src="https://img.shields.io/badge/Expo-SDK_57-49334F?style=flat-square&amp;logo=expo&amp;logoColor=white" alt="Expo SDK 57" />
+  <img src="https://img.shields.io/badge/React_Native-Mobile-8064B1?style=flat-square&amp;logo=react&amp;logoColor=white" alt="React Native" />
+  <img src="https://img.shields.io/badge/TypeScript-Full_Stack-527BA8?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-Persistence-577F8E?style=flat-square&amp;logo=postgresql&amp;logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Stage-Closed_Test_Prep-C66693?style=flat-square" alt="Closed test preparation" />
+</p>
+
+<h1 align="center">Meet through personality. Connect through conversation.</h1>
 
 Blumi is an avatar-first social mobile app combining discovery, mutual matching, messaging, and shared virtual rooms. People can express themselves through a character and a personal space, then connect at their own pace.
 
@@ -8,19 +18,23 @@ This repository contains the React Native application, backend API, real-time se
 
 [Product experience](#product-experience) · [Engineering highlights](#engineering-highlights) · [Explore the code](#explore-the-code) · [Run locally](#run-locally)
 
-## Product experience
+<a id="product-experience"></a>
+
+## ✦ Product experience
 
 **Create an avatar → Discover people → Match → Start a conversation → Meet in a shared room**
 
-- **Personal expression:** customize an avatar with clothing and accessories, and decorate a personal room.
-- **Mutual connections:** explore profiles and interests, with text conversations opening after a mutual match.
-- **Shared spaces:** invite a connection from a chat into a room that captures the host's decor when the invitation is accepted.
-- **Optional live voice:** continue texting or enable live audio in the shared room when ready.
-- **User controls:** manage notification preferences, block or report accounts, and access account export and deletion flows.
+| 🌷 Make it yours | 💬 Find a connection | 🏡 Share a space |
+| :--- | :--- | :--- |
+| Build an avatar with clothing and accessories. Decorate a room that expresses your style. | Discover profiles and interests. Start a text conversation after a mutual match. | Send a room invitation from chat. Meet in a shared copy of the host's decor, with optional live voice. |
+
+**Your pace, your boundaries.** Notification preferences, blocking, reporting, account export, and deletion give users control over their experience.
 
 The product centers on avatars, text, and optional live voice. Photos, video calls, and voice messages are outside the current product scope.
 
-## Engineering highlights
+<a id="engineering-highlights"></a>
+
+## ◈ Engineering highlights
 
 The implementation focuses on keeping user-visible behavior consistent when requests overlap, connections drop, or background jobs retry.
 
@@ -33,7 +47,7 @@ The implementation focuses on keeping user-visible behavior consistent when requ
 | Service lifecycle | Readiness checks, bounded requests, and graceful shutdown coordinate active work with database closure. |
 | Privacy | Generic chat push bodies, telemetry filtering, and streamed account exports reduce unnecessary exposure and memory usage. |
 
-## Technology
+## ⚙ Technology
 
 | Layer | Stack |
 | --- | --- |
@@ -43,7 +57,9 @@ The implementation focuses on keeping user-visible behavior consistent when requ
 | Shared code | TypeScript contracts, domain rules, real-time client |
 | Workspace | npm workspaces with a single root lockfile |
 
-## Explore the code
+<a id="explore-the-code"></a>
+
+## ↗ Explore the code
 
 | Directory | Responsibility |
 | --- | --- |
@@ -62,6 +78,9 @@ For a closer look at behavior under failure and concurrency:
 - [Streaming a 100,000-message account export](apps/server/src/account/accountDataExport.postgres.test.ts)
 
 ## Run locally
+
+<details>
+<summary><strong>Developer setup — requirements, installation, and local commands</strong></summary>
 
 ### Requirements
 
@@ -115,7 +134,9 @@ cd apps/mobile
 SENTRY_DISABLE_AUTO_UPLOAD=true npm run ios
 ```
 
-## Verification
+</details>
+
+## ✓ Verification
 
 ```bash
 npm run verify
