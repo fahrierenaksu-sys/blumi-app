@@ -40,6 +40,7 @@ import {
   ROOM_V2_AVATAR_FIRST_MOTION_SLICE,
   ROOM_V2_AVATAR_FIRST_MOTION_SLICE_REQUIREMENTS
 } from "../../roomV2/roomV2AvatarMotion"
+import { resolveUnifiedRoomAvatarBody } from "./avatarRoomUnifiedBodyAssets"
 
 type RequiredRoomAvatarLayerType =
   Exclude<RoomAvatarLayerType, "accessory">
@@ -205,7 +206,29 @@ export function getRoomAvatarRenderLayers(input: {
   const appearance = resolveRoomAvatarAppearance(input.appearance, catalog)
   const state = input.state ?? "idle"
   const direction = input.direction ?? "front"
+  const unifiedBody = resolveUnifiedRoomAvatarBody(appearance)
   const requiredLayers = REQUIRED_LAYER_TYPES.flatMap((type): ResolvedRoomAvatarLayer[] => {
+    if (unifiedBody && type === "base") {
+      const baseItem = resolveRequiredRoomAvatarItem(
+        "base",
+        appearance.baseId,
+        appearance.bodyPreset,
+        catalog
+      )
+      if (!baseItem) return []
+      return [toResolvedLayer(
+        {
+          ...baseItem,
+          name: unifiedBody.name,
+          asset: unifiedBody.asset,
+          assetsByMotion: unifiedBody.assetsByMotion
+        },
+        state,
+        direction,
+        appearance.bodyPreset
+      )]
+    }
+    if (unifiedBody && type === "face") return []
     const id = getEquippedRoomAvatarIdForType(appearance, type)
     if (!id && OPTIONAL_LAYER_TYPES.has(type)) return []
     const item = resolveRequiredRoomAvatarItem(

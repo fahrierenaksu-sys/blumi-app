@@ -82,7 +82,6 @@ test("new room wardrobe layers resolve dedicated walking and sitting assets at m
 test("the fitted male starter stack resolves walking and sitting without static fallbacks", () => {
   const expectedLayerIds = [
     fittedMaleMotionAppearance.baseId,
-    fittedMaleMotionAppearance.faceId,
     fittedMaleMotionAppearance.shoesId,
     fittedMaleMotionAppearance.bottomId,
     fittedMaleMotionAppearance.topId,
@@ -112,8 +111,8 @@ test("the fitted male starter stack resolves walking and sitting without static 
     assert.ok(
       layers.every((layer) => layer.fitProfileId === "blumi_male_room_avatar_v1")
     )
-    assert.equal(coverage.layerCount, 6)
-    assert.equal(coverage.dedicatedLayerCount, 6)
+    assert.equal(coverage.layerCount, 5)
+    assert.equal(coverage.dedicatedLayerCount, 5)
     assert.equal(coverage.fallbackLayerCount, 0)
     assert.deepEqual(coverage.fallbackLayerIds, [])
     assert.equal(coverage.supportsRequestedMotionExactly, true)
@@ -192,17 +191,17 @@ test("the male walking body and clothes use four-frame motion while head layers 
     )
     assert.equal(new Set(frames?.map((frame) => frame.source)).size, 4)
     frames?.forEach((frame, index) => {
+      const expectedSourceId = animatedId === fittedMaleMotionAppearance.baseId
+        ? "room_avatar_body_surface_male_light_warm_friendly_v1"
+        : animatedId
       assert.match(
         String(frame.source),
-        new RegExp(`${animatedId}_walking_front_f0${index + 1}\\.png$`)
+        new RegExp(`${expectedSourceId}_walking_front_f0${index + 1}\\.png$`)
       )
     })
   }
 
-  for (const anchoredId of [
-    fittedMaleMotionAppearance.faceId,
-    fittedMaleMotionAppearance.hairFrontId
-  ]) {
+  for (const anchoredId of [fittedMaleMotionAppearance.hairFrontId]) {
     const frames = byId.get(anchoredId)?.animation?.frames
     assert.equal(frames?.length, 4, `${anchoredId} anchored four-frame walk`)
     assert.equal(new Set(frames?.map((frame) => frame.key)).size, 4)
@@ -210,7 +209,7 @@ test("the male walking body and clothes use four-frame motion while head layers 
   }
 })
 
-test("the male sitting face and hair keep the same rigid-head source", () => {
+test("the male sitting hair keeps the same rigid-head source", () => {
   const sittingLayers = getRoomAvatarRenderLayers({
     appearance: fittedMaleMotionAppearance,
     state: "sitting",
@@ -218,10 +217,7 @@ test("the male sitting face and hair keep the same rigid-head source", () => {
   })
   const byId = new Map(sittingLayers.map((layer) => [layer.id, layer]))
 
-  for (const anchoredId of [
-    fittedMaleMotionAppearance.faceId,
-    fittedMaleMotionAppearance.hairFrontId
-  ]) {
+  for (const anchoredId of [fittedMaleMotionAppearance.hairFrontId]) {
     const catalogItem = ROOM_AVATAR_CATALOG.find((item) => item.id === anchoredId)
     const sittingLayer = byId.get(anchoredId)
     assert.ok(catalogItem)
@@ -240,8 +236,68 @@ test("the male sitting face and hair keep the same rigid-head source", () => {
     assert.ok(catalogItem)
     assert.equal(sittingLayer?.animation, undefined)
     assert.notEqual(sittingLayer?.asset.source, catalogItem.asset.source)
-    assert.match(String(sittingLayer?.asset.source), new RegExp(`${fittedId}_sitting_front_f01\\.png$`))
+    const expectedSourceId = fittedId === fittedMaleMotionAppearance.baseId
+      ? "room_avatar_body_surface_male_light_warm_friendly_v1"
+      : fittedId
+    assert.match(
+      String(sittingLayer?.asset.source),
+      new RegExp(`${expectedSourceId}_sitting_front_f01\\.png$`)
+    )
   }
+})
+
+test("canonical base and face pairs resolve as one body surface", () => {
+  const maleLayers = getRoomAvatarRenderLayers({ appearance: fittedMaleMotionAppearance })
+  assert.equal(maleLayers.filter((layer) => layer.type === "base").length, 1)
+  assert.equal(maleLayers.some((layer) => layer.type === "face"), false)
+  assert.match(
+    String(maleLayers.find((layer) => layer.type === "base")?.asset.source),
+    /avatar_room_body_surface_male_light_warm_friendly_v1\.png$/
+  )
+
+  const femaleLayers = getRoomAvatarRenderLayers({
+    appearance: {
+      ...DEFAULT_ROOM_AVATAR_FEMALE,
+      faceId: "room_avatar_face_female_warm_peach_foundation_v2"
+    }
+  })
+  assert.equal(femaleLayers.some((layer) => layer.type === "face"), false)
+  assert.match(
+    String(femaleLayers.find((layer) => layer.type === "base")?.asset.source),
+    /avatar_room_body_surface_female_warm_peach_v2\.png$/
+  )
+})
+
+test("an unmapped base and face pair keeps the legacy two-layer fallback", () => {
+  const customCatalog = [
+    {
+      id: "custom-base",
+      type: "base" as const,
+      bodyPreset: "female" as const,
+      name: "Custom Base",
+      layerOrder: ROOM_AVATAR_LAYER_ORDER.base,
+      asset: { key: "custom-base", source: { uri: "custom-base.png" } }
+    },
+    {
+      id: "custom-face",
+      type: "face" as const,
+      bodyPreset: "female" as const,
+      name: "Custom Face",
+      layerOrder: ROOM_AVATAR_LAYER_ORDER.face,
+      asset: { key: "custom-face", source: { uri: "custom-face.png" } }
+    }
+  ]
+  const layers = getRoomAvatarRenderLayers({
+    catalog: customCatalog,
+    appearance: {
+      bodyPreset: "female",
+      baseId: "custom-base",
+      faceId: "custom-face",
+      accessoryIds: []
+    }
+  })
+
+  assert.deepEqual(layers.map((layer) => layer.id), ["custom-base", "custom-face"])
 })
 
 test("premium female hairstyles use their dedicated four-frame walk and sitting art", () => {
@@ -698,7 +754,7 @@ test("a persisted cream and sage male loadout keeps its selected layers", () => 
   assert.deepEqual(appearance.accessoryIds, [])
   assert.deepEqual(unmappedItemIds, [])
   const layers = getRoomAvatarRenderLayers({ appearance })
-  assert.ok(layers.length >= 6)
+  assert.ok(layers.length >= 5)
   assert.ok(layers.every((layer) => layer.fitProfileId === "blumi_male_room_avatar_v1"))
   assert.ok(layers.every((layer) => !layer.id.includes("female")))
 })
