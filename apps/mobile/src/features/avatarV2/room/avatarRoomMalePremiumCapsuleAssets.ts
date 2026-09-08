@@ -152,7 +152,7 @@ export const roomAvatarMalePremiumCapsuleLayerAssets = {
   ),
   soft_textured_crop: asset(
     "avatar_room_hair_front_male_soft_textured_crop_v1",
-    require("../assets/room/avatar_room_hair_front_male_soft_textured_crop_v1.png"),
+    require("../assets/room/avatar_room_hair_front_male_soft_textured_crop_v2.png"),
   ),
   controlled_modern_mullet: asset(
     "avatar_room_hair_front_male_controlled_modern_mullet_v1",
@@ -160,11 +160,11 @@ export const roomAvatarMalePremiumCapsuleLayerAssets = {
   ),
   voluminous_wavy_quiff: asset(
     "avatar_room_hair_front_male_voluminous_wavy_quiff_v1",
-    require("../assets/room/avatar_room_hair_front_male_voluminous_wavy_quiff_v1.png"),
+    require("../assets/room/avatar_room_hair_front_male_voluminous_wavy_quiff_v2.png"),
   ),
   short_twists_textured_style: asset(
     "avatar_room_hair_front_male_short_twists_textured_style_v1",
-    require("../assets/room/avatar_room_hair_front_male_short_twists_textured_style_v1.png"),
+    require("../assets/room/avatar_room_hair_front_male_short_twists_textured_style_v2.png"),
   ),
   copper_compact_quiff: asset(
     "avatar_room_hair_front_male_copper_compact_quiff_v1",
@@ -172,11 +172,11 @@ export const roomAvatarMalePremiumCapsuleLayerAssets = {
   ),
   ash_blond_low_fade_crop: asset(
     "avatar_room_hair_front_male_ash_blond_low_fade_crop_v1",
-    require("../assets/room/avatar_room_hair_front_male_ash_blond_low_fade_crop_v1.png"),
+    require("../assets/room/avatar_room_hair_front_male_ash_blond_low_fade_crop_v2.png"),
   ),
   blue_black_short_curls: asset(
     "avatar_room_hair_front_male_blue_black_short_curls_v1",
-    require("../assets/room/avatar_room_hair_front_male_blue_black_short_curls_v1.png"),
+    require("../assets/room/avatar_room_hair_front_male_blue_black_short_curls_v2.png"),
   ),
   retro_colorblock_runner: asset(
     "avatar_room_shoes_male_retro_colorblock_runner_v1",

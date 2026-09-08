@@ -28,7 +28,7 @@ const expected = {
     accessory: { scale: 4, top: 6 }
   },
   wardrobe: {
-    hair: { scale: 3.2, top: 29 },
+    hair: { scale: 3.2, top: 44.5 },
     top: { scale: 2.7, top: -60 },
     bottom: { scale: 3, top: -116 },
     shoes: { scale: 3, top: -130 },

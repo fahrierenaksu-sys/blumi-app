@@ -31,15 +31,15 @@ const motion = (
 export const roomAvatarMaleCapsuleLayerAssets = {
   hairFrontMaleCocoaTexturedQuiffV1: asset(
     "avatar_room_hair_front_male_cocoa_textured_quiff_v1",
-    require("../assets/room/avatar_room_hair_front_male_cocoa_textured_quiff_v1.png")
+    require("../assets/room/avatar_room_hair_front_male_cocoa_textured_quiff_v2.png")
   ),
   hairFrontMaleSoftBlackSidePartV1: asset(
     "avatar_room_hair_front_male_soft_black_side_part_v1",
-    require("../assets/room/avatar_room_hair_front_male_soft_black_side_part_v1.png")
+    require("../assets/room/avatar_room_hair_front_male_soft_black_side_part_v2.png")
   ),
   hairFrontMaleChestnutShortWavesV1: asset(
     "avatar_room_hair_front_male_chestnut_short_waves_v1",
-    require("../assets/room/avatar_room_hair_front_male_chestnut_short_waves_v1.png")
+    require("../assets/room/avatar_room_hair_front_male_chestnut_short_waves_v2.png")
   ),
   topMaleDustyNavyTeeV1: asset(
     "avatar_room_top_male_dusty_navy_tee_v1",
