@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "fitProfileId": "datevibe_female_room_avatar_v1",
+  "rigId": "datevibe_2_5d_layered_v1",
+  "scope": "female-nondress-wardrobe",
+  "provenance": "Recovered from the prior Blumi/DateVibe fit contract and checked against current female runtime canvas; this is a measurement contract, not an asset promotion.",
+  "canvas": {
+    "width": 256,
+    "height": 384,
+    "centerline": 127.5,
+    "bodyFeetBaseline": 343,
+    "shoeSoleBaseline": {
+      "static": [346, 349],
+      "walkingFront": [346, 349],
+      "sittingFront": [346, 347]
+    }
+  },
+  "states": {
+    "idleFront": {
+      "base": "assets/room/avatar_room_base_female_v2.png",
+      "bodyBounds": [76, 215, 179, 343]
+    },
+    "walkingFront": {
+      "frames": ["f01", "f02", "f03", "f04"],
+      "baseFrames": "assets/room/motion/room_avatar_base_female_v2_walking_front_f{frame}.png"
+    },
+    "sittingFront": {
+      "frames": ["f01"],
+      "baseFrames": "assets/room/motion/room_avatar_base_female_v2_sitting_front_f{frame}.png"
+    }
+  },
+  "zones": {
+    "neckline": { "y": [207, 234], "x": [94, 162], "rules": ["front-opening-follows-neck", "no-rear-collar-band"] },
+    "shoulderAndArmhole": { "y": [218, 250], "x": [82, 174], "rules": ["no-floating-shoulder", "no-body-leak-through-sleeve"] },
+    "torsoCore": { "y": [232, 286], "x": [104, 152], "rules": ["top-covers-body-contact", "no-detached-islands"] },
+    "waistAndCrotch": { "y": [280, 325], "x": [94, 162], "rules": ["top-bottom-seam-is-intentional", "crotch-remains-covered"] },
+    "legCorridors": { "left": [94, 124], "right": [132, 162], "y": [294, 341], "rules": ["left-right-separation", "no-cross-leg-noise"] },
+    "shoeUpperAndSole": { "left": [99, 127], "right": [130, 157], "y": [318, 349], "rules": ["two-foot-components", "sole-on-state-baseline", "no-shoe-gap"] },
+    "bottomHem": { "trousers": [329, 331], "shortsAndSkirts": [312, 327], "rules": ["hem-stays-inside-category-range", "no-global-z-index-only-fix"] },
+    "accessoryAnchors": { "head": [60, 62, 196, 180], "neck": [96, 198, 160, 260], "ear": [94, 172, 160, 206], "bag": [148, 211, 216, 334], "rules": ["anchor-follows-matching-base-pose", "no-global-jitter"] }
+  },
+  "occlusionRoles": {
+    "trousers": "bottomOverShoeUpper",
+    "shortsAndSkirts": "bottomBehindShoes",
+    "dresses": "out-of-scope"
+  },
+  "promotionGate": ["static-premium-render", "static-body-fit", "native-and-8x-contact-review", "walking-4w", "sitting-1s", "composite-qa", "independent-reviewer"]
+}

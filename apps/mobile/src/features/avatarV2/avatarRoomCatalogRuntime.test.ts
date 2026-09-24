@@ -35,6 +35,10 @@ const {
   FEMALE_WARDROBE_QUARANTINED_ITEM_IDS
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./room/avatarRoomMotionContract") as typeof import("./room/avatarRoomMotionContract")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
+const { roomAvatarLayerAssets } = require("./room/avatarRoomAssets") as typeof import("./room/avatarRoomAssets")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
+const { roomAvatarMotionLayerAssets } = require("./room/avatarRoomMotionAssets") as typeof import("./room/avatarRoomMotionAssets")
 
 const currentMotionIds = new Set([
   "room_avatar_base_male_light_v1",
@@ -337,6 +341,37 @@ test("the default female room avatar is fully dressed", () => {
   assert.equal(
     DEFAULT_ROOM_AVATAR_FEMALE.shoesId,
     "room_avatar_shoes_female_milk_tea_court_sneakers_v2"
+  )
+})
+
+test("female Cream Basic Tee binds its stable ID to the approved v17 static and six motion assets", () => {
+  const productId = "room_avatar_top_female_cream_basic_tee_v2"
+  const staticAsset = roomAvatarLayerAssets.topFemaleCreamBasicTeeV2
+  assert.equal(staticAsset.key, "avatar_room_top_female_cream_basic_tee_v2")
+  assert.equal(
+    String(staticAsset.source).split("/").at(-1),
+    "avatar_room_top_female_cream_basic_tee_v2_art_v17.png"
+  )
+
+  const motionAssets = roomAvatarMotionLayerAssets.topFemaleCreamBasicTeeV2
+  const expectedWalkingNames = [
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f01_art_v17.png",
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f02_art_v17.png",
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f03_art_v17.png",
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f04_art_v17.png"
+  ]
+  assert.deepEqual(
+    motionAssets.walkingFront.frames.map((frame) => frame.key),
+    [1, 2, 3, 4].map((index) => productId + "_walking_front_f0" + index)
+  )
+  assert.deepEqual(
+    motionAssets.walkingFront.frames.map((frame) => String(frame.source).split("/").at(-1)),
+    expectedWalkingNames
+  )
+  assert.equal(motionAssets.sittingFront.key, productId + "_sitting_front_f01")
+  assert.equal(
+    String(motionAssets.sittingFront.source).split("/").at(-1),
+    "room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01_art_v17.png"
   )
 })
 

@@ -398,7 +398,7 @@ export const roomAvatarLayerAssets = {
   ),
   topFemaleCreamBasicTeeV2: roomAvatarAsset(
     "avatar_room_top_female_cream_basic_tee_v2",
-    require("../assets/room/avatar_room_top_female_cream_basic_tee_v2.png")
+    require("../assets/room/avatar_room_top_female_cream_basic_tee_v2_art_v17.png")
   ),
   topFemaleBlushLaceCardiganV2: roomAvatarAsset(
     "avatar_room_top_female_blush_lace_cardigan_v2",

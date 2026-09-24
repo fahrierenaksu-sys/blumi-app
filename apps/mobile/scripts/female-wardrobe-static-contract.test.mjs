@@ -15,7 +15,7 @@ const fitManifest = JSON.parse(
 const [trouserHemMinY, trouserHemMaxY] = fitManifest.zones.bottomHem.trousers
 
 const tops = [
-  "avatar_room_top_female_cream_basic_tee_v2.png",
+  "avatar_room_top_female_cream_basic_tee_v2_art_v17.png",
   "avatar_room_top_female_blush_lace_cardigan_v2.png",
   "avatar_room_top_female_sage_ribbon_knit_jacket_v2.png",
   "avatar_room_top_female_cherry_heart_milkmaid_blouse_v2.png",
@@ -157,6 +157,11 @@ const motionStem = (filename) => filename
   .replace(/^avatar_room_/, "room_avatar_")
   .replace(/\.png$/, "")
 
+const wearableMotionFilename = (filename, state) =>
+  filename === "avatar_room_top_female_cream_basic_tee_v2_art_v17.png"
+    ? `room_avatar_top_female_cream_basic_tee_v2_${state}_art_v17.png`
+    : `${motionStem(filename)}_${state}.png`
+
 const allWearables = [
   ...tops.map((filename) => ["top", filename]),
   ...bottoms.map((filename) => ["bottom", filename]),
@@ -185,7 +190,7 @@ test("female static tops cover the torso core without detached islands", () => {
 })
 
 test("cream tee closes the front center seam before the lower layer begins", () => {
-  const image = readPng(assetRoot, "avatar_room_top_female_cream_basic_tee_v2.png")
+  const image = readPng(assetRoot, "avatar_room_top_female_cream_basic_tee_v2_art_v17.png")
   let required = 0
   let covered = 0
   for (let y = 284; y <= 292; y += 1) {
@@ -227,13 +232,12 @@ test("female shoes have two grounded feet and a stable sole baseline", () => {
 
 test("every promoted female non-dress wearable has a real 4W+1S motion set", () => {
   for (const [, filename] of allWearables) {
-    const stem = motionStem(filename)
     for (const frame of ["f01", "f02", "f03", "f04"]) {
-      const image = readPng(motionRoot, `${stem}_walking_front_${frame}.png`)
+      const image = readPng(motionRoot, wearableMotionFilename(filename, `walking_front_${frame}`))
       assert.equal(image.width, 256, `${filename} ${frame} width`)
       assert.equal(image.height, 384, `${filename} ${frame} height`)
     }
-    const sitting = readPng(motionRoot, `${stem}_sitting_front_f01.png`)
+    const sitting = readPng(motionRoot, wearableMotionFilename(filename, "sitting_front_f01"))
     assert.equal(sitting.width, 256, `${filename} sitting width`)
     assert.equal(sitting.height, 384, `${filename} sitting height`)
   }
@@ -342,25 +346,19 @@ test("female head features follow the canonical head anchor in every motion fram
   }
 })
 
-test("cream tee follows the measured front-body walk anchor", () => {
-  const filename = "avatar_room_top_female_cream_basic_tee_v2.png"
-  const sourceBounds = alphaBounds(readPng(assetRoot, filename))
-  const stem = motionStem(filename)
-  const offsets = {
-    f01: [0, 0],
-    f02: [-1, 0],
-    f03: [0, 1],
-    f04: [1, 0]
-  }
-  const hashes = []
-  for (const [frame, [dx, dy]] of Object.entries(offsets)) {
-    const image = readPng(motionRoot, `${stem}_walking_front_${frame}.png`)
-    assert.deepEqual(
-      alphaBounds(image),
-      [sourceBounds[0] + dx, sourceBounds[1] + dy, sourceBounds[2] + dx, sourceBounds[3] + dy],
-      `${filename} ${frame} must follow the front-body offset`
-    )
-    hashes.push(image.data.toString("hex"))
-  }
-  assert.equal(new Set(hashes).size, 4, "cream tee walk frames must not be stale duplicates")
+test("approved cream tee keeps its garment envelope while motion details change", () => {
+  const staticImage = readPng(assetRoot, "avatar_room_top_female_cream_basic_tee_v2_art_v17.png")
+  const expectedBounds = alphaBounds(staticImage)
+  const frames = ["f01", "f02", "f03", "f04"].map(frame =>
+    readPng(motionRoot, `room_avatar_top_female_cream_basic_tee_v2_walking_front_${frame}_art_v17.png`)
+  )
+  const sitting = readPng(motionRoot,
+    "room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01_art_v17.png")
+  for (const image of [...frames, sitting]) assert.deepEqual(alphaBounds(image), expectedBounds)
+  assert.deepEqual(frames[0].data, staticImage.data,
+    "the canonical static and walking f01 torso footprints share one approved master")
+  assert.equal(new Set(frames.map(image => image.data.toString("hex"))).size, 4,
+    "each later walking frame needs its own fabric detail")
+  assert.notDeepEqual(sitting.data, staticImage.data,
+    "the sitting fabric treatment must remain pose specific")
 })

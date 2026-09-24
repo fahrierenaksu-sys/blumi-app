@@ -791,14 +791,14 @@ export const roomAvatarMotionLayerAssets = {
   topFemaleCreamBasicTeeV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_cream_basic_tee_v2",
-      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f04.png")
+      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f01_art_v17.png"),
+      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f02_art_v17.png"),
+      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f03_art_v17.png"),
+      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_walking_front_f04_art_v17.png")
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_cream_basic_tee_v2",
-      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01.png")
+      require("../assets/room/motion/room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01_art_v17.png")
     )
   },
   bottomFemaleDenimSkortShortsV2: {
