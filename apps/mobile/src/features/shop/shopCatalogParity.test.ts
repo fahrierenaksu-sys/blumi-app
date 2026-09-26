@@ -380,7 +380,7 @@ test("mobile pricing delegates to the shared server catalog", () => {
   );
 });
 
-test("the shared catalog contains the approved 106 premium avatar items", () => {
+test("the shared catalog contains the 109 premium avatar items, including Coral Wave", () => {
   const premiumAvatarEntries = Array.from(
     economyCatalogSource.matchAll(
       /avatarItem\(\s*"([^"]+)"\s*,\s*"[^"]+"\s*,\s*(\d+)/g,
@@ -389,7 +389,7 @@ test("the shared catalog contains the approved 106 premium avatar items", () => 
 
   // This is a release catalog contract, not a derived expectation. Change it
   // only together with an approved merch expansion and its runtime assets.
-  assert.equal(premiumAvatarEntries.length, 106);
+  assert.equal(premiumAvatarEntries.length, 109);
   assert.equal(
     new Set(premiumAvatarEntries.map((match) => match[1])).size,
     premiumAvatarEntries.length,

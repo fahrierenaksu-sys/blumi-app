@@ -9,6 +9,28 @@ require.extensions[".png"] = (module, filename) => {
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { AVATAR_V2_CATALOG } = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+type CoralLoadoutCatalogItem = {
+  itemId: string
+  slot: "top" | "bottom" | "shoes"
+  supportedBodyIds: string[]
+  outfitKey?: string
+  pairedItemId?: string
+}
+type CoralEconomyCatalogItem = {
+  itemId: string
+  type: string
+  title: string
+  priceCoins: number
+  ownedByDefault?: boolean
+}
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- The avatar test runner builds @blumi/domain before compiling tests into its isolated src-only directory.
+const { AVATAR_LOADOUT_CATALOG, ECONOMY_CATALOG } = require("@blumi/domain") as {
+  AVATAR_LOADOUT_CATALOG: CoralLoadoutCatalogItem[]
+  ECONOMY_CATALOG: CoralEconomyCatalogItem[]
+}
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Keep the test aligned with the authored capsule catalog.
+const { FEMALE_SWEET_CAPSULE_LAYERS } = require("./femaleSweetCapsuleDefinitions") as typeof import("./femaleSweetCapsuleDefinitions")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -166,4 +188,88 @@ test("female sweet capsule is visible through both wardrobe and shop thumbnail s
     assert.match(source, /FEMALE_SWEET_CAPSULE_SQUARE_THUMBNAIL_SOURCES/)
   }
   assert.match(shopScreenSource, /from "\.\.\/features\/shop\/shopAssets"/)
+})
+
+test("Coral Wave is listed as three independent paid female capsule layers", () => {
+  const expectedLayers = [
+    { kind: "top", slug: "coral_wave_polo", name: "Coral Wave Polo", priceCoins: 80 },
+    { kind: "bottom", slug: "coral_wave_pants", name: "Coral Wave Pants", priceCoins: 440 },
+    { kind: "shoes", slug: "coral_wave_shoes", name: "Coral Wave Shoes", priceCoins: 450 }
+  ] as const
+
+  for (const expected of expectedLayers) {
+    const matches = FEMALE_SWEET_CAPSULE_LAYERS.filter(
+      (item) => item.kind === expected.kind && item.slug === expected.slug
+    )
+    assert.equal(matches.length, 1, expected.slug)
+    assert.equal(matches[0]?.visible, true, expected.slug)
+    assert.equal(matches[0]?.name, expected.name, expected.slug)
+    assert.equal(matches[0]?.priceCoins, expected.priceCoins, expected.slug)
+    assert.equal(matches[0]?.outfitKey, undefined, expected.slug)
+    assert.equal(matches[0]?.pairedItemId, undefined, expected.slug)
+  }
+
+  const expectedCatalogEntries = [
+    { itemId: "avatar_v2_top_coral_wave_polo", slot: "top", title: "Coral Wave Polo", priceCoins: 80 },
+    { itemId: "avatar_v2_bottom_coral_wave_pants", slot: "bottom", title: "Coral Wave Pants", priceCoins: 440 },
+    { itemId: "avatar_v2_shoes_coral_wave_shoes", slot: "shoes", title: "Coral Wave Shoes", priceCoins: 450 }
+  ] as const
+
+  for (const expected of expectedCatalogEntries) {
+    const mobileItem = AVATAR_V2_CATALOG.find((item) => item.id === expected.itemId)
+    assert.ok(mobileItem, expected.itemId)
+    assert.equal(mobileItem.type, expected.slot, expected.itemId)
+    assert.equal(mobileItem.hiddenFromShop, undefined, expected.itemId)
+    assert.notEqual(mobileItem.ownedByDefault, true, expected.itemId)
+
+    const roomId = `room_avatar_${expected.slot}_female_${expected.itemId.split("_").slice(3).join("_")}_v2`
+    const roomSlot = expected.slot === "top" ? "topId" : expected.slot === "bottom" ? "bottomId" : "shoesId"
+    const roomItem = ROOM_AVATAR_CATALOG.find((item) => item.id === roomId)
+    assert.ok(roomItem, roomId)
+    assert.equal(DEFAULT_AVATAR_ROOM_PROJECTION_MAP[expected.itemId]?.[roomSlot], roomId)
+    assert.equal(roomItem.bodyPreset, "female", roomId)
+    assert.equal(roomItem.rigId, "blumi_2_5d_layered_v1", roomId)
+    assert.equal(roomItem.fitProfileId, "blumi_female_room_avatar_v1", roomId)
+    assert.equal(roomItem.asset.key, `${roomId.replace(/_v2$/, "_v1")}`, `${roomId} static asset`)
+
+    const walking = roomItem.assetsByMotion?.walking?.front
+    assert.ok(walking && "frames" in walking, `${roomId} walking sequence`)
+    assert.equal(walking.frames.length, 4, `${roomId} walking frame count`)
+    assert.deepEqual(
+      walking.frames.map((frame) => frame.key),
+      [1, 2, 3, 4].map((frame) => `${roomId.replace(/_v2$/, "_v1")}_walking_front_f0${frame}`),
+      `${roomId} pose-specific walking sources`
+    )
+    const sitting = roomItem.assetsByMotion?.sitting?.front
+    assert.ok(sitting && "key" in sitting, `${roomId} sitting frame`)
+    assert.equal(
+      sitting.key,
+      `${roomId.replace(/_v2$/, "_v1")}_sitting_front_f01`,
+      `${roomId} sitting source`
+    )
+    assert.equal(roomItem.layerOrder, expected.slot === "top" ? 60 : expected.slot === "shoes" ? 50 : 51)
+    if (expected.slot === "bottom") {
+      assert.equal(roomItem.occlusionRole, "bottomOverShoeUpper", roomId)
+    }
+
+    const loadoutItem = AVATAR_LOADOUT_CATALOG.find((item) => item.itemId === expected.itemId)
+    assert.ok(loadoutItem, expected.itemId)
+    assert.equal(loadoutItem.slot, expected.slot, expected.itemId)
+    assert.deepEqual(loadoutItem.supportedBodyIds, ["avatar_v2_body_default"])
+    assert.equal(loadoutItem.outfitKey, undefined, expected.itemId)
+    assert.equal(loadoutItem.pairedItemId, undefined, expected.itemId)
+
+    const economyItem = ECONOMY_CATALOG.find((item) => item.itemId === expected.itemId)
+    assert.ok(economyItem, expected.itemId)
+    assert.equal(economyItem.type, "avatar", expected.itemId)
+    assert.equal(economyItem.title, expected.title, expected.itemId)
+    assert.equal(economyItem.priceCoins, expected.priceCoins, expected.itemId)
+    assert.equal(economyItem.ownedByDefault, undefined, expected.itemId)
+  }
+
+  const premiumAvatarItems = ECONOMY_CATALOG.filter(
+    (item) => item.type === "avatar" && item.priceCoins > 0
+  )
+  assert.equal(premiumAvatarItems.length, 109)
+  assert.equal(new Set(premiumAvatarItems.map((item) => item.itemId)).size, premiumAvatarItems.length)
 })

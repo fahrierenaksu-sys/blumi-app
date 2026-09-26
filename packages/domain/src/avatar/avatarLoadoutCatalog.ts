@@ -138,6 +138,7 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     ...slotItems("top", [
       "avatar_v2_top_default",
       "avatar_v2_top_blush_lace_cardigan",
+      "avatar_v2_top_coral_wave_polo",
       "avatar_v2_top_sage_ribbon_knit_jacket",
       "avatar_v2_top_cherry_heart_milkmaid_blouse",
       "avatar_v2_top_powder_blue_ribbon_corset_top",
@@ -153,6 +154,7 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     ...slotItems("bottom", [
       "avatar_v2_bottom_default",
       "avatar_v2_bottom_striped_crochet_shorts",
+      "avatar_v2_bottom_coral_wave_pants",
       "avatar_v2_bottom_layered_lace_ruffle_mini_skirt",
       "avatar_v2_bottom_black_palm_embellished_pants",
       "avatar_v2_bottom_coral_embellished_laceup_pants",
@@ -166,6 +168,7 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     ...slotItems("shoes", [
       "avatar_v2_shoes_milk_tea_court_sneakers",
       "avatar_v2_shoes_cherry_satin_ballets",
+      "avatar_v2_shoes_coral_wave_shoes",
       "avatar_v2_shoes_onyx_heart_mary_janes",
       "avatar_v2_shoes_rosewood_platform_loafers",
       "avatar_v2_shoes_pearl_slingback_sandals",

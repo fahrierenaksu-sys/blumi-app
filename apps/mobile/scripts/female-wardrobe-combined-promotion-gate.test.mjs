@@ -8,6 +8,7 @@ import { PNG } from "pngjs"
 
 import {
   FRAME_DURATION_MS,
+  FEMALE_NONDRESS_CATALOG,
   STATES,
   assertCatalogMatchesRuntimeSource,
   createCandidateAssetResolver,
@@ -131,6 +132,29 @@ test("catalog contract fails closed when a new runtime wearable is omitted", () 
     () => assertCatalogMatchesRuntimeSource({ catalog: FIXTURE, source: `${source}\nid: \"room_avatar_top_female_new_live_top_v2\"`, contract }),
     /new_live_top/
   )
+})
+
+test("live room catalog and promotion contract include the Coral Wave capsule", () => {
+  const roomCatalogSourcePath = new URL(
+    "../src/features/avatarV2/room/avatarRoom.mock.ts",
+    import.meta.url
+  )
+  const source = readFileSync(roomCatalogSourcePath, "utf8")
+
+  assert.doesNotThrow(() => assertCatalogMatchesRuntimeSource({
+    catalog: FEMALE_NONDRESS_CATALOG,
+    source
+  }))
+  assert.ok(FEMALE_NONDRESS_CATALOG.tops.includes("coral_wave_polo"))
+  assert.ok(FEMALE_NONDRESS_CATALOG.bottoms.some(({ slug, occlusionRole }) => (
+    slug === "coral_wave_pants" && occlusionRole === "bottomOverShoeUpper"
+  )))
+  assert.ok(FEMALE_NONDRESS_CATALOG.shoes.includes("coral_wave_shoes"))
+
+  const contract = loadRuntimePromotionContract()
+  assert.ok(contract.pantsOverShoeUpperIds.includes(
+    "room_avatar_bottom_female_coral_wave_pants_v2"
+  ))
 })
 
 test("runtime promotion contract is the single source for quarantine and 120ms playback", () => {

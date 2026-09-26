@@ -115,6 +115,63 @@ test("V2 validation accepts explicit empty new slots and rejects unavailable ite
   )
 })
 
+test("Coral Wave products are independent paid female loadout items", () => {
+  const products = [
+    {
+      itemId: "avatar_v2_top_coral_wave_polo",
+      slot: "top",
+      loadoutKey: "topId",
+      title: "Coral Wave Polo",
+      priceCoins: 80
+    },
+    {
+      itemId: "avatar_v2_bottom_coral_wave_pants",
+      slot: "bottom",
+      loadoutKey: "bottomId",
+      title: "Coral Wave Pants",
+      priceCoins: 440
+    },
+    {
+      itemId: "avatar_v2_shoes_coral_wave_shoes",
+      slot: "shoes",
+      loadoutKey: "shoesId",
+      title: "Coral Wave Shoes",
+      priceCoins: 450
+    }
+  ] as const
+
+  for (const product of products) {
+    const matches = AVATAR_LOADOUT_CATALOG.filter(
+      (item) => item.itemId === product.itemId
+    )
+    assert.equal(matches.length, 1, product.itemId)
+    assert.equal(matches[0]?.slot, product.slot)
+    assert.deepEqual(matches[0]?.supportedBodyIds, ["avatar_v2_body_default"])
+    assert.equal(matches[0]?.outfitKey, undefined)
+    assert.equal(matches[0]?.pairedItemId, undefined)
+
+    const purchases = ECONOMY_CATALOG.filter(
+      (item) => item.itemId === product.itemId
+    )
+    assert.equal(purchases.length, 1, product.itemId)
+    assert.equal(purchases[0]?.type, "avatar")
+    assert.equal(purchases[0]?.title, product.title)
+    assert.equal(purchases[0]?.priceCoins, product.priceCoins)
+    assert.equal(purchases[0]?.ownedByDefault, undefined)
+    assert.equal(purchases[0]?.grantedItemIds, undefined)
+
+    const loadout = {
+      ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+      [product.loadoutKey]: product.itemId
+    }
+    assert.equal(
+      validateAvatarLoadout(loadout, [...ownedDefaultIds, product.itemId]).ok,
+      true,
+      product.itemId
+    )
+  }
+})
+
 test("V2 dressId uses the existing dress entitlement and keeps separates underneath", () => {
   const dressId = "avatar_v2_top_boho_patchwork_maxi_dress"
   const pairedBottomId = "avatar_v2_bottom_boho_patchwork_maxi_dress"

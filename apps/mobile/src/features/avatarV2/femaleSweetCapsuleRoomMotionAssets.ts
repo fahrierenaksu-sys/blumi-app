@@ -220,6 +220,45 @@ export const femaleSweetCapsuleRoomMotionLayerAssets = {
       require("./assets/room/motion/room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_sitting_front_f01.png")
     )
   },
+  topFemaleCoralWavePoloV1: {
+    walkingFront: walkingFrontSequence(
+      "room_avatar_top_female_coral_wave_polo_v1",
+      require("./assets/room/motion/room_avatar_top_female_coral_wave_polo_v1_walking_front_f01.png"),
+      require("./assets/room/motion/room_avatar_top_female_coral_wave_polo_v1_walking_front_f02.png"),
+      require("./assets/room/motion/room_avatar_top_female_coral_wave_polo_v1_walking_front_f03.png"),
+      require("./assets/room/motion/room_avatar_top_female_coral_wave_polo_v1_walking_front_f04.png")
+    ),
+    sittingFront: sittingFrontFrame(
+      "room_avatar_top_female_coral_wave_polo_v1",
+      require("./assets/room/motion/room_avatar_top_female_coral_wave_polo_v1_sitting_front_f01.png")
+    )
+  },
+  bottomFemaleCoralWavePantsV1: {
+    walkingFront: walkingFrontSequence(
+      "room_avatar_bottom_female_coral_wave_pants_v1",
+      require("./assets/room/motion/room_avatar_bottom_female_coral_wave_pants_v1_walking_front_f01.png"),
+      require("./assets/room/motion/room_avatar_bottom_female_coral_wave_pants_v1_walking_front_f02.png"),
+      require("./assets/room/motion/room_avatar_bottom_female_coral_wave_pants_v1_walking_front_f03.png"),
+      require("./assets/room/motion/room_avatar_bottom_female_coral_wave_pants_v1_walking_front_f04.png")
+    ),
+    sittingFront: sittingFrontFrame(
+      "room_avatar_bottom_female_coral_wave_pants_v1",
+      require("./assets/room/motion/room_avatar_bottom_female_coral_wave_pants_v1_sitting_front_f01.png")
+    )
+  },
+  shoesFemaleCoralWaveShoesV1: {
+    walkingFront: walkingFrontSequence(
+      "room_avatar_shoes_female_coral_wave_shoes_v1",
+      require("./assets/room/motion/room_avatar_shoes_female_coral_wave_shoes_v1_walking_front_f01.png"),
+      require("./assets/room/motion/room_avatar_shoes_female_coral_wave_shoes_v1_walking_front_f02.png"),
+      require("./assets/room/motion/room_avatar_shoes_female_coral_wave_shoes_v1_walking_front_f03.png"),
+      require("./assets/room/motion/room_avatar_shoes_female_coral_wave_shoes_v1_walking_front_f04.png")
+    ),
+    sittingFront: sittingFrontFrame(
+      "room_avatar_shoes_female_coral_wave_shoes_v1",
+      require("./assets/room/motion/room_avatar_shoes_female_coral_wave_shoes_v1_sitting_front_f01.png")
+    )
+  },
   topFemaleRoseRibbonTeaDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_rose_ribbon_tea_dress_v2",

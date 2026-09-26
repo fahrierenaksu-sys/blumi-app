@@ -63,6 +63,18 @@ export const femaleSweetCapsuleRoomLayerAssets = {
     "avatar_room_shoes_female_mint_ribbon_court_sneakers_v2",
     require("./assets/room/avatar_room_shoes_female_mint_ribbon_court_sneakers_v2.png")
   ),
+  topFemaleCoralWavePoloV1: roomAvatarAsset(
+    "room_avatar_top_female_coral_wave_polo_v1",
+    require("./assets/room/room_avatar_top_female_coral_wave_polo_v1.png")
+  ),
+  bottomFemaleCoralWavePantsV1: roomAvatarAsset(
+    "room_avatar_bottom_female_coral_wave_pants_v1",
+    require("./assets/room/room_avatar_bottom_female_coral_wave_pants_v1.png")
+  ),
+  shoesFemaleCoralWaveShoesV1: roomAvatarAsset(
+    "room_avatar_shoes_female_coral_wave_shoes_v1",
+    require("./assets/room/room_avatar_shoes_female_coral_wave_shoes_v1.png")
+  ),
   topFemaleRoseRibbonTeaDressV2: roomAvatarAsset(
     "avatar_room_top_female_rose_ribbon_tea_dress_v2",
     require("./assets/room/avatar_room_top_female_rose_ribbon_tea_dress_v2.png")

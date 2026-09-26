@@ -54,7 +54,8 @@ export const FEMALE_NONDRESS_CATALOG = {
     "azure_garden_halter",
     "ivory_tweed_crop_jacket",
     "cherry_varsity_cardigan",
-    "midnight_velvet_bolero"
+    "midnight_velvet_bolero",
+    "coral_wave_polo"
   ],
   bottoms: [
     { slug: "denim_skort_shorts", occlusionRole: "bottomBehindShoes" },
@@ -67,7 +68,8 @@ export const FEMALE_NONDRESS_CATALOG = {
     { slug: "midnight_ribbon_wide_leg_pants", occlusionRole: "bottomOverShoeUpper" },
     { slug: "buttercream_pearl_tailored_pants", occlusionRole: "bottomOverShoeUpper" },
     { slug: "rose_picnic_pleated_shorts", occlusionRole: "bottomBehindShoes" },
-    { slug: "lavender_bow_twill_shorts", occlusionRole: "bottomBehindShoes" }
+    { slug: "lavender_bow_twill_shorts", occlusionRole: "bottomBehindShoes" },
+    { slug: "coral_wave_pants", occlusionRole: "bottomOverShoeUpper" }
   ],
   shoes: [
     "milk_tea_court_sneakers",
@@ -78,7 +80,8 @@ export const FEMALE_NONDRESS_CATALOG = {
     "rose_satin_bow_heels",
     "ivory_pearl_slingback_heels",
     "lilac_star_platform_sneakers",
-    "mint_ribbon_court_sneakers"
+    "mint_ribbon_court_sneakers",
+    "coral_wave_shoes"
   ]
 }
 
@@ -93,19 +96,22 @@ const DECLARATIVE_SWEET_CAPSULE_SLUGS = {
     "azure_garden_halter",
     "ivory_tweed_crop_jacket",
     "cherry_varsity_cardigan",
-    "midnight_velvet_bolero"
+    "midnight_velvet_bolero",
+    "coral_wave_polo"
   ]),
   bottom: new Set([
     "midnight_ribbon_wide_leg_pants",
     "buttercream_pearl_tailored_pants",
     "rose_picnic_pleated_shorts",
-    "lavender_bow_twill_shorts"
+    "lavender_bow_twill_shorts",
+    "coral_wave_pants"
   ]),
   shoes: new Set([
     "rose_satin_bow_heels",
     "ivory_pearl_slingback_heels",
     "lilac_star_platform_sneakers",
-    "mint_ribbon_court_sneakers"
+    "mint_ribbon_court_sneakers",
+    "coral_wave_shoes"
   ])
 }
 
