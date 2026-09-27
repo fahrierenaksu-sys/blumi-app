@@ -203,15 +203,27 @@ export function resolveServerConfig(
   )
   const databaseUrl = env.DATABASE_URL?.trim()
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
-  const livekitUrl = env.LIVEKIT_URL?.trim()
-  const livekitApiKey = env.LIVEKIT_API_KEY?.trim()
-  const livekitApiSecret = env.LIVEKIT_API_SECRET?.trim()
+  const voiceFlag = env.BLUMI_VOICE_ENABLED?.trim()
+  if (voiceFlag !== undefined && voiceFlag !== "0" && voiceFlag !== "1") {
+    throw new Error("BLUMI_VOICE_ENABLED must be 0 or 1.")
+  }
+  const voiceEnabled = voiceFlag !== "0"
+  // Omitting all media credentials selects the existing text-only room protocol.
+  const livekitUrl = voiceEnabled ? env.LIVEKIT_URL?.trim() : undefined
+  const livekitApiKey = voiceEnabled ? env.LIVEKIT_API_KEY?.trim() : undefined
+  const livekitApiSecret = voiceEnabled ? env.LIVEKIT_API_SECRET?.trim() : undefined
   const expoPushAccessToken = env.EXPO_PUSH_ACCESS_TOKEN?.trim()
-  const revenueCatApiKey = env.REVENUECAT_SECRET_API_KEY?.trim()
-  const revenueCatProjectId = env.REVENUECAT_PROJECT_ID?.trim()
-  const revenueCatWebhookSigningSecret = env.REVENUECAT_WEBHOOK_SIGNING_SECRET?.trim()
+  const paymentsFlag = env.BLUMI_PAYMENTS_ENABLED?.trim()
+  if (paymentsFlag !== undefined && paymentsFlag !== "0" && paymentsFlag !== "1") {
+    throw new Error("BLUMI_PAYMENTS_ENABLED must be 0 or 1.")
+  }
+  const paymentsEnabled = paymentsFlag !== "0"
+  // Disable both verification and webhook authentication; never grant unverified purchases.
+  const revenueCatApiKey = paymentsEnabled ? env.REVENUECAT_SECRET_API_KEY?.trim() : undefined
+  const revenueCatProjectId = paymentsEnabled ? env.REVENUECAT_PROJECT_ID?.trim() : undefined
+  const revenueCatWebhookSigningSecret = paymentsEnabled ? env.REVENUECAT_WEBHOOK_SIGNING_SECRET?.trim() : undefined
   const revenueCatCoinProductIdMap = parseRevenueCatCoinProductIdMap(
-    env.REVENUECAT_COIN_PRODUCT_ID_MAP
+    paymentsEnabled ? env.REVENUECAT_COIN_PRODUCT_ID_MAP : undefined
   )
   const adminKey = env.BLUMI_ADMIN_KEY?.trim()
   const adminSigningKeys = parseAdminSigningKeys(
@@ -310,12 +322,12 @@ export function resolveServerConfig(
     throw new Error("Expo push requires EXPO_PUSH_ACCESS_TOKEN.")
   }
   if (nodeEnv === "production") {
-    if (!livekitUrl || !livekitApiKey || !livekitApiSecret) {
+    if (voiceEnabled && (!livekitUrl || !livekitApiKey || !livekitApiSecret)) {
       throw new Error(
         "Production media requires LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET."
       )
     }
-    if (!isSecureWebSocketUrl(livekitUrl)) {
+    if (voiceEnabled && (!livekitUrl || !isSecureWebSocketUrl(livekitUrl))) {
       throw new Error("Production LIVEKIT_URL must use WSS.")
     }
     if (adminSigningKeys.length === 0 || !adminActiveKeyId) {
@@ -323,29 +335,29 @@ export function resolveServerConfig(
         "Production requires BLUMI_ADMIN_SIGNING_KEYS and BLUMI_ADMIN_ACTIVE_KID."
       )
     }
-    if (!appleAppId || !/^[A-Z0-9]{10}\.com\.blumi\.mobile$/.test(appleAppId)) {
+    if (deployEnvironment === "production" && (!appleAppId || !/^[A-Z0-9]{10}\.com\.blumi\.mobile$/.test(appleAppId))) {
       throw new Error(
         "Production universal links require BLUMI_APPLE_APP_ID in TEAMID.com.blumi.mobile format."
       )
     }
-    if (
+    if (deployEnvironment === "production" && (
       androidAppLinkSha256CertFingerprints.length === 0 ||
       !androidAppLinkSha256CertFingerprints.every(isSha256Fingerprint)
-    ) {
+    )) {
       throw new Error(
         "Production app links require valid BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS."
       )
     }
-    if (!revenueCatApiKey) {
+    if (paymentsEnabled && !revenueCatApiKey) {
       throw new Error("Production-mode purchases require REVENUECAT_SECRET_API_KEY.")
     }
-    if (!revenueCatProjectId) {
+    if (paymentsEnabled && !revenueCatProjectId) {
       throw new Error("Production-mode purchases require REVENUECAT_PROJECT_ID.")
     }
-    if (!revenueCatWebhookSigningSecret) {
+    if (paymentsEnabled && !revenueCatWebhookSigningSecret) {
       throw new Error("Production-mode purchases require REVENUECAT_WEBHOOK_SIGNING_SECRET.")
     }
-    if (Object.keys(revenueCatCoinProductIdMap).length === 0) {
+    if (paymentsEnabled && Object.keys(revenueCatCoinProductIdMap).length === 0) {
       throw new Error("Production-mode purchases require a nonempty REVENUECAT_COIN_PRODUCT_ID_MAP.")
     }
   }

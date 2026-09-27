@@ -2,7 +2,24 @@
 
 **Current verdict: not ready for public release.** The Operations Center is a read-only view of this evidence snapshot, not live provider telemetry or a production admin console. External systems remain unverified until connected. Follow the [reusable release-captain workflow](./RELEASE_CAPTAIN_WORKFLOW.md); detailed infrastructure steps and evidence live in [`railway-supabase-launch.md`](./railway-supabase-launch.md).
 
-Snapshot: 2026-09-27. Recheck volatile statuses before acting.
+Snapshot: 2026-09-28. Recheck volatile statuses before acting. The status table and ordered checklist below this infrastructure update are historical release-planning items, not live provider telemetry.
+
+## Infrastructure setup update — 2026-09-28
+
+This update supersedes the older infrastructure/account snapshot below, not its release gates.
+
+### Latest decision — test deployment with payments and voice deferred
+
+**Test server status, 2026-09-28:** [Railway HTTPS test endpoint](https://blumi-app-production.up.railway.app) is active. External `/health` and `/ready` returned HTTP 200; unauthenticated `/v1/users/me`, `/v1/admin/session` and `/v1/economy/balance` returned HTTP 401. Railway deployment `357b30b4-792c-4889-aba1-1b51c570afce` is Online/ACTIVE. No real-device or App Store proof yet. This is test staging (`NODE_ENV=production`, `BLUMI_DEPLOY_ENV=staging`) in an existing Railway environment named `production`; its label does not mean the app is ready for public release.
+
+- Existing Supabase project `nkqcbxufbhfibrgvajim` was confirmed as the user's test database. A fresh public-schema custom archive was created at `/Users/evrenevren/BlumiReleaseBackups/supabase-public-pre-062-064-2026-09-27.dump` (owner-only access) and restored into a disposable local PostgreSQL 17 instance: 62 prior migrations and 17 accounts present. Missing migrations 062/063/064 were then tested on that restored copy and applied to the existing test project; the other 62 were skipped. This is a local public-schema backup, not a managed Supabase PITR backup.
+- Railway variable readback and local `resolveServerConfig` passed with Expo Push, Firebase service account, PostgreSQL/OTP, admin signing key, payments off and voice off. Production-mode server config remains fail-closed; test staging omits unverified Apple/Android app-link identities, so no fake association files are served.
+- The installed mobile development configuration still points to LAN API/WS addresses. A healthy public server alone does not make that build work off Wi-Fi. Client endpoint setup and a real-device flow remain OPEN.
+- This active version came from a 6.3 MB server-only CLI upload; the full-repository CLI archive hit HTTP 413. GitHub source remains connected to `main`. The matching source patch is being placed on `main`; verify the automatic GitHub redeploy remains healthy. No source asset was deleted to shrink the upload.
+- `BLUMI_PAYMENTS_ENABLED=0` rejects RevenueCat verification/webhooks; `BLUMI_VOICE_ENABLED=0` retains text-only rooms. Neither integration was removed. Expo project `@erenaksu/blumi` (`bc61197e-e1cb-478b-9f1d-61d8582d77c8`) is linked, enhanced push security is on, and the push token is in Railway. APNs/FCM and actual phone delivery remain OPEN. No paid plan or build was started.
+- Existing Firebase project `blumi-mobile-eren` was already on Blaze. No plan upgrade or SMS test was performed; zero ongoing SMS cost is not established. RevenueCat, LiveKit, real app-link identities, native flows and legal/store gates remain OPEN.
+- Firebase identity created after user approval: `blumi-railway-auth@blumi-mobile-eren.iam.gserviceaccount.com`, with custom role `projects/blumi-mobile-eren/roles/blumiAuthRuntime` containing only `firebaseauth.users.get` and `firebaseauth.users.delete`. Google Cloud confirmed the role assignment; propagation and authenticated runtime proof remain OPEN. No existing users were deleted and the broad Firebase Admin SDK service-agent identity was not reused.
+- User completed Firebase private-key creation. The downloaded JSON was checked for the dedicated account/project and transferred to Railway `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` using stdin; readback equality passed without printing values. A local Admin SDK lookup of a random nonexistent UID returned `auth/user-not-found`, verifying credential/user-read access without reading real users. Account deletion and real-device login were not exercised. The downloaded source remains in Downloads; do not share or commit it.
 
 ## Paneli aç
 
@@ -95,7 +112,7 @@ Repo ana klasöründe Node 22.22.2 seçiliyken `npm run ops:center` çalıştır
 
 ## Immediate next action
 
-**Apple Developer onay e-postasını bekle. Geldiğinde bana “onaylandı” yaz; EAS bağlantısını ve deneme sürümünü adım adım hazırlayacağım.** Şifre, doğrulama kodu, API anahtarı veya imzalama bilgisi gönderme.
+**Immediate next user action:** Tell Codex which Blumi build is currently installed on the iPhone (development build or TestFlight) so the app can be pointed at the new HTTPS/WSS test endpoint without making an unapproved store build. A real phone login, match, chat, text-room and push test remain OPEN. Never send passwords or API keys in chat.
 
 ## Status meanings
 

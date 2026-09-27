@@ -7,6 +7,7 @@ import {
   resolveServerConfig
 } from "./config"
 import { CommerceProviderUnavailableError } from "./commerce/revenueCatPurchaseVerifier"
+import { createLivekitTokenService } from "./miniRooms/livekitTokenService"
 
 test("purchase environments default to production and reject unknown values", () => {
   assert.equal(resolveServerConfig({}).purchaseEnvironment, "production")
@@ -42,6 +43,38 @@ const VALID_PRODUCTION_ENV = {
   ...REVENUECAT_ENV
 }
 
+test("production can explicitly disable voice without LiveKit credentials", () => {
+  const config = resolveServerConfig({
+    ...VALID_PRODUCTION_ENV,
+    BLUMI_VOICE_ENABLED: "0",
+    LIVEKIT_URL: undefined,
+    LIVEKIT_API_KEY: undefined,
+    LIVEKIT_API_SECRET: undefined
+  })
+  assert.equal(config.livekitUrl, undefined)
+  assert.equal(config.livekitApiKey, undefined)
+  assert.equal(config.livekitApiSecret, undefined)
+  const media = createLivekitTokenService({
+    livekitUrl: config.livekitUrl,
+    apiKey: config.livekitApiKey,
+    apiSecret: config.livekitApiSecret
+  }).createMediaSession({
+    miniRoom: { miniRoomId: "text-only-room", livekitRoomName: "unused" } as Parameters<ReturnType<typeof createLivekitTokenService>["createMediaSession"]>[0]["miniRoom"],
+    userId: "text-only-user"
+  })
+  assert.equal(media.livekitUrl, "wss://demo.livekit.invalid")
+  assert.equal(media.token, "demo-token-text-only-room-text-only-user")
+})
+
+test("disabled voice ignores existing credentials and invalid voice flags fail closed", () => {
+  const config = resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "0" })
+  assert.equal(config.livekitUrl, undefined)
+  assert.equal(config.livekitApiKey, undefined)
+  assert.equal(config.livekitApiSecret, undefined)
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "false" }), /BLUMI_VOICE_ENABLED/)
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "1", LIVEKIT_API_KEY: undefined }), /Production media requires/)
+})
+
 test("production-mode staging accepts only an explicit sandbox purchase environment", () => {
   const staging = resolveServerConfig({
     ...VALID_PRODUCTION_ENV,
@@ -67,6 +100,46 @@ test("production-mode staging accepts only an explicit sandbox purchase environm
     () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_DEPLOY_ENV: "unknown" }),
     /BLUMI_DEPLOY_ENV/
   )
+})
+
+test("disabled payments discard provider credentials and fail closed", async () => {
+  const config = resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0" })
+  assert.equal(config.revenueCatApiKey, undefined)
+  assert.equal(config.revenueCatProjectId, undefined)
+  assert.equal(config.revenueCatWebhookSigningSecret, undefined)
+  assert.deepEqual(config.revenueCatCoinProductIdMap, {})
+  const services = createConfiguredServerServices(config)
+  try {
+    await assert.rejects(services.revenueCatPurchaseVerifier.verifyTransactions({
+      userId: "user_a", transactionIds: ["transaction_1"]
+    }), CommerceProviderUnavailableError)
+  } finally {
+    await services.close()
+  }
+  for (const key of Object.keys(REVENUECAT_ENV)) {
+    assert.doesNotThrow(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", [key]: undefined }))
+  }
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "false" }), /BLUMI_PAYMENTS_ENABLED/)
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", LIVEKIT_API_KEY: undefined }), /Production media/)
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", EXPO_PUSH_ACCESS_TOKEN: undefined }), /EXPO_PUSH_ACCESS_TOKEN/)
+})
+
+test("staging can omit unverified app-link identities without weakening production", () => {
+  const staging = resolveServerConfig({
+    ...VALID_PRODUCTION_ENV,
+    BLUMI_DEPLOY_ENV: "staging",
+    REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox",
+    BLUMI_PAYMENTS_ENABLED: "0",
+    BLUMI_VOICE_ENABLED: "0",
+    BLUMI_APPLE_APP_ID: undefined,
+    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: undefined
+  })
+  assert.equal(staging.appleAppId, undefined)
+  assert.deepEqual(staging.androidAppLinkSha256CertFingerprints, [])
+  assert.throws(() => resolveServerConfig({
+    ...VALID_PRODUCTION_ENV,
+    BLUMI_APPLE_APP_ID: undefined
+  }), /BLUMI_APPLE_APP_ID/)
 })
 
 test("production-mode purchases require the complete server-only RevenueCat configuration", () => {

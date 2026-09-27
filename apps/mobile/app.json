@@ -77,7 +77,11 @@
     },
     "extra": {
       "buildProfile": "development",
-      "enableDemo": true
-    }
+      "enableDemo": true,
+      "eas": {
+        "projectId": "bc61197e-e1cb-478b-9f1d-61d8582d77c8"
+      }
+    },
+    "owner": "erenaksu"
   }
 }
