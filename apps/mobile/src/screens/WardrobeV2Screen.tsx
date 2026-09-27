@@ -771,7 +771,10 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   const thumbnailPresentation = getWardrobeThumbnailPresentation({
     type: item.type,
     isRigLayer: Boolean(rigLayerPresentation),
-    isSquareAsset: item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES || Boolean(getGarmentThumbnailOverride(item.id))
+    isSquareAsset:
+      item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES ||
+      Boolean(getGarmentThumbnailOverride(item.id)) ||
+      ["face", "eyes", "nose", "mouth"].includes(item.type)
   })
   const visibleThumbnailLayout = thumbnailPresentation.frame === "square"
     ? getShopThumbnailLayout(getShopProductThumbnailBounds(item.id), 100, 68)
@@ -807,6 +810,8 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
             style={[
               thumbnailPresentation.frame === "rig"
                 ? styles.itemPreviewRigLayer
+                : thumbnailPresentation.frame === "portrait"
+                  ? styles.itemPreviewFeaturePortrait
                 : thumbnailPresentation.frame === "square"
                   ? styles.itemPreviewSquare
                   : styles.itemPreviewImage,

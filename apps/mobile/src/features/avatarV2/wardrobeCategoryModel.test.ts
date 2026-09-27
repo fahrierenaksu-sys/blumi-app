@@ -180,6 +180,24 @@ test("female wearable thumbnails use a full square frame instead of a cropped ri
   }
 })
 
+test("face feature thumbnails use a consistent head portrait crop", () => {
+  for (const type of ["face", "eyes", "nose", "mouth"] as const) {
+    assert.deepEqual(
+      getWardrobeThumbnailPresentation({
+        type,
+        isRigLayer: false,
+        isSquareAsset: true
+      }),
+      {
+        frame: "portrait",
+        scale: 1,
+        translateY: 0
+      },
+      `${type} previews must share the same head portrait framing`
+    )
+  }
+})
+
 test("canonical canvas fallbacks keep the legacy fit profile", () => {
   assert.deepEqual(
     getWardrobeThumbnailPresentation({

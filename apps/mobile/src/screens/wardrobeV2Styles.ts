@@ -382,6 +382,13 @@ export const wardrobeV2Styles = StyleSheet.create({
     height: "100%",
     alignSelf: "center",
   },
+  itemPreviewFeaturePortrait: {
+    position: "absolute",
+    top: 0,
+    alignSelf: "center",
+    width: 116,
+    height: 116,
+  },
   itemPreviewImage: {
     alignSelf: "center",
   },

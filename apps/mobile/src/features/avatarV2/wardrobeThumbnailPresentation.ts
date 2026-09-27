@@ -1,6 +1,6 @@
 import type { AvatarItemType } from "./avatarV2.types"
 
-export type WardrobeThumbnailFrame = "square" | "rig" | "legacy"
+export type WardrobeThumbnailFrame = "square" | "portrait" | "rig" | "legacy"
 
 export interface WardrobeThumbnailPresentation {
   frame: WardrobeThumbnailFrame
@@ -19,6 +19,14 @@ export function getWardrobeThumbnailPresentation(input: {
   if (input.isRigLayer) {
     return {
       frame: "rig",
+      scale: 1,
+      translateY: 0
+    }
+  }
+
+  if (input.isSquareAsset && ["face", "eyes", "nose", "mouth"].includes(input.type)) {
+    return {
+      frame: "portrait",
       scale: 1,
       translateY: 0
     }
