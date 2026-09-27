@@ -14,9 +14,9 @@
 
 Blumi is an avatar-first social mobile app combining discovery, mutual matching, messaging, and shared virtual rooms. People can express themselves through a character and a personal space, then connect at their own pace.
 
-This repository contains the React Native application, backend API, real-time services, and shared TypeScript packages. **Status: active development and closed-test preparation.**
+This repository contains the React Native application, backend API, real-time services, and shared TypeScript packages. **Status: active development and closed-test preparation; not publicly released.**
 
-[Product experience](#product-experience) · [Engineering highlights](#engineering-highlights) · [Explore the code](#explore-the-code) · [Run locally](#run-locally)
+[Product experience](#product-experience) · [Engineering highlights](#engineering-highlights) · [Release status](#release-status) · [Explore the code](#explore-the-code) · [Run locally](#run-locally)
 
 <br />
 
@@ -181,3 +181,13 @@ The PostgreSQL gate creates a temporary cluster accessible through a local Unix 
 Installation applies a version-specific React Navigation compatibility patch for the updated `query-string` dependency. Source checks and deep-link regression tests cover this patch.
 
 Automated source checks complement device testing. Real-device audio, push delivery, purchase-provider flows, and file sharing require separate integration validation. Production packaging checks legal configuration before native preparation; preview configuration does not establish production readiness.
+
+<a id="release-status"></a>
+
+## Release status
+
+**Current as of 2026-09-27: not ready for public release.** The latest full `npm run verify` passed on Node.js 22.22.2, including package builds, type checks, lint, workspace tests, isolated PostgreSQL migration checks, the release dependency audit, and Expo Doctor (21/21). These checks validate the repository and disposable test database; they do not prove a live deployment or native-device release.
+
+The release configuration currently blocks preview/production packaging while unapproved candidate artwork is still imported by the app. Railway and external provider setup, EAS/TestFlight distribution, real-device OTP/push/voice/purchase flows, production backup/restore, and continuous monitoring still need verification. The protected Supabase database was inspected read-only; migrations 062–063 were not applied to it.
+
+See [Launch Control](docs/release/LAUNCH_CONTROL.md) for the dated readiness snapshot and [the staging and production guide](docs/release/railway-supabase-launch.md) for the deployment sequence and evidence requirements. Provider and account statuses can change, so recheck those documents before taking release action.
