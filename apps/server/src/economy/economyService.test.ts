@@ -42,24 +42,24 @@ test("economy creates a starter inventory once per user", async () => {
   assert.deepEqual(first.ownedRoomItemIds, ["room_v2_cozy_bed"])
 })
 
-test("the mobile shop hero item can be purchased at the server price", async () => {
+test("an active mobile shop garment can be purchased at the server price", async () => {
   const service = createEconomyService()
 
   const result = await service.purchaseItem(
     "user_a",
     {
       type: "avatar",
-      itemId: "avatar_v2_top_blush_lace_cardigan",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       avatarBodyId: "avatar_v2_body_default"
     },
     new Date("2026-06-26T12:00:00.000Z")
   )
 
-  assert.equal(result.priceCoins, 390)
-  assert.equal(result.inventory.coins, 860)
+  assert.equal(result.priceCoins, 410)
+  assert.equal(result.inventory.coins, 840)
   assert.ok(
     result.inventory.ownedAvatarItemIds.includes(
-      "avatar_v2_top_blush_lace_cardigan"
+      "avatar_v2_top_sage_ribbon_knit_jacket"
     )
   )
 })
@@ -70,7 +70,7 @@ test("avatar purchases reject wearables that do not fit the active body", async 
   await assert.rejects(
     () => service.purchaseItem("male_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_blush_lace_cardigan",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       avatarBodyId: "avatar_v2_body_male_light"
     }),
     /does not fit your avatar/i
@@ -148,12 +148,12 @@ test("two service instances cannot both purchase the same item", async () => {
   const attempts = await Promise.allSettled([
     firstService.purchaseItem("shared_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_blush_lace_cardigan",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       avatarBodyId: "avatar_v2_body_default"
     }),
     secondService.purchaseItem("shared_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_blush_lace_cardigan",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       avatarBodyId: "avatar_v2_body_default"
     })
   ])
@@ -167,10 +167,10 @@ test("two service instances cannot both purchase the same item", async () => {
     attempts.filter((attempt) => attempt.status === "rejected").length,
     1
   )
-  assert.equal(inventory.coins, 860)
+  assert.equal(inventory.coins, 840)
   assert.equal(
     inventory.ownedAvatarItemIds.filter(
-      (itemId) => itemId === "avatar_v2_top_blush_lace_cardigan"
+      (itemId) => itemId === "avatar_v2_top_sage_ribbon_knit_jacket"
     ).length,
     1
   )
@@ -266,7 +266,7 @@ test("invalid, already owned, and unaffordable purchases are rejected", async ()
     () =>
       service.purchaseItem("user_a", {
         type: "avatar",
-        itemId: "avatar_v2_top_blush_lace_cardigan",
+        itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
         avatarBodyId: "avatar_v2_body_default"
       }),
     /Not enough coins/

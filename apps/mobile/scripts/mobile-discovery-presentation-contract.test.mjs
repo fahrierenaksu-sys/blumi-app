@@ -409,7 +409,7 @@ test("production Discover error surfaces stay actionable without raw diagnostics
   assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("load", productionDiscoveryQuery\.error\)/)
   assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("refresh", error\)/)
   assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("decision", error\)/)
-  assert.match(lobbySource, /error instanceof DiscoveryDecisionQuotaExhaustedError[\s\S]*?"Today’s Discover limit reached"/)
+  assert.match(lobbySource, /error instanceof DiscoveryDecisionQuotaExhaustedError[\s\S]*?lobbyCopy\.quota/)
   assert.doesNotMatch(lobbySource, /error\.message/)
 })
 

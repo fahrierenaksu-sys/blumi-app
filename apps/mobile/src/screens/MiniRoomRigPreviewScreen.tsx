@@ -14,6 +14,7 @@ import { resolveRoomV2Scene } from "../features/roomV2/roomV2Selectors"
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 
 type MiniRoomRigPreviewScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -62,10 +63,11 @@ export function MiniRoomRigPreviewScreen(props: MiniRoomRigPreviewScreenProps) {
       partnerUser={PARTNER}
       participantAvatarSnapshots={participantAvatarSnapshots}
       connectionStatus="connected"
+      voiceAvailable={true}
       localMedia={LOCAL_MEDIA_OFF}
       roomDecorScene={roomDecorScene}
       leaveDisabled={false}
-      onLeave={() => navigation.goBack()}
+      onLeave={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}
       onOpenSafety={() => undefined}
       onRetryConnect={() => undefined}
       onToggleMic={() => undefined}

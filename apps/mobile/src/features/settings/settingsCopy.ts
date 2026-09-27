@@ -64,6 +64,8 @@ export interface SettingsCopy {
   finish: string
   deletedTitle: string
   deletedBody: string
+  deletionPendingTitle: string
+  deletionPendingBody: string
   cancel: string
   codeNotSent: string
   signInRequired: string
@@ -118,7 +120,7 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     currentPhoneBody: "Enter the 6-digit code sent to your current sign-in phone.", newPhoneBody: "Choose the country, then enter the local phone number. We’ll text the new number next.", verifyNewPhoneBody: "Enter the 6-digit code sent to your new phone number. Finishing this will sign out every active session.",
     newPhoneInput: "New local sign-in phone number", localPhonePlaceholder: "Local phone number", currentPhoneCode: "Current phone verification code", newPhoneCode: "New phone verification code",
     cancelPhoneChange: "Cancel phone change", verifyCurrentCode: "Verify current phone code", sendCodeToNewPhone: "Send code to new phone", finishPhoneChange: "Finish phone change", checking: "Checking…", finishing: "Finishing…", sendCode: "Send code", finish: "Finish",
-    deletedTitle: "Account deleted", deletedBody: "Your Blumi session has been cleared.", tryAgain: "Try again in a moment.", privacyNotSaved: "Privacy setting not saved",
+    deletedTitle: "Account deleted", deletedBody: "Your Blumi session has been cleared.", deletionPendingTitle: "Deletion in progress", deletionPendingBody: "Your Blumi account is removed. Firebase sign-in deletion is still being completed.", tryAgain: "Try again in a moment.", privacyNotSaved: "Privacy setting not saved",
     cancel: "Cancel", codeNotSent: "Code not sent", signInRequired: "Sign in required", signInBeforeDelete: "Sign in to your production account before deleting it.", signInBeforeExport: "Sign in to your production account before exporting data.", signInBeforePhone: "Sign in to your production account before changing your phone.",
     deletePermanentlyTitle: "Delete permanently?", deletePermanentlyBody: "Your code is confirmed. This permanently removes your profile, avatar, room, matches, messages, and active account data. This cannot be undone.", deletePermanently: "Delete permanently",
     deleteAccountPromptBody: "We’ll send a one-time code to your sign-in phone. After you enter it, you’ll make one final permanent-delete confirmation.", sending: "Sending…", sendDeletionCode: "Send deletion code",
@@ -150,7 +152,7 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     currentPhoneBody: "Mevcut giriş telefonuna gönderilen 6 haneli kodu gir.", newPhoneBody: "Ülkeyi seç, ardından yerel telefon numaranı gir. Yeni numaraya sonraki adımda mesaj göndeririz.", verifyNewPhoneBody: "Yeni telefonuna gönderilen 6 haneli kodu gir. Tamamlandığında tüm aktif oturumlar kapatılır.",
     newPhoneInput: "Yeni yerel giriş telefon numarası", localPhonePlaceholder: "Yerel telefon numarası", currentPhoneCode: "Mevcut telefon doğrulama kodu", newPhoneCode: "Yeni telefon doğrulama kodu",
     cancelPhoneChange: "Telefon değişikliğini iptal et", verifyCurrentCode: "Mevcut telefon kodunu doğrula", sendCodeToNewPhone: "Yeni telefona kod gönder", finishPhoneChange: "Telefon değişikliğini bitir", checking: "Kontrol ediliyor…", finishing: "Tamamlanıyor…", sendCode: "Kod gönder", finish: "Bitir",
-    deletedTitle: "Hesap silindi", deletedBody: "Blumi oturumun temizlendi.", tryAgain: "Biraz sonra tekrar dene.", privacyNotSaved: "Gizlilik ayarı kaydedilmedi",
+    deletedTitle: "Hesap silindi", deletedBody: "Blumi oturumun temizlendi.", deletionPendingTitle: "Silme işlemi sürüyor", deletionPendingBody: "Blumi hesabın kaldırıldı. Firebase giriş kaydının silinmesi tamamlanıyor.", tryAgain: "Biraz sonra tekrar dene.", privacyNotSaved: "Gizlilik ayarı kaydedilmedi",
     cancel: "Vazgeç", codeNotSent: "Kod gönderilemedi", signInRequired: "Oturum açman gerekiyor", signInBeforeDelete: "Hesabını silmeden önce production hesabında oturum aç.", signInBeforeExport: "Verilerini dışa aktarmadan önce production hesabında oturum aç.", signInBeforePhone: "Giriş telefonunu değiştirmeden önce production hesabında oturum aç.",
     deletePermanentlyTitle: "Kalıcı olarak silinsin mi?", deletePermanentlyBody: "Kodun doğrulandı. Bu işlem profilini, avatarını, odanı, eşleşmelerini, mesajlarını ve etkin hesap verilerini kalıcı olarak siler. Geri alınamaz.", deletePermanently: "Kalıcı olarak sil",
     deleteAccountPromptBody: "Giriş telefonuna tek kullanımlık bir kod göndereceğiz. Kodu girdikten sonra son bir kalıcı silme onayı vereceksin.", sending: "Gönderiliyor…", sendDeletionCode: "Silme kodu gönder",

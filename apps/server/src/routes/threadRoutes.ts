@@ -224,6 +224,20 @@ export async function registerThreadRoutes(
 
     const existing = await chatService.repository.findThread(input.threadId as string)
     const thread = await chatService.createThread(input)
+    const partnerUserId = canonicalParticipantUserIds.find(
+      (userId) => userId !== resolved.account.userId
+    )
+    const persona = partnerUserId
+      ? await chatService.repository.findTestPersona(partnerUserId)
+      : null
+    if (persona) {
+      await deliveryService.sendMessage({
+        senderUserId: persona.userId,
+        threadId: thread.threadId,
+        body: persona.greeting,
+        clientMessageId: `test-persona-greeting-${thread.threadId}`
+      })
+    }
     const allowV2 = resolveRequestCapabilities(
       request,
       resolved.account.userId,
@@ -259,13 +273,37 @@ export async function registerThreadRoutes(
       return reply.code(403).send({ error: "That room invite is not available." })
     }
     try {
-      return {
-        threadId,
-        invites: await miniRoomService.listChatInvites(
-          resolved.account.userId,
-          threadId
-        )
+      let invites = await miniRoomService.listChatInvites(
+        resolved.account.userId,
+        threadId
+      )
+      // A synthetic test partner can initiate a real, persisted chat invitation
+      // when the user opens the conversation. Reopening it is idempotent, and
+      // normal accounts never enter this branch.
+      if (!invites.some((invite) => invite.status === "pending" || invite.status === "accepted")) {
+        const persona = await chatService.repository.findTestPersona(context.partnerAccount.userId)
+        if (persona) {
+          try {
+            const result = await miniRoomService.createChatInvite({
+              threadId,
+              senderProfile: context.partnerAccount.profile,
+              recipientProfile: resolved.account.profile
+            })
+            if (result.created) {
+              services.connectionManager.sendToUsers(
+                [persona.userId, resolved.account.userId],
+                { type: "chat.room_invite_updated", payload: result.invite }
+              )
+            }
+            invites = await miniRoomService.listChatInvites(resolved.account.userId, threadId)
+          } catch (error) {
+            if (!(error instanceof ChatRoomInviteError) || error.code !== "PARTICIPANT_BUSY") {
+              throw error
+            }
+          }
+        }
       }
+      return { threadId, invites }
     } catch (error) {
       return sendChatRoomInviteError(error, reply)
     }

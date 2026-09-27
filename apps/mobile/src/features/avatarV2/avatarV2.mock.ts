@@ -1,6 +1,7 @@
 import { avatarV2LayerAssets } from "./avatarV2Assets"
 import { FEMALE_SWEET_CAPSULE_LAYERS } from "./femaleSweetCapsuleDefinitions"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "./malePremiumCapsulePilotDefinitions"
+import { isRetiredAvatarItemId } from "@blumi/domain"
 import type {
   AvatarCatalogItem,
   AvatarCategory,
@@ -934,7 +935,9 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
 
 export const AVATAR_V2_CATALOG: AvatarCatalogItem[] =
   AVATAR_V2_CATALOG_SOURCE.map((item) =>
-    AVATAR_STUDIO_FREE_ITEM_TYPES.has(item.type)
+    isRetiredAvatarItemId(item.id)
+      ? { ...item, hiddenFromShop: true, hiddenFromWardrobe: true }
+      : AVATAR_STUDIO_FREE_ITEM_TYPES.has(item.type)
       ? { ...item, ownedByDefault: true }
       : item
   )

@@ -17,6 +17,7 @@ import { resolveAccountRecoveryLocale } from "../features/session/accountRecover
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackFromInbox } from "../navigation/rootNavigationModel"
 import { ParticipantAvatar } from "../ui/participantAvatar"
 import { areChatParticipantAvatarsEquivalent } from "../features/chat/chatParticipantAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
@@ -64,6 +65,7 @@ interface ConversationCardProps {
   lastBody: string | undefined
   lastTime: string
   hasUnread: boolean
+  reduceMotion: boolean
   unreadPulseAnim: Animated.Value
   onPress: () => void
 }
@@ -72,22 +74,39 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
   const scaleAnim = useRef(new Animated.Value(1)).current
 
   const handlePressIn = useCallback(() => {
+    if (props.reduceMotion) {
+      scaleAnim.stopAnimation()
+      scaleAnim.setValue(1)
+      return
+    }
     Animated.spring(scaleAnim, {
       toValue: 0.98,
       useNativeDriver: true,
       speed: 50,
       bounciness: 4
     }).start()
-  }, [scaleAnim])
+  }, [props.reduceMotion, scaleAnim])
 
   const handlePressOut = useCallback(() => {
+    if (props.reduceMotion) {
+      scaleAnim.stopAnimation()
+      scaleAnim.setValue(1)
+      return
+    }
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,
       speed: 50,
       bounciness: 4
     }).start()
-  }, [scaleAnim])
+  }, [props.reduceMotion, scaleAnim])
+
+  useEffect(() => {
+    if (props.reduceMotion) {
+      scaleAnim.stopAnimation()
+      scaleAnim.setValue(1)
+    }
+  }, [props.reduceMotion, scaleAnim])
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -176,6 +195,7 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
   previous.lastBody === next.lastBody &&
   previous.lastTime === next.lastTime &&
   previous.hasUnread === next.hasUnread &&
+  previous.reduceMotion === next.reduceMotion &&
   previous.unreadPulseAnim === next.unreadPulseAnim &&
   previous.onPress === next.onPress
 )
@@ -261,7 +281,7 @@ export function InboxScreen(props: InboxScreenProps) {
     [navigation]
   )
   const handleGoBack = useCallback(() => {
-    navigation.goBack()
+    goBackFromInbox(navigation)
   }, [navigation])
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
@@ -270,7 +290,7 @@ export function InboxScreen(props: InboxScreenProps) {
     item: (typeof threadRows)[number]
     index: number
   }) => (
-    <Animated.View style={getItemAnim(index)}>
+    <Animated.View style={reduceMotion ? undefined : getItemAnim(index)}>
       <ConversationCard
         copy={copy}
         partnerName={item.partnerName}
@@ -279,11 +299,12 @@ export function InboxScreen(props: InboxScreenProps) {
         lastBody={item.lastBody}
         lastTime={item.lastTime}
         hasUnread={item.hasUnread}
+        reduceMotion={reduceMotion}
         unreadPulseAnim={unreadPulseAnim}
         onPress={() => openThread(item.thread.threadId)}
       />
     </Animated.View>
-  ), [copy, getItemAnim, openThread, unreadPulseAnim])
+  ), [copy, getItemAnim, openThread, reduceMotion, unreadPulseAnim])
 
   return (
     <View style={styles.root}>
@@ -363,23 +384,10 @@ interface EmptyInboxProps {
 }
 
 function EmptyInbox(props: EmptyInboxProps) {
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const slideAnim = useRef(new Animated.Value(24)).current
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: uiTheme.animation.durationEntrance,
-        useNativeDriver: true
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: uiTheme.animation.durationEntrance,
-        useNativeDriver: true
-      })
-    ]).start()
-  }, [fadeAnim, slideAnim])
+  const entranceStyle = useEntranceAnimation({
+    duration: uiTheme.animation.durationEntrance,
+    translateY: 24
+  })
 
   if (
     props.threadListState.status === "idle" ||
@@ -389,7 +397,7 @@ function EmptyInbox(props: EmptyInboxProps) {
       <Animated.View
         style={[
           emptyStyles.card,
-          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          entranceStyle
         ]}
       >
         <Text style={emptyStyles.body}>{props.copy.opening}</Text>
@@ -402,7 +410,7 @@ function EmptyInbox(props: EmptyInboxProps) {
         accessibilityRole="alert"
         style={[
           emptyStyles.card,
-          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          entranceStyle
         ]}
       >
         <Text style={emptyStyles.title}>{props.copy.failedTitle}</Text>
@@ -438,7 +446,7 @@ function EmptyInbox(props: EmptyInboxProps) {
     <Animated.View
       style={[
         emptyStyles.card,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+        entranceStyle
       ]}
     >
       {/* Gradient glow orb */}

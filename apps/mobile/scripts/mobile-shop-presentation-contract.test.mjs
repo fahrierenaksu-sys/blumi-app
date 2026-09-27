@@ -30,7 +30,7 @@ test("shop remains body-compatible through the catalog source of truth", () => {
 test("compact shop shows two readable product columns per page", () => {
   assert.match(shopScreen, /SHOP_PRODUCT_COLUMNS_PER_PAGE\s*=\s*2/)
   assert.match(shopScreen, /productCardWidth[\s\S]*SHOP_PRODUCT_COLUMNS_PER_PAGE/)
-  assert.match(shopScreen, /index \+= SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  assert.match(shopScreen, /index \+= catalog.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
 })
 
 test("full-canvas rig layers get a type-aware contained presentation", () => {

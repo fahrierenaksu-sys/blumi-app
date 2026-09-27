@@ -6,6 +6,7 @@ import type { SessionActor } from "../features/session/sessionApi"
 import { getAppLocale } from "../features/session/authLocale"
 import { getYouScreenCopy } from "../features/session/youScreenCopy"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { MyAvatar } from "../ui/myAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
@@ -41,7 +42,7 @@ export function YouScreen(props: YouScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => navigation.goBack()} size={40}>
+            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("Lobby"))} size={40}>
               <Ionicons name="chevron-back" size={22} color={uiTheme.colors.textPrimary} />
             </ActionButtonCircle>
           }

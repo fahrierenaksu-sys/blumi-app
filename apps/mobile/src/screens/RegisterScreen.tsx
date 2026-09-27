@@ -15,6 +15,7 @@ import {
   useWindowDimensions
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import {
   advanceRegisterFlowToCode,
   analyzeLocalPhoneNumber,
@@ -40,9 +41,15 @@ import {
 import type { RegisterAccountInput } from "../features/session/sessionApi"
 import { validateAccountRecoveryPhones } from "../features/session/accountRecoveryModel"
 import {
-  requestAccountRecoveryChallenge,
   submitAccountRecoveryRequest
 } from "../features/session/sessionApi"
+import {
+  confirmFirebasePhoneCode,
+  getFirebaseCurrentPhoneNumber,
+  requestFirebasePhoneCode,
+  subscribeToFirebasePhoneNumber,
+  type FirebasePhoneConfirmation
+} from "../features/session/firebasePhoneAuth"
 import {
   getAccountRecoveryCopy,
   getAccountRecoveryErrorMessageForDisplay,
@@ -122,6 +129,13 @@ export function RegisterScreen({
   const [attemptedPrimaryAction, setAttemptedPrimaryAction] = useState(false)
   const [localBusy, setLocalBusy] = useState(false)
   const [smsNotice, setSmsNotice] = useState<string | null>(null)
+  const [codeRequestStatus, setCodeRequestStatus] = useState<
+    "idle" | "sending" | "sent" | "failed"
+  >("idle")
+  const [firebasePhoneNumber, setFirebasePhoneNumber] = useState(
+    getFirebaseCurrentPhoneNumber
+  )
+  useEffect(() => subscribeToFirebasePhoneNumber(setFirebasePhoneNumber), [])
   const [otpFocused, setOtpFocused] = useState(false)
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -134,6 +148,7 @@ export function RegisterScreen({
   const [recoveryCode, setRecoveryCode] = useState("")
   const [recoveryBusy, setRecoveryBusy] = useState(false)
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const recoveryFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
   const actionInFlightRef = useRef(false)
   const phoneInputRef = useRef<TextInput | null>(null)
   const busy = isSubmitting || localBusy
@@ -146,14 +161,17 @@ export function RegisterScreen({
   const legalRequirementsMet = authIntent === "create"
     ? termsAccepted
     : true
+  const verifiedFirebasePhone =
+    firebasePhoneNumber === availability.normalizedPhoneNumber
   const primaryEnabled = isCodeStep
-    ? availability.canVerify
+    ? availability.canVerify || (verifiedFirebasePhone && availability.phoneValid)
     : canRequestRegisterPhoneCode({
       phoneValid: availability.phoneValid,
       termsAccepted: legalRequirementsMet,
       isSubmitting: busy
     })
-  const primaryDisabled = busy || !primaryEnabled
+  const primaryDisabled = busy || !primaryEnabled ||
+    (isCodeStep && codeRequestStatus !== "sent" && !verifiedFirebasePhone)
   const maskedPhoneNumber = maskPhoneNumber(
     availability.normalizedPhoneNumber
   )
@@ -196,12 +214,33 @@ export function RegisterScreen({
     setAttemptedPrimaryAction(false)
     setOtpTouched(false)
     setSmsNotice(null)
+    setCodeRequestStatus("idle")
     setResendCooldownSeconds(0)
     onClearError()
   }
 
   const requestVerificationCode = async (): Promise<void> => {
     setAttemptedPrimaryAction(true)
+    if (verifiedFirebasePhone && availability.phoneValid && legalRequirementsMet &&
+      !actionInFlightRef.current) {
+      actionInFlightRef.current = true
+      setLocalBusy(true)
+      onClearError()
+      try {
+        await onRegister({
+          phoneNumber: availability.normalizedPhoneNumber,
+          verificationCode: "",
+          authIntent,
+          termsAcceptance: { version: LEGAL_DOCUMENT_VERSION, locale }
+        })
+      } catch {
+        // Session state owns the user-facing account-completion error.
+      } finally {
+        actionInFlightRef.current = false
+        setLocalBusy(false)
+      }
+      return
+    }
     if (
       !availability.canRequestCode ||
       !legalRequirementsMet ||
@@ -212,19 +251,27 @@ export function RegisterScreen({
       return
     }
 
+    const previousCodeAvailable = codeRequestStatus === "sent"
     actionInFlightRef.current = true
     setLocalBusy(true)
     onClearError()
+    setCodeRequestStatus("sending")
+    setSmsNotice(authCopy.sendingCode)
     try {
+      if (!isCodeStep) {
+        setFlow((current) =>
+          normalizePhoneNumber(current.phoneNumber, current.selectedCountry) ===
+          availability.normalizedPhoneNumber
+            ? advanceRegisterFlowToCode(current)
+            : current
+        )
+        // Let the OTP screen render before the native verification request can open UI.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      }
       await onRequestVerificationCode({
         phoneNumber: availability.normalizedPhoneNumber
       })
-      setFlow((current) =>
-        normalizePhoneNumber(current.phoneNumber, current.selectedCountry) ===
-        availability.normalizedPhoneNumber
-          ? advanceRegisterFlowToCode(current)
-          : current
-      )
+      setCodeRequestStatus("sent")
       setAttemptedPrimaryAction(false)
       setOtpTouched(false)
       setResendCooldownSeconds(RESEND_COOLDOWN_SECONDS)
@@ -235,6 +282,8 @@ export function RegisterScreen({
       )
     } catch {
       // Session state owns the user-facing provider error.
+      setCodeRequestStatus(previousCodeAvailable ? "sent" : "failed")
+      setSmsNotice(previousCodeAvailable ? authCopy.resendFailed : authCopy.codeNotSent)
     } finally {
       actionInFlightRef.current = false
       setLocalBusy(false)
@@ -243,7 +292,8 @@ export function RegisterScreen({
 
   const verifyCode = async (): Promise<void> => {
     setAttemptedPrimaryAction(true)
-    if (!availability.canVerify || actionInFlightRef.current) return
+    if (!(availability.canVerify || verifiedFirebasePhone) || actionInFlightRef.current ||
+      (codeRequestStatus !== "sent" && !verifiedFirebasePhone)) return
 
     actionInFlightRef.current = true
     setLocalBusy(true)
@@ -252,6 +302,7 @@ export function RegisterScreen({
       await onRegister({
         phoneNumber: availability.normalizedPhoneNumber,
         verificationCode: flow.verificationCode,
+        authIntent,
         termsAcceptance: {
           version: LEGAL_DOCUMENT_VERSION,
           locale
@@ -286,8 +337,7 @@ export function RegisterScreen({
     setRecoveryBusy(true)
     setRecoveryError(null)
     try {
-      await requestAccountRecoveryChallenge(
-        MOBILE_HTTP_BASE_URL,
+      recoveryFirebaseConfirmationRef.current = await requestFirebasePhoneCode(
         validation.normalizedNewPhoneNumber
       )
       setRecoveryOldPhone(validation.normalizedOldPhoneNumber)
@@ -314,11 +364,15 @@ export function RegisterScreen({
     setRecoveryBusy(true)
     setRecoveryError(null)
     try {
+      const confirmation = recoveryFirebaseConfirmationRef.current
+      if (!confirmation) throw new Error("Request a verification code first.")
+      const idToken = await confirmFirebasePhoneCode(confirmation, recoveryCode)
       await submitAccountRecoveryRequest(MOBILE_HTTP_BASE_URL, {
         oldPhoneNumber: validation.normalizedOldPhoneNumber,
         newPhoneNumber: validation.normalizedNewPhoneNumber,
-        verificationCode: recoveryCode
+        idToken
       })
+      recoveryFirebaseConfirmationRef.current = null
       setRecoveryVisible(false)
       setRecoveryStage("details")
       setRecoveryOldPhone("")
@@ -338,6 +392,7 @@ export function RegisterScreen({
     setRecoveryOldPhone("")
     setRecoveryNewPhone("")
     setRecoveryCode("")
+    recoveryFirebaseConfirmationRef.current = null
     setRecoveryError(null)
   }
 
@@ -366,12 +421,12 @@ export function RegisterScreen({
             return
           }
           onClearError()
-          navigation.goBack()
+          goBackOrFallback(navigation, () => navigation.replace("AuthEntry"))
         }}
         onPrimaryAction={runPrimaryAction}
         primaryActionBusy={busy}
         primaryActionDisabled={primaryDisabled}
-        primaryActionLabel={isCodeStep ? "Blumi'ye katil" : authCopy.sendCode}
+        primaryActionLabel={isCodeStep || verifiedFirebasePhone ? "Blumi'ye katil" : authCopy.sendCode}
         primaryActionTestID={isCodeStep ? "register-submit" : "register-send-code"}
         scrollBottomInset={0}
         stageHeight={resolveRegisterPhoneStageHeight(setupMetrics)}
@@ -418,7 +473,7 @@ export function RegisterScreen({
                   <View style={styles.sentIcon}>
                     <Ionicons
                       accessible={false}
-                      name="checkmark"
+                      name={codeRequestStatus === "sent" ? "checkmark" : "ellipsis-horizontal"}
                       size={15}
                       color={uiTheme.colors.successInk}
                     />
@@ -714,7 +769,7 @@ export function RegisterScreen({
                 accessibilityLabel={authCopy.backToAccountChoices}
                 onPress={() => {
                   onClearError()
-                  navigation.goBack()
+                  goBackOrFallback(navigation, () => navigation.replace("AuthEntry"))
                 }}
                 style={({ pressed }) => [
                   styles.back,
@@ -746,9 +801,13 @@ export function RegisterScreen({
                 compact={compactHero}
                 body={
                   isCodeStep
-                    ? authIntent === "sign-in"
-                      ? authCopy.signInCodeBody
-                      : authCopy.createCodeBody
+                    ? codeRequestStatus === "sending"
+                      ? authCopy.sendingCode
+                      : codeRequestStatus === "failed"
+                        ? authCopy.codeNotSent
+                        : authIntent === "sign-in"
+                          ? authCopy.signInCodeBody
+                          : authCopy.createCodeBody
                     : authIntent === "sign-in"
                       ? authCopy.signInPhoneBody
                       : authCopy.registerHeroBody
@@ -773,7 +832,11 @@ export function RegisterScreen({
                   </Text>
                   <Text style={styles.createHeadingBody}>
                     {isCodeStep
-                      ? "Gönderdiğimiz 6 haneli kodu gir."
+                      ? codeRequestStatus === "sending"
+                        ? authCopy.sendingCode
+                        : codeRequestStatus === "failed"
+                          ? authCopy.codeNotSent
+                          : "Gönderdiğimiz 6 haneli kodu gir."
                       : "Telefonunla Blumi dünyanı güvende tut."}
                   </Text>
                   <View
@@ -870,7 +933,7 @@ export function RegisterScreen({
                     <View style={styles.sentIcon}>
                       <Ionicons
                         accessible={false}
-                        name="checkmark"
+                        name={codeRequestStatus === "sent" ? "checkmark" : "ellipsis-horizontal"}
                         size={15}
                         color={uiTheme.colors.successInk}
                       />
@@ -1081,7 +1144,7 @@ export function RegisterScreen({
               {authIntent === "sign-in" ? <View testID="register-primary-action">
                 <PrimaryButton
                   label={
-                    isCodeStep
+                    isCodeStep || verifiedFirebasePhone
                       ? authIntent === "sign-in" ? authCopy.signInToBlumi : "Blumi’ye katıl"
                       : authCopy.sendCode
                   }

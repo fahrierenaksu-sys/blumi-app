@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createStableMatchedUserAvatar } from "../matches/matchRoomResolvers"
 import {
   createMatchFromDiscoveryResult,
   decideDiscoverProfile,
@@ -367,7 +368,11 @@ test("decideDiscoverProfile posts like/pass and builds a backend match preview",
 
   const match = createMatchFromDiscoveryResult({
     currentUser: { userId: "me", displayName: "Mina" },
-    matchedUser: { userId: "discover_defne", displayName: "Defne Yildiz" },
+    matchedUser: {
+      userId: "discover_defne",
+      displayName: "Defne Yildiz",
+      avatarSelection: COMPLETE_DISCOVERY_AVATAR
+    },
     result
   })
 
@@ -376,6 +381,14 @@ test("decideDiscoverProfile posts like/pass and builds a backend match preview",
   assert.equal(match?.mode, "futureBackend")
   assert.equal(match?.backendBoundary, "future-backend-adapter")
   assert.equal(match?.matchedUser.displayName, "Defne Yildiz")
+  assert.deepEqual(match?.matchedUser.avatarSelection, COMPLETE_DISCOVERY_AVATAR)
+  assert.notEqual(match?.matchedUser.avatarSelection, COMPLETE_DISCOVERY_AVATAR)
+  const { schemaVersion: _schemaVersion, ...equippedItems } = COMPLETE_DISCOVERY_AVATAR.loadout
+  assert.deepEqual(createStableMatchedUserAvatar(match!.matchedUser), {
+    ...equippedItems,
+    dressId: null,
+    outerwearId: null
+  })
 })
 
 test("decideDiscoverProfile preserves the server stale-eligibility contract", async () => {

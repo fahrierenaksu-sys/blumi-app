@@ -10,6 +10,7 @@ import {
   View
 } from "react-native"
 import { uiTheme } from "../ui/theme"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import {
   applyRoomStudioRecipe,
@@ -56,7 +57,11 @@ const ZONE_LABELS: Readonly<Record<RoomStudioZoneId, string>> = {
 }
 
 type HomeStudioScreenProps = {
-  navigation: { goBack: () => void }
+  navigation: {
+    canGoBack: () => boolean
+    goBack: () => void
+    replace: (route: "MyRoom") => void
+  }
   sessionActor?: { profile?: { userId?: string } }
 }
 
@@ -193,7 +198,7 @@ export function HomeStudioScreen({ navigation, sessionActor }: HomeStudioScreenP
         <Text style={styles.blockedBody}>
           Enable the isolated Home Studio QA flag in a development or native-ui-test build.
         </Text>
-        <Pressable style={styles.backButton} onPress={navigation.goBack}>
+        <Pressable style={styles.backButton} onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
       </SafeAreaView>
@@ -213,7 +218,7 @@ export function HomeStudioScreen({ navigation, sessionActor }: HomeStudioScreenP
     <SafeAreaView contentGutter={false} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable accessibilityLabel="Geri" onPress={navigation.goBack} style={styles.iconButton}>
+          <Pressable accessibilityLabel="Geri" onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))} style={styles.iconButton}>
             <Text style={styles.iconText}>‹</Text>
           </Pressable>
           <View style={styles.headerCopy}>

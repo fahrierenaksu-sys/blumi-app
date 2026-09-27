@@ -18,6 +18,18 @@ export function createPostgresChatRepository(
   pool: QueryExecutor
 ): ChatRepository {
   return {
+    async findTestPersona(userId) {
+      const result = await pool.query(
+        `SELECT user_id, greeting, replies FROM blumi_test_personas WHERE user_id = $1`,
+        [userId]
+      )
+      const row = result.rows[0]
+      return row ? {
+        userId: String(row.user_id),
+        greeting: String(row.greeting),
+        replies: Array.isArray(row.replies) ? row.replies.map(String) : []
+      } : null
+    },
     async listThreads(userId) {
       return (await this.listThreadsPage(userId)).threads
     },

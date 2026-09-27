@@ -8,6 +8,18 @@
     "icon": "./assets/brand/blumi-app-icon-1024.png",
     "userInterfaceStyle": "light",
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "./plugins/withIosDynamicFrameworks",
+      "./plugins/withIosRecaptchaEnterprise",
       "@config-plugins/react-native-webrtc",
       "./plugins/withAudioOnlyLiveRoom",
       [
@@ -19,6 +31,7 @@
       "expo-secure-store",
       "expo-font",
       "expo-image",
+      "expo-sharing",
       "expo-web-browser",
       "expo-notifications",
       "@sentry/react-native",
@@ -31,6 +44,7 @@
       "bitcode": false,
       "deploymentTarget": "16.4",
       "bundleIdentifier": "com.blumi.mobile",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "buildNumber": "1",
       "supportsTablet": false,
       "entitlements": {
@@ -38,6 +52,7 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["fetch", "remote-notification"],
         "NSMicrophoneUsageDescription": "Blumi uses your microphone only when you choose to speak in a live room."
       }
     },
@@ -56,6 +71,7 @@
       "blockedPermissions": [
         "android.permission.CAMERA"
       ],
+      "googleServicesFile": "./google-services.json",
       "package": "com.blumi.mobile",
       "versionCode": 1
     },

@@ -3,6 +3,7 @@ import type {
   AccountActionPurpose,
   AccountOnboardingStep,
   BlumiBackendStore,
+  FirebaseActionChallenge,
   PendingAccountActionOtp,
   PendingOtp,
   OtpSendLimit,
@@ -19,6 +20,16 @@ import type {
 import { normalizeUserProfilePrompts } from "@blumi/contracts"
 
 export interface AuthRepository {
+  saveFirebaseActionChallenge(challenge: FirebaseActionChallenge): Promise<void>
+  consumeFirebaseActionChallenge(input: {
+    accountId: string
+    purpose: FirebaseActionChallenge["purpose"]
+    challengeId: string
+    sessionTokenHash: string
+    phoneNumber: string
+    authTime: number
+    now: number
+  }): Promise<boolean>
   getPendingOtp(phoneNumber: string): Promise<PendingOtp | null>
   claimOtpSend(input: OtpSendClaimInput): Promise<OtpSendClaimResult>
   activatePendingOtp(pendingOtp: PendingOtp): Promise<boolean>
@@ -29,11 +40,29 @@ export interface AuthRepository {
   getPendingAccountDeletionOtp(accountId: string): Promise<PendingOtp | null>
   claimAccountDeletionOtpSend(input: AccountDeletionOtpSendClaimInput): Promise<OtpSendClaimResult>
   activatePendingAccountDeletionOtp(input: { accountId: string; pendingOtp: PendingOtp }): Promise<boolean>
+  createAccountDeletionConfirmation(input: {
+    accountId: string
+    confirmationTokenDigest: string
+    confirmationExpiresAt: number
+    firebaseUid?: string
+  }): Promise<void>
+  listDueFirebaseUserDeletions(now: Date, limit: number): Promise<Array<{ uid: string; accountId: string; attemptCount: number }>>
+  completeFirebaseUserDeletion(uid: string): Promise<void>
+  retryFirebaseUserDeletion(uid: string, nextAttemptAt: Date): Promise<void>
+  hasPendingFirebaseUserDeletion(accountId: string): Promise<boolean>
+  isFirebaseUserDeletionPending(uid: string): Promise<boolean>
   verifyAndCreateAccountDeletionConfirmation(input: AccountDeletionOtpVerificationInput): Promise<OtpVerificationResult>
   consumeAccountDeletionConfirmation(input: AccountDeletionConfirmationConsumption): Promise<boolean>
   getPendingAccountActionOtp(input: { accountId: string; purpose: AccountActionPurpose }): Promise<PendingAccountActionOtp | null>
   claimAccountActionOtpSend(input: AccountActionOtpSendClaimInput): Promise<OtpSendClaimResult>
   activatePendingAccountActionOtp(input: { action: PendingAccountActionOtp }): Promise<boolean>
+  createAccountActionConfirmation(input: {
+    accountId: string
+    purpose: AccountActionPurpose
+    targetPhoneNumber: string
+    confirmationTokenDigest: string
+    confirmationExpiresAt: number
+  }): Promise<void>
   verifyAndCreateAccountActionConfirmation(input: AccountActionOtpVerificationInput): Promise<OtpVerificationResult>
   validateAccountActionConfirmation(input: AccountActionConfirmationConsumption): Promise<boolean>
   consumeAccountActionConfirmation(input: AccountActionConfirmationConsumption): Promise<boolean>
@@ -134,6 +163,8 @@ export type OtpVerificationResult =
 
 export interface OtpSignInFinalizationInput extends OtpVerificationInput {
   requireExistingAccount?: boolean
+  /** Used only after a trusted external identity provider has verified the phone. */
+  verifiedWithoutOtp?: boolean
   newAccount: AccountRecord
   createSession(account: AccountRecord): SessionRecord
 }
@@ -188,6 +219,7 @@ export type PhoneChangeResult =
 
 export type OtpSignInFinalizationResult =
   | { kind: "terms_required" }
+  | { kind: "account_not_found" }
   | { kind: "verified"; account: AccountRecord; session: SessionRecord }
   | { kind: "invalid"; attemptsRemaining: number }
   | { kind: "missing_or_expired" }
@@ -197,6 +229,41 @@ export function createInMemoryAuthRepository(
   store: BlumiBackendStore
 ): AuthRepository {
   return {
+    async listDueFirebaseUserDeletions(now, limit) {
+      return [...store.firebaseUserDeletionOutbox.values()]
+        .filter((item) => item.nextAttemptAt <= now.getTime())
+        .slice(0, limit)
+        .map(({ uid, accountId, attemptCount }) => ({ uid, accountId, attemptCount }))
+    },
+    async completeFirebaseUserDeletion(uid) {
+      store.firebaseUserDeletionOutbox.delete(uid)
+    },
+    async retryFirebaseUserDeletion(uid, nextAttemptAt) {
+      const pending = store.firebaseUserDeletionOutbox.get(uid)
+      if (pending) store.firebaseUserDeletionOutbox.set(uid, {
+        ...pending, attemptCount: pending.attemptCount + 1, nextAttemptAt: nextAttemptAt.getTime()
+      })
+    },
+    async hasPendingFirebaseUserDeletion(accountId) {
+      return [...store.firebaseUserDeletionOutbox.values()].some((item) => item.accountId === accountId)
+    },
+    async isFirebaseUserDeletionPending(uid) {
+      return store.firebaseUserDeletionOutbox.has(uid)
+    },
+    async saveFirebaseActionChallenge(challenge) {
+      store.firebaseActionChallenges.set(`${challenge.accountId}:${challenge.purpose}`, { ...challenge })
+    },
+    async consumeFirebaseActionChallenge(input) {
+      const key = `${input.accountId}:${input.purpose}`
+      const challenge = store.firebaseActionChallenges.get(key)
+      if (!challenge || challenge.challengeId !== input.challengeId ||
+        challenge.sessionTokenHash !== input.sessionTokenHash ||
+        challenge.targetPhoneNumber !== input.phoneNumber ||
+        challenge.expiresAt <= input.now ||
+        input.authTime * 1000 < challenge.issuedAt) return false
+      store.firebaseActionChallenges.delete(key)
+      return true
+    },
     async getPendingOtp(phoneNumber) {
       const pending = store.pendingOtps.get(phoneNumber)
       return pending ? { ...pending } : null
@@ -314,6 +381,14 @@ export function createInMemoryAuthRepository(
       store.pendingAccountDeletionOtps.set(input.accountId, { ...input.pendingOtp })
       return true
     },
+    async createAccountDeletionConfirmation(input) {
+      store.accountDeletionConfirmations.set(input.accountId, {
+        accountId: input.accountId,
+        tokenDigest: input.confirmationTokenDigest,
+        expiresAt: input.confirmationExpiresAt,
+        firebaseUid: input.firebaseUid
+      })
+    },
     async verifyAndCreateAccountDeletionConfirmation(input) {
       const pending = store.pendingAccountDeletionOtps.get(input.accountId)
       if (!pending || pending.expiresAt <= input.now) {
@@ -375,6 +450,16 @@ export function createInMemoryAuthRepository(
       if (!limit || limit.activeRequestId !== action.otpId) return false
       store.pendingAccountActionOtps.set(key, { ...action })
       return true
+    },
+    async createAccountActionConfirmation(input) {
+      const key = accountActionKey(input.accountId, input.purpose)
+      store.accountActionConfirmations.set(key, {
+        accountId: input.accountId,
+        purpose: input.purpose,
+        targetPhoneNumber: input.targetPhoneNumber,
+        tokenDigest: input.confirmationTokenDigest,
+        expiresAt: input.confirmationExpiresAt
+      })
     },
     async verifyAndCreateAccountActionConfirmation(input) {
       const key = accountActionKey(input.accountId, input.purpose)
@@ -470,33 +555,37 @@ export function createInMemoryAuthRepository(
       return { kind: "verified" }
     },
     async finalizeOtpSignIn(input) {
-      const pending = store.pendingOtps.get(input.phoneNumber)
-      if (!pending || pending.expiresAt <= input.now) {
-        if (pending) store.pendingOtps.delete(input.phoneNumber)
-        return { kind: "missing_or_expired" }
-      }
-      if (pending.attemptCount >= input.maxAttempts) {
-        return { kind: "attempt_limit" }
-      }
-      if (!input.matches(pending)) {
-        const attemptCount = pending.attemptCount + 1
-        store.pendingOtps.set(input.phoneNumber, {
-          ...pending,
-          attemptCount
-        })
-        return attemptCount >= input.maxAttempts
-          ? { kind: "attempt_limit" }
-          : {
-              kind: "invalid",
-              attemptsRemaining: input.maxAttempts - attemptCount
-            }
+      if (!input.verifiedWithoutOtp) {
+        const pending = store.pendingOtps.get(input.phoneNumber)
+        if (!pending || pending.expiresAt <= input.now) {
+          if (pending) store.pendingOtps.delete(input.phoneNumber)
+          return { kind: "missing_or_expired" }
+        }
+        if (pending.attemptCount >= input.maxAttempts) {
+          return { kind: "attempt_limit" }
+        }
+        if (!input.matches(pending)) {
+          const attemptCount = pending.attemptCount + 1
+          store.pendingOtps.set(input.phoneNumber, {
+            ...pending,
+            attemptCount
+          })
+          return attemptCount >= input.maxAttempts
+            ? { kind: "attempt_limit" }
+            : {
+                kind: "invalid",
+                attemptsRemaining: input.maxAttempts - attemptCount
+              }
+        }
       }
       if (input.newAccount.phoneNumber !== input.phoneNumber) {
         throw new Error("The sign-in account must match the verified phone number.")
       }
 
       const existingAccount = store.accountsByPhone.get(input.phoneNumber)
-      if (!existingAccount && input.requireExistingAccount) return { kind: "terms_required" }
+      if (!existingAccount && input.requireExistingAccount) {
+        return { kind: input.verifiedWithoutOtp ? "account_not_found" : "terms_required" }
+      }
       const account = cloneAccount(existingAccount ?? input.newAccount)
       const session = input.createSession(cloneAccount(account))
       assertSessionMatchesAccount(session, account)
@@ -750,6 +839,10 @@ export function createInMemoryAuthRepository(
           return false
         }
       }
+      const firebaseUid = store.accountDeletionConfirmations.get(account.accountId)?.firebaseUid
+      if (firebaseUid) store.firebaseUserDeletionOutbox.set(firebaseUid, {
+        uid: firebaseUid, accountId: account.accountId, nextAttemptAt: Date.now(), attemptCount: 0
+      })
       store.pendingOtps.delete(account.phoneNumber)
       store.otpSendLimits.delete(account.phoneNumber)
       store.pendingAccountDeletionOtps.delete(account.accountId)

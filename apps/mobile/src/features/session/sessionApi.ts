@@ -49,6 +49,7 @@ export interface UpdateSessionProfileInput {
 export interface RegisterAccountInput {
   phoneNumber: string
   verificationCode: string
+  authIntent?: "create" | "sign-in"
   termsAcceptance: {
     version: string
     locale: "en" | "tr"
@@ -59,16 +60,31 @@ export interface SendVerificationCodeInput {
   phoneNumber: string
 }
 
+export interface FirebaseAccountCompletionInput {
+  idToken: string
+  authIntent: "create" | "sign-in"
+  termsAcceptance?: {
+    version: string
+    locale: "en" | "tr"
+  }
+}
+
 export interface VerifyAccountDeletionCodeInput {
   verificationCode: string
 }
+
+export type FirebaseAccountActionPurpose =
+  | "account_deletion"
+  | "account_data_export"
+  | "phone_change_current"
+  | "phone_change_new"
 
 const VERIFICATION_CODE_REQUEST_TIMEOUT_MS = 10_000
 
 export interface SubmitAccountRecoveryRequestInput {
   oldPhoneNumber: string
   newPhoneNumber: string
-  verificationCode: string
+  idToken: string
 }
 
 export function updateSessionActorProfile(
@@ -168,6 +184,47 @@ export async function registerAccount(
   return actor
 }
 
+export async function completeFirebaseAccount(
+  baseHttpUrl: string,
+  input: FirebaseAccountCompletionInput,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<SessionActor> {
+  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/auth/firebase/complete"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(input),
+    signal
+  })
+  const payload: unknown = await response.json()
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(
+      payload,
+      "We could not finish phone verification yet.",
+      [input.idToken]
+    ))
+  }
+
+  const actor = normalizeSessionActor(payload, {
+    requireExplicitIdentity: true,
+    requiredMode: "production"
+  })
+  if (!actor || actor.session.mode !== "production") {
+    throw new Error("Blumi could not finish account setup yet.")
+  }
+  const explicitOnboarding = normalizeOnboardingStatus(
+    (payload as { session?: { onboarding?: unknown } } | null)
+      ?.session?.onboarding
+  )
+  if (!explicitOnboarding) {
+    throw new Error("Blumi could not confirm your account onboarding status.")
+  }
+  return actor
+}
+
 export async function sendVerificationCode(
   baseHttpUrl: string,
   input: SendVerificationCodeInput,
@@ -232,7 +289,7 @@ export async function deleteProductionAccount(
   confirmationToken: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
-): Promise<void> {
+): Promise<"deleted" | "pending_firebase_deletion"> {
   const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account"), {
     method: "DELETE",
     headers: {
@@ -246,6 +303,62 @@ export async function deleteProductionAccount(
     const payload = await readJsonPayload(response)
     throw new Error(getApiErrorMessage(payload, "We could not delete your account yet."))
   }
+  return response.status === 202 ? "pending_firebase_deletion" : "deleted"
+}
+
+export async function verifyFirebaseAccountAction(
+  baseHttpUrl: string,
+  sessionToken: string,
+  input: {
+    idToken: string
+    challengeId: string
+    purpose: FirebaseAccountActionPurpose
+    currentPhoneConfirmationToken?: string
+  },
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<{ confirmationToken: string; expiresAt: string }> {
+  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/firebase/reauth"), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${sessionToken}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(input),
+    signal
+  })
+  const payload = await readJsonPayload(response)
+  if (
+    !response.ok ||
+    typeof (payload as { confirmationToken?: unknown } | null)?.confirmationToken !== "string" ||
+    typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string"
+  ) {
+    throw new Error(getApiErrorMessage(payload, "We could not verify your phone yet.", [input.idToken]))
+  }
+  return payload as { confirmationToken: string; expiresAt: string }
+}
+
+export async function requestFirebaseAccountActionChallenge(
+  baseHttpUrl: string,
+  sessionToken: string,
+  input: { purpose: FirebaseAccountActionPurpose; targetPhoneNumber?: string },
+  fetcher: typeof fetch = fetch
+): Promise<{ challengeId: string; expiresAt: string }> {
+  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/firebase/challenge"), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${sessionToken}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(input)
+  })
+  const payload = await readJsonPayload(response)
+  if (!response.ok ||
+    typeof (payload as { challengeId?: unknown } | null)?.challengeId !== "string" ||
+    typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
+    throw new Error(getApiErrorMessage(payload, "We could not start phone verification yet."))
+  }
+  return payload as { challengeId: string; expiresAt: string }
 }
 
 export async function requestAccountDeletionChallenge(

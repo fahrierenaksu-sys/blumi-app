@@ -3,6 +3,8 @@ import test from "node:test"
 import {
   createDemoRoomInvite,
   demoLike,
+  demoSendMessage,
+  getDemoMessages,
   demoRoomInviteAction,
   getDemoRoomInvites,
   resetDemoDeck
@@ -50,5 +52,20 @@ test("demo users can send and decide room invites without a production API", () 
   )
   assert.equal(cancelled?.status, "cancelled")
 
+  resetDemoDeck()
+})
+
+test("matched demo characters reply to a local conversation without a production API", async () => {
+  resetDemoDeck()
+  assert.equal(demoLike("demo-user-009", currentUser).matched, true)
+
+  const threadId = "demo-thread-demo-user-009"
+  const sent = demoSendMessage(threadId, currentUser.userId, "Merhaba", "client_message_123")
+  assert.equal(sent.senderUserId, currentUser.userId)
+  assert.equal(demoSendMessage(threadId, currentUser.userId, "Merhaba", "client_message_123").messageId, sent.messageId)
+  assert.equal(getDemoMessages(threadId).filter((message) => message.senderUserId === currentUser.userId).length, 1)
+
+  await new Promise((resolve) => setTimeout(resolve, 1_650))
+  assert.ok(getDemoMessages(threadId).some((message) => message.senderUserId === "demo-user-009"))
   resetDemoDeck()
 })

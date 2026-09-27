@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useMemo } from "react"
+import { memo, useMemo, useState, useLayoutEffect } from "react"
 import {
   Image,
+  Animated,
+  useWindowDimensions,
   type ImageStyle,
   Pressable,
   Text,
@@ -18,12 +20,20 @@ import type { FurnitureItem } from "../roomV2/roomV2.types"
 import type { AppLocale } from "../session/appLocale"
 import type { ShopCatalogItem } from "./shopCatalog"
 import { getShopCopy } from "./shopCopy"
+import { getShopProductPresentation } from "./shopProductPresentation"
 import { formatCoins } from "./shopFormatters"
 import type { ShopLayoutMetrics } from "./shopLayoutMetrics"
+import type { ShopCombinationItem, ShopCombinationSummary } from "./shopCombinationSummary"
+import { getShopProductThumbnailBounds, getShopProductThumbnailSource } from "./shopAssets"
+import type { ShopMode } from "./ShopNavigationControls"
+import { getShopThumbnailLayout } from "./shopThumbnailLayout"
+import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage } from "./shopCombinationViewport"
+import { useEntranceAnimation } from "../../ui/animations"
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
 
 export function ShopPreviewPanel(props: {
+  mode: ShopMode
   product: ShopCatalogItem | undefined
   previewAvatar: UserAvatar
   roomPreviewScene: ReturnType<typeof resolveRoomV2Scene>
@@ -33,11 +43,16 @@ export function ShopPreviewPanel(props: {
   isActionAvailable: boolean
   primaryActionLabel?: string
   primaryActionDisabled?: boolean
+  combinationSummary?: ShopCombinationSummary
+  combinationItems?: readonly ShopCombinationItem[]
+  supportsCombinationAction?: boolean
+  onSelectCombinationItem?: (id: string) => void
   canRemovePreview?: boolean
   onRemovePreview?: () => void
   onPrimaryAction: () => void
 }) {
   const {
+    mode,
     isPurchasing,
     layoutMetrics,
     locale,
@@ -45,25 +60,89 @@ export function ShopPreviewPanel(props: {
     product,
     primaryActionDisabled,
     primaryActionLabel,
+    combinationSummary,
+    combinationItems = [],
+    supportsCombinationAction = false,
+    onSelectCombinationItem,
     canRemovePreview = false,
     onRemovePreview,
     previewAvatar,
     roomPreviewScene,
     onPrimaryAction
   } = props
-  if (!product) return null
-
   const copy = getShopCopy(locale)
+  const { fontScale } = useWindowDimensions()
+  const pageSize = getCombinationPageSize(layoutMetrics.preview.avatarStageHeight, fontScale, combinationItems.length)
+  const [combinationPage, setCombinationPage] = useState(0)
+  const selectionPage = getCombinationSelectionPage(combinationItems, product?.sourceItemId, pageSize)
+  useLayoutEffect(() => { setCombinationPage(selectionPage) }, [selectionPage, product?.sourceItemId, pageSize])
+  const page = getCombinationPage(combinationItems, pageSize, combinationPage)
+  const navigateCombinationPage = (index: number) => {
+    const target = getCombinationPage(combinationItems, pageSize, index)
+    setCombinationPage(target.page)
+    // Single-item checkout must never act on an item hidden on another page.
+    if (!supportsCombinationAction && target.items[0]) onSelectCombinationItem?.(target.items[0].id)
+  }
+  if (!product) {
+    if (mode === "home") {
+      return (
+        <View
+          testID="shop-room-default-preview"
+          accessibilityLabel={copy.roomPreview}
+          style={[styles.previewCard, { padding: layoutMetrics.preview.cardPadding }]}
+        >
+          <View style={[styles.previewStage, styles.previewStageRoom, {
+            height: layoutMetrics.preview.roomStageHeight,
+            minHeight: layoutMetrics.preview.roomStageHeight
+          }]}>
+            <ShopRoomItemPreview item={undefined} scene={roomPreviewScene} locale={locale} />
+          </View>
+        </View>
+      )
+    }
+    return (
+      <View
+        testID="shop-avatar-default-preview"
+        accessibilityLabel={copy.previewOnAvatar}
+        style={[styles.previewCard, { padding: layoutMetrics.preview.cardPadding }]}
+      >
+        <View style={[styles.previewStage, styles.previewStageAvatar, { height: layoutMetrics.preview.avatarStageHeight, minHeight: layoutMetrics.preview.avatarStageHeight }]}>
+          <ShopAvatarLivePreview avatar={previewAvatar} avatarWidth={layoutMetrics.preview.avatarWidth} />
+          <View style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
+            left: undefined,
+            right: layoutMetrics.preview.overlayInset,
+            top: layoutMetrics.preview.overlayInset
+          }]}>
+            <View style={[styles.roomHeroTitleGlass, styles.avatarHeroTopPanel]}>
+              <Text style={styles.roomHeroEyebrow}>{copy.avatarPreviewGuide}</Text>
+              <Text style={styles.showcaseHeadline} numberOfLines={2}>
+                {copy.showcaseTitle}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    )
+  }
+
+  const presentation = getShopProductPresentation(product, locale)
   const disabled = (primaryActionDisabled ?? product.actionType === "disabled") ||
     isPurchasing ||
     !isActionAvailable
-  const actionLabel = primaryActionLabel ?? product.actionLabel
+  const actionLabel = supportsCombinationAction && combinationSummary?.total === null
+    ? copy.combination.priceNeedsRefresh : primaryActionLabel ?? presentation.actionLabel
   const isAvatarUnlock = product.actionType === "avatarUnlock" &&
     primaryActionLabel === undefined &&
     product.priceCoins !== null
+  const showCombination = product.previewType === "avatar" && combinationItems.length > 1
+  const actionPrice = supportsCombinationAction && combinationSummary?.purchaseCount
+    ? combinationSummary.total
+    : isAvatarUnlock ? product.priceCoins : null
   const avatarActionAccessibilityLabel = isAvatarUnlock
     ? `${copy.unlock}, ${formatCoins(product.priceCoins ?? 0, locale)} ${copy.coins}`
-    : actionLabel
+    : actionPrice !== null
+      ? `${actionLabel}, ${formatCoins(actionPrice, locale)} ${copy.coins}`
+      : actionLabel
   const previewGuide =
     product.previewType === "avatar"
       ? copy.avatarPreviewGuide
@@ -79,7 +158,7 @@ export function ShopPreviewPanel(props: {
   return (
     <View
       testID="shop-selected-product-preview"
-      accessibilityLabel={`${product.title}, ${product.stateLabel}`}
+      accessibilityLabel={`${product.title}, ${presentation.stateLabel}`}
       style={[
         styles.previewCard,
         {
@@ -103,15 +182,9 @@ export function ShopPreviewPanel(props: {
             avatarPreview
               ? styles.previewStageAvatar
               : styles.previewStageRoom,
-            { minHeight: stageHeight }
+            { height: stageHeight, minHeight: stageHeight }
           ]}
         >
-          <View style={styles.previewSparkleA}>
-            <Ionicons name="sparkles" size={17} color="rgba(255, 255, 255, 0.86)" />
-          </View>
-          <View style={styles.previewSparkleB}>
-            <Ionicons name="sparkles" size={12} color="rgba(255, 79, 152, 0.36)" />
-          </View>
           {avatarPreview ? (
             <ShopAvatarLivePreview
               avatar={previewAvatar}
@@ -123,45 +196,95 @@ export function ShopPreviewPanel(props: {
           <View
             style={[
               styles.roomHeroTopOverlay,
+              avatarPreview ? styles.avatarInfoOverlay : null,
+              showCombination ? styles.combinationOverlay : null,
               {
-                left: layoutMetrics.preview.overlayInset,
+                left: avatarPreview ? undefined : layoutMetrics.preview.overlayInset,
                 right: layoutMetrics.preview.overlayInset,
-                top: layoutMetrics.preview.overlayInset
+                top: showCombination ? 4 : layoutMetrics.preview.overlayInset,
+                bottom: showCombination ? 4 : avatarPreview ? 10 : undefined
               }
             ]}
           >
-            <View style={[
+            {showCombination ? (
+              <>
+                <View style={[styles.combinationPager, { height: page.pageCount === 1 ? Math.ceil(16 * Math.max(1, fontScale)) : Math.max(44, Math.ceil(16 * fontScale)) }]}>
+                  {page.pageCount > 1 ? <Pressable style={styles.combinationPageButton} disabled={page.page === 0} accessibilityRole="button" accessibilityLabel={copy.combination.previousPieces} accessibilityState={{ disabled: page.page === 0 }} onPress={() => navigateCombinationPage(page.page - 1)}><Ionicons name="chevron-back" size={17} color={page.page === 0 ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></Pressable> : null}
+                  <Text style={[styles.combinationHeading, styles.combinationPageLabel]} accessibilityLiveRegion="polite">
+                    {page.pageCount > 1 ? `${page.start + 1}–${page.end} / ${combinationItems.length}` : copy.combination.lookTitle(combinationItems.length)}
+                  </Text>
+                  {page.pageCount > 1 ? <Pressable style={styles.combinationPageButton} disabled={page.page + 1 === page.pageCount} accessibilityRole="button" accessibilityLabel={copy.combination.nextPieces} accessibilityState={{ disabled: page.page + 1 === page.pageCount }} onPress={() => navigateCombinationPage(page.page + 1)}><Ionicons name="chevron-forward" size={17} color={page.page + 1 === page.pageCount ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></Pressable> : null}
+                </View>
+                <View style={styles.combinationRows}>
+                  {page.items.map((item) => <CombinationRow key={item.id} item={item} locale={locale} selected={item.id === product.sourceItemId} onSelect={onSelectCombinationItem} />)}
+                </View>
+              </>
+            ) : <View style={[
               styles.roomHeroTitleGlass,
               avatarPreview ? styles.avatarHeroTopPanel : null
             ]}>
-              <Text style={styles.roomHeroEyebrow}>{product.eyebrow}</Text>
+              <View style={avatarPreview ? styles.avatarProductHeading : undefined}>
+                <Text style={[styles.roomHeroEyebrow, avatarPreview ? styles.avatarProductEyebrow : null]} numberOfLines={2}>
+                  {presentation.eyebrow}
+                </Text>
+                {avatarPreview && canRemovePreview && onRemovePreview ? (
+                  <Pressable
+                    testID="shop-preview-remove-preview"
+                    accessibilityRole="button"
+                    accessibilityLabel={copy.removePreview}
+                    onPress={onRemovePreview}
+                    style={({ pressed }) => [styles.avatarPreviewRemoveButton, pressed ? styles.avatarPreviewRemoveButtonPressed : null]}
+                  >
+                    <Ionicons name="close" size={17} color={uiTheme.colors.primary} />
+                  </Pressable>
+                ) : null}
+              </View>
               <Text
                 style={[
                   styles.roomHeroTitle,
-                  avatarPreview && canRemovePreview ? styles.avatarHeroTitleWithRemove : null
+                  avatarPreview ? styles.avatarProductTitle : null
                 ]}
                 numberOfLines={2}
                 adjustsFontSizeToFit
               >
                 {product.title}
               </Text>
-              {avatarPreview && canRemovePreview && onRemovePreview ? (
-                <Pressable
-                  testID="shop-preview-remove-preview"
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.removePreview}
-                  onPress={onRemovePreview}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.avatarPreviewRemoveButton,
-                    pressed ? styles.avatarPreviewRemoveButtonPressed : null
-                  ]}
-                >
-                  <Ionicons name="close" size={15} color={uiTheme.colors.primary} />
-                </Pressable>
-              ) : null}
-            </View>
-            <View style={[
+            </View>}
+            {avatarPreview && !showCombination && combinationSummary?.total === null ? (
+              <Text style={styles.combinationSummary} accessibilityLiveRegion="polite">
+                {combinationSummary.total === null
+                  ? copy.combination.priceNeedsRefresh
+                  : copy.combination.selectionSummary(combinationSummary.selectedCount, combinationSummary.purchaseCount)}
+              </Text>
+            ) : null}
+            {avatarPreview ? (
+              <Pressable
+                testID="shop-preview-primary-action"
+                accessibilityRole="button"
+                accessibilityLabel={disabled && !isActionAvailable ? copy.offline.actionUnavailable : avatarActionAccessibilityLabel}
+                accessibilityState={{ disabled }}
+                disabled={disabled}
+                onPress={onPrimaryAction}
+                style={({ pressed }) => [
+                  styles.avatarHeroAction,
+                  showCombination ? styles.combinationAction : null,
+                  disabled ? styles.primaryActionDisabled : null,
+                  pressed && !disabled ? styles.primaryActionPressed : null
+                ]}
+              >
+                <View style={styles.avatarHeroActionContent}>
+                  <Text style={styles.avatarHeroActionText} numberOfLines={1} adjustsFontSizeToFit>
+                    {isPurchasing ? copy.saving : isAvatarUnlock ? copy.unlock : actionLabel}
+                  </Text>
+                  {!isPurchasing && actionPrice !== null ? (
+                    <View style={styles.avatarHeroPricePill}>
+                      <Ionicons name="diamond" size={12} color={uiTheme.colors.primary} />
+                      <Text style={styles.avatarHeroPriceText}>{formatCoins(actionPrice, locale)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            ) : <View style={[
               styles.roomHeroStatusPill,
               avatarPreview ? styles.avatarHeroTopPanel : null
             ]}>
@@ -172,12 +295,12 @@ export function ShopPreviewPanel(props: {
               />
               <Text style={styles.roomHeroStatusText} numberOfLines={1}>
                 {product.owned
-                  ? product.stateLabel
+                  ? presentation.stateLabel
                   : product.priceCoins !== null
                     ? `${formatCoins(product.priceCoins, locale)} ${copy.coins}`
                     : previewGuide}
               </Text>
-            </View>
+            </View>}
           </View>
           {roomPreview ? (
             <Pressable
@@ -204,39 +327,35 @@ export function ShopPreviewPanel(props: {
           ) : null}
         </View>
 
-        {avatarPreview ? (
-          <Pressable
-            testID="shop-preview-primary-action"
-            accessibilityRole="button"
-            accessibilityLabel={disabled && !isActionAvailable
-              ? copy.offline.actionUnavailable
-              : avatarActionAccessibilityLabel}
-            accessibilityState={{ disabled }}
-            disabled={disabled}
-            onPress={onPrimaryAction}
-            style={({ pressed }) => [
-              styles.avatarHeroAction,
-              disabled ? styles.primaryActionDisabled : null,
-              pressed && !disabled ? styles.primaryActionPressed : null
-            ]}
-          >
-            <View style={styles.avatarHeroActionContent}>
-              <Text style={styles.avatarHeroActionText} numberOfLines={1} adjustsFontSizeToFit>
-                {isPurchasing ? copy.saving : isAvatarUnlock ? copy.unlock : actionLabel}
-              </Text>
-              {!isPurchasing && isAvatarUnlock ? (
-                <View style={styles.avatarHeroPricePill}>
-                  <Ionicons name="diamond" size={14} color="#F93696" />
-                  <Text style={styles.avatarHeroPriceText} numberOfLines={1}>
-                    {formatCoins(product.priceCoins ?? 0, locale)}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
-        ) : null}
       </View>
     </View>
+  )
+}
+
+function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombinationItem; locale: AppLocale; selected: boolean; onSelect?: (id: string) => void }) {
+  const entrance = useEntranceAnimation({ duration: 200, translateY: 5 })
+  const copy = getShopCopy(locale)
+  const source = getShopProductThumbnailSource(item.id)
+  const bounds = getShopProductThumbnailBounds(item.id)
+  const frame = getShopThumbnailLayout(bounds, 34, 34)
+  return (
+    <Animated.View style={entrance}>
+      <Pressable
+        style={[styles.combinationRow, selected ? styles.combinationRowSelected : null]}
+        onPress={() => onSelect?.(item.id)}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${item.title ?? copy.combination.itemUnavailable}, ${item.owned ? copy.owned : item.price === null ? copy.combination.priceNeedsRefresh : `${formatCoins(item.price, locale)} ${copy.coins}`}`}
+      >
+        <View style={styles.combinationThumbnail}>
+          {source ? <Image source={source} resizeMode="contain" style={frame ? { position: "absolute", ...frame } : { width: 34, height: 34 }} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
+        </View>
+        <View style={styles.combinationRowCopy}>
+          <Text style={styles.combinationItemTitle} numberOfLines={1}>{item.title ?? copy.combination.itemUnavailable}</Text>
+          <Text style={styles.combinationItemPrice} numberOfLines={1}>{item.owned ? `✓ ${copy.owned}` : item.price === null ? "—" : `◇ ${formatCoins(item.price, locale)}`}</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   )
 }
 

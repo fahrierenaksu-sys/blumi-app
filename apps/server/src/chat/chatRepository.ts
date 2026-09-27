@@ -15,7 +15,14 @@ export interface ChatMessagePageOptions {
   limit: number
 }
 
+export interface TestPersona {
+  userId: string
+  greeting: string
+  replies: string[]
+}
+
 export interface ChatRepository {
+  findTestPersona(userId: string): Promise<TestPersona | null>
   listThreads(userId: string): Promise<ChatThread[]>
   listThreadsPage(userId: string, options?: ChatThreadPageOptions): Promise<ChatThreadPage>
   findThread(threadId: string): Promise<ChatThread | null>
@@ -57,6 +64,7 @@ export function createInMemoryChatRepository(
   store: InMemoryChatStore = createInMemoryChatStore()
 ): ChatRepository {
   return {
+    async findTestPersona() { return null },
     async listThreads(userId) {
       return (await this.listThreadsPage(userId)).threads
     },

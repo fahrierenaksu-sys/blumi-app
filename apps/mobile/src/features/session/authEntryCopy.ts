@@ -40,6 +40,9 @@ export interface AuthEntryCopy {
   phoneQuestion: string
   codeQuestion: string
   codeSent: string
+  sendingCode: string
+  codeNotSent: string
+  resendFailed: string
   freshCodeSent: string
   codeExpiresSoon: string
   changePhoneNumber: string
@@ -113,6 +116,9 @@ const COPY: Record<AccountRecoveryLocale, AuthEntryCopy> = {
     phoneQuestion: "Where should we send your code?",
     codeQuestion: "Enter your code",
     codeSent: "Code sent",
+    sendingCode: "Sending your SMS code…",
+    codeNotSent: "The code could not be sent. Try again below.",
+    resendFailed: "A new code could not be sent. Your previous code may still work.",
     freshCodeSent: "A fresh code is on its way.",
     codeExpiresSoon: "Code sent. It expires in a few minutes.",
     changePhoneNumber: "Change phone number",
@@ -184,6 +190,9 @@ const COPY: Record<AccountRecoveryLocale, AuthEntryCopy> = {
     phoneQuestion: "Kodunu nereye gönderelim?",
     codeQuestion: "Kodunu gir",
     codeSent: "Kod gönderildi",
+    sendingCode: "SMS kodun gönderiliyor…",
+    codeNotSent: "Kod gönderilemedi. Aşağıdan tekrar dene.",
+    resendFailed: "Yeni kod gönderilemedi. Önceki kodun hâlâ geçerli olabilir.",
     freshCodeSent: "Yeni kod yolda.",
     codeExpiresSoon: "Kod gönderildi. Birkaç dakika içinde geçerliliğini yitirir.",
     changePhoneNumber: "Telefon numarasını değiştir",

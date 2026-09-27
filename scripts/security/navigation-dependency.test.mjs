@@ -13,7 +13,8 @@ test("navigation uses the patched decoder through a compatible query-string adap
 test("actual navigation parser retains deep links and bounds malformed input", () => {
   const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
     import assert from 'node:assert/strict';
-    import {getStateFromPath} from './node_modules/@react-navigation/core/src/getStateFromPath.tsx';
+    import navigationPathModule from './node_modules/@react-navigation/core/src/getStateFromPath.tsx';
+    const {getStateFromPath}=navigationPathModule;
     const config={screens:{Profile:'profile/:id'}};
     const result=getStateFromPath('/profile/alice?name=Blumi%20Test&tag=a&tag=b',config);
     assert.equal(result.routes[0].params.id,'alice');

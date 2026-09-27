@@ -11,6 +11,14 @@ import { ReportResolutionConflictError } from "../safety/safetyService"
 import { isPublicRequestError } from "../errors/publicRequestError"
 import { isRecord, readLimit, readParam } from "./routeHelpers"
 import type { AccountRecoveryService, AccountRecoveryStatus } from "../account/accountRecoveryService"
+import type { AdminUsersService } from "../admin/adminUsersService"
+import {
+  AdminQuotaExtensionLimitError,
+  AdminQuotaLimitError,
+  AdminUserNotFoundError,
+  AdminUsersInputError
+} from "../admin/adminUsersService"
+import { registerAdminConsoleRoutes } from "../admin/adminConsole"
 import {
   getModerationQueueMetadata,
   orderPendingModerationReports,
@@ -42,6 +50,7 @@ export interface AdminRouteServices {
   adminTokenService?: AdminTokenService
   allowLegacyAdminKey?: boolean
   accountRecoveryService?: AccountRecoveryService
+  adminUsersService?: AdminUsersService
 }
 
 function safeCompare(a: string, b: string): boolean {
@@ -56,6 +65,101 @@ export async function registerAdminRoutes(
   services: AdminRouteServices
 ): Promise<void> {
   const { safetyService } = services
+
+  await registerAdminConsoleRoutes(app)
+
+  app.get("/v1/admin/session", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const principal = getBearerPrincipal(request, reply, services)
+    if (!principal) return
+    return {
+      operatorId: principal.operatorId,
+      scopes: principal.scopes,
+      expiresAt: principal.expiresAt
+    }
+  })
+
+  app.get("/v1/admin/users", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
+    if (!requireAdmin(request, reply, services, "users:read")) return
+    const userService = services.adminUsersService
+    if (!userService) return reply.code(503).send({ error: "User administration is unavailable." })
+    const query = isRecord(request.query) ? request.query.query : undefined
+    if (typeof query !== "string") return reply.code(400).send({ error: "Provide a search query." })
+    try {
+      return { users: await userService.searchUsers(query) }
+    } catch (error) {
+      if (error instanceof AdminUsersInputError) return reply.code(400).send({ error: error.message })
+      throw error
+    }
+  })
+
+  app.get("/v1/admin/users/:userId", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
+    if (!requireAdmin(request, reply, services, "users:read")) return
+    const userService = services.adminUsersService
+    if (!userService) return reply.code(503).send({ error: "User administration is unavailable." })
+    try {
+      const user = await userService.getUser(readParam(request, "userId"))
+      return user ? { user } : reply.code(404).send({ error: "User not found." })
+    } catch (error) {
+      if (error instanceof AdminUsersInputError) return reply.code(400).send({ error: error.message })
+      throw error
+    }
+  })
+
+  app.get("/v1/admin/users/:userId/quota-audit", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
+    if (!requireAdmin(request, reply, services, "users:read")) return
+    const userService = services.adminUsersService
+    if (!userService) return reply.code(503).send({ error: "User administration is unavailable." })
+    try {
+      const events = await userService.listQuotaAudit(readParam(request, "userId"))
+      return events ? { events } : reply.code(404).send({ error: "User not found." })
+    } catch (error) {
+      if (error instanceof AdminUsersInputError) return reply.code(400).send({ error: error.message })
+      throw error
+    }
+  })
+
+  app.post("/v1/admin/users/:userId/discovery-quota/reset", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const principal = requireAdmin(request, reply, services, "users:manage")
+    if (!principal) return
+    const userService = services.adminUsersService
+    if (!userService) return reply.code(503).send({ error: "User administration is unavailable." })
+    const body = isRecord(request.body) ? request.body : {}
+    if (typeof body.reason !== "string") return reply.code(400).send({ error: "A reason is required." })
+    try {
+      return await userService.resetDiscoveryQuota({
+        userId: readParam(request, "userId"), reason: body.reason,
+        operatorId: principal.operatorId, tokenId: principal.tokenId
+      })
+    } catch (error) {
+      if (error instanceof AdminUserNotFoundError) return reply.code(404).send({ error: "User not found." })
+      if (error instanceof AdminUsersInputError) return reply.code(400).send({ error: error.message })
+      throw error
+    }
+  })
+
+  app.post("/v1/admin/users/:userId/discovery-quota/grant", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const principal = requireAdmin(request, reply, services, "users:manage")
+    if (!principal) return
+    const userService = services.adminUsersService
+    if (!userService) return reply.code(503).send({ error: "User administration is unavailable." })
+    const body = isRecord(request.body) ? request.body : {}
+    if (typeof body.reason !== "string" || typeof body.amount !== "number") {
+      return reply.code(400).send({ error: "A grant amount and reason are required." })
+    }
+    try {
+      return await userService.grantDiscoveryQuota({
+        userId: readParam(request, "userId"), reason: body.reason, amount: body.amount,
+        operatorId: principal.operatorId, tokenId: principal.tokenId
+      })
+    } catch (error) {
+      if (error instanceof AdminUserNotFoundError) return reply.code(404).send({ error: "User not found." })
+      if (error instanceof AdminUsersInputError) return reply.code(400).send({ error: error.message })
+      if (error instanceof AdminQuotaLimitError || error instanceof AdminQuotaExtensionLimitError) {
+        return reply.code(409).send({ error: error.message })
+      }
+      throw error
+    }
+  })
 
   app.get("/v1/admin/reports", async (request, reply) => {
     if (!requireAdmin(request, reply, services, "reports:read")) return
@@ -214,6 +318,28 @@ function requireAdmin(
     scopes: Object.freeze(["reports:read", "reports:resolve"] as const),
     expiresAt: new Date(0).toISOString()
   })
+}
+
+function getBearerPrincipal(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  services: AdminRouteServices
+): AdminPrincipal | null {
+  const authorization = request.headers.authorization
+  if (!services.adminTokenService) {
+    reply.code(403).send({ error: "Admin API is not configured." })
+    return null
+  }
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
+    reply.code(401).send({ error: "Admin access is required." })
+    return null
+  }
+  const principal = services.adminTokenService.verify(authorization.slice(7))
+  if (!principal) {
+    reply.code(401).send({ error: "Admin access is required." })
+    return null
+  }
+  return principal
 }
 
 function toAdminReportView(report: ReportRecord): AdminReportView {

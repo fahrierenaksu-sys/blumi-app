@@ -20,6 +20,7 @@ import {
   isAvatarV2ItemCompatibleWithBody,
   normalizeAvatarV2ForBody
 } from "./avatarBodyCompatibility"
+import { isRetiredAvatarItemId } from "@blumi/domain"
 
 type RequiredAvatarItemType = Exclude<AvatarItemType, "accessory">
 
@@ -58,7 +59,7 @@ export function canEquipAvatarV2Item(
 ): boolean {
   // Inventory is the ownership source-of-truth. Items can be merchandised as
   // locked in the catalog, but become equipable once inventory owns them.
-  return isAvatarV2ItemOwned(inventory, item) &&
+  return !isRetiredAvatarItemId(item.id) && isAvatarV2ItemOwned(inventory, item) &&
     (!bodyId || isAvatarV2ItemCompatibleWithBody(item, bodyId))
 }
 
@@ -179,7 +180,7 @@ function resolveRequiredItem(
   catalog: AvatarCatalogItem[]
 ): AvatarCatalogItem | undefined {
   const providedSelected = id
-    ? catalog.find((item) => item.id === id && item.type === type)
+    ? catalog.find((item) => item.id === id && item.type === type && !isRetiredAvatarItemId(item.id))
     : undefined
   if (providedSelected) return providedSelected
 
@@ -187,7 +188,7 @@ function resolveRequiredItem(
   if (providedDefault) return providedDefault
 
   const builtInSelected = id
-    ? AVATAR_V2_CATALOG.find((item) => item.id === id && item.type === type)
+    ? AVATAR_V2_CATALOG.find((item) => item.id === id && item.type === type && !isRetiredAvatarItemId(item.id))
     : undefined
   return builtInSelected ?? getDefaultItemForType(AVATAR_V2_CATALOG, type)
 }

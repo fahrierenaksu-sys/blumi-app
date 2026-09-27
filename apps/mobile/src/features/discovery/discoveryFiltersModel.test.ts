@@ -71,6 +71,10 @@ test("discovery filter persistence is isolated by user", () => {
 
 test("matching preference summary stays compact and product-readable", () => {
   assert.equal(
+    formatDiscoveryFiltersSummary(DEFAULT_DISCOVERY_FILTERS, "tr"),
+    "Herkes · Yaş 18–99"
+  )
+  assert.equal(
     formatDiscoveryFiltersSummary(DEFAULT_DISCOVERY_FILTERS),
     "Everyone · Ages 18–99"
   )

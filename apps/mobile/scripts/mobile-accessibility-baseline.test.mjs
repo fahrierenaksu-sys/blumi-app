@@ -326,18 +326,25 @@ test("profile editing exposes radio semantics and announces validation and save 
     resolve(mobileRoot, "src/screens/ProfileEditScreen.tsx"),
     "utf8"
   )
+  const copy = readFileSync(
+    resolve(mobileRoot, "src/features/session/profileEditCopy.ts"),
+    "utf8"
+  )
 
   assert.match(source, /accessibilityRole="radiogroup"/)
   assert.match(source, /accessibilityRole="radio"/)
   assert.match(source, /accessibilityRole="alert"/)
   assert.match(source, /accessibilityLiveRegion="polite"/)
-  assert.match(source, /Profile saved/)
-  assert.match(source, /One interest per line/)
+  assert.match(source, /\{copy\.savedStatus\}/)
+  assert.match(copy, /savedStatus: "Profile saved"/)
+  assert.match(source, /\{copy\.interestHint\}/)
+  assert.match(copy, /interestHint: "One interest per line"/)
   assert.match(source, /\(currentInterests \?\? \[\]\)\.join\("\\n"\)/)
   assert.match(
     source,
-    /accessibilityLabel="Interests, one interest per line"[\s\S]*?multiline/
+    /accessibilityLabel=\{copy\.interestsAccessibility\}[\s\S]*?multiline/
   )
+  assert.match(copy, /interestsAccessibility: "Interests, one interest per line"/)
 })
 
 test("settings phone change reuses the country-aware phone contract", () => {

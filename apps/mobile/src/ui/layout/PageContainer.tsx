@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react"
+import { createContext, useContext, type PropsWithChildren } from "react"
 import {
   ScrollView,
   StyleSheet,
@@ -13,10 +13,16 @@ import {
   type Edge,
   type SafeAreaViewProps
 } from "react-native-safe-area-context"
-import { resolvePageContainerLayout } from "./pageContainerLayout"
+import {
+  resolvePageContainerLayout,
+  resolvePageContentWidth,
+  resolvePageScrollBottomPadding,
+  PAGE_COMPONENT_SPACING
+} from "./pageContainerLayout"
 import { useAppViewportMetrics } from "./useAppViewportMetrics"
 
 const DEFAULT_EDGES: Edge[] = ["top", "right", "bottom", "left"]
+const PageGutterContext = createContext(false)
 
 export interface PageSafeAreaProps extends SafeAreaViewProps {
   contentGutter: boolean
@@ -42,7 +48,9 @@ export function PageSafeArea({
         style
       ]}
     >
-      {children}
+      <PageGutterContext.Provider value={contentGutter}>
+        {children}
+      </PageGutterContext.Provider>
     </SafeAreaView>
   )
 }
@@ -61,6 +69,7 @@ export function PageContent({
 }: PropsWithChildren<PageContentProps>) {
   const viewport = useAppViewportMetrics({ bottomNavVisible: false })
   const layout = resolvePageContainerLayout(viewport.safeWidth)
+  const parentHasGutter = useContext(PageGutterContext)
 
   return (
     <View {...props} style={[styles.contentFrame, style]}>
@@ -68,7 +77,7 @@ export function PageContent({
         style={[
           styles.content,
           !fullBleed && {
-            width: layout.contentWidth,
+            width: resolvePageContentWidth(viewport.safeWidth, parentHasGutter),
             maxWidth: layout.maxContentWidth
           },
           fullBleed && styles.fullBleed,
@@ -84,6 +93,9 @@ export function PageContent({
 export interface PageScrollContentProps extends ScrollViewProps {
   fullBleed?: boolean
   innerStyle?: StyleProp<ViewStyle>
+  bottomNavVisible?: boolean
+  safeAreaBottomIncluded?: boolean
+  bottomSpacing?: number
 }
 
 export function PageScrollContent({
@@ -91,12 +103,25 @@ export function PageScrollContent({
   fullBleed = false,
   contentContainerStyle,
   innerStyle,
+  bottomNavVisible = false,
+  safeAreaBottomIncluded = true,
+  bottomSpacing = PAGE_COMPONENT_SPACING.sectionGap,
   ...props
 }: PropsWithChildren<PageScrollContentProps>) {
+  const viewport = useAppViewportMetrics({ bottomNavVisible })
+  const bottomPadding = resolvePageScrollBottomPadding({
+    bottomContentInset: viewport.bottomContentInset,
+    safeAreaBottom: viewport.safeAreaInsets.bottom,
+    safeAreaBottomIncluded
+  })
   return (
     <ScrollView
       {...props}
-      contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+      contentContainerStyle={[
+        styles.scrollContent,
+        contentContainerStyle,
+        { paddingBottom: bottomPadding + Math.max(0, bottomSpacing) }
+      ]}
     >
       <PageContent fullBleed={fullBleed} contentStyle={innerStyle}>
         {children}

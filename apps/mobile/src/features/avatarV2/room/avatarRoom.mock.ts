@@ -64,7 +64,7 @@ export const DEFAULT_ROOM_AVATAR_MALE: RoomAvatarAppearance = {
   baseId: "room_avatar_base_male_light_v1",
   faceId: "room_avatar_face_male_warm_friendly_v1",
   hairBackId: undefined,
-  hairFrontId: "room_avatar_hair_front_male_espresso_crop_v1",
+  hairFrontId: "room_avatar_hair_front_male_cocoa_textured_quiff_v1",
   topId: "room_avatar_top_male_powder_blue_crew_tee_v1",
   bottomId: "room_avatar_bottom_male_navy_straight_pants_v1",
   shoesId: "room_avatar_shoes_male_milk_tea_court_v1",
@@ -211,7 +211,7 @@ const ROOM_AVATAR_CATALOG_ITEMS: RoomAvatarCatalogItem[] = [
     )
   },
   {
-    id: DEFAULT_ROOM_AVATAR_MALE.hairFrontId!,
+    id: "room_avatar_hair_front_male_espresso_crop_v1",
     type: "hairFront",
     bodyPreset: "male",
     fitProfileId: "blumi_male_room_avatar_v1",

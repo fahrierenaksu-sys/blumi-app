@@ -1,6 +1,14 @@
 {
   "allowlist": [
     {
+      "id": "GHSA-w5hq-g745-h8pq",
+      "package": "uuid",
+      "scope": "@expo/ngrok development tunnel and firebase-admin gaxios dependency",
+      "owner": "Blumi server and mobile",
+      "expiresOn": "2026-11-30",
+      "reason": "Advisory affects v3/v5/v6 with caller-provided output buffers. Both installed consumers invoke only v4 without a buffer; revisit when compatible patched transitive versions ship."
+    },
+    {
       "id": "GHSA-w3rx-r6r6-pgpr",
       "package": "image-size",
       "scope": "Expo SDK 57 Metro build tooling only",

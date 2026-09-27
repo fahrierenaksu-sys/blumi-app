@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -52,9 +52,6 @@ const maleCapsulePreviewSource = readFileSync(
 const { ROOM_V2_FURNITURE_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../roomV2/roomV2.mock") as typeof import("../roomV2/roomV2.mock");
-const { resolveHistoricalRoomV2QaFurnitureCatalog } =
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../roomV2/roomV2HistoricalQaCatalog") as typeof import("../roomV2/roomV2HistoricalQaCatalog");
 const {
   ROOM_V3_UNIVERSAL_CORE_ARTIFACT_HASHES_BY_CANDIDATE_ID,
   ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,
@@ -271,6 +268,24 @@ test("room shop accepts an explicitly gated QA catalog and treats its QA-owned p
   assert.equal(roomProducts[0]?.priceCoins, null);
 });
 
+test("demo Shop lists Room products even when none are owned", () => {
+  const products = buildShopCatalogItems({
+    avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
+    inventory: {
+      coins: 0,
+      ownedAvatarItemIds: [],
+      ownedRoomItemIds: [],
+      unlockedFeatureIds: [],
+      updatedAt: "2026-09-27T00:00:00.000Z"
+    },
+    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] }
+  })
+  const roomProducts = products.filter((product) => product.sectionId === "room")
+  assert.equal(roomProducts.length, ROOM_V2_FURNITURE_CATALOG.length)
+  assert.ok(roomProducts.some((product) => !product.owned))
+  assert.ok(roomProducts.every((product) => product.roomItem))
+})
+
 test("R1 Shop hides every unreceipted paid item while retaining its published starter catalog", () => {
   const r1Catalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
   const publishedItemIds = new Set(r1Catalog.map((item) => item.itemId));
@@ -300,7 +315,16 @@ test("R1 Shop hides every unreceipted paid item while retaining its published st
   );
 });
 
-test("a complete shared promotion record makes a Universal Core room product purchasable in the production shop contract", () => {
+test("a complete shared promotion record makes a Universal Core room product purchasable in the production shop contract", (context) => {
+  // Historical QA evidence is not part of the production checkout. Never
+  // manufacture a replacement manifest merely to make this pilot test pass.
+  if (!existsSync(join(workspaceRoot, "../../scripts/room-vnext-pilot/full-wave-catalog-spec.json"))) {
+    context.skip("Historical Room VNext pilot manifest is unavailable")
+    return
+  }
+  const { resolveHistoricalRoomV2QaFurnitureCatalog } =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Historical QA assets are loaded only for this pilot fixture.
+    require("../roomV2/roomV2HistoricalQaCatalog") as typeof import("../roomV2/roomV2HistoricalQaCatalog");
   const completePromotion = createCompletePromotionRecord();
   const products = buildShopCatalogItems({
     avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
@@ -476,7 +500,7 @@ test("server loadout metadata exactly follows the runtime mobile avatar catalog"
 
 test("male starter basics are browsable, owned, and have real shop previews", () => {
   const visibleMaleBasics = [
-    "avatar_v2_hair_male_espresso_crop",
+    "avatar_v2_hair_male_cocoa_textured_quiff",
     "avatar_v2_top_male_cream_basic_tee",
     "avatar_v2_shoes_male_milk_tea_court",
   ];

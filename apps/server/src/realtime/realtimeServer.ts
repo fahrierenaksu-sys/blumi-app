@@ -62,12 +62,14 @@ export interface CreateRealtimeServerOptions {
   notificationService?: NotificationService
   connectionManager?: ConnectionManager
   realtimeTicketService: RealtimeTicketService
+  httpServer?: Server
 }
 
 export function createRealtimeServer(
   options: CreateRealtimeServerOptions
 ): RealtimeServer {
-  const httpServer = createServer()
+  const ownsHttpServer = !options.httpServer
+  const httpServer = options.httpServer ?? createServer()
   const wsServer = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_REALTIME_MESSAGE_BYTES,
@@ -99,12 +101,13 @@ export function createRealtimeServer(
     notificationService
   })
 
-  httpServer.on("upgrade", (request, socket, head) => {
+  const handleUpgradeRequest = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (closing) { rejectUpgrade(socket, "503 Service Unavailable"); return }
     void track(authorizeAndUpgrade(request, socket, head)).catch(() => {
       rejectUpgrade(socket, "503 Service Unavailable")
     })
-  })
+  }
+  httpServer.on("upgrade", handleUpgradeRequest)
 
   async function authorizeAndUpgrade(
     request: IncomingMessage,
@@ -274,6 +277,11 @@ export function createRealtimeServer(
     connectionManager,
     async listen({ port, host }) {
       await connectionManager.startFanout()
+      if (!ownsHttpServer && !httpServer.listening) {
+        await connectionManager.closeFanout()
+        throw new Error("The shared HTTP server must be listening before realtime starts.")
+      }
+      if (httpServer.listening) return
       try {
         await new Promise<void>((resolve, reject) => {
           httpServer.once("error", reject)
@@ -299,12 +307,15 @@ export function createRealtimeServer(
       await socketsClosed
       await Promise.allSettled([...activeOperations])
       if (!closeOptions.preserveFanout) await connectionManager.closeFanout()
-      await new Promise<void>((resolve, reject) => {
-        httpServer.close((error) => {
-          if (error) reject(error)
-          else resolve()
+      httpServer.off("upgrade", handleUpgradeRequest)
+      if (ownsHttpServer && httpServer.listening) {
+        await new Promise<void>((resolve, reject) => {
+          httpServer.close((error) => {
+            if (error) reject(error)
+            else resolve()
+          })
         })
-      })
+      }
     },
     address() {
       return httpServer.address()

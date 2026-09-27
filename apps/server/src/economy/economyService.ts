@@ -1,4 +1,4 @@
-import { isAvatarLoadoutItemCompatibleWithBody } from "@blumi/domain"
+import { isAvatarLoadoutItemCompatibleWithBody, isRetiredAvatarItemId } from "@blumi/domain"
 import {
   findEconomyCatalogItem,
   getDefaultOwnedItemIds,
@@ -98,6 +98,9 @@ export function createEconomyService(
     },
     async purchaseItem(userId, input, now = new Date()) {
       const itemId = normalizeItemId(input.itemId)
+      if (input.type === "avatar" && isRetiredAvatarItemId(itemId)) {
+        throw new PublicRequestError("That shop item is not available.")
+      }
       const item = findEconomyCatalogItem(itemId, input.type)
       if (!item) {
         throw new PublicRequestError("That shop item is not available.")

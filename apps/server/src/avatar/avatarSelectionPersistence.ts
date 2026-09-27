@@ -9,7 +9,10 @@ import {
 } from "@blumi/contracts"
 import {
   AVATAR_LOADOUT_CATALOG,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
   cloneAvatarLoadout,
+  isRetiredAvatarItemId,
   toAvatarLoadoutV2,
   validateAvatarLoadout
 } from "@blumi/domain"
@@ -29,7 +32,10 @@ export function normalizeStoredAvatarSelection(
   if (!isStoredPresetId(input.presetId) || !isAvatarRevision(input.revision)) {
     throw invalidStoredAvatarSelection()
   }
-  const loadoutResult = validateAvatarLoadout(input.loadout, catalogItemIds)
+  const loadoutResult = validateAvatarLoadout(
+    sanitizeStoredAvatarLoadout(input.loadout),
+    catalogItemIds
+  )
   if (!loadoutResult.ok) {
     throw invalidStoredAvatarSelection()
   }
@@ -40,6 +46,25 @@ export function normalizeStoredAvatarSelection(
     presetId: input.presetId,
     loadout: loadoutResult.loadout,
     revision: input.revision
+  }
+}
+
+function sanitizeStoredAvatarLoadout(value: unknown): unknown {
+  if (!isAvatarLoadoutV1(value) && !isAvatarLoadoutV2(value)) return value
+  const retiredTop = isRetiredAvatarItemId(value.topId)
+  const retiredBottom = isRetiredAvatarItemId(value.bottomId)
+  const retiredHair = isRetiredAvatarItemId(value.hairId)
+  const unsupportedOuterwear = value.schemaVersion === 2 && value.outerwearId !== null
+  if (!retiredTop && !retiredBottom && !retiredHair && !unsupportedOuterwear) return value
+  const starter = value.bodyId === DEFAULT_MALE_AVATAR_LOADOUT.bodyId
+    ? DEFAULT_MALE_AVATAR_LOADOUT
+    : DEFAULT_FEMALE_AVATAR_LOADOUT
+  return {
+    ...value,
+    topId: retiredTop ? starter.topId : value.topId,
+    bottomId: retiredBottom ? starter.bottomId : value.bottomId,
+    hairId: retiredHair ? starter.hairId : value.hairId,
+    ...(value.schemaVersion === 2 ? { outerwearId: null } : {})
   }
 }
 

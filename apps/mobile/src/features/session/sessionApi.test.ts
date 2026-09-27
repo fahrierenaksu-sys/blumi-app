@@ -7,7 +7,6 @@ import {
   downloadAccountDataExport,
   fetchProductionProfile,
   requestAccountDataExportChallenge,
-  requestAccountRecoveryChallenge,
   registerAccount,
   requestAccountDeletionChallenge,
   requestPhoneChangeCurrentChallenge,
@@ -453,41 +452,30 @@ test("account data export uses dedicated challenge, verify, and download boundar
   assert.equal(exported.uri, "file:///cache/test-export.json")
 })
 
-test("lost-phone recovery verifies only the new number before creating a generic review request", async () => {
+test("lost-phone recovery submits a Firebase ID token for the new number", async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init })
-    return calls.length === 1
-      ? new Response(JSON.stringify({ ok: true, expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 202 })
-      : new Response(JSON.stringify({ status: "accepted" }), { status: 202 })
+    return new Response(JSON.stringify({ status: "accepted" }), { status: 202 })
   }
 
-  await requestAccountRecoveryChallenge(
-    "https://api.blumi.test",
-    "+905559998877",
-    fetcher
-  )
   await submitAccountRecoveryRequest(
     "https://api.blumi.test",
     {
       oldPhoneNumber: "+905551112233",
       newPhoneNumber: "+905559998877",
-      verificationCode: "482931"
+      idToken: "firebase-id-token"
     },
     fetcher
   )
 
-  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/recovery/challenge")
+  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/recovery/requests")
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
-    phoneNumber: "+905559998877"
-  })
-  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/recovery/requests")
-  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), {
     oldPhoneNumber: "+905551112233",
     newPhoneNumber: "+905559998877",
-    verificationCode: "482931"
+    idToken: "firebase-id-token"
   })
-  assert.equal((calls[1]?.init?.headers as Record<string, string>).authorization, undefined)
+  assert.equal((calls[0]?.init?.headers as Record<string, string>).authorization, undefined)
 })
 
 test("phone change uses current-proof, new-number, and confirm boundaries", async () => {

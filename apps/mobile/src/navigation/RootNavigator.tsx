@@ -22,7 +22,9 @@ import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
 import { createCandidateAvatarSnapshot } from "../features/avatarV2/candidateAvatarSnapshot"
 import {
+  demoSendMessage,
   demoRoomInviteAction,
+  getDemoMessages,
   isDemoMode,
   setDemoMode,
   useDemoStore
@@ -156,11 +158,13 @@ import {
 import {
   getBottomNavKeyForRoute,
   getChatLocale,
+  getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
 import { uiTheme } from "../ui/theme"
+import { useReducedMotion } from "../ui/animations"
 import { ToastContainer, showToast } from "../ui/toast"
 import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
@@ -411,6 +415,8 @@ interface RootNavigatorProps {
 
 export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   void fontsReady
+  const reduceMotion = useReducedMotion()
+  const reducedMotionScreenOptions = getReducedMotionScreenOptions(reduceMotion)
   const {
     sessionActor,
     hasSeenIntro,
@@ -767,7 +773,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             userId: partnerUserId,
             displayName: partnerProfile?.displayName ?? "Blumi friend",
             avatar: {
-              presetId: "dusk"
+              presetId: partnerProfile?.avatarPresetId ?? "dusk"
             }
           }
         ] as [MiniRoomParticipant, MiniRoomParticipant]
@@ -833,6 +839,39 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     upsertRoomInvite
   } = chatCoordinator
 
+  const sendChatMessageForRoute = useCallback(async (
+    threadId: string,
+    body: string,
+    clientMessageId: string
+  ): Promise<void> => {
+    const actor = latestSessionActorRef.current
+    if (actor?.session.mode !== "demo") {
+      return sendChatMessage(threadId, body, clientMessageId)
+    }
+    try {
+      const message = demoSendMessage(threadId, actor.profile.userId, body, clientMessageId)
+      confirmOptimisticMessage(clientMessageId, message, actor.profile.userId)
+    } catch (error) {
+      markOptimisticMessageFailed(clientMessageId)
+      throw error
+    }
+  }, [sendChatMessage])
+
+  const requestMessagesForRoute = useCallback(async (
+    threadId: string,
+    options?: FetchThreadMessagesOptions
+  ): Promise<void> => {
+    const actor = latestSessionActorRef.current
+    if (actor?.session.mode !== "demo") {
+      return requestMessages(threadId, options)
+    }
+    applyChatMessageListed({
+      userId: actor.profile.userId,
+      threadId,
+      messages: getDemoMessages(threadId)
+    })
+  }, [requestMessages])
+
   const syncCurrentRouteName = useCallback((): void => {
     setCurrentRouteName(
       navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined
@@ -868,8 +907,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       if (navigationRef.isReady()) {
         navigationRef.navigate("ChatThread", {
           ...params,
-          sendChatMessage,
-          requestMessages,
+          sendChatMessage: sendChatMessageForRoute,
+          requestMessages: requestMessagesForRoute,
           markThreadRead: markChatThreadRead,
           roomInvites: visibleRoomInvites,
           onRoomInviteAction: sessionActor?.session.mode === "demo"
@@ -884,8 +923,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       handleDemoRoomInviteAction,
       handleRoomInviteAction,
       markChatThreadRead,
-      requestMessages,
-      sendChatMessage,
+      requestMessagesForRoute,
+      sendChatMessageForRoute,
       sessionActor?.session.mode,
       visibleRoomInvites
     ]
@@ -1215,6 +1254,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           }
           screenOptions={{
             ...ROOT_STACK_SCREEN_OPTIONS,
+            ...reducedMotionScreenOptions,
             contentStyle: styles.screenContent
           }}
         >
@@ -1248,7 +1288,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             <>
               <Stack.Screen
                 name="Lobby"
-                options={{ ...MAIN_TAB_SCREEN_OPTIONS, title: "Discover" }}
+                options={{
+                  ...MAIN_TAB_SCREEN_OPTIONS,
+                  ...reducedMotionScreenOptions,
+                  title: "Discover"
+                }}
               >
                 {() => (
                   <LobbyScreen
@@ -1324,7 +1368,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="Inbox"
-                options={MAIN_TAB_SCREEN_OPTIONS}
+                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => (
                   <InboxScreen
@@ -1336,7 +1380,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="MyRoom"
-                options={MAIN_TAB_SCREEN_OPTIONS}
+                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => (
                   <myRoomScreenBundle.DeferredScreen
@@ -1375,8 +1419,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       ...screenProps.route,
                       params: {
                         ...screenProps.route.params,
-                        sendChatMessage,
-                        requestMessages,
+                        sendChatMessage: sendChatMessageForRoute,
+                        requestMessages: requestMessagesForRoute,
                         markThreadRead: markChatThreadRead,
                         roomInvites: visibleRoomInvites,
                         onRoomInviteAction: sessionActor?.session.mode === "demo"
@@ -1413,7 +1457,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="CosmeticShop"
-                options={MAIN_TAB_SCREEN_OPTIONS}
+                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => (
                   <cosmeticShopScreenBundle.DeferredScreen
@@ -1541,7 +1585,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="Register"
-                    options={{ headerShown: false, animation: "fade" }}
+                    options={{ headerShown: false, animation: "fade", ...reducedMotionScreenOptions }}
                   >
                     {(screenProps) => (
                       <registerScreenBundle.DeferredScreen
@@ -1572,7 +1616,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             <>
               <Stack.Screen
                 name="ProfileSetup"
-                options={{ headerShown: false, animation: "fade" }}
+                options={{ headerShown: false, animation: "fade", ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => {
                   const profileMode = getOnboardingScreenMode(
@@ -1617,7 +1661,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="AvatarSetup"
-                options={{ headerShown: false, animation: "fade" }}
+                options={{ headerShown: false, animation: "fade", ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => (
                       <avatarSetupScreenBundle.DeferredScreen
@@ -1649,7 +1693,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="RoomSetup"
-                options={{ headerShown: false, animation: "fade" }}
+                options={{ headerShown: false, animation: "fade", ...reducedMotionScreenOptions }}
               >
                 {(screenProps) => (
                   <roomSetupScreenBundle.DeferredScreen

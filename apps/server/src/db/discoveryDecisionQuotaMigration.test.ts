@@ -20,3 +20,15 @@ test("Discovery quota migration is UTC-day scoped and consumes decisions atomica
   assert.match(sql, /UPDATE blumi_discovery_decisions/i)
   assert.match(sql, /UPDATE blumi_discovery_decision_quotas/i)
 })
+
+test("Discovery decision repair qualifies quota columns that shadow output parameters", async () => {
+  const sql = await readFile(
+    resolve(__dirname, "../../db/migrations/061_qualify_discovery_decision_quota_columns.sql"),
+    "utf8"
+  )
+
+  assert.match(sql, /CREATE OR REPLACE FUNCTION blumi_consume_discovery_decision/i)
+  assert.match(sql, /SELECT q\.used_decisions, q\.extension_decisions/i)
+  assert.match(sql, /AND q\.quota_day = v_quota_day/i)
+  assert.match(sql, /RETURNING q\.used_decisions INTO v_used/i)
+})

@@ -106,7 +106,7 @@ test("refund reversals consume unused coins first, then create debt without revo
   await assert.rejects(
     economyService.purchaseItem("user_a", {
       type: "avatar",
-      itemId: "avatar_v2_top_blush_lace_cardigan",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       avatarBodyId: "avatar_v2_body_default"
     }),
     /coin balance needs to be settled/i

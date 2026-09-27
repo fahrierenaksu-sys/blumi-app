@@ -418,6 +418,29 @@ test("multiple accessory groups remain in the draft and queue independently", ()
   ])
 })
 
+test("saving one piece preserves the other preview selections", () => {
+  const previewDraft = { ...equipped, top: "new-top", bottom: "new-bottom", shoes: "new-shoes", hair: "new-hair", accessoryIds: ["new-bag"] }
+  const state = createShopCombinationState({ equipped: { ...equipped, top: "new-top" }, previewDraft,
+    ownedProductIds: ["new-top"], avatarRevision: 2 })
+  assert.deepEqual(state.draft, previewDraft)
+  assert.equal(state.equipped.bottom, "bottom-current")
+  const applying = reduceShopCombination(state, { type: "apply" })
+  assert.equal(applying.state.purchaseQueue.length, 4)
+})
+
+test("five selected pieces all enter and complete the purchase queue", () => {
+  const state = createShopCombinationState({
+    equipped: { top: "top", bottom: "bottom", shoes: "shoes", hair: "hair", accessoryIds: ["bag"] },
+    ownedProductIds: [], avatarRevision: 1
+  })
+  let next = reduceShopCombination(state, { type: "apply" })
+  const ids = next.state.purchaseQueue.map((item) => item.productId)
+  assert.equal(ids.length, 5)
+  for (const id of ids) next = completePurchase(next.state, id)
+  assert.equal(next.state.purchasedProductIds.length, 5)
+  assert.equal(next.commands[0]?.type, "save_avatar")
+})
+
 function completePurchase(
   state: ShopCombinationState,
   productId: string

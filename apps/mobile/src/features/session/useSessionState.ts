@@ -32,17 +32,23 @@ import {
 import {
   completeProductionOnboardingStep,
   acknowledgeAccountModeration,
+  completeFirebaseAccount,
   AccountAccessError,
   fetchProductionAccountSnapshot,
-  registerAccount,
   revokeProductionSession,
-  sendVerificationCode,
   type RegisterAccountInput,
   type SendVerificationCodeInput,
   type UpdateSessionProfileInput,
   updateProductionProfile,
   updateSessionActorProfile
 } from "./sessionApi"
+import {
+  confirmFirebasePhoneCode,
+  getVerifiedFirebasePhoneIdToken,
+  requestFirebasePhoneCode,
+  signOutFirebasePhoneAuth,
+  type FirebasePhoneConfirmation
+} from "./firebasePhoneAuth"
 import {
   needsModerationInterruption,
   type AccountModerationState
@@ -157,6 +163,7 @@ export function useSessionState(): UseSessionStateResult {
       capabilities: createFailClosedCapabilityResolution().capabilities
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
+  const firebasePhoneConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
   const mutationCoordinatorRef = useRef<ReturnType<typeof createSessionMutationCoordinator> | null>(null)
   if (!mutationCoordinatorRef.current) {
     mutationCoordinatorRef.current = createSessionMutationCoordinator({
@@ -531,7 +538,20 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(true)
       setErrorMessage(null)
       try {
-        const nextSessionActor = await registerAccount(MOBILE_HTTP_BASE_URL, input)
+        const confirmation = firebasePhoneConfirmationRef.current
+        const idToken = await getVerifiedFirebasePhoneIdToken(input.phoneNumber)
+          ?? (confirmation
+            ? await confirmFirebasePhoneCode(confirmation, input.verificationCode)
+            : null)
+        if (!idToken) throw new Error("Request a verification code before continuing.")
+        const nextSessionActor = await completeFirebaseAccount(
+          MOBILE_HTTP_BASE_URL,
+          {
+            idToken,
+            authIntent: input.authIntent ?? "sign-in"
+          }
+        )
+        firebasePhoneConfirmationRef.current = null
         await mutationCoordinator.replace(nextSessionActor, replacement)
         setAccountModeration(null)
         captureProductEvent("onboarding_step_completed", { step: "account" })
@@ -564,7 +584,21 @@ export function useSessionState(): UseSessionStateResult {
         let registrationCapabilities = createFailClosedCapabilityResolution().capabilities
         await replayPreAuthOnboardingDraft(draft, {
           register: async () => {
-            const actor = await registerAccount(MOBILE_HTTP_BASE_URL, input)
+            const confirmation = firebasePhoneConfirmationRef.current
+            const idToken = await getVerifiedFirebasePhoneIdToken(input.phoneNumber)
+              ?? (confirmation
+                ? await confirmFirebasePhoneCode(confirmation, input.verificationCode)
+                : null)
+            if (!idToken) throw new Error("Request a verification code before continuing.")
+            const actor = await completeFirebaseAccount(
+              MOBILE_HTTP_BASE_URL,
+              {
+                idToken,
+                authIntent: "create",
+                termsAcceptance: input.termsAcceptance
+              }
+            )
+            firebasePhoneConfirmationRef.current = null
             const resolution = await resolveProductionCapabilities(
               MOBILE_HTTP_BASE_URL,
               actor.session.sessionToken,
@@ -653,7 +687,9 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(true)
       setErrorMessage(null)
       try {
-        await sendVerificationCode(MOBILE_HTTP_BASE_URL, input)
+        firebasePhoneConfirmationRef.current = await requestFirebasePhoneCode(
+          input.phoneNumber
+        )
       } catch (error) {
         setErrorMessage(getErrorMessage(error))
         throw error
@@ -720,6 +756,7 @@ export function useSessionState(): UseSessionStateResult {
             : undefined,
         clear: () => clearing
       })
+      await signOutFirebasePhoneAuth()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
       throw error

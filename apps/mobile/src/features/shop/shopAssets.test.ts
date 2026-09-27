@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
+import sharp from "sharp"
+import thumbnailBounds from "./shopThumbnailBounds.json"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -14,6 +16,7 @@ const {
   SHOP_THUMBNAIL_SOURCES,
   getAvatarItemPreviewSource,
   getRoomProductThumbnailSource,
+  getShopProductThumbnailBounds,
   getShopProductThumbnailSource
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./shopAssets") as typeof import("./shopAssets")
@@ -64,4 +67,53 @@ test("shop asset registries retain representative capsule and room entries", () 
     getRoomProductThumbnailSource(roomItemId),
     ROOM_SHOP_THUMBNAIL_SOURCES[roomItemId]
   )
+})
+
+test("visible thumbnail metadata stays bound to the resolved source geometry", async () => {
+  for (const [id, source] of Object.entries(SHOP_THUMBNAIL_SOURCES)) {
+    const expected = (thumbnailBounds as Record<string, number[]>)[id]
+    assert.ok(expected, `${id}: missing visible bounds`)
+    const { data, info } = await sharp(source as string).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    let left = info.width, top = info.height, right = 0, bottom = 0
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        if (data[(y * info.width + x) * 4 + 3] <= 8) continue
+        left = Math.min(left, x)
+        top = Math.min(top, y)
+        right = Math.max(right, x + 1)
+        bottom = Math.max(bottom, y + 1)
+      }
+    }
+    assert.deepEqual(expected, [info.width, info.height, left, top, right - left, bottom - top], `${id}: regenerate presentation bounds after changing the source`)
+  }
+})
+
+test("garment thumbnails never substitute a full-character square image", async () => {
+  for (const id of [
+    "avatar_v2_bottom_midnight_ribbon_wide_leg_pants",
+    "avatar_v2_bottom_buttercream_pearl_tailored_pants",
+    "avatar_v2_bottom_rose_picnic_pleated_shorts",
+    "avatar_v2_bottom_lavender_bow_twill_shorts",
+    "avatar_v2_shoes_rose_satin_bow_heels",
+    "avatar_v2_shoes_ivory_pearl_slingback_heels",
+    "avatar_v2_shoes_lilac_star_platform_sneakers",
+    "avatar_v2_shoes_mint_ribbon_court_sneakers"
+  ]) {
+    const source = getShopProductThumbnailSource(id) as string
+    const bounds = getShopProductThumbnailBounds(id)
+    assert.match(source, /\/assets\/room\//, `${id}: use the garment-only source`)
+    assert.ok(bounds, `${id}: missing visible bounds`)
+    const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    let left = info.width, top = info.height, right = 0, bottom = 0
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        if (data[(y * info.width + x) * 4 + 3] <= 8) continue
+        left = Math.min(left, x)
+        top = Math.min(top, y)
+        right = Math.max(right, x + 1)
+        bottom = Math.max(bottom, y + 1)
+      }
+    }
+    assert.deepEqual(bounds, [info.width, info.height, left, top, right - left, bottom - top])
+  }
 })

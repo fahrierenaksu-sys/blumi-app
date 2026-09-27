@@ -122,6 +122,8 @@ export interface SessionRecord {
 }
 
 export interface BlumiBackendStore {
+  firebaseActionChallenges: Map<string, FirebaseActionChallenge>
+  firebaseUserDeletionOutbox: Map<string, { uid: string; accountId: string; nextAttemptAt: number; attemptCount: number }>
   pendingOtps: Map<string, PendingOtp>
   otpSendLimits: Map<string, OtpSendLimit>
   pendingRecoveryOtps: Map<string, PendingOtp>
@@ -139,6 +141,17 @@ export interface BlumiBackendStore {
 export interface AccountDeletionConfirmation {
   accountId: string
   tokenDigest: string
+  expiresAt: number
+  firebaseUid?: string
+}
+
+export interface FirebaseActionChallenge {
+  accountId: string
+  purpose: "account_deletion" | AccountActionPurpose
+  challengeId: string
+  sessionTokenHash: string
+  targetPhoneNumber: string
+  issuedAt: number
   expiresAt: number
 }
 
@@ -158,6 +171,8 @@ export interface AccountActionConfirmation {
 
 export function createBlumiBackendStore(): BlumiBackendStore {
   return {
+    firebaseActionChallenges: new Map(),
+    firebaseUserDeletionOutbox: new Map(),
     pendingOtps: new Map(),
     otpSendLimits: new Map(),
     pendingRecoveryOtps: new Map(),

@@ -4,11 +4,9 @@ import {
   Animated,
   Easing,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  Vibration,
   View
 } from "react-native"
 import { MyAvatar } from "../ui/myAvatar"
@@ -199,7 +197,6 @@ export function MatchResultModal(props: MatchResultModalProps) {
     entranceAnimationRef.current = null
     scaleAnim.stopAnimation()
     heartPulse.stopAnimation()
-    Vibration.cancel()
   }, [heartPulse, scaleAnim])
 
   const runEntrance = useCallback(() => {
@@ -238,11 +235,6 @@ export function MatchResultModal(props: MatchResultModalProps) {
     ])
     entranceAnimationRef.current = animation
     animation.start()
-
-    // Haptic burst
-    if (Platform.OS !== "web") {
-      Vibration.vibrate([0, 40, 60, 40, 60, 80])
-    }
   }, [heartPulse, reduceMotion, scaleAnim, stopEntrance])
 
   useEffect(() => {
@@ -255,7 +247,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
   }, [runEntrance, stopEntrance, visible])
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable
           accessibilityRole="button"

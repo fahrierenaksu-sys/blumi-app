@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
@@ -51,6 +52,18 @@ function renderLegalBody(body: string): ReactNode[] {
 
 export function LegalScreen(props: LegalScreenProps) {
   const { navigation, route } = props
+  const handleGoBack = (): void => {
+    const routeNames = navigation.getState().routeNames
+    goBackOrFallback(navigation, () => {
+      if (routeNames.includes("Settings")) {
+        navigation.replace("Settings")
+      } else if (routeNames.includes("AccountRestriction")) {
+        navigation.replace("AccountRestriction")
+      } else {
+        navigation.replace("AuthEntry")
+      }
+    })
+  }
   const type = route.params.type
   const content = getLegalContent(
     getAppLocale(),
@@ -65,7 +78,7 @@ export function LegalScreen(props: LegalScreenProps) {
           title={content.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={getAppLocale() === "tr" ? "Geri dön" : "Go back"} onPress={() => navigation.goBack()} size={40}>
+            <ActionButtonCircle accessibilityLabel={getAppLocale() === "tr" ? "Geri dön" : "Go back"} onPress={handleGoBack} size={40}>
               <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
             </ActionButtonCircle>
           }

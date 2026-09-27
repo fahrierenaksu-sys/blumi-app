@@ -73,10 +73,35 @@ export class OnboardingPrerequisiteError extends Error {
 export interface AuthService {
   store: BlumiBackendStore
   repository: AuthRepository
+  createFirebaseActionChallenge(
+    sessionToken: string,
+    purpose: "account_deletion" | AccountActionPurpose,
+    targetPhoneNumber?: string,
+    now?: Date
+  ): Promise<{ challengeId: string; expiresAt: string } | null>
+  consumeFirebaseActionChallenge(input: {
+    sessionToken: string
+    purpose: "account_deletion" | AccountActionPurpose
+    challengeId: string
+    phoneNumber: string
+    authTime: number
+    now?: Date
+  }): Promise<boolean>
   sendCode(phoneNumber: string, now?: Date): Promise<{ expiresAt: string }>
   /** Internal fixture/bootstrap compatibility only. HTTP login must use verifyExistingAccount. */
   verifyCode(phoneNumber: string, code: string, now?: Date): Promise<{ account: AccountRecord; session: SessionRecord; sessionToken: string }>
   verifyExistingAccount(phoneNumber: string, code: string, now?: Date): Promise<{ account: AccountRecord; session: SessionRecord; sessionToken: string }>
+  signInWithVerifiedPhone(
+    phoneNumber: string,
+    options: {
+      requireExistingAccount?: boolean
+      acceptedTerms?: {
+        version: string
+        locale: "en" | "tr"
+      }
+    },
+    now?: Date
+  ): Promise<{ account: AccountRecord; session: SessionRecord; sessionToken: string }>
   registerAccount(
     phoneNumber: string,
     code: string,
@@ -106,9 +131,11 @@ export interface AuthService {
   revokeSession(sessionToken: string): Promise<void>
   requestAccountDeletionChallenge(sessionToken: string, now?: Date): Promise<{ expiresAt: string } | null>
   verifyAccountDeletionChallenge(sessionToken: string, code: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
-  deleteAccount(sessionToken: string, confirmationToken: string, now?: Date): Promise<"deleted" | "missing_session" | "reauth_required">
+  verifyFirebaseAccountDeletion(sessionToken: string, phoneNumber: string, firebaseUid: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
+  deleteAccount(sessionToken: string, confirmationToken: string, now?: Date): Promise<"deleted" | "pending_firebase_deletion" | "missing_session" | "reauth_required">
   requestAccountDataExportChallenge(sessionToken: string, now?: Date): Promise<{ expiresAt: string } | null>
   verifyAccountDataExportChallenge(sessionToken: string, code: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
+  verifyFirebaseAccountAction(sessionToken: string, purpose: AccountActionPurpose, phoneNumber: string, currentPhoneConfirmationToken?: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
   exportAccountData(sessionToken: string, confirmationToken: string, now?: Date): Promise<AsyncIterable<string> | "missing_session" | "reauth_required">
   requestPhoneChangeChallenge(sessionToken: string, now?: Date): Promise<{ expiresAt: string } | null>
   verifyPhoneChangeChallenge(sessionToken: string, code: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
@@ -332,6 +359,46 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
   }
 
   return {
+    async createFirebaseActionChallenge(sessionToken, purpose, targetPhoneNumber, now = new Date()) {
+      const resolved = await this.getSession(sessionToken, now)
+      if (!resolved) return null
+      const phoneNumber = purpose === "phone_change_new"
+        ? normalizePhoneNumber(targetPhoneNumber ?? "")
+        : resolved.account.phoneNumber
+      if (!phoneNumber || (purpose === "phone_change_new" && phoneNumber === resolved.account.phoneNumber)) {
+        throw new PublicRequestError("Choose a different phone number.")
+      }
+      const challengeId = createSessionToken()
+      const expiresAt = now.getTime() + OTP_TTL_MS
+      await repository.saveFirebaseActionChallenge({
+        accountId: resolved.account.accountId,
+        purpose,
+        challengeId,
+        sessionTokenHash: hashSessionToken(sessionToken),
+        targetPhoneNumber: phoneNumber,
+        // Firebase auth_time has second resolution. Require the next full
+        // second so a token minted just before this challenge cannot replay.
+        issuedAt: Math.ceil(now.getTime() / 1000) * 1000,
+        expiresAt
+      })
+      return { challengeId, expiresAt: new Date(expiresAt).toISOString() }
+    },
+
+    async consumeFirebaseActionChallenge(input) {
+      const now = input.now ?? new Date()
+      const resolved = await this.getSession(input.sessionToken, now)
+      if (!resolved || !Number.isSafeInteger(input.authTime) ||
+        input.authTime * 1000 > now.getTime() + 30_000) return false
+      return repository.consumeFirebaseActionChallenge({
+        accountId: resolved.account.accountId,
+        purpose: input.purpose,
+        challengeId: input.challengeId,
+        sessionTokenHash: hashSessionToken(input.sessionToken),
+        phoneNumber: normalizePhoneNumber(input.phoneNumber),
+        authTime: input.authTime,
+        now: now.getTime()
+      })
+    },
     store,
     repository,
     async sendCode(phoneNumber, now = new Date()) {
@@ -419,6 +486,47 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
     async verifyExistingAccount(phoneNumber, code, now = new Date()) {
       return finalizePhoneOtpSignIn({ phoneNumber, code, now, requireExistingAccount: true })
+    },
+
+    async signInWithVerifiedPhone(phoneNumber, options, now = new Date()) {
+      const sessionToken = createSessionToken()
+      const finalization = await repository.finalizeOtpSignIn({
+        verifiedWithoutOtp: true,
+        requireExistingAccount: options.requireExistingAccount,
+        phoneNumber,
+        now: now.getTime(),
+        maxAttempts: MAX_VERIFY_ATTEMPTS,
+        newAccount: createAccountRecord(
+          phoneNumber,
+          now,
+          options.acceptedTerms
+            ? {
+                version: options.acceptedTerms.version,
+                locale: options.acceptedTerms.locale,
+                acceptedAt: now.toISOString()
+              }
+            : undefined
+        ),
+        matches: () => true,
+        createSession(account) {
+          return createSessionRecord(account, sessionToken, now)
+        }
+      })
+      if (finalization.kind === "account_not_found") {
+        throw new AuthError({
+          code: "OTP_INVALID_OR_EXPIRED",
+          message: "We could not sign you in with that phone number.",
+          statusCode: 401
+        })
+      }
+      if (finalization.kind !== "verified") {
+        throw new AuthError({
+          code: "OTP_INVALID_OR_EXPIRED",
+          message: "We could not finish phone verification.",
+          statusCode: 401
+        })
+      }
+      return { account: finalization.account, session: finalization.session, sessionToken }
     },
 
     async registerAccount(phoneNumber, code, termsAcceptance, now = new Date()) {
@@ -816,6 +924,28 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       return { confirmationToken, expiresAt: new Date(confirmationExpiresAt).toISOString() }
     },
 
+    async verifyFirebaseAccountDeletion(sessionToken, phoneNumber, firebaseUid, now = new Date()) {
+      const resolved = await this.getSession(sessionToken, now)
+      if (!resolved) return null
+      assertVerifiedPhoneMatchesAccount(resolved.account, phoneNumber)
+      if (!firebaseUid) return null
+      const confirmationToken = createSessionToken()
+      const confirmationExpiresAt = now.getTime() + OTP_TTL_MS
+      await repository.createAccountDeletionConfirmation({
+        accountId: resolved.account.accountId,
+        confirmationTokenDigest: createOtpDigest({
+          secret: otpHmacSecret,
+          otpId: resolved.account.accountId,
+          phoneNumber: resolved.account.phoneNumber,
+          code: confirmationToken,
+          purpose: "account_deletion"
+        }),
+        confirmationExpiresAt,
+        firebaseUid
+      })
+      return { confirmationToken, expiresAt: new Date(confirmationExpiresAt).toISOString() }
+    },
+
     async requestAccountDataExportChallenge(sessionToken, now = new Date()) {
       const resolved = await this.getSession(sessionToken, now)
       if (!resolved) return null
@@ -837,6 +967,54 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         code,
         now
       })
+    },
+
+    async verifyFirebaseAccountAction(sessionToken, purpose, phoneNumber, currentPhoneConfirmationToken, now = new Date()) {
+      const resolved = await this.getSession(sessionToken, now)
+      if (!resolved) return null
+      const verifiedPhoneNumber = normalizePhoneNumber(phoneNumber)
+      if (purpose === "phone_change_new") {
+        if (!currentPhoneConfirmationToken) {
+          throw new AuthError({ code: "OTP_INVALID_OR_EXPIRED", message: "Confirm your current phone number first.", statusCode: 401 })
+        }
+        const currentPhoneProofValid = await repository.validateAccountActionConfirmation({
+          accountId: resolved.account.accountId,
+          purpose: "phone_change_current",
+          confirmationTokenDigest: createOtpDigest({
+            secret: otpHmacSecret,
+            otpId: resolved.account.accountId,
+            phoneNumber: resolved.account.accountId,
+            code: currentPhoneConfirmationToken,
+            purpose: "phone_change_current"
+          }),
+          now: now.getTime()
+        })
+        if (!currentPhoneProofValid) {
+          throw new AuthError({ code: "OTP_INVALID_OR_EXPIRED", message: "Confirm your current phone number first.", statusCode: 401 })
+        }
+        if (verifiedPhoneNumber === resolved.account.phoneNumber) {
+          throw new PublicRequestError("Choose a different phone number.")
+        }
+      } else {
+        assertVerifiedPhoneMatchesAccount(resolved.account, verifiedPhoneNumber)
+      }
+
+      const confirmationToken = createSessionToken()
+      const confirmationExpiresAt = now.getTime() + OTP_TTL_MS
+      await repository.createAccountActionConfirmation({
+        accountId: resolved.account.accountId,
+        purpose,
+        targetPhoneNumber: verifiedPhoneNumber,
+        confirmationTokenDigest: createOtpDigest({
+          secret: otpHmacSecret,
+          otpId: resolved.account.accountId,
+          phoneNumber: resolved.account.accountId,
+          code: confirmationToken,
+          purpose
+        }),
+        confirmationExpiresAt
+      })
+      return { confirmationToken, expiresAt: new Date(confirmationExpiresAt).toISOString() }
     },
 
     async exportAccountData(sessionToken, confirmationToken, now = new Date()) {
@@ -986,7 +1164,10 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
           accountDeletionHandlers.map((handler) => handler(resolved.account))
         )
       }
-      return deleted ? "deleted" : "reauth_required"
+      if (!deleted) return "reauth_required"
+      return await repository.hasPendingFirebaseUserDeletion(resolved.account.accountId)
+        ? "pending_firebase_deletion"
+        : "deleted"
     }
   }
 }
@@ -1028,6 +1209,20 @@ function normalizePhoneNumber(phoneNumber: string): string {
     throw new PublicRequestError("Enter a valid phone number with country code.")
   }
   return normalized
+}
+
+function assertVerifiedPhoneMatchesAccount(
+  account: AccountRecord,
+  phoneNumber: string
+): void {
+  const normalized = normalizePhoneNumber(phoneNumber)
+  if (normalized !== account.phoneNumber) {
+    throw new AuthError({
+      code: "OTP_INVALID_OR_EXPIRED",
+      message: "The verified phone number does not match this account.",
+      statusCode: 401
+    })
+  }
 }
 
 function normalizeAge(age: number): number {

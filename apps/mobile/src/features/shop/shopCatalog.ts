@@ -94,7 +94,6 @@ const SHOP_AVATAR_TYPES = new Set([
   "accessory"
 ])
 
-export const INITIAL_SHOP_ITEM_ID = "avatar:avatar_v2_top_blush_lace_cardigan"
 
 export function buildShopCatalogItems(
   input: BuildShopCatalogItemsInput
@@ -118,6 +117,7 @@ function buildAvatarShopItems(input: BuildShopCatalogItemsInput): ShopCatalogIte
     input.avatar.bodyId
   )
     .filter((item) => SHOP_AVATAR_TYPES.has(item.type))
+    .filter((item) => item.hiddenFromShop !== true)
     .filter((item) => !publishedItemIds || publishedItemIds.has(item.id))
     .map((item) =>
       buildAvatarShopCatalogItem({

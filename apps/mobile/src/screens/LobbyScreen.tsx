@@ -28,7 +28,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  Vibration,
   View
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
@@ -97,6 +96,8 @@ import {
 } from "../features/discovery/discoveryQueryOptions"
 import { getDiscoveryErrorMessageForDisplay } from "../features/discovery/discoveryErrorCopy"
 import { useLobbyFlow } from "../features/lobby/useLobbyFlow"
+import { getLobbyFeedbackCopy } from "../features/lobby/lobbyFeedbackCopy"
+import { getAppLocale } from "../features/session/appLocale"
 import {
   loadPendingInvitesForUser,
   recordPendingInviteForUser,
@@ -142,6 +143,7 @@ interface DiscoverFeedback {
 
 export function LobbyScreen(props: LobbyScreenProps) {
   const { sessionActor, onResetSession, onUpdateDiscoveryPreferences } = props
+  const lobbyCopy = getLobbyFeedbackCopy(getAppLocale())
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const route = useRoute<RouteProp<RootStackParamList, "Lobby">>()
   const queryClient = useQueryClient()
@@ -351,7 +353,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
       }
     } catch (error) {
       showToast({
-        title: "Discover needs a moment",
+        title: lobbyCopy.refreshTitle,
         body: getDiscoveryErrorMessageForDisplay("refresh", error),
         type: "warning"
       })
@@ -362,6 +364,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }, [
     filtersReady,
     isProductionDiscovery,
+    lobbyCopy,
     requestRefresh,
     refreshProductionDiscover
   ])
@@ -410,8 +413,8 @@ export function LobbyScreen(props: LobbyScreenProps) {
       )
     } catch {
       showToast({
-        title: "Vibe Card wasn’t saved",
-        body: "Try again when you’re connected.",
+        title: lobbyCopy.watchSaveTitle,
+        body: lobbyCopy.watchSaveBody,
         type: "warning"
       })
     } finally {
@@ -420,6 +423,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }, [
     discoveryWatchBusy,
     isProductionDiscovery,
+    lobbyCopy,
     queryClient,
     sessionActor.profile.userId,
     sessionActor.session.sessionToken
@@ -442,8 +446,8 @@ export function LobbyScreen(props: LobbyScreenProps) {
       )
     } catch {
       showToast({
-        title: "Vibe Card is still active",
-        body: "Try cancelling again when you’re connected.",
+        title: lobbyCopy.watchCancelTitle,
+        body: lobbyCopy.watchCancelBody,
         type: "warning"
       })
     } finally {
@@ -452,6 +456,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }, [
     discoveryWatchBusy,
     isProductionDiscovery,
+    lobbyCopy,
     queryClient,
     sessionActor.profile.userId,
     sessionActor.session.sessionToken
@@ -774,10 +779,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
     }
   }, [lobbyState.isJoined, lobbyState.snapshot])
 
-  const triggerHaptic = useCallback((tone: DiscoverFeedbackTone): void => {
-    Vibration.vibrate(tone === "warm" ? 18 : 10)
-  }, [])
-
   const showDiscoverFeedback = useCallback(
     (text: string, tone: DiscoverFeedbackTone): void => {
       feedbackCounterRef.current += 1
@@ -810,12 +811,12 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
   const showInviteDeliveryFailure = useCallback((): void => {
     showToast({
-      title: "Invite not sent",
-      body: "Wait a moment, then try again.",
+      title: lobbyCopy.inviteTitle,
+      body: lobbyCopy.inviteBody,
       type: "warning"
     })
-    showDiscoverFeedback("Invite not sent. Try again in a moment.", "soft")
-  }, [showDiscoverFeedback])
+    showDiscoverFeedback(lobbyCopy.inviteFeedback, "soft")
+  }, [lobbyCopy, showDiscoverFeedback])
 
   const markCandidateSeen = useCallback((userId: string): void => {
     setSeenThisSessionUserIds((current) =>
@@ -885,45 +886,47 @@ export function LobbyScreen(props: LobbyScreenProps) {
           })
         }
         if (decision === "pass") {
-          showDiscoverFeedback("Passed for now.", "soft")
+          showDiscoverFeedback(lobbyCopy.passed, "soft")
           return true
         }
 
         const match = createMatchFromDiscoveryResult({
           currentUser: {
             userId: myUserId,
-            displayName: myDisplayName
+            displayName: myDisplayName,
+            avatarSelection: sessionActor.profile.avatar
           },
           matchedUser: {
             userId: candidate.userId,
-            displayName: candidate.displayName
+            displayName: candidate.displayName,
+            avatarSelection: candidate.avatar
           },
           result
         })
 
         if (match) {
           void hydrateFromServer(sessionActor.session.sessionToken)
-          showDiscoverFeedback("It’s a match.", "warm")
+          showDiscoverFeedback(lobbyCopy.matched, "warm")
           setTimeout(() => {
             navigation.navigate("MatchResult", { match })
           }, 260)
           return true
         }
 
-        showDiscoverFeedback("Like sent.", "warm")
+        showDiscoverFeedback(lobbyCopy.liked, "warm")
         return true
       } catch (error) {
         if (error instanceof DiscoveryDecisionQuotaExhaustedError) {
           updateProductionQuota(error.quota)
         }
         const title = error instanceof DiscoveryDecisionQuotaExhaustedError
-          ? "Today’s Discover limit reached"
+          ? lobbyCopy.quota
           : getDiscoveryErrorMessageForDisplay("decision", error)
         showToast({
           title,
           type: "warning"
         })
-        showDiscoverFeedback("Try that again in a moment.", "soft")
+        showDiscoverFeedback(lobbyCopy.retry, "soft")
         restoreCandidateAfterDecisionFailure(candidate.userId)
         return false
       } finally {
@@ -937,11 +940,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
     },
     [
       hydrateFromServer,
+      lobbyCopy,
       markCandidateSeen,
       myDisplayName,
       myUserId,
       navigation,
       restoreCandidateAfterDecisionFailure,
+      sessionActor.profile.avatar,
       sessionActor.session.sessionToken,
       showDiscoverFeedback,
       updateProductionQuota
@@ -955,17 +960,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
       (!isProductionDiscovery && !isLiveInviteAvailable(featuredCandidate))
     ) return
     if (isProductionDiscovery) {
-      triggerHaptic("warm")
       void decideProductionCandidate(featuredCandidate, "like")
       return
     }
-    triggerHaptic("warm")
     const inviteSent = sendInvite(featuredCandidate.userId)
     if (!inviteSent) {
       showInviteDeliveryFailure()
       return
     }
-    showDiscoverFeedback("Invite sent. A shared room opens if they accept.", "warm")
+    showDiscoverFeedback(lobbyCopy.inviteSent, "warm")
     captureProductEvent("discovery_decision", {
       decision: "like",
       mode: sessionActor.session.mode
@@ -988,23 +991,22 @@ export function LobbyScreen(props: LobbyScreenProps) {
     decideProductionCandidate,
     featuredCandidate,
     isProductionDiscovery,
+    lobbyCopy,
     markCandidateSeen,
     sessionActor.session.mode,
     sendInvite,
     showDiscoverFeedback,
-    showInviteDeliveryFailure,
-    triggerHaptic
+    showInviteDeliveryFailure
   ])
 
   const handleSkipFeatured = useCallback(() => {
     if (!featuredCandidate) return
     if (inFlightDecisionUserIdsRef.current.has(featuredCandidate.userId)) return
-    triggerHaptic("soft")
     if (isProductionDiscovery) {
       void decideProductionCandidate(featuredCandidate, "pass")
       return
     }
-    showDiscoverFeedback("Skipped for now.", "soft")
+    showDiscoverFeedback(lobbyCopy.skipped, "soft")
     markCandidateSeen(featuredCandidate.userId)
     void skipDiscoveryCandidate({
       ownerUserId: sessionActor.profile.userId,
@@ -1026,10 +1028,10 @@ export function LobbyScreen(props: LobbyScreenProps) {
     decideProductionCandidate,
     featuredCandidate,
     isProductionDiscovery,
+    lobbyCopy,
     markCandidateSeen,
     sessionActor.session.mode,
-    showDiscoverFeedback,
-    triggerHaptic
+    showDiscoverFeedback
   ])
 
   const isPendingForFeatured =
@@ -1054,7 +1056,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
       if (targetUser) {
         void decideProductionCandidate(targetUser, "like")
       } else {
-        showDiscoverFeedback("This profile is no longer available in Discover.", "soft")
+        showDiscoverFeedback(lobbyCopy.unavailable, "soft")
       }
       navigation.setParams({ pendingLikeUserId: undefined })
       return
@@ -1067,7 +1069,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
     }
     addPendingInvite({
       userId: target,
-      displayName: targetUser?.displayName ?? "Someone",
+      displayName: targetUser?.displayName ?? lobbyCopy.someone,
       sentAt: Date.now()
     })
     markCandidateSeen(target)
@@ -1078,6 +1080,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
     decideProductionCandidate,
     discoverSourceUsers,
     isProductionDiscovery,
+    lobbyCopy,
     markCandidateSeen,
     navigation,
     route.params?.pendingLikeUserId,
@@ -1094,14 +1097,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
       if (targetUser) {
         void decideProductionCandidate(targetUser, "pass")
       } else {
-        showDiscoverFeedback("This profile is no longer available in Discover.", "soft")
+        showDiscoverFeedback(lobbyCopy.unavailable, "soft")
       }
       navigation.setParams({ pendingPassUserId: undefined })
       return
     }
     if (!isProductionDiscovery) {
-      triggerHaptic("soft")
-      showDiscoverFeedback("Passed for now.", "soft")
+      showDiscoverFeedback(lobbyCopy.passed, "soft")
       markCandidateSeen(target)
       void skipDiscoveryCandidate({
         ownerUserId: sessionActor.profile.userId,
@@ -1117,13 +1119,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
     decideProductionCandidate,
     discoverSourceUsers,
     isProductionDiscovery,
+    lobbyCopy,
     markCandidateSeen,
     navigation,
     route.params?.pendingPassUserId,
     sessionActor.profile.userId,
     sessionActor.session.mode,
-    showDiscoverFeedback,
-    triggerHaptic
+    showDiscoverFeedback
   ])
 
   const nearbyCount = useMemo(
@@ -1141,15 +1143,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
     .join(", ")
   const progressLabel =
     productionDiscoverLoading
-      ? "Finding people who match your vibe"
+      ? lobbyCopy.finding
       : productionDiscoverError
         ? productionDiscoverError
         : discoveryQuotaExhausted
-          ? "Today’s Discover limit reached"
+          ? lobbyCopy.quota
         : discoverableCount > 0
-      ? `${discoverableCount} ${discoverableCount === 1 ? "person" : "people"} to meet`
+      ? lobbyCopy.peopleToMeet(discoverableCount)
       : nearbyCount > 0
-        ? "You've seen everyone for now"
+        ? lobbyCopy.everyoneSeen
         : null
   const showDiscoveryLoading = isProductionDiscovery && productionProfiles.length === 0 && (
     !filtersReady || productionDiscoverLoading || !isSafetyListReady
@@ -1197,14 +1199,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
         ).catch(() => undefined)
       } catch {
         showToast({
-          title: "Your filters are active on this device.",
-          body: "Blumi could not sync them to your account yet.",
+          title: lobbyCopy.filtersLocalTitle,
+          body: lobbyCopy.filtersLocalBody,
           type: "warning"
         })
       }
     })()
   }, [
     isProductionDiscovery,
+    lobbyCopy,
     onUpdateDiscoveryPreferences,
     sessionActor.profile.discoveryPreferences?.radiusKm,
     sessionActor.profile.userId

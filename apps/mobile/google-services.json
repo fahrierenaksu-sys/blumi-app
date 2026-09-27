@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "968696126142",
+    "project_id": "blumi-mobile-eren",
+    "storage_bucket": "blumi-mobile-eren.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:968696126142:android:2f25e20232715a93675cef",
+        "android_client_info": {
+          "package_name": "com.blumi.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFR2vutyjczowt3rShED3FKSEvFBNHUBk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

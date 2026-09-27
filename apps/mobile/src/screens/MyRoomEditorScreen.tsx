@@ -54,6 +54,7 @@ import {
   removeRoomV2PlacedItem
 } from "../features/roomV2/state/RoomV2Provider"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { uiTheme } from "../ui/theme"
 import { hapticLight, hapticSuccess, hapticError } from "../ui/haptics"
 import { useSelectionTransition } from "../ui/animations"
@@ -963,7 +964,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     if (requestedExitAction) {
       navigation.dispatch(requestedExitAction)
     } else {
-      navigation.goBack()
+      goBackOrFallback(navigation, () => navigation.replace("MyRoom"))
     }
   }, [
     draftDecor,
@@ -1011,7 +1012,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
 
   const handleCancel = useCallback(() => {
     hapticLight()
-    navigation.goBack()
+    goBackOrFallback(navigation, () => navigation.replace("MyRoom"))
   }, [navigation])
 
   const handleResetDraft = useCallback(() => {

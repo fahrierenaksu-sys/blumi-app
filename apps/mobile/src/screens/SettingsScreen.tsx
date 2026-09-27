@@ -12,14 +12,14 @@ import {
   Modal,
   Pressable,
   Platform,
-  ScrollView,
   Switch,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native"
-import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { PageSafeArea as SafeAreaView, PageScrollContent } from "../ui/layout/PageContainer"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import {
   hydrateBlockedUsersFromServer,
   useBlockStore
@@ -41,15 +41,15 @@ import {
   confirmPhoneChange,
   deleteProductionAccount,
   downloadAccountDataExport,
-  requestAccountDataExportChallenge,
-  requestAccountDeletionChallenge,
-  requestPhoneChangeCurrentChallenge,
-  requestPhoneChangeNewNumberChallenge,
-  verifyAccountDataExportCode,
-  verifyAccountDeletionCode,
-  verifyPhoneChangeCurrentCode,
-  verifyPhoneChangeNewNumberCode
+  requestFirebaseAccountActionChallenge,
+  verifyFirebaseAccountAction
 } from "../features/session/sessionApi"
+import {
+  confirmFirebasePhoneCode,
+  getFirebaseCurrentPhoneNumber,
+  requestFirebasePhoneCode,
+  type FirebasePhoneConfirmation
+} from "../features/session/firebasePhoneAuth"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import type { SessionActor } from "../features/session/sessionModel"
 import {
@@ -196,18 +196,26 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [deletionCode, setDeletionCode] = useState("")
   const [deletionCodeVisible, setDeletionCodeVisible] = useState(false)
+  const deletionFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
+  const deletionChallengeRef = useRef<string | null>(null)
   const [isExportingAccountData, setIsExportingAccountData] = useState(false)
   const exportControllerRef = useRef<AbortController | null>(null)
   useEffect(() => () => { exportControllerRef.current?.abort() }, [sessionActor.session.userId])
   const [exportCode, setExportCode] = useState("")
   const [exportCodeVisible, setExportCodeVisible] = useState(false)
+  const exportFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
+  const exportChallengeRef = useRef<string | null>(null)
   const [isChangingPhone, setIsChangingPhone] = useState(false)
   const [phoneChangeVisible, setPhoneChangeVisible] = useState(false)
   const [phoneChangeStep, setPhoneChangeStep] = useState<"current_code" | "new_number" | "new_code">("current_code")
   const [currentPhoneCode, setCurrentPhoneCode] = useState("")
+  const currentPhoneFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
+  const currentPhoneChallengeRef = useRef<string | null>(null)
   const [newPhoneCountry, setNewPhoneCountry] = useState<PhoneCountryCode>("TR")
   const [newPhoneNumber, setNewPhoneNumber] = useState("")
   const [newPhoneCode, setNewPhoneCode] = useState("")
+  const newPhoneFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
+  const newPhoneChallengeRef = useRef<string | null>(null)
   const [currentPhoneConfirmationToken, setCurrentPhoneConfirmationToken] = useState("")
   const [matchingFilters, setMatchingFilters] = useState<DiscoveryFilters>(
     DEFAULT_DISCOVERY_FILTERS
@@ -219,7 +227,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const analyticsConsent = useAnalyticsConsent()
   const newPhoneAnalysis = analyzeLocalPhoneNumber(newPhoneNumber, newPhoneCountry)
   const handleGoBack = useCallback(() => {
-    navigation.goBack()
+    goBackOrFallback(navigation, () => navigation.replace("You"))
   }, [navigation])
 
   useEffect(() => {
@@ -366,8 +374,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
     if (isDeletingAccount) return
     setIsDeletingAccount(true)
     try {
+      let deletionStatus: "deleted" | "pending_firebase_deletion" = "deleted"
       if (sessionActor.session.mode === "production") {
-        await deleteProductionAccount(
+        deletionStatus = await deleteProductionAccount(
           MOBILE_HTTP_BASE_URL,
           sessionActor.session.sessionToken,
           confirmationToken
@@ -375,9 +384,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
       }
       await onResetSession()
       showToast({
-        title: copy.deletedTitle,
-        body: copy.deletedBody,
-        type: "success"
+        title: deletionStatus === "deleted" ? copy.deletedTitle : copy.deletionPendingTitle,
+        body: deletionStatus === "deleted" ? copy.deletedBody : copy.deletionPendingBody,
+        type: deletionStatus === "deleted" ? "success" : "warning"
       })
     } catch (error) {
       showToast({
@@ -398,7 +407,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
     }
     setIsDeletingAccount(true)
     try {
-      await requestAccountDeletionChallenge(MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken)
+      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
+      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      deletionChallengeRef.current = (await requestFirebaseAccountActionChallenge(
+        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_deletion" }
+      )).challengeId
+      deletionFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
       setDeletionCode("")
       setDeletionCodeVisible(true)
     } catch (error) {
@@ -417,11 +431,17 @@ export function SettingsScreen(props: SettingsScreenProps) {
     if (isDeletingAccount || sessionActor.session.mode !== "production") return
     setIsDeletingAccount(true)
     try {
-      const confirmation = await verifyAccountDeletionCode(
+      const firebaseConfirmation = deletionFirebaseConfirmationRef.current
+      const challengeId = deletionChallengeRef.current
+      if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+      const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, deletionCode)
+      const confirmation = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
-        { verificationCode: deletionCode }
+        { idToken, challengeId, purpose: "account_deletion" }
       )
+      deletionFirebaseConfirmationRef.current = null
+      deletionChallengeRef.current = null
       setDeletionCodeVisible(false)
       Alert.alert(
         copy.deletePermanentlyTitle,
@@ -456,10 +476,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
     }
     setIsExportingAccountData(true)
     try {
-      await requestAccountDataExportChallenge(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken
-      )
+      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
+      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      exportChallengeRef.current = (await requestFirebaseAccountActionChallenge(
+        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_data_export" }
+      )).challengeId
+      exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
       setExportCode("")
       setExportCodeVisible(true)
     } catch (error) {
@@ -486,13 +508,19 @@ export function SettingsScreen(props: SettingsScreenProps) {
     exportControllerRef.current = controller
     setIsExportingAccountData(true)
     try {
-      const confirmation = await verifyAccountDataExportCode(
+      const firebaseConfirmation = exportFirebaseConfirmationRef.current
+      const challengeId = exportChallengeRef.current
+      if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+      const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, exportCode)
+      const confirmation = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
-        exportCode,
+        { idToken, challengeId, purpose: "account_data_export" },
         undefined,
         controller.signal
       )
+      exportFirebaseConfirmationRef.current = null
+      exportChallengeRef.current = null
       const exported = await downloadAccountDataExport(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
@@ -527,6 +555,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
     setNewPhoneNumber("")
     setNewPhoneCode("")
     setCurrentPhoneConfirmationToken("")
+    currentPhoneFirebaseConfirmationRef.current = null
+    currentPhoneChallengeRef.current = null
+    newPhoneFirebaseConfirmationRef.current = null
+    newPhoneChallengeRef.current = null
   }, [])
 
   const requestPhoneChangeCurrentCode = useCallback(async () => {
@@ -540,10 +572,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
     }
     setIsChangingPhone(true)
     try {
-      await requestPhoneChangeCurrentChallenge(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken
-      )
+      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
+      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      currentPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
+        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
+      )).challengeId
+      currentPhoneFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
       setPhoneChangeVisible(true)
       setPhoneChangeStep("current_code")
       setCurrentPhoneCode("")
@@ -567,11 +601,17 @@ export function SettingsScreen(props: SettingsScreenProps) {
     if (isChangingPhone || sessionActor.session.mode !== "production") return
     setIsChangingPhone(true)
     try {
-      const confirmation = await verifyPhoneChangeCurrentCode(
+      const firebaseConfirmation = currentPhoneFirebaseConfirmationRef.current
+      const challengeId = currentPhoneChallengeRef.current
+      if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+      const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, currentPhoneCode)
+      const confirmation = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
-        currentPhoneCode
+        { idToken, challengeId, purpose: "phone_change_current" }
       )
+      currentPhoneFirebaseConfirmationRef.current = null
+      currentPhoneChallengeRef.current = null
       setCurrentPhoneConfirmationToken(confirmation.confirmationToken)
       setPhoneChangeStep("new_number")
       setCurrentPhoneCode("")
@@ -596,11 +636,13 @@ export function SettingsScreen(props: SettingsScreenProps) {
     }
     setIsChangingPhone(true)
     try {
-      await requestPhoneChangeNewNumberChallenge(
+      newPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
-        newPhoneAnalysis.normalizedPhoneNumber,
-        currentPhoneConfirmationToken
+        { purpose: "phone_change_new", targetPhoneNumber: newPhoneAnalysis.normalizedPhoneNumber }
+      )).challengeId
+      newPhoneFirebaseConfirmationRef.current = await requestFirebasePhoneCode(
+        newPhoneAnalysis.normalizedPhoneNumber
       )
       setPhoneChangeStep("new_code")
       setNewPhoneCode("")
@@ -626,13 +668,24 @@ export function SettingsScreen(props: SettingsScreenProps) {
   }
   setIsChangingPhone(true)
   try {
-    let next: Awaited<ReturnType<typeof verifyPhoneChangeNewNumberCode>>
+    let next: { confirmationToken: string; expiresAt: string }
     try {
-      next = await verifyPhoneChangeNewNumberCode(
+      const firebaseConfirmation = newPhoneFirebaseConfirmationRef.current
+      const challengeId = newPhoneChallengeRef.current
+      if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+      const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, newPhoneCode)
+      next = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
-        newPhoneCode
+        {
+          idToken,
+          challengeId,
+          purpose: "phone_change_new",
+          currentPhoneConfirmationToken
+        }
       )
+      newPhoneFirebaseConfirmationRef.current = null
+      newPhoneChallengeRef.current = null
     } catch (error) {
       showToast({
         ...getSettingsVerificationErrorToastForDisplay("verifyNewPhoneCode", error, locale),
@@ -810,7 +863,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
           }
         />
 
-        <ScrollView
+        <PageScrollContent
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
         >
@@ -821,7 +874,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                 icon="heart"
                 iconColors={uiTheme.gradients.primary}
                 label={copy.discoveryPreferences}
-                value={formatDiscoveryFiltersSummary(matchingFilters)}
+                value={formatDiscoveryFiltersSummary(matchingFilters, locale)}
                 chevron
                 isLast
                 onPress={() => setMatchingFiltersVisible(true)}
@@ -1072,7 +1125,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             </Text>
             <Text style={styles.footerVersion}>Blumi {VERSION_LABEL}</Text>
           </View>
-        </ScrollView>
+        </PageScrollContent>
       </SafeAreaView>
       <DiscoverFiltersBottomSheet
         visible={matchingFiltersVisible}
@@ -1364,8 +1417,7 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.sm
   },
   scroll: {
-    gap: uiTheme.spacing.md,
-    paddingBottom: uiTheme.spacing.xxl
+    gap: uiTheme.spacing.md
   },
 
   /* ── Section ────────────────────────────────────── */

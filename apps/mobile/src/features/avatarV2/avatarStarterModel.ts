@@ -42,7 +42,6 @@ const STARTER_ITEM_IDS: Readonly<
   },
   [MALE_STARTER_BODY_ID]: {
     hair: [
-      "avatar_v2_hair_male_espresso_crop",
       "avatar_v2_hair_male_cocoa_textured_quiff"
     ],
     top: [

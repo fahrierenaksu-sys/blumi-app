@@ -16,11 +16,13 @@ import {
   type AvatarLoadoutSlot,
   type ReadonlyAvatarLoadout
 } from "./avatarLoadoutCatalog"
+import { isRetiredAvatarItemId } from "./retiredAvatarItems"
 
 export type AvatarLoadoutValidationCode =
   | "invalid_shape"
   | "unknown_item"
   | "wrong_slot"
+  | "retired_item"
   | "incompatible_item"
   | "unowned_item"
   | "too_many_accessories"
@@ -71,6 +73,13 @@ export function validateAvatarLoadout(
 ): AvatarLoadoutValidationResult {
   const loadout = parseAvatarLoadout(input)
   if (!loadout) return invalid("invalid_shape", "Choose a complete avatar look.")
+  if ([loadout.bodyId, loadout.faceId, loadout.eyesId, loadout.noseId,
+    loadout.mouthId, loadout.hairId, loadout.topId, loadout.bottomId,
+    loadout.shoesId, ...loadout.accessoryIds,
+    ...(loadout.schemaVersion === 2 ? [loadout.dressId, loadout.outerwearId] : [])]
+    .some((itemId) => itemId !== null && isRetiredAvatarItemId(itemId))) {
+    return invalid("retired_item", "This avatar item is temporarily unavailable.")
+  }
   if (loadout.accessoryIds.length > MAX_ACCESSORIES) {
     return invalid("too_many_accessories", "Choose up to six accessories.")
   }
@@ -90,15 +99,13 @@ export function validateAvatarLoadout(
     selectedItems.push(result.item)
   }
   if (loadout.schemaVersion === 2) {
+    if (loadout.outerwearId !== null) {
+      return invalid("unknown_item", "Outerwear is not available in the room yet.")
+    }
     if (loadout.dressId !== null) {
       const result = resolveDressItems(loadout.dressId)
       if ("error" in result) return result.error
       selectedItems.push(...result.items)
-    }
-    if (loadout.outerwearId !== null) {
-      const result = resolveSelectedItem(loadout.outerwearId, "outerwear")
-      if ("error" in result) return result.error
-      selectedItems.push(result.item)
     }
   }
   const incompatibleItem = selectedItems.find(

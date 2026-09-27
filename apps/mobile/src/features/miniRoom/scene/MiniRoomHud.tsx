@@ -8,6 +8,7 @@ import { uiTheme } from "../../../ui/theme"
 interface MiniRoomHudProps {
   copy: MiniRoomCopy
   connectionStatus: MiniRoomConnectionStatus
+  voiceAvailable: boolean
   localMedia: MiniRoomLocalMediaState
   leaveDisabled: boolean
   onLeave: () => void
@@ -19,6 +20,7 @@ interface MiniRoomHudProps {
 export function MiniRoomHud(props: MiniRoomHudProps) {
   const {
     connectionStatus,
+    voiceAvailable,
     localMedia,
     copy,
     leaveDisabled,
@@ -28,7 +30,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     onToggleMic
   } = props
 
-  const mediaDisabled = connectionStatus !== "connected"
+  const mediaDisabled = connectionStatus !== "connected" || !voiceAvailable
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -48,7 +50,9 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
           <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
         </Pressable>
 
-        <ConnectionPill status={connectionStatus} tone="dark" />
+        {voiceAvailable
+          ? <ConnectionPill status={connectionStatus} tone="dark" />
+          : <Text style={styles.retryText}>{copy.textRoom}</Text>}
 
         <View style={styles.topRightDock}>
           {connectionStatus === "error" ? (

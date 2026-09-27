@@ -1,13 +1,46 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  createPostMatchChatNavigationState,
   getBottomNavKeyForRoute,
   getChatLocale,
   getLobbyReturnStrategy,
+  getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
+  goBackFromInbox,
   MAIN_TAB_SCREEN_OPTIONS,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
+
+test("Inbox opened as the root returns to discovery without dispatching GO_BACK", () => {
+  const actions: string[] = []
+  goBackFromInbox({
+    canGoBack: () => false,
+    goBack: () => actions.push("GO_BACK"),
+    replace: (route) => actions.push(`REPLACE:${route}`)
+  })
+  assert.deepEqual(actions, ["REPLACE:Lobby"])
+})
+
+test("Inbox preserves real navigation history when going back", () => {
+  const actions: string[] = []
+  goBackFromInbox({
+    canGoBack: () => true,
+    goBack: () => actions.push("GO_BACK"),
+    replace: (route) => actions.push(`REPLACE:${route}`)
+  })
+  assert.deepEqual(actions, ["GO_BACK"])
+})
+
+test("opening a match chat leaves Inbox under the conversation, not the match screen", () => {
+  assert.deepEqual(createPostMatchChatNavigationState({ threadId: "thread_1" }), {
+    index: 1,
+    routes: [
+      { name: "Inbox" },
+      { name: "ChatThread", params: { threadId: "thread_1" } }
+    ]
+  })
+})
 
 test("root routes use a stable fade transition by default", () => {
   assert.deepEqual(ROOT_STACK_SCREEN_OPTIONS, {
@@ -22,6 +55,11 @@ test("main tabs use a stable fade transition instead of the stack slide", () => 
     animation: "fade",
     gestureEnabled: false
   })
+})
+
+test("root and tab transitions stop when the system requests reduced motion", () => {
+  assert.deepEqual(getReducedMotionScreenOptions(true), { animation: "none" })
+  assert.deepEqual(getReducedMotionScreenOptions(false), {})
 })
 
 test("bottom navigation maps only product-owned main routes", () => {

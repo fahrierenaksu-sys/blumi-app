@@ -3,7 +3,9 @@ import test from "node:test"
 import {
   PAGE_COMPONENT_SPACING,
   PAGE_CONTAINER_SPACING,
-  resolvePageContainerLayout
+  resolvePageContainerLayout,
+  resolvePageContentWidth,
+  resolvePageScrollBottomPadding
 } from "./pageContainerLayout"
 
 test("compact iPhone widths use a 16-point content gutter", () => {
@@ -63,4 +65,21 @@ test("page and component spacing expose one immutable eight-point-based contract
   })
   assert.equal(Object.isFrozen(PAGE_CONTAINER_SPACING), true)
   assert.equal(Object.isFrozen(PAGE_COMPONENT_SPACING), true)
+})
+
+test("nested pages do not apply the horizontal gutter twice", () => {
+  assert.equal(resolvePageContentWidth(390, false), 350)
+  assert.equal(resolvePageContentWidth(390, true), "100%")
+})
+
+test("scroll content clears bottom navigation without repeating an included safe inset", () => {
+  assert.equal(resolvePageScrollBottomPadding({
+    bottomContentInset: 114, safeAreaBottom: 34, safeAreaBottomIncluded: true
+  }), 80)
+  assert.equal(resolvePageScrollBottomPadding({
+    bottomContentInset: 114, safeAreaBottom: 34, safeAreaBottomIncluded: false
+  }), 114)
+  assert.equal(resolvePageScrollBottomPadding({
+    bottomContentInset: Number.NaN, safeAreaBottom: 34, safeAreaBottomIncluded: true
+  }), 0)
 })

@@ -15,7 +15,7 @@ import {
   createAuthenticatedHeaders,
   requestJson
 } from "../network/apiClient"
-import type { BlumiMatch } from "../matches/matchRoomModel"
+import type { BlumiMatch, MatchParticipant } from "../matches/matchRoomModel"
 import {
   discoveryDecisionSchema,
   discoveryQuotaSchema,
@@ -335,8 +335,8 @@ export async function decideDiscoverProfile(
 }
 
 export function createMatchFromDiscoveryResult(input: {
-  currentUser: { userId: string; displayName: string }
-  matchedUser: { userId: string; displayName: string }
+  currentUser: MatchParticipant
+  matchedUser: MatchParticipant
   result: DiscoveryDecisionResult
 }): BlumiMatch | null {
   if (!input.result.matched || !input.result.match) return null
@@ -344,10 +344,19 @@ export function createMatchFromDiscoveryResult(input: {
     id: input.result.match.matchId,
     mode: "futureBackend",
     createdAt: input.result.match.matchedAt,
-    currentUser: { ...input.currentUser },
-    matchedUser: { ...input.matchedUser },
+    currentUser: copyDiscoveryMatchParticipant(input.currentUser),
+    matchedUser: copyDiscoveryMatchParticipant(input.matchedUser),
     roomOwnerUserId: input.currentUser.userId,
     backendBoundary: "future-backend-adapter"
+  }
+}
+
+function copyDiscoveryMatchParticipant(participant: MatchParticipant): MatchParticipant {
+  return {
+    ...participant,
+    ...(participant.avatarSelection
+      ? { avatarSelection: cloneAvatarSelection(participant.avatarSelection) }
+      : {})
   }
 }
 

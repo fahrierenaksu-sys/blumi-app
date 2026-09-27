@@ -24,6 +24,14 @@ export interface MiniRoomMediaState {
   roomInfo: MiniRoomMediaRoomInfo
 }
 
+export function isTextOnlyRoomMediaSession(input: {
+  livekitUrl: string
+  token: string
+}): boolean {
+  return input.livekitUrl === "wss://demo.livekit.invalid" &&
+    input.token.startsWith("demo-token-")
+}
+
 export function createInitialMiniRoomMediaState(
   roomInfo: MiniRoomMediaRoomInfo
 ): MiniRoomMediaState {

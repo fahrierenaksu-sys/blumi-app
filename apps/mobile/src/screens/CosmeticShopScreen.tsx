@@ -1,4 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
+import { getShopCombinationItems, getShopCombinationSummary } from "../features/shop/shopCombinationSummary"
+import { getShopThumbnailLayout } from "../features/shop/shopThumbnailLayout"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import {
   ECONOMY_CATALOG,
   resolveR1PublishedEconomyCatalog
@@ -56,12 +60,14 @@ import {
 } from "../features/shop/shopLayoutMetrics"
 import { formatCoins } from "../features/shop/shopFormatters"
 import { getShopCopy } from "../features/shop/shopCopy"
+import { getShopProductPresentation } from "../features/shop/shopProductPresentation"
 import { resolveShopCatalogRuntime } from "../features/shop/shopCatalogRuntime"
 import { getMaleRigLayerThumbnailPresentation } from "../features/avatarV2/maleRigThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../features/avatarV2/qa/avatarQaInventory"
 import {
   getAvatarItemPreviewSource,
   getRoomProductThumbnailSource,
+  getShopProductThumbnailBounds,
   getShopProductThumbnailSource,
   PRODUCT_REFERENCE_AVATAR_ITEM_IDS,
   RIG_LAYER_THUMBNAIL_ITEM_IDS
@@ -105,7 +111,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { hapticError, hapticLight, hapticSuccess } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
-import { useSelectionTransition } from "../ui/animations"
+import { useReducedMotion, useSelectionTransition } from "../ui/animations"
 import { ActionButtonCircle } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 import { showToast } from "../ui/toast"
@@ -126,8 +132,6 @@ type CosmeticShopScreenProps = NativeStackScreenProps<
   initialShopMode?: ShopMode
 }
 
-const INITIAL_PRODUCT_REFERENCE_SHOP_ITEM_ID =
-  "avatar:avatar_v2_top_cherry_heart_milkmaid_blouse"
 type ShopCategoryOption = {
   id: string
   label: string
@@ -135,6 +139,13 @@ type ShopCategoryOption = {
   icon: keyof typeof Ionicons.glyphMap
 }
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
+const AVATAR_CATEGORY_GLYPHS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  top: "tshirt-crew-outline",
+  dress: "hanger",
+  shoes: "shoe-sneaker",
+  accessory: "sunglasses",
+  hair: "hair-dryer-outline"
+}
 
 export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const { navigation, sessionActor } = props
@@ -182,7 +193,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     [productionEconomyCatalog]
   )
   const initialShopMode = props.route.params?.initialShopMode ?? props.initialShopMode ?? "avatar"
-  const [selectedId, setSelectedId] = useState(INITIAL_PRODUCT_REFERENCE_SHOP_ITEM_ID)
+  const [selectedId, setSelectedId] = useState("")
+  const [previewSelectionOrder, setPreviewSelectionOrder] = useState<string[]>([])
   const [shopMode, setShopMode] = useState<ShopMode>(initialShopMode)
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     getDefaultShopCategoryId(initialShopMode)
@@ -203,11 +215,13 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     () => getShopLayoutMetrics({
       width: viewportMetrics.safeWidth,
       height: viewportMetrics.contentHeight,
+      fontScale: viewportMetrics.fontScale,
       horizontalInset: viewportMetrics.horizontalGutter,
       minimumTouchTarget: viewportMetrics.minTouchTarget
     }),
     [
       viewportMetrics.contentHeight,
+      viewportMetrics.fontScale,
       viewportMetrics.horizontalGutter,
       viewportMetrics.minTouchTarget,
       viewportMetrics.safeWidth
@@ -219,6 +233,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     if (!requestedShopMode) return
     setShopMode(requestedShopMode)
     setSelectedCategoryId(getDefaultShopCategoryId(requestedShopMode))
+    setSelectedId("")
   }, [props.route.params?.initialShopMode])
 
   useEffect(() => {
@@ -259,7 +274,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const handleCloseShop = useCallback((): void => {
     if (combinationStateRef.current.phase !== "editing") return
     discardShopPreview()
-    navigation.goBack()
+    goBackOrFallback(navigation, () => navigation.replace("Lobby"))
   }, [discardShopPreview, navigation])
 
   const shopItems = useMemo(
@@ -359,6 +374,12 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     () => hasAvatarDraftChanges(avatarV2.avatar, previewAvatar),
     [avatarV2.avatar, previewAvatar]
   )
+  const combinationSummary = useMemo(() => getShopCombinationSummary({
+    draft: combinationState.draft,
+    equipped: combinationState.equipped,
+    ownedProductIds: [...new Set([...combinationState.ownedProductIds, ...inventoryStore.inventory.ownedAvatarItemIds])],
+    products: avatarProducts
+  }), [combinationState.draft, combinationState.equipped, combinationState.ownedProductIds, inventoryStore.inventory.ownedAvatarItemIds, avatarProducts])
   const canRemoveAvatarPreview = useMemo(
     () => Boolean(
       selectedProduct?.avatarItem &&
@@ -371,6 +392,13 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     ),
     [avatarV2.avatar, previewAvatar, selectedProduct]
   )
+  const combinationItems = getShopCombinationItems({
+    selectionOrder: previewSelectionOrder,
+    draft: combinationState.draft,
+    equipped: combinationState.equipped,
+    ownedProductIds: [...new Set([...combinationState.ownedProductIds, ...inventoryStore.inventory.ownedAvatarItemIds])],
+    products: avatarProducts
+  })
 
   const handleRemoveAvatarPreview = useCallback((): void => {
     const item = selectedProduct?.avatarItem
@@ -398,12 +426,12 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     const selectedRoomItem =
       selectedProduct?.previewType === "room"
         ? selectedProduct.roomItem
-        : roomProducts[0]?.roomItem
+        : undefined
     if (!selectedRoomItem) {
       return resolveRoomV2Scene({
         roomShellCatalog: ROOM_V2_SHELL_CATALOG,
         furnitureCatalog: props.roomFurnitureCatalog ?? ROOM_V2_FURNITURE_CATALOG,
-        decor: { roomShellId: DEFAULT_ROOM_V2_SHELL_ID, placedItems: [] },
+        decor: roomV2.userRoomDecor,
         defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
       })
     }
@@ -413,7 +441,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
       decor: createRoomPreviewDecor(selectedRoomItem, roomV2.userRoomDecor),
       defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
     })
-  }, [props.roomFurnitureCatalog, roomProducts, roomV2.userRoomDecor, selectedProduct])
+  }, [props.roomFurnitureCatalog, roomV2.userRoomDecor, selectedProduct])
 
   const handleSelectProduct = useCallback((product: ShopCatalogItem): void => {
     hapticLight()
@@ -423,6 +451,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         setSelectedCategoryId(getPrimaryProductCategoryId(product, "avatar"))
       }
       if (product.avatarItem && combinationStateRef.current.phase === "editing") {
+        setPreviewSelectionOrder((current) => current.includes(product.sourceItemId)
+          ? current : [...current, product.sourceItemId])
         const currentAvatar = shopCombinationDraftToAvatar(
           combinationStateRef.current.draft,
           avatarV2.avatar
@@ -455,27 +485,14 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const handleSelectMode = useCallback((nextMode: ShopMode): void => {
     hapticLight()
     setShopMode(nextMode)
-    const nextCategoryId = getDefaultShopCategoryId(nextMode)
-    const nextProducts = nextMode === "avatar" ? avatarProducts : roomProducts
-    const nextProduct =
-      filterProductsByCategory(nextProducts, nextMode, nextCategoryId)[0]
-        ?? nextProducts[0]
-    setSelectedCategoryId(nextCategoryId)
-    if (nextProduct) {
-      setSelectedId(nextProduct.id)
-    }
-  }, [avatarProducts, roomProducts])
+    setSelectedCategoryId(getDefaultShopCategoryId(nextMode))
+    setSelectedId("")
+  }, [])
 
   const handleSelectCategory = useCallback((categoryId: string): void => {
     hapticLight()
-    const nextProduct =
-      filterProductsByCategory(activeProducts, shopMode, categoryId)[0]
-        ?? activeProducts[0]
     setSelectedCategoryId(categoryId)
-    if (nextProduct) {
-      setSelectedId(nextProduct.id)
-    }
-  }, [activeProducts, shopMode])
+  }, [])
 
   const handleRetryShop = useCallback((): void => {
     if (!requiresServerInventory) return
@@ -725,6 +742,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     if (savedAvatar) {
       const rebasedState = createShopCombinationState({
         equipped: avatarToShopCombinationDraft(savedAvatar),
+        previewDraft: combinationStateRef.current.draft,
         ownedProductIds: inventoryStore.inventory.ownedAvatarItemIds,
         avatarRevision: combinationStateRef.current.avatarRevision
       })
@@ -753,14 +771,24 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     <View style={styles.root}>
       <SoftBlobBackground variant="homeLiquid" />
       <SafeAreaView
-        contentGutter={false}
-        style={[
-          styles.safe,
-          { paddingHorizontal: shopLayoutMetrics.horizontalInset }
-        ]}
+        contentGutter
+        style={styles.safe}
         edges={["top", "left", "right"]}
       >
-        <View style={styles.header}>
+        <ScrollView
+          scrollEnabled={shopLayoutMetrics.catalog.accessibilityLayout || isCoinWalletOpen || shopPresentationState === "offline"}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.shopContent,
+            {
+              gap: shopLayoutMetrics.sectionGap,
+              paddingBottom: 4
+            }
+          ]}
+          style={[styles.shopScroller, { marginBottom: viewportMetrics.bottomContentInset }]}
+        >
+        <View style={[styles.header, shopLayoutMetrics.catalog.accessibilityLayout && styles.headerAccessibility]}>
           <View style={styles.headerLeft}>
             <ActionButtonCircle
               accessibilityLabel={copy.back}
@@ -793,6 +821,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               onPress={() => setIsCoinWalletOpen((current) => !current)}
               style={({ pressed }) => [
                 styles.coinPill,
+                shopLayoutMetrics.catalog.accessibilityLayout && styles.coinPillAccessibility,
                 pressed ? styles.coinPillPressed : null
               ]}
             >
@@ -803,20 +832,6 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
             </Pressable>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.shopContent,
-            {
-              gap: shopLayoutMetrics.sectionGap,
-              paddingBottom: uiTheme.spacing.lg
-            }
-          ]}
-          style={[
-            styles.shopScroller,
-            { marginBottom: viewportMetrics.bottomContentInset }
-          ]}
-        >
           <ShopModeDock
             activeMode={shopMode}
             locale={locale}
@@ -847,10 +862,11 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 style={[
                   styles.showcaseCard,
                   { padding: shopLayoutMetrics.showcasePadding },
-                  previewTransition
+                  shopMode === "avatar" ? undefined : previewTransition
                 ]}
               >
                 <ShopPreviewPanel
+                  mode={shopMode}
                   product={selectedProduct}
                   previewAvatar={previewAvatar}
                   roomPreviewScene={roomPreviewScene}
@@ -860,13 +876,20 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   }
                   locale={locale}
                   isActionAvailable={isActionAvailable}
+                  combinationSummary={shopMode === "avatar" && hasCombinationChanges ? combinationSummary : undefined}
+                  combinationItems={combinationItems}
+                  onSelectCombinationItem={(id) => {
+                    const item = avatarProducts.find((entry) => entry.sourceItemId === id)
+                    if (item) setSelectedId(item.id)
+                  }}
+                  supportsCombinationAction={multiItemApplyEnabled}
                   primaryActionLabel={shopMode === "avatar"
-                    ? multiItemApplyEnabled
-                      ? copy.combination.applyLook
+                    ? multiItemApplyEnabled && (combinationItems.length > 1 || combinationSummary.purchaseCount === 0)
+                      ? combinationSummary.purchaseCount > 0 ? copy.combination.buyLook : copy.combination.applyLook
                       : undefined
                     : undefined}
                   primaryActionDisabled={shopMode === "avatar"
-                    ? multiItemApplyEnabled ? !hasCombinationChanges : undefined
+                    ? multiItemApplyEnabled ? !hasCombinationChanges || combinationSummary.total === null : undefined
                     : undefined}
                   canRemovePreview={shopMode === "avatar" && canRemoveAvatarPreview}
                   onRemovePreview={handleRemoveAvatarPreview}
@@ -933,6 +956,7 @@ function ClosetBrowser(props: {
   onSelectCategory: (categoryId: string) => void
   onSelectProduct: (product: ShopCatalogItem) => void
 }) {
+  const reduceMotion = useReducedMotion()
   const copy = getShopCopy(props.locale)
   const title = props.mode === "avatar" ? copy.findYourStyle : copy.roomPieces
   const subtitle =
@@ -944,7 +968,9 @@ function ClosetBrowser(props: {
   const productShelfWidth = catalog.productShelfWidth
   const productCardWidth = catalog.productCardWidth
   const productScrollerRef = useRef<FlatList<ShopCatalogItem[][]>>(null)
+  const [pageIndex, setPageIndex] = useState(0)
   useEffect(() => {
+    setPageIndex(0)
     productScrollerRef.current?.scrollToOffset({ offset: 0, animated: false })
   }, [props.activeCategoryId, props.mode])
   const productColumns = useMemo(() => {
@@ -959,14 +985,14 @@ function ClosetBrowser(props: {
     for (
       let index = 0;
       index < productColumns.length;
-      index += SHOP_PRODUCT_COLUMNS_PER_PAGE
+      index += catalog.accessibilityLayout ? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE
     ) {
       pages.push(
-        productColumns.slice(index, index + SHOP_PRODUCT_COLUMNS_PER_PAGE)
+        productColumns.slice(index, index + (catalog.accessibilityLayout ? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE))
       )
     }
     return pages
-  }, [productColumns])
+  }, [catalog.accessibilityLayout, productColumns])
   const renderProductPage = useCallback(
     ({ item, index }: { item: ShopCatalogItem[][]; index: number }) => (
       <View
@@ -1011,26 +1037,59 @@ function ClosetBrowser(props: {
             {subtitle}
           </Text>
         </View>
+        <View style={styles.catalogPagination}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.previousPage}
+            disabled={pageIndex === 0}
+            accessibilityState={{ disabled: pageIndex === 0 }}
+            onPress={() => {
+              setPageIndex(pageIndex - 1)
+              productScrollerRef.current?.scrollToOffset({ offset: (pageIndex - 1) * productShelfWidth, animated: !reduceMotion })
+            }}
+            style={[styles.catalogPageButton, pageIndex === 0 && styles.catalogPageButtonDisabled]}
+          >
+            <Ionicons name="chevron-back" size={17} color={uiTheme.colors.primary} />
+          </Pressable>
+          <Text style={styles.catalogPageCount}>{pageIndex + 1}/{Math.max(1, productPages.length)}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.nextPage}
+            disabled={pageIndex >= productPages.length - 1}
+            accessibilityState={{ disabled: pageIndex >= productPages.length - 1 }}
+            onPress={() => {
+              setPageIndex(pageIndex + 1)
+              productScrollerRef.current?.scrollToOffset({ offset: (pageIndex + 1) * productShelfWidth, animated: !reduceMotion })
+            }}
+            style={[styles.catalogPageButton, pageIndex >= productPages.length - 1 && styles.catalogPageButtonDisabled]}
+          >
+            <Ionicons name="chevron-forward" size={17} color={uiTheme.colors.primary} />
+          </Pressable>
+        </View>
       </View>
-      <View style={[styles.closetBrowserBody, { gap: catalog.bodyGap }]}>
+      <View style={[styles.closetBrowserBody, catalog.accessibilityLayout && styles.closetBrowserBodyAccessibility, { gap: catalog.bodyGap }]}>
         <VerticalShopCategoryRail
           categories={props.categories}
           activeCategoryId={props.activeCategoryId}
           onSelectCategory={props.onSelectCategory}
           width={categoryRailWidth}
           locale={props.locale}
+          accessibilityLayout={catalog.accessibilityLayout}
+          height={catalog.productCardHeight * 2 + 8}
         />
         <FlatList
           ref={productScrollerRef}
           data={productPages}
           horizontal
           pagingEnabled
+          bounces={false}
+          onMomentumScrollEnd={(event) => setPageIndex(Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth))))}
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
           removeClippedSubviews
           showsHorizontalScrollIndicator={false}
-          style={styles.closetProductScroller}
+          style={[styles.closetProductScroller, { width: productShelfWidth, height: catalog.productCardHeight * 2 + 8 }]}
           contentContainerStyle={styles.closetProductShelf}
           keyExtractor={(item, index) => item[0]?.[0]?.id ?? `shop-page-${index}`}
           getItemLayout={(_data, index) => ({
@@ -1045,7 +1104,9 @@ function ClosetBrowser(props: {
   )
 }
 
-function getCompactCategoryLabel(category: ShopCategoryOption): string {
+function getCompactCategoryLabel(category: ShopCategoryOption, locale: ReturnType<typeof getAppLocale>): string {
+  if (locale === "tr" && category.id === "shoes") return "Ayakkabı"
+  if (locale === "tr" && category.id === "accessory") return "Aksesuar"
   return category.label
 }
 
@@ -1053,12 +1114,14 @@ const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(props: {
   categories: ShopCategoryOption[]
   activeCategoryId: string
   width: number
+  height: number
   onSelectCategory: (categoryId: string) => void
   locale: ReturnType<typeof getAppLocale>
+  accessibilityLayout: boolean
 }) {
   const copy = getShopCopy(props.locale)
-  return (
-    <View style={[styles.verticalCategoryRail, { width: props.width }]}>
+  const rail = (
+    <View style={[styles.verticalCategoryRail, props.accessibilityLayout && styles.horizontalCategoryRail, !props.accessibilityLayout && { width: props.width }]}>
       {props.categories.map((category) => {
         const active = category.id === props.activeCategoryId
         return (
@@ -1070,40 +1133,70 @@ const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(props: {
             onPress={() => props.onSelectCategory(category.id)}
             style={({ pressed }) => [
               styles.verticalCategoryChip,
+              props.accessibilityLayout && styles.horizontalCategoryChip,
               active ? styles.verticalCategoryChipActive : null,
               pressed ? styles.verticalCategoryChipPressed : null
             ]}
           >
-            <Ionicons
-              name={category.icon}
-              size={13}
-              color={active ? uiTheme.colors.primary : "rgba(45, 31, 58, 0.56)"}
-            />
+            <View style={styles.verticalCategoryHeading}>
+              {category.id === "bottom" ? (
+                <View style={styles.trousersIcon}>
+                  <View style={[styles.trousersWaist, { borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
+                  <View style={[styles.trousersLeg, { left: 1, borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
+                  <View style={[styles.trousersLeg, { right: 1, borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
+                </View>
+              ) : AVATAR_CATEGORY_GLYPHS[category.id] ? <MaterialCommunityIcons
+                name={AVATAR_CATEGORY_GLYPHS[category.id]}
+                size={17}
+                color={active ? uiTheme.colors.primary : "rgba(45, 31, 58, 0.56)"}
+              /> : <Ionicons
+                name={category.icon}
+                size={17}
+                color={active ? uiTheme.colors.primary : "rgba(45, 31, 58, 0.56)"}
+              />}
+              <Text
+                style={[
+                  styles.verticalCategoryCount,
+                  active ? styles.verticalCategoryCountActive : null
+                ]}
+              >
+                {category.count}
+              </Text>
+            </View>
             <Text
               style={[
                 styles.verticalCategoryLabel,
                 active ? styles.verticalCategoryLabelActive : null
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
             >
-              {getCompactCategoryLabel(category)}
-            </Text>
-            <Text
-              style={[
-                styles.verticalCategoryCount,
-                active ? styles.verticalCategoryCountActive : null
-              ]}
-            >
-              {category.count}
+              {getCompactCategoryLabel(category, props.locale)}
             </Text>
           </Pressable>
         )
       })}
     </View>
   )
+  return props.accessibilityLayout ? (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalCategoryScroller}>
+      {rail}
+    </ScrollView>
+  ) : (
+    <ScrollView
+      style={{ width: props.width, height: props.height, flexGrow: 0, flexShrink: 0 }}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      {rail}
+    </ScrollView>
+  )
 }, (previous, next) =>
   previous.activeCategoryId === next.activeCategoryId &&
   previous.width === next.width &&
+  previous.height === next.height &&
+  previous.locale === next.locale &&
+  previous.accessibilityLayout === next.accessibilityLayout &&
   previous.categories === next.categories &&
   previous.onSelectCategory === next.onSelectCategory
 )
@@ -1133,6 +1226,7 @@ const ShopProductCard = memo(function ShopProductCard(props: {
     onSelectProduct
   } = props
   const copy = getShopCopy(locale)
+  const presentation = getShopProductPresentation(product, locale)
   const compactCardSizeStyle =
     selectedCompact && cardWidth
       ? {
@@ -1148,7 +1242,9 @@ const ShopProductCard = memo(function ShopProductCard(props: {
         ? formatCoins(product.priceCoins, locale)
         : selectedCompact && product.previewType === "room" && product.owned
           ? copy.readyToPlace
-          : product.stateLabel)
+          : selectedCompact && product.owned && product.previewType === "avatar"
+            ? locale === "tr" ? "Sende" : copy.owned
+            : presentation.stateLabel)
   const avatarPreviewSource = product.avatarItem
     ? getShopProductThumbnailSource(product.sourceItemId)
       ?? getAvatarItemPreviewSource(product.avatarItem)
@@ -1159,7 +1255,6 @@ const ShopProductCard = memo(function ShopProductCard(props: {
   const roomPreviewSource = product.roomItem
     ? getRoomProductThumbnailSource(product.sourceItemId) ?? product.roomItem.asset.source
     : undefined
-  const productReference = PRODUCT_REFERENCE_AVATAR_ITEM_IDS.has(product.sourceItemId)
   const automationSlug = product.avatarItem
     ? getAvatarAutomationSlug(product.sourceItemId)
     : product.sourceItemId.replaceAll("_", "-")
@@ -1182,9 +1277,6 @@ const ShopProductCard = memo(function ShopProductCard(props: {
       ]}
     >
       <View style={[styles.productThumb, { height: thumbHeight }]}>
-        {product.previewType === "avatar" ? (
-          <View style={styles.productThumbHalo} />
-        ) : null}
         {product.previewType === "avatar" && product.avatarItem ? (
           <AvatarProductThumbnail
             item={product.avatarItem}
@@ -1200,7 +1292,7 @@ const ShopProductCard = memo(function ShopProductCard(props: {
             style={styles.productImage}
           />
         ) : null}
-        {selected || productReference ? (
+        {selected ? (
           <View style={[styles.productDropBadge, selected ? styles.productViewingBadge : null]}>
             <Ionicons
               name={selected ? "eye" : "sparkles"}
@@ -1240,6 +1332,9 @@ function AvatarProductThumbnail(props: {
   isRigLayerSource: boolean
 }) {
   const { item, source, selected, isRigLayerSource } = props
+  const [frame, setFrame] = useState({ width: 0, height: 0 })
+  const bounds = getShopProductThumbnailBounds(item.id)
+  const visibleLayout = getShopThumbnailLayout(bounds, frame.width, frame.height)
   if (!source) {
     return (
       <View
@@ -1262,6 +1357,12 @@ function AvatarProductThumbnail(props: {
     : undefined
 
   return (
+    <View
+      style={StyleSheet.absoluteFill}
+      onLayout={({ nativeEvent: { layout } }) => setFrame((current) =>
+        current.width === layout.width && current.height === layout.height
+          ? current : { width: layout.width, height: layout.height })}
+    >
     <Image
       source={source}
       resizeMode="contain"
@@ -1270,7 +1371,7 @@ function AvatarProductThumbnail(props: {
         isRigLayerSource
           ? styles.productWearableRigLayer
           : styles.productWearableImage,
-        rigLayerPresentation
+        visibleLayout ? { position: "absolute", ...visibleLayout } : rigLayerPresentation
           ? {
               top: rigLayerPresentation.top,
               transform: [{ scale: rigLayerPresentation.scale }]
@@ -1278,6 +1379,7 @@ function AvatarProductThumbnail(props: {
           : null
       ]}
     />
+    </View>
   )
 }
 
@@ -1494,6 +1596,10 @@ const styles = StyleSheet.create({
     gap: uiTheme.spacing.sm,
     paddingBottom: 6,
   },
+  headerAccessibility: {
+    alignItems: "stretch",
+    flexDirection: "column"
+  },
   headerLeft: {
     flex: 1,
     flexDirection: "row",
@@ -1527,6 +1633,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.6)",
     ...uiTheme.shadow.soft,
   },
+  coinPillAccessibility: {
+    alignSelf: "flex-end"
+  },
   coinPillPressed: {
     opacity: 0.82,
   },
@@ -1544,7 +1653,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.86)",
     overflow: "hidden",
-    ...uiTheme.shadow.deep,
+    ...uiTheme.shadow.soft,
   },
   closetBrowserCard: {
     gap: 6,
@@ -1554,7 +1663,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.86)",
     overflow: "hidden",
-    ...uiTheme.shadow.deep,
+    ...uiTheme.shadow.soft,
   },
   closetBrowserHeader: {
     minHeight: 34,
@@ -1569,7 +1678,7 @@ const styles = StyleSheet.create({
   },
   closetBrowserTitle: {
     ...uiTheme.font.subheading,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 20,
     color: uiTheme.colors.textPrimary,
   },
@@ -1581,24 +1690,40 @@ const styles = StyleSheet.create({
   },
   closetBrowserBody: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "stretch",
     gap: 7,
-    minHeight: 254,
+  },
+  closetBrowserBodyAccessibility: {
+    flexDirection: "column"
+  },
+  horizontalCategoryScroller: {
+    flexGrow: 0,
+    width: "100%"
+  },
+  horizontalCategoryRail: {
+    flexDirection: "row",
+    minHeight: 0
+  },
+  horizontalCategoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10
   },
   verticalCategoryRail: {
-    gap: 5,
-    minHeight: 254,
+    gap: 4,
   },
   verticalCategoryChip: {
     minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    borderRadius: 15,
-    backgroundColor: "rgba(255, 255, 255, 0.66)",
+    alignItems: "stretch",
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.74)",
+    borderColor: "transparent",
   },
   verticalCategoryChipActive: {
     backgroundColor: "rgba(255, 235, 246, 0.96)",
@@ -1610,11 +1735,21 @@ const styles = StyleSheet.create({
   },
   verticalCategoryLabel: {
     ...uiTheme.font.micro,
-    flex: 1,
+    textAlign: "center",
     color: "rgba(45, 31, 58, 0.64)",
-    fontSize: 10.5,
+    fontSize: 10,
+    lineHeight: 12,
     fontWeight: "900",
   },
+  verticalCategoryHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  trousersIcon: { width: 17, height: 18 },
+  trousersWaist: { position: "absolute", top: 1, left: 1, right: 1, height: 6, borderWidth: 1.5, borderBottomWidth: 0 },
+  trousersLeg: { position: "absolute", top: 6, width: 6, height: 11, borderWidth: 1.5, borderTopWidth: 0 },
   verticalCategoryLabelActive: {
     color: uiTheme.colors.primary,
   },
@@ -1624,25 +1759,43 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "rgba(45, 31, 58, 0.54)",
     paddingHorizontal: 3,
-    paddingVertical: 2,
+    paddingVertical: 0,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.72)",
+    backgroundColor: "transparent",
     overflow: "hidden",
   },
   verticalCategoryCountActive: {
-    color: "#FFFFFF",
-    backgroundColor: "rgba(255, 79, 152, 0.72)",
+    color: uiTheme.colors.primary,
+    backgroundColor: "transparent",
   },
   closetProductScroller: {
-    flex: 1,
+    flexGrow: 0,
     minWidth: 0,
-    marginRight: -4,
   },
   closetProductShelf: {
     flexDirection: "row",
     gap: 0,
     paddingRight: 0,
     paddingBottom: 1,
+  },
+  catalogPagination: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  catalogPageButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: "transparent"
+  },
+  catalogPageButtonDisabled: { opacity: 0.3 },
+  catalogPageCount: {
+    ...uiTheme.font.micro,
+    color: uiTheme.colors.primary,
+    marginHorizontal: 5,
+    fontVariant: ["tabular-nums"]
   },
   closetProductPage: {
     flexDirection: "row",
@@ -1658,11 +1811,10 @@ const styles = StyleSheet.create({
     gap: 3,
     padding: 7,
     justifyContent: "space-between",
-    borderRadius: 19,
-    backgroundColor: "rgba(255, 255, 255, 0.68)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.70)",
-    ...uiTheme.shadow.float,
   },
   productCardCompact: {
     width: 76,
@@ -1683,10 +1835,8 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 238, 247, 0.82)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.70)",
+    borderRadius: 12,
+    backgroundColor: "#FFF0F6",
     overflow: "hidden",
   },
   productThumbHalo: {
@@ -1744,11 +1894,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.76)",
   },
   productTitle: {
-    ...uiTheme.font.captionBold,
+    ...uiTheme.font.caption,
     minHeight: 26,
     fontSize: 11,
     color: uiTheme.colors.textPrimary,
-    fontWeight: "900",
+    fontWeight: "600",
     lineHeight: 13,
     textAlign: "center",
   },
@@ -1762,13 +1912,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 250, 244, 0.78)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.70)",
+    backgroundColor: "transparent",
   },
   productMetaPillOwned: {
-    backgroundColor: "rgba(221, 245, 234, 0.86)",
-    borderColor: "rgba(58, 192, 138, 0.30)",
+    backgroundColor: "transparent",
   },
   productMeta: {
     ...uiTheme.font.micro,

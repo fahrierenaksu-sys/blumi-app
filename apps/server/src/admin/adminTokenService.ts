@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
-export const ADMIN_SCOPES = ["reports:read", "reports:resolve", "account-recovery:read", "account-recovery:resolve"] as const
+export const ADMIN_SCOPES = [
+  "reports:read",
+  "reports:resolve",
+  "account-recovery:read",
+  "account-recovery:resolve",
+  "users:read",
+  "users:manage"
+] as const
 
 export type AdminScope = (typeof ADMIN_SCOPES)[number]
 

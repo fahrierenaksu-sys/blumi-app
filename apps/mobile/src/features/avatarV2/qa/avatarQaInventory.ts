@@ -28,9 +28,10 @@ export const BLUMI_QA_AVATAR_ITEM_IDS: readonly string[] = [
 
 export function isAvatarQaUnlockEnabled(
   isDevelopment: boolean,
-  rawFlag: string | undefined
+  rawFlag: string | undefined,
+  serverAuthoritative = false
 ): boolean {
-  return isDevelopment && rawFlag?.trim() === "1"
+  return !serverAuthoritative && isDevelopment && rawFlag?.trim() === "1"
 }
 
 export function createAvatarQaInventory(

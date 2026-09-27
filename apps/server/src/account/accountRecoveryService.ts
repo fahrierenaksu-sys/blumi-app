@@ -29,6 +29,7 @@ export interface AccountRecoveryRepository {
 
 export interface AccountRecoveryService {
   request(input: { oldPhoneNumber: string; newPhoneNumber: string; verificationCode: string; now?: Date }): Promise<void>
+  requestWithVerifiedPhone(input: { oldPhoneNumber: string; newPhoneNumber: string; verifiedPhoneNumber: string; now?: Date }): Promise<void>
   list(limit?: number): Promise<readonly AccountRecoveryRequest[]>
   listPage(input?: RecoveryPageInput): Promise<RecoveryPage>
   resolve(input: { requestId: string; status: Exclude<AccountRecoveryStatus, "pending">; operatorId: string; tokenId: string; now?: Date }): Promise<AccountRecoveryRequest | null>
@@ -61,6 +62,20 @@ export function createAccountRecoveryService(input: { authService: AuthService; 
   return {
     async request({ oldPhoneNumber, newPhoneNumber, verificationCode, now = new Date() }) {
       await input.authService.verifyRecoveryPhoneVerification(newPhoneNumber, verificationCode, now)
+      const account = await input.authService.repository.getAccountByPhone(oldPhoneNumber)
+      await repository.save({
+        requestId: `recovery_${randomUUID()}`,
+        ...(account ? { accountId: account.accountId } : {}),
+        claimedOldPhoneNumber: oldPhoneNumber,
+        newPhoneNumber,
+        createdAt: now.toISOString(),
+        status: "pending"
+      })
+    },
+    async requestWithVerifiedPhone({ oldPhoneNumber, newPhoneNumber, verifiedPhoneNumber, now = new Date() }) {
+      if (newPhoneNumber !== verifiedPhoneNumber) {
+        throw new PublicRequestError("The verified phone number does not match the recovery number.")
+      }
       const account = await input.authService.repository.getAccountByPhone(oldPhoneNumber)
       await repository.save({
         requestId: `recovery_${randomUUID()}`,

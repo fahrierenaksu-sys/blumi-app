@@ -42,3 +42,18 @@ export function resolvePageContainerLayout(width: number): PageContainerLayout {
     maxContentWidth: PAGE_CONTAINER_SPACING.maxContentWidth
   }
 }
+
+/** A PageSafeArea-owned gutter must not be subtracted a second time. */
+export function resolvePageContentWidth(width: number, parentHasGutter: boolean): number | "100%" {
+  return parentHasGutter ? "100%" : resolvePageContainerLayout(width).contentWidth
+}
+
+export function resolvePageScrollBottomPadding(input: {
+  bottomContentInset: number
+  safeAreaBottom: number
+  safeAreaBottomIncluded: boolean
+}): number {
+  const inset = Number.isFinite(input.bottomContentInset) ? Math.max(0, input.bottomContentInset) : 0
+  const safeBottom = Number.isFinite(input.safeAreaBottom) ? Math.max(0, input.safeAreaBottom) : 0
+  return Math.max(0, inset - (input.safeAreaBottomIncluded ? safeBottom : 0))
+}

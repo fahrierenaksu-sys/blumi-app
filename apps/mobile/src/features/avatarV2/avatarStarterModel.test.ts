@@ -89,7 +89,6 @@ const starterCatalog = [
     [FEMALE_STARTER_BODY_ID, "bottom", "avatar_v2_bottom_lavender_bow_twill_shorts"],
     [FEMALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_milk_tea_court_sneakers"],
     [FEMALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_mint_ribbon_court_sneakers"],
-    [MALE_STARTER_BODY_ID, "hair", "avatar_v2_hair_male_espresso_crop"],
     [MALE_STARTER_BODY_ID, "hair", "avatar_v2_hair_male_cocoa_textured_quiff"],
     [MALE_STARTER_BODY_ID, "top", "avatar_v2_top_male_powder_blue_crew_tee"],
     [MALE_STARTER_BODY_ID, "top", "avatar_v2_top_male_cream_basic_tee"],
@@ -196,9 +195,8 @@ test("female starter styling exposes exactly two free choices in every category"
   ])
 })
 
-test("male starter styling exposes exactly two free choices in every category", () => {
+test("male starter styling excludes retired hair and preserves other free choices", () => {
   assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "hair"), [
-    "avatar_v2_hair_male_espresso_crop",
     "avatar_v2_hair_male_cocoa_textured_quiff"
   ])
   assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "top"), [

@@ -8,7 +8,6 @@ import { normalizeStoredAvatarSelection } from "./avatar/avatarSelectionPersiste
 import { createSixDigitCode } from "./auth/authStore"
 import {
   createDevelopmentSmsProvider,
-  createTwilioSmsProvider,
   type SmsProvider
 } from "./auth/smsProvider"
 import { createChatService, type ChatService } from "./chat/chatService"
@@ -86,6 +85,9 @@ import { createSafetyService, type SafetyService } from "./safety/safetyService"
 import { createPostgresReferralRepository } from "./db/postgresReferralRepository"
 import { createReferralService, type ReferralService } from "./referrals/referralService"
 import type { AdminSigningKey } from "./admin/adminTokenService"
+import type { AdminUsersService } from "./admin/adminUsersService"
+import { createAdminUsersService } from "./admin/adminUsersService"
+import { createPostgresAdminUserRepository } from "./db/postgresAdminUserRepository"
 import {
   createInMemoryRealtimeTicketStore,
   type RealtimeTicketStore
@@ -93,7 +95,7 @@ import {
 import type { RealtimeFanout } from "./realtime/realtimeFanout"
 
 export type AuthRepositoryMode = "memory" | "postgres"
-export type SmsProviderMode = "development" | "twilio"
+export type SmsProviderMode = "development"
 export type PushProviderMode = "development" | "expo"
 
 export interface ServerConfig {
@@ -101,14 +103,12 @@ export interface ServerConfig {
   port: number
   realtimePort: number
   nodeEnv: string
+  deployEnvironment: "development" | "staging" | "production"
   purchaseEnvironment: "production" | "sandbox"
   authRepositoryMode: AuthRepositoryMode
   smsProviderMode: SmsProviderMode
   pushProviderMode: PushProviderMode
   databaseUrl?: string
-  twilioAccountSid?: string
-  twilioAuthToken?: string
-  twilioFromPhoneNumber?: string
   otpHmacSecret?: string
   livekitUrl?: string
   livekitApiKey?: string
@@ -155,6 +155,7 @@ export interface ConfiguredServerServices {
   realtimeFanout?: RealtimeFanout
   referralService: ReferralService
   accountRecoveryService: AccountRecoveryService
+  adminUsersService?: AdminUsersService
   personalRoomDecorService: PersonalRoomDecorService
   roomSnapshotService: RoomSnapshotService
   checkReadiness(): Promise<void>
@@ -165,28 +166,42 @@ export function resolveServerConfig(
   env: NodeJS.ProcessEnv = process.env
 ): ServerConfig {
   const nodeEnv = env.NODE_ENV ?? "development"
+  const requestedDeployEnvironment = env.BLUMI_DEPLOY_ENV?.trim()
+  if (requestedDeployEnvironment &&
+      requestedDeployEnvironment !== "staging" &&
+      requestedDeployEnvironment !== "production") {
+    throw new Error("BLUMI_DEPLOY_ENV must be staging or production.")
+  }
+  if (nodeEnv !== "production" && requestedDeployEnvironment) {
+    throw new Error("BLUMI_DEPLOY_ENV requires NODE_ENV=production.")
+  }
+  const deployEnvironment: ServerConfig["deployEnvironment"] = nodeEnv === "production"
+    ? requestedDeployEnvironment === "staging" ? "staging" : "production"
+    : "development"
   const purchaseEnvironment = env.REVENUECAT_PURCHASE_ENVIRONMENT?.trim() || "production"
   if ((purchaseEnvironment !== "production" && purchaseEnvironment !== "sandbox") ||
-      (nodeEnv === "production" && purchaseEnvironment !== "production")) {
-    throw new Error("Invalid RevenueCat purchase environment; production cannot accept sandbox purchases.")
+      (purchaseEnvironment === "sandbox" && nodeEnv === "production" && deployEnvironment !== "staging")) {
+    throw new Error("Invalid RevenueCat purchase environment; sandbox requires BLUMI_DEPLOY_ENV=staging in production mode.")
+  }
+  if (deployEnvironment === "staging" && purchaseEnvironment !== "sandbox") {
+    throw new Error("Staging purchases require REVENUECAT_PURCHASE_ENVIRONMENT=sandbox.")
   }
   const host = env.HOST ?? "0.0.0.0"
+  const port = Number(env.PORT ?? 4000)
+  const realtimePort = Number(
+    env.REALTIME_PORT ?? (nodeEnv === "production" ? port : 4100)
+  )
   const requestedMode = env.BLUMI_AUTH_REPOSITORY?.trim().toLowerCase()
   const authRepositoryMode = normalizeRepositoryMode(
     requestedMode ?? (nodeEnv === "production" ? "postgres" : "memory")
   )
   const requestedSmsProvider = env.BLUMI_SMS_PROVIDER?.trim().toLowerCase()
-  const smsProviderMode = normalizeSmsProviderMode(
-    requestedSmsProvider ?? (nodeEnv === "production" ? "twilio" : "development")
-  )
+  const smsProviderMode = normalizeSmsProviderMode(requestedSmsProvider ?? "development")
   const requestedPushProvider = env.BLUMI_PUSH_PROVIDER?.trim().toLowerCase()
   const pushProviderMode = normalizePushProviderMode(
     requestedPushProvider ?? "development"
   )
   const databaseUrl = env.DATABASE_URL?.trim()
-  const twilioAccountSid = env.TWILIO_ACCOUNT_SID?.trim()
-  const twilioAuthToken = env.TWILIO_AUTH_TOKEN?.trim()
-  const twilioFromPhoneNumber = env.TWILIO_FROM_PHONE_NUMBER?.trim()
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
   const livekitUrl = env.LIVEKIT_URL?.trim()
   const livekitApiKey = env.LIVEKIT_API_KEY?.trim()
@@ -288,14 +303,6 @@ export function resolveServerConfig(
       "BLUMI_OTP_HMAC_SECRET must contain at least 32 characters when using PostgreSQL auth."
     )
   }
-  if (smsProviderMode === "twilio") {
-    if (!twilioAccountSid || !twilioAuthToken || !twilioFromPhoneNumber) {
-      throw new Error("Twilio SMS requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_PHONE_NUMBER.")
-    }
-  }
-  if (nodeEnv === "production" && smsProviderMode !== "twilio") {
-    throw new Error("Production server must use BLUMI_SMS_PROVIDER=twilio.")
-  }
   if (nodeEnv === "production" && pushProviderMode !== "expo") {
     throw new Error("Production server must use BLUMI_PUSH_PROVIDER=expo.")
   }
@@ -329,20 +336,30 @@ export function resolveServerConfig(
         "Production app links require valid BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS."
       )
     }
+    if (!revenueCatApiKey) {
+      throw new Error("Production-mode purchases require REVENUECAT_SECRET_API_KEY.")
+    }
+    if (!revenueCatProjectId) {
+      throw new Error("Production-mode purchases require REVENUECAT_PROJECT_ID.")
+    }
+    if (!revenueCatWebhookSigningSecret) {
+      throw new Error("Production-mode purchases require REVENUECAT_WEBHOOK_SIGNING_SECRET.")
+    }
+    if (Object.keys(revenueCatCoinProductIdMap).length === 0) {
+      throw new Error("Production-mode purchases require a nonempty REVENUECAT_COIN_PRODUCT_ID_MAP.")
+    }
   }
   return {
     host,
-    port: Number(env.PORT ?? 4000),
-    realtimePort: Number(env.REALTIME_PORT ?? 4100),
+    port,
+    realtimePort,
     nodeEnv,
+    deployEnvironment,
     purchaseEnvironment,
     authRepositoryMode,
     smsProviderMode,
     pushProviderMode,
     databaseUrl,
-    twilioAccountSid,
-    twilioAuthToken,
-    twilioFromPhoneNumber,
     otpHmacSecret,
     livekitUrl,
     livekitApiKey,
@@ -549,6 +566,9 @@ export function createConfiguredServerServices(
       }),
       referralService,
       accountRecoveryService,
+      adminUsersService: createAdminUsersService({
+        repository: createPostgresAdminUserRepository(pool)
+      }),
       personalRoomDecorService,
       roomSnapshotService,
       async checkReadiness() {
@@ -661,7 +681,7 @@ function normalizeRepositoryMode(value: string): AuthRepositoryMode {
 }
 
 function normalizeSmsProviderMode(value: string): SmsProviderMode {
-  if (value === "development" || value === "twilio") return value
+  if (value === "development") return value
   throw new Error(`Unsupported BLUMI_SMS_PROVIDER value: ${value}`)
 }
 
@@ -670,15 +690,7 @@ function normalizePushProviderMode(value: string): PushProviderMode {
   throw new Error(`Unsupported BLUMI_PUSH_PROVIDER value: ${value}`)
 }
 
-function createConfiguredSmsProvider(config: ServerConfig): SmsProvider {
-  if (config.smsProviderMode === "twilio") {
-    return createTwilioSmsProvider({
-      accountSid: config.twilioAccountSid ?? "",
-      authToken: config.twilioAuthToken ?? "",
-      fromPhoneNumber: config.twilioFromPhoneNumber ?? ""
-    })
-  }
-
+function createConfiguredSmsProvider(_config: ServerConfig): SmsProvider {
   return createDevelopmentSmsProvider()
 }
 

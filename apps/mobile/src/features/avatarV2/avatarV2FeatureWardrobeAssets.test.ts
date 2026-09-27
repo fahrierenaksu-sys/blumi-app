@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import test from "node:test"
 import type { UserAvatar } from "./avatarV2.types"
+import { isRetiredAvatarItemId } from "@blumi/domain"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -238,7 +239,7 @@ test("female accessory assets are wired through avatar, room, shop, and motion l
   }
 })
 
-test("outerwear assets are wired through avatar, room, shop, wardrobe, and motion layers", () => {
+test("supported tops retain assets while retired tops remain hidden under stable IDs", () => {
   const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2.mock.ts")
   const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoom.mock.ts")
   const projection = readProjectFile("src/features/avatarV2/room/avatarRoomProjection.ts")
@@ -262,6 +263,11 @@ test("outerwear assets are wired through avatar, room, shop, wardrobe, and motio
       new RegExp(`avatarItem\\(\\s*\"${avatarId}\"`),
       avatarId
     )
+    if (isRetiredAvatarItemId(avatarId)) {
+      assert.equal(AVATAR_V2_CATALOG.find((item) => item.id === avatarId)?.hiddenFromShop, true)
+      assert.equal(AVATAR_V2_CATALOG.find((item) => item.id === avatarId)?.hiddenFromWardrobe, true)
+      continue
+    }
     assert.equal(existsSync(join(assetRoot, "layers", layerFile)), true, layerFile)
     assert.equal(existsSync(join(assetRoot, "room", roomFile)), true, roomFile)
     assert.equal(existsSync(join(assetRoot, "shop-thumbnails", thumbnailFile)), true, thumbnailFile)

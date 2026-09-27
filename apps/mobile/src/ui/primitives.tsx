@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import type { ReactNode } from "react"
 import {
   Animated,
@@ -440,11 +440,20 @@ export function ActionButtonCircle(props: ActionButtonCircleProps) {
   } = props
 
   const scaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
   const isPrimary = variant === "primary"
   const isDanger = variant === "danger"
   const isGlass = variant === "glass"
 
+  useEffect(() => {
+    if (reduceMotion) {
+      scaleAnim.stopAnimation()
+      scaleAnim.setValue(1)
+    }
+  }, [reduceMotion, scaleAnim])
+
   const handlePressIn = () => {
+    if (reduceMotion) return
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       useNativeDriver: true,
@@ -453,6 +462,11 @@ export function ActionButtonCircle(props: ActionButtonCircleProps) {
   }
 
   const handlePressOut = () => {
+    if (reduceMotion) {
+      scaleAnim.stopAnimation()
+      scaleAnim.setValue(1)
+      return
+    }
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,

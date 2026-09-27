@@ -5,6 +5,7 @@ import { createLivekitClient } from "./livekitClient"
 import { closeOwnedMediaClient, createMicrophoneRequestGate, MediaClientOwnershipError } from "./livekitRoomLifecycle"
 import {
   createInitialMiniRoomMediaState,
+  isTextOnlyRoomMediaSession,
   type MiniRoomMediaState
 } from "./miniRoomMediaState"
 
@@ -15,6 +16,7 @@ export interface UseMiniRoomMediaInput {
 
 export interface UseMiniRoomMediaResult {
   mediaState: MiniRoomMediaState
+  voiceAvailable: boolean
   retryConnect: () => Promise<void>
   toggleMic: () => Promise<void>
 }
@@ -28,6 +30,7 @@ function getErrorMessage(error: unknown): string {
 
 export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMediaResult {
   const { miniRoom, mediaSession } = input
+  const voiceAvailable = !isTextOnlyRoomMediaSession(mediaSession)
   const roomInfo = useMemo(
     () => ({
       miniRoomId: miniRoom.miniRoomId,
@@ -37,9 +40,10 @@ export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMedia
     [mediaSession.livekitUrl, miniRoom.livekitRoomName, miniRoom.miniRoomId]
   )
 
-  const [mediaState, setMediaState] = useState<MiniRoomMediaState>(() =>
-    createInitialMiniRoomMediaState(roomInfo)
-  )
+  const [mediaState, setMediaState] = useState<MiniRoomMediaState>(() => ({
+    ...createInitialMiniRoomMediaState(roomInfo),
+    ...(voiceAvailable ? {} : { connectionStatus: "connected" as const })
+  }))
 
   const livekitClientRef = useRef<Awaited<ReturnType<typeof createLivekitClient>> | null>(null)
   const requestIdRef = useRef(0)
@@ -47,6 +51,15 @@ export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMedia
   const micRequestGateRef = useRef(createMicrophoneRequestGate())
 
   const runConnectAttempt = useCallback(async () => {
+    if (!voiceAvailable) {
+      setMediaState((previousState) => ({
+        ...previousState,
+        connectionStatus: "connected",
+        errorMessage: null,
+        roomInfo
+      }))
+      return
+    }
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
 
@@ -96,13 +109,14 @@ export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMedia
         errorMessage: getErrorMessage(error)
       }))
     }
-  }, [mediaSession.livekitUrl, mediaSession.token, roomInfo])
+  }, [mediaSession.livekitUrl, mediaSession.token, roomInfo, voiceAvailable])
 
   const retryConnect = useCallback(async () => {
     await runConnectAttempt()
   }, [runConnectAttempt])
 
   const toggleMic = useCallback(async (): Promise<void> => {
+    if (!voiceAvailable) return
     const client = livekitClientRef.current
     if (!client || mediaState.connectionStatus !== "connected") return
     const finishRequest = micRequestGateRef.current.begin(client)
@@ -112,7 +126,7 @@ export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMedia
       await client.setMicrophoneEnabled(nextEnabled)
     } catch { /* The client publishes the confirmed SDK state and error. */ }
     finally { finishRequest() }
-  }, [mediaState.connectionStatus, mediaState.localMedia.micEnabled])
+  }, [mediaState.connectionStatus, mediaState.localMedia.micEnabled, voiceAvailable])
 
   useEffect(() => {
     mountedRef.current = true
@@ -129,6 +143,7 @@ export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMedia
 
   return {
     mediaState,
+    voiceAvailable,
     retryConnect,
     toggleMic
   }

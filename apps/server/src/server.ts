@@ -9,6 +9,7 @@ import Fastify, {
 } from "fastify"
 import { randomUUID } from "node:crypto"
 import { createAuthService, type AuthService } from "./auth/authService"
+import type { FirebaseAuthVerifier } from "./auth/firebaseAuth"
 import { createAvatarService, type AvatarService } from "./avatar/avatarService"
 import { createChatService, type ChatService } from "./chat/chatService"
 import type { ConnectionService } from "./connections/connectionService"
@@ -56,6 +57,7 @@ import {
 import { registerRealtimeTicketRoutes } from "./routes/realtimeTicketRoutes"
 import { createReadinessProbe } from "./operations/serviceLifecycle"
 import type { AdminTokenService } from "./admin/adminTokenService"
+import type { AdminUsersService } from "./admin/adminUsersService"
 import type { MiniRoomService } from "./miniRooms/miniRoomService"
 import { createAccountRecoveryService, type AccountRecoveryService } from "./account/accountRecoveryService"
 import { createReferralService, type ReferralService } from "./referrals/referralService"
@@ -87,6 +89,7 @@ interface CreateServerOptions {
   checkReadiness?: () => Promise<void>
   readinessTimeoutMs?: number
   authService?: AuthService
+  firebaseAuthVerifier?: FirebaseAuthVerifier
   matchService?: MatchService
   discoverySnapshots?: import("./matches/discoverySnapshot").DiscoverySnapshotService
   chatService?: ChatService
@@ -109,6 +112,7 @@ interface CreateServerOptions {
   trustedProxyAddresses?: string[]
   adminKey?: string
   adminTokenService?: AdminTokenService
+  adminUsersService?: AdminUsersService
   allowLegacyAdminKey?: boolean
   appLinks?: AppLinkConfig
   accountRecoveryService?: AccountRecoveryService
@@ -224,6 +228,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const routeServices = {
     discoverySnapshots: options.discoverySnapshots,
     authService,
+    firebaseAuthVerifier: options.firebaseAuthVerifier,
     matchService,
     chatService,
     safetyService,
@@ -255,7 +260,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       adminKey: options.adminKey,
       adminTokenService: options.adminTokenService,
       allowLegacyAdminKey: options.allowLegacyAdminKey,
-      accountRecoveryService
+      accountRecoveryService,
+      adminUsersService: options.adminUsersService
     })
     await registerUserRoutes(instance, routeServices)
     await registerDiscoverRoutes(instance, routeServices)

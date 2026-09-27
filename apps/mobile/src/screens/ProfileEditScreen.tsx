@@ -6,20 +6,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native"
-import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { PageSafeArea as SafeAreaView, PageScrollContent } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { MyAvatar } from "../ui/myAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 import { hapticMedium } from "../ui/haptics"
+import { getAppLocale } from "../features/session/appLocale"
+import { getProfileEditCopy } from "../features/session/profileEditCopy"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import { analyzeProfileEditDraft } from "../features/session/profileEditModel"
 import {
@@ -175,26 +177,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     []
   )
   const canSave = valid && !saved && !isSaving
-  const isTurkish = Intl.DateTimeFormat().resolvedOptions().locale
-    .toLowerCase()
-    .startsWith("tr")
-  const discoveryCopy = isTurkish
-    ? {
-        audience: "Kiminle tanışmak istiyorum",
-        everyone: "Herkes",
-        radius: "Arama alanı",
-        character: "Karakter gövdesi",
-        characterHelp: "Kimliğinden bağımsızdır. Görünüşünü Avatar Stüdyosu’nda değiştirebilirsin.",
-        editCharacter: "Avatar Stüdyosu’nda düzenle"
-      }
-    : {
-        audience: "Who I’d like to meet",
-        everyone: "Everyone",
-        radius: "Search area",
-        character: "Character frame",
-        characterHelp: "Separate from your identity. Change your look in Avatar Studio.",
-        editCharacter: "Edit in Avatar Studio"
-      }
+  const copy = getProfileEditCopy(getAppLocale())
+  const discoveryCopy = copy
 
   const toggleDiscoveryGender = useCallback((option: DiscoveryGender) => {
     setDiscoveryGenders((current) => current.includes(option)
@@ -211,15 +195,18 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
       hapticMedium()
       setSaved(true)
       setTimeout(() => {
-        if (isMountedRef.current) navigation.goBack()
+        if (isMountedRef.current) {
+          goBackOrFallback(navigation, () => navigation.replace("You"))
+        }
       }, 600)
     } catch {
-      setSaveError("We could not save that yet. Your profile is still safe.")
+      setSaveError(copy.saveError)
     } finally {
       setIsSaving(false)
     }
   }, [
     canSave,
+    copy.saveError,
     hasChanges,
     navigation,
     onSave,
@@ -251,10 +238,10 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
         edges={["top", "left", "right", "bottom"]}
       >
         <TopBar
-          title="Edit Profile"
+          title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel="Go back" onPress={() => navigation.goBack()} size={40}>
+            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("You"))} size={40}>
               <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
             </ActionButtonCircle>
           }
@@ -264,7 +251,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           style={styles.content}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <ScrollView
+          <PageScrollContent
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
@@ -285,38 +272,38 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               ring="strong"
             />
             <Text style={styles.previewName}>
-              {displayName || "Your Name"}
+              {displayName || copy.yourName}
             </Text>
             <Text style={styles.previewHint}>
-              This is the name people see first.
+              {copy.nameHint}
             </Text>
           </View>
 
-          <Text style={styles.sectionTitle}>About me</Text>
+          <Text style={styles.sectionTitle}>{copy.about}</Text>
 
           {/* Fields */}
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Display name</Text>
+            <Text style={styles.fieldLabel}>{copy.displayName}</Text>
             <TextInput
-              accessibilityLabel="Display name"
+              accessibilityLabel={copy.displayName}
               style={styles.input}
               value={displayName}
               onChangeText={setDisplayName}
-              placeholder="What should people call you?"
+              placeholder={copy.namePlaceholder}
               placeholderTextColor={uiTheme.colors.textMuted}
               maxLength={30}
               autoCapitalize="words"
               autoCorrect={false}
             />
             {!nameValid ? (
-              <ValidationError message="Use a name from 2 to 30 characters" />
+              <ValidationError message={copy.nameError} />
             ) : null}
           </View>
 
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Age</Text>
+            <Text style={styles.fieldLabel}>{copy.age}</Text>
             <TextInput
-              accessibilityLabel="Age"
+              accessibilityLabel={copy.age}
               style={styles.input}
               value={ageText}
               onChangeText={setAgeText}
@@ -326,21 +313,21 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               maxLength={2}
             />
             {!ageValid ? (
-              <ValidationError message="Use an age from 18 to 99" />
+              <ValidationError message={copy.ageError} />
             ) : null}
             <Text style={styles.fieldHint}>
-              Keep it simple. Your avatar and room add the personality.
+              {copy.ageHint}
             </Text>
           </View>
 
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Bio</Text>
+            <Text style={styles.fieldLabel}>{copy.bio}</Text>
             <TextInput
-              accessibilityLabel="Bio"
+              accessibilityLabel={copy.bio}
               style={[styles.input, styles.bioInput]}
               value={bio}
               onChangeText={setBio}
-              placeholder="A quick line about your vibe"
+              placeholder={copy.bioPlaceholder}
               placeholderTextColor={uiTheme.colors.textMuted}
               maxLength={160}
               multiline
@@ -348,7 +335,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           </View>
 
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>My identity</Text>
+            <Text style={styles.fieldLabel}>{copy.identity}</Text>
             <View accessibilityRole="radiogroup" style={styles.segmentRow}>
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option
@@ -356,7 +343,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                   <Pressable
                     key={option}
                     accessibilityRole="radio"
-                    accessibilityLabel={`${formatGenderLabel(option)} gender`}
+                    accessibilityLabel={copy.genderAccessibility(formatGenderLabel(option))}
                     accessibilityState={{ selected }}
                     onPress={() => setGender(option)}
                     style={[
@@ -377,7 +364,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               })}
             </View>
             {!genderValid ? (
-              <ValidationError message="Choose one option to keep your profile complete" />
+              <ValidationError message={copy.identityError} />
             ) : null}
           </View>
 
@@ -461,9 +448,9 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           </View>
 
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Interests</Text>
+            <Text style={styles.fieldLabel}>{copy.interests}</Text>
             <TextInput
-              accessibilityLabel="Interests, one interest per line"
+              accessibilityLabel={copy.interestsAccessibility}
               style={[styles.input, styles.interestsInput]}
               value={interestsText}
               onChangeText={setInterestsText}
@@ -485,21 +472,21 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               <ValidationError
                 message={
                   interestError === "too-many"
-                    ? `Choose up to ${USER_PROFILE_MAX_INTERESTS} interests`
-                    : `Keep each interest to ${USER_PROFILE_MAX_INTEREST_LENGTH} characters or fewer`
+                    ? copy.interestLimit(USER_PROFILE_MAX_INTERESTS)
+                    : copy.interestLength(USER_PROFILE_MAX_INTEREST_LENGTH)
                 }
               />
             ) : (
               <Text style={styles.fieldHint}>
-                One interest per line · {interests.length} / {USER_PROFILE_MAX_INTERESTS}
+                {copy.interestHint} · {interests.length} / {USER_PROFILE_MAX_INTERESTS}
               </Text>
             )}
           </View>
 
           <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Conversation starters</Text>
+            <Text style={styles.fieldLabel}>{copy.conversation}</Text>
             <Text style={styles.fieldHint}>
-              Choose up to {USER_PROFILE_MAX_PROMPTS}. Your own words only.
+              {copy.choosePrompts(USER_PROFILE_MAX_PROMPTS)}
             </Text>
             <View style={styles.promptOptionList}>
               {USER_PROFILE_PROMPT_OPTIONS.map((option) => {
@@ -509,7 +496,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                 return (
                   <View key={option.promptId} style={styles.promptOption}>
                     <Pressable
-                      accessibilityLabel={`Toggle conversation starter: ${option.question}`}
+                      accessibilityLabel={copy.togglePrompt(option.question)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: Boolean(selected) }}
                       onPress={() => togglePrompt(option.promptId)}
@@ -527,13 +514,13 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                     </Pressable>
                     {selected ? (
                       <TextInput
-                        accessibilityLabel={`Answer: ${option.question}`}
+                        accessibilityLabel={copy.answer(option.question)}
                         style={[styles.input, styles.promptAnswerInput]}
                         value={selected.answer}
                         onChangeText={(answer) =>
                           updatePromptAnswer(option.promptId, answer)
                         }
-                        placeholder="Write a short, real answer"
+                        placeholder={copy.answerPlaceholder}
                         placeholderTextColor={uiTheme.colors.textMuted}
                         maxLength={USER_PROFILE_MAX_PROMPT_ANSWER_LENGTH}
                         multiline
@@ -546,8 +533,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
             {promptError ? (
               <ValidationError message={
                 promptError === "empty"
-                  ? "Answer each selected prompt or remove it"
-                  : "Choose up to two different prompts with short answers"
+                  ? copy.promptEmpty
+                  : copy.promptLimit
               } />
             ) : null}
           </View>
@@ -568,10 +555,10 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               accessibilityRole="button"
               accessibilityLabel={
                 saved
-                  ? "Profile saved"
+                  ? copy.savedStatus
                   : isSaving
-                    ? "Saving profile"
-                    : "Save profile"
+                    ? copy.savingAccessibility
+                    : copy.save
               }
               accessibilityState={{ disabled: !canSave || !hasChanges }}
               onPress={handleSave}
@@ -594,7 +581,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                 style={styles.saveButtonGradient}
               >
                 <Text style={styles.saveButtonText}>
-                  {saved ? "Saved" : isSaving ? "Saving..." : "Save profile"}
+                  {saved ? copy.saved : isSaving ? copy.saving : copy.save}
                 </Text>
                 {saved ? (
                   <Ionicons name="checkmark" size={18} color="#FFFFFF" />
@@ -608,10 +595,10 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               accessibilityRole="alert"
               style={styles.saveStatus}
             >
-              Profile saved
+              {copy.savedStatus}
             </Text>
           ) : null}
-          </ScrollView>
+          </PageScrollContent>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -659,7 +646,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     gap: uiTheme.spacing.md,
-    paddingBottom: uiTheme.spacing.xxl,
   },
   previewCard: {
     borderRadius: uiTheme.radius.xl,

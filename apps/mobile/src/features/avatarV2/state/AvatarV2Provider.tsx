@@ -94,14 +94,6 @@ const AVATAR_EQUIP_SAVE_TIMEOUT_MS = 8_000
 
 const AvatarV2Context = createContext<AvatarV2ContextValue | null>(null)
 
-const AVATAR_QA_UNLOCK_ENABLED = isAvatarQaUnlockEnabled(
-  __DEV__,
-  process.env.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS
-)
-const AVATAR_QA_PERSISTENCE_POLICY = getAvatarQaPersistencePolicy(
-  AVATAR_QA_UNLOCK_ENABLED
-)
-
 interface AvatarV2ProviderProps {
   children: ReactNode
   storageScopeId?: string
@@ -124,6 +116,14 @@ export function AvatarV2Provider({
   onSaveAvatar,
   resolvedCapabilities = createFailClosedCapabilityResolution().capabilities
 }: AvatarV2ProviderProps) {
+  // Development builds may be signed into a real account. QA ownership must
+  // never bypass server inventory or suppress saves for that account.
+  const qaUnlockEnabled = isAvatarQaUnlockEnabled(
+    __DEV__,
+    process.env.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS,
+    requireServerInventory
+  )
+  const qaPersistencePolicy = getAvatarQaPersistencePolicy(qaUnlockEnabled)
   const localInventory = useInventoryStore(
     storageScopeId,
     requireServerInventory
@@ -226,21 +226,21 @@ export function AvatarV2Provider({
     // Disposable regression QA must never overwrite the user's saved avatar.
     // The env flag is also guarded by __DEV__ above, so production builds
     // always retain the normal persistence and inventory behavior.
-    if (!AVATAR_QA_PERSISTENCE_POLICY.allowLocalPersistence) return
+    if (!qaPersistencePolicy.allowLocalPersistence) return
     void AsyncStorage.setItem(
       storageKey,
       JSON.stringify(avatar)
     ).catch(() => {
       // Keep wardrobe interactions responsive if local persistence fails.
     })
-  }, [avatar, hasHydratedPersistedAvatar, requireServerInventory, storageKey])
+  }, [avatar, hasHydratedPersistedAvatar, qaPersistencePolicy.allowLocalPersistence, requireServerInventory, storageKey])
 
   const avatarInventory = useMemo<AvatarInventory>(
     () => createAvatarQaInventory(
       localInventory.inventory.ownedAvatarItemIds,
-      AVATAR_QA_UNLOCK_ENABLED
+      qaUnlockEnabled
     ),
-    [localInventory.inventory.ownedAvatarItemIds]
+    [localInventory.inventory.ownedAvatarItemIds, qaUnlockEnabled]
   )
 
   const canEquipItem = useCallback((item: AvatarCatalogItem): boolean => {
@@ -267,13 +267,20 @@ export function AvatarV2Provider({
         }
       }
       const nextAvatar = resolveAvatarV2(nextAvatarInput)
-      if (!AVATAR_QA_PERSISTENCE_POLICY.allowRemotePersistence) {
+      if (!qaPersistencePolicy.allowRemotePersistence) {
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setSaveErrorMessage(null)
         setAvatar(nextAvatar)
         return { ok: true }
       }
       if (!onSaveAvatar) {
+        if (requireServerInventory) {
+          return {
+            ok: false,
+            reason: "error",
+            errorMessage: "Avatar changes cannot be saved right now. Try again later."
+          }
+        }
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setAvatar(nextAvatar)
         return { ok: true }
@@ -343,7 +350,7 @@ export function AvatarV2Provider({
         }
       }
     },
-    [onSaveAvatar]
+    [onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory]
   )
 
   const equipAndSaveItem = useCallback(
@@ -358,7 +365,7 @@ export function AvatarV2Provider({
       if (!canEquipItem(item)) {
         return { ok: false, reason: "error", errorMessage: "Unlock this look first" }
       }
-      if (!AVATAR_QA_PERSISTENCE_POLICY.allowRemotePersistence) {
+      if (!qaPersistencePolicy.allowRemotePersistence) {
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setSaveErrorMessage(null)
         setAvatar((current) => applyDisposableAvatarEquip(
@@ -370,6 +377,13 @@ export function AvatarV2Provider({
       }
       const nextAvatar = equipAvatarV2Item(avatar, item)
       if (!onSaveAvatar) {
+        if (requireServerInventory) {
+          return {
+            ok: false,
+            reason: "error",
+            errorMessage: "Avatar changes cannot be saved right now. Try again later."
+          }
+        }
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setAvatar(nextAvatar)
         return { ok: true }
@@ -434,7 +448,7 @@ export function AvatarV2Provider({
         }
       }
     },
-    [avatar, canEquipItem, onSaveAvatar]
+    [avatar, canEquipItem, onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory]
   )
 
   const value = useMemo<AvatarV2ContextValue>(

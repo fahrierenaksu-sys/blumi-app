@@ -139,7 +139,7 @@ In a second terminal, start Expo:
 npm start
 ```
 
-This starts Metro from `apps/mobile` on LAN port `8081` for Expo Go. The phone must be able to reach the development machine and its configured API address.
+This starts Metro from `apps/mobile` on LAN port `8081` for the native Blumi development client. Install the development build on the phone or Simulator first. The device must be able to reach the development machine and its configured API address.
 
 For a clean Metro cache:
 
@@ -147,10 +147,16 @@ For a clean Metro cache:
 npm --workspace @blumi/mobile run start:clear
 ```
 
-For a development client with native integrations:
+To start the development client explicitly:
 
 ```bash
 npm --workspace @blumi/mobile run start:dev-client
+```
+
+For Expo Go demos that do not require the native integrations:
+
+```bash
+npm --workspace @blumi/mobile run start:go
 ```
 
 To build the native iOS app locally:

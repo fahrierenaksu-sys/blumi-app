@@ -65,6 +65,20 @@ export function createChatMessageDeliveryService(options: {
       // The periodic worker also picks up this durable job after restart.
       try { await dispatchDue(new Date(), delivery.message.messageId) }
       catch (error) { options.reportError?.(error) }
+
+      for (const recipientUserId of recipientUserIds) {
+        const persona = await chatService.repository.findTestPersona(recipientUserId)
+        if (!persona?.replies.length) continue
+        const replyIndex = stableReplyIndex(delivery.message.messageId, persona.replies.length)
+        const reply = await chatService.sendMessageIdempotently(
+          persona.userId,
+          input.threadId,
+          persona.replies[replyIndex]!,
+          `test-persona-reply-${delivery.message.messageId}`
+        )
+        try { await dispatchDue(new Date(), reply.message.messageId) }
+        catch (error) { options.reportError?.(error) }
+      }
       return delivery
     }
   }
@@ -101,4 +115,10 @@ export function createChatMessageDeliveryService(options: {
       await chatService.repository.retryDelivery(message.messageId, leaseToken, new Date(now.getTime() + backoffMs))
     }
   }
+}
+
+function stableReplyIndex(messageId: string, count: number): number {
+  let hash = 0
+  for (const character of messageId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0
+  return hash % count
 }

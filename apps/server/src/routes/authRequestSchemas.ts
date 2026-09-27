@@ -29,6 +29,15 @@ const registerAccountRequestSchema = authVerificationRequestSchema.extend({
   })
 })
 
+const firebaseAuthRequestSchema = z.object({
+  idToken: z.string().trim().min(1).max(12_000),
+  authIntent: z.enum(["create", "sign-in"]),
+  termsAcceptance: z.object({
+    version: z.string().trim().min(1),
+    locale: z.enum(["en", "tr"])
+  }).optional()
+})
+
 export interface AuthPhoneRequest {
   phoneNumber: string
 }
@@ -39,6 +48,15 @@ export interface AuthVerificationRequest extends AuthPhoneRequest {
 
 export interface RegisterAccountRequest extends AuthVerificationRequest {
   termsAcceptance: {
+    version: string
+    locale: "en" | "tr"
+  }
+}
+
+export interface FirebaseAuthRequest {
+  idToken: string
+  authIntent: "create" | "sign-in"
+  termsAcceptance?: {
     version: string
     locale: "en" | "tr"
   }
@@ -62,5 +80,12 @@ export function parseRegisterAccountRequest(
   input: unknown
 ): RegisterAccountRequest | null {
   const result = registerAccountRequestSchema.safeParse(input)
+  return result.success ? result.data : null
+}
+
+export function parseFirebaseAuthRequest(
+  input: unknown
+): FirebaseAuthRequest | null {
+  const result = firebaseAuthRequestSchema.safeParse(input)
   return result.success ? result.data : null
 }

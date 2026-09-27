@@ -14,6 +14,7 @@ import {
 import { uiTheme } from "../ui/theme"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
+import { resolveMyRoomAvatarSource } from "../features/avatarV2/myRoomAvatarSource"
 import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoom.mock"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
 import {
@@ -118,6 +119,11 @@ export function MyRoomScreen({
   const copy = getMyRoomCopy(getAppLocale())
   const { userRoomDecor } = useRoomV2()
   const { avatar, catalog } = useAvatarV2()
+  const displayedAvatar = useMemo(() => resolveMyRoomAvatarSource(
+    avatar,
+    sessionActor.profile.avatar,
+    sessionActor.session.mode === "production"
+  ), [avatar, sessionActor.profile.avatar, sessionActor.session.mode])
   const viewport = useAppViewportMetrics({ bottomNavVisible: true })
   const [avatarPose, setAvatarPose] = useState<MyRoomAvatarPose>({
     ...MY_ROOM_AVATAR_SPAWN,
@@ -251,11 +257,11 @@ export function MyRoomScreen({
   const projectedRoomAvatar = useMemo(
     () =>
       projectAvatarV2ToRoomAvatarAppearance({
-        avatar,
+        avatar: displayedAvatar,
         avatarCatalog: catalog,
         roomAvatarCatalog: ROOM_AVATAR_CATALOG
       }).appearance,
-    [avatar, catalog]
+    [displayedAvatar, catalog]
   )
   const roomAvatar = useMemo(() => {
     const avatarSize = usesWideStageCamera

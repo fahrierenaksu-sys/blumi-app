@@ -1,12 +1,15 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import releaseConfig from "./mobile-release-config.cjs"
+import releaseAssets from "./mobile-release-assets.cjs"
 
 const { resolveMobileReleaseEnvironment } = releaseConfig
+const { assertNoCandidateAssetImportsInSourceRoot, findCandidateAssetImports } = releaseAssets
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const require = createRequire(import.meta.url)
 const legacyBrand = ["Date", "Vibe"].join("")
@@ -161,6 +164,62 @@ test("production resolves a complete fail-closed environment", () => {
   })
 })
 
+test("release app configuration requires EAS linkage and rejects candidate asset imports", () => {
+  const env = {
+    ...process.env,
+    EAS_BUILD_PROFILE: "preview",
+    EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.example.test",
+    EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://api.example.test",
+    EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
+    EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
+    EXPO_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/123",
+    EXPO_PUBLIC_POSTHOG_API_KEY: "phc_public",
+    EXPO_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com",
+    EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: "appl_test_ios",
+    EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: "goog_test_android"
+  }
+  const code = `const app=require('./app.config.js'); app({config:{extra:{}}})`
+  const missing = spawnSync(process.execPath, ["-e", code], { cwd: mobileRoot, env, encoding: "utf8" })
+  assert.notEqual(missing.status, 0)
+  assert.match(missing.stderr, /linked EAS projectId/)
+
+  const linked = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); const config=app({config:{extra:{eas:{projectId:'project-test'}}}}); if(config.extra.eas.projectId!=='project-test') process.exit(1)`], {
+    cwd: mobileRoot, env, encoding: "utf8"
+  })
+  assert.notEqual(linked.status, 0)
+  assert.match(linked.stderr, /cannot include candidate asset imports/)
+  assert.match(linked.stderr, /OnboardingWelcomeHomeScene\.tsx/)
+
+  const development = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); app({config:{extra:{}}})`], {
+    cwd: mobileRoot,
+    env: { ...process.env, EAS_BUILD_PROFILE: "development" },
+    encoding: "utf8"
+  })
+  assert.equal(development.status, 0, development.stderr)
+})
+
+test("candidate asset release guard catches static imports and ignores ordinary runtime assets", () => {
+  const references = findCandidateAssetImports([
+    {
+      filePath: "OnboardingWelcomeHomeScene.tsx",
+      content: 'const cottage = require("./assets/welcome-v1-candidate/cottage.png")'
+    },
+    {
+      filePath: "ApprovedScene.tsx",
+      content: 'const cottage = require("./assets/welcome-v1-runtime/cottage.png")'
+    }
+  ])
+  assert.deepEqual(references, [{
+    filePath: "OnboardingWelcomeHomeScene.tsx",
+    assetPath: "./assets/welcome-v1-candidate/cottage.png"
+  }])
+
+  assert.throws(
+    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")),
+    /cannot include candidate asset imports/
+  )
+})
+
 test("release crash reporting uses the official Sentry integration without PII", () => {
   const app = read("App.tsx")
   const crashReporting = read("src/observability/crashReporting.ts")
@@ -180,7 +239,7 @@ test("managed project stays aligned with the Expo SDK 57 platform contract", () 
   const packageJson = JSON.parse(read("package.json"))
   const tsconfig = JSON.parse(read("tsconfig.json"))
 
-  assert.match(packageJson.dependencies.expo, /^\^57\.0\./)
+  assert.match(packageJson.dependencies.expo, /^~57\.0\./)
   assert.match(packageJson.dependencies.react, /^19\.2\./)
   assert.equal(packageJson.dependencies["react-native"], "0.86.3")
   assert.equal(tsconfig.compilerOptions.baseUrl, undefined)
@@ -445,6 +504,7 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   const settings = read("src/screens/SettingsScreen.tsx")
   const settingsCopy = read("src/features/settings/settingsCopy.ts")
   const smsProvider = read("../server/src/auth/smsProvider.ts")
+  const firebaseAuth = read("src/features/session/firebasePhoneAuth.ts")
   const realtimeRouter = read("../server/src/realtime/realtimeRouter.ts")
   const navigator = read("src/navigation/RootNavigator.tsx")
   const avatarSetup = read("src/screens/AvatarSetupScreen.tsx")
@@ -471,14 +531,9 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   assert.match(settings, /label=\{copy\.signOut\}/)
   assert.match(settingsCopy, /signOut:\s*"Sign out"/)
   assert.match(settingsCopy, /signOut:\s*"Çıkış yap"/)
-  assert.match(smsProvider, /input\.purpose === "account_deletion"/)
-  assert.match(smsProvider, /input\.purpose === "account_data_export"/)
-  assert.match(smsProvider, /input\.purpose === "phone_change_current"/)
-  assert.match(smsProvider, /input\.purpose === "phone_change_new"/)
-  assert.match(
-    smsProvider,
-    /Body: `Your Blumi \$\{message\} code is \$\{input\.code\}\. It expires in 5 minutes\.`/
-  )
+  assert.match(firebaseAuth, /signInWithPhoneNumber\(/)
+  assert.match(firebaseAuth, /confirmation\.confirm\(verificationCode\)/)
+  assert.doesNotMatch(smsProvider, /fetch\(|https:\/\//)
   assert.equal(realtimeRouter.includes(`title: "${legacyBrand}"`), false)
   assert.doesNotMatch(navigator, /\bRoomV2Preview\b|\bRoomShop\b/)
   assert.equal(existsSync(resolve(mobileRoot, "src/screens/RoomV2PreviewScreen.tsx")), false)
@@ -509,7 +564,7 @@ test("production profile and chat actions never fall back to local demo behavior
   assert.doesNotMatch(chatThread, /setTimeout\(\(\) => setIsLoadingEarlier\(false\), 700\)/)
   assert.match(navigator, /requestMessages[\s\S]*Promise<void>/)
   assert.match(matchResult, /const canStartConversation = canOpenMatchExperience\(sessionActor\)/)
-  assert.match(matchResult, /navigation\.navigate\("ChatThread"/)
+  assert.match(matchResult, /navigation\.reset\(/)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|Go to Room|SharedMatchRoom/)
   assert.doesNotMatch(discoverCard, /Save this vibe for later|Taking it slow/)
 })

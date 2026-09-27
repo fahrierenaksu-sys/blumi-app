@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
 import test from "node:test"
+import { isRetiredAvatarItemId } from "@blumi/domain"
 
 import { getMaleRigLayerThumbnailPresentation } from "./maleRigThumbnailPresentation"
 import { isAvatarV2ItemCompatibleWithBody } from "./avatarBodyCompatibility"
@@ -97,14 +98,15 @@ test("every promoted male rig layer alpha stays inside Shop and Wardrobe stages"
   )
   const itemIds = [...sourceMap.matchAll(/^\s+(avatar_v2_(hair|top|bottom|shoes)_male_[a-z0-9_]+):/gm)]
     .map((match) => ({ id: match[1], type: match[2] as AvatarItemType }))
+    .filter((item) => !isRetiredAvatarItemId(item.id))
 
   assert.deepEqual(
     itemIds.reduce<Record<string, number>>(
       (counts, item) => ({ ...counts, [item.type]: (counts[item.type] ?? 0) + 1 }),
       {}
     ),
-    { hair: 4, top: 8, bottom: 5, shoes: 4 },
-    "the alpha-bound suite must track every shared male rig thumbnail source"
+    { hair: 3, top: 8, bottom: 5, shoes: 4 },
+    "the alpha-bound suite must track every live male rig thumbnail source"
   )
 
   const surfaces = {

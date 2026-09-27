@@ -13,9 +13,24 @@ import { createGracefulShutdown } from "./operations/serviceLifecycle"
 import { startPeriodicWorker } from "./operations/periodicWorker"
 import { createChatMessageDeliveryService } from "./chat/chatMessageDeliveryService"
 import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
+import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
+import { createFirebaseUserDeletionDispatch } from "./auth/firebaseUserDeletionWorker"
 
 const config = resolveServerConfig()
 const services = createConfiguredServerServices(config)
+const firebaseAuthVerifier = createFirebaseAuthVerifier({
+  projectId: process.env.FIREBASE_PROJECT_ID ?? "blumi-mobile-eren",
+  serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+  serviceAccountJsonBase64: process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
+})
+const firebaseDeletionWorker = startPeriodicWorker({
+  run: createFirebaseUserDeletionDispatch({
+    repository: services.authService.repository,
+    deleteUser: (uid) => firebaseAuthVerifier.deleteUser(uid)
+  }),
+  intervalMs: 30_000,
+  reportError: () => console.error("Firebase user deletion worker failed")
+})
 const mediaRevocationWorker = startPeriodicWorker({
   run: () => services.mediaRevocationService.dispatchDue(),
   intervalMs: 1000,
@@ -80,6 +95,7 @@ const app = createServer({
     if (!connectionManager.isFanoutReady()) throw new Error("Realtime fanout unavailable")
   },
   authService: services.authService,
+  firebaseAuthVerifier,
   chatService: services.chatService,
   economyService: services.economyService,
   commerceService: services.commerceService,
@@ -104,6 +120,7 @@ const app = createServer({
   trustedProxyAddresses: config.trustedProxyAddresses,
   adminKey: config.adminKey,
   adminTokenService,
+  adminUsersService: services.adminUsersService,
   allowLegacyAdminKey: config.adminLegacyKeyEnabled,
   appLinks: config.appleAppId && config.androidAppLinkSha256CertFingerprints.length > 0
     ? {
@@ -124,7 +141,8 @@ const realtimeServer = createRealtimeServer({
   reactionService: services.reactionService,
   notificationService: services.notificationService,
   connectionManager,
-  realtimeTicketService
+  realtimeTicketService,
+  httpServer: config.port === config.realtimePort ? app.server : undefined
 })
 
 async function start() {
@@ -139,10 +157,11 @@ async function start() {
 const shutdown = createGracefulShutdown({
   markNotReady: () => { accepting = false },
   drain: [
-    () => app.close(),
     () => realtimeServer.close({ preserveFanout: true }),
+    () => app.close(),
     () => discoveryWatchWorker.stop(),
     () => notificationOutboxWorker.stop(),
+    () => firebaseDeletionWorker.stop(),
     () => chatDeliveryWorker.stop(),
     () => mediaRevocationWorker.stop(),
     () => ticketCleanupWorker.stop(),

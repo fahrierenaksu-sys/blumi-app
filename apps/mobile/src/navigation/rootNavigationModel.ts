@@ -2,6 +2,7 @@ import type { ChatLocale } from "../features/chat/chatRoomInviteModel"
 import type { OnboardingRoute } from "../features/session/onboardingFlowModel"
 import type { SessionEntryRoute } from "../features/session/sessionRouting"
 import type { BottomNavKey } from "../ui/bottomNav"
+import type { RootStackParamList } from "./RootNavigator"
 
 /**
  * Keep every root-level route on the same transition. The default native-stack
@@ -25,6 +26,36 @@ export const MAIN_TAB_SCREEN_OPTIONS = {
   animation: "fade",
   gestureEnabled: false
 } as const
+
+/** Override any native-stack fade only when the OS requests less motion. */
+export function getReducedMotionScreenOptions(reduceMotion: boolean):
+  { animation: "none" } | Record<string, never> {
+  return reduceMotion ? { animation: "none" } : {}
+}
+
+/** Inbox may be the stack root after a direct link or a restored session. */
+export function goBackFromInbox(navigation: {
+  canGoBack: () => boolean
+  goBack: () => void
+  replace: (route: "Lobby") => void
+}): void {
+  goBackOrFallback(navigation, () => navigation.replace("Lobby"))
+}
+
+/** Use a registered route when an explicit back action has no stack history. */
+export function goBackOrFallback(
+  navigation: {
+    canGoBack: () => boolean
+    goBack: () => void
+  },
+  fallback: () => void
+): void {
+  if (navigation.canGoBack()) {
+    navigation.goBack()
+  } else {
+    fallback()
+  }
+}
 
 export function getBottomNavKeyForRoute(
   routeName: string | undefined
@@ -57,4 +88,16 @@ export function getLobbyReturnStrategy(
   stackRouteNames: readonly string[]
 ): "popTo" | "replace" {
   return stackRouteNames.includes("Lobby") ? "popTo" : "replace"
+}
+
+export function createPostMatchChatNavigationState(
+  params: RootStackParamList["ChatThread"]
+) {
+  return {
+    index: 1,
+    routes: [
+      { name: "Inbox" as const },
+      { name: "ChatThread" as const, params }
+    ]
+  }
 }

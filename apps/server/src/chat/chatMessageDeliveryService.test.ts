@@ -10,6 +10,7 @@ import {
   createChatMessageDeliveryService
 } from "./chatMessageDeliveryService"
 import { createChatService } from "./chatService"
+import { createInMemoryChatRepository } from "./chatRepository"
 
 test("failed notification enqueue remains recoverable by a fresh delivery dispatcher", async () => {
   const chatService = createChatService({ idFactory: () => "message_recover" })
@@ -170,6 +171,38 @@ test("retries with the same client message ID return one message and fan out onc
   assert.equal(retry.created, false)
   assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
   assert.equal(sentEvents.length, 1)
+})
+
+test("a persisted test persona replies once to a newly delivered user message", async () => {
+  let nextMessageId = 0
+  const repository = createInMemoryChatRepository()
+  repository.findTestPersona = async (userId) => userId === "user_b"
+    ? { userId, greeting: "Selam!", replies: ["Kahve iyi fikir."] }
+    : null
+  const chatService = createChatService({ repository, idFactory: () => `message_${++nextMessageId}` })
+  await createThread(chatService)
+  const events: ServerEvent[] = []
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService: createSafetyService(),
+    connectionManager: {
+      async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+        events.push(event)
+      },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+  const send = () => delivery.sendMessage({
+    senderUserId: "user_a", threadId: "thread_one", body: "Merhaba",
+    clientMessageId: "test-client-1"
+  })
+  await send()
+  await send()
+  const messages = await chatService.listMessages("user_a", "thread_one")
+  assert.deepEqual(messages.map((message) => message.senderUserId), ["user_a", "user_b"])
+  assert.equal(messages[1]?.body, "Kahve iyi fikir.")
+  assert.equal(events.length, 2)
 })
 
 async function createThread(chatService: ReturnType<typeof createChatService>) {

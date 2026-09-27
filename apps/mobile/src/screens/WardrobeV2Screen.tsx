@@ -31,8 +31,10 @@ import type { AvatarCatalogItem, AvatarItemType } from "../features/avatarV2/ava
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { buildAvatarShopCatalogItem } from "../features/shop/shopCatalog"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { hapticError, hapticLight, hapticSuccess } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
+import { useReducedMotion } from "../ui/animations"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getAppLocale } from "../features/session/authLocale"
 import {
@@ -41,17 +43,17 @@ import {
   getAvatarStudioCategories,
   getAvatarStudioDefaultCategory,
   getWardrobeCategoryItems,
-  getWardrobeVisibleSlots,
   shouldUseWardrobeVerticalFallback,
-  shouldUseWardrobeSlotCompactLayout,
   AVATAR_STUDIO_SECTIONS,
   type AvatarStudioSectionId,
   type WardrobeCategoryId
 } from "../features/avatarV2/wardrobeCategoryModel"
 import { getWardrobeThumbnailPresentation } from "../features/avatarV2/wardrobeThumbnailPresentation"
+import { getGarmentThumbnailOverride } from "../features/avatarV2/garmentThumbnailOverrides"
+import { getShopProductThumbnailBounds } from "../features/shop/shopAssets"
+import { getShopThumbnailLayout } from "../features/shop/shopThumbnailLayout"
 import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 import { WardrobeCarouselProgress } from "./components/WardrobeCarouselProgress"
-import { WardrobeEquippedSlotsRail } from "./components/WardrobeEquippedSlotsRail"
 
 type WardrobeV2ScreenProps = NativeStackScreenProps<RootStackParamList, "WardrobeV2">
 
@@ -75,7 +77,17 @@ const AVATAR_STUDIO_COPY = {
     accessory: "Extras",
     sectionA11ySuffix: "section",
     categoryA11ySuffix: "Avatar Studio category",
-    bodySwitchHint: "Switching your base refits the complete starter look."
+    bodySwitchHint: "Switching your base refits the complete starter look.",
+    wearing: "Wearing",
+    tryOn: "Try on",
+    equipped: "equipped",
+    choose: "Choose",
+    roomFitPending: "Room fit pending",
+    switchBase: "Switch base",
+    fullLook: "Full look",
+    emptyTitle: "Nothing here yet",
+    emptyBody: "Find a new favorite in the Shop.",
+    exploreShop: "Explore Shop"
   },
   tr: {
     title: "Blumi",
@@ -96,7 +108,17 @@ const AVATAR_STUDIO_COPY = {
     accessory: "Ekstralar",
     sectionA11ySuffix: "bölümünü aç",
     categoryA11ySuffix: "Avatar Stüdyosu kategorisini aç",
-    bodySwitchHint: "Bazı değiştirince başlangıç görünümü birlikte yeniden uyarlanır."
+    bodySwitchHint: "Bazı değiştirince başlangıç görünümü birlikte yeniden uyarlanır.",
+    wearing: "Giyiliyor",
+    tryOn: "Dene",
+    equipped: "giyiliyor",
+    choose: "Seç",
+    roomFitPending: "Oda uyumu bekleniyor",
+    switchBase: "Bazı değiştir",
+    fullLook: "Tam kombin",
+    emptyTitle: "Bu bölüm şimdilik boş",
+    emptyBody: "Yeni bir favori bulmak için Mağaza'ya göz at.",
+    exploreShop: "Mağazayı keşfet"
   }
 } as const
 
@@ -248,7 +270,7 @@ const AVATAR_ITEM_PREVIEW_SOURCES: Partial<Record<string, ImageSourcePropType>> 
 const WARDROBE_SQUARE_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropType>> = {
   ...FEMALE_SWEET_CAPSULE_SQUARE_THUMBNAIL_SOURCES,
   avatar_v2_top_blush_lace_cardigan:
-    require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_blush_lace_cardigan.png"),
+    require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_buttercream_bow_tee.png"),
   avatar_v2_top_sage_ribbon_knit_jacket:
     require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_sage_ribbon_knit_jacket.png"),
   avatar_v2_top_cherry_heart_milkmaid_blouse:
@@ -256,7 +278,7 @@ const WARDROBE_SQUARE_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropT
   avatar_v2_top_powder_blue_ribbon_corset_top:
     require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_powder_blue_ribbon_corset_top.png"),
   avatar_v2_top_noir_rose_heart_cardigan:
-    require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_noir_rose_heart_cardigan.png"),
+    require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_buttercream_bow_tee.png"),
   avatar_v2_top_boho_patchwork_maxi_dress:
     require("../features/avatarV2/assets/shop-thumbnails/avatar_v2_top_boho_patchwork_maxi_dress.png"),
   avatar_v2_top_embroidered_halter_wrap_dress:
@@ -306,12 +328,15 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   const [carouselViewportWidth, setCarouselViewportWidth] = useState(0)
   const carouselOffsetX = useRef(new Animated.Value(0)).current
   const carouselOffsetXRef = useRef(0)
+  const categoryScrollRef = useRef<ScrollView>(null)
+  const categoryOffsetsRef = useRef<Record<string, number>>({})
+  const catalogOpacity = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
   const { fontScale, height: viewportHeight } = useWindowDimensions()
   const useCompactVerticalFallback = shouldUseWardrobeVerticalFallback(
     viewportHeight,
     fontScale
   )
-  const useCompactSlotLayout = shouldUseWardrobeSlotCompactLayout(fontScale)
   const {
     avatar,
     catalog,
@@ -328,10 +353,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     carouselOffsetX.setValue(0)
   }, [activeCategory, carouselOffsetX])
 
-  const visibleSlots = useMemo(
-    () => getWardrobeVisibleSlots(catalog, avatar),
-    [avatar, catalog]
-  )
   const getCategoryLabel = useCallback(
     (categoryId: WardrobeCategoryId): string => studioCopy[categoryId],
     [studioCopy]
@@ -340,6 +361,31 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     () => getAvatarStudioCategories(activeSection, catalog, avatar),
     [activeSection, avatar, catalog]
   )
+
+  useEffect(() => {
+    const offset = categoryOffsetsRef.current[activeCategory]
+    if (offset === undefined) return
+    const frame = requestAnimationFrame(() => {
+      categoryScrollRef.current?.scrollTo({ x: Math.max(0, offset - 16), animated: !reduceMotion })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [activeCategory, activeSection, reduceMotion])
+
+  useEffect(() => {
+    catalogOpacity.stopAnimation()
+    if (reduceMotion) {
+      catalogOpacity.setValue(1)
+      return
+    }
+    catalogOpacity.setValue(0)
+    const animation = Animated.timing(catalogOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true
+    })
+    animation.start()
+    return () => animation.stop()
+  }, [activeCategory, catalogOpacity, reduceMotion])
 
   const activeItems = useMemo(
     () => getWardrobeCategoryItems(catalog, activeCategory).filter(
@@ -361,12 +407,12 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     const equipped = activeItems.find((item) =>
       isAvatarV2ItemEquipped(avatar, item)
     )
-    if (!equipped) return activeCategory === "dress" ? "Choose a dress" : `Choose ${activeCategory}`
+    if (!equipped) return `${studioCopy.choose}: ${getCategoryLabel(activeCategory)}`
     if (!isAvatarItemRoomPreviewSupported(equipped)) {
-      return `${equipped.name} room art pending`
+      return `${equipped.name}: ${studioCopy.roomFitPending}`
     }
-    return `${equipped.name} equipped`
-  }, [activeCategory, activeItems, avatar])
+    return `${equipped.name} ${studioCopy.equipped}`
+  }, [activeCategory, activeItems, avatar, getCategoryLabel, studioCopy])
   const visibleActiveItems = useMemo(
     () =>
       [...activeItems].sort((left, right) => {
@@ -392,14 +438,14 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
         const equipped = isAvatarV2ItemEquipped(avatar, item) && roomPreviewSupported
         const previewSource = getAvatarItemPreviewSource(item)
         const itemStateLabel = !roomPreviewSupported
-          ? "Room fit pending"
+          ? studioCopy.roomFitPending
           : locked
             ? catalogItem.stateLabel
             : item.type === "body"
-              ? "Switch base"
+              ? studioCopy.switchBase
               : item.outfitKey
-              ? "Full look"
-              : "Try on"
+              ? studioCopy.fullLook
+              : studioCopy.tryOn
 
         return {
           item,
@@ -409,7 +455,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           previewSource
         }
       }),
-    [avatar, canEquipItem, inventory, isSaving, visibleActiveItems]
+    [avatar, canEquipItem, inventory, isSaving, studioCopy, visibleActiveItems]
   )
 
   const handleEquip = useCallback((item: AvatarCatalogItem): void => {
@@ -492,11 +538,12 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       item={item.item}
       equipped={item.equipped}
       itemStateLabel={item.itemStateLabel}
+      wearingLabel={studioCopy.wearing}
       locked={item.locked}
       previewSource={item.previewSource}
       onEquip={handleEquip}
     />
-  ), [handleEquip])
+  ), [handleEquip, studioCopy.wearing])
 
   return (
     <View style={styles.root}>
@@ -505,7 +552,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => navigation.goBack()}
+            onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}
             style={({ pressed }) => [
               styles.iconButton,
               pressed ? styles.iconButtonPressed : null
@@ -568,32 +615,18 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
             showsVerticalScrollIndicator={false}
           >
         <View style={styles.previewPanel}>
-          <View style={[
-            styles.previewAndSlots,
-            useCompactSlotLayout ? styles.previewAndSlotsCompact : null
-          ]}>
+          <View style={styles.previewAndSlots}>
             <View style={styles.avatarPreviewColumn}>
               <AvatarPreview2D
                 avatar={avatar}
                 catalog={catalog}
                 animationState="idle_front"
-                selectedType={activeCategory === "dress" ? "top" : activeCategory}
-                label={equippedLabel}
                 metaTone="light"
-                size={190}
-                stageHeight={240}
+                size={180}
+                stageHeight={228}
               />
             </View>
 
-            {activeSection === "closet" ? (
-              <WardrobeEquippedSlotsRail
-                activeCategory={activeCategory}
-                slots={visibleSlots}
-                compact={useCompactSlotLayout}
-                getPreviewSource={getAvatarItemPreviewSource}
-                onSelectCategory={setActiveCategory}
-              />
-            ) : null}
           </View>
 
         </View>
@@ -615,7 +648,9 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
 
         <View style={styles.catalogShelf}>
           <ScrollView
+            ref={categoryScrollRef}
             horizontal
+            style={styles.categoryScroll}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoryRow}
           >
@@ -628,6 +663,9 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
                   accessibilityRole="button"
                   accessibilityLabel={`${studioCopy[category.id]} ${studioCopy.categoryA11ySuffix}`}
                   accessibilityState={{ selected: active }}
+                  onLayout={(event) => {
+                    categoryOffsetsRef.current[category.id] = event.nativeEvent.layout.x
+                  }}
                   onPress={() => {
                     hapticLight()
                     setActiveCategory(category.id)
@@ -640,7 +678,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
                   <Ionicons
                     name={WARDROBE_CATEGORY_ICONS[category.id]}
                     size={15}
-                    color={active ? "#FFFFFF" : uiTheme.colors.textSecondary}
+                    color={active ? uiTheme.colors.primaryDeep : uiTheme.colors.textSecondary}
                   />
                   <Text
                     maxFontSizeMultiplier={1.4}
@@ -673,8 +711,26 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
 
           <Animated.FlatList
             key={activeCategory}
+            style={{ opacity: catalogOpacity }}
             horizontal
             data={visibleWardrobeCards}
+            ListEmptyComponent={
+              <View style={styles.catalogEmpty}>
+                <Ionicons name="sparkles-outline" size={23} color={uiTheme.colors.primary} />
+                <View style={styles.catalogEmptyCopy}>
+                  <Text style={styles.catalogEmptyTitle}>{studioCopy.emptyTitle}</Text>
+                  <Text style={styles.catalogEmptyBody}>{studioCopy.emptyBody}</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={studioCopy.exploreShop}
+                  onPress={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
+                  style={styles.catalogEmptyAction}
+                >
+                  <Text style={styles.catalogEmptyActionText}>{studioCopy.exploreShop}</Text>
+                </Pressable>
+              </View>
+            }
             keyExtractor={(entry) => entry.item.id}
             initialNumToRender={4}
             maxToRenderPerBatch={4}
@@ -703,25 +759,32 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   item: AvatarCatalogItem
   equipped: boolean
   itemStateLabel: string
+  wearingLabel: string
   locked: boolean
   onEquip: (item: AvatarCatalogItem) => void
   previewSource?: ImageSourcePropType
 }) {
-  const { item, equipped, itemStateLabel, locked, onEquip, previewSource } = props
+  const { item, equipped, itemStateLabel, wearingLabel, locked, onEquip, previewSource } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
     ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
     : undefined
   const thumbnailPresentation = getWardrobeThumbnailPresentation({
     type: item.type,
     isRigLayer: Boolean(rigLayerPresentation),
-    isSquareAsset: item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES
+    isSquareAsset: item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES || Boolean(getGarmentThumbnailOverride(item.id))
   })
+  const visibleThumbnailLayout = thumbnailPresentation.frame === "square"
+    ? getShopThumbnailLayout(getShopProductThumbnailBounds(item.id), 100, 68)
+    : undefined
+  const thumbnailLayout = visibleThumbnailLayout
+    ? { ...visibleThumbnailLayout, left: visibleThumbnailLayout.left + 16, top: visibleThumbnailLayout.top + 10 }
+    : undefined
 
   return (
     <Pressable
       testID={`wardrobe-item-${getAvatarAutomationSlug(item.id)}`}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name}, ${equipped ? "Wearing" : itemStateLabel}`}
+      accessibilityLabel={`${item.name}, ${equipped ? wearingLabel : itemStateLabel}`}
       accessibilityState={{
         disabled: locked,
         selected: equipped
@@ -747,6 +810,7 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
                 : thumbnailPresentation.frame === "square"
                   ? styles.itemPreviewSquare
                   : styles.itemPreviewImage,
+              thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
               rigLayerPresentation
                 ? {
                     top: rigLayerPresentation.top,
@@ -788,7 +852,7 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
         ]}
       >
         <Text style={styles.itemMeta} numberOfLines={1}>
-          {equipped ? "Wearing" : itemStateLabel}
+          {equipped ? wearingLabel : itemStateLabel}
         </Text>
       </View>
     </Pressable>
@@ -797,6 +861,7 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   previous.item.id === next.item.id &&
   previous.equipped === next.equipped &&
   previous.itemStateLabel === next.itemStateLabel &&
+  previous.wearingLabel === next.wearingLabel &&
   previous.locked === next.locked &&
   previous.onEquip === next.onEquip &&
   previous.previewSource === next.previewSource
@@ -805,7 +870,8 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
 function getAvatarItemPreviewSource(
   item: AvatarCatalogItem
 ): ImageSourcePropType | undefined {
-  return WARDROBE_SQUARE_THUMBNAIL_SOURCES[item.id]
+  return getGarmentThumbnailOverride(item.id)?.source
+    ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[item.id]
     ?? AVATAR_ITEM_PREVIEW_SOURCES[item.id]
 }
 

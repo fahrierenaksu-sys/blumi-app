@@ -19,7 +19,7 @@ export function createSchemaReadinessCheck(
     if (expected.some(row => actual.get(row.id) !== row.checksum)) throw new Error("Database migrations are incomplete or incompatible")
     const missing = await pool.query(
       "SELECT relation FROM unnest($1::text[]) AS relation WHERE to_regclass(relation) IS NULL",
-      [["blumi_accounts", "blumi_sessions", "blumi_chat_messages", "blumi_push_delivery_outbox", "blumi_realtime_tickets"]]
+      [["blumi_accounts", "blumi_sessions", "blumi_chat_messages", "blumi_push_delivery_outbox", "blumi_realtime_tickets", "blumi_admin_user_audit"]]
     )
     if (missing.rows.length) throw new Error("Required database schema is missing")
   }

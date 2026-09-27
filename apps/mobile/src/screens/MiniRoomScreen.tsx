@@ -42,7 +42,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const roomCopy = getMiniRoomCopy(locale)
   const sharedRoomDecor = useMemo(() => resolveSharedRoomDecor(miniRoom), [miniRoom])
   const { avatar: localAvatarV2, catalog: avatarV2Catalog } = useAvatarV2()
-  const { mediaState, retryConnect, toggleMic } = useMiniRoomMedia({ miniRoom, mediaSession })
+  const { mediaState, voiceAvailable, retryConnect, toggleMic } = useMiniRoomMedia({ miniRoom, mediaSession })
   const roomChat = useInRoomChat({
     miniRoomId: miniRoom.miniRoomId,
     sourceThreadId: miniRoom.sourceThreadId,
@@ -50,7 +50,12 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     partnerUserId: participants.partner.userId
   })
 
-  const status = mediaState.connectionStatus
+  const { connectionStatus: lifecycleConnectionStatus, send: sendLifecycleEvent } = useGlobalRealtime()
+  const status = voiceAvailable
+    ? mediaState.connectionStatus
+    : lifecycleConnectionStatus === "reconnecting"
+      ? "connecting"
+      : lifecycleConnectionStatus
   const connectedAtRef = useRef<number | null>(null)
   const accumulatedConnectedMsRef = useRef<number>(0)
   const everConnectedRef = useRef<boolean>(false)
@@ -140,7 +145,6 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   )
 
   useGlobalRealtimeEvents(handleLifecycleEvent)
-  const { connectionStatus: lifecycleConnectionStatus, send: sendLifecycleEvent } = useGlobalRealtime()
 
   const requestEndMiniRoom = useCallback((): void => {
     if (exitedRef.current || endRequestedRef.current) {
@@ -187,6 +191,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         partnerUser={participants.partner}
         participantAvatarSnapshots={participantAvatarSnapshots}
         connectionStatus={status}
+        voiceAvailable={voiceAvailable}
         localMedia={mediaState.localMedia}
         roomDecorScene={hostRoomSnapshot}
         leaveDisabled={leaveDisabled}

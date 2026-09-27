@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import test from "node:test"
+import { isRetiredAvatarItemId } from "@blumi/domain"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -99,7 +100,7 @@ const everyLayer = [
   ...dresses.map((slug) => ({ kind: "bottom" as const, slug }))
 ]
 
-test("female sweet capsule is complete, mapped, and ready for a fitted 4W+1S wardrobe", () => {
+test("active female capsule is complete while retired products stay hidden under stable IDs", () => {
   assert.equal(tops.length, 7, "four tops plus three jackets")
   assert.equal(bottoms.length, 4, "two trousers plus two shorts")
   assert.equal(shoes.length, 4, "two heels plus two sneakers")
@@ -136,13 +137,19 @@ test("female sweet capsule is complete, mapped, and ready for a fitted 4W+1S war
     assert.ok(roomItem.assetsByMotion?.walking?.front, `${roomId} walking`)
     assert.ok(roomItem.assetsByMotion?.sitting?.front, `${roomId} sitting`)
     assert.match(economyCatalog, new RegExp(`avatarItem\\(\\s*"${avatarId}"`), avatarId)
-    assert.equal(existsSync(join(assetRoot, "layers", `avatar_${kind}_${slug}.png`)), true, `${avatarId} profile layer`)
-    assert.equal(existsSync(join(assetRoot, "shop-thumbnails", `${avatarId}.png`)), true, `${avatarId} thumbnail`)
+    const retired = isRetiredAvatarItemId(avatarId)
+    assert.equal(item.hiddenFromShop === true, retired, `${avatarId} shop availability`)
+    assert.equal(item.hiddenFromWardrobe === true, retired, `${avatarId} wardrobe availability`)
+    if (retired) continue
+    assert.equal(existsSync(join(assetRoot, "layers", `avatar_${kind}_${slug}.png`)), !retired, `${avatarId} profile layer`)
+    assert.equal(existsSync(join(assetRoot, "shop-thumbnails", `${avatarId}.png`)), !retired, `${avatarId} thumbnail`)
     assert.ok(FEMALE_SWEET_CAPSULE_SQUARE_THUMBNAIL_SOURCES[avatarId], `${avatarId} square thumbnail map`)
   }
 
   for (const { kind, slug } of everyLayer) {
     const roomId = `room_avatar_${kind}_female_${slug}_v2`
+    const retired = isRetiredAvatarItemId(`avatar_v2_${kind}_${slug}`)
+    if (retired) continue
     assert.equal(existsSync(assetPath(kind, slug)), true, `${roomId} static`)
     for (const state of motionStates) {
       assert.equal(existsSync(assetPath(kind, slug, state)), true, `${roomId} ${state}`)

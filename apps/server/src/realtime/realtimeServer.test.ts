@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import test from "node:test"
 import type { ServerEvent } from "@blumi/contracts"
@@ -20,6 +21,22 @@ test("realtime rejects invalid tickets before websocket upgrade", async () => {
   try {
     const socket = new WebSocket(`${harness.url}/ws`, ["ticket-missing"])
     await expectUpgradeRejected(socket)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("realtime websocket upgrades can share the API HTTP server and port", async () => {
+  const harness = await createRealtimeHarness({ shareHttpServer: true })
+  try {
+    const response = await fetch(harness.httpUrl)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), "api-ok")
+
+    const session = await harness.createSession("+905551110091", "Shared Port")
+    const socket = await harness.connect(session.sessionToken)
+    assert.equal(socket.readyState, WebSocket.OPEN)
+    socket.close()
   } finally {
     await harness.close()
   }
@@ -367,6 +384,7 @@ async function createRealtimeHarness(options: {
   pauseTicketConsumption?: boolean
   rejectTicketConsumption?: boolean
   rejectRealtimeAuthorization?: boolean
+  shareHttpServer?: boolean
 } = {}) {
   const authService = createAuthService({ codeFactory: () => "123456" })
   if (options.rejectRealtimeAuthorization) {
@@ -413,6 +431,21 @@ async function createRealtimeHarness(options: {
   })
   const connectionService = createConnectionService({ miniRoomService })
   const reactionService = createReactionService()
+  const sharedHttpServer: HttpServer | undefined = options.shareHttpServer
+    ? createHttpServer((_request, response) => {
+        response.writeHead(200, { "content-type": "text/plain" })
+        response.end("api-ok")
+      })
+    : undefined
+  if (sharedHttpServer) {
+    await new Promise<void>((resolve, reject) => {
+      sharedHttpServer.once("error", reject)
+      sharedHttpServer.listen(0, "127.0.0.1", () => {
+        sharedHttpServer.off("error", reject)
+        resolve()
+      })
+    })
+  }
   const realtimeServer = createRealtimeServer({
     authService,
     chatService,
@@ -421,7 +454,8 @@ async function createRealtimeHarness(options: {
     miniRoomService,
     connectionService,
     reactionService,
-    realtimeTicketService
+    realtimeTicketService,
+    httpServer: sharedHttpServer
   })
   await realtimeServer.listen({ port: 0, host: "127.0.0.1" })
   const address = realtimeServer.address() as AddressInfo
@@ -430,6 +464,7 @@ async function createRealtimeHarness(options: {
     authService,
     connectionManager: realtimeServer.connectionManager,
     url: `ws://127.0.0.1:${address.port}`,
+    httpUrl: `http://127.0.0.1:${address.port}`,
     ticketConsumptionStarted,
     releaseTicketConsumption() {
       releaseTicketConsumption?.()
@@ -463,6 +498,14 @@ async function createRealtimeHarness(options: {
     },
     async close() {
       await realtimeServer.close()
+      if (sharedHttpServer?.listening) {
+        await new Promise<void>((resolve, reject) => {
+          sharedHttpServer.close((error) => {
+            if (error) reject(error)
+            else resolve()
+          })
+        })
+      }
     }
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react"
+import type { ChatMessage } from "@blumi/contracts"
 import type {
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
@@ -36,6 +37,9 @@ let demoCurrentUser: DemoLikeCurrentUser = {
   displayName: DEMO_CURRENT_USER.displayName
 }
 let demoTimers: ReturnType<typeof setTimeout>[] = []
+let demoMessagesByThread = new Map<string, ChatMessage[]>()
+let demoClientMessageIds = new Map<string, string>()
+let demoReplyCountByThread = new Map<string, number>()
 
 type DemoListener = () => void
 const demoListeners: Set<DemoListener> = new Set()
@@ -57,6 +61,64 @@ function scheduleDemoWork(work: () => void, delayMs: number): void {
   demoTimers = [...demoTimers, timer]
 }
 
+function rememberDemoMessage(message: ChatMessage): void {
+  const existing = demoMessagesByThread.get(message.threadId) ?? []
+  if (existing.some((candidate) => candidate.messageId === message.messageId)) return
+  demoMessagesByThread.set(message.threadId, [...existing, message])
+}
+
+export function getDemoMessages(threadId: string): ChatMessage[] {
+  return (demoMessagesByThread.get(threadId) ?? []).map((message) => ({ ...message }))
+}
+
+export function demoSendMessage(
+  threadId: string,
+  senderUserId: string,
+  body: string,
+  clientMessageId: string
+): ChatMessage {
+  const profile = getDemoProfileForThread(threadId)
+  if (!profile || !matchedUserIds.has(profile.userId) || senderUserId !== demoCurrentUser.userId) {
+    throw new Error("That demo conversation is not available.")
+  }
+  const normalizedBody = body.trim().replace(/\s+/g, " ")
+  if (!normalizedBody || normalizedBody.length > 500) {
+    throw new Error("Write a message under 500 characters.")
+  }
+  const retryKey = `${threadId}:${clientMessageId}`
+  const previousMessageId = demoClientMessageIds.get(retryKey)
+  const previous = previousMessageId
+    ? getDemoMessages(threadId).find((message) => message.messageId === previousMessageId)
+    : undefined
+  if (previous) return previous
+
+  const message: ChatMessage = {
+    messageId: `demo-sent-${clientMessageId}`,
+    threadId,
+    senderUserId,
+    body: normalizedBody,
+    sentAt: new Date().toISOString()
+  }
+  demoClientMessageIds.set(retryKey, message.messageId)
+  rememberDemoMessage(message)
+
+  const replyNumber = demoReplyCountByThread.get(threadId) ?? 0
+  demoReplyCountByThread.set(threadId, replyNumber + 1)
+  scheduleDemoWork(() => {
+    if (!matchedUserIds.has(profile.userId)) return
+    const reply: ChatMessage = {
+      messageId: `demo-reply-${clientMessageId}`,
+      threadId,
+      senderUserId: profile.userId,
+      body: profile.replies[replyNumber % profile.replies.length],
+      sentAt: new Date().toISOString()
+    }
+    rememberDemoMessage(reply)
+    applyChatMessageReceived(reply, { localUserId: senderUserId })
+  }, 1_200)
+  return { ...message }
+}
+
 // ─── Actions ─────────────────────────────────────────────────
 
 export function isDemoMode(): boolean {
@@ -65,6 +127,9 @@ export function isDemoMode(): boolean {
 
 export function setDemoMode(enabled: boolean): void {
   clearDemoTimers()
+  demoMessagesByThread = new Map()
+  demoClientMessageIds = new Map()
+  demoReplyCountByThread = new Map()
   demoEnabled = enabled
   likedUserIds.clear()
   skippedUserIds.clear()
@@ -251,13 +316,15 @@ export function demoLike(
     // Auto-send a greeting message from the matched person after a short delay
     scheduleDemoWork(() => {
       if (!matchedUserIds.has(userId)) return
-      applyChatMessageReceived({
+      const greeting: ChatMessage = {
         messageId: `demo-msg-${userId}-1`,
         threadId,
         senderUserId: userId,
-        body: `Hi, I’m ${profile.firstName}. Glad we matched.`,
+        body: profile.greeting,
         sentAt: new Date().toISOString()
-      })
+      }
+      rememberDemoMessage(greeting)
+      applyChatMessageReceived(greeting, { localUserId: selfUserId })
     }, 1500)
 
     // Follow up with an inbound room invite so the user can try the MiniRoom
@@ -306,6 +373,9 @@ export function getMatchedProfiles(): DummyProfile[] {
 /** Reset the demo deck back to beginning */
 export function resetDemoDeck(): void {
   clearDemoTimers()
+  demoMessagesByThread = new Map()
+  demoClientMessageIds = new Map()
+  demoReplyCountByThread = new Map()
   likedUserIds.clear()
   skippedUserIds.clear()
   matchedUserIds.clear()

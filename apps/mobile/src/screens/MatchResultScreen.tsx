@@ -24,6 +24,7 @@ import { applyChatThreadCreated } from "../features/chat/chatStore"
 import { openMatchedChat } from "../features/chat/matchChatOpening"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { createPostMatchChatNavigationState } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import {
   FloatingGlassDock,
@@ -71,10 +72,10 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const handleStartChat = async (): Promise<void> => {
     if (!canStartConversation || openingChatRef.current) return
     if (sessionActor.session.mode !== "production") {
-      navigation.navigate("ChatThread", {
+      navigation.reset(createPostMatchChatNavigationState({
         partnerId: match.matchedUser.userId,
         partnerName: match.matchedUser.displayName
-      })
+      }))
       return
     }
 
@@ -94,7 +95,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
       ),
       onThreadReady: (thread) => {
         applyChatThreadCreated(thread)
-        navigation.navigate("ChatThread", { threadId: thread.threadId })
+        navigation.reset(createPostMatchChatNavigationState({ threadId: thread.threadId }))
       }
     })
     openingChatRef.current = false

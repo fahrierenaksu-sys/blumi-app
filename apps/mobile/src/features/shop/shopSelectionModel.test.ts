@@ -18,7 +18,7 @@ test("shop selection exposes only live avatar and room sections", () => {
   )
 })
 
-test("avatar mode selects its first compatible product instead of stale home decor", () => {
+test("category changes do not implicitly select or price a different product", () => {
   assert.equal(
     resolveShopSelectedProduct({
       mode: "avatar",
@@ -26,8 +26,27 @@ test("avatar mode selects its first compatible product instead of stale home dec
       filteredProducts: [maleTop, maleShoes],
       activeProducts: [maleTop, maleShoes]
     }),
-    maleTop
+    undefined
   )
+})
+
+test("selected avatar remains visible when browsing another category", () => {
+  assert.equal(resolveShopSelectedProduct({
+    mode: "avatar",
+    selectedId: maleTop.id,
+    filteredProducts: [maleShoes],
+    activeProducts: [maleTop, maleShoes]
+  }), maleTop)
+})
+
+test("an empty category does not clear a selection still in the live catalog", () => {
+  assert.equal(resolveShopSelectedProduct({ mode: "avatar", selectedId: maleTop.id,
+    filteredProducts: [], activeProducts: [maleTop] }), maleTop)
+})
+
+test("removed products cannot remain selected through stale category data", () => {
+  assert.equal(resolveShopSelectedProduct({ mode: "avatar", selectedId: maleTop.id,
+    filteredProducts: [maleTop], activeProducts: [] }), undefined)
 })
 
 test("an empty avatar catalog never falls through to a home product", () => {

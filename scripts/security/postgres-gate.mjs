@@ -35,6 +35,16 @@ try {
   run("initdb", ["-D", data, "-U", "blumi", "--auth-local=trust", "--auth-host=reject", "--no-locale", "-E", "UTF8"])
   run("pg_ctl", ["-D", data, "-l", join(directory, "postgres.log"), "-o", `-F -k ${directory} -h '' -p ${port}`, "-w", "start"])
   started = true
+  // Supabase defines these API roles cluster-wide. Reproduce that contract only
+  // in this disposable PostgreSQL cluster; applied migrations stay immutable.
+  run(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
+    import pg from 'pg';
+    const pool=new pg.Pool({connectionString:process.env.DATABASE_URL});
+    try {
+      await pool.query('CREATE ROLE anon NOLOGIN');
+      await pool.query('CREATE ROLE authenticated NOLOGIN');
+    } finally {await pool.end()}
+  `])
   const tests = process.argv.slice(2)
   const selected = tests.length ? tests : readdirSync(join(root, "apps/server/src"), { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".test.ts"))
@@ -61,13 +71,51 @@ try {
     const caseEnvironment = { ...environment, DATABASE_URL: caseUrl.toString() }
     run(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
       import assert from 'node:assert/strict';
-      import {runMigrations} from './apps/server/src/db/migrate.ts';
-      const first=await runMigrations({databaseUrl:process.env.DATABASE_URL});
-      assert.ok(first.applied.length>0);
-      const second=await runMigrations({databaseUrl:process.env.DATABASE_URL});
-      assert.equal(second.applied.length,0);
-      assert.equal(second.skipped.length,first.applied.length);
-      console.log('Migration from-empty and rerun passed:', first.applied.length);
+      import pg from 'pg';
+      import migrationModule from './apps/server/src/db/migrate.ts';
+      const {runMigrations}=migrationModule;
+      const pool=new pg.Pool({connectionString:process.env.DATABASE_URL});
+      try {
+        const roles=await pool.query("SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname IN ('anon', 'authenticated') ORDER BY rolname");
+        assert.deepEqual(roles.rows, [
+          {rolname:'anon',rolcanlogin:false},
+          {rolname:'authenticated',rolcanlogin:false}
+        ]);
+        await pool.query('CREATE TABLE public.blumi_gate_privilege_probe (id integer)');
+        await pool.query('CREATE SEQUENCE public.blumi_gate_privilege_probe_seq');
+        await pool.query('CREATE FUNCTION public.blumi_gate_privilege_probe_fn() RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$');
+        await pool.query('GRANT SELECT ON public.blumi_gate_privilege_probe TO anon, authenticated');
+        await pool.query('GRANT USAGE ON SEQUENCE public.blumi_gate_privilege_probe_seq TO anon, authenticated');
+        await pool.query('GRANT EXECUTE ON FUNCTION public.blumi_gate_privilege_probe_fn() TO anon, authenticated');
+        const privileges=async () => (await pool.query(
+          "SELECT role_name, " +
+          "has_table_privilege(role_name, 'public.blumi_gate_privilege_probe', 'SELECT') AS table_access, " +
+          "has_sequence_privilege(role_name, 'public.blumi_gate_privilege_probe_seq', 'USAGE') AS sequence_access, " +
+          "has_function_privilege(role_name, 'public.blumi_gate_privilege_probe_fn()', 'EXECUTE') AS function_access " +
+          "FROM (VALUES ('anon'), ('authenticated')) AS roles(role_name) ORDER BY role_name"
+        )).rows;
+        for (const row of await privileges()) {
+          assert.equal(row.table_access,true);
+          assert.equal(row.sequence_access,true);
+          assert.equal(row.function_access,true);
+        }
+        const first=await runMigrations({databaseUrl:process.env.DATABASE_URL});
+        assert.ok(first.applied.length>0);
+        for (const row of await privileges()) {
+          assert.equal(row.table_access,false, row.role_name+' table access');
+          assert.equal(row.sequence_access,false, row.role_name+' sequence access');
+          assert.equal(row.function_access,false, row.role_name+' function access');
+        }
+        const second=await runMigrations({databaseUrl:process.env.DATABASE_URL});
+        assert.equal(second.applied.length,0);
+        assert.equal(second.skipped.length,first.applied.length);
+        for (const row of await privileges()) {
+          assert.equal(row.table_access,false, row.role_name+' table access after rerun');
+          assert.equal(row.sequence_access,false, row.role_name+' sequence access after rerun');
+          assert.equal(row.function_access,false, row.role_name+' function access after rerun');
+        }
+        console.log('Migration from-empty and rerun passed:', first.applied.length);
+      } finally {await pool.end()}
     `], { env: caseEnvironment })
     const output = run(process.execPath, ["--import", "tsx", "--test", file], { env: caseEnvironment })
     if (!/^# tests [1-9]\d*$/m.test(output) || !/^# skipped 0$/m.test(output)) {

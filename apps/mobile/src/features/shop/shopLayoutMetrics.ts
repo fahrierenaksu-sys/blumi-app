@@ -15,6 +15,7 @@ export type ShopLayoutMetrics = {
     overlayInset: number
   }
   catalog: {
+    accessibilityLayout: boolean
     cardPadding: number
     bodyGap: number
     categoryRailWidth: number
@@ -29,13 +30,14 @@ export type ShopLayoutMetrics = {
 type ShopViewport = {
   width: number
   height: number
+  fontScale?: number
   horizontalInset?: number
   minimumTouchTarget?: number
 }
 
 const MINIMUM_TOUCH_TARGET = 44
 const MINIMUM_VIEWPORT_WIDTH = 320
-const MINIMUM_VIEWPORT_HEIGHT = 568
+const MINIMUM_VIEWPORT_HEIGHT = 400
 const MINIMUM_PRODUCT_CARD_WIDTH = 88
 const MINIMUM_CATEGORY_RAIL_WIDTH = 64
 
@@ -43,8 +45,10 @@ export function getShopLayoutMetrics(
   viewport: ShopViewport
 ): ShopLayoutMetrics {
   const width = finiteAtLeast(viewport.width, MINIMUM_VIEWPORT_WIDTH)
-  finiteAtLeast(viewport.height, MINIMUM_VIEWPORT_HEIGHT)
+  const height = finiteAtLeast(viewport.height, MINIMUM_VIEWPORT_HEIGHT)
   const widthProgress = inverseLerp(360, 440, width)
+  const largeTextProgress = Math.min(1, Math.max(0, (viewport.fontScale ?? 1) - 1))
+  const accessibilityLayout = (viewport.fontScale ?? 1) >= 1.35
   const scaleProgress = widthProgress
   const horizontalInset = Number.isFinite(viewport.horizontalInset)
     ? metric(Math.max(0, viewport.horizontalInset ?? 0))
@@ -63,19 +67,30 @@ export function getShopLayoutMetrics(
       - minimumProductShelfWidth
   )
   const categoryRailWidth = metric(clamp(
-    lerp(90, 98, widthProgress),
+    lerp(66, 74, widthProgress),
     MINIMUM_CATEGORY_RAIL_WIDTH,
     maximumCategoryRailWidth
   ))
-  const productShelfWidth = metric(Math.max(
-    minimumProductShelfWidth,
-    contentWidth - catalogCardPadding * 2 - categoryRailWidth - catalogBodyGap
-  ))
-  const productCardWidth = metric(clamp(
-    (productShelfWidth - columnGap) / 2,
-    MINIMUM_PRODUCT_CARD_WIDTH,
-    112
-  ))
+  const productShelfWidth = metric(contentWidth - catalogCardPadding * 2 - 2
+    - (accessibilityLayout ? 0 : categoryRailWidth + catalogBodyGap))
+  const productCardWidth = accessibilityLayout
+    ? productShelfWidth
+    : Math.floor(clamp(
+      (productShelfWidth - columnGap) / 2,
+      MINIMUM_PRODUCT_CARD_WIDTH,
+      320
+    ))
+  const shortViewport = height < 600
+  const preferredProductCardHeight = metric((shortViewport ? 124 : lerp(134, 144, scaleProgress))
+    + (accessibilityLayout ? 90 : 48) * largeTextProgress)
+  // Redistribute the same vertical budget before selection, so trying more pieces
+  // cannot move the catalog. Short phones keep readable cards and use the pager.
+  const productCardHeight = largeTextProgress > 0 ? preferredProductCardHeight : metric(Math.max(108,
+    Math.min(preferredProductCardHeight, (height - 246 - 228) / 2)))
+  // Height is the usable viewport, already excluding safe area and bottom navigation.
+  // Two product rows, catalog heading, header/dock, card padding and section gaps.
+  const avatarStageHeight = metric(clamp(height - productCardHeight * 2 - 246,
+    Math.max(140, Math.ceil(26 * (viewport.fontScale ?? 1)) + 104), 256))
 
   return {
     hierarchy: "live-preview",
@@ -88,19 +103,21 @@ export function getShopLayoutMetrics(
       cardPadding: metric(lerp(4, 7, scaleProgress)),
       cardGap: metric(lerp(3, 7, scaleProgress)),
       heroGap: metric(lerp(6, 10, scaleProgress)),
-      avatarStageHeight: metric(lerp(176, 216, scaleProgress)),
-      roomStageHeight: metric(lerp(214, 254, scaleProgress)),
-      avatarWidth: metric(lerp(146, 178, scaleProgress)),
+      avatarStageHeight,
+      roomStageHeight: avatarStageHeight,
+      avatarWidth: Math.floor(Math.min(178, contentWidth * 0.48, Math.min(avatarStageHeight,
+        Math.max(110, height - preferredProductCardHeight * 2 - 246)) / 1.4) * 10) / 10,
       overlayInset: metric(lerp(8, 12, scaleProgress))
     },
     catalog: {
+      accessibilityLayout,
       cardPadding: catalogCardPadding,
       bodyGap: catalogBodyGap,
       categoryRailWidth,
       columnGap,
       productCardWidth,
-      productCardHeight: metric(lerp(122, 132, scaleProgress)),
-      productThumbHeight: metric(lerp(60, 68, scaleProgress)),
+      productCardHeight,
+      productThumbHeight: Math.min(shortViewport ? 56 : metric(lerp(64, 70, scaleProgress)), productCardHeight - 64),
       productShelfWidth
     }
   }

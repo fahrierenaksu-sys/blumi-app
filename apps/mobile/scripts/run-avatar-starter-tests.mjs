@@ -49,7 +49,14 @@ try {
       join(outputDirectory, "features/avatarV2/avatarStarterModel.test.js"),
       join(outputDirectory, "features/avatarV2/avatarSetupLayout.test.js")
     ],
-    { cwd: workspaceRoot, stdio: "inherit" }
+    {
+      cwd: workspaceRoot,
+      env: {
+        ...process.env,
+        NODE_PATH: resolve(workspaceRoot, "../../node_modules")
+      },
+      stdio: "inherit"
+    }
   )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })

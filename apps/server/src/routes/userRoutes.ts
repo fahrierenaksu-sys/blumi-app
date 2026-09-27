@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify"
 import { Readable } from "node:stream"
 import {
   accountConfirmationRequestSchema,
-  accountRecoveryRequestSchema,
   authenticatedErrorResponses,
   coreApiJsonSchemas,
   noContentResponseJsonSchema,
@@ -42,12 +41,14 @@ import type {
 } from "@blumi/contracts"
 import { isAuthError } from "../auth/authErrors"
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
+import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
 
 export interface UserRouteServices {
   authService: AuthService
   avatarService: AvatarService
   capabilityService: CapabilityService
   accountRecoveryService?: AccountRecoveryService
+  firebaseAuthVerifier?: FirebaseAuthVerifier
 }
 
 const accountChallengeRouteSchema = {
@@ -79,6 +80,117 @@ export async function registerUserRoutes(
   services: UserRouteServices
 ): Promise<void> {
   const { authService, avatarService, capabilityService } = services
+
+  app.post("/v1/account/firebase/challenge", {
+    attachValidation: true,
+    config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    schema: {
+      body: {
+        type: "object",
+        required: ["purpose"],
+        properties: {
+          purpose: { type: "string", enum: ["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"] },
+          targetPhoneNumber: { type: "string", minLength: 5, maxLength: 20 }
+        },
+        additionalProperties: false
+      },
+      response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses }
+    }
+  }, async (request, reply) => {
+    const sessionToken = readBearerToken(request)
+    if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (!services.firebaseAuthVerifier) return reply.code(503).send({ error: "Phone verification is not configured yet." })
+    const body = isRecord(request.body) ? request.body : null
+    const purpose = typeof body?.purpose === "string" ? body.purpose : ""
+    if (!["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose)) {
+      return reply.code(400).send({ error: "Invalid verification purpose." })
+    }
+    try {
+      const challenge = await authService.createFirebaseActionChallenge(
+        sessionToken,
+        purpose as "account_deletion" | "account_data_export" | "phone_change_current" | "phone_change_new",
+        typeof body?.targetPhoneNumber === "string" ? body.targetPhoneNumber : undefined
+      )
+      return challenge ? reply.code(200).send(challenge) : reply.code(401).send({ error: "Sign in again to continue." })
+    } catch (error) {
+      if (isPublicRequestError(error)) return reply.code(400).send({ error: error.message })
+      throw error
+    }
+  })
+
+  app.post("/v1/account/firebase/reauth", {
+    attachValidation: true,
+    config: { rateLimit: { max: 10, timeWindow: "5 minutes" } },
+    schema: {
+      body: {
+        type: "object",
+        required: ["idToken", "purpose", "challengeId"],
+        properties: {
+          idToken: { type: "string", minLength: 1, maxLength: 12_000 },
+          challengeId: { type: "string", minLength: 32, maxLength: 512 },
+          purpose: {
+            type: "string",
+            enum: ["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"]
+          },
+          currentPhoneConfirmationToken: { type: "string", minLength: 1, maxLength: 512 }
+        },
+        additionalProperties: false
+      },
+      response: {
+        200: successResponseJsonSchema,
+        ...authenticatedErrorResponses
+      }
+    }
+  }, async (request, reply) => {
+    const sessionToken = readBearerToken(request)
+    if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (!services.firebaseAuthVerifier) {
+      return reply.code(503).send({ error: "Phone verification is not configured yet." })
+    }
+    const body = isRecord(request.body) ? request.body : null
+    const idToken = typeof body?.idToken === "string" ? body.idToken : ""
+    const challengeId = typeof body?.challengeId === "string" ? body.challengeId : ""
+    const purpose = typeof body?.purpose === "string" ? body.purpose : ""
+    const currentPhoneConfirmationToken = typeof body?.currentPhoneConfirmationToken === "string"
+      ? body.currentPhoneConfirmationToken
+      : undefined
+    if (!idToken || !challengeId || !["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose)) {
+      return reply.code(400).send({ error: "Phone verification could not be completed." })
+    }
+
+    try {
+      const identity = await services.firebaseAuthVerifier.verifyIdToken(idToken)
+      const phoneNumber = readPhoneNumber({ phoneNumber: identity.phoneNumber })
+      if (!phoneNumber) return reply.code(401).send({ error: "Phone verification could not be completed." })
+      const fresh = await authService.consumeFirebaseActionChallenge({
+        sessionToken,
+        purpose: purpose as "account_deletion" | "account_data_export" | "phone_change_current" | "phone_change_new",
+        challengeId,
+        phoneNumber: phoneNumber.e164,
+        authTime: identity.authTime
+      })
+      if (!fresh) return reply.code(401).send({ error: "Request a fresh verification code and try again." })
+      if (purpose === "account_deletion") {
+        const confirmation = await authService.verifyFirebaseAccountDeletion(sessionToken, phoneNumber.e164, identity.uid)
+        return confirmation
+          ? reply.code(200).send(confirmation)
+          : reply.code(401).send({ error: "Sign in again to continue." })
+      }
+      const confirmation = await authService.verifyFirebaseAccountAction(
+        sessionToken,
+        purpose as "account_data_export" | "phone_change_current" | "phone_change_new",
+        phoneNumber.e164,
+        currentPhoneConfirmationToken
+      )
+      return confirmation
+        ? reply.code(200).send(confirmation)
+        : reply.code(401).send({ error: "Sign in again to continue." })
+    } catch (error) {
+      if (isPublicRequestError(error)) return reply.code(400).send({ error: error.message })
+      if (isAuthError(error)) return reply.code(error.statusCode).send({ code: error.code, error: error.message })
+      return reply.code(401).send({ error: "Phone verification could not be completed." })
+    }
+  })
 
   app.get("/v1/users/me", {
     schema: {
@@ -302,6 +414,7 @@ export async function registerUserRoutes(
     async (request, reply) => {
       const sessionToken = readBearerToken(request)
       if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+      if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       try {
         const challenge = await authService.requestAccountDeletionChallenge(sessionToken)
         if (!challenge) return reply.code(401).send({ error: "Sign in again to continue." })
@@ -326,6 +439,7 @@ export async function registerUserRoutes(
       const parsed = verificationCodeRequestSchema.safeParse(request.body)
       const code = parsed.success ? readVerificationCode(parsed.data) : null
       if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+      if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       if (!code) return reply.code(400).send({ error: "Enter the 6-digit deletion code." })
       try {
         const confirmation = await authService.verifyAccountDeletionChallenge(sessionToken, code)
@@ -359,6 +473,10 @@ export async function registerUserRoutes(
       return reply.code(403).send({ code: "REAUTH_REQUIRED", error: "Confirm account deletion with a fresh code sent to your phone." })
     }
 
+    if (result === "pending_firebase_deletion") {
+      return reply.code(202).send({ status: "pending_firebase_deletion" })
+    }
+
     return reply.code(204).send()
   })
 
@@ -369,6 +487,7 @@ export async function registerUserRoutes(
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     try {
       const challenge = await authService.requestAccountDataExportChallenge(sessionToken)
       if (!challenge) return reply.code(401).send({ error: "Sign in again to continue." })
@@ -388,6 +507,7 @@ export async function registerUserRoutes(
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
     const code = parsed.success ? readVerificationCode(parsed.data) : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
     try {
       const confirmation = await authService.verifyAccountDataExportChallenge(sessionToken, code)
@@ -425,6 +545,7 @@ export async function registerUserRoutes(
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     try {
       const challenge = await authService.requestPhoneChangeChallenge(sessionToken)
       if (!challenge) return reply.code(401).send({ error: "Sign in again to continue." })
@@ -444,6 +565,7 @@ export async function registerUserRoutes(
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
     const code = parsed.success ? readVerificationCode(parsed.data) : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
     try {
       const confirmation = await authService.verifyPhoneChangeChallenge(sessionToken, code)
@@ -462,6 +584,7 @@ export async function registerUserRoutes(
       body: coreApiJsonSchemas.phoneChangeNewChallenge,
       response: {
         202: successResponseJsonSchema,
+        410: successResponseJsonSchema,
         ...authenticatedErrorResponses
       }
     }
@@ -473,6 +596,7 @@ export async function registerUserRoutes(
       ? readConfirmationToken(parsed.data, "currentPhoneConfirmationToken")
       : ""
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!phoneNumber || !currentPhoneConfirmationToken) return reply.code(400).send({ error: "Enter a valid new phone number and confirm your current number first." })
     try {
       const challenge = await authService.requestPhoneChangeNewNumberChallenge(sessionToken, phoneNumber.e164, currentPhoneConfirmationToken)
@@ -494,6 +618,7 @@ export async function registerUserRoutes(
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
     const code = parsed.success ? readVerificationCode(parsed.data) : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
     try {
       const confirmation = await authService.verifyPhoneChangeNewNumberChallenge(sessionToken, code)
@@ -558,27 +683,44 @@ export async function registerUserRoutes(
     attachValidation: true,
     config: { apiAuth: "public", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
-      body: coreApiJsonSchemas.accountRecoveryRequest,
+      body: {
+        type: "object",
+        required: ["oldPhoneNumber", "newPhoneNumber", "idToken"],
+        properties: {
+          oldPhoneNumber: { type: "string" },
+          newPhoneNumber: { type: "string" },
+          idToken: { type: "string", minLength: 1, maxLength: 12_000 }
+        },
+        additionalProperties: false
+      },
       response: {
         202: successResponseJsonSchema,
         ...authenticatedErrorResponses
       }
     }
   }, async (request, reply) => {
-    const parsed = accountRecoveryRequestSchema.safeParse(request.body)
-    const oldPhone = parsed.success
-      ? readPhoneNumber({ phoneNumber: parsed.data.oldPhoneNumber })
+    const body = isRecord(request.body) ? request.body : null
+    const oldPhone = typeof body?.oldPhoneNumber === "string"
+      ? readPhoneNumber({ phoneNumber: body.oldPhoneNumber })
       : null
-    const newPhone = parsed.success
-      ? readPhoneNumber({ phoneNumber: parsed.data.newPhoneNumber })
+    const newPhone = typeof body?.newPhoneNumber === "string"
+      ? readPhoneNumber({ phoneNumber: body.newPhoneNumber })
       : null
-    const code = parsed.success ? readVerificationCode(parsed.data) : null
+    const idToken = typeof body?.idToken === "string" ? body.idToken : ""
     const recovery = services.accountRecoveryService
-    if (!oldPhone || !newPhone || !code || !recovery) return reply.code(202).send({ ok: true })
+    if (!oldPhone || !newPhone || !idToken || !recovery || !services.firebaseAuthVerifier) return reply.code(202).send({ ok: true })
     try {
-      await recovery.request({ oldPhoneNumber: oldPhone.e164, newPhoneNumber: newPhone.e164, verificationCode: code })
+      const identity = await services.firebaseAuthVerifier.verifyIdToken(idToken)
+      const verifiedPhone = readPhoneNumber({ phoneNumber: identity.phoneNumber })
+      if (!verifiedPhone) return reply.code(202).send({ ok: true })
+      await recovery.requestWithVerifiedPhone({
+        oldPhoneNumber: oldPhone.e164,
+        newPhoneNumber: newPhone.e164,
+        verifiedPhoneNumber: verifiedPhone.e164
+      })
     } catch (error) {
       if (isAuthError(error)) return reply.code(401).send({ code: error.code, error: error.message })
+      if (isPublicRequestError(error)) return reply.code(400).send({ error: error.message })
       throw error
     }
     return reply.code(202).send({ ok: true })

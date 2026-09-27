@@ -9,6 +9,41 @@ const PHONE = "+905551112233"
 const NEXT_PHONE = "+905559998877"
 const CODE = "482931"
 
+test("Firebase account action rejects stale, wrong-purpose and replayed proof", async () => {
+  const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
+  let authTime = Math.floor(Date.now() / 1000) - 60
+  const app = createServer({
+    authService,
+    firebaseAuthVerifier: {
+      async verifyIdToken() {
+        return { uid: "firebase-account-user", phoneNumber: PHONE, authTime }
+      }
+    }
+  })
+  try {
+    await authService.sendCode(PHONE)
+    const signedIn = await authService.verifyCode(PHONE, CODE)
+    const headers = { authorization: `Bearer ${signedIn.sessionToken}` }
+    const withoutChallenge = await app.inject({
+      method: "POST", url: "/v1/account/firebase/reauth", headers,
+      payload: { idToken: "token", purpose: "account_data_export", challengeId: "x".repeat(64) }
+    })
+    assert.equal(withoutChallenge.statusCode, 401)
+    const challenge = await app.inject({
+      method: "POST", url: "/v1/account/firebase/challenge", headers,
+      payload: { purpose: "account_data_export" }
+    })
+    assert.equal(challenge.statusCode, 200)
+    const proof = { idToken: "token", purpose: "account_data_export", challengeId: challenge.json().challengeId }
+    assert.equal((await app.inject({ method: "POST", url: "/v1/account/firebase/reauth", headers, payload: proof })).statusCode, 401)
+    authTime = Math.ceil(Date.now() / 1000) + 1
+    assert.equal((await app.inject({ method: "POST", url: "/v1/account/firebase/reauth", headers,
+      payload: { ...proof, purpose: "account_deletion" } })).statusCode, 401)
+    assert.equal((await app.inject({ method: "POST", url: "/v1/account/firebase/reauth", headers, payload: proof })).statusCode, 200)
+    assert.equal((await app.inject({ method: "POST", url: "/v1/account/firebase/reauth", headers, payload: proof })).statusCode, 401)
+  } finally { await app.close() }
+})
+
 async function signedInApp() {
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
   const app = createServer({ authService })
@@ -50,34 +85,31 @@ test("phone change requires both proofs and invalidates the bearer session", asy
 
 test("lost-phone recovery response does not disclose whether the old number has an account", async () => {
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
-  const app = createServer({ authService })
+  const app = createServer({
+    authService,
+    firebaseAuthVerifier: {
+      async verifyIdToken(idToken) {
+        assert.equal(idToken, "firebase-id-token")
+        return { uid: "firebase-recovery-user", phoneNumber: NEXT_PHONE, authTime: Math.floor(Date.now() / 1000) }
+      }
+    }
+  })
   try {
     await authService.sendCode(PHONE)
     await authService.verifyCode(PHONE, CODE)
 
-    const knownChallenge = await app.inject({
-      method: "POST",
-      url: "/v1/account/recovery/challenge",
-      payload: { phoneNumber: NEXT_PHONE }
-    })
-    assert.equal(knownChallenge.statusCode, 202)
     const known = await app.inject({
       method: "POST",
       url: "/v1/account/recovery/requests",
-      payload: { oldPhoneNumber: PHONE, newPhoneNumber: NEXT_PHONE, verificationCode: CODE }
+      payload: { oldPhoneNumber: PHONE, newPhoneNumber: NEXT_PHONE, idToken: "firebase-id-token" }
     })
 
     const unknownPhone = "+905551110000"
     const secondNewPhone = "+905559990000"
-    assert.equal((await app.inject({
-      method: "POST",
-      url: "/v1/account/recovery/challenge",
-      payload: { phoneNumber: secondNewPhone }
-    })).statusCode, 202)
     const unknown = await app.inject({
       method: "POST",
       url: "/v1/account/recovery/requests",
-      payload: { oldPhoneNumber: unknownPhone, newPhoneNumber: secondNewPhone, verificationCode: CODE }
+      payload: { oldPhoneNumber: unknownPhone, newPhoneNumber: NEXT_PHONE, idToken: "firebase-id-token" }
     })
 
     assert.equal(known.statusCode, 202)
@@ -129,19 +161,23 @@ test("account recovery admin flow preserves old-phone evidence and audited resol
   const signingKey = { keyId: "kid_recovery", secret: Buffer.alloc(32, 9) }
   const adminTokenService = createAdminTokenService({ keys: [signingKey] })
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
-  const app = createServer({ authService, adminTokenService })
+  const app = createServer({
+    authService,
+    adminTokenService,
+    firebaseAuthVerifier: {
+      async verifyIdToken(idToken) {
+        assert.equal(idToken, "firebase-id-token")
+        return { uid: "firebase-recovery-user", phoneNumber: NEXT_PHONE, authTime: Math.floor(Date.now() / 1000) }
+      }
+    }
+  })
   try {
     await authService.sendCode(PHONE)
     await authService.verifyCode(PHONE, CODE)
     await app.inject({
       method: "POST",
-      url: "/v1/account/recovery/challenge",
-      payload: { phoneNumber: NEXT_PHONE }
-    })
-    await app.inject({
-      method: "POST",
       url: "/v1/account/recovery/requests",
-      payload: { oldPhoneNumber: PHONE, newPhoneNumber: NEXT_PHONE, verificationCode: CODE }
+      payload: { oldPhoneNumber: PHONE, newPhoneNumber: NEXT_PHONE, idToken: "firebase-id-token" }
     })
     const adminToken = mintAdminToken({
       key: signingKey,

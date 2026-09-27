@@ -5,6 +5,7 @@ export interface MiniRoomCopy {
   leaveRoom: string
   retryRoomConnection: string
   retry: string
+  textRoom: string
   muteMicrophone: string
   turnOnMicrophone: string
   voiceOn: string
@@ -30,6 +31,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     leaveRoom: "Leave room",
     retryRoomConnection: "Retry room connection",
     retry: "Retry",
+    textRoom: "Text room · voice off",
     muteMicrophone: "Mute microphone",
     turnOnMicrophone: "Turn on microphone",
     voiceOn: "Voice on",
@@ -49,6 +51,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     leaveRoom: "Odadan ayrıl",
     retryRoomConnection: "Oda bağlantısını yeniden dene",
     retry: "Tekrar dene",
+    textRoom: "Yazılı oda · ses kapalı",
     muteMicrophone: "Mikrofonu kapat",
     turnOnMicrophone: "Mikrofonu aç",
     voiceOn: "Canlı ses açık",

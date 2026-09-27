@@ -19,7 +19,13 @@ const SLOT_ICONS: Record<WardrobeVisibleSlot["id"], keyof typeof Ionicons.glyphM
   look: "sparkles"
 }
 
+const SHORT_SLOT_LABELS: Record<"en" | "tr", Record<WardrobeVisibleSlot["id"], string>> = {
+  en: { hair: "Hair", top: "Top", bottom: "Bottom", shoes: "Shoes", accessory: "Extra", look: "Look" },
+  tr: { hair: "Saç", top: "Üst", bottom: "Alt", shoes: "Ayakkabı", accessory: "Ekstra", look: "Kombin" }
+}
+
 interface WardrobeEquippedSlotsRailProps {
+  locale: "en" | "tr"
   activeCategory: WardrobeCategoryId
   compact: boolean
   slots: WardrobeVisibleSlot[]
@@ -34,7 +40,7 @@ export function WardrobeEquippedSlotsRail(
   return (
     <View
       accessibilityRole="toolbar"
-      accessibilityLabel="Wearing now"
+      accessibilityLabel={props.locale === "tr" ? "Şu an giyilenler" : "Wearing now"}
       style={[
         styles.equippedSlotsRail,
         props.compact ? styles.equippedSlotsRailCompact : null
@@ -50,7 +56,9 @@ export function WardrobeEquippedSlotsRail(
             key={slot.id}
             testID={`wardrobe-equipped-slot-${slot.id}`}
             accessibilityRole="button"
-            accessibilityLabel={`Open ${slot.label}, wearing ${slot.accessibilitySummary ?? slot.item?.name ?? "nothing"}`}
+            accessibilityLabel={props.locale === "tr"
+              ? `${slot.label} bölümünü aç, ${slot.accessibilitySummary ?? slot.item?.name ?? "boş"}`
+              : `Open ${slot.label}, wearing ${slot.accessibilitySummary ?? slot.item?.name ?? "nothing"}`}
             accessibilityState={{ selected: active }}
             onPress={() => {
               hapticLight()
@@ -87,13 +95,13 @@ export function WardrobeEquippedSlotsRail(
             </View>
             <Text
               maxFontSizeMultiplier={1.4}
-              numberOfLines={props.compact ? 2 : 1}
+              numberOfLines={1}
               style={[
                 styles.equippedSlotLabel,
                 active ? styles.equippedSlotLabelActive : null
               ]}
             >
-              {slot.label}
+              {SHORT_SLOT_LABELS[props.locale][slot.id]}
             </Text>
           </Pressable>
         )

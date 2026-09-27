@@ -1,3 +1,4 @@
+import { isRetiredAvatarItemId } from "@blumi/domain"
 import type {
   AvatarCatalogItem,
   AvatarItemType,
@@ -52,11 +53,12 @@ export function normalizeAvatarV2ForBody(
     const key = `${slot}Id` as keyof UserAvatar
     const selectedId = next[key] as string
     const selected = catalog.find((item) => item.id === selectedId && item.type === slot)
-    if (selected && isAvatarV2ItemCompatibleWithBody(selected, bodyId)) continue
+    if (selected && !isRetiredAvatarItemId(selected.id) && isAvatarV2ItemCompatibleWithBody(selected, bodyId)) continue
     const fallback = catalog
       .filter(
         (item) =>
           item.type === slot &&
+          !isRetiredAvatarItemId(item.id) &&
           isAvatarV2ItemCompatibleWithBody(item, bodyId)
       )
       .sort((a, b) => a.sortOrder - b.sortOrder)

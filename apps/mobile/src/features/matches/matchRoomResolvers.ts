@@ -1,4 +1,5 @@
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
+import { loadoutToUserAvatar, normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
 import type { MatchParticipant } from "./matchRoomModel"
 
 export const DEFAULT_MATCH_ROOM_AVATAR: UserAvatar = {
@@ -23,6 +24,22 @@ export function resolveLatestMatchRoomAvatar(
 export function createStableMatchedUserAvatar(
   participant: MatchParticipant
 ): UserAvatar {
+  const complete = normalizeCompleteAvatarSelection(participant.avatarSelection)
+  if (complete) return loadoutToUserAvatar(complete.loadout)
+  if (participant.avatarPresetId === "avatar_v2_body_male_light") {
+    return {
+      bodyId: "avatar_v2_body_male_light",
+      faceId: "avatar_v2_face_male_warm_friendly",
+      eyesId: "avatar_v2_eyes_male_warm_brown",
+      noseId: "avatar_v2_nose_male_gentle_bridge",
+      mouthId: "avatar_v2_mouth_male_soft_smile",
+      hairId: "avatar_v2_hair_male_cocoa_textured_quiff",
+      topId: "avatar_v2_top_male_powder_blue_crew_tee",
+      bottomId: "avatar_v2_bottom_male_navy_straight_pants",
+      shoesId: "avatar_v2_shoes_male_milk_tea_court",
+      accessoryIds: []
+    }
+  }
   const hash = hashStableString(participant.userId || participant.displayName)
   const eyesOptions = [
     "avatar_v2_eyes_mocha_doe",

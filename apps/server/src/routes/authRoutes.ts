@@ -7,15 +7,19 @@ import {
 } from "@blumi/contracts"
 import { isAuthError } from "../auth/authErrors"
 import { toSessionActor, type AuthService } from "../auth/authService"
+import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import { normalizePhoneNumber } from "../auth/phone"
 import { readBearerToken } from "./routeHelpers"
 import {
   parseAuthPhoneRequest,
   parseAuthVerificationRequest,
-  parseRegisterAccountRequest
+  parseRegisterAccountRequest,
+  parseFirebaseAuthRequest
 } from "./authRequestSchemas"
 
 export interface AuthRouteServices {
   authService: AuthService
+  firebaseAuthVerifier?: FirebaseAuthVerifier
 }
 
 const sendCodeResponses = {
@@ -45,6 +49,9 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
+      if (services.firebaseAuthVerifier) {
+        return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
+      }
       const parsed = parseAuthPhoneRequest(request.body)
       if (!parsed) {
         return reply.code(400).send({
@@ -79,6 +86,9 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
+      if (services.firebaseAuthVerifier) {
+        return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
+      }
       return verifyAndCreateSession({ request, reply, authService })
     }
   )
@@ -94,6 +104,9 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
+      if (services.firebaseAuthVerifier) {
+        return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
+      }
       const parsed = parseRegisterAccountRequest(request.body)
       if (!parsed) {
         return reply.code(400).send({
@@ -113,6 +126,66 @@ export async function registerAuthRoutes(
       } catch (error) {
         if (!isAuthError(error)) throw error
         return reply.code(error.statusCode).send({ error: error.message })
+      }
+    }
+  )
+
+  app.post(
+    "/v1/auth/firebase/complete",
+    {
+      attachValidation: true,
+      config: { apiAuth: "public", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      schema: {
+        body: {
+          type: "object",
+          required: ["idToken", "authIntent"],
+          properties: {
+            idToken: { type: "string", minLength: 1, maxLength: 12_000 },
+            authIntent: { type: "string", enum: ["create", "sign-in"] },
+            termsAcceptance: {
+              type: "object",
+              required: ["version", "locale"],
+              properties: {
+                version: { type: "string", minLength: 1 },
+                locale: { type: "string", enum: ["en", "tr"] }
+              }
+            }
+          }
+        },
+        response: verificationResponses
+      }
+    },
+    async (request, reply) => {
+      const parsed = parseFirebaseAuthRequest(request.body)
+      if (!parsed) {
+        return reply.code(400).send({ error: "Phone verification could not be completed." })
+      }
+      if (!services.firebaseAuthVerifier) {
+        return reply.code(503).send({ error: "Phone verification is not configured yet." })
+      }
+      if (parsed.authIntent === "create" && !parsed.termsAcceptance) {
+        return reply.code(400).send({ error: "Terms acceptance is required to create an account." })
+      }
+
+      try {
+        const identity = await services.firebaseAuthVerifier.verifyIdToken(parsed.idToken)
+        if (await authService.repository.isFirebaseUserDeletionPending(identity.uid)) {
+          return reply.code(403).send({ error: "This account is being deleted." })
+        }
+        const phoneNumber = normalizePhoneNumber(identity.phoneNumber)?.e164
+        if (!phoneNumber) {
+          return reply.code(401).send({ error: "Firebase did not provide a valid phone number." })
+        }
+        const result = await authService.signInWithVerifiedPhone(phoneNumber, {
+          requireExistingAccount: parsed.authIntent === "sign-in",
+          acceptedTerms: parsed.authIntent === "create" ? parsed.termsAcceptance : undefined
+        })
+        return reply.code(200).send(toSessionActor(result.account, result.session, result.sessionToken))
+      } catch (error) {
+        if (isAuthError(error)) {
+          return reply.code(error.statusCode).send({ error: error.message })
+        }
+        return reply.code(401).send({ error: "Phone verification could not be completed." })
       }
     }
   )

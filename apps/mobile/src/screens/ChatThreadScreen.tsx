@@ -17,6 +17,7 @@ import {
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useChatStore } from "../features/chat/chatStore"
 import type { RootStackParamList } from "../navigation/RootNavigator"
+import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
 import { ParticipantAvatar } from "../ui/participantAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
@@ -28,6 +29,7 @@ import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { ChatRoomInviteCard } from "../features/chat/ChatRoomInviteCard"
+import { createMatchFromPersistedThread } from "../features/matches/matchRoomModel"
 import {
   buildChatTimeline,
   getChatMessageGroupPosition,
@@ -240,6 +242,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const partnerName = partnerSummary?.displayName ?? pendingPartnerName ?? chatCopy.unknownPartner
   const partnerUserId = partnerSummary?.userId ?? pendingPartnerId ?? ""
   const partnerAvatar = partnerSummary?.avatar
+  const persistedMatch = useMemo(
+    () => thread && sessionActor.session.mode === "production"
+      ? createMatchFromPersistedThread(thread, currentUserId)
+      : null,
+    [currentUserId, sessionActor.session.mode, thread]
+  )
 
   // Request messages from server when entering thread
   useEffect(() => {
@@ -389,6 +397,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     }).start()
   }
 
+  const handleGoBack = (): void => {
+    goBackOrFallback(navigation, () => navigation.replace("Inbox"))
+  }
+
   if (!thread && !pendingPartnerId) {
     return (
       <View style={styles.root}>
@@ -398,7 +410,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             title={chatCopy.chat}
             titleAlign="start"
             leftSlot={
-              <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={() => navigation.goBack()} size={40}>
+              <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={handleGoBack} size={40}>
                 <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
               </ActionButtonCircle>
             }
@@ -451,7 +463,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       <SoftBlobBackground variant="lobby" />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
         <Animated.View style={[styles.chatHeader, headerAnim]}>
-          <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={() => navigation.goBack()} size={40}>
+          <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={handleGoBack} size={40}>
             <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
           </ActionButtonCircle>
           <ParticipantAvatar
@@ -463,6 +475,18 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           />
           <View style={styles.chatHeaderCopy}>
             <Text numberOfLines={1} style={styles.chatHeaderName}>{partnerName}</Text>
+            {persistedMatch ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
+                hitSlop={8}
+                onPress={() => navigation.navigate("MatchResult", { match: persistedMatch })}
+              >
+                <Text style={styles.matchReplayText}>
+                  {chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           <Pressable
             accessibilityRole="button"
@@ -804,6 +828,12 @@ const styles = StyleSheet.create({
     ...uiTheme.font.subheading,
     color: uiTheme.colors.textPrimary,
     fontWeight: "800"
+  },
+  matchReplayText: {
+    ...uiTheme.font.micro,
+    color: uiTheme.colors.primaryDeep,
+    fontWeight: "700",
+    marginTop: 2
   },
   moreButton: {
     width: 44,

@@ -45,6 +45,21 @@ test("shop preview presentation lives outside the screen monolith", () => {
   assert.match(copySource, /applyLook:\s*"Kombini uygula"/)
 })
 
+test("avatar remains visible before explicit product selection", () => {
+  assert.match(panelSource, /testID="shop-avatar-default-preview"/)
+  assert.match(panelSource, /ShopAvatarLivePreview avatar=\{previewAvatar\}/)
+  assert.match(screenSource, /<ShopPreviewPanel/)
+  assert.doesNotMatch(screenSource, /shopMode === "avatar" \|\| selectedProduct/)
+})
+
+test("home preview shows the room before product selection without a purchase action", () => {
+  assert.match(panelSource, /testID="shop-room-default-preview"/)
+  assert.match(panelSource, /mode === "home"/)
+  assert.match(panelSource, /<ShopRoomItemPreview item=\{undefined\} scene=\{roomPreviewScene\}/)
+  assert.match(screenSource, /mode=\{shopMode\}/)
+  assert.doesNotMatch(screenSource, /roomProducts\[0\]\?\.roomItem/)
+})
+
 test("shop preview keeps one approved hierarchy across supported phone sizes", () => {
   assert.doesNotMatch(screenSource, /height\s*<\s*880/)
   assert.doesNotMatch(screenSource, /width\s*<\s*390/)
@@ -63,21 +78,18 @@ test("avatar preview uses one clear unlock action without beta-like chrome or a 
   assert.match(panelSource, /styles\.avatarHeroTopPanel/)
   assert.match(panelSource, /testID="shop-preview-remove-preview"/)
   assert.match(panelSource, /onRemovePreview/)
-  assert.match(stylesSource, /avatarHeroTopPanel:\s*\{[\s\S]*?height:\s*54[\s\S]*?borderRadius:\s*18/)
-  assert.match(stylesSource, /avatarHeroAction:\s*\{[\s\S]*?minHeight:\s*54[\s\S]*?borderRadius:\s*18/)
-  assert.match(stylesSource, /shopAvatarFrame:\s*\{[\s\S]*?translateY:\s*14/)
+  assert.match(stylesSource, /avatarHeroTopPanel:\s*\{[\s\S]*?minHeight:\s*64[\s\S]*?borderRadius:\s*18/)
+  assert.match(stylesSource, /avatarHeroAction:\s*\{[\s\S]*?minHeight:\s*44[\s\S]*?borderRadius:\s*18/)
+  assert.match(stylesSource, /shopAvatarFrame:\s*\{\s*marginBottom:\s*0/)
   assert.match(copySource, /unlock:\s*"Aç"/)
 })
 
 test("shop scroll viewport ends above the floating bottom navigation", () => {
   assert.match(
     screenSource,
-    /style=\{\[\s*styles\.shopScroller,[\s\S]*?marginBottom:\s*viewportMetrics\.bottomContentInset/
+    /marginBottom:\s*viewportMetrics\.bottomContentInset/
   )
-  assert.match(
-    screenSource,
-    /paddingBottom:\s*uiTheme\.spacing\.lg/
-  )
+  assert.match(screenSource, /paddingBottom:\s*4/)
 })
 
 test("room VNext QA stays isolated from the approved Shop presentation", () => {

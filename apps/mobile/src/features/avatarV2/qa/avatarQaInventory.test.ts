@@ -15,6 +15,7 @@ test("QA unlock requires both development mode and the explicit env flag", () =>
   assert.equal(isAvatarQaUnlockEnabled(true, undefined), false);
   assert.equal(isAvatarQaUnlockEnabled(true, "0"), false);
   assert.equal(isAvatarQaUnlockEnabled(true, "1"), true);
+  assert.equal(isAvatarQaUnlockEnabled(true, "1", true), false);
 });
 
 test("clean mode preserves the real inventory without mutation", () => {

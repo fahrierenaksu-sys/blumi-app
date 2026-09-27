@@ -8,10 +8,9 @@ import {
 } from "./config"
 import { CommerceProviderUnavailableError } from "./commerce/revenueCatPurchaseVerifier"
 
-test("purchase environments default to production and cannot enable sandbox in production", () => {
+test("purchase environments default to production and reject unknown values", () => {
   assert.equal(resolveServerConfig({}).purchaseEnvironment, "production")
   assert.equal(resolveServerConfig({ REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox" }).purchaseEnvironment, "sandbox")
-  assert.throws(() => resolveServerConfig({ NODE_ENV: "production", REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox" }), /purchase environment/i)
   assert.throws(() => resolveServerConfig({ REVENUECAT_PURCHASE_ENVIRONMENT: "unknown" }), /purchase environment/i)
 })
 
@@ -20,6 +19,68 @@ const ADMIN_SIGNING_ENV = {
   BLUMI_ADMIN_SIGNING_KEYS: `active=${ADMIN_SIGNING_SECRET}`,
   BLUMI_ADMIN_ACTIVE_KID: "active"
 }
+const REVENUECAT_ENV = {
+  REVENUECAT_SECRET_API_KEY: "server_secret",
+  REVENUECAT_PROJECT_ID: "project_1",
+  REVENUECAT_WEBHOOK_SIGNING_SECRET: "webhook_secret",
+  REVENUECAT_COIN_PRODUCT_ID_MAP: JSON.stringify({
+    rc_product_500: "com.blumi.mobile.coins.500"
+  })
+}
+const VALID_PRODUCTION_ENV = {
+  NODE_ENV: "production",
+  DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
+  BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
+  BLUMI_PUSH_PROVIDER: "expo",
+  EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
+  LIVEKIT_URL: "wss://live.blumi.app",
+  LIVEKIT_API_KEY: "livekit-key",
+  LIVEKIT_API_SECRET: "livekit-secret",
+  ...ADMIN_SIGNING_ENV,
+  BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
+  BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+  ...REVENUECAT_ENV
+}
+
+test("production-mode staging accepts only an explicit sandbox purchase environment", () => {
+  const staging = resolveServerConfig({
+    ...VALID_PRODUCTION_ENV,
+    BLUMI_DEPLOY_ENV: "staging",
+    REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox"
+  })
+  assert.equal(staging.deployEnvironment, "staging")
+  assert.equal(staging.purchaseEnvironment, "sandbox")
+  assert.equal(resolveServerConfig(VALID_PRODUCTION_ENV).deployEnvironment, "production")
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_DEPLOY_ENV: "staging" }),
+    /Staging purchases require.*sandbox/
+  )
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox" }),
+    /sandbox.*staging|staging.*sandbox/i
+  )
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_DEPLOY_ENV: "production", REVENUECAT_PURCHASE_ENVIRONMENT: "sandbox" }),
+    /sandbox.*staging|staging.*sandbox/i
+  )
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_DEPLOY_ENV: "unknown" }),
+    /BLUMI_DEPLOY_ENV/
+  )
+})
+
+test("production-mode purchases require the complete server-only RevenueCat configuration", () => {
+  for (const key of Object.keys(REVENUECAT_ENV) as (keyof typeof REVENUECAT_ENV)[]) {
+    const incomplete = { ...VALID_PRODUCTION_ENV }
+    delete incomplete[key]
+    assert.throws(() => resolveServerConfig(incomplete), new RegExp(key))
+  }
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, REVENUECAT_COIN_PRODUCT_ID_MAP: "{}" }),
+    /REVENUECAT_COIN_PRODUCT_ID_MAP/
+  )
+  assert.equal(resolveServerConfig(VALID_PRODUCTION_ENV).revenueCatProjectId, "project_1")
+})
 
 test("server uses in-memory auth repository outside production by default", () => {
   const config = resolveServerConfig({
@@ -147,9 +208,6 @@ test("an explicit disabled QA flag is safe in production", () => {
   const config = resolveServerConfig({
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567",
     BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
     BLUMI_PUSH_PROVIDER: "expo",
     EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
@@ -159,6 +217,7 @@ test("an explicit disabled QA flag is safe in production", () => {
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
     BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    ...REVENUECAT_ENV,
     BLUMI_QA_AUTH_ENABLED: "0"
   })
 
@@ -197,18 +256,15 @@ test("local QA auth fails closed outside its exact development boundary", () => 
     () => resolveServerConfig({ NODE_ENV: "development", HOST: "0.0.0.0", ...validQa }),
     /loopback/i
   )
-  assert.throws(
-    () => resolveServerConfig({
-      NODE_ENV: "development",
-      HOST: "127.0.0.1",
-      BLUMI_SMS_PROVIDER: "twilio",
-      TWILIO_ACCOUNT_SID: "AC123",
-      TWILIO_AUTH_TOKEN: "token",
-      TWILIO_FROM_PHONE_NUMBER: "+15551234567",
-      ...validQa
-    }),
-    /development SMS/i
-  )
+  const firebaseOnlyDevelopment = resolveServerConfig({
+    NODE_ENV: "development",
+    HOST: "127.0.0.1",
+    ...validQa
+  })
+  assert.deepEqual(firebaseOnlyDevelopment.qaAuth, {
+    phoneNumber: "+12025550123",
+    verificationCode: "246810"
+  })
   assert.throws(
     () => resolveServerConfig({
       NODE_ENV: "development",
@@ -236,10 +292,8 @@ test("production requires a postgres repository and database url", () => {
 
   const config = resolveServerConfig({
     NODE_ENV: "production",
+    PORT: "8080",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567",
     BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
     BLUMI_PUSH_PROVIDER: "expo",
     EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
@@ -248,10 +302,31 @@ test("production requires a postgres repository and database url", () => {
     LIVEKIT_API_SECRET: "livekit-secret",
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
-    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    ...REVENUECAT_ENV
   })
   assert.equal(config.authRepositoryMode, "postgres")
-  assert.equal(config.smsProviderMode, "twilio")
+  assert.equal(config.smsProviderMode, "development")
+  assert.equal(config.port, 8080)
+  assert.equal(config.realtimePort, 8080)
+
+  const legacySplitPorts = resolveServerConfig({
+    NODE_ENV: "production",
+    PORT: "8080",
+    REALTIME_PORT: "4100",
+    DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
+    BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
+    BLUMI_PUSH_PROVIDER: "expo",
+    EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
+    LIVEKIT_URL: "wss://live.blumi.app",
+    LIVEKIT_API_KEY: "livekit-key",
+    LIVEKIT_API_SECRET: "livekit-secret",
+    ...ADMIN_SIGNING_ENV,
+    BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
+    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    ...REVENUECAT_ENV
+  })
+  assert.equal(legacySplitPorts.realtimePort, 4100)
 })
 
 test("postgres mode requires database url in every environment", () => {
@@ -274,35 +349,28 @@ test("unsupported repository mode fails fast", () => {
   )
 })
 
-test("twilio mode requires provider credentials", () => {
-  assert.throws(
-    () => resolveServerConfig({
-      NODE_ENV: "development",
-      BLUMI_SMS_PROVIDER: "twilio"
-    }),
-    /Twilio/
-  )
-})
-
-test("production requires twilio sms provider", () => {
-  assert.throws(
-    () => resolveServerConfig({
-      NODE_ENV: "production",
-      DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-      BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
-      BLUMI_SMS_PROVIDER: "development"
-    }),
-    /BLUMI_SMS_PROVIDER/
-  )
+test("Firebase Phone Auth is the only production verification provider", () => {
+  const config = resolveServerConfig({
+    NODE_ENV: "production",
+    DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
+    BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
+    BLUMI_PUSH_PROVIDER: "expo",
+    EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
+    LIVEKIT_URL: "wss://live.blumi.app",
+    LIVEKIT_API_KEY: "livekit-key",
+    LIVEKIT_API_SECRET: "livekit-secret",
+    ...ADMIN_SIGNING_ENV,
+    BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
+    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    ...REVENUECAT_ENV
+  })
+  assert.equal(config.smsProviderMode, "development")
 })
 
 test("production requires the Expo push provider and access token", () => {
   const productionBase = {
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567",
     BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters"
   }
 
@@ -323,9 +391,6 @@ test("production requires secure LiveKit and moderation configuration", () => {
   const productionBase = {
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567",
     BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
     BLUMI_PUSH_PROVIDER: "expo",
     EXPO_PUSH_ACCESS_TOKEN: "expo-access-token"
@@ -361,9 +426,6 @@ test("production requires verified universal-link identities", () => {
   const production = {
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567",
     BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
     BLUMI_PUSH_PROVIDER: "expo",
     EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
@@ -386,9 +448,6 @@ test("production requires a dedicated high-entropy OTP HMAC secret", () => {
   const productionBase = {
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    TWILIO_ACCOUNT_SID: "AC123",
-    TWILIO_AUTH_TOKEN: "token",
-    TWILIO_FROM_PHONE_NUMBER: "+15551234567"
   }
 
   assert.throws(() => resolveServerConfig(productionBase), /BLUMI_OTP_HMAC_SECRET/)

@@ -21,6 +21,7 @@ export interface ShopCopy {
   removePreview: string
   liveTryOn: string
   previewOnAvatar: string
+  showcaseTitle: string
   roomPreview: string
   owned: string
   previewing: string
@@ -36,10 +37,32 @@ export interface ShopCopy {
   roomPieces: string
   avatarCatalogHint: string
   roomCatalogHint: string
+  previousPage: string
+  nextPage: string
   itemCount: (count: number) => string
   categories: Record<string, string>
   readyToPlace: string
+  product: {
+    wearing: string
+    wearingOutfit: string
+    ownedOutfit: string
+    placed: (count: number) => string
+    wearNow: string
+    wearOutfit: string
+    placeNow: string
+    tryStyle: string
+    avatarOutfit: string
+    avatarAccessory: string
+    avatarCategory: (category: string) => string
+    roomCategory: (category: string) => string
+  }
   combination: {
+    buyLook: string
+    lookTitle: (count: number) => string
+    individualPurchase: string
+    previousPieces: string
+    nextPieces: string
+    selectionSummary: (count: number, purchaseCount: number) => string
     applyLook: string
     itemUnavailable: string
     priceNeedsRefresh: string
@@ -59,7 +82,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     back: "Go back",
     brand: "Blumi Store",
     homeCollection: "Home Collection.",
-    liveCloset: "Live Closet.",
+    liveCloset: "Style Boutique.",
     coins: "coins",
     avatar: "Avatar",
     home: "Home",
@@ -80,6 +103,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     removePreview: "Remove preview",
     liveTryOn: "Live try-on",
     previewOnAvatar: "Preview on avatar",
+    showcaseTitle: "Find your\nnext favorite.",
     roomPreview: "Room preview",
     owned: "Owned",
     previewing: "Previewing",
@@ -91,9 +115,11 @@ const COPY: Record<AppLocale, ShopCopy> = {
     roomOwnedFootnote: "Opens Edit Room so you can place it.",
     roomUnlockFootnote: "Unlock it here, then place it from Edit Room.",
     genericFootnote: "A clean preview of the look.",
-    findYourStyle: "Find your style",
+    findYourStyle: "Shop the collection",
     roomPieces: "Room pieces",
-    avatarCatalogHint: "Tap a piece to try it on.",
+    avatarCatalogHint: "Swipe to explore styles",
+    previousPage: "Previous items",
+    nextPage: "Next items",
     roomCatalogHint: "Tap a piece to preview it in your room.",
     itemCount: (count) => `${count} items`,
     categories: {
@@ -103,7 +129,20 @@ const COPY: Record<AppLocale, ShopCopy> = {
       lighting: "Lighting", rug: "Rugs", wallDecor: "Wall", plant: "Plants", misc: "Storage & decor"
     },
     readyToPlace: "Ready to place",
+    product: {
+      wearing: "Wearing", wearingOutfit: "Wearing outfit", ownedOutfit: "Owned outfit",
+      placed: (count) => `${count} placed`, wearNow: "Wear now", wearOutfit: "Wear outfit",
+      placeNow: "Place now", tryStyle: "Try style", avatarOutfit: "Avatar outfit",
+      avatarAccessory: "Avatar accessory", avatarCategory: (category) => `Avatar ${category}`,
+      roomCategory: (category) => `Room ${category}`
+    },
     combination: {
+      buyLook: "Buy the look",
+      lookTitle: (count) => `Your look · ${count}`,
+      individualPurchase: "Open selected item below",
+      previousPieces: "Show previous pieces",
+      nextPieces: "Show more pieces",
+      selectionSummary: (count, purchaseCount) => `${count} selected · ${purchaseCount} to buy`,
       applyLook: "Apply look",
       itemUnavailable: "This item cannot be applied right now",
       priceNeedsRefresh: "This item price needs a refresh",
@@ -127,7 +166,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     back: "Geri dön",
     brand: "Blumi Mağaza",
     homeCollection: "Ev Koleksiyonu.",
-    liveCloset: "Canlı Gardırop.",
+    liveCloset: "Stil Mağazası.",
     coins: "jeton",
     avatar: "Avatar",
     home: "Ev",
@@ -148,6 +187,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     removePreview: "Önizlemeyi kaldır",
     liveTryOn: "Canlı dene",
     previewOnAvatar: "Avatarında önizle",
+    showcaseTitle: "Yeni favorini\nkeşfet.",
     roomPreview: "Oda önizlemesi",
     owned: "Sahip olundu",
     previewing: "Önizleniyor",
@@ -159,9 +199,11 @@ const COPY: Record<AppLocale, ShopCopy> = {
     roomOwnedFootnote: "Yerleştirmek için Odayı Düzenle’yi açar.",
     roomUnlockFootnote: "Buradan aç, sonra Odayı Düzenle’den yerleştir.",
     genericFootnote: "Görünümün temiz bir önizlemesi.",
-    findYourStyle: "Tarzını bul",
+    findYourStyle: "Koleksiyonu keşfet",
     roomPieces: "Oda parçaları",
-    avatarCatalogHint: "Denemek için bir parçaya dokun.",
+    avatarCatalogHint: "Kaydır, tarzını keşfet",
+    previousPage: "Önceki ürünler",
+    nextPage: "Sonraki ürünler",
     roomCatalogHint: "Odanda önizlemek için bir parçaya dokun.",
     itemCount: (count) => `${count} öğe`,
     categories: {
@@ -171,7 +213,20 @@ const COPY: Record<AppLocale, ShopCopy> = {
       lighting: "Aydınlatma", rug: "Halılar", wallDecor: "Duvar", plant: "Bitkiler", misc: "Depolama ve dekor"
     },
     readyToPlace: "Yerleştirmeye hazır",
+    product: {
+      wearing: "Giyili", wearingOutfit: "Kombin giyili", ownedOutfit: "Kombin sende",
+      placed: (count) => `${count} yerleştirildi`, wearNow: "Şimdi giy", wearOutfit: "Kombini giy",
+      placeNow: "Şimdi yerleştir", tryStyle: "Tarzı dene", avatarOutfit: "Avatar kombini",
+      avatarAccessory: "Avatar aksesuarı", avatarCategory: (category) => `Avatar ${category}`,
+      roomCategory: (category) => `Oda ${category}`
+    },
     combination: {
+      buyLook: "Kombini al",
+      lookTitle: (count) => `Kombinin · ${count} parça`,
+      individualPurchase: "Aşağıdan seçili parçayı aç",
+      previousPieces: "Önceki parçaları göster",
+      nextPieces: "Diğer parçaları göster",
+      selectionSummary: (count, purchaseCount) => `${count} parça · ${purchaseCount} yeni`,
       applyLook: "Kombini uygula",
       itemUnavailable: "Bu ürün şu anda uygulanamıyor",
       priceNeedsRefresh: "Ürün fiyatı yenilenmeli",

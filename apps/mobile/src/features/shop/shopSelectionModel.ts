@@ -14,15 +14,8 @@ export function resolveShopSelectedProduct<T extends ShopSelectableProduct>(
   }
 ): T | undefined {
   const expectedSection = input.mode === "avatar" ? "avatar" : "room"
-  const filteredProducts = input.filteredProducts.filter(
+  const availableProducts = input.activeProducts.filter(
     (product) => product.sectionId === expectedSection
   )
-  const activeProducts = input.activeProducts.filter(
-    (product) => product.sectionId === expectedSection
-  )
-
-  return filteredProducts.find((product) => product.id === input.selectedId)
-    ?? filteredProducts[0]
-    ?? activeProducts.find((product) => product.id === input.selectedId)
-    ?? activeProducts[0]
+  return availableProducts.find((product) => product.id === input.selectedId)
 }

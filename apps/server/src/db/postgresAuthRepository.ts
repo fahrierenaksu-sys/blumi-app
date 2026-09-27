@@ -20,6 +20,73 @@ import { discoveryWatchLockSql } from "./discoveryWatchLock"
 
 export function createPostgresAuthRepository(pool: Pool): AuthRepository {
   return {
+    async listDueFirebaseUserDeletions(now, limit) {
+      const result = await pool.query(
+        `SELECT firebase_uid, account_id, attempt_count
+           FROM blumi_firebase_user_deletion_outbox
+          WHERE next_attempt_at <= $1
+          ORDER BY next_attempt_at, created_at LIMIT $2`,
+        [now, limit]
+      )
+      return result.rows.map((row) => ({
+        uid: String(row.firebase_uid), accountId: String(row.account_id),
+        attemptCount: Number(row.attempt_count)
+      }))
+    },
+    async completeFirebaseUserDeletion(uid) {
+      await pool.query("DELETE FROM blumi_firebase_user_deletion_outbox WHERE firebase_uid = $1", [uid])
+    },
+    async retryFirebaseUserDeletion(uid, nextAttemptAt) {
+      await pool.query(
+        `UPDATE blumi_firebase_user_deletion_outbox
+            SET attempt_count = attempt_count + 1, next_attempt_at = $2
+          WHERE firebase_uid = $1`, [uid, nextAttemptAt]
+      )
+    },
+    async hasPendingFirebaseUserDeletion(accountId) {
+      const result = await pool.query(
+        "SELECT 1 FROM blumi_firebase_user_deletion_outbox WHERE account_id = $1 LIMIT 1",
+        [accountId]
+      )
+      return Boolean(result.rowCount)
+    },
+    async isFirebaseUserDeletionPending(uid) {
+      const result = await pool.query(
+        "SELECT 1 FROM blumi_firebase_user_deletion_outbox WHERE firebase_uid = $1 LIMIT 1", [uid]
+      )
+      return Boolean(result.rowCount)
+    },
+    async saveFirebaseActionChallenge(challenge) {
+      await pool.query(
+        `INSERT INTO blumi_firebase_action_challenges (
+          account_id, purpose, challenge_id, session_token_hash,
+          target_phone_number, issued_at, expires_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (account_id, purpose) DO UPDATE SET
+          challenge_id = EXCLUDED.challenge_id,
+          session_token_hash = EXCLUDED.session_token_hash,
+          target_phone_number = EXCLUDED.target_phone_number,
+          issued_at = EXCLUDED.issued_at,
+          expires_at = EXCLUDED.expires_at`,
+        [challenge.accountId, challenge.purpose, challenge.challengeId,
+          challenge.sessionTokenHash, challenge.targetPhoneNumber,
+          new Date(challenge.issuedAt), new Date(challenge.expiresAt)]
+      )
+    },
+
+    async consumeFirebaseActionChallenge(input) {
+      const result = await pool.query(
+        `DELETE FROM blumi_firebase_action_challenges
+          WHERE account_id = $1 AND purpose = $2 AND challenge_id = $3
+            AND session_token_hash = $4 AND target_phone_number = $5
+            AND expires_at > $6 AND issued_at <= $7
+          RETURNING challenge_id`,
+        [input.accountId, input.purpose, input.challengeId,
+          input.sessionTokenHash, input.phoneNumber, new Date(input.now),
+          new Date(input.authTime * 1000)]
+      )
+      return Boolean(result.rowCount)
+    },
     async getPendingOtp(phoneNumber) {
       const result = await pool.query(
         `SELECT phone_number, otp_id, code_digest, expires_at, attempt_count
@@ -306,6 +373,16 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       } catch (error) { await client.query("ROLLBACK"); throw error } finally { client.release() }
     },
 
+    async createAccountDeletionConfirmation(input) {
+      await pool.query(
+        `INSERT INTO blumi_account_deletion_confirmations (account_id, token_digest, expires_at, firebase_uid)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (account_id) DO UPDATE SET token_digest = EXCLUDED.token_digest,
+           expires_at = EXCLUDED.expires_at, firebase_uid = EXCLUDED.firebase_uid`,
+        [input.accountId, input.confirmationTokenDigest, new Date(input.confirmationExpiresAt), input.firebaseUid ?? null]
+      )
+    },
+
     async verifyAndCreateAccountDeletionConfirmation(input) {
       const client = await pool.connect()
       try {
@@ -331,7 +408,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         await client.query(
           `INSERT INTO blumi_account_deletion_confirmations (account_id, token_digest, expires_at)
            VALUES ($1, $2, $3)
-           ON CONFLICT (account_id) DO UPDATE SET token_digest = EXCLUDED.token_digest, expires_at = EXCLUDED.expires_at`,
+           ON CONFLICT (account_id) DO UPDATE SET token_digest = EXCLUDED.token_digest,
+             expires_at = EXCLUDED.expires_at, firebase_uid = NULL`,
           [input.accountId, input.confirmationTokenDigest, new Date(input.confirmationExpiresAt)]
         )
         await client.query("COMMIT")
@@ -414,6 +492,25 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         await client.query("COMMIT")
         return Boolean(result.rowCount && result.rowCount > 0)
       } catch (error) { await client.query("ROLLBACK"); throw error } finally { client.release() }
+    },
+
+    async createAccountActionConfirmation(input) {
+      await pool.query(
+        `INSERT INTO blumi_account_action_confirmations (
+           account_id, purpose, target_phone_number, token_digest, expires_at
+         ) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (account_id, purpose) DO UPDATE SET
+           target_phone_number = EXCLUDED.target_phone_number,
+           token_digest = EXCLUDED.token_digest,
+           expires_at = EXCLUDED.expires_at`,
+        [
+          input.accountId,
+          input.purpose,
+          input.targetPhoneNumber,
+          input.confirmationTokenDigest,
+          new Date(input.confirmationExpiresAt)
+        ]
+      )
     },
 
     async verifyAndCreateAccountActionConfirmation(input) {
@@ -577,45 +674,47 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
           [input.phoneNumber]
         )
-        const otpResult = await client.query(
-          `SELECT phone_number, otp_id, code_digest, expires_at, attempt_count
-             FROM blumi_pending_otps
-            WHERE phone_number = $1
-            FOR UPDATE`,
-          [input.phoneNumber]
-        )
-        const pending = otpResult.rows[0]
-          ? mapPendingOtp(otpResult.rows[0])
-          : null
-        if (!pending || pending.expiresAt <= input.now) {
-          if (pending) {
-            await client.query(
-              "DELETE FROM blumi_pending_otps WHERE phone_number = $1",
-              [input.phoneNumber]
-            )
-          }
-          await client.query("COMMIT")
-          return { kind: "missing_or_expired" }
-        }
-        if (pending.attemptCount >= input.maxAttempts) {
-          await client.query("COMMIT")
-          return { kind: "attempt_limit" }
-        }
-        if (!input.matches(pending)) {
-          const attemptCount = pending.attemptCount + 1
-          await client.query(
-            `UPDATE blumi_pending_otps
-                SET attempt_count = $2
-              WHERE phone_number = $1`,
-            [input.phoneNumber, attemptCount]
+        if (!input.verifiedWithoutOtp) {
+          const otpResult = await client.query(
+            `SELECT phone_number, otp_id, code_digest, expires_at, attempt_count
+               FROM blumi_pending_otps
+              WHERE phone_number = $1
+              FOR UPDATE`,
+            [input.phoneNumber]
           )
-          await client.query("COMMIT")
-          return attemptCount >= input.maxAttempts
-            ? { kind: "attempt_limit" }
-            : {
-                kind: "invalid",
-                attemptsRemaining: input.maxAttempts - attemptCount
-              }
+          const pending = otpResult.rows[0]
+            ? mapPendingOtp(otpResult.rows[0])
+            : null
+          if (!pending || pending.expiresAt <= input.now) {
+            if (pending) {
+              await client.query(
+                "DELETE FROM blumi_pending_otps WHERE phone_number = $1",
+                [input.phoneNumber]
+              )
+            }
+            await client.query("COMMIT")
+            return { kind: "missing_or_expired" }
+          }
+          if (pending.attemptCount >= input.maxAttempts) {
+            await client.query("COMMIT")
+            return { kind: "attempt_limit" }
+          }
+          if (!input.matches(pending)) {
+            const attemptCount = pending.attemptCount + 1
+            await client.query(
+              `UPDATE blumi_pending_otps
+                  SET attempt_count = $2
+                WHERE phone_number = $1`,
+              [input.phoneNumber, attemptCount]
+            )
+            await client.query("COMMIT")
+            return attemptCount >= input.maxAttempts
+              ? { kind: "attempt_limit" }
+              : {
+                  kind: "invalid",
+                  attemptsRemaining: input.maxAttempts - attemptCount
+                }
+          }
         }
 
         const existingAccountResult = await client.query(
@@ -630,7 +729,7 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         if (!account) {
           if (input.requireExistingAccount) {
             await client.query("COMMIT")
-            return { kind: "terms_required" }
+            return { kind: input.verifiedWithoutOtp ? "account_not_found" : "terms_required" }
           }
           const candidate = input.newAccount
           const selection = toCompleteAvatarSelection(candidate.profile.avatar)
@@ -1106,11 +1205,11 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         await client.query("BEGIN")
         if (confirmation) {
           const consumed = await client.query(
-            `DELETE FROM blumi_account_deletion_confirmations
+          `DELETE FROM blumi_account_deletion_confirmations
               WHERE account_id = $1
                 AND token_digest = $2
                 AND expires_at > $3
-            RETURNING account_id`,
+            RETURNING account_id, firebase_uid`,
             [
               account.accountId,
               confirmation.confirmationTokenDigest,
@@ -1120,6 +1219,14 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           if (!consumed.rowCount) {
             await client.query("ROLLBACK")
             return false
+          }
+          const firebaseUid = consumed.rows[0]?.firebase_uid
+          if (typeof firebaseUid === "string" && firebaseUid.length > 0) {
+            await client.query(
+              `INSERT INTO blumi_firebase_user_deletion_outbox (firebase_uid, account_id)
+               VALUES ($1, $2) ON CONFLICT (firebase_uid) DO NOTHING`,
+              [firebaseUid, account.accountId]
+            )
           }
         }
         // Match dispatch/enqueue lock order: user authority -> watch -> device -> outbox.

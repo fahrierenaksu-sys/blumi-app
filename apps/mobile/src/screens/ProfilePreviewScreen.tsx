@@ -9,7 +9,7 @@ import {
   type CandidateAvatarSnapshot
 } from "../components/DiscoverCard"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { getLobbyReturnStrategy } from "../navigation/rootNavigationModel"
+import { getLobbyReturnStrategy, goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
 import type { DiscoveryDecisionCapability } from "../features/discovery/discoveryCandidateModel"
 import {
@@ -106,6 +106,9 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const [isDeciding, setIsDeciding] = useState(false)
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const [serverDeniedDecision, setServerDeniedDecision] = useState(false)
+  const goBackToDiscovery = (): void => {
+    goBackOrFallback(navigation, () => navigation.replace("Lobby"))
+  }
 
   useEffect(() => {
     Animated.spring(contentAnim, {
@@ -171,11 +174,13 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         const match = createMatchFromDiscoveryResult({
           currentUser: {
             userId: props.sessionActor.profile.userId,
-            displayName: props.sessionActor.profile.displayName
+            displayName: props.sessionActor.profile.displayName,
+            avatarSelection: props.sessionActor.profile.avatar
           },
           matchedUser: {
             userId: profile.userId,
-            displayName: profile.displayName
+            displayName: profile.displayName,
+            avatarSelection: avatarSnapshot.avatarSelection
           },
           result
         })
@@ -209,7 +214,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
 
   const passAndReturn = (): void => {
     if (profile.isSelf) {
-      navigation.goBack()
+      goBackToDiscovery()
       return
     }
     if (isProductionDiscovery) {
@@ -268,7 +273,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
             <SafeAreaView contentGutter={false} edges={["top"]} style={styles.heroNav}>
               <ActionButtonCircle
                 accessibilityLabel={copy.back}
-                onPress={() => navigation.goBack()}
+                onPress={goBackToDiscovery}
                 size={42}
                 style={styles.navButton}
               >
@@ -464,7 +469,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
           targetDisplayName={profile.displayName}
           sessionActor={props.sessionActor}
           onClose={() => setReportVisible(false)}
-          onActionComplete={() => navigation.goBack()}
+          onActionComplete={goBackToDiscovery}
         />
       ) : null}
     </View>

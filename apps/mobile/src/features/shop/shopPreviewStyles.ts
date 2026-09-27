@@ -113,7 +113,6 @@ export const shopPreviewStyles = StyleSheet.create({
     color: uiTheme.colors.primary
   },
   previewStage: {
-    flex: 1,
     minWidth: 148,
     minHeight: 272,
     alignItems: "center",
@@ -131,30 +130,25 @@ export const shopPreviewStyles = StyleSheet.create({
     minHeight: 262,
     backgroundColor: "rgba(255, 245, 239, 0.54)"
   },
-  previewSparkleA: {
-    position: "absolute",
-    left: 16,
-    top: 28,
-    zIndex: 3
-  },
-  previewSparkleB: {
-    position: "absolute",
-    right: 20,
-    top: 58,
-    zIndex: 3
-  },
   shopAvatarPreview: {
-    width: "100%",
-    minHeight: 168,
+    width: "56%",
+    height: "100%",
+    alignSelf: "flex-start",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "center",
     overflow: "visible",
-    zIndex: 10
+    zIndex: 1
   },
   shopAvatarFrame: {
-    marginBottom: 5,
-    overflow: "visible",
-    transform: [{ translateY: 14 }]
+    marginBottom: 0,
+    overflow: "visible"
+  },
+  showcaseHeadline: {
+    ...uiTheme.font.heading,
+    fontSize: 19,
+    lineHeight: 23,
+    letterSpacing: -0.4,
+    color: "#45243C"
   },
   shopAvatarLayer: {
     ...StyleSheet.absoluteFill,
@@ -225,7 +219,8 @@ export const shopPreviewStyles = StyleSheet.create({
     ...uiTheme.font.micro,
     color: uiTheme.colors.primary,
     fontWeight: "900",
-    letterSpacing: 1.5
+    letterSpacing: 0.5,
+    fontSize: 9
   },
   roomHeroTitle: {
     ...uiTheme.font.captionBold,
@@ -233,18 +228,16 @@ export const shopPreviewStyles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 15
   },
-  avatarHeroTitleWithRemove: {
-    paddingRight: 36
-  },
+  avatarProductHeading: { flexDirection: "row", alignItems: "center", gap: 4 },
+  avatarProductEyebrow: { flex: 1 },
+  avatarProductTitle: { fontSize: 14, lineHeight: 18 },
   avatarPreviewRemoveButton: {
-    position: "absolute",
-    right: 8,
-    top: 11,
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
+    flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderRadius: 22,
     backgroundColor: "rgba(255, 236, 246, 0.92)",
     borderWidth: 1,
     borderColor: "rgba(255, 79, 152, 0.22)"
@@ -271,9 +264,42 @@ export const shopPreviewStyles = StyleSheet.create({
     lineHeight: 15
   },
   avatarHeroTopPanel: {
-    height: 54,
-    borderRadius: 18
+    minHeight: 64,
+    flex: 0,
+    width: "100%",
+    borderRadius: 18,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 0
   },
+  avatarInfoOverlay: {
+    width: "40%",
+    bottom: 10,
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: 8
+  },
+  combinationSummary: {
+    ...uiTheme.font.micro,
+    fontSize: 10,
+    lineHeight: 14,
+    color: uiTheme.colors.textSecondary
+  },
+  combinationOverlay: { gap: 4 },
+  combinationPager: { height: 44, flexDirection: "row", alignItems: "center", alignSelf: "stretch", flexShrink: 0 },
+  combinationPageButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  combinationPageLabel: { flex: 1, textAlign: "center" },
+  combinationHeading: { ...uiTheme.font.captionBold, fontSize: 11, lineHeight: 16, color: uiTheme.colors.primary },
+  combinationList: { flexGrow: 0, flexShrink: 1, alignSelf: "stretch" },
+  combinationRowSelected: { backgroundColor: "#FAD8EA" },
+  combinationRows: { gap: 3, alignSelf: "stretch" },
+  combinationRow: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 34, borderRadius: 11, paddingRight: 4, backgroundColor: "rgba(255,255,255,0.72)" },
+  combinationThumbnail: { width: 34, height: 34, overflow: "hidden", alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#FCE8F2" },
+  combinationRowCopy: { flex: 1, minWidth: 0 },
+  combinationItemTitle: { ...uiTheme.font.captionBold, fontSize: 10, lineHeight: 13, color: uiTheme.colors.textPrimary },
+  combinationItemPrice: { ...uiTheme.font.micro, fontSize: 10, lineHeight: 13, color: uiTheme.colors.primary },
+  combinationAction: { height: 44, flexShrink: 0, borderRadius: 14 },
   roomHeroAction: {
     position: "absolute",
     right: 10,
@@ -298,12 +324,15 @@ export const shopPreviewStyles = StyleSheet.create({
     textAlign: "center"
   },
   avatarHeroAction: {
-    minHeight: 54,
+    minHeight: 44,
+    height: 54,
+    maxWidth: "100%",
+    alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 7,
     borderRadius: 18,
-    backgroundColor: "#F93696",
+    backgroundColor: uiTheme.colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.48)",
     ...uiTheme.shadow.glow
@@ -314,29 +343,29 @@ export const shopPreviewStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10
+    gap: 4
   },
   avatarHeroActionText: {
     ...uiTheme.font.bodyBold,
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 13,
     lineHeight: 20,
     textAlign: "center"
   },
   avatarHeroPricePill: {
-    minHeight: 36,
+    minHeight: 26,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 13,
+    gap: 3,
+    paddingHorizontal: 6,
     borderRadius: uiTheme.radius.full,
     backgroundColor: "#FFFFFF"
   },
   avatarHeroPriceText: {
     ...uiTheme.font.bodyBold,
     color: "#D91F78",
-    fontSize: 15,
+    fontSize: 12,
     lineHeight: 18,
     fontVariant: ["tabular-nums"]
   },

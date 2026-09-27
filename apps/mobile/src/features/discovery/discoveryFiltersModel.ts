@@ -3,6 +3,7 @@ import type {
   DiscoveryGender
 } from "@blumi/contracts"
 import { DISCOVERY_GENDERS } from "@blumi/contracts"
+import type { AppLocale } from "../session/appLocale"
 
 export const DISCOVERY_MINIMUM_AGE = 18
 export const DISCOVERY_MAXIMUM_AGE = 99
@@ -57,12 +58,15 @@ export function getLocalDiscoveryFiltersFallbackStorageKey(userId: string): stri
   return `@blumi/discover_filters_pending_sync/${encodeURIComponent(userId.trim())}`
 }
 
-export function formatDiscoveryFiltersSummary(filters: DiscoveryFilters): string {
+export function formatDiscoveryFiltersSummary(filters: DiscoveryFilters, locale: AppLocale = "en"): string {
   const normalized = normalizeDiscoveryFilters(filters)
+  const genderLabels: Record<DiscoveryGender, string> = locale === "tr"
+    ? { woman: "Kadın", man: "Erkek" }
+    : GENDER_LABELS
   const audience = normalized.genders.length === 0
-    ? "Everyone"
-    : normalized.genders.map((gender) => GENDER_LABELS[gender]).join(" + ")
-  return `${audience} · Ages ${normalized.ageMin}–${normalized.ageMax}`
+    ? locale === "tr" ? "Herkes" : "Everyone"
+    : normalized.genders.map((gender) => genderLabels[gender]).join(" + ")
+  return `${audience} · ${locale === "tr" ? "Yaş" : "Ages"} ${normalized.ageMin}–${normalized.ageMax}`
 }
 
 export async function loadDiscoveryFilters(

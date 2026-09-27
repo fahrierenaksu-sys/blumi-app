@@ -96,7 +96,7 @@ test("female preview seeds keep their deterministic wardrobe variants", () => {
   }
 })
 
-test("a complete server selection projects the exact remote wardrobe without hash substitution", () => {
+test("a retired remote top falls back safely while other purchased layers remain exact", () => {
   const loadout = {
     schemaVersion: 1 as const,
     bodyId: "avatar_v2_body_default",
@@ -120,7 +120,7 @@ test("a complete server selection projects the exact remote wardrobe without has
     }
   })
   const appearance = createCandidateAvatarAppearance(snapshot)
-  assert.equal(appearance.topId, "room_avatar_top_female_blush_lace_cardigan_v2")
+  assert.equal(appearance.topId, "room_avatar_top_female_cream_basic_tee_v2")
   assert.equal(
     appearance.bottomId,
     "room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2"

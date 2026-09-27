@@ -107,10 +107,6 @@ const approved = {
   ],
   hair: [
     [
-      "avatar_v2_hair_male_espresso_crop",
-      "room_avatar_hair_front_male_espresso_crop_v1",
-    ],
-    [
       "avatar_v2_hair_male_cocoa_textured_quiff",
       "room_avatar_hair_front_male_cocoa_textured_quiff_v1",
     ],
@@ -348,7 +344,7 @@ test("approved male starter capsule exposes exactly the PM-approved live counts"
       shirt: 2,
       jacket: 2,
       pants: 4,
-      hair: 4,
+      hair: 3,
       shoes: 4,
     },
   );
@@ -402,7 +398,7 @@ test("live room catalog has non-empty rig layers and exact 4W+1S motion for anim
   }
 });
 
-test("all four male hairs keep exact keyed fixed-head motion in the full MiniRoom avatar", () => {
+test("all retained starter male hairs keep exact keyed fixed-head motion in the full MiniRoom avatar", () => {
   for (const [, roomId] of approved.hair) {
     const item = ROOM_AVATAR_CATALOG.find(
       (candidate) => candidate.id === roomId,

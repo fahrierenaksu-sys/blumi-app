@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#111b2e" />
+    <meta name="description" content="Blumi ürün, yayın, altyapı ve operasyon durumunu tek yerden takip et." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23111b2e'/%3E%3Cpath d='M18 43V21h7v8c2-3 5-5 9-5 6 0 10 4 10 11v8h-7v-8c0-3-2-5-5-5s-5 2-5 5v8z' fill='%2385ddd2'/%3E%3Ccircle cx='47' cy='20' r='5' fill='%23ffa7a5'/%3E%3C/svg%3E" />
+    <title>Blumi Operasyon Merkezi</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172238;
+        --muted: #64728a;
+        --line: #dfe5ed;
+        --paper: #f2f5f8;
+        --card: #fff;
+        --navy: #111b2e;
+        --navy-soft: #1b2940;
+        --mint: #85ddd2;
+        --coral: #ffa7a5;
+        --green-ink: #145c46;
+        --green-bg: #e0f3ea;
+        --red-ink: #9c2f3d;
+        --red-bg: #fde7e8;
+        --amber-ink: #765216;
+        --amber-bg: #fff1d8;
+        --blue-ink: #335475;
+        --blue-bg: #e9f0f8;
+        --shadow: 0 12px 35px rgba(28, 43, 66, .055);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font-size: 16px; }
+      button, input, select { font: inherit; }
+      button, a, input, select { -webkit-tap-highlight-color: transparent; }
+      button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+        outline: 3px solid #369c9a;
+        outline-offset: 3px;
+      }
+
+      .shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+      .sidebar {
+        min-height: 100vh;
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        padding: 28px 18px 20px;
+        display: flex;
+        flex-direction: column;
+        background: var(--navy);
+        color: #eef3fb;
+      }
+      .brand { display: flex; gap: 11px; align-items: center; padding: 3px 9px 30px; }
+      .brand-mark { width: 35px; height: 35px; border-radius: 12px; background: var(--mint); display: grid; place-items: center; color: var(--navy); font-weight: 900; font-size: 19px; }
+      .brand-name { font-size: 17px; font-weight: 760; letter-spacing: -.02em; }
+      .brand-sub { display: block; color: #9cabc1; font-size: 12px; margin-top: 2px; font-weight: 500; letter-spacing: .04em; }
+      .nav-label { margin: 5px 11px 9px; color: #8291a9; font-size: 11px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+      .nav-list { display: grid; gap: 5px; }
+      .nav-list a { display: flex; align-items: center; gap: 11px; min-height: 43px; padding: 0 11px; border-radius: 10px; color: #d2dbea; text-decoration: none; font-size: 14px; transition: background .16s ease, color .16s ease; }
+      .nav-list a:hover, .nav-list a[aria-current="page"] { background: var(--navy-soft); color: #fff; }
+      .nav-icon { width: 21px; color: var(--mint); text-align: center; font-size: 15px; }
+      .side-note { margin-top: auto; padding: 15px; border: 1px solid rgba(207, 221, 240, .14); border-radius: 13px; background: rgba(255,255,255,.035); }
+      .side-note strong { display: block; font-size: 13px; margin-bottom: 7px; }
+      .side-note p { margin: 0; color: #aab7ca; font-size: 12px; line-height: 1.55; }
+
+      main { min-width: 0; padding: 34px clamp(20px, 4vw, 58px) 54px; }
+      .page { max-width: 1420px; margin: 0 auto; }
+      .topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 25px; }
+      .eyebrow { margin: 0 0 8px; color: #60738f; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: clamp(28px, 3.2vw, 39px); letter-spacing: -.045em; line-height: 1.12; }
+      .intro { max-width: 650px; margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+      .snapshot { flex: 0 0 auto; min-width: 220px; padding: 13px 15px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+      .snapshot-line { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+      .snapshot-line + .snapshot-line { margin-top: 7px; color: var(--muted); }
+      .snapshot-breakdown { margin-top: 5px; color: var(--muted); font-size: 11px; text-align: right; }
+      .snapshot time { color: var(--ink); font-weight: 750; }
+      .dot { width: 8px; height: 8px; display: inline-block; flex: 0 0 auto; border-radius: 50%; background: #e0a02f; margin-right: 7px; }
+
+      .hero-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .8fr); gap: 15px; margin-bottom: 16px; }
+      .next-action, .live-status { border-radius: 17px; box-shadow: var(--shadow); }
+      .next-action { position: relative; overflow: hidden; padding: 23px 25px; color: #f8fbff; background: var(--navy); }
+      .next-action::after { content: ""; position: absolute; width: 190px; height: 190px; right: -78px; top: -90px; border: 1px solid rgba(133,221,210,.27); border-radius: 50%; box-shadow: 0 0 0 24px rgba(133,221,210,.05), 0 0 0 49px rgba(133,221,210,.035); pointer-events: none; }
+      .action-kicker { display: flex; align-items: center; gap: 8px; color: var(--mint); font-size: 12px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+      .action-kicker span { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+      .next-action h2 { max-width: 760px; margin: 12px 0 8px; font-size: clamp(20px, 2.2vw, 28px); letter-spacing: -.025em; }
+      .next-action p { max-width: 780px; margin: 0; color: #bfcbda; line-height: 1.6; font-size: 15px; }
+      .action-foot { margin-top: 17px; color: #91a0b6; font-size: 12px; }
+      .live-status { display: flex; flex-direction: column; justify-content: space-between; padding: 20px; border: 1px solid var(--line); background: var(--card); }
+      .live-status .label { color: var(--muted); font-size: 13px; font-weight: 650; }
+      .live-status h2 { margin: 13px 0 5px; font-size: 19px; letter-spacing: -.02em; }
+      .live-status p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+      .live-status .signal { margin-top: 16px; padding: 10px 11px; border-radius: 10px; background: #fff5df; color: #72511b; font-size: 13px; line-height: 1.45; }
+
+      .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 0 0 30px; }
+      .metric { padding: 15px 17px; background: var(--card); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); }
+      .metric-label { color: var(--muted); font-size: 13px; }
+      .metric-value { margin-top: 7px; font-size: 24px; font-weight: 780; letter-spacing: -.04em; }
+      .metric-hint { margin-top: 2px; color: #7b8799; font-size: 12px; }
+
+      .systems { scroll-margin-top: 22px; }
+      .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; }
+      .section-heading h2 { margin: 0; font-size: 22px; letter-spacing: -.03em; }
+      .section-heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+      .count { color: #68758a; font-size: 13px; white-space: nowrap; }
+      .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; }
+      .filters { display: flex; flex-wrap: wrap; gap: 7px; }
+      .filter { min-height: 37px; padding: 7px 12px; border: 1px solid #d8e0e9; border-radius: 9px; background: #fff; color: #52627a; cursor: pointer; font-size: 13px; font-weight: 650; transition: .15s ease; }
+      .filter:hover { border-color: #9eb1c8; color: var(--ink); }
+      .filter[aria-pressed="true"] { border-color: var(--navy); background: var(--navy); color: #fff; }
+      .search { min-width: min(100%, 235px); height: 39px; padding: 0 12px; border: 1px solid #d8e0e9; border-radius: 9px; color: var(--ink); background: #fff; }
+      .search::placeholder { color: #7c899c; }
+      .system-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 13px; }
+      .system-card { min-width: 0; padding: 18px 19px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+      .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+      .card-category { margin: 0 0 6px; color: #77859a; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .card-title { margin: 0; font-size: 17px; line-height: 1.35; letter-spacing: -.015em; }
+      .status { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 25px; padding: 4px 9px; border-radius: 999px; font-size: 11px; line-height: 1.2; font-weight: 800; }
+      .status-pass { color: var(--green-ink); background: var(--green-bg); }
+      .status-blocked { color: var(--red-ink); background: var(--red-bg); }
+      .status-waiting { color: var(--amber-ink); background: var(--amber-bg); }
+      .status-open { color: var(--blue-ink); background: var(--blue-bg); }
+      .status-progress { color: #574985; background: #eeeafb; }
+      .card-description { margin: 12px 0 15px; color: #536179; font-size: 14px; line-height: 1.58; }
+      .card-meta { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid #edf0f4; }
+      .meta-row { display: grid; grid-template-columns: 92px minmax(0,1fr); gap: 9px; font-size: 13px; line-height: 1.5; }
+      .meta-label { color: #7a879a; }
+      .meta-value { color: #35435b; overflow-wrap: anywhere; }
+      .card-evidence { color: #6a778b; font-size: 12px; }
+      .empty { grid-column: 1/-1; padding: 28px; text-align: center; color: var(--muted); border: 1px dashed #bfcbd9; border-radius: 14px; background: rgba(255,255,255,.65); }
+
+      .guardrail { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 13px; margin-top: 27px; padding: 18px 20px; border: 1px solid #d8e4e6; border-radius: 14px; background: #e8f4f3; scroll-margin-top: 20px; }
+      .guard-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #145c59; background: #cdece7; font-weight: 900; }
+      .guardrail h2 { margin: 2px 0 6px; font-size: 16px; }
+      .guardrail p { margin: 0; color: #416461; font-size: 14px; line-height: 1.55; }
+      footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--line); color: #778398; font-size: 12px; line-height: 1.5; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+      @media (max-width: 980px) {
+        .shell { grid-template-columns: 210px minmax(0,1fr); }
+        .hero-grid { grid-template-columns: 1fr; }
+        .live-status { min-height: 165px; }
+        .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      }
+      @media (max-width: 700px) {
+        .shell { display: block; }
+        .sidebar { position: relative; width: 100%; min-height: auto; height: auto; padding: 13px 16px; }
+        .brand { padding: 0 1px 12px; }
+        .brand-mark { width: 31px; height: 31px; }
+        .nav-label, .side-note { display: none; }
+        .nav-list { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; }
+        .nav-list a { flex: 0 0 auto; min-height: 37px; padding: 0 10px; font-size: 13px; }
+        .nav-icon { display: none; }
+        main { padding: 22px 16px 38px; }
+        .topline { display: block; }
+        .snapshot { display: inline-block; margin-top: 15px; min-width: min(100%, 300px); }
+        .system-grid { grid-template-columns: 1fr; }
+        .section-heading { align-items: flex-start; flex-direction: column; }
+        .toolbar { align-items: stretch; }
+        .search { width: 100%; }
+        .filters { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 3px; }
+        .filter { white-space: nowrap; }
+      }
+      @media (max-width: 390px) {
+        .metrics { gap: 8px; }
+        .metric { padding: 12px; }
+        .metric-value { font-size: 21px; }
+        .system-card { padding: 15px; }
+        .meta-row { grid-template-columns: 82px minmax(0,1fr); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Blumi Operasyon Merkezi gezinme">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">b.</div>
+          <div><span class="brand-name">Blumi</span><span class="brand-sub">OPERASYON MERKEZİ</span></div>
+        </div>
+        <p class="nav-label">Çalışma alanı</p>
+        <nav class="nav-list" aria-label="Bölümler">
+          <a href="#overview" aria-current="page"><span class="nav-icon" aria-hidden="true">◈</span>Genel bakış</a>
+          <a href="#systems"><span class="nav-icon" aria-hidden="true">▦</span>Tüm sistemler</a>
+          <a href="#guardrail"><span class="nav-icon" aria-hidden="true">⌑</span>Güvenli kullanım</a>
+        </nav>
+        <div class="side-note">
+          <strong>Şu anki mod</strong>
+          <p>Kontrol et ve yönlendir. Dış sistemlere bağlı canlı sinyal veya kullanıcı hesabı değiştirme yetkisi yok.</p>
+        </div>
+      </aside>
+
+      <main>
+        <div class="page">
+          <header class="topline" id="overview">
+            <div>
+              <p class="eyebrow">Blumi · kurucu kontrol paneli</p>
+              <h1>Sistemin durumu, tek yerde.</h1>
+              <p class="intro">Yayın, sunucu, veritabanı, kullanıcı güvenliği ve günlük operasyonlar. Her kartta ne biliniyor, ne eksik ve sıradaki iş açıkça yazıyor.</p>
+            </div>
+            <div class="snapshot" aria-label="Durum kaynağı">
+              <div class="snapshot-line"><span>Kaynak anlık görüntüsü</span><time id="snapshot-date"></time></div>
+              <div class="snapshot-line"><span><i class="dot" aria-hidden="true"></i><span id="snapshot-branch">Yerel repo</span></span><span id="worktree-total">—</span></div>
+              <div class="snapshot-breakdown" id="worktree-breakdown"></div>
+            </div>
+          </header>
+
+          <section class="hero-grid" aria-label="Öncelikli durum">
+            <div class="next-action">
+              <div class="action-kicker"><span aria-hidden="true"></span>Şu an senden gereken tek adım</div>
+              <h2 id="next-title">Durum okunuyor…</h2>
+              <p id="next-detail"></p>
+              <div class="action-foot">Bundan sonra sıradaki adımı bu panelde ve Codex’te adım adım ilerleteceğiz.</div>
+            </div>
+            <div class="live-status">
+              <div>
+                <span class="label">Dış sistemlerden canlı veri</span>
+                <h2>Henüz bağlanmadı</h2>
+                <p>Railway, Supabase, Apple, SMS ve ödeme sağlayıcıları şu anda buradan sorgulanmıyor.</p>
+              </div>
+              <div class="signal">Bu ekrandaki durumlar doğrulanmış kaynak anlık görüntüsüdür; yeşil görünmesi canlı servisin çalıştığı anlamına gelmez.</div>
+            </div>
+          </section>
+
+          <section class="metrics" aria-label="Durum özeti">
+            <div class="metric"><div class="metric-label">Takip edilen alan</div><div class="metric-value" id="metric-total">—</div><div class="metric-hint">Ürün ve operasyonun tamamı</div></div>
+            <div class="metric"><div class="metric-label">Engel var</div><div class="metric-value" id="metric-blocked">—</div><div class="metric-hint">Canlıya çıkışı durduran işler</div></div>
+            <div class="metric"><div class="metric-label">Senden gereken</div><div class="metric-value" id="metric-waiting">—</div><div class="metric-hint">Hesap veya karar bekleyen işler</div></div>
+            <div class="metric"><div class="metric-label">Kod kontrolü geçti</div><div class="metric-value" id="metric-pass">—</div><div class="metric-hint">Kaynak kontrolü; cihaz testi değil</div></div>
+          </section>
+
+          <section class="systems" id="systems">
+            <div class="section-heading">
+              <div><h2>Tüm alanlar</h2><p>Her durumun sahibi, sıradaki adımı ve kanıtı görünür.</p></div>
+              <span class="count" id="result-count" aria-live="polite"></span>
+            </div>
+            <div class="toolbar">
+              <div class="filters" role="group" aria-label="Sistem alanına göre filtrele" id="category-filters">
+                <button class="filter" type="button" data-category="all" aria-pressed="true">Tümü</button>
+              </div>
+              <label class="sr-only" for="search">Alanlarda ara</label>
+              <input class="search" id="search" type="search" autocomplete="off" placeholder="Alan, sağlayıcı veya eksik iş ara" />
+            </div>
+            <div class="filters" role="group" aria-label="Duruma göre filtrele" id="status-filters" style="margin:-2px 0 14px">
+              <button class="filter" type="button" data-status="all" aria-pressed="true">Her durum</button>
+              <button class="filter" type="button" data-status="blocked" aria-pressed="false">Engelli</button>
+              <button class="filter" type="button" data-status="waiting" aria-pressed="false">Senden bekliyor</button>
+              <button class="filter" type="button" data-status="open" aria-pressed="false">Açık işler</button>
+              <button class="filter" type="button" data-status="pass" aria-pressed="false">Geçen kontroller</button>
+            </div>
+            <div class="system-grid" id="system-grid" aria-live="polite"></div>
+          </section>
+
+          <section class="guardrail" id="guardrail">
+            <div class="guard-icon" aria-hidden="true">i</div>
+            <div>
+              <h2>Panelin güvenlik sınırı</h2>
+              <p>Bu ilk sürüm yalnızca durum gösterir; Blumi kullanıcılarını, limitleri, satın alımları veya veritabanını değiştiremez. Gerçek admin işlemleri için ayrı operatör kimliği, dar yetki ve denetim kaydı gerekir. Canlı servis ve maliyet uyarıları da ilgili sağlayıcılara güvenli bağlantı kurulduktan sonra eklenir; şifreleri veya OTP kodlarını buraya yazma.</p>
+            </div>
+          </section>
+
+          <footer>
+            <span>Durum kaynağı: `docs/release/LAUNCH_CONTROL.md` · Son kaynak kontrolü: <span id="footer-date"></span></span>
+            <span>Panel oluşturuldu: <time id="build-time"></time> · dış servis verisi bağlı değil</span>
+          </footer>
+        </div>
+      </main>
+    </div>
+
+    <script type="application/json" id="ops-data">__OPS_DATA__</script>
+    <script>
+      (() => {
+        const data = JSON.parse(document.getElementById("ops-data").textContent || "{}");
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+        const state = { category: "all", status: "all", query: "" };
+        const byId = (id) => document.getElementById(id);
+
+        function statusKey(status) {
+          const value = status.toLowerCase();
+          if (value.includes("blocked") || value.includes("block") || value.includes("engelli")) return "blocked";
+          if (value.includes("waiting") || value.includes("bekliyor")) return "waiting";
+          if (value.includes("pass") || value.includes("geçti")) return "pass";
+          if (value.includes("open") || value.includes("açık") || value.includes("not present") || value.includes("not configured") || value.includes("henüz") || value.includes("kurulmadı")) return "open";
+          return "progress";
+        }
+
+        function statusLabel(status) {
+          const value = statusKey(status);
+          if (value === "blocked") return "Engelli";
+          if (value === "waiting") return "Senden bekliyor";
+          if (value === "pass") return "Kontrol geçti";
+          if (value === "open") return "Açık";
+          return "Sürüyor";
+        }
+
+        function element(tag, className, text) {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined) node.textContent = text;
+          return node;
+        }
+
+        function addMeta(parent, label, value, extraClass) {
+          const row = element("div", "meta-row");
+          row.append(element("span", "meta-label", label));
+          row.append(element("span", extraClass || "meta-value", value));
+          parent.append(row);
+        }
+
+        function renderCategories() {
+          const holder = byId("category-filters");
+          const categories = [...new Set(rows.map((row) => row.category))];
+          for (const category of categories) {
+            const button = element("button", "filter", category);
+            button.type = "button";
+            button.dataset.category = category;
+            button.setAttribute("aria-pressed", "false");
+            holder.append(button);
+          }
+        }
+
+        function render() {
+          const holder = byId("system-grid");
+          holder.replaceChildren();
+          const visible = rows.filter((row) => {
+            const normalized = `${row.category} ${row.area} ${row.status} ${row.meaning} ${row.owner} ${row.nextAction} ${row.evidence}`.toLocaleLowerCase("tr-TR");
+            return (state.category === "all" || row.category === state.category) &&
+              (state.status === "all" || statusKey(row.status) === state.status) &&
+              (!state.query || normalized.includes(state.query));
+          });
+          byId("result-count").textContent = `${visible.length} / ${rows.length} alan gösteriliyor`;
+
+          if (visible.length === 0) {
+            holder.append(element("div", "empty", "Bu aramaya veya filtreye uygun alan yok."));
+            return;
+          }
+
+          for (const item of visible) {
+            const card = element("article", "system-card");
+            const top = element("div", "card-top");
+            const titleGroup = element("div", "");
+            titleGroup.append(element("p", "card-category", item.category));
+            titleGroup.append(element("h3", "card-title", item.area));
+            const status = element("span", `status status-${statusKey(item.status)}`, statusLabel(item.status));
+            status.setAttribute("aria-label", `Durum: ${item.status}`);
+            top.append(titleGroup, status);
+            card.append(top);
+            card.append(element("p", "card-description", item.meaning));
+            const meta = element("div", "card-meta");
+            addMeta(meta, "Sorumlu", item.owner);
+            addMeta(meta, "Sıradaki adım", item.nextAction);
+            addMeta(meta, "Kanıt", item.evidence, "meta-value card-evidence");
+            card.append(meta);
+            holder.append(card);
+          }
+        }
+
+        function selectFilter(group, key, value) {
+          state[key] = value;
+          for (const button of document.querySelectorAll(`#${group} .filter`)) {
+            const selected = button.dataset[key] === value;
+            button.setAttribute("aria-pressed", String(selected));
+          }
+          render();
+        }
+
+        byId("category-filters").addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-category]");
+          if (button) selectFilter("category-filters", "category", button.dataset.category);
+        });
+        byId("status-filters").addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-status]");
+          if (button) selectFilter("status-filters", "status", button.dataset.status);
+        });
+        byId("search").addEventListener("input", (event) => {
+          state.query = event.target.value.trim().toLocaleLowerCase("tr-TR");
+          render();
+        });
+
+        const date = data.snapshotDate || "Tarih belirtilmemiş";
+        byId("snapshot-date").textContent = date;
+        byId("footer-date").textContent = date;
+        byId("snapshot-branch").textContent = data.worktree?.branch || "Yerel repo";
+        byId("worktree-total").textContent = `${data.worktree?.total ?? "—"} değişiklik`;
+        byId("worktree-breakdown").textContent = `${data.worktree?.modified ?? 0} düzenleme · ${data.worktree?.deleted ?? 0} silinme · ${data.worktree?.untracked ?? 0} yeni`;
+        const generatedAt = new Date(data.generatedAt);
+        byId("build-time").textContent = Number.isNaN(generatedAt.valueOf())
+          ? "Tarih yok"
+          : generatedAt.toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+        byId("next-title").textContent = data.nextActionTitle || "Öncelikli adım henüz kaydedilmedi";
+        byId("next-detail").textContent = data.nextAction || "Kaynak panoya bir sonraki adımı ekleyince burada görünecek.";
+
+        const totals = { blocked: 0, waiting: 0, pass: 0 };
+        for (const row of rows) {
+          const key = statusKey(row.status);
+          if (Object.hasOwn(totals, key)) totals[key] += 1;
+        }
+        byId("metric-total").textContent = String(rows.length);
+        byId("metric-blocked").textContent = String(totals.blocked);
+        byId("metric-waiting").textContent = String(totals.waiting);
+        byId("metric-pass").textContent = String(totals.pass);
+        renderCategories();
+        render();
+      })();
+    </script>
+  </body>
+</html>

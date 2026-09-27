@@ -9,3 +9,4 @@ export * from "./economy/universalCoreRoomEconomy";
 export * from "./release/releaseCatalog";
 export * from "./avatar/avatarLoadoutCatalog";
 export * from "./avatar/avatarLoadoutRules";
+export * from "./avatar/retiredAvatarItems";

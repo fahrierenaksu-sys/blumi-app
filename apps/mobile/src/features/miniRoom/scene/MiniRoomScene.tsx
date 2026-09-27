@@ -56,6 +56,7 @@ interface MiniRoomSceneProps {
   }
   participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
   connectionStatus: MiniRoomConnectionStatus
+  voiceAvailable: boolean
   localMedia: MiniRoomLocalMediaState
   roomDecorScene?: ResolvedRoomV2Scene
   leaveDisabled: boolean
@@ -83,6 +84,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     copy,
     participantAvatarSnapshots,
     connectionStatus,
+    voiceAvailable,
     localMedia,
     roomDecorScene,
     leaveDisabled,
@@ -336,6 +338,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       >
         <StableMiniRoomHud
           connectionStatus={connectionStatus}
+          voiceAvailable={voiceAvailable}
           localMedia={localMedia}
           copy={copy}
           leaveDisabled={leaveDisabled}

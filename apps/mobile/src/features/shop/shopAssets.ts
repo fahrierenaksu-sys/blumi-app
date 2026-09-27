@@ -6,6 +6,8 @@ import {
 import { MALE_CAPSULE_PREVIEW_SOURCES } from "../avatarV2/maleCapsulePreviewSources"
 import { PREMIUM_FACE_PREVIEW_SOURCES } from "../avatarV2/avatarV2PreviewAssets"
 import { roomAvatarLayerAssets } from "../avatarV2/room/avatarRoomAssets"
+import { getGarmentThumbnailOverride } from "../avatarV2/garmentThumbnailOverrides"
+import shopThumbnailBounds from "./shopThumbnailBounds.json"
 
 export const PRODUCT_REFERENCE_AVATAR_ITEM_IDS = new Set([
   "avatar_v2_eyes_sage_glass",
@@ -204,7 +206,13 @@ export function getAvatarItemPreviewSource(
 export function getShopProductThumbnailSource(
   sourceItemId: string
 ): ImageSourcePropType | undefined {
-  return SHOP_THUMBNAIL_SOURCES[sourceItemId]
+  return getGarmentThumbnailOverride(sourceItemId)?.source
+    ?? SHOP_THUMBNAIL_SOURCES[sourceItemId]
+}
+
+export function getShopProductThumbnailBounds(sourceItemId: string): readonly number[] | undefined {
+  return getGarmentThumbnailOverride(sourceItemId)?.bounds
+    ?? (shopThumbnailBounds as Record<string, number[]>)[sourceItemId]
 }
 
 export function getRoomProductThumbnailSource(

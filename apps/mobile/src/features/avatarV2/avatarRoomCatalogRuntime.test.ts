@@ -381,7 +381,7 @@ test("the default male room avatar uses an independent fitted starter stack", ()
     baseId: "room_avatar_base_male_light_v1",
     faceId: "room_avatar_face_male_warm_friendly_v1",
     hairBackId: undefined,
-    hairFrontId: "room_avatar_hair_front_male_espresso_crop_v1",
+    hairFrontId: "room_avatar_hair_front_male_cocoa_textured_quiff_v1",
     topId: "room_avatar_top_male_powder_blue_crew_tee_v1",
     bottomId: "room_avatar_bottom_male_navy_straight_pants_v1",
     shoesId: "room_avatar_shoes_male_milk_tea_court_v1",
@@ -703,7 +703,7 @@ test("promoted female wardrobe layers carry an explicit rig and fit profile", ()
   }
 })
 
-test("a persisted cream and sage male loadout keeps its selected layers", () => {
+test("a persisted cream and sage male loadout falls back from retired hair and keeps other layers", () => {
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({
     avatar: {
       bodyId: "avatar_v2_body_male_light",

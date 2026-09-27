@@ -20,7 +20,7 @@ if (!operatorId) throw new Error("Use --subject=operator-id.")
 if (
   requestedScopes.length === 0 ||
   !requestedScopes.every((scope) => ADMIN_SCOPES.includes(scope as AdminScope))
-) throw new Error("Use --scopes=reports:read and/or reports:resolve.")
+) throw new Error("Use --scopes=<comma-separated supported scopes>.")
 
 const config = resolveServerConfig()
 const key = config.adminSigningKeys.find(

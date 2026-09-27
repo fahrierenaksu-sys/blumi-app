@@ -139,6 +139,72 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
   }
 })
 
+test("opening a matched chat with a test persona creates one incoming room invite", async () => {
+  const authService = createAuthService({ codeFactory: () => "482931" })
+  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const matchService = createMatchService({
+    repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
+  })
+  const miniRoomService = createMiniRoomService({
+    presenceService: createPresenceService({ roomService: createRoomService() }),
+    safetyService,
+    chatService,
+    livekitTokenService: createLivekitTokenService()
+  })
+  const app = createServer({
+    authService,
+    chatService,
+    safetyService,
+    matchService,
+    miniRoomService,
+    connectionManager: createConnectionManager()
+  })
+  try {
+    const user = await createEligibleAccount(app, authService, "+905551110010", "Ada")
+    const persona = await createEligibleAccount(app, authService, "+905551110011", "Bora")
+    chatService.repository.findTestPersona = async (userId) => userId === persona.userId
+      ? { userId, greeting: "Merhaba", replies: ["Nasılsın?"] }
+      : null
+    await matchService.repository.createMatch({
+      matchId: "persona_room",
+      participantUserIds: [user.userId, persona.userId],
+      matchedAt: "2026-07-21T10:00:00.000Z"
+    })
+    const threadId = "thread_match_persona_room"
+    await chatService.createThread({
+      threadId,
+      miniRoomId: "match_persona_room",
+      participantUserIds: [user.userId, persona.userId],
+      participants: [
+        { userId: user.userId, displayName: "Ada" },
+        { userId: persona.userId, displayName: "Bora" }
+      ]
+    })
+
+    const first = await app.inject({
+      method: "GET",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${user.sessionToken}` }
+    })
+    assert.equal(first.statusCode, 200)
+    assert.equal(first.json().invites.length, 1)
+    assert.equal(first.json().invites[0].senderUserId, persona.userId)
+    assert.equal(first.json().invites[0].recipientUserId, user.userId)
+
+    const repeated = await app.inject({
+      method: "GET",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${user.sessionToken}` }
+    })
+    assert.equal(repeated.statusCode, 200)
+    assert.equal(repeated.json().invites.length, 1)
+    assert.equal(repeated.json().invites[0].inviteId, first.json().invites[0].inviteId)
+  } finally {
+    await app.close()
+  }
+})
+
 test("room invite creation rejects a chat not backed by a persisted mutual match", async () => {
   const authService = createAuthService({ codeFactory: () => "482931" })
   const chatService = createChatService()

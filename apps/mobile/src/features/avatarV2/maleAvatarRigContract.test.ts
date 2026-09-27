@@ -245,7 +245,7 @@ test("male starter PNGs keep fully transparent pixels colorless", () => {
   const staticAssets = [
     "avatar_room_base_male_light_v1.png",
     "avatar_room_face_male_warm_friendly_v1.png",
-    "avatar_room_hair_front_male_espresso_crop_v1.png",
+    "avatar_room_hair_front_male_cocoa_textured_quiff_v1.png",
     "avatar_room_top_male_cream_basic_tee_v1.png",
     assetNames.top,
     "avatar_room_bottom_male_sage_cuffed_shorts_v1.png",

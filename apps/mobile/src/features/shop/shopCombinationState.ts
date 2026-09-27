@@ -108,11 +108,12 @@ export type ShopCombinationAction =
 
 export function createShopCombinationState(input: {
   equipped: ShopCombinationDraft
+  previewDraft?: ShopCombinationDraft
   ownedProductIds: readonly string[]
   avatarRevision: ShopAvatarRevision
 }): ShopCombinationState {
   return {
-    draft: { ...input.equipped },
+    draft: { ...(input.previewDraft ?? input.equipped) },
     equipped: { ...input.equipped },
     ownedProductIds: unique(input.ownedProductIds),
     avatarRevision: input.avatarRevision,

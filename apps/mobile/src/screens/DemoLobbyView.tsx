@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useRef } from "react"
-import { Animated, StyleSheet, Vibration, View } from "react-native"
+import { Animated, StyleSheet, View } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -20,6 +20,7 @@ import { DiscoveryDeckView } from "../features/discovery/DiscoveryDeckView"
 import { EmptyDiscoveryDeck } from "../features/discovery/EmptyDiscoveryDeck"
 import { createLocalDemoMatch } from "../features/matches/matchRoomModel"
 import { uiTheme } from "../ui/theme"
+import { getAppLocale } from "../features/session/appLocale"
 
   // Demo-only visual fixture. Production Discovery receives roomSnapshotUrl
   // from the server's revision-bound Room Save projection instead.
@@ -30,6 +31,7 @@ interface DemoLobbyViewProps {
 }
 
 export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
+  const locale = getAppLocale()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const demo = useDemoStore()
 
@@ -40,7 +42,6 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
 
   const handleSwipeRight = useCallback(
     (userId: string) => {
-      Vibration.vibrate(18)
       const result = demo.like(
         userId,
         {
@@ -52,7 +53,6 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
         const matchedProfile = result.profile
         // Let the card finish leaving before opening the match moment.
         setTimeout(() => {
-          Vibration.vibrate([0, 40, 60, 40, 60, 80])
           navigation.navigate("MatchResult", {
             match: createLocalDemoMatch({
               currentUser: {
@@ -61,7 +61,8 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
               },
               matchedUser: {
                 userId: matchedProfile.userId,
-                displayName: matchedProfile.displayName
+                displayName: matchedProfile.displayName,
+                avatarPresetId: matchedProfile.avatarPresetId
               },
               mode: "demo"
             })
@@ -74,7 +75,6 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
 
   const handleSwipeLeft = useCallback(
     (userId: string) => {
-      Vibration.vibrate(10)
       demo.skip(userId)
     },
     [demo]
@@ -89,16 +89,19 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
           prompts: profile.prompt
             ? [{ promptId: "small_joy" as const, answer: profile.prompt }]
             : undefined,
-          badges: profile.badges,
           roomSnapshot: demoRoomSnapshot,
-          roomHeadline: profile.userId === "demo-user-001" ? "Kahve ve sakin pazarlar" : undefined
+          roomHeadline: profile.userId === "demo-user-001"
+            ? locale === "tr" ? "Kahve ve sakin pazarlar" : "Coffee and quiet Sundays"
+            : undefined
         }))}
         swipeAnim={swipeAnim}
         onSwipeRight={handleSwipeRight}
         onSwipeLeft={handleSwipeLeft}
         progressLabel={demo.deckRemaining > 0
-          ? `${demo.deckRemaining} nearby ${demo.deckRemaining === 1 ? "vibe" : "vibes"}`
-          : "Fresh vibes soon"}
+          ? locale === "tr"
+            ? `Yakınında ${demo.deckRemaining} kişi`
+            : `${demo.deckRemaining} nearby ${demo.deckRemaining === 1 ? "vibe" : "vibes"}`
+          : locale === "tr" ? "Yeni kişiler yakında" : "Fresh vibes soon"}
         emptyContent={(
           <EmptyDiscoveryDeck
             avatarName={sessionActor.profile.displayName}

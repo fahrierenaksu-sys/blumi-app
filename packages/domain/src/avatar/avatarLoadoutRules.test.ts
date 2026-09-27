@@ -111,7 +111,25 @@ test("V2 validation accepts explicit empty new slots and rejects unavailable ite
       { ...v2, outerwearId: DEFAULT_FEMALE_AVATAR_LOADOUT.topId },
       ownedDefaultIds
     ).code,
-    "wrong_slot"
+    "unknown_item"
+  )
+})
+
+test("retired tops and unsupported outerwear cannot be equipped even when owned", () => {
+  const v2 = toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT)
+  assert.equal(
+    validateAvatarLoadout(
+      { ...v2, topId: "avatar_v2_top_blush_lace_cardigan" },
+      [...ownedDefaultIds, "avatar_v2_top_blush_lace_cardigan"]
+    ).code,
+    "retired_item"
+  )
+  assert.equal(
+    validateAvatarLoadout(
+      { ...v2, outerwearId: "avatar_v2_top_sage_ribbon_knit_jacket" },
+      [...ownedDefaultIds, "avatar_v2_top_sage_ribbon_knit_jacket"]
+    ).code,
+    "unknown_item"
   )
 })
 
