@@ -4,8 +4,20 @@ import { getAllLegalContent, getLegalContent } from "./legalCopy"
 import {
   getLegalReleaseBlockers,
   LEGAL_DOCUMENT_VERSION,
+  LEGAL_OPERATOR_IDENTITY,
   LEGAL_REQUIRED_MARKER
 } from "./legalPolicyMetadata"
+
+test("individual controller copy states the country without inventing a postal address", () => {
+  for (const locale of ["en", "tr"] as const) {
+    const privacy = getLegalContent(locale, "privacy").body
+    const terms = getLegalContent(locale, "terms").body
+    assert.match(privacy, new RegExp(LEGAL_OPERATOR_IDENTITY.legalName))
+    assert.match(terms, new RegExp(LEGAL_OPERATOR_IDENTITY.legalName))
+    assert.match(privacy, /Türkiye/)
+    assert.doesNotMatch(`${privacy}\n${terms}`, /Montreal|Xavier Ballesteros|Kayıtlı adres|Registered address/i)
+  }
+})
 
 test("legal copy discloses consumable coin economics without promising restore purchases", () => {
   for (const locale of ["en", "tr"] as const) {
@@ -35,6 +47,8 @@ test("privacy copy discloses controller identity, processing paths, rights, and 
   assert.match(enPrivacy.body, /retention|retain/i)
   assert.match(enPrivacy.body, /account-data export|delete your account|rights/i)
   assert.match(enPrivacy.body, /support page|privacy choices/i)
+  assert.match(enPrivacy.body, /does not request your device location/i)
+  assert.match(enPrivacy.body, /coordinates were saved.*earlier version/i)
 
   assert.match(trPrivacy.body, /veri sorumlusu/i)
   assert.match(trPrivacy.body, /telefon numarası|görünen ad|mesajlar|raporlar/i)
@@ -50,6 +64,8 @@ test("privacy copy discloses controller identity, processing paths, rights, and 
   assert.match(trPrivacy.body, /saklama/i)
   assert.match(trPrivacy.body, /hesap verisi dışa aktarımı|hesabını silebilirsin|hakların/i)
   assert.match(trPrivacy.body, /destek sayfası|gizlilik tercihleri/i)
+  assert.match(trPrivacy.body, /cihazının konumunu istemez/i)
+  assert.match(trPrivacy.body, /önceki bir sürümde hesabına koordinat kaydedildiyse/i)
 })
 
 test("terms copy covers eligibility, safety, virtual items, and dispute boundaries", () => {
@@ -57,7 +73,7 @@ test("terms copy covers eligibility, safety, virtual items, and dispute boundari
   const trTerms = getLegalContent("tr", "terms")
 
   assert.match(enTerms.body, /18 years old/i)
-  assert.match(enTerms.body, /mutual interest|live audio/i)
+  assert.match(enTerms.body, /mutual-interest matching/i)
   assert.match(enTerms.body, /virtual|licensed/i)
   assert.match(enTerms.body, /suspend|terminate/i)
   assert.match(enTerms.body, /user content|license/i)
@@ -68,7 +84,7 @@ test("terms copy covers eligibility, safety, virtual items, and dispute boundari
   assert.doesNotMatch(enTerms.body, /not liable for any damages/i)
 
   assert.match(trTerms.body, /18 yaş/i)
-  assert.match(trTerms.body, /karşılıklı ilgi|canlı ses/i)
+  assert.match(trTerms.body, /karşılıklı ilgiyle eşleşme/i)
   assert.match(trTerms.body, /sanal|lisans/i)
   assert.match(trTerms.body, /askıya al|sonlandır/i)
   assert.match(trTerms.body, /kullanıcı içeriği|lisans/i)
@@ -76,6 +92,21 @@ test("terms copy covers eligibility, safety, virtual items, and dispute boundari
   assert.match(trTerms.body, /çevrim dışı|yüz yüze|acil/i)
   assert.match(trTerms.body, /emredici tüketici hakları/i)
   assert.match(trTerms.body, /tazmin|sorumluluk|uygulanacak hukuk|iletişim/i)
+})
+
+test("first-release terms do not advertise disabled voice or paid coin purchases", () => {
+  const en = getLegalContent("en", "terms").body
+  const tr = getLegalContent("tr", "terms").body
+  assert.match(en, /Live audio and paid coin purchases are unavailable in this release/i)
+  assert.match(tr, /Canlı ses ve ücretli jeton satın alma bu sürümde kullanılamaz/i)
+  assert.doesNotMatch(en, /Live audio is optional, starts muted/i)
+  assert.doesNotMatch(tr, /Canlı ses isteğe bağlıdır, sessiz\/kapalı başlar/i)
+  assert.doesNotMatch(en, /relies on [^.]*live-audio/i)
+  assert.doesNotMatch(tr, /Blumi [^.]*canlı ses[^.]*sağlayıcılarına dayanır/i)
+  assert.match(getLegalContent("en", "guidelines").body, /Live audio is unavailable in this release/i)
+  assert.match(getLegalContent("tr", "guidelines").body, /Canlı ses bu sürümde yoktur/i)
+  assert.doesNotMatch(getLegalContent("en", "guidelines").body, /Live audio starts muted/i)
+  assert.doesNotMatch(getLegalContent("tr", "guidelines").body, /Canlı ses sessiz\/kapalı başlar/i)
 })
 
 test("legal bundle is versioned, bilingual, consent-safe, and effective", () => {

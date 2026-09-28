@@ -33,6 +33,15 @@ export interface SafetyReportInput {
   idempotencyKey: string
 }
 
+export type MySafetyReportStatus = "pending" | "resolved" | "dismissed"
+
+export interface MySafetyReportRecord {
+  reportId: string
+  createdAt: string
+  status: MySafetyReportStatus
+  response: string
+}
+
 function withBaseUrl(baseHttpUrl: string, path: string): string {
   const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
   return `${trimmed}${path}`
@@ -132,6 +141,54 @@ export async function reportSafetyUser(
   }
 
   return normalizeReportPayload(payload)
+}
+
+export async function fetchMySafetyReports(
+  baseHttpUrl: string,
+  sessionToken: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<MySafetyReportRecord[]> {
+  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/safety/reports"), {
+    headers: createAuthHeaders(sessionToken),
+    signal
+  })
+  const payload: unknown = await response.json()
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload, "We could not load your reports."))
+  }
+  return normalizeMyReportsPayload(payload)
+}
+
+export function normalizeMyReportsPayload(payload: unknown): MySafetyReportRecord[] {
+  const reports = (payload as { reports?: unknown } | null)?.reports
+  if (!Array.isArray(reports)) {
+    throw new Error("Blumi could not read your reports.")
+  }
+  return reports.map(normalizeMyReportRecord)
+}
+
+function normalizeMyReportRecord(value: unknown): MySafetyReportRecord {
+  if (!value || typeof value !== "object") {
+    throw new Error("Blumi could not read one of your reports.")
+  }
+  const record = value as Partial<MySafetyReportRecord>
+  if (
+    typeof record.reportId !== "string" ||
+    typeof record.createdAt !== "string" ||
+    (record.status !== "pending" && record.status !== "resolved" && record.status !== "dismissed") ||
+    typeof record.response !== "string"
+  ) {
+    throw new Error("Blumi could not read one of your reports.")
+  }
+  // Allowlist the public reporter view so future API additions cannot expose
+  // moderation notes, sanctions, or another member's identity in the client.
+  return {
+    reportId: record.reportId,
+    createdAt: record.createdAt,
+    status: record.status,
+    response: record.response
+  }
 }
 
 export function normalizeBlocksPayload(payload: unknown): SafetyBlockRecord[] {

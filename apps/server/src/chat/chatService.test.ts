@@ -134,6 +134,11 @@ test("empty and oversized messages are rejected", async () => {
     () => service.sendMessage("user_a", "thread_one", "x".repeat(501)),
     /500/
   )
+  await assert.rejects(
+    () => service.sendMessage("user_a", "thread_one", "kill yourself"),
+    /community rules/
+  )
+  assert.deepEqual(await service.listMessages("user_b", "thread_one"), [])
 })
 
 test("malformed client retry IDs are rejected before persistence", async () => {

@@ -21,11 +21,53 @@ export interface SafetyRouteServices {
   miniRoomService?: MiniRoomService
 }
 
+const reporterReportResponseSchema = {
+  type: "object",
+  required: ["reportId", "createdAt", "status", "response"],
+  additionalProperties: false,
+  properties: {
+    reportId: { type: "string" },
+    createdAt: { type: "string" },
+    status: { type: "string", enum: ["pending", "resolved", "dismissed"] },
+    response: { type: "string" }
+  }
+} as const
+
 export async function registerSafetyRoutes(
   app: FastifyInstance,
   services: SafetyRouteServices
 ): Promise<void> {
   const { authService, safetyService, miniRoomService } = services
+
+  app.get("/v1/safety/reports", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    schema: {
+      response: {
+        200: {
+          type: "object",
+          required: ["reports"],
+          additionalProperties: false,
+          properties: {
+            reports: { type: "array", items: reporterReportResponseSchema }
+          }
+        },
+        ...authenticatedErrorResponses
+      }
+    }
+  }, async (request, reply) => {
+    const resolved = await resolveBearerSession({ request, reply, authService })
+    if (!resolved) return
+
+    const reports = await safetyService.listReportsForActor(resolved.account.userId, 50)
+    return {
+      reports: reports.map((report) => ({
+        reportId: report.reportId,
+        createdAt: report.createdAt,
+        status: report.status,
+        response: reporterResponseForStatus(report.status)
+      }))
+    }
+  })
 
   app.get("/v1/safety/blocks", {
     schema: {
@@ -171,6 +213,13 @@ export async function registerSafetyRoutes(
       })
     }
   })
+}
+
+function reporterResponseForStatus(status: "pending" | "resolved" | "dismissed"): string {
+  if (status === "pending") {
+    return "We received your report. Our safety team is reviewing it."
+  }
+  return "We reviewed your report and closed it. Thank you for helping keep Blumi safe."
 }
 
 function readIdempotencyKey(value: string | string[] | undefined): string | undefined {

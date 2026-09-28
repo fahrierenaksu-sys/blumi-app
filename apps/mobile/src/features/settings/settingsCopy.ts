@@ -18,6 +18,15 @@ export interface SettingsCopy {
   notificationNote: string
   safety: string
   noHiddenPeople: string
+  myReports: string
+  myReportsDescription: string
+  reportsLoading: string
+  reportsUnavailable: string
+  noReports: string
+  reportPending: string
+  reportReviewed: string
+  reportPendingResponse: string
+  reportClosedResponse: string
   privacy: string
   analytics: string
   on: string
@@ -108,6 +117,11 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     notificationDescription: "Choose this when you want match and message updates outside the app. Blumi will ask for device permission next.",
     opening: "Opening…", enable: "Enable", notificationNote: "Choose only the moments that are useful to you. Quiet hours and delivery limits are enforced by Blumi.",
     safety: "SAFETY", noHiddenPeople: "No one is hidden right now. If you hide someone, they will appear here.",
+    myReports: "My reports", myReportsDescription: "Check the status of reports you sent.",
+    reportsLoading: "Loading your reports…", reportsUnavailable: "Your reports could not be loaded.",
+    noReports: "You have not sent a safety report yet.", reportPending: "In review", reportReviewed: "Reviewed",
+    reportPendingResponse: "We received your report. Our safety team is reviewing it.",
+    reportClosedResponse: "We reviewed your report and closed it. Thank you for helping keep Blumi safe.",
     privacy: "PRIVACY", analytics: "Product analytics", on: "On", off: "Off",
     analyticsNote: "Optional, anonymous product events only. No messages, profile text, photos, session replay, or advertising identifiers.",
     about: "ABOUT", version: "Version", philosophy: "Philosophy", philosophyValue: "Avatar-first dating",
@@ -140,6 +154,11 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     notificationDescription: "Uygulama dışında eşleşme ve mesaj güncellemeleri istediğinde bunu seç. Blumi birazdan cihaz izni ister.",
     opening: "Açılıyor…", enable: "Etkinleştir", notificationNote: "Yalnızca sana yararlı anları seç. Sessiz saatler ve gönderim sınırları Blumi tarafından uygulanır.",
     safety: "GÜVENLİK", noHiddenPeople: "Şu an gizlediğin kimse yok. Birini gizlersen burada görünür.",
+    myReports: "Bildirimlerim", myReportsDescription: "Gönderdiğin bildirimlerin durumunu gör.",
+    reportsLoading: "Bildirimlerin yükleniyor…", reportsUnavailable: "Bildirimlerin yüklenemedi.",
+    noReports: "Henüz güvenlik bildirimi göndermedin.", reportPending: "İnceleniyor", reportReviewed: "İncelendi",
+    reportPendingResponse: "Bildirimin bize ulaştı. Güvenlik ekibimiz inceliyor.",
+    reportClosedResponse: "Bildirimin incelendi ve kapatıldı. Blumi’yi güvenli tutmaya yardımcı olduğun için teşekkürler.",
     privacy: "GİZLİLİK", analytics: "Ürün analitiği", on: "Açık", off: "Kapalı",
     analyticsNote: "Yalnızca isteğe bağlı ve anonim ürün olayları. Mesajlar, profil metni, fotoğraflar, oturum kaydı veya reklam tanımlayıcıları dahil değildir.",
     about: "HAKKINDA", version: "Sürüm", philosophy: "Yaklaşım", philosophyValue: "Avatar öncelikli flört",

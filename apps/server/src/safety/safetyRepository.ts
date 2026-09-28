@@ -60,7 +60,7 @@ export interface SafetyRepository {
     report: ReportRecord,
     block: BlockRecord
   ): Promise<SaveReportAndBlockResult>
-  listReportsForActor(actorUserId: string): Promise<ReportRecord[]>
+  listReportsForActor(actorUserId: string, limit?: number): Promise<ReportRecord[]>
   listAllReports(options: { status?: string; limit: number }): Promise<ReportRecord[]>
   summarizePendingReports(
     query: PendingReportSummaryQuery
@@ -178,10 +178,11 @@ export function createInMemorySafetyRepository(
         block: { ...(existingBlock ?? block) }
       }
     },
-    async listReportsForActor(actorUserId) {
+    async listReportsForActor(actorUserId, limit = 50) {
       return [...store.reports.values()]
         .filter((report) => report.actorUserId === actorUserId)
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .slice(0, limit)
         .map(cloneReport)
     },
     async listAllReports(options) {

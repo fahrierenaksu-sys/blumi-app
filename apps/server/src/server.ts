@@ -40,6 +40,7 @@ import { registerDiscoverRoutes } from "./routes/discoverRoutes"
 import { registerEconomyRoutes } from "./routes/economyRoutes"
 import { registerCommerceRoutes } from "./routes/commerceRoutes"
 import { registerNotificationRoutes } from "./routes/notificationRoutes"
+import { registerLegalPageRoutes } from "./routes/legalPageRoutes"
 import { registerSafetyRoutes } from "./routes/safetyRoutes"
 import { registerConnectionRoutes } from "./routes/connectionRoutes"
 import { registerThreadRoutes } from "./routes/threadRoutes"
@@ -58,6 +59,7 @@ import { registerRealtimeTicketRoutes } from "./routes/realtimeTicketRoutes"
 import { createReadinessProbe } from "./operations/serviceLifecycle"
 import type { AdminTokenService } from "./admin/adminTokenService"
 import type { AdminUsersService } from "./admin/adminUsersService"
+import type { AdminAnalyticsService } from "./admin/adminAnalyticsService"
 import type { MiniRoomService } from "./miniRooms/miniRoomService"
 import { createAccountRecoveryService, type AccountRecoveryService } from "./account/accountRecoveryService"
 import { createReferralService, type ReferralService } from "./referrals/referralService"
@@ -113,8 +115,10 @@ interface CreateServerOptions {
   adminKey?: string
   adminTokenService?: AdminTokenService
   adminUsersService?: AdminUsersService
+  adminAnalyticsService?: AdminAnalyticsService
   allowLegacyAdminKey?: boolean
   appLinks?: AppLinkConfig
+  legalPagesEnabled?: boolean
   accountRecoveryService?: AccountRecoveryService
   referralService?: ReferralService
   personalRoomDecorService?: PersonalRoomDecorService
@@ -151,11 +155,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const referralService = options.referralService ?? createReferralService()
   const roomSnapshotService = options.roomSnapshotService ?? createRoomSnapshotService({
     isPublicByDefault: false,
-    onRenderError: (error, room) => {
+    onRenderError: (error) => {
       console.error("Room showcase snapshot render failed", {
-        error,
-        userId: room.userId,
-        revision: room.revision
+        errorType: error instanceof Error ? error.name : typeof error
       })
     }
   })
@@ -199,6 +201,10 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     corsOrigins: options.corsOrigins ?? []
   })
   registerErrorHandler(app)
+
+  if (options.legalPagesEnabled) {
+    void app.register(registerLegalPageRoutes)
+  }
 
   app.get("/health", async () => ({
     ok: true,
@@ -261,7 +267,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       adminTokenService: options.adminTokenService,
       allowLegacyAdminKey: options.allowLegacyAdminKey,
       accountRecoveryService,
-      adminUsersService: options.adminUsersService
+      adminUsersService: options.adminUsersService,
+      adminAnalyticsService: options.adminAnalyticsService,
+      connectionManager
     })
     await registerUserRoutes(instance, routeServices)
     await registerDiscoverRoutes(instance, routeServices)

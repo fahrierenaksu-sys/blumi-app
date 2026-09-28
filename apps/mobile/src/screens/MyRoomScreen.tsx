@@ -38,7 +38,7 @@ import {
 import { resolveRoomV2MyRoomCamera } from "../features/roomV2/roomV2Camera"
 import { resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetrics"
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
-import { getMyRoomCopy } from "../features/roomV2/myRoomCopy"
+import { getMyRoomCopy, getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   isRoomWorldPointWalkable,
@@ -117,7 +117,7 @@ export function MyRoomScreen({
   resolvedCapabilities
 }: MyRoomScreenProps) {
   const copy = getMyRoomCopy(getAppLocale())
-  const { userRoomDecor } = useRoomV2()
+  const { userRoomDecor, persistenceState } = useRoomV2()
   const { avatar, catalog } = useAvatarV2()
   const displayedAvatar = useMemo(() => resolveMyRoomAvatarSource(
     avatar,
@@ -732,7 +732,11 @@ export function MyRoomScreen({
           >
             <View style={styles.stageBackdrop} pointerEvents="none" />
             <View style={styles.stageTopScrim} pointerEvents="none" />
-            <RoomRenderer2D
+            {persistenceState === "loading" ? (
+              <Text style={styles.stageLoading} accessibilityRole="text">
+                {getMyRoomEditorCopy(getAppLocale()).preparing}
+              </Text>
+            ) : <RoomRenderer2D
               shell={baseRoomScene.shell}
               renderItems={renderItems}
               stageMarkers={stageMarker ? [stageMarker] : undefined}
@@ -750,7 +754,7 @@ export function MyRoomScreen({
                   transform: [{ translateY: stageRendererTranslateY }]
                 }
               ]}
-            />
+            />}
             <View style={styles.stageHud} pointerEvents="none">
               <Ionicons name="heart" size={13} color="#D92A79" />
               <Text style={styles.stageHeaderText} numberOfLines={1}>
@@ -966,6 +970,11 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     backgroundColor: "#E8B698",
+  },
+  stageLoading: {
+    color: "#702344",
+    fontSize: 16,
+    fontWeight: "600"
   },
   stageTopScrim: {
     position: "absolute",

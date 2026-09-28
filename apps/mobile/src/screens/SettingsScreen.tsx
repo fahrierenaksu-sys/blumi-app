@@ -25,8 +25,10 @@ import {
   useBlockStore
 } from "../features/safety/blockStore"
 import {
+  fetchMySafetyReports,
   unblockSafetyUser
 } from "../features/safety/safetyApi"
+import type { MySafetyReportRecord } from "../features/safety/safetyApi"
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -194,6 +196,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
     sessionActor.session.mode === "production"
   )
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [myReportsVisible, setMyReportsVisible] = useState(false)
+  const [myReports, setMyReports] = useState<MySafetyReportRecord[]>([])
+  const [myReportsStatus, setMyReportsStatus] = useState<"idle" | "loading" | "ready" | "error">("idle")
+  const [myReportsRetry, setMyReportsRetry] = useState(0)
   const [deletionCode, setDeletionCode] = useState("")
   const [deletionCodeVisible, setDeletionCodeVisible] = useState(false)
   const deletionFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
@@ -250,6 +256,26 @@ export function SettingsScreen(props: SettingsScreenProps) {
       active = false
     }
   }, [sessionActor.profile.discoveryPreferences, sessionActor.profile.userId, sessionActor.session.mode])
+
+  useEffect(() => {
+    if (!myReportsVisible || sessionActor.session.mode !== "production") return
+    const controller = new AbortController()
+    setMyReportsStatus("loading")
+    void fetchMySafetyReports(
+      MOBILE_HTTP_BASE_URL,
+      sessionActor.session.sessionToken,
+      fetch,
+      controller.signal
+    ).then((reports) => {
+      if (!controller.signal.aborted) {
+        setMyReports(reports)
+        setMyReportsStatus("ready")
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) setMyReportsStatus("error")
+    })
+    return () => controller.abort()
+  }, [myReportsRetry, myReportsVisible, sessionActor.session.mode, sessionActor.session.sessionToken])
 
   const loadNotificationPreferences = useCallback(async () => {
     if (sessionActor.session.mode !== "production") return
@@ -992,6 +1018,53 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   />
                 ))
               )}
+              {sessionActor.session.mode === "production" ? (
+                <>
+                  <SettingsRow
+                    icon="document-text"
+                    iconColors={uiTheme.gradients.cool}
+                    label={copy.myReports}
+                    description={copy.myReportsDescription}
+                    chevron
+                    isLast={!myReportsVisible}
+                    onPress={() => setMyReportsVisible((visible) => !visible)}
+                  />
+                  {myReportsVisible ? (
+                    <View style={styles.myReportsPanel}>
+                      {myReportsStatus === "loading" || myReportsStatus === "idle" ? (
+                        <Text accessibilityRole="text" style={styles.myReportMessage}>{copy.reportsLoading}</Text>
+                      ) : myReportsStatus === "error" ? (
+                        <View style={styles.myReportErrorRow}>
+                          <Text accessibilityRole="alert" style={styles.myReportMessage}>{copy.reportsUnavailable}</Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={copy.notificationsRetry}
+                            onPress={() => setMyReportsRetry((value) => value + 1)}
+                          >
+                            <Text style={styles.myReportRetry}>{copy.notificationsRetry}</Text>
+                          </Pressable>
+                        </View>
+                      ) : myReports.length === 0 ? (
+                        <Text style={styles.myReportMessage}>{copy.noReports}</Text>
+                      ) : myReports.map((report, index) => (
+                        <View key={report.reportId} style={[styles.myReportRow, index < myReports.length - 1 && styles.myReportDivider]}>
+                          <View style={styles.myReportHeading}>
+                            <Text style={styles.myReportStatus}>
+                              {report.status === "pending" ? copy.reportPending : copy.reportReviewed}
+                            </Text>
+                            <Text style={styles.myReportDate}>
+                              {new Date(report.createdAt).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB")}
+                            </Text>
+                          </View>
+                          <Text style={styles.myReportMessage}>
+                            {report.status === "pending" ? copy.reportPendingResponse : copy.reportClosedResponse}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : null}
             </View>
           </View>
 
@@ -1443,6 +1516,50 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.textMuted,
     lineHeight: 18,
     paddingHorizontal: uiTheme.spacing.xs
+  },
+  myReportsPanel: {
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingBottom: uiTheme.spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: uiTheme.colors.glassBorder
+  },
+  myReportRow: {
+    gap: uiTheme.spacing.xxs,
+    paddingVertical: uiTheme.spacing.sm
+  },
+  myReportDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: uiTheme.colors.glassBorder
+  },
+  myReportHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: uiTheme.spacing.sm
+  },
+  myReportStatus: {
+    ...uiTheme.font.subheading,
+    color: uiTheme.colors.textPrimary
+  },
+  myReportDate: {
+    ...uiTheme.font.caption,
+    color: uiTheme.colors.textMuted
+  },
+  myReportMessage: {
+    ...uiTheme.font.bodySmall,
+    color: uiTheme.colors.textSecondary,
+    lineHeight: 20
+  },
+  myReportErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: uiTheme.spacing.sm,
+    paddingTop: uiTheme.spacing.sm
+  },
+  myReportRetry: {
+    ...uiTheme.font.subheading,
+    color: uiTheme.colors.primary
   },
   deletionModalBackdrop: {
     flex: 1,

@@ -132,6 +132,7 @@ export function RoomV2Provider({
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
     [
       ownedRoomItemIdKey,
+      inventoryStore.isReady,
       qaOnlyOwnedRoomItemIds,
       isQaRuntimeAuthorized,
       isVNextRuntimeProof,

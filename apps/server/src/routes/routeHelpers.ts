@@ -87,16 +87,6 @@ export function readLimit(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-export function readLocationNumber(
-  body: Record<string, unknown>,
-  key: "lat" | "lng"
-): number | undefined {
-  const flatKey = key === "lat" ? "locationLat" : "locationLng"
-  if (typeof body[flatKey] === "number") return body[flatKey]
-  const location = isRecord(body.location) ? body.location : null
-  return typeof location?.[key] === "number" ? location[key] : undefined
-}
-
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }

@@ -1,7 +1,8 @@
 import { Platform } from "react-native"
 import {
   BLUMI_REVENUECAT_ANDROID_API_KEY,
-  BLUMI_REVENUECAT_IOS_API_KEY
+  BLUMI_REVENUECAT_IOS_API_KEY,
+  IS_BLUMI_PAID_COINS_ENABLED
 } from "../../config/env"
 import {
   createRevenueCatCoinPackClient,
@@ -37,11 +38,11 @@ export function resolveRevenueCatPublicApiKey(input: {
 export function getRevenueCatCoinPackClient(): RevenueCatCoinPackClient {
   if (singleton) return singleton
 
-  const apiKey = resolveRevenueCatPublicApiKey({
+  const apiKey = IS_BLUMI_PAID_COINS_ENABLED ? resolveRevenueCatPublicApiKey({
     platform: Platform.OS,
     iosApiKey: BLUMI_REVENUECAT_IOS_API_KEY,
     androidApiKey: BLUMI_REVENUECAT_ANDROID_API_KEY
-  })
+  }) : undefined
   singleton = createRevenueCatCoinPackClient({
     apiKey,
     bridge: apiKey

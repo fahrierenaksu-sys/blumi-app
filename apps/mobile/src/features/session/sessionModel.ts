@@ -294,7 +294,7 @@ export function normalizeSessionActor(
       ),
       interests: normalizeOptionalStringArray(profile.interests),
       prompts: normalizeUserProfilePrompts(profile.prompts),
-      location: normalizeLocation(profile.location),
+      location: undefined,
       avatar: normalizedAvatar
     }
   }
@@ -339,18 +339,6 @@ function normalizeOptionalStringArray(value: unknown): string[] | undefined {
   return strings.length > 0 ? [...strings] : undefined
 }
 
-function normalizeLocation(value: unknown): UserProfile["location"] {
-  if (!value || typeof value !== "object") return undefined
-  const record = value as Record<string, unknown>
-  if (typeof record.lat !== "number" || typeof record.lng !== "number") {
-    return undefined
-  }
-  return {
-    lat: record.lat,
-    lng: record.lng
-  }
-}
-
 function normalizeDiscoveryPreferences(
   value: unknown
 ): UserProfile["discoveryPreferences"] {
@@ -392,6 +380,6 @@ function copyUserProfile(profile: UserProfile): UserProfile {
           vibes: [...profile.discoveryPreferences.vibes]
         }
       : undefined,
-    location: profile.location ? { ...profile.location } : undefined
+    location: undefined
   }
 }

@@ -6,7 +6,8 @@ export const ADMIN_SCOPES = [
   "account-recovery:read",
   "account-recovery:resolve",
   "users:read",
-  "users:manage"
+  "users:manage",
+  "metrics:read"
 ] as const
 
 export type AdminScope = (typeof ADMIN_SCOPES)[number]

@@ -1,9 +1,9 @@
+import { Image as ExpoImage } from "expo-image"
 import {
   Animated,
   Easing,
   type GestureResponderEvent,
   type AccessibilityValue,
-  Image,
   type LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -132,10 +132,12 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
       ]}
     >
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Image
+        <ExpoImage
           testID={testID ? `${testID}-shell` : undefined}
           source={shell.asset.source}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={reduceMotion ? 0 : 120}
           style={styles.shell}
         />
       </View>
@@ -258,9 +260,11 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
           }
         ]}
       >
-        <Image
+        <ExpoImage
           source={item.foregroundOcclusionAsset.source}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          transition={0}
           style={styles.furnitureFrontOcclusionImage}
         />
       </View>
@@ -293,9 +297,11 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
           }
         ]}
       >
-        <Image
+        <ExpoImage
           source={item.asset.source}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          transition={0}
           style={{
             position: "absolute",
             left: `${(-occlusion.left / occlusion.width) * 100}%`,
@@ -343,9 +349,11 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
         }
       ]}
     >
-      <Image
+      <ExpoImage
         source={shadow.source}
-        resizeMode="contain"
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={0}
         style={styles.furnitureContactShadowImage}
       />
     </View>
@@ -734,9 +742,11 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             <RoomAvatarRenderer2D layers={item.layers} />
           </Animated.View>
         ) : (
-          <Image
+          <ExpoImage
             source={item.asset.source}
-            resizeMode={getRoomV2FurnitureImageResizeMode(item.sceneProjection)}
+            contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
+            cachePolicy="memory-disk"
+            transition={0}
             style={[
               styles.itemImage,
               { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }

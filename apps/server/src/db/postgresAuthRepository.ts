@@ -751,8 +751,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                         avatar_preset_id, avatar_selection, avatar_revision,
                         bio, gender, identity_gender, discovery_genders,
                         discovery_age_min, discovery_age_max, discovery_vibes,
-                        discovery_radius_km, interests, profile_prompts, location_lat,
-                        location_lng, onboarding_profile_complete,
+                        discovery_radius_km, interests, profile_prompts,
+                        onboarding_profile_complete,
                         onboarding_avatar_complete, onboarding_room_complete,
                         onboarding_completed_at, accepted_terms, moderation_status, moderation_updated_at, suspended_until, created_at, updated_at`,
             [
@@ -773,8 +773,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
               candidate.profile.discoveryPreferences?.vibes ?? [],
               candidate.profile.discoveryPreferences?.radiusKm ?? 25,
               candidate.profile.interests ?? [],
-              candidate.profile.location?.lat ?? null,
-              candidate.profile.location?.lng ?? null,
+              null,
+              null,
               candidate.createdAt,
               candidate.updatedAt,
               candidate.onboarding.profile === "complete",
@@ -890,8 +890,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           account.profile.discoveryPreferences?.vibes ?? [],
           account.profile.discoveryPreferences?.radiusKm ?? 25,
           account.profile.interests ?? [],
-          account.profile.location?.lat ?? null,
-          account.profile.location?.lng ?? null,
+          null,
+          null,
           account.createdAt,
           account.updatedAt,
           account.onboarding.profile === "complete",
@@ -930,10 +930,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       if (Object.hasOwn(profile, "prompts")) {
         setValue("profile_prompts", JSON.stringify(profile.prompts ?? []))
       }
-      if (Object.hasOwn(profile, "location")) {
-        setValue("location_lat", profile.location?.lat ?? null)
-        setValue("location_lng", profile.location?.lng ?? null)
-      }
+      // Retain the legacy columns for compatibility, but make every profile
+      // write an opportunity to clear old values and never accept new ones.
+      setValue("location_lat", null)
+      setValue("location_lng", null)
       setValue("updated_at", input.now)
       const blocksCompletedGenderClear =
         Object.hasOwn(profile, "gender") && profile.gender === null
@@ -948,8 +948,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                     avatar_preset_id, avatar_selection, avatar_revision,
                     bio, gender, identity_gender, discovery_genders,
                     discovery_age_min, discovery_age_max, discovery_vibes,
-                    discovery_radius_km, interests, profile_prompts, location_lat,
-                    location_lng, onboarding_profile_complete,
+                    discovery_radius_km, interests, profile_prompts,
+                    onboarding_profile_complete,
                     onboarding_avatar_complete, onboarding_room_complete,
                     onboarding_completed_at, accepted_terms, moderation_status, moderation_updated_at, suspended_until, created_at, updated_at`,
         values
@@ -969,8 +969,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                     avatar_preset_id, avatar_selection, avatar_revision,
                     bio, gender, identity_gender, discovery_genders,
                     discovery_age_min, discovery_age_max, discovery_vibes,
-                    discovery_radius_km, interests, profile_prompts, location_lat,
-                    location_lng, onboarding_profile_complete,
+                    discovery_radius_km, interests, profile_prompts,
+                    onboarding_profile_complete,
                     onboarding_avatar_complete, onboarding_room_complete,
                     onboarding_completed_at, accepted_terms, moderation_status, moderation_updated_at, suspended_until, created_at, updated_at`,
         [
@@ -990,8 +990,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                 avatar_preset_id, avatar_selection, avatar_revision,
                 bio, gender, identity_gender, discovery_genders,
                 discovery_age_min, discovery_age_max, discovery_vibes,
-                discovery_radius_km, interests, profile_prompts, location_lat,
-                location_lng, onboarding_profile_complete,
+                discovery_radius_km, interests, profile_prompts,
+                onboarding_profile_complete,
                 onboarding_avatar_complete, onboarding_room_complete,
                 onboarding_completed_at, accepted_terms, moderation_status, moderation_updated_at, suspended_until, created_at, updated_at
            FROM blumi_accounts
@@ -1045,8 +1045,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                     avatar_preset_id, avatar_selection, avatar_revision,
                     bio, gender, identity_gender, discovery_genders,
                     discovery_age_min, discovery_age_max, discovery_vibes,
-                    discovery_radius_km, interests, profile_prompts, location_lat,
-                    location_lng, onboarding_profile_complete,
+                    discovery_radius_km, interests, profile_prompts,
+                    onboarding_profile_complete,
                     onboarding_avatar_complete, onboarding_room_complete,
                     onboarding_completed_at, accepted_terms, moderation_status, moderation_updated_at, suspended_until, created_at, updated_at`,
         [input.accountId, input.now, input.step]
@@ -1122,8 +1122,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                   avatar_preset_id, avatar_selection, avatar_revision,
                   bio, gender, identity_gender, discovery_genders,
                   discovery_age_min, discovery_age_max, discovery_vibes,
-                  discovery_radius_km, interests, profile_prompts, location_lat,
-                  location_lng, onboarding_profile_complete,
+                  discovery_radius_km, interests, profile_prompts,
+                  onboarding_profile_complete,
                   onboarding_avatar_complete, onboarding_room_complete,
                   onboarding_completed_at, moderation_status,
                   moderation_updated_at, suspended_until, accepted_terms, created_at, updated_at`,
@@ -1147,8 +1147,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                   avatar_preset_id, avatar_selection, avatar_revision,
                   bio, gender, identity_gender, discovery_genders,
                   discovery_age_min, discovery_age_max, discovery_vibes,
-                  discovery_radius_km, interests, profile_prompts, location_lat,
-                  location_lng, onboarding_profile_complete,
+                  discovery_radius_km, interests, profile_prompts,
+                  onboarding_profile_complete,
                   onboarding_avatar_complete, onboarding_room_complete,
                   onboarding_completed_at, moderation_status,
                   moderation_updated_at, suspended_until, accepted_terms, created_at, updated_at`,
@@ -1468,8 +1468,8 @@ function accountSelectSql(): string {
                  avatar_preset_id, avatar_selection, avatar_revision,
                  bio, gender, identity_gender, discovery_genders,
                  discovery_age_min, discovery_age_max, discovery_vibes,
-                 discovery_radius_km, interests, profile_prompts, location_lat,
-                 location_lng, onboarding_profile_complete,
+                 discovery_radius_km, interests, profile_prompts,
+                 onboarding_profile_complete,
                  onboarding_avatar_complete, onboarding_room_complete,
                  onboarding_completed_at, moderation_status,
                  moderation_updated_at, suspended_until, accepted_terms, created_at, updated_at
@@ -1520,7 +1520,6 @@ function mapAccount(row: QueryResultRow): AccountRecord {
       discoveryPreferences: mapDiscoveryPreferences(row),
       interests: normalizeTextArray(row.interests),
       prompts: normalizeUserProfilePrompts(row.profile_prompts),
-      location: normalizeLocation(row.location_lat, row.location_lng),
       avatar: mapAvatarSelection(row)
     },
     onboarding: {
@@ -1598,16 +1597,6 @@ function normalizeTextArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const normalized = value.map(String).filter((item) => item.length > 0)
   return normalized.length > 0 ? normalized : undefined
-}
-
-function normalizeLocation(lat: unknown, lng: unknown): { lat: number; lng: number } | undefined {
-  if (lat === null || lat === undefined || lng === null || lng === undefined) {
-    return undefined
-  }
-  return {
-    lat: Number(lat),
-    lng: Number(lng)
-  }
 }
 
 function mapSession(row: QueryResultRow): SessionRecord {

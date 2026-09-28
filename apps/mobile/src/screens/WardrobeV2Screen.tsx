@@ -1,9 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { Image as ExpoImage } from "expo-image"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
-  Image,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ImageSourcePropType,
@@ -541,9 +541,10 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       wearingLabel={studioCopy.wearing}
       locked={item.locked}
       previewSource={item.previewSource}
+      thumbnailTransition={reduceMotion ? 0 : 120}
       onEquip={handleEquip}
     />
-  ), [handleEquip, studioCopy.wearing])
+  ), [handleEquip, reduceMotion, studioCopy.wearing])
 
   return (
     <View style={styles.root}>
@@ -763,8 +764,9 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   locked: boolean
   onEquip: (item: AvatarCatalogItem) => void
   previewSource?: ImageSourcePropType
+  thumbnailTransition: number
 }) {
-  const { item, equipped, itemStateLabel, wearingLabel, locked, onEquip, previewSource } = props
+  const { item, equipped, itemStateLabel, wearingLabel, locked, onEquip, previewSource, thumbnailTransition } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
     ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
     : undefined
@@ -804,9 +806,11 @@ const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       <View style={styles.itemPreviewStage}>
         <View style={styles.itemPreviewHalo} />
         {previewSource ? (
-          <Image
+          <ExpoImage
             source={previewSource}
-            resizeMode="contain"
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            transition={thumbnailTransition}
             style={[
               thumbnailPresentation.frame === "rig"
                 ? styles.itemPreviewRigLayer

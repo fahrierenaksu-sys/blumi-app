@@ -1,10 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useMemo, useState, useLayoutEffect } from "react"
+import { useMemo, useState, useLayoutEffect } from "react"
 import {
   Image,
   Animated,
   useWindowDimensions,
-  type ImageStyle,
   Pressable,
   Text,
   View
@@ -12,6 +11,7 @@ import {
 import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
 import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoom.mock"
+import { RoomAvatarRenderer2D } from "../avatarV2/room/components/RoomAvatarRenderer2D"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import { RoomRenderer2D } from "../roomV2/components/RoomRenderer2D"
@@ -377,43 +377,12 @@ function ShopAvatarLivePreview(props: { avatar: UserAvatar; avatarWidth: number 
 
   return (
     <View style={styles.shopAvatarPreview}>
-      <ShopAvatarLayerStack
-        avatarHeight={avatarHeight}
-        avatarWidth={props.avatarWidth}
-        layers={roomAvatarLayers}
-      />
+      <View style={[styles.shopAvatarFrame, { width: props.avatarWidth, height: avatarHeight }]}>
+        <RoomAvatarRenderer2D layers={roomAvatarLayers} />
+      </View>
     </View>
   )
 }
-
-const ShopAvatarLayerStack = memo(function ShopAvatarLayerStack(props: {
-  avatarHeight: number
-  avatarWidth: number
-  layers: ReturnType<typeof getRoomAvatarRenderLayers>
-}) {
-  return (
-    <View
-      style={[
-        styles.shopAvatarFrame,
-        { width: props.avatarWidth, height: props.avatarHeight }
-      ]}
-    >
-      {props.layers.map((layer, index) => (
-        <Image
-          key={`${layer.type}:${layer.id}`}
-          source={layer.asset.source}
-          resizeMode="contain"
-          fadeDuration={0}
-          style={[styles.shopAvatarLayer as ImageStyle, { zIndex: index }]}
-        />
-      ))}
-    </View>
-  )
-}, (previous, next) =>
-  previous.avatarHeight === next.avatarHeight &&
-  previous.avatarWidth === next.avatarWidth &&
-  previous.layers === next.layers
-)
 
 function ShopRoomItemPreview(props: {
   item: FurnitureItem | undefined

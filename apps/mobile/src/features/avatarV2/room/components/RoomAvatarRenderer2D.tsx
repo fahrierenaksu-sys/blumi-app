@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View, type ImageStyle } from "react-native"
+import { Image as ExpoImage } from "expo-image"
+import { StyleSheet, View, type ImageStyle } from "react-native"
 import {
   memo,
   useCallback,
@@ -6,7 +7,6 @@ import {
   useSyncExternalStore
 } from "react"
 import type {
-  RoomV2AssetRef,
   RoomV2AvatarRenderLayer
 } from "../../../roomV2/roomV2.types"
 import type {
@@ -15,6 +15,10 @@ import type {
 } from "../avatarRoom.types"
 import { ROOM_AVATAR_FRAME_DURATION_MS } from "../avatarRoomMotionContract"
 import { useReducedMotion } from "../../../../ui/animations"
+import {
+  getRoomAvatarLayerFrameAsset,
+  shouldRerenderRoomAvatarLayer
+} from "../roomAvatarLayerRenderModel"
 
 interface RoomAvatarRenderer2DProps {
   layers: RoomV2AvatarRenderLayer[]
@@ -95,13 +99,15 @@ interface RoomAvatarLayerImageProps {
 const RoomAvatarLayerImage = memo(
   function RoomAvatarLayerImage(props: RoomAvatarLayerImageProps) {
     const { layer, frameIndex } = props
-    const asset = getLayerFrameAsset(layer, frameIndex)
+    const asset = getRoomAvatarLayerFrameAsset(layer, frameIndex)
 
     return (
-      <Image
+      <ExpoImage
         source={asset.source}
-        resizeMode="contain"
-        fadeDuration={0}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        priority="high"
+        transition={0}
         style={[
           styles.layer,
           getLayerFitStyle(layer)
@@ -109,25 +115,11 @@ const RoomAvatarLayerImage = memo(
       />
     )
   },
-  (previous, next) =>
-    previous.layer === next.layer &&
-    (
-      !hasAnimatedLayerFrames(next.layer) ||
-      previous.frameIndex === next.frameIndex
-    )
+  (previous, next) => !shouldRerenderRoomAvatarLayer(previous, next)
 )
 
 function hasAnimatedLayerFrames(layer: RoomV2AvatarRenderLayer): boolean {
   return (layer.animation?.frames.length ?? 0) > 1
-}
-
-function getLayerFrameAsset(
-  layer: RoomV2AvatarRenderLayer,
-  frameIndex: number
-): RoomV2AssetRef {
-  const frames = layer.animation?.frames
-  if (!frames?.length) return layer.asset
-  return frames[frameIndex % frames.length] ?? layer.asset
 }
 
 function getLayerAnimationState(layers: RoomV2AvatarRenderLayer[], animate: boolean): {

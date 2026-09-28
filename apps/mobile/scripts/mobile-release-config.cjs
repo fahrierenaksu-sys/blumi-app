@@ -1,18 +1,20 @@
 const LOCAL_API_HTTP_URL = "http://127.0.0.1:4000"
 const LOCAL_REALTIME_WS_URL = "ws://127.0.0.1:4100"
 const EXTERNAL_BUILD_PROFILES = new Set(["preview", "production"])
+const SERVER_TEST_BUILD_PROFILE = "server-test"
 
 function resolveMobileReleaseEnvironment(environment = process.env) {
   const buildProfile = normalizeValue(environment.EAS_BUILD_PROFILE) || "development"
   const isExternalBuild = EXTERNAL_BUILD_PROFILES.has(buildProfile)
+  const isConnectedBuild = isExternalBuild || buildProfile === SERVER_TEST_BUILD_PROFILE
   const apiHttpUrl = normalizeUrl(
     environment.EXPO_PUBLIC_BLUMI_API_HTTP_URL,
-    isExternalBuild ? undefined : LOCAL_API_HTTP_URL,
+    isConnectedBuild ? undefined : LOCAL_API_HTTP_URL,
     "EXPO_PUBLIC_BLUMI_API_HTTP_URL"
   )
   const realtimeWsUrl = normalizeUrl(
     environment.EXPO_PUBLIC_REALTIME_EDGE_WS_URL,
-    isExternalBuild ? undefined : LOCAL_REALTIME_WS_URL,
+    isConnectedBuild ? undefined : LOCAL_REALTIME_WS_URL,
     "EXPO_PUBLIC_REALTIME_EDGE_WS_URL"
   )
   const mediaMode = normalizeValue(environment.EXPO_PUBLIC_BLUMI_MEDIA_MODE) || "demo"
@@ -20,7 +22,7 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     normalizeValue(environment.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS) || "0"
   const enableDemo =
     normalizeValue(environment.EXPO_PUBLIC_BLUMI_ENABLE_DEMO) ||
-    (isExternalBuild ? "0" : "1")
+    (isConnectedBuild ? "0" : "1")
   const devEntryRoute = normalizeValue(
     environment.EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE
   ) || undefined
@@ -28,6 +30,12 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   const posthogApiKey =
     normalizeValue(environment.EXPO_PUBLIC_POSTHOG_API_KEY) || undefined
   const posthogHost = normalizeValue(environment.EXPO_PUBLIC_POSTHOG_HOST) || undefined
+  const paidCoinsEnabled = normalizeValue(environment.EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED) || "0"
+  const voiceFlag = normalizeValue(environment.EXPO_PUBLIC_BLUMI_VOICE_ENABLED)
+  if (voiceFlag && voiceFlag !== "0") {
+    throw new Error("Live voice and microphone access are disabled in Blumi builds.")
+  }
+  const voiceEnabled = "0"
   const revenueCatIosApiKey =
     normalizeValue(environment.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY) || undefined
   const revenueCatAndroidApiKey =
@@ -39,21 +47,36 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   if (enableDemo !== "0" && enableDemo !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_ENABLE_DEMO must be 0 or 1.")
   }
+  if (paidCoinsEnabled !== "0" && paidCoinsEnabled !== "1") {
+    throw new Error("EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED must be 0 or 1.")
+  }
+  if (voiceEnabled !== "0" && voiceEnabled !== "1") {
+    throw new Error("EXPO_PUBLIC_BLUMI_VOICE_ENABLED must be 0 or 1.")
+  }
 
-  if (isExternalBuild) {
-    requireProtocol(apiHttpUrl, "https:", "Release API must use HTTPS.")
-    requireProtocol(realtimeWsUrl, "wss:", "Release realtime must use WSS.")
-    if (mediaMode !== "native") {
-      throw new Error("Preview and production builds require native media.")
-    }
+  if (isConnectedBuild) {
+    requireProtocol(apiHttpUrl, "https:", "Connected mobile API must use HTTPS.")
+    requireProtocol(realtimeWsUrl, "wss:", "Connected mobile realtime must use WSS.")
     if (qaUnlockAvatarItems !== "0") {
-      throw new Error("QA avatar unlock cannot be enabled in preview or production.")
+      throw new Error("QA avatar unlock cannot be enabled in connected builds.")
     }
     if (enableDemo !== "0") {
-      throw new Error("Demo sessions cannot be enabled in preview or production.")
+      throw new Error("Demo sessions cannot be enabled in connected builds.")
     }
     if (devEntryRoute) {
-      throw new Error("Development entry routes cannot be enabled in preview or production.")
+      throw new Error("Development entry routes cannot be enabled in connected builds.")
+    }
+  }
+
+  if (isExternalBuild) {
+    if (voiceEnabled !== "0") {
+      throw new Error("First-release live voice is deferred in preview and production builds.")
+    }
+    if (paidCoinsEnabled !== "0") {
+      throw new Error("First-release paid coin sales are deferred in preview and production builds.")
+    }
+    if (mediaMode !== "native") {
+      throw new Error("Preview and production builds require native media.")
     }
     if (!sentryDsn) {
       throw new Error("EXPO_PUBLIC_SENTRY_DSN is required for preview and production builds.")
@@ -66,12 +89,6 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
       throw new Error("EXPO_PUBLIC_POSTHOG_HOST is required for preview and production builds.")
     }
     requireProtocol(posthogHost, "https:", "Release PostHog host must use HTTPS.")
-    if (!revenueCatIosApiKey) {
-      throw new Error("EXPO_PUBLIC_REVENUECAT_IOS_API_KEY is required for preview and production builds.")
-    }
-    if (!revenueCatAndroidApiKey) {
-      throw new Error("EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY is required for preview and production builds.")
-    }
   }
 
   return {
@@ -85,6 +102,8 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     sentryDsn,
     posthogApiKey,
     posthogHost,
+    paidCoinsEnabled,
+    voiceEnabled,
     revenueCatIosApiKey,
     revenueCatAndroidApiKey
   }

@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
+import { Image as ExpoImage } from "expo-image"
 import { getShopCombinationItems, getShopCombinationSummary } from "../features/shop/shopCombinationSummary"
 import { getShopThumbnailLayout } from "../features/shop/shopThumbnailLayout"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
@@ -13,7 +14,7 @@ import {
   Animated,
   Alert,
   FlatList,
-  Image,
+  Image as ReactNativeImage,
   type ImageSourcePropType,
   Pressable,
   ScrollView,
@@ -22,6 +23,7 @@ import {
   View
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { IS_BLUMI_PAID_COINS_ENABLED } from "../config/env"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { CoinPackWalletPanel } from "../features/commerce/CoinPackWalletPanel"
 import { getCoinPackCopy } from "../features/commerce/coinPackCopy"
@@ -64,6 +66,8 @@ import { getShopProductPresentation } from "../features/shop/shopProductPresenta
 import { resolveShopCatalogRuntime } from "../features/shop/shopCatalogRuntime"
 import { getMaleRigLayerThumbnailPresentation } from "../features/avatarV2/maleRigThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../features/avatarV2/qa/avatarQaInventory"
+import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
+import { getShopPreviewAddedAssets } from "../features/shop/shopAvatarPreviewAssets"
 import {
   getAvatarItemPreviewSource,
   getRoomProductThumbnailSource,
@@ -139,6 +143,7 @@ type ShopCategoryOption = {
   icon: keyof typeof Ionicons.glyphMap
 }
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
+const pendingShopPreviewUris = new Set<string>()
 const AVATAR_CATEGORY_GLYPHS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   top: "tshirt-crew-outline",
   dress: "hanger",
@@ -167,7 +172,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   )
   const coinPackWallet = useCoinPackWallet({
     isConnected,
-    isProductionSession: sessionActor.session.mode === "production",
+    isProductionSession: IS_BLUMI_PAID_COINS_ENABLED && sessionActor.session.mode === "production",
     sessionToken: sessionActor.session.sessionToken,
     userId: sessionActor.session.userId,
     inventoryStore
@@ -776,7 +781,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         edges={["top", "left", "right"]}
       >
         <ScrollView
-          scrollEnabled={shopLayoutMetrics.catalog.accessibilityLayout || isCoinWalletOpen || shopPresentationState === "offline"}
+          scrollEnabled={shopLayoutMetrics.catalog.accessibilityLayout || (IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen) || shopPresentationState === "offline"}
           bounces={false}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
@@ -815,9 +820,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
             <Pressable
               testID="shop-coin-balance"
               accessibilityRole="button"
-              accessibilityLabel={`${coinPackCopy.title}, ${formatCoins(inventoryStore.inventory.coins, locale)} ${coinPackCopy.coins}`}
-              accessibilityState={{ disabled: !requiresServerInventory, expanded: isCoinWalletOpen }}
-              disabled={!requiresServerInventory}
+              accessibilityLabel={`${showShopContent ? formatCoins(inventoryStore.inventory.coins, locale) : "—"} ${coinPackCopy.coins}`}
+              accessibilityState={{ disabled: !requiresServerInventory || !IS_BLUMI_PAID_COINS_ENABLED, expanded: IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen }}
+              disabled={!requiresServerInventory || !IS_BLUMI_PAID_COINS_ENABLED}
               onPress={() => setIsCoinWalletOpen((current) => !current)}
               style={({ pressed }) => [
                 styles.coinPill,
@@ -827,7 +832,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
             >
               <Ionicons name="diamond" size={14} color="#B9820D" />
               <Text style={styles.coinText}>
-                {formatCoins(inventoryStore.inventory.coins, locale)}
+                {showShopContent
+                  ? formatCoins(inventoryStore.inventory.coins, locale)
+                  : "—"}
               </Text>
             </Pressable>
         </View>
@@ -841,7 +848,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               home: roomProducts.length
             }}
           />
-          {requiresServerInventory && isCoinWalletOpen ? (
+          {IS_BLUMI_PAID_COINS_ENABLED && requiresServerInventory && isCoinWalletOpen ? (
             <CoinPackWalletPanel
               locale={locale}
               state={coinPackWallet.state}
@@ -900,6 +907,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               </Animated.View>
 
               <ClosetBrowser
+                avatar={avatarV2.avatar}
                 categories={categoryOptions}
                 activeCategoryId={activeCategoryId}
                 products={filteredProducts}
@@ -946,6 +954,7 @@ function getAvatarShopProductPriority(product: ShopCatalogItem): number {
 }
 
 function ClosetBrowser(props: {
+  avatar: UserAvatar
   categories: ShopCategoryOption[]
   activeCategoryId: string
   products: ShopCatalogItem[]
@@ -1017,6 +1026,9 @@ function ClosetBrowser(props: {
                 cardHeight={catalog.productCardHeight}
                 cardPadding={catalog.cardPadding}
                 thumbHeight={catalog.productThumbHeight}
+                thumbnailTransition={reduceMotion ? 0 : 120}
+                avatar={props.avatar}
+                shouldPrefetchPreview={index === pageIndex}
                 locale={props.locale}
                 onSelectProduct={props.onSelectProduct}
               />
@@ -1025,7 +1037,7 @@ function ClosetBrowser(props: {
         ))}
       </View>
     ),
-    [catalog, productCardWidth, productShelfWidth, props.locale, props.onSelectProduct, props.selectedId]
+    [catalog, pageIndex, productCardWidth, productShelfWidth, props.avatar, props.locale, props.onSelectProduct, props.selectedId, reduceMotion]
   )
 
   return (
@@ -1202,6 +1214,7 @@ const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(props: {
 )
 
 const ShopProductCard = memo(function ShopProductCard(props: {
+  avatar: UserAvatar
   product: ShopCatalogItem
   selected: boolean
   selectedCompact?: boolean
@@ -1209,22 +1222,42 @@ const ShopProductCard = memo(function ShopProductCard(props: {
   cardHeight?: number
   cardPadding?: number
   thumbHeight?: number
+  thumbnailTransition: number
+  shouldPrefetchPreview: boolean
   metaLabel?: string
   locale: ReturnType<typeof getAppLocale>
   onSelectProduct: (product: ShopCatalogItem) => void
 }) {
   const {
     product,
+    avatar,
     selected,
     selectedCompact,
     cardWidth,
     cardHeight,
     cardPadding,
     thumbHeight,
+    thumbnailTransition,
+    shouldPrefetchPreview,
     metaLabel,
     locale,
     onSelectProduct
   } = props
+  useEffect(() => {
+    if (!shouldPrefetchPreview || !product.avatarItem) return
+    const urls = getShopPreviewAddedAssets(avatar, product.avatarItem)
+      .map((asset) => ReactNativeImage.resolveAssetSource(asset.source)?.uri)
+      .filter((uri): uri is string => Boolean(uri))
+      .filter((uri) => {
+        if (pendingShopPreviewUris.has(uri)) return false
+        pendingShopPreviewUris.add(uri)
+        return true
+      })
+    if (urls.length === 0) return
+    void ExpoImage.prefetch(urls, "memory-disk")
+      .catch(() => undefined)
+      .finally(() => urls.forEach((uri) => pendingShopPreviewUris.delete(uri)))
+  }, [avatar, product.avatarItem, shouldPrefetchPreview])
   const copy = getShopCopy(locale)
   const presentation = getShopProductPresentation(product, locale)
   const compactCardSizeStyle =
@@ -1283,12 +1316,14 @@ const ShopProductCard = memo(function ShopProductCard(props: {
             source={avatarPreviewSource}
             selected={selected}
             isRigLayerSource={isRigLayerSource}
+            transitionMs={thumbnailTransition}
           />
         ) : product.roomItem ? (
-          <Image
+          <ExpoImage
             source={roomPreviewSource}
-            resizeMode="contain"
-            fadeDuration={0}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            transition={thumbnailTransition}
             style={styles.productImage}
           />
         ) : null}
@@ -1330,6 +1365,7 @@ function AvatarProductThumbnail(props: {
   source: ImageSourcePropType | undefined
   selected: boolean
   isRigLayerSource: boolean
+  transitionMs: number
 }) {
   const { item, source, selected, isRigLayerSource } = props
   const [frame, setFrame] = useState({ width: 0, height: 0 })
@@ -1363,10 +1399,11 @@ function AvatarProductThumbnail(props: {
         current.width === layout.width && current.height === layout.height
           ? current : { width: layout.width, height: layout.height })}
     >
-    <Image
+    <ExpoImage
       source={source}
-      resizeMode="contain"
-      fadeDuration={0}
+      contentFit="contain"
+      cachePolicy="memory-disk"
+      transition={props.transitionMs}
       style={[
         isRigLayerSource
           ? styles.productWearableRigLayer

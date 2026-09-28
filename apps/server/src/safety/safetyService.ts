@@ -16,6 +16,8 @@ import {
 const MAX_REPORT_NOTE_LENGTH = 1000
 const DEFAULT_ADMIN_REPORT_LIMIT = 50
 const MAX_ADMIN_REPORT_LIMIT = 100
+const DEFAULT_ACTOR_REPORT_LIMIT = 50
+const MAX_ACTOR_REPORT_LIMIT = 100
 const REPORT_STATUSES = ["pending", "resolved", "dismissed"] as const
 const REPORT_RESOLUTION_ACTIONS = ["warn", "suspend", "ban", "dismiss"] as const
 
@@ -38,7 +40,7 @@ export interface SafetyService {
     input: ReportUserInput,
     now?: Date
   ): Promise<{ report: ReportRecord; block: BlockRecord; replayed: boolean }>
-  listReportsForActor(actorUserId: string): Promise<ReportRecord[]>
+  listReportsForActor(actorUserId: string, limit?: number): Promise<ReportRecord[]>
   listAllReports(options: { status?: string; limit?: number }): Promise<ReportRecord[]>
   getPendingReportQueueSummary(now?: Date): Promise<PendingModerationQueueSummary>
   findReport(reportId: string): Promise<ReportRecord | null>
@@ -163,8 +165,11 @@ export function createSafetyService(
         replayed: saved.kind === "replayed"
       }
     },
-    async listReportsForActor(actorUserId) {
-      return repository.listReportsForActor(actorUserId)
+    async listReportsForActor(actorUserId, limit = DEFAULT_ACTOR_REPORT_LIMIT) {
+      return repository.listReportsForActor(
+        actorUserId,
+        normalizeActorReportLimit(limit)
+      )
     },
     async listAllReports(options) {
       return repository.listAllReports({
@@ -285,6 +290,13 @@ function normalizeAdminReportLimit(limit: number | undefined): number {
     return DEFAULT_ADMIN_REPORT_LIMIT
   }
   return Math.min(Math.max(Math.floor(limit), 1), MAX_ADMIN_REPORT_LIMIT)
+}
+
+function normalizeActorReportLimit(limit: number | undefined): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) {
+    return DEFAULT_ACTOR_REPORT_LIMIT
+  }
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_ACTOR_REPORT_LIMIT)
 }
 
 function normalizeReportId(reportId: string): string {

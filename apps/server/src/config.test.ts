@@ -72,7 +72,14 @@ test("disabled voice ignores existing credentials and invalid voice flags fail c
   assert.equal(config.livekitApiKey, undefined)
   assert.equal(config.livekitApiSecret, undefined)
   assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "false" }), /BLUMI_VOICE_ENABLED/)
-  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "1", LIVEKIT_API_KEY: undefined }), /Production media requires/)
+  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: "1", LIVEKIT_API_KEY: undefined }), /Live voice and microphone access are disabled/)
+})
+
+test("production voice defaults off even when LiveKit credentials are present", () => {
+  const config = resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_VOICE_ENABLED: undefined })
+  assert.equal(config.livekitUrl, undefined)
+  assert.equal(config.livekitApiKey, undefined)
+  assert.equal(config.livekitApiSecret, undefined)
 })
 
 test("production-mode staging accepts only an explicit sandbox purchase environment", () => {
@@ -120,7 +127,14 @@ test("disabled payments discard provider credentials and fail closed", async () 
     assert.doesNotThrow(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", [key]: undefined }))
   }
   assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "false" }), /BLUMI_PAYMENTS_ENABLED/)
-  assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", LIVEKIT_API_KEY: undefined }), /Production media/)
+  assert.doesNotThrow(() => resolveServerConfig({
+    ...VALID_PRODUCTION_ENV,
+    BLUMI_PAYMENTS_ENABLED: "0",
+    BLUMI_VOICE_ENABLED: "0",
+    LIVEKIT_URL: undefined,
+    LIVEKIT_API_KEY: undefined,
+    LIVEKIT_API_SECRET: undefined
+  }))
   assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "0", EXPO_PUSH_ACCESS_TOKEN: undefined }), /EXPO_PUSH_ACCESS_TOKEN/)
 })
 
@@ -460,7 +474,7 @@ test("production requires the Expo push provider and access token", () => {
   )
 })
 
-test("production requires secure LiveKit and moderation configuration", () => {
+test("production refuses live voice and still validates operator signing secrets", () => {
   const productionBase = {
     NODE_ENV: "production",
     DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
@@ -470,24 +484,12 @@ test("production requires secure LiveKit and moderation configuration", () => {
   }
 
   assert.throws(
-    () => resolveServerConfig(productionBase),
-    /LIVEKIT_URL/
+    () => resolveServerConfig({ ...productionBase, BLUMI_VOICE_ENABLED: "1" }),
+    /Live voice and microphone access are disabled/
   )
   assert.throws(
     () => resolveServerConfig({
       ...productionBase,
-      LIVEKIT_URL: "https://live.blumi.app",
-      LIVEKIT_API_KEY: "livekit-key",
-      LIVEKIT_API_SECRET: "livekit-secret"
-    }),
-    /WSS/
-  )
-  assert.throws(
-    () => resolveServerConfig({
-      ...productionBase,
-      LIVEKIT_URL: "wss://live.blumi.app",
-      LIVEKIT_API_KEY: "livekit-key",
-      LIVEKIT_API_SECRET: "livekit-secret",
       BLUMI_ADMIN_SIGNING_KEYS: "active=too-short",
       BLUMI_ADMIN_ACTIVE_KID: "active"
     }),

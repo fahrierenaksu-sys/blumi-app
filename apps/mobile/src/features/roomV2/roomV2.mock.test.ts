@@ -366,9 +366,9 @@ test("VNext QA candidate catalog contains the bed plus every cohesion pilot piec
   assert.equal(ROOM_V2_FURNITURE_CATALOG.some((item) => item.id === "room_vnext_rug"), false)
 })
 
-test("VNext QA candidate uses the refined v17 pilot and v0.34 clean-master bed proof sources", () => {
+test("VNext historical QA keeps the safe v0.12 bed and refined v17 pilot sources", () => {
   const [, ...pilot] = ROOM_VNEXT_CANDIDATE_FURNITURE_CATALOG
-  assert.equal(ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT.assetVersion, 25)
+  assert.equal(ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT.assetVersion, 12)
   assert.equal(ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT.physicalSizeCm.height, 140)
   for (const direction of ["front", "right", "back", "left"] as const) {
     const visual = ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT.directions[direction]
@@ -376,9 +376,9 @@ test("VNext QA candidate uses the refined v17 pilot and v0.34 clean-master bed p
       visual.normalizedFloorPivot,
       { x: 0.5027322404371585, y: 0.6857923497267759 }
     )
-    assert.ok(String(visual.bodyAsset.source).includes("pink-cloud-bed-v0.34-candidate"))
-    assert.ok(String(visual.contactShadowAsset?.source).includes("pink-cloud-bed-v0.34-candidate"))
-    assert.ok(String(visual.thumbnailAsset?.source).includes("pink-cloud-bed-v0.34-candidate"))
+    assert.ok(String(visual.bodyAsset.source).includes("pink-cloud-bed-v0.12"))
+    assert.ok(String(visual.contactShadowAsset?.source).includes("pink-cloud-bed-v0.12"))
+    assert.ok(String(visual.thumbnailAsset?.source).includes("pink-cloud-bed-v0.12"))
   }
   assert.ok(pilot.every((item) =>
     String(item.visualContract?.directions.front.bodyAsset.source).includes("pilot-v17") &&

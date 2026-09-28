@@ -21,11 +21,11 @@ Effective date: ${LEGAL_EFFECTIVE_DATE}
 
 1. Data Controller and Contact
 Data controller: ${LEGAL_OPERATOR_IDENTITY.legalName}
-Registered address: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Country of operation: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 Privacy contact: ${LEGAL_OPERATOR_IDENTITY.privacyContact}
 Support page: ${LEGAL_OPERATOR_IDENTITY.supportUrl}
 
-The entity named above determines why and how Blumi personal data is processed. Service providers listed below process data only for their defined roles, except where their own terms or law make them an independent controller.
+The controller named above determines why and how Blumi personal data is processed. Service providers listed below process data only for their defined roles, except where their own terms or law make them an independent controller.
 
 2. Scope; Notice Is Separate from Consent
 This notice explains Blumi's processing in the mobile app, its server APIs, support and related safety operations. It is an information notice under Turkish Law No. 6698 (KVKK) and, where applicable, Articles 13–14 of the GDPR. This privacy notice is not a request for consent and is not accepted as a contract. Terms acceptance, optional analytics consent, marketing consent and any explicit consent for special-category processing must be presented separately. Refusing an optional consent does not block unrelated core functions.
@@ -33,20 +33,20 @@ This notice explains Blumi's processing in the mobile app, its server APIs, supp
 3. Data We Process
 Account and verification data: phone number, one-time-code request and verification status, account/user identifiers, session and security records, language, timestamps and account status. Blumi does not need your phone contacts.
 
-Profile and discovery data: display name, age, biography, identity/gender fields you choose to provide, discovery age and gender preferences, interests, prompt answers, avatar and wardrobe selections, profile-completion state, and location coordinates or location information you choose to provide. Your exact location is not displayed to other users.
+Profile and discovery data: display name, age, biography, identity/gender fields you choose to provide, discovery age and gender preferences, interests, prompt answers, avatar and wardrobe selections and profile-completion state. Blumi does not request your device location or use location for discovery, and this version's profile update API no longer stores submitted coordinates. If coordinates were saved to your account by an earlier version, they may remain in server records until the retention/deletion review is completed; they are not displayed to other users.
 
 Interaction and user content: discovery decisions, likes, mutual matches, blocks, reactions, private text messages, room invitations and decisions, room chat, room configuration and decor, and content or context submitted with support, safety reports or appeals.
 
 Safety and integrity data: report reason and details, reported account/content identifiers, moderation decisions, enforcement history, fraud and abuse signals, rate-limit events, IP address, device/app information, authentication attempts and relevant server logs. Reports are access-restricted, not promised to be absolutely confidential, and may be shared when needed for investigation, due process or law.
 
-Purchase and virtual-economy data: store product, price/currency information shown by the store, transaction and original transaction identifiers, purchase/refund/revocation status, RevenueCat app-user identifier, coin balance and debt, wallet ledger, owned virtual items and reward history. Blumi does not receive or store full payment-card details.
+Virtual-economy data: coin balance and debt, wallet ledger, owned virtual items and reward history. Paid coin purchases are unavailable in this version. If a later version enables purchases, store transaction and RevenueCat account identifiers may also be processed after this notice is updated. Blumi does not receive or store full payment-card details.
 
 Device, notification and diagnostics data: operating system and app version, device/push token, notification preferences and delivery status. When configured, privacy-reduced crash and performance diagnostics may include technical stack, screen/feature tag, device class and timing information, but Sentry is configured not to send default PII, screenshots, view hierarchy, profile content or message bodies.
 
 Optional product analytics: only after your separate opt-in, Blumi may send limited, allow-listed product-interaction events to PostHog. The configured analytics policy excludes names, phone numbers, message bodies, profile text, URLs, location, authentication codes and tokens; session replay and automatic person profiles are disabled.
 
 4. Sources and Collection Methods
-We obtain data directly from you; from your use of Blumi; from the other participant in a match, message, room, block or report; from Apple App Store, Google Play and RevenueCat for purchase verification; from Firebase Authentication and telecom carriers for phone verification metadata; from Expo, Apple Push Notification service or Firebase Cloud Messaging for notification delivery; from LiveKit for real-time room connectivity; and from security, analytics and diagnostic providers when enabled. We do not buy data-broker profiles.
+We obtain data directly from you; from your use of Blumi; from the other participant in a match, message, room, block or report; from Firebase Authentication and telecom carriers for phone verification metadata; from Expo, Apple Push Notification service or Firebase Cloud Messaging for notification delivery; and from security, analytics and diagnostic providers when enabled. Paid purchases and live audio are disabled in this version, so RevenueCat purchase verification and LiveKit audio connectivity are not used. We do not buy data-broker profiles.
 
 5. Purposes and Legal Bases
 Contract formation and performance: create and secure the account; authenticate by phone; provide profiles, discovery, matching, durable text chat, accepted shared rooms, inventory, purchases, support, export and deletion tools; and keep the server-authoritative wallet accurate.
@@ -68,7 +68,7 @@ Blumi filters and orders discovery candidates using factors such as age range, s
 8. Messages, Shared Rooms and Live Audio
 Private text messages are stored so matched users can access the conversation and so Blumi can provide safety, export and deletion functions. Recipients can copy, capture or disclose content; do not share information you cannot safely lose control of.
 
-When you choose to join a shared room, you can use text chat. If you choose to turn on live audio, it is transmitted in real time to the other participant through LiveKit. Blumi does not request camera access and does not record or retain live audio content. LiveKit and network operators may process transient media packets and connection metadata needed to deliver and secure the session. Participants must not record, transcribe or rebroadcast another person's audio without a valid legal basis and any required consent.
+When you choose to join a shared room, you can use text chat. Live audio is unavailable in this version; Blumi does not request camera access or transmit audio to LiveKit. Any future live-audio feature would require an updated notice and your action to enable it. Participants must not record, transcribe or rebroadcast another person's communications without a valid legal basis and any required consent.
 
 9. Safety, Reports and Legal Requests
 We process blocks, reports, relevant content/context, moderation decisions and limited technical evidence to protect users, investigate suspected violations, prevent repeat abuse and comply with law. Access is limited to authorized personnel and providers with a need to know. We may preserve specific evidence when reasonably necessary for an active investigation, legal claim or binding request, then delete or anonymize it when that purpose and any mandatory retention period end. We may notify authorities or emergency services when required by law or reasonably necessary to address a credible imminent threat; Blumi is not an emergency service.
@@ -77,10 +77,10 @@ We process blocks, reports, relevant content/context, moderation decisions and l
 If you grant device permission and register a push token, Blumi uses Expo Push Service, Apple Push Notification service and/or Firebase Cloud Messaging to deliver the notification types you enable. A notification payload and token pass through the relevant services, and its preview may appear on your lock screen depending on device settings. Likes, matches, messages and discovery-watch notifications have separate in-app controls. Operational and safety notices are kept distinct from marketing. You can change app preferences or device permission at any time.
 
 11. Purchases
-Blumi uses RevenueCat and the applicable Apple or Google store to offer, process and verify native coin purchases. RevenueCat receives the store transaction, product, purchase history and app account identifier needed for verification. Blumi stores transaction, event and wallet-ledger records to prevent duplicate credits, handle reversals and operate coin balances. Payment credentials stay with the store/payment provider.
+Paid coin purchases are unavailable in this version. The app may still show earned coin balances and virtual-item ownership. If a later version enables native purchases, this notice will be updated before RevenueCat and the applicable Apple or Google store receive purchase-verification data. Payment credentials would stay with the store/payment provider.
 
 12. Recipients and Service Providers
-Recipients may include: the other users to whom you intentionally expose a profile, message, room interaction or live voice; Firebase Authentication and telecom carriers for one-time SMS; LiveKit for live audio connectivity; Expo, Apple and Google for push delivery; RevenueCat, Apple and Google for in-app purchases; PostHog for separately consented analytics; Sentry for privacy-reduced diagnostics; contracted hosting, database and infrastructure providers; professional advisers bound by confidentiality; corporate successors subject to lawful notice and safeguards; and competent authorities when legally required.
+Recipients may include: the other users to whom you intentionally expose a profile, message or room interaction; Firebase Authentication and telecom carriers for one-time SMS; Expo, Apple and Google for push delivery; PostHog for separately consented analytics; Sentry for privacy-reduced diagnostics; contracted hosting, database and infrastructure providers; professional advisers bound by confidentiality; corporate successors subject to lawful notice and safeguards; and competent authorities when legally required. LiveKit and RevenueCat are not recipients of live-audio or purchase data in this version because those features are disabled.
 
 Service-provider roles and material changes are reflected in this notice or the support page. SMS opt-in and verification consent records are not sold, rented or shared for third-party marketing.
 
@@ -106,7 +106,7 @@ Where GDPR or another law applies, you may also have rights of access, rectifica
 18. Exercising Rights; Export and Account Deletion
 You can request an account-data export or delete your account from Settings after confirming a fresh one-time code sent to your sign-in phone. The active deletion flow removes active account, profile, sessions, messages, matches, rooms, economy, safety and push-registration records, except information that must be segregated and retained by law or for a documented legal hold. A freeze or deactivation is not presented as deletion.
 
-You may also send a signed or otherwise legally valid request to the privacy contact, registered address or another verified application channel announced by the controller. Include enough information to locate the account and identify the requested right; do not send passwords or OTPs. We respond as soon as possible and no later than 30 days, subject to the statutory procedure. After applying to the controller, you may complain to the Turkish Personal Data Protection Board within the applicable statutory period, or to another competent authority where applicable.
+You may also send a signed or otherwise legally valid request to the privacy contact or another verified application channel announced by the controller. Include enough information to locate the account and identify the requested right; do not send passwords or OTPs. We respond as soon as possible and no later than 30 days, subject to the statutory procedure. After applying to the controller, you may complain to the Turkish Personal Data Protection Board within the applicable statutory period, or to another competent authority where applicable.
 
 19. Children
 Blumi is strictly for people aged 18 or older and must not be marketed to children. We may use age declarations, store/platform age tools, reports and proportionate checks to enforce this rule. If we reasonably determine that an account belongs to a minor, we suspend access and delete or lawfully preserve the minimum evidence needed for safety and compliance. Report suspected underage use through the in-app reporting tool or support page.
@@ -121,7 +121,7 @@ We may update this notice to reflect legal, provider or product changes. The ver
 Privacy requests: ${LEGAL_OPERATOR_IDENTITY.privacyContact}
 Legal notices: ${LEGAL_OPERATOR_IDENTITY.legalContact}
 Support page and privacy choices: ${LEGAL_OPERATOR_IDENTITY.supportUrl}
-Controller address: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Country of operation: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 
 Do not include passwords, one-time codes, payment-card data or unnecessary sensitive information in an email.`
   },
@@ -135,7 +135,7 @@ Version: ${LEGAL_DOCUMENT_VERSION}
 Effective date: ${LEGAL_EFFECTIVE_DATE}
 
 Service provider and contracting party: ${LEGAL_OPERATOR_IDENTITY.legalName}
-Registered address: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Country of operation: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 Legal contact: ${LEGAL_OPERATOR_IDENTITY.legalContact}
 
 1. Agreement and Privacy Notice
@@ -148,7 +148,7 @@ You must be at least 18 years old, legally capable of entering this agreement an
 One person may control only the accounts permitted by the service. Keep your device and SMS access secure; never share a one-time code. You are responsible for activity you authorize and must promptly report suspected compromise. You may not sell, transfer, rent, automate or impersonate an account. Blumi may require re-verification for sensitive account actions. Phone verification confirms control of a number at that time; it does not verify identity, background, intent or safety.
 
 4. The Service
-Blumi is an anonymous-first social discovery service. It provides avatar-based profiles, discovery preferences, mutual-interest matching, durable text chat, an optional chat-initiated and accepted shared room, room customization, optional live audio that starts muted/off, safety tools and virtual items. Features may differ by device, territory, account state or lawful safety restriction. A mutual match or recommendation is not an endorsement and does not guarantee identity, compatibility, availability or any outcome.
+Blumi is an anonymous-first social discovery service. It provides avatar-based profiles, discovery preferences, mutual-interest matching, durable text chat, an optional chat-initiated and accepted shared room, room customization, safety tools and virtual items. Live audio and paid coin purchases are unavailable in this release. Features may differ by device, territory, account state or lawful safety restriction. A mutual match or recommendation is not an endorsement and does not guarantee identity, compatibility, availability or any outcome.
 
 5. User Content and License
 You retain ownership of profile text, prompts, messages, reports, room choices and other user content you lawfully create. You grant the service provider a worldwide, non-exclusive, royalty-free, sublicensable-to-necessary-providers license to host, store, reproduce, transmit, format and display that content only as reasonably needed to operate, secure, moderate, improve and legally defend Blumi. The license ends when content is deleted from active systems, subject to recipient copies, backups, legal holds and lawful retention described in the Privacy Notice.
@@ -161,8 +161,8 @@ You must not: use Blumi if under 18; sexually exploit or endanger a child; solic
 7. Safety and In-Person Interaction
 Blumi does not conduct a universal criminal, identity or background check and cannot guarantee another user's statements or conduct. Use report and block, keep early conversations in-app, protect financial and address information, and meet only when and where you decide it is safe. Tell a trusted person, control transport and use a public setting. Blumi is not an emergency service. For an immediate threat, contact local emergency services or law enforcement. You remain responsible for your voluntary offline or in-person decisions, subject always to liabilities that law does not allow us to exclude.
 
-8. Shared Rooms and Live Audio
-A room begins only through the supported invitation and acceptance flow. Text is durable. Live audio is optional, starts muted/off and is transmitted in real time through the configured provider. No camera, video call or voice-message feature is promised. Do not record, transcribe or broadcast another person without a valid legal basis and required consent. Leave, mute, block or report when needed. Technical controls reduce risk but cannot prevent a recipient from using another device to capture content.
+8. Shared Rooms
+A room begins only through the supported invitation and acceptance flow. Text is durable. Live audio is unavailable in this release; Blumi does not transmit room audio. No camera, video call or voice-message feature is offered. Do not record, transcribe or broadcast another person's content without a valid legal basis and required consent. Leave, block or report when needed. Technical controls reduce risk but cannot prevent a recipient from using another device to capture content.
 
 9. Moderation, Reports and Appeals
 Blumi may use automated signals and human review to investigate content or conduct, reduce distribution, remove content, limit features, suspend or terminate accounts, preserve evidence and make legally required reports. We do not promise to monitor every interaction or prevent every violation. Enforcement considers severity, context, recurrence, credible risk, law and platform requirements. Except where notice would create risk or is legally restricted, we will provide a meaningful reason for material enforcement and a route to appeal through support. Repeated or severe abuse may lead to permanent removal without a prior warning.
@@ -171,7 +171,7 @@ Blumi may use automated signals and human review to investigate content or condu
 Blumi software, authored avatars, animations, room art, logos, interfaces, text and other service materials are owned by or licensed to the service provider and protected by law. Subject to these Terms, you receive a limited, personal, revocable, non-exclusive, non-transferable license to use the app for its intended purpose. No source code, trademark, asset or commercial-use right is transferred. Valid infringement notices and counter-notices may be sent to the legal contact with sufficient identification and supporting detail.
 
 11. Coins, Virtual Items and Store Purchases
-Blumi may offer consumable coin packs through Apple App Store or Google Play. Coins and virtual items are contractual, non-transferable features usable only inside Blumi; they are not money, deposits or securities, have no cash-redemption value and may be used only for eligible Blumi items. This description does not remove their mandatory legal treatment as digital content or service, or any mandatory consumer right. Prices, taxes, currency and required pre-contract information are shown by the store before purchase. The store processes payment; RevenueCat and Blumi verify the transaction.
+Paid coin purchases are unavailable in this release. If Blumi later offers consumable coin packs through Apple App Store or Google Play, the following purchase terms apply only once that feature is enabled. Coins and virtual items are contractual, non-transferable features usable only inside Blumi; they are not money, deposits or securities, have no cash-redemption value and may be used only for eligible Blumi items. This description does not remove their mandatory legal treatment as digital content or service, or any mandatory consumer right. Prices, taxes, currency and required pre-contract information would be shown by the store before purchase. The store would process payment; RevenueCat and Blumi would verify the transaction.
 
 We do not promise a consumer-facing purchase-restoration flow for consumable coin packs. Signing back into the same Blumi account restores the server wallet balance. If a verified store refund, revocation, chargeback or reversal occurs, Blumi may reverse only the coins credited by that transaction. If some were already spent, the wallet may become negative and further coin spending may be disabled; this accounting adjustment is not an independently collected money debt. Already owned cosmetic or room items are not removed solely because of a negative balance unless law, fraud correction or a clear transaction reversal requires otherwise.
 
@@ -189,7 +189,7 @@ We may suspend or terminate access for a material or repeated breach, credible s
 We may maintain, secure, improve, add, remove or discontinue features. We will provide reasonable notice of a material adverse change when practicable and any remedy required by law. We do not promise uninterrupted or error-free availability; outages, device limits and provider failures can occur. We will not use this clause to avoid performing a paid obligation or to make an unfair unilateral change.
 
 15. Third-Party Services
-Blumi relies on app stores, SMS, push, live-audio, analytics, diagnostics and infrastructure providers. Their own terms may apply to their direct relationship with you. We are responsible for selecting and governing processors as required by law, but we do not control an app store, carrier or platform acting independently. External links are not endorsements. The Privacy Notice identifies data roles and transfers.
+Blumi relies on app stores, SMS, push, analytics, diagnostics and infrastructure providers. Live-audio and paid-purchase providers are not used for those disabled features in this release. Their own terms may apply to their direct relationship with you. We are responsible for selecting and governing processors as required by law, but we do not control an app store, carrier or platform acting independently. External links are not endorsements. The Privacy Notice identifies data roles and transfers.
 
 16. Disclaimers
 To the extent permitted by law, Blumi is supplied with reasonable care but without a promise that a match will be suitable, that another user is truthful, or that every harmful act will be detected. Any "as available" limitation is subject to statutory conformity, consumer and digital-content guarantees. Nothing excludes an express promise stated at purchase or a duty that cannot lawfully be excluded.
@@ -218,7 +218,7 @@ Material changes will receive reasonable advance notice when required. A change 
 Version: ${LEGAL_DOCUMENT_VERSION}
 Effective date: ${LEGAL_EFFECTIVE_DATE}
 
-These rules apply to profiles, prompts, messages, shared rooms, live audio, reports and conduct connected to Blumi. Context matters, but safety does not depend on clever wording or moving abuse off-platform.
+These rules apply to profiles, prompts, messages, shared rooms, reports and conduct connected to Blumi. Live audio is unavailable in this release. Context matters, but safety does not depend on clever wording or moving abuse off-platform.
 
 Adults Only
 • You must be 18 or older. Do not create or operate an account for a minor.
@@ -228,7 +228,7 @@ Adults Only
 Consent and Sexual Safety
 • No sexual threat, coercion, extortion, non-consensual explicit content or pressure after a boundary is stated.
 • Consent must be freely given, specific, informed, current and reversible. A match, prior message or room acceptance is not consent to sexual conduct.
-• Do not record, transcribe, screenshot for abuse, or rebroadcast private messages or live audio without lawful authority and any required consent.
+• Do not record, transcribe, screenshot for abuse, or rebroadcast private messages or room content without lawful authority and any required consent.
 
 Respect and Inclusion
 • No harassment, stalking, bullying, threats, hate speech or degrading attacks.
@@ -250,10 +250,10 @@ Violence, Crime and Self-Harm
 • No credible threats, glorification or coordination of violent wrongdoing, trafficking, illegal drugs, weapons sales or other illegal activity.
 • Do not encourage self-harm or suicide. If someone appears in immediate danger, contact local emergency services; Blumi is not an emergency service.
 
-Room and Audio Etiquette
-• A shared room is mutual. Do not pressure someone to enter, stay, speak or turn on audio.
-• Live audio starts muted/off. Respect silence, leave requests and accessibility needs.
-• No disruptive noise, sexual audio, hate, threats, unlawful recording or attempts to capture another person's environment.
+Room Etiquette
+• A shared room is mutual. Do not pressure someone to enter or stay.
+• Respect a request to leave and another person's accessibility needs.
+• No harassment, hate, threats, unlawful recording or attempts to capture another person's environment.
 
 Report, Block and Evidence
 • Use report on the relevant profile or chat and block when contact should stop.
@@ -278,7 +278,7 @@ Yürürlük tarihi: ${LEGAL_EFFECTIVE_DATE_TR}
 
 1. Veri Sorumlusu ve İletişim
 Veri sorumlusu: ${LEGAL_OPERATOR_IDENTITY.legalName}
-Kayıtlı adres: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Faaliyet ülkesi: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 Gizlilik iletişimi: ${LEGAL_OPERATOR_IDENTITY.privacyContact}
 Destek sayfası: ${LEGAL_OPERATOR_IDENTITY.supportUrl}
 
@@ -290,20 +290,20 @@ Bu metin Blumi mobil uygulaması, sunucu API'leri, destek ve güvenlik faaliyetl
 3. İşlediğimiz Veri Kategorileri
 Hesap ve doğrulama: telefon numarası, tek kullanımlık kod talebi ve doğrulama durumu, hesap/kullanıcı kimlikleri, oturum ve güvenlik kayıtları, dil, zaman damgaları ve hesap durumu. Blumi telefon rehberine ihtiyaç duymaz.
 
-Profil ve keşif: görünen ad, yaş, biyografi, paylaşmayı seçtiğin kimlik/cinsiyet alanları, keşif yaş ve cinsiyet tercihleri, ilgi alanları, profil sorularına yanıtlar, avatar ve gardırop seçimleri, profil tamamlama durumu ve sağlamayı seçtiğin konum koordinatları veya konum bilgisi. Kesin konumun diğer kullanıcılara gösterilmez.
+Profil ve keşif: görünen ad, yaş, biyografi, paylaşmayı seçtiğin kimlik/cinsiyet alanları, keşif yaş ve cinsiyet tercihleri, ilgi alanları, profil sorularına yanıtlar, avatar ve gardırop seçimleri ve profil tamamlama durumu. Blumi cihazının konumunu istemez ve keşifte konum kullanmaz; bu sürümün profil güncelleme API'si gönderilen koordinatları artık kaydetmez. Önceki bir sürümde hesabına koordinat kaydedildiyse, saklama/silme incelemesi tamamlanana kadar sunucu kayıtlarında bulunabilir; diğer kullanıcılara gösterilmez.
 
 Etkileşim ve kullanıcı içeriği: keşif kararları, beğeniler, karşılıklı eşleşmeler, engeller, tepkiler, özel yazılı mesajlar, oda davetleri ve kararları, oda sohbeti, oda düzeni/dekoru ile destek, güvenlik bildirimi veya itiraz kapsamında iletilen içerik ve bağlam.
 
 Güvenlik ve bütünlük: bildirim nedeni ve açıklaması, bildirilen hesap/içerik kimlikleri, moderasyon kararları, yaptırım geçmişi, dolandırıcılık ve kötüye kullanım sinyalleri, hız sınırı olayları, IP adresi, cihaz/uygulama bilgisi, giriş denemeleri ve ilgili sunucu günlükleri. Bildirimlere erişim kısıtlıdır; mutlak gizlilik sözü verilmez ve inceleme, savunma hakkı veya kanun gerektiğinde paylaşılabilir.
 
-Satın alma ve sanal ekonomi: mağaza ürünü, mağazada gösterilen fiyat/para birimi, işlem ve ilk işlem kimlikleri, satın alma/iade/iptal durumu, RevenueCat uygulama-kullanıcı kimliği, jeton bakiyesi ve borcu, cüzdan defteri, sahip olunan sanal öğeler ve ödül geçmişi. Tam ödeme kartı bilgisini almayız veya saklamayız.
+Sanal ekonomi: jeton bakiyesi ve borcu, cüzdan defteri, sahip olunan sanal öğeler ve ödül geçmişi. Ücretli jeton satışı bu sürümde yoktur. Sonraki bir sürümde sunulursa mağaza işlemi ve RevenueCat hesap kimlikleri, bu metin güncellendikten sonra işlenebilir. Tam ödeme kartı bilgisini almayız veya saklamayız.
 
 Cihaz, bildirim ve tanı: işletim sistemi ve uygulama sürümü, cihaz/push belirteci, bildirim tercihleri ve teslim durumu. Yapılandırıldığında, gizliliği azaltılmış çökme/performans tanısı teknik yığın, ekran/özellik etiketi, cihaz sınıfı ve zamanlama içerebilir; ancak Sentry varsayılan kişisel veriyi, ekran görüntüsünü, görünüm ağacını, profil içeriğini veya mesaj gövdesini göndermeyecek şekilde yapılandırılmıştır.
 
 İsteğe bağlı ürün analitiği: yalnız ayrı onayın sonrasında, sınırlı ve izin listeli ürün-etkileşim olayları PostHog'a gönderilebilir. Analitik politikası ad, telefon, mesaj gövdesi, profil metni, URL, konum, doğrulama kodu ve tokenları dışlar; oturum tekrarı ve otomatik kişi profilleri kapalıdır.
 
 4. Kaynak ve Toplama Yöntemleri
-Verileri doğrudan senden; Blumi kullanımından; eşleşme, mesaj, oda, engel veya bildirimin diğer katılımcısından; satın alma doğrulaması için Apple App Store, Google Play ve RevenueCat'ten; telefon doğrulama verisi için Firebase Authentication ve telekom operatörlerinden; anlık bildirim teslimi için Expo, Apple Push Notification service veya Firebase Cloud Messaging'den; gerçek zamanlı oda bağlantısı için LiveKit'ten; etkinleştirilmiş güvenlik, analitik ve tanı sağlayıcılarından alırız. Veri simsarı profili satın almayız.
+Verileri doğrudan senden; Blumi kullanımından; eşleşme, mesaj, oda, engel veya bildirimin diğer katılımcısından; telefon doğrulama verisi için Firebase Authentication ve telekom operatörlerinden; anlık bildirim teslimi için Expo, Apple Push Notification service veya Firebase Cloud Messaging'den; etkinleştirilmiş güvenlik, analitik ve tanı sağlayıcılarından alırız. Ücretli satın alma ve canlı ses bu sürümde kapalıdır; RevenueCat satın alma doğrulaması ve LiveKit ses bağlantısı kullanılmaz. Veri simsarı profili satın almayız.
 
 5. Amaçlar ve Hukuki Sebepler
 Sözleşmenin kurulması veya ifası: hesabı oluşturmak ve korumak; telefonla doğrulamak; profil, keşif, eşleştirme, kalıcı yazılı sohbet, kabul edilmiş ortak oda, envanter, satın alma, destek, dışa aktarma ve silme işlevlerini sağlamak; sunucu tarafından yönetilen cüzdanı doğru tutmak.
@@ -325,7 +325,7 @@ Blumi; yaş aralığı, seçilen cinsiyetler, engeller, önceki kararlar, uygunl
 8. Mesajlar, Ortak Odalar ve Canlı Ses
 Özel yazılı mesajlar; eşleşen kullanıcıların konuşmaya erişebilmesi ve güvenlik, dışa aktarma, silme işlevleri için saklanır. Alıcı içeriği kopyalayabilir, kaydedebilir veya açıklayabilir; kontrolünü kaybetmenin güvenli olmayacağı bilgiyi paylaşma.
 
-Ortak bir odaya katıldığında yazılı sohbet kullanabilirsin. Canlı sesi açmayı seçersen ses LiveKit üzerinden diğer katılımcıya gerçek zamanlı iletilir. Blumi kamera erişimi istemez; canlı ses içeriğini kaydetmez veya saklamaz. LiveKit ve ağ işletmecileri oturumu iletmek ve güvenli tutmak için geçici medya paketleri ile bağlantı meta verisini işleyebilir. Katılımcılar geçerli hukuki sebep ve gerekli rıza olmadan başkasının sesini kaydedemez, yazıya dökemez veya yeniden yayımlayamaz.
+Ortak bir odaya katıldığında yazılı sohbet kullanabilirsin. Canlı ses bu sürümde yoktur; Blumi kamera erişimi istemez ve LiveKit'e ses iletmez. İleride canlı ses sunulursa metin güncellenecek ve özellik senin eyleminle açılacaktır. Katılımcılar geçerli hukuki sebep ve gerekli rıza olmadan başkasının iletişimini kaydedemez, yazıya dökemez veya yeniden yayımlayamaz.
 
 9. Güvenlik Bildirimleri ve Hukuki Talepler
 Kullanıcıları korumak, şüpheli ihlalleri araştırmak, tekrar eden kötüye kullanımı önlemek ve kanuna uymak için engelleri, bildirimleri, ilgili içerik/bağlamı, moderasyon kararlarını ve sınırlı teknik kanıtı işleriz. Erişim, bilmesi gereken yetkili kişi ve sağlayıcılarla sınırlıdır. Aktif inceleme, hukuki talep veya bağlayıcı karar için belirli kanıtı makul süre koruyup amaç ve zorunlu saklama süresi sona erdiğinde siler ya da anonimleştiririz. Kanun gerektiriyorsa veya inandırıcı yakın tehlikeyi önlemek için makul biçimde gerekliyse yetkili makamlara/acil servislere bildirim yapabiliriz; Blumi acil yardım hizmeti değildir.
@@ -334,10 +334,10 @@ Kullanıcıları korumak, şüpheli ihlalleri araştırmak, tekrar eden kötüye
 Cihaz izni verir ve push belirtecini kaydedersen Blumi, etkinleştirdiğin bildirim türlerini iletmek için Expo Push Service, Apple Push Notification service ve/veya Firebase Cloud Messaging kullanır. Bildirim içeriği ve belirteç ilgili servislerden geçer; cihaz ayarlarına göre kilit ekranında önizleme görünebilir. Beğeni, eşleşme, mesaj ve keşif izleme bildirimlerinin ayrı uygulama içi kontrolleri vardır. Operasyonel/güvenlik bildirimleri pazarlamadan ayrıdır. Uygulama tercihini veya cihaz iznini dilediğin zaman değiştirebilirsin.
 
 11. Satın Almalar
-Blumi, yerel jeton satın alımlarını sunmak, işlemek ve doğrulamak için RevenueCat ile ilgili Apple veya Google mağazasını kullanır. RevenueCat; doğrulama için gerekli mağaza işlemi, ürün, satın alma geçmişi ve uygulama hesap kimliğini alır. Blumi, çift kredi vermeyi önlemek, iadeleri işlemek ve jeton bakiyesini çalıştırmak için işlem, olay ve cüzdan-defteri kayıtlarını saklar. Ödeme bilgileri mağaza/ödeme sağlayıcısında kalır.
+Ücretli jeton satın alımı bu sürümde yoktur. Uygulama kazanılmış jeton bakiyesi ve sanal öğe sahipliğini yine gösterebilir. İleride yerel satın alma açılırsa RevenueCat ve ilgili Apple veya Google mağazası satın alma doğrulama verisi almadan önce bu metin güncellenecektir. Ödeme bilgileri mağaza/ödeme sağlayıcısında kalacaktır.
 
 12. Alıcılar ve Hizmet Sağlayıcılar
-Alıcılar şunlar olabilir: bilerek profil, mesaj, oda etkileşimi veya canlı ses paylaştığın diğer kullanıcılar; tek kullanımlık SMS için Firebase Authentication ve telekom işletmecileri; canlı ses bağlantısı için LiveKit; anlık bildirim için Expo, Apple ve Google; uygulama içi satın alma için RevenueCat, Apple ve Google; ayrı onay verilmiş analitik için PostHog; gizliliği azaltılmış tanı için Sentry; sözleşmeli barındırma, veritabanı ve altyapı sağlayıcıları; sır saklama yükümlülüğündeki profesyonel danışmanlar; hukuka uygun bildirim ve güvenceye tabi şirket devralanları; kanunen gerekliyse yetkili makamlar.
+Alıcılar şunlar olabilir: bilerek profil, mesaj veya oda etkileşimi paylaştığın diğer kullanıcılar; tek kullanımlık SMS için Firebase Authentication ve telekom işletmecileri; anlık bildirim için Expo, Apple ve Google; ayrı onay verilmiş analitik için PostHog; gizliliği azaltılmış tanı için Sentry; sözleşmeli barındırma, veritabanı ve altyapı sağlayıcıları; sır saklama yükümlülüğündeki profesyonel danışmanlar; hukuka uygun bildirim ve güvenceye tabi şirket devralanları; kanunen gerekliyse yetkili makamlar. LiveKit ve RevenueCat bu sürümde ses veya satın alma verisi almaz; ilgili özellikler kapalıdır.
 
 Hizmet sağlayıcıların rolleri ve önemli değişiklikler bu metne veya destek sayfasına yansıtılır. SMS katılım ve doğrulama rıza kayıtları üçüncü taraf pazarlaması için satılmaz, kiralanmaz veya paylaşılmaz.
 
@@ -363,7 +363,7 @@ GDPR veya başka hukuk uygulanıyorsa erişim, düzeltme, silme, kısıtlama, ta
 18. Hak Kullanımı, Dışa Aktarım ve Hesap Silme
 Ayarlar'dan giriş telefonuna gönderilen yeni tek kullanımlık kodu doğruladıktan sonra hesap verisi dışa aktarımı isteyebilir veya hesabını silebilirsin. Aktif silme akışı; kanunen ayrıştırılıp saklanması gereken veya belgeli hukuki muhafazaya giren bilgi dışında aktif hesap, profil, oturum, mesaj, eşleşme, oda, ekonomi, güvenlik ve push kayıtlarını kaldırır. Dondurma veya devre dışı bırakma, silme olarak sunulmaz.
 
-Gizlilik adresine, kayıtlı adrese veya veri sorumlusunun ilan ettiği başka bir doğrulanmış başvuru kanalına imzalı ya da hukuken geçerli taleple başvurabilirsin. Hesabı bulmaya ve hakkı belirlemeye yetecek bilgi ver; parola veya OTP gönderme. Başvuruyu en kısa sürede ve en geç 30 gün içinde kanuni usule göre yanıtlarız. Veri sorumlusuna başvurudan sonra uygulanabilir kanuni sürede Kişisel Verileri Koruma Kurulu'na veya başka yetkili makama şikâyet edebilirsin.
+Gizlilik iletişimine veya veri sorumlusunun ilan ettiği başka bir doğrulanmış başvuru kanalına imzalı ya da hukuken geçerli taleple başvurabilirsin. Hesabı bulmaya ve hakkı belirlemeye yetecek bilgi ver; parola veya OTP gönderme. Başvuruyu en kısa sürede ve en geç 30 gün içinde kanuni usule göre yanıtlarız. Veri sorumlusuna başvurudan sonra uygulanabilir kanuni sürede Kişisel Verileri Koruma Kurulu'na veya başka yetkili makama şikâyet edebilirsin.
 
 19. Çocuklar
 Blumi yalnız 18 yaş ve üzeri kişiler içindir ve çocuklara pazarlanamaz. Yaş beyanı, mağaza/platform yaş araçları, bildirimler ve ölçülü kontroller kullanılabilir. Hesabın reşit olmayana ait olduğunu makul biçimde belirlersek erişimi askıya alır, güvenlik ve uyum için gereken asgari kanıtı hukuka uygun biçimde saklar ve kalan veriyi sileriz. Şüpheli reşit olmayan kullanımı uygulama içi bildirim aracı veya destek sayfasından bildir.
@@ -378,7 +378,7 @@ Hukuk, sağlayıcı veya ürün değişikliğini yansıtmak için metin güncell
 Gizlilik başvuruları: ${LEGAL_OPERATOR_IDENTITY.privacyContact}
 Hukuki bildirimler: ${LEGAL_OPERATOR_IDENTITY.legalContact}
 Destek sayfası ve gizlilik tercihleri: ${LEGAL_OPERATOR_IDENTITY.supportUrl}
-Veri sorumlusu adresi: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Faaliyet ülkesi: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 
 E-postaya parola, tek kullanımlık kod, ödeme kartı verisi veya gereksiz hassas bilgi ekleme.`
   },
@@ -392,7 +392,7 @@ Sürüm: ${LEGAL_DOCUMENT_VERSION}
 Yürürlük tarihi: ${LEGAL_EFFECTIVE_DATE_TR}
 
 Hizmet sağlayıcı ve sözleşme tarafı: ${LEGAL_OPERATOR_IDENTITY.legalName}
-Kayıtlı adres: ${LEGAL_OPERATOR_IDENTITY.registeredAddress}
+Faaliyet ülkesi: ${LEGAL_OPERATOR_IDENTITY.operatingCountry}
 Hukuki iletişim: ${LEGAL_OPERATOR_IDENTITY.legalContact}
 
 1. Sözleşme ve Gizlilik Metni
@@ -405,7 +405,7 @@ En az 18 yaşında, bu sözleşmeyi kurabilecek ehliyette ve hizmeti kullanması
 Bir kişi yalnız hizmetin izin verdiği sayıda hesabı yönetebilir. Cihazını ve SMS erişimini koru; tek kullanımlık kodu paylaşma. Yetkilendirdiğin faaliyetten sorumlusun ve şüpheli ele geçirmeyi hemen bildirmelisin. Hesabı satamaz, devredemez, kiralayamaz, otomatikleştiremez veya başkasını taklit edemezsin. Hassas hesap işlemlerinde yeniden doğrulama istenebilir. Telefon doğrulaması yalnız o anda numaranın kontrolünü gösterir; kimlik, geçmiş, niyet veya güvenlik doğrulaması değildir.
 
 4. Hizmetin Kapsamı
-Blumi anonimlik öncelikli sosyal keşif hizmetidir. Avatar tabanlı profil, keşif tercihi, karşılıklı ilgiyle eşleşme, kalıcı yazılı sohbet, sohbetten başlatılan ve kabul edilen isteğe bağlı ortak oda, oda düzenleme, başlangıçta sessiz/kapalı isteğe bağlı canlı ses, güvenlik araçları ve sanal öğeler sunar. Özellikler cihaz, ülke, hesap durumu veya hukuka uygun güvenlik kısıtına göre değişebilir. Eşleşme veya öneri onay değildir; kimlik, uyumluluk, erişilebilirlik veya sonuç garantisi vermez.
+Blumi anonimlik öncelikli sosyal keşif hizmetidir. Avatar tabanlı profil, keşif tercihi, karşılıklı ilgiyle eşleşme, kalıcı yazılı sohbet, sohbetten başlatılan ve kabul edilen isteğe bağlı ortak oda, oda düzenleme, güvenlik araçları ve sanal öğeler sunar. Canlı ses ve ücretli jeton satın alma bu sürümde kullanılamaz. Özellikler cihaz, ülke, hesap durumu veya hukuka uygun güvenlik kısıtına göre değişebilir. Eşleşme veya öneri onay değildir; kimlik, uyumluluk, erişilebilirlik veya sonuç garantisi vermez.
 
 5. Kullanıcı İçeriği ve Lisans
 Hukuka uygun oluşturduğun profil metni, yanıt, mesaj, rapor, oda seçimi ve diğer kullanıcı içeriğinin mülkiyeti sende kalır. Hizmeti işletmek, korumak, moderasyon yapmak, iyileştirmek ve hukuken savunmak için makul ölçüde gerekli olmak üzere; barındırma, saklama, çoğaltma, iletme, biçimlendirme ve gösterme için dünya çapında, münhasır olmayan, bedelsiz ve yalnız gerekli sağlayıcılara alt lisanslanabilir bir lisans verirsin. Lisans aktif sistemlerden silmeyle sona erer; alıcı kopyaları, yedek, hukuki muhafaza ve Gizlilik Metni'ndeki kanuni saklama istisnadır.
@@ -418,8 +418,8 @@ Hukuka uygun oluşturduğun profil metni, yanıt, mesaj, rapor, oda seçimi ve d
 7. Güvenlik ve Yüz Yüze Etkileşim
 Blumi herkese yönelik adli sicil, kimlik veya geçmiş kontrolü yapmaz; başkasının beyanını/davranışını garanti edemez. Bildir ve engelle araçlarını kullan, ilk konuşmaları uygulamada tut, finansal ve adres bilgini koru; çevrim dışı veya yüz yüze buluşmaya yalnız güvenli olduğuna kendin karar verdiğinde geç. Güvendiğin birine haber ver, ulaşımını kontrol et ve kamusal yer seç. Blumi acil yardım hizmeti değildir; yakın tehlikede yerel acil servis veya kolluğa ulaş. Kanunen dışlanamayan sorumluluklar saklı olmak üzere, gönüllü buluşma kararından sen sorumlusun.
 
-8. Ortak Oda ve Canlı Ses
-Oda yalnız desteklenen davet ve kabul akışıyla başlar. Yazılı sohbet kalıcıdır. Canlı ses isteğe bağlıdır, sessiz/kapalı başlar ve sağlayıcı üzerinden gerçek zamanlı iletilir. Kamera, görüntülü arama veya sesli mesaj özelliği vaat edilmez. Geçerli hukuki sebep ve gerekli rıza olmadan başkasını kaydetme, yazıya dökme veya yayınlama. Gerektiğinde ayrıl, sessize al, engelle veya bildir. Teknik kontroller alıcının başka cihazla kayıt almasını kesin engelleyemez.
+8. Ortak Oda
+Oda yalnız desteklenen davet ve kabul akışıyla başlar. Yazılı sohbet kalıcıdır. Canlı ses bu sürümde yoktur; Blumi oda sesi iletmez. Kamera, görüntülü arama veya sesli mesaj özelliği sunulmaz. Geçerli hukuki sebep ve gerekli rıza olmadan başkasının içeriğini kaydetme, yazıya dökme veya yayınlama. Gerektiğinde ayrıl, engelle veya bildir. Teknik kontroller alıcının başka cihazla kayıt almasını kesin engelleyemez.
 
 9. Moderasyon, Bildirim ve İtiraz
 Blumi; otomatik sinyal ve insan incelemesiyle içerik/davranışı araştırabilir, görünürlüğü azaltabilir, içerik kaldırabilir, özelliği sınırlayabilir, hesabı askıya alabilir/sonlandırabilir, kanıt koruyabilir ve kanuni bildirim yapabilir. Her etkileşimi önceden izleme veya her ihlali önleme sözü vermeyiz. Yaptırımda ağırlık, bağlam, tekrar, inandırıcı risk, kanun ve platform koşulları dikkate alınır. Bildirim risk yaratmıyor ve kanunen yasak değilse önemli yaptırımın anlamlı gerekçesi ile destek üzerinden itiraz yolu sağlanır. Ağır veya tekrarlanan ihlal ön uyarı olmadan kalıcı sonuca yol açabilir.
@@ -428,7 +428,7 @@ Blumi; otomatik sinyal ve insan incelemesiyle içerik/davranışı araştırabil
 Blumi yazılımı, özgün avatarlar, animasyonlar, oda sanatı, logolar, arayüzler, metin ve diğer hizmet materyalleri hizmet sağlayıcıya aittir veya lisanslıdır ve kanunla korunur. Bu Koşullara bağlı olarak yalnız amaçlanan kişisel kullanım için sınırlı, geri alınabilir, münhasır olmayan ve devredilemez lisans alırsın. Kaynak kodu, marka, asset veya ticari kullanım hakkı devredilmez. Geçerli ihlal/karşı bildirim, yeterli kimlik ve dayanakla hukuki iletişime gönderilebilir.
 
 11. Jetonlar, Sanal Öğeler ve Mağaza Satın Almaları
-Blumi Apple App Store veya Google Play üzerinden tüketilebilir jeton paketi sunabilir. Jetonlar ve sanal öğeler yalnız Blumi içinde kullanılabilen sözleşmesel, devredilemez özelliklerdir; para, mevduat veya menkul kıymet değildir, nakde çevrilemez ve yalnız uygun Blumi öğelerinde kullanılabilir. Bu nitelendirme, dijital içerik veya hizmete ilişkin emredici hukuki niteliği ve tüketici haklarını kaldırmaz. Fiyat, vergi, para birimi ve zorunlu ön bilgilendirme satın alma öncesi mağazada gösterilir. Ödemeyi mağaza işler; RevenueCat ve Blumi işlemi doğrular.
+Ücretli jeton satın alma bu sürümde kullanılamaz. Blumi ileride Apple App Store veya Google Play üzerinden tüketilebilir jeton paketi sunarsa, aşağıdaki satın alma koşulları yalnız özellik açıldığında uygulanır. Jetonlar ve sanal öğeler yalnız Blumi içinde kullanılabilen sözleşmesel, devredilemez özelliklerdir; para, mevduat veya menkul kıymet değildir, nakde çevrilemez ve yalnız uygun Blumi öğelerinde kullanılabilir. Bu nitelendirme, dijital içerik veya hizmete ilişkin emredici hukuki niteliği ve tüketici haklarını kaldırmaz. Fiyat, vergi, para birimi ve zorunlu ön bilgilendirme satın alma öncesi mağazada gösterilir. Ödemeyi mağaza işler; RevenueCat ve Blumi işlemi doğrular.
 
 Tüketilebilir jetonlar için kullanıcıya dönük satın alma geri yükleme akışı vaat etmeyiz. Aynı Blumi hesabına giriş sunucu cüzdan bakiyesini getirir. Doğrulanmış mağaza iadesi, iptali, ters ibraz veya ters kayıt olursa yalnız o işlemle verilen jetonlar geri alınabilir. Bir kısmı harcanmışsa bakiye negatife düşebilir ve jeton harcaması durdurulabilir; bu muhasebe düzeltmesi ayrıca tahsil edilen bir para borcu değildir. Sahip olunan kozmetik/oda öğeleri, kanun, dolandırıcılık düzeltmesi veya açık işlem ters kaydı gerektirmedikçe yalnız negatif bakiye nedeniyle alınmaz.
 
@@ -446,7 +446,7 @@ Esaslı/tekrarlanan ihlal, inandırıcı güvenlik riski, dolandırıcılık, hu
 Özellikleri bakım, güvenlik, iyileştirme, ekleme, kaldırma veya sonlandırma amacıyla değiştirebiliriz. Esaslı olumsuz değişiklikte uygulanabilir ve makulse ön bildirim ve kanunun zorunlu kıldığı çözüm sağlanır. Kesintisiz/hatasız erişim sözü verilmez; kesinti, cihaz sınırı ve sağlayıcı arızası olabilir. Bu hüküm ücretli borcu ifadan kaçınmak veya haksız tek taraflı değişiklik yapmak için kullanılamaz.
 
 15. Üçüncü Taraf Hizmetleri
-Blumi mağaza, SMS, anlık bildirim, canlı ses, analitik, tanı ve altyapı sağlayıcılarına dayanır. Doğrudan ilişkin için onların koşulları uygulanabilir. İşleyen seçimi ve yönetiminden kanunun istediği ölçüde sorumluyuz; bağımsız hareket eden mağaza, operatör veya platformu kontrol etmeyiz. Dış bağlantı onay değildir. Veri rolleri ve aktarımlar Gizlilik Metni'ndedir.
+Blumi mağaza, SMS, anlık bildirim, analitik, tanı ve altyapı sağlayıcılarına dayanır. Bu sürümde kapalı olan canlı ses ve ücretli satın alma özellikleri için ilgili sağlayıcılar kullanılmaz. Doğrudan ilişkin için onların koşulları uygulanabilir. İşleyen seçimi ve yönetiminden kanunun istediği ölçüde sorumluyuz; bağımsız hareket eden mağaza, operatör veya platformu kontrol etmeyiz. Dış bağlantı onay değildir. Veri rolleri ve aktarımlar Gizlilik Metni'ndedir.
 
 16. Garantiler Hakkında
 Blumi makul özenle sunulur; eşleşmenin uygun, diğer kişinin doğru sözlü veya her zararlı eylemin tespit edileceği vaat edilmez. “Mevcut hâliyle” sınırlaması kanuni uygunluk, tüketici ve dijital içerik garantilerine tabidir. Satın almada açıkça verilen taahhüt veya kanunen dışlanamayan yükümlülük kaldırılmaz.
@@ -475,7 +475,7 @@ Bir hüküm geçersizse yalnız gerektiği kadar daraltılır/ayrılır; kalanı
 Sürüm: ${LEGAL_DOCUMENT_VERSION}
 Yürürlük tarihi: ${LEGAL_EFFECTIVE_DATE_TR}
 
-Bu kurallar profil, yanıt, mesaj, ortak oda, canlı ses, bildirim ve Blumi bağlantılı davranışlara uygulanır. Bağlam önemlidir; fakat kötüye kullanımı uygulama dışına taşımak veya kelime oyunu yapmak güvenlik kuralını ortadan kaldırmaz.
+Bu kurallar profil, yanıt, mesaj, ortak oda, bildirim ve Blumi bağlantılı davranışlara uygulanır. Canlı ses bu sürümde yoktur. Bağlam önemlidir; fakat kötüye kullanımı uygulama dışına taşımak veya kelime oyunu yapmak güvenlik kuralını ortadan kaldırmaz.
 
 Yalnız Yetişkinler
 • En az 18 yaşında olmalısın; reşit olmayan adına hesap açamazsın.
@@ -485,7 +485,7 @@ Yalnız Yetişkinler
 Rıza ve Cinsel Güvenlik
 • Cinsel tehdit, baskı, şantaj, rıza dışı açık içerik ve belirtilen sınırdan sonra ısrar yasaktır.
 • Rıza özgür, belirli, bilgilendirilmiş, güncel ve geri alınabilir olmalıdır. Eşleşme, önceki mesaj veya oda kabulü cinsel davranışa rıza değildir.
-• Geçerli yetki ve gerekli rıza olmadan özel mesajı veya canlı sesi kaydetme, yazıya dökme, kötüye kullanmak için ekran görüntüsü alma ya da yeniden yayımlama.
+• Geçerli yetki ve gerekli rıza olmadan özel mesajı veya oda içeriğini kaydetme, yazıya dökme, kötüye kullanmak için ekran görüntüsü alma ya da yeniden yayımlama.
 
 Saygı ve Kapsayıcılık
 • Taciz, ısrarlı takip, zorbalık, tehdit, nefret söylemi ve aşağılayıcı saldırı yasaktır.
@@ -507,10 +507,10 @@ Dolandırıcılık ve Ticari Kötüye Kullanım
 • İnandırıcı tehdit, şiddet eylemini övme/planlama, insan ticareti, yasa dışı uyuşturucu, silah satışı ve başka suç yasaktır.
 • Kendine zarar veya intiharı teşvik etme. Birisi yakın tehlikedeyse yerel acil servise ulaş; Blumi acil yardım hizmeti değildir.
 
-Oda ve Ses Görgüsü
-• Ortak oda karşılıklıdır. Birini girmeye, kalmaya, konuşmaya veya sesi açmaya zorlama.
-• Canlı ses sessiz/kapalı başlar. Sessizliğe, ayrılma isteğine ve erişilebilirlik ihtiyacına saygı duy.
-• Rahatsız edici gürültü, cinsel ses, nefret, tehdit, hukuka aykırı kayıt veya başkasının ortamını yakalama girişimi yasaktır.
+Oda Görgüsü
+• Ortak oda karşılıklıdır. Birini girmeye veya kalmaya zorlama.
+• Ayrılma isteğine ve erişilebilirlik ihtiyacına saygı duy.
+• Taciz, nefret, tehdit, hukuka aykırı kayıt veya başkasının ortamını yakalama girişimi yasaktır.
 
 Bildir, Engelle ve Kanıt
 • İlgili profil veya sohbette bildir aracını; temasın bitmesi gerektiğinde engelleyi kullan.

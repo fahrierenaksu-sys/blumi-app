@@ -19,6 +19,8 @@ const sourceFiles = [
   "src/features/inventory/inventoryScopeModel.test.ts",
   "src/features/inventory/inventoryHydrationPolicy.ts",
   "src/features/inventory/inventoryHydrationPolicy.test.ts",
+  "src/features/inventory/inventoryHydrationSingleFlight.ts",
+  "src/features/inventory/inventoryHydrationSingleFlight.test.ts",
   "src/features/inventory/inventoryStore.ts"
 ]
 
@@ -59,7 +61,8 @@ try {
       join(outputDirectory, "features/inventory/economyApi.test.js"),
       join(outputDirectory, "features/inventory/inventoryModel.test.js"),
       join(outputDirectory, "features/inventory/inventoryScopeModel.test.js"),
-      join(outputDirectory, "features/inventory/inventoryHydrationPolicy.test.js")
+      join(outputDirectory, "features/inventory/inventoryHydrationPolicy.test.js"),
+      join(outputDirectory, "features/inventory/inventoryHydrationSingleFlight.test.js")
     ],
     {
       cwd: workspaceRoot,

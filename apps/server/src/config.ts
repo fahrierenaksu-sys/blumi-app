@@ -87,6 +87,7 @@ import { createReferralService, type ReferralService } from "./referrals/referra
 import type { AdminSigningKey } from "./admin/adminTokenService"
 import type { AdminUsersService } from "./admin/adminUsersService"
 import { createAdminUsersService } from "./admin/adminUsersService"
+import { createAdminAnalyticsService, type AdminAnalyticsService } from "./admin/adminAnalyticsService"
 import { createPostgresAdminUserRepository } from "./db/postgresAdminUserRepository"
 import {
   createInMemoryRealtimeTicketStore,
@@ -156,6 +157,7 @@ export interface ConfiguredServerServices {
   referralService: ReferralService
   accountRecoveryService: AccountRecoveryService
   adminUsersService?: AdminUsersService
+  adminAnalyticsService?: AdminAnalyticsService
   personalRoomDecorService: PersonalRoomDecorService
   roomSnapshotService: RoomSnapshotService
   checkReadiness(): Promise<void>
@@ -207,7 +209,10 @@ export function resolveServerConfig(
   if (voiceFlag !== undefined && voiceFlag !== "0" && voiceFlag !== "1") {
     throw new Error("BLUMI_VOICE_ENABLED must be 0 or 1.")
   }
-  const voiceEnabled = voiceFlag !== "0"
+  if (voiceFlag === "1") {
+    throw new Error("Live voice and microphone access are disabled in this Blumi version.")
+  }
+  const voiceEnabled = false
   // Omitting all media credentials selects the existing text-only room protocol.
   const livekitUrl = voiceEnabled ? env.LIVEKIT_URL?.trim() : undefined
   const livekitApiKey = voiceEnabled ? env.LIVEKIT_API_KEY?.trim() : undefined
@@ -497,11 +502,9 @@ export function createConfiguredServerServices(
     const roomSnapshotService = createRoomSnapshotService({
       repository: createPostgresRoomSnapshotRepository(pool),
       isPublicByDefault: false,
-      onRenderError: (error, room) => {
+      onRenderError: (error) => {
         console.error("Room showcase snapshot render failed", {
-          error,
-          userId: room.userId,
-          revision: room.revision
+          errorType: error instanceof Error ? error.name : typeof error
         })
       }
     })
@@ -581,6 +584,7 @@ export function createConfiguredServerServices(
       adminUsersService: createAdminUsersService({
         repository: createPostgresAdminUserRepository(pool)
       }),
+      adminAnalyticsService: createAdminAnalyticsService({ pool, environment: config.deployEnvironment }),
       personalRoomDecorService,
       roomSnapshotService,
       async checkReadiness() {
@@ -609,11 +613,9 @@ export function createConfiguredServerServices(
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({
     isPublicByDefault: false,
-    onRenderError: (error, room) => {
+    onRenderError: (error) => {
       console.error("Room showcase snapshot render failed", {
-        error,
-        userId: room.userId,
-        revision: room.revision
+        errorType: error instanceof Error ? error.name : typeof error
       })
     }
   })

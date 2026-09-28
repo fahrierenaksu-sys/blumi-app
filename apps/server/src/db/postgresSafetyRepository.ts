@@ -178,16 +178,17 @@ export function createPostgresSafetyRepository(
       }
     },
 
-    async listReportsForActor(actorUserId) {
+    async listReportsForActor(actorUserId, limit = 50) {
       const result = await pool.query(
         `SELECT report_id, actor_user_id, reported_user_id, reason, note, idempotency_key,
                 created_at, status, resolution_action, resolution_note,
                 resolved_at, resolved_by_admin_id, resolved_by_token_id,
                 resolution_suspended_until
-           FROM blumi_safety_reports
+          FROM blumi_safety_reports
           WHERE actor_user_id = $1
-          ORDER BY created_at DESC`,
-        [actorUserId]
+          ORDER BY created_at DESC
+          LIMIT $2`,
+        [actorUserId, limit]
       )
       return result.rows.map(mapReport)
     },

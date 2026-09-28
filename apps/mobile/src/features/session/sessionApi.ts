@@ -42,8 +42,6 @@ export interface UpdateSessionProfileInput {
   discoveryPreferences?: DiscoveryPreferences
   interests?: string[]
   prompts?: UserProfilePrompt[]
-  locationLat?: number
-  locationLng?: number
 }
 
 export interface RegisterAccountInput {
@@ -118,16 +116,7 @@ export function updateSessionActorProfile(
       prompts: input.prompts
         ? input.prompts.map((prompt) => ({ ...prompt }))
         : sessionActor.profile.prompts?.map((prompt) => ({ ...prompt })),
-      location:
-        typeof input.locationLat === "number" &&
-        typeof input.locationLng === "number"
-          ? {
-              lat: input.locationLat,
-              lng: input.locationLng
-            }
-          : sessionActor.profile.location
-            ? { ...sessionActor.profile.location }
-            : undefined,
+      location: undefined,
       avatar: sessionActor.profile.avatar.loadout
         ? cloneAvatarSelection(sessionActor.profile.avatar)
         : {
@@ -668,7 +657,17 @@ export async function updateProductionProfile(
       authorization: `Bearer ${sessionToken}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      displayName: input.displayName,
+      age: input.age,
+      avatarPresetId: input.avatarPresetId,
+      bio: input.bio,
+      gender: input.gender,
+      identityGender: input.identityGender,
+      discoveryPreferences: input.discoveryPreferences,
+      interests: input.interests,
+      prompts: input.prompts
+    }),
     signal
   })
   const payload: unknown = await response.json()
@@ -855,20 +854,8 @@ function normalizeUserProfilePayload(payload: unknown): UserProfile {
       ? record.interests.filter((item): item is string => typeof item === "string")
       : undefined,
     prompts: normalizeUserProfilePrompts(record.prompts),
-    location: normalizeProfileLocation(record.location),
+    location: undefined,
     avatar: normalizedAvatar
-  }
-}
-
-function normalizeProfileLocation(value: unknown): UserProfile["location"] {
-  if (!value || typeof value !== "object") return undefined
-  const record = value as Record<string, unknown>
-  if (typeof record.lat !== "number" || typeof record.lng !== "number") {
-    return undefined
-  }
-  return {
-    lat: record.lat,
-    lng: record.lng
   }
 }
 

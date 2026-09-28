@@ -43,9 +43,7 @@ test("profile updates create a new session actor without mutating the source", (
     age: 25,
     bio: "Coffee walks.",
     gender: "woman",
-    interests: ["coffee", "jazz"],
-    locationLat: 41.01,
-    locationLng: 28.97
+    interests: ["coffee", "jazz"]
   })
 
   assert.notEqual(updated, actor)
@@ -57,7 +55,7 @@ test("profile updates create a new session actor without mutating the source", (
   assert.equal(updated.profile.bio, "Coffee walks.")
   assert.equal(updated.profile.gender, "woman")
   assert.deepEqual(updated.profile.interests, ["coffee", "jazz"])
-  assert.deepEqual(updated.profile.location, { lat: 41.01, lng: 28.97 })
+  assert.equal(updated.profile.location, undefined)
   assert.deepEqual(updated.profile.avatar, actor.profile.avatar)
 })
 
@@ -573,19 +571,20 @@ test("sign out revokes the active production session", async () => {
 
 test("production profile update calls the account profile boundary", async () => {
   const fetchCalls: { url: string; init?: RequestInit }[] = []
+  const legacyProfileInput = {
+    displayName: "Defne Yildiz",
+    age: 24,
+    avatarPresetId: "sunset",
+    bio: "Slow coffee, fast wit.",
+    gender: "woman" as const,
+    interests: ["coffee", "music"],
+    locationLat: 41.01,
+    locationLng: 28.97
+  } as Parameters<typeof updateProductionProfile>[2]
   const profile = await updateProductionProfile(
     "https://api.blumi.test/",
     "production-token",
-    {
-      displayName: "Defne Yildiz",
-      age: 24,
-      avatarPresetId: "sunset",
-      bio: "Slow coffee, fast wit.",
-      gender: "woman",
-      interests: ["coffee", "music"],
-      locationLat: 41.01,
-      locationLng: 28.97
-    },
+    legacyProfileInput,
     async (url, init) => {
       fetchCalls.push({ url: String(url), init })
       return new Response(JSON.stringify({
@@ -619,14 +618,12 @@ test("production profile update calls the account profile boundary", async () =>
     bio: "Slow coffee, fast wit.",
     gender: "woman",
     interests: ["coffee", "music"],
-    locationLat: 41.01,
-    locationLng: 28.97
   })
   assert.equal(profile.displayName, "Defne Yildiz")
   assert.equal(profile.avatar.presetId, "sunset")
   assert.equal(profile.bio, "Slow coffee, fast wit.")
   assert.deepEqual(profile.interests, ["coffee", "music"])
-  assert.deepEqual(profile.location, { lat: 41.01, lng: 28.97 })
+  assert.equal(profile.location, undefined)
 })
 
 test("production profile fetch loads the latest account profile", async () => {
@@ -668,7 +665,7 @@ test("production profile fetch loads the latest account profile", async () => {
   assert.equal(profile.age, 25)
   assert.equal(profile.bio, "Bookstores and tea.")
   assert.deepEqual(profile.interests, ["books", "tea"])
-  assert.deepEqual(profile.location, { lat: 40.99, lng: 29.02 })
+  assert.equal(profile.location, undefined)
 })
 
 test("production account snapshot reconciles profile and onboarding together", async () => {

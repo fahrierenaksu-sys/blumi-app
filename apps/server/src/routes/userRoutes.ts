@@ -30,7 +30,6 @@ import {
 import {
   isRecord,
   readBearerToken,
-  readLocationNumber,
   readPhoneNumber,
   readVerificationCode,
   resolveBearerSession
@@ -287,9 +286,7 @@ export async function registerUserRoutes(
           body.interests.every((interest) => typeof interest === "string")
             ? body.interests
             : undefined,
-        prompts: readProfilePrompts(body),
-        locationLat: readLocationNumber(body, "lat"),
-        locationLng: readLocationNumber(body, "lng")
+        prompts: readProfilePrompts(body)
       })
       if (!profile) {
         return reply.code(401).send({ error: "Sign in again to continue." })

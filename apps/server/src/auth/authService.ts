@@ -41,6 +41,7 @@ import {
   type SmsProvider
 } from "./smsProvider"
 import { PublicRequestError } from "../errors/publicRequestError"
+import { assertPublicTextAllowed } from "../safety/publicTextFilter"
 import {
   createEmptyAccountDataExporter,
   type AccountDataExporter,
@@ -162,8 +163,6 @@ export interface ProfileUpdateInput {
   discoveryPreferences?: DiscoveryPreferences
   interests?: string[]
   prompts?: UserProfilePrompt[]
-  locationLat?: number
-  locationLng?: number
 }
 
 export interface CreateAuthServiceOptions {
@@ -720,19 +719,6 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       const prompts = Array.isArray(profile.prompts)
         ? normalizeProfilePrompts(profile.prompts)
         : resolved.account.profile.prompts
-      const location =
-        typeof profile.locationLat === "number" ||
-        typeof profile.locationLng === "number"
-          ? normalizeLocation(
-              typeof profile.locationLat === "number"
-                ? profile.locationLat
-                : resolved.account.profile.location?.lat,
-              typeof profile.locationLng === "number"
-                ? profile.locationLng
-                : resolved.account.profile.location?.lng
-            )
-          : resolved.account.profile.location
-
       const updatedProfile: AccountProfileUpdate = {
         ...(typeof profile.displayName === "string" ? { displayName } : {}),
         ...(typeof profile.age === "number" ? { age } : {}),
@@ -753,12 +739,14 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
           : {}),
         ...(Array.isArray(profile.prompts)
           ? { prompts: prompts ?? null }
-          : {}),
-        ...(typeof profile.locationLat === "number" ||
-        typeof profile.locationLng === "number"
-          ? { location: location ?? null }
           : {})
       }
+
+      if (typeof updatedProfile.displayName === "string") assertPublicTextAllowed(updatedProfile.displayName)
+      if (typeof updatedProfile.bio === "string") assertPublicTextAllowed(updatedProfile.bio)
+      for (const interest of updatedProfile.interests ?? []) assertPublicTextAllowed(interest)
+      for (const prompt of updatedProfile.prompts ?? []) assertPublicTextAllowed(prompt.answer)
+      for (const vibe of updatedProfile.discoveryPreferences?.vibes ?? []) assertPublicTextAllowed(vibe)
 
       const updatedAccount = await repository.updateAccountProfile({
         accountId: resolved.account.accountId,
@@ -1334,26 +1322,6 @@ function normalizeInterests(interests: string[]): string[] | undefined {
     }
   }
   return unique.length > 0 ? unique : undefined
-}
-
-function normalizeLocation(
-  lat: number | undefined,
-  lng: number | undefined
-): { lat: number; lng: number } | undefined {
-  if (lat === undefined && lng === undefined) return undefined
-  if (
-    typeof lat !== "number" ||
-    typeof lng !== "number" ||
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng) ||
-    lat < -90 ||
-    lat > 90 ||
-    lng < -180 ||
-    lng > 180
-  ) {
-    throw new PublicRequestError("Choose a valid location.")
-  }
-  return { lat, lng }
 }
 
 export function toSessionActor(

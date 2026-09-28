@@ -29,6 +29,10 @@ import {
   type InventoryHydrationStatus,
   type OwnerInventoryState
 } from "./inventoryScopeModel"
+import {
+  runInventoryHydrationSingleFlight,
+  type InventoryHydrationFlight
+} from "./inventoryHydrationSingleFlight"
 
 export type { BlumiInventorySnapshot, InventoryUnlockResult } from "./inventoryModel"
 
@@ -68,6 +72,7 @@ interface OwnerInventoryCache {
   serverHydrationGeneration: number
   serverMutationGeneration: number
   serverMutationTail: Promise<void>
+  serverHydrationFlight: { current: InventoryHydrationFlight<InventoryUnlockResult> | null }
 }
 
 type Listener = () => void
@@ -104,7 +109,8 @@ function getOwnerCache(ownerUserId: string): OwnerInventoryCache {
     loadPromise: null,
     serverHydrationGeneration: 0,
     serverMutationGeneration: 0,
-    serverMutationTail: Promise.resolve()
+    serverMutationTail: Promise.resolve(),
+    serverHydrationFlight: { current: null }
   }
   ownerCaches.set(ownerUserId, created)
   return created
@@ -270,7 +276,6 @@ export function useInventoryStore(
     listeners.add(listener)
     ownerListeners.set(ownerId, listeners)
     void loadInventorySnapshot(ownerId)
-    setTick((current) => current + 1)
     return () => {
       listeners.delete(listener)
       if (listeners.size === 0) ownerListeners.delete(ownerId)
@@ -317,39 +322,43 @@ export function useInventoryStore(
     return result
   }, [ownerId])
 
-  const hydrateFromServer = useCallback(async (
+  const hydrateFromServer = useCallback((
     sessionToken: string
-  ): Promise<InventoryUnlockResult> => {
-    const ownerCache = getOwnerCache(ownerId)
-    const hydrationGeneration = ownerCache.serverHydrationGeneration + 1
-    ownerCache.serverHydrationGeneration = hydrationGeneration
-    const startedMutationGeneration = ownerCache.serverMutationGeneration
-    if (ownerCache.state.serverStatus !== "ready") {
-      ownerCache.state = { ...ownerCache.state, serverStatus: "loading" }
-    }
-    notify(ownerId)
-    try {
-      const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
-      if (!shouldApplyInventoryHydrationResponse({
-        currentHydrationGeneration: ownerCache.serverHydrationGeneration,
-        responseHydrationGeneration: hydrationGeneration,
-        currentMutationGeneration: ownerCache.serverMutationGeneration,
-        startedMutationGeneration
-      })) return { success: true }
-      replaceInventoryState(ownerId, inventory, "server")
-      return { success: true }
-    } catch {
+  ): Promise<InventoryUnlockResult> => runInventoryHydrationSingleFlight(
+    getOwnerCache(ownerId).serverHydrationFlight,
+    sessionToken,
+    async () => {
+      const ownerCache = getOwnerCache(ownerId)
+      const hydrationGeneration = ownerCache.serverHydrationGeneration + 1
+      ownerCache.serverHydrationGeneration = hydrationGeneration
+      const startedMutationGeneration = ownerCache.serverMutationGeneration
       if (ownerCache.state.serverStatus !== "ready") {
-        ownerCache.state = failOwnerInventoryHydration({
-          current: ownerCache.state,
-          ownerUserId: ownerId,
-          source: "server"
-        })
+        ownerCache.state = { ...ownerCache.state, serverStatus: "loading" }
+        notify(ownerId)
       }
-      notify(ownerId)
-      return { success: false, reason: "server_error" }
+      try {
+        const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
+        if (!shouldApplyInventoryHydrationResponse({
+          currentHydrationGeneration: ownerCache.serverHydrationGeneration,
+          responseHydrationGeneration: hydrationGeneration,
+          currentMutationGeneration: ownerCache.serverMutationGeneration,
+          startedMutationGeneration
+        })) return { success: true }
+        replaceInventoryState(ownerId, inventory, "server")
+        return { success: true }
+      } catch {
+        if (ownerCache.state.serverStatus !== "ready") {
+          ownerCache.state = failOwnerInventoryHydration({
+            current: ownerCache.state,
+            ownerUserId: ownerId,
+            source: "server"
+          })
+          notify(ownerId)
+        }
+        return { success: false, reason: "server_error" }
+      }
     }
-  }, [ownerId])
+  ), [ownerId])
 
   const claimDailyRewardFromServer = useCallback(async (
     sessionToken: string

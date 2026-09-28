@@ -606,7 +606,9 @@ test("profile updates are immutable and validate age range", async () => {
       location: {
         lat: 41.0082,
         lng: 28.9784
-      }
+      },
+      locationLat: 41.0082,
+      locationLng: 28.9784
     }
   })
   assert.equal(updated.statusCode, 200)
@@ -628,10 +630,7 @@ test("profile updates are immutable and validate age range", async () => {
     "music",
     "weekend trips"
   ])
-  assert.deepEqual(updated.json().profile.location, {
-    lat: 41.0082,
-    lng: 28.9784
-  })
+  assert.equal(updated.json().profile.location, undefined)
 
   const rejectedLegacyGenderWrite = await app.inject({
     method: "PATCH",
@@ -1702,6 +1701,16 @@ test("thread endpoints require session access and send messages", async () => {
   assert.equal(sent.json().message.body, "hello from Blumi")
   assert.equal(sent.json().message.messageId, "message_1")
 
+  const screened = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "k.i.l.l yourself" }
+  })
+  assert.equal(screened.statusCode, 400)
+  assert.match(screened.json().error, /community rules/)
+  assert.deepEqual((await chatService.listMessages(userId, "thread_server")).map((message) => message.body), ["hello from Blumi"])
+
   await safetyService.blockUser(partnerUserId, userId)
 
   const blockedCreate = await app.inject({
@@ -2327,6 +2336,63 @@ test("production server refuses legacy admin key compatibility", () => {
     }),
     /legacy admin/i
   )
+})
+
+test("reporters can read only a privacy-safe status for their own safety reports", async () => {
+  const authService = createAuthService({ codeFactory: () => "482931" })
+  const safetyService = createSafetyService()
+  const app = createServer({ authService, safetyService })
+  const firstToken = await registerTestSession(app, "+905553330021")
+  const secondToken = await registerTestSession(app, "+905553330022")
+  const firstActor = (await authService.getSession(firstToken))!.account.userId
+  const secondActor = (await authService.getSession(secondToken))!.account.userId
+
+  const firstReport = await safetyService.reportUser(firstActor, {
+    reportedUserId: secondActor,
+    reason: "harassment",
+    note: "private reporter detail: keep this internal"
+  }, new Date("2026-09-28T10:00:00.000Z"))
+  await safetyService.reportUser(secondActor, {
+    reportedUserId: firstActor,
+    reason: "spam",
+    note: "another person's private report"
+  }, new Date("2026-09-28T10:01:00.000Z"))
+  await safetyService.resolveReport(firstReport.report.reportId, {
+    action: "ban",
+    note: "internal moderation decision: sanction applied",
+    admin: { operatorId: "moderator", tokenId: "token_test" }
+  }, new Date("2026-09-28T11:00:00.000Z"))
+
+  try {
+    const ownReports = await app.inject({
+      method: "GET",
+      url: "/v1/safety/reports",
+      headers: { authorization: `Bearer ${firstToken}` }
+    })
+    assert.equal(ownReports.statusCode, 200)
+    assert.deepEqual(ownReports.json().reports, [{
+      reportId: firstReport.report.reportId,
+      createdAt: "2026-09-28T10:00:00.000Z",
+      status: "resolved",
+      response: "We reviewed your report and closed it. Thank you for helping keep Blumi safe."
+    }])
+    assert.doesNotMatch(ownReports.body, /private reporter detail|moderation decision|reportedUserId|actorUserId|resolution_note/i)
+
+    const secondReports = await app.inject({
+      method: "GET",
+      url: "/v1/safety/reports",
+      headers: { authorization: `Bearer ${secondToken}` }
+    })
+    assert.equal(secondReports.statusCode, 200)
+    assert.equal(secondReports.json().reports.length, 1)
+    assert.notEqual(secondReports.json().reports[0].reportId, firstReport.report.reportId)
+    assert.doesNotMatch(secondReports.body, /another person's private report|private reporter detail|sanction applied/i)
+
+    const anonymous = await app.inject({ method: "GET", url: "/v1/safety/reports" })
+    assert.equal(anonymous.statusCode, 401)
+  } finally {
+    await app.close()
+  }
 })
 
 test("profile prompt route persists fixed questions and rejects malformed values", async () => {

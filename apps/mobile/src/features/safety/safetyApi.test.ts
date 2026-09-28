@@ -2,10 +2,41 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   blockSafetyUser,
+  fetchMySafetyReports,
   fetchSafetyBlocks,
   reportSafetyUser,
   unblockSafetyUser
 } from "./safetyApi"
+
+test("fetchMySafetyReports returns only the caller-facing status and generic response", async () => {
+  const reports = await fetchMySafetyReports(
+    "http://localhost:4000/",
+    "session_token",
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal(String(url), "http://localhost:4000/v1/safety/reports")
+      assert.equal((init?.headers as Record<string, string>).authorization, "Bearer session_token")
+      return createJsonResponse(200, {
+        reports: [{
+          reportId: "report_private",
+          createdAt: "2026-09-28T10:00:00.000Z",
+          status: "resolved",
+          response: "We reviewed your report and closed it.",
+          actorUserId: "must_not_be_kept",
+          reportedUserId: "must_not_be_kept",
+          adminNote: "must_not_be_kept",
+          sanction: "must_not_be_kept"
+        }]
+      })
+    }) as typeof fetch
+  )
+
+  assert.deepEqual(reports, [{
+    reportId: "report_private",
+    createdAt: "2026-09-28T10:00:00.000Z",
+    status: "resolved",
+    response: "We reviewed your report and closed it."
+  }])
+})
 
 test("fetchSafetyBlocks loads authenticated production block list", async () => {
   const calls: { url: string; init: RequestInit | undefined }[] = []

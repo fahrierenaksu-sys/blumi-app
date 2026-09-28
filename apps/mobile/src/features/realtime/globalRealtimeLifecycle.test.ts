@@ -4,6 +4,7 @@ import type { ChatThreadList } from "@blumi/contracts"
 import type { SessionActor } from "../session/sessionModel"
 import {
   createGlobalRealtimeLifecycle,
+  getGlobalRealtimeLifecycleIdentity,
   type GlobalRealtimeLifecycleDependencies
 } from "./globalRealtimeLifecycle"
 
@@ -35,6 +36,29 @@ const demoActor = {
   ...productionActor,
   session: { ...productionActor.session, mode: "demo" }
 } as SessionActor
+
+test("realtime lifecycle identity ignores profile-only edits but changes with the session", () => {
+  const renamed = {
+    ...productionActor,
+    profile: { ...productionActor.profile, displayName: "Ada Updated" }
+  }
+  assert.equal(
+    getGlobalRealtimeLifecycleIdentity(renamed),
+    getGlobalRealtimeLifecycleIdentity(productionActor)
+  )
+  assert.notEqual(
+    getGlobalRealtimeLifecycleIdentity({
+      ...productionActor,
+      session: { ...productionActor.session, sessionToken: "refreshed-token" }
+    }),
+    getGlobalRealtimeLifecycleIdentity(productionActor)
+  )
+  assert.notEqual(
+    getGlobalRealtimeLifecycleIdentity(demoActor),
+    getGlobalRealtimeLifecycleIdentity(productionActor)
+  )
+  assert.equal(getGlobalRealtimeLifecycleIdentity(null), null)
+})
 
 function createDependencies(
   overrides: Partial<TestDependencies> = {}

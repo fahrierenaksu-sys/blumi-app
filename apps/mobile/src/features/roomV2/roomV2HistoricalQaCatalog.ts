@@ -26,8 +26,8 @@ import type {
 export const ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT: RoomFurnitureVisualContract = {
   schemaVersion: "room-furniture-visual-vnext-1",
   skuId: "room_v2_cozy_bed",
-  assetSetId: "pink-cloud-bed-world-kit-v3.5-finished-apron",
-  assetVersion: 25,
+  assetSetId: "pink-cloud-bed-v0.12",
+  assetVersion: 12,
   perspectiveProfile: "my-room-locked-2.5d-v1",
   viewportProfile: "ROOM_V2_APPROVED_MY_ROOM_CAMERA",
   assetCameraRigId: "blumi-room-camera-rig-v1",
@@ -39,30 +39,30 @@ export const ROOM_VNEXT_PINK_CLOUD_BED_CONTRACT: RoomFurnitureVisualContract = {
   placementSurface: "floor",
   directions: {
     front: {
-      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontV0_34Candidate,
-      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontShadowV0_34Candidate,
-      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontThumbnailV0_34Candidate,
+      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontV0_12,
+      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontShadowV0_12,
+      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedFrontThumbnailV0_12,
       normalizedRenderSize: { width: 0.294, height: 0.294 },
       normalizedFloorPivot: { x: 0.5027322404371585, y: 0.6857923497267759 }
     },
     right: {
-      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightV0_34Candidate,
-      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightShadowV0_34Candidate,
-      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightThumbnailV0_34Candidate,
+      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightV0_12,
+      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightShadowV0_12,
+      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedRightThumbnailV0_12,
       normalizedRenderSize: { width: 0.294, height: 0.294 },
       normalizedFloorPivot: { x: 0.5027322404371585, y: 0.6857923497267759 }
     },
     back: {
-      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackV0_34Candidate,
-      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackShadowV0_34Candidate,
-      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackThumbnailV0_34Candidate,
+      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackV0_12,
+      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackShadowV0_12,
+      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedBackThumbnailV0_12,
       normalizedRenderSize: { width: 0.294, height: 0.294 },
       normalizedFloorPivot: { x: 0.5027322404371585, y: 0.6857923497267759 }
     },
     left: {
-      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftV0_34Candidate,
-      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftShadowV0_34Candidate,
-      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftThumbnailV0_34Candidate,
+      bodyAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftV0_12,
+      contactShadowAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftShadowV0_12,
+      thumbnailAsset: roomV2Assets.furniture.roomVNextPinkCloudBedLeftThumbnailV0_12,
       normalizedRenderSize: { width: 0.294, height: 0.294 },
       normalizedFloorPivot: { x: 0.5027322404371585, y: 0.6857923497267759 }
     }

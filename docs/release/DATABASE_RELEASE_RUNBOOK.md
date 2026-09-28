@@ -1,0 +1,120 @@
+# Blumi database release runbook
+
+This is an implementation and verification guide, not a release approval. The
+founder-facing status remains in `LAUNCH_CONTROL.md`.
+
+## Current evidence (2026-09-28)
+
+- `nkqcbxufbhfibrgvajim` is still the test database. Read-only inspection found
+  18 accounts, 14 inventories, 16 test personas, 20 chat messages, four mini
+  rooms and zero store transactions. One account was created after the prior
+  17-account snapshot. Its identity and purpose have not been classified.
+- Applied migration checksums matched all 65 pre-existing source files. The new
+  `066_inventory_release_integrity.sql` has **not** been applied to Supabase.
+- No orphan inventory, duplicate inventory row, malformed owned item ID,
+  negative balance, unknown owned/equipped catalog ID, unowned equipped item,
+  or `anon`/`authenticated` grant was detected. Four accounts have no inventory;
+  this can be normal before inventory hydration, but must be classified before
+  clearing the test project.
+- Owner-only public-schema archive:
+  `/Users/evrenevren/BlumiReleaseBackups/supabase-public-pre-066-2026-09-28.dump`
+  (SHA-256 `12da272415c8bc7a5e7d8dd76ca6a33606b8c3375fde90771509771e7930a532`).
+  A local PostgreSQL 17 restore contained all 18 accounts and 14 inventories;
+  migration 066 applied once and its rerun applied zero files. The post-restore
+  grant check passed **after** replaying migration 059's privilege revocations.
+  This archive is local and covers only the application `public` schema. It is
+  not the planned offsite S3 backup or a Supabase platform recovery point.
+
+## Safe inspection
+
+From the repository root, with the exact target project ref:
+
+```bash
+node --env-file-if-exists=.env.local --import tsx \
+  apps/server/scripts/auditDatabaseRelease.ts \
+  --project-ref nkqcbxufbhfibrgvajim --require-clean
+```
+
+The audit refuses a mismatched project ref, uses a read-only transaction and
+prints aggregate counts only. It exits 2 when integrity or access findings
+exist. `accountsWithoutInventory` is informational; investigate it in the
+classified environment. A missing migration is expected until an authorized
+staging/production rollout. Do not run `npm run db:migrate` against a URL whose
+project and environment have not been independently confirmed.
+
+## Environment conversion order
+
+1. Create a separate staging Supabase project. Apply source migrations there
+   and seed only synthetic identities. Point the currently staging-configured
+   Railway API at it; verify `/ready`, authenticated API paths, account
+   creation/deletion, Chat, Room and avatar equip/reload. Staging and production
+   must never share a database or Firebase test identity.
+2. Freeze writes to the existing test project. Produce an exact account and
+   dependent-record inventory privately, including the 18th account and any
+   Firebase identity. Confirm that **every** listed account is disposable.
+   Do not infer this from the old 17-account snapshot or a `blumi_test_personas`
+   marker alone. Take a fresh archive and restore it before any deletion.
+3. Clean the confirmed test identities through the reviewed account-deletion
+   path and reconcile remaining linked records. Verify zero account, session,
+   inventory, chat, room, report, push and test-persona residue. Deleting a
+   PostgreSQL row alone does not prove Firebase identity deletion. Keep the
+   original backup under the agreed retention policy and verify no production
+   session points at test data.
+4. Apply migration 066 and later reviewed migrations to staging first, rerun
+   idempotently, then repeat on the classified production project with a fresh
+   restorable backup. The matching API commit must be deployed only after the
+   database is compatible. Stop rollout on any checksum, integrity, grant or
+   `/ready` failure; restore to a **new** database or use a reviewed forward
+   repair rather than assuming SQL rollback is safe.
+
+## Independent S3 backup
+
+The source for a dedicated Railway cron service is `apps/server/backup/`.
+Build `Dockerfile` with repository root as Docker context. The production-only
+job must have `DATABASE_URL`, `BLUMI_EXPECTED_PROJECT_REF`,
+`BLUMI_BACKUP_BUCKET`, `AWS_REGION` and scoped S3 credentials in Railway
+secrets, plus `NODE_ENV=production` and `BLUMI_DEPLOY_ENV=production`.
+Schedule `0 2 * * *` UTC. The container exits after `pg_dump`, validates its
+archive, uploads an AES256-encrypted object and a SHA-256 receipt using only
+`PutObject`, then checks the upload acknowledgements. The separate read-only
+freshness job checks remote size and encryption against the receipt. The single
+PUT implementation fails closed above 5 GiB; a reviewed multipart uploader is
+needed before archives reach that size. The URL must use the exact project-ref username and
+TLS (`sslmode=require` or `verify-full`). No credentials belong in Git or the
+mobile bundle.
+
+Use a private bucket with Block Public Access, versioning, and lifecycle expiry
+of both current and noncurrent backup-object versions after 30 days, subject to
+the approved data-retention policy. The writer identity needs only prefix-limited
+`PutObject`, with no read, list or delete rights. A separate read-only identity
+should run `check-freshness.sh` hourly and deliver an alert when it exits
+nonzero; the script rejects a missing completed receipt, a mismatched archive,
+or one older than 26 hours. Configure external alert delivery and test it. A skipped
+Railway cron execution must not silently count as a backup.
+
+For weekly verification, download one archive with the read-only identity and
+compare its SHA-256 with its receipt, then run:
+
+```bash
+node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/backup.dump
+```
+
+This gate creates an isolated PostgreSQL 17 cluster, restores the archive,
+replays `059_revoke_public_api_access.sql` because the portable dump omits ACLs,
+applies new migrations, checks idempotency and audits grants/data counts.
+The monthly drill must additionally restore into a disposable Supabase project
+and time the complete switch/readiness path. Only that measured drill can prove
+the four-hour recovery target. The daily schedule alone does not guarantee a
+24-hour maximum data loss if a run is skipped; monitor age, retry failures and
+hold public release until the observed backup process meets the target.
+
+## Acceptance gate
+
+Before public users enter: isolated PostgreSQL suite and source checks pass;
+staging and production identities are distinct; all test data is classified and
+cleaned; backup and restore are proven; permissions are closed; production
+migration hashes match; `/ready` is healthy; 1,000-DAU launch traffic is
+measured and tested at twice observed peak concurrency; connection and query
+latency are inside the measured budget; alarms reach an operator; rollback to
+the previous API version or a newly restored database is rehearsed. Native and
+App Store readiness are separate gates.

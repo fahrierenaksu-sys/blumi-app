@@ -55,6 +55,19 @@ const globalRefreshFailureCopy = {
   safety: "We couldn't refresh your safety list yet. It will try again later."
 } as const
 
+/** Profile presentation changes must not tear down an authenticated socket. */
+export function getGlobalRealtimeLifecycleIdentity(actor: SessionActor | null): string | null {
+  if (!actor) return null
+  return JSON.stringify([
+    actor.session.mode,
+    actor.session.accountId,
+    actor.session.sessionId,
+    actor.session.userId,
+    actor.profile.userId,
+    actor.session.sessionToken
+  ])
+}
+
 /**
  * Owns the authenticated session's single global realtime lifecycle. The
  * returned starter is side-effectful by design, while its dependencies keep

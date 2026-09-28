@@ -45,3 +45,19 @@ test("profile prompt updates reject unknown, duplicate, excessive, and long answ
     )
   }
 })
+
+test("profile public text is screened before persistence", async () => {
+  const { service, token } = await createSignedInService()
+  const profiles: Parameters<typeof service.updateProfile>[1][] = [
+    { displayName: "kill yourself" },
+    { bio: "s.e.n.d n.u.d.e.s" },
+    { interests: ["çıplak foto gönder"] },
+    { prompts: [{ promptId: "small_joy", answer: "seni öldüreceğim" }] }
+  ]
+  for (const profile of profiles) {
+    await assert.rejects(service.updateProfile(token, profile), /community rules/)
+  }
+  const account = await service.getSession(token)
+  assert.equal(account?.account.profile.bio, undefined)
+  assert.equal(account?.account.profile.prompts, undefined)
+})

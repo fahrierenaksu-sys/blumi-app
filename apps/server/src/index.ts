@@ -31,11 +31,13 @@ const firebaseDeletionWorker = startPeriodicWorker({
   intervalMs: 30_000,
   reportError: () => console.error("Firebase user deletion worker failed")
 })
-const mediaRevocationWorker = startPeriodicWorker({
-  run: () => services.mediaRevocationService.dispatchDue(),
-  intervalMs: 1000,
-  reportError: (error) => console.error("Media revocation worker failed", error)
-})
+const mediaRevocationWorker = config.livekitUrl && config.livekitApiKey && config.livekitApiSecret
+  ? startPeriodicWorker({
+      run: () => services.mediaRevocationService.dispatchDue(),
+      intervalMs: 1000,
+      reportError: (error) => console.error("Media revocation worker failed", error)
+    })
+  : undefined
 let accepting = false
 const connectionManager = createConnectionManager({
   fanout: services.realtimeFanout,
@@ -87,6 +89,7 @@ const adminTokenService = config.adminSigningKeys.length > 0
   : undefined
 
 const app = createServer({
+  legalPagesEnabled: process.env.BLUMI_LEGAL_PAGES_ENABLED === "1",
   discoverySnapshots: services.discoverySnapshots,
   sharedRateLimiter: services.sharedRateLimiter,
   isAccepting: () => accepting,
@@ -121,6 +124,7 @@ const app = createServer({
   adminKey: config.adminKey,
   adminTokenService,
   adminUsersService: services.adminUsersService,
+  adminAnalyticsService: services.adminAnalyticsService,
   allowLegacyAdminKey: config.adminLegacyKeyEnabled,
   appLinks: config.appleAppId && config.androidAppLinkSha256CertFingerprints.length > 0
     ? {
@@ -163,7 +167,7 @@ const shutdown = createGracefulShutdown({
     () => notificationOutboxWorker.stop(),
     () => firebaseDeletionWorker.stop(),
     () => chatDeliveryWorker.stop(),
-    () => mediaRevocationWorker.stop(),
+    () => mediaRevocationWorker?.stop() ?? Promise.resolve(),
     () => ticketCleanupWorker.stop(),
     () => rateBudgetCleanupWorker.stop(),
     () => discoverySnapshotCleanupWorker.stop()

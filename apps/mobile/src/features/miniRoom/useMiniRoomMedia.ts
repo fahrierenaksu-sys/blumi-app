@@ -1,6 +1,7 @@
 import type { MediaSessionToken, MiniRoom } from "@blumi/contracts"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { captureAppException } from "../../observability/crashReporting"
+import { IS_BLUMI_VOICE_ENABLED } from "../../config/env"
 import { createLivekitClient } from "./livekitClient"
 import { closeOwnedMediaClient, createMicrophoneRequestGate, MediaClientOwnershipError } from "./livekitRoomLifecycle"
 import {
@@ -30,7 +31,7 @@ function getErrorMessage(error: unknown): string {
 
 export function useMiniRoomMedia(input: UseMiniRoomMediaInput): UseMiniRoomMediaResult {
   const { miniRoom, mediaSession } = input
-  const voiceAvailable = !isTextOnlyRoomMediaSession(mediaSession)
+  const voiceAvailable = IS_BLUMI_VOICE_ENABLED && !isTextOnlyRoomMediaSession(mediaSession)
   const roomInfo = useMemo(
     () => ({
       miniRoomId: miniRoom.miniRoomId,

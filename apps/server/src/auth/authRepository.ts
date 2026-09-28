@@ -680,13 +680,7 @@ export function createInMemoryAuthRepository(
                   : undefined
               }
             : {}),
-          ...(Object.hasOwn(profile, "location")
-            ? {
-                location: profile.location
-                  ? { ...profile.location }
-                  : undefined
-              }
-            : {}),
+          location: undefined,
           avatar: cloneAvatarSelection(toCompleteAvatarSelection(account.profile.avatar))
         },
         updatedAt: input.now.toISOString()
@@ -886,9 +880,9 @@ function cloneAccount(account: AccountRecord): AccountRecord {
         ? [...account.profile.interests]
         : undefined,
       prompts: normalizeUserProfilePrompts(account.profile.prompts),
-      location: account.profile.location
-        ? { ...account.profile.location }
-        : undefined,
+      // Legacy coordinate data is intentionally discarded at every in-memory
+      // repository boundary, including reads and account-data export.
+      location: undefined,
       discoveryPreferences: account.profile.discoveryPreferences
         ? {
             ...account.profile.discoveryPreferences,

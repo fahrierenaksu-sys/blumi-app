@@ -33,6 +33,9 @@ export const IS_BLUMI_DEMO_ENABLED =
 export const BLUMI_BUILD_PROFILE =
   process.env.EXPO_PUBLIC_BLUMI_BUILD_PROFILE?.trim() || "development"
 
+// Audio capture is intentionally unavailable in every current app build.
+export const IS_BLUMI_VOICE_ENABLED = false
+
 export interface BlumiNativeUiTestSessionResetInput {
   buildProfile: string
   rawResetFlag: string | undefined
@@ -266,10 +269,14 @@ export const BLUMI_POSTHOG_API_KEY =
 export const BLUMI_POSTHOG_HOST =
   process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() || undefined
 
+// Paid packs are intentionally unavailable in the first release. A later
+// release needs an explicit product, legal and store approval to turn this on.
+export const IS_BLUMI_PAID_COINS_ENABLED =
+  process.env.EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED?.trim() === "1"
+
 /**
  * RevenueCat platform API keys are publishable SDK identifiers, not provider
- * secrets. Release validation still requires them so a signed build cannot
- * silently fall back to a local or mock purchase flow.
+ * secrets. A publishable key alone must not activate deferred purchases.
  */
 export const BLUMI_REVENUECAT_IOS_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY?.trim() || undefined

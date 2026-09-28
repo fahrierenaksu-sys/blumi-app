@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { Pool } from "pg"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
+import { createEmptyAccountDataExporter } from "../account/accountDataExporter"
 import type { AccountRecord } from "../auth/authStore"
 import type { PendingOtp, SessionRecord } from "../auth/authStore"
 import type { CompleteAvatarSelection } from "@blumi/contracts"
@@ -80,6 +81,60 @@ test("account insertion persists acceptance without inventing a historical recor
   await repository.saveAccount(ACCOUNT)
   assert.equal(valuesSeen[0]?.at(-1), JSON.stringify(terms))
   assert.equal(valuesSeen[1]?.at(-1), null)
+})
+
+test("legacy coordinates are cleared by profile writes and omitted from reads and exports", async () => {
+  const legacyAccount: AccountRecord = {
+    ...ACCOUNT,
+    profile: { ...ACCOUNT.profile, location: { lat: 41.01, lng: 28.97 } }
+  }
+  const writes: Array<{ text: string; values: unknown[] }> = []
+  const writePool = {
+    async query(text: string, values: unknown[] = []) {
+      writes.push({ text: normalizeSql(text), values })
+      return { rows: [] }
+    }
+  } as unknown as Pool
+  const writeRepository = createPostgresAuthRepository(writePool)
+  await writeRepository.saveAccount(legacyAccount)
+  assert.equal(writes[0]?.values[17], null)
+  assert.equal(writes[0]?.values[18], null)
+
+  const legacyRow = {
+    ...accountRow(legacyAccount),
+    location_lat: 41.01,
+    location_lng: 28.97
+  }
+  const readPool = {
+    async query(text: string, values: unknown[] = []) {
+      if (text.trimStart().startsWith("UPDATE blumi_accounts")) {
+        writes.push({ text: normalizeSql(text), values })
+      }
+      return { rows: [legacyRow], rowCount: 1 }
+    }
+  } as unknown as Pool
+  const repository = createPostgresAuthRepository(readPool)
+  const updated = await repository.updateAccountProfile({
+    accountId: ACCOUNT.accountId,
+    profile: {
+      displayName: "Mina Updated",
+      location: { lat: 40.99, lng: 29.02 }
+    },
+    now: new Date("2026-09-28T12:00:00.000Z")
+  })
+  assert.deepEqual(writes[1]?.values.slice(2, 4), [null, null])
+  assert.match(writes[1]?.text ?? "", /location_lat = \$[0-9]+.*location_lng = \$[0-9]+/)
+  assert.equal(updated?.profile.location, undefined)
+
+  const loaded = await repository.findAccountByUserId(ACCOUNT.userId)
+  assert.equal(loaded?.profile.location, undefined)
+  let exported = ""
+  for await (const chunk of createEmptyAccountDataExporter().streamExport(loaded!, {
+    schemaVersion: "2026-07-21",
+    exportedAt: "2026-09-28T12:00:00.000Z",
+    exclusions: []
+  })) exported += chunk
+  assert.doesNotMatch(exported, /location_lat|location_lng|41\.01|28\.97/)
 })
 
 const NEXT_SESSION: SessionRecord = {
@@ -508,7 +563,7 @@ test("postgres profile clears persist empty values and normalize the reread", as
   assert.ok(updateQuery)
   assert.match(
     updateQuery.text.split(" RETURNING ")[0] ?? "",
-    /^UPDATE blumi_accounts SET bio = \$2, interests = \$3, profile_prompts = \$4, updated_at = \$5/
+    /^UPDATE blumi_accounts SET bio = \$2, interests = \$3, profile_prompts = \$4, location_lat = \$5, location_lng = \$6, updated_at = \$7/
   )
   assert.equal(updateQuery.values[1], "")
   assert.deepEqual(updateQuery.values[2], [])
@@ -884,9 +939,10 @@ test("postgres OTP verification increments or consumes inside one transaction", 
 
 test("postgres OTP sign-in commits account and session before consuming the code", async () => {
   const queries: string[] = []
+  let accountWriteValues: unknown[] = []
   let released = false
   const client = {
-    async query(text: string) {
+    async query(text: string, values: unknown[] = []) {
       const normalized = normalizeSql(text)
       queries.push(normalized)
       if (normalized.includes("FROM blumi_pending_otps")) {
@@ -905,6 +961,7 @@ test("postgres OTP sign-in commits account and session before consuming the code
         return { rows: [], rowCount: 0 }
       }
       if (normalized.startsWith("INSERT INTO blumi_accounts")) {
+        accountWriteValues = values
         return { rows: [accountRow()], rowCount: 1 }
       }
       return { rows: [], rowCount: 1 }
@@ -924,7 +981,10 @@ test("postgres OTP sign-in commits account and session before consuming the code
     now: Date.parse("2026-07-11T10:01:00.000Z"),
     maxAttempts: 5,
     matches: () => true,
-    newAccount: ACCOUNT,
+    newAccount: {
+      ...ACCOUNT,
+      profile: { ...ACCOUNT.profile, location: { lat: 41.01, lng: 28.97 } }
+    },
     createSession: () => NEXT_SESSION
   })
 
@@ -941,6 +1001,8 @@ test("postgres OTP sign-in commits account and session before consuming the code
     query.startsWith("DELETE FROM blumi_pending_otps")
   )
   assert.ok(accountWrite > 2)
+  assert.equal(accountWriteValues[17], null)
+  assert.equal(accountWriteValues[18], null)
   assert.ok(sessionWrite > accountWrite)
   assert.ok(consume > sessionWrite)
   assert.equal(queries.at(-1), "COMMIT")

@@ -12,6 +12,8 @@ import { isPublicRequestError } from "../errors/publicRequestError"
 import { isRecord, readLimit, readParam } from "./routeHelpers"
 import type { AccountRecoveryService, AccountRecoveryStatus } from "../account/accountRecoveryService"
 import type { AdminUsersService } from "../admin/adminUsersService"
+import { parseAnalyticsPeriod, type AdminAnalyticsService } from "../admin/adminAnalyticsService"
+import type { ConnectionManager } from "../realtime/connectionManager"
 import {
   AdminQuotaExtensionLimitError,
   AdminQuotaLimitError,
@@ -51,6 +53,8 @@ export interface AdminRouteServices {
   allowLegacyAdminKey?: boolean
   accountRecoveryService?: AccountRecoveryService
   adminUsersService?: AdminUsersService
+  adminAnalyticsService?: AdminAnalyticsService
+  connectionManager?: ConnectionManager
 }
 
 function safeCompare(a: string, b: string): boolean {
@@ -76,6 +80,18 @@ export async function registerAdminRoutes(
       scopes: principal.scopes,
       expiresAt: principal.expiresAt
     }
+  })
+
+  app.get("/v1/admin/analytics", { config: { rateLimit: { max: 12, timeWindow: "1 minute" } } }, async (request, reply) => {
+    if (!requireAdmin(request, reply, services, "metrics:read")) return
+    const period = parseAnalyticsPeriod(isRecord(request.query) ? request.query.period : undefined)
+    if (!period) return reply.code(400).send({ error: "Invalid analytics period." })
+    if (!services.adminAnalyticsService) return reply.code(503).send({ error: "Analytics is unavailable." })
+    const connections = services.connectionManager?.listConnections().filter((connection) =>
+      connection.isAlive && connection.socket.readyState === 1) ?? []
+    const online = { users: new Set(connections.map((connection) => connection.userId)).size, connections: connections.length }
+    reply.header("Cache-Control", "no-store")
+    return { snapshot: await services.adminAnalyticsService.snapshot(period, online) }
   })
 
   app.get("/v1/admin/users", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {

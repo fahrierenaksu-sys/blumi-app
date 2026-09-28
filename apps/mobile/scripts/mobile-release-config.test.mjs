@@ -35,9 +35,18 @@ test("development keeps explicit local defaults and demo media", () => {
     sentryDsn: undefined,
     posthogApiKey: undefined,
     posthogHost: undefined,
+    paidCoinsEnabled: "0",
+    voiceEnabled: "0",
     revenueCatIosApiKey: undefined,
     revenueCatAndroidApiKey: undefined
   })
+})
+
+test("development cannot re-enable live voice or microphone access", () => {
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ EXPO_PUBLIC_BLUMI_VOICE_ENABLED: "1" }),
+    /Live voice and microphone access are disabled/
+  )
 })
 
 test("iOS Debug builds do not require Sentry upload credentials", () => {
@@ -76,6 +85,139 @@ test("preview and production builds require secure public services", () => {
       /WSS/
     )
   }
+})
+
+test("server-test requires public TLS endpoints and disables local test bypasses", () => {
+  const profile = JSON.parse(readFileSync(resolve(mobileRoot, "eas.json"), "utf8")).build["server-test"]
+  assert.equal(profile.distribution, "internal")
+  assert.notEqual(profile.developmentClient, true)
+  assert.equal(profile.env.EAS_BUILD_PROFILE, "server-test")
+  assert.equal(profile.env.EXPO_PUBLIC_BLUMI_ENABLE_DEMO, "0")
+  assert.equal(profile.env.EXPO_PUBLIC_FIREBASE_DISABLE_APP_VERIFICATION, "0")
+  assert.equal(profile.env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED, "0")
+  assert.equal(profile.env.EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED, "0")
+  const base = {
+    EAS_BUILD_PROFILE: "server-test",
+    EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://blumi-app-production.up.railway.app",
+    EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://blumi-app-production.up.railway.app",
+    EXPO_PUBLIC_BLUMI_MEDIA_MODE: "demo",
+    EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0"
+  }
+  assert.equal(profile.env.EXPO_PUBLIC_BLUMI_API_HTTP_URL, base.EXPO_PUBLIC_BLUMI_API_HTTP_URL)
+  assert.equal(profile.env.EXPO_PUBLIC_REALTIME_EDGE_WS_URL, base.EXPO_PUBLIC_REALTIME_EDGE_WS_URL)
+  assert.equal(resolveMobileReleaseEnvironment(base).apiHttpUrl, base.EXPO_PUBLIC_BLUMI_API_HTTP_URL)
+  assert.equal(resolveMobileReleaseEnvironment(base).enableDemo, "0")
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_API_HTTP_URL: "http://127.0.0.1:4000" }),
+    /HTTPS/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "ws://127.0.0.1:4100" }),
+    /WSS/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "1" }),
+    /Demo sessions cannot be enabled/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS: "1" }),
+    /QA avatar unlock/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE: "myroom" }),
+    /Development entry routes cannot be enabled/
+  )
+})
+
+test("every EAS profile ships with voice and paid coin sales disabled", () => {
+  const profiles = JSON.parse(readFileSync(resolve(mobileRoot, "eas.json"), "utf8")).build
+  for (const name of ["development", "server-test", "preview", "production"]) {
+    assert.equal(profiles[name].env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED, "0")
+  }
+  for (const name of ["server-test", "preview", "production"]) {
+    assert.equal(profiles[name].env.EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED, "0")
+  }
+})
+
+test("all app configurations remove microphone and camera permissions", () => {
+  const sourceConfig = JSON.parse(read("app.json")).expo
+  const originalProfile = process.env.EAS_BUILD_PROFILE
+  const originalApi = process.env.EXPO_PUBLIC_BLUMI_API_HTTP_URL
+  const originalWs = process.env.EXPO_PUBLIC_REALTIME_EDGE_WS_URL
+  const originalVoiceEnabled = process.env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED
+  try {
+    process.env.EAS_BUILD_PROFILE = "development"
+    process.env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED = "0"
+    const configured = require("../app.config.js")({ config: sourceConfig })
+    assert.equal(configured.ios.infoPlist.NSMicrophoneUsageDescription, undefined)
+    assert.equal(configured.ios.infoPlist.NSCameraUsageDescription, undefined)
+    assert.equal(configured.plugins.includes("@config-plugins/react-native-webrtc"), false)
+    assert.equal(configured.plugins.includes("./plugins/withAudioOnlyLiveRoom"), false)
+    assert.equal(configured.android.permissions.includes("android.permission.RECORD_AUDIO"), false)
+    assert.equal(configured.android.permissions.includes("android.permission.MODIFY_AUDIO_SETTINGS"), false)
+    assert.equal(configured.android.permissions.includes("android.permission.CAMERA"), false)
+    assert.ok(configured.android.blockedPermissions.includes("android.permission.RECORD_AUDIO"))
+    assert.ok(configured.android.blockedPermissions.includes("android.permission.MODIFY_AUDIO_SETTINGS"))
+    assert.ok(configured.android.blockedPermissions.includes("android.permission.CAMERA"))
+    assert.ok(configured.plugins.includes("./plugins/withNoMediaPermissions"))
+    assert.match(read("src/config/env.ts"), /IS_BLUMI_VOICE_ENABLED\s*=\s*false/)
+  } finally {
+    if (originalProfile === undefined) delete process.env.EAS_BUILD_PROFILE
+    else process.env.EAS_BUILD_PROFILE = originalProfile
+    if (originalApi === undefined) delete process.env.EXPO_PUBLIC_BLUMI_API_HTTP_URL
+    else process.env.EXPO_PUBLIC_BLUMI_API_HTTP_URL = originalApi
+    if (originalWs === undefined) delete process.env.EXPO_PUBLIC_REALTIME_EDGE_WS_URL
+    else process.env.EXPO_PUBLIC_REALTIME_EDGE_WS_URL = originalWs
+    if (originalVoiceEnabled === undefined) delete process.env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED
+    else process.env.EXPO_PUBLIC_BLUMI_VOICE_ENABLED = originalVoiceEnabled
+  }
+})
+
+test("native no-media config plugin strips every camera and microphone declaration", async () => {
+  const withNoMediaPermissions = require("../plugins/withNoMediaPermissions.js")
+  const configured = withNoMediaPermissions({
+    android: {
+      permissions: [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
+      ],
+      blockedPermissions: []
+    }
+  })
+  assert.deepEqual(configured.android.permissions, ["android.permission.INTERNET"])
+  assert.deepEqual(configured.android.blockedPermissions, [
+    "android.permission.RECORD_AUDIO",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.CAMERA"
+  ])
+
+  const iosResult = await configured.mods.ios.infoPlist({
+    ...configured,
+    modResults: {
+      NSMicrophoneUsageDescription: "Mic",
+      NSCameraUsageDescription: "Camera",
+      CFBundleIdentifier: "com.blumi.mobile"
+    }
+  })
+  assert.deepEqual(iosResult.modResults, { CFBundleIdentifier: "com.blumi.mobile" })
+
+  const androidResult = await configured.mods.android.manifest({
+    ...configured,
+    modResults: {
+      manifest: {
+        "uses-permission": [
+          { $: { "android:name": "android.permission.RECORD_AUDIO" } },
+          { $: { "android:name": "android.permission.CAMERA" } },
+          { $: { "android:name": "android.permission.INTERNET" } }
+        ]
+      }
+    }
+  })
+  assert.deepEqual(androidResult.modResults.manifest["uses-permission"], [
+    { $: { "android:name": "android.permission.INTERNET" } }
+  ])
 })
 
 test("release builds require native media and reject QA inventory unlocks", () => {
@@ -122,16 +264,40 @@ test("release builds require native media and reject QA inventory unlocks", () =
     }),
     /EXPO_PUBLIC_SENTRY_DSN/
   )
-  assert.throws(
-    () => resolveMobileReleaseEnvironment({
+  assert.equal(
+    resolveMobileReleaseEnvironment({
       ...secureReleaseEnvironment,
       EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
       EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
       EXPO_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/123",
       EXPO_PUBLIC_POSTHOG_API_KEY: "phc_public",
       EXPO_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com"
+    }).paidCoinsEnabled,
+    "0"
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({
+      ...secureReleaseEnvironment,
+      EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
+      EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
+      EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED: "1",
+      EXPO_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/123",
+      EXPO_PUBLIC_POSTHOG_API_KEY: "phc_public",
+      EXPO_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com"
     }),
-    /EXPO_PUBLIC_REVENUECAT_IOS_API_KEY/
+    /paid coin sales are deferred/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({
+      ...secureReleaseEnvironment,
+      EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
+      EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
+      EXPO_PUBLIC_BLUMI_VOICE_ENABLED: "1",
+      EXPO_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/123",
+      EXPO_PUBLIC_POSTHOG_API_KEY: "phc_public",
+      EXPO_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com"
+    }),
+    /Live voice and microphone access are disabled/
   )
 })
 
@@ -159,6 +325,8 @@ test("production resolves a complete fail-closed environment", () => {
     sentryDsn: "https://public@example.ingest.sentry.io/123",
     posthogApiKey: "phc_public",
     posthogHost: "https://eu.i.posthog.com",
+    paidCoinsEnabled: "0",
+    voiceEnabled: "0",
     revenueCatIosApiKey: "appl_test_ios",
     revenueCatAndroidApiKey: "goog_test_android"
   })
@@ -186,9 +354,7 @@ test("release app configuration requires EAS linkage and rejects candidate asset
   const linked = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); const config=app({config:{extra:{eas:{projectId:'project-test'}}}}); if(config.extra.eas.projectId!=='project-test') process.exit(1)`], {
     cwd: mobileRoot, env, encoding: "utf8"
   })
-  assert.notEqual(linked.status, 0)
-  assert.match(linked.stderr, /cannot include candidate asset imports/)
-  assert.match(linked.stderr, /OnboardingWelcomeHomeScene\.tsx/)
+  assert.equal(linked.status, 0, linked.stderr)
 
   const development = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); app({config:{extra:{}}})`], {
     cwd: mobileRoot,
@@ -214,9 +380,8 @@ test("candidate asset release guard catches static imports and ignores ordinary 
     assetPath: "./assets/welcome-v1-candidate/cottage.png"
   }])
 
-  assert.throws(
-    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")),
-    /cannot include candidate asset imports/
+  assert.doesNotThrow(
+    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src"))
   )
 })
 
@@ -270,7 +435,7 @@ test("release bundle imports only the fonts and icon family used by the app", ()
   assert.match(sourceFiles, /@expo\/vector-icons\/Ionicons/)
 })
 
-test("Blumi Room keeps text chat, makes live audio optional, and never declares camera access", () => {
+test("Blumi Room keeps text chat and declares no live audio or camera permission", () => {
   const appConfig = read("app.json")
   const app = JSON.parse(appConfig)
   const livekitClient = read("src/features/miniRoom/livekitClient.ts")
@@ -278,27 +443,33 @@ test("Blumi Room keeps text chat, makes live audio optional, and never declares 
   const miniRoomScreen = read("src/screens/MiniRoomScreen.tsx")
   const miniRoomScene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
 
-  assert.match(appConfig, /\.\/plugins\/withAudioOnlyLiveRoom/)
+  assert.match(appConfig, /\.\/plugins\/withNoMediaPermissions/)
+  assert.doesNotMatch(appConfig, /@config-plugins\/react-native-webrtc|withAudioOnlyLiveRoom/)
   assert.match(appConfig, /"blockedPermissions":\s*\[\s*"android\.permission\.CAMERA"/)
   assert.equal(app.expo.android.permissions.includes("android.permission.CAMERA"), false)
-  assert.deepEqual(app.expo.android.blockedPermissions, ["android.permission.CAMERA"])
+  assert.deepEqual(app.expo.android.blockedPermissions, [
+    "android.permission.CAMERA",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.RECORD_AUDIO"
+  ])
   assert.doesNotMatch(appConfig, /NSCameraUsageDescription/)
+  assert.doesNotMatch(appConfig, /NSMicrophoneUsageDescription/)
   assert.doesNotMatch(livekitClient, /setCameraEnabled/)
   assert.doesNotMatch(mediaHook, /toggleCamera|cameraEnabled/)
   assert.match(miniRoomScreen, /useInRoomChat/)
   assert.match(miniRoomScene, /<TextInput/)
 })
 
-test("privacy copy accurately describes Room text chat, optional audio, and profile exposure", () => {
+test("privacy copy accurately describes first-release text rooms and deferred audio", () => {
   const legalScreen = read("src/screens/LegalScreen.tsx")
   const legalCopy = read("src/features/legal/legalCopy.ts")
 
   assert.match(legalScreen, /getLegalContent\(/)
   assert.match(legalCopy, /shared room, you can use text chat/)
-  assert.match(legalCopy, /choose to turn on live audio/)
+  assert.match(legalCopy, /Live audio is unavailable in this version/)
   assert.doesNotMatch(legalCopy, /Live camera and microphone media/)
   assert.match(legalCopy, /Your phone number, exact location, reports, and private messages are not shown/)
-  assert.match(legalCopy, /live audio, it is transmitted in real time/)
+  assert.match(legalCopy, /does not request camera access or transmit audio to LiveKit/)
   assert.match(legalCopy, /RevenueCat/)
   assert.match(legalCopy, /coin balance and debt/i)
 })
@@ -616,7 +787,11 @@ test("managed config declares the release identity, custom scheme, push, and pri
   assert.equal(app.android.package, "com.blumi.mobile")
   assert.equal(app.scheme, "blumi")
   assert.equal(app.android.intentFilters, undefined)
-  assert.deepEqual(app.android.blockedPermissions, ["android.permission.CAMERA"])
+  assert.deepEqual(app.android.blockedPermissions, [
+    "android.permission.CAMERA",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.RECORD_AUDIO"
+  ])
   assert.equal(app.android.permissions.some((permission) =>
     /CAMERA|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|SYSTEM_ALERT_WINDOW/.test(permission)
   ), false)

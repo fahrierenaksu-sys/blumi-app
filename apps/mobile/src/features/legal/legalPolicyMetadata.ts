@@ -1,12 +1,12 @@
-export const LEGAL_DOCUMENT_VERSION = "2026.08.31"
-export const LEGAL_EFFECTIVE_DATE = "31 August 2026"
-export const LEGAL_EFFECTIVE_DATE_TR = "31 Ağustos 2026"
+export const LEGAL_DOCUMENT_VERSION = "2026.09.28-r3"
+export const LEGAL_EFFECTIVE_DATE = "28 September 2026"
+export const LEGAL_EFFECTIVE_DATE_TR = "28 Eylül 2026"
 
 export const LEGAL_REQUIRED_MARKER = "[REQUIRED BEFORE RELEASE"
 
 export interface LegalOperatorIdentity {
   legalName: string
-  registeredAddress: string
+  operatingCountry: string
   privacyContact: string
   legalContact: string
   supportUrl: string
@@ -21,26 +21,26 @@ export interface LegalHostedPageUrls {
 }
 
 export const LEGAL_OPERATOR_IDENTITY: Readonly<LegalOperatorIdentity> = Object.freeze({
-  legalName: "Xavier Ballesteros",
-  registeredAddress: "Montreal, Quebec, Canada",
-  privacyContact: "privacy@blumi.io",
-  legalContact: "legal@blumi.io",
-  supportUrl: "https://www.blumi.io/support"
+  legalName: "Fahri Eren Aksu",
+  operatingCountry: "Türkiye",
+  privacyContact: "cesikeynn19077@hotmail.com",
+  legalContact: "cesikeynn19077@hotmail.com",
+  supportUrl: "https://www.agentsworkerplus.online/blumi/support"
 })
 
 export const LEGAL_HOSTED_PAGE_URLS: Readonly<LegalHostedPageUrls> = Object.freeze({
-  privacyUrl: "https://www.blumi.io/legal/privacy",
-  termsUrl: "https://www.blumi.io/legal/terms",
-  communityUrl: "https://www.blumi.io/legal/child-safety",
-  supportUrl: "https://www.blumi.io/support",
-  deleteAccountUrl: "https://www.blumi.io/legal/delete-account"
+  privacyUrl: "https://www.agentsworkerplus.online/blumi/legal/privacy",
+  termsUrl: "https://www.agentsworkerplus.online/blumi/legal/terms",
+  communityUrl: "https://www.agentsworkerplus.online/blumi/legal/child-safety",
+  supportUrl: "https://www.agentsworkerplus.online/blumi/support",
+  deleteAccountUrl: "https://www.agentsworkerplus.online/blumi/legal/delete-account"
 })
 
 export const LEGAL_ACCEPTANCE_CAPTURE_MODE = "server_recorded" as const
 export const LEGAL_HOSTED_COPY_ALIGNMENT = "update-required" as const
 
 export const LEGAL_RELEASE_REQUIREMENTS = Object.freeze([
-  "Provide a verified operator legal name and a real contact address in every published legal surface.",
+  "Provide a verified operator legal name, country and working contact method in every published legal surface.",
   "Keep the privacy notice separate from Terms consent and record the accepted Terms version, locale, server timestamp, and account identifier.",
   "Keep live HTTPS privacy, terms, community, support, and account-deletion pages aligned with the in-app copy."
 ])
@@ -64,7 +64,7 @@ export function getLegalReleaseBlockers(
 ): readonly string[] {
   const missingIdentity = [
     identity.legalName,
-    identity.registeredAddress,
+    identity.operatingCountry,
     identity.privacyContact,
     identity.legalContact,
     identity.supportUrl

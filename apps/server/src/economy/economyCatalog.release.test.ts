@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { ECONOMY_CATALOG as DOMAIN_ECONOMY_CATALOG } from "@blumi/domain"
+import {
+  AVATAR_LOADOUT_CATALOG,
+  ECONOMY_CATALOG as DOMAIN_ECONOMY_CATALOG,
+  resolveR1PublishedEconomyCatalog
+} from "@blumi/domain"
 import { resolveProductionEconomyCatalog } from "./economyCatalog"
 
 test("the production economy projection excludes unreceipted paid cosmetics and held Room V3 candidates", () => {
@@ -28,4 +32,23 @@ test("the production economy projection excludes unreceipted paid cosmetics and 
     catalog.some((item) => item.itemId === "universal_cloud_loveseat_a"),
     false
   )
+})
+
+test("mobile Shop and server publish the same semantic IDs, prices and grants", () => {
+  const mobileProjection = resolveR1PublishedEconomyCatalog(DOMAIN_ECONOMY_CATALOG)
+  const serverProjection = resolveProductionEconomyCatalog(DOMAIN_ECONOMY_CATALOG)
+  assert.deepEqual(serverProjection, mobileProjection)
+
+  const allIds = DOMAIN_ECONOMY_CATALOG.map(item => item.itemId)
+  assert.equal(new Set(allIds).size, allIds.length, "economy IDs must be unique")
+  const economyIds = new Set(allIds)
+  const loadoutIds = new Set(AVATAR_LOADOUT_CATALOG.map(item => item.itemId))
+  for (const item of mobileProjection) {
+    if (item.type === "avatar") {
+      assert.ok(loadoutIds.has(item.itemId), `${item.itemId} lacks a loadout definition`)
+    }
+    for (const grantedId of item.grantedItemIds ?? []) {
+      assert.ok(economyIds.has(grantedId), `${item.itemId} grants an unknown ID`)
+    }
+  }
 })

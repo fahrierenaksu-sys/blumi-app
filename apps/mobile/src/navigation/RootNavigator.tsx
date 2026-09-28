@@ -34,6 +34,7 @@ import {
   BLUMI_BUILD_PROFILE,
   BLUMI_DEV_ENTRY_ROUTE,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG,
+  IS_BLUMI_PAID_COINS_ENABLED,
   MOBILE_HTTP_BASE_URL,
   MOBILE_WS_BASE_URL
 } from "../config/env"
@@ -109,7 +110,10 @@ import {
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
 import { isRealtimeAuthInvalidClose } from "../features/realtime/realtimeClient"
-import { createGlobalRealtimeLifecycle } from "../features/realtime/globalRealtimeLifecycle"
+import {
+  createGlobalRealtimeLifecycle,
+  getGlobalRealtimeLifecycleIdentity
+} from "../features/realtime/globalRealtimeLifecycle"
 import { LobbyScreen } from "../screens/LobbyScreen"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
@@ -584,6 +588,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   const chatLocale = getChatLocale(Intl.DateTimeFormat().resolvedOptions().locale)
 
   useEffect(() => {
+    if (!IS_BLUMI_PAID_COINS_ENABLED) return
     const revenueCat = getRevenueCatCoinPackClient()
     if (!revenueCat.isAvailable) return
     const userId = sessionActor?.session.mode === "production"
@@ -597,7 +602,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [sessionActor?.profile.userId, sessionActor?.session.mode])
 
   const refreshProductionThreads = useCallback(async (): Promise<void> => {
-    const actor = sessionActor
+    const actor = latestSessionActorRef.current
     if (actor?.session.mode !== "production") return
     applyChatThreadListLoading()
     try {
@@ -615,7 +620,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       applyChatThreadListFailed(message)
       throw error
     }
-  }, [isCurrentSession, sessionActor])
+  }, [isCurrentSession])
 
   const reconcileConnectionDecisionDelivery = useCallback<
     NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
@@ -946,26 +951,27 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     handleNotificationResponseData
   )
 
+  const inventoryHydrationSessionToken = sessionActor &&
+    shouldHydrateProductionInventory(
+      sessionActor.session.mode,
+      sessionActor.session.onboarding
+    )
+    ? sessionActor.session.sessionToken
+    : null
+  const inventoryRewardBody = sessionActor?.session.onboarding.completedAt
+    ? "A little something for your next vibe."
+    : "Your first vibe starts with a little extra."
+
   useEffect(() => {
-    if (
-      !sessionActor ||
-      !shouldHydrateProductionInventory(
-        sessionActor.session.mode,
-        sessionActor.session.onboarding
-      )
-    ) return
+    if (!inventoryHydrationSessionToken) return
     let active = true
-    const sessionToken = sessionActor.session.sessionToken
-    void hydrateFromServer(sessionToken).then((hydrated) => {
+    void hydrateFromServer(inventoryHydrationSessionToken).then((hydrated) => {
       if (!active || !hydrated.success) return
-      return claimDailyRewardFromServer(sessionToken).then((rewardCoins) => {
+      return claimDailyRewardFromServer(inventoryHydrationSessionToken).then((rewardCoins) => {
         if (!active || !rewardCoins) return
-        const rewardBody = sessionActor.session.onboarding.completedAt
-          ? "A little something for your next vibe."
-          : "Your first vibe starts with a little extra."
         showToast({
           title: `Daily reward: +${rewardCoins} coins`,
-          body: rewardBody,
+          body: inventoryRewardBody,
           type: "success",
           durationMs: 4000
         })
@@ -974,7 +980,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     return () => {
       active = false
     }
-  }, [claimDailyRewardFromServer, hydrateFromServer, sessionActor])
+  }, [claimDailyRewardFromServer, hydrateFromServer, inventoryHydrationSessionToken, inventoryRewardBody])
 
   useEffect(() => {
     if (sessionActor?.session.mode !== "production") return
@@ -1061,6 +1067,10 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     disconnectGlobal()
   }, [])
 
+  const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
+  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration })
+  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration }
+
   useEffect(() => createGlobalRealtimeLifecycle({
     sessionActor,
     isMainRoute: sessionEntryRoute === "Main",
@@ -1078,8 +1088,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     applyChatThreadListed,
     getThreads,
     isRealtimeAuthInvalidClose,
-    clearSessionActor,
-    refreshAccountModeration,
+    clearSessionActor: () => realtimeSessionCallbacksRef.current.clearSessionActor(),
+    refreshAccountModeration: () => realtimeSessionCallbacksRef.current.refreshAccountModeration(),
     showWarningToast: (toast) => {
       showToast({ ...toast, type: "warning" })
     },
@@ -1087,12 +1097,10 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     httpBaseUrl: MOBILE_HTTP_BASE_URL
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   })(), [
-    clearSessionActor,
     isAccountRestricted,
-    refreshAccountModeration,
     refreshProductionThreads,
     resetInactiveSessionState,
-    sessionActor,
+    realtimeSessionIdentity,
     sessionEntryRoute
   ])
 
