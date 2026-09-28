@@ -176,26 +176,10 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             item={item}
             isSelected={selectedInstanceId === item.renderId}
             placementState={placementStateByRenderId?.[item.renderId]}
-            onTap={
-              onItemTap && item.kind === "furniture"
-                ? () => onItemTap(item)
-                : undefined
-            }
-            onLongPress={
-              onItemLongPress && item.kind === "furniture"
-                ? () => onItemLongPress(item)
-                : undefined
-            }
-            onLongPressMove={
-              onItemLongPressMove && item.kind === "furniture"
-                ? (point) => onItemLongPressMove(item, point)
-                : undefined
-            }
-            onLongPressRelease={
-              onItemLongPressRelease && item.kind === "furniture"
-                ? (point) => onItemLongPressRelease(item, point)
-                : undefined
-            }
+            onItemTap={item.kind === "furniture" ? onItemTap : undefined}
+            onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
+            onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
+            onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}
             itemInteractionMode={itemInteractionMode}
             debugPlacement={debugPlacement}
             reduceMotion={reduceMotion || !motionEnabled}
@@ -458,10 +442,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   item: RoomV2RenderItem
   isSelected?: boolean
   placementState?: RoomRendererPlacementState
-  onTap?: () => void
-  onLongPress?: () => void
-  onLongPressMove?: (point: { pageX: number; pageY: number }) => void
-  onLongPressRelease?: (point: RoomWorldPoint) => void
+  onItemTap?: (item: RoomV2RenderItem) => void
+  onItemLongPress?: (item: RoomV2RenderItem) => void
+  onItemLongPressMove?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
+  onItemLongPressRelease?: (item: RoomV2RenderItem, point: RoomWorldPoint) => void
   itemInteractionMode: "edit" | "interact"
   debugPlacement: boolean
   reduceMotion: boolean
@@ -474,10 +458,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     item,
     isSelected,
     placementState,
-    onTap,
-    onLongPress,
-    onLongPressMove,
-    onLongPressRelease,
+    onItemTap,
+    onItemLongPress,
+    onItemLongPressMove,
+    onItemLongPressRelease,
     itemInteractionMode,
     debugPlacement,
     reduceMotion,
@@ -610,8 +594,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     }
   }, [avatarMotion.state, avatarMotion.usesRuntimeGesture, gestureRef, item.kind, reduceMotion])
 
-  // If onTap is provided, we need to allow touches. Otherwise pass through.
-  const isTouchInteractive = Boolean(onTap || onLongPress || onLongPressMove)
+  // If an interaction is provided, we need to allow touches. Otherwise pass through.
+  const isTouchInteractive = Boolean(onItemTap || onItemLongPress || onItemLongPressMove)
   const pointerEvents = isTouchInteractive ? "auto" : "none"
 
   const Wrapper = isTouchInteractive ? Pressable : View
@@ -647,10 +631,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             }
           : undefined
       }
-      delayLongPress={onLongPressMove ? 0 : 360}
+      delayLongPress={onItemLongPressMove ? 0 : 360}
       onLongPress={() => {
         longPressActiveRef.current = true
-        onLongPress?.()
+        onItemLongPress?.(item)
       }}
       onPress={(event) => {
         event.stopPropagation()
@@ -658,26 +642,27 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
           suppressPressRef.current = false
           return
         }
-        onTap?.()
+        onItemTap?.(item)
       }}
       onPressOut={(event) => {
         if (!longPressActiveRef.current) return
         longPressActiveRef.current = false
         suppressPressRef.current = true
-        onLongPressRelease?.(
+        onItemLongPressRelease?.(
+          item,
           resolvePressPoint(event.nativeEvent.locationX, event.nativeEvent.locationY)
         )
       }}
       onResponderMove={(event) => {
-        if (!longPressActiveRef.current || !onLongPressMove) return
-        onLongPressMove({
+        if (!longPressActiveRef.current || !onItemLongPressMove) return
+        onItemLongPressMove(item, {
           pageX: event.nativeEvent.pageX,
           pageY: event.nativeEvent.pageY
         })
       }}
-      onStartShouldSetResponder={() => Boolean(onLongPressMove)}
-      onMoveShouldSetResponder={() => Boolean(onLongPressMove)}
-      onResponderTerminationRequest={() => !onLongPressMove}
+      onStartShouldSetResponder={() => Boolean(onItemLongPressMove)}
+      onMoveShouldSetResponder={() => Boolean(onItemLongPressMove)}
+      onResponderTerminationRequest={() => !onItemLongPressMove}
       testID={testID}
       pointerEvents={pointerEvents}
       style={[
@@ -785,10 +770,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.item === next.item &&
   previous.isSelected === next.isSelected &&
   previous.placementState === next.placementState &&
-  previous.onTap === next.onTap &&
-  previous.onLongPress === next.onLongPress &&
-  previous.onLongPressMove === next.onLongPressMove &&
-  previous.onLongPressRelease === next.onLongPressRelease &&
+  previous.onItemTap === next.onItemTap &&
+  previous.onItemLongPress === next.onItemLongPress &&
+  previous.onItemLongPressMove === next.onItemLongPressMove &&
+  previous.onItemLongPressRelease === next.onItemLongPressRelease &&
   previous.debugPlacement === next.debugPlacement &&
   previous.reduceMotion === next.reduceMotion &&
   previous.stageWidthPx === next.stageWidthPx &&

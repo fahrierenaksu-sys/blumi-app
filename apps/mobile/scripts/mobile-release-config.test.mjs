@@ -354,7 +354,8 @@ test("release app configuration requires EAS linkage and rejects candidate asset
   const linked = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); const config=app({config:{extra:{eas:{projectId:'project-test'}}}}); if(config.extra.eas.projectId!=='project-test') process.exit(1)`], {
     cwd: mobileRoot, env, encoding: "utf8"
   })
-  assert.equal(linked.status, 0, linked.stderr)
+  assert.notEqual(linked.status, 0)
+  assert.match(linked.stderr, /candidate asset imports/)
 
   const development = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); app({config:{extra:{}}})`], {
     cwd: mobileRoot,
@@ -380,8 +381,9 @@ test("candidate asset release guard catches static imports and ignores ordinary 
     assetPath: "./assets/welcome-v1-candidate/cottage.png"
   }])
 
-  assert.doesNotThrow(
-    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src"))
+  assert.throws(
+    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")),
+    /candidate asset imports/
   )
 })
 

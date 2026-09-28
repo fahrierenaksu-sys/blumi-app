@@ -179,7 +179,6 @@ test("room renderer exposes continuous touch movement for edit-mode furniture", 
   )
 
   assert.match(renderer, /onItemLongPressMove\?:/)
-  assert.match(renderer, /onLongPressMove\?:/)
   assert.match(renderer, /onResponderMove=\{\(event\) =>/)
-  assert.match(renderer, /onLongPressMove\(\{[\s\S]*pageX:/)
+  assert.match(renderer, /onItemLongPressMove\(item, \{[\s\S]*pageX:/)
 })
