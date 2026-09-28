@@ -32,7 +32,7 @@ interface RoomAvatarFrameTickerStore {
 
 const roomAvatarFrameTickerStores = new Map<number, RoomAvatarFrameTickerStore>()
 
-export function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
+export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
   const { layers } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
@@ -89,7 +89,7 @@ export function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
       ))}
     </View>
   )
-}
+})
 
 interface RoomAvatarLayerImageProps {
   layer: RoomV2AvatarRenderLayer
