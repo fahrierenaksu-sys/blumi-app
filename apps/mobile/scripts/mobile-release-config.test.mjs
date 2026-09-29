@@ -861,11 +861,12 @@ test("managed config declares the release identity, custom scheme, push, and pri
 
 test("navigation links and offline status remain wired to native runtime", () => {
   const navigator = read("src/navigation/RootNavigator.tsx")
+  const rootLinking = read("src/navigation/rootLinking.ts")
   const networkStore = read("src/features/network/networkStore.ts")
   const connectionBanner = read("src/ui/connectionBanner.tsx")
   const connectionBannerModel = read("src/ui/connectionBannerModel.ts")
 
-  assert.match(navigator, /prefixes: \["blumi:\/\/"\]/)
+  assert.match(rootLinking, /prefixes: \["blumi:\/\/"\]/)
   for (const path of [
     "discover",
     "inbox",
@@ -876,8 +877,9 @@ test("navigation links and offline status remain wired to native runtime", () =>
     "wardrobe",
     "shop"
   ]) {
-    assert.match(navigator, new RegExp(`"${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`))
+    assert.match(rootLinking, new RegExp(`"${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`))
   }
+  assert.match(navigator, /import \{ linking \} from "\.\/rootLinking"/)
   assert.match(navigator, /linking=\{linking\}/)
   assert.match(navigator, /<ConnectionBanner status=\{rootConnectionStatus\}/)
   assert.match(networkStore, /NetInfo\.addEventListener/)

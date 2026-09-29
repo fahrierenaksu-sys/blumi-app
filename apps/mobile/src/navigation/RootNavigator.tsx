@@ -7,15 +7,12 @@ import type {
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
   CommonActions,
-  createNavigationContainerRef,
-  NavigationContainer,
-  type LinkingOptions
+  NavigationContainer
 } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import {
   ActivityIndicator,
-  Linking,
   Platform,
   StyleSheet,
   View
@@ -197,9 +194,9 @@ import {
 } from "./rootNavigationChromeStore"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
 import { ConnectionBanner } from "../ui/connectionBanner"
-import { parseReferralCodeFromUrl } from "../features/referrals/referralModel"
-import { capturePendingReferral } from "../features/referrals/referralStorage"
 import { LinkedProfileScreen } from "./LinkedProfileScreen"
+import { linking } from "./rootLinking"
+import { navigationRef } from "./rootNavigationRef"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -324,46 +321,7 @@ export type RootStackParamList = {
   }
 }
 
-const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ["blumi://"],
-  config: {
-    screens: {
-      Lobby: "discover",
-      Inbox: "inbox",
-      ChatThread: "chat/:threadId",
-      ProfilePreview: "profile/:userId",
-      Settings: "settings",
-      MyRoom: "room",
-      MyRoomEditor: "room/edit",
-      WardrobeV2: "wardrobe",
-      CosmeticShop: "shop"
-    }
-  },
-  async getInitialURL() {
-    const url = await Linking.getInitialURL()
-    if (!url) return url
-    const referralCode = parseReferralCodeFromUrl(url)
-    if (!referralCode) return url
-    await capturePendingReferral({ code: referralCode })
-    captureProductEvent("referral_link_opened", { source: "initial_url" })
-    return null
-  },
-  subscribe(listener) {
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      const referralCode = parseReferralCodeFromUrl(url)
-      if (referralCode) {
-        void capturePendingReferral({ code: referralCode })
-        captureProductEvent("referral_link_opened", { source: "app_link" })
-        return
-      }
-      listener(url)
-    })
-    return () => subscription.remove()
-  }
-}
-
 const Stack = createNativeStackNavigator<RootStackParamList>()
-const navigationRef = createNavigationContainerRef<RootStackParamList>()
 
 function createLocalDemoMediaSessionToken(): string {
   return "demo-session"

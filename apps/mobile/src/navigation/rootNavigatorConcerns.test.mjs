@@ -19,7 +19,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 const OWNER = {
   bottomNav: "./RootNavigator.tsx",
   roomInvites: "./RootNavigator.tsx",
-  linking: "./RootNavigator.tsx",
+  linking: "./rootLinking.ts",
   matchModal: "./RootNavigator.tsx",
   realtime: "./RootNavigator.tsx"
 }

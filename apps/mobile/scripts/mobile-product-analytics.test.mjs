@@ -9,7 +9,7 @@ const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 test("product analytics is explicit-consent, minimal, and replay-free", () => {
   const analytics = read("src/analytics/productAnalytics.ts")
   const policy = read("src/analytics/productAnalyticsPolicy.ts")
-  const linking = read("src/navigation/RootNavigator.tsx")
+  const linking = read("src/navigation/rootLinking.ts")
   const session = read("src/features/session/useSessionState.ts")
   const consent = read("src/analytics/analyticsConsent.ts")
   const settings = read("src/screens/SettingsScreen.tsx")
@@ -40,6 +40,7 @@ test("critical product funnels emit only named analytics events", () => {
     "src/features/session/useSessionState.ts",
     "src/screens/LobbyScreen.tsx",
     "src/navigation/RootNavigator.tsx",
+    "src/navigation/rootLinking.ts",
     "src/screens/ChatThreadScreen.tsx",
     "src/components/ReportModal.tsx",
     "src/screens/CosmeticShopScreen.tsx",
