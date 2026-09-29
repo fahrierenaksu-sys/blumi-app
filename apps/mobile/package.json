@@ -13,7 +13,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test:release-config": "node --test scripts/mobile-release-config.test.mjs",
-    "test:launch-config": "node --test scripts/mobile-launch-config.test.mjs scripts/mobile-dev-bundle-host.test.mjs scripts/mobile-package-name.test.mjs scripts/nativeUiTestSelection.test.mjs scripts/nativeUiDiskGuard.test.mjs scripts/nativeUiScreenshotDirectory.test.mjs scripts/nativeUiTemporaryData.test.mjs",
+    "test:launch-config": "node --test scripts/mobile-launch-config.test.mjs scripts/mobile-env-gate-characterization.test.mjs scripts/mobile-dev-bundle-host.test.mjs scripts/mobile-package-name.test.mjs scripts/nativeUiTestSelection.test.mjs scripts/nativeUiDiskGuard.test.mjs scripts/nativeUiScreenshotDirectory.test.mjs scripts/nativeUiTemporaryData.test.mjs",
     "test:bundle-size": "node --test scripts/mobile-bundle-size.test.mjs",
     "test:theme": "node --test scripts/mobile-theme-scope.test.mjs scripts/mobile-core-icon-contract.test.mjs scripts/mobile-trust-icon-contract.test.mjs scripts/mobile-celebration-icon-contract.test.mjs",
     "test:accessibility": "node --test scripts/mobile-accessibility-baseline.test.mjs scripts/mobile-motion-polish-contract.test.mjs",

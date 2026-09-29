@@ -9,8 +9,10 @@ import {
 } from "./OnboardingRunner"
 import { OnboardingArrivalCharacter } from "./OnboardingArrivalCharacter"
 import { OnboardingPopulationCounter } from "./OnboardingPopulationCounter"
-import { ONBOARDING_RUN_ASSET_MODE } from "../../config/env"
-import { shouldUseOnboardingArrivalAssets } from "./onboardingRunAssetGate"
+import {
+  ONBOARDING_RUN_ASSET_MODE,
+  shouldUseOnboardingArrivalAssets
+} from "./onboardingRunAssetGate"
 import {
   ONBOARDING_ARRIVAL_PRELOAD_GLOBE_PROGRESS,
   shouldShowOnboardingRunnerCrownMask,

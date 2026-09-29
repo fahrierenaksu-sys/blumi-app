@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Animated, Easing, Image, StyleSheet, View } from "react-native"
-import { ONBOARDING_RUN_ASSET_MODE } from "../../config/env"
+import { ONBOARDING_RUN_ASSET_MODE } from "./onboardingRunAssetGate"
 import { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS } from "./onboardingBrandPreludeModel"
 import { APPROVED_ONBOARDING_RUN_ASSETS } from "./onboardingRunApprovedAssetCatalog"
 import { getOnboardingRunAssetSet } from "./onboardingRunAssetCatalog"
