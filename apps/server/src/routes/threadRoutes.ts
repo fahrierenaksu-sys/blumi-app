@@ -150,30 +150,58 @@ export async function registerThreadRoutes(
       group.push(source)
       sourcesByPartner.set(partnerUserId, group)
     }
-    for (const [partnerUserId, group] of sourcesByPartner) {
-      if (group.some((source) => existingThreadIds.has(createAuthorizedThreadId(source)))) continue
-      if (await services.safetyService.hasBlockBetween(userId, partnerUserId)) continue
-      const source = group[0]!
-      const threadId = createAuthorizedThreadId(source)
-      const participantUserIds = [...source.participantUserIds].sort() as [string, string]
-      const accounts = await Promise.all(participantUserIds.map((id) => authService.repository.findAccountByUserId(id)))
-      if (accounts.some((account) => !account?.profile.displayName)) continue
-      const thread = await chatService.createThread({
-        threadId,
-        miniRoomId: source.miniRoomId,
-        participantUserIds,
-        participants: participantUserIds.map((id, index) => ({
-          userId: id,
-          displayName: accounts[index]!.profile.displayName,
-          avatar: completeAvatarForChat(accounts[index]!.profile.avatar)
-        })) as CreateThreadInput["participants"]
-      })
-      existingThreadIds.add(threadId)
-      if (!await services.safetyService.hasBlockBetween(userId, partnerUserId)) {
-        services.connectionManager.sendToUsers(thread.participantUserIds, {
-          type: "chat.thread_created",
-          payload: thread
+    // Batched: one block query and one account query cover every partner
+    // still missing a thread, instead of per-partner lookups (N+1).
+    const missingPartners = [...sourcesByPartner].filter(([, group]) =>
+      !group.some((source) => existingThreadIds.has(createAuthorizedThreadId(source))))
+    const blockedBeforeCreate = new Set(missingPartners.length === 0
+      ? []
+      : await services.safetyService.listBlockedUserIdsBetween(
+        userId,
+        missingPartners.map(([partnerUserId]) => partnerUserId)
+      ))
+    const creatable = missingPartners.filter(([partnerUserId]) => !blockedBeforeCreate.has(partnerUserId))
+    const accountsByUserId = new Map((creatable.length === 0
+      ? []
+      : await authService.repository.findAccountsByUserIds([
+        ...new Set(creatable.flatMap(([, group]) => group[0]!.participantUserIds))
+      ])).map((account) => [account.userId, account]))
+    const created: Array<{ partnerUserId: string; thread: ChatThread }> = []
+    try {
+      for (const [partnerUserId, group] of creatable) {
+        const source = group[0]!
+        const threadId = createAuthorizedThreadId(source)
+        const participantUserIds = [...source.participantUserIds].sort() as [string, string]
+        const accounts = participantUserIds.map((id) => accountsByUserId.get(id))
+        if (accounts.some((account) => !account?.profile.displayName)) continue
+        const thread = await chatService.createThread({
+          threadId,
+          miniRoomId: source.miniRoomId,
+          participantUserIds,
+          participants: participantUserIds.map((id, index) => ({
+            userId: id,
+            displayName: accounts[index]!.profile.displayName,
+            avatar: completeAvatarForChat(accounts[index]!.profile.avatar)
+          })) as CreateThreadInput["participants"]
         })
+        existingThreadIds.add(threadId)
+        created.push({ partnerUserId, thread })
+      }
+    } finally {
+      // Re-check blocks after creation (a block may land meanwhile) with one
+      // batched query, then announce only the still-unblocked threads.
+      if (created.length > 0) {
+        const blockedAfterCreate = new Set(await services.safetyService.listBlockedUserIdsBetween(
+          userId,
+          created.map(({ partnerUserId }) => partnerUserId)
+        ))
+        for (const { partnerUserId, thread } of created) {
+          if (blockedAfterCreate.has(partnerUserId)) continue
+          services.connectionManager.sendToUsers(thread.participantUserIds, {
+            type: "chat.thread_created",
+            payload: thread
+          })
+        }
       }
     }
     const page = await chatService.listThreadsPage(userId)

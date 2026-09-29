@@ -83,24 +83,26 @@ export async function registerSafetyRoutes(
     if (!resolved) return
 
     const blocks = await safetyService.listBlocks(resolved.account.userId)
-    const blocksWithProfiles = await Promise.all(
-      blocks.map(async (block) => {
-        const account = await authService.repository.findAccountByUserId(
-          block.blockedUserId
-        )
-        if (!account) return block
-        return {
-          ...block,
-          blockedProfile: {
-            userId: account.userId,
-            displayName: account.profile.displayName,
-            ...(account.profile.avatar.presetId
-              ? { avatarPresetId: account.profile.avatar.presetId }
-              : {})
-          }
+    // One batched account lookup for every blocked user (was one per block).
+    const accountsByUserId = new Map((blocks.length === 0
+      ? []
+      : await authService.repository.findAccountsByUserIds(
+        blocks.map((block) => block.blockedUserId)
+      )).map((account) => [account.userId, account]))
+    const blocksWithProfiles = blocks.map((block) => {
+      const account = accountsByUserId.get(block.blockedUserId)
+      if (!account) return block
+      return {
+        ...block,
+        blockedProfile: {
+          userId: account.userId,
+          displayName: account.profile.displayName,
+          ...(account.profile.avatar.presetId
+            ? { avatarPresetId: account.profile.avatar.presetId }
+            : {})
         }
-      })
-    )
+      }
+    })
     return {
       userId: resolved.account.userId,
       blocks: blocksWithProfiles

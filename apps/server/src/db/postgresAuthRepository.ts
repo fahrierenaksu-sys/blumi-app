@@ -861,6 +861,17 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       return result.rows[0] ? mapAccount(result.rows[0]) : null
     },
 
+    async findAccountsByUserIds(userIds) {
+      const distinctUserIds = [...new Set(userIds)]
+      if (distinctUserIds.length === 0) return []
+      const result = await pool.query(
+        `${accountSelectSql()}
+          WHERE user_id = ANY($1::text[])`,
+        [distinctUserIds]
+      )
+      return result.rows.map(mapAccount)
+    },
+
     async saveAccount(account) {
       await pool.query(
         `INSERT INTO blumi_accounts (

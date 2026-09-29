@@ -44,6 +44,12 @@ export interface PresenceRepository {
   heartbeatConnectionLease(connectionId: string, userId: string, leaseMs: number): Promise<boolean>
   disconnectConnectionLease(connectionId: string, userId: string): Promise<string[]>
   purgeExpiredConnectionLeases(limit: number): Promise<number>
+  /**
+   * Deletes up to `limit` expired presence rows. Reads never return expired
+   * rows and never delete; this bounded purge runs on the periodic realtime
+   * cleanup timer instead.
+   */
+  purgeExpiredPresence(limit: number): Promise<number>
   updateMiniRoomStatus(userIds: readonly string[], inMiniRoom: boolean): Promise<void>
 }
 
@@ -71,9 +77,8 @@ export function createInMemoryPresenceRepository(
 ): PresenceRepository {
   return {
     async listRoomPresence(roomId, now = new Date()) {
-      deleteExpiredRecords(store, now)
       const records = [...store.records.values()].filter(
-        (record) => record.roomId === roomId
+        (record) => record.roomId === roomId && isLive(record, now)
       )
       const hydrated = await Promise.all(
         records.map((record) => hydratePresence(record, options))
@@ -81,14 +86,14 @@ export function createInMemoryPresenceRepository(
       return hydrated.filter(isPresenceRecord)
     },
     async findUserPresence(roomId, userId, now = new Date()) {
-      deleteExpiredRecords(store, now)
       const record = store.records.get(presenceKey(roomId, userId))
-      return record ? hydratePresence(record, options) : null
+      return record && isLive(record, now) ? hydratePresence(record, options) : null
     },
     async findUserPresenceAcrossRooms(userId, now = new Date()) {
-      deleteExpiredRecords(store, now)
       const record =
-        [...store.records.values()].find((entry) => entry.userId === userId) ??
+        [...store.records.values()]
+          .filter((entry) => entry.userId === userId && isLive(entry, now))
+          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] ??
         null
       return record ? hydratePresence(record, options) : null
     },
@@ -181,6 +186,19 @@ export function createInMemoryPresenceRepository(
       }
       return removed
     },
+    async purgeExpiredPresence(limit) {
+      const maximum = validatePresencePurgeLimit(limit)
+      const nowMs = Date.now()
+      let removed = 0
+      for (const [key, record] of store.records.entries()) {
+        if (removed >= maximum) break
+        if (Date.parse(record.expiresAt) <= nowMs) {
+          store.records.delete(key)
+          removed += 1
+        }
+      }
+      return removed
+    },
     async updateMiniRoomStatus(userIds, inMiniRoom) {
       const userIdSet = new Set(userIds)
       for (const [key, record] of store.records.entries()) {
@@ -224,6 +242,17 @@ export function clonePresence(record: PresenceRecord): PresenceRecord {
 
 function presenceKey(roomId: string, userId: string): string {
   return `${roomId}:${userId}`
+}
+
+function isLive(record: PresenceRecord, now: Date): boolean {
+  return Date.parse(record.expiresAt) > now.getTime()
+}
+
+function validatePresencePurgeLimit(limit: number): number {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10_000) {
+    throw new Error("Room presence purge limit is invalid.")
+  }
+  return limit
 }
 
 function deleteExpiredRecords(store: InMemoryPresenceStore, now: Date): void {

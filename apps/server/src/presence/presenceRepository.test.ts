@@ -5,7 +5,10 @@ import {
   createAvatarSelection,
   DEFAULT_MALE_AVATAR_LOADOUT
 } from "@blumi/domain"
-import { createInMemoryPresenceRepository } from "./presenceRepository"
+import {
+  createInMemoryPresenceRepository,
+  createInMemoryPresenceStore
+} from "./presenceRepository"
 
 const createAvatar = (): CompleteAvatarSelection => ({
   presetId: "avatar_v2_body_default",
@@ -128,4 +131,49 @@ test("in-memory presence reads hydrate the account avatar and ignore stale webso
     ),
     []
   )
+})
+
+test("in-memory presence reads hide expired rows without deleting them; the bounded purge removes them", async () => {
+  const store = createInMemoryPresenceStore()
+  const repository = createInMemoryPresenceRepository(store)
+  const base = {
+    displayName: "Defne",
+    avatar: createAvatar(),
+    inMiniRoom: false,
+    joinedAt: "2026-07-13T10:00:00.000Z",
+    updatedAt: "2026-07-13T10:00:00.000Z"
+  }
+  // Seed directly: expired rows only exist when a lease lapses after saving.
+  for (const [index, expiresAt] of [
+    "2026-07-13T10:00:30.000Z",
+    "2026-07-13T10:00:40.000Z",
+    "2026-07-13T10:00:50.000Z",
+    "2099-01-01T00:00:00.000Z"
+  ].entries()) {
+    store.records.set(`room_one:user_${index}`, {
+      ...base, roomId: "room_one", userId: `user_${index}`, spotId: `spot_${index}`, expiresAt
+    })
+  }
+  store.records.set("room_two:user_0", {
+    ...base,
+    roomId: "room_two",
+    userId: "user_0",
+    spotId: "spot_0",
+    updatedAt: "2026-07-13T10:00:05.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z"
+  })
+  const now = new Date("2026-07-13T10:01:00.000Z")
+
+  assert.deepEqual((await repository.listRoomPresence("room_one", now)).map((record) => record.userId), ["user_3"])
+  assert.equal(await repository.findUserPresence("room_one", "user_0", now), null)
+  assert.equal((await repository.findUserPresence("room_one", "user_3", now))?.spotId, "spot_3")
+  // The expired room_one row is skipped; the live room_two row is returned.
+  assert.equal((await repository.findUserPresenceAcrossRooms("user_0", now))?.roomId, "room_two")
+  assert.equal(store.records.size, 5, "reads must not delete")
+
+  await assert.rejects(repository.purgeExpiredPresence(0), /purge limit is invalid/)
+  assert.equal(await repository.purgeExpiredPresence(2), 2)
+  assert.equal(await repository.purgeExpiredPresence(500), 1)
+  assert.equal(await repository.purgeExpiredPresence(500), 0)
+  assert.deepEqual([...store.records.keys()].sort(), ["room_one:user_3", "room_two:user_0"])
 })

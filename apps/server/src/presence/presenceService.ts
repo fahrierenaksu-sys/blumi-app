@@ -33,6 +33,7 @@ export interface PresenceService {
   heartbeatConnection(connectionId: string, userId: string): Promise<boolean>
   disconnectConnection(connectionId: string, userId: string): Promise<string[]>
   purgeExpiredConnectionLeases(): Promise<number>
+  purgeExpiredPresence(): Promise<number>
   moveToSpot(
     roomId: string,
     userId: string,
@@ -177,6 +178,9 @@ export function createPresenceService(
     },
     async purgeExpiredConnectionLeases() {
       return repository.purgeExpiredConnectionLeases(500)
+    },
+    async purgeExpiredPresence() {
+      return repository.purgeExpiredPresence(500)
     },
     async moveToSpot(roomId, userId, spotId, now = new Date()) {
       const layout = await roomService.getOrCreateLayout(roomId)
