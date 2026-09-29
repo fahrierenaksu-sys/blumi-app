@@ -69,3 +69,16 @@ test("ticket API preserves authorization failures for session cleanup", async ()
       error instanceof RealtimeTicketRequestError && error.statusCode === 401
   )
 })
+
+test("ticket API times out a stalled transport so realtime can retry", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let transportSignal: AbortSignal | null | undefined
+  const request = requestRealtimeTicket("https://api.test", "session-token", async (_url, init) => {
+    transportSignal = init?.signal
+    return new Promise<Response>(() => {})
+  })
+  const rejected = assert.rejects(request, { name: "TimeoutError" })
+  context.mock.timers.tick(15_000)
+  assert.equal(transportSignal?.aborted, true)
+  await rejected
+})

@@ -35,3 +35,20 @@ test("referral APIs use authenticated server endpoints and reject malformed serv
   assert.equal(calls[0]?.init?.headers && (calls[0].init.headers as Record<string, string>).authorization, "Bearer session-token")
   assert.equal(calls[1]?.url, "https://api.blumi.test/v1/referrals/claim")
 })
+
+test("referral requests time out a stalled transport", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  for (const run of [
+    (fetcher: typeof fetch) => createReferralInvite("https://api.test", "session-token", fetcher),
+    (fetcher: typeof fetch) => claimReferralInvite("https://api.test", "session-token", "r_code", fetcher)
+  ]) {
+    let transportSignal: AbortSignal | null | undefined
+    const rejected = assert.rejects(run(async (_url, init) => {
+      transportSignal = init?.signal
+      return new Promise<Response>(() => {})
+    }), { name: "TimeoutError" })
+    context.mock.timers.tick(15_000)
+    assert.equal(transportSignal?.aborted, true)
+    await rejected
+  }
+})

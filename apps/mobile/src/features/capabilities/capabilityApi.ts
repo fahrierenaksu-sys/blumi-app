@@ -4,6 +4,7 @@ import {
   type CapabilityMap,
   type CapabilityResolution
 } from "@blumi/contracts"
+import { requestJson } from "../network/apiClient"
 
 export const SUPPORTED_MOBILE_CAPABILITIES = [
   "avatar_loadout_v2_read",
@@ -63,22 +64,25 @@ export async function resolveProductionCapabilities(
   declaredCapabilities: readonly CapabilityKey[],
   fetcher: typeof fetch = fetch
 ): Promise<CapabilityResolution> {
-  const baseUrl = baseHttpUrl.endsWith("/")
-    ? baseHttpUrl.slice(0, -1)
-    : baseHttpUrl
   try {
-    const response = await fetcher(`${baseUrl}/v1/capabilities/resolve`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${sessionToken}`,
-        "content-type": "application/json"
+    // A stalled request times out and fails closed like any other failure.
+    const { response, payload } = await requestJson(
+      baseHttpUrl,
+      "/v1/capabilities/resolve",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${sessionToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          declaredCapabilities: [...declaredCapabilities]
+        })
       },
-      body: JSON.stringify({
-        declaredCapabilities: [...declaredCapabilities]
-      })
-    })
+      fetcher
+    )
     if (!response.ok) return createFailClosedCapabilityResolution()
-    return normalizeCapabilityResolution(await response.json()) ??
+    return normalizeCapabilityResolution(payload) ??
       createFailClosedCapabilityResolution()
   } catch {
     return createFailClosedCapabilityResolution()

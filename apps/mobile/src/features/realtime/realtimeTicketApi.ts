@@ -1,3 +1,4 @@
+import { requestJson } from "../network/apiClient"
 import { RealtimeTicketRequestError } from "./realtimeClient"
 
 export async function requestRealtimeTicket(
@@ -5,16 +6,19 @@ export async function requestRealtimeTicket(
   sessionToken: string,
   fetcher: typeof fetch = fetch
 ): Promise<string> {
-  const base = baseHttpUrl.endsWith("/")
-    ? baseHttpUrl.slice(0, -1)
-    : baseHttpUrl
-  const response = await fetcher(`${base}/v1/auth/realtime-ticket`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${sessionToken}` }
-  })
+  // Bounded like other JSON APIs: a stalled ticket request must not block
+  // realtime reconnection indefinitely.
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/auth/realtime-ticket",
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${sessionToken}` }
+    },
+    fetcher
+  )
   if (!response.ok) throw new RealtimeTicketRequestError(response.status)
 
-  const payload: unknown = await response.json()
   const record =
     payload && typeof payload === "object" && !Array.isArray(payload)
       ? payload as Record<string, unknown>

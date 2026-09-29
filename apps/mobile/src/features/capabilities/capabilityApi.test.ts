@@ -143,3 +143,21 @@ test("capabilities never leak across production session tokens", () => {
     true
   )
 })
+
+test("a stalled capability request fails closed instead of hanging", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let transportSignal: AbortSignal | null | undefined
+  const resolution = resolveProductionCapabilities(
+    "https://api.test",
+    "session-token",
+    SUPPORTED_MOBILE_CAPABILITIES,
+    async (_url, init) => {
+      transportSignal = init?.signal
+      return new Promise<Response>(() => {})
+    }
+  )
+  await Promise.resolve()
+  context.mock.timers.tick(15_000)
+  assert.deepEqual(await resolution, createFailClosedCapabilityResolution())
+  assert.equal(transportSignal?.aborted, true)
+})
