@@ -756,6 +756,9 @@ export function LobbyScreen(props: LobbyScreenProps) {
   ])
 
   useEffect(() => {
+    // Production Discover never uses lobby presence (legacy lobby retired,
+    // owner decision 2026-09-30), so lobby churn must not reset seen cards.
+    if (isProductionDiscovery) return
     setSeenThisSessionUserIds((current) => {
       const nearbyUserIds = new Set(nearbyUsers.map((user) => user.userId))
       const next = new Set(
@@ -763,7 +766,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
       )
       return next.size === current.size ? current : next
     })
-  }, [nearbyUsers])
+  }, [isProductionDiscovery, nearbyUsers])
 
   // Resolve participant display names then navigate to MiniRoom.
   useEffect(() => {
