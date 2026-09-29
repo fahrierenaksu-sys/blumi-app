@@ -36,9 +36,9 @@ candidate onboarding imports are being promoted in parallel.
 | | ARCHIVE | 12 | 3,045,201 | 2.90 MiB |
 | Non-test TS/TSX in `apps/mobile/src` outside the production graph | KEEP | 63 | 854,944 | 0.82 MiB |
 | | ARCHIVE | 5 | 14,509 | 0.01 MiB |
-| `apps/mobile/scripts/*.py` | KEEP | 27 | 295,301 | 0.28 MiB |
-| | ARCHIVE | 281 | 1,999,787 | 1.91 MiB |
-| **All areas** | **ARCHIVE** | **298** | **5,059,497** | **4.83 MiB** |
+| `apps/mobile/scripts/*.py` | KEEP | 245 | 1,793,471 | 1.71 MiB |
+| | ARCHIVE | 63 | 501,617 | 0.48 MiB |
+| **All areas** | **ARCHIVE** | **80** | **3,561,327** | **3.40 MiB** |
 
 KEEP by basis:
 
@@ -52,7 +52,8 @@ KEEP by basis:
 | TS/TSX | production-type-import (type-only, erased from the bundle) | 5 | 0.01 MiB |
 | TS/TSX | owner-keep (`features/session/*`) | 6 | 0.01 MiB |
 | TS/TSX | string-reference / metro-resolver | 5 | 0.01 MiB |
-| py | string-reference (named by a gate test, a kept script, a candidate manifest or a Python test) | 27 | 0.28 MiB |
+| py | python-test (`test_*.py`; rule 4) | 120 | 0.50 MiB |
+| py | string-reference (named or imported by a gate test, a Python test, a kept script or a candidate manifest) | 125 | 1.21 MiB |
 
 ## What is actually shipped
 
@@ -93,9 +94,10 @@ KEEP by basis:
 
   Four of them have explicit negative guards: tests assert that screen
   sources do *not* use them. Removing the files keeps those guards green.
-- **281 Python production/QA-source scripts.** No package script, workflow,
-  test, gate, runner, kept script or manifest names them, and no kept Python
-  file imports them. Under `AGENTS.md`, production sources and temporary
+- **63 Python production/QA-source scripts.** No package script, workflow,
+  test (JS or Python), gate, runner, kept script or manifest names them, and no
+  kept Python file imports them. The 120 Python tests (`test_*.py`) are KEEP
+  under rule 4. The scripts they exercise are KEEP through those references. Under `AGENTS.md`, production sources and temporary
   scripts belong in the Workbench.
 
 ## UNSURE items (kept)
@@ -118,6 +120,29 @@ all of it today. Retiring it needs an explicit owner decision to retire the
 matching test and QA modules together (for example `roomVNextFullWave*`,
 `roomV2HistoricalQaCatalog.ts`, `roomV3UniversalCore*` and
 `roomV3Focus12QaCatalog.ts`). It isn't an asset-only deletion.
+
+## Integration-branch note (commit `58d2d04`)
+
+`58d2d04` (feat: promote approved onboarding and profile artwork) moves 5
+session images from `*-candidate/` to `*-runtime/` folders and deletes 24
+duplicate candidate PNGs. This manifest has **no entries under
+`features/session/assets`**, so none of its asset entries are affected.
+Effects on the manifest:
+
+- `apps/mobile/scripts/test_profile_character_reaction_v4_assets.py`
+  (KEEP, python-test) is modified by that commit. Its recorded SHA-256
+  describes the pre-merge file. It is not archived, so the archive tool
+  never reads it.
+- `apps/mobile/scripts/package_onboarding_arrival_v3.py` (KEEP) is kept
+  through `session/assets/onboarding-arrival-v3-candidate/candidate-manifest.json`.
+  That file still exists at `58d2d04`.
+- The six `features/session/*.ts(x)` owner-keep entries don't change.
+- After that merge, `EAS_BUILD_PROFILE=production` should pass the
+  `app.config.js` candidate-import gate. The production export can then be
+  rerun without the `server-test` substitution.
+
+If the manifest is applied on a branch where an ARCHIVE file changed, the
+archive tool reports `source-hash-mismatch` for it and does not copy it.
 
 ## Method
 
