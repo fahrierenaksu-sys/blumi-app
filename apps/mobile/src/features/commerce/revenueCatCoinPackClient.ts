@@ -1,25 +1,18 @@
-export const COIN_PACKS = [
-  {
-    id: "com.blumi.mobile.coins.500",
-    coins: 500,
-    launchPriceUsdCents: 199,
-    type: "consumable"
-  },
-  {
-    id: "com.blumi.mobile.coins.1500",
-    coins: 1500,
-    launchPriceUsdCents: 499,
-    type: "consumable"
-  },
-  {
-    id: "com.blumi.mobile.coins.4000",
-    coins: 4000,
-    launchPriceUsdCents: 999,
-    type: "consumable"
-  }
-] as const
+import {
+  COIN_PACKS as DOMAIN_COIN_PACKS,
+  type CoinPackProductId
+} from "@blumi/domain"
 
-export type CoinPackId = (typeof COIN_PACKS)[number]["id"]
+// The shared domain catalog is the single source of coin pack IDs and prices;
+// the server credits purchases against the same list.
+export const COIN_PACKS = DOMAIN_COIN_PACKS.map((pack) => ({
+  id: pack.productId,
+  coins: pack.coins,
+  launchPriceUsdCents: pack.usdPriceCents,
+  type: "consumable" as const
+}))
+
+export type CoinPackId = CoinPackProductId
 /** Matches the server's RevenueCat verified transaction contract. */
 export type CoinPackStore = "ios" | "android"
 

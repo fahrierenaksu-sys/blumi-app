@@ -70,7 +70,13 @@ try {
     ],
     {
       cwd: workspaceRoot,
-      stdio: "inherit"
+      stdio: "inherit",
+      // Compiled tests run from a temp directory; resolve workspace packages
+      // such as @blumi/domain from the repository root like other runners.
+      env: {
+        ...process.env,
+        NODE_PATH: resolve(workspaceRoot, "../../node_modules")
+      }
     }
   )
   execFileSync(
