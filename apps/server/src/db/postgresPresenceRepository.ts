@@ -30,7 +30,6 @@ export function createPostgresPresenceRepository(
 ): PresenceRepository {
   return {
     async listRoomPresence(roomId, now = new Date()) {
-      await deleteExpired(pool, now)
       const result = await pool.query(
         `SELECT presence.room_id, presence.user_id, presence.display_name,
                 account.avatar_preset_id AS avatar_preset_id,
@@ -42,13 +41,13 @@ export function createPostgresPresenceRepository(
           INNER JOIN blumi_accounts AS account
              ON account.user_id = presence.user_id
           WHERE presence.room_id = $1
+            AND presence.expires_at > $2
           ORDER BY presence.joined_at ASC`,
-        [roomId]
+        [roomId, now]
       )
       return result.rows.map(mapPresence)
     },
     async findUserPresence(roomId, userId, now = new Date()) {
-      await deleteExpired(pool, now)
       const result = await pool.query(
         `SELECT presence.room_id, presence.user_id, presence.display_name,
                 account.avatar_preset_id AS avatar_preset_id,
@@ -59,13 +58,13 @@ export function createPostgresPresenceRepository(
            FROM blumi_room_presence AS presence
           INNER JOIN blumi_accounts AS account
              ON account.user_id = presence.user_id
-          WHERE presence.room_id = $1 AND presence.user_id = $2`,
-        [roomId, userId]
+          WHERE presence.room_id = $1 AND presence.user_id = $2
+            AND presence.expires_at > $3`,
+        [roomId, userId, now]
       )
       return result.rows[0] ? mapPresence(result.rows[0]) : null
     },
     async findUserPresenceAcrossRooms(userId, now = new Date()) {
-      await deleteExpired(pool, now)
       const result = await pool.query(
         `SELECT presence.room_id, presence.user_id, presence.display_name,
                 account.avatar_preset_id AS avatar_preset_id,
@@ -77,9 +76,10 @@ export function createPostgresPresenceRepository(
           INNER JOIN blumi_accounts AS account
              ON account.user_id = presence.user_id
           WHERE presence.user_id = $1
+            AND presence.expires_at > $2
           ORDER BY presence.updated_at DESC
           LIMIT 1`,
-        [userId]
+        [userId, now]
       )
       return result.rows[0] ? mapPresence(result.rows[0]) : null
     },
@@ -192,6 +192,23 @@ export function createPostgresPresenceRepository(
           USING expired
           WHERE lease.connection_id = expired.connection_id
           RETURNING lease.connection_id`,
+        [maximum]
+      )
+      return result.rows.length
+    },
+    async purgeExpiredPresence(limit) {
+      const maximum = validatePresencePurgeLimit(limit)
+      const result = await pool.query(
+        `DELETE FROM blumi_room_presence
+          WHERE ctid = ANY(ARRAY(
+            SELECT ctid
+              FROM blumi_room_presence
+             WHERE expires_at <= clock_timestamp()
+             ORDER BY expires_at
+             LIMIT $1
+             FOR UPDATE SKIP LOCKED
+          ))
+          RETURNING room_id`,
         [maximum]
       )
       return result.rows.length
@@ -423,11 +440,11 @@ async function readDatabaseClock(client: TransactionClient): Promise<Date> {
   return timestamp
 }
 
-async function deleteExpired(pool: QueryExecutor, now: Date): Promise<void> {
-  await pool.query(
-    "DELETE FROM blumi_room_presence WHERE expires_at <= $1",
-    [now]
-  )
+function validatePresencePurgeLimit(limit: number): number {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10_000) {
+    throw new Error("Room presence purge limit is invalid.")
+  }
+  return limit
 }
 
 function mapPresence(row: QueryResultRow): PresenceRecord {

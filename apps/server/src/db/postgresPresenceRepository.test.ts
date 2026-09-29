@@ -138,7 +138,10 @@ test("postgres presence reads hydrate canonical account avatars instead of stale
       const record = Array.isArray(result) ? result[0] : result
 
       assert.deepEqual(record?.avatar, canonicalAccountAvatar)
-      assertCanonicalAccountAvatarQuery(fake.calls[1]?.text ?? "")
+      assert.equal(fake.calls.length, 1, "presence reads issue a single SELECT and never DELETE")
+      assert.doesNotMatch(fake.calls[0]?.text ?? "", /DELETE/i)
+      assert.match(fake.calls[0]?.text ?? "", /presence\.expires_at > \$\d/)
+      assertCanonicalAccountAvatarQuery(fake.calls[0]?.text ?? "")
     }
   }
 })

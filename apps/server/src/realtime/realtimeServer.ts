@@ -332,6 +332,11 @@ export function createRealtimeServer(
     void track(options.presenceService.purgeExpiredConnectionLeases()).catch((error) => {
       console.error("Realtime connection lease cleanup failed", safeOperationalErrorKind(error))
     })
+    // Expired room presence is invisible to reads; purge it here in bounded
+    // batches rather than with a global DELETE on every presence read.
+    void track(options.presenceService.purgeExpiredPresence()).catch((error) => {
+      console.error("Realtime presence cleanup failed", safeOperationalErrorKind(error))
+    })
   }, CONNECTION_LEASE_CLEANUP_INTERVAL_MS)
   connectionLeaseCleanup.unref()
 
