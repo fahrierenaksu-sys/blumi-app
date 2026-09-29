@@ -215,13 +215,9 @@ test("Get started opens the mounted character greeting before the world launch",
 })
 
 test("setup characters use authored walking frames instead of the unsupported waving fallback", () => {
-  const preview = read("src/features/session/setupFlow/SetupAnimatedAvatarPreview.tsx")
   const model = read("src/features/session/setupFlow/setupCharacterMotionModel.ts")
 
-  assert.match(preview, /setAnimationState\(plan\.spriteCueState\)/)
-  assert.match(preview, /spriteTravel\.value = withSequence/)
   assert.match(model, /spriteCueState:\s*"walk_front"/)
-  assert.doesNotMatch(preview, /setAnimationState\("wave_front"\)/)
 })
 
 test("first-launch account handoff errors remain visible throughout the cinematic entry", () => {

@@ -22,7 +22,6 @@ const directPageScreens = [
   "screens/RoomDebriefScreen.tsx",
   "screens/SettingsScreen.tsx",
   "screens/WardrobeV2Screen.tsx",
-  "screens/WelcomeScreen.tsx",
   "screens/YouScreen.tsx"
 ]
 
@@ -42,7 +41,6 @@ const regularContentPages = [
   "screens/ProfileEditScreen.tsx",
   "screens/RoomDebriefScreen.tsx",
   "screens/SettingsScreen.tsx",
-  "screens/WelcomeScreen.tsx",
   "screens/YouScreen.tsx"
 ]
 

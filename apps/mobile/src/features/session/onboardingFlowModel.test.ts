@@ -127,7 +127,6 @@ test("boot prelude gates every onboarding-facing cold-launch route", () => {
   assert.equal(shouldGateOnboardingBootPrelude("AvatarSetup"), true)
   assert.equal(shouldGateOnboardingBootPrelude("RoomSetup"), true)
   assert.equal(shouldGateOnboardingBootPrelude("Main"), false)
-  assert.equal(shouldGateOnboardingBootPrelude("Welcome"), false)
   assert.equal(shouldGateOnboardingBootPrelude("Splash"), false)
 })
 

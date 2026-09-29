@@ -128,7 +128,6 @@ import { ChatThreadScreen } from "../screens/ChatThreadScreen"
 import { YouScreen } from "../screens/YouScreen"
 import { ProfileEditScreen } from "../screens/ProfileEditScreen"
 import { MatchResultScreen } from "../screens/MatchResultScreen"
-import { WelcomeScreen } from "../screens/WelcomeScreen"
 import { AuthEntryScreen } from "../screens/AuthEntryScreen"
 import { AvatarV2Provider } from "../features/avatarV2/state/AvatarV2Provider"
 import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
@@ -234,7 +233,6 @@ export interface MiniRoomParticipantsRouteParam {
 }
 
 export type RootStackParamList = {
-  Welcome: undefined
   AuthEntry: undefined
   Register: {
     intent?: "create" | "sign-in"
@@ -1735,19 +1733,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                 options={{ headerShown: false }}
               />
             </>
-          ) : sessionEntryRoute === "Welcome" ? (
-            <Stack.Screen
-              name="Welcome"
-              options={{ headerShown: false }}
-            >
-              {() => (
-                <WelcomeScreen
-                  isSubmitting={isBootstrapping}
-                  errorMessage={errorMessage}
-                  onComplete={completeIntro}
-                />
-              )}
-            </Stack.Screen>
           ) : sessionEntryRoute === "AuthEntry" ? (
             <>
               <Stack.Screen name="AuthEntry" options={{ headerShown: false }}>

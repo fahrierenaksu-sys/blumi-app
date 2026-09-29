@@ -47,7 +47,6 @@ import { registerConnectionRoutes } from "./routes/connectionRoutes"
 import { registerThreadRoutes } from "./routes/threadRoutes"
 import { registerUserRoutes } from "./routes/userRoutes"
 import { createSafetyService, type SafetyService } from "./safety/safetyService"
-import { createInMemoryPresenceRepository } from "./presence/presenceRepository"
 import {
   createConnectionManager,
   type ConnectionManager
@@ -143,11 +142,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const revenueCatPurchaseVerifier =
     options.revenueCatPurchaseVerifier ??
     createUnavailableRevenueCatPurchaseVerifier()
-  const presenceRepository = createInMemoryPresenceRepository()
   const avatarService = options.avatarService ?? createAvatarService({
     authService,
-    economyService,
-    presenceRepository
+    economyService
   })
   const notificationService =
     options.notificationService ?? createNotificationService()

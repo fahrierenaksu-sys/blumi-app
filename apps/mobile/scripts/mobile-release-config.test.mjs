@@ -898,7 +898,6 @@ test("the public mobile brand is Blumi while stable runtime identifiers remain u
   const publicBrandSurfaces = [
     "src/navigation/RootNavigator.tsx",
     "src/screens/AuthEntryScreen.tsx",
-    "src/screens/WelcomeScreen.tsx",
     "src/screens/YouScreen.tsx",
     "src/screens/SettingsScreen.tsx",
     "src/ui/errorBoundary.tsx"

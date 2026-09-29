@@ -2,7 +2,6 @@ import type { SessionActor } from "./sessionModel"
 
 export type SessionEntryRoute =
   | "Splash"
-  | "Welcome"
   | "AuthEntry"
   | "ProfileSetup"
   | "AvatarSetup"

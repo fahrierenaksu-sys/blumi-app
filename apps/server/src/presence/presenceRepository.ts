@@ -38,11 +38,6 @@ export interface PresenceRepository {
     record: Pick<PresenceRecord, "roomId" | "userId" | "spotId" | "updatedAt" | "expiresAt">,
     now?: Date
   ): Promise<MovePresenceResult>
-  updateUserAvatarSelection(
-    userId: string,
-    selection: CompleteAvatarSelection,
-    now?: Date
-  ): Promise<void>
   deletePresence(roomId: string, userId: string): Promise<void>
   deleteUserPresence(userId: string): Promise<void>
   registerConnectionLease(connectionId: string, userId: string, leaseMs: number): Promise<void>
@@ -123,21 +118,6 @@ export function createInMemoryPresenceRepository(
         expiresAt: record.expiresAt
       }))
       return "moved"
-    },
-    async updateUserAvatarSelection(userId, selection, now = new Date()) {
-      deleteExpiredRecords(store, now)
-      for (const [key, record] of store.records.entries()) {
-        if (
-          record.userId === userId &&
-          record.avatar.revision < selection.revision
-        ) {
-          store.records.set(key, {
-            ...record,
-            avatar: cloneCompleteAvatarSelection(selection),
-            updatedAt: now.toISOString()
-          })
-        }
-      }
     },
     async deletePresence(roomId, userId) {
       store.records.delete(presenceKey(roomId, userId))
