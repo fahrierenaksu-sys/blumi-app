@@ -30,10 +30,7 @@ import {
   canApplyBlumiDevEntry,
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
-import {
-  createThread,
-  type FetchThreadMessagesOptions
-} from "../features/chat/chatApi"
+import type { FetchThreadMessagesOptions } from "../features/chat/chatApi"
 import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import type {
   ChatLocale,
@@ -49,25 +46,14 @@ import {
   applyChatMessageReceived,
   applyChatThreadListed,
   applyChatThreadRead,
-  findThreadForPartner,
   getThreads,
   resetChatStore,
   useTotalUnreadCount
 } from "../features/chat/chatStore"
-import {
-  recordMutualConnection,
-  updateSavedConnectionStatus
-} from "../features/connections/savedConnectionsStore"
-import { presentConnectionMatch } from "../features/connections/connectionMatchPresentation"
 import { flushAuthenticatedConnectionDecisionOutbox } from "../features/connections/connectionDecisionRuntime"
-import type { ConnectionDecisionDeliveryDependencies } from "../features/connections/connectionDecisionDelivery"
 import {
   createGlobalRealtimeEventHandler
 } from "../features/realtime/globalRealtimeEventHandler"
-import {
-  reconcileRealtimeConnectionMatch,
-  type ConnectionMatchedPayload
-} from "../features/connections/globalMatchReconciliation"
 import {
   connectGlobal,
   disconnectGlobal,
@@ -143,6 +129,7 @@ import { useBottomNavChrome } from "./useBottomNavChrome"
 import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
 import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
+import { useMatchModal } from "./useMatchModal"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -302,12 +289,6 @@ function scheduleDeferredPreload(work: () => void): () => void {
   }
 }
 
-interface GlobalMatchState {
-  miniRoomId: string
-  matchedUserName: string
-  matchedUserId?: string
-}
-
 interface RootNavigatorProps {
   fontsReady?: boolean
 }
@@ -351,9 +332,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   const handleBootPreludeReady = useCallback(() => {
     setIsBootPreludeReady(true)
   }, [])
-  const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
-  const handledMatchIdsRef = useRef(new Set<string>())
-  const reconcilingMatchIdsRef = useRef(new Set<string>())
   const { latestSessionActorRef, isCurrentSession } = useCurrentSessionGuard(sessionActor)
   const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
@@ -413,6 +391,23 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     openReadyMiniRoom,
     handleDemoRoomInviteAction
   })
+  const {
+    globalMatch,
+    reconcileConnectionDecisionDelivery,
+    handleRealtimeConnectionMatch,
+    getMatchDeduplicationState,
+    dismissGlobalMatch,
+    goLobby,
+    handleMatchSendMessage,
+    resetMatchModal
+  } = useMatchModal({
+    sessionActor,
+    latestSessionActorRef,
+    isCurrentSession,
+    applyNewThread,
+    hydrateFromServer,
+    chatThreadRouteBindings
+  })
 
   useEffect(() => {
     if (!IS_BLUMI_PAID_COINS_ENABLED) return
@@ -427,73 +422,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       })
     })
   }, [sessionActor?.profile.userId, sessionActor?.session.mode])
-
-  const reconcileConnectionDecisionDelivery = useCallback<
-    NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
-  >(async (intent, response): Promise<void> => {
-    const actor = sessionActor
-    if (!actor) return
-    if (response.match) {
-      const connection = await recordMutualConnection({
-        ownerUserId: actor.profile.userId,
-        currentUserId: actor.profile.userId,
-        participantUserIds: response.match.participantUserIds
-      })
-      if (!connection || !isCurrentSession(actor) || actor.session.mode !== "production") {
-        return
-      }
-      const thread = await createThread(
-        MOBILE_HTTP_BASE_URL,
-        actor.session.sessionToken,
-        { participantUserIds: response.match.participantUserIds }
-      )
-      if (!isCurrentSession(actor)) return
-      applyNewThread(thread)
-      presentConnectionMatch({
-        hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
-        markPresented: (miniRoomId) => {
-          handledMatchIdsRef.current = new Set([
-            ...handledMatchIdsRef.current,
-            miniRoomId
-          ])
-        },
-        captureMatchCreated: () => {
-          captureProductEvent("match_created", {
-            source: "mini_room_mutual_save",
-            mode: actor.session.mode
-          })
-        },
-        showMatchToast: (toast) => {
-          showToast({ ...toast, type: "success" })
-        },
-        showMatchModal: setGlobalMatch
-      }, {
-        miniRoomId: response.match.miniRoomId,
-        matchedUserId: connection.userId,
-        matchedUserName: connection.displayName,
-        mode: actor.session.mode
-      })
-      return
-    }
-    if (intent.status === "saved" && isCurrentSession(actor)) {
-      await updateSavedConnectionStatus({
-        ownerUserId: actor.profile.userId,
-        userId: intent.partnerUserId,
-        status: "pending"
-      })
-    }
-  }, [applyNewThread, isCurrentSession, sessionActor])
-
-  const dismissGlobalMatch = useCallback((): void => {
-    setGlobalMatch(null)
-  }, [])
-
-  const goLobby = useCallback((): void => {
-    setGlobalMatch(null)
-    if (navigationRef.isReady()) {
-      navigationRef.navigate("Lobby")
-    }
-  }, [])
 
   const {
     syncCurrentRouteName,
@@ -514,19 +442,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       markOnboardingContentReady()
     }
   }, [sessionEntryRoute, syncCurrentRouteName])
-
-  const goChat = useCallback(
-    (params: { threadId?: string; partnerId?: string; partnerName?: string }): void => {
-      setGlobalMatch(null)
-      if (navigationRef.isReady()) {
-        navigationRef.navigate("ChatThread", {
-          ...params,
-          ...chatThreadRouteBindings
-        })
-      }
-    },
-    [chatThreadRouteBindings]
-  )
 
   const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
     if (
@@ -659,13 +574,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   // ── Global WS lifecycle ─────────────────────────────────
   const resetInactiveSessionState = useCallback((): void => {
     if (isDemoMode()) setDemoMode(false)
-    handledMatchIdsRef.current = new Set()
-    reconcilingMatchIdsRef.current = new Set()
-    setGlobalMatch(null)
+    resetMatchModal()
     resetRoomInviteRouting()
     resetChatStore()
     disconnectGlobal()
-  }, [resetRoomInviteRouting])
+  }, [resetMatchModal, resetRoomInviteRouting])
 
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
@@ -714,63 +627,10 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   ])
 
   // ── Chat + match event routing ──────────────────────────
-  const handleRealtimeConnectionMatch = useCallback(
-    (payload: ConnectionMatchedPayload): void => {
-      const actor = sessionActor
-      if (!actor) return
-
-      reconcilingMatchIdsRef.current = new Set([
-        ...reconcilingMatchIdsRef.current,
-        payload.miniRoomId
-      ])
-      void reconcileRealtimeConnectionMatch(payload, actor, {
-        getCurrentSessionActor: () => latestSessionActorRef.current,
-        recordMutualConnection,
-        hydrateFromServer,
-        createThread,
-        applyChatThreadCreated: applyNewThread,
-        presentMatch: (match) => {
-          presentConnectionMatch({
-            hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
-            markPresented: (miniRoomId) => {
-              handledMatchIdsRef.current = new Set([
-                ...handledMatchIdsRef.current,
-                miniRoomId
-              ])
-            },
-            captureMatchCreated: () => {
-              captureProductEvent("match_created", {
-                source: "mini_room_mutual_save",
-                mode: match.mode
-              })
-            },
-            showMatchToast: (toast) => {
-              showToast({ ...toast, type: "success" })
-            },
-            showMatchModal: setGlobalMatch
-          }, match)
-        },
-        httpBaseUrl: MOBILE_HTTP_BASE_URL
-      })
-        .catch(() => undefined)
-        .finally(() => {
-          reconcilingMatchIdsRef.current = new Set(
-            [...reconcilingMatchIdsRef.current].filter(
-              (miniRoomId) => miniRoomId !== payload.miniRoomId
-            )
-          )
-        })
-    },
-    [applyNewThread, hydrateFromServer, latestSessionActorRef, sessionActor]
-  )
-
   const handleGlobalEvent = useMemo(
     () => createGlobalRealtimeEventHandler({
       currentUserId: sessionActor?.profile.userId,
-      getMatchDeduplicationState: () => ({
-        handledMatchIds: handledMatchIdsRef.current,
-        reconcilingMatchIds: reconcilingMatchIdsRef.current
-      }),
+      getMatchDeduplicationState,
       normalizeRoomInviteRecord,
       upsertRoomInvite,
       applyChatThreadListed: applyRealtimeThreadList,
@@ -789,6 +649,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }),
     [
       handleRealtimeConnectionMatch,
+      getMatchDeduplicationState,
       applyNewThread,
       applyRealtimeThreadList,
       refreshProductionThreads,
@@ -1342,23 +1203,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             matchedUserId={globalMatch?.matchedUserId}
             onClose={dismissGlobalMatch}
             onKeepDiscovering={goLobby}
-            onSendMessage={() => {
-              if (!globalMatch?.matchedUserId) {
-                goLobby()
-                return
-              }
-
-              const thread = findThreadForPartner(globalMatch.matchedUserId)
-              if (thread) {
-                goChat({ threadId: thread.threadId })
-              } else {
-                // Thread not synced yet, navigate with partner intent
-                goChat({
-                  partnerId: globalMatch.matchedUserId,
-                  partnerName: globalMatch.matchedUserName
-                })
-              }
-            }}
+            onSendMessage={handleMatchSendMessage}
           />
         ) : null}
       </NavigationContainer>

@@ -21,7 +21,7 @@ const OWNER = {
   roomInvites: "./useRoomInviteRouting.ts",
   chat: "./useRootChatSync.ts",
   linking: "./rootLinking.ts",
-  matchModal: "./RootNavigator.tsx",
+  matchModal: "./useMatchModal.ts",
   realtime: "./RootNavigator.tsx"
 }
 
@@ -426,7 +426,7 @@ test("a live referral link is captured while other links reach navigation", () =
 
 function matchSendMessage(globalMatch, thread) {
   const calls = []
-  const handler = evaluate(findJsxAttribute(OWNER.matchModal, "MatchResultModal", "onSendMessage"), {
+  const handler = evaluate(findInitializer(OWNER.matchModal, "handleMatchSendMessage"), {
     globalMatch,
     goLobby: () => calls.push(["lobby"]),
     goChat: (params) => calls.push(["chat", params]),
@@ -446,6 +446,38 @@ test("the match modal opens the synced thread, a pending partner chat, or Discov
     [["chat", { partnerId: "user-two", partnerName: "Two" }]]
   )
   assert.deepEqual(matchSendMessage({ miniRoomId: "m", matchedUserName: "Two" }, undefined), [["lobby"]])
+  assert.equal(
+    findJsxAttribute("./RootNavigator.tsx", "MatchResultModal", "onSendMessage"),
+    "handleMatchSendMessage"
+  )
+})
+
+test("ending a session forgets presented and reconciling matches and closes the modal", () => {
+  const handledMatchIdsRef = { current: new Set(["match-1"]) }
+  const reconcilingMatchIdsRef = { current: new Set(["match-2"]) }
+  const modalUpdates = []
+  evaluate(findInitializer(OWNER.matchModal, "resetMatchModal"), {
+    handledMatchIdsRef,
+    reconcilingMatchIdsRef,
+    setGlobalMatch: (value) => modalUpdates.push(value)
+  })()
+  assert.equal(handledMatchIdsRef.current.size, 0)
+  assert.equal(reconcilingMatchIdsRef.current.size, 0)
+  assert.deepEqual(modalUpdates, [null])
+})
+
+test("an inactive session resets demo mode, matches, invites, chat, and the socket in order", () => {
+  const calls = []
+  let demo = true
+  evaluate(findInitializer(OWNER.realtime, "resetInactiveSessionState"), {
+    isDemoMode: () => demo,
+    setDemoMode: (value) => { demo = value; calls.push(["demo", value]) },
+    resetMatchModal: () => calls.push(["matches"]),
+    resetRoomInviteRouting: () => calls.push(["invites"]),
+    resetChatStore: () => calls.push(["chat"]),
+    disconnectGlobal: () => calls.push(["disconnect"])
+  })()
+  assert.deepEqual(calls, [["demo", false], ["matches"], ["invites"], ["chat"], ["disconnect"]])
 })
 
 // ── Global realtime lifecycle wiring ───────────────────────
