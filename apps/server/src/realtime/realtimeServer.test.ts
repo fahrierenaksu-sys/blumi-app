@@ -17,6 +17,8 @@ import { createGracefulShutdown } from "../operations/serviceLifecycle"
 import { createRealtimeServer } from "./realtimeServer"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
+const AUTHORIZED_TEST_ROOM_ID = "authorized-test-room"
+
 test("realtime rejects invalid tickets before websocket upgrade", async () => {
   const harness = await createRealtimeHarness()
   try {
@@ -186,7 +188,7 @@ test("realtime persists a connection before upgrade and serializes its heartbeat
 })
 
 test("realtime waits for an in-flight room join before disconnect cleanup", async () => {
-  const harness = await createRealtimeHarness()
+  const harness = await createRealtimeHarness({ allowAuthorizedTestRoom: true })
   const joinStarted = deferred<void>()
   const releaseJoin = deferred<void>()
   const joinFinished = deferred<void>()
@@ -221,7 +223,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
     const socket = await harness.connect(session.sessionToken)
     socket.send(JSON.stringify({
       type: "room.join",
-      payload: { roomId: "public-lobby" }
+      payload: { roomId: AUTHORIZED_TEST_ROOM_ID }
     }))
     await joinStarted.promise
 
@@ -234,7 +236,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
     releaseJoin.resolve()
     await Promise.all([joinFinished.promise, disconnectFinished.promise])
     assert.deepEqual(order, ["join:start", "join:committed", "disconnect:start", "disconnect:finished"])
-    assert.equal(await harness.presenceService.findUserPresence("public-lobby", session.userId), null)
+    assert.equal(await harness.presenceService.findUserPresence(AUTHORIZED_TEST_ROOM_ID, session.userId), null)
   } finally {
     releaseJoin.resolve()
     await harness.close()
@@ -242,7 +244,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
 })
 
 test("a delayed join from a closed socket does not remove presence rejoined on another connection", async () => {
-  const harness = await createRealtimeHarness()
+  const harness = await createRealtimeHarness({ allowAuthorizedTestRoom: true })
   const delayedJoinStarted = deferred<void>()
   const releaseDelayedJoin = deferred<void>()
   const disconnectFinished = deferred<void>()
@@ -271,7 +273,7 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
 
     closingSocket.send(JSON.stringify({
       type: "room.join",
-      payload: { roomId: "public-lobby" }
+      payload: { roomId: AUTHORIZED_TEST_ROOM_ID }
     }))
     await delayedJoinStarted.promise
 
@@ -285,13 +287,13 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
     const rejoinedEvents = collectEvents(rejoinedSocket)
     rejoinedSocket.send(JSON.stringify({
       type: "room.join",
-      payload: { roomId: "public-lobby" }
+      payload: { roomId: AUTHORIZED_TEST_ROOM_ID }
     }))
     await rejoinedEvents.waitFor("room.joined")
 
     releaseDelayedJoin.resolve()
     await disconnectFinished.promise
-    const presence = await harness.presenceService.findUserPresence("public-lobby", session.userId)
+    const presence = await harness.presenceService.findUserPresence(AUTHORIZED_TEST_ROOM_ID, session.userId)
     assert.ok(presence, "the closed connection's cleanup must preserve the other live connection's room presence")
     assert.equal(rejoinedSocket.readyState, WebSocket.OPEN)
   } finally {
@@ -302,14 +304,14 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
 
 test("realtime close waits for websocket lease cleanup before data close and clears timers", { timeout: 5000 }, async () => {
   const intervalHandles: ReturnType<typeof setInterval>[] = []
-  const harness = await createRealtimeHarness({ captureIntervals: intervalHandles })
+  const harness = await createRealtimeHarness({ captureIntervals: intervalHandles, allowAuthorizedTestRoom: true })
   const releaseDisconnect = deferred<void>()
   const disconnectStarted = deferred<void>()
   const order: string[] = []
   const session = await harness.createSession("+905551110076", "Realtime shutdown drain")
   const socket = await harness.connect(session.sessionToken)
   const events = collectEvents(socket)
-  socket.send(JSON.stringify({ type: "room.join", payload: { roomId: "public-lobby" } }))
+  socket.send(JSON.stringify({ type: "room.join", payload: { roomId: AUTHORIZED_TEST_ROOM_ID } }))
   await events.waitFor("room.joined")
 
   const connection = harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)
@@ -359,7 +361,7 @@ test("realtime close waits for websocket lease cleanup before data close and cle
     await stopping
     assert.deepEqual(order, ["lease:disconnect-start", "lease:disconnect-finished", "data:close"])
     assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false)
-    assert.equal(await harness.presenceService.findUserPresence("public-lobby", session.userId), null)
+    assert.equal(await harness.presenceService.findUserPresence(AUTHORIZED_TEST_ROOM_ID, session.userId), null)
     assert.equal(harness.connectionManager.listConnections().some((entry) => entry.connectionId === connection.connectionId), false)
   } finally {
     releaseDisconnect.resolve()
@@ -611,108 +613,42 @@ test("realtime rate limiting is shared across a user's connections", async () =>
   }
 })
 
-test("room join emits joined snapshot and nearby presence", async () => {
+// Owner decision 2026-09-30: the legacy public lobby is retired. The former
+// "room join emits joined snapshot and nearby presence" and lobby
+// "invite accept opens a mini room" tests encoded the removed behaviour; the
+// chat-initiated room flow, mini-room reactions and connection matches are
+// covered end to end in legacyLobbyRetirement.test.ts.
+test("default realtime server rejects the retired public lobby without presence data", async () => {
   const harness = await createRealtimeHarness()
   try {
     const first = await harness.createSession("+905551110001", "Aylin")
     const second = await harness.createSession("+905551110002", "Defne")
     const firstSocket = await harness.connect(first.sessionToken)
     const secondSocket = await harness.connect(second.sessionToken)
-
     const firstEvents = collectEvents(firstSocket)
     const secondEvents = collectEvents(secondSocket)
 
-    firstSocket.send(JSON.stringify({
-      type: "room.join",
-      payload: { roomId: "public-lobby", sessionToken: first.sessionToken }
-    }))
-    secondSocket.send(JSON.stringify({
-      type: "room.join",
-      payload: { roomId: "public-lobby", sessionToken: second.sessionToken }
-    }))
-
-    const joined = await firstEvents.waitFor("room.joined")
-    assert.equal(joined.payload.currentUserId, first.userId)
-    assert.equal(joined.payload.roomId, "public-lobby")
-
-    const nearby = await firstEvents.waitForMatching(
-      "presence.nearby",
-      (event) => event.payload.nearbyUsers.some((user) => user.userId === second.userId)
-    )
-    assert.equal(nearby.payload.userId, first.userId)
-    assert.equal(nearby.payload.nearbyUsers[0]?.userId, second.userId)
-
-    assert.equal((await secondEvents.waitFor("room.joined")).payload.currentUserId, second.userId)
-  } finally {
-    await harness.close()
-  }
-})
-
-test("invite accept opens a mini room and mutual save creates a connection match", async () => {
-  const harness = await createRealtimeHarness()
-  try {
-    const sender = await harness.createSession("+905551110011", "Mira")
-    const recipient = await harness.createSession("+905551110012", "Yasmin")
-    const senderSocket = await harness.connect(sender.sessionToken)
-    const recipientSocket = await harness.connect(recipient.sessionToken)
-    const senderEvents = collectEvents(senderSocket)
-    const recipientEvents = collectEvents(recipientSocket)
-
-    senderSocket.send(JSON.stringify({
-      type: "room.join",
-      payload: { roomId: "public-lobby", sessionToken: sender.sessionToken }
-    }))
-    recipientSocket.send(JSON.stringify({
-      type: "room.join",
-      payload: { roomId: "public-lobby", sessionToken: recipient.sessionToken }
-    }))
-    await senderEvents.waitFor("presence.nearby")
-
-    senderSocket.send(JSON.stringify({
-      type: "mini_room.invite",
-      payload: { roomId: "public-lobby", recipientUserId: recipient.userId }
-    }))
-    const invite = await recipientEvents.waitFor("mini_room.invite_received")
-
-    recipientSocket.send(JSON.stringify({
-      type: "mini_room.invite_decision",
-      payload: { inviteId: invite.payload.inviteId, status: "accepted" }
-    }))
-
-    const senderReady = await senderEvents.waitFor("mini_room.ready")
-    const recipientReady = await recipientEvents.waitFor("mini_room.ready")
-    assert.equal(senderReady.payload.miniRoom.miniRoomId, recipientReady.payload.miniRoom.miniRoomId)
-    assert.match(senderReady.payload.mediaSession.token, /^demo-token-/)
-    assert.deepEqual(
-      senderReady.payload.participants.map((participant) => ({
-        userId: participant.userId,
-        presetId: participant.avatar.presetId
-      })),
-      [
-        { userId: sender.userId, presetId: "avatar_v2_body_default" },
-        { userId: recipient.userId, presetId: "avatar_v2_body_default" }
-      ]
-    )
-
-    senderSocket.send(JSON.stringify({
-      type: "connection.decide",
-      payload: {
-        miniRoomId: senderReady.payload.miniRoom.miniRoomId,
-        partnerUserId: recipient.userId,
-        status: "saved"
-      }
-    }))
-    recipientSocket.send(JSON.stringify({
-      type: "connection.decide",
-      payload: {
-        miniRoomId: senderReady.payload.miniRoom.miniRoomId,
-        partnerUserId: sender.userId,
-        status: "saved"
-      }
-    }))
-
-    const match = await senderEvents.waitFor("connection.matched")
-    assert.deepEqual(new Set(match.payload.participantUserIds), new Set([sender.userId, recipient.userId]))
+    for (const socket of [firstSocket, secondSocket]) {
+      socket.send(JSON.stringify({ type: "room.join", payload: { roomId: "public-lobby" } }))
+    }
+    const rejected = await firstEvents.waitFor("realtime.error")
+    assert.deepEqual(rejected.payload, {
+      code: "PRESENCE_ROOM_UNAVAILABLE",
+      requestType: "room.join",
+      message: "That room is not available."
+    })
+    await secondEvents.waitFor("realtime.error")
+    // A no-op round trip proves no later presence event is still in flight.
+    firstSocket.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+    await firstEvents.waitFor("chat.thread_listed")
+    for (const events of [firstEvents, secondEvents]) {
+      assert.deepEqual(
+        events.all().filter((event) => event.type !== "chat.thread_listed").map((event) => event.type),
+        ["realtime.error"]
+      )
+    }
+    assert.equal(await harness.presenceService.findUserPresence("public-lobby", first.userId), null)
+    assert.equal(await harness.presenceService.findUserPresence("public-lobby", second.userId), null)
   } finally {
     await harness.close()
   }
@@ -724,6 +660,7 @@ async function createRealtimeHarness(options: {
   rejectRealtimeAuthorization?: boolean
   shareHttpServer?: boolean
   captureIntervals?: ReturnType<typeof setInterval>[]
+  allowAuthorizedTestRoom?: boolean
 } = {}) {
   const authService = createAuthService({ codeFactory: () => "123456" })
   if (options.rejectRealtimeAuthorization) {
@@ -760,6 +697,14 @@ async function createRealtimeHarness(options: {
   const chatService = createChatService()
   const safetyService = createSafetyService()
   const roomService = createRoomService()
+  await roomService.repository.saveLayout({
+    roomId: AUTHORIZED_TEST_ROOM_ID,
+    proximityRadius: 180,
+    spots: [
+      { spotId: "seat-a", kind: "seat", x: 0, y: 0 },
+      { spotId: "seat-b", kind: "seat", x: 40, y: 0 }
+    ]
+  })
   const presenceService = createPresenceService({ roomService })
   const livekitTokenService = createLivekitTokenService()
   const miniRoomService = createMiniRoomService({
@@ -794,7 +739,12 @@ async function createRealtimeHarness(options: {
     connectionService,
     reactionService,
     realtimeTicketService,
-    httpServer: sharedHttpServer
+    httpServer: sharedHttpServer,
+    // The production default denies every presence room. Mechanism tests opt
+    // into one synthetic authorized room to keep join/disconnect coverage.
+    ...(options.allowAuthorizedTestRoom
+      ? { isPresenceRoomAllowed: (_actor: unknown, roomId: string) => roomId === AUTHORIZED_TEST_ROOM_ID }
+      : {})
   })
   let realtimeServer: ReturnType<typeof createRealtimeServer>
   if (options.captureIntervals) {
@@ -893,6 +843,9 @@ function collectEvents(socket: WebSocket) {
     }
   })
   return {
+    all(): ServerEvent[] {
+      return [...events]
+    },
     waitFor<T extends ServerEvent["type"]>(
       type: T
     ): Promise<Extract<ServerEvent, { type: T }>> {

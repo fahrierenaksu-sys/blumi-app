@@ -14,6 +14,14 @@ import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
 import { createConnectionManager } from "./connectionManager"
 import { createRealtimeRouter } from "./realtimeRouter"
+import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
+
+// Owner decision 2026-09-30: the legacy public lobby is retired and presence
+// publication is filtered per recipient. Blocked peers are removed from each
+// recipient's snapshot and nearby list (not flagged), there is no unfiltered
+// room broadcast, and a failed block lookup sends that recipient nothing.
+// These tests inject an allow rule for the synthetic "publication-test" room
+// to exercise publication mechanics; the production default denies all rooms.
 
 const BLOCKS = [
   ["user_0", "user_1"],
@@ -23,7 +31,11 @@ const BLOCKS = [
   ["unrelated_a", "unrelated_b"]
 ] as const
 
-async function createHarness(context: TestContext, count = 6) {
+async function createHarness(
+  context: TestContext,
+  count = 6,
+  policy?: RealtimePresenceRoomPolicy
+) {
   const queries: { sql: string; values?: readonly unknown[] }[] = []
   let failLookup = false
   const safetyService = createSafetyService({ repository: createPostgresSafetyRepository({
@@ -101,7 +113,8 @@ async function createHarness(context: TestContext, count = 6) {
     reactionService: createReactionService(),
     // These dependencies are never called by room.leave/publication.
     miniRoomService: {} as MiniRoomService,
-    connectionService: {} as ConnectionService
+    connectionService: {} as ConnectionService,
+    isPresenceRoomAllowed: policy ?? ((_actor, roomId) => roomId === layout.roomId)
   })
   return { queries, safetyService, layout, presenceService, deliveries,
     snapshotSpy, nearbySpy, layoutSpy,
@@ -111,7 +124,7 @@ async function createHarness(context: TestContext, count = 6) {
     }) }
 }
 
-test("six-user presence publication uses six block SQL reads with equivalent bidirectional flags and delivery", async (context) => {
+test("six-user presence publication uses six block SQL reads and removes bidirectionally blocked peers per recipient", async (context) => {
   const harness = await createHarness(context)
   const snapshot = await harness.presenceService.createSnapshot(harness.layout.roomId)
   harness.snapshotSpy.mock.resetCalls()
@@ -135,11 +148,26 @@ test("six-user presence publication uses six block SQL reads with equivalent bid
   for (const user of snapshot.users) {
     const events = harness.deliveries.get(user.userId)!
     assert.equal(events.length, 2)
+    const blockedPeers = new Set((expected.get(user.userId) ?? [])
+      .filter(peer => peer.blocked).map(peer => peer.userId))
     assert.equal(events[0].type, "presence.snapshot")
-    if (events[0].type === "presence.snapshot") assert.deepEqual(events[0].payload.users, snapshot.users)
+    if (events[0].type === "presence.snapshot") assert.deepEqual(events[0].payload.users,
+      snapshot.users.filter(peer => !blockedPeers.has(peer.userId)))
     assert.deepEqual(events[1], { type: "presence.nearby", payload: {
-      roomId: harness.layout.roomId, userId: user.userId, nearbyUsers: expected.get(user.userId)
+      roomId: harness.layout.roomId, userId: user.userId,
+      nearbyUsers: expected.get(user.userId)?.filter(peer => !peer.blocked)
     } })
+  }
+  const userIdsIn = (viewer: string, type: "presence.snapshot" | "presence.nearby") =>
+    harness.deliveries.get(viewer)!.flatMap(event =>
+      event.type === "presence.snapshot" && type === event.type ? event.payload.users.map(u => u.userId) :
+        event.type === "presence.nearby" && type === event.type ? event.payload.nearbyUsers.map(u => u.userId) : [])
+  for (const type of ["presence.snapshot", "presence.nearby"] as const) {
+    assert.ok(!userIdsIn("user_0", type).includes("user_1"), `${type}: user_0 must not see user_1`)
+    assert.ok(!userIdsIn("user_0", type).includes("user_2"), `${type}: user_0 must not see user_2`)
+    assert.ok(!userIdsIn("user_1", type).includes("user_0"), `${type}: user_1 must not see user_0`)
+    assert.ok(!userIdsIn("user_2", type).includes("user_0"), `${type}: user_2 must not see user_0`)
+    assert.ok(userIdsIn("user_0", type).includes("user_3"), `${type}: unrelated peers stay visible`)
   }
   assert.equal(harness.queries.length, 6)
   for (const query of harness.queries) {
@@ -153,13 +181,24 @@ test("six-user presence publication uses six block SQL reads with equivalent bid
   assert.deepEqual(harness.deliveries.get("departed")?.map(event => event.type), ["room.left"])
 })
 
-test("block lookup failure preserves snapshot broadcast and fails closed before nearby delivery", async (context) => {
+test("block lookup failure fails closed: no snapshot or nearby delivery to any recipient", async (context) => {
   const harness = await createHarness(context)
   harness.failLookup()
-  await assert.rejects(harness.publish(), /block lookup unavailable/)
+  context.mock.method(console, "error", () => undefined)
+  await harness.publish()
   assert.equal(harness.nearbySpy.mock.callCount(), 0)
   for (let index = 0; index < 6; index += 1) {
-    assert.deepEqual(harness.deliveries.get(`user_${index}`)?.map(event => event.type), ["presence.snapshot"])
+    assert.deepEqual(harness.deliveries.get(`user_${index}`), [])
+  }
+})
+
+test("default deny-all presence policy publishes nothing to anyone in any room", async (context) => {
+  const harness = await createHarness(context, 6, () => false)
+  await harness.publish()
+  assert.equal(harness.queries.length, 0, "no block lookups are needed when nobody may receive presence")
+  assert.equal(harness.nearbySpy.mock.callCount(), 0)
+  for (let index = 0; index < 6; index += 1) {
+    assert.deepEqual(harness.deliveries.get(`user_${index}`), [])
   }
 })
 

@@ -55,4 +55,25 @@ export type ServerEvent =
   | { type: "chat.message_listed"; payload: ChatMessageList }
   | { type: "chat.message_received"; payload: ChatMessage }
   | { type: "reaction.received"; payload: ReactionEvent }
-  | { type: "safety.user_blocked"; payload: { blockedUserId: string } };
+  | { type: "safety.user_blocked"; payload: { blockedUserId: string } }
+  | { type: "realtime.error"; payload: RealtimeErrorPayload };
+
+/**
+ * Sent only to the requesting connection when the server rejects a client
+ * event it can describe safely. It never carries data about another user.
+ *
+ * `PRESENCE_ROOM_UNAVAILABLE` (owner decision 2026-09-30): the legacy shared
+ * public lobby is retired, so `room.join`, `presence.move_to_spot`, legacy
+ * `mini_room.invite` / `mini_room.invite_decision`, and presence-room
+ * `reaction.send` are refused. The related `room.joined`, `presence.snapshot`,
+ * `presence.nearby`, and `mini_room.invite_received` event types stay in this
+ * union for compatibility with older clients and future authorized presence
+ * rooms; authenticated sessions no longer receive them for the public lobby.
+ */
+export type RealtimeErrorCode = "PRESENCE_ROOM_UNAVAILABLE";
+
+export interface RealtimeErrorPayload {
+  code: RealtimeErrorCode;
+  requestType: string;
+  message: string;
+}
