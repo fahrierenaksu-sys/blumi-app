@@ -1,6 +1,6 @@
 # Blumi App Store listing and reviewer packet — draft
 
-Status: **NOT SUBMITTED / NOT APPROVED**. This copy describes the agreed first-release scope only. Confirm every sentence against the signed iPhone build before entering it in App Store Connect. Apple Developer membership, a working support/privacy URL, screenshots and reviewer access remain open.
+Status: **NOT SUBMITTED / NOT APPROVED** (draft prepared 2026-09-28). This copy describes the agreed first-release scope only. Confirm every sentence against the signed iPhone build before entering it in App Store Connect. Apple Developer membership, a working support/privacy URL, screenshots and reviewer access remain open.
 
 ## Turkish product-page draft
 

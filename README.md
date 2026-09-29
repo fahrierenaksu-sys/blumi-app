@@ -174,7 +174,7 @@ SENTRY_DISABLE_AUTO_UPLOAD=true npm run ios
 npm run verify
 ```
 
-The pipeline runs source-hygiene checks, dependency-policy tests, package builds, type checks, lint, workspace tests, isolated PostgreSQL integration tests, the production dependency audit, and Expo Doctor.
+The pipeline is a multi-step release gate; the authoritative list of steps is in the Commands section of [AGENTS.md](AGENTS.md).
 
 The PostgreSQL gate creates a temporary cluster accessible through a local Unix socket. It does not use an existing `DATABASE_URL`. Migrations are tested from an empty database and on a repeated run; missing tools or skipped database tests fail the gate. The cluster is stopped and its generated data removed afterward, while diagnostic logs are retained. Set `BLUMI_PG_KEEP_TEST_DATA=1` only when retaining a test database for investigation.
 
@@ -188,6 +188,6 @@ Automated source checks complement device testing. Real-device audio, push deliv
 
 **Current as of 2026-09-30: not ready for public release.** The latest full `npm run verify` passed on 2026-09-30 on the integration branch `claude/busy-cray-dl5wvr` (not merged to `main`), including package builds, type checks, lint, workspace tests, isolated PostgreSQL migration checks, the release dependency audit, and Expo Doctor (21/21); see the [2026-09-30 engineering audit](docs/quality/ENGINEERING_AUDIT_2026-09-30.md). These checks validate the repository and disposable test database; they do not prove a live deployment or native-device release.
 
-The earlier candidate-import build block is resolved: the owner-approved artwork was promoted to runtime paths and the release candidate-import gate remains in place. Railway and external provider setup, EAS/TestFlight distribution, real-device OTP/push/voice/purchase flows, production backup/restore, and continuous monitoring still need verification. The protected Supabase database was inspected read-only; migrations 062–063 were not applied to it.
+The earlier candidate-import build block is resolved: the owner-approved artwork was promoted to runtime paths and the release candidate-import gate remains in place. Railway and external provider setup, EAS/TestFlight distribution, real-device OTP/push/voice/purchase flows, production backup/restore, and continuous monitoring still need verification. The protected Supabase test database was last inspected read-only on 2026-09-28: 18 accounts, 65 applied migration checksums matching source, and integrity migration 066 not live (this supersedes the earlier 2026-09-27 note that migrations 062–063 were not applied; see [Launch Control](docs/release/LAUNCH_CONTROL.md) and the [database release runbook](docs/release/DATABASE_RELEASE_RUNBOOK.md)).
 
 See [Launch Control](docs/release/LAUNCH_CONTROL.md) for the dated readiness snapshot and [the staging and production guide](docs/release/railway-supabase-launch.md) for the deployment sequence and evidence requirements. Provider and account statuses can change, so recheck those documents before taking release action.

@@ -7,7 +7,6 @@ import {
 import { createAuthService } from "../auth/authService"
 import { createBlumiBackendStore } from "../auth/authStore"
 import { createEconomyService } from "../economy/economyService"
-import { createInMemoryPresenceRepository } from "../presence/presenceRepository"
 import { createAvatarService } from "./avatarService"
 
 test("avatar save is authenticated, ownership-checked, and revision-safe", async () => {
@@ -73,33 +72,4 @@ test("avatar save rejects invalid revisions before touching session state", asyn
     assert.equal(result.kind, "invalid")
     if (result.kind === "invalid") assert.equal(result.code, "invalid_revision")
   }
-})
-
-test("a successful account avatar CAS is not failed by legacy presence projection", async () => {
-  const authService = createAuthService({
-    store: createBlumiBackendStore(),
-    codeFactory: () => "482931"
-  })
-  const presenceRepository = {
-    ...createInMemoryPresenceRepository(),
-    async updateUserAvatarSelection() {
-      throw new Error("presence projection unavailable")
-    }
-  }
-  const avatarService = createAvatarService({
-    authService,
-    economyService: createEconomyService(),
-    presenceRepository
-  })
-  await authService.sendCode("+905551112233")
-  const verified = await authService.verifyCode("+905551112233", "482931")
-
-  const result = await avatarService.saveAvatar(verified.sessionToken, {
-    loadout: DEFAULT_MALE_AVATAR_LOADOUT,
-    revision: 0
-  })
-
-  assert.equal(result.kind, "updated")
-  const stored = await authService.getSession(verified.sessionToken)
-  assert.equal(stored?.account.profile.avatar.revision, 1)
 })

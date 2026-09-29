@@ -173,16 +173,6 @@ test("cached stale presence saves update metadata without writing avatar columns
   assert.match(query, /clock_timestamp\(\)/)
 })
 
-test("legacy avatar projection updates are compatibility no-ops", async () => {
-  const fake = createFakePool()
-  const repository = createPostgresPresenceRepository(fake.pool)
-  const now = new Date("2026-07-13T10:01:00.000Z")
-
-  await repository.updateUserAvatarSelection("user_one", avatar, now)
-
-  assert.equal(fake.calls.length, 0)
-})
-
 test("postgres presence repository rejects malformed stored avatar selections", async () => {
   const fake = createFakePool([
     { ...presenceRow, avatar_revision: "4" }

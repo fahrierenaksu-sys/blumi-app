@@ -122,7 +122,7 @@ test("country calling code picker is searchable and modal-accessible", () => {
 
 test("onboarding explains the full account-to-room journey", () => {
   const progress = readFileSync(
-    resolve(mobileRoot, "src/components/OnboardingProgress.tsx"),
+    resolve(mobileRoot, "src/features/session/setupFlow/SetupFlowProgress.tsx"),
     "utf8"
   )
   const profile = readFileSync(
@@ -143,7 +143,7 @@ test("onboarding explains the full account-to-room journey", () => {
   )
 
   assert.match(progress, /accessibilityRole="progressbar"/)
-  assert.match(progress, /Setup step \$\{activeStep \+ 1\} of \$\{steps\.length\}/)
+  assert.match(progress, /accessibilityValue=\{\{[\s\S]*now: current/)
   assert.match(shellModel, /profile:[\s\S]*avatar:[\s\S]*room:[\s\S]*phone:/)
   assert.match(profile, /step="profile"/)
   assert.match(profile, /copy\.publicNameHint/)
@@ -252,12 +252,6 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
       patterns: [
         /if \(reduceMotion\) \{[\s\S]*slideAnim\.stopAnimation\(\)[\s\S]*slideAnim\.setValue\(targetValue\)/,
         /if \(!shouldShow \|\| reduceMotion\) \{[\s\S]*pulseAnim\.stopAnimation\(\)[\s\S]*pulseAnim\.setValue\(1\)/
-      ]
-    },
-    {
-      relativePath: "src/ui/connectionPill.tsx",
-      patterns: [
-        /if \(!isConnected \|\| reduceMotion\) \{[\s\S]*pulseAnim\.stopAnimation\(\)[\s\S]*pulseAnim\.setValue\(1\)/
       ]
     },
     {

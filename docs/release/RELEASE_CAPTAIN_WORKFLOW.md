@@ -4,7 +4,7 @@ Bu belge, Blumi'nin yayın hazırlığını farklı Codex oturumlarında ve ür�
 
 ## Her oturumda
 
-1. Aktif checkout'un `/Users/evrenevren/blumi-sdk54` olduğunu doğrula. `git status --short` ve dalı kontrol et; mevcut değişiklikleri kullanıcı işi kabul et, koru ve hiçbir şeyi topluca temizleme.
+1. Aktif checkout'u kullan (`pwd`, `git status --short` ve dalı doğrula; dizin adına güvenme); mevcut değişiklikleri kullanıcı işi kabul et, koru ve hiçbir şeyi topluca temizleme.
 2. `.nvmrc` ile aynı Node sürümünü seç (`nvm use 22.22.2`), sonra `node -v` ile doğrula. İlgisiz veya değişmemiş alanlarda geniş doğrulamaları tekrarlama.
 3. `LAUNCH_CONTROL.md` ve yalnızca üzerinde çalışılan alanın kanıtını oku. Apple, sağlayıcı, veritabanı, harcama, yasal onay ve cihaz durumu gibi değişebilir bilgileri eski metinden güncel gerçekmiş gibi aktarma; yeniden doğrula ya da tarihli ve doğrulanmamış olarak bırak.
 4. En kritik mevcut engeli seç. Kodla güvenle çözülebilen açık işi uygula; kullanıcı hesabı, gizli bilgi, dış servis, üretim verisi veya geri alınması zor karar gerektiren yerde kapsamı daralt ya da kullanıcıyı adım adım yönlendir.

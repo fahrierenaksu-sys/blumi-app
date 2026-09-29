@@ -125,7 +125,6 @@ test("profile decisions use the production API directly and never fall through t
 
 test("empty inbox and onboarding direct people toward Discover and chat", () => {
   const inbox = read("src/screens/InboxScreen.tsx")
-  const welcome = read("src/screens/WelcomeScreen.tsx")
   const register = read("src/screens/RegisterScreen.tsx")
   const authCopy = read("src/features/session/authEntryCopy.ts")
   const inboxCopy = read("src/features/chat/inboxCopy.ts")
@@ -133,8 +132,6 @@ test("empty inbox and onboarding direct people toward Discover and chat", () => 
   assert.match(inbox, /const handleGoDiscover = useCallback\(\(\) => \{\s*navigation\.navigate\("Lobby"\)/)
   assert.match(inbox, /getInboxCopy\(locale\)/)
   assert.match(inboxCopy, /When a mutual match happens, your conversation starts here\./)
-  assert.match(welcome, /Match, then chat/)
-  assert.doesNotMatch(welcome, /Match into a private room/)
   assert.match(register, /authCopy\.createCodeBody/)
   assert.match(authCopy, /createCodeBody:\s*"Enter the 6-digit code we sent\. This is the final step before your Blumi world opens\."/)
   assert.match(register, /const progressTotal = authIntent === "create" \? 4 : 2/)

@@ -20,7 +20,7 @@ public variables, or a mobile bundle.
 
 Never point both Railway environments at the same database or RevenueCat
 webhook destination. The existing local `DATABASE_URL` has **17 accounts and
-61/63 migrations** as of 2026-09-27. Its role as development, staging, or
+61/63 migrations** as of 2026-09-27 (superseded 2026-09-28: 18 accounts, 65 migrations, see DATABASE_RELEASE_RUNBOOK.md). Its role as development, staging, or
 production is not established; treat it as protected. The local public-schema
 archive and restore proof are in `~/BlumiReleaseBackups/` with owner-only
 permissions. That archive is an application-schema snapshot, **not** a full
@@ -64,7 +64,7 @@ plan with managed backups and test a managed restore before taking payments.
 2. Run the current migration runner **once** against the staging database. It
    must apply exactly `062_firebase_action_challenges.sql` and
    `063_firebase_user_deletion_outbox.sql` when starting from the observed
-   61-migration state. Rerun to prove zero new applications and require schema
+   61-migration state (062/063 have since been applied to the existing test project, see DATABASE_RELEASE_RUNBOOK.md; the 61-migration case remains the generic starting point for other databases). Rerun to prove zero new applications and require schema
    readiness PASS. Validate Firebase challenge/deletion flows in staging.
 3. Only after the production backup and staging evidence, run the same
    one-shot migration against the classified production database. A failed
@@ -131,7 +131,7 @@ plan with managed backups and test a managed restore before taking payments.
 - PostgreSQL isolated gate: 17 suites, fresh 63 migrations and idempotent reruns
   passed after disposable Supabase role bootstrap.
 - Existing protected Supabase database: read-only inspection found 17 accounts,
-  61 migrations; 062/063 have **not** been applied there. A SHA-256 checked
+  61 migrations; 062/063 had **not** been applied there as of 2026-09-27 (superseded 2026-09-28: 18 accounts, 65 migrations, 066 not live; see DATABASE_RELEASE_RUNBOOK.md). A SHA-256 checked
   public-schema archive restored into PostgreSQL 17 with 17 accounts. The two
   new migrations and schema readiness passed on that disposable restore.
 - Railway account/project, separate Supabase staging/production identities,

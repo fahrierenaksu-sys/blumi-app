@@ -46,14 +46,6 @@ test("continuous pulse animation is suppressed for reduced motion", () => {
   assert.match(pulseSource, /pulse\.setValue\(0\)/)
 })
 
-test("welcome motion has an instant reduced-motion path", () => {
-  const source = readMobileFile("src/screens/WelcomeScreen.tsx")
-
-  assert.match(source, /useReducedMotion/)
-  assert.match(source, /<AnimatedDot[^>]*reduceMotion=\{reduceMotion\}/)
-  assert.match(source, /if \(reduceMotion\) \{[\s\S]*?setCurrentStep\(step\)/)
-})
-
 test("account and shop selection changes use restrained shared transitions", () => {
   const register = readMobileFile("src/screens/RegisterScreen.tsx")
   const shop = readMobileFile("src/screens/CosmeticShopScreen.tsx")

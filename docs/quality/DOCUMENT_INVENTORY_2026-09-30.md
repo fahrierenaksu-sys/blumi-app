@@ -109,18 +109,18 @@ Version mismatches: 0. (AGENTS.md:47 tells agents not to infer SDK from the `blu
 - `npm run verify:operations-center`: pass (3/3).
 - `npm run verify:source-hygiene`: pass (8/8).
 
-## Fix checklist (separate step; nothing below is applied here)
+## Fix checklist (applied in the docs-resolution commit; S-2 tracking and no-action items remain)
 
-- [ ] `README.md:191`: replace "migrations 062–063 were not applied to it" with the dated state from `LAUNCH_CONTROL.md:7` (test project: 65 checksums match, 066/067 not live, 18 accounts on 2026-09-28) or link to it without restating counts. (C-1)
-- [ ] `docs/release/LAUNCH_CONTROL.md:89`: mark the "17 accounts and 61/63 migrations" sentence as superseded by line 7 and the runbook, or update it to 18 accounts / 65 migrations. (C-2)
-- [ ] `docs/release/railway-supabase-launch.md:22-23`: add "(superseded 2026-09-28: 18 accounts, 65 migrations, see DATABASE_RELEASE_RUNBOOK.md)". (C-2)
-- [ ] `docs/release/railway-supabase-launch.md:65-66`: state that 062/063 have since been applied to the test project, and keep the 61-migration case as the generic starting point for other databases. (C-2)
-- [ ] `docs/release/railway-supabase-launch.md:133-135`: add the same dated supersession note. (C-2)
-- [ ] `docs/release/LAUNCH_CONTROL.md:5`: update the snapshot line to say the document mixes 2026-09-28 and 2026-09-30 rows, or refresh the date once the rows are reviewed. (C-3)
-- [ ] `docs/release/LAUNCH_CONTROL.md:65`: update the "Git yayın adayı" row (branch `claude/busy-cray-dl5wvr`, not `main` / `167a566c`) or mark it as a 2026-09-28 observation. (C-3)
-- [ ] `README.md:177`: align the verify description with `AGENTS.md:116` (add operations center, workbench tools, audit policy, release infrastructure) or point to `AGENTS.md`. (C-4)
-- [ ] `docs/release/RELEASE_CAPTAIN_WORKFLOW.md:7`: replace the hard-coded `/Users/evrenevren/blumi-sdk54` with "the active checkout (verify `pwd`, `git status --short`, branch)". (C-5)
-- [ ] `docs/quality/ENGINEERING_AUDIT_2026-09-30.md`, coverage row "2, 3": change Status to Done after this inventory is merged and the checklist is applied. (S-3)
-- [ ] `docs/release/APP_STORE_LISTING_DRAFT.md:3`: add a preparation date to the Status line. (S-4)
+- [x] `README.md:191`: replace "migrations 062–063 were not applied to it" with the dated state from `LAUNCH_CONTROL.md:7` (test project: 65 checksums match, 066/067 not live, 18 accounts on 2026-09-28) or link to it without restating counts. (C-1)
+- [x] `docs/release/LAUNCH_CONTROL.md:89`: mark the "17 accounts and 61/63 migrations" sentence as superseded by line 7 and the runbook, or update it to 18 accounts / 65 migrations. (C-2)
+- [x] `docs/release/railway-supabase-launch.md:22-23`: add "(superseded 2026-09-28: 18 accounts, 65 migrations, see DATABASE_RELEASE_RUNBOOK.md)". (C-2)
+- [x] `docs/release/railway-supabase-launch.md:65-66`: state that 062/063 have since been applied to the test project, and keep the 61-migration case as the generic starting point for other databases. (C-2)
+- [x] `docs/release/railway-supabase-launch.md:133-135`: add the same dated supersession note. (C-2)
+- [x] `docs/release/LAUNCH_CONTROL.md:5`: update the snapshot line to say the document mixes 2026-09-28 and 2026-09-30 rows, or refresh the date once the rows are reviewed. (C-3)
+- [x] `docs/release/LAUNCH_CONTROL.md:65`: update the "Git yayın adayı" row (branch `claude/busy-cray-dl5wvr`, not `main` / `167a566c`) or mark it as a 2026-09-28 observation. (C-3)
+- [x] `README.md:177`: align the verify description with `AGENTS.md:116` (add operations center, workbench tools, audit policy, release infrastructure) or point to `AGENTS.md`. (C-4)
+- [x] `docs/release/RELEASE_CAPTAIN_WORKFLOW.md:7`: replace the hard-coded `/Users/evrenevren/blumi-sdk54` with "the active checkout (verify `pwd`, `git status --short`, branch)". (C-5)
+- [x] `docs/quality/ENGINEERING_AUDIT_2026-09-30.md`, coverage row "2, 3": change Status to Done after this inventory is merged and the checklist is applied. (S-3)
+- [x] `docs/release/APP_STORE_LISTING_DRAFT.md:3`: add a preparation date to the Status line. (S-4)
 - [ ] Track: commit `docs/quality/archive-verification-2026-09-29.json` from the owner's Mac run before any deletion. (S-2)
 - [ ] No action: `ENGINEERING_AUDIT_2026-09-28.md:329` (S-1) is historical; `README.md:166` (V-2) is correct.

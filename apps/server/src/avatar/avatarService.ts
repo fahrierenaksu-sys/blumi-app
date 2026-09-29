@@ -35,8 +35,6 @@ export interface AvatarService {
 export interface AvatarServiceOptions {
   authService: AuthService
   economyService: EconomyService
-  /** @deprecated Account avatar state is authoritative; this is ignored. */
-  presenceRepository?: unknown
 }
 
 export function createAvatarService(options: AvatarServiceOptions): AvatarService {

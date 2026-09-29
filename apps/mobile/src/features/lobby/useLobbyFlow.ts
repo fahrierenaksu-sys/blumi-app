@@ -30,11 +30,9 @@ export interface UseLobbyFlowResult {
   nearbyUsers: NearbyLobbyUser[]
   incomingInvite: LobbyState["interaction"]["incomingInvite"]
   readyMiniRoom: LobbyState["interaction"]["readyMiniRoom"]
-  recentReactions: LobbyState["interaction"]["recentReactions"]
   clearReadyMiniRoom: () => void
   sendInvite: (recipientUserId: string) => boolean
   decideInvite: (status: InviteDecisionStatus) => void
-  sendReaction: (reaction: LobbyReaction) => void
   requestRefresh: () => Promise<void>
 }
 
@@ -47,7 +45,6 @@ export interface NearbyLobbyUser {
   blocked: boolean
 }
 
-export type LobbyReaction = "wave" | "heart" | "laugh" | "fire"
 export type InviteDecisionStatus = "accepted" | "declined"
 
 export function useLobbyFlow(options: UseLobbyFlowOptions): UseLobbyFlowResult {
@@ -102,23 +99,6 @@ export function useLobbyFlow(options: UseLobbyFlowOptions): UseLobbyFlowResult {
         recipientUserId,
         send
       }),
-    [connectionStatus, lobbyState.isJoined, lobbyState.roomId, send]
-  )
-
-  const sendReaction = useCallback(
-    (reaction: LobbyReaction) => {
-      if (connectionStatus !== "connected" || !lobbyState.isJoined) {
-        return
-      }
-
-      send({
-        type: "reaction.send",
-        payload: {
-          roomId: lobbyState.roomId,
-          reaction
-        }
-      })
-    },
     [connectionStatus, lobbyState.isJoined, lobbyState.roomId, send]
   )
 
@@ -214,11 +194,9 @@ export function useLobbyFlow(options: UseLobbyFlowOptions): UseLobbyFlowResult {
       nearbyUsers,
       incomingInvite: lobbyState.interaction.incomingInvite,
       readyMiniRoom: lobbyState.interaction.readyMiniRoom,
-      recentReactions: lobbyState.interaction.recentReactions,
       clearReadyMiniRoom,
       sendInvite,
       decideInvite,
-      sendReaction,
       requestRefresh
     }),
     [
@@ -228,7 +206,6 @@ export function useLobbyFlow(options: UseLobbyFlowOptions): UseLobbyFlowResult {
       clearReadyMiniRoom,
       sendInvite,
       decideInvite,
-      sendReaction,
       requestRefresh
     ]
   )
