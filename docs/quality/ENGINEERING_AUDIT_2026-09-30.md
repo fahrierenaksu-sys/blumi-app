@@ -36,10 +36,10 @@ checks are performed separately on the owner's iPhone.
 | F-05 | Server auth | Security | `PATCH /v1/users/me`, `PUT /v1/users/me/avatar`, `PATCH /v1/users/me/onboarding` skipped the moderation check (banned account got 200) | Routes use `resolveBearerSession`; 403 `ACCOUNT_BANNED`/`ACCOUNT_SUSPENDED` | Implemented, Tested (6 route tests); live only after an authorised deploy |
 | F-06 | Trust & safety | Security | Seeded staging test personas greet/auto-reply; nothing stopped this in production | Production resolves no persona; seed script refuses `BLUMI_DEPLOY_ENV=production` | Implemented, Tested; live after deploy |
 | F-07 | Rate limiting | Security | Staging logs: one client (edge `srcIp` 92.44.146.44) reached the app from rotating peers 100.64.0.6/.8/.9/.10 while `BLUMI_TRUST_PROXY` was unset, so limits keyed on proxy peers | Trust only `100.64.0.0/10`; IaC + tests pin client resolution and spoofed prefixes | Implemented, Tested; **Railway variable set 2026-09-29 21:30 UTC, deploy `d5f77b8e` SUCCESS**, `/health` `/ready` 200 |
-| F-08 | Lobby presence | Privacy | Every production Discover session auto-joined `public-lobby`; `presence.snapshot` broadcast all online users (incl. blocked) though production discovery does not use it | Owner approved removal (2026-09-30); server-enforced policy + per-recipient block filtering | In progress (see below) |
+| F-08 | Lobby presence | Privacy | Every production Discover session auto-joined `public-lobby`; `presence.snapshot` broadcast all online users (incl. blocked) though production discovery does not use it. Also found: an ended mini room still relayed reactions between former participants after a block | Owner approved removal (2026-09-30). Server: deny-all `isRealtimePresenceRoomAllowed` policy (not keyed on deploy env) rejects `room.join`, `presence.move_to_spot`, legacy `mini_room.invite`/`invite_decision` and lobby `reaction.send` with a requester-only `realtime.error`; per-recipient snapshots with blocked users removed; fail closed on block lookup errors; mini-room reactions refused after end or block. Mobile: production sessions never send `room.join` and ignore lobby events | Implemented, Tested (`legacyLobbyRetirement.test.ts` two-account, blocked, legacy-client in staging and production, reconnect; `realtimeRouter.presence.test.ts`; `lobbyState.test.ts`); **live only after an authorised deploy**; Native OPEN |
 | F-09 | Assets | Release gate | 29 candidate-path imports blocked preview/production builds | Owner-approved art moved to `*-runtime` paths, bytes unchanged (SHA-256 recorded in commit `58d2d04`); gate unchanged | Implemented, Tested, User approved; Native OPEN |
 | F-10 | Cleanup | Tech debt | 318 MB of room art and 16k lines of unreachable code in `apps/mobile/src` | Evidence manifest: only 80 files / 3.4 MB are safe to archive; ~297 MB candidate/vnext art is used by tests and QA catalogs (KEEP) | Manifest Implemented; archive run on owner's Mac OPEN; deletion waits for `archive-verification` |
-| F-11 | Tests | Coverage | ~86 `src` tests and most `scripts/*.test.*` were never run by any runner; server runner never cleaned `dist` | Wire passing orphans into existing runners | In progress |
+| F-11 | Tests | Coverage | 185 mobile test files were never executed by `npm test`; server runner never cleaned `dist` nor built contracts | 105 passing orphans wired into existing runners (mobile total 1,590 → 1,973 tests). Server runner cleans `dist` and builds contracts. Not wired, listed with evidence: 18 stale, 5 failing asset/tooling gates, 57 missing-fixture tests | Implemented, Tested |
 
 ### Findings re-checked and closed without code change
 
@@ -75,6 +75,19 @@ Their residual conditions stay tracked here.
   clients that send extra fields, and handlers already parse with zod.
 - **Realtime per-event re-authorisation cost** — deferred; caching changes
   revocation latency and needs measurement first.
+
+### Failing gates found by wiring orphan tests (not wired, need an owner)
+
+- `female-sweet-capsule-promotion-gate`: broken since `263cd8a` (Coral Wave).
+  `verifyPromotedInventory` in `scripts/female-wardrobe-combined-promotion-gate.mjs`
+  expects `avatar_room_top_female_coral_wave_polo_v2.png`; runtime assets are
+  named `room_avatar_*_female_coral_wave_*_v1.png`.
+- Art QA gates that the shipped art never passed (same failure at the commit
+  that introduced them): `female-walk-rig-contract`,
+  `female-legacy-milk-tea-repair`, `male-basic-tshirt-static-contract`,
+  `male-basic-tshirt-rig-fit-qa`. These need an art decision, not a test edit.
+- 18 stale source-text tests and 57 tests whose fixtures live only in the
+  Workbench are candidates for retirement or fixture restoration; none deleted.
 
 ## Things that must not change
 
