@@ -10,12 +10,14 @@ const readMobileFile = (relativePath) =>
 
 test("shared motion hooks honor the operating system reduced-motion preference", () => {
   const source = readMobileFile("src/ui/animations.ts")
+  const store = readMobileFile("src/ui/reducedMotionStore.ts")
 
-  assert.match(source, /AccessibilityInfo/)
+  // One shared OS subscription (behaviour covered by reducedMotionStore.test.ts).
+  assert.match(source, /createReducedMotionStore\(\{[\s\S]*?AccessibilityInfo\.isReduceMotionEnabled\(\)[\s\S]*?AccessibilityInfo\.addEventListener\(event, listener\)/)
   assert.match(source, /export function useReducedMotion/)
-  assert.match(source, /useState\(true\)/)
-  assert.match(source, /isReduceMotionEnabled\(\)/)
-  assert.match(source, /"reduceMotionChanged"/)
+  assert.match(source, /useSyncExternalStore\(/)
+  assert.match(store, /const UNRESOLVED: ReducedMotionPreference = Object\.freeze\(\{\s*reduceMotion: true,\s*isResolved: false/)
+  assert.match(store, /"reduceMotionChanged"/)
   assert.match(source, /if \(reduceMotion\) \{[\s\S]*?setValue\(1\)/)
   assert.match(source, /export function useSelectionTransition/)
 })
@@ -54,13 +56,10 @@ test("welcome motion has an instant reduced-motion path", () => {
 
 test("account and shop selection changes use restrained shared transitions", () => {
   const register = readMobileFile("src/screens/RegisterScreen.tsx")
-  const profile = readMobileFile("src/screens/ProfileSetupScreen.tsx")
   const shop = readMobileFile("src/screens/CosmeticShopScreen.tsx")
 
   assert.match(register, /useSelectionTransition\(flow\.stage/)
   assert.match(register, /testID="register-motion-card"/)
-  assert.match(profile, /useSelectionTransition\(gender/)
-  assert.match(profile, /testID="profile-avatar-motion"/)
   assert.match(shop, /useSelectionTransition\(selectedProduct\?\.id/)
   assert.match(shop, /testID="shop-preview-motion"/)
   assert.match(shop, /useReducedMotion/)

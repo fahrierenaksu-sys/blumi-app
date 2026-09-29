@@ -18,12 +18,14 @@ test("production match flow leads from Discover to chat without a room promise",
   const matchResult = read("src/screens/MatchResultScreen.tsx")
   const matchModal = read("src/components/MatchResultModal.tsx")
   const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobbyCopy = read("src/features/lobby/lobbyFeedbackCopy.ts")
 
   assert.match(matchResult, /You two just matched\./)
   assert.match(matchResult, /Start with a message and get to know each other at your pace\./)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|SharedMatchRoom|Go to Room/)
-  assert.match(lobby, /showDiscoverFeedback\("Like sent\.", "warm"\)/)
-  assert.doesNotMatch(lobby, /We’ll open a room if it’s mutual\./)
+  assert.match(lobby, /showDiscoverFeedback\(lobbyCopy\.liked, "warm"\)/)
+  assert.match(lobbyCopy, /liked: "Like sent\."/)
+  assert.doesNotMatch(lobby + lobbyCopy, /open a room if it’s mutual/)
   assert.match(lobby, /if \(isProductionDiscovery\) \{\s*clearReadyMiniRoom\(\)\s*return/)
   assert.match(lobby, /\{!isProductionDiscovery && incomingInvite && senderDisplayName \? \(/)
   assert.match(matchModal, /onSendMessage: \(\) => void/)
@@ -56,10 +58,11 @@ test("chat keeps the room invitation entry visible and explains unavailable stat
 test("loading earlier messages preserves the current chat scroll position", () => {
   const chat = read("src/screens/ChatThreadScreen.tsx")
 
-  assert.match(chat, /preserveScrollOnNextHistoryLoadRef\.current = true/)
-  assert.match(chat, /const isHistoryPrepend =[\s\S]*?preserveScrollOnNextHistoryLoadRef\.current[\s\S]*?newestMessageId === newestMessageIdRef\.current/)
-  assert.match(chat, /maintainVisibleContentPosition=\{\{ minIndexForVisible: 0 \}\}/)
-  assert.match(chat, /onContentSizeChange=\{\(\) => \{[\s\S]*?preserveScrollOnNextHistoryLoadRef\.current = false[\s\S]*?return/)
+  // The list is inverted (newest first), so earlier history is appended at the
+  // far end in the footer and the visible messages keep their position.
+  assert.match(chat, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
+  assert.match(chat, /maintainVisibleContentPosition=\{\{ minIndexForVisible: 0,/)
+  assert.match(chat, /ListFooterComponent=\{[\s\S]*?chatCopy\.loadEarlier/)
 })
 
 test("chat composer places the guarded room button before the text input", () => {
@@ -74,7 +77,7 @@ test("chat header keeps the canonical avatar and bubbles use the muted WhatsApp-
   const chat = read("src/screens/ChatThreadScreen.tsx")
   const inviteCard = read("src/features/chat/ChatRoomInviteCard.tsx")
 
-  assert.match(chat, /<Animated\.View style=\{\[styles\.chatHeader, headerAnim\]\}>[\s\S]*?<ParticipantAvatar[\s\S]*?avatar=\{partnerAvatar\}[\s\S]*?size=\{44\}/)
+  assert.match(chat, /<View style=\{styles\.chatHeader\}>[\s\S]*?<ParticipantAvatar[\s\S]*?avatar=\{partnerAvatar\}[\s\S]*?size=\{44\}/)
   assert.match(chat, /bubbleMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
   assert.match(chat, /bubbleThem: \{[\s\S]*?backgroundColor: "#FFFDFC"[\s\S]*?borderColor: "#EEE5E8"/)
   assert.match(chat, /tailMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
@@ -104,6 +107,7 @@ test("production discovery preferences use the authoritative profile path", () =
 
 test("profile decisions use the production API directly and never fall through to legacy invites", () => {
   const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobbyCopy = read("src/features/lobby/lobbyFeedbackCopy.ts")
   const profile = read("src/screens/ProfilePreviewScreen.tsx")
 
   assert.match(profile, /const isProductionDiscovery = props\.sessionActor\.session\.mode === "production"/)
@@ -115,7 +119,8 @@ test("profile decisions use the production API directly and never fall through t
   assert.match(profile, /accessibilityLabel=\{copy\.safetyOptions\(profile\.displayName\)\}/)
   assert.match(lobby, /const target = route\.params\?\.pendingPassUserId/)
   assert.match(lobby, /decideProductionCandidate\(targetUser, "pass"\)/)
-  assert.match(lobby, /This profile is no longer available in Discover\./)
+  assert.match(lobby, /showDiscoverFeedback\(lobbyCopy\.unavailable, "soft"\)/)
+  assert.match(lobbyCopy, /unavailable: "This profile is no longer available in Discover\."/)
 })
 
 test("empty inbox and onboarding direct people toward Discover and chat", () => {
@@ -185,11 +190,12 @@ test("room setup exposes only the free starter bed and shop does not claim unpla
   const roomSetup = read("src/screens/RoomSetupScreen.tsx")
   const shop = read("src/screens/CosmeticShopScreen.tsx")
 
-  assert.match(roomSetup, /FREE STARTER ITEM/)
-  assert.match(roomSetup, /Pink Cloud Bed/)
+  assert.match(roomSetup, /STARTER_ROOM_BED_ITEM_ID/)
+  assert.match(roomSetup, /ücretsiz başlangıç eşyası/)
+  assert.match(roomSetup, /Pembe Bulut Yatak/)
   assert.match(roomSetup, /testID="starter-bed-card"/)
   assert.match(roomSetup, /testID="starter-bed-rotate"/)
-  assert.match(roomSetup, /testID="room-setup-submit"/)
+  assert.match(roomSetup, /primaryActionTestID="room-setup-submit"/)
   assert.doesNotMatch(roomSetup, /STARTER_ROOM_PRESETS/)
   assert.match(shop, /copy\.readyToPlace/)
   assert.doesNotMatch(shop, /\? "Placed"/)
