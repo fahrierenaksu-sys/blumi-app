@@ -17,7 +17,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 
 // Each concern names the module that owns it.
 const OWNER = {
-  bottomNav: "./RootNavigator.tsx",
+  bottomNav: "./useBottomNavChrome.ts",
   roomInvites: "./RootNavigator.tsx",
   linking: "./rootLinking.ts",
   matchModal: "./RootNavigator.tsx",
@@ -144,6 +144,18 @@ test("bottom tabs ignore presses before readiness and reselection of the focused
   bottomNavPress(focused, focusedEvents)("chats")
   assert.deepEqual(focused.calls, [])
   assert.deepEqual(focusedEvents, [], "a focused-tab reselect leaves the match modal alone")
+})
+
+test("the root navigator wires route sync, return previews, and tab presses to the chrome", () => {
+  const navigator = read("./RootNavigator.tsx")
+  assert.match(navigator, /screenListeners=\{screenListeners\}/)
+  assert.match(navigator, /onStateChange=\{syncCurrentRouteName\}/)
+  assert.match(navigator, /onBottomNavPress=\{handleBottomNavPress\}/)
+  assert.match(navigator, /isFullShopCatalogQaPreview=\{IS_FULL_SHOP_CATALOG_QA_PREVIEW\}\s*onBottomNavPress/)
+  const chrome = read("./useBottomNavChrome.ts")
+  assert.match(chrome, /transitionStart: \(\{ data \}\) => \{\s*if \(sessionEntryRoute !== "Main" \|\| isAccountRestricted\) return/)
+  assert.match(chrome, /transitionEnd: \(\{ data \}\) => \{\s*settleRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key, data\.closing\)/)
+  assert.match(chrome, /gestureCancel: \(\) => \{\s*clearRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key\)/)
 })
 
 // ── Ready MiniRoom routing ─────────────────────────────────

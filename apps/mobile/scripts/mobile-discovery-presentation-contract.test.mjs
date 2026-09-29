@@ -170,7 +170,7 @@ test("Discover ambient glass shares one shadowless light system", () => {
   const cardSource = read("src/features/demo/SwipeableDiscoverCard.tsx")
   const deckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
   const bottomNavSource = read("src/ui/bottomNav.tsx")
-  const rootSource = read("src/navigation/RootNavigator.tsx")
+  const rootSource = read("src/navigation/RootNavigationChrome.tsx")
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
 
   assert.match(

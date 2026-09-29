@@ -4,15 +4,11 @@ import type {
   MiniRoom,
   MiniRoomParticipant
 , ServerEvent } from "@blumi/contracts"
-import {
-  CommonActions,
-  NavigationContainer
-} from "@react-navigation/native"
+import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
-  Platform,
   StyleSheet,
   View
 } from "react-native"
@@ -127,7 +123,6 @@ import { MatchResultScreen } from "../screens/MatchResultScreen"
 import { WelcomeScreen } from "../screens/WelcomeScreen"
 import { AuthEntryScreen } from "../screens/AuthEntryScreen"
 import { AvatarV2Provider } from "../features/avatarV2/state/AvatarV2Provider"
-import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
 import { isAvatarQaUnlockEnabled } from "../features/avatarV2/qa/avatarQaInventory"
 import { getOnboardingStarterBodyId } from "../features/avatarV2/avatarStarterModel"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
@@ -154,36 +149,27 @@ import {
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
-  shouldDispatchMainTabNavigation,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
-import { getBottomNavReturnPresentation, resolveBottomNavReturnPreview, retainBottomNavReturnPreview } from "./bottomNavReturnPreview"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
 import { ToastContainer, showToast } from "../ui/toast"
 import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
-import { BottomNav, type BottomNavKey } from "../ui/bottomNav"
 import type { BlumiMatch } from "../features/matches/matchRoomModel"
 import { usePushRegistration } from "../features/notifications/usePushRegistration"
 import { resolveNotificationDestination } from "../features/notifications/notificationRouting"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
-import {
-  getRootNavigationChromeSnapshot,
-  publishRootNavigationChromeReturnPreview,
-  clearRootNavigationChromeReturnPreview,
-  settleRootNavigationChromeReturnPreview,
-  publishRootNavigationChrome,
-  subscribeToRootNavigationChrome
-} from "./rootNavigationChromeStore"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
 import { ConnectionBanner } from "../ui/connectionBanner"
 import { LinkedProfileScreen } from "./LinkedProfileScreen"
 import { linking } from "./rootLinking"
 import { navigationRef } from "./rootNavigationRef"
+import { RootNavigationChrome } from "./RootNavigationChrome"
+import { useBottomNavChrome } from "./useBottomNavChrome"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -356,89 +342,6 @@ type ReadyMiniRoomEvent = Extract<ServerEvent, { type: "mini_room.ready" }>
 
 interface RootNavigatorProps {
   fontsReady?: boolean
-}
-
-interface RootNavigationChromeProps {
-  navigatorKey: string
-  sessionActor: SessionActor | null
-  sessionEntryRoute: string
-  isAccountRestricted: boolean
-  chatCount: number
-  onBottomNavPress: (key: BottomNavKey) => void
-}
-
-const RootNavigationChrome = memo(function RootNavigationChrome({
-  navigatorKey,
-  sessionActor,
-  sessionEntryRoute,
-  isAccountRestricted,
-  chatCount,
-  onBottomNavPress
-}: RootNavigationChromeProps) {
-  const routeSnapshot = useSyncExternalStore(
-    subscribeToRootNavigationChrome,
-    getRootNavigationChromeSnapshot,
-    getRootNavigationChromeSnapshot
-  )
-  const hasCurrentNavigatorSnapshot = routeSnapshot.navigatorKey === navigatorKey
-  const routeName = hasCurrentNavigatorSnapshot
-    ? routeSnapshot.routeName as keyof RootStackParamList | undefined
-    : undefined
-  const bottomNavRoutePresentation = getBottomNavReturnPresentation(
-    routeName,
-    hasCurrentNavigatorSnapshot ? routeSnapshot.routeKey : undefined,
-    hasCurrentNavigatorSnapshot ? routeSnapshot.returnPreview : undefined
-  )
-  const earlyReturnNavVisualOnly = bottomNavRoutePresentation.visualOnly
-  const currentBottomNavKey = sessionEntryRoute === "Main" && sessionActor
-    ? bottomNavRoutePresentation.currentKey
-    : null
-  const lastBottomNavKeyRef = useRef<BottomNavKey>("discover")
-  if (currentBottomNavKey) lastBottomNavKeyRef.current = currentBottomNavKey
-  const canWarmCurrentSceneAssets = isCurrentSceneWarmupRoute(
-    routeName,
-    sessionEntryRoute,
-    isAccountRestricted
-  )
-
-  return (
-    <>
-      {sessionActor ? (
-        <CurrentSceneAssetWarmup
-          enabled={canWarmCurrentSceneAssets}
-          initialShopMode={hasCurrentNavigatorSnapshot ? routeSnapshot.shopMode : undefined}
-          sessionMode={sessionActor.session.mode}
-          isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
-        />
-      ) : null}
-      {sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation.mounted ? (
-        <View
-          pointerEvents={earlyReturnNavVisualOnly ? "none" : "box-none"}
-          accessibilityElementsHidden={earlyReturnNavVisualOnly}
-          importantForAccessibility={earlyReturnNavVisualOnly ? "no-hide-descendants" : "auto"}
-          style={StyleSheet.absoluteFill}
-        >
-          <BottomNav
-            currentKey={currentBottomNavKey ?? lastBottomNavKeyRef.current}
-            chatCount={chatCount}
-            onPress={onBottomNavPress}
-            visible={bottomNavRoutePresentation.visible}
-            appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
-          />
-        </View>
-      ) : null}
-    </>
-  )
-})
-
-export function isCurrentSceneWarmupRoute(
-  routeName: keyof RootStackParamList | undefined,
-  sessionEntryRoute: string,
-  isAccountRestricted: boolean
-): boolean {
-  return sessionEntryRoute === "Main" &&
-    !isAccountRestricted &&
-    (routeName === "Lobby" || routeName === "CosmeticShop")
 }
 
 export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
@@ -854,22 +757,16 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
   }, [requestMessages])
 
-  const syncCurrentRouteName = useCallback((): void => {
-    const currentRoute = navigationRef.getCurrentRoute()
-    const routeName = currentRoute?.name as keyof RootStackParamList | undefined
-    const shopParams = currentRoute?.params as RootStackParamList["CosmeticShop"]
-    const previousSnapshot = getRootNavigationChromeSnapshot()
-    const returnPreview = previousSnapshot.navigatorKey === sessionNavigatorKey
-      ? retainBottomNavReturnPreview(previousSnapshot.returnPreview, currentRoute?.key)
-      : undefined
-    publishRootNavigationChrome({
-      navigatorKey: sessionNavigatorKey,
-      routeName,
-      routeKey: currentRoute?.key,
-      shopMode: routeName === "CosmeticShop" ? shopParams?.initialShopMode : undefined,
-      returnPreview
-    })
-  }, [sessionNavigatorKey])
+  const {
+    syncCurrentRouteName,
+    handleBottomNavPress,
+    screenListeners
+  } = useBottomNavChrome({
+    sessionNavigatorKey,
+    sessionEntryRoute,
+    isAccountRestricted,
+    dismissGlobalMatch
+  })
 
   const handleNavigationReady = useCallback((): void => {
     setIsNavigationReady(true)
@@ -879,28 +776,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       markOnboardingContentReady()
     }
   }, [sessionEntryRoute, syncCurrentRouteName])
-
-  const handleBottomNavPress = useCallback((key: BottomNavKey): void => {
-    if (!navigationRef.isReady()) return
-    const destination = key === "discover"
-      ? "Lobby"
-      : key === "chats"
-        ? "Inbox"
-        : key === "myroom"
-          ? "MyRoom"
-          : "CosmeticShop"
-    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) return
-    setGlobalMatch(null)
-    // The bottom bar shares a native stack with detail routes. Reordering
-    // existing native controllers with RESET can leave a rapid-switching iOS
-    // transition unresponsive. StackRouter's pop navigation returns to an
-    // earlier tab, or pushes it once when absent, without reordering live
-    // controllers or accumulating another instance on every revisit.
-    navigationRef.dispatch(CommonActions.navigate(destination, undefined, {
-      pop: true,
-      merge: true
-    }))
-  }, [])
 
   const goChat = useCallback(
     (params: { threadId?: string; partnerId?: string; partnerName?: string }): void => {
@@ -1265,30 +1140,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         onStateChange={syncCurrentRouteName}
       >
         <Stack.Navigator
-          screenListeners={({ route, navigation }) => ({
-            transitionStart: ({ data }) => {
-              if (sessionEntryRoute !== "Main" || isAccountRestricted) return
-              if (!data.closing) {
-                // A cancelled pop reappears on the source; the target's willAppear
-                // must not discard the preview while the gesture is still active.
-                clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
-                return
-              }
-              const preview = resolveBottomNavReturnPreview({
-                platform: Platform.OS === "ios" ? "ios" : "android",
-                closing: data.closing,
-                sourceRouteKey: route.key,
-                stack: navigation.getState()
-              })
-              if (preview) publishRootNavigationChromeReturnPreview(sessionNavigatorKey, preview)
-            },
-            transitionEnd: ({ data }) => {
-              settleRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key, data.closing)
-            },
-            gestureCancel: () => {
-              clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
-            }
-          })}
+          screenListeners={screenListeners}
           key={sessionNavigatorKey}
           initialRouteName={
             isAccountRestricted
@@ -1809,6 +1661,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         sessionEntryRoute={sessionEntryRoute}
         isAccountRestricted={isAccountRestricted}
         chatCount={chatBadgeCount}
+        isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
         onBottomNavPress={handleBottomNavPress}
       />
       <ToastContainer />

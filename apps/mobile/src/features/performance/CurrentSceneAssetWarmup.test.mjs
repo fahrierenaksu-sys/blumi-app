@@ -8,8 +8,9 @@ const source = readFileSync(new URL("./CurrentSceneAssetWarmup.tsx", import.meta
 const roomRendererSource = readFileSync(
   new URL("../roomV2/components/RoomRenderer2D.tsx", import.meta.url), "utf8"
 )
+// The root chrome (bottom bar + current-scene warmup) lives beside RootNavigator.
 const rootNavigatorSource = readFileSync(
-  new URL("../../navigation/RootNavigator.tsx", import.meta.url),
+  new URL("../../navigation/RootNavigationChrome.tsx", import.meta.url),
   "utf8"
 )
 const roomEditorSource = readFileSync(
@@ -32,7 +33,7 @@ const schedulerDeclaration = sourceFile.statements.find((statement) =>
 )
 assert.ok(schedulerDeclaration, "warmup scheduler is declared in the component module")
 const rootNavigatorSourceFile = ts.createSourceFile(
-  "RootNavigator.tsx",
+  "RootNavigationChrome.tsx",
   rootNavigatorSource,
   ts.ScriptTarget.Latest,
   true,
@@ -41,7 +42,7 @@ const rootNavigatorSourceFile = ts.createSourceFile(
 const routePolicyDeclaration = rootNavigatorSourceFile.statements.find((statement) =>
   ts.isFunctionDeclaration(statement) && statement.name?.text === "isCurrentSceneWarmupRoute"
 )
-assert.ok(routePolicyDeclaration, "RootNavigator declares the warmup route allowlist")
+assert.ok(routePolicyDeclaration, "RootNavigationChrome declares the warmup route allowlist")
 
 const schedulerCode = ts.transpileModule(schedulerDeclaration.getText(sourceFile), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
