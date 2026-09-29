@@ -266,8 +266,9 @@ export function createConnectionManager(
       connection.socket.close(4429, "Realtime delivery backlog exceeded")
       return
     }
-    // Serialize bounded delivery checks: no positive auth cache can leak events
-    // after revocation, including events arriving from another server instance.
+    // Serialize bounded delivery checks. The realtime server's authorizer reuses a
+    // positive decision for at most REALTIME_AUTHORIZATION_CACHE_TTL_MS and drops it
+    // at once on local revocations; this queue never caches decisions itself.
     const queued = {
       pending: (previous?.pending ?? 0) + 1,
       tail: (previous?.tail ?? Promise.resolve()).then(async () => {

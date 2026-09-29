@@ -23,6 +23,12 @@ import {
   authenticateRealtimeRequest,
   type RealtimeSessionActor
 } from "./realtimeAuth"
+import {
+  createRealtimeAuthorizationCache,
+  forEachWithConcurrency,
+  REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
+} from "./realtimeAuthorizationCache"
+import type { RealtimeAccessRevocation } from "../auth/realtimeAccessRevocation"
 import { createRealtimeRouter } from "./realtimeRouter"
 import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
@@ -69,6 +75,8 @@ export interface CreateRealtimeServerOptions {
   httpServer?: Server
   /** Test seam; production always uses the deny-all presence-room policy. */
   isPresenceRoomAllowed?: RealtimePresenceRoomPolicy
+  /** Test seam for the authorization cache clock; production uses Date.now. */
+  authorizationClock?: () => number
 }
 
 export function createRealtimeServer(
@@ -138,6 +146,25 @@ export function createRealtimeServer(
       await Promise.allSettled([...pending])
     }
   }
+  // Positive decisions are reused for at most REALTIME_AUTHORIZATION_CACHE_TTL_MS
+  // per session family; concurrent checks for one family share one query.
+  const authorizationCache = createRealtimeAuthorizationCache({
+    check: (identity) => options.authService.isRealtimeSessionAllowed(identity),
+    ...(options.authorizationClock ? { now: options.authorizationClock } : {})
+  })
+  const handleAccessRevocation = (revocation: RealtimeAccessRevocation) => {
+    authorizationCache.invalidate(revocation)
+    if (closing || revocation.kind !== "user") return
+    // Close the affected sockets now rather than on their next event or sweep.
+    for (const connection of connectionManager.getUserConnections(revocation.userId)) {
+      void track(authorizeConnection(connection))
+    }
+  }
+  // Fakes in tests may omit the subscription; the TTL bound still applies.
+  const unsubscribeAccessRevocations = [
+    options.authService.subscribeRealtimeAccessRevocations?.(handleAccessRevocation),
+    options.safetyService.subscribeRealtimeAccessRevocations?.(handleAccessRevocation)
+  ]
   connectionManager.setDeliveryAuthorization(authorizeConnection)
   const notificationService =
     options.notificationService ?? createNotificationService()
@@ -341,8 +368,12 @@ export function createRealtimeServer(
   connectionLeaseCleanup.unref()
 
   async function closeRestrictedConnections(): Promise<void> {
-    await Promise.all(
-      collectConnections(connectionManager).map(async (connection) => {
+    authorizationCache.purgeExpired()
+    // Bounded so a large instance does not burst every check at the pool at once.
+    await forEachWithConcurrency(
+      collectConnections(connectionManager),
+      REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
+      async (connection) => {
         try {
           await authorizeConnection(connection)
         } catch {
@@ -353,7 +384,7 @@ export function createRealtimeServer(
             )
           }
         }
-      })
+      }
     )
   }
 
@@ -412,7 +443,7 @@ export function createRealtimeServer(
 
   async function authorizeConnection(connection: RealtimeConnection): Promise<boolean> {
     try {
-      const allowed = Boolean(connection.sessionFamilyId) && await options.authService.isRealtimeSessionAllowed({
+      const allowed = Boolean(connection.sessionFamilyId) && await authorizationCache.authorize({
         userId: connection.userId,
         sessionFamilyId: connection.sessionFamilyId!
       })
@@ -450,6 +481,7 @@ export function createRealtimeServer(
     },
     async close(closeOptions = {}) {
       closing = true
+      for (const unsubscribe of unsubscribeAccessRevocations) unsubscribe?.()
       clearInterval(heartbeat)
       clearInterval(connectionLeaseCleanup)
       const socketsClosed = new Promise<void>((resolve) => {

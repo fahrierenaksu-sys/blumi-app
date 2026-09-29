@@ -2,9 +2,11 @@ import assert from "node:assert/strict"
 import { createServer as createHttpServer, type Server as HttpServer } from "node:http"
 import { createConnection as createTcpConnection, type AddressInfo } from "node:net"
 import test from "node:test"
-import type { ServerEvent } from "@blumi/contracts"
+import { REPORT_REASONS, type ServerEvent } from "@blumi/contracts"
 import WebSocket from "ws"
+import { createInMemoryAuthRepository } from "../auth/authRepository"
 import { createAuthService } from "../auth/authService"
+import { createBlumiBackendStore } from "../auth/authStore"
 import { createChatService } from "../chat/chatService"
 import { createConnectionService } from "../connections/connectionService"
 import { createMiniRoomService } from "../miniRooms/miniRoomService"
@@ -14,6 +16,10 @@ import { createReactionService } from "../reactions/reactionService"
 import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
 import { createGracefulShutdown } from "../operations/serviceLifecycle"
+import {
+  REALTIME_AUTHORIZATION_CACHE_TTL_MS,
+  REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
+} from "./realtimeAuthorizationCache"
 import { createRealtimeServer } from "./realtimeServer"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
@@ -654,6 +660,166 @@ test("default realtime server rejects the retired public lobby without presence 
   }
 })
 
+const THREAD_LISTED = (userId: string): ServerEvent => ({
+  type: "chat.thread_listed", payload: { userId, threads: [] }
+})
+
+async function waitUntil(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for condition")
+    await new Promise<void>((resolve) => setTimeout(resolve, 2))
+  }
+}
+
+async function primeAuthorization(harness: Awaited<ReturnType<typeof createRealtimeHarness>>, socket: WebSocket) {
+  const events = collectEvents(socket)
+  socket.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+  await events.waitFor("chat.thread_listed")
+  return events
+}
+
+test("realtime authorization costs one check per session family per TTL window, not per event", async () => {
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
+  try {
+    const session = await harness.createSession("+905551110070", "Query Count")
+    const socket = await harness.connect(session.sessionToken)
+    let received = 0
+    socket.on("message", () => { received += 1 })
+    harness.authorizationQueries.count = 0
+    const inbound = 10
+    const outbound = 10
+    for (let index = 0; index < inbound; index += 1) {
+      socket.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+      await waitUntil(() => received === index + 1)
+    }
+    for (let index = 0; index < outbound; index += 1) {
+      harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    }
+    await waitUntil(() => received === inbound + outbound)
+    // Before the cache: 2 queries per inbound event, per inbound reply and per
+    // outbound event (2 x (10 + 10 + 10) = 60). After: one shared check.
+    assert.equal(harness.authorizationQueries.count, 2,
+      `${inbound} inbound + ${outbound} outbound events cost ${harness.authorizationQueries.count} authorization queries`)
+    clock.now += REALTIME_AUTHORIZATION_CACHE_TTL_MS
+    harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    await waitUntil(() => received === inbound + outbound + 1)
+    assert.equal(harness.authorizationQueries.count, 4, "an expired window re-checks the database")
+  } finally {
+    await harness.close()
+  }
+})
+
+test("sign-out closes a socket with a cached authorization immediately, without waiting for traffic", async () => {
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
+  try {
+    const session = await harness.createSession("+905551110071", "Cached Revoke")
+    const socket = await harness.connect(session.sessionToken)
+    await primeAuthorization(harness, socket)
+    const received: unknown[] = []
+    socket.on("message", (data) => received.push(data))
+    const closed = waitForClose(socket, 500)
+    await harness.authService.revokeSession(session.sessionToken)
+    harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    assert.equal(await closed, 4403)
+    assert.deepEqual(received, [])
+  } finally {
+    await harness.close()
+  }
+})
+
+test("a moderation action closes the reported user's cached socket immediately", async () => {
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
+  try {
+    const reporter = await harness.createSession("+905551110072", "Reporter")
+    const reported = await harness.createSession("+905551110073", "Reported")
+    const reporterSocket = await harness.connect(reporter.sessionToken)
+    const reportedSocket = await harness.connect(reported.sessionToken)
+    await primeAuthorization(harness, reporterSocket)
+    await primeAuthorization(harness, reportedSocket)
+    // The PostgreSQL safety repository writes the ban onto the account; the
+    // in-memory one does not, so model the committed ban at the auth boundary.
+    const check = harness.authService.isRealtimeSessionAllowed.bind(harness.authService)
+    harness.authService.isRealtimeSessionAllowed = async (identity, now) =>
+      identity.userId === reported.userId ? false : check(identity, now)
+    const closed = waitForClose(reportedSocket, 500)
+    const { report } = await harness.safetyService.reportUser(reporter.userId, {
+      reportedUserId: reported.userId,
+      reason: REPORT_REASONS[0]
+    })
+    await harness.safetyService.resolveReport(report.reportId, {
+      action: "ban",
+      admin: { operatorId: "operator_1", tokenId: "token_1" }
+    })
+    assert.equal(await closed, 4403)
+    assert.equal(reporterSocket.readyState, WebSocket.OPEN)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("a revocation without a local signal is enforced once the bounded TTL window ends", async () => {
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
+  try {
+    const session = await harness.createSession("+905551110074", "Remote Revoke")
+    const socket = await harness.connect(session.sessionToken)
+    const events = await primeAuthorization(harness, socket)
+    // Another instance or a session expiry: the database says no, but this
+    // process received no invalidation.
+    harness.authService.isRealtimeSessionAllowed = async () => false
+    clock.now += REALTIME_AUTHORIZATION_CACHE_TTL_MS - 1
+    harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    await waitUntil(() => events.all().length === 2)
+    clock.now += 1
+    const closed = waitForClose(socket, 500)
+    harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    assert.equal(await closed, 4403)
+    assert.equal(events.all().length, 2, "no delivery after the staleness window")
+  } finally {
+    await harness.close()
+  }
+})
+
+test("the periodic authorization sweep has bounded concurrency and fails closed per connection", async () => {
+  const callbacks: { callback: () => void; ms: number }[] = []
+  const harness = await createRealtimeHarness({ captureIntervalCallbacks: callbacks })
+  try {
+    const sockets: { userId: string; socket: WebSocket }[] = []
+    for (let index = 0; index < REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY + 4; index += 1) {
+      const session = await harness.createSession(`+9055522200${String(index).padStart(2, "0")}`, `Sweep ${index}`)
+      sockets.push({ userId: session.userId, socket: await harness.connect(session.sessionToken) })
+    }
+    const failing = sockets[0]!
+    let active = 0
+    let maxActive = 0
+    let calls = 0
+    harness.authService.isRealtimeSessionAllowed = async (identity) => {
+      calls += 1
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise<void>((resolve) => setTimeout(resolve, 5))
+      active -= 1
+      if (identity.userId === failing.userId) throw new Error("authorization store unavailable")
+      return true
+    }
+    const closed = waitForClose(failing.socket, 1000)
+    const heartbeat = callbacks.find((entry) => entry.ms === 30_000)
+    assert.ok(heartbeat)
+    heartbeat.callback()
+    await waitUntil(() => calls === sockets.length && active === 0)
+    assert.ok(maxActive <= REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
+      `sweep ran ${maxActive} concurrent checks`)
+    assert.equal(await closed, 1011)
+    for (const entry of sockets.slice(1)) assert.equal(entry.socket.readyState, WebSocket.OPEN)
+  } finally {
+    await harness.close()
+  }
+})
+
 async function createRealtimeHarness(options: {
   pauseTicketConsumption?: boolean
   rejectTicketConsumption?: boolean
@@ -661,8 +827,28 @@ async function createRealtimeHarness(options: {
   shareHttpServer?: boolean
   captureIntervals?: ReturnType<typeof setInterval>[]
   allowAuthorizedTestRoom?: boolean
+  captureIntervalCallbacks?: { callback: () => void; ms: number }[]
+  authorizationClock?: () => number
 } = {}) {
-  const authService = createAuthService({ codeFactory: () => "123456" })
+  // Each realtime authorization check costs these two queries in PostgreSQL.
+  const authorizationQueries = { count: 0 }
+  const authStore = createBlumiBackendStore()
+  const baseAuthRepository = createInMemoryAuthRepository(authStore)
+  const authService = createAuthService({
+    codeFactory: () => "123456",
+    store: authStore,
+    repository: {
+      ...baseAuthRepository,
+      async hasActiveSessionFamily(input) {
+        authorizationQueries.count += 1
+        return baseAuthRepository.hasActiveSessionFamily(input)
+      },
+      async findAccountByUserId(userId) {
+        authorizationQueries.count += 1
+        return baseAuthRepository.findAccountByUserId(userId)
+      }
+    }
+  })
   if (options.rejectRealtimeAuthorization) {
     authService.isRealtimeSessionAllowed = async () => {
       throw new Error("authorization store unavailable")
@@ -744,14 +930,16 @@ async function createRealtimeHarness(options: {
     // into one synthetic authorized room to keep join/disconnect coverage.
     ...(options.allowAuthorizedTestRoom
       ? { isPresenceRoomAllowed: (_actor: unknown, roomId: string) => roomId === AUTHORIZED_TEST_ROOM_ID }
-      : {})
+      : {}),
+    ...(options.authorizationClock ? { authorizationClock: options.authorizationClock } : {})
   })
   let realtimeServer: ReturnType<typeof createRealtimeServer>
-  if (options.captureIntervals) {
+  if (options.captureIntervals || options.captureIntervalCallbacks) {
     const originalSetInterval = globalThis.setInterval
     globalThis.setInterval = ((...args: Parameters<typeof setInterval>) => {
       const interval = originalSetInterval(...args)
       options.captureIntervals?.push(interval)
+      options.captureIntervalCallbacks?.push({ callback: args[0] as () => void, ms: Number(args[1]) })
       return interval
     }) as typeof globalThis.setInterval
     try {
@@ -772,6 +960,8 @@ async function createRealtimeHarness(options: {
 
   return {
     authService,
+    safetyService,
+    authorizationQueries,
     presenceService,
     connectionManager: realtimeServer.connectionManager,
     closeRealtime,
