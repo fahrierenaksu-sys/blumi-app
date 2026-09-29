@@ -257,10 +257,10 @@ export async function registerUserRoutes(
       }
     }
   }, async (request, reply) => {
-    const sessionToken = readBearerToken(request)
-    if (!sessionToken) {
-      return reply.code(401).send({ error: "Sign in again to continue." })
-    }
+    // Banned or suspended accounts may not change public profile state.
+    const resolvedSession = await resolveBearerSession({ request, reply, authService })
+    if (!resolvedSession) return reply
+    const sessionToken = readBearerToken(request) as string
 
     try {
       const body = isRecord(request.body) ? request.body : {}
@@ -311,14 +311,10 @@ export async function registerUserRoutes(
       }
     }
   }, async (request, reply) => {
-    const sessionToken = readBearerToken(request)
-    if (!sessionToken) {
-      return reply.code(401).send({ error: "Sign in again to continue." })
-    }
-    const resolvedSession = await authService.getSession(sessionToken)
-    if (!resolvedSession) {
-      return reply.code(401).send({ error: "Sign in again to continue." })
-    }
+    // Banned or suspended accounts may not change public profile state.
+    const resolvedSession = await resolveBearerSession({ request, reply, authService })
+    if (!resolvedSession) return reply
+    const sessionToken = readBearerToken(request) as string
     const body = isRecord(request.body) ? request.body : {}
     const requestCapabilities = resolveRequestCapabilities(
       request,
@@ -375,10 +371,10 @@ export async function registerUserRoutes(
       }
     }
   }, async (request, reply) => {
-    const sessionToken = readBearerToken(request)
-    if (!sessionToken) {
-      return reply.code(401).send({ error: "Sign in again to continue." })
-    }
+    // Banned or suspended accounts may not change public profile state.
+    const resolvedSession = await resolveBearerSession({ request, reply, authService })
+    if (!resolvedSession) return reply
+    const sessionToken = readBearerToken(request) as string
     const parsed = onboardingStepRequestSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send({ error: "Choose a valid setup step." })
