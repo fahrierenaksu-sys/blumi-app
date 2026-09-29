@@ -127,7 +127,19 @@ try {
     resolve(repositoryRoot, "node_modules/.bin/tsx"),
     [
       "--test",
-      resolve(workspaceRoot, "src/features/avatarV2/avatarSetupStudioContract.test.ts")
+      resolve(workspaceRoot, "src/features/avatarV2/avatarSetupStudioContract.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/avatarEquipLifecycle.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/avatarEquipSave.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/maleHairV2SurfaceIntegration.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/myRoomAvatarSource.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/retiredWardrobe.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
+      resolve(workspaceRoot, "scripts/room-avatar-renderer-subscription.test.mjs"),
+      resolve(workspaceRoot, "scripts/female-sitting-rig-contract.test.mjs"),
+      resolve(workspaceRoot, "scripts/female-wardrobe-static-contract.test.mjs"),
+      resolve(workspaceRoot, "scripts/female-wardrobe-combined-promotion-gate.test.mjs"),
+      resolve(workspaceRoot, "scripts/promote-female-nondress-wardrobe.test.mjs"),
+      resolve(workspaceRoot, "scripts/promote-male-capsule-assets.test.mjs")
     ],
     {
       cwd: workspaceRoot,

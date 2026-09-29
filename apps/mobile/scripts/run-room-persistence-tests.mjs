@@ -82,7 +82,12 @@ try {
   )
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/roomV2/roomV2ProviderLifecycle.test.ts"],
+    [
+      "--import", "tsx",
+      "--test",
+      "src/features/roomV2/roomV2ProviderLifecycle.test.ts",
+      "src/features/roomV2/roomV2EditorSave.test.ts"
+    ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
