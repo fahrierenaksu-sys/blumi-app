@@ -10,13 +10,13 @@ require.extensions[".png"] = (module, filename) => {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { equipAvatarV2Item, resolveAvatarV2 } = require("./avatarV2Selectors") as typeof import("./avatarV2Selectors")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock")
+const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 
 const workspaceRoot = process.cwd()
 const assetRoot = join(workspaceRoot, "src/features/avatarV2/assets")
@@ -98,7 +98,7 @@ function readProjectFile(relativePath: string): string {
 }
 
 test("soft doll feature assets are wired through avatar, room, shop, and motion layers", () => {
-  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2.mock.ts")
+  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2Catalog.ts")
   const projection = readProjectFile("src/features/avatarV2/room/avatarRoomProjection.ts")
   const shopSource = [
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),
@@ -208,8 +208,8 @@ test("malformed male snapshots fail closed instead of rendering female features"
 })
 
 test("female accessory assets are wired through avatar, room, shop, and motion layers", () => {
-  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2.mock.ts")
-  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoom.mock.ts")
+  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2Catalog.ts")
+  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoomCatalog.ts")
   const projection = readProjectFile("src/features/avatarV2/room/avatarRoomProjection.ts")
   const shopSource = [
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),
@@ -240,8 +240,8 @@ test("female accessory assets are wired through avatar, room, shop, and motion l
 })
 
 test("supported tops retain assets while retired tops remain hidden under stable IDs", () => {
-  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2.mock.ts")
-  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoom.mock.ts")
+  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2Catalog.ts")
+  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoomCatalog.ts")
   const projection = readProjectFile("src/features/avatarV2/room/avatarRoomProjection.ts")
   const shopSource = [
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),

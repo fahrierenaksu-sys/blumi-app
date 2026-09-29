@@ -36,7 +36,7 @@ import {
 } from "../features/roomStudio/roomStudioThemeMatrix"
 import { ROOM_STUDIO_QA_ASSET_BINDINGS } from "../features/roomStudio/roomStudioQaAssetBindings"
 import { resolveRoomStudioQaCatalog } from "../features/roomStudio/roomStudioQaCatalog"
-import { ROOM_V2_SHELL_CATALOG } from "../features/roomV2/roomV2.mock"
+import { ROOM_V2_SHELL_CATALOG } from "../features/roomV2/roomV2Catalog"
 import { RoomRenderer2D } from "../features/roomV2/components/RoomRenderer2D"
 import { resolveRoomV2Scene } from "../features/roomV2/roomV2Selectors"
 import { resolveRoomStudioRuntimeGate } from "../features/roomStudio/roomStudioRuntimeGate"

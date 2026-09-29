@@ -11,7 +11,7 @@ import {
 } from "react-native"
 import { BlumiSetupShell } from "../features/session/setupFlow/BlumiSetupShell"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
-import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../features/avatarV2/room/avatarRoomSelectors"
 import { RoomRenderer2D } from "../features/roomV2/components/RoomRenderer2D"
@@ -24,7 +24,7 @@ import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
-} from "../features/roomV2/roomV2.mock"
+} from "../features/roomV2/roomV2Catalog"
 import {
   createRoomV2AvatarRenderItem,
   insertRoomV2RenderItemSorted,

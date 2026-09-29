@@ -47,8 +47,8 @@ function readProjectFile(relativePath: string): string {
 }
 
 test("new bottom wardrobe assets are wired across catalog, room projection, and generated files", () => {
-  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2.mock.ts")
-  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoom.mock.ts")
+  const avatarCatalog = readProjectFile("src/features/avatarV2/avatarV2Catalog.ts")
+  const roomCatalog = readProjectFile("src/features/avatarV2/room/avatarRoomCatalog.ts")
   const projection = readProjectFile("src/features/avatarV2/room/avatarRoomProjection.ts")
   const shopSource = [
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),

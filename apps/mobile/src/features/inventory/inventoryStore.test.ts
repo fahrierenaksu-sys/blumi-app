@@ -25,10 +25,10 @@ stub("@react-native-async-storage/async-storage", {
   setItem: async () => undefined
 })
 stub("../../config/env", { MOBILE_HTTP_BASE_URL: "https://api.test" })
-stub("../avatarV2/avatarV2.mock", {
+stub("../avatarV2/avatarV2Catalog", {
   AVATAR_V2_CATALOG: [{ id: "paid_top" }, { id: "next_top" }]
 })
-stub("../roomV2/roomV2.mock", {
+stub("../roomV2/roomV2Catalog", {
   ROOM_V2_FURNITURE_CATALOG: [{ id: "paid_chair" }]
 })
 const { useInventoryStore } = testRequire("./inventoryStore") as typeof import("./inventoryStore")

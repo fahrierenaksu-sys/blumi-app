@@ -1,6 +1,6 @@
 import {
   AVATAR_V2_CATALOG
-} from "../avatarV2.mock"
+} from "../avatarV2Catalog"
 import { FEMALE_SWEET_CAPSULE_LAYERS } from "../femaleSweetCapsuleDefinitions"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "../malePremiumCapsulePilotDefinitions"
 import { resolveAvatarV2 } from "../avatarV2Selectors"
@@ -11,7 +11,7 @@ import type {
 } from "../avatarV2.types"
 import {
   ROOM_AVATAR_CATALOG
-} from "./avatarRoom.mock"
+} from "./avatarRoomCatalog"
 import { resolveRoomAvatarAppearance } from "./avatarRoomSelectors"
 import type {
   RoomAvatarAppearance,

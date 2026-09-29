@@ -2,7 +2,7 @@ import {
   DEFAULT_ROOM_AVATAR_FEMALE,
   DEFAULT_ROOM_AVATAR_MALE,
   ROOM_AVATAR_CATALOG
-} from "./room/avatarRoom.mock"
+} from "./room/avatarRoomCatalog"
 import { resolveRoomAvatarAppearance } from "./room/avatarRoomSelectors"
 import type {
   RoomAvatarAppearance,

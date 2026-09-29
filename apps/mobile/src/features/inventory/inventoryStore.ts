@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { loadAccountScopedStorage } from "../persistence/accountScopedStorage"
-import { ROOM_V2_FURNITURE_CATALOG } from "../roomV2/roomV2.mock"
+import { ROOM_V2_FURNITURE_CATALOG } from "../roomV2/roomV2Catalog"
 import {
   claimDailyEconomyReward,
   EconomyHttpError,

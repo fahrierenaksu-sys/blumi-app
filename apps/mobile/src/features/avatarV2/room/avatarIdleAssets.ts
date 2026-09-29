@@ -1,7 +1,7 @@
 import type { UserAvatar } from "../avatarV2.types"
-import { AVATAR_V2_CATALOG } from "../avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2Catalog"
 import type { RoomV2AssetRef } from "../../roomV2/roomV2.types"
-import { ROOM_AVATAR_CATALOG } from "./avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "./avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "./avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "./avatarRoomSelectors"
 

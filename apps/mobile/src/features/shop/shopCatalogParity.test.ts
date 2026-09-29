@@ -12,7 +12,7 @@ require.extensions[".webp"] = require.extensions[".png"];
 
 const { AVATAR_V2_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../avatarV2/avatarV2.mock") as typeof import("../avatarV2/avatarV2.mock");
+  require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog");
 const { resolveInitialAvatarV2 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../avatarV2/avatarV2Persistence") as typeof import("../avatarV2/avatarV2Persistence");
@@ -51,7 +51,7 @@ const maleCapsulePreviewSource = readFileSync(
 );
 const { ROOM_V2_FURNITURE_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../roomV2/roomV2.mock") as typeof import("../roomV2/roomV2.mock");
+  require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog");
 const {
   ROOM_V3_UNIVERSAL_CORE_ARTIFACT_HASHES_BY_CANDIDATE_ID,
   ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,

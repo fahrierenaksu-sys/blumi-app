@@ -2,7 +2,7 @@ import {
   AVATAR_V2_CATALOG,
   AVATAR_V2_LAYER_ORDER,
   DEFAULT_AVATAR_V2
-} from "./avatarV2.mock"
+} from "./avatarV2Catalog"
 import {
   applyAvatarOutfitSelection,
   normalizeAvatarOutfitSelection,

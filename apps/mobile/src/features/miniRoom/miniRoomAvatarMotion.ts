@@ -1,4 +1,4 @@
-import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import { getRoomV2AvatarMotionAssetDiagnostics } from "../roomV2/roomV2AvatarMotion"
 import type { RoomV2AvatarMotionState } from "../roomV2/roomV2.types"

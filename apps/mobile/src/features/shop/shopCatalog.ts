@@ -4,7 +4,7 @@ import {
 } from "@blumi/domain"
 import {
   AVATAR_V2_CATALOG
-} from "../avatarV2/avatarV2.mock"
+} from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import {
   isAvatarV2ItemEquipped,
@@ -16,7 +16,7 @@ import type {
   UserAvatar
 } from "../avatarV2/avatarV2.types"
 import type { BlumiInventorySnapshot } from "../inventory/inventoryStore"
-import { ROOM_V2_FURNITURE_CATALOG } from "../roomV2/roomV2.mock"
+import { ROOM_V2_FURNITURE_CATALOG } from "../roomV2/roomV2Catalog"
 import type {
   FurnitureItem,
   UserRoomDecor

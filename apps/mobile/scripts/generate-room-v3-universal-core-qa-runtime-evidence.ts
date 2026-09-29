@@ -9,7 +9,7 @@ require.extensions[".png"] = (module, filename) => {
 require.extensions[".webp"] = require.extensions[".png"]
 
 const runtimeModule = require("../src/features/roomV2/roomV3UniversalCoreQaRuntimeEvidence") as typeof import("../src/features/roomV2/roomV3UniversalCoreQaRuntimeEvidence")
-const { ROOM_V2_FURNITURE_CATALOG } = require("../src/features/roomV2/roomV2.mock") as typeof import("../src/features/roomV2/roomV2.mock")
+const { ROOM_V2_FURNITURE_CATALOG } = require("../src/features/roomV2/roomV2Catalog") as typeof import("../src/features/roomV2/roomV2Catalog")
 const {
   createRoomV3UniversalCoreQaArtifactRegistry,
   resolveRoomV2FurnitureCatalogForRuntime

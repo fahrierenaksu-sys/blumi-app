@@ -91,7 +91,7 @@ test("home Shop warmup selection matches the real room catalog and Shop viewport
     require.extensions[extension] = (module, filename) => { module.exports = filename }
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading static room assets.
-  const { ROOM_V2_FURNITURE_CATALOG } = require("../roomV2/roomV2.mock") as typeof import("../roomV2/roomV2.mock")
+  const { ROOM_V2_FURNITURE_CATALOG } = require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading static room assets.
   const { getRoomProductThumbnailSource } = require("../shop/shopAssets") as typeof import("../shop/shopAssets")
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading layout model.
@@ -145,7 +145,7 @@ test("the production top shelf resolves to the current female and male first-vie
   // Metro's static asset IDs are represented by paths in Node's catalog fixture.
   require.extensions[".png"] = (module, filename) => { module.exports = filename }
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
-  const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2.mock") as typeof import("../avatarV2/avatarV2.mock")
+  const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
   const { getAvatarV2ShopItemsCompatibleWithBody } = require("../avatarV2/avatarBodyCompatibility") as typeof import("../avatarV2/avatarBodyCompatibility")
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.

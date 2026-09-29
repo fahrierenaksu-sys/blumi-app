@@ -228,7 +228,7 @@ function createAvatarProviderHarness({ storageScopeId = "owner-a", onSaveAvatar 
       getItem: async () => null,
       setItem: async () => undefined
     },
-    "../avatarV2.mock": { AVATAR_V2_CATALOG: [] },
+    "../avatarV2Catalog": { AVATAR_V2_CATALOG: [] },
     "../../inventory/inventoryStore": {
       useInventoryStore: () => ({ inventory: { ownedAvatarItemIds: [] } })
     },

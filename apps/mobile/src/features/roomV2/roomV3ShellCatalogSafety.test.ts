@@ -5,7 +5,7 @@ import test from "node:test"
 
 test("My Room runtime catalog is isolated from every draft and promotion shell path", () => {
   const mockSource = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomV2.mock.ts"),
+    resolve(process.cwd(), "src/features/roomV2/roomV2Catalog.ts"),
     "utf8"
   )
 

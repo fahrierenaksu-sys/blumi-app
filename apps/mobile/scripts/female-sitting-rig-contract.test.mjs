@@ -13,7 +13,7 @@ const room = resolve(feature, "assets/room")
 const motion = resolve(room, "motion")
 
 function projectedFemaleNonDressItems() {
-  const catalog = readFileSync(resolve(feature, "avatarV2.mock.ts"), "utf8")
+  const catalog = readFileSync(resolve(feature, "avatarV2Catalog.ts"), "utf8")
   const projection = readFileSync(resolve(feature, "room/avatarRoomProjection.ts"), "utf8")
   const catalogIds = new Set(
     [...catalog.matchAll(/\bid:\s*"(avatar_v2_[^"]+)"/g)].map((match) => match[1])

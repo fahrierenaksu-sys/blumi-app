@@ -6,7 +6,7 @@ require.extensions[".png"] = (module, filename) => { module.exports = filename }
 require.extensions[".webp"] = require.extensions[".png"]
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
-const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("../avatarV2/avatarV2.mock") as typeof import("../avatarV2/avatarV2.mock")
+const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
 const {
   getShopPreviewAddedAssets
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.

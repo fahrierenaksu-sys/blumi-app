@@ -10,7 +10,7 @@ const PRODUCTION_ENTRYPOINTS = [
   "src/screens/MyRoomScreen.tsx",
   "src/screens/MyRoomEditorScreen.tsx",
   "src/features/roomV2/roomV2ProductionAssets.ts",
-  "src/features/roomV2/roomV2.mock.ts"
+  "src/features/roomV2/roomV2Catalog.ts"
 ] as const
 
 test("production dependency roots do not import Home Studio QA bitmap bindings", () => {

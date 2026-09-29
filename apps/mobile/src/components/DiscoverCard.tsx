@@ -4,7 +4,7 @@ import { Animated, Easing, ImageBackground, StyleSheet, Text, View } from "react
 import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClient"
 import {
   ROOM_AVATAR_CATALOG
-} from "../features/avatarV2/room/avatarRoom.mock"
+} from "../features/avatarV2/room/avatarRoomCatalog"
 import {
   getRoomAvatarRenderLayers
 } from "../features/avatarV2/room/avatarRoomSelectors"

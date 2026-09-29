@@ -11,14 +11,14 @@ testRequire.extensions[".png"] = (module, filename) => {
 // The Shop avatar path does not depend on room furniture. Stub only that
 // unrelated catalog so this focused test does not load the historical Room V3
 // fixture graph from a sparse checkout.
-const roomMockPath = testRequire.resolve("../roomV2/roomV2.mock")
+const roomMockPath = testRequire.resolve("../roomV2/roomV2Catalog")
 const roomMock = new Module(roomMockPath)
 roomMock.filename = roomMockPath
 roomMock.loaded = true
 roomMock.exports = { ROOM_V2_FURNITURE_CATALOG: [] }
 testRequire.cache[roomMockPath] = roomMock
 
-const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = testRequire("../avatarV2/avatarV2.mock") as typeof import("../avatarV2/avatarV2.mock")
+const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = testRequire("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
 const { ECONOMY_CATALOG } = testRequire("@blumi/domain") as typeof import("@blumi/domain")
 const { buildShopCatalogItems } = testRequire("./shopCatalog") as typeof import("./shopCatalog")
 

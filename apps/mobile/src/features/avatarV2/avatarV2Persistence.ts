@@ -1,7 +1,7 @@
 import {
   AVATAR_V2_CATALOG,
   DEFAULT_AVATAR_V2
-} from "./avatarV2.mock"
+} from "./avatarV2Catalog"
 import { resolveAvatarV2 } from "./avatarV2Selectors"
 import { normalizeAvatarV2ForBody } from "./avatarBodyCompatibility"
 import type { UserAvatar } from "./avatarV2.types"

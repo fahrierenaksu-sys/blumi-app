@@ -12,9 +12,9 @@ const {
   ROOM_AVATAR_CATALOG,
   ROOM_AVATAR_LAYER_ORDER
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock")
+} = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { AVATAR_V2_CATALOG } = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+const { AVATAR_V2_CATALOG } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
 const {
   DEFAULT_AVATAR_ROOM_PROJECTION_MAP,
   projectAvatarV2ToRoomAvatarAppearance

@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
-import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../features/avatarV2/room/avatarRoomSelectors"
 import { RoomAvatarRenderer2D } from "../features/avatarV2/room/components/RoomAvatarRenderer2D"

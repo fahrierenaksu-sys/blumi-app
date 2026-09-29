@@ -6,11 +6,11 @@ import { RETIRED_AVATAR_ITEM_IDS, DEFAULT_MALE_AVATAR_LOADOUT, DEFAULT_FEMALE_AV
 require.extensions[".png"] = (module, filename) => { module.exports = filename }
 require.extensions[".webp"] = require.extensions[".png"]
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AVATAR_V2_CATALOG } = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+const { AVATAR_V2_CATALOG } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { resolveAvatarV2, canEquipAvatarV2Item } = require("./avatarV2Selectors") as typeof import("./avatarV2Selectors")
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock")
+const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
 

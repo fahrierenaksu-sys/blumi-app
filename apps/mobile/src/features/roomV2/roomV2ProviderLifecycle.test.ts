@@ -108,7 +108,7 @@ function providerFixture(options?: {
         }
       }
     },
-    "../roomV2.mock": { DEFAULT_ROOM_V2_SHELL_ID: "default" },
+    "../roomV2Catalog": { DEFAULT_ROOM_V2_SHELL_ID: "default" },
     "../../realtime/globalRealtimeProvider": {
       getGlobalStatus: () => realtimeStatus,
       subscribeToStatus: (listener: (status: RealtimeConnectionStatus) => void) => {

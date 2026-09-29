@@ -72,7 +72,7 @@ test("female sweet capsule needs every static and fitted motion layer before pro
 test("female sweet capsule promotion understands the declarative room catalog mapping", () => {
   const roomRoot = new URL("../src/features/avatarV2/assets/room/", import.meta.url).pathname
   const catalogSourcePath = fileURLToPath(
-    new URL("../src/features/avatarV2/room/avatarRoom.mock.ts", import.meta.url)
+    new URL("../src/features/avatarV2/room/avatarRoomCatalog.ts", import.meta.url)
   )
   assert.doesNotThrow(() => verifyPromotedInventory({
     roomRoot,

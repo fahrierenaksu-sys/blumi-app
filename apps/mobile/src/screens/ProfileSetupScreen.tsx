@@ -11,7 +11,7 @@ import { BlumiSetupShell } from "../features/session/setupFlow/BlumiSetupShell"
 import {
   AVATAR_V2_CATALOG,
   DEFAULT_AVATAR_V2
-} from "../features/avatarV2/avatarV2.mock"
+} from "../features/avatarV2/avatarV2Catalog"
 import {
   applyOnboardingStarterBody,
   getOnboardingStarterBodyId

@@ -98,7 +98,7 @@ export interface RoomV3UniversalCorePlacementDepthEvidenceManifest {
 }
 
 type RuntimeFurnitureModule = typeof import("./roomV3UniversalCoreRuntimeFurniture")
-type RoomMockModule = typeof import("./roomV2.mock")
+type RoomMockModule = typeof import("./roomV2Catalog")
 type ArtifactRegistryModule = typeof import("./roomV3UniversalCoreArtifactRegistry")
 
 const SOURCE_ASSET_PATH =
@@ -121,7 +121,7 @@ export function createRoomV3UniversalCorePlacementDepthEvidenceManifest(
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   const artifactRegistryModule = require("./roomV3UniversalCoreArtifactRegistry") as ArtifactRegistryModule
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  const roomMockModule = require("./roomV2.mock") as RoomMockModule
+  const roomMockModule = require("./roomV2Catalog") as RoomMockModule
   const shell = roomMockModule.ROOM_V2_SHELL_CATALOG.find(
     (candidate) => candidate.id === ROOM_V3_UNIVERSAL_CORE_LOCKED_SHELL_ID
   )

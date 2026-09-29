@@ -734,7 +734,7 @@ export const verifyGeneratedEvidence = ({
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 if (isMain) {
   const roomRoot = join(repositoryRoot, "apps/mobile/src/features/avatarV2/assets/room")
-  const catalogSourcePath = join(repositoryRoot, "apps/mobile/src/features/avatarV2/room/avatarRoom.mock.ts")
+  const catalogSourcePath = join(repositoryRoot, "apps/mobile/src/features/avatarV2/room/avatarRoomCatalog.ts")
   const outputFlagIndex = process.argv.indexOf("--output-root")
   const outputRoot = outputFlagIndex >= 0
     ? resolve(process.argv[outputFlagIndex + 1] ?? "")

@@ -2,7 +2,7 @@ import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
-} from "./roomV2.mock"
+} from "./roomV2Catalog"
 import {
   getRoomV2DraftPlacementCandidates
 } from "./roomV2DraftPlacementCandidates"

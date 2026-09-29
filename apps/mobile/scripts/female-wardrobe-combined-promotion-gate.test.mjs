@@ -136,7 +136,7 @@ test("catalog contract fails closed when a new runtime wearable is omitted", () 
 
 test("live room catalog and promotion contract include the Coral Wave capsule", () => {
   const roomCatalogSourcePath = new URL(
-    "../src/features/avatarV2/room/avatarRoom.mock.ts",
+    "../src/features/avatarV2/room/avatarRoomCatalog.ts",
     import.meta.url
   )
   const source = readFileSync(roomCatalogSourcePath, "utf8")

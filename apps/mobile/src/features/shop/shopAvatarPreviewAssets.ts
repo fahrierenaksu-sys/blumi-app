@@ -1,5 +1,5 @@
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2/avatarV2.types"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getIdleAvatarLayerAssets } from "../avatarV2/room/avatarIdleAssets"
 import type { RoomV2AssetRef } from "../roomV2/roomV2.types"
 import { previewAvatarShopItem } from "./shopAvatarDraft"

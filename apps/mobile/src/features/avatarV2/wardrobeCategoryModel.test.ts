@@ -12,7 +12,7 @@ const {
   AVATAR_V2_INVENTORY,
   DEFAULT_AVATAR_V2
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+} = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
 const {
   canEquipAvatarV2Item,
   equipAvatarV2Item

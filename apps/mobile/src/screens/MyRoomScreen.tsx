@@ -16,7 +16,7 @@ import { uiTheme } from "../ui/theme"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { resolveMyRoomAvatarSource } from "../features/avatarV2/myRoomAvatarSource"
-import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
 import {
   createRoomAvatarRenderItem,
@@ -31,7 +31,7 @@ import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
-} from "../features/roomV2/roomV2.mock"
+} from "../features/roomV2/roomV2Catalog"
 import {
   insertRoomV2RenderItemSorted,
   resolveRoomV2Scene

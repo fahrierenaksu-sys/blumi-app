@@ -20,9 +20,9 @@ const {
   DEFAULT_ROOM_AVATAR_MALE,
   ROOM_AVATAR_CATALOG
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../avatarV2/room/avatarRoom.mock") as typeof import("../avatarV2/room/avatarRoom.mock")
+} = require("../avatarV2/room/avatarRoomCatalog") as typeof import("../avatarV2/room/avatarRoomCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2.mock") as typeof import("../avatarV2/avatarV2.mock")
+const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { resolveInitialAvatarV2 } = require("../avatarV2/avatarV2Persistence") as typeof import("../avatarV2/avatarV2Persistence")
 

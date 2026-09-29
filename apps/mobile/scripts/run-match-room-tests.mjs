@@ -33,7 +33,7 @@ const sourceFiles = [
   "src/config/env.ts",
   "src/config/env.test.ts",
   "src/features/roomV2/roomV2.types.ts",
-  "src/features/roomV2/roomV2.mock.ts",
+  "src/features/roomV2/roomV2Catalog.ts",
   "src/features/roomV2/roomV2Camera.ts",
   "src/features/roomV2/roomV2Camera.test.ts",
   "src/features/roomV2/myRoomLayoutMetrics.ts",

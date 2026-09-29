@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react"
 import { ECONOMY_CATALOG, resolveR1PublishedEconomyCatalog } from "@blumi/domain"
 import { Image as ExpoImage } from "expo-image"
 import { Image as ReactNativeImage, type ImageSourcePropType } from "react-native"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import { getIdleAvatarLayerAssets } from "../avatarV2/room/avatarIdleAssets"
 import { useAvatarV2 } from "../avatarV2/state/AvatarV2Provider"
@@ -10,7 +10,7 @@ import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
-} from "../roomV2/roomV2.mock"
+} from "../roomV2/roomV2Catalog"
 import { resolveRoomV2Shell } from "../roomV2/roomV2Selectors"
 import { useRoomV2 } from "../roomV2/state/RoomV2Provider"
 import { getAppLocale, getLocaleIdentifier } from "../session/appLocale"

@@ -32,7 +32,7 @@ runtimeModule._resolveFilename = (request, parent, ...rest) => {
 }
 const { ROOM_V2_FURNITURE_CATALOG, ROOM_V2_SHELL_CATALOG, MOCK_USER_ROOM_V2_DECOR } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../roomV2/roomV2.mock") as typeof import("../roomV2/roomV2.mock")
+  require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { resolveRoomWorldSeatSelection } = require("./roomWorldRuntime") as typeof import("./roomWorldRuntime")
 

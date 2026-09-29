@@ -7,9 +7,9 @@ import {
   Text,
   View
 } from "react-native"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
-import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { RoomAvatarRenderer2D } from "../avatarV2/room/components/RoomAvatarRenderer2D"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"

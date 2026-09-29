@@ -19,7 +19,7 @@ import { createPromotionPlan, resolvePromotionRoots } from "./promote-female-non
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, "../../..")
 const roomRoot = join(repositoryRoot, "apps/mobile/src/features/avatarV2/assets/room")
-const catalogSourcePath = join(repositoryRoot, "apps/mobile/src/features/avatarV2/room/avatarRoom.mock.ts")
+const catalogSourcePath = join(repositoryRoot, "apps/mobile/src/features/avatarV2/room/avatarRoomCatalog.ts")
 const background = [247, 237, 244, 255]
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex")

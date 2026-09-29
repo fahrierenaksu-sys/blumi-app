@@ -24,7 +24,7 @@ const {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_SHELL_CATALOG
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("./roomV2.mock") as typeof import("./roomV2.mock")
+} = require("./roomV2Catalog") as typeof import("./roomV2Catalog")
 const {
   resolveRoomV2Scene,
   resolvePlacedFurnitureRenderItem,

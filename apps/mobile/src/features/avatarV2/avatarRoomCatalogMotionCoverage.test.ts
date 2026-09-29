@@ -6,7 +6,7 @@ require.extensions[".png"] = (module, filename) => {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock")
+const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { ROOM_AVATAR_FRAME_DURATION_MS } = require("./room/avatarRoomMotionContract") as typeof import("./room/avatarRoomMotionContract")
 

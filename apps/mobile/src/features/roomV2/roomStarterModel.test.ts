@@ -89,7 +89,7 @@ test("rotating the starter bed preserves unrelated room items", () => {
 
 test("the starter bed has a dedicated runtime asset for every rotation", () => {
   const catalogSource = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomV2.mock.ts"),
+    resolve(process.cwd(), "src/features/roomV2/roomV2Catalog.ts"),
     "utf8"
   )
   assert.match(catalogSource, /rotationPolicy: "directional_assets_required"/)
@@ -119,7 +119,7 @@ test("the starter bed has a dedicated runtime asset for every rotation", () => {
 
 test("the modeled starter bed exposes body, contact shadow and thumbnail through one visual contract", () => {
   const catalogSource = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomV2.mock.ts"),
+    resolve(process.cwd(), "src/features/roomV2/roomV2Catalog.ts"),
     "utf8"
   )
 

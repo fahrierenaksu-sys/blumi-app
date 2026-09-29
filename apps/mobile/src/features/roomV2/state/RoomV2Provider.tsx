@@ -10,7 +10,7 @@ import {
 } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { loadAccountScopedStorage } from "../../persistence/accountScopedStorage"
-import { DEFAULT_ROOM_V2_SHELL_ID } from "../roomV2.mock"
+import { DEFAULT_ROOM_V2_SHELL_ID } from "../roomV2Catalog"
 import { useInventoryStore } from "../../inventory/inventoryStore"
 import type {
   PlacedRoomItem,

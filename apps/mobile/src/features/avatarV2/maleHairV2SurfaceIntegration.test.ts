@@ -6,11 +6,11 @@ require.extensions[".png"] = (module, filename) => {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixtures need a Node require hook.
-const { AVATAR_V2_CATALOG } = require("./avatarV2.mock") as typeof import("./avatarV2.mock")
+const { AVATAR_V2_CATALOG } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixtures need a Node require hook.
 const { MALE_CAPSULE_PREVIEW_SOURCES } = require("./maleCapsulePreviewSources") as typeof import("./maleCapsulePreviewSources")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixtures need a Node require hook.
-const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock")
+const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 
 const approved = [
   "ash_blond_low_fade_crop",

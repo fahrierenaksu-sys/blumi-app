@@ -1,6 +1,6 @@
 import { roomV2Assets } from "./roomV2Assets"
 import { ROOM_VNEXT_PILOT_FURNITURE_CATALOG } from "./roomVNextPilotFurniture"
-import { ROOM_V2_FURNITURE_CATALOG } from "./roomV2.mock"
+import { ROOM_V2_FURNITURE_CATALOG } from "./roomV2Catalog"
 import {
   resolveApprovedRoomV3UniversalCoreFurniture,
   type RoomV3UniversalCorePromotionRecord,

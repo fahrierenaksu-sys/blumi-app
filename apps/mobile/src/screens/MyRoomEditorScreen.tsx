@@ -10,7 +10,7 @@ import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
-} from "../features/roomV2/roomV2.mock"
+} from "../features/roomV2/roomV2Catalog"
 import {
   createRoomV2FurniturePlacementPreview,
   normalizeRoomInventorySearchText,

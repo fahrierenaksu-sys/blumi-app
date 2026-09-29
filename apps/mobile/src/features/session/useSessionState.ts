@@ -22,7 +22,7 @@ import {
   SUPPORTED_MOBILE_CAPABILITIES,
   type SessionScopedCapabilities
 } from "../capabilities/capabilityApi"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { resolveInitialAvatarV2 } from "../avatarV2/avatarV2Persistence"
 import {
   normalizeCompleteAvatarSelection,

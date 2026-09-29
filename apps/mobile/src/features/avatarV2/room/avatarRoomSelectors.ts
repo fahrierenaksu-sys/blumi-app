@@ -3,7 +3,7 @@ import {
   DEFAULT_ROOM_AVATAR_MALE,
   ROOM_AVATAR_CATALOG,
   ROOM_AVATAR_LAYER_ORDER
-} from "./avatarRoom.mock"
+} from "./avatarRoomCatalog"
 import type {
   CreateRoomAvatarRenderItemInput,
   ResolvedRoomAvatarLayer,

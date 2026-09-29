@@ -1,4 +1,4 @@
-import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoom.mock"
+import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import type { MiniRoomParticipantAvatarSnapshot } from "./scene/miniRoomSceneTypes"

@@ -12,7 +12,7 @@ const { ECONOMY_CATALOG, AVATAR_LOADOUT_CATALOG } =
   require("@blumi/domain") as typeof import("@blumi/domain");
 const { AVATAR_V2_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("./avatarV2.mock") as typeof import("./avatarV2.mock");
+  require("./avatarV2Catalog") as typeof import("./avatarV2Catalog");
 const { resolveInitialAvatarV2 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("./avatarV2Persistence") as typeof import("./avatarV2Persistence");
@@ -25,7 +25,7 @@ const {
   ROOM_AVATAR_LAYER_ORDER,
 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("./room/avatarRoom.mock") as typeof import("./room/avatarRoom.mock");
+  require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog");
 const {
   DEFAULT_AVATAR_ROOM_PROJECTION_MAP,
   projectAvatarV2ToRoomAvatarAppearance,

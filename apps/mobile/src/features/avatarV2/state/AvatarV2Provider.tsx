@@ -14,7 +14,7 @@ import type {
   CapabilityMap,
   CompleteAvatarSelection
 } from "@blumi/contracts"
-import { AVATAR_V2_CATALOG } from "../avatarV2.mock"
+import { AVATAR_V2_CATALOG } from "../avatarV2Catalog"
 import { useInventoryStore } from "../../inventory/inventoryStore"
 import {
   canEquipAvatarV2Item,
