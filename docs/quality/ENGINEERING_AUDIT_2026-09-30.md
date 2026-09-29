@@ -141,6 +141,40 @@ performance, W3 measurement, native evidence and release readiness.
 | 16 | Continuity | Progress reports and this audit | Done (ongoing) | — | — |
 | 17 | Final delivery report | Interim reports only | Planned | Final report in the brief's 15-point format | W3 |
 
+## Wave 2 cleanup and architecture checkpoint (2026-09-30)
+
+Full `npm run verify` on merged commit `579417c` exited 0: 2,820 passed,
+0 failed, 0 cancelled, 40 skipped (38 PostgreSQL-only cases run by the
+isolated gate, 2 intentional skips); dependency audit passed; Expo Doctor
+21/21. Code evidence only, not native evidence.
+
+- **Removed (proven unused, evidence in commit messages):** 13 source files
+  (~1,600 lines) including the unreachable `WelcomeScreen` and route, unused
+  onboarding/setup components, `useMiniRoomReactions`, typing indicator,
+  connection pill, the server rewarded-ad placeholder and presence-avatar
+  no-op, the unused lobby reaction API, the MiniRoom `animateEmote` flag, the
+  unreferenced `run-senior-runtime-fix-tests.mjs`, and two unused server
+  service factories. Production iOS export: 4,410 → 4,409 modules (only
+  `WelcomeScreen`), assets unchanged.
+- **Repaired and wired:** 16 stale contract tests; 1 trimmed to its unique
+  assertion; Coral Wave promotion gate fixed on the code side (explicit
+  approved file stems, pixel/fit checks unchanged, drift test added);
+  thumbnail generator finds normalized front art. Mobile suite now 2,084+
+  tests.
+- **Architecture:** `RootNavigator.tsx` 1,992 → 1,135 lines, split into 12
+  focused modules (linking, chrome/tab dispatch, pre-auth draft, room invite
+  routing, chat sync, match modal, notification routing, realtime session,
+  session guard); 18 characterization tests committed before the move.
+  Reduced-motion preference shared through one store.
+- **Held for the owner's Mac archive:** 75 production-source files (12 room
+  art PNGs, 63 Python scripts); removal via
+  `tools/workbench/remove-archived-from-manifest.mjs` after the receipt.
+- **Kept as ambiguous:** server legacy invite/lobby code used by mini-room
+  lifecycle tests; demo-only lobby code woven into `LobbyScreen`;
+  `roomV3UniversalSurfaceWaveArtifacts` (Workbench fixtures); 57
+  missing-fixture tests; 4 art QA gates (art decision); whether the wardrobe
+  gate should check `*_art_v17` frames for older items (art decision).
+
 ## Things that must not change
 
 - Migrations: `apps/server/db/migrations` has two `032_*` files and no `044`.
