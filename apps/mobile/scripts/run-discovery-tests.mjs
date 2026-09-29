@@ -42,8 +42,16 @@ const sourceFiles = [
   "src/features/discovery/discoveryWatchMutation.test.ts",
   "src/features/discovery/lobbyPresentationModel.ts",
   "src/features/discovery/lobbyPresentationModel.test.ts",
+  "src/features/discovery/discoveryCardFlipModel.ts",
+  "src/features/discovery/discoveryCardFlipModel.test.ts",
+  "src/features/discovery/profilePreviewCopy.ts",
+  "src/features/discovery/profilePreviewCopy.test.ts",
+  "src/features/discovery/roomShowcaseApi.ts",
+  "src/features/discovery/roomShowcaseApi.test.ts",
   "src/features/demo/dummyProfiles.ts",
   "src/features/demo/dummyProfiles.test.ts",
+  "src/features/demo/demoStore.ts",
+  "src/features/demo/demoStore.test.ts",
   "src/features/matches/matchRoomModel.ts"
 ]
 
@@ -101,7 +109,11 @@ try {
       join(outputDirectory, "features/discovery/discoveryStartupModel.test.js"),
       join(outputDirectory, "features/discovery/discoveryWatchMutation.test.js"),
       join(outputDirectory, "features/discovery/lobbyPresentationModel.test.js"),
-      join(outputDirectory, "features/demo/dummyProfiles.test.js")
+      join(outputDirectory, "features/discovery/discoveryCardFlipModel.test.js"),
+      join(outputDirectory, "features/discovery/profilePreviewCopy.test.js"),
+      join(outputDirectory, "features/discovery/roomShowcaseApi.test.js"),
+      join(outputDirectory, "features/demo/dummyProfiles.test.js"),
+      join(outputDirectory, "features/demo/demoStore.test.js")
     ],
     {
       cwd: workspaceRoot,
@@ -122,6 +134,7 @@ try {
       resolve(workspaceRoot, "src/ui/PreparedDiscoveryLoadingScreen.test.mjs"),
       resolve(workspaceRoot, "src/features/discovery/EmptyDiscoveryDeck.test.mjs"),
       resolve(workspaceRoot, "src/features/demo/SwipeableDiscoverCard.test.mjs"),
+      resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-refresh-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-presentation-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs")

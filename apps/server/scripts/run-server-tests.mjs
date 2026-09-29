@@ -1,15 +1,20 @@
 import { execFileSync } from "node:child_process"
-import { readdirSync, statSync } from "node:fs"
+import { readdirSync, rmSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const workspaceRoot = resolve(new URL("..", import.meta.url).pathname)
 const repositoryRoot = resolve(workspaceRoot, "../..")
 const distDirectory = join(workspaceRoot, "dist")
 
-execFileSync("npm", ["run", "build", "-w", "@blumi/domain"], {
-  cwd: repositoryRoot,
-  stdio: "inherit"
-})
+for (const workspace of ["@blumi/contracts", "@blumi/domain"]) {
+  execFileSync("npm", ["run", "build", "-w", workspace], {
+    cwd: repositoryRoot,
+    stdio: "inherit"
+  })
+}
+
+// Compiled tests of deleted sources must not survive in dist and keep running.
+rmSync(distDirectory, { recursive: true, force: true })
 
 execFileSync("npm", ["run", "build"], {
   cwd: workspaceRoot,
