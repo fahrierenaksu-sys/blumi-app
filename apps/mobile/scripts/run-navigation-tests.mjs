@@ -72,7 +72,8 @@ try {
       join(outputDirectory, "navigation/linkedProfileResolutionModel.test.js"),
       join(outputDirectory, "features/lobby/lobbyInviteAttempt.test.js"),
       join(outputDirectory, "features/shop/shopCatalogRuntime.test.js"),
-      resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs")
+      resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs"),
+      resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs")
     ],
     {
       cwd: workspaceRoot,
