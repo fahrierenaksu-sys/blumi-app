@@ -8,6 +8,10 @@ import {
 } from "./safetyRepository"
 import { PublicRequestError } from "../errors/publicRequestError"
 import {
+  createRealtimeAccessRevocationChannel,
+  type RealtimeAccessRevocationListener
+} from "../auth/realtimeAccessRevocation"
+import {
   getModerationTarget,
   type PendingModerationQueueSummary,
   summarizePendingModerationWorkload
@@ -54,6 +58,8 @@ export interface SafetyService {
     },
     now?: Date
   ): Promise<ReportRecord | null>
+  /** Fires after a report resolution (which may suspend or ban) has committed. */
+  subscribeRealtimeAccessRevocations(listener: RealtimeAccessRevocationListener): () => void
 }
 
 export class ReportResolutionConflictError extends PublicRequestError {
@@ -87,6 +93,7 @@ export function createSafetyService(
 ): SafetyService {
   const repository = options.repository ?? createInMemorySafetyRepository()
   const idFactory = options.idFactory ?? createReportId
+  const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
 
   return {
     repository,
@@ -215,7 +222,20 @@ export function createSafetyService(
       })
       if (result === "not_found") return null
       if (result === "conflict") throw new ReportResolutionConflictError()
-      return repository.findReport(normalizedReportId)
+      let report: ReportRecord | null = null
+      try {
+        report = await repository.findReport(normalizedReportId)
+        return report
+      } finally {
+        // The moderation write has committed; drop cached realtime access for
+        // the reported user (or for everyone if the report cannot be read).
+        realtimeAccessRevocations.publish(
+          report ? { kind: "user", userId: report.reportedUserId } : { kind: "all" }
+        )
+      }
+    },
+    subscribeRealtimeAccessRevocations(listener) {
+      return realtimeAccessRevocations.subscribeRealtimeAccessRevocations(listener)
     }
   }
 }

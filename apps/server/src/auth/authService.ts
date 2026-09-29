@@ -13,6 +13,11 @@ import {
 import { randomBytes } from "node:crypto"
 import { AuthError } from "./authErrors"
 import {
+  createRealtimeAccessRevocationChannel,
+  type RealtimeAccessRevocation,
+  type RealtimeAccessRevocationListener
+} from "./realtimeAccessRevocation"
+import {
   createInMemoryAuthRepository,
   type AccountProfileUpdate,
   type AuthRepository
@@ -143,6 +148,8 @@ export interface AuthService {
   requestPhoneChangeNewNumberChallenge(sessionToken: string, phoneNumber: string, currentPhoneConfirmationToken: string, now?: Date): Promise<{ expiresAt: string } | null>
   verifyPhoneChangeNewNumberChallenge(sessionToken: string, code: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
   confirmPhoneChange(sessionToken: string, currentPhoneConfirmationToken: string, newPhoneConfirmationToken: string, now?: Date): Promise<{ account: AccountRecord } | "missing_session" | "reauth_required" | "phone_in_use">
+  /** Fires after sign-out, account deletion or phone change has committed. */
+  subscribeRealtimeAccessRevocations(listener: RealtimeAccessRevocationListener): () => void
 }
 
 export interface AccountDataExport {
@@ -184,6 +191,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
   const otpHmacSecret = options.otpHmacSecret ?? randomBytes(32)
   const accountDeletionHandlers = options.accountDeletionHandlers ?? []
   const accountDataExporter = options.accountDataExporter ?? createEmptyAccountDataExporter()
+  const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
 
   async function requestAccountActionChallenge(input: {
     account: AccountRecord
@@ -806,7 +814,21 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
 
     async revokeSession(sessionToken) {
-      await repository.deleteSession(hashSessionToken(sessionToken))
+      const sessionTokenHash = hashSessionToken(sessionToken)
+      let revocation: RealtimeAccessRevocation | null
+      try {
+        const session = await repository.getSessionByTokenHash(sessionTokenHash)
+        revocation = session ? { kind: "user", userId: session.userId } : null
+      } catch {
+        // Sign-out must still succeed; without the owner, invalidate every
+        // cached realtime decision instead of none.
+        revocation = { kind: "all" }
+      }
+      await repository.deleteSession(sessionTokenHash)
+      if (revocation) realtimeAccessRevocations.publish(revocation)
+    },
+    subscribeRealtimeAccessRevocations(listener) {
+      return realtimeAccessRevocations.subscribeRealtimeAccessRevocations(listener)
     },
 
     async requestAccountDeletionChallenge(sessionToken, now = new Date()) {
@@ -1128,6 +1150,8 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       })
       if (result.kind === "conflict") return "phone_in_use"
       if (result.kind !== "updated") return "reauth_required"
+      // The phone change deleted every session of the account.
+      realtimeAccessRevocations.publish({ kind: "user", userId: resolved.account.userId })
       return { account: result.account }
     },
 
@@ -1148,6 +1172,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         now: now.getTime()
       })
       if (deleted) {
+        realtimeAccessRevocations.publish({ kind: "user", userId: resolved.account.userId })
         await Promise.all(
           accountDeletionHandlers.map((handler) => handler(resolved.account))
         )
