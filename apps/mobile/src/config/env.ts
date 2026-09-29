@@ -1,9 +1,3 @@
-import { resolveRoomVNextRuntimeGate } from "../features/roomV2/roomVNextRuntimeGate"
-import { resolveOnboardingRunAssetMode } from "../features/session/onboardingRunAssetGate"
-import { resolveOnboardingWelcomeHomeAssetMode } from "../features/session/onboardingWelcomeHomeAssetGate"
-import { ONBOARDING_ASSET_PRODUCTION_PROMOTION } from "../features/session/onboardingAssetPromotion"
-import { resolveProfileCharacterReactionAssetMode } from "../features/session/profileCharacterReactionAssetGate"
-
 function ensureNoTrailingSlash(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url
 }
@@ -87,8 +81,10 @@ export function resolveBlumiUniversalCoreQaEnabled(
   return resolveBlumiRoomV3DraftPreviewEnabled(input)
 }
 
-const isDevelopmentRuntime =
+export const IS_BLUMI_DEVELOPMENT_RUNTIME =
   typeof __DEV__ === "boolean" && __DEV__
+
+const isDevelopmentRuntime = IS_BLUMI_DEVELOPMENT_RUNTIME
 
 export const BLUMI_ONBOARDING_RUN_V3_QA_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_RUN_V3_QA
@@ -97,41 +93,12 @@ export const BLUMI_ONBOARDING_RUN_V3_REVIEW_APPROVED_FLAG =
 export const BLUMI_ONBOARDING_RUN_V3_USER_APPROVED_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_RUN_V3_USER_APPROVED
 
-export const ONBOARDING_RUN_ASSET_MODE = resolveOnboardingRunAssetMode({
-  isDevelopmentRuntime,
-  buildProfile: BLUMI_BUILD_PROFILE,
-  rawQaFlag: BLUMI_ONBOARDING_RUN_V3_QA_FLAG,
-  independentReviewApproved:
-    BLUMI_ONBOARDING_RUN_V3_REVIEW_APPROVED_FLAG?.trim() === "1",
-  finalUserApproval:
-    BLUMI_ONBOARDING_RUN_V3_USER_APPROVED_FLAG?.trim() === "1",
-  productionApproved: ONBOARDING_ASSET_PRODUCTION_PROMOTION.run
-})
-
-export const ONBOARDING_WELCOME_HOME_ASSET_MODE =
-  resolveOnboardingWelcomeHomeAssetMode({
-    isDevelopmentRuntime,
-    buildProfile: BLUMI_BUILD_PROFILE,
-    rawQaFlag: process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_WELCOME_HOME_QA,
-    independentReviewApproved:
-      process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_WELCOME_HOME_REVIEW_APPROVED?.trim() === "1",
-    finalUserApproval:
-      process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_WELCOME_HOME_USER_APPROVED?.trim() === "1",
-    productionApproved: ONBOARDING_ASSET_PRODUCTION_PROMOTION.welcomeHome
-  })
-
-export const PROFILE_CHARACTER_REACTION_ASSET_MODE =
-  resolveProfileCharacterReactionAssetMode({
-    isDevelopmentRuntime,
-    buildProfile: BLUMI_BUILD_PROFILE,
-    rawQaFlag: process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_QA,
-    independentReviewApproved:
-      process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_REVIEW_APPROVED?.trim() === "1",
-    finalUserApproval:
-      process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED?.trim() === "1",
-    productionApproved:
-      ONBOARDING_ASSET_PRODUCTION_PROMOTION.profileCharacterReaction
-  })
+export const BLUMI_PROFILE_CHARACTER_REACTION_QA_FLAG =
+  process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_QA
+export const BLUMI_PROFILE_CHARACTER_REACTION_REVIEW_APPROVED_FLAG =
+  process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_REVIEW_APPROVED
+export const BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED_FLAG =
+  process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED
 
 export const IS_BLUMI_ROOM_V3_DRAFT_PREVIEW =
   resolveBlumiRoomV3DraftPreviewEnabled({
@@ -240,22 +207,6 @@ export const IS_BLUMI_ROOM_VNEXT_FULL_WAVE_QA =
     buildProfile: BLUMI_BUILD_PROFILE,
     rawQaFlag: BLUMI_ROOM_VNEXT_FULL_WAVE_QA_FLAG
   })
-
-export const ROOM_VNEXT_RUNTIME_GATE = resolveRoomVNextRuntimeGate({
-  isDevelopmentRuntime,
-  buildProfile: BLUMI_BUILD_PROFILE,
-  rawFlag:
-    IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF ||
-    IS_BLUMI_ROOM_VNEXT_FULL_WAVE_QA
-      ? "1"
-      : undefined,
-  independentReviewApproved:
-    BLUMI_ROOM_VNEXT_INDEPENDENT_REVIEW_APPROVED_FLAG?.trim() === "1",
-  finalUserApproval:
-    BLUMI_ROOM_VNEXT_FINAL_USER_APPROVAL_FLAG?.trim() === "1"
-})
-
-export const ROOM_VNEXT_RUNTIME_MODE = ROOM_VNEXT_RUNTIME_GATE.mode
 
 export const BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS

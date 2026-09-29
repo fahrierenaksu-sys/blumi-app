@@ -3,7 +3,7 @@ import {
   StyleSheet,
   type ImageSourcePropType
 } from "react-native"
-import { ONBOARDING_RUN_ASSET_MODE } from "../../config/env"
+import { ONBOARDING_RUN_ASSET_MODE } from "./onboardingRunAssetGate"
 import {
   ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS,
   ONBOARDING_RUNNER_CATCH_X_OFFSETS,

@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native"
 
-import { PROFILE_CHARACTER_REACTION_ASSET_MODE } from "../../config/env"
 import { useReducedMotionPreference } from "../../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { AvatarPreview2D } from "../avatarV2/components/AvatarPreview2D"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
-import { shouldUseProfileCharacterReactionAssets } from "./profileCharacterReactionAssetGate"
+import {
+  PROFILE_CHARACTER_REACTION_ASSET_MODE,
+  shouldUseProfileCharacterReactionAssets
+} from "./profileCharacterReactionAssetGate"
 import { getProfileCharacterReaction } from "./profileCharacterReactionModel"
 import { getProfileCharacterReactionGeometry } from "./profileSetupVisualModel"
 
