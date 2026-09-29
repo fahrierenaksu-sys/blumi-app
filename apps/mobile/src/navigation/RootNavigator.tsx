@@ -561,7 +561,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     onConnectionMatched: handleRealtimeConnectionMatch
   })
 
-
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||
     (shouldWaitForPreAuthDraftHydration(sessionEntryRoute) &&
