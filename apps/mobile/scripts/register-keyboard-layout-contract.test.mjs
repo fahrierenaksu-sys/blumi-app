@@ -20,10 +20,13 @@ test("create-account phone entry collapses its hero cleanly for the keyboard", (
   assert.match(shell, /collapseStageOnKeyboard && keyboardVisible/)
   assert.match(shell, /scrollTo\(\{ y: 0, animated: false \}\)/)
   assert.match(shell, /ref=\{scrollRef\}/)
+  // With the keyboard open the scroll content always clears the primary action.
+  assert.match(shell, /const keyboardBottomPadding =\s*metrics\.primaryActionHeight/)
   assert.match(
     shell,
-    /paddingBottom:\s*scrollBottomInset \?\?\s*metrics\.primaryActionHeight/
+    /const scrollContentBottomPadding = keyboardVisible\s*\?\s*keyboardBottomPadding\s*:\s*scrollBottomInset \?\? keyboardBottomPadding/
   )
+  assert.match(shell, /paddingBottom:\s*scrollContentBottomPadding/)
   assert.match(shell, /backgroundColor: uiTheme\.colors\.backgroundWarm/)
   assert.match(register, /const setupMetrics = getSetupLayoutMetrics\(/)
   assert.match(register, /setupMetrics\.dense \? styles\.formCardCompact : null/)

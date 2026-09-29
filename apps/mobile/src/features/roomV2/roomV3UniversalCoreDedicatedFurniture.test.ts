@@ -7,6 +7,7 @@ import {
   type UniversalCorePilotDirectionalAssets
 } from "./roomV3UniversalCorePilotFurniture"
 import { getRoomV3FootprintForRotation } from "./roomV3Contracts"
+import { getRoomV3ScenePhysicalFootprint } from "./roomV3PhysicalScaleContract"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -140,16 +141,18 @@ test("runtime uses the dedicated console and plant contracts without inherited m
   assert.ok(consoleTable)
   assert.equal(consoleTable.category, "table")
   assert.equal(consoleTable.surfaceSupports?.[0]?.surface, "tabletop")
-  assert.deepEqual(getRoomV3FootprintForRotation(consoleTable, "right"), {
-    width: 0.11,
-    height: 0.22
-  })
+  // Runtime footprints come from the avatar-calibrated physical scale
+  // contract, not from the uncalibrated pilot art envelope.
+  assert.deepEqual(
+    getRoomV3FootprintForRotation(consoleTable, "right"),
+    getRoomV3ScenePhysicalFootprint("universal_console_table_a", "right")
+  )
 
   assert.ok(plant)
   assert.equal(plant.category, "plant")
   assert.equal(plant.surfaceSupports, undefined)
-  assert.deepEqual(getRoomV3FootprintForRotation(plant, "left"), {
-    width: 0.045,
-    height: 0.055
-  })
+  assert.deepEqual(
+    getRoomV3FootprintForRotation(plant, "left"),
+    getRoomV3ScenePhysicalFootprint("universal_large_standing_plant_a", "left")
+  )
 })

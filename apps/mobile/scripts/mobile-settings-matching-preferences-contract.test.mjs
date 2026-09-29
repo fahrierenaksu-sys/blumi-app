@@ -11,8 +11,8 @@ const settings = readFileSync(
 )
 
 test("Settings edits the same persisted filters used by Discover", () => {
-  assert.match(settings, /label="Discovery preferences"/)
-  assert.match(settings, /formatDiscoveryFiltersSummary\(matchingFilters\)/)
+  assert.match(settings, /label=\{copy\.discoveryPreferences\}/)
+  assert.match(settings, /formatDiscoveryFiltersSummary\(matchingFilters, locale\)/)
   assert.match(settings, /<DiscoverFiltersBottomSheet/)
   assert.match(settings, /loadDiscoveryFilters\(AsyncStorage, sessionActor\.profile\.userId\)/)
   assert.match(settings, /persistDiscoveryFilters\([\s\S]*?AsyncStorage,[\s\S]*?sessionActor\.profile\.userId/)

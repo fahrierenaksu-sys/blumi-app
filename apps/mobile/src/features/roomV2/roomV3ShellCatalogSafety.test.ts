@@ -67,7 +67,7 @@ test("failed shell generators stay removed while evidence-only verifiers remain"
   assert.equal(existsSync(resolve(scriptsRoot, "verify-room-v3-shell-geometry.py")), true)
 })
 
-test("six current shells are reachable only through the explicit development QA resolver", () => {
+test("six current QA shells stay in the QA catalog and out of the My Room screens", () => {
   const roomV2Root = resolve(process.cwd(), "src/features/roomV2")
   const qaCatalogSource = readFileSync(
     resolve(roomV2Root, "roomV3QaShellCatalog.ts"),
@@ -92,8 +92,7 @@ test("six current shells are reachable only through the explicit development QA 
   assert.match(qaCatalogSource, /sourceStatus: "candidate"/)
   assert.match(qaCatalogSource, /qaStatus: "pending"/)
   for (const source of [myRoomSource, editorSource]) {
-    assert.match(source, /resolveRoomV3QaShellCatalogRuntime/)
-    assert.match(source, /BLUMI_ROOM_V3_DRAFT_PREVIEW_FLAG/)
-    assert.match(source, /ACTIVE_ROOM_SHELL_CATALOG/)
+    assert.match(source, /const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG\n/)
+    assert.doesNotMatch(source, /roomV3QaShellCatalog|ROOM_V3_QA_SHELL/)
   }
 })

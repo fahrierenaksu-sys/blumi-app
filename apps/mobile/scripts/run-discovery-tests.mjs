@@ -137,7 +137,8 @@ try {
       resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-refresh-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-presentation-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs")
+      resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs"),
+      resolve(workspaceRoot, "scripts/mobile-settings-matching-preferences-contract.test.mjs")
     ],
     {
       cwd: workspaceRoot,

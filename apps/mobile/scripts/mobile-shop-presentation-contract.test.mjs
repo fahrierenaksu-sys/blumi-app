@@ -39,7 +39,7 @@ test("full-canvas rig layers get a type-aware contained presentation", () => {
     /getMaleRigLayerThumbnailPresentation\(item\.type, "shop"\)/
   )
   assert.match(shopScreen, /isRigLayerSource=\{isRigLayerSource\}/)
-  assert.match(shopScreen, /resizeMode="contain"/)
+  assert.match(shopScreen, /contentFit="contain"/)
   assert.match(shopScreen, /productWearableRigLayer/)
 })
 
@@ -77,7 +77,8 @@ test("every compact shop action keeps a 44 point touch target", () => {
 test("shop makes loading, empty, offline, and retry states explicit and accessible", () => {
   assert.match(shopScreen, /useNetworkStatus/)
   assert.match(shopScreen, /const shopPresentationState = getShopPresentationState\(/)
-  assert.match(shopScreen, /const showShopContent = shouldRenderShopContent\(/)
+  assert.match(shopScreen, /showShopContent: shouldRenderShopContent\(/)
+  assert.match(shopScreen, /const \{\s*showShopContent,[\s\S]*?\} = shopSurfacePolicy/)
   assert.match(shopScreen, /isProduction: requiresServerInventory/)
   assert.match(shopScreen, /showShopContent \? \(/)
   assert.match(shopNavigationControls, /case "loading":/)
@@ -102,7 +103,7 @@ test("coin packs stay hidden until the balance pill is pressed", () => {
   assert.match(shopScreen, /testID="shop-coin-balance"/)
   assert.match(
     shopScreen,
-    /accessibilityState=\{\{ disabled: !requiresServerInventory, expanded: isCoinWalletOpen \}\}/
+    /accessibilityState=\{\{ disabled: !requiresServerInventory \|\| !canPerformShopActions \|\| !IS_BLUMI_PAID_COINS_ENABLED, expanded: IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen \}\}/
   )
   assert.match(
     shopScreen,
@@ -110,7 +111,7 @@ test("coin packs stay hidden until the balance pill is pressed", () => {
   )
   assert.match(
     shopScreen,
-    /\{requiresServerInventory && isCoinWalletOpen \? \([\s\S]*?<CoinPackWalletPanel/
+    /\{IS_BLUMI_PAID_COINS_ENABLED && requiresServerInventory && inventoryVerified && isCoinWalletOpen \? \([\s\S]*?<CoinPackWalletPanel/
   )
   assert.doesNotMatch(
     shopScreen,

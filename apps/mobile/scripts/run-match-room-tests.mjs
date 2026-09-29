@@ -125,6 +125,8 @@ const sourceFiles = [
   "src/features/roomV2/roomV3QaShellCatalogRuntime.ts",
   "src/features/roomV2/roomV3QaShellCatalogRuntime.test.ts",
   "src/features/roomV2/roomV3UniversalCoreInventory.test.ts",
+  "src/features/roomV2/roomV3ShellCatalogSafety.test.ts",
+  "src/features/roomV2/roomV3UniversalCoreDedicatedFurniture.test.ts",
   "src/features/roomV2/roomV3UniversalRuntimeWaveArtifacts.test.ts",
   "src/features/roomV2/roomVNextCandidateIdAdapter.ts",
   "src/features/roomV2/roomVNextCandidateIdAdapter.test.ts",
@@ -260,6 +262,8 @@ try {
       join(outputDirectory, "features/roomV2/roomV3QaRuntimeGate.test.js"),
       join(outputDirectory, "features/roomV2/roomV3QaShellCatalogRuntime.test.js"),
       join(outputDirectory, "features/roomV2/roomV3UniversalCoreInventory.test.js"),
+      join(outputDirectory, "features/roomV2/roomV3ShellCatalogSafety.test.js"),
+      join(outputDirectory, "features/roomV2/roomV3UniversalCoreDedicatedFurniture.test.js"),
       join(outputDirectory, "features/roomV2/roomV3UniversalRuntimeWaveArtifacts.test.js"),
       join(outputDirectory, "features/roomV2/roomVNextCandidateIdAdapter.test.js"),
       join(outputDirectory, "features/roomV2/roomVNextContracts.test.js"),
@@ -304,7 +308,8 @@ try {
       resolve(workspaceRoot, "scripts/create-room-v3-universal-core-evidence-manifest.test.mjs"),
       resolve(workspaceRoot, "scripts/prepare-room-v3-full-catalog-native-evidence.test.mjs"),
       resolve(workspaceRoot, "scripts/verify-room-v3-shell-promotion.test.mjs"),
-      resolve(workspaceRoot, "scripts/verify-room-v3-universal-core-assets.test.mjs")
+      resolve(workspaceRoot, "scripts/verify-room-v3-universal-core-assets.test.mjs"),
+      resolve(workspaceRoot, "scripts/generate-room-v3-universal-thumbnails.test.mjs")
     ],
     {
       cwd: workspaceRoot,

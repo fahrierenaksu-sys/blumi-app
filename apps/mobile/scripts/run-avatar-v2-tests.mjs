@@ -135,6 +135,8 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/retiredWardrobe.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
       resolve(workspaceRoot, "scripts/room-avatar-renderer-subscription.test.mjs"),
+      resolve(workspaceRoot, "scripts/mobile-avatar-runtime-performance.test.mjs"),
+      resolve(workspaceRoot, "scripts/mobile-senior-runtime-fixes-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/female-sitting-rig-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/female-wardrobe-static-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/female-wardrobe-combined-promotion-gate.test.mjs"),

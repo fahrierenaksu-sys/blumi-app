@@ -1,9 +1,11 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { dirname, resolve } from "node:path"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 
-const read = (path) => readFileSync(resolve(path), "utf8")
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..")
+const read = (path) => readFileSync(resolve(repositoryRoot, path), "utf8")
 
 test("Shop displays the result of the current avatar save attempt", () => {
   const provider = read("apps/mobile/src/features/avatarV2/state/AvatarV2Provider.tsx")
@@ -13,7 +15,7 @@ test("Shop displays the result of the current avatar save attempt", () => {
   assert.match(provider, /runAvatarEquipSave\(\{[\s\S]*?nextAvatar,[\s\S]*?save: \(avatarToSave\) => onSaveAvatar/)
   assert.match(provider, /beginAvatarEquipSave\(avatarEquipLifecycleRef\.current\)/)
   assert.match(provider, /mayCommitAvatarEquipSave\([\s\S]*?avatarEquipLifecycleRef\.current,[\s\S]*?requestGeneration/)
-  assert.match(provider, /hasLocalCustomizationRef\.current = markAvatarLocallyCustomized\(\)[\s\S]*?setAvatar\(nextAvatar\)/)
+  assert.match(provider, /hasLocalCustomizationRef\.current = markAvatarLocallyCustomized\(\)[\s\S]*?updateAvatar\(nextAvatar\)/)
   assert.match(purchase, /const equipResult = await input\.equipAndSaveItem/)
   assert.match(purchase, /title: equipResult\.errorMessage/)
   assert.doesNotMatch(purchase, /title: avatarV2\.saveErrorMessage/)
@@ -40,12 +42,11 @@ test("reduced-motion policy is wired to decorative avatar motion", () => {
     "animateBreathe",
     "animateJoin",
     "animateSpeaking",
-    "animateEmote",
     "animateBubble"
   ]) {
     assert.match(layer, new RegExp(`motionPolicy\\.${field}`))
   }
-  assert.match(layer, /emotePopRef\.setValue\(1\)/)
+  assert.match(layer, /bubblePopRef\.setValue\(1\)/)
   assert.match(layer, /joinPulseRef\.setValue\(1\)/)
 })
 

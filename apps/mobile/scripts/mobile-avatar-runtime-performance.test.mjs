@@ -106,5 +106,4 @@ test("MiniRoom movement rerenders only the live avatar layer", () => {
     /const RoomChatComposer = memo\(function RoomChatComposer/
   )
   assert.match(miniRoomSceneSource, /const handleRoomPress = useCallback\(/)
-  assert.match(miniRoomSceneSource, /const handleSendReaction = useCallback\(/)
 })

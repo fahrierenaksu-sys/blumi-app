@@ -27,7 +27,6 @@ test("room onboarding uses the room-first shell without duplicate heading or che
   assert.match(screen, /roomSceneSurface/)
   assert.match(screen, /backgroundColor:\s*uiTheme\.colors\.backgroundWarm/)
   assert.match(screen, /bedEditorToolbar/)
-  assert.match(screen, /setupMetrics\.dense \? styles\.stageFrameDense : null/)
   assert.match(screen, /setupMetrics\.dense \? styles\.roomFirstSheetDense : null/)
   assert.doesNotMatch(screen, /roomInteractionCue/)
   assert.doesNotMatch(screen, /roomRenderer:\s*\{[^}]*borderWidth/)

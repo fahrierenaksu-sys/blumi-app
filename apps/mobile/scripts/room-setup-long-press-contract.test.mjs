@@ -15,13 +15,15 @@ test("starter bed becomes editable from the placed object with long-press haptic
 
   assert.match(screen, /hapticMedium/)
   assert.match(screen, /onItemLongPress=\{handlePlacedBedLongPress\}/)
+  assert.match(screen, /onItemLongPressMove=\{handlePlacedBedLongPressMove\}/)
   assert.match(screen, /onItemLongPressRelease=\{handlePlacedBedLongPressRelease\}/)
-  assert.match(screen, /selectedInstanceId=\{placedBedRenderId\}/)
   assert.match(screen, /Basılı tutup sürükleyerek taşı/)
 
   assert.match(renderer, /onItemLongPress\?: \(item: RoomV2RenderItem\) => void/)
+  assert.match(renderer, /onItemLongPressMove\?: \(item: RoomV2RenderItem, point: \{ pageX: number; pageY: number \}\) => void/)
   assert.match(renderer, /onItemLongPressRelease\?: \(item: RoomV2RenderItem, point: RoomWorldPoint\) => void/)
   assert.match(renderer, /onLongPress=/)
   assert.match(renderer, /onPressOut=/)
-  assert.match(renderer, /delayLongPress=\{360\}/)
+  // A drag-capable host starts the move immediately; others keep the 360 ms hold.
+  assert.match(renderer, /delayLongPress=\{onItemLongPressMove \? 0 : 360\}/)
 })

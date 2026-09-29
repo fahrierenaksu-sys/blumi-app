@@ -39,7 +39,7 @@ test("the create-account handoff keeps the selected character in the phone scene
   assert.match(registerSource, /createFlowAvatar/)
   assert.match(registerSource, /AvatarPreview2D/)
   assert.doesNotMatch(registerSource, /SetupAnimatedAvatarPreview/)
-  assert.match(coordinatorSource, /createFlowAvatar=\{draft\.avatar/)
+  assert.match(coordinatorSource, /createFlowAvatar=\{renderedDraft\.avatar\}/)
   assert.doesNotMatch(registerSource, /Previous style|Next style/)
 })
 
@@ -95,7 +95,8 @@ test("the shared action dock owns a consistent bottom surface", () => {
 
   assert.match(shellSource, /<View style=\{styles\.footer\}>/)
   assert.match(actionSource, /LinearGradient/)
-  assert.match(actionSource, /height:\s*58/)
+  // The 58 pt height itself is pinned by onboardingActionLayout.test.ts.
+  assert.match(actionSource, /height:\s*ONBOARDING_PRIMARY_ACTION_LAYOUT\.height/)
 })
 
 test("profile setup uses the full-height shared shell instead of assembling its own chrome", () => {

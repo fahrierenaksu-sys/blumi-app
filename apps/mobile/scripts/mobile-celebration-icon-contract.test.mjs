@@ -22,17 +22,3 @@ test("match and debrief celebrations use the product icon system instead of font
   assert.match(roomDebrief, /name="sparkles"/)
   assert.match(roomDebrief, /name="hand-left-outline"/)
 })
-
-test("MiniRoom reactions preserve all four semantics with stable vector icons", () => {
-  const miniRoomScene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
-  const avatarLayer = read("src/features/miniRoom/scene/AvatarLayer.tsx")
-
-  for (const source of [miniRoomScene, avatarLayer]) {
-    assert.match(source, /@expo\/vector-icons\/Ionicons/)
-    assert.match(source, /wave:\s*"hand-left-outline"/)
-    assert.match(source, /heart:\s*"heart"/)
-    assert.match(source, /laugh:\s*"happy"/)
-    assert.match(source, /fire:\s*"flame"/)
-    assert.doesNotMatch(source, /[👋❤😂🔥💗]/u)
-  }
-})

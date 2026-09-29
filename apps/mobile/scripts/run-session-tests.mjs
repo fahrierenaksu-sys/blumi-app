@@ -170,7 +170,8 @@ try {
       "src/features/settings/settingsCopy.test.ts",
       "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/screens/AuthEntryScreen.test.ts",
-      "src/ui/onboardingColorConsistency.test.ts"
+      "src/ui/onboardingColorConsistency.test.ts",
+      "src/ui/onboardingActionSystem.test.ts"
     ],
     {
       cwd: workspaceRoot,
