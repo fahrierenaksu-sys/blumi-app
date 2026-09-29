@@ -112,7 +112,7 @@ performance, W3 measurement, native evidence and release readiness.
 
 | Brief § | Area | Surface reviewed / method | Status | Remaining | Wave |
 |---|---|---|---|---|---|
-| 2, 3 | Existing solutions and docs are not exempt | Previous audit re-checked; stale claims corrected (LAUNCH_CONTROL, 09-28 audit marked historical) | Partial | Full Markdown inventory and classification (active instruction / guide / decision / status / history), broken links and command checks, AGENTS/README alignment (in progress) | W2 |
+| 2, 3 | Existing solutions and docs are not exempt | Previous audit re-checked; stale claims corrected (LAUNCH_CONTROL, 09-28 audit marked historical) | Done | keep DOCUMENT_INVENTORY current | — |
 | 4 | Authority and protection | Branch-only commits, explicit file lists, no main merge/deploy/migration without the owner; one owner-approved Railway variable | Done | — | — |
 | 5 | Role coverage and agents | Orchestrated agents per package with file ownership; results verified on the merged tree | Done (ongoing) | — | — |
 | 6 | Real system and baseline | Workspaces, versions, config/env resolution, CI, test infrastructure, Railway environment and logs | Done | Metro/native build identity on the owner's device | W3 |
