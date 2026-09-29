@@ -14,7 +14,9 @@ export const UNIVERSAL_CORE_THUMBNAIL_SIZE = 180
 export const UNIVERSAL_CORE_THUMBNAIL_MANIFEST_VERSION =
   "room-v3-universal-core-thumbnail-manifest-v1"
 
-const FRONT_ONLY_FALLBACKS = ["runtime_v2", "runtime_v1", "pilot_v1"]
+// Order mirrors the runtime asset modules: a normalized front (as loaded by
+// roomV3UniversalCoreRuntimeFurniture.ts) wins over the plain runtime art.
+const FRONT_ONLY_FALLBACKS = ["runtime_v2_normalized_v3", "runtime_v2", "runtime_v1", "pilot_v1"]
 
 export async function generateUniversalCoreThumbnails({
   outputRoot = resolve(
