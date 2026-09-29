@@ -54,7 +54,10 @@ A snapshot, not a promise. Re-verify against the code before relying on it, and 
 
 - **Implemented:** Avatar V2 layered-PNG runtime with existing motion contracts, RoomWorld geometry and interaction model, My Room and MiniRoom surfaces. Stack: Expo SDK 57, React Native 0.86, React 19, Reanimated 4, Worklets.
 - **Planned, not present:** Avatar V3 (no code yet; `docs/avatar-motion-pipeline/` holds fit data only), Spine runtime, React Native Skia (neither is a dependency). Do not describe them as implemented or import them without the gates in this file.
+- **Retired:** the legacy public lobby is retired server-side (deny-all realtime presence policy) and in mobile production sessions, which never send `room.join` and ignore lobby events (`docs/quality/ENGINEERING_AUDIT_2026-09-30.md` F-08). It is live only after an authorised deploy.
+- **Promoted:** the candidate onboarding/profile imports were promoted to `*-runtime` paths with bytes unchanged (F-09); the app has 0 candidate-path imports. The release candidate-import gate stays in place.
 - **Open:** native, physical-device, and performance evidence for the current build.
+- **Evidence log:** `docs/quality/ENGINEERING_AUDIT_2026-09-30.md` is the current evidence log; check it before relying on older reports.
 
 ## Product and architecture invariants
 
@@ -110,12 +113,19 @@ Prefer immutable state/domain updates, explicit errors, validated boundaries, st
 ### Commands
 
 - `npm run typecheck`, `npm run lint`, `npm test`: focused checks.
-- `npm run verify`: full release gate (source hygiene, operations center, audit policy, release infrastructure, package build, typecheck, lint, tests).
+- `npm run verify`: full release gate (source hygiene, operations center, workbench tools, audit policy, release infrastructure, package build, typecheck, lint, tests, PostgreSQL gate, release audit, Expo Doctor).
 - `npm run doctor`: Expo dependency health check.
 - `npm run dev:mobile` / `npm run dev:server`: start Metro or the backend. `npm run server:qa` starts the backend with QA env files.
 - `npm run db:migrate`: data-affecting; confirm the target first.
-- `npm run audit:release`, `npm run verify:source-hygiene`, `npm run verify:release-infra`, `npm run verify:postgres`, `npm run verify:operations-center`: individual gates.
+- `npm run audit:release`, `npm run verify:source-hygiene`, `npm run verify:release-infra`, `npm run verify:postgres`, `npm run verify:operations-center`, `npm run verify:workbench-tools`: individual gates. `npm run verify` includes `verify:workbench-tools`.
+- The PostgreSQL gate (`npm run verify:postgres`) needs PostgreSQL binaries and refuses to run `initdb` as root.
 - `npm run clean-clone:verify`: `npm ci` then `npm run verify`; slow, final gate only.
+
+### Repository notes
+
+- Migrations in `apps/server/db/migrations` are checksummed and applied: two files share prefix 032 and 044 is missing. Never rename or renumber them.
+- Railway staging requires `BLUMI_TRUST_PROXY=100.64.0.0/10` (set in `.railway/railway.ts`).
+- Cleanup of archived production sources follows `docs/quality/CLEANUP_MANIFEST_2026-09-29.md`: archive on the owner's Mac first, then run `tools/workbench/remove-archived-from-manifest.mjs`.
 
 Choose checks by risk. Run the broad gate at the appropriate phase, not repeatedly without new evidence. For release, TestFlight, or App Store readiness work, follow `docs/release/RELEASE_CAPTAIN_WORKFLOW.md`.
 

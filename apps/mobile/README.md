@@ -1,23 +1,21 @@
-# Blumi SDK 57
+# Blumi Mobile
 
-Standalone Expo SDK 57 mobile app extracted from the Blumi workspace.
+Expo SDK 57 mobile app (React Native 0.86), the `@blumi/mobile` workspace package of the Blumi monorepo. It is not a standalone project: install from the repository root.
 
 ## Setup
 
 ```bash
-npm install
+npm ci   # at the repository root
 ```
 
 ## Run
 
-```bash
-npm run ios
-```
-
-For Metro only:
+From the repository root:
 
 ```bash
-npm run start
+npm run dev:mobile                       # Metro (dev client, demo media mode)
+npm --workspace @blumi/mobile run start  # equivalent
+npm --workspace @blumi/mobile run ios    # build and run on the iOS Simulator
 ```
 
 ## Notes
