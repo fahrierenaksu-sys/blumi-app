@@ -23,7 +23,6 @@ test("reduced motion makes decorative room motion instant or static", () => {
     animateJoin: false,
     animateHeart: false,
     animateSpeaking: false,
-    animateEmote: false,
     animateBubble: false,
     animateWalking: true,
     transitionDuration: 0
@@ -36,7 +35,6 @@ test("the default room policy retains tasteful motion", () => {
     animateJoin: true,
     animateHeart: true,
     animateSpeaking: true,
-    animateEmote: true,
     animateBubble: true,
     animateWalking: true,
     transitionDuration: 420

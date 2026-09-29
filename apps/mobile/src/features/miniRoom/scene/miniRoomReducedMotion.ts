@@ -3,7 +3,6 @@ export interface MiniRoomMotionPolicy {
   animateJoin: boolean
   animateHeart: boolean
   animateSpeaking: boolean
-  animateEmote: boolean
   animateBubble: boolean
   animateWalking: boolean
   transitionDuration: number
@@ -27,7 +26,6 @@ export function resolveMiniRoomMotionPolicy(
     animateJoin: !reduceMotion,
     animateHeart: !reduceMotion,
     animateSpeaking: !reduceMotion,
-    animateEmote: !reduceMotion,
     animateBubble: !reduceMotion,
     animateWalking: true,
     transitionDuration: reduceMotion ? 0 : 420
