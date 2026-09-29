@@ -146,6 +146,7 @@ try {
       "--test",
       "src/features/session/registerLegalContract.test.ts",
       "src/features/session/accountRecoveryModel.test.ts",
+      "src/features/session/accountSwitchIsolation.test.ts",
       "src/features/session/appLocale.test.ts",
       "src/features/session/authLocaleResolver.test.ts",
       "src/features/session/nativeUiSessionReset.test.ts",
