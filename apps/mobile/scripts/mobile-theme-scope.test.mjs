@@ -78,7 +78,6 @@ test("entry and onboarding surfaces use their scoped Blumi palette", () => {
     "src/screens/ProfileSetupScreen.tsx",
     "src/screens/AvatarSetupScreen.tsx",
     "src/screens/RoomSetupScreen.tsx",
-    "src/screens/WelcomeScreen.tsx",
     "src/features/session/OnboardingScanStage.tsx",
     "src/features/session/ProfileCharacterReactionStage.tsx",
     "src/features/avatarV2/components/AvatarSetupStudioStage.tsx"
@@ -110,7 +109,10 @@ test("entry and onboarding surfaces use their scoped Blumi palette", () => {
 
   const backgroundSource = readSource("src/ui/backgrounds.tsx")
   assert.match(backgroundSource, /bootstrap:[\s\S]*blumiEntryTheme\.colors\.backgroundWarm/)
-  assert.match(readSource("src/screens/WelcomeScreen.tsx"), /variant="bootstrap"/)
+  assert.match(
+    readSource("src/features/session/setupFlow/BlumiSetupShell.tsx"),
+    /variant="bootstrap"/
+  )
   assert.match(
     readSource("src/ui/BlumiLoadingScreen.tsx"),
     /backgroundColor: "#FFF6F8"/

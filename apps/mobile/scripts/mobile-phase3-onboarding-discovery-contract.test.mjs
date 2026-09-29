@@ -46,12 +46,9 @@ test("avatar onboarding has one progress surface and keeps identity editing sepa
   assert.match(source, /Edit profile details/)
 })
 
-test("Welcome, character setup, and Discover share Blumi's avatar-first low-pressure promise", () => {
-  const welcome = read("src/screens/WelcomeScreen.tsx")
+test("character setup and Discover share Blumi's avatar-first low-pressure promise", () => {
   const avatar = read("src/screens/AvatarSetupScreen.tsx")
   const discovery = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
-  assert.match(welcome, /Lead with your avatar/)
-  assert.match(welcome, /low-pressure/)
   assert.match(avatar, /Build the first look people meet\./)
   assert.match(discovery, /match your vibe/)
 })
