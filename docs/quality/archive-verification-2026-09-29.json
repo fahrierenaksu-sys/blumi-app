@@ -1,0 +1,542 @@
+{
+  "schemaVersion": "blumi-workbench-archive-verification-v1",
+  "generatedAt": "2026-09-29T22:37:31.051Z",
+  "dryRun": false,
+  "manifest": "docs/quality/cleanup-manifest-2026-09-29.json",
+  "manifestSha256": "c83d8831391a28a5af7127807b0254bdc7208b210addfa1f5d14062df1eae2fa",
+  "destination": "/Users/evrenevren/BlumiArtWorkbench/2026-09-30/repo-cleanup-archive",
+  "totals": {
+    "archiveEntries": 75,
+    "verified": 75,
+    "failed": 0,
+    "bytes": 3546818
+  },
+  "complete": true,
+  "entries": [
+    {
+      "path": "apps/mobile/scripts/build_room_avatar_motion_canvas.py",
+      "bytes": 2055,
+      "sha256": "5d015ec3947334376cb8016a27ed889b916cc707ef9b59f491378dff65df5b1a",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/build_room_avatar_motion_canvases.py",
+      "bytes": 2093,
+      "sha256": "d69aaf90277d4148b226df8e23695f793e9e265fe67049c758a572ac505086aa",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/clean_female_hair_alpha.py",
+      "bytes": 1362,
+      "sha256": "6e60c2cec353c53d5ccab4f50f334a92fcce15d615e8786ace3857079ccdb07e",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/export_female_hair_catalog_assets.py",
+      "bytes": 2149,
+      "sha256": "6bd863853f98d5fd78411ecb46dba8957feb68cfa645f4d2ff5ae98e1a5118a9",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/export_room_avatar_motion_manifest.py",
+      "bytes": 8218,
+      "sha256": "044513c71efe055c4f6cb022ab6a81a39f36063581cf427ab2f5f12e7b151cdb",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/export_room_avatar_motion_prompts.py",
+      "bytes": 9885,
+      "sha256": "5344d2884cdbfdb2286b6b08a026071a8f9a038ec665a5f7eef1468cad19a2e3",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/extract_room_avatar_motion_frames.py",
+      "bytes": 4296,
+      "sha256": "7c1dcc3e1cbe547731aa86de998d42963d5476da30dbd02cab6287611c94cc17",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/finalize_male_motion_independent_review.py",
+      "bytes": 2430,
+      "sha256": "99766250bd87b995da58ce23188629cae2ea4a2c2dabaac548571818b290f83d",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/finish_modern_track_luxury_candidate.py",
+      "bytes": 2375,
+      "sha256": "e244431e4ec388cbc06020501e87fce193c2f4bcbfce4590ac6bb4a076936817",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_accessory_collection.py",
+      "bytes": 7478,
+      "sha256": "4ba3c2a2d9c1b62f4c78e0c11e673c78ba8c4f9efb265b71b96db7b9303e0445",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_approved_face_v4.py",
+      "bytes": 19396,
+      "sha256": "378131d6d4cce6ba0708d56ae265174148b844d50b63b11ca21a6ece06fdf97a",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_base_refresh.py",
+      "bytes": 6823,
+      "sha256": "a39b248dba43be2259f8e670defd89f06155fc3c817b134110638f92acebeac1",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_default_outfit_motion_v2.py",
+      "bytes": 28735,
+      "sha256": "e3b88ed60a45edb868ec6ed3a7a2eab1992220a4658c9a8db3359a32c966b71d",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_outerwear_capsule.py",
+      "bytes": 7547,
+      "sha256": "ef47c35b185290ef02142e797a3a2d12391d6dcd42f8e1d35bb265bb0c01be0e",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_shoe_capsule.py",
+      "bytes": 5154,
+      "sha256": "c8ad0e290a6ffdb1632d33c6ea9ec01b372a0ca7ec9340ab32034fcef8d7e1a1",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_avatar_soft_doll_feature_set.py",
+      "bytes": 31771,
+      "sha256": "3f209d36963b721c37ca74f72046725560491b81154a99eb0118b6419802c814",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_dress_reference_motion_layers.py",
+      "bytes": 14442,
+      "sha256": "09c131c1ef69d8d4dc02469e8cb25648981d721e4e4a2d2180d166a773851578",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/generate_male_premium_capsule_final_qa.py",
+      "bytes": 9889,
+      "sha256": "bcc374d131050f38012e7c341a43893e5ad79a1d0c589e89da9e03e56e3121a5",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/normalize_female_face_feature_assets.py",
+      "bytes": 2389,
+      "sha256": "0ebd254647b017f6d3f0d2e871b3d93ab288f63e541192dec713edc1a2678b63",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/normalize_room_alpha.py",
+      "bytes": 2977,
+      "sha256": "0c4474f98e2651533125917d530f28c7250edf654a67af1d92d7f9c237ae4373",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/normalize-room-v3-directional-assets.py",
+      "bytes": 6653,
+      "sha256": "6165b3d41152d54b4ab7a13e9d18772acb942499740b17b49949aa6333fa702c",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/package_male_sitting_short_panel_v8.py",
+      "bytes": 9933,
+      "sha256": "18f8aa31fdafa35270a64496d9d9c34092e2604c1985c9904950cc57aa3782f2",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/prepare_avatar_feature_assets.py",
+      "bytes": 4953,
+      "sha256": "f7b6c883134f6c7ce5c3a2fc77f600e9dfaa663c619b2c1f1a3b260bada0c292",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/prepare_female_cream_tee_motion_staging.py",
+      "bytes": 7128,
+      "sha256": "dcc0d7c1919d7cf0a6b4dca59b83ec8a846cf3829f6901596b5204fb2da28956",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/prepare_female_hair_capsule.py",
+      "bytes": 3879,
+      "sha256": "edd62c1dbc56366a6ef23654bb690748c69805208caf4a56bd8ea9f43056a347",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_hair_shoes_wave3_static.py",
+      "bytes": 16157,
+      "sha256": "969a1c776a7a6948e35e005a2ac1a3edca0835f309fbc44cfe127a3cbd2af5eb",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_premium_capsule_motion.py",
+      "bytes": 8688,
+      "sha256": "7338f16ea0004e13c53935b18810044f90c797c00c328495bce2ca6933d47ab0",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_sage_shorts_motion.py",
+      "bytes": 3386,
+      "sha256": "48f3f0b2050b076150883d1eb006b95dd2e0ff8694625f2d78757e4fd7ecde17",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_shoes_wave3_motion.py",
+      "bytes": 18940,
+      "sha256": "53b74892bb3f191dd5de8701afbf9f5b74498f19b926d763a2e53a0226edce18",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_wave2_static.py",
+      "bytes": 15190,
+      "sha256": "f0d43fff5a60f0bf32240d4c54d0f006d5d44a10e69b8aceb8137798d8f1dd92",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/produce_male_young_drop_motion.py",
+      "bytes": 7982,
+      "sha256": "d74c03641c46573bc0e81c22211c062b1f4f541d81f2a8b406f47ce948d7d41f",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/reauthor_legacy_milk_tea_medial_seam.py",
+      "bytes": 5237,
+      "sha256": "4035dbe1ad2c9c52508501be3e1f40e7392ed179a5798fd1ac8f61dbc2cf21cf",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/refit_male_wardrobe_motion.py",
+      "bytes": 10598,
+      "sha256": "ae20c258ab8b51f02b09416b677310760a87f26ac23d035d496dd36e9365b6b6",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_deep_front_rig_qa.py",
+      "bytes": 15863,
+      "sha256": "520e8c9cde2eb6520fd2af06b0e4911d892d55d7d57da1b553532b921e133a47",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_female_dress_capsule.py",
+      "bytes": 17579,
+      "sha256": "813b4b1b5f38173ca02a9574b314895a03c7b24448ac321b00ed1e94a6578c33",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_female_feature_qa.py",
+      "bytes": 6862,
+      "sha256": "f6c3c05cd85bb45657f669661320ca2534e2cdbf42039b3e1a7058d71e3976d6",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_female_front_fit_closeups.py",
+      "bytes": 7783,
+      "sha256": "fa0518d8b3a88e90b3726387b09c2479178d3d38372fef9e15d61d036a68a44d",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_female_front_static_4w_seam_matrix.py",
+      "bytes": 4750,
+      "sha256": "9005a858e7216bc871f8cd2ac70804f5ff1d3aff97139ee214cf4aecf9e773c3",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_female_hair_capsule_qa.py",
+      "bytes": 3743,
+      "sha256": "97b49e3985412b44f78e956e4061f743c2d71d72b489af16a10c42038506552f",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_bottom_19_corrected_review_board.py",
+      "bytes": 5525,
+      "sha256": "73ae11c86dca952d830e8239f75f2ec083efba5f12d8cbb686abd304f50f2c24",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_bottom_19_v8_review_board.py",
+      "bytes": 1147,
+      "sha256": "30783ca00e33d58802cf481b7ad73e3d1c058979b2680b5200aa2228a1fca52b",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_bottom_walking_v4_review_board.py",
+      "bytes": 1601,
+      "sha256": "98f33948978c8eb2131e091e5c7f007d082aaa222f0400883e7cd8ecf4cc51ab",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_sage_shorts_motion_qa.py",
+      "bytes": 5129,
+      "sha256": "e85fd63d3ba6b5d8bd296868517a4bb4cb6fd9fae76b79f7ddccbd64d207e80c",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_starter_static_qa.py",
+      "bytes": 4514,
+      "sha256": "3f88101e317cd253f5ae038a2887ead84b999a8e1eea4e27feac5cbe01390759",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_wardrobe_54_motion_candidate_board.py",
+      "bytes": 4620,
+      "sha256": "68d38df7c4622428e14611ff925bb5690f46fff5a6892d95d5369ab16f9ff0bd",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_wardrobe_motion_qa.py",
+      "bytes": 3360,
+      "sha256": "974b16902af6e5f3a9e2a4fed9bd16eb3179238d26b5df7273916088fefcae19",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_male_wardrobe_production_qa.py",
+      "bytes": 9353,
+      "sha256": "3a0bd516c6079912811cc43c6e26f8e4b6855a8153b178beba59d2df2a2ad466",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_room_avatar_motion_contact_sheet.py",
+      "bytes": 5073,
+      "sha256": "2d0983312be0d541df8edd5ee9355e00246f7c90f70e69bee6103eb0cdb9fa8a",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render_room_avatar_motion_overlay_qa.py",
+      "bytes": 6924,
+      "sha256": "b1f2671c4991e27648737d456f0777a3ab467f4aef737ccbaf92b7e7a57bb1a6",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render-room-v3-phase7-scale-board.py",
+      "bytes": 13187,
+      "sha256": "dad65b21828cad135b522594a6d75774a8ab1024b10ebfcde22ae2dff6f98e9f",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/render-room-v3-universal-core-directional-contact-sheet.py",
+      "bytes": 2564,
+      "sha256": "041a9fe8b90df86272de7c70b79818bbc4f5cdd8656be008a7de93e8e1c97b77",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/repair_male_pixel_heart_motion_v1.py",
+      "bytes": 6340,
+      "sha256": "f2e1befbba7eeee1471f542ffe8b3a0a15c7eda8106aa06f85b59b41e8c8b10d",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/repair_male_starter_contract_v1.py",
+      "bytes": 17008,
+      "sha256": "4ebe9403a246216a7648080ec7e086d5d16ed9f6e63e9d62149727a1f2bcd0d6",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/rig_female_cream_tee_motion_assets.py",
+      "bytes": 1841,
+      "sha256": "b201ab8d1e702f2cd562feac696985b6201b44df4d93d871b7217715b57de6ad",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/rig_female_head_motion_assets.py",
+      "bytes": 3768,
+      "sha256": "3973faf8efb368538be3a3474c67002b3f27b144b02a993696eac194de3a045d",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/rig_female_sitting_wardrobe_assets.py",
+      "bytes": 12172,
+      "sha256": "36253fbcc88f5522771cadc1c1809063a7f92eac8ba651fe9b0c90fe54330a0c",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/room-v3-shell-evidence.py",
+      "bytes": 4344,
+      "sha256": "d266798af01a8930c4f75c1c2fdb2eb4524bb74d6408030540ef96815df03b8b",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/room-v3-universal-contact-sheet.py",
+      "bytes": 4008,
+      "sha256": "38325cb54a5900efd7eea96733e9743b1419c36a9c0c712e9a4f49132731d344",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/room-v3-universal-context-evidence.py",
+      "bytes": 5401,
+      "sha256": "7ab4ef656fab6844d7a876d3a64900cff65e4fd79f02ee8cd2b46deca55fcfed",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/stage_female_accessory_occlusion_repairs.py",
+      "bytes": 11522,
+      "sha256": "d59b8cbb52e8ab1e33beec28d69f43fef1e7873836fd08f3007b8237af514a1e",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/stage_female_cream_tee_sitting_pilot.py",
+      "bytes": 7190,
+      "sha256": "d0a6903f863cd0a12a65cb9c13891e7f8bf146f904e73546baaae1c8aab98876",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/stage_female_shoes_accessories_motion.py",
+      "bytes": 15324,
+      "sha256": "1182b99490ee82e5f7d1b219872c56f4351aff64c776379d64f4cbb6582a5ad6",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/scripts/verify_room_avatar_motion_canvases.py",
+      "bytes": 2934,
+      "sha256": "8b2b351088e64ee15f49dd6421d3ddf91e681a1635ad9b08fd084af4d3f8109c",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/back_body.png",
+      "bytes": 667189,
+      "sha256": "837ad81609a0b676a5aebc4d4cf8486f490dd8ea8889f03d8ec9d8ea6b95fb49",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/back_contact_shadow.png",
+      "bytes": 26400,
+      "sha256": "2ef1380e4c97902fe35e3655c4a5c0770d066c925d7ad47a92f3a000e5114941",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/back_thumbnail.png",
+      "bytes": 69614,
+      "sha256": "94b2524e0049b8fdf91872493e9b45b17b482bc1e8ff6f430a4b5d7b620df059",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/front_body.png",
+      "bytes": 719524,
+      "sha256": "6803c7066f7d97d691f3b0b8fe0967913367f65b6a69b50ec0a2285370af3ce3",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/front_contact_shadow.png",
+      "bytes": 33699,
+      "sha256": "8bf3885028f2cbc6c471cd54a45886397b2e45fd0fd70cf8f15c1c21ae0a083e",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/front_thumbnail.png",
+      "bytes": 77784,
+      "sha256": "3562ef9c8728c8fc99199a027fcd1eab07fd7fd877a2abe1004d60ac846c9607",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/left_body.png",
+      "bytes": 544468,
+      "sha256": "ce8e88518e55a268830100fac6010b84486dd949eb35fa56e68eeb3d71217bba",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/left_contact_shadow.png",
+      "bytes": 27078,
+      "sha256": "d9438c15b6fabb28ee5438e1eba78b50bb975cb2f2482a7d087bd5ec562e4041",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/left_thumbnail.png",
+      "bytes": 60684,
+      "sha256": "c9cf13547cc68344cdc62bdc144d29157a8858244f35d19d561a00a0a96acc3b",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/right_body.png",
+      "bytes": 709209,
+      "sha256": "706d2b90e2324c913481af87c712934d4bc413a049038819c6aa4acdab1dd8b3",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/right_contact_shadow.png",
+      "bytes": 33811,
+      "sha256": "80aa18d5036093dfc1ca9bbc806ea815eab536fc1def77e69b5a9d208d80a130",
+      "verified": true,
+      "status": "copied"
+    },
+    {
+      "path": "apps/mobile/src/features/roomV2/assets/runtime/room-vnext/pink-cloud-bed-v0.23-candidate/right_thumbnail.png",
+      "bytes": 75741,
+      "sha256": "203149c3525f68332ae4261480a45b1c7968ebd78bc3f4a00cbba09a18613ea6",
+      "verified": true,
+      "status": "copied"
+    }
+  ]
+}
