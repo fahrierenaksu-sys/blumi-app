@@ -19,6 +19,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 const OWNER = {
   bottomNav: "./useBottomNavChrome.ts",
   roomInvites: "./useRoomInviteRouting.ts",
+  chat: "./useRootChatSync.ts",
   linking: "./rootLinking.ts",
   matchModal: "./RootNavigator.tsx",
   realtime: "./RootNavigator.tsx"
@@ -295,6 +296,58 @@ test("demo room invitations open the local MiniRoom only once accepted", async (
   assert.equal(payload.mediaSession.token, "demo-session")
   assert.equal(payload.participants[1].displayName, "Demo Two")
   assert.equal(payload.participants[1].avatar.presetId, "dawn")
+})
+
+// ── Chat route bindings ────────────────────────────────────
+
+function chatThreadRouteBindings(sessionMode) {
+  const handlers = {
+    sendChatMessageForRoute: () => "send",
+    requestMessagesForRoute: () => "request",
+    markChatThreadRead: () => "read",
+    handleDemoRoomInviteAction: () => "demo-invite",
+    handleRoomInviteAction: () => "production-invite",
+    closeMyActiveRoom: () => "close-room"
+  }
+  const bindings = evaluate(findInitializer(OWNER.chat, "chatThreadRouteBindings"), {
+    ...handlers,
+    visibleRoomInvites: ["invite"],
+    sessionMode,
+    chatLocale: "tr"
+  })
+  return { bindings, handlers }
+}
+
+test("chat routes receive demo-aware invite handlers and production-only room closing", () => {
+  const production = chatThreadRouteBindings("production")
+  assert.deepEqual(Object.keys(production.bindings), [
+    "sendChatMessage",
+    "requestMessages",
+    "markThreadRead",
+    "roomInvites",
+    "onRoomInviteAction",
+    "onCloseActiveRoom",
+    "locale"
+  ])
+  assert.equal(production.bindings.sendChatMessage, production.handlers.sendChatMessageForRoute)
+  assert.equal(production.bindings.requestMessages, production.handlers.requestMessagesForRoute)
+  assert.equal(production.bindings.markThreadRead, production.handlers.markChatThreadRead)
+  assert.deepEqual(plain(production.bindings.roomInvites), ["invite"])
+  assert.equal(production.bindings.onRoomInviteAction, production.handlers.handleRoomInviteAction)
+  assert.equal(production.bindings.onCloseActiveRoom, production.handlers.closeMyActiveRoom)
+  assert.equal(production.bindings.locale, "tr")
+
+  const demo = chatThreadRouteBindings("demo")
+  assert.equal(demo.bindings.onRoomInviteAction, demo.handlers.handleDemoRoomInviteAction)
+  assert.equal(demo.bindings.onCloseActiveRoom, undefined)
+})
+
+test("the ChatThread screen and match-modal chat navigation inject the same bindings", () => {
+  const navigator = read("./RootNavigator.tsx")
+  const chatRoute = navigator.match(/<Stack\.Screen\s+name="ChatThread"([\s\S]*?)<\/Stack\.Screen>/)?.[1] ?? ""
+  assert.match(chatRoute, /params: \{\s*\.\.\.screenProps\.route\.params,\s*\.\.\.chatThreadRouteBindings\s*\}/)
+  assert.match(chatRoute, /onThreadCreated=\{applyNewThread\}/)
+  assert.match(read(OWNER.matchModal), /navigationRef\.navigate\("ChatThread", \{\s*\.\.\.params,\s*\.\.\.chatThreadRouteBindings\s*\}\)/)
 })
 
 // ── Referral capture in linking ────────────────────────────

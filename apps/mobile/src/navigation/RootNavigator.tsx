@@ -14,8 +14,6 @@ import {
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
 import {
-  demoSendMessage,
-  getDemoMessages,
   isDemoMode,
   setDemoMode,
   useDemoStore
@@ -34,23 +32,9 @@ import {
 } from "../features/dev/blumiDevEntryPolicy"
 import {
   createThread,
-  fetchChatThreads,
-  fetchThreadMessages,
-  markThreadRead,
-  type FetchThreadMessagesOptions,
-  sendThreadMessage
+  type FetchThreadMessagesOptions
 } from "../features/chat/chatApi"
-import { createChatCoordinator } from "../features/chat/chatCoordinator"
-import { createMatchThreadSyncGate, createThreadListRefreshGuard } from "../features/chat/threadListRefreshGuard"
-import {
-  cancelThreadRoomInvite,
-  createThreadRoomInvite,
-  decideThreadRoomInvite,
-  fetchThreadRoomInvites,
-  joinRoomSession,
-  leaveActiveRoom,
-  normalizeRoomInviteRecord
-} from "../features/chat/chatRoomInviteApi"
+import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import type {
   ChatLocale,
   ChatRoomInviteAction,
@@ -62,20 +46,11 @@ import {
 } from "../features/safety/blockStore"
 import {
   applyChatMessageListed,
-  hasMessageHistory,
-  applyChatMessageListFailed,
-  applyChatMessageListLoading,
   applyChatMessageReceived,
-  confirmOptimisticMessage,
-  applyChatThreadCreated,
-  applyChatThreadListFailed,
   applyChatThreadListed,
   applyChatThreadRead,
-  applyChatThreadListLoading,
   findThreadForPartner,
   getThreads,
-  markThreadRead as markLocalThreadRead,
-  markOptimisticMessageFailed,
   resetChatStore,
   useTotalUnreadCount
 } from "../features/chat/chatStore"
@@ -167,6 +142,7 @@ import { RootNavigationChrome } from "./RootNavigationChrome"
 import { useBottomNavChrome } from "./useBottomNavChrome"
 import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
 import { useRoomInviteRouting } from "./useRoomInviteRouting"
+import { useRootChatSync } from "./useRootChatSync"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -419,18 +395,24 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     ? `restricted:${sessionActor?.profile.userId ?? "no-session"}`
     : getSessionNavigatorKey(sessionEntryRoute, sessionActor?.profile.userId)
   const chatLocale = getChatLocale(Intl.DateTimeFormat().resolvedOptions().locale)
-  const threadListRefreshGuardRef = useRef<ReturnType<typeof createThreadListRefreshGuard> | null>(null)
-  if (!threadListRefreshGuardRef.current) threadListRefreshGuardRef.current = createThreadListRefreshGuard()
-  const matchThreadSyncGateRef = useRef<ReturnType<typeof createMatchThreadSyncGate> | null>(null)
-  if (!matchThreadSyncGateRef.current) matchThreadSyncGateRef.current = createMatchThreadSyncGate()
-  const applyRealtimeThreadList = useCallback((list: Parameters<typeof applyChatThreadListed>[0]): void => {
-    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
-    applyChatThreadListed(list)
-  }, [])
-  const applyNewThread = useCallback((thread: Parameters<typeof applyChatThreadCreated>[0]): void => {
-    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
-    applyChatThreadCreated(thread)
-  }, [])
+  const {
+    applyRealtimeThreadList,
+    applyNewThread,
+    refreshProductionThreads,
+    resynchronizeMessages,
+    upsertRoomInvite,
+    warmThreadMessagesForInbox,
+    chatThreadRouteBindings
+  } = useRootChatSync({
+    latestSessionActorRef,
+    isCurrentSession,
+    sessionMode: sessionActor?.session.mode,
+    chatLocale,
+    visibleRoomInvites,
+    setRoomInvites,
+    openReadyMiniRoom,
+    handleDemoRoomInviteAction
+  })
 
   useEffect(() => {
     if (!IS_BLUMI_PAID_COINS_ENABLED) return
@@ -445,46 +427,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       })
     })
   }, [sessionActor?.profile.userId, sessionActor?.session.mode])
-
-  const refreshProductionThreads = useCallback(async (): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "production") return
-    const requestRevision = threadListRefreshGuardRef.current!.beginHttpRefresh()
-    applyChatThreadListLoading()
-    try {
-      const threadList = await fetchChatThreads(
-        MOBILE_HTTP_BASE_URL,
-        actor.session.sessionToken
-      )
-      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
-      applyChatThreadListed(threadList)
-      const syncKey = `${actor.profile.userId}:${actor.session.sessionToken}`
-      if (matchThreadSyncGateRef.current?.shouldStart(syncKey, Date.now())) {
-        void fetchChatThreads(
-          MOBILE_HTTP_BASE_URL,
-          actor.session.sessionToken,
-          fetch,
-          undefined,
-          { syncMatches: true }
-        ).then((recovered) => {
-          if (!isCurrentSession(actor) || recovered.userId !== actor.profile.userId) return
-          const knownThreadIds = new Set(getThreads().map((thread) => thread.threadId))
-          for (const thread of recovered.threads) {
-            if (knownThreadIds.has(thread.threadId) || !thread.participantUserIds.includes(actor.profile.userId)) continue
-            applyNewThread(thread)
-            knownThreadIds.add(thread.threadId)
-          }
-        }).catch(() => { /* The readable Inbox remains available; retry on a later visit. */ })
-      }
-    } catch (error) {
-      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
-      const message = error instanceof Error
-        ? error.message
-        : "We could not refresh your chats yet."
-      applyChatThreadListFailed(message)
-      throw error
-    }
-  }, [applyNewThread, isCurrentSession, latestSessionActorRef])
 
   const reconcileConnectionDecisionDelivery = useCallback<
     NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
@@ -553,86 +495,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }
   }, [])
 
-  const chatCoordinator = useMemo(
-    () => createChatCoordinator({
-      hasMessageHistory,
-      getSessionActor: () => latestSessionActorRef.current,
-      isCurrentSession,
-      setRoomInvites: (update) => {
-        setRoomInvites((current) => update(current))
-      },
-      fetchThreadRoomInvites,
-      sendThreadMessage,
-      fetchThreadMessages,
-      markThreadRead,
-      createThreadRoomInvite,
-      leaveActiveRoom,
-      decideThreadRoomInvite,
-      cancelThreadRoomInvite,
-      joinRoomSession,
-      applyChatMessageListed,
-      applyChatMessageListLoading,
-      applyChatMessageListFailed,
-      confirmOptimisticMessage,
-      markOptimisticMessageFailed,
-      markLocalThreadRead,
-      openReadyMiniRoom,
-      captureProductEvent,
-      showWarningToast: (toast) => {
-        showToast({ ...toast, type: "warning" })
-      },
-      sendGlobal,
-      baseHttpUrl: MOBILE_HTTP_BASE_URL
-    }),
-    [isCurrentSession, latestSessionActorRef, openReadyMiniRoom, setRoomInvites]
-  )
-  const {
-    handleRoomInviteAction,
-    closeMyActiveRoom,
-    markChatThreadRead,
-    requestMessages,
-    sendChatMessage,
-    upsertRoomInvite
-  } = chatCoordinator
-
-  const sendChatMessageForRoute = useCallback(async (
-    threadId: string,
-    body: string,
-    clientMessageId: string
-  ): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "demo") {
-      return sendChatMessage(threadId, body, clientMessageId)
-    }
-    try {
-      const message = demoSendMessage(threadId, actor.profile.userId, body, clientMessageId)
-      confirmOptimisticMessage(clientMessageId, message, actor.profile.userId)
-    } catch (error) {
-      markOptimisticMessageFailed(clientMessageId)
-      throw error
-    }
-  }, [latestSessionActorRef, sendChatMessage])
-
-  const requestMessagesForRoute = useCallback(async (
-    threadId: string,
-    options?: FetchThreadMessagesOptions
-  ): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "demo") {
-      return requestMessages(threadId, options)
-    }
-    applyChatMessageListed({
-      userId: actor.profile.userId,
-      threadId,
-      messages: getDemoMessages(threadId)
-    })
-  }, [latestSessionActorRef, requestMessages])
-
-  const warmThreadMessagesForInbox = useCallback((threadId: string): Promise<void> => {
-    if (latestSessionActorRef.current?.session.mode !== "production") return Promise.resolve()
-    return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
-  }, [latestSessionActorRef, requestMessages])
-
   const {
     syncCurrentRouteName,
     handleBottomNavPress,
@@ -659,31 +521,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       if (navigationRef.isReady()) {
         navigationRef.navigate("ChatThread", {
           ...params,
-          sendChatMessage: sendChatMessageForRoute,
-          requestMessages: requestMessagesForRoute,
-          markThreadRead: markChatThreadRead,
-          roomInvites: visibleRoomInvites,
-          onRoomInviteAction: sessionActor?.session.mode === "demo"
-            ? handleDemoRoomInviteAction
-            : handleRoomInviteAction,
-          onCloseActiveRoom: sessionActor?.session.mode === "production"
-            ? closeMyActiveRoom
-            : undefined,
-          locale: chatLocale
+          ...chatThreadRouteBindings
         })
       }
     },
-    [
-      chatLocale,
-      closeMyActiveRoom,
-      handleDemoRoomInviteAction,
-      handleRoomInviteAction,
-      markChatThreadRead,
-      requestMessagesForRoute,
-      sendChatMessageForRoute,
-      sessionActor?.session.mode,
-      visibleRoomInvites
-    ]
+    [chatThreadRouteBindings]
   )
 
   const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
@@ -826,8 +668,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [resetRoomInviteRouting])
 
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
-  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages })
-  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages }
+  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
+  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration, resynchronizeMessages }
 
   useEffect(() => createGlobalRealtimeLifecycle({
     sessionActor,
@@ -1197,17 +1039,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       ...screenProps.route,
                       params: {
                         ...screenProps.route.params,
-                        sendChatMessage: sendChatMessageForRoute,
-                        requestMessages: requestMessagesForRoute,
-                        markThreadRead: markChatThreadRead,
-                        roomInvites: visibleRoomInvites,
-                        onRoomInviteAction: sessionActor?.session.mode === "demo"
-                          ? handleDemoRoomInviteAction
-                          : handleRoomInviteAction,
-                        onCloseActiveRoom: sessionActor?.session.mode === "production"
-                          ? closeMyActiveRoom
-                          : undefined,
-                        locale: chatLocale
+                        ...chatThreadRouteBindings
                       }
                     }}
                   />
