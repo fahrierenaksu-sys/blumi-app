@@ -9,6 +9,9 @@ async function main(): Promise<void> {
   if (process.argv[2] !== "--apply") {
     throw new Error("Use --apply to seed the configured database deliberately.")
   }
+  if (process.env.BLUMI_DEPLOY_ENV?.trim() === "production") {
+    throw new Error("Test personas must never be seeded into a production deployment.")
+  }
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required.")
   if (DUMMY_PROFILES.length !== 16) throw new Error("Expected exactly 16 test profiles.")
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })

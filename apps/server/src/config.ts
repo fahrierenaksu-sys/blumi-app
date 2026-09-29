@@ -33,6 +33,7 @@ import { createPostgresAccountDataExporter } from "./account/accountDataExporter
 import { createAccountRecoveryService, type AccountRecoveryService } from "./account/accountRecoveryService"
 import { createPostgresAccountRecoveryRepository } from "./db/postgresAccountRecoveryRepository"
 import { createPostgresChatRepository } from "./db/postgresChatRepository"
+import { applyTestPersonaPolicy } from "./chat/testPersonaPolicy"
 import { createPostgresConnectionRepository } from "./db/postgresConnectionRepository"
 import { createPostgresEconomyRepository } from "./db/postgresEconomyRepository"
 import { createPostgresMatchRepository } from "./db/postgresMatchRepository"
@@ -494,7 +495,10 @@ export function createConfiguredServerServices(
       repository: createPostgresAccountRecoveryRepository(pool)
     })
     const chatService = createChatService({
-      repository: createPostgresChatRepository(pool)
+      repository: applyTestPersonaPolicy(
+        createPostgresChatRepository(pool),
+        config.deployEnvironment
+      )
     })
     const economyService = createEconomyService({
       repository: createPostgresEconomyRepository(pool)
