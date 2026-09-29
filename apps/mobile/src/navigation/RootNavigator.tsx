@@ -4,7 +4,6 @@ import type {
   MiniRoom,
   MiniRoomParticipant
 , ServerEvent } from "@blumi/contracts"
-import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
   CommonActions,
   NavigationContainer
@@ -132,10 +131,7 @@ import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAss
 import { isAvatarQaUnlockEnabled } from "../features/avatarV2/qa/avatarQaInventory"
 import { getOnboardingStarterBodyId } from "../features/avatarV2/avatarStarterModel"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
-import { getAvatarV2StorageKey } from "../features/avatarV2/avatarV2Persistence"
 import { RoomV2Provider } from "../features/roomV2/state/RoomV2Provider"
-import type { UserRoomDecor } from "../features/roomV2/roomV2.types"
-import { getRoomV2StorageKey } from "../features/roomV2/roomV2Persistence"
 import { AccountRestrictionScreen } from "../screens/AccountRestrictionScreen"
 import type { SessionActor } from "../features/session/sessionModel"
 import { useSessionState } from "../features/session/useSessionState"
@@ -144,17 +140,8 @@ import type {
   RegisterAccountInput,
   UpdateSessionProfileInput
 } from "../features/session/sessionApi"
-import {
-  createPreAuthOnboardingDraft,
-  type PreAuthOnboardingDraft
-} from "../features/session/preAuthOnboardingDraft"
-import {
-  createPreAuthOnboardingDraftStorage,
-  getPreAuthOnboardingDraftScope,
-  resolvePreAuthOnboardingDraftId,
-  type PreAuthOnboardingDraftSnapshot,
-  type PreAuthOnboardingResumeStep
-} from "../features/session/preAuthOnboardingStorage"
+import type { PreAuthOnboardingResumeStep } from "../features/session/preAuthOnboardingStorage"
+import { usePreAuthOnboardingDraft } from "../features/session/usePreAuthOnboardingDraft"
 import {
   getOnboardingScreenMode,
   shouldGateOnboardingBootPrelude,
@@ -326,17 +313,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>()
 function createLocalDemoMediaSessionToken(): string {
   return "demo-session"
 }
-const preAuthDraftStorage = createPreAuthOnboardingDraftStorage<
-  UpdateSessionProfileInput,
-  UserAvatar,
-  UserRoomDecor
->({
-  store: {
-    getItem: (key) => AsyncStorage.getItem(key),
-    setItem: (key, value) => AsyncStorage.setItem(key, value),
-    removeItem: (key) => AsyncStorage.removeItem(key)
-  }
-})
 const CAN_REGISTER_MINI_ROOM_RIG_PREVIEW = canApplyBlumiDevEntry({
   route: BLUMI_DEV_ENTRY_ROUTE,
   buildProfile: BLUMI_BUILD_PROFILE,
@@ -368,16 +344,6 @@ function scheduleDeferredPreload(work: () => void): () => void {
   return () => {
     clearTimeout(timeoutId)
   }
-}
-
-function scheduleDeferredMaintenance(work: () => void): () => void {
-  if (typeof globalThis.requestIdleCallback === "function") {
-    const idleId = globalThis.requestIdleCallback(work, { timeout: 5_000 })
-    return () => globalThis.cancelIdleCallback?.(idleId)
-  }
-
-  const timeoutId = setTimeout(work, 5_000)
-  return () => clearTimeout(timeoutId)
 }
 
 interface GlobalMatchState {
@@ -502,104 +468,18 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     refreshAccountModeration,
     clearSessionActor
   } = useSessionState()
-  const [preAuthDraft, setPreAuthDraft] = useState<
-    PreAuthOnboardingDraft<
-      UpdateSessionProfileInput,
-      UserAvatar,
-      UserRoomDecor
-    >
-  >(() => createPreAuthOnboardingDraft())
-  const preAuthDraftSnapshotRef = useRef<PreAuthOnboardingDraftSnapshot<
-    UpdateSessionProfileInput,
-    UserAvatar,
-    UserRoomDecor
-  > | null>(null)
-  const [preAuthDraftSnapshot, setPreAuthDraftSnapshot] = useState(
-    preAuthDraftSnapshotRef.current
-  )
-  const [isPreAuthDraftHydrating, setIsPreAuthDraftHydrating] = useState(true)
+  const {
+    preAuthDraft,
+    preAuthDraftSnapshot,
+    isPreAuthDraftHydrating,
+    preAuthDraftScopeId,
+    persistPreAuthDraft,
+    clearPreAuthDraft
+  } = usePreAuthOnboardingDraft()
   const [isBootPreludeReady, setIsBootPreludeReady] = useState(false)
   const handleBootPreludeReady = useCallback(() => {
     setIsBootPreludeReady(true)
   }, [])
-  const preAuthDraftAttemptIdRef = useRef(
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-  )
-  const [preAuthDraftGeneration, setPreAuthDraftGeneration] = useState(0)
-  const preAuthDraftId = resolvePreAuthOnboardingDraftId(
-    preAuthDraftSnapshot?.draftId,
-    preAuthDraftAttemptIdRef.current,
-    preAuthDraftGeneration
-  )
-  const preAuthDraftScopeId = getPreAuthOnboardingDraftScope(preAuthDraftId)
-  const persistPreAuthDraft = useCallback(async (
-    nextDraft: PreAuthOnboardingDraft<
-      UpdateSessionProfileInput,
-      UserAvatar,
-      UserRoomDecor
-    >,
-    resumeStep: PreAuthOnboardingResumeStep
-  ): Promise<void> => {
-    const snapshot = await preAuthDraftStorage.save(
-      nextDraft,
-      resumeStep,
-      preAuthDraftSnapshotRef.current ?? { draftId: preAuthDraftId }
-    )
-    preAuthDraftSnapshotRef.current = snapshot
-    setPreAuthDraftSnapshot(snapshot)
-    setPreAuthDraft(snapshot.draft)
-  }, [preAuthDraftId])
-  const clearPreAuthDraft = useCallback(async (): Promise<void> => {
-    const keys = [
-      getAvatarV2StorageKey(preAuthDraftScopeId),
-      getRoomV2StorageKey(preAuthDraftScopeId)
-    ].filter((key): key is string => Boolean(key))
-    await Promise.all([
-      AsyncStorage.multiRemove(keys),
-      preAuthDraftStorage.clear()
-    ])
-    preAuthDraftSnapshotRef.current = null
-    setPreAuthDraftSnapshot(null)
-    setPreAuthDraft(createPreAuthOnboardingDraft())
-    setPreAuthDraftGeneration((generation) => generation + 1)
-  }, [preAuthDraftScopeId])
-
-  useEffect(() => {
-    let active = true
-    void preAuthDraftStorage.load()
-      .then((snapshot) => {
-        if (!active || snapshot === null) return
-        preAuthDraftSnapshotRef.current = snapshot
-        setPreAuthDraftSnapshot(snapshot)
-        setPreAuthDraft(snapshot.draft)
-      })
-      .catch(() => preAuthDraftStorage.clear())
-      .finally(() => {
-        if (active) setIsPreAuthDraftHydrating(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isPreAuthDraftHydrating) return
-    const currentKeys = new Set([
-      getAvatarV2StorageKey(preAuthDraftScopeId),
-      getRoomV2StorageKey(preAuthDraftScopeId)
-    ].filter((key): key is string => Boolean(key)))
-    const cancelDeferredCleanup = scheduleDeferredMaintenance(() => {
-      void AsyncStorage.getAllKeys()
-        .then((keys) => keys.filter(
-          (key) => key.includes("preauth-onboarding-draft") && !currentKeys.has(key)
-        ))
-        .then((staleKeys) => staleKeys.length > 0
-          ? AsyncStorage.multiRemove(staleKeys)
-          : undefined)
-        .catch(() => undefined)
-    })
-    return cancelDeferredCleanup
-  }, [isPreAuthDraftHydrating, preAuthDraftScopeId])
   const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
   const [roomInvites, setRoomInvites] = useState<ChatRoomInviteTimelineItem[]>([])
   const handledMatchIdsRef = useRef(new Set<string>())

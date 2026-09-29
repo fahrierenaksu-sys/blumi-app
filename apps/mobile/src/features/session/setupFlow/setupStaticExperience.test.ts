@@ -252,7 +252,7 @@ test("authenticated onboarding warms deferred setup routes and uses one light na
     "utf8"
   )
   const authenticatedPreloadEffect = navigatorSource.match(
-    /useEffect\(\(\) => \{[\s\S]*?onboardingEntryRoute[\s\S]*?preloadDeferredAuthScreens\(\)[\s\S]*?\}, \[onboardingEntryRoute, sessionEntryRoute\]\)/
+    /useEffect\(\(\) => \{\s*if \(sessionEntryRoute === "AuthEntry"\)[\s\S]*?\}, \[onboardingEntryRoute, sessionEntryRoute\]\)/
   )?.[0] ?? ""
   const onboardingRoutes = navigatorSource.match(
     /<Stack\.Screen\s+name="ProfileSetup"[\s\S]*?<Stack\.Screen\s+name="RoomSetup"[\s\S]*?\) : \(/
