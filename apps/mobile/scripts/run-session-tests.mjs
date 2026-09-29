@@ -62,6 +62,10 @@ sourceFiles.push(
   `${sourceDirectory}/setupFlow/roomSetupCharacterMotionModel.test.ts`
 )
 sourceFiles.push(
+  `${sourceDirectory}/register/registerScreenModel.ts`,
+  `${sourceDirectory}/register/registerScreenModel.test.ts`
+)
+sourceFiles.push(
   "src/features/capabilities/capabilityApi.ts",
   "src/features/capabilities/capabilityApi.test.ts",
   "src/features/avatarV2/avatarV2.types.ts",
@@ -128,6 +132,7 @@ try {
       join(outputDirectory, "features/session/registerPresentationModel.test.js")
       ,join(outputDirectory, "features/session/setupFlow/setupCharacterMotionModel.test.js")
       ,join(outputDirectory, "features/session/setupFlow/roomSetupCharacterMotionModel.test.js")
+      ,join(outputDirectory, "features/session/register/registerScreenModel.test.js")
     ],
     {
       cwd: workspaceRoot,
