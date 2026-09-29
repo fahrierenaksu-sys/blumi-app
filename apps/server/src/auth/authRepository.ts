@@ -75,6 +75,12 @@ export interface AuthRepository {
   getAccountByPhone(phoneNumber: string): Promise<AccountRecord | null>
   findAccountById(accountId: string): Promise<AccountRecord | null>
   findAccountByUserId(userId: string): Promise<AccountRecord | null>
+  /**
+   * Batch form of findAccountByUserId: one lookup for many user IDs. Returns
+   * the accounts that exist, at most one per distinct user ID, in no
+   * guaranteed order; missing IDs are simply absent.
+   */
+  findAccountsByUserIds(userIds: readonly string[]): Promise<AccountRecord[]>
   saveAccount(account: AccountRecord): Promise<void>
   updateAccountProfile(input: {
     accountId: string
@@ -621,6 +627,17 @@ export function createInMemoryAuthRepository(
           (account) => account.userId === userId
         ) ?? null
       return account ? cloneAccount(account) : null
+    },
+    async findAccountsByUserIds(userIds) {
+      const wanted = new Set(userIds)
+      if (wanted.size === 0) return []
+      const found = new Map<string, AccountRecord>()
+      for (const account of store.accountsByPhone.values()) {
+        if (wanted.has(account.userId) && !found.has(account.userId)) {
+          found.set(account.userId, cloneAccount(account))
+        }
+      }
+      return [...found.values()]
     },
     async saveAccount(account) {
       store.accountsByPhone.set(account.phoneNumber, cloneAccount(account))
