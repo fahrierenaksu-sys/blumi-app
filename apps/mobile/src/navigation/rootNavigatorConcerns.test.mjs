@@ -151,7 +151,7 @@ test("bottom tabs ignore presses before readiness and reselection of the focused
 test("the root navigator wires route sync, return previews, and tab presses to the chrome", () => {
   const navigator = read("./RootNavigator.tsx")
   assert.match(navigator, /screenListeners=\{screenListeners\}/)
-  assert.match(navigator, /onStateChange=\{syncCurrentRouteName\}/)
+  assert.match(navigator, /onStateChange=\{handleNavigationStateChange\}/)
   assert.match(navigator, /onBottomNavPress=\{handleBottomNavPress\}/)
   assert.match(navigator, /isFullShopCatalogQaPreview=\{IS_FULL_SHOP_CATALOG_QA_PREVIEW\}\s*onBottomNavPress/)
   const chrome = read("./useBottomNavChrome.ts")
@@ -351,15 +351,51 @@ test("the ChatThread screen and match-modal chat navigation inject the same bind
   assert.match(read(OWNER.matchModal), /navigationRef\.navigate\("ChatThread", \{\s*\.\.\.params,\s*\.\.\.chatThreadRouteBindings\s*\}\)/)
 })
 
-// ── Referral capture in linking ────────────────────────────
+// ── Linking: referral capture and pending deep links ───────
 
 const REFERRAL_URL = `blumi://r/r_${"a".repeat(32)}`
+const { createPendingDeepLinkStore } = loadModule("./pendingDeepLink.ts")
+const OWNER_A = { userId: "user-a", sessionId: "session-a" }
+const OWNER_B = { userId: "user-b", sessionId: "session-b" }
+const MAIN_ROUTE_NAMES = ["Lobby", "Inbox", "ChatThread", "ProfilePreview", "Settings", "MyRoom", "MyRoomEditor", "WardrobeV2", "CosmeticShop"]
+
+function sessionActorFor(owner) {
+  return owner ? { profile: { userId: owner.userId }, session: { sessionId: owner.sessionId } } : null
+}
+
+function findFunction(path, name) {
+  const file = parse(path)
+  const matches = []
+  const visit = (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name && node.body) {
+      const parameters = node.parameters.map((parameter) => parameter.getText(file)).join(", ")
+      matches.push(`function ${name}(${parameters}) ${node.body.getText(file)}`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  assert.equal(matches.length, 1, `${path} must declare exactly one function ${name}`)
+  return matches[0]
+}
 
 function linkingWith({ initialUrl = null } = {}) {
   const captured = []
   const events = []
+  const routed = []
+  const navigation = { ready: false, routeNames: undefined }
+  let nowMs = 0
   let urlListener
   let removed = 0
+  const ROOT_LINK_SCREENS = evaluate(findInitializer(OWNER.linking, "ROOT_LINK_SCREENS"), {})
+  const pendingDeepLinks = createPendingDeepLinkStore({
+    prefixes: ["blumi://"],
+    screens: ROOT_LINK_SCREENS,
+    now: () => nowMs,
+    navigation: {
+      isReady: () => navigation.ready,
+      getRouteNames: () => navigation.routeNames
+    }
+  })
   const linking = evaluate(findInitializer(OWNER.linking, "linking"), {
     Linking: {
       getInitialURL: async () => initialUrl,
@@ -369,14 +405,52 @@ function linkingWith({ initialUrl = null } = {}) {
         return { remove: () => { removed += 1 } }
       }
     },
+    ROOT_LINK_SCREENS,
+    pendingDeepLinks,
     parseReferralCodeFromUrl,
     capturePendingReferral: async (referral) => { captured.push(referral) },
     captureProductEvent: (name, properties) => events.push([name, properties])
   })
+  const renderPendingDeepLinkReplay = evaluate(findFunction("./usePendingDeepLinkReplay.ts", "usePendingDeepLinkReplay"), {
+    useEffect: (effect) => { effect() },
+    pendingDeepLinks
+  })
+  let generation = 0
+  // One root render: the session selects its entry route, and the container
+  // shows the matching navigator once navigation is ready.
+  const render = ({ route, owner = null, restricted = false, ready = true }) => {
+    navigation.ready = ready
+    navigation.routeNames = !ready
+      ? undefined
+      : restricted
+        ? ["AccountRestriction", "Legal"]
+        : route === "Main"
+          ? MAIN_ROUTE_NAMES
+          : route === "AuthEntry"
+            ? ["AuthEntry", "PreAuthSetup", "Register", "Legal"]
+            : [route, "Legal"]
+    if (ready) generation += 1
+    return renderPendingDeepLinkReplay({
+      sessionActor: sessionActorFor(owner),
+      sessionEntryRoute: route,
+      isAccountRestricted: restricted,
+      navigationReadyGeneration: generation
+    })
+  }
   return {
     linking,
     captured,
     events,
+    routed,
+    pendingDeepLinks,
+    render,
+    advance: (ms) => { nowMs += ms },
+    // Mount the container: subscribe first, then resolve the initial URL.
+    mount: async () => {
+      const unsubscribe = linking.subscribe((url) => routed.push(url))
+      const initial = await linking.getInitialURL()
+      return { unsubscribe, initial }
+    },
     emit: (url) => urlListener({ url }),
     get removed() { return removed }
   }
@@ -396,22 +470,27 @@ test("linking keeps the blumi scheme and route paths", () => {
     WardrobeV2: "wardrobe",
     CosmeticShop: "shop"
   })
+  assert.match(read(OWNER.linking), /export const pendingDeepLinks = createPendingDeepLinkStore\(\{\s*prefixes: linking\.prefixes,\s*screens: ROOT_LINK_SCREENS,/)
 })
 
 test("a referral initial URL is captured and never routed", async () => {
   const runtime = linkingWith({ initialUrl: REFERRAL_URL })
   assert.equal(parseReferralCodeFromUrl(REFERRAL_URL) !== null, true, "fixture must be a referral link")
+  runtime.render({ route: "Main", owner: OWNER_A })
   assert.equal(await runtime.linking.getInitialURL(), null)
   assert.equal(runtime.captured.length, 1)
   assert.deepEqual(plain(runtime.events), [["referral_link_opened", { source: "initial_url" }]])
+  assert.equal(runtime.pendingDeepLinks.peek(), null, "a referral is never kept as a pending deep link")
 
   const ordinary = linkingWith({ initialUrl: "blumi://inbox" })
+  ordinary.render({ route: "Main", owner: OWNER_A, ready: false })
   assert.equal(await ordinary.linking.getInitialURL(), "blumi://inbox")
   assert.deepEqual(ordinary.captured, [])
 })
 
 test("a live referral link is captured while other links reach navigation", () => {
   const runtime = linkingWith()
+  runtime.render({ route: "Main", owner: OWNER_A })
   const routed = []
   const unsubscribe = runtime.linking.subscribe((url) => routed.push(url))
   runtime.emit(REFERRAL_URL)
@@ -421,6 +500,125 @@ test("a live referral link is captured while other links reach navigation", () =
   assert.deepEqual(plain(runtime.events), [["referral_link_opened", { source: "app_link" }]])
   unsubscribe()
   assert.equal(runtime.removed, 1)
+})
+
+test("a referral link before Main is captured and never replayed as navigation", async () => {
+  const runtime = linkingWith({ initialUrl: REFERRAL_URL })
+  runtime.render({ route: "Splash", ready: false })
+  runtime.render({ route: "AuthEntry", ready: false })
+  const { initial } = await runtime.mount()
+  runtime.render({ route: "AuthEntry" })
+  runtime.emit(REFERRAL_URL)
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.equal(initial, null)
+  assert.equal(runtime.captured.length, 2, "one initial and one live referral capture")
+  assert.deepEqual(runtime.routed, [])
+  assert.equal(runtime.pendingDeepLinks.peek(), null)
+})
+
+test("a cold-start link during Splash replays once after the restored session reaches Main", async () => {
+  const runtime = linkingWith({ initialUrl: "blumi://chat/thread-7" })
+  runtime.render({ route: "Splash", ready: false })
+  // The container mounts on the first non-Splash render (onboarding here).
+  runtime.render({ route: "ProfileSetup", owner: OWNER_A, ready: false })
+  const { initial } = await runtime.mount()
+  assert.equal(initial, null, "the onboarding navigator never receives the link")
+  runtime.render({ route: "ProfileSetup", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, [])
+  const replayOnStateChange = runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, ["blumi://chat/thread-7"])
+  replayOnStateChange()
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, ["blumi://chat/thread-7"], "replayed exactly once")
+})
+
+test("the root state-change hook replays a link once the Main stack registers its routes", async () => {
+  const runtime = linkingWith()
+  runtime.render({ route: "RoomSetup", owner: OWNER_A })
+  await runtime.mount()
+  runtime.emit("blumi://inbox")
+  assert.deepEqual(runtime.routed, [])
+  // Main is selected, but the container does not report the Main routes yet.
+  const replayOnStateChange = runtime.render({ route: "Main", owner: OWNER_A, ready: false })
+  assert.deepEqual(runtime.routed, [])
+  runtime.render({ route: "Main", owner: OWNER_A })
+  replayOnStateChange()
+  assert.deepEqual(runtime.routed, ["blumi://inbox"])
+})
+
+test("a pending link is discarded on sign-out", async () => {
+  const runtime = linkingWith()
+  runtime.render({ route: "AvatarSetup", owner: OWNER_A })
+  await runtime.mount()
+  runtime.emit("blumi://settings")
+  runtime.render({ route: "AuthEntry" })
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, [])
+})
+
+test("a pending link is discarded on account switch", async () => {
+  const runtime = linkingWith()
+  runtime.render({ route: "AvatarSetup", owner: OWNER_A })
+  await runtime.mount()
+  runtime.emit("blumi://settings")
+  runtime.render({ route: "Main", owner: OWNER_B })
+  assert.deepEqual(runtime.routed, [])
+  assert.equal(runtime.pendingDeepLinks.peek(), null)
+})
+
+test("an expired pending link is discarded", async () => {
+  const runtime = linkingWith({ initialUrl: "blumi://shop" })
+  runtime.render({ route: "AuthEntry" })
+  await runtime.mount()
+  runtime.advance(10 * 60 * 1000 + 1)
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, [])
+})
+
+test("an unknown deep link path is ignored before Main", async () => {
+  const runtime = linkingWith({ initialUrl: "blumi://admin/secret" })
+  runtime.render({ route: "AuthEntry" })
+  await runtime.mount()
+  runtime.emit("blumi://nowhere")
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, [])
+})
+
+test("a restricted account never receives a pending link", async () => {
+  const runtime = linkingWith()
+  runtime.render({ route: "ProfileSetup", owner: OWNER_A })
+  await runtime.mount()
+  runtime.emit("blumi://inbox")
+  runtime.render({ route: "Main", owner: OWNER_A, restricted: true })
+  runtime.emit("blumi://shop")
+  assert.deepEqual(runtime.routed, [])
+})
+
+test("a link that arrives in Main navigates immediately as before", async () => {
+  const runtime = linkingWith({ initialUrl: "blumi://profile/user-3" })
+  runtime.render({ route: "Main", owner: OWNER_A, ready: false })
+  const { initial, unsubscribe } = await runtime.mount()
+  assert.equal(initial, "blumi://profile/user-3", "the initial URL still becomes the initial state")
+  runtime.render({ route: "Main", owner: OWNER_A })
+  runtime.emit("blumi://chat/thread-3")
+  assert.deepEqual(runtime.routed, ["blumi://chat/thread-3"])
+  runtime.render({ route: "Main", owner: OWNER_A })
+  assert.deepEqual(runtime.routed, ["blumi://chat/thread-3"], "nothing is replayed afterwards")
+  unsubscribe()
+  runtime.emit("blumi://inbox")
+  assert.deepEqual(runtime.routed, ["blumi://chat/thread-3"], "an unsubscribed container is never called")
+})
+
+test("the root navigator wires pending deep link replay to readiness and state changes", () => {
+  const navigator = read("./RootNavigator.tsx")
+  assert.match(navigator, /const replayPendingDeepLink = usePendingDeepLinkReplay\(\{\s*sessionActor,\s*sessionEntryRoute,\s*isAccountRestricted,\s*navigationReadyGeneration\s*\}\)/)
+  const calls = []
+  const stateChange = evaluate(findInitializer("./RootNavigator.tsx", "handleNavigationStateChange"), {
+    syncCurrentRouteName: () => calls.push("sync"),
+    replayPendingDeepLink: () => calls.push("replay")
+  })
+  stateChange()
+  assert.deepEqual(calls, ["sync", "replay"])
 })
 
 // ── Match modal ────────────────────────────────────────────

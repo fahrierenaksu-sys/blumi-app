@@ -105,6 +105,7 @@ import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
 import { useMatchModal } from "./useMatchModal"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
+import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
 import {
   cosmeticShopScreenBundle,
@@ -426,6 +427,17 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     navigationReadyGeneration
   })
 
+  const replayPendingDeepLink = usePendingDeepLinkReplay({
+    sessionActor,
+    sessionEntryRoute,
+    isAccountRestricted,
+    navigationReadyGeneration
+  })
+  const handleNavigationStateChange = useCallback((): void => {
+    syncCurrentRouteName()
+    replayPendingDeepLink()
+  }, [replayPendingDeepLink, syncCurrentRouteName])
+
   const inventoryHydrationSessionToken = sessionActor &&
     shouldHydrateProductionInventory(
       sessionActor.session.mode,
@@ -613,7 +625,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         linking={linking}
         fallback={<ActivityIndicator color="#F26779" />}
         onReady={handleNavigationReady}
-        onStateChange={syncCurrentRouteName}
+        onStateChange={handleNavigationStateChange}
       >
         <Stack.Navigator
           screenListeners={screenListeners}
