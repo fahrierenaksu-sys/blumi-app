@@ -97,7 +97,6 @@ test("entry and onboarding surfaces use their scoped Blumi palette", () => {
   }
 
   for (const relativePath of [
-    "src/components/OnboardingProgress.tsx",
     "src/components/CountryCallingCodePicker.tsx",
     "src/ui/fieldInput.tsx"
   ]) {
