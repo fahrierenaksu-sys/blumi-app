@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
@@ -24,6 +24,15 @@ const criticalFiles = [
   "src/screens/ProfileEditScreen.tsx",
   "src/screens/RoomDebriefScreen.tsx",
   "src/screens/RegisterScreen.tsx",
+  "src/features/session/register/RegisterCreateView.tsx",
+  "src/features/session/register/RegisterSignInView.tsx",
+  "src/features/session/register/RegisterPhoneEntry.tsx",
+  "src/features/session/register/RegisterOtpEntry.tsx",
+  "src/features/session/register/RegisterTermsConsent.tsx",
+  "src/features/session/register/RegisterLegalLinks.tsx",
+  "src/features/session/register/RegisterErrorNotice.tsx",
+  "src/features/session/register/RegisterFormMetaRow.tsx",
+  "src/features/session/register/AccountRecoveryModal.tsx",
   "src/screens/ProfileSetupScreen.tsx",
   "src/features/miniRoom/scene/MiniRoomHud.tsx",
   "src/features/miniRoom/scene/MiniRoomScene.tsx",
@@ -33,6 +42,19 @@ const criticalFiles = [
   "src/ui/toast.tsx",
   "src/ui/vibeTilePicker.tsx"
 ]
+
+const registerDirectory = resolve(mobileRoot, "src/features/session/register")
+const readRegister = (fileName) =>
+  readFileSync(resolve(registerDirectory, fileName), "utf8")
+const readRegisterScreen = () =>
+  readFileSync(resolve(mobileRoot, "src/screens/RegisterScreen.tsx"), "utf8")
+// The whole registration surface: the screen plus every non-test register module.
+const readRegisterSurface = () => [
+  readRegisterScreen(),
+  ...readdirSync(registerDirectory)
+    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+    .map(readRegister)
+].join("\n")
 
 test("critical journey controls expose accessible roles and names", () => {
   const failures = []
@@ -51,57 +73,56 @@ test("critical journey controls expose accessible roles and names", () => {
 })
 
 test("registration exposes one progressive primary action", () => {
-  const source = readFileSync(
-    resolve(mobileRoot, "src/screens/RegisterScreen.tsx"),
-    "utf8"
-  )
+  const screen = readRegisterScreen()
+  const surface = readRegisterSurface()
+  const signInView = readRegister("RegisterSignInView.tsx")
+  const phoneEntry = readRegister("RegisterPhoneEntry.tsx")
+  const otpEntry = readRegister("RegisterOtpEntry.tsx")
+  const metaRow = readRegister("RegisterFormMetaRow.tsx")
+  const model = readRegister("registerScreenModel.ts")
+  const controller = readRegister("useRegisterFlowController.ts")
 
-  assert.match(source, /testID="register-phone-step"/)
-  assert.match(source, /testID="register-code-step"/)
-  assert.match(source, /testID="register-primary-action"/)
-  assert.match(source, /accessibilityRole="header"/)
-  assert.match(source, /authCopy\.changePhoneNumber/)
+  assert.match(phoneEntry, /testID="register-phone-step"/)
+  assert.match(otpEntry, /testID="register-code-step"/)
+  assert.match(signInView, /testID="register-primary-action"/)
+  assert.match(signInView, /accessibilityRole="header"/)
+  assert.match(otpEntry, /authCopy\.changePhoneNumber/)
   assert.match(
     readFileSync(resolve(mobileRoot, "src/features/session/authEntryCopy.ts"), "utf8"),
     /changePhoneNumber:\s*"Change phone number"/
   )
-  assert.match(source, /disabled=\{busy\}/)
-  assert.doesNotMatch(source, /YOUR BLUMI ACCOUNT/)
-  assert.match(source, /const progressTotal = authIntent === "create" \? 4 : 2/)
-  assert.match(source, /const progressCurrent = authIntent === "create"/)
-  assert.match(source, /testID=\{`register-progress-\$\{index\}`\}/)
-  assert.match(source, /accessibilityRole="progressbar"/)
-  assert.match(source, /accessibilityValue=\{\{\s*min: 1,\s*max: progressTotal,\s*now: progressCurrent/)
-  assert.match(source, /authCopy\.phoneQuestion/)
-  assert.doesNotMatch(source, /YOUR BLUMI JOURNEY/)
-  assert.doesNotMatch(source, /\bAI\b|artificial intelligence/i)
-  assert.match(source, /authCopy\.phonePrivacy/)
-  assert.doesNotMatch(source, /Example format: \+90/)
-  assert.match(source, /testID=\{`register-otp-cell-\$\{index\}`\}/)
-  assert.match(source, /importantForAccessibility="no-hide-descendants"/)
-  assert.match(source, /accessibilityElementsHidden/)
-  assert.match(source, /textContentType="oneTimeCode"/)
-  assert.match(source, /resendCooldownSeconds/)
-  assert.match(source, /setPhoneTouched\(true\)/)
-  assert.match(source, /setOtpTouched\(true\)/)
-  assert.match(source, /phoneTouched[^\n]*\|\|[^\n]*attemptedPrimaryAction/)
-  assert.match(source, /otpTouched[^\n]*\|\|[^\n]*attemptedPrimaryAction/)
-  assert.doesNotMatch(source, /disabled=\{busy \|\| !primaryEnabled\}/)
-  assert.match(source, /navigation\.navigate\("Legal", \{ type: "privacy" \}\)/)
-  assert.match(source, /navigation\.navigate\("Legal", \{ type: "terms" \}\)/)
+  assert.match(otpEntry, /disabled=\{busy\}/)
+  assert.doesNotMatch(surface, /YOUR BLUMI ACCOUNT/)
+  assert.match(model, /const progressTotal = authIntent === "create" \? 4 : 2/)
+  assert.match(model, /const progressCurrent = authIntent === "create"/)
+  assert.match(signInView, /testID=\{`register-progress-\$\{index\}`\}/)
+  assert.match(signInView, /accessibilityRole="progressbar"/)
+  assert.match(signInView, /accessibilityValue=\{\{\s*min: 1,\s*max: progressTotal,\s*now: progressCurrent/)
+  assert.match(metaRow, /authCopy\.phoneQuestion/)
+  assert.doesNotMatch(surface, /YOUR BLUMI JOURNEY/)
+  assert.doesNotMatch(surface, /\bAI\b|artificial intelligence/i)
+  assert.match(signInView, /authCopy\.phonePrivacy/)
+  assert.doesNotMatch(surface, /Example format: \+90/)
+  assert.match(otpEntry, /testID=\{`register-otp-cell-\$\{index\}`\}/)
+  assert.match(otpEntry, /importantForAccessibility="no-hide-descendants"/)
+  assert.match(otpEntry, /accessibilityElementsHidden/)
+  assert.match(otpEntry, /textContentType="oneTimeCode"/)
+  assert.match(otpEntry, /resendCooldownSeconds/)
+  assert.match(controller, /setPhoneTouched\(true\)/)
+  assert.match(controller, /setOtpTouched\(true\)/)
+  assert.match(model, /phoneTouched[^\n]*\|\|[^\n]*attemptedPrimaryAction/)
+  assert.match(model, /otpTouched[^\n]*\|\|[^\n]*attemptedPrimaryAction/)
+  assert.doesNotMatch(surface, /disabled=\{busy \|\| !primaryEnabled\}/)
+  assert.match(screen, /navigation\.navigate\("Legal", \{ type: "privacy" \}\)/)
+  assert.match(screen, /navigation\.navigate\("Legal", \{ type: "terms" \}\)/)
 })
 
 test("registration distributes its primary sections across the viewport", () => {
-  const source = readFileSync(
-    resolve(mobileRoot, "src/screens/RegisterScreen.tsx"),
-    "utf8"
-  )
-
   assert.match(
-    source,
+    readRegister("registerStyles.ts"),
     /content:\s*\{[^}]*flexGrow:\s*1,[^}]*justifyContent:\s*"space-between"/
   )
-  assert.match(source, /contentContainerStyle=\{styles\.content\}/)
+  assert.match(readRegister("RegisterSignInView.tsx"), /contentContainerStyle=\{styles\.content\}/)
 })
 
 test("country calling code picker is searchable and modal-accessible", () => {
@@ -370,17 +391,18 @@ test("room starter choices stay reachable on narrow screens and larger text", ()
 })
 
 test("account recovery remains keyboard-safe and scrollable on short screens", () => {
-  const source = readFileSync(
-    resolve(mobileRoot, "src/screens/RegisterScreen.tsx"),
-    "utf8"
-  )
+  const modal = readRegister("AccountRecoveryModal.tsx")
+  const layoutHook = readRegister("useRegisterLayout.ts")
+  const model = readRegister("registerScreenModel.ts")
 
-  assert.match(source, /<KeyboardAvoidingView[\s\S]*recoveryKeyboard/)
-  assert.match(source, /keyboardShouldPersistTaps="handled"/)
-  assert.match(source, /recoveryScrollContent/)
-  assert.match(source, /useWindowDimensions/)
-  assert.match(source, /stackRecoveryActions/)
-  assert.match(source, /recoveryActionsStacked/)
+  assert.match(modal, /<KeyboardAvoidingView[\s\S]*recoveryKeyboard/)
+  assert.match(modal, /keyboardShouldPersistTaps="handled"/)
+  assert.match(modal, /recoveryScrollContent/)
+  assert.match(layoutHook, /useWindowDimensions/)
+  assert.match(model, /const stackRecoveryActions = viewportWidth < 360 \|\| viewportFontScale >= 1\.25/)
+  assert.match(modal, /stackRecoveryActions/)
+  assert.match(modal, /recoveryActionsStacked/)
+  assert.match(readRegister("RegisterSignInView.tsx"), /stackRecoveryActions=\{layout\.stackRecoveryActions\}/)
 })
 
 function inspectNode(node, sourceFile, relativePath, failures) {

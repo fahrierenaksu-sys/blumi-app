@@ -22,19 +22,28 @@ test("auth entry makes account intent explicit", () => {
 })
 
 test("sign-in intent uses sign-in-specific verification copy", () => {
-  const source = read("src/screens/RegisterScreen.tsx")
+  const source = read("src/features/session/register/registerScreenModel.ts")
+  const signInView = read("src/features/session/register/RegisterSignInView.tsx")
   const copy = read("src/features/session/authEntryCopy.ts")
   assert.match(source, /authIntent === "sign-in"[\s\S]*authCopy\.signInCodeBody/)
   assert.match(source, /authIntent === "sign-in" \? authCopy\.signInToBlumi/)
+  assert.match(signInView, /label=\{resolveSignInPrimaryActionLabel\(/)
+  assert.match(read("src/screens/RegisterScreen.tsx"), /resolveSignInHeroCopy\(\{/)
   assert.match(copy, /If this phone is linked/)
   assert.match(copy, /Sign in to Blumi/)
 })
 
 test("invalid phone input returns focus to the field", () => {
-  const source = read("src/screens/RegisterScreen.tsx")
+  const source = read("src/features/session/register/useRegisterFlowController.ts")
   assert.match(source, /phoneInputRef = useRef<\s*TextInput\s*\|\s*null\s*>\(null\)/)
   assert.match(source, /phoneInputRef\.current\?\.focus\(\)/)
-  assert.match(source, /ref=\{phoneInputRef\}/)
+  assert.match(read("src/features/session/register/RegisterPhoneEntry.tsx"), /ref=\{phoneInputRef\}/)
+  for (const view of ["RegisterCreateView.tsx", "RegisterSignInView.tsx"]) {
+    assert.match(
+      read(`src/features/session/register/${view}`),
+      /phoneInputRef=\{register\.phoneInputRef\}/
+    )
+  }
 })
 
 test("avatar onboarding has one progress surface and keeps identity editing separate", () => {

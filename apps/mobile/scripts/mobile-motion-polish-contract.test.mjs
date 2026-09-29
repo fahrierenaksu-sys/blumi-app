@@ -48,10 +48,11 @@ test("continuous pulse animation is suppressed for reduced motion", () => {
 
 test("account and shop selection changes use restrained shared transitions", () => {
   const register = readMobileFile("src/screens/RegisterScreen.tsx")
+  const registerSignIn = readMobileFile("src/features/session/register/RegisterSignInView.tsx")
   const shop = readMobileFile("src/screens/CosmeticShopScreen.tsx")
 
   assert.match(register, /useSelectionTransition\(flow\.stage/)
-  assert.match(register, /testID="register-motion-card"/)
+  assert.match(registerSignIn, /testID="register-motion-card"/)
   assert.match(shop, /useSelectionTransition\(selectedProduct\?\.id/)
   assert.match(shop, /testID="shop-preview-motion"/)
   assert.match(shop, /useReducedMotion/)

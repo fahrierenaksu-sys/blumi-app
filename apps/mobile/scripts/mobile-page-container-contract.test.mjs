@@ -18,7 +18,7 @@ const directPageScreens = [
   "screens/MyRoomScreen.tsx",
   "screens/ProfileEditScreen.tsx",
   "screens/ProfilePreviewScreen.tsx",
-  "screens/RegisterScreen.tsx",
+  "features/session/register/RegisterSignInView.tsx",
   "screens/RoomDebriefScreen.tsx",
   "screens/SettingsScreen.tsx",
   "screens/WardrobeV2Screen.tsx",
@@ -31,7 +31,10 @@ const delegatedPageScreens = new Map([
   ["screens/RoomSetupScreen.tsx", "BlumiSetupShell"],
   ["screens/MiniRoomScreen.tsx", "MiniRoomScene"],
   ["screens/MiniRoomRigPreviewScreen.tsx", "MiniRoomScene"],
-  ["screens/PreAuthSetupFlowScreen.tsx", "ProfileSetupScreen"]
+  ["screens/PreAuthSetupFlowScreen.tsx", "ProfileSetupScreen"],
+  // Register composes a sign-in page (checked above) or the create-account setup shell.
+  ["screens/RegisterScreen.tsx", "RegisterSignInView"],
+  ["features/session/register/RegisterCreateView.tsx", "BlumiSetupShell"]
 ])
 
 const regularContentPages = [

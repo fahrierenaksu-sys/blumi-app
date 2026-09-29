@@ -10,7 +10,11 @@ const componentPath = resolve(
   mobileRoot,
   "src/features/session/RegisterWorldHero.tsx"
 )
-const registerPath = resolve(mobileRoot, "src/screens/RegisterScreen.tsx")
+const registerScreenPath = resolve(mobileRoot, "src/screens/RegisterScreen.tsx")
+const registerPath = resolve(
+  mobileRoot,
+  "src/features/session/register/RegisterCreateView.tsx"
+)
 const assetPath = resolve(
   mobileRoot,
   "src/features/session/assets/register-world-hero-v1-runtime/blumi_register_world_hero_v1.png"
@@ -53,4 +57,5 @@ test("register uses one native-driven hero without sprite-frame seams", () => {
   assert.doesNotMatch(component, /setTimeout|requestAnimationFrame/)
   assert.match(register, /RegisterWorldHero/)
   assert.doesNotMatch(register, /RegisterDancePair/)
+  assert.doesNotMatch(readFileSync(registerScreenPath, "utf8"), /RegisterDancePair/)
 })
