@@ -168,6 +168,8 @@ try {
       "src/features/session/setupFlow/setupStaticExperience.test.ts",
       "src/features/session/youCopy.test.ts",
       "src/features/settings/settingsCopy.test.ts",
+      "src/features/settings/settingsPresentationModel.test.ts",
+      "src/features/settings/settingsPhoneChangeModel.test.ts",
       "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/screens/AuthEntryScreen.test.ts",
       "src/ui/onboardingColorConsistency.test.ts",
