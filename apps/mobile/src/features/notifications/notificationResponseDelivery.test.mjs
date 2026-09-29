@@ -7,8 +7,11 @@ import ts from "typescript"
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 const rootSource = read("../../navigation/RootNavigator.tsx")
 const rootFile = ts.createSourceFile("RootNavigator.tsx", rootSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+// Notification tap routing is owned by a root hook beside RootNavigator.
+const routingSource = read("../../navigation/useNotificationResponseRouting.ts")
+const routingFile = ts.createSourceFile("useNotificationResponseRouting.ts", routingSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 
-function rootCallback(name, bindings) {
+function rootCallback(name, bindings, sourceFile = rootFile) {
   let initializer
   const visit = (node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) {
@@ -16,9 +19,9 @@ function rootCallback(name, bindings) {
     }
     ts.forEachChild(node, visit)
   }
-  visit(rootFile)
+  visit(sourceFile)
   assert.ok(initializer, `${name} must have an initializer`)
-  const executable = ts.transpileModule(`(${initializer.getText(rootFile)})`, {
+  const executable = ts.transpileModule(`(${initializer.getText(sourceFile)})`, {
     compilerOptions: { target: ts.ScriptTarget.ES2022 }
   }).outputText
   return runInNewContext(executable, { useCallback: (callback) => callback, ...bindings })
@@ -129,7 +132,7 @@ function createRuntime({ ready = true, response = null, onResponse } = {}) {
     navigationRef,
     resolveNotificationDestination: load("./notificationRouting").resolveNotificationDestination
   }
-  const routeResponse = rootCallback("handleNotificationResponseData", sessionBindings)
+  const routeResponse = rootCallback("handleNotificationResponseData", sessionBindings, routingFile)
   currentResponseCallback ??= routeResponse
   const registration = load("./usePushRegistration").usePushRegistration
   const renderHook = (sessionActor, callback = currentResponseCallback) => {

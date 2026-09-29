@@ -1,124 +1,50 @@
 import type {
   DiscoveryDecisionQuota,
   MediaSessionToken,
-  MiniRoom,
-  MiniRoomParticipant
-, ServerEvent } from "@blumi/contracts"
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import {
-  CommonActions,
-  createNavigationContainerRef,
-  NavigationContainer,
-  type LinkingOptions
-} from "@react-navigation/native"
+  MiniRoom
+} from "@blumi/contracts"
+import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   StyleSheet,
   View
 } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
-import { createCandidateAvatarSnapshot } from "../features/avatarV2/candidateAvatarSnapshot"
 import {
-  demoSendMessage,
-  demoRoomInviteAction,
-  getDemoMessages,
   isDemoMode,
   setDemoMode,
   useDemoStore
 } from "../features/demo/demoStore"
-import { DUMMY_PROFILES } from "../features/demo/dummyProfiles"
 import {
   BLUMI_BUILD_PROFILE,
   BLUMI_DEV_ENTRY_ROUTE,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG,
   IS_BLUMI_PAID_COINS_ENABLED,
-  MOBILE_HTTP_BASE_URL,
-  MOBILE_WS_BASE_URL
+  MOBILE_HTTP_BASE_URL
 } from "../config/env"
 import {
   canApplyBlumiDevEntry,
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
-import {
-  createThread,
-  fetchChatThreads,
-  fetchThreadMessages,
-  markThreadRead,
-  type FetchThreadMessagesOptions,
-  sendThreadMessage
-} from "../features/chat/chatApi"
-import { createChatCoordinator } from "../features/chat/chatCoordinator"
-import { createMatchThreadSyncGate, createThreadListRefreshGuard } from "../features/chat/threadListRefreshGuard"
-import {
-  cancelThreadRoomInvite,
-  createThreadRoomInvite,
-  decideThreadRoomInvite,
-  fetchThreadRoomInvites,
-  joinRoomSession,
-  leaveActiveRoom,
-  normalizeRoomInviteRecord
-} from "../features/chat/chatRoomInviteApi"
+import type { FetchThreadMessagesOptions } from "../features/chat/chatApi"
 import type {
   ChatLocale,
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
 } from "../features/chat/chatRoomInviteModel"
+import { useBlockStore } from "../features/safety/blockStore"
 import {
-  hydrateBlockedUsersFromServer,
-  useBlockStore
-} from "../features/safety/blockStore"
-import {
-  applyChatMessageListed,
-  hasMessageHistory,
-  applyChatMessageListFailed,
-  applyChatMessageListLoading,
-  applyChatMessageReceived,
-  confirmOptimisticMessage,
-  applyChatThreadCreated,
-  applyChatThreadListFailed,
-  applyChatThreadListed,
-  applyChatThreadRead,
-  applyChatThreadListLoading,
-  findThreadForPartner,
-  getThreads,
-  markThreadRead as markLocalThreadRead,
-  markOptimisticMessageFailed,
   resetChatStore,
   useTotalUnreadCount
 } from "../features/chat/chatStore"
-import {
-  recordMutualConnection,
-  updateSavedConnectionStatus
-} from "../features/connections/savedConnectionsStore"
-import { presentConnectionMatch } from "../features/connections/connectionMatchPresentation"
 import { flushAuthenticatedConnectionDecisionOutbox } from "../features/connections/connectionDecisionRuntime"
-import type { ConnectionDecisionDeliveryDependencies } from "../features/connections/connectionDecisionDelivery"
 import {
-  createGlobalRealtimeEventHandler
-} from "../features/realtime/globalRealtimeEventHandler"
-import {
-  isSameAuthenticatedSession,
-  reconcileRealtimeConnectionMatch,
-  type ConnectionMatchedPayload
-} from "../features/connections/globalMatchReconciliation"
-import {
-  connectGlobal,
   disconnectGlobal,
-  sendGlobal,
-  subscribeToStatus,
-  useGlobalRealtime,
-  useGlobalRealtimeEvents
+  useGlobalRealtime
 } from "../features/realtime/globalRealtimeProvider"
-import { isRealtimeAuthInvalidClose } from "../features/realtime/realtimeClient"
-import {
-  createGlobalRealtimeLifecycle,
-  getGlobalRealtimeLifecycleIdentity
-} from "../features/realtime/globalRealtimeLifecycle"
 import { LobbyScreen } from "../screens/LobbyScreen"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
@@ -130,33 +56,19 @@ import { ProfileEditScreen } from "../screens/ProfileEditScreen"
 import { MatchResultScreen } from "../screens/MatchResultScreen"
 import { AuthEntryScreen } from "../screens/AuthEntryScreen"
 import { AvatarV2Provider } from "../features/avatarV2/state/AvatarV2Provider"
-import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
 import { isAvatarQaUnlockEnabled } from "../features/avatarV2/qa/avatarQaInventory"
 import { getOnboardingStarterBodyId } from "../features/avatarV2/avatarStarterModel"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
-import { getAvatarV2StorageKey } from "../features/avatarV2/avatarV2Persistence"
 import { RoomV2Provider } from "../features/roomV2/state/RoomV2Provider"
-import type { UserRoomDecor } from "../features/roomV2/roomV2.types"
-import { getRoomV2StorageKey } from "../features/roomV2/roomV2Persistence"
 import { AccountRestrictionScreen } from "../screens/AccountRestrictionScreen"
-import type { SessionActor } from "../features/session/sessionModel"
 import { useSessionState } from "../features/session/useSessionState"
 import { selectSessionEntryRoute } from "../features/session/sessionRouting"
 import type {
   RegisterAccountInput,
   UpdateSessionProfileInput
 } from "../features/session/sessionApi"
-import {
-  createPreAuthOnboardingDraft,
-  type PreAuthOnboardingDraft
-} from "../features/session/preAuthOnboardingDraft"
-import {
-  createPreAuthOnboardingDraftStorage,
-  getPreAuthOnboardingDraftScope,
-  resolvePreAuthOnboardingDraftId,
-  type PreAuthOnboardingDraftSnapshot,
-  type PreAuthOnboardingResumeStep
-} from "../features/session/preAuthOnboardingStorage"
+import type { PreAuthOnboardingResumeStep } from "../features/session/preAuthOnboardingStorage"
+import { usePreAuthOnboardingDraft } from "../features/session/usePreAuthOnboardingDraft"
 import {
   getOnboardingScreenMode,
   shouldGateOnboardingBootPrelude,
@@ -169,36 +81,31 @@ import {
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
-  shouldDispatchMainTabNavigation,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
-import { getBottomNavReturnPresentation, resolveBottomNavReturnPreview, retainBottomNavReturnPreview } from "./bottomNavReturnPreview"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
 import { ToastContainer, showToast } from "../ui/toast"
 import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
-import { BottomNav, type BottomNavKey } from "../ui/bottomNav"
 import type { BlumiMatch } from "../features/matches/matchRoomModel"
-import { usePushRegistration } from "../features/notifications/usePushRegistration"
-import { resolveNotificationDestination } from "../features/notifications/notificationRouting"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
-import {
-  getRootNavigationChromeSnapshot,
-  publishRootNavigationChromeReturnPreview,
-  clearRootNavigationChromeReturnPreview,
-  settleRootNavigationChromeReturnPreview,
-  publishRootNavigationChrome,
-  subscribeToRootNavigationChrome
-} from "./rootNavigationChromeStore"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
 import { ConnectionBanner } from "../ui/connectionBanner"
-import { parseReferralCodeFromUrl } from "../features/referrals/referralModel"
-import { capturePendingReferral } from "../features/referrals/referralStorage"
 import { LinkedProfileScreen } from "./LinkedProfileScreen"
+import { linking } from "./rootLinking"
+import { navigationRef } from "./rootNavigationRef"
+import { RootNavigationChrome } from "./RootNavigationChrome"
+import { useBottomNavChrome } from "./useBottomNavChrome"
+import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
+import { useRoomInviteRouting } from "./useRoomInviteRouting"
+import { useRootChatSync } from "./useRootChatSync"
+import { useMatchModal } from "./useMatchModal"
+import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
+import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -322,61 +229,8 @@ export type RootStackParamList = {
   }
 }
 
-const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ["blumi://"],
-  config: {
-    screens: {
-      Lobby: "discover",
-      Inbox: "inbox",
-      ChatThread: "chat/:threadId",
-      ProfilePreview: "profile/:userId",
-      Settings: "settings",
-      MyRoom: "room",
-      MyRoomEditor: "room/edit",
-      WardrobeV2: "wardrobe",
-      CosmeticShop: "shop"
-    }
-  },
-  async getInitialURL() {
-    const url = await Linking.getInitialURL()
-    if (!url) return url
-    const referralCode = parseReferralCodeFromUrl(url)
-    if (!referralCode) return url
-    await capturePendingReferral({ code: referralCode })
-    captureProductEvent("referral_link_opened", { source: "initial_url" })
-    return null
-  },
-  subscribe(listener) {
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      const referralCode = parseReferralCodeFromUrl(url)
-      if (referralCode) {
-        void capturePendingReferral({ code: referralCode })
-        captureProductEvent("referral_link_opened", { source: "app_link" })
-        return
-      }
-      listener(url)
-    })
-    return () => subscription.remove()
-  }
-}
-
 const Stack = createNativeStackNavigator<RootStackParamList>()
-const navigationRef = createNavigationContainerRef<RootStackParamList>()
 
-function createLocalDemoMediaSessionToken(): string {
-  return "demo-session"
-}
-const preAuthDraftStorage = createPreAuthOnboardingDraftStorage<
-  UpdateSessionProfileInput,
-  UserAvatar,
-  UserRoomDecor
->({
-  store: {
-    getItem: (key) => AsyncStorage.getItem(key),
-    setItem: (key, value) => AsyncStorage.setItem(key, value),
-    removeItem: (key) => AsyncStorage.removeItem(key)
-  }
-})
 const CAN_REGISTER_MINI_ROOM_RIG_PREVIEW = canApplyBlumiDevEntry({
   route: BLUMI_DEV_ENTRY_ROUTE,
   buildProfile: BLUMI_BUILD_PROFILE,
@@ -410,109 +264,8 @@ function scheduleDeferredPreload(work: () => void): () => void {
   }
 }
 
-function scheduleDeferredMaintenance(work: () => void): () => void {
-  if (typeof globalThis.requestIdleCallback === "function") {
-    const idleId = globalThis.requestIdleCallback(work, { timeout: 5_000 })
-    return () => globalThis.cancelIdleCallback?.(idleId)
-  }
-
-  const timeoutId = setTimeout(work, 5_000)
-  return () => clearTimeout(timeoutId)
-}
-
-interface GlobalMatchState {
-  miniRoomId: string
-  matchedUserName: string
-  matchedUserId?: string
-}
-
-type ReadyMiniRoomEvent = Extract<ServerEvent, { type: "mini_room.ready" }>
-
 interface RootNavigatorProps {
   fontsReady?: boolean
-}
-
-interface RootNavigationChromeProps {
-  navigatorKey: string
-  sessionActor: SessionActor | null
-  sessionEntryRoute: string
-  isAccountRestricted: boolean
-  chatCount: number
-  onBottomNavPress: (key: BottomNavKey) => void
-}
-
-const RootNavigationChrome = memo(function RootNavigationChrome({
-  navigatorKey,
-  sessionActor,
-  sessionEntryRoute,
-  isAccountRestricted,
-  chatCount,
-  onBottomNavPress
-}: RootNavigationChromeProps) {
-  const routeSnapshot = useSyncExternalStore(
-    subscribeToRootNavigationChrome,
-    getRootNavigationChromeSnapshot,
-    getRootNavigationChromeSnapshot
-  )
-  const hasCurrentNavigatorSnapshot = routeSnapshot.navigatorKey === navigatorKey
-  const routeName = hasCurrentNavigatorSnapshot
-    ? routeSnapshot.routeName as keyof RootStackParamList | undefined
-    : undefined
-  const bottomNavRoutePresentation = getBottomNavReturnPresentation(
-    routeName,
-    hasCurrentNavigatorSnapshot ? routeSnapshot.routeKey : undefined,
-    hasCurrentNavigatorSnapshot ? routeSnapshot.returnPreview : undefined
-  )
-  const earlyReturnNavVisualOnly = bottomNavRoutePresentation.visualOnly
-  const currentBottomNavKey = sessionEntryRoute === "Main" && sessionActor
-    ? bottomNavRoutePresentation.currentKey
-    : null
-  const lastBottomNavKeyRef = useRef<BottomNavKey>("discover")
-  if (currentBottomNavKey) lastBottomNavKeyRef.current = currentBottomNavKey
-  const canWarmCurrentSceneAssets = isCurrentSceneWarmupRoute(
-    routeName,
-    sessionEntryRoute,
-    isAccountRestricted
-  )
-
-  return (
-    <>
-      {sessionActor ? (
-        <CurrentSceneAssetWarmup
-          enabled={canWarmCurrentSceneAssets}
-          initialShopMode={hasCurrentNavigatorSnapshot ? routeSnapshot.shopMode : undefined}
-          sessionMode={sessionActor.session.mode}
-          isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
-        />
-      ) : null}
-      {sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation.mounted ? (
-        <View
-          pointerEvents={earlyReturnNavVisualOnly ? "none" : "box-none"}
-          accessibilityElementsHidden={earlyReturnNavVisualOnly}
-          importantForAccessibility={earlyReturnNavVisualOnly ? "no-hide-descendants" : "auto"}
-          style={StyleSheet.absoluteFill}
-        >
-          <BottomNav
-            currentKey={currentBottomNavKey ?? lastBottomNavKeyRef.current}
-            chatCount={chatCount}
-            onPress={onBottomNavPress}
-            visible={bottomNavRoutePresentation.visible}
-            appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
-          />
-        </View>
-      ) : null}
-    </>
-  )
-})
-
-export function isCurrentSceneWarmupRoute(
-  routeName: keyof RootStackParamList | undefined,
-  sessionEntryRoute: string,
-  isAccountRestricted: boolean
-): boolean {
-  return sessionEntryRoute === "Main" &&
-    !isAccountRestricted &&
-    (routeName === "Lobby" || routeName === "CosmeticShop")
 }
 
 export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
@@ -542,125 +295,36 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     refreshAccountModeration,
     clearSessionActor
   } = useSessionState()
-  const [preAuthDraft, setPreAuthDraft] = useState<
-    PreAuthOnboardingDraft<
-      UpdateSessionProfileInput,
-      UserAvatar,
-      UserRoomDecor
-    >
-  >(() => createPreAuthOnboardingDraft())
-  const preAuthDraftSnapshotRef = useRef<PreAuthOnboardingDraftSnapshot<
-    UpdateSessionProfileInput,
-    UserAvatar,
-    UserRoomDecor
-  > | null>(null)
-  const [preAuthDraftSnapshot, setPreAuthDraftSnapshot] = useState(
-    preAuthDraftSnapshotRef.current
-  )
-  const [isPreAuthDraftHydrating, setIsPreAuthDraftHydrating] = useState(true)
+  const {
+    preAuthDraft,
+    preAuthDraftSnapshot,
+    isPreAuthDraftHydrating,
+    preAuthDraftScopeId,
+    persistPreAuthDraft,
+    clearPreAuthDraft
+  } = usePreAuthOnboardingDraft()
   const [isBootPreludeReady, setIsBootPreludeReady] = useState(false)
   const handleBootPreludeReady = useCallback(() => {
     setIsBootPreludeReady(true)
   }, [])
-  const preAuthDraftAttemptIdRef = useRef(
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-  )
-  const [preAuthDraftGeneration, setPreAuthDraftGeneration] = useState(0)
-  const preAuthDraftId = resolvePreAuthOnboardingDraftId(
-    preAuthDraftSnapshot?.draftId,
-    preAuthDraftAttemptIdRef.current,
-    preAuthDraftGeneration
-  )
-  const preAuthDraftScopeId = getPreAuthOnboardingDraftScope(preAuthDraftId)
-  const persistPreAuthDraft = useCallback(async (
-    nextDraft: PreAuthOnboardingDraft<
-      UpdateSessionProfileInput,
-      UserAvatar,
-      UserRoomDecor
-    >,
-    resumeStep: PreAuthOnboardingResumeStep
-  ): Promise<void> => {
-    const snapshot = await preAuthDraftStorage.save(
-      nextDraft,
-      resumeStep,
-      preAuthDraftSnapshotRef.current ?? { draftId: preAuthDraftId }
-    )
-    preAuthDraftSnapshotRef.current = snapshot
-    setPreAuthDraftSnapshot(snapshot)
-    setPreAuthDraft(snapshot.draft)
-  }, [preAuthDraftId])
-  const clearPreAuthDraft = useCallback(async (): Promise<void> => {
-    const keys = [
-      getAvatarV2StorageKey(preAuthDraftScopeId),
-      getRoomV2StorageKey(preAuthDraftScopeId)
-    ].filter((key): key is string => Boolean(key))
-    await Promise.all([
-      AsyncStorage.multiRemove(keys),
-      preAuthDraftStorage.clear()
-    ])
-    preAuthDraftSnapshotRef.current = null
-    setPreAuthDraftSnapshot(null)
-    setPreAuthDraft(createPreAuthOnboardingDraft())
-    setPreAuthDraftGeneration((generation) => generation + 1)
-  }, [preAuthDraftScopeId])
-
-  useEffect(() => {
-    let active = true
-    void preAuthDraftStorage.load()
-      .then((snapshot) => {
-        if (!active || snapshot === null) return
-        preAuthDraftSnapshotRef.current = snapshot
-        setPreAuthDraftSnapshot(snapshot)
-        setPreAuthDraft(snapshot.draft)
-      })
-      .catch(() => preAuthDraftStorage.clear())
-      .finally(() => {
-        if (active) setIsPreAuthDraftHydrating(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isPreAuthDraftHydrating) return
-    const currentKeys = new Set([
-      getAvatarV2StorageKey(preAuthDraftScopeId),
-      getRoomV2StorageKey(preAuthDraftScopeId)
-    ].filter((key): key is string => Boolean(key)))
-    const cancelDeferredCleanup = scheduleDeferredMaintenance(() => {
-      void AsyncStorage.getAllKeys()
-        .then((keys) => keys.filter(
-          (key) => key.includes("preauth-onboarding-draft") && !currentKeys.has(key)
-        ))
-        .then((staleKeys) => staleKeys.length > 0
-          ? AsyncStorage.multiRemove(staleKeys)
-          : undefined)
-        .catch(() => undefined)
-    })
-    return cancelDeferredCleanup
-  }, [isPreAuthDraftHydrating, preAuthDraftScopeId])
-  const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
-  const [roomInvites, setRoomInvites] = useState<ChatRoomInviteTimelineItem[]>([])
-  const handledMatchIdsRef = useRef(new Set<string>())
-  const reconcilingMatchIdsRef = useRef(new Set<string>())
-  const latestSessionActorRef = useRef<SessionActor | null>(sessionActor)
-  latestSessionActorRef.current = sessionActor
-  const isCurrentSession = useCallback(
-    (expectedActor: SessionActor): boolean =>
-      isSameAuthenticatedSession(expectedActor, latestSessionActorRef.current),
-    []
-  )
-  const handledReadyMiniRoomIdsRef = useRef(new Set<string>())
+  const { latestSessionActorRef, isCurrentSession } = useCurrentSessionGuard(sessionActor)
   const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
   const [navigationReadyGeneration, setNavigationReadyGeneration] = useState(0)
   const totalUnreadCount = useTotalUnreadCount()
   const { connectionStatus: rootConnectionStatus } = useGlobalRealtime()
   const demoStore = useDemoStore()
-  const visibleRoomInvites = sessionActor?.session.mode === "demo"
-    ? demoStore.roomInvites
-    : roomInvites
+  const {
+    visibleRoomInvites,
+    setRoomInvites,
+    openReadyMiniRoom,
+    handleDemoRoomInviteAction,
+    resetRoomInviteRouting
+  } = useRoomInviteRouting({
+    latestSessionActorRef,
+    sessionMode: sessionActor?.session.mode,
+    demoRoomInvites: demoStore.roomInvites
+  })
   const { claimDailyRewardFromServer, hydrateFromServer } = useInventoryStore(
     sessionActor?.profile.userId,
     sessionActor?.session.mode === "production"
@@ -684,18 +348,41 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     ? `restricted:${sessionActor?.profile.userId ?? "no-session"}`
     : getSessionNavigatorKey(sessionEntryRoute, sessionActor?.profile.userId)
   const chatLocale = getChatLocale(Intl.DateTimeFormat().resolvedOptions().locale)
-  const threadListRefreshGuardRef = useRef<ReturnType<typeof createThreadListRefreshGuard> | null>(null)
-  if (!threadListRefreshGuardRef.current) threadListRefreshGuardRef.current = createThreadListRefreshGuard()
-  const matchThreadSyncGateRef = useRef<ReturnType<typeof createMatchThreadSyncGate> | null>(null)
-  if (!matchThreadSyncGateRef.current) matchThreadSyncGateRef.current = createMatchThreadSyncGate()
-  const applyRealtimeThreadList = useCallback((list: Parameters<typeof applyChatThreadListed>[0]): void => {
-    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
-    applyChatThreadListed(list)
-  }, [])
-  const applyNewThread = useCallback((thread: Parameters<typeof applyChatThreadCreated>[0]): void => {
-    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
-    applyChatThreadCreated(thread)
-  }, [])
+  const {
+    applyRealtimeThreadList,
+    applyNewThread,
+    refreshProductionThreads,
+    resynchronizeMessages,
+    upsertRoomInvite,
+    warmThreadMessagesForInbox,
+    chatThreadRouteBindings
+  } = useRootChatSync({
+    latestSessionActorRef,
+    isCurrentSession,
+    sessionMode: sessionActor?.session.mode,
+    chatLocale,
+    visibleRoomInvites,
+    setRoomInvites,
+    openReadyMiniRoom,
+    handleDemoRoomInviteAction
+  })
+  const {
+    globalMatch,
+    reconcileConnectionDecisionDelivery,
+    handleRealtimeConnectionMatch,
+    getMatchDeduplicationState,
+    dismissGlobalMatch,
+    goLobby,
+    handleMatchSendMessage,
+    resetMatchModal
+  } = useMatchModal({
+    sessionActor,
+    latestSessionActorRef,
+    isCurrentSession,
+    applyNewThread,
+    hydrateFromServer,
+    chatThreadRouteBindings
+  })
 
   useEffect(() => {
     if (!IS_BLUMI_PAID_COINS_ENABLED) return
@@ -711,325 +398,16 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     })
   }, [sessionActor?.profile.userId, sessionActor?.session.mode])
 
-  const refreshProductionThreads = useCallback(async (): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "production") return
-    const requestRevision = threadListRefreshGuardRef.current!.beginHttpRefresh()
-    applyChatThreadListLoading()
-    try {
-      const threadList = await fetchChatThreads(
-        MOBILE_HTTP_BASE_URL,
-        actor.session.sessionToken
-      )
-      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
-      applyChatThreadListed(threadList)
-      const syncKey = `${actor.profile.userId}:${actor.session.sessionToken}`
-      if (matchThreadSyncGateRef.current?.shouldStart(syncKey, Date.now())) {
-        void fetchChatThreads(
-          MOBILE_HTTP_BASE_URL,
-          actor.session.sessionToken,
-          fetch,
-          undefined,
-          { syncMatches: true }
-        ).then((recovered) => {
-          if (!isCurrentSession(actor) || recovered.userId !== actor.profile.userId) return
-          const knownThreadIds = new Set(getThreads().map((thread) => thread.threadId))
-          for (const thread of recovered.threads) {
-            if (knownThreadIds.has(thread.threadId) || !thread.participantUserIds.includes(actor.profile.userId)) continue
-            applyNewThread(thread)
-            knownThreadIds.add(thread.threadId)
-          }
-        }).catch(() => { /* The readable Inbox remains available; retry on a later visit. */ })
-      }
-    } catch (error) {
-      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
-      const message = error instanceof Error
-        ? error.message
-        : "We could not refresh your chats yet."
-      applyChatThreadListFailed(message)
-      throw error
-    }
-  }, [applyNewThread, isCurrentSession])
-
-  const reconcileConnectionDecisionDelivery = useCallback<
-    NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
-  >(async (intent, response): Promise<void> => {
-    const actor = sessionActor
-    if (!actor) return
-    if (response.match) {
-      const connection = await recordMutualConnection({
-        ownerUserId: actor.profile.userId,
-        currentUserId: actor.profile.userId,
-        participantUserIds: response.match.participantUserIds
-      })
-      if (!connection || !isCurrentSession(actor) || actor.session.mode !== "production") {
-        return
-      }
-      const thread = await createThread(
-        MOBILE_HTTP_BASE_URL,
-        actor.session.sessionToken,
-        { participantUserIds: response.match.participantUserIds }
-      )
-      if (!isCurrentSession(actor)) return
-      applyNewThread(thread)
-      presentConnectionMatch({
-        hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
-        markPresented: (miniRoomId) => {
-          handledMatchIdsRef.current = new Set([
-            ...handledMatchIdsRef.current,
-            miniRoomId
-          ])
-        },
-        captureMatchCreated: () => {
-          captureProductEvent("match_created", {
-            source: "mini_room_mutual_save",
-            mode: actor.session.mode
-          })
-        },
-        showMatchToast: (toast) => {
-          showToast({ ...toast, type: "success" })
-        },
-        showMatchModal: setGlobalMatch
-      }, {
-        miniRoomId: response.match.miniRoomId,
-        matchedUserId: connection.userId,
-        matchedUserName: connection.displayName,
-        mode: actor.session.mode
-      })
-      return
-    }
-    if (intent.status === "saved" && isCurrentSession(actor)) {
-      await updateSavedConnectionStatus({
-        ownerUserId: actor.profile.userId,
-        userId: intent.partnerUserId,
-        status: "pending"
-      })
-    }
-  }, [applyNewThread, isCurrentSession, sessionActor])
-
-  const dismissGlobalMatch = useCallback((): void => {
-    setGlobalMatch(null)
-  }, [])
-
-  const goLobby = useCallback((): void => {
-    setGlobalMatch(null)
-    if (navigationRef.isReady()) {
-      navigationRef.navigate("Lobby")
-    }
-  }, [])
-
-  const openReadyMiniRoom = useCallback(
-    (
-      payload: ReadyMiniRoomEvent["payload"],
-      options: { allowReopen?: boolean } = {}
-    ): void => {
-      const actor = latestSessionActorRef.current
-      if (!actor || !navigationRef.isReady()) return
-      if (!payload.miniRoom.participantUserIds.includes(actor.profile.userId)) {
-        return
-      }
-      if (
-        !options.allowReopen &&
-        handledReadyMiniRoomIdsRef.current.has(payload.miniRoom.miniRoomId)
-      ) {
-        return
-      }
-
-      const partner = payload.participants.find(
-        (participant) => participant.userId !== actor.profile.userId
-      )
-      if (!partner) return
-
-      handledReadyMiniRoomIdsRef.current = new Set([
-        ...handledReadyMiniRoomIdsRef.current,
-        payload.miniRoom.miniRoomId
-      ])
-      navigationRef.navigate("MiniRoom", {
-        readyMiniRoom: {
-          miniRoom: payload.miniRoom,
-          mediaSession: payload.mediaSession
-        },
-        participants: {
-          you: {
-            userId: actor.profile.userId,
-            displayName: actor.profile.displayName
-          },
-          partner: {
-            userId: partner.userId,
-            displayName: partner.displayName,
-            avatarSnapshot: createCandidateAvatarSnapshot({
-              userId: partner.userId,
-              displayName: partner.displayName,
-              avatarSelection: partner.avatar
-            })
-          }
-        }
-      })
-    },
-    []
-  )
-
-  const handleDemoRoomInviteAction = useCallback(
-    async (action: ChatRoomInviteAction): Promise<void> => {
-      const actor = latestSessionActorRef.current
-      if (!actor || actor.session.mode !== "demo") {
-        throw new Error("Blumi Room invitations are available in demo mode only.")
-      }
-
-      const currentUser = {
-        userId: actor.profile.userId,
-        displayName: actor.profile.displayName
-      }
-      const invite = demoRoomInviteAction(action, currentUser)
-      if (!invite) {
-        throw new Error("That demo room invitation is no longer available.")
-      }
-
-      if (
-        (action.type === "accept" || action.type === "open_room") &&
-        invite.status === "accepted" &&
-        invite.roomSessionId
-      ) {
-        const partnerUserId = invite.senderUserId === actor.profile.userId
-          ? invite.recipientUserId
-          : invite.senderUserId
-        const partnerProfile = DUMMY_PROFILES.find(
-          (profile) => profile.userId === partnerUserId
-        )
-        const participants = [
-          {
-            userId: actor.profile.userId,
-            displayName: actor.profile.displayName,
-            avatar: {
-              presetId: actor.profile.avatar?.presetId ?? "dusk"
-            }
-          },
-          {
-            userId: partnerUserId,
-            displayName: partnerProfile?.displayName ?? "Blumi friend",
-            avatar: {
-              presetId: partnerProfile?.avatarPresetId ?? "dusk"
-            }
-          }
-        ] as [MiniRoomParticipant, MiniRoomParticipant]
-        const miniRoomId = invite.roomSessionId
-        openReadyMiniRoom({
-          miniRoom: {
-            miniRoomId,
-            lobbyRoomId: "demo-lobby",
-            sourceThreadId: invite.threadId,
-            participantUserIds: [actor.profile.userId, partnerUserId] as [string, string],
-            livekitRoomName: miniRoomId
-          },
-          mediaSession: {
-            miniRoomId,
-            livekitUrl: "demo://local",
-            token: createLocalDemoMediaSessionToken(),
-            issuedAt: new Date().toISOString()
-          },
-          participants
-        }, { allowReopen: true })
-      }
-    },
-    [openReadyMiniRoom]
-  )
-
-  const chatCoordinator = useMemo(
-    () => createChatCoordinator({
-      hasMessageHistory,
-      getSessionActor: () => latestSessionActorRef.current,
-      isCurrentSession,
-      setRoomInvites: (update) => {
-        setRoomInvites((current) => update(current))
-      },
-      fetchThreadRoomInvites,
-      sendThreadMessage,
-      fetchThreadMessages,
-      markThreadRead,
-      createThreadRoomInvite,
-      leaveActiveRoom,
-      decideThreadRoomInvite,
-      cancelThreadRoomInvite,
-      joinRoomSession,
-      applyChatMessageListed,
-      applyChatMessageListLoading,
-      applyChatMessageListFailed,
-      confirmOptimisticMessage,
-      markOptimisticMessageFailed,
-      markLocalThreadRead,
-      openReadyMiniRoom,
-      captureProductEvent,
-      showWarningToast: (toast) => {
-        showToast({ ...toast, type: "warning" })
-      },
-      sendGlobal,
-      baseHttpUrl: MOBILE_HTTP_BASE_URL
-    }),
-    [isCurrentSession, openReadyMiniRoom]
-  )
   const {
-    handleRoomInviteAction,
-    closeMyActiveRoom,
-    markChatThreadRead,
-    requestMessages,
-    sendChatMessage,
-    upsertRoomInvite
-  } = chatCoordinator
-
-  const sendChatMessageForRoute = useCallback(async (
-    threadId: string,
-    body: string,
-    clientMessageId: string
-  ): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "demo") {
-      return sendChatMessage(threadId, body, clientMessageId)
-    }
-    try {
-      const message = demoSendMessage(threadId, actor.profile.userId, body, clientMessageId)
-      confirmOptimisticMessage(clientMessageId, message, actor.profile.userId)
-    } catch (error) {
-      markOptimisticMessageFailed(clientMessageId)
-      throw error
-    }
-  }, [sendChatMessage])
-
-  const requestMessagesForRoute = useCallback(async (
-    threadId: string,
-    options?: FetchThreadMessagesOptions
-  ): Promise<void> => {
-    const actor = latestSessionActorRef.current
-    if (actor?.session.mode !== "demo") {
-      return requestMessages(threadId, options)
-    }
-    applyChatMessageListed({
-      userId: actor.profile.userId,
-      threadId,
-      messages: getDemoMessages(threadId)
-    })
-  }, [requestMessages])
-
-  const warmThreadMessagesForInbox = useCallback((threadId: string): Promise<void> => {
-    if (latestSessionActorRef.current?.session.mode !== "production") return Promise.resolve()
-    return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
-  }, [requestMessages])
-
-  const syncCurrentRouteName = useCallback((): void => {
-    const currentRoute = navigationRef.getCurrentRoute()
-    const routeName = currentRoute?.name as keyof RootStackParamList | undefined
-    const shopParams = currentRoute?.params as RootStackParamList["CosmeticShop"]
-    const previousSnapshot = getRootNavigationChromeSnapshot()
-    const returnPreview = previousSnapshot.navigatorKey === sessionNavigatorKey
-      ? retainBottomNavReturnPreview(previousSnapshot.returnPreview, currentRoute?.key)
-      : undefined
-    publishRootNavigationChrome({
-      navigatorKey: sessionNavigatorKey,
-      routeName,
-      routeKey: currentRoute?.key,
-      shopMode: routeName === "CosmeticShop" ? shopParams?.initialShopMode : undefined,
-      returnPreview
-    })
-  }, [sessionNavigatorKey])
+    syncCurrentRouteName,
+    handleBottomNavPress,
+    screenListeners
+  } = useBottomNavChrome({
+    sessionNavigatorKey,
+    sessionEntryRoute,
+    isAccountRestricted,
+    dismissGlobalMatch
+  })
 
   const handleNavigationReady = useCallback((): void => {
     setIsNavigationReady(true)
@@ -1040,84 +418,13 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }
   }, [sessionEntryRoute, syncCurrentRouteName])
 
-  const handleBottomNavPress = useCallback((key: BottomNavKey): void => {
-    if (!navigationRef.isReady()) return
-    const destination = key === "discover"
-      ? "Lobby"
-      : key === "chats"
-        ? "Inbox"
-        : key === "myroom"
-          ? "MyRoom"
-          : "CosmeticShop"
-    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) return
-    setGlobalMatch(null)
-    // The bottom bar shares a native stack with detail routes. Reordering
-    // existing native controllers with RESET can leave a rapid-switching iOS
-    // transition unresponsive. StackRouter's pop navigation returns to an
-    // earlier tab, or pushes it once when absent, without reordering live
-    // controllers or accumulating another instance on every revisit.
-    navigationRef.dispatch(CommonActions.navigate(destination, undefined, {
-      pop: true,
-      merge: true
-    }))
-  }, [])
-
-  const goChat = useCallback(
-    (params: { threadId?: string; partnerId?: string; partnerName?: string }): void => {
-      setGlobalMatch(null)
-      if (navigationRef.isReady()) {
-        navigationRef.navigate("ChatThread", {
-          ...params,
-          sendChatMessage: sendChatMessageForRoute,
-          requestMessages: requestMessagesForRoute,
-          markThreadRead: markChatThreadRead,
-          roomInvites: visibleRoomInvites,
-          onRoomInviteAction: sessionActor?.session.mode === "demo"
-            ? handleDemoRoomInviteAction
-            : handleRoomInviteAction,
-          onCloseActiveRoom: sessionActor?.session.mode === "production"
-            ? closeMyActiveRoom
-            : undefined,
-          locale: chatLocale
-        })
-      }
-    },
-    [
-      chatLocale,
-      closeMyActiveRoom,
-      handleDemoRoomInviteAction,
-      handleRoomInviteAction,
-      markChatThreadRead,
-      requestMessagesForRoute,
-      sendChatMessageForRoute,
-      sessionActor?.session.mode,
-      visibleRoomInvites
-    ]
-  )
-
-  const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
-    if (
-      expectedActor.session.mode !== "production" ||
-      sessionEntryRoute !== "Main" ||
-      isAccountRestricted ||
-      !isCurrentSession(expectedActor) ||
-      !navigationRef.isReady()
-    ) return false
-    const destination = resolveNotificationDestination(data)
-    if (!destination) return false
-    if (destination.route === "ChatThread") {
-      navigationRef.navigate("ChatThread", destination.params)
-      return true
-    }
-    navigationRef.navigate(destination.route)
-    return true
-  }, [isAccountRestricted, isCurrentSession, sessionEntryRoute])
-
-  const pushRegistration = usePushRegistration(
-    sessionEntryRoute === "Main" && !isAccountRestricted ? sessionActor : null,
-    handleNotificationResponseData,
+  const pushRegistration = useNotificationResponseRouting({
+    sessionActor,
+    sessionEntryRoute,
+    isAccountRestricted,
+    isCurrentSession,
     navigationReadyGeneration
-  )
+  })
 
   const inventoryHydrationSessionToken = sessionActor &&
     shouldHydrateProductionInventory(
@@ -1224,149 +531,33 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [isNavigationReady, navigationReadyGeneration, sessionActor, sessionEntryRoute])
 
   // ── Global WS lifecycle ─────────────────────────────────
+  // Leaving the authenticated main session leaves demo mode and clears every
+  // session-scoped root store before the socket closes.
   const resetInactiveSessionState = useCallback((): void => {
     if (isDemoMode()) setDemoMode(false)
-    handledMatchIdsRef.current = new Set()
-    reconcilingMatchIdsRef.current = new Set()
-    handledReadyMiniRoomIdsRef.current = new Set()
-    setGlobalMatch(null)
-    setRoomInvites([])
+    resetMatchModal()
+    resetRoomInviteRouting()
     resetChatStore()
     disconnectGlobal()
-  }, [])
+  }, [resetMatchModal, resetRoomInviteRouting])
 
-  const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
-  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages })
-  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages }
-
-  useEffect(() => createGlobalRealtimeLifecycle({
+  useGlobalRealtimeSession({
     sessionActor,
-    isMainRoute: sessionEntryRoute === "Main",
+    sessionEntryRoute,
     isAccountRestricted,
     isCurrentSession,
-    isDemoMode,
-    setDemoMode,
     resetInactiveSessionState,
+    clearSessionActor,
+    refreshAccountModeration,
     refreshProductionThreads,
-    resynchronizeActiveConversation: () => {
-      const route = navigationRef.getCurrentRoute()
-      const threadId = route?.name === "ChatThread"
-        ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
-        : route?.name === "MiniRoom"
-          ? (route.params as RootStackParamList["MiniRoom"] | undefined)?.readyMiniRoom.miniRoom.sourceThreadId
-          : undefined
-      return threadId ? realtimeSessionCallbacksRef.current.resynchronizeMessages(threadId) : Promise.resolve()
-    },
-    hydrateBlockedUsersFromServer,
-    connectGlobal,
-    disconnectGlobal,
-    sendGlobal,
-    subscribeToStatus,
-    applyChatThreadListed,
-    getThreads,
-    isRealtimeAuthInvalidClose,
-    clearSessionActor: () => realtimeSessionCallbacksRef.current.clearSessionActor(),
-    refreshAccountModeration: () => realtimeSessionCallbacksRef.current.refreshAccountModeration(),
-    showWarningToast: (toast) => {
-      showToast({ ...toast, type: "warning" })
-    },
-    wsBaseUrl: MOBILE_WS_BASE_URL,
-    httpBaseUrl: MOBILE_HTTP_BASE_URL
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  })(), [
-    isAccountRestricted,
-    refreshProductionThreads,
-    resetInactiveSessionState,
-    realtimeSessionIdentity,
-    sessionEntryRoute
-  ])
-
-  // ── Chat + match event routing ──────────────────────────
-  const handleRealtimeConnectionMatch = useCallback(
-    (payload: ConnectionMatchedPayload): void => {
-      const actor = sessionActor
-      if (!actor) return
-
-      reconcilingMatchIdsRef.current = new Set([
-        ...reconcilingMatchIdsRef.current,
-        payload.miniRoomId
-      ])
-      void reconcileRealtimeConnectionMatch(payload, actor, {
-        getCurrentSessionActor: () => latestSessionActorRef.current,
-        recordMutualConnection,
-        hydrateFromServer,
-        createThread,
-        applyChatThreadCreated: applyNewThread,
-        presentMatch: (match) => {
-          presentConnectionMatch({
-            hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
-            markPresented: (miniRoomId) => {
-              handledMatchIdsRef.current = new Set([
-                ...handledMatchIdsRef.current,
-                miniRoomId
-              ])
-            },
-            captureMatchCreated: () => {
-              captureProductEvent("match_created", {
-                source: "mini_room_mutual_save",
-                mode: match.mode
-              })
-            },
-            showMatchToast: (toast) => {
-              showToast({ ...toast, type: "success" })
-            },
-            showMatchModal: setGlobalMatch
-          }, match)
-        },
-        httpBaseUrl: MOBILE_HTTP_BASE_URL
-      })
-        .catch(() => undefined)
-        .finally(() => {
-          reconcilingMatchIdsRef.current = new Set(
-            [...reconcilingMatchIdsRef.current].filter(
-              (miniRoomId) => miniRoomId !== payload.miniRoomId
-            )
-          )
-        })
-    },
-    [applyNewThread, hydrateFromServer, sessionActor]
-  )
-
-  const handleGlobalEvent = useMemo(
-    () => createGlobalRealtimeEventHandler({
-      currentUserId: sessionActor?.profile.userId,
-      getMatchDeduplicationState: () => ({
-        handledMatchIds: handledMatchIdsRef.current,
-        reconcilingMatchIds: reconcilingMatchIdsRef.current
-      }),
-      normalizeRoomInviteRecord,
-      upsertRoomInvite,
-      applyChatThreadListed: applyRealtimeThreadList,
-      applyChatThreadRead,
-      requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
-      requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
-      applyChatThreadCreated: applyNewThread,
-      applyChatMessageListed,
-      applyChatMessageReceived,
-      getThreads,
-      openReadyMiniRoom,
-      onConnectionMatched: handleRealtimeConnectionMatch,
-      showIncomingMessageToast: (toast) => {
-        showToast({ ...toast, type: "info" })
-      }
-    }),
-    [
-      handleRealtimeConnectionMatch,
-      applyNewThread,
-      applyRealtimeThreadList,
-      refreshProductionThreads,
-      openReadyMiniRoom,
-      sessionActor?.profile.userId,
-      upsertRoomInvite
-    ]
-  )
-
-  useGlobalRealtimeEvents(handleGlobalEvent)
+    resynchronizeMessages,
+    upsertRoomInvite,
+    applyRealtimeThreadList,
+    applyNewThread,
+    openReadyMiniRoom,
+    getMatchDeduplicationState,
+    onConnectionMatched: handleRealtimeConnectionMatch
+  })
 
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||
@@ -1425,30 +616,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         onStateChange={syncCurrentRouteName}
       >
         <Stack.Navigator
-          screenListeners={({ route, navigation }) => ({
-            transitionStart: ({ data }) => {
-              if (sessionEntryRoute !== "Main" || isAccountRestricted) return
-              if (!data.closing) {
-                // A cancelled pop reappears on the source; the target's willAppear
-                // must not discard the preview while the gesture is still active.
-                clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
-                return
-              }
-              const preview = resolveBottomNavReturnPreview({
-                platform: Platform.OS === "ios" ? "ios" : "android",
-                closing: data.closing,
-                sourceRouteKey: route.key,
-                stack: navigation.getState()
-              })
-              if (preview) publishRootNavigationChromeReturnPreview(sessionNavigatorKey, preview)
-            },
-            transitionEnd: ({ data }) => {
-              settleRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key, data.closing)
-            },
-            gestureCancel: () => {
-              clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
-            }
-          })}
+          screenListeners={screenListeners}
           key={sessionNavigatorKey}
           initialRouteName={
             isAccountRestricted
@@ -1630,17 +798,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       ...screenProps.route,
                       params: {
                         ...screenProps.route.params,
-                        sendChatMessage: sendChatMessageForRoute,
-                        requestMessages: requestMessagesForRoute,
-                        markThreadRead: markChatThreadRead,
-                        roomInvites: visibleRoomInvites,
-                        onRoomInviteAction: sessionActor?.session.mode === "demo"
-                          ? handleDemoRoomInviteAction
-                          : handleRoomInviteAction,
-                        onCloseActiveRoom: sessionActor?.session.mode === "production"
-                          ? closeMyActiveRoom
-                          : undefined,
-                        locale: chatLocale
+                        ...chatThreadRouteBindings
                       }
                     }}
                   />
@@ -1930,23 +1088,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             matchedUserId={globalMatch?.matchedUserId}
             onClose={dismissGlobalMatch}
             onKeepDiscovering={goLobby}
-            onSendMessage={() => {
-              if (!globalMatch?.matchedUserId) {
-                goLobby()
-                return
-              }
-
-              const thread = findThreadForPartner(globalMatch.matchedUserId)
-              if (thread) {
-                goChat({ threadId: thread.threadId })
-              } else {
-                // Thread not synced yet, navigate with partner intent
-                goChat({
-                  partnerId: globalMatch.matchedUserId,
-                  partnerName: globalMatch.matchedUserName
-                })
-              }
-            }}
+            onSendMessage={handleMatchSendMessage}
           />
         ) : null}
       </NavigationContainer>
@@ -1956,6 +1098,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         sessionEntryRoute={sessionEntryRoute}
         isAccountRestricted={isAccountRestricted}
         chatCount={chatBadgeCount}
+        isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
         onBottomNavPress={handleBottomNavPress}
       />
       <ToastContainer />
