@@ -23,6 +23,11 @@ type ServerEventListener = (event: ServerEvent) => void
 type StatusListener = (status: RealtimeConnectionStatus, meta?: RealtimeConnectionMeta) => void
 export type RealtimeTicketProvider = (sessionToken: string) => Promise<string>
 
+export interface RealtimeClientOptions {
+  /** Uniform random source in [0, 1); injectable for deterministic tests. */
+  random?: () => number
+}
+
 export class RealtimeTicketRequestError extends Error {
   public constructor(public readonly statusCode: number) {
     super("Blumi could not authorize realtime right now.")
@@ -57,8 +62,13 @@ export class RealtimeClient {
 
   public constructor(
     private readonly wsBaseUrl: string,
-    private readonly ticketProvider: RealtimeTicketProvider
-  ) {}
+    private readonly ticketProvider: RealtimeTicketProvider,
+    options: RealtimeClientOptions = {}
+  ) {
+    this.random = options.random ?? Math.random
+  }
+
+  private readonly random: () => number
 
   public connect(sessionToken: string): void {
     this.intentionalDisconnect = false
@@ -234,7 +244,11 @@ export class RealtimeClient {
       return
     }
 
-    const delay = Math.min(1_000 * 2 ** this.reconnectAttempts, 30_000)
+    // A fanout gap or server restart closes every socket on an instance at
+    // once. Equal jitter keeps each attempt within its exponential ceiling
+    // while spreading clients across the upper half of the window.
+    const ceiling = Math.min(1_000 * 2 ** this.reconnectAttempts, 30_000)
+    const delay = Math.round(ceiling / 2 + this.random() * (ceiling / 2))
     this.reconnectAttempts += 1
     this.emitStatus("reconnecting")
     this.reconnectTimer = setTimeout(() => {

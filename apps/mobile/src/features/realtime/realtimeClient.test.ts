@@ -351,3 +351,44 @@ test("a transient ticket request failure retries with a newly issued ticket", as
     "ticket-fresh-ticket-after-retry"
   ])
 })
+
+test("reconnect delay is jittered below the exponential ceiling", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient(
+    "wss://realtime.example",
+    createTicketProvider(),
+    { random: () => 0 }
+  )
+
+  client.connect("token-jitter-floor")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop()
+  context.mock.timers.tick(499)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 1)
+  context.mock.timers.tick(1)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2)
+})
+
+test("clients disconnected together spread their reconnect attempts", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const early = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 0 })
+  const late = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 0.99 })
+
+  early.connect("token-early")
+  late.connect("token-late")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop(1012)
+  MockWebSocket.instances[1]?.drop(1012)
+  context.mock.timers.tick(500)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 3)
+  context.mock.timers.tick(495)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 4)
+})
