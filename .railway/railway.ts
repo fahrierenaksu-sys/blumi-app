@@ -26,6 +26,10 @@ export default defineRailway((ctx) => {
       BLUMI_DEPLOY_ENV: ctx.environment,
       BLUMI_AUTH_REPOSITORY: "postgres",
       BLUMI_PUSH_PROVIDER: "expo",
+      // Railway's edge reaches the app from rotating internal peers in the
+      // CGNAT range; trust only that range so request.ip is the edge-appended
+      // client address used by rate limits (verified in staging logs).
+      BLUMI_TRUST_PROXY: "100.64.0.0/10",
       REVENUECAT_PURCHASE_ENVIRONMENT:
         ctx.environment === "staging" ? "sandbox" : "production",
     },

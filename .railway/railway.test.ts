@@ -22,6 +22,7 @@ for (const environment of ["staging", "production"] as const) {
     assert.deepEqual(api.variables.REVENUECAT_PURCHASE_ENVIRONMENT, {
       type: "literal", value: environment === "staging" ? "sandbox" : "production",
     })
+    assert.deepEqual(api.variables.BLUMI_TRUST_PROXY, { type: "literal", value: "100.64.0.0/10" })
     assert.equal(api.variables.DATABASE_URL, undefined)
   })
 }
