@@ -424,44 +424,6 @@ export function parseAdminSigningKeys(value: string | undefined): readonly Admin
   return Object.freeze(keys)
 }
 
-export function createConfiguredAuthService(config = resolveServerConfig()): AuthService {
-  const smsProvider = createConfiguredSmsProvider(config)
-  const codeFactory = createConfiguredCodeFactory(config)
-  if (config.authRepositoryMode === "postgres") {
-    const pool = new Pool({
-      connectionString: config.databaseUrl
-    })
-    return createAuthService({
-      repository: createPostgresAuthRepository(pool),
-      accountDataExporter: createPostgresAccountDataExporter(pool),
-      smsProvider,
-      codeFactory,
-      otpHmacSecret: config.otpHmacSecret
-    })
-  }
-
-  return createAuthService({
-    smsProvider,
-    codeFactory,
-    otpHmacSecret: config.otpHmacSecret
-  })
-}
-
-export function createConfiguredSafetyService(
-  config = resolveServerConfig()
-): SafetyService {
-  if (config.authRepositoryMode === "postgres") {
-    const pool = new Pool({
-      connectionString: config.databaseUrl
-    })
-    return createSafetyService({
-      repository: createPostgresSafetyRepository(pool)
-    })
-  }
-
-  return createSafetyService()
-}
-
 export function createConfiguredServerServices(
   config = resolveServerConfig()
 ): ConfiguredServerServices {

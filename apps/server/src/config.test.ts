@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   createConfiguredServerServices,
-  createConfiguredAuthService,
   createConfiguredCodeFactory,
   resolveServerConfig
 } from "./config"
@@ -269,7 +268,7 @@ test("local QA auth requires a complete loopback-only development setup", async 
     verificationCode: "246810"
   })
 
-  const service = createConfiguredAuthService(config)
+  const service = createConfiguredServerServices(config).authService
   const now = new Date("2026-07-14T10:00:00.000Z")
   await service.sendCode(config.qaAuth.phoneNumber, now)
   const signedIn = await service.verifyCode(
