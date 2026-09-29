@@ -5,17 +5,19 @@ import test from "node:test"
 import { fileURLToPath } from "node:url"
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
-const register = readFileSync(
-  resolve(mobileRoot, "src/screens/RegisterScreen.tsx"),
-  "utf8"
-)
+const registerDirectory = resolve(mobileRoot, "src/features/session/register")
+const readRegister = (fileName) =>
+  readFileSync(resolve(registerDirectory, fileName), "utf8")
+const createView = readRegister("RegisterCreateView.tsx")
+const signInView = readRegister("RegisterSignInView.tsx")
+const layoutHook = readRegister("useRegisterLayout.ts")
 const shell = readFileSync(
   resolve(mobileRoot, "src/features/session/setupFlow/BlumiSetupShell.tsx"),
   "utf8"
 )
 
 test("create-account phone entry collapses its hero cleanly for the keyboard", () => {
-  assert.match(register, /<BlumiSetupShell[\s\S]*collapseStageOnKeyboard/)
+  assert.match(createView, /<BlumiSetupShell[\s\S]*collapseStageOnKeyboard/)
   assert.match(shell, /collapseStageOnKeyboard\?: boolean/)
   assert.match(shell, /collapseStageOnKeyboard && keyboardVisible/)
   assert.match(shell, /scrollTo\(\{ y: 0, animated: false \}\)/)
@@ -28,16 +30,15 @@ test("create-account phone entry collapses its hero cleanly for the keyboard", (
   )
   assert.match(shell, /paddingBottom:\s*scrollContentBottomPadding/)
   assert.match(shell, /backgroundColor: uiTheme\.colors\.backgroundWarm/)
-  assert.match(register, /const setupMetrics = getSetupLayoutMetrics\(/)
-  assert.match(register, /setupMetrics\.dense \? styles\.formCardCompact : null/)
-  assert.match(register, /setupMetrics\.dense \? styles\.footerAreaCompact : null/)
-  assert.match(register, /setupMetrics\.compact \? styles\.legalRowWrapped : null/)
+  assert.match(layoutHook, /const setupMetrics = getSetupLayoutMetrics\(/)
+  assert.match(layoutHook, /useWindowDimensions\(\)/)
+  assert.match(createView, /const \{ setupMetrics \} = layout/)
+  assert.match(signInView, /setupMetrics\.dense \? styles\.formCardCompact : null/)
+  assert.match(createView, /setupMetrics\.dense \? styles\.footerAreaCompact : null/)
+  assert.match(createView, /setupMetrics\.compact \? styles\.legalRowWrapped : null/)
 
-  const createBranchStart = register.indexOf('if (authIntent === "create")')
-  const createBranchEnd = register.indexOf('\n  return (\n    <View style={styles.root}>', createBranchStart)
-  const createBranch = register.slice(createBranchStart, createBranchEnd)
   assert.doesNotMatch(
-    createBranch,
+    createView,
     /styles\.privacyRow/,
     "the create card should end at its legal links"
   )

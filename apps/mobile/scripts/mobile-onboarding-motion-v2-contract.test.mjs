@@ -273,7 +273,7 @@ test("the remaining skip control is quiet and accessible", () => {
 
 test("the cinematic flow reserves one CTA anchor and one blush canvas", () => {
   const authEntry = read("src/screens/AuthEntryScreen.tsx")
-  const register = read("src/screens/RegisterScreen.tsx")
+  const register = read("src/features/session/register/RegisterSignInView.tsx")
 
   assert.match(authEntry, /cinematicActionSlot/)
   assert.match(authEntry, /useState\(false\)/)

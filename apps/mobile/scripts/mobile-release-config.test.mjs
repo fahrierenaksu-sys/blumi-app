@@ -482,6 +482,12 @@ test("release bundle imports only the fonts and icon family used by the app", ()
     "src/screens/MyRoomEditorScreen.tsx",
     "src/screens/LegalScreen.tsx",
     "src/screens/RegisterScreen.tsx",
+    "src/features/session/register/RegisterCreateView.tsx",
+    "src/features/session/register/RegisterSignInView.tsx",
+    "src/features/session/register/RegisterOtpEntry.tsx",
+    "src/features/session/register/RegisterTermsConsent.tsx",
+    "src/features/session/register/RegisterErrorNotice.tsx",
+    "src/features/session/register/RegisterFormMetaRow.tsx",
     "src/screens/AuthEntryScreen.tsx",
     "src/screens/MyRoomScreen.tsx",
     "src/screens/CosmeticShopScreen.tsx",
@@ -731,7 +737,17 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   const environment = read("src/config/env.ts")
   const lobby = read("src/screens/LobbyScreen.tsx")
   const myRoom = read("src/screens/MyRoomScreen.tsx")
-  const register = read("src/screens/RegisterScreen.tsx")
+  const registerFeature = "src/features/session/register"
+  const registerPhoneEntry = read(`${registerFeature}/RegisterPhoneEntry.tsx`)
+  const registerSignIn = read(`${registerFeature}/RegisterSignInView.tsx`)
+  const register = [
+    read("src/screens/RegisterScreen.tsx"),
+    read(`${registerFeature}/RegisterCreateView.tsx`),
+    registerSignIn,
+    registerPhoneEntry,
+    read(`${registerFeature}/RegisterOtpEntry.tsx`),
+    read(`${registerFeature}/registerScreenModel.ts`)
+  ].join("\n")
   const authEntryCopy = read("src/features/session/authEntryCopy.ts")
   const roomDebrief = read("src/screens/RoomDebriefScreen.tsx")
   const settings = read("src/screens/SettingsScreen.tsx")
@@ -755,12 +771,12 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   assert.doesNotMatch(lobby, /Here together|nearby and active right now/)
   assert.doesNotMatch(myRoom, /3 new likes|View room likes/)
   assert.doesNotMatch(register, /\+90 5XX XXX XX XX/)
-  assert.match(register, /<CountryCallingCodePicker/)
-  assert.match(register, /authCopy\.automaticCallingCodeHint/)
+  assert.match(registerPhoneEntry, /<CountryCallingCodePicker/)
+  assert.match(registerPhoneEntry, /authCopy\.automaticCallingCodeHint/)
   assert.match(authEntryCopy, /enter only your local number/)
   assert.doesNotMatch(register, /YOUR BLUMI ACCOUNT/)
-  assert.match(register, /<BrandMark size=\{28\}/)
-  assert.match(register, /style=\{styles\.brandText\}>Blumi<\/Text>/)
+  assert.match(registerSignIn, /<BrandMark size=\{28\}/)
+  assert.match(registerSignIn, /style=\{styles\.brandText\}>Blumi<\/Text>/)
   assert.doesNotMatch(roomDebrief, /addInventoryCoins/)
   assert.match(settings, /onSignOut=\{handleSignOutPrompt\}/)
   assert.match(settingsAccount, /label=\{copy\.signOut\}/)

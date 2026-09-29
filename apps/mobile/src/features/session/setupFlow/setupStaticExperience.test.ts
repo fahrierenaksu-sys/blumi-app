@@ -6,8 +6,14 @@ import { fileURLToPath, URL } from "node:url"
 const SCREEN_ROOT = new URL("../../../screens/", import.meta.url)
 const NAVIGATION_ROOT = new URL("../../../navigation/", import.meta.url)
 
+const REGISTER_ROOT = new URL("../register/", import.meta.url)
+
 function readScreen(name: string): string {
   return readFileSync(fileURLToPath(new URL(name, SCREEN_ROOT)), "utf8")
+}
+
+function readRegister(name: string): string {
+  return readFileSync(fileURLToPath(new URL(name, REGISTER_ROOT)), "utf8")
 }
 
 test("setup screens keep character motion inside their dedicated stages", () => {
@@ -37,9 +43,12 @@ test("setup screens keep character motion inside their dedicated stages", () => 
   assert.match(avatarStageSource, /animationState="idle_front"/)
 
   const registerSource = readScreen("RegisterScreen.tsx")
+  const registerSignInSource = readRegister("RegisterSignInView.tsx")
   assert.doesNotMatch(registerSource, /SetupAnimatedAvatarPreview/)
-  assert.match(registerSource, /AvatarPreview2D/)
-  assert.match(registerSource, /animationState="idle_front"/)
+  assert.doesNotMatch(registerSignInSource, /SetupAnimatedAvatarPreview/)
+  assert.doesNotMatch(readRegister("RegisterCreateView.tsx"), /SetupAnimatedAvatarPreview/)
+  assert.match(registerSignInSource, /AvatarPreview2D/)
+  assert.match(registerSignInSource, /animationState="idle_front"/)
 
   const roomSource = readScreen("RoomSetupScreen.tsx")
   assert.doesNotMatch(roomSource, /RoomSetupCharacterPhase/)
@@ -52,19 +61,23 @@ test("the four setup surfaces use the same header, progress and action dock syst
   for (const screen of [
     "ProfileSetupScreen.tsx",
     "AvatarSetupScreen.tsx",
-    "RoomSetupScreen.tsx",
-    "RegisterScreen.tsx"
+    "RoomSetupScreen.tsx"
   ]) {
     const source = readScreen(screen)
     assert.match(source, /BlumiSetupShell/)
   }
 
-  const registerSource = readScreen("RegisterScreen.tsx")
+  // RegisterScreen renders the create-account step through RegisterCreateView.
+  assert.match(readScreen("RegisterScreen.tsx"), /<RegisterCreateView/)
+  const registerSource = readRegister("RegisterCreateView.tsx")
+  assert.match(registerSource, /BlumiSetupShell/)
   assert.match(registerSource, /step=\{isCodeStep \? "otp" : "phone"\}/)
 })
 
 test("the phone to OTP handoff commits before the next frame", () => {
-  const registerSource = readScreen("RegisterScreen.tsx")
+  // The Register flow controller owns the stage report; RegisterScreen calls it.
+  assert.match(readScreen("RegisterScreen.tsx"), /useRegisterFlowController\(\{[\s\S]*onCreateFlowStageChange[\s\S]*\}\)/)
+  const registerSource = readRegister("useRegisterFlowController.ts")
 
   assert.match(registerSource, /import \{[\s\S]*useLayoutEffect[\s\S]*\} from "react"/)
   assert.match(

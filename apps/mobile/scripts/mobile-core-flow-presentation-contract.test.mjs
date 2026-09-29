@@ -127,19 +127,22 @@ test("profile decisions use the production API directly and never fall through t
 
 test("empty inbox and onboarding direct people toward Discover and chat", () => {
   const inbox = read("src/screens/InboxScreen.tsx")
-  const register = read("src/screens/RegisterScreen.tsx")
+  const registerModel = read("src/features/session/register/registerScreenModel.ts")
+  const registerSignIn = read("src/features/session/register/RegisterSignInView.tsx")
+  const registerCreate = read("src/features/session/register/RegisterCreateView.tsx")
   const authCopy = read("src/features/session/authEntryCopy.ts")
   const inboxCopy = read("src/features/chat/inboxCopy.ts")
 
   assert.match(inbox, /const handleGoDiscover = useCallback\(\(\) => \{\s*navigation\.navigate\("Lobby"\)/)
   assert.match(inbox, /getInboxCopy\(locale\)/)
   assert.match(inboxCopy, /When a mutual match happens, your conversation starts here\./)
-  assert.match(register, /authCopy\.createCodeBody/)
+  assert.match(registerModel, /authCopy\.createCodeBody/)
   assert.match(authCopy, /createCodeBody:\s*"Enter the 6-digit code we sent\. This is the final step before your Blumi world opens\."/)
-  assert.match(register, /const progressTotal = authIntent === "create" \? 4 : 2/)
-  assert.match(register, /const progressCurrent = authIntent === "create"/)
-  assert.match(register, /const primaryDisabled = busy \|\| !primaryEnabled/)
-  assert.match(register, /disabled=\{primaryDisabled\}/)
+  assert.match(registerModel, /const progressTotal = authIntent === "create" \? 4 : 2/)
+  assert.match(registerModel, /const progressCurrent = authIntent === "create"/)
+  assert.match(registerModel, /const primaryDisabled = busy \|\| !primaryEnabled/)
+  assert.match(registerSignIn, /disabled=\{register\.primaryDisabled\}/)
+  assert.match(registerCreate, /primaryActionDisabled=\{register\.primaryDisabled\}/)
 })
 
 test("inbox does not present unverified partner presence", () => {

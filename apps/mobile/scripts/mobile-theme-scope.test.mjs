@@ -72,8 +72,21 @@ test("entry and onboarding surfaces use their scoped Blumi palette", () => {
   assert.match(themeSource, /primary: "#C63D59"/)
   assert.match(themeSource, /primaryDeep: "#A92F48"/)
 
+  // RegisterScreen composes the register feature and renders no colors itself.
+  assert.doesNotMatch(
+    readSource("src/screens/RegisterScreen.tsx"),
+    /import \{ uiTheme \}/,
+    "src/screens/RegisterScreen.tsx must not import the generic app theme"
+  )
+
   for (const relativePath of [
-    "src/screens/RegisterScreen.tsx",
+    "src/features/session/register/registerStyles.ts",
+    "src/features/session/register/RegisterSignInView.tsx",
+    "src/features/session/register/RegisterPhoneEntry.tsx",
+    "src/features/session/register/RegisterOtpEntry.tsx",
+    "src/features/session/register/RegisterTermsConsent.tsx",
+    "src/features/session/register/RegisterErrorNotice.tsx",
+    "src/features/session/register/RegisterFormMetaRow.tsx",
     "src/screens/AuthEntryScreen.tsx",
     "src/screens/ProfileSetupScreen.tsx",
     "src/screens/AvatarSetupScreen.tsx",

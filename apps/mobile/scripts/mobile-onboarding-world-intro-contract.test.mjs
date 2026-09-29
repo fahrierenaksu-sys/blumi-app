@@ -195,30 +195,43 @@ test("the authored globe texture is a real packaged asset, not a placeholder", (
 
 test("the selected population, Whoa, and phone-screen handoff copy stay localized", () => {
   const copy = read("src/features/session/authEntryCopy.ts")
-  const register = read("src/screens/RegisterScreen.tsx")
+  const registerModel = read("src/features/session/register/registerScreenModel.ts")
+  const registerSignIn = read("src/features/session/register/RegisterSignInView.tsx")
 
   assert.match(copy, /8\.000\.000\.000\+/)
   assert.match(copy, /whoa: "Whoa!"/)
   assert.match(copy, /letsGetStarted: "Hadi başlayalım\."/)
-  assert.match(register, /authCopy\.registerHeroTitle/)
-  assert.match(register, /authCopy\.registrationProgressLabel/)
-  assert.match(register, /authCopy\.registrationProgressValue/)
+  assert.match(registerModel, /authCopy\.registerHeroTitle/)
+  assert.match(registerSignIn, /authCopy\.registrationProgressLabel/)
+  assert.match(registerSignIn, /authCopy\.registrationProgressValue/)
 })
 
 test("the phone verification screen uses the Blumi character hero instead of an email-first form", () => {
   const register = read("src/screens/RegisterScreen.tsx")
+  const registerModel = read("src/features/session/register/registerScreenModel.ts")
+  const registerSurface = [
+    register,
+    ...[
+      "RegisterCreateView.tsx",
+      "RegisterSignInView.tsx",
+      "RegisterPhoneEntry.tsx",
+      "RegisterOtpEntry.tsx",
+      "RegisterFormMetaRow.tsx",
+      "registerScreenModel.ts"
+    ].map((fileName) => read(`src/features/session/register/${fileName}`))
+  ].join("\n")
   const hero = read("src/screens/RegisterCharacterHero.tsx")
   const copy = read("src/features/session/authEntryCopy.ts")
 
-  assert.match(register, /RegisterCharacterHero/)
+  assert.match(register, /<RegisterCharacterHero/)
   assert.match(register, /authCopy\.registerHeroMessage/)
-  assert.match(register, /authCopy\.registerHeroTitle/)
-  assert.match(register, /authCopy\.registerHeroBody/)
-  assert.match(register, /register-phone-step/)
-  assert.match(register, /register-code-step/)
+  assert.match(registerModel, /authCopy\.registerHeroTitle/)
+  assert.match(registerModel, /authCopy\.registerHeroBody/)
+  assert.match(read("src/features/session/register/RegisterPhoneEntry.tsx"), /register-phone-step/)
+  assert.match(read("src/features/session/register/RegisterOtpEntry.tsx"), /register-code-step/)
   assert.match(hero, /ONBOARDING_HERO_FRAME/)
   assert.match(hero, /ONBOARDING_MALE_HERO_FRAME/)
   assert.match(hero, /reduceMotion|useReducedMotion/)
   assert.match(copy, /registerHeroMessage:/)
-  assert.doesNotMatch(register, /email|e-mail/i)
+  assert.doesNotMatch(registerSurface, /email|e-mail/i)
 })
