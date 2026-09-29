@@ -484,8 +484,7 @@ export function createConfiguredServerServices(
     const presenceRepository = createPostgresPresenceRepository(pool)
     const avatarService = createAvatarService({
       authService,
-      economyService,
-      presenceRepository
+      economyService
     })
     const matchService = createMatchService({
       repository: createPostgresMatchRepository(pool),
@@ -605,8 +604,7 @@ export function createConfiguredServerServices(
   })
   const avatarService = createAvatarService({
     authService,
-    economyService,
-    presenceRepository
+    economyService
   })
   const matchService = createMatchService({ economyService, notificationService })
   const safetyService = createSafetyService()

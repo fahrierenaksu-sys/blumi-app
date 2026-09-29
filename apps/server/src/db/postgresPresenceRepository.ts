@@ -94,10 +94,6 @@ export function createPostgresPresenceRepository(
     async tryMovePresence(record) {
       return tryMovePostgresPresence(pool, record)
     },
-    async updateUserAvatarSelection() {
-      // Account rows are the canonical avatar source. This legacy interface
-      // remains a no-op so callers cannot reintroduce a fallible dual write.
-    },
     async deletePresence(roomId, userId) {
       await pool.query(
         `DELETE FROM blumi_room_presence

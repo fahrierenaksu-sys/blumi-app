@@ -60,69 +60,6 @@ test("in-memory presence repository deep-clones complete avatar selections", asy
   assert.equal(secondRead?.avatar.revision, 2)
 })
 
-test("in-memory presence repository updates every active user presence without stale downgrades", async () => {
-  const repository = createInMemoryPresenceRepository()
-  const original = createAvatar()
-  const activeAt = new Date(Date.now() + 60_000)
-  const joinedAt = new Date(activeAt.getTime() - 60_000).toISOString()
-  const expiresAt = new Date(activeAt.getTime() + 9 * 60_000).toISOString()
-
-  for (const roomId of ["room_one", "room_two"]) {
-    await repository.savePresence({
-      roomId,
-      userId: "user_one",
-      displayName: "Defne",
-      avatar: original,
-      spotId: "spot_one",
-      inMiniRoom: false,
-      joinedAt,
-      updatedAt: joinedAt,
-      expiresAt
-    })
-  }
-  await repository.savePresence({
-    roomId: "expired_room",
-    userId: "user_one",
-    displayName: "Defne",
-    avatar: original,
-    spotId: "spot_one",
-    inMiniRoom: false,
-    joinedAt: new Date(activeAt.getTime() - 60 * 60_000).toISOString(),
-    updatedAt: new Date(activeAt.getTime() - 60 * 60_000).toISOString(),
-    expiresAt: new Date(activeAt.getTime() - 60_000).toISOString()
-  })
-
-  const canonical: CompleteAvatarSelection = {
-    ...original,
-    revision: 3,
-    loadout: {
-      ...original.loadout,
-      accessoryIds: []
-    }
-  }
-  await repository.updateUserAvatarSelection("user_one", canonical, activeAt)
-  canonical.loadout.accessoryIds.push("caller_mutation")
-
-  for (const roomId of ["room_one", "room_two"]) {
-    const presence = await repository.findUserPresence(roomId, "user_one", activeAt)
-    assert.equal(presence?.avatar.revision, 3)
-    assert.deepEqual(presence?.avatar.loadout.accessoryIds, [])
-    assert.equal(presence?.updatedAt, activeAt.toISOString())
-  }
-  assert.equal(
-    await repository.findUserPresence("expired_room", "user_one", activeAt),
-    null
-  )
-
-  await repository.updateUserAvatarSelection("user_one", original, activeAt)
-  const afterStaleWrite = await repository.findUserPresence(
-    "room_one",
-    "user_one",
-    activeAt
-  )
-  assert.equal(afterStaleWrite?.avatar.revision, 3)
-})
-
 test("in-memory presence reads hydrate the account avatar and ignore stale websocket snapshots", async () => {
   const storedPresenceAvatar = createAvatar()
   let canonicalAvatar: CompleteAvatarSelection | null = createAvatarSelection(
