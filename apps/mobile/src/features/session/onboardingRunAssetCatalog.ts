@@ -41,38 +41,38 @@ const FALLBACK_ASSETS: OnboardingRunAssetSet = {
 const AUTHORED_ASSETS: OnboardingRunAssetSet = {
   wave: {
     female: [
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f01.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f02.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f03.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f04.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f05.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_female_f06.png")
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f01.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f02.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f03.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f04.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f05.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f06.png")
     ],
     male: [
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f01.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f02.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f03.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f04.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f05.png"),
-      require("./assets/onboarding-wave-v3-candidate/blumi_intro_wave_male_f06.png")
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f01.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f02.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f03.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f04.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f05.png"),
+      require("./assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f06.png")
     ]
   },
   run: {
     chaser: [
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f01.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f02.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f03.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f04.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f05.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_male_f06.png")
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f01.png"),
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f02.png"),
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f03.png"),
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f04.png"),
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f05.png"),
+      require("./assets/onboarding-runners-v10-synced-runtime/blumi_intro_run_male_f06.png")
     ],
     leader: [
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f01.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f02.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f03.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f04.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f05.png"),
-      require("./assets/onboarding-runners-v3-candidate/blumi_intro_run_female_f06.png")
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f01.png"),
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f02.png"),
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f03.png"),
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f04.png"),
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f05.png"),
+      require("./assets/onboarding-runners-v3-runtime/blumi_intro_run_female_f06.png")
     ]
   }
 }

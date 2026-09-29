@@ -10,7 +10,7 @@ from PIL import Image
 
 ASSET_DIR = (
     Path(__file__).resolve().parents[1]
-    / "src/features/session/assets/profile-character-reaction-v4-candidate"
+    / "src/features/session/assets/profile-character-reaction-v4-runtime"
 )
 
 

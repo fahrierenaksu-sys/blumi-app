@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { spawnSync } from "node:child_process"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { createRequire } from "node:module"
-import { dirname, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import releaseConfig from "./mobile-release-config.cjs"
 import releaseAssets from "./mobile-release-assets.cjs"
@@ -332,7 +333,7 @@ test("production resolves a complete fail-closed environment", () => {
   })
 })
 
-test("release app configuration requires EAS linkage and rejects candidate asset imports", () => {
+test("release app configuration requires EAS linkage and accepts the promoted source tree", () => {
   const env = {
     ...process.env,
     EAS_BUILD_PROFILE: "preview",
@@ -354,8 +355,8 @@ test("release app configuration requires EAS linkage and rejects candidate asset
   const linked = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); const config=app({config:{extra:{eas:{projectId:'project-test'}}}}); if(config.extra.eas.projectId!=='project-test') process.exit(1)`], {
     cwd: mobileRoot, env, encoding: "utf8"
   })
-  assert.notEqual(linked.status, 0)
-  assert.match(linked.stderr, /candidate asset imports/)
+  assert.equal(linked.status, 0, linked.stderr)
+  assert.doesNotMatch(linked.stderr, /candidate asset imports/)
 
   const development = spawnSync(process.execPath, ["-e", `const app=require('./app.config.js'); app({config:{extra:{}}})`], {
     cwd: mobileRoot,
@@ -381,10 +382,65 @@ test("candidate asset release guard catches static imports and ignores ordinary 
     assetPath: "./assets/welcome-v1-candidate/cottage.png"
   }])
 
-  assert.throws(
-    () => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")),
-    /candidate asset imports/
-  )
+  assert.doesNotThrow(() => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")))
+})
+
+test("candidate asset release guard still rejects a source root that imports a candidate asset", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "blumi-candidate-guard-"))
+  try {
+    writeFileSync(
+      join(fixtureRoot, "Scene.tsx"),
+      'const cottage = require("./assets/welcome-v1-candidate/cottage.png")\n'
+    )
+    writeFileSync(
+      join(fixtureRoot, "Scene.test.tsx"),
+      'const cottage = require("./assets/welcome-v1-candidate/cottage.png")\n'
+    )
+    assert.throws(
+      () => assertNoCandidateAssetImportsInSourceRoot(fixtureRoot),
+      /candidate asset imports.*Scene\.tsx \(1\)/
+    )
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  }
+})
+
+test("user-approved onboarding and profile artwork resolves from approved runtime paths", () => {
+  const promotedSources = [
+    "src/features/session/onboardingRunAssetCatalog.ts",
+    "src/features/session/onboardingArrivalAssetCatalog.ts",
+    "src/features/session/ProfileCharacterReactionStage.tsx",
+    "src/features/session/OnboardingWelcomeHomeScene.tsx"
+  ]
+  const expectedRuntimeDirectories = new Map([
+    ["src/features/session/onboardingRunAssetCatalog.ts", [
+      "onboarding-wave-v3-runtime",
+      "onboarding-runners-v3-runtime",
+      "onboarding-runners-v10-synced-runtime"
+    ]],
+    ["src/features/session/onboardingArrivalAssetCatalog.ts", ["onboarding-arrival-v3-runtime"]],
+    ["src/features/session/ProfileCharacterReactionStage.tsx", ["profile-character-reaction-v4-runtime"]],
+    ["src/features/session/OnboardingWelcomeHomeScene.tsx", ["onboarding-welcome-home-v1-runtime"]]
+  ])
+  for (const sourcePath of promotedSources) {
+    const source = read(sourcePath)
+    assert.deepEqual(findCandidateAssetImports([{ filePath: sourcePath, content: source }]), [])
+    const assetPaths = [...source.matchAll(/require\("(\.\/assets\/[^"]+\.png)"\)/g)].map((match) => match[1])
+    assert.ok(assetPaths.length > 0, `${sourcePath} should reference runtime artwork`)
+    for (const assetPath of assetPaths) {
+      assert.doesNotMatch(assetPath, /candidate/, `${sourcePath} -> ${assetPath}`)
+      assert.ok(
+        existsSync(resolve(mobileRoot, "src/features/session", assetPath)),
+        `${sourcePath} -> ${assetPath} must resolve`
+      )
+    }
+    for (const directory of expectedRuntimeDirectories.get(sourcePath)) {
+      assert.ok(source.includes(`./assets/${directory}/`), `${sourcePath} should use ${directory}`)
+    }
+  }
+  assert.equal(read("src/features/session/onboardingRunAssetCatalog.ts").match(/require\(/g).length, 34)
+  assert.equal(readPngSize("src/features/session/assets/profile-character-reaction-v4-runtime/blumi_profile_twirling_female_atlas_v4_final.png").width, 1024)
+  assert.equal(readPngSize("src/features/session/assets/onboarding-arrival-v3-runtime/blumi_intro_arrival_female_atlas.png").width, 256 * 6)
 })
 
 test("release crash reporting uses the official Sentry integration without PII", () => {
