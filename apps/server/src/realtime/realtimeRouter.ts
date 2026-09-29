@@ -11,6 +11,13 @@ import type {
   ConnectionManager,
   RealtimeConnection
 } from "./connectionManager"
+import {
+  isRealtimePresenceRoomAllowed,
+  PRESENCE_ROOM_UNAVAILABLE_CODE,
+  PRESENCE_ROOM_UNAVAILABLE_MESSAGE,
+  type RealtimePresenceRoomPolicy
+} from "./realtimePresencePolicy"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 export interface RealtimeRouter {
   handleClientEvent(
@@ -29,6 +36,13 @@ export interface CreateRealtimeRouterOptions {
   chatService: ChatService
   safetyService: SafetyService
   notificationService: NotificationService
+  /**
+   * Which realtime presence rooms an authenticated actor may join, move in,
+   * receive presence for, or react in. Defaults to the deny-all policy (legacy
+   * public lobby retired, owner decision 2026-09-30); tests inject a narrower
+   * allow rule to exercise presence mechanics.
+   */
+  isPresenceRoomAllowed?: RealtimePresenceRoomPolicy
 }
 
 export function createRealtimeRouter(
@@ -44,6 +58,8 @@ export function createRealtimeRouter(
     safetyService,
     notificationService
   } = options
+  const isPresenceRoomAllowed =
+    options.isPresenceRoomAllowed ?? isRealtimePresenceRoomAllowed
   const chatMessageDeliveryService = createChatMessageDeliveryService({
     chatService,
     safetyService,
@@ -51,21 +67,42 @@ export function createRealtimeRouter(
     notificationService
   })
 
+  /**
+   * Publishes presence per recipient. Owner decision 2026-09-30: a user's
+   * presence is never sent to someone who blocks or is blocked by them (blocked
+   * peers are removed, not flagged), there is no unfiltered room broadcast, and
+   * a recipient whose block lookup fails receives nothing (fail closed).
+   * Recipients the presence-room policy does not allow receive nothing, which
+   * makes the retired public lobby publish to nobody.
+   */
   async function publishRoomPresence(roomId: string): Promise<void> {
     const snapshot = await presenceService.createSnapshot(roomId)
-    connectionManager.broadcastRoom(roomId, {
-      type: "presence.snapshot",
-      payload: snapshot
-    })
-
     await Promise.all(
       snapshot.users.map(async (user) => {
-        const blockedUserIds = await safetyService.listBlockedUserIdsBetween(
-          user.userId,
-          snapshot.users
-            .filter((candidate) => candidate.userId !== user.userId)
-            .map((candidate) => candidate.userId)
-        )
+        let blockedUserIds: string[]
+        try {
+          if (!(await isPresenceRoomAllowed({ userId: user.userId }, roomId))) return
+          blockedUserIds = await safetyService.listBlockedUserIdsBetween(
+            user.userId,
+            snapshot.users
+              .filter((candidate) => candidate.userId !== user.userId)
+              .map((candidate) => candidate.userId)
+          )
+        } catch (error) {
+          console.error(
+            "Realtime presence recipient check failed",
+            safeOperationalErrorKind(error)
+          )
+          return
+        }
+        const blocked = new Set(blockedUserIds)
+        connectionManager.sendToUser(user.userId, {
+          type: "presence.snapshot",
+          payload: {
+            ...snapshot,
+            users: snapshot.users.filter((candidate) => !blocked.has(candidate.userId))
+          }
+        })
         const nearbyUsers = await presenceService.listNearbyUsers(
           roomId,
           user.userId,
@@ -76,11 +113,35 @@ export function createRealtimeRouter(
           payload: {
             roomId,
             userId: user.userId,
-            nearbyUsers
+            nearbyUsers: nearbyUsers.filter(
+              (nearbyUser) => !nearbyUser.blocked && !blocked.has(nearbyUser.userId)
+            )
           }
         })
       })
     )
+  }
+
+  function rejectPresenceRoomRequest(
+    connection: RealtimeConnection,
+    requestType: ClientEvent["type"]
+  ): void {
+    connectionManager.sendToConnection(connection.connectionId, {
+      type: "realtime.error",
+      payload: {
+        code: PRESENCE_ROOM_UNAVAILABLE_CODE,
+        requestType,
+        message: PRESENCE_ROOM_UNAVAILABLE_MESSAGE
+      }
+    })
+  }
+
+  async function canUsePresenceRoom(
+    connection: RealtimeConnection,
+    roomId: unknown
+  ): Promise<boolean> {
+    if (typeof roomId !== "string" || !roomId.trim()) return false
+    return Boolean(await isPresenceRoomAllowed({ userId: connection.userId }, roomId))
   }
 
   async function endActiveRoomBetween(
@@ -104,6 +165,10 @@ export function createRealtimeRouter(
     async handleClientEvent(connection, event) {
       switch (event.type) {
         case "room.join": {
+          if (!(await canUsePresenceRoom(connection, event.payload.roomId))) {
+            rejectPresenceRoomRequest(connection, event.type)
+            return
+          }
           const joined = await presenceService.joinRoom({
             roomId: event.payload.roomId,
             profile: connection.profile,
@@ -113,10 +178,29 @@ export function createRealtimeRouter(
           // Disconnect cleanup waits for this join, so do not attach or fan out
           // the completed join on behalf of a connection that is already gone.
           if (!connectionManager.getConnection(connection.connectionId)) return
+          const joinedPeers = joined.snapshot.users
+            .filter((user) => user.userId !== connection.userId)
+            .map((user) => user.userId)
+          let blockedPeers: Set<string>
+          try {
+            blockedPeers = new Set(
+              await safetyService.listBlockedUserIdsBetween(connection.userId, joinedPeers)
+            )
+          } catch (error) {
+            // Fail closed: never hand out an unfiltered join snapshot.
+            await presenceService.leaveRoom(joined.roomId, connection.userId)
+            throw error
+          }
           connectionManager.joinRoom(connection.connectionId, joined.roomId)
           connectionManager.sendToConnection(connection.connectionId, {
             type: "room.joined",
-            payload: joined
+            payload: {
+              ...joined,
+              snapshot: {
+                ...joined.snapshot,
+                users: joined.snapshot.users.filter((user) => !blockedPeers.has(user.userId))
+              }
+            }
           })
           await publishRoomPresence(joined.roomId)
           return
@@ -132,6 +216,10 @@ export function createRealtimeRouter(
           return
         }
         case "presence.move_to_spot": {
+          if (!(await canUsePresenceRoom(connection, event.payload.roomId))) {
+            rejectPresenceRoomRequest(connection, event.type)
+            return
+          }
           await presenceService.moveToSpot(
             event.payload.roomId,
             connection.userId,
@@ -141,6 +229,12 @@ export function createRealtimeRouter(
           return
         }
         case "mini_room.invite": {
+          // Legacy lobby invites require presence-room access. Chat-initiated
+          // room invites use the authenticated HTTP thread routes instead.
+          if (!(await canUsePresenceRoom(connection, event.payload.roomId))) {
+            rejectPresenceRoomRequest(connection, event.type)
+            return
+          }
           const invite = await miniRoomService.createInvite({
             roomId: event.payload.roomId,
             senderProfile: connection.profile,
@@ -165,6 +259,17 @@ export function createRealtimeRouter(
           return
         }
         case "mini_room.invite_decision": {
+          const legacyInvite = await miniRoomService.repository.findInvite(
+            event.payload.inviteId
+          )
+          if (
+            !legacyInvite ||
+            legacyInvite.recipientUserId !== connection.userId ||
+            !(await canUsePresenceRoom(connection, legacyInvite.roomId))
+          ) {
+            rejectPresenceRoomRequest(connection, event.type)
+            return
+          }
           const result = await miniRoomService.decideInvite({
             inviteId: event.payload.inviteId,
             actorProfile: connection.profile,
@@ -252,7 +357,23 @@ export function createRealtimeRouter(
             if (!activeMiniRoom.participantUserIds.includes(connection.userId)) {
               throw new Error("That room is not available.")
             }
+            // An ended room (for example one closed by a block) must not keep
+            // relaying reactions between its former participants.
+            const partnerUserId = activeMiniRoom.participantUserIds.find(
+              (userId) => userId !== connection.userId
+            )
+            if (
+              activeMiniRoom.endedAt ||
+              (partnerUserId &&
+                (await safetyService.hasBlockBetween(connection.userId, partnerUserId)))
+            ) {
+              throw new Error("That room is not available.")
+            }
           } else {
+            if (!(await canUsePresenceRoom(connection, event.payload.roomId))) {
+              rejectPresenceRoomRequest(connection, event.type)
+              return
+            }
             const presence = await presenceService.findUserPresence(
               event.payload.roomId,
               connection.userId
@@ -275,7 +396,22 @@ export function createRealtimeRouter(
               reactionEvent
             )
           } else {
-            connectionManager.broadcastRoom(event.payload.roomId, reactionEvent)
+            // Presence-room reactions reach only present, policy-allowed users
+            // with no block relationship to the actor (fails closed on lookup).
+            const snapshot = await presenceService.createSnapshot(event.payload.roomId)
+            const peers = snapshot.users
+              .map((user) => user.userId)
+              .filter((userId) => userId !== connection.userId)
+            const blocked = new Set(
+              await safetyService.listBlockedUserIdsBetween(connection.userId, peers)
+            )
+            const recipients: string[] = [connection.userId]
+            for (const userId of peers) {
+              if (blocked.has(userId)) continue
+              if (!(await isPresenceRoomAllowed({ userId }, event.payload.roomId))) continue
+              recipients.push(userId)
+            }
+            connectionManager.sendToUsers(recipients, reactionEvent)
           }
           return
         }

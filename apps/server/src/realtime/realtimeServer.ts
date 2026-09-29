@@ -24,6 +24,7 @@ import {
   type RealtimeSessionActor
 } from "./realtimeAuth"
 import { createRealtimeRouter } from "./realtimeRouter"
+import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
 
@@ -66,6 +67,8 @@ export interface CreateRealtimeServerOptions {
   connectionManager?: ConnectionManager
   realtimeTicketService: RealtimeTicketService
   httpServer?: Server
+  /** Test seam; production always uses the deny-all presence-room policy. */
+  isPresenceRoomAllowed?: RealtimePresenceRoomPolicy
 }
 
 export function createRealtimeServer(
@@ -146,7 +149,8 @@ export function createRealtimeServer(
     reactionService: options.reactionService,
     chatService: options.chatService,
     safetyService: options.safetyService,
-    notificationService
+    notificationService,
+    isPresenceRoomAllowed: options.isPresenceRoomAllowed
   })
 
   const handleUpgradeRequest = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
