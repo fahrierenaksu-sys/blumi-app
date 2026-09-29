@@ -35,10 +35,10 @@ candidate onboarding imports are being promoted in parallel.
 | | UNSURE | 7 | 59,470 | 0.06 MiB |
 | | ARCHIVE | 12 | 3,045,201 | 2.90 MiB |
 | Non-test TS/TSX in `apps/mobile/src` outside the production graph | KEEP | 63 | 854,944 | 0.82 MiB |
-| | ARCHIVE | 5 | 14,509 | 0.01 MiB |
+| | REMOVED_CODE (2026-09-30) | 5 | 14,509 | 0.01 MiB |
 | `apps/mobile/scripts/*.py` | KEEP | 245 | 1,793,471 | 1.71 MiB |
 | | ARCHIVE | 63 | 501,617 | 0.48 MiB |
-| **All areas** | **ARCHIVE** | **80** | **3,561,327** | **3.40 MiB** |
+| **All areas** | **ARCHIVE** | **75** | **3,546,818** | **3.38 MiB** |
 
 KEEP by basis:
 
@@ -85,15 +85,14 @@ KEEP by basis:
   No code, test, gate, manifest or script references them.
   `ENGINEERING_AUDIT_2026-09-28.md` item 4 records that the QA binding moved
   back to the v0.12 asset.
-- **5 dead TS/TSX modules:**
-  - `features/miniRoom/useMiniRoomReactions.ts`
-  - `features/roomV2/components/RoomSetupProgressRail.tsx`
-  - `screens/components/onboardingInteraction.ts`
-  - `screens/components/WardrobeEquippedSlotsRail.tsx`
-  - `ui/typingIndicator.tsx`
-
-  Four of them have explicit negative guards: tests assert that screen
-  sources do *not* use them. Removing the files keeps those guards green.
+- **5 dead TS/TSX modules (removed 2026-09-30, decision `REMOVED_CODE`):**
+  `features/miniRoom/useMiniRoomReactions.ts`,
+  `features/roomV2/components/RoomSetupProgressRail.tsx`,
+  `screens/components/onboardingInteraction.ts`,
+  `screens/components/WardrobeEquippedSlotsRail.tsx`, `ui/typingIndicator.tsx`.
+  They are code, not production sources, so they were deleted directly with
+  their evidence instead of being archived. They are no longer part of the
+  archive run, which therefore covers 75 files.
 - **63 Python production/QA-source scripts.** No package script, workflow,
   test (JS or Python), gate, runner, kept script or manifest names them, and no
   kept Python file imports them. The 120 Python tests (`test_*.py`) are KEEP
