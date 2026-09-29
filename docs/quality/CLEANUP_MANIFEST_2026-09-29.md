@@ -214,3 +214,16 @@ It must show `complete: true` and a `manifestSha256` that matches this
 manifest. A verification file from a CI or agent sandbox doesn't count. A later
 deletion commit may remove only paths whose receipt entry is `verified: true`,
 and it should rerun the relevant test suites.
+
+### Removal step (after the receipt is committed)
+
+```sh
+node tools/workbench/remove-archived-from-manifest.mjs          # report only
+node tools/workbench/remove-archived-from-manifest.mjs --apply  # stage git rm
+```
+
+It refuses dry-run, incomplete or other-manifest receipts, and stages removal
+only for entries that are `verified: true` with status `copied` or
+`already-archived` and whose repository bytes still match the archived
+SHA-256. Anything else is reported and left in place. Its tests run in
+`npm run verify:workbench-tools` (part of `npm run verify`).
