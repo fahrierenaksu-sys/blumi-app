@@ -3,40 +3,28 @@
  * Uses React Native's Animated API with useNativeDriver for 60fps.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { AccessibilityInfo, Animated, Easing } from "react-native"
+import {
+  createReducedMotionStore,
+  type ReducedMotionPreference
+} from "./reducedMotionStore"
 
 /** Keeps product motion aligned with the OS accessibility preference. */
-export function useReducedMotionPreference(): {
-  reduceMotion: boolean
-  isResolved: boolean
-} {
-  // Fail closed until the asynchronous OS preference is known so a fresh
-  // mount never flashes motion for someone who has requested less of it.
-  const [preference, setPreference] = useState({
-    reduceMotion: true,
-    isResolved: false
-  })
+const reducedMotionStore = createReducedMotionStore({
+  isReduceMotionEnabled: () => AccessibilityInfo.isReduceMotionEnabled(),
+  addEventListener: (event, listener) =>
+    AccessibilityInfo.addEventListener(event, listener)
+})
 
-  useEffect(() => {
-    let active = true
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (active) setPreference({ reduceMotion: enabled, isResolved: true })
-    }).catch(() => {
-      if (active) setPreference({ reduceMotion: true, isResolved: true })
-    })
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      (enabled) => setPreference({ reduceMotion: enabled, isResolved: true })
-    )
-
-    return () => {
-      active = false
-      subscription.remove()
-    }
-  }, [])
-
-  return preference
+export function useReducedMotionPreference(): ReducedMotionPreference {
+  // One shared OS subscription; resolved values are available synchronously
+  // to later mounts, and the unresolved default remains fail closed.
+  return useSyncExternalStore(
+    reducedMotionStore.subscribe,
+    reducedMotionStore.getSnapshot,
+    reducedMotionStore.getSnapshot
+  )
 }
 
 export function useReducedMotion(): boolean {
