@@ -735,6 +735,7 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   const authEntryCopy = read("src/features/session/authEntryCopy.ts")
   const roomDebrief = read("src/screens/RoomDebriefScreen.tsx")
   const settings = read("src/screens/SettingsScreen.tsx")
+  const settingsAccount = read("src/features/settings/SettingsAccountSection.tsx")
   const settingsCopy = read("src/features/settings/settingsCopy.ts")
   const smsProvider = read("../server/src/auth/smsProvider.ts")
   const firebaseAuth = read("src/features/session/firebasePhoneAuth.ts")
@@ -761,7 +762,9 @@ test("store UI is honest, globally usable, and consistently branded", () => {
   assert.match(register, /<BrandMark size=\{28\}/)
   assert.match(register, /style=\{styles\.brandText\}>Blumi<\/Text>/)
   assert.doesNotMatch(roomDebrief, /addInventoryCoins/)
-  assert.match(settings, /label=\{copy\.signOut\}/)
+  assert.match(settings, /onSignOut=\{handleSignOutPrompt\}/)
+  assert.match(settingsAccount, /label=\{copy\.signOut\}/)
+  assert.match(settingsAccount, /onPress=\{onSignOut\}/)
   assert.match(settingsCopy, /signOut:\s*"Sign out"/)
   assert.match(settingsCopy, /signOut:\s*"Çıkış yap"/)
   assert.match(firebaseAuth, /signInWithPhoneNumber\(/)
@@ -902,6 +905,9 @@ test("the public mobile brand is Blumi while stable runtime identifiers remain u
     "src/screens/AuthEntryScreen.tsx",
     "src/screens/YouScreen.tsx",
     "src/screens/SettingsScreen.tsx",
+    ...readdirSync(resolve(mobileRoot, "src/features/settings"))
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+      .map((name) => `src/features/settings/${name}`),
     "src/ui/errorBoundary.tsx"
   ].map(read).join("\n")
 

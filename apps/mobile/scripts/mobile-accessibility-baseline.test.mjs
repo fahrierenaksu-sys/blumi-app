@@ -15,6 +15,15 @@ const criticalFiles = [
   "src/screens/InboxScreen.tsx",
   "src/screens/ChatThreadScreen.tsx",
   "src/screens/SettingsScreen.tsx",
+  "src/features/settings/SettingsRow.tsx",
+  "src/features/settings/BlockedUserRow.tsx",
+  "src/features/settings/SettingsMatchingSection.tsx",
+  "src/features/settings/SettingsNotificationsSection.tsx",
+  "src/features/settings/SettingsSafetySection.tsx",
+  "src/features/settings/SettingsPrivacySection.tsx",
+  "src/features/settings/SettingsInfoSections.tsx",
+  "src/features/settings/SettingsAccountSection.tsx",
+  "src/features/settings/AccountVerificationModals.tsx",
   "src/screens/YouScreen.tsx",
   "src/screens/WardrobeV2Screen.tsx",
   "src/screens/AvatarSetupScreen.tsx",
@@ -342,15 +351,20 @@ test("profile editing exposes radio semantics and announces validation and save 
 })
 
 test("settings phone change reuses the country-aware phone contract", () => {
-  const source = readFileSync(
-    resolve(mobileRoot, "src/screens/SettingsScreen.tsx"),
+  const modal = readFileSync(
+    resolve(mobileRoot, "src/features/settings/AccountVerificationModals.tsx"),
+    "utf8"
+  )
+  const flow = readFileSync(
+    resolve(mobileRoot, "src/features/settings/usePhoneChange.ts"),
     "utf8"
   )
 
-  assert.match(source, /CountryCallingCodePicker/)
-  assert.match(source, /analyzeLocalPhoneNumber\(newPhoneNumber, newPhoneCountry\)/)
-  assert.match(source, /newPhoneAnalysis\.normalizedPhoneNumber/)
-  assert.match(source, /newPhoneAnalysis\.valid/)
+  assert.match(modal, /<CountryCallingCodePicker/)
+  assert.match(flow, /analyzeLocalPhoneNumber\(newPhoneNumber, newPhoneCountry\)/)
+  assert.match(flow, /newPhoneAnalysis\.normalizedPhoneNumber/)
+  assert.match(flow, /newPhoneAnalysis\.valid/)
+  assert.match(flow, /formatLocalPhoneNumber\(value, newPhoneCountry\)/)
 })
 
 test("room starter choices stay reachable on narrow screens and larger text", () => {

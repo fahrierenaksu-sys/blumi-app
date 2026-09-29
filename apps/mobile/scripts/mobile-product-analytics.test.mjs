@@ -13,6 +13,7 @@ test("product analytics is explicit-consent, minimal, and replay-free", () => {
   const session = read("src/features/session/useSessionState.ts")
   const consent = read("src/analytics/analyticsConsent.ts")
   const settings = read("src/screens/SettingsScreen.tsx")
+  const settingsPrivacy = read("src/features/settings/SettingsPrivacySection.tsx")
   const settingsCopy = read("src/features/settings/settingsCopy.ts")
 
   assert.match(analytics, /defaultOptIn:\s*false/)
@@ -27,10 +28,12 @@ test("product analytics is explicit-consent, minimal, and replay-free", () => {
   assert.match(consent, /optOut\(\)/)
   assert.match(consent, /reset\(\)/)
   assert.match(consent, /hydrationPromise/)
-  assert.match(settings, /label=\{copy\.analytics\}/)
+  assert.match(settings, /const analyticsConsent = useAnalyticsConsent\(\)/)
+  assert.match(settings, /<SettingsPrivacySection copy=\{copy\} analyticsConsent=\{analyticsConsent\} \/>/)
+  assert.match(settingsPrivacy, /label=\{copy\.analytics\}/)
   assert.match(settingsCopy, /analytics:\s*"Product analytics"/)
-  assert.match(settings, /accessibilityRole="switch"/)
-  assert.match(settings, /title:\s*copy\.privacyNotSaved/)
+  assert.match(settingsPrivacy, /accessibilityRole="switch"/)
+  assert.match(settingsPrivacy, /title:\s*copy\.privacyNotSaved/)
   assert.match(settingsCopy, /privacyNotSaved:\s*"Privacy setting not saved"/)
 })
 

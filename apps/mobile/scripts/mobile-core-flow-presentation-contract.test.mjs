@@ -98,10 +98,12 @@ test("chat localizes core empty, history, composer, and accessibility copy for T
 
 test("production discovery preferences use the authoritative profile path", () => {
   const settings = read("src/screens/SettingsScreen.tsx")
+  const matchingPreferences = read("src/features/settings/useMatchingPreferences.ts")
   const navigator = read("src/navigation/RootNavigator.tsx")
 
-  assert.match(settings, /onUpdateProfile/)
-  assert.match(settings, /discoveryPreferences:/)
+  assert.match(settings, /useMatchingPreferences\(sessionActor, onUpdateProfile\)/)
+  assert.match(matchingPreferences, /await onUpdateProfile\(\{/)
+  assert.match(matchingPreferences, /discoveryPreferences:/)
   assert.match(navigator, /onUpdateProfile=\{updateSessionProfile\}/)
 })
 
