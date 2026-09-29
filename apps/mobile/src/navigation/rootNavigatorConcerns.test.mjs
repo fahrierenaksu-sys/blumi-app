@@ -18,7 +18,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 // Each concern names the module that owns it.
 const OWNER = {
   bottomNav: "./useBottomNavChrome.ts",
-  roomInvites: "./RootNavigator.tsx",
+  roomInvites: "./useRoomInviteRouting.ts",
   linking: "./rootLinking.ts",
   matchModal: "./RootNavigator.tsx",
   realtime: "./RootNavigator.tsx"
@@ -240,6 +240,17 @@ test("a ready MiniRoom is ignored before readiness, for non-participants, and wi
   const signedOut = createNavigationRef()
   openReadyMiniRoomFor(signedOut, null).open(readyPayload())
   assert.deepEqual(signedOut.calls, [])
+})
+
+test("ending a session forgets opened MiniRooms and clears the invite timeline", () => {
+  const handledReadyMiniRoomIdsRef = { current: new Set(["room-1"]) }
+  const inviteUpdates = []
+  evaluate(findInitializer(OWNER.roomInvites, "resetRoomInviteRouting"), {
+    handledReadyMiniRoomIdsRef,
+    setRoomInvites: (value) => inviteUpdates.push(value)
+  })()
+  assert.equal(handledReadyMiniRoomIdsRef.current.size, 0)
+  assert.deepEqual(plain(inviteUpdates), [[]])
 })
 
 function demoInviteHandler(currentActor, invite, opened) {

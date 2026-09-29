@@ -1,9 +1,8 @@
 import type {
   DiscoveryDecisionQuota,
   MediaSessionToken,
-  MiniRoom,
-  MiniRoomParticipant
-, ServerEvent } from "@blumi/contracts"
+  MiniRoom
+} from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -14,16 +13,13 @@ import {
 } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
-import { createCandidateAvatarSnapshot } from "../features/avatarV2/candidateAvatarSnapshot"
 import {
   demoSendMessage,
-  demoRoomInviteAction,
   getDemoMessages,
   isDemoMode,
   setDemoMode,
   useDemoStore
 } from "../features/demo/demoStore"
-import { DUMMY_PROFILES } from "../features/demo/dummyProfiles"
 import {
   BLUMI_BUILD_PROFILE,
   BLUMI_DEV_ENTRY_ROUTE,
@@ -94,7 +90,6 @@ import {
   createGlobalRealtimeEventHandler
 } from "../features/realtime/globalRealtimeEventHandler"
 import {
-  isSameAuthenticatedSession,
   reconcileRealtimeConnectionMatch,
   type ConnectionMatchedPayload
 } from "../features/connections/globalMatchReconciliation"
@@ -170,6 +165,8 @@ import { linking } from "./rootLinking"
 import { navigationRef } from "./rootNavigationRef"
 import { RootNavigationChrome } from "./RootNavigationChrome"
 import { useBottomNavChrome } from "./useBottomNavChrome"
+import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
+import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -296,9 +293,6 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
-function createLocalDemoMediaSessionToken(): string {
-  return "demo-session"
-}
 const CAN_REGISTER_MINI_ROOM_RIG_PREVIEW = canApplyBlumiDevEntry({
   route: BLUMI_DEV_ENTRY_ROUTE,
   buildProfile: BLUMI_BUILD_PROFILE,
@@ -337,8 +331,6 @@ interface GlobalMatchState {
   matchedUserName: string
   matchedUserId?: string
 }
-
-type ReadyMiniRoomEvent = Extract<ServerEvent, { type: "mini_room.ready" }>
 
 interface RootNavigatorProps {
   fontsReady?: boolean
@@ -384,26 +376,26 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     setIsBootPreludeReady(true)
   }, [])
   const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
-  const [roomInvites, setRoomInvites] = useState<ChatRoomInviteTimelineItem[]>([])
   const handledMatchIdsRef = useRef(new Set<string>())
   const reconcilingMatchIdsRef = useRef(new Set<string>())
-  const latestSessionActorRef = useRef<SessionActor | null>(sessionActor)
-  latestSessionActorRef.current = sessionActor
-  const isCurrentSession = useCallback(
-    (expectedActor: SessionActor): boolean =>
-      isSameAuthenticatedSession(expectedActor, latestSessionActorRef.current),
-    []
-  )
-  const handledReadyMiniRoomIdsRef = useRef(new Set<string>())
+  const { latestSessionActorRef, isCurrentSession } = useCurrentSessionGuard(sessionActor)
   const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
   const [navigationReadyGeneration, setNavigationReadyGeneration] = useState(0)
   const totalUnreadCount = useTotalUnreadCount()
   const { connectionStatus: rootConnectionStatus } = useGlobalRealtime()
   const demoStore = useDemoStore()
-  const visibleRoomInvites = sessionActor?.session.mode === "demo"
-    ? demoStore.roomInvites
-    : roomInvites
+  const {
+    visibleRoomInvites,
+    setRoomInvites,
+    openReadyMiniRoom,
+    handleDemoRoomInviteAction,
+    resetRoomInviteRouting
+  } = useRoomInviteRouting({
+    latestSessionActorRef,
+    sessionMode: sessionActor?.session.mode,
+    demoRoomInvites: demoStore.roomInvites
+  })
   const { claimDailyRewardFromServer, hydrateFromServer } = useInventoryStore(
     sessionActor?.profile.userId,
     sessionActor?.session.mode === "production"
@@ -492,7 +484,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       applyChatThreadListFailed(message)
       throw error
     }
-  }, [applyNewThread, isCurrentSession])
+  }, [applyNewThread, isCurrentSession, latestSessionActorRef])
 
   const reconcileConnectionDecisionDelivery = useCallback<
     NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
@@ -561,122 +553,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }
   }, [])
 
-  const openReadyMiniRoom = useCallback(
-    (
-      payload: ReadyMiniRoomEvent["payload"],
-      options: { allowReopen?: boolean } = {}
-    ): void => {
-      const actor = latestSessionActorRef.current
-      if (!actor || !navigationRef.isReady()) return
-      if (!payload.miniRoom.participantUserIds.includes(actor.profile.userId)) {
-        return
-      }
-      if (
-        !options.allowReopen &&
-        handledReadyMiniRoomIdsRef.current.has(payload.miniRoom.miniRoomId)
-      ) {
-        return
-      }
-
-      const partner = payload.participants.find(
-        (participant) => participant.userId !== actor.profile.userId
-      )
-      if (!partner) return
-
-      handledReadyMiniRoomIdsRef.current = new Set([
-        ...handledReadyMiniRoomIdsRef.current,
-        payload.miniRoom.miniRoomId
-      ])
-      navigationRef.navigate("MiniRoom", {
-        readyMiniRoom: {
-          miniRoom: payload.miniRoom,
-          mediaSession: payload.mediaSession
-        },
-        participants: {
-          you: {
-            userId: actor.profile.userId,
-            displayName: actor.profile.displayName
-          },
-          partner: {
-            userId: partner.userId,
-            displayName: partner.displayName,
-            avatarSnapshot: createCandidateAvatarSnapshot({
-              userId: partner.userId,
-              displayName: partner.displayName,
-              avatarSelection: partner.avatar
-            })
-          }
-        }
-      })
-    },
-    []
-  )
-
-  const handleDemoRoomInviteAction = useCallback(
-    async (action: ChatRoomInviteAction): Promise<void> => {
-      const actor = latestSessionActorRef.current
-      if (!actor || actor.session.mode !== "demo") {
-        throw new Error("Blumi Room invitations are available in demo mode only.")
-      }
-
-      const currentUser = {
-        userId: actor.profile.userId,
-        displayName: actor.profile.displayName
-      }
-      const invite = demoRoomInviteAction(action, currentUser)
-      if (!invite) {
-        throw new Error("That demo room invitation is no longer available.")
-      }
-
-      if (
-        (action.type === "accept" || action.type === "open_room") &&
-        invite.status === "accepted" &&
-        invite.roomSessionId
-      ) {
-        const partnerUserId = invite.senderUserId === actor.profile.userId
-          ? invite.recipientUserId
-          : invite.senderUserId
-        const partnerProfile = DUMMY_PROFILES.find(
-          (profile) => profile.userId === partnerUserId
-        )
-        const participants = [
-          {
-            userId: actor.profile.userId,
-            displayName: actor.profile.displayName,
-            avatar: {
-              presetId: actor.profile.avatar?.presetId ?? "dusk"
-            }
-          },
-          {
-            userId: partnerUserId,
-            displayName: partnerProfile?.displayName ?? "Blumi friend",
-            avatar: {
-              presetId: partnerProfile?.avatarPresetId ?? "dusk"
-            }
-          }
-        ] as [MiniRoomParticipant, MiniRoomParticipant]
-        const miniRoomId = invite.roomSessionId
-        openReadyMiniRoom({
-          miniRoom: {
-            miniRoomId,
-            lobbyRoomId: "demo-lobby",
-            sourceThreadId: invite.threadId,
-            participantUserIds: [actor.profile.userId, partnerUserId] as [string, string],
-            livekitRoomName: miniRoomId
-          },
-          mediaSession: {
-            miniRoomId,
-            livekitUrl: "demo://local",
-            token: createLocalDemoMediaSessionToken(),
-            issuedAt: new Date().toISOString()
-          },
-          participants
-        }, { allowReopen: true })
-      }
-    },
-    [openReadyMiniRoom]
-  )
-
   const chatCoordinator = useMemo(
     () => createChatCoordinator({
       hasMessageHistory,
@@ -708,7 +584,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       sendGlobal,
       baseHttpUrl: MOBILE_HTTP_BASE_URL
     }),
-    [isCurrentSession, openReadyMiniRoom]
+    [isCurrentSession, latestSessionActorRef, openReadyMiniRoom, setRoomInvites]
   )
   const {
     handleRoomInviteAction,
@@ -735,7 +611,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       markOptimisticMessageFailed(clientMessageId)
       throw error
     }
-  }, [sendChatMessage])
+  }, [latestSessionActorRef, sendChatMessage])
 
   const requestMessagesForRoute = useCallback(async (
     threadId: string,
@@ -750,12 +626,12 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       threadId,
       messages: getDemoMessages(threadId)
     })
-  }, [requestMessages])
+  }, [latestSessionActorRef, requestMessages])
 
   const warmThreadMessagesForInbox = useCallback((threadId: string): Promise<void> => {
     if (latestSessionActorRef.current?.session.mode !== "production") return Promise.resolve()
     return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
-  }, [requestMessages])
+  }, [latestSessionActorRef, requestMessages])
 
   const {
     syncCurrentRouteName,
@@ -943,12 +819,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     if (isDemoMode()) setDemoMode(false)
     handledMatchIdsRef.current = new Set()
     reconcilingMatchIdsRef.current = new Set()
-    handledReadyMiniRoomIdsRef.current = new Set()
     setGlobalMatch(null)
-    setRoomInvites([])
+    resetRoomInviteRouting()
     resetChatStore()
     disconnectGlobal()
-  }, [])
+  }, [resetRoomInviteRouting])
 
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages })
@@ -1044,7 +919,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           )
         })
     },
-    [applyNewThread, hydrateFromServer, sessionActor]
+    [applyNewThread, hydrateFromServer, latestSessionActorRef, sessionActor]
   )
 
   const handleGlobalEvent = useMemo(
