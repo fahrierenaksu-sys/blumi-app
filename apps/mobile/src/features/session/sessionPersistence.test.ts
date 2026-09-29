@@ -385,3 +385,124 @@ test("native logout clears secure and legacy session values", async () => {
   assert.equal(secureStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
   assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
 })
+
+test("native persistence discards a stored demo session when demo sessions are disabled", async () => {
+  const demoActor = createDemoSessionActor({ displayName: "Internal Demo" })
+  const secureStore = createMemoryStore()
+  const asyncStore = createMemoryStore({
+    [DEMO_SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(demoActor)
+  })
+  const persistence = createSessionPersistence({
+    platform: "native",
+    secureStore,
+    asyncStore,
+    demoEnabled: false
+  })
+
+  assert.equal(await persistence.load(), null)
+  assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("native persistence keeps a secure production session when a stale demo session is discarded", async () => {
+  const productionActor = createProductionActor()
+  const secureStore = createMemoryStore({
+    [SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(productionActor)
+  })
+  const asyncStore = createMemoryStore({
+    [DEMO_SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(
+      createDemoSessionActor({ displayName: "Internal Demo" })
+    )
+  })
+  const persistence = createSessionPersistence({
+    platform: "native",
+    secureStore,
+    asyncStore,
+    demoEnabled: false
+  })
+
+  const loaded = await persistence.load()
+
+  assert.equal(loaded?.session.mode, "production")
+  assert.equal(loaded?.profile.userId, "user-1")
+  assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("native persistence does not import a legacy demo session when demo sessions are disabled", async () => {
+  const secureStore = createMemoryStore()
+  const asyncStore = createMemoryStore({
+    [SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(
+      createDemoSessionActor({ displayName: "Legacy Demo" })
+    )
+  })
+  const persistence = createSessionPersistence({
+    platform: "native",
+    secureStore,
+    asyncStore,
+    demoEnabled: false
+  })
+
+  assert.equal(await persistence.load(), null)
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
+  assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("native persistence does not recover a legacy demo session without a credential store when demo sessions are disabled", async () => {
+  const secureStore: SessionKeyValueStore = {
+    getItem: async () => {
+      throw new Error("A required entitlement isn't present")
+    },
+    setItem: async () => {
+      throw new Error("A required entitlement isn't present")
+    },
+    removeItem: async () => {
+      throw new Error("A required entitlement isn't present")
+    }
+  }
+  const asyncStore = createMemoryStore({
+    [SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(
+      createDemoSessionActor({ displayName: "Legacy Demo" })
+    )
+  })
+  const persistence = createSessionPersistence({
+    platform: "native",
+    secureStore,
+    asyncStore,
+    demoEnabled: false
+  })
+
+  await assert.rejects(persistence.load(), SecureSessionStorageUnavailableError)
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
+  assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("web persistence discards a stored demo session when demo sessions are disabled", async () => {
+  const asyncStore = createMemoryStore({
+    [SESSION_ACTOR_STORAGE_KEY]: JSON.stringify(
+      createDemoSessionActor({ displayName: "Web Demo" })
+    )
+  })
+  const persistence = createSessionPersistence({
+    platform: "web",
+    asyncStore,
+    demoEnabled: false
+  })
+
+  assert.equal(await persistence.load(), null)
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("persistence refuses to save a demo session when demo sessions are disabled", async () => {
+  const asyncStore = createMemoryStore()
+  const persistence = createSessionPersistence({
+    platform: "native",
+    secureStore: createMemoryStore(),
+    asyncStore,
+    demoEnabled: false
+  })
+
+  await assert.rejects(
+    persistence.save(createDemoSessionActor({ displayName: "Demo" })),
+    /Demo sessions are disabled/
+  )
+  assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
+})

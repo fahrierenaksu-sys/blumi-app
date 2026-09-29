@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as SecureStore from "expo-secure-store"
 import { Platform } from "react-native"
+import { IS_BLUMI_DEMO_ENABLED } from "../../config/env"
 import {
   createSessionPersistence,
   NATIVE_SESSION_CLEARED_STORAGE_KEY,
@@ -28,7 +29,8 @@ const secureStore: SessionKeyValueStore = {
 const sessionPersistence = createSessionPersistence({
   platform: Platform.OS === "web" ? "web" : "native",
   asyncStore,
-  secureStore
+  secureStore,
+  demoEnabled: IS_BLUMI_DEMO_ENABLED
 })
 
 export const loadSessionActor = sessionPersistence.load

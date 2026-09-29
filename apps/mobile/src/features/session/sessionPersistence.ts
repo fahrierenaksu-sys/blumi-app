@@ -18,6 +18,13 @@ export interface SessionPersistenceDependencies {
   asyncStore: SessionKeyValueStore
   secureStore?: SessionKeyValueStore
   now?: () => number
+  /**
+   * Whether this build may restore or create demo sessions. Every build
+   * profile shares one bundle ID and AsyncStorage survives upgrades, so a demo
+   * actor written by an internal build must not boot a build that disables
+   * demo sessions.
+   */
+  demoEnabled?: boolean
 }
 
 export interface SessionPersistence {
@@ -47,6 +54,7 @@ export function createSessionPersistence(
   dependencies: SessionPersistenceDependencies
 ): SessionPersistence {
   const now = dependencies.now ?? Date.now
+  const demoEnabled = dependencies.demoEnabled ?? true
 
   return {
     load: async () => {
@@ -54,7 +62,9 @@ export function createSessionPersistence(
         const storedDemo = await dependencies.asyncStore.getItem(
           DEMO_SESSION_ACTOR_STORAGE_KEY
         )
-        if (storedDemo) {
+        if (storedDemo && !demoEnabled) {
+          await dependencies.asyncStore.removeItem(DEMO_SESSION_ACTOR_STORAGE_KEY)
+        } else if (storedDemo) {
           const demoActor = await parseStoredActor(
             storedDemo,
             now,
@@ -93,7 +103,8 @@ export function createSessionPersistence(
           const demoActor = await recoverLegacyDemoWithoutCredentialStore(
             legacyValue,
             dependencies.asyncStore,
-            now
+            now,
+            demoEnabled
           )
           if (demoActor) return demoActor
           throw new SecureSessionStorageUnavailableError()
@@ -109,11 +120,12 @@ export function createSessionPersistence(
         if (!actor) return null
 
         if (actor.session.mode === "demo") {
+          await dependencies.asyncStore.removeItem(SESSION_ACTOR_STORAGE_KEY)
+          if (!demoEnabled) return null
           await dependencies.asyncStore.setItem(
             DEMO_SESSION_ACTOR_STORAGE_KEY,
             JSON.stringify(actor)
           )
-          await dependencies.asyncStore.removeItem(SESSION_ACTOR_STORAGE_KEY)
           return actor
         }
 
@@ -143,7 +155,7 @@ export function createSessionPersistence(
       )
       if (!actor) return null
 
-      if (actor.session.mode === "production") {
+      if (actor.session.mode === "production" || !demoEnabled) {
         await dependencies.asyncStore.removeItem(SESSION_ACTOR_STORAGE_KEY)
         return null
       }
@@ -151,6 +163,9 @@ export function createSessionPersistence(
       return actor
     },
     save: async (actor) => {
+      if (actor.session.mode === "demo" && !demoEnabled) {
+        throw new Error("Demo sessions are disabled in this build")
+      }
       if (dependencies.platform === "native") {
         if (actor.session.mode === "demo") {
           await dependencies.asyncStore.setItem(
@@ -230,7 +245,8 @@ export function createSessionPersistence(
 async function recoverLegacyDemoWithoutCredentialStore(
   legacyValue: string | null,
   asyncStore: SessionKeyValueStore,
-  now: () => number
+  now: () => number,
+  demoEnabled: boolean
 ): Promise<SessionActor | null> {
   if (!legacyValue) return null
 
@@ -239,7 +255,7 @@ async function recoverLegacyDemoWithoutCredentialStore(
     now,
     asyncStore
   )
-  if (actor?.session.mode === "demo") {
+  if (actor?.session.mode === "demo" && demoEnabled) {
     await asyncStore.setItem(
       DEMO_SESSION_ACTOR_STORAGE_KEY,
       JSON.stringify(actor)
