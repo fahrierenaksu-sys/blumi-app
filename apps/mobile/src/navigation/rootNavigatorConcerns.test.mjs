@@ -480,6 +480,20 @@ test("an inactive session resets demo mode, matches, invites, chat, and the sock
   assert.deepEqual(calls, [["demo", false], ["matches"], ["invites"], ["chat"], ["disconnect"]])
 })
 
+// ── Notification responses ─────────────────────────────────
+
+test("push registration is scoped to the unrestricted main session and replays on readiness", () => {
+  const routing = read("./useNotificationResponseRouting.ts")
+  assert.match(
+    routing,
+    /usePushRegistration\(\s*sessionEntryRoute === "Main" && !isAccountRestricted \? sessionActor : null,\s*handleNotificationResponseData,\s*navigationReadyGeneration\s*\)/
+  )
+  const navigator = read("./RootNavigator.tsx")
+  assert.match(navigator, /const pushRegistration = useNotificationResponseRouting\(\{[\s\S]*?navigationReadyGeneration\s*\}\)/)
+  assert.match(navigator, /setNavigationReadyGeneration\(\(generation\) => generation \+ 1\)/)
+  assert.match(navigator, /onRequestPushPermission=\{pushRegistration\.requestPermission\}/)
+})
+
 // ── Global realtime lifecycle wiring ───────────────────────
 
 test("the global realtime lifecycle restarts only on its protected identity inputs", () => {

@@ -84,7 +84,6 @@ import { getOnboardingStarterBodyId } from "../features/avatarV2/avatarStarterMo
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
 import { RoomV2Provider } from "../features/roomV2/state/RoomV2Provider"
 import { AccountRestrictionScreen } from "../screens/AccountRestrictionScreen"
-import type { SessionActor } from "../features/session/sessionModel"
 import { useSessionState } from "../features/session/useSessionState"
 import { selectSessionEntryRoute } from "../features/session/sessionRouting"
 import type {
@@ -114,8 +113,6 @@ import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
 import type { BlumiMatch } from "../features/matches/matchRoomModel"
-import { usePushRegistration } from "../features/notifications/usePushRegistration"
-import { resolveNotificationDestination } from "../features/notifications/notificationRouting"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
@@ -130,6 +127,7 @@ import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
 import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
 import { useMatchModal } from "./useMatchModal"
+import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -443,29 +441,13 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }
   }, [sessionEntryRoute, syncCurrentRouteName])
 
-  const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
-    if (
-      expectedActor.session.mode !== "production" ||
-      sessionEntryRoute !== "Main" ||
-      isAccountRestricted ||
-      !isCurrentSession(expectedActor) ||
-      !navigationRef.isReady()
-    ) return false
-    const destination = resolveNotificationDestination(data)
-    if (!destination) return false
-    if (destination.route === "ChatThread") {
-      navigationRef.navigate("ChatThread", destination.params)
-      return true
-    }
-    navigationRef.navigate(destination.route)
-    return true
-  }, [isAccountRestricted, isCurrentSession, sessionEntryRoute])
-
-  const pushRegistration = usePushRegistration(
-    sessionEntryRoute === "Main" && !isAccountRestricted ? sessionActor : null,
-    handleNotificationResponseData,
+  const pushRegistration = useNotificationResponseRouting({
+    sessionActor,
+    sessionEntryRoute,
+    isAccountRestricted,
+    isCurrentSession,
     navigationReadyGeneration
-  )
+  })
 
   const inventoryHydrationSessionToken = sessionActor &&
     shouldHydrateProductionInventory(
