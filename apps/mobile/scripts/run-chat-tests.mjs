@@ -88,6 +88,12 @@ try {
       stdio: "inherit",
       env: {
         ...process.env,
+        // Store and coordinator tests assert the default English copy while
+        // production resolves the device locale. Pin the ICU locale so a
+        // Turkish Mac and an English CI runner produce the same result;
+        // Turkish copy is asserted explicitly in chatErrorCopy.test.ts.
+        LANG: "en_US.UTF-8",
+        LC_ALL: "en_US.UTF-8",
         NODE_PATH: [
           resolve(workspaceRoot, "node_modules"),
           resolve(workspaceRoot, "../../node_modules"),

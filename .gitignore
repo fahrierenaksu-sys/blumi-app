@@ -46,3 +46,6 @@ app-example
 /android
 /apps/mobile/ios
 /apps/mobile/android
+
+# Disposable test runner output (apps/mobile/scripts/run-*.mjs); removed after each run
+/apps/mobile/.blumi-*-tests-*/
