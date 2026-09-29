@@ -150,6 +150,7 @@ try {
       "--import", "tsx",
       "--test",
       "src/features/session/registerLegalContract.test.ts",
+      "src/features/session/register/useRegisterFlowController.test.ts",
       "src/features/session/accountRecoveryModel.test.ts",
       "src/features/session/accountSwitchIsolation.test.ts",
       "src/features/session/appLocale.test.ts",
