@@ -89,6 +89,20 @@ Their residual conditions stay tracked here.
 - 18 stale source-text tests and 57 tests whose fixtures live only in the
   Workbench are candidates for retirement or fixture restoration; none deleted.
 
+## Integrated verification (2026-09-30)
+
+Full `npm run verify` on integrated commit `338fb1d` (all agent branches and
+`main` merged; the only later commit changes this document) exited 0:
+source hygiene, Operations Center, audit policy, release infrastructure,
+package builds, all workspace typechecks, lint, every mobile and server test
+group, the isolated PostgreSQL gate (disposable PostgreSQL 16 cluster,
+migrations from empty and rerun), the production dependency audit and Expo
+Doctor 21/21. Totals: 2,703 passed, 0 failed, 0 cancelled, 40 skipped
+(38 PostgreSQL-only cases inside the normal suites, which the isolated gate
+runs separately, plus 2 intentional skips: the generated-`ios/` check and a
+`shopCatalogParity` subtest whose Room VNext manifest is not in the repo).
+This is code evidence only; it is not native, device or deploy evidence.
+
 ## Things that must not change
 
 - Migrations: `apps/server/db/migrations` has two `032_*` files and no `044`.
