@@ -1,4 +1,7 @@
-# Blumi engineering audit — 2026-09-28 (in progress)
+# Blumi engineering audit — 2026-09-28 (historical)
+
+> Superseded for current status by [ENGINEERING_AUDIT_2026-09-30.md](./ENGINEERING_AUDIT_2026-09-30.md).
+> In particular, the 29 candidate imports noted below were promoted on 2026-09-30.
 
 This is an evidence log, not a production-readiness certificate. The current
 repository is Expo 57 / React Native 0.86, Fastify, PostgreSQL, and shared
