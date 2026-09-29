@@ -103,6 +103,44 @@ runs separately, plus 2 intentional skips: the generated-`ios/` check and a
 `shopCatalogParity` subtest whose Room VNext manifest is not in the repo).
 This is code evidence only; it is not native, device or deploy evidence.
 
+## Coverage matrix against the transformation brief
+
+Status: **Done** (implemented and tested in this run), **Partial**, **Planned**
+(scheduled, not started), **Blocked** (needs the owner, a device or a deploy).
+"Wave" is where the remaining work is scheduled: W2 architecture and
+performance, W3 measurement, native evidence and release readiness.
+
+| Brief § | Area | Surface reviewed / method | Status | Remaining | Wave |
+|---|---|---|---|---|---|
+| 2, 3 | Existing solutions and docs are not exempt | Previous audit re-checked; stale claims corrected (LAUNCH_CONTROL, 09-28 audit marked historical) | Partial | Full Markdown inventory and classification (active instruction / guide / decision / status / history), broken links and command checks, AGENTS/README alignment (in progress) | W2 |
+| 4 | Authority and protection | Branch-only commits, explicit file lists, no main merge/deploy/migration without the owner; one owner-approved Railway variable | Done | — | — |
+| 5 | Role coverage and agents | Orchestrated agents per package with file ownership; results verified on the merged tree | Done (ongoing) | — | — |
+| 6 | Real system and baseline | Workspaces, versions, config/env resolution, CI, test infrastructure, Railway environment and logs | Done | Metro/native build identity on the owner's device | W3 |
+| 7 | September 2026 technology research | Only targeted checks (RevenueCat webhook/v2 docs, Railway proxy behaviour) | Planned | Official sources for Expo/RN/Reanimated/React Navigation/Fastify/pg/zod/testing/observability; adopt / prototype / watch / reject decisions | W3 |
+| 8 | Architecture and file organisation | Module map, largest files, layer inversions, unreachable code | Partial | RootNavigator split (in progress); `config/env.ts` → features decoupling; `*.mock.ts` production catalogs rename; import-boundary test; large screens (MyRoomEditor, CosmeticShop, Register, Lobby, Settings); state/store consistency; realtime client into `packages/realtime-client` | W2 |
+| 9 | Dead code and debt | Evidence manifest (production and QA Expo exports + reference search) | Partial | Proven-dead code removal (in progress); archived-source removal after the owner's Mac receipt | W2 / Blocked |
+| 10A | Product journeys | Journey map from navigation and routing; lobby loop retired | Partial | Deep links arriving before `Main` are dropped; duplicate match UI (modal + screen); per-journey failure/retry paths | W2 |
+| 10B | UX, visual, accessibility | Accessibility gate test, Reduce Motion sharing | Partial | Screen-by-screen review on device (large text, VoiceOver, keyboard, safe areas, states); hard-coded colours/font sizes vs theme | W3 |
+| 10C | Mobile state, navigation, lifecycle | Session persistence, logout isolation, realtime reconnect, fake tabs | Partial | exhaustive-deps suppressions (48), render-time ref writes, function-valued route params, single root error boundary | W2 |
+| 10D | Animation, avatar, room | Renderer and ticker reviewed; Coral Wave gate (in progress) | Partial | Avatar frame ticker and My Room movement off React state (needs device baseline); art QA gates need an art decision | W2 / W3 |
+| 10E | API and network | Route inventory, timeouts on 3 more modules, validation gap | Partial | Remaining modules onto the shared client; enforce request validation with staging check; realtime event schema validation | W2 |
+| 10F | Backend and systems | Moderation, personas, presence policy, single-instance assumptions | Partial | Per-event realtime re-auth cost, unbounded 30 s recheck, sync-matches and block-list N+1, multi-instance limits | W2 |
+| 10G | Database | Migrations run from empty and rerun in the isolated gate; repository parity gaps noted | Partial | `EXPLAIN (ANALYZE, BUFFERS)` on synthetic data for hot queries; in-memory vs PostgreSQL parity suite; presence global DELETE | W2 / W3 |
+| 10H | Realtime, multi-user | Lobby retirement tests, fanout/backpressure reviewed | Partial | Ordering/replay guarantees documented; slow-consumer handling; fanout > 100 targets | W2 |
+| 10I | Security, privacy, abuse | Moderation bypass, demo leak, trust proxy, lobby privacy, persona guard fixed | Partial | Threat model document; session refresh reuse detection; Firebase uid binding; report/block abuse limits; PII in request URLs | W2 |
+| 10J | Economy and entitlement | Coin pack single source; RevenueCat mapping verified with open conditions | Partial | Sandbox purchase check before payments; refund/unmatched-account webhook handling | W3 (payments off) |
+| 10K | Performance, capacity, cost | Source-level only | Planned | Cold/warm start, frame time, memory, request counts on the owner's iPhone; API/DB p95 | W3 |
+| 10L | Test engineering | Clean-clone CI fixed; 105 orphan tests wired; stale-test repair in progress | Partial | 57 Workbench-fixture tests; E2E two-account native flow | W2 / W3 |
+| 10M | Platform, SRE, release | Railway variables, deploys and logs checked; `expo-updates` absent (EAS channels unused) | Partial | Build-profile single source; migration/deploy ordering for lease rollout; alerting | W3 |
+| 10N | Operations, support, analytics | Not reviewed beyond existing docs | Planned | Moderation queue operations, analytics event schema and PII review | W3 |
+| 11 | Blumi foundations | Core loop, canonical IDs, approved art and Workbench boundary preserved | Done | — | — |
+| 12 | Keep / refactor / rebuild / replace decisions | Recorded for stack, realtime, navigation, tests, repositories, migrations, demo | Partial | Decision records for W2 rebuilds | W2 |
+| 13 | Measurable quality | Tests and gates per change | Partial | Baseline/target per quality dimension (depends on W3 measurements) | W3 |
+| 14 | Findings register and coverage matrix | Findings table and this matrix | Partial | Add confidence, owner and residual-risk columns to the findings table | W2 |
+| 15 | Implement and verify critically | Failing-first tests, merged-tree `npm run verify` | Done (ongoing) | Independent review of W2 changes | W2 |
+| 16 | Continuity | Progress reports and this audit | Done (ongoing) | — | — |
+| 17 | Final delivery report | Interim reports only | Planned | Final report in the brief's 15-point format | W3 |
+
 ## Things that must not change
 
 - Migrations: `apps/server/db/migrations` has two `032_*` files and no `044`.
