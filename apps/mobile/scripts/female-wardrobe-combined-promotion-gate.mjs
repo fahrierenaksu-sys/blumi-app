@@ -235,9 +235,26 @@ export const assertCatalogMatchesRuntimeSource = ({
   )
 }
 
-const assetPath = (roomRoot, kind, slug, state) => state === "static"
-  ? join(roomRoot, `avatar_room_${kind}_female_${slug}_v2.png`)
-  : join(roomRoot, "motion", `room_avatar_${kind}_female_${slug}_v2_${state}.png`)
+// Approved runtime art whose file stem differs from the canonical
+// `avatar_room_*_v2.png` / `room_avatar_*_v2_<state>.png` convention. The
+// catalog item ID stays `room_avatar_<kind>_female_<slug>_v2`; only the file
+// names differ, and they must match what the runtime asset modules require.
+export const RUNTIME_ASSET_FILE_STEMS = Object.freeze({
+  "top:coral_wave_polo": "room_avatar_top_female_coral_wave_polo_v1",
+  "bottom:coral_wave_pants": "room_avatar_bottom_female_coral_wave_pants_v1",
+  "shoes:coral_wave_shoes": "room_avatar_shoes_female_coral_wave_shoes_v1"
+})
+
+export const runtimeAssetFileName = (kind, slug, state) => {
+  const stem = RUNTIME_ASSET_FILE_STEMS[`${kind}:${slug}`]
+  if (stem) return state === "static" ? `${stem}.png` : `motion/${stem}_${state}.png`
+  return state === "static"
+    ? `avatar_room_${kind}_female_${slug}_v2.png`
+    : `motion/room_avatar_${kind}_female_${slug}_v2_${state}.png`
+}
+
+const assetPath = (roomRoot, kind, slug, state) =>
+  join(roomRoot, runtimeAssetFileName(kind, slug, state))
 
 const basePath = (roomRoot, state) => state === "static"
   ? join(roomRoot, "avatar_room_base_female_v2.png")

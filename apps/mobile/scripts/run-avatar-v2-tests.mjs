@@ -138,6 +138,7 @@ try {
       resolve(workspaceRoot, "scripts/female-sitting-rig-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/female-wardrobe-static-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/female-wardrobe-combined-promotion-gate.test.mjs"),
+      resolve(workspaceRoot, "scripts/female-sweet-capsule-promotion-gate.test.mjs"),
       resolve(workspaceRoot, "scripts/promote-female-nondress-wardrobe.test.mjs"),
       resolve(workspaceRoot, "scripts/promote-male-capsule-assets.test.mjs")
     ],

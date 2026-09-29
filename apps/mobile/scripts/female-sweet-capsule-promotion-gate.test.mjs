@@ -5,7 +5,10 @@ import test from "node:test"
 
 import {
   FEMALE_NONDRESS_CATALOG,
+  RUNTIME_ASSET_FILE_STEMS,
+  STATES,
   createPairwisePlan,
+  runtimeAssetFileName,
   verifyPromotedInventory
 } from "./female-wardrobe-combined-promotion-gate.mjs"
 
@@ -81,4 +84,21 @@ test("female sweet capsule promotion understands the declarative room catalog ma
     /FEMALE_SWEET_CAPSULE_LAYERS/,
     "the runtime room catalog must consume the canonical capsule definition"
   )
+})
+
+test("female sweet capsule gate verifies the exact files the runtime asset modules load", () => {
+  const runtimeSource = ["femaleSweetCapsuleRoomAssets.ts", "femaleSweetCapsuleRoomMotionAssets.ts"]
+    .map((file) => readFileSync(new URL(`../src/features/avatarV2/${file}`, import.meta.url), "utf8"))
+    .join("\n")
+  assert.ok(Object.keys(RUNTIME_ASSET_FILE_STEMS).length > 0)
+  for (const key of Object.keys(RUNTIME_ASSET_FILE_STEMS)) {
+    const [kind, slug] = key.split(":")
+    for (const state of STATES) {
+      const fileName = runtimeAssetFileName(kind, slug, state)
+      assert.ok(
+        runtimeSource.includes(`require("./assets/room/${fileName}")`),
+        `${key} ${state}: runtime does not load ${fileName}`
+      )
+    }
+  }
 })
