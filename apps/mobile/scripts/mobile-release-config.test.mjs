@@ -394,6 +394,10 @@ test("release crash reporting uses the official Sentry integration without PII",
   const appConfig = read("app.json")
 
   assert.match(app, /initializeCrashReporting\(\)/)
+  assert.ok(
+    app.indexOf("initializeCrashReporting()") < app.indexOf("assertLegalReleaseReady({"),
+    "crash reporting must start before the startup legal assertion so a failed release check is reported"
+  )
   assert.match(crashReporting, /sendDefaultPii:\s*false/)
   assert.match(crashReporting, /attachScreenshot:\s*false/)
   assert.match(crashReporting, /attachViewHierarchy:\s*false/)

@@ -23,12 +23,14 @@ import { BLUMI_BUILD_PROFILE } from "./src/config/env"
 import { getAllLegalContent } from "./src/features/legal/legalCopy"
 import { assertLegalReleaseReady } from "./src/features/legal/legalPolicyMetadata"
 
+// Start crash reporting first so a failed release legal check is reported
+// instead of terminating before Sentry is installed.
+initializeCrashReporting()
+
 assertLegalReleaseReady({
   buildProfile: BLUMI_BUILD_PROFILE,
   serializedDocuments: JSON.stringify(getAllLegalContent())
 })
-
-initializeCrashReporting()
 
 function App() {
   const [queryClient] = useState(() => new QueryClient({
