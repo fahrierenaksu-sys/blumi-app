@@ -10,8 +10,8 @@ import { shouldUseProfileCharacterReactionAssets } from "./profileCharacterReact
 import { getProfileCharacterReaction } from "./profileCharacterReactionModel"
 import { getProfileCharacterReactionGeometry } from "./profileSetupVisualModel"
 
-const FEMALE_TWIRL_ATLAS_V4 = require("./assets/profile-character-reaction-v4-candidate/blumi_profile_twirling_female_atlas_v4_final.png")
-const MALE_COLLAR_ATLAS_V4 = require("./assets/profile-character-reaction-v4-candidate/blumi_profile_collar_male_atlas_v4_final.png")
+const FEMALE_TWIRL_ATLAS_V4 = require("./assets/profile-character-reaction-v4-runtime/blumi_profile_twirling_female_atlas_v4_final.png")
+const MALE_COLLAR_ATLAS_V4 = require("./assets/profile-character-reaction-v4-runtime/blumi_profile_collar_male_atlas_v4_final.png")
 
 interface ProfileCharacterReactionStageProps {
   avatar: UserAvatar

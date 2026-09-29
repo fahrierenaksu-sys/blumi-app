@@ -8,6 +8,6 @@ export const ONBOARDING_ARRIVAL_ATLAS_GRID = Object.freeze({
 })
 
 export const ONBOARDING_ARRIVAL_ATLAS_ASSETS = {
-  female: require("./assets/onboarding-arrival-v3-candidate/blumi_intro_arrival_female_atlas.png") as ImageSourcePropType,
-  male: require("./assets/onboarding-arrival-v3-candidate/blumi_intro_arrival_male_atlas.png") as ImageSourcePropType
+  female: require("./assets/onboarding-arrival-v3-runtime/blumi_intro_arrival_female_atlas.png") as ImageSourcePropType,
+  male: require("./assets/onboarding-arrival-v3-runtime/blumi_intro_arrival_male_atlas.png") as ImageSourcePropType
 } as const

@@ -7,7 +7,7 @@ import {
   getOnboardingWelcomeHomeProgressAtElapsed
 } from "./onboardingWelcomeHomeModel"
 
-const WELCOME_COTTAGE = require("./assets/onboarding-welcome-home-v1-candidate/blumi_welcome_cottage_v1.png")
+const WELCOME_COTTAGE = require("./assets/onboarding-welcome-home-v1-runtime/blumi_welcome_cottage_v1.png")
 
 interface OnboardingWelcomeHomeSceneProps {
   compact: boolean
