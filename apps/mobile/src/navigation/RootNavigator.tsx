@@ -5,7 +5,7 @@ import type {
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ActivityIndicator,
   StyleSheet,
@@ -23,50 +23,28 @@ import {
   BLUMI_DEV_ENTRY_ROUTE,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG,
   IS_BLUMI_PAID_COINS_ENABLED,
-  MOBILE_HTTP_BASE_URL,
-  MOBILE_WS_BASE_URL
+  MOBILE_HTTP_BASE_URL
 } from "../config/env"
 import {
   canApplyBlumiDevEntry,
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
 import type { FetchThreadMessagesOptions } from "../features/chat/chatApi"
-import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import type {
   ChatLocale,
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
 } from "../features/chat/chatRoomInviteModel"
+import { useBlockStore } from "../features/safety/blockStore"
 import {
-  hydrateBlockedUsersFromServer,
-  useBlockStore
-} from "../features/safety/blockStore"
-import {
-  applyChatMessageListed,
-  applyChatMessageReceived,
-  applyChatThreadListed,
-  applyChatThreadRead,
-  getThreads,
   resetChatStore,
   useTotalUnreadCount
 } from "../features/chat/chatStore"
 import { flushAuthenticatedConnectionDecisionOutbox } from "../features/connections/connectionDecisionRuntime"
 import {
-  createGlobalRealtimeEventHandler
-} from "../features/realtime/globalRealtimeEventHandler"
-import {
-  connectGlobal,
   disconnectGlobal,
-  sendGlobal,
-  subscribeToStatus,
-  useGlobalRealtime,
-  useGlobalRealtimeEvents
+  useGlobalRealtime
 } from "../features/realtime/globalRealtimeProvider"
-import { isRealtimeAuthInvalidClose } from "../features/realtime/realtimeClient"
-import {
-  createGlobalRealtimeLifecycle,
-  getGlobalRealtimeLifecycleIdentity
-} from "../features/realtime/globalRealtimeLifecycle"
 import { LobbyScreen } from "../screens/LobbyScreen"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
@@ -128,6 +106,7 @@ import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
 import { useMatchModal } from "./useMatchModal"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
+import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -554,6 +533,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [isNavigationReady, navigationReadyGeneration, sessionActor, sessionEntryRoute])
 
   // ── Global WS lifecycle ─────────────────────────────────
+  // Leaving the authenticated main session leaves demo mode and clears every
+  // session-scoped root store before the socket closes.
   const resetInactiveSessionState = useCallback((): void => {
     if (isDemoMode()) setDemoMode(false)
     resetMatchModal()
@@ -562,86 +543,24 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     disconnectGlobal()
   }, [resetMatchModal, resetRoomInviteRouting])
 
-  const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
-  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
-  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration, resynchronizeMessages }
-
-  useEffect(() => createGlobalRealtimeLifecycle({
+  useGlobalRealtimeSession({
     sessionActor,
-    isMainRoute: sessionEntryRoute === "Main",
+    sessionEntryRoute,
     isAccountRestricted,
     isCurrentSession,
-    isDemoMode,
-    setDemoMode,
     resetInactiveSessionState,
+    clearSessionActor,
+    refreshAccountModeration,
     refreshProductionThreads,
-    resynchronizeActiveConversation: () => {
-      const route = navigationRef.getCurrentRoute()
-      const threadId = route?.name === "ChatThread"
-        ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
-        : route?.name === "MiniRoom"
-          ? (route.params as RootStackParamList["MiniRoom"] | undefined)?.readyMiniRoom.miniRoom.sourceThreadId
-          : undefined
-      return threadId ? realtimeSessionCallbacksRef.current.resynchronizeMessages(threadId) : Promise.resolve()
-    },
-    hydrateBlockedUsersFromServer,
-    connectGlobal,
-    disconnectGlobal,
-    sendGlobal,
-    subscribeToStatus,
-    applyChatThreadListed,
-    getThreads,
-    isRealtimeAuthInvalidClose,
-    clearSessionActor: () => realtimeSessionCallbacksRef.current.clearSessionActor(),
-    refreshAccountModeration: () => realtimeSessionCallbacksRef.current.refreshAccountModeration(),
-    showWarningToast: (toast) => {
-      showToast({ ...toast, type: "warning" })
-    },
-    wsBaseUrl: MOBILE_WS_BASE_URL,
-    httpBaseUrl: MOBILE_HTTP_BASE_URL
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  })(), [
-    isAccountRestricted,
-    refreshProductionThreads,
-    resetInactiveSessionState,
-    realtimeSessionIdentity,
-    sessionEntryRoute
-  ])
+    resynchronizeMessages,
+    upsertRoomInvite,
+    applyRealtimeThreadList,
+    applyNewThread,
+    openReadyMiniRoom,
+    getMatchDeduplicationState,
+    onConnectionMatched: handleRealtimeConnectionMatch
+  })
 
-  // ── Chat + match event routing ──────────────────────────
-  const handleGlobalEvent = useMemo(
-    () => createGlobalRealtimeEventHandler({
-      currentUserId: sessionActor?.profile.userId,
-      getMatchDeduplicationState,
-      normalizeRoomInviteRecord,
-      upsertRoomInvite,
-      applyChatThreadListed: applyRealtimeThreadList,
-      applyChatThreadRead,
-      requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
-      requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
-      applyChatThreadCreated: applyNewThread,
-      applyChatMessageListed,
-      applyChatMessageReceived,
-      getThreads,
-      openReadyMiniRoom,
-      onConnectionMatched: handleRealtimeConnectionMatch,
-      showIncomingMessageToast: (toast) => {
-        showToast({ ...toast, type: "info" })
-      }
-    }),
-    [
-      handleRealtimeConnectionMatch,
-      getMatchDeduplicationState,
-      applyNewThread,
-      applyRealtimeThreadList,
-      refreshProductionThreads,
-      openReadyMiniRoom,
-      sessionActor?.profile.userId,
-      upsertRoomInvite
-    ]
-  )
-
-  useGlobalRealtimeEvents(handleGlobalEvent)
 
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||

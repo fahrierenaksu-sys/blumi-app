@@ -22,7 +22,8 @@ const OWNER = {
   chat: "./useRootChatSync.ts",
   linking: "./rootLinking.ts",
   matchModal: "./useMatchModal.ts",
-  realtime: "./RootNavigator.tsx"
+  realtime: "./useGlobalRealtimeSession.ts",
+  sessionReset: "./RootNavigator.tsx"
 }
 
 function parse(path) {
@@ -469,7 +470,7 @@ test("ending a session forgets presented and reconciling matches and closes the 
 test("an inactive session resets demo mode, matches, invites, chat, and the socket in order", () => {
   const calls = []
   let demo = true
-  evaluate(findInitializer(OWNER.realtime, "resetInactiveSessionState"), {
+  evaluate(findInitializer(OWNER.sessionReset, "resetInactiveSessionState"), {
     isDemoMode: () => demo,
     setDemoMode: (value) => { demo = value; calls.push(["demo", value]) },
     resetMatchModal: () => calls.push(["matches"]),
@@ -506,4 +507,36 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
   assert.match(source, /clearSessionActor: \(\) => realtimeSessionCallbacksRef\.current\.clearSessionActor\(\)/)
   assert.match(source, /refreshAccountModeration: \(\) => realtimeSessionCallbacksRef\.current\.refreshAccountModeration\(\)/)
   assert.match(source, /useGlobalRealtimeEvents\(handleGlobalEvent\)/)
+  // Session callbacks are read from the latest commit, never written during render.
+  assert.match(
+    source,
+    /const realtimeSessionCallbacksRef = useLatestRef\(\{ clearSessionActor, refreshAccountModeration, resynchronizeMessages \}\)/
+  )
+  assert.doesNotMatch(source, /realtimeSessionCallbacksRef\.current = /)
+  assert.match(read("./useLatestRef.ts"), /useLayoutEffect\(\(\) => \{\s*ref\.current = value\s*\}, \[value\]\)/)
+
+  const navigator = read(OWNER.sessionReset)
+  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch\s*\}\)/)
+  assert.match(navigator, /const resetInactiveSessionState = useCallback\([\s\S]*?\}, \[resetMatchModal, resetRoomInviteRouting\]\)/)
+})
+
+test("the realtime active-conversation resync follows the focused chat or MiniRoom thread", async () => {
+  const lifecycleSource = read(OWNER.realtime)
+  const start = lifecycleSource.indexOf("resynchronizeActiveConversation: () => {")
+  assert.ok(start >= 0)
+  const body = lifecycleSource.slice(start + "resynchronizeActiveConversation: ".length, lifecycleSource.indexOf("hydrateBlockedUsersFromServer,", start))
+    .trim()
+    .replace(/,$/, "")
+  const resynchronized = []
+  const resync = (route) => evaluate(body, {
+    navigationRef: { getCurrentRoute: () => route },
+    realtimeSessionCallbacksRef: {
+      current: { resynchronizeMessages: async (threadId) => { resynchronized.push(threadId) } }
+    }
+  })
+  await resync({ name: "ChatThread", params: { threadId: "thread-chat" } })()
+  await resync({ name: "MiniRoom", params: { readyMiniRoom: { miniRoom: { sourceThreadId: "thread-room" } } } })()
+  await resync({ name: "Lobby" })()
+  await resync(undefined)()
+  assert.deepEqual(resynchronized, ["thread-chat", "thread-room"])
 })
