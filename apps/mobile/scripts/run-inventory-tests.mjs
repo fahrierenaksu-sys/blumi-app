@@ -11,6 +11,8 @@ const coverageArguments = nodeMajorVersion >= 22
   ? ["--experimental-test-coverage"]
   : []
 const sourceFiles = [
+  "src/features/commerce/coinPackCommerce.test.ts",
+  "src/features/commerce/coinPackWalletModel.test.ts",
   "src/features/inventory/economyApi.ts",
   "src/features/inventory/economyApi.test.ts",
   "src/features/inventory/inventoryModel.ts",
@@ -58,6 +60,8 @@ try {
     [
       ...coverageArguments,
       "--test",
+      join(outputDirectory, "features/commerce/coinPackCommerce.test.js"),
+      join(outputDirectory, "features/commerce/coinPackWalletModel.test.js"),
       join(outputDirectory, "features/inventory/economyApi.test.js"),
       join(outputDirectory, "features/inventory/inventoryModel.test.js"),
       join(outputDirectory, "features/inventory/inventoryScopeModel.test.js"),
@@ -68,6 +72,11 @@ try {
       cwd: workspaceRoot,
       stdio: "inherit"
     }
+  )
+  execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--test", "src/features/inventory/inventoryStore.test.ts"],
+    { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })

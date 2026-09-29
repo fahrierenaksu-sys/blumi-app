@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { createServer as createHttpServer, type Server as HttpServer } from "node:http"
-import type { AddressInfo } from "node:net"
+import { createConnection as createTcpConnection, type AddressInfo } from "node:net"
 import test from "node:test"
 import type { ServerEvent } from "@blumi/contracts"
 import WebSocket from "ws"
@@ -13,6 +13,7 @@ import { createPresenceService } from "../presence/presenceService"
 import { createReactionService } from "../reactions/reactionService"
 import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
+import { createGracefulShutdown } from "../operations/serviceLifecycle"
 import { createRealtimeServer } from "./realtimeServer"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
@@ -100,6 +101,343 @@ test("realtime does not complete the websocket upgrade before ticket authenticat
     assert.equal(socket.readyState, WebSocket.OPEN)
   } finally {
     harness.releaseTicketConsumption()
+    await harness.close()
+  }
+})
+
+test("realtime persists a connection before upgrade and serializes its heartbeat before disconnect", async () => {
+  const harness = await createRealtimeHarness()
+  let signalRegistrationStarted!: () => void
+  let releaseRegistration!: () => void
+  let releaseHeartbeat: () => void = () => {}
+  const registrationStarted = new Promise<void>((resolve) => { signalRegistrationStarted = resolve })
+  const registrationGate = new Promise<void>((resolve) => { releaseRegistration = resolve })
+  const originalRegister = harness.presenceService.registerConnection.bind(harness.presenceService)
+  harness.presenceService.registerConnection = async (connectionId, userId) => {
+    signalRegistrationStarted()
+    await registrationGate
+    await originalRegister(connectionId, userId)
+  }
+
+  try {
+    const session = await harness.createSession("+905551110094", "Lease Ordering")
+    const ticket = await harness.issueTicket(session.sessionToken)
+    const socket = new WebSocket(`${harness.url}/ws`, [`ticket-${ticket}`])
+    const opened = waitForOpen(socket)
+    await registrationStarted
+    assert.equal(socket.readyState, WebSocket.CONNECTING)
+    releaseRegistration()
+    await opened
+
+    const connection = harness.connectionManager.listConnections()[0]
+    assert.ok(connection)
+    assert.match(connection.connectionId, /^connection_[0-9a-f-]{36}$/i)
+    const order: string[] = []
+    let signalHeartbeatStarted!: () => void
+    let signalDisconnectStarted!: () => void
+    const heartbeatStarted = new Promise<void>((resolve) => { signalHeartbeatStarted = resolve })
+    const heartbeatGate = new Promise<void>((resolve) => { releaseHeartbeat = resolve })
+    const disconnectStarted = new Promise<void>((resolve) => { signalDisconnectStarted = resolve })
+    const originalHeartbeat = harness.presenceService.heartbeatConnection.bind(harness.presenceService)
+    const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+    harness.presenceService.heartbeatConnection = async (connectionId, userId) => {
+      order.push(`heartbeat:start:${connectionId}`)
+      signalHeartbeatStarted()
+      await heartbeatGate
+      const renewed = await originalHeartbeat(connectionId, userId)
+      order.push(`heartbeat:end:${connectionId}`)
+      return renewed
+    }
+    harness.presenceService.disconnectConnection = async (connectionId, userId) => {
+      order.push(`disconnect:${connectionId}`)
+      signalDisconnectStarted()
+      return originalDisconnect(connectionId, userId)
+    }
+
+    connection.socket.emit("pong")
+    await heartbeatStarted
+    const closed = waitForClose(socket)
+    socket.close()
+    await closed
+    assert.deepEqual(order, [`heartbeat:start:${connection.connectionId}`])
+
+    releaseHeartbeat()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        disconnectStarted,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("Disconnect did not follow the queued heartbeat")), 1000)
+        })
+      ])
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+    assert.deepEqual(order, [
+      `heartbeat:start:${connection.connectionId}`,
+      `heartbeat:end:${connection.connectionId}`,
+      `disconnect:${connection.connectionId}`
+    ])
+  } finally {
+    releaseRegistration()
+    releaseHeartbeat()
+    await harness.close()
+  }
+})
+
+test("realtime waits for an in-flight room join before disconnect cleanup", async () => {
+  const harness = await createRealtimeHarness()
+  const joinStarted = deferred<void>()
+  const releaseJoin = deferred<void>()
+  const joinFinished = deferred<void>()
+  const disconnectFinished = deferred<void>()
+  const order: string[] = []
+  const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  harness.presenceService.joinRoom = async (...args) => {
+    order.push("join:start")
+    joinStarted.resolve()
+    await releaseJoin.promise
+    try {
+      const result = await originalJoin(...args)
+      order.push("join:committed")
+      return result
+    } finally {
+      joinFinished.resolve()
+    }
+  }
+  harness.presenceService.disconnectConnection = async (...args) => {
+    order.push("disconnect:start")
+    try {
+      return await originalDisconnect(...args)
+    } finally {
+      order.push("disconnect:finished")
+      disconnectFinished.resolve()
+    }
+  }
+
+  try {
+    const session = await harness.createSession("+905551110077", "Join Disconnect Race")
+    const socket = await harness.connect(session.sessionToken)
+    socket.send(JSON.stringify({
+      type: "room.join",
+      payload: { roomId: "public-lobby" }
+    }))
+    await joinStarted.promise
+
+    const closed = waitForClose(socket)
+    socket.close()
+    await closed
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.deepEqual(order, ["join:start"], "disconnect waits while the room join is unresolved")
+
+    releaseJoin.resolve()
+    await Promise.all([joinFinished.promise, disconnectFinished.promise])
+    assert.deepEqual(order, ["join:start", "join:committed", "disconnect:start", "disconnect:finished"])
+    assert.equal(await harness.presenceService.findUserPresence("public-lobby", session.userId), null)
+  } finally {
+    releaseJoin.resolve()
+    await harness.close()
+  }
+})
+
+test("a delayed join from a closed socket does not remove presence rejoined on another connection", async () => {
+  const harness = await createRealtimeHarness()
+  const delayedJoinStarted = deferred<void>()
+  const releaseDelayedJoin = deferred<void>()
+  const disconnectFinished = deferred<void>()
+  let joinCalls = 0
+  const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  harness.presenceService.joinRoom = async (...args) => {
+    joinCalls += 1
+    if (joinCalls === 1) {
+      delayedJoinStarted.resolve()
+      await releaseDelayedJoin.promise
+    }
+    return originalJoin(...args)
+  }
+  harness.presenceService.disconnectConnection = async (...args) => {
+    try {
+      return await originalDisconnect(...args)
+    } finally {
+      disconnectFinished.resolve()
+    }
+  }
+
+  try {
+    const session = await harness.createSession("+905551110078", "Room Rejoin")
+    const closingSocket = await harness.connect(session.sessionToken)
+
+    closingSocket.send(JSON.stringify({
+      type: "room.join",
+      payload: { roomId: "public-lobby" }
+    }))
+    await delayedJoinStarted.promise
+
+    const closed = waitForClose(closingSocket)
+    closingSocket.close()
+    await closed
+
+    // A replacement connection may establish presence while the old socket's
+    // room.join is still awaiting its presence write.
+    const rejoinedSocket = await harness.connect(session.sessionToken)
+    const rejoinedEvents = collectEvents(rejoinedSocket)
+    rejoinedSocket.send(JSON.stringify({
+      type: "room.join",
+      payload: { roomId: "public-lobby" }
+    }))
+    await rejoinedEvents.waitFor("room.joined")
+
+    releaseDelayedJoin.resolve()
+    await disconnectFinished.promise
+    const presence = await harness.presenceService.findUserPresence("public-lobby", session.userId)
+    assert.ok(presence, "the closed connection's cleanup must preserve the other live connection's room presence")
+    assert.equal(rejoinedSocket.readyState, WebSocket.OPEN)
+  } finally {
+    releaseDelayedJoin.resolve()
+    await harness.close()
+  }
+})
+
+test("realtime close waits for websocket lease cleanup before data close and clears timers", { timeout: 5000 }, async () => {
+  const intervalHandles: ReturnType<typeof setInterval>[] = []
+  const harness = await createRealtimeHarness({ captureIntervals: intervalHandles })
+  const releaseDisconnect = deferred<void>()
+  const disconnectStarted = deferred<void>()
+  const order: string[] = []
+  const session = await harness.createSession("+905551110076", "Realtime shutdown drain")
+  const socket = await harness.connect(session.sessionToken)
+  const events = collectEvents(socket)
+  socket.send(JSON.stringify({ type: "room.join", payload: { roomId: "public-lobby" } }))
+  await events.waitFor("room.joined")
+
+  const connection = harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)
+  assert.ok(connection)
+  assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), true)
+
+  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  harness.presenceService.disconnectConnection = async (connectionId, userId) => {
+    order.push("lease:disconnect-start")
+    disconnectStarted.resolve()
+    await releaseDisconnect.promise
+    const rooms = await originalDisconnect(connectionId, userId)
+    order.push("lease:disconnect-finished")
+    return rooms
+  }
+
+  const originalClearInterval = globalThis.clearInterval
+  const clearedIntervals = new Set<unknown>()
+  globalThis.clearInterval = ((interval: unknown) => {
+    clearedIntervals.add(interval)
+    originalClearInterval(interval as Parameters<typeof clearInterval>[0])
+  }) as typeof globalThis.clearInterval
+
+  try {
+    let dataClosed = false
+    const shutdown = createGracefulShutdown({
+      markNotReady() {},
+      drain: [() => harness.closeRealtime()],
+      closeData: async () => {
+        order.push("data:close")
+        dataClosed = true
+      }
+    })
+    const stopping = shutdown()
+
+    assert.equal(await waitForClose(socket), 1005, "server close completes without an abnormal 1006 termination")
+    await disconnectStarted.promise
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(dataClosed, false, "database closure must wait for realtime disconnect cleanup")
+    assert.deepEqual(order, ["lease:disconnect-start"])
+    assert.equal(intervalHandles.length, 2, "both realtime maintenance timers were installed")
+    for (const interval of intervalHandles) {
+      assert.ok(clearedIntervals.has(interval), "close must clear each realtime maintenance timer")
+    }
+
+    releaseDisconnect.resolve()
+    await stopping
+    assert.deepEqual(order, ["lease:disconnect-start", "lease:disconnect-finished", "data:close"])
+    assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false)
+    assert.equal(await harness.presenceService.findUserPresence("public-lobby", session.userId), null)
+    assert.equal(harness.connectionManager.listConnections().some((entry) => entry.connectionId === connection.connectionId), false)
+  } finally {
+    releaseDisconnect.resolve()
+    globalThis.clearInterval = originalClearInterval
+    await harness.close()
+  }
+})
+
+test("realtime close rejects an upgrade whose connection lease registration is still pending", { timeout: 5000 }, async () => {
+  const harness = await createRealtimeHarness()
+  const registrationStarted = deferred<{ connectionId: string; userId: string }>()
+  const releaseRegistration = deferred<void>()
+  const originalRegister = harness.presenceService.registerConnection.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  let disconnectCalls = 0
+  harness.presenceService.registerConnection = async (connectionId, userId) => {
+    registrationStarted.resolve({ connectionId, userId })
+    await releaseRegistration.promise
+    await originalRegister(connectionId, userId)
+  }
+  harness.presenceService.disconnectConnection = async (...args) => {
+    disconnectCalls += 1
+    return originalDisconnect(...args)
+  }
+
+  try {
+    const session = await harness.createSession("+905551110075", "Pending realtime admission")
+    const ticket = await harness.issueTicket(session.sessionToken)
+    const socket = new WebSocket(`${harness.url}/ws`, [`ticket-${ticket}`])
+    const rejected = expectUpgradeRejected(socket, 503)
+    const registration = await registrationStarted.promise
+
+    let closeFinished = false
+    const stopping = harness.closeRealtime().then(() => { closeFinished = true })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(closeFinished, false, "close must wait for the in-flight upgrade and lease rollback")
+
+    releaseRegistration.resolve()
+    await rejected
+    await stopping
+    assert.equal(disconnectCalls, 1)
+    assert.equal(await harness.presenceService.heartbeatConnection(registration.connectionId, registration.userId), false)
+    assert.equal(harness.connectionManager.listConnections().some((entry) => entry.connectionId === registration.connectionId), false)
+  } finally {
+    releaseRegistration.resolve()
+    await harness.close()
+  }
+})
+
+test("realtime close timeout terminates an unresponsive websocket and drains its lease", { timeout: 5000 }, async () => {
+  const harness = await createRealtimeHarness()
+  const session = await harness.createSession("+905551110074", "Unresponsive realtime peer")
+  const ticket = await harness.issueTicket(session.sessionToken)
+  const socket = await connectUnresponsiveWebSocket(harness.url, ticket)
+  const connection = harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)
+  assert.ok(connection)
+
+  const originalSetTimeout = globalThis.setTimeout
+  let acceleratedCloseTimeouts = 0
+  globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
+    const adjustedArgs = [...args] as Parameters<typeof setTimeout>
+    if (adjustedArgs[1] === 30_000) {
+      adjustedArgs[1] = 15
+      acceleratedCloseTimeouts += 1
+    }
+    return originalSetTimeout(...adjustedArgs)
+  }) as typeof globalThis.setTimeout
+
+  try {
+    const startedAt = Date.now()
+    await harness.closeRealtime()
+    assert.equal(acceleratedCloseTimeouts, 1, "the unresponsive peer must use ws's bounded close handshake timeout")
+    assert.ok(Date.now() - startedAt < 1000, "the test-only shortened timeout should bound this regression")
+    assert.equal(socket.destroyed, true, "a peer that ignores the close frame is forcibly torn down")
+    assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false)
+  } finally {
+    globalThis.setTimeout = originalSetTimeout
+    socket.destroy()
     await harness.close()
   }
 })
@@ -385,6 +723,7 @@ async function createRealtimeHarness(options: {
   rejectTicketConsumption?: boolean
   rejectRealtimeAuthorization?: boolean
   shareHttpServer?: boolean
+  captureIntervals?: ReturnType<typeof setInterval>[]
 } = {}) {
   const authService = createAuthService({ codeFactory: () => "123456" })
   if (options.rejectRealtimeAuthorization) {
@@ -446,7 +785,7 @@ async function createRealtimeHarness(options: {
       })
     })
   }
-  const realtimeServer = createRealtimeServer({
+  const createRealtimeServerForHarness = () => createRealtimeServer({
     authService,
     chatService,
     safetyService,
@@ -457,12 +796,35 @@ async function createRealtimeHarness(options: {
     realtimeTicketService,
     httpServer: sharedHttpServer
   })
+  let realtimeServer: ReturnType<typeof createRealtimeServer>
+  if (options.captureIntervals) {
+    const originalSetInterval = globalThis.setInterval
+    globalThis.setInterval = ((...args: Parameters<typeof setInterval>) => {
+      const interval = originalSetInterval(...args)
+      options.captureIntervals?.push(interval)
+      return interval
+    }) as typeof globalThis.setInterval
+    try {
+      realtimeServer = createRealtimeServerForHarness()
+    } finally {
+      globalThis.setInterval = originalSetInterval
+    }
+  } else {
+    realtimeServer = createRealtimeServerForHarness()
+  }
   await realtimeServer.listen({ port: 0, host: "127.0.0.1" })
   const address = realtimeServer.address() as AddressInfo
+  let closePromise: Promise<void> | undefined
+  const closeRealtime = () => {
+    closePromise ??= realtimeServer.close()
+    return closePromise
+  }
 
   return {
     authService,
+    presenceService,
     connectionManager: realtimeServer.connectionManager,
+    closeRealtime,
     url: `ws://127.0.0.1:${address.port}`,
     httpUrl: `http://127.0.0.1:${address.port}`,
     ticketConsumptionStarted,
@@ -497,7 +859,7 @@ async function createRealtimeHarness(options: {
       }
     },
     async close() {
-      await realtimeServer.close()
+      await closeRealtime()
       if (sharedHttpServer?.listening) {
         await new Promise<void>((resolve, reject) => {
           sharedHttpServer.close((error) => {
@@ -592,6 +954,56 @@ async function connectSocket(baseUrl: string, ticket: string): Promise<WebSocket
     socket.once("error", reject)
   })
   return socket
+}
+
+async function connectUnresponsiveWebSocket(baseUrl: string, ticket: string) {
+  const address = new URL(baseUrl)
+  const socket = createTcpConnection({ host: address.hostname, port: Number(address.port) })
+  await new Promise<void>((resolve, reject) => {
+    let response = Buffer.alloc(0)
+    const cleanup = () => {
+      socket.off("data", onData)
+      socket.off("error", onError)
+    }
+    const onError = (error: Error) => {
+      cleanup()
+      reject(error)
+    }
+    const onData = (chunk: Buffer) => {
+      response = Buffer.concat([response, chunk])
+      const headerEnd = response.indexOf("\r\n\r\n")
+      if (headerEnd < 0) return
+      const headers = response.subarray(0, headerEnd).toString("latin1")
+      cleanup()
+      try {
+        assert.match(headers, /^HTTP\/1\.1 101 /)
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    }
+    socket.on("data", onData)
+    socket.once("error", onError)
+    socket.once("connect", () => {
+      socket.write(
+        `GET /ws HTTP/1.1\r\n` +
+        `Host: ${address.host}\r\n` +
+        "Upgrade: websocket\r\n" +
+        "Connection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+        "Sec-WebSocket-Version: 13\r\n" +
+        `Sec-WebSocket-Protocol: ticket-${ticket}\r\n\r\n`
+      )
+    })
+  })
+  socket.on("error", () => {})
+  return socket
+}
+
+function deferred<T = void>(): { promise: Promise<T>; resolve: (value?: T) => void } {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((complete) => { resolve = complete })
+  return { promise, resolve: (value) => resolve(value as T) }
 }
 
 async function waitForOpen(socket: WebSocket): Promise<void> {

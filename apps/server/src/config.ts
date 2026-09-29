@@ -1,4 +1,5 @@
 import { Pool } from "pg"
+import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
 import { createSchemaReadinessCheck } from "./operations/schemaReadiness"
@@ -576,7 +577,7 @@ export function createConfiguredServerServices(
       realtimeTicketStore: createPostgresRealtimeTicketStore(pool),
       realtimeFanout: createPostgresRealtimeFanout(pool, {
         reportError: (error) => {
-          console.error("Realtime fanout subscription failed", error)
+          console.error("Realtime fanout subscription failed", safeOperationalErrorKind(error))
         }
       }),
       referralService,

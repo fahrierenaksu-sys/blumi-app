@@ -24,6 +24,7 @@ export interface GlobalRealtimeLifecycleDependencies {
   setDemoMode: (enabled: boolean) => void
   resetInactiveSessionState: () => void
   refreshProductionThreads: () => Promise<void>
+  resynchronizeActiveConversation?: () => Promise<void>
   hydrateBlockedUsersFromServer: (
     ownerUserId: string,
     sessionToken: string
@@ -125,11 +126,32 @@ export function createGlobalRealtimeLifecycle(
       actor.session.sessionToken
     )
 
+    let hasConnected = false
+    let connected = false
+    let connectionGeneration = 0
     const unsubscribeConnected = dependencies.subscribeToStatus((status) => {
-      if (!active) return
-      if (status === "connected") {
-        dependencies.sendGlobal({ type: "chat.list_threads", payload: {} })
+      if (!active || !dependencies.isCurrentSession(actor)) return
+      if (status !== "connected") {
+        if (connected) connectionGeneration += 1
+        connected = false
+        return
       }
+      if (connected) return
+      connected = true
+      const generation = ++connectionGeneration
+      const reconnect = hasConnected
+      hasConnected = true
+      dependencies.sendGlobal({ type: "chat.list_threads", payload: {} })
+      if (!reconnect) return
+      void dependencies.hydrateBlockedUsersFromServer(actor.profile.userId, actor.session.sessionToken)
+        .catch(() => {
+          if (!active || generation !== connectionGeneration || !dependencies.isCurrentSession(actor)) return
+          dependencies.showWarningToast({ title: "Safety sync delayed", body: globalRefreshFailureCopy.safety })
+        })
+      void dependencies.resynchronizeActiveConversation?.().catch(() => {
+        // The coordinator already reports a current history failure. Older
+        // reconnect failures are intentionally silent after a newer snapshot.
+      })
     })
 
     const unsubscribeInvalidSession = dependencies.subscribeToStatus((_status, meta) => {

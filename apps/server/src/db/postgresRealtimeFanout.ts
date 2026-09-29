@@ -3,13 +3,17 @@ import { randomUUID } from "node:crypto"
 import {
   MAX_REALTIME_FANOUT_BYTES,
   type RealtimeFanout,
+  type RealtimeFanoutGapReason,
   validateRealtimeFanoutMessage
 } from "../realtime/realtimeFanout"
 
 export const REALTIME_FANOUT_CHANNEL = "blumi_realtime"
+const MAX_REFERENCE_PAYLOAD_BYTES = 2_000_000
+// jsonb::text may add separators absent from the publisher's compact JSON.
+const MAX_REFERENCE_QUERY_BYTES = 4_000_000
 
 interface NotificationClient {
-  query(text: string): Promise<unknown>
+  query(text: string, values?: readonly unknown[]): Promise<unknown>
   on(event: "notification", listener: (notification: {
     channel: string
     payload?: string
@@ -33,6 +37,11 @@ interface FanoutPool {
 export interface PostgresRealtimeFanoutOptions {
   reportError?: (error: unknown) => void
   reconnectDelayMs?: number
+  maxPendingNotifications?: number
+  maxPendingBytes?: number
+  watchdogMs?: number
+  setupTimeoutMs?: number
+  onMetrics?: (counters: { pending: number; pendingBytes: number; gaps: number }) => void
 }
 
 export function createPostgresRealtimeFanout(
@@ -61,31 +70,100 @@ export function createPostgresRealtimeFanout(
         payload
       ])
     },
-    async subscribe(handler) {
+    async subscribe(handler, onGap) {
       const reconnectDelayMs = Math.max(0, options.reconnectDelayMs ?? 1_000)
       let activeClient: NotificationClient | undefined
       let activeCleanup: (() => void) | undefined
       let reconnectTimer: ReturnType<typeof setTimeout> | undefined
       let connecting: Promise<void> | undefined
+      let connectGeneration = 0
       let stopped = false
-      let incoming = Promise.resolve()
+      let gaps = 0
       let purging: Promise<void> | undefined
+      const reportError = (error: unknown): void => {
+        try { options.reportError?.(error) }
+        catch { /* Reporting must never prevent gap recovery or shutdown. */ }
+      }
       const cleanupTimer = setInterval(() => {
         if (purging) return
-        purging = purgeExpiredRealtimePayloads(pool).catch((error) => options.reportError?.(error))
+        purging = purgeExpiredRealtimePayloads(pool).catch(reportError)
           .finally(() => { purging = undefined })
       }, 60_000)
       cleanupTimer.unref()
 
-      const establishClient = async (): Promise<void> => {
+      const establishClient = async (generation: number): Promise<void> => {
         const client = await pool.connect()
+        if (stopped || generation !== connectGeneration) { client.release(true); return }
         let detached = false
         let healthy = false
+        const queue: { value: unknown; referenceId: string | null; bytes: number }[] = []
+        let running = false
+        let pending = 0
+        let pendingBytes = 0
+        let watchdog: ReturnType<typeof setTimeout> | undefined
+        const metrics = (): void => {
+          try { options.onMetrics?.({ pending, pendingBytes, gaps }) }
+          catch { /* Observability must not interrupt gap recovery or delivery. */ }
+        }
+        const fail = (reason: RealtimeFanoutGapReason): void => {
+          if (detached || stopped) return
+          if (activeClient === client) { activeClient = undefined; activeCleanup = undefined }
+          detach(true)
+          gaps += 1
+          metrics()
+          reportError(new Error(`Realtime fanout gap: ${reason}`))
+          try { onGap?.(reason) }
+          catch { reportError(new Error("Realtime gap callback failed.")) }
+          finally { scheduleReconnect() }
+        }
+        const drain = async (): Promise<void> => {
+          if (running) return
+          running = true
+          try {
+            while (!detached && !stopped && queue.length) {
+              const item = queue.shift()!
+              watchdog = setTimeout(() => fail("deadline"), Math.max(1, options.watchdogMs ?? 6_000))
+              watchdog.unref()
+              let value = item.value
+              if (item.referenceId) {
+                // Bound data returned by other publishers before pg decodes it.
+                const result = await client.query(
+                  "SELECT payload FROM blumi_realtime_payload_refs WHERE payload_id = $1 AND expires_at > NOW() AND octet_length(payload::text) <= $2",
+                  [item.referenceId, MAX_REFERENCE_QUERY_BYTES]
+                ) as { rows?: { payload?: unknown }[] }
+                if (detached || stopped) return
+                value = result.rows?.[0]?.payload
+                if (!validateRealtimeFanoutMessage(value)) { fail("missing_payload"); return }
+                const decodedBytes = Buffer.byteLength(JSON.stringify(value), "utf8")
+                // The reference envelope remains live in the active queue item.
+                if (decodedBytes > MAX_REFERENCE_PAYLOAD_BYTES ||
+                  pendingBytes + decodedBytes > (options.maxPendingBytes ?? 4 * 1024 * 1024)) {
+                  fail("overflow")
+                  return
+                }
+                item.bytes += decodedBytes
+                pendingBytes += decodedBytes
+                metrics()
+              }
+              if (detached || stopped) return
+              if (validateRealtimeFanoutMessage(value)) await handler(value)
+              if (detached || stopped) return
+              clearTimeout(watchdog)
+              watchdog = undefined
+              pending -= 1
+              pendingBytes -= item.bytes
+              metrics()
+            }
+          } catch (error) {
+            fail("error")
+            reportError(error)
+          } finally { running = false }
+        }
         const listener = (notification: {
           channel: string
           payload?: string
         }) => {
-          if (
+          if (detached || stopped ||
             notification.channel !== REALTIME_FANOUT_CHANNEL ||
             !notification.payload
           ) {
@@ -102,18 +180,25 @@ export function createPostgresRealtimeFanout(
             /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(reference.payloadRef)
               ? reference.payloadRef : null
           if (!referenceId && !validateRealtimeFanoutMessage(value)) return
-          incoming = incoming.then(async () => {
-            if (stopped) return
-            if (referenceId) {
-              const result = await pool.query("SELECT payload FROM blumi_realtime_payload_refs WHERE payload_id = $1 AND expires_at > NOW()", [referenceId]) as { rows?: { payload?: unknown }[] }
-              value = result.rows?.[0]?.payload
-            }
-            if (!stopped && validateRealtimeFanoutMessage(value)) await handler(value)
-          }).catch((error) => { options.reportError?.(error) })
+          const bytes = Buffer.byteLength(notification.payload, "utf8")
+          if (pending >= (options.maxPendingNotifications ?? 256) ||
+            pendingBytes + bytes > (options.maxPendingBytes ?? 4 * 1024 * 1024)) {
+            fail("overflow")
+            return
+          }
+          pending += 1
+          pendingBytes += bytes
+          queue.push({ value, referenceId, bytes })
+          metrics()
+          void drain()
         }
         const detach = (releaseArgument?: Error | boolean): void => {
           if (detached) return
           detached = true
+          clearTimeout(watchdog)
+          queue.length = 0
+          pending = 0
+          pendingBytes = 0
           if (healthy) { healthy = false; healthySubscriptions -= 1 }
           client.off("notification", listener)
           client.off("error", onError)
@@ -122,35 +207,32 @@ export function createPostgresRealtimeFanout(
         }
         const onError = (error: unknown): void => {
           if (activeClient !== client) return
-          activeClient = undefined
-          activeCleanup = undefined
-          detach(error instanceof Error ? error : new Error("Notification client failed."))
-          options.reportError?.(error)
-          scheduleReconnect()
+          fail("error")
+          reportError(error)
         }
         const onEnd = (): void => {
           if (activeClient !== client) return
-          activeClient = undefined
-          activeCleanup = undefined
-          detach(true)
-          scheduleReconnect()
+          fail("disconnect")
         }
 
         client.on("notification", listener)
         client.on("error", onError)
         client.on("end", onEnd)
+        activeClient = client
+        activeCleanup = () => detach(true)
         try {
+          await client.query("SET statement_timeout = '5s'")
+          if (stopped || detached || generation !== connectGeneration) return
           await client.query(`LISTEN ${REALTIME_FANOUT_CHANNEL}`)
-          if (stopped) {
-            detach()
+          if (stopped || detached || generation !== connectGeneration) {
+            detach(true)
             return
           }
-          activeClient = client
           healthy = true
           healthySubscriptions += 1
-          activeCleanup = detach
         } catch (error) {
-          detach(error instanceof Error ? error : new Error("LISTEN failed."))
+          if (activeClient === client) { activeClient = undefined; activeCleanup = undefined }
+          detach(true)
           throw error
         }
       }
@@ -159,12 +241,29 @@ export function createPostgresRealtimeFanout(
         if (stopped || activeClient) return
         if (connecting) return connecting
 
-        const attempt = establishClient()
+        const generation = ++connectGeneration
+        let setupTimer: ReturnType<typeof setTimeout> | undefined
+        const setupDeadline = new Promise<void>((_resolve, reject) => {
+          setupTimer = setTimeout(() => reject(new Error("Realtime fanout setup timed out.")),
+            Math.max(1, options.setupTimeoutMs ?? 6_000))
+        })
+        const attempt = Promise.race([establishClient(generation), setupDeadline])
         connecting = attempt
         try {
           await attempt
+        } catch (error) {
+          if (generation === connectGeneration) {
+            connectGeneration += 1
+            const cleanup = activeCleanup
+            activeClient = undefined
+            activeCleanup = undefined
+            cleanup?.()
+          }
+          throw error
         } finally {
+          clearTimeout(setupTimer)
           if (connecting === attempt) connecting = undefined
+          if (!stopped && !activeClient) scheduleReconnect()
         }
       }
 
@@ -173,38 +272,33 @@ export function createPostgresRealtimeFanout(
         reconnectTimer = setTimeout(() => {
           reconnectTimer = undefined
           void connect().catch((error) => {
-            options.reportError?.(error)
+            reportError(error)
             scheduleReconnect()
           })
         }, reconnectDelayMs)
       }
 
-      try { await connect() } catch (error) { clearInterval(cleanupTimer); throw error }
+      try { await connect() } catch (error) {
+        stopped = true
+        clearInterval(cleanupTimer)
+        clearTimeout(reconnectTimer)
+        throw error
+      }
 
       return async () => {
         stopped = true
+        connectGeneration += 1
         clearInterval(cleanupTimer)
-        await incoming
-        await purging
         if (reconnectTimer) {
           clearTimeout(reconnectTimer)
           reconnectTimer = undefined
         }
-        const pendingConnection = connecting
-        if (pendingConnection) await pendingConnection.catch(() => undefined)
-        const client = activeClient
         const cleanup = activeCleanup
         activeClient = undefined
         activeCleanup = undefined
-        if (client) {
-          try {
-            await client.query(`UNLISTEN ${REALTIME_FANOUT_CHANNEL}`)
-          } catch (error) {
-            options.reportError?.(error)
-          } finally {
-            cleanup?.()
-          }
-        }
+        // Destroy rather than queue UNLISTEN behind a stuck lookup. No client
+        // with session statement_timeout is returned to the shared pool.
+        cleanup?.()
       }
     }
   }

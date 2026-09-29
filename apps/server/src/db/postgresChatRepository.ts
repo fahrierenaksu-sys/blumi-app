@@ -71,10 +71,17 @@ export function createPostgresChatRepository(
            LEFT JOIN blumi_accounts AS account ON account.user_id = participant.user_id
           WHERE participant.thread_id = ANY($1::text[])
           ORDER BY participant.thread_id, participant.participant_order`, [rows.map((row) => String(row.thread_id))])
+      const participantsByThread = new Map<string, ChatThread["participants"][number][]>()
+      for (const participant of participantRows.rows) {
+        const threadId = String(participant.thread_id)
+        const grouped = participantsByThread.get(threadId) ?? []
+        grouped.push(mapParticipant(participant))
+        participantsByThread.set(threadId, grouped)
+      }
       const threads = await Promise.all(rows.map(async (row) => {
-        const participants = participantRows.rows.filter((participant) => participant.thread_id === row.thread_id).map(mapParticipant)
+        const participants = participantsByThread.get(String(row.thread_id)) ?? []
         if (participants.length !== 2) throw new Error("Chat thread is missing participants.")
-        return { ...await mapThread(pool, row, [participants[0], participants[1]]),
+        return { ...await mapThread(pool, row, [participants[0]!, participants[1]!]),
           unreadCount: Number(row.unread_count ?? 0),
           ...(row.viewer_last_read_at ? { lastReadAt: new Date(row.viewer_last_read_at).toISOString() } : {}) }
       }))
@@ -104,14 +111,21 @@ export function createPostgresChatRepository(
       return result.rows[0] ? mapThread(pool, result.rows[0]) : null
     },
 
+    async findExistingThreadIds(threadIds) {
+      if (threadIds.length === 0) return new Set<string>()
+      const result = await pool.query(
+        `SELECT thread_id FROM blumi_chat_threads WHERE thread_id = ANY($1::text[])`,
+        [threadIds]
+      )
+      return new Set(result.rows.map((row) => String(row.thread_id)))
+    },
+
     async saveThread(thread) {
       await pool.query(
         `INSERT INTO blumi_chat_threads (
             thread_id, mini_room_id, created_at, last_message_id
           ) VALUES ($1, $2, $3, $4)
-          ON CONFLICT (thread_id) DO UPDATE SET
-            mini_room_id = EXCLUDED.mini_room_id,
-            last_message_id = EXCLUDED.last_message_id`,
+          ON CONFLICT (thread_id) DO NOTHING`,
         [
           thread.threadId,
           thread.miniRoomId,
@@ -152,6 +166,18 @@ export function createPostgresChatRepository(
             [threadId]
           )
       return result.rows.map(mapMessage)
+    },
+
+    async findMessageByClientMessageId(threadId, senderUserId, clientMessageId) {
+      const result = await pool.query(
+        `SELECT message_id, thread_id, sender_user_id, body, sent_at,
+                delivered_at, read_at, edited_at
+           FROM blumi_chat_messages
+          WHERE thread_id = $1 AND sender_user_id = $2 AND client_message_id = $3
+          LIMIT 1`,
+        [threadId, senderUserId, clientMessageId]
+      )
+      return result.rows[0] ? mapMessage(result.rows[0]) : null
     },
 
     async createMessage(message, clientMessageId) {
@@ -197,24 +223,31 @@ export function createPostgresChatRepository(
            FROM blumi_chat_messages
           WHERE thread_id = $1 AND sender_user_id = $2 AND client_message_id = $3
          ), preview AS (
-           UPDATE blumi_chat_threads AS thread
-              SET last_message_id = saved.message_id, last_message_sent_at = saved.sent_at
+            UPDATE blumi_chat_threads AS thread
+               SET last_message_id = saved.message_id, last_message_sent_at = saved.sent_at
              FROM saved
-            WHERE thread.thread_id = saved.thread_id AND (
+            WHERE thread.thread_id = saved.thread_id AND saved.body = $4 AND (
               thread.last_message_sent_at IS NULL OR
               (thread.last_message_sent_at, thread.last_message_id) <= (saved.sent_at, saved.message_id)
             ) RETURNING thread.thread_id
          ), delivery AS (
            INSERT INTO blumi_chat_delivery_outbox(message_id)
-           SELECT message_id FROM saved ON CONFLICT (message_id) DO NOTHING
+           SELECT message_id FROM saved WHERE body = $4 ON CONFLICT (message_id) DO NOTHING
            RETURNING message_id
          ) SELECT saved.* FROM saved`,
-        [message.threadId, message.senderUserId, clientMessageId]
+        [message.threadId, message.senderUserId, clientMessageId, message.body]
       )
       if (!existing.rows[0]) {
         throw new Error("Chat message retry could not be resolved.")
       }
-      return { message: mapMessage(existing.rows[0]), created: false }
+      const existingMessage = mapMessage(existing.rows[0])
+      return {
+        message: existingMessage,
+        created: false,
+        ...(existingMessage.body !== message.body
+          ? { idempotencyConflict: true as const }
+          : {})
+      }
     },
 
     async updateThreadLastMessage(threadId, message) {

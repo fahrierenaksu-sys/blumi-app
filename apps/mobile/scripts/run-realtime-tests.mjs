@@ -25,6 +25,7 @@ try {
     "src/features/realtime/globalRealtimeEventHandler.test.ts",
     "src/features/realtime/globalRealtimeLifecycle.ts",
     "src/features/realtime/globalRealtimeLifecycle.test.ts",
+    "src/features/realtime/reconnectTransitionTracker.ts",
     "src/features/connections/connectionMatchRuntime.ts",
     "src/features/miniRoom/miniRoomMediaState.ts",
     "src/features/miniRoom/miniRoomMediaState.test.ts",
@@ -36,6 +37,8 @@ try {
     "src/features/miniRoom/roomDebriefCopy.test.ts",
     "src/features/miniRoom/inRoomChatThread.ts",
     "src/features/miniRoom/inRoomChatThread.test.ts",
+    "src/features/miniRoom/useInRoomChat.reconnect.test.ts",
+    "src/features/miniRoom/reconnectRoomSnapshot.test.ts",
     "src/features/lobby/interactionState.ts",
     "src/features/lobby/lobbyState.ts",
     "src/features/lobby/lobbyState.test.ts",
@@ -69,6 +72,8 @@ try {
     join(outputDirectory, "features/miniRoom/miniRoomCopy.test.js"),
     join(outputDirectory, "features/miniRoom/roomDebriefCopy.test.js"),
     join(outputDirectory, "features/miniRoom/inRoomChatThread.test.js"),
+    join(outputDirectory, "features/miniRoom/useInRoomChat.reconnect.test.js"),
+    join(outputDirectory, "features/miniRoom/reconnectRoomSnapshot.test.js"),
     join(outputDirectory, "features/lobby/lobbyState.test.js")
   ], {
     cwd: workspaceRoot,

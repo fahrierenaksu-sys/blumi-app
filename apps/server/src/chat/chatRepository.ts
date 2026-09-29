@@ -15,6 +15,12 @@ export interface ChatMessagePageOptions {
   limit: number
 }
 
+export interface ChatMessageCreateResult {
+  message: ChatMessage
+  created: boolean
+  idempotencyConflict?: true
+}
+
 export interface TestPersona {
   userId: string
   greeting: string
@@ -26,15 +32,21 @@ export interface ChatRepository {
   listThreads(userId: string): Promise<ChatThread[]>
   listThreadsPage(userId: string, options?: ChatThreadPageOptions): Promise<ChatThreadPage>
   findThread(threadId: string): Promise<ChatThread | null>
+  findExistingThreadIds(threadIds: readonly string[]): Promise<Set<string>>
   saveThread(thread: ChatThread): Promise<void>
   listMessages(
     threadId: string,
     options?: ChatMessagePageOptions
   ): Promise<ChatMessage[]>
+  findMessageByClientMessageId(
+    threadId: string,
+    senderUserId: string,
+    clientMessageId: string
+  ): Promise<ChatMessage | null>
   createMessage(
     message: ChatMessage,
     clientMessageId?: string
-  ): Promise<{ message: ChatMessage; created: boolean }>
+  ): Promise<ChatMessageCreateResult>
   updateThreadLastMessage(threadId: string, message: ChatMessage): Promise<void>
   markThreadRead(threadId: string, userId: string, readAt: string): Promise<void>
   claimDeliveries(input: { now: Date; limit: number; leaseMs: number; messageId?: string }): Promise<ChatDeliveryJob[]>
@@ -89,8 +101,11 @@ export function createInMemoryChatRepository(
       const thread = store.threads.get(threadId)
       return thread ? cloneThread(thread) : null
     },
+    async findExistingThreadIds(threadIds) {
+      return new Set(threadIds.filter((id) => store.threads.has(id)))
+    },
     async saveThread(thread) {
-      store.threads.set(thread.threadId, cloneThread(thread))
+      if (!store.threads.has(thread.threadId)) store.threads.set(thread.threadId, cloneThread(thread))
     },
     async listMessages(threadId, options) {
       const sorted = [...(store.messagesByThread.get(threadId) ?? [])]
@@ -107,12 +122,23 @@ export function createInMemoryChatRepository(
       const limited = options ? filtered.slice(-options.limit) : filtered
       return limited.map((message) => ({ ...message }))
     },
+    async findMessageByClientMessageId(threadId, senderUserId, clientMessageId) {
+      const key = messageIdempotencyKey(threadId, senderUserId, clientMessageId)
+      const message = store.messagesByClientMessageId.get(key)
+      return message ? { ...message } : null
+    },
     async createMessage(message, clientMessageId) {
       const key = clientMessageId
         ? messageIdempotencyKey(message.threadId, message.senderUserId, clientMessageId)
         : undefined
       const existing = key ? store.messagesByClientMessageId.get(key) : undefined
-      if (existing) return { message: { ...existing }, created: false }
+      if (existing) {
+        return {
+          message: { ...existing },
+          created: false,
+          ...(existing.body !== message.body ? { idempotencyConflict: true as const } : {})
+        }
+      }
       const thread = store.threads.get(message.threadId)
       if (!thread) throw new Error("Chat thread is missing.")
       const messages = store.messagesByThread.get(message.threadId) ?? []

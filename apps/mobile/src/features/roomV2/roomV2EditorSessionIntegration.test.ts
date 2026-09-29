@@ -55,8 +55,9 @@ test("unsaved navigation offers save discard and stay without bypassing save val
 
   assert.match(editor, /navigation\.addListener\("beforeRemove"/)
   assert.match(editor, /if \(!editorSessionRef\.current\.isDirty\) return/)
-  assert.match(editor, /text: "Stay in editor"/)
-  assert.match(editor, /text: "Discard changes"/)
+  assert.match(editor, /text: copy\.unsavedDialog\.stay/)
+  assert.match(editor, /text: copy\.unsavedDialog\.discard/)
+  assert.match(editor, /text: copy\.save/)
   assert.match(editor, /pendingEditorExitActionRef\.current = event\.data\.action[\s\S]*?handleSave\(\)/)
   assert.match(
     editor,

@@ -13,6 +13,7 @@ import {
 } from "@blumi/contracts"
 
 const ALLOWED_PROFILE_GENDERS = new Set<ProfileGender>(PROFILE_GENDERS)
+const EMPTY_PROFILE_PROMPTS: readonly UserProfilePrompt[] = []
 
 export interface ProfileEditCurrent {
   displayName: string
@@ -82,10 +83,87 @@ export interface ProfileEditAnalysis {
   valid: boolean
 }
 
-export function analyzeProfileEditDraft(input: {
+export interface ProfileInterestAnalysis {
+  interests: string[]
+  error: "too-long" | "too-many" | null
+  valid: boolean
+}
+
+export interface ProfileEditDraftAnalysisInput {
   current: ProfileEditCurrent
   draft: ProfileEditDraft
-}): ProfileEditAnalysis {
+}
+
+export interface ProfileEditDraftMemoDependencies {
+  analyzeInterests: typeof analyzeProfileInterests
+  analyzePrompts: typeof analyzeProfilePrompts
+}
+
+export function analyzeProfileEditDraft(
+  input: ProfileEditDraftAnalysisInput
+): ProfileEditAnalysis {
+  return analyzeProfileEditDraftWithParts(
+    input,
+    analyzeProfileInterests(input.draft.interestsText),
+    analyzeProfilePrompts(
+      input.draft.prompts ?? input.current.prompts ?? EMPTY_PROFILE_PROMPTS
+    )
+  )
+}
+
+export function createMemoizedProfileEditDraftAnalyzer(
+  dependencies: Partial<ProfileEditDraftMemoDependencies> = {}
+): (input: ProfileEditDraftAnalysisInput) => ProfileEditAnalysis {
+  const analyzeInterests = dependencies.analyzeInterests ?? analyzeProfileInterests
+  const analyzePrompts = dependencies.analyzePrompts ?? analyzeProfilePrompts
+  let hasInterests = false
+  let previousInterestsText = ""
+  let cachedInterestAnalysis: ProfileInterestAnalysis = {
+    interests: [],
+    error: null,
+    valid: true
+  }
+  let hasPrompts = false
+  let previousPromptInput: readonly UserProfilePrompt[] | undefined
+  let cachedPromptAnalysis: ReturnType<typeof analyzeProfilePrompts> = {
+    prompts: [],
+    error: null,
+    valid: true
+  }
+
+  return (input) => {
+    if (!hasInterests || input.draft.interestsText !== previousInterestsText) {
+      previousInterestsText = input.draft.interestsText
+      cachedInterestAnalysis = analyzeInterests(input.draft.interestsText)
+      hasInterests = true
+    }
+
+    const promptInput = input.draft.prompts ?? input.current.prompts
+    if (!hasPrompts || promptInput !== previousPromptInput) {
+      previousPromptInput = promptInput
+      cachedPromptAnalysis = analyzePrompts(promptInput ?? EMPTY_PROFILE_PROMPTS)
+      hasPrompts = true
+    }
+
+    return analyzeProfileEditDraftWithParts(
+      input,
+      {
+        ...cachedInterestAnalysis,
+        interests: [...cachedInterestAnalysis.interests]
+      },
+      {
+        ...cachedPromptAnalysis,
+        prompts: cachedPromptAnalysis.prompts.map((prompt) => ({ ...prompt }))
+      }
+    )
+  }
+}
+
+function analyzeProfileEditDraftWithParts(
+  input: ProfileEditDraftAnalysisInput,
+  interestAnalysis: ProfileInterestAnalysis,
+  promptAnalysis: ReturnType<typeof analyzeProfilePrompts>
+): ProfileEditAnalysis {
   const displayName = input.draft.displayName.trim()
   const normalizedAgeText = input.draft.ageText.trim()
   const age = /^\d{1,2}$/.test(normalizedAgeText)
@@ -93,7 +171,7 @@ export function analyzeProfileEditDraft(input: {
     : Number.NaN
   const bio = input.draft.bio.trim()
   const gender = input.draft.gender.trim()
-  const interests = parseProfileInterests(input.draft.interestsText)
+  const interests = interestAnalysis.interests
   const nameValid = displayName.length >= 2 && displayName.length <= 30
   const ageValid = Number.isInteger(age) && age >= 18 && age <= 99
   const genderValid = ALLOWED_PROFILE_GENDERS.has(gender as ProfileGender)
@@ -124,11 +202,8 @@ export function analyzeProfileEditDraft(input: {
     vibes: [...currentDiscoveryPreferences.vibes],
     radiusKm
   }
-  const interestError = getProfileInterestError(interests)
-  const interestsValid = interestError === null
-  const promptAnalysis = analyzeProfilePrompts(
-    input.draft.prompts ?? input.current.prompts ?? []
-  )
+  const interestError = interestAnalysis.error
+  const interestsValid = interestAnalysis.valid
   const includesPrompts =
     input.draft.prompts !== undefined || input.current.prompts !== undefined
   const update: UpdateSessionProfileInput = {
@@ -213,6 +288,12 @@ export function parseProfileInterests(value: string): string[] {
         .filter((item) => item.length > 0)
     )
   ]
+}
+
+export function analyzeProfileInterests(value: string): ProfileInterestAnalysis {
+  const interests = parseProfileInterests(value)
+  const error = getProfileInterestError(interests)
+  return { interests, error, valid: error === null }
 }
 
 function getProfileInterestError(

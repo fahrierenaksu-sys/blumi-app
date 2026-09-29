@@ -31,6 +31,7 @@ import type { SessionActor } from "../features/session/sessionModel"
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
   sessionActor: SessionActor
   onRetryThreads: () => Promise<void>
+  onWarmThread: (threadId: string) => Promise<void>
 }
 
 const CONVERSATION_ROW_HEIGHT = 80
@@ -58,6 +59,7 @@ function formatTimeAgo(
 /* ── Animated conversation card ─────────────────────────────── */
 
 interface ConversationCardProps {
+  threadId: string
   copy: InboxCopy
   partnerName: string
   partnerUserId: string
@@ -67,14 +69,19 @@ interface ConversationCardProps {
   hasUnread: boolean
   reduceMotion: boolean
   unreadPulseAnim: Animated.Value
-  onPress: () => void
+  onPress: (threadId: string) => void
+  onWarm: (threadId: string) => void
 }
 
 const ConversationCard = memo(function ConversationCard(props: ConversationCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current
+  const { threadId, onPress: pressThread, onWarm: warmThread, reduceMotion } = props
+  const onPress = useCallback(() => pressThread(threadId), [pressThread, threadId])
+  const onWarm = useCallback(() => warmThread(threadId), [warmThread, threadId])
 
   const handlePressIn = useCallback(() => {
-    if (props.reduceMotion) {
+    onWarm()
+    if (reduceMotion) {
       scaleAnim.stopAnimation()
       scaleAnim.setValue(1)
       return
@@ -85,7 +92,7 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
       speed: 50,
       bounciness: 4
     }).start()
-  }, [props.reduceMotion, scaleAnim])
+  }, [onWarm, reduceMotion, scaleAnim])
 
   const handlePressOut = useCallback(() => {
     if (props.reduceMotion) {
@@ -114,7 +121,7 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
         accessibilityRole="button"
         accessibilityLabel={props.copy.openChatWith(props.partnerName, props.hasUnread)}
         style={cardStyles.card}
-        onPress={props.onPress}
+        onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
@@ -185,6 +192,7 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
     </Animated.View>
   )
 }, (previous, next) =>
+  previous.threadId === next.threadId &&
   previous.copy === next.copy &&
   previous.partnerName === next.partnerName &&
   previous.partnerUserId === next.partnerUserId &&
@@ -197,6 +205,7 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
   previous.hasUnread === next.hasUnread &&
   previous.reduceMotion === next.reduceMotion &&
   previous.unreadPulseAnim === next.unreadPulseAnim &&
+  previous.onWarm === next.onWarm &&
   previous.onPress === next.onPress
 )
 
@@ -204,8 +213,24 @@ const ConversationCard = memo(function ConversationCard(props: ConversationCardP
 
 export function InboxScreen(props: InboxScreenProps) {
   const { navigation, sessionActor } = props
+  const { onWarmThread, onRetryThreads } = props
   const { threads, threadListState, getThreadUnreadCount } = useChatStore()
   const currentUserId = sessionActor.profile.userId
+  const lastFocusRefreshAtRef = useRef(0)
+
+  useEffect(() => {
+    if (sessionActor.session.mode !== "production") return
+    const refresh = (): void => {
+      if (!navigation.isFocused()) return
+      const now = Date.now()
+      if (now - lastFocusRefreshAtRef.current < 5_000) return
+      lastFocusRefreshAtRef.current = now
+      void onRetryThreads().catch(() => undefined)
+    }
+    const unsubscribe = navigation.addListener("focus", refresh)
+    refresh()
+    return unsubscribe
+  }, [navigation, onRetryThreads, sessionActor.session.mode])
   const locale = useMemo(
     () => resolveAccountRecoveryLocale(
       getNativeAppLocale(),
@@ -245,6 +270,38 @@ export function InboxScreen(props: InboxScreenProps) {
     })
   }, [copy.roomInvitation, currentUserId, getThreadUnreadCount, locale, threads])
 
+  const warmThreadIds = useMemo(
+    () => threads
+      .filter((thread) => thread.participantUserIds.includes(currentUserId) && thread.lastMessage)
+      .slice(0, 6)
+      .map((thread) => thread.threadId)
+      .join("|"),
+    [currentUserId, threads]
+  )
+
+  useEffect(() => {
+    if (sessionActor.session.mode !== "production" || !warmThreadIds) return
+    let disposed = false
+    let warming = false
+    const warmVisibleInbox = async (): Promise<void> => {
+      if (warming || disposed || !navigation.isFocused()) return
+      warming = true
+      try {
+        const ids = warmThreadIds.split("|")
+        for (let offset = 0; offset < ids.length; offset += 2) {
+          if (disposed || !navigation.isFocused()) break
+          await Promise.all(ids.slice(offset, offset + 2).map(onWarmThread))
+        }
+      } finally {
+        warming = false
+      }
+    }
+    const warm = (): void => { void warmVisibleInbox().catch(() => undefined) }
+    const unsubscribe = navigation.addListener("focus", warm)
+    warm()
+    return () => { disposed = true; unsubscribe() }
+  }, [navigation, onWarmThread, sessionActor.session.mode, warmThreadIds])
+
   const hasUnreadThread = useMemo(
     () => threadRows.some((thread) => thread.hasUnread),
     [threadRows]
@@ -276,10 +333,14 @@ export function InboxScreen(props: InboxScreenProps) {
 
   const openThread = useCallback(
     (threadId: string) => {
+      if (sessionActor.session.mode === "production") void onWarmThread(threadId)
       navigation.navigate("ChatThread", { threadId })
     },
-    [navigation]
+    [navigation, onWarmThread, sessionActor.session.mode]
   )
+  const warmThread = useCallback((threadId: string) => {
+    if (sessionActor.session.mode === "production") void onWarmThread(threadId)
+  }, [onWarmThread, sessionActor.session.mode])
   const handleGoBack = useCallback(() => {
     goBackFromInbox(navigation)
   }, [navigation])
@@ -292,6 +353,7 @@ export function InboxScreen(props: InboxScreenProps) {
   }) => (
     <Animated.View style={reduceMotion ? undefined : getItemAnim(index)}>
       <ConversationCard
+        threadId={item.thread.threadId}
         copy={copy}
         partnerName={item.partnerName}
         partnerUserId={item.partnerUserId}
@@ -301,10 +363,11 @@ export function InboxScreen(props: InboxScreenProps) {
         hasUnread={item.hasUnread}
         reduceMotion={reduceMotion}
         unreadPulseAnim={unreadPulseAnim}
-        onPress={() => openThread(item.thread.threadId)}
+        onPress={openThread}
+        onWarm={warmThread}
       />
     </Animated.View>
-  ), [copy, getItemAnim, openThread, reduceMotion, unreadPulseAnim])
+  ), [copy, getItemAnim, openThread, reduceMotion, unreadPulseAnim, warmThread])
 
   return (
     <View style={styles.root}>

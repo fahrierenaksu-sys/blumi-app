@@ -22,7 +22,7 @@ test("schema readiness rejects absent runtime tables even when migration metadat
   await assert.rejects(check(), /schema/i)
 })
 
-test("production readiness includes the admin quota audit table", async () => {
+test("production readiness includes admin audit and realtime connection lease tables", async () => {
   const expected = [{ id: "064_admin_user_quota_audit.sql", checksum: "abc" }]
   let requiredRelations: string[] = []
   const check = createSchemaReadinessCheck({ async query(sql, values) {
@@ -32,4 +32,5 @@ test("production readiness includes the admin quota audit table", async () => {
   } }, expected)
   await check()
   assert.ok(requiredRelations.includes("blumi_admin_user_audit"))
+  assert.ok(requiredRelations.includes("blumi_realtime_connection_leases"))
 })

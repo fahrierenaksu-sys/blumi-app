@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { AvatarSelection } from "@blumi/contracts"
 import { Animated, Easing, ImageBackground, StyleSheet, Text, View } from "react-native"
 import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClient"
@@ -193,8 +193,11 @@ export function CandidateAvatarPreview(props: {
   snapshot: CandidateAvatarSnapshot
   size?: number
   stage?: "discover" | "profile" | "match"
+  imagePriority?: "low" | "normal" | "high"
+  onDisplay?: () => void
+  onImageError?: () => void
 }) {
-  const { snapshot, size = 160, stage = "profile" } = props
+  const { snapshot, size = 160, stage = "profile", imagePriority = "high", onDisplay } = props
   const layers = useMemo(() => {
     const appearance = createCandidateAvatarAppearance(snapshot)
     return getRoomAvatarRenderLayers({
@@ -202,6 +205,17 @@ export function CandidateAvatarPreview(props: {
       catalog: ROOM_AVATAR_CATALOG
     })
   }, [snapshot])
+  const displayScope = JSON.stringify(snapshot)
+  const [displayedLayers, setDisplayedLayers] = useState<readonly string[]>([])
+  const onLayerDisplay = useCallback((id: string) => {
+    const receipt = `${displayScope}:${id}`
+    setDisplayedLayers((current) => current.includes(receipt) ? current : [...current, receipt])
+  }, [displayScope])
+  const allDisplayed = layers.length > 0 && layers.every((layer) =>
+    displayedLayers.includes(`${displayScope}:${layer.type}:${layer.id}`))
+  useEffect(() => {
+    if (allDisplayed) onDisplay?.()
+  }, [allDisplayed, onDisplay])
   const platformWidth = size * (stage === "discover" ? 0.96 : 0.82)
   const avatarWidth = size * 0.62
   const avatarHeight = avatarWidth / (256 / 384)
@@ -249,7 +263,8 @@ export function CandidateAvatarPreview(props: {
           }
         ]}
       >
-        <RoomAvatarRenderer2D layers={layers} />
+        <RoomAvatarRenderer2D key={props.onDisplay ? displayScope : undefined} layers={layers} imagePriority={imagePriority}
+          onLayerDisplay={props.onDisplay ? onLayerDisplay : undefined} onImageError={props.onImageError} />
       </View>
     </View>
   )

@@ -30,9 +30,11 @@ export class ChatRoomInviteError extends Error {
       | "INVITE_NOT_AVAILABLE"
       | "INVITE_EXPIRED"
       | "INVITE_FORBIDDEN"
+      | "SELF_IN_ROOM"
       | "PARTICIPANT_BUSY"
       | "PAIR_BLOCKED",
-    message: string
+    message: string,
+    readonly roomSessionId?: string
   ) {
     super(message)
     this.name = "ChatRoomInviteError"
@@ -189,10 +191,17 @@ export function createMiniRoomService(
         repository.findActiveMiniRoomForUser(input.senderProfile.userId),
         repository.findActiveMiniRoomForUser(input.recipientProfile.userId)
       ])
-      if (activeSenderRoom || activeRecipientRoom) {
+      if (activeSenderRoom) {
+        throw new ChatRoomInviteError(
+          "SELF_IN_ROOM",
+          "You are still in a room.",
+          activeSenderRoom.miniRoomId
+        )
+      }
+      if (activeRecipientRoom) {
         throw new ChatRoomInviteError(
           "PARTICIPANT_BUSY",
-          "One of you is already in a room."
+          "The other participant is already in a room."
         )
       }
       return repository.createOrFindPendingChatInvite({

@@ -3,18 +3,18 @@ import test from "node:test"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-const appDelegatePath = resolve(
-  import.meta.dirname,
-  "../ios/BlumiMobile/AppDelegate.swift"
-)
+const iosRoot = resolve(import.meta.dirname, "../ios")
 
-test("iOS debug bundleURL pins the simulator packager host to 127.0.0.1", () => {
-  const source = readFileSync(appDelegatePath, "utf8")
+test("the Xcode target uses Expo's development bundle resolver and an embedded release bundle", () => {
+  const project = readFileSync(resolve(iosRoot, "Blumi.xcodeproj/project.pbxproj"), "utf8")
+  const delegatePath = project.match(/path = (Blumi\/AppDelegate\.swift);/)?.[1]
+  assert.ok(delegatePath, "the Xcode target must reference its AppDelegate source")
+  const source = readFileSync(resolve(iosRoot, delegatePath), "utf8")
 
-  assert.match(source, /targetEnvironment\(simulator\)/)
-  assert.match(source, /packagerHost:\s*"127\.0\.0\.1"/)
+  assert.match(source, /bridge\.bundleURL \?\? bundleURL\(\)/)
   assert.match(
     source,
-    /jsBundleURL\(\s*[\s\S]*forBundleRoot:\s*"\.expo\/\.virtual-metro-entry"/
+    /#if DEBUG\s+return RCTBundleURLProvider\.sharedSettings\(\)\.jsBundleURL\(forBundleRoot: "\.expo\/\.virtual-metro-entry"\)\s+#else\s+return Bundle\.main\.url\(forResource: "main", withExtension: "jsbundle"\)/
   )
+  assert.doesNotMatch(source, /packagerHost:\s*"127\.0\.0\.1"/)
 })

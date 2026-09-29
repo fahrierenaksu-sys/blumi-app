@@ -14,6 +14,7 @@ import type {
 interface AvatarLayerProps {
   avatars: Record<string, AvatarState>
   localUserId: string
+  localUserLabel: string
   bubbles: SpeechBubble[]
   onDismissBubble: (bubbleId: string) => void
   dismissBubbleLabel: string
@@ -27,6 +28,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
   const {
     avatars,
     localUserId,
+    localUserLabel,
     bubbles,
     onDismissBubble,
     dismissBubbleLabel,
@@ -74,6 +76,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
             onDismissBubble={onDismissBubble}
             dismissBubbleLabel={dismissBubbleLabel}
             isLocal={isLocal}
+            localUserLabel={localUserLabel}
             showJoinPulse={showJoinPulse}
             motionPolicy={motionPolicy}
           />
@@ -91,6 +94,7 @@ interface AvatarFigureProps {
   onDismissBubble: (bubbleId: string) => void
   dismissBubbleLabel: string
   isLocal: boolean
+  localUserLabel: string
   showJoinPulse: boolean
   motionPolicy: MiniRoomMotionPolicy
 }
@@ -104,6 +108,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     onDismissBubble,
     dismissBubbleLabel,
     isLocal,
+    localUserLabel,
     showJoinPulse,
     motionPolicy
   } = props
@@ -323,11 +328,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     outputRange: [0.55, 0.1, 0]
   })
 
-  const sourceLabel =
-    !isLocal && avatar.appearance.snapshotSource === "partner_preview_fallback"
-      ? "Blumi avatar"
-      : undefined
-
   return (
     <View
       style={[
@@ -433,13 +433,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       </Animated.View>
       <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
-          {isLocal ? "You" : avatar.displayName}
+          {isLocal ? localUserLabel : avatar.displayName}
         </Text>
-        {sourceLabel ? (
-          <Text style={styles.sourceText} numberOfLines={1}>
-            {sourceLabel}
-          </Text>
-        ) : null}
       </View>
     </View>
   )
@@ -536,11 +531,6 @@ const styles = StyleSheet.create({
   nameText: {
     color: "#3A2430",
     fontSize: 10,
-    fontWeight: "800"
-  },
-  sourceText: {
-    color: "rgba(58, 36, 48, 0.7)",
-    fontSize: 8,
     fontWeight: "800"
   },
   bubbleAnchor: {

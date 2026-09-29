@@ -232,6 +232,17 @@ export function createPostgresMatchRepository(
       return result.rows[0] ? mapMatch(result.rows[0]) : null
     },
 
+    async listMatchesForUser(userId) {
+      const result = await pool.query(
+        `SELECT match_id, participant_a_user_id, participant_b_user_id, matched_at
+           FROM blumi_matches
+          WHERE participant_a_user_id = $1 OR participant_b_user_id = $1
+          ORDER BY matched_at DESC, match_id DESC`,
+        [userId]
+      )
+      return result.rows.map(mapMatch)
+    },
+
     async createMatch(match) {
       const result = await pool.query(
         `INSERT INTO blumi_matches (

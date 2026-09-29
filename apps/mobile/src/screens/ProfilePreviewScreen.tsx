@@ -104,11 +104,18 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const contentAnim = useRef(new Animated.Value(0)).current
   const [reportVisible, setReportVisible] = useState(false)
   const [isDeciding, setIsDeciding] = useState(false)
+  const screenMountedRef = useRef(true)
+  const decisionInFlightRef = useRef(false)
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const [serverDeniedDecision, setServerDeniedDecision] = useState(false)
   const goBackToDiscovery = (): void => {
     goBackOrFallback(navigation, () => navigation.replace("Lobby"))
   }
+
+  useEffect(() => {
+    screenMountedRef.current = true
+    return () => { screenMountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     Animated.spring(contentAnim, {
@@ -154,7 +161,8 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const submitProductionDecision = async (
     decision: DiscoveryDecision
   ): Promise<void> => {
-    if (decisionDisabled || isDeciding) return
+    if (decisionDisabled || decisionInFlightRef.current) return
+    decisionInFlightRef.current = true
     setIsDeciding(true)
     setDecisionError(null)
     try {
@@ -164,6 +172,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         profile.userId,
         decision
       )
+      if (!navigation.isFocused()) return
       captureProductEvent("discovery_decision", { decision, mode: "production" })
       const completedProductionDecision = {
         decision,
@@ -192,6 +201,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
       }
       returnToLobby(completedProductionDecision)
     } catch (error) {
+      if (!navigation.isFocused()) return
       if (error instanceof DiscoveryDecisionNotEligibleError) {
         setServerDeniedDecision(true)
         setDecisionError(copy.viewOnlyExplanation)
@@ -199,7 +209,8 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         setDecisionError(getDiscoveryDecisionErrorMessageForDisplay(error))
       }
     } finally {
-      setIsDeciding(false)
+      decisionInFlightRef.current = false
+      if (screenMountedRef.current) setIsDeciding(false)
     }
   }
 

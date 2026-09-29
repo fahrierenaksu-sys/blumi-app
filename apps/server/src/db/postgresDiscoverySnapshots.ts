@@ -12,8 +12,9 @@ function params(userId: string, filters: DiscoveryFilters): unknown[] {
   const f = normalizeFilters(filters)
   return [userId, f.ageMin, f.ageMax, f.genders, f.vibes]
 }
-function eligibleSql(): string {
-  return `SELECT ranked.* FROM (${discoveryProfilesSql()}) ranked
+function eligibleSql(projection: "profile" | "candidate" = "profile"): string {
+  const columns = projection === "candidate" ? "ranked.user_id, ranked.rank_score" : "ranked.*"
+  return `SELECT ${columns} FROM (${discoveryProfilesSql()}) ranked
     JOIN blumi_accounts account ON account.user_id = ranked.user_id
     WHERE account.moderation_status NOT IN ('suspended', 'banned')
       AND NOT EXISTS (SELECT 1 FROM blumi_safety_blocks b WHERE
@@ -41,14 +42,14 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
           throw new DiscoveryRefreshLimitError(Math.max(1,Number(budget.rows[0]!.retry_after)))
         }
         await client.query(`DELETE FROM blumi_discovery_snapshots WHERE user_id=$1 AND expires_at<=NOW()`,[input.userId])
-        const result = await client.query(`WITH candidates AS MATERIALIZED (${eligibleSql()}),
+        const result = await client.query(`WITH candidates AS MATERIALIZED (${eligibleSql("candidate")}),
         meta AS (INSERT INTO blumi_discovery_snapshots
           (snapshot_id,user_id,filter_hash,created_at,expires_at,candidate_count)
           SELECT $6::uuid,$1,$7,$8::timestamptz,$8::timestamptz + INTERVAL '30 minutes',COUNT(*) FROM candidates RETURNING *),
         inserted AS (INSERT INTO blumi_discovery_snapshot_candidates(snapshot_id,position,user_id)
           SELECT meta.snapshot_id,(ROW_NUMBER() OVER (ORDER BY candidates.rank_score DESC,candidates.user_id ASC)-1)::integer,candidates.user_id
-            FROM candidates CROSS JOIN meta RETURNING position)
-        SELECT meta.*, (SELECT COUNT(*) FROM inserted) AS inserted_count FROM meta`,
+            FROM candidates CROSS JOIN meta)
+        SELECT meta.* FROM meta`,
         [...params(input.userId,input.filters),randomUUID(),input.filterHash,input.now.toISOString()])
         await client.query("COMMIT")
         return map(result.rows[0]!)

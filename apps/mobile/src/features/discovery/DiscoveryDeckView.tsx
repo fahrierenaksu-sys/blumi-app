@@ -15,6 +15,7 @@ import { useAppViewportMetrics } from "../../ui/layout/useAppViewportMetrics"
 import { resolveDiscoveryLayoutMetrics } from "./discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "./discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
+import type { DiscoveryRoomShowcaseQueryInput } from "./discoveryApi"
 
 const ACTION_SWIPE_DURATION = 190
 
@@ -27,6 +28,13 @@ interface DiscoveryDeckViewProps {
   likeDisabled?: boolean
   actionsDisabled?: boolean
   emptyContent?: React.ReactNode
+  onFrontDisplay?: (part: "layout" | "surface" | "avatar") => void
+  onFrontImageError?: () => void
+  deferSecondaryImages?: boolean
+  showcaseRequest?: Pick<
+    DiscoveryRoomShowcaseQueryInput,
+    "baseHttpUrl" | "viewerUserId" | "sessionToken"
+  >
 }
 
 export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
@@ -38,7 +46,8 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
     progressLabel,
     likeDisabled = false,
     actionsDisabled = false,
-    emptyContent
+    emptyContent,
+    showcaseRequest
   } = props
   const featured = profiles[0]
   const copy = getDiscoverySurfaceCopy(getAppLocale())
@@ -167,6 +176,12 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                   disableEntryAnim
                   layoutMetrics={viewportLayout.card}
                   onFlipChange={isTop ? setIsFeaturedFlipped : undefined}
+                  showcaseRequest={isTop ? showcaseRequest : undefined}
+                  imagePriority={isTop ? "high" : "low"}
+                  onFrontDisplay={isTop ? props.onFrontDisplay : undefined}
+                  onFrontImageError={isTop ? props.onFrontImageError : undefined}
+                  deferFrontAvatar={!isTop && props.deferSecondaryImages}
+                  deferBackAvatar={props.deferSecondaryImages}
                 />
                 {!isTop ? <GlassDeckOverlay /> : null}
               </Animated.View>

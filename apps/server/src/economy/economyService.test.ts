@@ -6,6 +6,58 @@ import {
 } from "./economyRepository"
 import { createEconomyService } from "./economyService"
 
+test("complete inventory reads stay authoritative without reconciliation writes", async () => {
+  const backing = createInMemoryEconomyRepository()
+  const original = createDefaultEconomyInventory("complete_user")
+  await backing.saveInventory(original)
+  let reads = 0
+  let repairs = 0
+  const service = createEconomyService({ repository: {
+    ...backing,
+    async getInventory(userId) {
+      reads += 1
+      return backing.getInventory(userId)
+    },
+    async ensureInventory(input) {
+      repairs += 1
+      return backing.ensureInventory(input)
+    }
+  } })
+
+  assert.deepEqual(await service.getInventory(original.userId), original)
+  const updated = { ...original, coins: 700, coinDebt: 25 }
+  await backing.saveInventory(updated)
+  assert.deepEqual(await service.getInventory(original.userId), updated)
+  assert.equal(reads, 2)
+  assert.equal(repairs, 0)
+})
+
+test("missing starter ownership is repaired once without replacing balances", async () => {
+  const backing = createInMemoryEconomyRepository()
+  const inventory = {
+    ...createDefaultEconomyInventory("repair_user"),
+    coins: 700,
+    coinDebt: 25,
+    ownedRoomItemIds: []
+  }
+  await backing.saveInventory(inventory)
+  let repairs = 0
+  const service = createEconomyService({ repository: {
+    ...backing,
+    async ensureInventory(input) {
+      repairs += 1
+      return backing.ensureInventory(input)
+    }
+  } })
+
+  const repaired = await service.getInventory(inventory.userId)
+  assert.equal(repaired.coins, 700)
+  assert.equal(repaired.coinDebt, 25)
+  assert.deepEqual(repaired.ownedRoomItemIds, ["room_v2_cozy_bed"])
+  assert.deepEqual(await service.getInventory(inventory.userId), repaired)
+  assert.equal(repairs, 1)
+})
+
 test("economy creates a starter inventory once per user", async () => {
   const service = createEconomyService({
     repository: createInMemoryEconomyRepository()

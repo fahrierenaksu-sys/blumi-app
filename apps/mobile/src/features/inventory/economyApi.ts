@@ -1,6 +1,14 @@
 import type { BlumiInventorySnapshot } from "./inventoryStore"
+import { requestJson } from "../network/apiClient"
 
 export type EconomyPurchaseType = "avatar" | "room"
+
+export class EconomyHttpError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = "EconomyHttpError"
+  }
+}
 
 export interface EconomyPurchaseInput {
   itemId: string
@@ -26,22 +34,18 @@ interface EconomyInventoryPayload {
   inventory?: EconomyInventoryRecord
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function fetchEconomyInventory(
   baseHttpUrl: string,
   sessionToken: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<BlumiInventorySnapshot> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/economy/balance"), {
-    headers: createAuthHeaders(sessionToken),
-    signal
-  })
-  const payload: unknown = await response.json()
+  const { response, payload } = await requestEconomyJson(
+    baseHttpUrl,
+    "/v1/economy/balance",
+    { headers: createAuthHeaders(sessionToken), signal },
+    fetcher
+  )
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not refresh your coins yet."))
@@ -56,15 +60,16 @@ export async function claimDailyEconomyReward(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<DailyEconomyRewardResult> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/economy/rewards/daily"),
+  const { response, payload } = await requestEconomyJson(
+    baseHttpUrl,
+    "/v1/economy/rewards/daily",
     {
       method: "POST",
       headers: createAuthHeaders(sessionToken),
       signal
-    }
+    },
+    fetcher
   )
-  const payload: unknown = await response.json()
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not claim today's reward yet."))
   }
@@ -92,19 +97,26 @@ export async function purchaseEconomyItem(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<BlumiInventorySnapshot> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/economy/purchase"), {
-    method: "POST",
-    headers: {
-      ...createAuthHeaders(sessionToken),
-      "content-type": "application/json"
+  const { response, payload } = await requestEconomyJson(
+    baseHttpUrl,
+    "/v1/economy/purchase",
+    {
+      method: "POST",
+      headers: {
+        ...createAuthHeaders(sessionToken),
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(input),
+      signal
     },
-    body: JSON.stringify(input),
-    signal
-  })
-  const payload: unknown = await response.json()
+    fetcher
+  )
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(payload, "That purchase could not be completed."))
+    throw new EconomyHttpError(
+      getApiErrorMessage(payload, "That purchase could not be completed."),
+      response.status
+    )
   }
 
   return normalizeEconomyInventoryPayload(payload)
@@ -125,6 +137,25 @@ export function normalizeEconomyInventoryPayload(
     unlockedFeatureIds: [...(candidate.unlockedFeatureIds ?? [])],
     updatedAt: candidate.updatedAt
   }
+}
+
+function requestEconomyJson(
+  baseHttpUrl: string,
+  path: string,
+  init: RequestInit,
+  fetcher: typeof fetch
+) {
+  return requestJson(baseHttpUrl, path, init, async (url, requestInit) => {
+    const response = await fetcher(url, requestInit)
+    // Keep economy's strict body-error contract. Reading inside the fetcher
+    // remains covered by requestJson's deadline; its JSON reader gets cached data.
+    const payload: unknown = await response.json()
+    return {
+      ok: response.ok,
+      status: response.status,
+      json: async () => payload
+    } as Response
+  })
 }
 
 function createAuthHeaders(sessionToken: string): Record<string, string> {

@@ -5,6 +5,7 @@ import { createConnectionManager } from "./connectionManager"
 import {
   createInMemoryRealtimeFanout,
   type RealtimeFanout,
+  type RealtimeFanoutGapHandler,
   validateRealtimeFanoutMessage,
   type RealtimeFanoutMessage
 } from "./realtimeFanout"
@@ -17,6 +18,50 @@ const EVENT = {
     matchedAt: "2026-07-22T10:00:00.000Z"
   }
 } as unknown as ServerEvent
+
+test("fanout gap closes all instance sockets and terminates lingering closes after one second", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let onGap: RealtimeFanoutGapHandler | undefined
+  const manager = createConnectionManager({ fanout: {
+    async publish() {},
+    async subscribe(_handler, gap) { onGap = gap; return async () => {} }
+  } })
+  const calls: number[] = []
+  let terminated = 0
+  const sockets = Array.from({ length: 2 }, () => ({ readyState: 1,
+    close(code: number) { calls.push(code); this.readyState = 2 },
+    terminate() { terminated += 1; this.readyState = 3 }
+  }))
+  const connections = sockets.map((socket) => manager.addConnection({
+    socket: socket as unknown as Parameters<typeof manager.addConnection>[0]["socket"], profile: createProfile("user")
+  }))
+  await manager.startFanout()
+  onGap!("overflow")
+  assert.deepEqual(calls, [1012, 1012])
+  manager.removeConnection(connections[0]!.connectionId)
+  context.mock.timers.tick(999)
+  assert.equal(terminated, 0)
+  context.mock.timers.tick(1)
+  assert.equal(terminated, 1)
+  await manager.closeFanout()
+})
+
+test("shutdown cleans gap termination timers and terminates their sockets", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let onGap: RealtimeFanoutGapHandler | undefined
+  const manager = createConnectionManager({ fanout: {
+    async publish() {}, async subscribe(_handler, gap) { onGap = gap; return async () => {} }
+  } })
+  let terminated = 0
+  const socket = { readyState: 1, close() { this.readyState = 2 }, terminate() { terminated++; this.readyState = 3 } }
+  manager.addConnection({ socket: socket as unknown as Parameters<typeof manager.addConnection>[0]["socket"], profile: createProfile("user") })
+  await manager.startFanout()
+  onGap!("deadline")
+  await manager.closeFanout()
+  assert.equal(terminated, 1)
+  context.mock.timers.tick(1_000)
+  assert.equal(terminated, 1)
+})
 
 test("fanout close drains an ordinary asynchronous publish before unsubscribing", async () => {
   let release!: () => void
@@ -36,6 +81,65 @@ test("fanout close drains an ordinary asynchronous publish before unsubscribing"
   release()
   await closing
   assert.deepEqual(steps, ["publish-start", "publish-end", "unsubscribe"])
+})
+
+test("fanout close bounds a stuck publish and still unsubscribes", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let unsubscribed = 0
+  const manager = createConnectionManager({
+    fanout: {
+      async publish() { await new Promise(() => {}) },
+      async subscribe() { return async () => { unsubscribed += 1 } }
+    },
+    shutdownDrainTimeoutMs: 6
+  })
+  await manager.startFanout()
+  manager.sendToUser("user", EVENT)
+  const closing = manager.closeFanout()
+  await Promise.resolve()
+  context.mock.timers.tick(6)
+  await closing
+  assert.equal(unsubscribed, 1)
+})
+
+test("fanout close bounds unresolved startup and cleans a late subscription", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let resolveStart!: (unsubscribe: () => Promise<void>) => void
+  let unsubscribed = 0
+  const manager = createConnectionManager({
+    fanout: {
+      async publish() {},
+      async subscribe() { return new Promise((resolve) => { resolveStart = resolve }) }
+    },
+    shutdownDrainTimeoutMs: 6
+  })
+  void manager.startFanout()
+  const closing = manager.closeFanout()
+  await Promise.resolve()
+  context.mock.timers.tick(6)
+  await closing
+  resolveStart(async () => { unsubscribed += 1 })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  assert.equal(unsubscribed, 1)
+})
+
+test("fanout close bounds an unresponsive unsubscribe", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let unsubscribeStarted = false
+  const manager = createConnectionManager({
+    fanout: {
+      async publish() {},
+      async subscribe() { return async () => { unsubscribeStarted = true; await new Promise(() => {}) } }
+    },
+    shutdownDrainTimeoutMs: 6
+  })
+  await manager.startFanout()
+  const closing = manager.closeFanout()
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(unsubscribeStarted, true)
+  context.mock.timers.tick(6)
+  await closing
 })
 
 test("in-memory realtime fanout delivers immutable subscriptions and supports unsubscribe", async () => {

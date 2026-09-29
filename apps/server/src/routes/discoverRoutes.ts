@@ -24,6 +24,7 @@ import type { SafetyService } from "../safety/safetyService"
 import type { PersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import type { RoomSnapshotService } from "../rooms/roomSnapshotService"
 import type { DiscoverProfileRecord } from "../matches/matchRepository"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { isRecord, resolveProductSession } from "./routeHelpers"
 
 export interface DiscoverRouteServices {
@@ -103,13 +104,23 @@ export async function registerDiscoverRoutes(
       if (!controls.ok) {
         return reply.code(400).send({ error: controls.error })
       }
-      let snapshotPage
+      let snapshotPage: Awaited<ReturnType<typeof discoverySnapshots.page>>
+      let decisionQuota: Awaited<ReturnType<typeof matchService.getDecisionQuota>>
       try {
-        snapshotPage = await discoverySnapshots.page({
-          userId: resolved.account.userId, filters: parsedFilters.filters,
-          limit: controls.limit, cursor: controls.cursor,
-          blockedUserIds: (ids) => safetyService.listBlockedUserIdsBetween(resolved.account.userId, ids)
-        })
+        const [pageResult, quotaResult] = await Promise.allSettled([
+          discoverySnapshots.page({
+            userId: resolved.account.userId, filters: parsedFilters.filters,
+            limit: controls.limit, cursor: controls.cursor,
+            blockedUserIds: (ids) => safetyService.listBlockedUserIdsBetween(resolved.account.userId, ids)
+          }),
+          matchService.getDecisionQuota(resolved.account.userId)
+        ])
+        // Preserve the page's established 4xx mapping even if its parallel
+        // display-quota read fails first. Mutations still recheck quota server-side.
+        if (pageResult.status === "rejected") throw pageResult.reason
+        if (quotaResult.status === "rejected") throw quotaResult.reason
+        snapshotPage = pageResult.value
+        decisionQuota = quotaResult.value
       } catch (error) {
         if (error instanceof DiscoveryRefreshLimitError) return reply.code(429).header("Retry-After",error.retryAfterSeconds)
           .send({error:error.message,code:error.code,retryAfterSeconds:error.retryAfterSeconds})
@@ -118,22 +129,12 @@ export async function registerDiscoverRoutes(
         throw error
       }
       const pageProfiles = snapshotPage.profiles
-      const allowRoomShowcase = !capabilityService ||
-        resolveRequestCapabilities(
-          request,
-          resolved.account.userId,
-          capabilityService
-        ).capabilities.discovery_room_showcase
-      const profiles = await Promise.all(pageProfiles.map(async (profile) =>
-        decorateDiscoverProfile({
-          profile,
-          signals: buildDiscoverySignals(profile, parsedFilters.filters),
-          request,
-          personalRoomDecorService,
-          roomSnapshotService,
-          allowRoomShowcase
-        })
-      ))
+      // Room showcase is optional detail used only on the card's back face.
+      // Keep its storage reads out of the first-page response critical path.
+      const profiles = pageProfiles.map((profile) => ({
+        ...profile,
+        signals: buildDiscoverySignals(profile, parsedFilters.filters)
+      }))
       return {
         profiles,
         page: snapshotPage.page,
@@ -145,7 +146,7 @@ export async function registerDiscoverRoutes(
               : "healthy",
           scope: "global"
         },
-        quota: await matchService.getDecisionQuota(resolved.account.userId)
+        quota: decisionQuota
       }
     }
   )
@@ -219,12 +220,15 @@ export async function registerDiscoverRoutes(
         request,
         personalRoomDecorService,
         roomSnapshotService,
-        allowRoomShowcase: !capabilityService ||
-          resolveRequestCapabilities(
-            request,
-            resolved.account.userId,
-            capabilityService
-          ).capabilities.discovery_room_showcase
+        allowRoomShowcase:
+          linkedProfile.decision.capability === "mutual-like" && (
+            !capabilityService ||
+            resolveRequestCapabilities(
+              request,
+              resolved.account.userId,
+              capabilityService
+            ).capabilities.discovery_room_showcase
+          )
       })
     }
   })
@@ -339,7 +343,7 @@ export async function decorateDiscoverProfile({
     }
   } catch (error) {
     request.log.warn(
-      { error, userId: profile.userId },
+      { errorKind: safeOperationalErrorKind(error) },
       "Optional room showcase enrichment failed"
     )
     return base

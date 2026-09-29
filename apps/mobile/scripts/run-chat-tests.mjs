@@ -30,7 +30,9 @@ const sourceFiles = [
   "src/features/chat/chatRoomInviteModel.ts",
   "src/features/chat/chatRoomInviteModel.test.ts",
   "src/features/chat/chatCoordinator.ts",
-  "src/features/chat/chatCoordinator.test.ts"
+  "src/features/chat/chatCoordinator.test.ts",
+  "src/features/chat/threadListRefreshGuard.ts",
+  "src/features/chat/threadListRefreshGuard.test.ts"
 ]
 
 try {
@@ -76,7 +78,10 @@ try {
       join(outputDirectory, "features/chat/chatStore.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteApi.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteModel.test.js"),
-      join(outputDirectory, "features/chat/chatCoordinator.test.js")
+      join(outputDirectory, "features/chat/chatCoordinator.test.js"),
+      join(outputDirectory, "features/chat/threadListRefreshGuard.test.js"),
+      resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
+      resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],
     {
       cwd: workspaceRoot,

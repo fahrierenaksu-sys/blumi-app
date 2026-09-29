@@ -7,6 +7,10 @@ const editorSource = readFileSync(
   resolve(process.cwd(), "src/screens/MyRoomEditorScreen.tsx"),
   "utf8"
 )
+const editorInventoryEntriesSource = readFileSync(
+  resolve(process.cwd(), "src/screens/useRoomEditorInventoryEntries.ts"),
+  "utf8"
+)
 const rendererSource = readFileSync(
   resolve(process.cwd(), "src/features/roomV2/components/RoomRenderer2D.tsx"),
   "utf8"
@@ -170,7 +174,7 @@ test("editor uses the room-first collection hierarchy instead of the legacy deco
 test("editor waits for persisted decor and syncs the inspector when a staged item is selected", () => {
   assert.match(editorSource, /persistenceState/)
   assert.match(editorSource, /pointerEvents=\{isRoomDraftReady \? "auto" : "none"\}/)
-  assert.match(editorSource, /if \(!isRoomDraftReady\) return\s*lastAppliedPlacementItemId\.current = placementItemId/)
+  assert.match(editorSource, /if \(!canPlaceInventoryItem \|\| !isRoomDraftReady\) return\s*lastAppliedPlacementItemId\.current = placementItemId/)
   assert.match(editorSource, /if \(!isRoomDraftReady\) \{\s*hapticError\(\)/)
   assert.match(editorSource, /setSelectedInventoryItemId\(placedItem\?\.itemId\)/)
   assert.match(editorSource, /setSelectedInventoryRotation\(item\.rotation\)/)
@@ -186,7 +190,11 @@ test("stage furniture is announced as an editor selection rather than an in-room
 test("editor catalog contains only room furniture the current user owns", () => {
   assert.match(
     editorSource,
-    /ACTIVE_ROOM_FURNITURE_CATALOG\s*\.filter\(\(item\) =>\s*ownsRoomItem\(item\.id\) \|\| QA_OWNED_ROOM_ITEM_IDS\.has\(item\.id\)\s*\)/
+    /useRoomEditorInventoryEntries\(\s*ACTIVE_ROOM_FURNITURE_CATALOG,\s*inventory\.ownedRoomItemIds,\s*QA_OWNED_ROOM_ITEM_IDS\s*\)/
+  )
+  assert.match(
+    editorInventoryEntriesSource,
+    /ownedIds\.has\(item\.id\) \|\| qaOwnedItemIds\.has\(item\.id\)/
   )
 })
 

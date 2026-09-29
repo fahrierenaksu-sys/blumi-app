@@ -16,6 +16,8 @@ const coverageArguments = nodeMajorVersion >= 22
 const sourceFiles = [
   "src/features/miniRoom/sharedRoomDecor.ts",
   "src/features/miniRoom/sharedRoomDecor.test.ts",
+  "src/features/miniRoom/scene/miniRoomPresentation.ts",
+  "src/features/miniRoom/scene/miniRoomPresentation.test.ts",
   "src/features/matches/matchRoomModel.ts",
   "src/features/matches/matchRoomResolvers.ts",
   "src/features/matches/matchRoomModel.test.ts",
@@ -156,6 +158,7 @@ try {
       ...coverageArguments,
       "--test",
       join(outputDirectory, "features/miniRoom/sharedRoomDecor.test.js"),
+      join(outputDirectory, "features/miniRoom/scene/miniRoomPresentation.test.js"),
       join(outputDirectory, "features/matches/matchRoomModel.test.js"),
       join(outputDirectory, "config/env.test.js"),
       join(outputDirectory, "features/roomV2/roomV2Camera.test.js"),

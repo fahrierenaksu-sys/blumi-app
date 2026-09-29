@@ -35,7 +35,24 @@ test("short content viewports shrink the preview without narrowing the catalog",
   const tall = getShopLayoutMetrics({ width: 402, height: 740 })
   assert.ok(short.preview.avatarStageHeight < tall.preview.avatarStageHeight)
   assert.equal(short.catalog.productCardWidth, tall.catalog.productCardWidth)
-  assert.ok(short.preview.avatarWidth * 1.4 <= short.preview.avatarStageHeight)
+  assert.ok(short.preview.avatarWidth / (256 / 384) <= short.preview.avatarStageHeight)
+})
+
+test("shop avatar frame never exceeds its stage at supported phone sizes", () => {
+  for (const [width, height] of [
+    [320, 568],
+    [375, 667],
+    [390, 844],
+    [402, 874],
+    [440, 956]
+  ]) {
+    const metrics = getShopLayoutMetrics({ width, height })
+    const renderedAvatarHeight = metrics.preview.avatarWidth / (256 / 384)
+    assert.ok(
+      renderedAvatarHeight <= metrics.preview.avatarStageHeight,
+      `${width}x${height}: avatar ${renderedAvatarHeight} exceeds stage ${metrics.preview.avatarStageHeight}`
+    )
+  }
 })
 
 test("four-piece preview redistributes space without expanding the screen", () => {

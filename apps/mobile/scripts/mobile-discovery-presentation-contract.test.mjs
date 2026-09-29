@@ -48,6 +48,16 @@ test("production Discover reserves the shared responsive bottom navigation inset
   assert.doesNotMatch(lobbySource, /useSafeAreaInsets/)
 })
 
+test("returning to Discover keeps same-account filters ready while refreshing them", () => {
+  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const focusBody = lobbySource.match(/useFocusEffect\(useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[\n    isProductionDiscovery,/)
+
+  assert.ok(focusBody, "expected the filter hydration focus effect")
+  assert.doesNotMatch(focusBody[1], /setFiltersReadyForUserId\(null\)/)
+  assert.match(focusBody[1], /\.catch\(\(\) => \{[\s\S]*?setFiltersReadyForUserId\(sessionActor\.profile\.userId\)/)
+  assert.match(lobbySource, /const filtersReady = filtersReadyForUserId === sessionActor\.profile\.userId/)
+})
+
 test("approved swipe card accepts real candidate avatar and private distance data", () => {
   const cardSource = read("src/features/demo/SwipeableDiscoverCard.tsx")
 
@@ -314,11 +324,14 @@ test("production cards use real discovery signals without synthetic fit metadata
   assert.doesNotMatch(previewSource, /error\.message/)
 })
 
-test("server discovery delegates stable pagination and rechecks safety exclusions", () => {
+test("server discovery overlaps stable pagination with display quota and preserves safety/error boundaries", () => {
   const routeSource = read("../server/src/routes/discoverRoutes.ts")
   const snapshotSource = read("../server/src/matches/discoverySnapshot.ts")
 
-  assert.match(routeSource, /snapshotPage = await discoverySnapshots\.page\(/)
+  assert.match(routeSource, /Promise\.allSettled\(\[\s*discoverySnapshots\.page\(/)
+  assert.match(routeSource, /matchService\.getDecisionQuota\(resolved\.account\.userId\)/)
+  assert.match(routeSource, /if \(pageResult\.status === "rejected"\) throw pageResult\.reason/)
+  assert.match(routeSource, /if \(quotaResult\.status === "rejected"\) throw quotaResult\.reason/)
   assert.match(routeSource, /blockedUserIds: \(ids\) => safetyService\.listBlockedUserIdsBetween/)
   assert.match(routeSource, /page: snapshotPage\.page/)
   assert.match(snapshotSource, /const blocked = new Set\(await input\.blockedUserIds/)
@@ -383,7 +396,7 @@ test("production and demo share the approved end-of-deck screen", () => {
   assert.match(emptySource, /<CandidateAvatarPreview/)
   assert.doesNotMatch(emptySource, /ALL CAUGHT UP|restingBadge/)
   assert.match(emptySource, /backgroundColor:\s*"#FFF7FC"/)
-  assert.match(emptySource, /emptyPhotoProgress/)
+  assert.doesNotMatch(emptySource, /emptyPhotoProgress/, "loading must not imply profile-photo progress")
   assert.doesNotMatch(emptySource, /cardWash|heroGlow/)
   assert.match(lobbySource, /<CandidateAvatarPreview[\s\S]*?snapshot=\{myAvatarSnapshot\}/)
   assert.match(emptySource, /refreshing\?:\s*boolean/)
@@ -396,9 +409,12 @@ test("production discovery keeps loading distinct from a genuinely exhausted dec
   const lobbySource = read("src/screens/LobbyScreen.tsx")
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
 
-  assert.match(lobbySource, /showDiscoveryLoading/)
+  assert.match(lobbySource, /discoveryPlaceholderState === "loading"/)
+  assert.match(lobbySource, /resolveProductionDiscoveryPlaceholderState\(/)
   assert.match(lobbySource, /<LoadingDiscoveryDeck/)
   assert.match(emptySource, /export function LoadingDiscoveryDeck/)
+  assert.match(emptySource, /accessibilityState=\{\{ busy: true \}\}/)
+  assert.doesNotMatch(emptySource, /emptyPhotoProgress|loadingIndicatorWrap/)
   assert.match(lobbySource, /refreshInFlightRef\.current/)
 })
 

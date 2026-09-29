@@ -22,6 +22,9 @@ import {
 
 interface RoomAvatarRenderer2DProps {
   layers: RoomV2AvatarRenderLayer[]
+  imagePriority?: "low" | "normal" | "high"
+  onLayerDisplay?: (id: string) => void
+  onImageError?: () => void
 }
 
 interface RoomAvatarFrameTickerStore {
@@ -33,7 +36,7 @@ interface RoomAvatarFrameTickerStore {
 const roomAvatarFrameTickerStores = new Map<number, RoomAvatarFrameTickerStore>()
 
 export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
-  const { layers } = props
+  const { layers, imagePriority = "high" } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
     () => getLayerAnimationState(layers, !reduceMotion),
@@ -85,6 +88,9 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
           key={`${layer.type}:${layer.id}`}
           layer={layer}
           frameIndex={frameIndex}
+          imagePriority={imagePriority}
+          onLayerDisplay={props.onLayerDisplay}
+          onImageError={props.onImageError}
         />
       ))}
     </View>
@@ -94,11 +100,14 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
 interface RoomAvatarLayerImageProps {
   layer: RoomV2AvatarRenderLayer
   frameIndex: number
+  imagePriority: "low" | "normal" | "high"
+  onLayerDisplay?: (id: string) => void
+  onImageError?: () => void
 }
 
 const RoomAvatarLayerImage = memo(
   function RoomAvatarLayerImage(props: RoomAvatarLayerImageProps) {
-    const { layer, frameIndex } = props
+    const { layer, frameIndex, imagePriority } = props
     const asset = getRoomAvatarLayerFrameAsset(layer, frameIndex)
 
     return (
@@ -106,8 +115,10 @@ const RoomAvatarLayerImage = memo(
         source={asset.source}
         contentFit="contain"
         cachePolicy="memory-disk"
-        priority="high"
+        priority={imagePriority}
         transition={0}
+        onDisplay={() => props.onLayerDisplay?.(`${layer.type}:${layer.id}`)}
+        onError={props.onImageError}
         style={[
           styles.layer,
           getLayerFitStyle(layer)
@@ -115,7 +126,11 @@ const RoomAvatarLayerImage = memo(
       />
     )
   },
-  (previous, next) => !shouldRerenderRoomAvatarLayer(previous, next)
+  (previous, next) =>
+    previous.imagePriority === next.imagePriority &&
+    previous.onLayerDisplay === next.onLayerDisplay &&
+    previous.onImageError === next.onImageError &&
+    !shouldRerenderRoomAvatarLayer(previous, next)
 )
 
 function hasAnimatedLayerFrames(layer: RoomV2AvatarRenderLayer): boolean {

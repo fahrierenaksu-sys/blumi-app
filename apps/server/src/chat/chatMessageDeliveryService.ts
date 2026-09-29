@@ -33,6 +33,36 @@ export function createChatMessageDeliveryService(options: {
     notificationService
   } = options
 
+  const dispatchPostPersistEffects = async (
+    message: ChatMessage,
+    threadId: string,
+    recipientUserIds: string[]
+  ): Promise<void> => {
+    try {
+      await dispatchDue(new Date(), message.messageId)
+    } catch (error) {
+      options.reportError?.(error)
+    }
+
+    for (const recipientUserId of recipientUserIds) {
+      try {
+        const persona = await chatService.repository.findTestPersona(recipientUserId)
+        if (!persona?.replies.length) continue
+        const replyIndex = stableReplyIndex(message.messageId, persona.replies.length)
+        const reply = await chatService.sendMessageIdempotently(
+          persona.userId,
+          threadId,
+          persona.replies[replyIndex]!,
+          `test-persona-reply-${message.messageId}`
+        )
+        try { await dispatchDue(new Date(), reply.message.messageId) }
+        catch (error) { options.reportError?.(error) }
+      } catch (error) {
+        options.reportError?.(error)
+      }
+    }
+  }
+
   return {
     async dispatchDue(now = new Date()) { await dispatchDue(now) },
     async sendMessage(input) {
@@ -50,6 +80,15 @@ export function createChatMessageDeliveryService(options: {
         )
       )
       if (blocked.some(Boolean)) {
+        const committedRetry = input.clientMessageId
+          ? await chatService.findIdempotentMessage(
+            input.senderUserId,
+            input.threadId,
+            input.body,
+            input.clientMessageId
+          )
+          : null
+        if (committedRetry) return { message: committedRetry, created: false }
         throw new ChatDeliveryBlockedError(
           "That conversation is not available anymore."
         )
@@ -61,24 +100,14 @@ export function createChatMessageDeliveryService(options: {
         input.body,
         input.clientMessageId
       )
-      // A crash or failure after persistence must not erase the delivery intent.
-      // The periodic worker also picks up this durable job after restart.
-      try { await dispatchDue(new Date(), delivery.message.messageId) }
-      catch (error) { options.reportError?.(error) }
-
-      for (const recipientUserId of recipientUserIds) {
-        const persona = await chatService.repository.findTestPersona(recipientUserId)
-        if (!persona?.replies.length) continue
-        const replyIndex = stableReplyIndex(delivery.message.messageId, persona.replies.length)
-        const reply = await chatService.sendMessageIdempotently(
-          persona.userId,
-          input.threadId,
-          persona.replies[replyIndex]!,
-          `test-persona-reply-${delivery.message.messageId}`
-        )
-        try { await dispatchDue(new Date(), reply.message.messageId) }
-        catch (error) { options.reportError?.(error) }
-      }
+      // The persisted message plus durable outbox row is the send ACK. Push/realtime
+      // fanout and synthetic test-persona replies must not delay that confirmation.
+      // The periodic worker recovers the outbox if this process exits mid-dispatch.
+      void dispatchPostPersistEffects(
+        delivery.message,
+        input.threadId,
+        recipientUserIds
+      ).catch((error) => options.reportError?.(error))
       return delivery
     }
   }

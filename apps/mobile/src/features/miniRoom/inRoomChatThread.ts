@@ -21,6 +21,35 @@ export function findLastCanonicalRoomChatMessage(
   return undefined
 }
 
+/** Select durable partner messages missed since room entry or the last replay. */
+export function findMissedCanonicalRoomChatMessages(input: {
+  messages: readonly ChatMessage[]
+  baselineTimestamp: number
+  localUserId: string
+  alreadySeenMessageIds: ReadonlySet<string>
+}): ChatMessage[] {
+  const selected = new Set<string>()
+  return input.messages.filter((message) => {
+    if (
+      message.senderUserId === input.localUserId ||
+      message.messageId.startsWith("__local_") ||
+      message.body.trim() === ROOM_INVITE_SENTINEL ||
+      input.alreadySeenMessageIds.has(message.messageId) ||
+      selected.has(message.messageId)
+    ) {
+      return false
+    }
+
+    const sentAt = Date.parse(message.sentAt)
+    if (!Number.isFinite(sentAt) || sentAt < input.baselineTimestamp - 250) {
+      return false
+    }
+
+    selected.add(message.messageId)
+    return true
+  })
+}
+
 export function shouldRenderIncomingRoomChatMessage(input: {
   senderUserId: string
   localUserId: string

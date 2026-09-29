@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatThread } from "@blumi/contracts"
-import { openMatchedChat } from "./matchChatOpening"
+import { createMatchedChatOpener } from "./matchChatOpening"
 
 const thread: ChatThread = {
   threadId: "thread_match_one",
@@ -14,36 +14,52 @@ const thread: ChatThread = {
   createdAt: "2026-07-13T10:00:00.000Z"
 }
 
-test("matched chat navigates only after canonical thread creation succeeds", async () => {
-  const events: string[] = []
-  const result = await openMatchedChat({
-    createThread: async () => {
-      events.push("created")
-      return thread
-    },
-    onThreadReady: (createdThread) => {
-      events.push(`navigate:${createdThread.threadId}`)
-    }
-  })
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((yes) => { resolve = yes })
+  return { promise, resolve }
+}
 
-  assert.deepEqual(events, ["created", "navigate:thread_match_one"])
-  assert.deepEqual(result, { status: "opened", thread })
+test("concurrent pending-chat attempts share one canonical thread creation", async () => {
+  const request = deferred<ChatThread>()
+  const created: ChatThread[] = []
+  let requests = 0
+  const open = createMatchedChatOpener({
+    createThread: () => { requests += 1; return request.promise },
+    onThreadReady: (createdThread) => created.push(createdThread)
+  })
+  const first = open()
+  const duplicate = open()
+
+  assert.equal(requests, 1)
+  request.resolve(thread)
+  const [firstResult, duplicateResult] = await Promise.all([first, duplicate])
+  assert.deepEqual(firstResult, { status: "opened", thread })
+  assert.deepEqual(duplicateResult, firstResult)
+  assert.deepEqual(created, [thread])
 })
 
-test("matched chat returns retryable failure and never navigates on error", async () => {
-  let navigated = false
-  const result = await openMatchedChat({
+test("failed thread creation can be retried and only success publishes the thread", async () => {
+  const created: ChatThread[] = []
+  let requests = 0
+  const open = createMatchedChatOpener({
     createThread: async () => {
-      throw new Error("Network unavailable")
+      requests += 1
+      if (requests === 1) throw new Error("Network unavailable")
+      return thread
     },
-    onThreadReady: () => {
-      navigated = true
-    }
+    onThreadReady: (createdThread) => created.push(createdThread)
   })
 
-  assert.equal(navigated, false)
-  assert.deepEqual(result, {
+  const failed = await open()
+  assert.deepEqual(created, [])
+  assert.deepEqual(failed, {
     status: "failed",
     errorMessage: "We couldn't open that chat. Check your connection and try again."
   })
+
+  const retried = await open()
+  assert.equal(requests, 2)
+  assert.deepEqual(created, [thread])
+  assert.deepEqual(retried, { status: "opened", thread })
 })

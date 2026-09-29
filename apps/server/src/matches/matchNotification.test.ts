@@ -35,6 +35,24 @@ test("a first like notifies only its recipient and a new mutual match notifies b
   assert.equal(sent.length, 3)
 })
 
+test("notification failure never changes a persisted like or match response", async () => {
+  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([
+    profile("user_a", "A"), profile("user_b", "B")
+  ]))
+  const failedKinds: string[] = []
+  const service = createMatchService({
+    repository,
+    idFactory: () => "match_push_failure",
+    notificationService: {
+      sendPushToUser: async () => { throw new Error("push queue unavailable") }
+    },
+    reportSideEffectFailure: (kind) => { failedKinds.push(kind) }
+  })
+  assert.equal((await service.decide("user_a", "user_b", "like")).matched, false)
+  assert.equal((await service.decide("user_b", "user_a", "like")).match?.matchId, "match_push_failure")
+  assert.deepEqual(failedKinds, ["notification", "notification"])
+})
+
 function profile(userId: string, displayName: string) {
   return {
     userId,

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef } from "react"
 import {
   ActivityIndicator,
   Animated,
@@ -120,6 +120,7 @@ export function ShopOfflineNotice(props: { locale: AppLocale }) {
 
 export const ShopModeDock = memo(function ShopModeDock(props: {
   activeMode: ShopMode
+  width: number
   counts: Record<ShopMode, number>
   onSelectMode: (mode: ShopMode) => void
   locale: AppLocale
@@ -127,8 +128,7 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
   const copy = getShopCopy(props.locale)
   const slideAnim = useRef(new Animated.Value(props.activeMode === "avatar" ? 0 : 1)).current
   const reduceMotion = useReducedMotion()
-  const [dockWidth, setDockWidth] = useState(0)
-  const segmentWidth = dockWidth > 0 ? (dockWidth - 8) / 2 : 0
+  const segmentWidth = (props.width - 8) / 2
 
   useEffect(() => {
     const nextValue = props.activeMode === "avatar" ? 0 : 1
@@ -154,22 +154,17 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
   })
 
   return (
-    <View
-      style={styles.modeDock}
-      onLayout={(event) => setDockWidth(event.nativeEvent.layout.width)}
-    >
-      {segmentWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.modeIndicator,
-            {
-              width: segmentWidth,
-              transform: [{ translateX: indicatorTranslateX }]
-            }
-          ]}
-        />
-      ) : null}
+    <View style={styles.modeDock}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.modeIndicator,
+          {
+            width: segmentWidth,
+            transform: [{ translateX: indicatorTranslateX }]
+          }
+        ]}
+      />
       {SHOP_MODE_OPTIONS.map((option) => {
         const active = option.mode === props.activeMode
         const label = copy[option.copyKey]
@@ -207,6 +202,7 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
   )
 }, (previous, next) =>
   previous.activeMode === next.activeMode &&
+  previous.width === next.width &&
   previous.counts.avatar === next.counts.avatar &&
   previous.counts.home === next.counts.home &&
   previous.locale === next.locale &&

@@ -38,10 +38,13 @@ export type RealtimeFanoutHandler = (
   message: RealtimeFanoutMessage
 ) => void | Promise<void>
 
+export type RealtimeFanoutGapReason = "overflow" | "missing_payload" | "error" | "deadline" | "disconnect"
+export type RealtimeFanoutGapHandler = (reason: RealtimeFanoutGapReason) => void
+
 export interface RealtimeFanout {
   isHealthy?(): boolean
   publish(message: RealtimeFanoutMessage): Promise<void>
-  subscribe(handler: RealtimeFanoutHandler): Promise<() => Promise<void>>
+  subscribe(handler: RealtimeFanoutHandler, onGap?: RealtimeFanoutGapHandler): Promise<() => Promise<void>>
 }
 
 export function createInMemoryRealtimeFanout(): RealtimeFanout {

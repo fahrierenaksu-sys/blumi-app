@@ -1,8 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { Image as ExpoImage } from "expo-image"
+import type { ReactNode } from "react"
 import type { AvatarSelection, DiscoveryDecisionQuota } from "@blumi/contracts"
 import {
   ActivityIndicator,
-  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -54,12 +55,9 @@ export function EmptyDiscoveryDeck(props: EmptyDiscoveryDeckProps) {
       <EmptyDeckBack style={styles.emptyBottomCard} />
       <EmptyDeckBack style={styles.emptyMiddleCard} />
 
-      <ImageBackground
-        imageStyle={styles.emptyCardImage}
-        resizeMode="cover"
-        source={discoverCardSurface}
+      <DiscoveryCardSurface
+        priority="high"
         style={[
-          styles.emptyCard,
           props.state === "low-supply" ? styles.lowSupplyCard : null,
           isQuotaExhausted ? styles.quotaExhaustedCard : null
         ]}
@@ -197,7 +195,7 @@ export function EmptyDiscoveryDeck(props: EmptyDiscoveryDeckProps) {
           </Pressable>
         ) : null}
 
-      </ImageBackground>
+      </DiscoveryCardSurface>
     </View>
   )
 }
@@ -206,25 +204,16 @@ export function LoadingDiscoveryDeck() {
   const { copy, deckHeight } = useDiscoveryEmptyDeckPresentation()
   return (
     <View style={[styles.emptyDeck, { height: deckHeight }]}>
-      <EmptyDeckBack style={styles.emptyBottomCard} />
-      <EmptyDeckBack style={styles.emptyMiddleCard} />
-      <ImageBackground
-        imageStyle={styles.emptyCardImage}
-        resizeMode="cover"
-        source={discoverCardSurface}
-        style={[styles.emptyCard, styles.loadingCard]}
-      >
-        <View style={styles.emptyPhotoProgress} pointerEvents="none">
-          {[0, 1, 2, 3].map((index) => (
-            <View key={index} style={styles.emptyPhotoProgressTrack} />
-          ))}
-        </View>
-        <View style={styles.loadingIndicatorWrap}>
-          <ActivityIndicator color={uiTheme.colors.primary} size="large" />
-        </View>
-        <Text style={styles.emptyTitle}>{copy.empty.loadingTitle}</Text>
-        <Text style={styles.emptyBody}>{copy.empty.loadingBody}</Text>
-      </ImageBackground>
+      <EmptyDeckBack style={styles.emptyBottomCard} showDecorativeLines={false} />
+      <EmptyDeckBack style={styles.emptyMiddleCard} showDecorativeLines={false} />
+      <DiscoveryCardSurface priority="high" style={styles.loadingCard}>
+        <View
+          accessible
+          accessibilityLabel={copy.empty.loadingTitle}
+          accessibilityState={{ busy: true }}
+          style={StyleSheet.absoluteFill}
+        />
+      </DiscoveryCardSurface>
     </View>
   )
 }
@@ -237,12 +226,7 @@ export function DiscoverErrorCard(props: {
   const { copy, deckHeight } = useDiscoveryEmptyDeckPresentation()
   return (
     <View style={[styles.emptyDeck, { height: deckHeight }]}>
-      <ImageBackground
-        imageStyle={styles.emptyCardImage}
-        resizeMode="cover"
-        source={discoverCardSurface}
-        style={[styles.emptyCard, styles.errorCard]}
-      >
+      <DiscoveryCardSurface priority="high" style={styles.errorCard}>
         <View style={styles.errorIconBubble}>
           <Ionicons name="cloud-offline-outline" size={28} color={uiTheme.colors.primaryDeep} />
         </View>
@@ -258,7 +242,7 @@ export function DiscoverErrorCard(props: {
         >
           {props.refreshing ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.retryButtonText}>{copy.empty.errorAction}</Text>}
         </Pressable>
-      </ImageBackground>
+      </DiscoveryCardSurface>
     </View>
   )
 }
@@ -271,13 +255,37 @@ function useDiscoveryEmptyDeckPresentation() {
   }
 }
 
-function EmptyDeckBack(props: { style: StyleProp<ViewStyle> }) {
+function DiscoveryCardSurface(props: {
+  children: ReactNode
+  priority: "low" | "normal" | "high"
+  style?: StyleProp<ViewStyle>
+}) {
+  return (
+    <View style={[styles.emptyCard, props.style]}>
+      <ExpoImage
+        pointerEvents="none"
+        source={discoverCardSurface}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        priority={props.priority}
+        transition={0}
+        style={StyleSheet.absoluteFill}
+      />
+      {props.children}
+    </View>
+  )
+}
+
+function EmptyDeckBack(props: { style: StyleProp<ViewStyle>; showDecorativeLines?: boolean }) {
   return (
     <View pointerEvents="none" style={[styles.emptyBackCard, props.style]}>
-      <ImageBackground
-        imageStyle={styles.emptyCardImage}
-        resizeMode="cover"
+      <ExpoImage
+        pointerEvents="none"
         source={discoverCardSurface}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        priority="low"
+        transition={0}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
@@ -290,11 +298,13 @@ function EmptyDeckBack(props: { style: StyleProp<ViewStyle> }) {
         start={{ x: 0, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.backCardLines}>
-        <View style={[styles.backCardLine, styles.backCardLineWide]} />
-        <View style={styles.backCardLine} />
-        <View style={styles.backCardLine} />
-      </View>
+      {props.showDecorativeLines === false ? null : (
+        <View style={styles.backCardLines}>
+          <View style={[styles.backCardLine, styles.backCardLineWide]} />
+          <View style={styles.backCardLine} />
+          <View style={styles.backCardLine} />
+        </View>
+      )}
     </View>
   )
 }
@@ -372,29 +382,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 18
   },
-  emptyCardImage: {
-    borderRadius: 36
-  },
-  emptyPhotoProgress: {
-    flexDirection: "row",
-    gap: 6,
-    left: 18,
-    position: "absolute",
-    right: 18,
-    top: 14,
-    zIndex: 4
-  },
-  emptyPhotoProgressTrack: {
-    backgroundColor: "rgba(255, 255, 255, 0.38)",
-    borderColor: "rgba(255, 255, 255, 0.24)",
-    borderRadius: 999,
-    borderWidth: 0.5,
-    flex: 1,
-    height: 3
-  },
-  emptyPhotoProgressTrackActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.88)"
-  },
   avatarStage: {
     alignItems: "center",
     height: 224,
@@ -433,16 +420,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     ...uiTheme.font.bodyBold,
     color: "#FFFFFF"
-  },
-  loadingIndicatorWrap: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.58)",
-    borderColor: "rgba(255, 255, 255, 0.86)",
-    borderRadius: 50,
-    borderWidth: 1,
-    height: 100,
-    justifyContent: "center",
-    width: 100
   },
   copyBlock: {
     alignItems: "center",

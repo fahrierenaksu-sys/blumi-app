@@ -1,16 +1,22 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { BlurView } from "expo-blur"
+import type { RefObject } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { MiniRoomCopy } from "../miniRoomCopy"
-import { ConnectionPill } from "../../../ui/connectionPill"
 import { uiTheme } from "../../../ui/theme"
 
 interface MiniRoomHudProps {
   copy: MiniRoomCopy
+  partnerFirstName: string
   connectionStatus: MiniRoomConnectionStatus
   voiceAvailable: boolean
   localMedia: MiniRoomLocalMediaState
   leaveDisabled: boolean
+  horizontalInset: number
+  gap: number
+  topInset: number
+  blurTarget: RefObject<View | null>
   onLeave: () => void
   onOpenSafety: () => void
   onRetryConnect: () => void
@@ -23,7 +29,12 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     voiceAvailable,
     localMedia,
     copy,
+    partnerFirstName,
     leaveDisabled,
+    horizontalInset,
+    gap,
+    topInset,
+    blurTarget,
     onLeave,
     onOpenSafety,
     onRetryConnect,
@@ -31,10 +42,21 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
   } = props
 
   const mediaDisabled = connectionStatus !== "connected" || !voiceAvailable
+  const voiceLabel = localMedia.micEnabled ? copy.voiceOn : copy.voiceOff
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <View style={styles.topHud} pointerEvents="box-none">
+      <View
+        style={[
+          styles.topHud,
+          {
+            paddingHorizontal: horizontalInset,
+            paddingTop: topInset + uiTheme.spacing.sm,
+            gap
+          }
+        ]}
+        pointerEvents="box-none"
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={copy.leaveRoom}
@@ -47,152 +69,219 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
             pressed ? styles.pressed : null
           ]}
         >
-          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+          <GlassBackdrop blurTarget={blurTarget} />
+          <Ionicons name="arrow-back" size={24} color={uiTheme.colors.textPrimary} />
         </Pressable>
 
-        {voiceAvailable
-          ? <ConnectionPill status={connectionStatus} tone="dark" />
-          : <Text style={styles.retryText}>{copy.textRoom}</Text>}
+        <View style={styles.headerRail}>
+          <GlassBackdrop blurTarget={blurTarget} />
+          <View style={styles.titleBlock}>
+            <Text style={styles.roomTitle} numberOfLines={1}>
+              {copy.roomTitle}
+            </Text>
+            <Text style={styles.roomSubtitle} numberOfLines={1}>
+              {copy.roomSubtitle(partnerFirstName)}
+            </Text>
+          </View>
 
-        <View style={styles.topRightDock}>
           {connectionStatus === "error" ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={copy.retryRoomConnection}
               onPress={onRetryConnect}
-              style={({ pressed }) => [
-                styles.retryButton,
-                pressed ? styles.pressed : null
-              ]}
+              style={({ pressed }) => [styles.retryButton, pressed ? styles.pressed : null]}
             >
+              <Ionicons name="refresh" size={17} color={uiTheme.colors.primaryDeep} />
               <Text style={styles.retryText}>{copy.retry}</Text>
             </Pressable>
-          ) : null}
-          <View style={styles.mediaDock}>
+          ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={
-                localMedia.micEnabled
-                  ? copy.muteMicrophone
-                  : copy.turnOnMicrophone
-              }
-              accessibilityState={{
-                disabled: mediaDisabled,
-                selected: localMedia.micEnabled
-              }}
+              accessibilityLabel={localMedia.micEnabled ? copy.muteMicrophone : copy.turnOnMicrophone}
+              accessibilityState={{ disabled: mediaDisabled, selected: localMedia.micEnabled }}
               onPress={onToggleMic}
               disabled={mediaDisabled}
               style={({ pressed }) => [
-                styles.mediaButton,
-                localMedia.micEnabled ? styles.mediaButtonActive : null,
-                mediaDisabled ? styles.disabled : null,
+                styles.statusAction,
+                localMedia.micEnabled ? styles.statusActionActive : null,
+                mediaDisabled ? styles.statusActionUnavailable : null,
                 pressed ? styles.pressed : null
               ]}
             >
-              <Text style={styles.mediaText}>
-                {localMedia.micEnabled ? copy.voiceOn : copy.voiceOff}
+              <Ionicons
+                name={localMedia.micEnabled ? "mic" : "mic-off"}
+                size={17}
+                color={localMedia.micEnabled ? "#FFFFFF" : uiTheme.colors.brandPlum}
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  localMedia.micEnabled ? styles.statusTextActive : null
+                ]}
+                numberOfLines={1}
+              >
+                {voiceLabel}
               </Text>
             </Pressable>
-          </View>
+          )}
+
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={copy.openSafetyOptions}
             onPress={onOpenSafety}
-            style={({ pressed }) => [
-              styles.safetyButton,
-              pressed ? styles.pressed : null
-            ]}
+            style={({ pressed }) => [styles.safetyButton, pressed ? styles.pressed : null]}
           >
-            <Text style={styles.safetyText}>{copy.safety}</Text>
+            <Ionicons name="shield-outline" size={20} color={uiTheme.colors.brandPlum} />
+            <Text style={styles.safetyText} numberOfLines={1}>{copy.safety}</Text>
           </Pressable>
         </View>
       </View>
-
     </View>
+  )
+}
+
+function GlassBackdrop(props: { blurTarget: RefObject<View | null> }) {
+  return (
+    <>
+      <BlurView
+        blurTarget={props.blurTarget}
+        blurMethod="dimezisBlurViewSdk31Plus"
+        intensity={68}
+        tint="systemUltraThinMaterialLight"
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
+      <View pointerEvents="none" style={styles.glassTint} />
+      <View pointerEvents="none" style={styles.glassHighlight} />
+    </>
   )
 }
 
 const styles = StyleSheet.create({
   topHud: {
-    paddingTop: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.lg,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "center"
   },
   circleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(30, 15, 24, 0.55)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.82)",
+    ...uiTheme.shadow.float
   },
-  topRightDock: {
-    minWidth: 42,
+  headerRail: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 60,
+    borderRadius: 30,
+    overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
-    gap: uiTheme.spacing.xs,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.82)",
+    paddingLeft: 14,
+    paddingRight: 6,
+    gap: 4,
+    ...uiTheme.shadow.float
   },
-  retryButton: {
-    minHeight: 38,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: 12,
+  glassTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255, 247, 252, 0.78)"
+  },
+  glassHighlight: {
+    position: "absolute",
+    top: 1,
+    left: 12,
+    right: 12,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.96)"
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 88,
+    paddingRight: 4
+  },
+  roomTitle: {
+    fontFamily: "Inter_800ExtraBold",
+    fontWeight: "800",
+    fontSize: 16,
+    color: uiTheme.colors.textPrimary,
+    lineHeight: 19
+  },
+  roomSubtitle: {
+    ...uiTheme.font.caption,
+    color: "#826C8A",
+    lineHeight: 16
+  },
+  statusAction: {
+    minHeight: 42,
+    maxWidth: 92,
+    paddingHorizontal: 6,
+    borderRadius: 21,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    gap: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.30)"
   },
-  retryText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.primary,
+  statusActionActive: {
+    backgroundColor: uiTheme.colors.primary
   },
-  mediaDock: {
+  statusActionUnavailable: {
+    opacity: 0.78
+  },
+  statusText: {
+    color: uiTheme.colors.brandPlum,
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: "Inter_700Bold",
+    fontWeight: "700"
+  },
+  statusTextActive: {
+    color: "#FFFFFF"
+  },
+  retryButton: {
+    minHeight: 42,
+    paddingHorizontal: 8,
+    borderRadius: 21,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    padding: 4,
-    borderRadius: 16,
-    backgroundColor: "rgba(30, 15, 24, 0.52)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "rgba(255, 255, 255, 0.34)"
   },
-  mediaButton: {
-    minWidth: 48,
-    minHeight: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: uiTheme.spacing.sm,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  mediaButtonActive: {
-    backgroundColor: uiTheme.colors.primary,
+  retryText: {
+    color: uiTheme.colors.primaryDeep,
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    fontWeight: "700"
   },
   safetyButton: {
-    minHeight: 38,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: 12,
+    minWidth: 68,
+    minHeight: 42,
+    paddingHorizontal: 7,
+    borderRadius: 21,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 200, 220, 0.5)",
+    gap: 4,
+    backgroundColor: "rgba(255, 234, 246, 0.46)"
   },
   safetyText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.dangerInk,
-  },
-  mediaText: {
-    ...uiTheme.font.captionBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.brandPlum,
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: "Inter_800ExtraBold",
+    fontWeight: "800"
   },
   disabled: {
-    opacity: 0.4,
+    opacity: 0.42
   },
   pressed: {
-    opacity: 0.75,
-  },
+    opacity: 0.72,
+    transform: [{ scale: 0.97 }]
+  }
 })

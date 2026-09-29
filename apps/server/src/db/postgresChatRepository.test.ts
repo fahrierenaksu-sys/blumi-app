@@ -21,17 +21,26 @@ function createFakePool(handler: (text: string) => Record<string, unknown>[]) {
   }
 }
 
-test("chat duplicate lookup repairs only missing aggregate effects and keeps delivery identity", async () => {
-  let call = 0
-  const fake = createFakePool(() => ++call === 1 ? [] : [{
-    message_id: "message_existing", thread_id: "thread_one", sender_user_id: "user_a",
-    body: "original", sent_at: "2026-06-27T10:00:00.000Z"
-  }])
+test("chat duplicate lookup keeps same-body retries and flags changed-body idempotency conflicts", async () => {
+  const fake = createFakePool((text) => text.includes("INSERT INTO blumi_chat_messages")
+    ? []
+    : [{
+      message_id: "message_existing", thread_id: "thread_one", sender_user_id: "user_a",
+      body: "original", sent_at: "2026-06-27T10:00:00.000Z"
+    }])
   const repository = createPostgresChatRepository(fake.pool)
-  const result = await repository.createMessage({ messageId: "unused", threadId: "thread_one", senderUserId: "user_a", body: "changed", sentAt: "2026-06-27T10:00:00.000Z" }, "client-001")
-  assert.equal(result.created, false)
-  assert.equal(result.message.messageId, "message_existing")
-  assert.equal(result.message.body, "original")
+  const sameBodyRetry = await repository.createMessage({ messageId: "unused", threadId: "thread_one", senderUserId: "user_a", body: "original", sentAt: "2026-06-27T10:00:00.000Z" }, "client-001")
+  const changedBodyRetry = await repository.createMessage({ messageId: "unused_again", threadId: "thread_one", senderUserId: "user_a", body: "changed", sentAt: "2026-06-27T10:00:01.000Z" }, "client-001")
+  assert.equal(sameBodyRetry.created, false)
+  assert.notEqual(sameBodyRetry.idempotencyConflict, true)
+  assert.equal(sameBodyRetry.message.messageId, "message_existing")
+  assert.equal(sameBodyRetry.message.body, "original")
+  assert.equal(changedBodyRetry.created, false)
+  assert.equal(changedBodyRetry.idempotencyConflict, true)
+  assert.equal(changedBodyRetry.message.messageId, "message_existing")
+  assert.equal(changedBodyRetry.message.body, "original")
+  assert.match(fake.calls[3].text, /saved\.body = \$4/)
+  assert.deepEqual(fake.calls[3].values, ["thread_one", "user_a", "client-001", "changed"])
   assert.match(fake.calls[1].text, /INSERT INTO blumi_chat_delivery_outbox/)
   assert.match(fake.calls[1].text, /ON CONFLICT \(message_id\) DO NOTHING/)
 })
@@ -68,6 +77,7 @@ test("postgres chat repository saves threads with ordered participants", async (
   })
 
   assert.match(fake.calls[0].text, /INSERT INTO blumi_chat_threads/)
+  assert.match(fake.calls[0].text, /ON CONFLICT \(thread_id\) DO NOTHING/)
   assert.deepEqual(fake.calls[0].values?.slice(0, 2), [
     "thread_one",
     "room_one"
@@ -78,6 +88,15 @@ test("postgres chat repository saves threads with ordered participants", async (
   )
   assert.deepEqual(fake.calls[1].values, ["thread_one", "user_a", "A", 0])
   assert.deepEqual(fake.calls[2].values, ["thread_one", "user_b", "B", 1])
+})
+
+test("match sync checks existing chat IDs in one parameterized query", async () => {
+  const fake = createFakePool(() => [{ thread_id: "thread_match_one" }])
+  const repository = createPostgresChatRepository(fake.pool)
+  const ids = await repository.findExistingThreadIds(["thread_match_one", "thread_match_two"])
+  assert.deepEqual([...ids], ["thread_match_one"])
+  assert.match(fake.calls[0]?.text ?? "", /thread_id = ANY\(\$1::text\[\]\)/)
+  assert.deepEqual(fake.calls[0]?.values, [["thread_match_one", "thread_match_two"]])
 })
 
 test("postgres chat repository maps listed threads with latest message", async () => {
@@ -131,6 +150,29 @@ test("postgres chat repository maps listed threads with latest message", async (
   assert.equal(threads[0].participants[1].avatar?.revision, 2)
   assert.match(fake.calls[0].text, /ORDER BY t.created_at DESC, t.thread_id DESC LIMIT \$4/)
   assert.deepEqual(fake.calls[0].values, ["user_a", null, null, 51])
+})
+
+test("postgres chat repository groups participants by thread in a two-query page", async () => {
+  const fake = createFakePool((text) => text.includes("FROM blumi_chat_thread_participants")
+    ? [
+        { thread_id: "thread_two", user_id: "user_a", participant_order: 0 },
+        { thread_id: "thread_one", user_id: "user_a", participant_order: 0 },
+        { thread_id: "thread_one", user_id: "user_b", participant_order: 1 },
+        { thread_id: "thread_two", user_id: "user_c", participant_order: 1 }
+      ]
+    : [
+        { thread_id: "thread_two", mini_room_id: "room_two", created_at: "2026-06-27T10:00:00.000Z" },
+        { thread_id: "thread_one", mini_room_id: "room_one", created_at: "2026-06-27T09:00:00.000Z" }
+      ])
+  const repository = createPostgresChatRepository(fake.pool)
+
+  const page = await repository.listThreadsPage("user_a")
+
+  assert.deepEqual(page.threads.map((thread) => thread.participantUserIds), [
+    ["user_a", "user_c"],
+    ["user_a", "user_b"]
+  ])
+  assert.equal(fake.calls.length, 2)
 })
 
 test("postgres chat repository keeps a legacy malformed avatar optional", async () => {
@@ -224,6 +266,25 @@ test("postgres chat repository stores messages through an atomic idempotency key
   assert.equal(saved.created, true)
   assert.equal(messages[0]?.body, "hello")
   assert.match(fake.calls[1].text, /ORDER BY sent_at ASC/)
+})
+
+test("postgres idempotency lookup is a read scoped to thread, sender, and client ID", async () => {
+  const fake = createFakePool(() => [{
+    message_id: "message_existing", thread_id: "thread_one", sender_user_id: "user_a",
+    body: "persisted", sent_at: "2026-06-27T10:00:00.000Z"
+  }])
+  const repository = createPostgresChatRepository(fake.pool)
+
+  const message = await repository.findMessageByClientMessageId(
+    "thread_one", "user_a", "client-message-001"
+  )
+
+  assert.equal(message?.messageId, "message_existing")
+  assert.equal(message?.body, "persisted")
+  assert.match(fake.calls[0].text, /FROM blumi_chat_messages/)
+  assert.match(fake.calls[0].text, /thread_id = \$1 AND sender_user_id = \$2 AND client_message_id = \$3/)
+  assert.doesNotMatch(fake.calls[0].text, /INSERT INTO|UPDATE blumi_chat_delivery_outbox/)
+  assert.deepEqual(fake.calls[0].values, ["thread_one", "user_a", "client-message-001"])
 })
 
 test("postgres chat repository only advances a thread preview", async () => {

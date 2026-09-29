@@ -3,6 +3,8 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { Image as ExpoImage } from "expo-image"
 import { getShopCombinationItems, getShopCombinationSummary } from "../features/shop/shopCombinationSummary"
 import { getShopThumbnailLayout } from "../features/shop/shopThumbnailLayout"
+import { getShopPreviewAddedAssets } from "../features/shop/shopAvatarPreviewAssets"
+import { publishSelectedShopPreviewWarmup } from "../features/performance/sceneAssetWarmupModel"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import {
   ECONOMY_CATALOG,
@@ -14,7 +16,6 @@ import {
   Animated,
   Alert,
   FlatList,
-  Image as ReactNativeImage,
   type ImageSourcePropType,
   Pressable,
   ScrollView,
@@ -66,8 +67,6 @@ import { getShopProductPresentation } from "../features/shop/shopProductPresenta
 import { resolveShopCatalogRuntime } from "../features/shop/shopCatalogRuntime"
 import { getMaleRigLayerThumbnailPresentation } from "../features/avatarV2/maleRigThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../features/avatarV2/qa/avatarQaInventory"
-import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
-import { getShopPreviewAddedAssets } from "../features/shop/shopAvatarPreviewAssets"
 import {
   getAvatarItemPreviewSource,
   getRoomProductThumbnailSource,
@@ -143,7 +142,6 @@ type ShopCategoryOption = {
   icon: keyof typeof Ionicons.glyphMap
 }
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
-const pendingShopPreviewUris = new Set<string>()
 const AVATAR_CATEGORY_GLYPHS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   top: "tshirt-crew-outline",
   dress: "hanger",
@@ -236,6 +234,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   useEffect(() => {
     const requestedShopMode = props.route.params?.initialShopMode
     if (!requestedShopMode) return
+    publishSelectedShopPreviewWarmup([])
     setShopMode(requestedShopMode)
     setSelectedCategoryId(getDefaultShopCategoryId(requestedShopMode))
     setSelectedId("")
@@ -274,6 +273,10 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     discardShopPreview,
     navigation
   ])
+
+  useEffect(() => navigation.addListener("blur", () => {
+    publishSelectedShopPreviewWarmup([])
+  }), [navigation])
 
   const shopExitLocked = combinationState.phase !== "editing"
   const handleCloseShop = useCallback((): void => {
@@ -345,14 +348,27 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     hydrationStatus: inventoryStore.hydrationStatus,
     productCount: activeProducts.length
   })
-  const showShopContent = shouldRenderShopContent({
-    state: shopPresentationState,
+  const shopSurfacePolicy = getShopSurfacePolicy({
+    requiresServerInventory,
+    isConnected,
     isReady: inventoryStore.isReady,
+    hydrationStatus: inventoryStore.hydrationStatus,
+    state: shopPresentationState,
     productCount: activeProducts.length
   })
+  const {
+    showShopContent,
+    inventoryVerified,
+    canPerformShopActions
+  } = shopSurfacePolicy
   const shopStatusState: Exclude<ShopPresentationState, "ready"> =
     shopPresentationState === "ready" ? "loading" : shopPresentationState
   const isActionAvailable = !requiresServerInventory || isConnected
+  const inventoryGateLabel = shopPresentationState === "error"
+    ? copy.error.title
+    : shopPresentationState === "offline"
+      ? copy.offline.title
+      : copy.loading.title
 
   const selectedProduct = useMemo(
     () => resolveShopSelectedProduct({
@@ -362,6 +378,14 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
       activeProducts
     }),
     [activeProducts, filteredProducts, selectedId, shopMode]
+  )
+  const presentationProduct = useMemo(
+    () => maskUnverifiedProductOwnership(
+      selectedProduct,
+      inventoryVerified,
+      inventoryGateLabel
+    ),
+    [inventoryGateLabel, inventoryVerified, selectedProduct]
   )
   const previewTransition = useSelectionTransition(selectedProduct?.id, {
     fromScale: 0.99,
@@ -424,6 +448,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
       type: "replace_draft",
       draft: avatarToShopCombinationDraft(restored)
     })
+    publishSelectedShopPreviewWarmup([])
     hapticLight()
   }, [avatarV2.avatar, avatarV2.catalog, dispatchCombination, selectedProduct])
 
@@ -450,6 +475,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
 
   const handleSelectProduct = useCallback((product: ShopCatalogItem): void => {
     hapticLight()
+    const selectedWarmupSources: ImageSourcePropType[] = []
     if (product.previewType === "avatar") {
       setShopMode("avatar")
       if (shopMode !== "avatar") {
@@ -461,6 +487,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         const currentAvatar = shopCombinationDraftToAvatar(
           combinationStateRef.current.draft,
           avatarV2.avatar
+        )
+        selectedWarmupSources.push(
+          ...getShopPreviewAddedAssets(currentAvatar, product.avatarItem).map((asset) => asset.source)
         )
         const nextAvatar = previewAvatarShopItem(
           currentAvatar,
@@ -478,8 +507,10 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
       if (shopMode !== "home") {
         setSelectedCategoryId(getPrimaryProductCategoryId(product, "home"))
       }
+      if (product.roomItem) selectedWarmupSources.push(product.roomItem.asset.source)
     }
     setSelectedId(product.id)
+    publishSelectedShopPreviewWarmup(selectedWarmupSources)
   }, [
     avatarV2.avatar,
     avatarV2.catalog,
@@ -489,6 +520,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
 
   const handleSelectMode = useCallback((nextMode: ShopMode): void => {
     hapticLight()
+    publishSelectedShopPreviewWarmup([])
     setShopMode(nextMode)
     setSelectedCategoryId(getDefaultShopCategoryId(nextMode))
     setSelectedId("")
@@ -663,6 +695,15 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
 
   const handleApplyCombination = useCallback(async (): Promise<void> => {
     if (combinationStateRef.current.phase !== "editing") return
+    if (!inventoryVerified) {
+      hapticError()
+      showToast({
+        title: copy.loading.title,
+        body: copy.loading.body,
+        type: "warning"
+      })
+      return
+    }
     if (!isActionAvailable) {
       hapticError()
       showToast({
@@ -703,14 +744,26 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     copy.offline.actionUnavailable,
     copy.offline.title,
     copy.combination.alreadyApplied,
+    copy.loading.body,
+    copy.loading.title,
     dispatchCombination,
     executeCombinationCommands,
     inventoryStore.inventory,
+    inventoryVerified,
     isActionAvailable,
     locale
   ])
 
   const handlePrimaryAction = useCallback(async (): Promise<void> => {
+    if (!canPerformShopActions) {
+      hapticError()
+      showToast({
+        title: inventoryVerified ? copy.offline.title : copy.loading.title,
+        body: inventoryVerified ? copy.offline.actionUnavailable : copy.loading.body,
+        type: "warning"
+      })
+      return
+    }
     if (shopMode === "avatar" && multiItemApplyEnabled) {
       await handleApplyCombination()
       return
@@ -761,7 +814,11 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     avatarV2.catalog,
     copy.offline.title,
     copy.offline.actionUnavailable,
+    copy.loading.body,
+    copy.loading.title,
     inventoryStore,
+    inventoryVerified,
+    canPerformShopActions,
     isActionAvailable,
     isPurchasing,
     handleApplyCombination,
@@ -820,9 +877,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
             <Pressable
               testID="shop-coin-balance"
               accessibilityRole="button"
-              accessibilityLabel={`${showShopContent ? formatCoins(inventoryStore.inventory.coins, locale) : "—"} ${coinPackCopy.coins}`}
-              accessibilityState={{ disabled: !requiresServerInventory || !IS_BLUMI_PAID_COINS_ENABLED, expanded: IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen }}
-              disabled={!requiresServerInventory || !IS_BLUMI_PAID_COINS_ENABLED}
+              accessibilityLabel={`${inventoryVerified ? formatCoins(inventoryStore.inventory.coins, locale) : "—"} ${coinPackCopy.coins}`}
+              accessibilityState={{ disabled: !requiresServerInventory || !canPerformShopActions || !IS_BLUMI_PAID_COINS_ENABLED, expanded: IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen }}
+              disabled={!requiresServerInventory || !canPerformShopActions || !IS_BLUMI_PAID_COINS_ENABLED}
               onPress={() => setIsCoinWalletOpen((current) => !current)}
               style={({ pressed }) => [
                 styles.coinPill,
@@ -832,7 +889,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
             >
               <Ionicons name="diamond" size={14} color="#B9820D" />
               <Text style={styles.coinText}>
-                {showShopContent
+                {inventoryVerified
                   ? formatCoins(inventoryStore.inventory.coins, locale)
                   : "—"}
               </Text>
@@ -841,6 +898,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
 
           <ShopModeDock
             activeMode={shopMode}
+            width={shopLayoutMetrics.contentWidth}
             locale={locale}
             onSelectMode={handleSelectMode}
             counts={{
@@ -848,7 +906,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               home: roomProducts.length
             }}
           />
-          {IS_BLUMI_PAID_COINS_ENABLED && requiresServerInventory && isCoinWalletOpen ? (
+          {IS_BLUMI_PAID_COINS_ENABLED && requiresServerInventory && inventoryVerified && isCoinWalletOpen ? (
             <CoinPackWalletPanel
               locale={locale}
               state={coinPackWallet.state}
@@ -874,7 +932,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               >
                 <ShopPreviewPanel
                   mode={shopMode}
-                  product={selectedProduct}
+                  product={presentationProduct}
                   previewAvatar={previewAvatar}
                   roomPreviewScene={roomPreviewScene}
                   layoutMetrics={shopLayoutMetrics}
@@ -883,21 +941,33 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   }
                   locale={locale}
                   isActionAvailable={isActionAvailable}
-                  combinationSummary={shopMode === "avatar" && hasCombinationChanges ? combinationSummary : undefined}
-                  combinationItems={combinationItems}
+                  combinationSummary={inventoryVerified && shopMode === "avatar" && hasCombinationChanges ? combinationSummary : undefined}
+                  combinationItems={inventoryVerified ? combinationItems : []}
                   onSelectCombinationItem={(id) => {
                     const item = avatarProducts.find((entry) => entry.sourceItemId === id)
-                    if (item) setSelectedId(item.id)
+                    if (item) {
+                      publishSelectedShopPreviewWarmup([])
+                      setSelectedId(item.id)
+                    }
                   }}
-                  supportsCombinationAction={multiItemApplyEnabled}
-                  primaryActionLabel={shopMode === "avatar"
-                    ? multiItemApplyEnabled && (combinationItems.length > 1 || combinationSummary.purchaseCount === 0)
-                      ? combinationSummary.purchaseCount > 0 ? copy.combination.buyLook : copy.combination.applyLook
-                      : undefined
-                    : undefined}
-                  primaryActionDisabled={shopMode === "avatar"
-                    ? multiItemApplyEnabled ? !hasCombinationChanges || combinationSummary.total === null : undefined
-                    : undefined}
+                  supportsCombinationAction={inventoryVerified && multiItemApplyEnabled}
+                  primaryActionLabel={
+                    !inventoryVerified
+                      ? inventoryGateLabel
+                      : shopMode === "avatar"
+                        ? multiItemApplyEnabled && (combinationItems.length > 1 || combinationSummary.purchaseCount === 0)
+                          ? combinationSummary.purchaseCount > 0
+                            ? copy.combination.buyLook
+                            : copy.combination.applyLook
+                          : undefined
+                        : undefined
+                  }
+                  primaryActionDisabled={
+                    !inventoryVerified ||
+                    (shopMode === "avatar" && multiItemApplyEnabled && (
+                      !hasCombinationChanges || combinationSummary.total === null
+                    ))
+                  }
                   canRemovePreview={shopMode === "avatar" && canRemoveAvatarPreview}
                   onRemovePreview={handleRemoveAvatarPreview}
                   onPrimaryAction={() => {
@@ -906,11 +976,21 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 />
               </Animated.View>
 
+              {!inventoryVerified && shopPresentationState === "error" ? (
+                <ShopStatusCard
+                  state="error"
+                  isRetrying={inventoryStore.hydrationStatus === "loading"}
+                  onRetry={handleRetryShop}
+                  locale={locale}
+                />
+              ) : null}
+
               <ClosetBrowser
-                avatar={avatarV2.avatar}
                 categories={categoryOptions}
                 activeCategoryId={activeCategoryId}
                 products={filteredProducts}
+                inventoryVerified={inventoryVerified}
+                pendingInventoryLabel={inventoryGateLabel}
                 selectedId={selectedProduct?.id}
                 mode={shopMode}
                 locale={locale}
@@ -947,6 +1027,50 @@ function isDisplayableAvatarShopProduct(product: ShopCatalogItem): boolean {
   return getShopProductThumbnailSource(product.sourceItemId) !== undefined
 }
 
+function getShopSurfacePolicy(input: {
+  requiresServerInventory: boolean
+  isConnected: boolean
+  isReady: boolean
+  hydrationStatus: "idle" | "loading" | "ready" | "failed"
+  state: ShopPresentationState
+  productCount: number
+}): {
+  showShopContent: boolean
+  inventoryVerified: boolean
+  canPerformShopActions: boolean
+} {
+  const inventoryVerified = !input.requiresServerInventory || (
+    input.isReady && input.hydrationStatus === "ready"
+  )
+  return {
+    showShopContent: shouldRenderShopContent({
+      state: input.state,
+      isReady: input.isReady,
+      productCount: input.productCount
+    }) || (input.requiresServerInventory && input.productCount > 0),
+    inventoryVerified,
+    canPerformShopActions: inventoryVerified &&
+      (!input.requiresServerInventory || input.isConnected)
+  }
+}
+
+function maskUnverifiedProductOwnership(
+  product: ShopCatalogItem | undefined,
+  inventoryVerified: boolean,
+  pendingLabel: string
+): ShopCatalogItem | undefined {
+  if (!product || inventoryVerified) return product
+  return {
+    ...product,
+    owned: false,
+    priceCoins: null,
+    actionType: "disabled",
+    stateLabel: pendingLabel,
+    actionLabel: pendingLabel,
+    disabledReason: pendingLabel
+  }
+}
+
 function getAvatarShopProductPriority(product: ShopCatalogItem): number {
   if (PRODUCT_REFERENCE_AVATAR_ITEM_IDS.has(product.sourceItemId)) return 0
   if (product.priceCoins !== null) return 1
@@ -954,10 +1078,11 @@ function getAvatarShopProductPriority(product: ShopCatalogItem): number {
 }
 
 function ClosetBrowser(props: {
-  avatar: UserAvatar
   categories: ShopCategoryOption[]
   activeCategoryId: string
   products: ShopCatalogItem[]
+  inventoryVerified: boolean
+  pendingInventoryLabel: string
   selectedId: string | undefined
   mode: ShopMode
   locale: ReturnType<typeof getAppLocale>
@@ -1022,13 +1147,12 @@ function ClosetBrowser(props: {
                 product={product}
                 selected={product.id === props.selectedId}
                 selectedCompact
+                inventoryVerified={props.inventoryVerified}
+                pendingInventoryLabel={props.pendingInventoryLabel}
                 cardWidth={productCardWidth}
                 cardHeight={catalog.productCardHeight}
                 cardPadding={catalog.cardPadding}
                 thumbHeight={catalog.productThumbHeight}
-                thumbnailTransition={reduceMotion ? 0 : 120}
-                avatar={props.avatar}
-                shouldPrefetchPreview={index === pageIndex}
                 locale={props.locale}
                 onSelectProduct={props.onSelectProduct}
               />
@@ -1037,7 +1161,7 @@ function ClosetBrowser(props: {
         ))}
       </View>
     ),
-    [catalog, pageIndex, productCardWidth, productShelfWidth, props.avatar, props.locale, props.onSelectProduct, props.selectedId, reduceMotion]
+    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onSelectProduct, props.pendingInventoryLabel, props.selectedId]
   )
 
   return (
@@ -1056,8 +1180,9 @@ function ClosetBrowser(props: {
             disabled={pageIndex === 0}
             accessibilityState={{ disabled: pageIndex === 0 }}
             onPress={() => {
-              setPageIndex(pageIndex - 1)
-              productScrollerRef.current?.scrollToOffset({ offset: (pageIndex - 1) * productShelfWidth, animated: !reduceMotion })
+              const nextPageIndex = pageIndex - 1
+              setPageIndex(nextPageIndex)
+              productScrollerRef.current?.scrollToOffset({ offset: nextPageIndex * productShelfWidth, animated: !reduceMotion })
             }}
             style={[styles.catalogPageButton, pageIndex === 0 && styles.catalogPageButtonDisabled]}
           >
@@ -1070,8 +1195,9 @@ function ClosetBrowser(props: {
             disabled={pageIndex >= productPages.length - 1}
             accessibilityState={{ disabled: pageIndex >= productPages.length - 1 }}
             onPress={() => {
-              setPageIndex(pageIndex + 1)
-              productScrollerRef.current?.scrollToOffset({ offset: (pageIndex + 1) * productShelfWidth, animated: !reduceMotion })
+              const nextPageIndex = pageIndex + 1
+              setPageIndex(nextPageIndex)
+              productScrollerRef.current?.scrollToOffset({ offset: nextPageIndex * productShelfWidth, animated: !reduceMotion })
             }}
             style={[styles.catalogPageButton, pageIndex >= productPages.length - 1 && styles.catalogPageButtonDisabled]}
           >
@@ -1095,7 +1221,10 @@ function ClosetBrowser(props: {
           horizontal
           pagingEnabled
           bounces={false}
-          onMomentumScrollEnd={(event) => setPageIndex(Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth))))}
+          onMomentumScrollEnd={(event) => {
+            const nextPageIndex = Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth)))
+            setPageIndex(nextPageIndex)
+          }}
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
@@ -1214,50 +1343,33 @@ const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(props: {
 )
 
 const ShopProductCard = memo(function ShopProductCard(props: {
-  avatar: UserAvatar
   product: ShopCatalogItem
   selected: boolean
   selectedCompact?: boolean
-  cardWidth?: number
+  inventoryVerified: boolean
+  pendingInventoryLabel: string
+  cardWidth: number
   cardHeight?: number
-  cardPadding?: number
-  thumbHeight?: number
-  thumbnailTransition: number
-  shouldPrefetchPreview: boolean
+  cardPadding: number
+  thumbHeight: number
   metaLabel?: string
   locale: ReturnType<typeof getAppLocale>
   onSelectProduct: (product: ShopCatalogItem) => void
 }) {
   const {
     product,
-    avatar,
     selected,
     selectedCompact,
+    inventoryVerified,
+    pendingInventoryLabel,
     cardWidth,
     cardHeight,
     cardPadding,
     thumbHeight,
-    thumbnailTransition,
-    shouldPrefetchPreview,
     metaLabel,
     locale,
     onSelectProduct
   } = props
-  useEffect(() => {
-    if (!shouldPrefetchPreview || !product.avatarItem) return
-    const urls = getShopPreviewAddedAssets(avatar, product.avatarItem)
-      .map((asset) => ReactNativeImage.resolveAssetSource(asset.source)?.uri)
-      .filter((uri): uri is string => Boolean(uri))
-      .filter((uri) => {
-        if (pendingShopPreviewUris.has(uri)) return false
-        pendingShopPreviewUris.add(uri)
-        return true
-      })
-    if (urls.length === 0) return
-    void ExpoImage.prefetch(urls, "memory-disk")
-      .catch(() => undefined)
-      .finally(() => urls.forEach((uri) => pendingShopPreviewUris.delete(uri)))
-  }, [avatar, product.avatarItem, shouldPrefetchPreview])
   const copy = getShopCopy(locale)
   const presentation = getShopProductPresentation(product, locale)
   const compactCardSizeStyle =
@@ -1269,8 +1381,9 @@ const ShopProductCard = memo(function ShopProductCard(props: {
           padding: cardPadding
         }
       : undefined
-  const visibleMetaLabel =
-    metaLabel
+  const visibleMetaLabel = !inventoryVerified
+    ? pendingInventoryLabel
+    : metaLabel
       ?? (selectedCompact && product.priceCoins !== null && !product.owned
         ? formatCoins(product.priceCoins, locale)
         : selectedCompact && product.previewType === "room" && product.owned
@@ -1316,14 +1429,15 @@ const ShopProductCard = memo(function ShopProductCard(props: {
             source={avatarPreviewSource}
             selected={selected}
             isRigLayerSource={isRigLayerSource}
-            transitionMs={thumbnailTransition}
+            width={cardWidth - cardPadding * 2 - 2}
+            height={thumbHeight}
           />
         ) : product.roomItem ? (
           <ExpoImage
             source={roomPreviewSource}
             contentFit="contain"
             cachePolicy="memory-disk"
-            transition={thumbnailTransition}
+            transition={0}
             style={styles.productImage}
           />
         ) : null}
@@ -1344,12 +1458,12 @@ const ShopProductCard = memo(function ShopProductCard(props: {
         testID={`shop-item-${automationSlug}-price`}
         style={[
           styles.productMetaPill,
-          product.owned ? styles.productMetaPillOwned : null
+          inventoryVerified && product.owned ? styles.productMetaPillOwned : null
         ]}
       >
-        {product.owned ? (
+        {inventoryVerified && product.owned ? (
           <Ionicons name="checkmark-circle" size={12} color={uiTheme.colors.successInk} />
-        ) : product.priceCoins !== null ? (
+        ) : inventoryVerified && product.priceCoins !== null ? (
           <Ionicons name="diamond" size={12} color="#D79111" />
         ) : null}
         <Text style={styles.productMeta} numberOfLines={1}>
@@ -1365,12 +1479,12 @@ function AvatarProductThumbnail(props: {
   source: ImageSourcePropType | undefined
   selected: boolean
   isRigLayerSource: boolean
-  transitionMs: number
+  width: number
+  height: number
 }) {
-  const { item, source, selected, isRigLayerSource } = props
-  const [frame, setFrame] = useState({ width: 0, height: 0 })
+  const { item, source, selected, isRigLayerSource, width, height } = props
   const bounds = getShopProductThumbnailBounds(item.id)
-  const visibleLayout = getShopThumbnailLayout(bounds, frame.width, frame.height)
+  const visibleLayout = getShopThumbnailLayout(bounds, width, height)
   if (!source) {
     return (
       <View
@@ -1393,29 +1507,24 @@ function AvatarProductThumbnail(props: {
     : undefined
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onLayout={({ nativeEvent: { layout } }) => setFrame((current) =>
-        current.width === layout.width && current.height === layout.height
-          ? current : { width: layout.width, height: layout.height })}
-    >
-    <ExpoImage
-      source={source}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-      transition={props.transitionMs}
-      style={[
-        isRigLayerSource
-          ? styles.productWearableRigLayer
-          : styles.productWearableImage,
-        visibleLayout ? { position: "absolute", ...visibleLayout } : rigLayerPresentation
-          ? {
-              top: rigLayerPresentation.top,
-              transform: [{ scale: rigLayerPresentation.scale }]
-            }
-          : null
-      ]}
-    />
+    <View style={StyleSheet.absoluteFill}>
+      <ExpoImage
+        source={source}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={0}
+        style={[
+          isRigLayerSource
+            ? styles.productWearableRigLayer
+            : styles.productWearableImage,
+          visibleLayout ? { position: "absolute", ...visibleLayout } : rigLayerPresentation
+            ? {
+                top: rigLayerPresentation.top,
+                transform: [{ scale: rigLayerPresentation.scale }]
+              }
+            : null
+        ]}
+      />
     </View>
   )
 }

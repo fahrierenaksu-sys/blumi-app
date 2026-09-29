@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { Animated, Easing, StyleSheet, View } from "react-native"
 import { OnboardingScanStage } from "../features/session/OnboardingScanStage"
+import { ONBOARDING_SCAN_FRAMES } from "../features/session/OnboardingGreetingPair"
 import {
   ONBOARDING_BRAND_PRELUDE_TIMELINE_MS,
   getOnboardingBootGateRemainingMs,
@@ -131,6 +132,75 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
         style={styles.scanStage}
       >
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep} />
+      </View>
+    </View>
+  )
+}
+
+/** Discover has a local clock: the native onboarding clock may already be over. */
+export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
+  onFinished: () => void
+  onError: () => void
+}) {
+  const { reduceMotion, isResolved } = useReducedMotionPreference()
+  const nativeReduceMotion = getNativeOnboardingBootReduceMotion()
+  const motionResolved = isResolved || nativeReduceMotion !== null
+  const reduced = isResolved ? reduceMotion : nativeReduceMotion ?? false
+  const [loadedAssets, setLoadedAssets] = useState<readonly number[]>([])
+  const requiredAssetCount = ONBOARDING_SCAN_FRAMES.length + 1
+  const assetsReady = loadedAssets.length === requiredAssetCount
+  const scanRows = useRef(new Animated.Value(0)).current
+  const scanSweep = useRef(new Animated.Value(0)).current
+  const completed = useRef(false)
+  const onAssetLoad = useCallback((id: number) => {
+    if (!Number.isInteger(id) || id < 0 || id >= requiredAssetCount) return
+    setLoadedAssets((current) => current.includes(id) ? current : [...current, id])
+  }, [requiredAssetCount])
+
+  useEffect(() => {
+    if (!assetsReady || !motionResolved || completed.current) return
+    if (reduced) {
+      scanRows.setValue(1)
+      scanSweep.setValue(1)
+      completed.current = true
+      onFinished()
+      return
+    }
+    let active = true
+    const animation = Animated.sequence([
+      Animated.parallel([
+        Animated.timing(scanRows, {
+          toValue: 1, duration: timeline.scanRowsComplete,
+          easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false
+        }),
+        Animated.sequence([
+          Animated.delay(timeline.scanSweepStart),
+          Animated.timing(scanSweep, {
+            toValue: 1, duration: timeline.scanSweepComplete - timeline.scanSweepStart,
+            easing: Easing.inOut(Easing.cubic), useNativeDriver: true, isInteraction: false
+          })
+        ])
+      ]),
+      Animated.delay(timeline.scanDissolveComplete - timeline.scanSweepComplete)
+    ])
+    animation.start(({ finished }) => {
+      if (!active || !finished || completed.current) return
+      completed.current = true
+      onFinished()
+    })
+    return () => {
+      active = false
+      animation.stop()
+    }
+  }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep])
+
+  return (
+    <View style={styles.root}>
+      <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
+      <View accessibilityLabel="Blumi hazırlanıyor" accessibilityRole="progressbar"
+        style={[styles.scanStage, { opacity: assetsReady && motionResolved ? 1 : 0 }]}>
+        <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep}
+          onAssetLoad={onAssetLoad} onAssetError={onError} />
       </View>
     </View>
   )

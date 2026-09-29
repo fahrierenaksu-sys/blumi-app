@@ -36,7 +36,7 @@ import {
   CandidateAvatarPreview,
   createCandidateAvatarSnapshot
 } from "../components/DiscoverCard"
-import { useBlockStore } from "../features/safety/blockStore"
+import { hydrateBlockedUsersFromServer, useBlockStore } from "../features/safety/blockStore"
 import {
   DiscoverFiltersBottomSheet,
   DEFAULT_DISCOVER_FILTERS,
@@ -76,11 +76,13 @@ import {
   type DiscoveryCandidate
 } from "../features/discovery/discoveryCandidateModel"
 import { runDiscoveryRefresh } from "../features/discovery/discoveryRefreshModel"
+import { runDiscoveryWatchMutation } from "../features/discovery/discoveryWatchMutation"
 import {
   countActiveDiscoverFilters
 } from "../features/discovery/lobbyPresentationModel"
 import {
   clearLocalDiscoveryFiltersFallback,
+  getLoadedLocalDiscoveryFiltersFallback,
   loadDiscoveryFilters,
   loadLocalDiscoveryFiltersFallback,
   persistDiscoveryFilters,
@@ -92,9 +94,12 @@ import {
   buildDiscoveryWatchQueryKey,
   createDiscoveryPageQueryOptions,
   createDiscoveryWatchQueryOptions,
-  flattenDiscoveryPages
+  flattenDiscoveryPages,
+  shouldPrefetchDiscoveryPage,
+  shouldStartDiscoveryWatch
 } from "../features/discovery/discoveryQueryOptions"
 import { getDiscoveryErrorMessageForDisplay } from "../features/discovery/discoveryErrorCopy"
+import { scheduleMatchResultNavigation } from "../features/discovery/matchResultNavigation"
 import { useLobbyFlow } from "../features/lobby/useLobbyFlow"
 import { getLobbyFeedbackCopy } from "../features/lobby/lobbyFeedbackCopy"
 import { getAppLocale } from "../features/session/appLocale"
@@ -109,7 +114,9 @@ import type {
   MiniRoomParticipantsRouteParam,
   RootStackParamList
 } from "../navigation/RootNavigator"
-import { SoftBlobBackground } from "../ui/backgrounds"
+import { DiscoveryBackground } from "../features/discovery/DiscoveryBackground"
+import { useDiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
+import { areDiscoveryImagesDisplayed, recordDiscoveryImageReceipt, resolveDiscoveryStartup } from "../features/discovery/discoveryStartupModel"
 import { uiTheme } from "../ui/theme"
 import { DemoLobbyView } from "./DemoLobbyView"
 import { showToast } from "../ui/toast"
@@ -143,12 +150,29 @@ interface DiscoverFeedback {
 
 export function LobbyScreen(props: LobbyScreenProps) {
   const { sessionActor, onResetSession, onUpdateDiscoveryPreferences } = props
+  const startupBoundary = useDiscoveryStartupBoundary()
+  const [imageAttempt, setImageAttempt] = useState(0)
+  const [imageReceipts, setImageReceipts] = useState<readonly string[]>([])
+  const [imageFailures, setImageFailures] = useState<readonly string[]>([])
+  const [completedStartupScope, setCompletedStartupScope] = useState<string | null>(null)
+  const requiredImagesRef = useRef<readonly string[]>([])
+  const validImageFailureScopesRef = useRef<readonly string[]>([])
+  const imageSessionRef = useRef({ token: sessionActor.session.sessionToken, generation: 0 })
+  if (imageSessionRef.current.token !== sessionActor.session.sessionToken) {
+    imageSessionRef.current = { token: sessionActor.session.sessionToken, generation: imageSessionRef.current.generation + 1 }
+  }
   const lobbyCopy = getLobbyFeedbackCopy(getAppLocale())
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const route = useRoute<RouteProp<RootStackParamList, "Lobby">>()
   const queryClient = useQueryClient()
   const viewportMetrics = useAppViewportMetrics({ bottomNavVisible: true })
   const lastNavigatedMiniRoomIdRef = useRef<string | null>(null)
+  const cancelPendingMatchNavigationRef = useRef<(() => void) | null>(null)
+
+  useFocusEffect(useCallback(() => () => {
+    cancelPendingMatchNavigationRef.current?.()
+    cancelPendingMatchNavigationRef.current = null
+  }, []))
 
   const handleInvalidSession = useCallback(() => {
     void onResetSession()
@@ -178,13 +202,23 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }), [myDisplayName, myUserId, sessionActor.profile.avatar])
   const isDemoSession = sessionActor.session.mode === "demo"
   const isProductionDiscovery = sessionActor.session.mode === "production"
+  const showcaseRequest = useMemo(() => isProductionDiscovery ? ({
+    baseHttpUrl: MOBILE_HTTP_BASE_URL,
+    viewerUserId: sessionActor.profile.userId,
+    sessionToken: sessionActor.session.sessionToken
+  }) : undefined, [
+    isProductionDiscovery,
+    sessionActor.profile.userId,
+    sessionActor.session.sessionToken
+  ])
   const { saved: savedConnections, skipped: skippedConnections } = useSavedConnections(
     sessionActor.profile.userId
   )
   const {
     blockedUserIds,
     isBlocked: isUserBlocked,
-    isReady: isSafetyListReady
+    isReady: isSafetyListReady,
+    hydrationStatus: safetyHydrationStatus
   } = useBlockStore(
     sessionActor.profile.userId,
     sessionActor.session.mode === "production"
@@ -202,8 +236,19 @@ export function LobbyScreen(props: LobbyScreenProps) {
     useState<ReadonlySet<string>>(() => new Set())
   const inFlightDecisionUserIdsRef = useRef<ReadonlySet<string>>(new Set())
   const [filtersVisible, setFiltersVisible] = useState(false)
-  const [filters, setFilters] = useState<DiscoverFilters>(DEFAULT_DISCOVER_FILTERS)
-  const [filtersReadyForUserId, setFiltersReadyForUserId] = useState<string | null>(null)
+  const loadedLocalFallback = isProductionDiscovery
+    ? getLoadedLocalDiscoveryFiltersFallback(AsyncStorage, sessionActor.profile.userId)
+    : undefined
+  const [filters, setFilters] = useState<DiscoverFilters>(() =>
+    loadedLocalFallback === undefined
+      ? DEFAULT_DISCOVER_FILTERS
+      : resolveDiscoveryFiltersForFocus(sessionActor.profile.discoveryPreferences, loadedLocalFallback)
+  )
+  const [filtersReadyForUserId, setFiltersReadyForUserId] = useState<string | null>(() =>
+    isProductionDiscovery && loadedLocalFallback !== undefined
+      ? sessionActor.profile.userId
+      : null
+  )
   const filterPreferencesGenerationRef = useRef(0)
   const localFiltersFallbackRef = useRef<DiscoverFilters | null>(null)
   const filtersReady = filtersReadyForUserId === sessionActor.profile.userId
@@ -239,7 +284,11 @@ export function LobbyScreen(props: LobbyScreenProps) {
       baseHttpUrl: MOBILE_HTTP_BASE_URL,
       userId: sessionActor.profile.userId,
       sessionToken: sessionActor.session.sessionToken,
-      enabled: isProductionDiscovery
+      enabled: shouldStartDiscoveryWatch({
+        isProductionDiscovery,
+        filtersReady,
+        isInitialPagePending: productionDiscoveryQuery.isPending
+      })
     })
   )
   const productionProfiles = useMemo(
@@ -276,11 +325,20 @@ export function LobbyScreen(props: LobbyScreenProps) {
   useFocusEffect(useCallback(() => {
     let active = true
     const generation = filterPreferencesGenerationRef.current
-    setFiltersReadyForUserId(null)
     const accountPreferences = sessionActor.profile.discoveryPreferences
     const inMemoryFallback = localFiltersFallbackRef.current
     if (isProductionDiscovery && inMemoryFallback) {
       setFilters(resolveDiscoveryFiltersForFocus(accountPreferences, inMemoryFallback))
+      setFiltersReadyForUserId(sessionActor.profile.userId)
+      return () => {
+        active = false
+      }
+    }
+    const loadedFallback = isProductionDiscovery
+      ? getLoadedLocalDiscoveryFiltersFallback(AsyncStorage, sessionActor.profile.userId)
+      : undefined
+    if (loadedFallback !== undefined) {
+      setFilters(resolveDiscoveryFiltersForFocus(accountPreferences, loadedFallback))
       setFiltersReadyForUserId(sessionActor.profile.userId)
       return () => {
         active = false
@@ -309,7 +367,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
         setFilters(savedFilters)
         setFiltersReadyForUserId(sessionActor.profile.userId)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!active || generation !== filterPreferencesGenerationRef.current) return
+        setFilters(isProductionDiscovery
+          ? resolveDiscoveryFiltersForFocus(accountPreferences, localFiltersFallbackRef.current)
+          : DEFAULT_DISCOVER_FILTERS)
+        setFiltersReadyForUserId(sessionActor.profile.userId)
+      })
     return () => {
       active = false
     }
@@ -329,6 +393,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
   const firstDiscoveryDecisionCapturedRef = useRef(false)
 
   const [refreshing, setRefreshing] = useState(false)
+  const [safetyRetrying, setSafetyRetrying] = useState(false)
+  const handleRetrySafetyList = useCallback(() => {
+    if (safetyRetrying || !isProductionDiscovery) return
+    setSafetyRetrying(true)
+    void hydrateBlockedUsersFromServer(
+      sessionActor.profile.userId,
+      sessionActor.session.sessionToken
+    ).catch(() => undefined).finally(() => setSafetyRetrying(false))
+  }, [isProductionDiscovery, safetyRetrying, sessionActor.profile.userId, sessionActor.session.sessionToken])
   const refreshInFlightRef = useRef(false)
   const refreshProductionDiscover = useCallback(async (): Promise<void> => {
     if (!isProductionDiscovery || !filtersReady) return
@@ -400,17 +473,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
     if (!isProductionDiscovery || discoveryWatchBusy) return
     setDiscoveryWatchBusy(true)
     try {
-      const watch = await activateDiscoveryWatch(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken
-      )
-      queryClient.setQueryData(
-        buildDiscoveryWatchQueryKey({
-          baseHttpUrl: MOBILE_HTTP_BASE_URL,
-          userId: sessionActor.profile.userId
-        }),
-        watch
-      )
+      await runDiscoveryWatchMutation({
+        queryClient,
+        baseHttpUrl: MOBILE_HTTP_BASE_URL,
+        userId: sessionActor.profile.userId,
+        mutation: () => activateDiscoveryWatch(
+          MOBILE_HTTP_BASE_URL,
+          sessionActor.session.sessionToken
+        )
+      })
     } catch {
       showToast({
         title: lobbyCopy.watchSaveTitle,
@@ -433,17 +504,15 @@ export function LobbyScreen(props: LobbyScreenProps) {
     if (!isProductionDiscovery || discoveryWatchBusy) return
     setDiscoveryWatchBusy(true)
     try {
-      await cancelDiscoveryWatch(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken
-      )
-      queryClient.setQueryData(
-        buildDiscoveryWatchQueryKey({
-          baseHttpUrl: MOBILE_HTTP_BASE_URL,
-          userId: sessionActor.profile.userId
-        }),
-        null
-      )
+      await runDiscoveryWatchMutation({
+        queryClient,
+        baseHttpUrl: MOBILE_HTTP_BASE_URL,
+        userId: sessionActor.profile.userId,
+        mutation: () => cancelDiscoveryWatch(
+          MOBILE_HTTP_BASE_URL,
+          sessionActor.session.sessionToken
+        ).then(() => null)
+      })
     } catch {
       showToast({
         title: lobbyCopy.watchCancelTitle,
@@ -528,17 +597,14 @@ export function LobbyScreen(props: LobbyScreenProps) {
       discoveryQuotaExhausted ||
       discoverDeck.length === 0
     ) return
-    void cancelDiscoveryWatch(
-      MOBILE_HTTP_BASE_URL,
-      sessionActor.session.sessionToken
-    ).then(() => {
-      queryClient.setQueryData(
-        buildDiscoveryWatchQueryKey({
-          baseHttpUrl: MOBILE_HTTP_BASE_URL,
-          userId: sessionActor.profile.userId
-        }),
-        null
-      )
+    void runDiscoveryWatchMutation({
+      queryClient,
+      baseHttpUrl: MOBILE_HTTP_BASE_URL,
+      userId: sessionActor.profile.userId,
+      mutation: () => cancelDiscoveryWatch(
+        MOBILE_HTTP_BASE_URL,
+        sessionActor.session.sessionToken
+      ).then(() => null)
     }).catch(() => undefined)
   }, [
     discoverDeck.length,
@@ -551,18 +617,20 @@ export function LobbyScreen(props: LobbyScreenProps) {
   ])
 
   useEffect(() => {
-    if (
-      !isProductionDiscovery ||
-      productionDiscoveryQuery.isFetchingNextPage ||
-      !productionDiscoveryQuery.hasNextPage ||
-      discoveryQuotaExhausted ||
-      discoverDeck.length > 3
-    ) return
+    if (!shouldPrefetchDiscoveryPage({
+      isProductionDiscovery,
+      isSafetyListReady,
+      isFetchingNextPage: productionDiscoveryQuery.isFetchingNextPage,
+      hasNextPage: Boolean(productionDiscoveryQuery.hasNextPage),
+      isQuotaExhausted: discoveryQuotaExhausted,
+      availableCandidateCount: discoverDeck.length
+    })) return
     void productionDiscoveryQuery.fetchNextPage().catch(() => undefined)
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }, [
     discoverDeck.length,
     isProductionDiscovery,
+    isSafetyListReady,
     discoveryQuotaExhausted,
     productionDiscoveryQuery.fetchNextPage,
     productionDiscoveryQuery.hasNextPage,
@@ -907,9 +975,11 @@ export function LobbyScreen(props: LobbyScreenProps) {
         if (match) {
           void hydrateFromServer(sessionActor.session.sessionToken)
           showDiscoverFeedback(lobbyCopy.matched, "warm")
-          setTimeout(() => {
-            navigation.navigate("MatchResult", { match })
-          }, 260)
+          cancelPendingMatchNavigationRef.current?.()
+          cancelPendingMatchNavigationRef.current = scheduleMatchResultNavigation(
+            () => navigation.navigate("MatchResult", { match }),
+            () => navigation.isFocused()
+          )
           return true
         }
 
@@ -1153,9 +1223,51 @@ export function LobbyScreen(props: LobbyScreenProps) {
       : nearbyCount > 0
         ? lobbyCopy.everyoneSeen
         : null
-  const showDiscoveryLoading = isProductionDiscovery && productionProfiles.length === 0 && (
-    !filtersReady || productionDiscoverLoading || !isSafetyListReady
-  )
+  const discoveryPlaceholderState = resolveProductionDiscoveryPlaceholderState({
+    isProductionDiscovery,
+    filtersReady,
+    isSafetyListReady,
+    safetyHydrationFailed: safetyHydrationStatus === "failed",
+    hasCachedProfiles: productionProfiles.length > 0,
+    queryLoading: productionDiscoverLoading,
+    hasError: productionDiscoverError !== null
+  })
+  const startupSessionScope = `${sessionActor.profile.userId}:${imageSessionRef.current.generation}`
+  const startupComplete = completedStartupScope === startupSessionScope
+  const startupScope = `${startupSessionScope}:${imageAttempt}`
+  const firstCardScope = `${startupScope}:${visibleDiscoverDeck[0]?.userId ?? "empty"}:${JSON.stringify(visibleDiscoverDeck[0]?.avatar ?? null)}`
+  requiredImagesRef.current = [
+    `${startupScope}:background`, `${startupScope}:header`,
+    `${firstCardScope}:layout`, `${firstCardScope}:surface`, `${firstCardScope}:avatar`
+  ]
+  validImageFailureScopesRef.current = [startupScope, firstCardScope]
+  const recordImage = useCallback((key: string) => {
+    setImageReceipts((current) => recordDiscoveryImageReceipt(current, requiredImagesRef.current, key))
+  }, [])
+  const recordImageFailure = useCallback((key: string) => {
+    setImageFailures((current) => recordDiscoveryImageReceipt(current, validImageFailureScopesRef.current, key))
+  }, [])
+  const onBackgroundDisplay = useCallback(() => recordImage(`${startupScope}:background`), [recordImage, startupScope])
+  const onHeaderDisplay = useCallback(() => recordImage(`${startupScope}:header`), [recordImage, startupScope])
+  const onBackgroundError = useCallback(() => recordImageFailure(startupScope), [recordImageFailure, startupScope])
+  const onFrontDisplay = useCallback((part: "layout" | "surface" | "avatar") => recordImage(`${firstCardScope}:${part}`), [firstCardScope, recordImage])
+  const onFrontError = useCallback(() => recordImageFailure(firstCardScope), [firstCardScope, recordImageFailure])
+  const startupImageFailed = imageFailures.includes(startupScope) || imageFailures.includes(firstCardScope)
+  const startupImagesReady = areDiscoveryImagesDisplayed(requiredImagesRef.current, imageReceipts)
+  const startupStatus = resolveDiscoveryStartup({
+    safetyReady: !isProductionDiscovery || isSafetyListReady,
+    dataReady: filtersReady && !productionDiscoveryQuery.isPending,
+    hasCard: visibleDiscoverDeck.length > 0,
+    chromeReady: areDiscoveryImagesDisplayed([`${startupScope}:background`, `${startupScope}:header`], imageReceipts),
+    imagesReady: startupImagesReady,
+    failed: discoveryPlaceholderState === "error" || startupImageFailed
+  })
+  useEffect(() => {
+    if (isProductionDiscovery) startupBoundary?.report(startupStatus)
+    if (startupStatus === "ready") setCompletedStartupScope(startupSessionScope)
+  }, [isProductionDiscovery, startupBoundary, startupStatus, startupSessionScope])
+  const showStartupFailure = isProductionDiscovery && !startupComplete && (startupImageFailed || discoveryPlaceholderState === "error" ||
+    (startupBoundary?.deadlineExpired === true && startupStatus === "pending"))
 
   const handleOpenFilters = useCallback(() => {
     setFiltersVisible(true)
@@ -1232,7 +1344,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   )
   return (
     <View style={styles.root}>
-      <SoftBlobBackground variant="homeLiquid" />
+      <DiscoveryBackground key={startupScope} onDisplay={onBackgroundDisplay} onError={onBackgroundError} />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
         <ScrollView
           canCancelContentTouches={false}
@@ -1261,9 +1373,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
               <View style={styles.homeProfileSheen} pointerEvents="none" />
               <View style={styles.homeAvatarPreview}>
                 <CandidateAvatarPreview
+                  key={startupScope}
+                  onDisplay={onHeaderDisplay}
+                  onImageError={onBackgroundError}
                   size={48}
                   snapshot={myAvatarSnapshot}
                   stage="profile"
+                  imagePriority="normal"
                 />
               </View>
               <View style={styles.homeProfileText}>
@@ -1314,8 +1430,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
             <DemoLobbyView sessionActor={sessionActor} />
           ) : (
             <View>
+              <View pointerEvents={showStartupFailure ? "none" : "auto"}
+                accessibilityElementsHidden={showStartupFailure}
+                importantForAccessibility={showStartupFailure ? "no-hide-descendants" : "auto"}
+                style={showStartupFailure ? { opacity: 0 } : undefined}>
               <DiscoveryDeckView
                 profiles={visibleDiscoverDeck}
+                onFrontDisplay={onFrontDisplay}
+                onFrontImageError={onFrontError}
+                key={startupScope}
+                deferSecondaryImages={isProductionDiscovery && !startupComplete && !startupImagesReady}
+                showcaseRequest={showcaseRequest}
                 swipeAnim={cardDragX}
                 onSwipeRight={handlePrimaryLike}
                 onSwipeLeft={handleSkipFeatured}
@@ -1323,15 +1448,23 @@ export function LobbyScreen(props: LobbyScreenProps) {
                 likeDisabled={likeDisabled}
                 actionsDisabled={discoveryQuotaExhausted || (featuredCandidate ? inFlightDecisionUserIds.has(featuredCandidate.userId) : false)}
                   emptyContent={(
-                  productionDiscoverError ? (
+                  productionDiscoverError || discoveryPlaceholderState === "error" || showStartupFailure ? (
                     <DiscoverErrorCard
-                      message={productionDiscoverError}
-                      refreshing={refreshing}
+                      message={discoveryPlaceholderState === "error" && safetyHydrationStatus === "failed"
+                        ? getAppLocale() === "tr"
+                          ? "Güvenlik listesi doğrulanamadı. Bağlantını kontrol edip tekrar dene."
+                          : "We couldn't verify your safety list. Check your connection and try again."
+                        : productionDiscoverError ?? (getAppLocale() === "tr"
+                          ? "Keşfet henüz hazırlanamadı. Bağlantını kontrol edip tekrar dene."
+                          : "Discover isn't ready yet. Check your connection and try again.")}
+                      refreshing={refreshing || safetyRetrying}
                       onRetry={() => {
-                        void handleRefresh()
+                        setImageAttempt((current) => current + 1)
+                        if (safetyHydrationStatus === "failed") handleRetrySafetyList()
+                        if (productionDiscoverError || showStartupFailure) void productionDiscoveryQuery.refetch()
                       }}
                     />
-                  ) : showDiscoveryLoading ? (
+                  ) : discoveryPlaceholderState === "loading" ? (
                     <LoadingDiscoveryDeck />
                   ) : (
                     <EmptyDiscoveryDeck
@@ -1360,6 +1493,22 @@ export function LobbyScreen(props: LobbyScreenProps) {
                   )
                 )}
               />
+              </View>
+              {showStartupFailure ? (
+                <View style={StyleSheet.absoluteFill}>
+                  <DiscoverErrorCard
+                    message={getAppLocale() === "tr"
+                      ? "Keşfet henüz hazırlanamadı. Bağlantını kontrol edip tekrar dene."
+                      : "Discover isn't ready yet. Check your connection and try again."}
+                    refreshing={productionDiscoveryQuery.isFetching}
+                    onRetry={() => {
+                      setImageAttempt((current) => current + 1)
+                      if (!isSafetyListReady) handleRetrySafetyList()
+                      if (!productionDiscoveryQuery.data || productionDiscoverError) void productionDiscoveryQuery.refetch()
+                    }}
+                  />
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -1426,6 +1575,22 @@ export function LobbyScreen(props: LobbyScreenProps) {
       />
     </View>
   )
+}
+
+export function resolveProductionDiscoveryPlaceholderState(input: {
+  isProductionDiscovery: boolean
+  filtersReady: boolean
+  isSafetyListReady: boolean
+  safetyHydrationFailed: boolean
+  hasCachedProfiles: boolean
+  queryLoading: boolean
+  hasError: boolean
+}): "error" | "loading" | "empty" {
+  if (!input.isProductionDiscovery) return "empty"
+  if (input.hasError || input.safetyHydrationFailed) return "error"
+  if (!input.filtersReady || !input.isSafetyListReady) return "loading"
+  if (!input.hasCachedProfiles && input.queryLoading) return "loading"
+  return "empty"
 }
 
 function PendingInviteCountdown(props: { pendingInvites: PendingInviteMemory[] }) {

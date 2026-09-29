@@ -7,6 +7,7 @@ import {
   DISCOVERY_MINIMUM_AGE,
   clearLocalDiscoveryFiltersFallback,
   formatDiscoveryFiltersSummary,
+  getLoadedLocalDiscoveryFiltersFallback,
   getLocalDiscoveryFiltersFallbackStorageKey,
   getDiscoveryFiltersStorageKey,
   loadLocalDiscoveryFiltersFallback,
@@ -187,4 +188,76 @@ test("a successful account sync clears the device-local fallback", async () => {
     await loadLocalDiscoveryFiltersFallback(storage, "account-1"),
     null
   )
+})
+
+test("a preloaded local filter fallback is immediately available and never crosses accounts", async () => {
+  const readers = new Map<string, (value: string | null) => void>()
+  const reads: string[] = []
+  const storage = {
+    getItem(key: string): Promise<string | null> {
+      reads.push(key)
+      return new Promise((resolve) => readers.set(key, resolve))
+    },
+    async setItem() {},
+    async removeItem() {}
+  }
+  const first = loadLocalDiscoveryFiltersFallback(storage, "account-1")
+  const second = loadLocalDiscoveryFiltersFallback(storage, "account-1")
+  assert.equal(reads.length, 1)
+  assert.equal(getLoadedLocalDiscoveryFiltersFallback(storage, "account-1"), undefined)
+  assert.equal(getLoadedLocalDiscoveryFiltersFallback(storage, "account-2"), undefined)
+
+  readers.get(getLocalDiscoveryFiltersFallbackStorageKey("account-1"))?.(JSON.stringify({
+    ageMin: 27,
+    ageMax: 35,
+    genders: ["woman"],
+    vibes: []
+  }))
+  assert.deepEqual(await first, await second)
+  assert.equal(reads.length, 1)
+  assert.deepEqual(getLoadedLocalDiscoveryFiltersFallback(storage, "account-1"), {
+    ageMin: 27,
+    ageMax: 35,
+    genders: ["woman"],
+    vibes: []
+  })
+  assert.equal(getLoadedLocalDiscoveryFiltersFallback(storage, "account-2"), undefined)
+})
+
+test("local filter writes replace an in-flight read and failed reads can retry", async () => {
+  let resolveRead: ((value: string | null) => void) | undefined
+  let rejectRead: ((error: Error) => void) | undefined
+  let readCount = 0
+  const storage = {
+    getItem(): Promise<string | null> {
+      readCount += 1
+      return new Promise((resolve, reject) => {
+        resolveRead = resolve
+        rejectRead = reject
+      })
+    },
+    async setItem() {},
+    async removeItem() {}
+  }
+  const staleRead = loadLocalDiscoveryFiltersFallback(storage, "account-1")
+  const saved = await persistLocalDiscoveryFiltersFallback(storage, "account-1", {
+    ageMin: 28,
+    ageMax: 34,
+    genders: ["man"],
+    vibes: []
+  })
+  resolveRead?.(null)
+  await staleRead
+  assert.deepEqual(getLoadedLocalDiscoveryFiltersFallback(storage, "account-1"), saved)
+  await clearLocalDiscoveryFiltersFallback(storage, "account-1")
+  assert.equal(getLoadedLocalDiscoveryFiltersFallback(storage, "account-1"), null)
+
+  const failed = loadLocalDiscoveryFiltersFallback(storage, "account-2")
+  rejectRead?.(new Error("temporary storage failure"))
+  assert.equal(await failed, null)
+  assert.equal(getLoadedLocalDiscoveryFiltersFallback(storage, "account-2"), undefined)
+  const retry = loadLocalDiscoveryFiltersFallback(storage, "account-2")
+  assert.equal(readCount, 3)
+  resolveRead?.(null)
+  assert.equal(await retry, null)
 })

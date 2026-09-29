@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { QueryClient, QueryObserver } from "@tanstack/react-query"
+import { JSON_REQUEST_TIMEOUT_MS } from "../network/apiClient"
 import { createStableMatchedUserAvatar } from "../matches/matchRoomResolvers"
 import {
   createMatchFromDiscoveryResult,
@@ -12,6 +14,9 @@ import {
   fetchDiscoveryWatch,
   activateDiscoveryWatch,
   cancelDiscoveryWatch,
+  buildDiscoveryRoomShowcaseQueryKey,
+  createDiscoveryRoomShowcaseQueryOptions,
+  fetchDiscoveryRoomShowcase,
   isDiscoveryWatchActive
 } from "./discoveryApi"
 
@@ -23,6 +28,72 @@ const DISCOVERY_QUOTA = {
   resetsAt: "2026-07-23T00:00:00.000Z",
   rewardedAd: { available: false, extensionDecisions: 10 }
 } as const
+
+test("watch DELETE has a deadline even when transport ignores abort and never retries", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let calls = 0
+  let signal: AbortSignal | null | undefined
+  let failure: unknown
+  const request = cancelDiscoveryWatch("https://api.test", "token", async (_url, init) => {
+    calls += 1
+    signal = init?.signal
+    return new Promise<Response>(() => {})
+  }).catch((error: unknown) => { failure = error })
+  context.mock.timers.tick(JSON_REQUEST_TIMEOUT_MS)
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+  assert.equal((failure as Error | undefined)?.name, "TimeoutError")
+  assert.equal(signal?.aborted, true)
+  assert.equal(calls, 1)
+  await request
+})
+
+test("watch DELETE accepts an empty 204 and clears its deadline", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let signal: AbortSignal | null | undefined
+  await cancelDiscoveryWatch("https://api.test", "token", async (_url, init) => {
+    assert.equal(init?.method, "DELETE")
+    assert.equal((init?.headers as Record<string, string>).authorization, "Bearer token")
+    signal = init?.signal
+    return new Response(null, { status: 204 })
+  })
+  context.mock.timers.tick(JSON_REQUEST_TIMEOUT_MS)
+  assert.equal(signal?.aborted, false)
+})
+
+test("watch DELETE bounds error-body reads and retains API errors", async (context) => {
+  await assert.rejects(cancelDiscoveryWatch("https://api.test", "token", async () =>
+    new Response(JSON.stringify({ error: "Try later" }), { status: 503 })), /Try later/)
+  await assert.rejects(cancelDiscoveryWatch("https://api.test", "token", async () =>
+    new Response("not JSON", { status: 503 })), /We could not cancel your Vibe Card yet/)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  let failure: unknown
+  const request = cancelDiscoveryWatch("https://api.test", "token", async () => ({
+    ok: false,
+    json: () => { entered(); return new Promise<unknown>(() => {}) }
+  } as Response)).catch((error: unknown) => { failure = error })
+  await started
+  context.mock.timers.tick(JSON_REQUEST_TIMEOUT_MS)
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+  assert.equal((failure as Error | undefined)?.name, "TimeoutError")
+  await request
+})
+
+test("watch DELETE honors cancellation even when transport ignores the signal", async () => {
+  const controller = new AbortController()
+  let calls = 0
+  const fetcher: typeof fetch = async () => {
+    calls += 1
+    return new Promise<Response>(() => {})
+  }
+  const request = cancelDiscoveryWatch("https://api.test", "token", fetcher, controller.signal)
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  controller.abort()
+  await rejected
+  await assert.rejects(cancelDiscoveryWatch("https://api.test", "token", fetcher, controller.signal), { name: "AbortError" })
+  assert.equal(calls, 1)
+})
 
 test("expired discovery cursor exposes a restart marker instead of silently appending a new deck", async () => {
   await assert.rejects(fetchDiscoverPage("https://api.test", "token", {ageMin:18,ageMax:99,genders:[],vibes:[]},
@@ -212,7 +283,6 @@ test("fetchDiscoverPage omits legacy radius controls and returns global supply m
           distanceLabel: "In your area",
           vibeTags: ["coffee"],
           signals: ["Both into coffee"],
-          roomSnapshotUrl: "/v1/room-showcase/room-1",
           avatarPresetId: COMPLETE_DISCOVERY_AVATAR.presetId,
           avatar: COMPLETE_DISCOVERY_AVATAR
         }],
@@ -233,10 +303,8 @@ test("fetchDiscoverPage omits legacy radius controls and returns global supply m
   assert.equal(page.supply.state, "low")
   assert.deepEqual(page.quota, DISCOVERY_QUOTA)
   assert.deepEqual(page.profiles[0]?.signals, ["Both into coffee"])
-  assert.equal(
-    page.profiles[0]?.roomSnapshotUrl,
-    "https://api.blumi.test/v1/room-showcase/room-1"
-  )
+  assert.equal(page.profiles[0]?.roomSnapshotUrl, undefined)
+  assert.equal(page.profiles[0]?.roomHeadline, undefined)
 })
 
 test("fetchDiscoverProfile preserves the server-authoritative deep-link decision capability", async () => {
@@ -281,6 +349,116 @@ test("fetchDiscoverProfile caller cancellation reaches the composed transport si
   controller.abort()
   await rejected
   assert.equal(transportSignal?.aborted, true)
+})
+
+test("a new flip reauthorizes the room and never reuses the previous viewer's result", async () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  })
+  let calls = 0
+  const request = {
+    baseHttpUrl: "https://api.blumi.test",
+    viewerUserId: "viewer-a",
+    candidateUserId: "candidate-1",
+    sessionToken: "viewer-a-session",
+    fetcher: (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls += 1
+      assert.equal(String(url), "https://api.blumi.test/v1/discover/candidate-1")
+      assert.equal((init?.headers as Record<string, string>).authorization, "Bearer viewer-a-session")
+      return createJsonResponse(200, {
+        profile: {
+          userId: "candidate-1",
+          displayName: "Defne",
+          age: 24,
+          bio: "A prompt already present in the first page.",
+          distanceLabel: "Nearby",
+          vibeTags: ["coffee"],
+          signals: ["Both into coffee"],
+          roomHeadline: "A public room",
+          roomSnapshotUrl: "/v1/room-showcase/asset-1",
+          avatarPresetId: COMPLETE_DISCOVERY_AVATAR.presetId,
+          avatar: COMPLETE_DISCOVERY_AVATAR
+        },
+        decision: { capability: calls === 1 ? "mutual-like" : "view-only" }
+      })
+    }) as typeof fetch
+  }
+  const options = createDiscoveryRoomShowcaseQueryOptions({ ...request, authorizationId: 1, enabled: false })
+  const observer = new QueryObserver(queryClient, options)
+  const unsubscribe = observer.subscribe(() => {})
+
+  try {
+    assert.equal(calls, 0)
+    observer.setOptions({ ...options, enabled: true })
+    const first = await queryClient.getQueryCache().find({ queryKey: options.queryKey, exact: true })?.promise
+    assert.equal(calls, 1)
+    assert.deepEqual(first, {
+      roomSnapshotUrl: "https://api.blumi.test/v1/room-showcase/asset-1",
+      roomHeadline: "A public room"
+    })
+
+    const next = createDiscoveryRoomShowcaseQueryOptions({ ...request, authorizationId: 2 })
+    observer.setOptions(next)
+    assert.equal(observer.getCurrentResult().data, undefined)
+    const revoked = await queryClient.getQueryCache().find({ queryKey: next.queryKey, exact: true })?.promise
+    assert.deepEqual(revoked, { roomSnapshotUrl: null, roomHeadline: null })
+    assert.equal(calls, 2)
+    assert.deepEqual(observer.getCurrentResult().data, revoked)
+    const otherViewer = createDiscoveryRoomShowcaseQueryOptions({
+      ...request,
+      viewerUserId: "viewer-b",
+      sessionToken: "viewer-b-session",
+      authorizationId: 3,
+      fetcher: (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        assert.equal((init?.headers as Record<string, string>).authorization, "Bearer viewer-b-session")
+        return createJsonResponse(200, {
+          profile: {
+            userId: "candidate-1", displayName: "Defne", age: 24,
+            distanceLabel: "Nearby", vibeTags: [], signals: [],
+            roomHeadline: "Viewer B room", roomSnapshotUrl: "/viewer-b-room",
+            avatarPresetId: COMPLETE_DISCOVERY_AVATAR.presetId,
+            avatar: COMPLETE_DISCOVERY_AVATAR
+          },
+          decision: { capability: "mutual-like" }
+        })
+      }) as typeof fetch
+    })
+    observer.setOptions(otherViewer)
+    assert.equal(observer.getCurrentResult().data, undefined)
+    const otherResult = await queryClient.getQueryCache().find({
+      queryKey: otherViewer.queryKey, exact: true
+    })?.promise
+    assert.deepEqual(otherResult, {
+      roomHeadline: "Viewer B room",
+      roomSnapshotUrl: "https://api.blumi.test/viewer-b-room"
+    })
+    assert.notDeepEqual(
+      options.queryKey,
+      buildDiscoveryRoomShowcaseQueryKey({ ...request, viewerUserId: "viewer-b", authorizationId: 2 })
+    )
+    assert.notDeepEqual(options.queryKey, next.queryKey)
+    assert.equal(JSON.stringify(options.queryKey).includes("viewer-a-session"), false)
+  } finally {
+    unsubscribe()
+    queryClient.clear()
+  }
+})
+
+test("view-only room details cannot expose a headline or snapshot even if the response includes them", async () => {
+  const showcase = await fetchDiscoveryRoomShowcase(
+    "https://api.blumi.test", "session", "candidate-1",
+    (async () => createJsonResponse(200, {
+      profile: {
+        userId: "candidate-1", displayName: "Defne", age: 24,
+        distanceLabel: "Nearby", vibeTags: [], signals: [],
+        roomHeadline: "Should stay hidden", roomSnapshotUrl: "/private-room",
+        avatarPresetId: COMPLETE_DISCOVERY_AVATAR.presetId,
+        avatar: COMPLETE_DISCOVERY_AVATAR
+      },
+      decision: { capability: "view-only" }
+    })) as typeof fetch
+  )
+  assert.deepEqual(showcase, { roomSnapshotUrl: null, roomHeadline: null })
 })
 
 test("fetchDiscoverProfile rejects a malformed deep-link decision capability", async () => {

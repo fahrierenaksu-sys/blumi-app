@@ -8,6 +8,7 @@ import {
   applyChatMessageListLoading,
   confirmOptimisticMessage,
   getMessageListState,
+  getMessageListCompletionVersion,
   getMessageDeliveryState,
   applyChatThreadListFailed,
   applyChatThreadListed,
@@ -26,8 +27,39 @@ import {
   applyChatThreadCreated,
   resetChatStore,
   subscribeToChatStore,
-  setActiveThread
+  setActiveThread,
+  createChatThreadSnapshotReader
 } from "./chatStore"
+
+test("one realtime message is not proof that the first history page is ready", () => {
+  resetChatStore()
+  const read = createChatThreadSnapshotReader("cold-history")
+  applyChatMessageReceived({ messageId: "new", threadId: "cold-history", senderUserId: "peer", body: "hello", sentAt: "2026-09-29T00:00:00Z" })
+  applyChatMessageListLoading("cold-history")
+  assert.equal(read().messages.length, 1)
+  assert.equal(read().historyReady, false)
+  applyChatMessageListed({ userId: "owner", threadId: "cold-history", messages: [] })
+  assert.equal(read().historyReady, true, "even an empty server page is an authoritative completed fetch")
+  applyChatMessageListLoading("cold-history")
+  assert.equal(read().historyReady, true, "a background refresh must not hide an already-loaded conversation")
+  resetChatStore()
+  assert.equal(read().historyReady, false)
+})
+
+test("thread snapshot ignores other conversations but reflects delivery changes and logout", () => {
+  resetChatStore()
+  const read = createChatThreadSnapshotReader("selected")
+  const pending = addOptimisticMessage({ threadId: "selected", senderUserId: "owner", body: "hello", clientMessageId: "scoped-send" })
+  const original = read()
+  applyChatMessageReceived({ messageId: "other", threadId: "other-thread", senderUserId: "peer", body: "other", sentAt: "2026-09-29T00:00:00Z" })
+  assert.equal(read(), original, "unrelated messages should not render the selected timeline")
+  markOptimisticMessageFailed(pending.clientMessageId)
+  assert.notEqual(read(), original)
+  const failed = read()
+  assert.equal(read(), failed, "a snapshot is referentially stable until its values change")
+  resetChatStore()
+  assert.equal(read().messages.length, 0)
+})
 
 test("cold chat list hydrates server unread totals", () => {
   resetChatStore()
@@ -97,7 +129,7 @@ for (const order of ["http-first", "websocket-first"] as const) {
       if (order === "websocket-first") applyChatMessageReceived(message, { localUserId: "user_one" })
       const beforeConfirmation = snapshots.length
       confirmOptimisticMessage(pending.clientMessageId, message, "user_one")
-      assert.equal(snapshots.length, beforeConfirmation + 1)
+      assert.equal(snapshots.length, beforeConfirmation + (order === "http-first" ? 1 : 0))
       assert.deepEqual(snapshots.at(-1), ["server-001"])
       const beforeDuplicate = snapshots.length
       applyChatMessageReceived(message, { localUserId: "user_one" })
@@ -112,6 +144,47 @@ for (const order of ["http-first", "websocket-first"] as const) {
     assert.equal(snapshots.length, beforeReset)
   })
 }
+
+test("optimistic send is published immediately and stays pending until a canonical acknowledgement", () => {
+  resetChatStore()
+  const snapshots: { ids: string[]; state: string | undefined }[] = []
+  const unsubscribe = subscribeToChatStore(() => {
+    const optimistic = getMessages("thread_one").find((entry) => entry.messageId.startsWith("__local_"))
+    snapshots.push({
+      ids: getMessages("thread_one").map((entry) => entry.messageId),
+      state: optimistic ? getMessageDeliveryState(optimistic.messageId) : undefined
+    })
+  })
+  try {
+    const pending = addOptimisticMessage({
+      threadId: "thread_one",
+      senderUserId: "user_one",
+      body: "hello",
+      clientMessageId: "client-message-immediate-001"
+    })
+
+    assert.deepEqual(getMessages("thread_one").map((entry) => entry.messageId), [pending.localMessageId])
+    assert.equal(getMessageDeliveryState(pending.localMessageId), "sending")
+    assert.deepEqual(snapshots.at(-1), {
+      ids: [pending.localMessageId],
+      state: "sending"
+    })
+
+    confirmOptimisticMessage(pending.clientMessageId, {
+      messageId: "server-immediate-001",
+      threadId: "thread_one",
+      senderUserId: "user_one",
+      body: "hello",
+      sentAt: "2026-09-29T10:00:00Z"
+    }, "user_one")
+
+    assert.deepEqual(getMessages("thread_one").map((entry) => entry.messageId), ["server-immediate-001"])
+    assert.equal(getMessageDeliveryState("server-immediate-001"), "sent")
+  } finally {
+    unsubscribe()
+    resetChatStore()
+  }
+})
 
 test("acknowledgement removes retry metadata while unrelated pending messages stay retryable", () => {
   resetChatStore()
@@ -133,6 +206,111 @@ test("acknowledgement removes retry metadata while unrelated pending messages st
   assert.equal(getMessageDeliveryState(pending.localMessageId), "sent")
 })
 
+test("websocket echo atomically replaces a tracked optimistic bubble before ACK", () => {
+  resetChatStore()
+  try {
+    const target = addOptimisticMessage({
+      threadId: "thread_target",
+      senderUserId: "user_one",
+      body: "same body",
+      clientMessageId: "target-client-id"
+    })
+    markOptimisticMessageFailed(target.clientMessageId)
+    assert.equal(getMessageDeliveryState(target.localMessageId), "failed")
+
+    const snapshots: string[][] = []
+    const unsubscribe = subscribeToChatStore(() => {
+      snapshots.push(getMessages("thread_target").map((entry) => entry.messageId))
+    })
+    const canonical = {
+      messageId: "server-target",
+      threadId: "thread_target",
+      senderUserId: "user_one",
+      body: "same body",
+      sentAt: "2026-09-29T10:00:00.000Z"
+    }
+    try {
+      applyChatMessageReceived(canonical, { localUserId: "user_one" })
+
+      assert.deepEqual(snapshots, [["server-target"]],
+        "the websocket reducer publishes one atomic replacement, not both target rows")
+      assert.equal(getMessageDeliveryState("server-target"), "sent")
+      assert.equal(getRetryableMessage(target.localMessageId), null)
+
+      const snapshotCount = snapshots.length
+      confirmOptimisticMessage(target.clientMessageId, canonical, "user_one")
+      assert.equal(snapshots.length, snapshotCount, "the later ACK must not create or remove another scoped row")
+      assert.deepEqual(getMessages("thread_target").map((entry) => entry.messageId), ["server-target"])
+    } finally {
+      unsubscribe()
+    }
+  } finally {
+    resetChatStore()
+  }
+})
+
+test("same clientMessageId in another sender or thread does not steal optimistic tracking", () => {
+  resetChatStore()
+  try {
+    const clientMessageId = "shared-client-id-across-scopes"
+    const otherSender = addOptimisticMessage({
+      threadId: "thread_target",
+      senderUserId: "user_two",
+      body: "same body",
+      clientMessageId
+    })
+    markOptimisticMessageFailed(clientMessageId)
+    const otherThread = addOptimisticMessage({
+      threadId: "thread_other",
+      senderUserId: "user_one",
+      body: "same body",
+      clientMessageId
+    })
+    const target = addOptimisticMessage({
+      threadId: "thread_target",
+      senderUserId: "user_one",
+      body: "same body",
+      clientMessageId
+    })
+
+    applyChatMessageReceived({
+      messageId: "server-target-scoped",
+      threadId: "thread_target",
+      senderUserId: "user_one",
+      body: "same body",
+      sentAt: "2026-09-29T10:00:00.000Z"
+    }, { localUserId: "user_one" })
+
+    assert.equal(getMessageDeliveryState("server-target-scoped"), "sent")
+    assert.equal(getMessageDeliveryState(otherSender.localMessageId), "failed")
+    assert.equal(getMessageDeliveryState(otherThread.localMessageId), "sending")
+    assert.deepEqual(getRetryableMessage(otherSender.localMessageId), {
+      body: "same body", clientMessageId, threadId: "thread_target"
+    })
+    assert.deepEqual(getRetryableMessage(otherThread.localMessageId), {
+      body: "same body", clientMessageId, threadId: "thread_other"
+    })
+    assert.deepEqual(getMessages("thread_target").map((entry) => entry.messageId).sort(), [
+      "server-target-scoped", otherSender.localMessageId
+    ].sort())
+    assert.deepEqual(getMessages("thread_other").map((entry) => entry.messageId), [otherThread.localMessageId])
+
+    const beforeAck = getMessages("thread_target").map((entry) => entry.messageId).sort()
+    confirmOptimisticMessage(clientMessageId, {
+      messageId: "server-target-scoped",
+      threadId: "thread_target",
+      senderUserId: "user_one",
+      body: "same body",
+      sentAt: "2026-09-29T10:00:00.000Z"
+    }, "user_one")
+    assert.deepEqual(getMessages("thread_target").map((entry) => entry.messageId).sort(), beforeAck)
+    assert.deepEqual(getMessages("thread_other").map((entry) => entry.messageId), [otherThread.localMessageId])
+    assert.equal(getRetryableMessage(target.localMessageId), null)
+  } finally {
+    resetChatStore()
+  }
+})
+
 test("subscribers observe thread creation, canonical preview and read-count updates", () => {
   resetChatStore()
   applyChatThreadCreated({ threadId: "thread_one", miniRoomId: "room_one", participantUserIds: ["user_one", "user_two"],
@@ -148,6 +326,28 @@ test("subscribers observe thread creation, canonical preview and read-count upda
   assert.equal(getTotalUnreadCount(), 0)
   setActiveThread("thread_one")
   assert.equal(getThreadUnreadCount("thread_one"), 0)
+})
+
+test("unread badge snapshot stays stable across unrelated chat updates", () => {
+  resetChatStore()
+  const snapshots: number[] = []
+  const unsubscribe = subscribeToChatStore(() => snapshots.push(getTotalUnreadCount()))
+  try {
+    applyChatMessageListLoading("thread_one")
+    applyChatMessageListed({ userId: "user_one", threadId: "thread_one", messages: [] })
+    addOptimisticMessage({ threadId: "thread_one", senderUserId: "user_one", body: "hello" })
+    assert.deepEqual(snapshots, [0, 0, 0])
+
+    applyChatMessageReceived({ messageId: "incoming", threadId: "thread_one",
+      senderUserId: "user_two", body: "hi", sentAt: "2026-09-05T10:01:00Z" },
+    { localUserId: "user_one" })
+    assert.equal(getTotalUnreadCount(), 1)
+    markThreadRead("thread_one")
+    assert.equal(getTotalUnreadCount(), 0)
+  } finally {
+    unsubscribe()
+    resetChatStore()
+  }
 })
 
 test("server-confirmed messages replace one optimistic echo at a time", () => {
@@ -204,6 +404,63 @@ test("a failed optimistic send stays tied to its exact retry ID until acknowledg
     "message_server_one"
   ])
   assert.equal(getMessageDeliveryState("message_server_one"), "sent")
+})
+
+test("a retried failed message takes its canonical server sentAt position without duplicating", () => {
+  resetChatStore()
+  try {
+    const messageA = addOptimisticMessage({
+      threadId: "thread_retry_order",
+      senderUserId: "user_one",
+      body: "A",
+      clientMessageId: "client-retry-order-a"
+    })
+    markOptimisticMessageFailed(messageA.clientMessageId)
+    assert.equal(getMessageDeliveryState(messageA.localMessageId), "failed")
+    assert.deepEqual(getRetryableMessage(messageA.localMessageId), {
+      body: "A",
+      clientMessageId: messageA.clientMessageId,
+      threadId: "thread_retry_order"
+    })
+
+    const messageB = addOptimisticMessage({
+      threadId: "thread_retry_order",
+      senderUserId: "user_one",
+      body: "B",
+      clientMessageId: "client-retry-order-b"
+    })
+    confirmOptimisticMessage(messageB.clientMessageId, {
+      messageId: "server-retry-order-b",
+      threadId: "thread_retry_order",
+      senderUserId: "user_one",
+      body: "B",
+      sentAt: "2026-09-29T10:00:02.000Z"
+    }, "user_one")
+    assert.equal(getMessageDeliveryState("server-retry-order-b"), "sent")
+
+    markOptimisticMessageSending(messageA.clientMessageId)
+    assert.equal(getMessageDeliveryState(messageA.localMessageId), "sending")
+    confirmOptimisticMessage(messageA.clientMessageId, {
+      messageId: "server-retry-order-a",
+      threadId: "thread_retry_order",
+      senderUserId: "user_one",
+      body: "A",
+      sentAt: "2026-09-29T10:00:03.000Z"
+    }, "user_one")
+
+    const transcript = getMessages("thread_retry_order")
+    assert.deepEqual(transcript.map((message) => message.messageId), [
+      "server-retry-order-b",
+      "server-retry-order-a"
+    ])
+    assert.equal(transcript.filter((message) => message.messageId === "server-retry-order-a").length, 1)
+    assert.equal(transcript.some((message) => message.messageId.startsWith("__local_")), false)
+    assert.equal(getMessageDeliveryState("server-retry-order-b"), "sent")
+    assert.equal(getMessageDeliveryState("server-retry-order-a"), "sent")
+    assert.equal(getRetryableMessage(messageA.localMessageId), null)
+  } finally {
+    resetChatStore()
+  }
 })
 
 test("resetChatStore clears optimistic chat state", () => {
@@ -266,6 +523,20 @@ test("each conversation exposes loading, failed, and ready message states", () =
     messages: []
   })
   assert.deepEqual(getMessageListState("thread_one"), { status: "ready" })
+})
+
+test("message-list completion revision advances only when a fetch settles", () => {
+  resetChatStore()
+  const before = getMessageListCompletionVersion("revision-thread")
+  applyChatMessageListLoading("revision-thread")
+  assert.equal(getMessageListCompletionVersion("revision-thread"), before)
+  applyChatMessageListed({ userId: "owner", threadId: "revision-thread", messages: [] })
+  assert.equal(getMessageListCompletionVersion("revision-thread"), before + 1)
+  applyChatMessageListLoading("revision-thread")
+  applyChatMessageListFailed("revision-thread", "offline")
+  assert.equal(getMessageListCompletionVersion("revision-thread"), before + 2)
+  resetChatStore()
+  assert.equal(getMessageListCompletionVersion("revision-thread"), 0)
 })
 
 test("conversation failure never exposes transport diagnostics to people", () => {

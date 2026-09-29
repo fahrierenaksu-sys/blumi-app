@@ -20,7 +20,9 @@ const sourceFiles = [
   "src/features/notifications/pushRegistrationCoordinator.ts",
   "src/features/notifications/pushRegistrationCoordinator.test.ts",
   "src/features/notifications/notificationRouting.ts",
-  "src/features/notifications/notificationRouting.test.ts"
+  "src/features/notifications/notificationRouting.test.ts",
+  "src/features/notifications/notificationPreferencesModel.ts",
+  "src/features/notifications/notificationPreferencesModel.test.ts"
 ]
 
 try {
@@ -61,7 +63,9 @@ try {
       join(outputDirectory, "features/notifications/notificationTimeZoneSync.test.js"),
       join(outputDirectory, "features/notifications/notificationRuntimePolicy.test.js"),
       join(outputDirectory, "features/notifications/pushRegistrationCoordinator.test.js"),
-      join(outputDirectory, "features/notifications/notificationRouting.test.js")
+      join(outputDirectory, "features/notifications/notificationRouting.test.js"),
+      join(outputDirectory, "features/notifications/notificationPreferencesModel.test.js"),
+      resolve(workspaceRoot, "src/features/notifications/notificationResponseDelivery.test.mjs")
     ],
     {
       cwd: workspaceRoot,

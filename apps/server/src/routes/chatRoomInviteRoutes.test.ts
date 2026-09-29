@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { ServerEvent } from "@blumi/contracts"
 import { createAuthService } from "../auth/authService"
 import { createChatService } from "../chat/chatService"
+import { createInMemoryConnectionRepository } from "../connections/connectionRepository"
+import type { ConnectionService } from "../connections/connectionService"
 import {
   createInMemoryMatchRepository,
   createInMemoryMatchStore
@@ -41,6 +44,13 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
       return () => `http_${++index}`
     })()
   })
+  const connectionManager = createConnectionManager()
+  const roomEndEvents: Array<Extract<ServerEvent, { type: "mini_room.ended" }>> = []
+  const sendToUsers = connectionManager.sendToUsers.bind(connectionManager)
+  connectionManager.sendToUsers = (userIds, event) => {
+    if (event.type === "mini_room.ended") roomEndEvents.push(event)
+    sendToUsers(userIds, event)
+  }
   const app = createServer({
     authService,
     chatService,
@@ -48,7 +58,7 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     matchService,
     miniRoomService,
     notificationService,
-    connectionManager: createConnectionManager()
+    connectionManager
   })
   try {
     const sender = await createEligibleAccount(app, authService, "+905551110001", "Ada")
@@ -134,6 +144,126 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     })
     assert.equal(acceptedAgain.statusCode, 200)
     assert.equal(acceptedAgain.json().miniRoom.miniRoomId, accepted.json().miniRoom.miniRoomId)
+
+    const busy = await app.inject({
+      method: "POST",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(busy.statusCode, 409)
+    assert.equal(busy.json().code, "SELF_IN_ROOM")
+
+    const roomId = accepted.json().miniRoom.miniRoomId as string
+    assert.equal(busy.json().roomSessionId, roomId)
+    const unauthenticatedLeave = await app.inject({
+      method: "POST",
+      url: `/v1/room-sessions/${roomId}/leave`,
+      payload: {}
+    })
+    assert.equal(unauthenticatedLeave.statusCode, 401)
+    const stranger = await createEligibleAccount(app, authService, "+905551110012", "Cem")
+    const forbiddenLeave = await app.inject({
+      method: "POST",
+      url: `/v1/room-sessions/${roomId}/leave`,
+      headers: { authorization: `Bearer ${stranger.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(forbiddenLeave.statusCode, 404)
+    assert.ok(await miniRoomService.findActiveMiniRoomForUser(sender.userId))
+
+    const left = await app.inject({
+      method: "POST",
+      url: `/v1/room-sessions/${roomId}/leave`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(left.statusCode, 200)
+    assert.equal(left.json().ended, true)
+    assert.equal(await miniRoomService.findActiveMiniRoomForUser(sender.userId), null)
+    const repeatedLeave = await app.inject({
+      method: "POST",
+      url: `/v1/room-sessions/${roomId}/leave`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(repeatedLeave.statusCode, 200)
+    assert.equal(repeatedLeave.json().ended, false)
+
+    const otherParticipant = await app.inject({
+      method: "POST",
+      url: `/v1/users/me/active-room/leave`,
+      headers: { authorization: `Bearer ${recipient.sessionToken}` },
+      payload: { expectedRoomSessionId: roomId }
+    })
+    assert.equal(otherParticipant.statusCode, 200)
+    assert.equal(otherParticipant.json().ended, false)
+
+    const nextInvite = await app.inject({
+      method: "POST",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(nextInvite.statusCode, 201)
+    const nextAccepted = await app.inject({
+      method: "POST",
+      url: `/v1/room-invites/${nextInvite.json().invite.inviteId}/decision`,
+      headers: { authorization: `Bearer ${recipient.sessionToken}` },
+      payload: { status: "accepted" }
+    })
+    assert.equal(nextAccepted.statusCode, 200)
+    const nextRoomId = nextAccepted.json().miniRoom.miniRoomId as string
+    const staleRecovery = await app.inject({
+      method: "POST",
+      url: "/v1/users/me/active-room/leave",
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: { expectedRoomSessionId: roomId }
+    })
+    assert.equal(staleRecovery.statusCode, 409)
+    assert.equal((await miniRoomService.findActiveMiniRoomForUser(sender.userId))?.miniRoomId, nextRoomId)
+    const recovered = await app.inject({
+      method: "POST",
+      url: "/v1/users/me/active-room/leave",
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: { expectedRoomSessionId: nextRoomId }
+    })
+    assert.equal(recovered.statusCode, 200)
+    assert.equal(recovered.json().ended, true)
+    assert.equal(await miniRoomService.findActiveMiniRoomForUser(recipient.userId), null)
+    const nothingToRecover = await app.inject({
+      method: "POST",
+      url: "/v1/users/me/active-room/leave",
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: { expectedRoomSessionId: nextRoomId }
+    })
+    assert.equal(nothingToRecover.statusCode, 200)
+    assert.equal(nothingToRecover.json().ended, false)
+
+    const safetyInvite = await app.inject({
+      method: "POST",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(safetyInvite.statusCode, 201)
+    const safetyRoom = await app.inject({
+      method: "POST",
+      url: `/v1/room-invites/${safetyInvite.json().invite.inviteId}/decision`,
+      headers: { authorization: `Bearer ${recipient.sessionToken}` },
+      payload: { status: "accepted" }
+    })
+    assert.equal(safetyRoom.statusCode, 200)
+    const safetyRoomId = safetyRoom.json().miniRoom.miniRoomId as string
+    const block = await app.inject({
+      method: "POST",
+      url: "/v1/safety/blocks",
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: { blockedUserId: recipient.userId }
+    })
+    assert.equal(block.statusCode, 201)
+    assert.equal(await miniRoomService.findActiveMiniRoomForUser(sender.userId), null)
+    assert.equal(roomEndEvents.filter((event) => event.payload.miniRoomId === safetyRoomId).length, 1)
   } finally {
     await app.close()
   }
@@ -235,6 +365,68 @@ test("room invite creation rejects a chat not backed by a persisted mutual match
       payload: {}
     })
     assert.equal(response.statusCode, 403)
+  } finally {
+    await app.close()
+  }
+})
+
+test("room-saved mutual matches can invite again only from their canonical chat", async () => {
+  const authService = createAuthService({ codeFactory: () => "482931" })
+  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const matchService = createMatchService({
+    repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
+  })
+  const connectionRepository = createInMemoryConnectionRepository()
+  const miniRoomService = createMiniRoomService({
+    presenceService: createPresenceService({ roomService: createRoomService() }),
+    safetyService,
+    chatService,
+    livekitTokenService: createLivekitTokenService()
+  })
+  const app = createServer({
+    authService, chatService, safetyService, miniRoomService, matchService,
+    connectionService: { repository: connectionRepository } as ConnectionService
+  })
+  try {
+    const sender = await createEligibleAccount(app, authService, "+905551110091", "Ada")
+    const recipient = await createEligibleAccount(app, authService, "+905551110092", "Bora")
+    await connectionRepository.saveMatch({
+      miniRoomId: "saved_room_pair",
+      participantUserIds: [sender.userId, recipient.userId],
+      matchedAt: "2026-09-29T10:00:00.000Z"
+    })
+    await matchService.repository.createMatch({
+      matchId: "later_discovery_match",
+      participantUserIds: [sender.userId, recipient.userId],
+      matchedAt: "2026-09-29T10:01:00.000Z"
+    })
+    const participants = [
+      { userId: sender.userId, displayName: "Ada" },
+      { userId: recipient.userId, displayName: "Bora" }
+    ] as [{ userId: string; displayName: string }, { userId: string; displayName: string }]
+    await chatService.createThread({
+      threadId: "thread_connection_saved_room_pair",
+      miniRoomId: "saved_room_pair",
+      participantUserIds: [sender.userId, recipient.userId], participants
+    })
+    await chatService.createThread({
+      threadId: "thread_other",
+      miniRoomId: "saved_room_pair",
+      participantUserIds: [sender.userId, recipient.userId], participants
+    })
+    const headers = { authorization: `Bearer ${sender.sessionToken}` }
+    const invalid = await app.inject({ method: "POST", url: "/v1/threads/thread_other/room-invites", headers, payload: {} })
+    assert.equal(invalid.statusCode, 403)
+    const created = await app.inject({ method: "POST", url: "/v1/threads/thread_connection_saved_room_pair/room-invites", headers, payload: {} })
+    assert.equal(created.statusCode, 201)
+    assert.equal(created.json().invite.sourceThreadId, "thread_connection_saved_room_pair")
+    const listed = await app.inject({
+      method: "GET", url: "/v1/threads/thread_connection_saved_room_pair/room-invites",
+      headers: { authorization: `Bearer ${recipient.sessionToken}` }
+    })
+    assert.equal(listed.statusCode, 200)
+    assert.equal(listed.json().invites.length, 1)
   } finally {
     await app.close()
   }

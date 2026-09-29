@@ -3,6 +3,7 @@ import test from "node:test"
 import type { ChatThread } from "@blumi/contracts"
 import {
   findLastCanonicalRoomChatMessage,
+  findMissedCanonicalRoomChatMessages,
   findCanonicalRoomChatThread,
   shouldRenderIncomingRoomChatMessage
 } from "./inRoomChatThread"
@@ -91,6 +92,26 @@ test("in-room chat does not render the sender's realtime echo as a second bubble
   )
 })
 
+test("reconnect replay returns only unseen post-entry durable partner messages", () => {
+  const baseline = Date.parse("2026-07-22T09:00:00.000Z")
+  const missed = findMissedCanonicalRoomChatMessages({
+    messages: [
+      createMessage("before-room", "Older conversation", "2026-07-22T08:59:00.000Z"),
+      createMessage("seen-live", "Already received live", "2026-07-22T09:01:00.000Z"),
+      createMessage("missed-one", "While offline", "2026-07-22T09:02:00.000Z"),
+      createMessage("own-canonical", "My own message", "2026-07-22T09:03:00.000Z"),
+      createMessage("__local_optimistic", "Optimistic echo", "2026-07-22T09:04:00.000Z"),
+      createMessage("room-invite", "__room_invite__", "2026-07-22T09:05:00.000Z"),
+      createMessage("missed-two", "Also while offline", "2026-07-22T09:06:00.000Z")
+    ],
+    baselineTimestamp: baseline,
+    localUserId: "user_one",
+    alreadySeenMessageIds: new Set(["seen-live"])
+  })
+
+  assert.deepEqual(missed.map((message) => message.messageId), ["missed-one", "missed-two"])
+})
+
 function createThread(threadId: string, miniRoomId: string): ChatThread {
   return {
     threadId,
@@ -108,7 +129,7 @@ function createMessage(messageId: string, body: string, sentAt: string) {
   return {
     messageId,
     threadId: "mutual_match_thread",
-    senderUserId: "user_two",
+    senderUserId: messageId === "own-canonical" ? "user_one" : "user_two",
     body,
     sentAt
   }

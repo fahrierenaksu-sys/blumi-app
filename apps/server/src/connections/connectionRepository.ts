@@ -14,6 +14,7 @@ export interface ConnectionRepository {
     userAId: string,
     userBId: string
   ): Promise<ConnectionMatch | null>
+  listMatchesForUser(userId: string): Promise<ConnectionMatch[]>
   saveMatch(match: ConnectionMatch): Promise<void>
 }
 
@@ -34,9 +35,8 @@ export function createInMemoryConnectionRepository(
 ): ConnectionRepository {
   return {
     async saveDecision(decision) {
-      store.decisions.set(decisionKey(decision.miniRoomId, decision.actorUserId), {
-        ...decision
-      })
+      const key = decisionKey(decision.miniRoomId, decision.actorUserId)
+      if (!store.decisions.has(key)) store.decisions.set(key, { ...decision })
     },
     async findDecision(miniRoomId, actorUserId) {
       const decision = store.decisions.get(decisionKey(miniRoomId, actorUserId))
@@ -62,6 +62,15 @@ export function createInMemoryConnectionRepository(
             participantUserIds: [...match.participantUserIds] as [string, string]
           }
         : null
+    },
+    async listMatchesForUser(userId) {
+      return [...store.matches.values()]
+        .filter((match) => match.participantUserIds.includes(userId))
+        .sort((left, right) => right.matchedAt.localeCompare(left.matchedAt))
+        .map((match) => ({
+          ...match,
+          participantUserIds: [...match.participantUserIds] as [string, string]
+        }))
     },
     async saveMatch(match) {
       store.matches.set(match.miniRoomId, {

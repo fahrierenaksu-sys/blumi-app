@@ -5,6 +5,7 @@ import type {
   DiscoveryWatchRecord,
   UserProfilePrompt
 } from "@blumi/contracts"
+import type { QueryFunctionContext } from "@tanstack/react-query"
 import { normalizeUserProfilePrompts } from "@blumi/contracts"
 import {
   cloneAvatarSelection,
@@ -49,10 +50,89 @@ export interface DiscoverProfileResponse {
   decision: { capability: DeepLinkDiscoveryDecisionCapability }
 }
 
+export interface DiscoveryRoomShowcase {
+  roomSnapshotUrl: string | null
+  roomHeadline: string | null
+}
+
+export interface DiscoveryRoomShowcaseQueryInput {
+  baseHttpUrl: string
+  viewerUserId: string
+  candidateUserId: string
+  sessionToken: string
+  authorizationId: number
+  enabled?: boolean
+  fetcher?: typeof fetch
+}
+
 export class DiscoveryProfileUnavailableError extends Error {
   constructor(message = "That profile is not available anymore.") {
     super(message)
     this.name = "DiscoveryProfileUnavailableError"
+  }
+}
+
+export function buildDiscoveryRoomShowcaseQueryKey(input: {
+  baseHttpUrl: string
+  viewerUserId: string
+  candidateUserId: string
+  authorizationId: number
+}) {
+  return [
+    "discovery",
+    "room-showcase",
+    input.baseHttpUrl,
+    input.viewerUserId,
+    input.candidateUserId,
+    input.authorizationId
+  ] as const
+}
+
+/** Load only the public room fields from the same server-authorized detail route. */
+export async function fetchDiscoveryRoomShowcase(
+  baseHttpUrl: string,
+  sessionToken: string,
+  candidateUserId: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<DiscoveryRoomShowcase> {
+  const detail = await fetchDiscoverProfile(
+    baseHttpUrl,
+    sessionToken,
+    candidateUserId,
+    fetcher,
+    signal
+  )
+  // A view-only profile remains visible, but its room is not authorized.
+  if (detail.decision.capability !== "mutual-like") {
+    return { roomSnapshotUrl: null, roomHeadline: null }
+  }
+  return {
+    roomSnapshotUrl: detail.profile.roomSnapshotUrl ?? null,
+    roomHeadline: detail.profile.roomHeadline ?? null
+  }
+}
+
+export function createDiscoveryRoomShowcaseQueryOptions(
+  input: DiscoveryRoomShowcaseQueryInput
+) {
+  const queryKey = buildDiscoveryRoomShowcaseQueryKey(input)
+  return {
+    queryKey,
+    enabled: input.enabled ?? true,
+    // Every flip has a new authorizationId. An earlier room response must never
+    // satisfy a later flip or a different session, even while the card is mounted.
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    queryFn: ({ signal }: QueryFunctionContext<typeof queryKey>) =>
+      fetchDiscoveryRoomShowcase(
+        input.baseHttpUrl,
+        input.sessionToken,
+        input.candidateUserId,
+        input.fetcher ?? fetch,
+        signal
+      )
   }
 }
 
@@ -168,13 +248,17 @@ export async function cancelDiscoveryWatch(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(buildApiUrl(baseHttpUrl, "/v1/discover/watch"), {
-    method: "DELETE",
-    headers: createAuthenticatedHeaders(sessionToken),
-    signal
-  })
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/discover/watch",
+    {
+      method: "DELETE",
+      headers: createAuthenticatedHeaders(sessionToken),
+      signal
+    },
+    fetcher
+  )
   if (!response.ok) {
-    const payload: unknown = await response.json()
     throw new Error(getApiErrorMessage(payload, "We could not cancel your Vibe Card yet."))
   }
 }

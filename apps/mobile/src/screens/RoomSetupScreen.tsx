@@ -49,6 +49,18 @@ import {
   useOnboardingHardwareBack,
   useOnboardingSignOut
 } from "./components/onboardingScreenActions"
+import { getAppLocale } from "../features/session/appLocale"
+
+const ROOM_SETUP_FEEDBACK_COPY = {
+  tr: {
+    mutationRejected: "Oda değişikliği uygulanamadı. Yeniden dene.",
+    persistenceAttention: "Oda kaydıyla ilgili bir sorun var. Güncel düzeni kontrol et."
+  },
+  en: {
+    mutationRejected: "That room change could not be applied. Please try again.",
+    persistenceAttention: "Room saving needs attention. Review the current layout."
+  }
+} as const
 
 export interface RoomSetupScreenProps {
   isSubmitting: boolean
@@ -79,10 +91,12 @@ export function RoomSetupScreen({
     userRoomDecor,
     setUserRoomDecor
   } = useRoomV2()
+  const feedbackCopy = ROOM_SETUP_FEEDBACK_COPY[getAppLocale()]
   const { avatar, catalog: avatarCatalog } = useAvatarV2()
   const roomFrameRef = useRef<View>(null)
   const [bedSelected, setBedSelected] = useState(false)
   const [placementMessage, setPlacementMessage] = useState("")
+  const [placementErrorMessage, setPlacementErrorMessage] = useState("")
   const starterBed = useMemo(
     () => ROOM_V2_FURNITURE_CATALOG.find(
       (item) => item.id === STARTER_ROOM_BED_ITEM_ID
@@ -217,10 +231,14 @@ export function RoomSetupScreen({
       setPlacementMessage("Odanın zemininde başka bir nokta seç.")
       return
     }
-    setUserRoomDecor(nextDecor)
+    if (!setUserRoomDecor(nextDecor)) {
+      setPlacementErrorMessage(feedbackCopy.mutationRejected)
+      return
+    }
+    setPlacementErrorMessage("")
     setBedSelected(true)
     setPlacementMessage("Yatağın yerleşti.")
-  }, [persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
+  }, [feedbackCopy.mutationRejected, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
 
   const rotatePlacedBed = useCallback((): void => {
     if (!starterBed || !hasPlacedStarterBed(userRoomDecor)) return
@@ -248,9 +266,13 @@ export function RoomSetupScreen({
       setPlacementMessage("Çevirmeden önce yatağı biraz içeri taşı.")
       return
     }
-    setUserRoomDecor(nextDecor)
+    if (!setUserRoomDecor(nextDecor)) {
+      setPlacementErrorMessage(feedbackCopy.mutationRejected)
+      return
+    }
+    setPlacementErrorMessage("")
     setPlacementMessage("Yatak çevrildi. Taşımak için odaya dokun.")
-  }, [setUserRoomDecor, starterBed, userRoomDecor])
+  }, [feedbackCopy.mutationRejected, setUserRoomDecor, starterBed, userRoomDecor])
 
   const handlePlacedBedLongPress = useCallback((): void => {
     hapticMedium()
@@ -477,7 +499,23 @@ export function RoomSetupScreen({
             </View>
           ) : null}
         </View>
-        {!starterRoomReady && bedSelected && placementMessage ? (
+        {persistenceState === "failed" ? (
+          <Text
+            accessibilityLiveRegion="assertive"
+            accessibilityRole="alert"
+            style={styles.placementMessage}
+          >
+            {feedbackCopy.persistenceAttention}
+          </Text>
+        ) : placementErrorMessage ? (
+          <Text
+            accessibilityLiveRegion="assertive"
+            accessibilityRole="alert"
+            style={styles.placementMessage}
+          >
+            {placementErrorMessage}
+          </Text>
+        ) : !starterRoomReady && bedSelected && placementMessage ? (
           <Text accessibilityLiveRegion="polite" style={styles.placementMessage}>
             {placementMessage}
           </Text>

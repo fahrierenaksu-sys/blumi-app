@@ -13,19 +13,31 @@ import type { RootStackParamList } from "./RootNavigator"
  */
 export const ROOT_STACK_SCREEN_OPTIONS = {
   headerShown: false,
-  animation: "fade"
+  animation: "fade",
+  // Keep a visible transition cue without leaving every route change feeling
+  // like a loading delay. Reduced Motion still disables the animation below.
+  animationDuration: 240
 } as const
 
 /**
  * The four bottom-navigation destinations live in one native stack for now.
- * Keep tab changes non-gesture so a horizontal back swipe cannot expose a
- * second tab underneath the fixed shell while the shared fade is running.
+ * Tab changes are immediate; the custom bottom bar owns the short selection
+ * motion. A full-screen native fade kept the whole page translucent during
+ * rapid taps and delayed the next interaction until its transition completed.
  */
 export const MAIN_TAB_SCREEN_OPTIONS = {
   headerShown: false,
-  animation: "fade",
+  animation: "none",
   gestureEnabled: false
 } as const
+
+/** Avoid rebuilding the native-stack state when the focused tab is tapped again. */
+export function shouldDispatchMainTabNavigation(
+  currentRouteName: string | undefined,
+  destination: string
+): boolean {
+  return currentRouteName !== destination
+}
 
 /** Override any native-stack fade only when the OS requests less motion. */
 export function getReducedMotionScreenOptions(reduceMotion: boolean):
@@ -65,6 +77,79 @@ export function getBottomNavKeyForRoute(
   if (routeName === "MyRoom") return "myroom"
   if (routeName === "CosmeticShop") return "shop"
   return null
+}
+
+/** Native-stack transitionStart is emitted before a gesture pop updates JS navigation state. */
+export function shouldRevealMyRoomNavDuringClosing(input: {
+  platform: "ios" | "android"
+  currentRouteName: string | undefined
+  editorRouteKey: string
+  closing: boolean
+  reduceMotion: boolean
+  stack: { index: number; routes: readonly { key: string; name: string }[] } | undefined
+}): boolean {
+  // Android's installed native-stack does not emit gestureCancel, so an
+  // interrupted close could otherwise leave the visual-only nav preview shown.
+  if (input.platform !== "ios" || input.reduceMotion || !input.closing || input.currentRouteName !== "MyRoomEditor") return false
+  const { stack } = input
+  if (!stack || stack.index < 1) return false
+  return stack.routes[stack.index]?.key === input.editorRouteKey &&
+    stack.routes[stack.index]?.name === "MyRoomEditor" &&
+    stack.routes[stack.index - 1]?.name === "MyRoom"
+}
+
+export function shouldClearMyRoomNavPreviewOnTransitionEnd(input: {
+  closing: boolean
+  editorRouteKey: string
+  previewedEditorRouteKey: string | null
+  currentRouteKey: string | undefined
+}): boolean {
+  if (input.previewedEditorRouteKey !== input.editorRouteKey) return false
+  return input.closing
+    ? input.currentRouteKey !== undefined && input.currentRouteKey !== input.editorRouteKey
+    : input.currentRouteKey === input.editorRouteKey
+}
+
+export function shouldClearMyRoomNavPreviewOnRouteChange(input: {
+  routeName: string | undefined
+  routeKey: string | undefined
+  previewedEditorRouteKey: string | null
+}): boolean {
+  return input.routeName !== undefined && input.previewedEditorRouteKey !== null &&
+    (input.routeName !== "MyRoomEditor" || input.routeKey !== input.previewedEditorRouteKey)
+}
+
+export function getBottomNavRoutePresentation(
+  routeName: string | undefined,
+  revealMyRoomReturn = false
+): {
+  mounted: boolean
+  visible: boolean
+  currentKey: BottomNavKey | null
+} {
+  const currentKey = getBottomNavKeyForRoute(routeName)
+  if (routeName === "MyRoomEditor" && revealMyRoomReturn) {
+    return { mounted: true, visible: true, currentKey: "myroom" }
+  }
+  return {
+    // This helper is used only inside the signed-in Main navigator. Keep its
+    // small native animated shell mounted on nested screens too, so a push to
+    // You/Settings/ProfileEdit cannot discard the selected-pill/press state
+    // before the user returns to a main tab.
+    mounted: routeName !== undefined,
+    visible: currentKey !== null,
+    currentKey
+  }
+}
+
+export function shouldShowMyRoomNavPreview(input: {
+  routeName: string | undefined
+  routeKey: string | undefined
+  previewedEditorRouteKey: string | undefined
+}): boolean {
+  return input.routeName === "MyRoomEditor" &&
+    input.routeKey !== undefined &&
+    input.previewedEditorRouteKey === input.routeKey
 }
 
 export function getOnboardingEntryRoute(

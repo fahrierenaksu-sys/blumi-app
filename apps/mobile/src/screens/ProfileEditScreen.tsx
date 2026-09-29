@@ -23,7 +23,9 @@ import { hapticMedium } from "../ui/haptics"
 import { getAppLocale } from "../features/session/appLocale"
 import { getProfileEditCopy } from "../features/session/profileEditCopy"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
-import { analyzeProfileEditDraft } from "../features/session/profileEditModel"
+import {
+  createMemoizedProfileEditDraftAnalyzer
+} from "../features/session/profileEditModel"
 import {
   USER_PROFILE_MAX_INTEREST_LENGTH,
   USER_PROFILE_MAX_INTERESTS,
@@ -107,8 +109,12 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     }
   }, [])
 
+  const analyzeMemoizedDraft = useMemo(
+    () => createMemoizedProfileEditDraftAnalyzer(),
+    []
+  )
   const profileAnalysis = useMemo(
-    () => analyzeProfileEditDraft({
+    () => analyzeMemoizedDraft({
       current: {
         displayName: currentDisplayName,
         age: currentAge,
@@ -146,7 +152,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
       discoveryGenders,
       interestsText,
       prompts,
-      radiusKm
+      radiusKm,
+      analyzeMemoizedDraft
     ]
   )
   const {
@@ -179,6 +186,17 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   const canSave = valid && !saved && !isSaving
   const copy = getProfileEditCopy(getAppLocale())
   const discoveryCopy = copy
+  const avatarPreview = useMemo(
+    () => (
+      <MyAvatar
+        name={displayName || "?"}
+        seed={currentUserId}
+        size={110}
+        ring="strong"
+      />
+    ),
+    [currentUserId, displayName]
+  )
 
   const toggleDiscoveryGender = useCallback((option: DiscoveryGender) => {
     setDiscoveryGenders((current) => current.includes(option)
@@ -265,12 +283,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.previewGlow} pointerEvents="none" />
-            <MyAvatar
-              name={displayName || "?"}
-              seed={currentUserId}
-              size={110}
-              ring="strong"
-            />
+            {avatarPreview}
             <Text style={styles.previewName}>
               {displayName || copy.yourName}
             </Text>

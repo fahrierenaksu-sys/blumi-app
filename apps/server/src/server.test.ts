@@ -9,6 +9,8 @@ import {
   type AccountRecord
 } from "./auth/authStore"
 import { createChatService } from "./chat/chatService"
+import { createInMemoryConnectionRepository } from "./connections/connectionRepository"
+import type { ConnectionService } from "./connections/connectionService"
 import { createEconomyService } from "./economy/economyService"
 import { createNotificationService } from "./notifications/notificationService"
 import {
@@ -19,6 +21,7 @@ import {
 import { createMatchService } from "./matches/matchService"
 import {createDiscoverySnapshotService,createInMemoryDiscoverySnapshots} from "./matches/discoverySnapshot"
 import { createSafetyService } from "./safety/safetyService"
+import { createConnectionManager } from "./realtime/connectionManager"
 import { createServer } from "./server"
 import {
   createAdminTokenService,
@@ -1526,11 +1529,19 @@ test("thread endpoints require session access and send messages", async () => {
     repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
   })
   const safetyService = createSafetyService()
+  const connectionManager = createConnectionManager()
+  const createdThreadEvents: string[] = []
+  const sendToUsers = connectionManager.sendToUsers
+  connectionManager.sendToUsers = (userIds, event) => {
+    if (event.type === "chat.thread_created") createdThreadEvents.push(event.payload.threadId)
+    sendToUsers(userIds, event)
+  }
   const app = createServer({
     authService,
     chatService,
     matchService,
-    safetyService
+    safetyService,
+    connectionManager
   })
 
   const unauthenticated = await app.inject({
@@ -1623,6 +1634,7 @@ test("thread endpoints require session access and send messages", async () => {
     }
   })
   assert.equal(createdThread.statusCode, 201)
+  assert.deepEqual(createdThreadEvents, ["thread_match_match_chat_authorized"])
   assert.equal(
     createdThread.json().thread.threadId,
     "thread_match_match_chat_authorized"
@@ -1777,6 +1789,58 @@ test("thread endpoints require session access and send messages", async () => {
   assert.deepEqual(
     paged.json().messages.map((message: { messageId: string }) => message.messageId),
     ["message_2"]
+  )
+
+  const idempotentSend = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "idempotent body", clientMessageId: "client-server-001" }
+  })
+  assert.equal(idempotentSend.statusCode, 201)
+  const sameBodyRetry = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "idempotent body", clientMessageId: "client-server-001" }
+  })
+  assert.equal(sameBodyRetry.statusCode, 200)
+  assert.deepEqual(sameBodyRetry.json().message, idempotentSend.json().message)
+
+  await safetyService.blockUser(partnerUserId, userId)
+  const blockedSameBodyRetry = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "idempotent body", clientMessageId: "client-server-001" }
+  })
+  assert.equal(blockedSameBodyRetry.statusCode, 200)
+  assert.deepEqual(blockedSameBodyRetry.json().message, idempotentSend.json().message)
+
+  const changedBodyRetry = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "different body", clientMessageId: "client-server-001" }
+  })
+  assert.equal(changedBodyRetry.statusCode, 409)
+  assert.deepEqual(changedBodyRetry.json(), {
+    code: "CHAT_MESSAGE_IDEMPOTENCY_CONFLICT",
+    error: "This message ID was already used with different content."
+  })
+  const newMessageAfterBlock = await app.inject({
+    method: "POST",
+    url: "/v1/threads/thread_server/messages",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { body: "new blocked message", clientMessageId: "client-server-new-001" }
+  })
+  assert.equal(newMessageAfterBlock.statusCode, 403)
+  await safetyService.unblockUser(partnerUserId, userId)
+  assert.equal(
+    (await chatService.listMessages(userId, "thread_server")).filter(
+      (message) => message.body === "idempotent body"
+    ).length,
+    1
   )
 
   const read = await app.inject({
@@ -2422,6 +2486,98 @@ test("profile prompt route persists fixed questions and rejects malformed values
   })
   assert.equal(malformed.statusCode, 400)
   await app.close()
+})
+
+test("match sync restores missing chats for both matched participants without exposing them to strangers", async () => {
+  const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => "482931" })
+  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([]))
+  const matchService = createMatchService({ repository })
+  const connectionRepository = createInMemoryConnectionRepository()
+  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const connectionManager = createConnectionManager()
+  const createdThreadEvents: string[] = []
+  const sendToUsers = connectionManager.sendToUsers
+  connectionManager.sendToUsers = (userIds, event) => {
+    if (event.type === "chat.thread_created") createdThreadEvents.push(event.payload.threadId)
+    sendToUsers(userIds, event)
+  }
+  const app = createServer({
+    authService,
+    matchService,
+    chatService,
+    safetyService,
+    connectionService: { repository: connectionRepository } as ConnectionService,
+    connectionManager
+  })
+  try {
+    const adaToken = await registerTestSession(app, "+905553339101")
+    const boraToken = await registerTestSession(app, "+905553339102")
+    const strangerToken = await registerTestSession(app, "+905553339103")
+    await makeAccountEligible(authService, adaToken, "Ada")
+    await makeAccountEligible(authService, boraToken, "Bora")
+    await makeAccountEligible(authService, strangerToken, "Stranger")
+    const ada = (await authService.getSession(adaToken))!.account.userId
+    const bora = (await authService.getSession(boraToken))!.account.userId
+    await repository.createMatch({
+      matchId: "persisted_match",
+      participantUserIds: [ada, bora],
+      matchedAt: "2026-09-29T10:00:00.000Z"
+    })
+    await connectionRepository.saveMatch({
+      miniRoomId: "persisted_room_match",
+      participantUserIds: [ada, bora],
+      matchedAt: "2026-09-29T10:01:00.000Z"
+    })
+    const before = await app.inject({ method: "GET", url: "/v1/threads", headers: { authorization: `Bearer ${adaToken}` } })
+    assert.equal(before.json().threads.length, 0)
+    assert.equal((await app.inject({ method: "POST", url: "/v1/threads/sync-matches" })).statusCode, 401)
+    const stranger = await app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: { authorization: `Bearer ${strangerToken}` } })
+    assert.equal(stranger.statusCode, 200)
+    assert.equal(stranger.json().threads.length, 0)
+    await safetyService.blockUser(ada, bora)
+    const blocked = await app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: { authorization: `Bearer ${adaToken}` } })
+    assert.equal(blocked.statusCode, 200)
+    assert.equal(blocked.json().threads.length, 0)
+    await safetyService.unblockUser(ada, bora)
+    for (const token of [adaToken, boraToken]) {
+      const synced = await app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: { authorization: `Bearer ${token}` } })
+      assert.equal(synced.statusCode, 200)
+      assert.deepEqual(synced.json().threads.map((thread: { threadId: string }) => thread.threadId), [
+        "thread_match_persisted_match"
+      ])
+    }
+    const repeated = await app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: { authorization: `Bearer ${adaToken}` } })
+    assert.equal(repeated.json().threads.length, 1)
+    assert.deepEqual(createdThreadEvents, ["thread_match_persisted_match"])
+
+    const charlieToken = await registerTestSession(app, "+905553339104")
+    await makeAccountEligible(authService, charlieToken, "Charlie")
+    const strangerId = (await authService.getSession(strangerToken))!.account.userId
+    const charlieId = (await authService.getSession(charlieToken))!.account.userId
+    await connectionRepository.saveMatch({
+      miniRoomId: "connection_only",
+      participantUserIds: [strangerId, charlieId],
+      matchedAt: "2026-09-29T10:02:00.000Z"
+    })
+    const recoveredConnection = await app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: { authorization: `Bearer ${strangerToken}` } })
+    assert.equal(recoveredConnection.json().threads[0]?.threadId, "thread_connection_connection_only")
+    await repository.createMatch({
+      matchId: "later_discovery_match",
+      participantUserIds: [strangerId, charlieId],
+      matchedAt: "2026-09-29T10:03:00.000Z"
+    })
+    const opened = await app.inject({
+      method: "POST",
+      url: "/v1/threads",
+      headers: { authorization: `Bearer ${strangerToken}` },
+      payload: { participantUserIds: [strangerId, charlieId] }
+    })
+    assert.equal(opened.statusCode, 200)
+    assert.equal(opened.json().thread.threadId, "thread_connection_connection_only")
+  } finally {
+    await app.close()
+  }
 })
 
 async function makeAccountEligible(

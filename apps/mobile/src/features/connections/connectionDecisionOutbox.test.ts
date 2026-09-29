@@ -93,3 +93,61 @@ test("a terminal delivery rejection is removed while transient failures remain q
   })
   assert.deepEqual(delivered, ["room_retry"])
 })
+
+test("queuing another room during delivery does not lose the new decision", async () => {
+  const storage = createStorage()
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_a", partnerUserId: "bora", status: "saved" })
+  let releaseDelivery!: () => void
+  let deliveryStarted!: () => void
+  const started = new Promise<void>((resolve) => { deliveryStarted = resolve })
+  const hold = new Promise<void>((resolve) => { releaseDelivery = resolve })
+  const flush = flushPendingConnectionDecisions(storage, "ada", async () => {
+    deliveryStarted()
+    await hold
+  })
+  await started
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_b", partnerUserId: "cora", status: "saved" })
+  releaseDelivery()
+  assert.equal((await flush).pending, 1)
+  const delivered: string[] = []
+  await flushPendingConnectionDecisions(storage, "ada", async (intent) => { delivered.push(intent.miniRoomId) })
+  assert.deepEqual(delivered, ["room_b"])
+})
+
+test("replacing the same room during delivery preserves the newer intent", async () => {
+  const storage = createStorage()
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_a", partnerUserId: "bora", status: "saved" })
+  let releaseDelivery!: () => void
+  let deliveryStarted!: () => void
+  const started = new Promise<void>((resolve) => { deliveryStarted = resolve })
+  const hold = new Promise<void>((resolve) => { releaseDelivery = resolve })
+  const flush = flushPendingConnectionDecisions(storage, "ada", async () => {
+    deliveryStarted()
+    await hold
+  })
+  await started
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_a", partnerUserId: "bora", status: "passed" })
+  releaseDelivery()
+  assert.equal((await flush).pending, 1)
+  const delivered: string[] = []
+  await flushPendingConnectionDecisions(storage, "ada", async (intent) => { delivered.push(intent.status) })
+  assert.deepEqual(delivered, ["passed"])
+})
+
+test("a terminal response for an old intent cannot reject its newer replacement", async () => {
+  const storage = createStorage()
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_a", partnerUserId: "bora", status: "saved" })
+  let releaseDelivery!: () => void
+  let deliveryStarted!: () => void
+  const started = new Promise<void>((resolve) => { deliveryStarted = resolve })
+  const hold = new Promise<void>((resolve) => { releaseDelivery = resolve })
+  const flush = flushPendingConnectionDecisions(storage, "ada", async () => {
+    deliveryStarted()
+    await hold
+    throw new Error("terminal")
+  }, () => false)
+  await started
+  await queueConnectionDecision(storage, { actorUserId: "ada", miniRoomId: "room_a", partnerUserId: "bora", status: "passed" })
+  releaseDelivery()
+  assert.deepEqual(await flush, { delivered: 0, pending: 1, rejectedMiniRoomIds: [] })
+})

@@ -1,4 +1,5 @@
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
+import { useFocusEffect } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import * as Sentry from "@sentry/react-native"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -88,6 +89,12 @@ import {
 import { showToast } from "../ui/toast"
 import { useAppViewportMetrics } from "../ui/layout/useAppViewportMetrics"
 import { updateRoomShowcaseVisibility } from "../features/discovery/roomShowcaseApi"
+import {
+  cancelMyRoomMotionTasks,
+  createMyRoomMotionLifecycle,
+  resolveMyRoomPoseAfterBlur,
+  scheduleMyRoomMotionCallback
+} from "./myRoomMotionLifecycle"
 
 type MyRoomNavProps = {
   navigation: NativeStackNavigationProp<RootStackParamList>
@@ -130,6 +137,8 @@ export function MyRoomScreen({
     state: "idle"
   })
   const avatarPoseRef = useRef(avatarPose)
+  const motionLifecycle = useMemo(() => createMyRoomMotionLifecycle(), [])
+  const isMountedRef = useRef(false)
   const animationFrameRef = useRef<number | null>(null)
   const transientPoseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const movementFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -317,28 +326,67 @@ export function MyRoomScreen({
     avatarPoseRef.current = avatarPose
   }, [avatarPose])
 
-  useEffect(() => () => {
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current)
+  const cancelPendingMotionWork = useCallback((): void => {
+    motionLifecycle.blur()
+    cancelMyRoomMotionTasks({
+      refs: {
+        animationFrame: animationFrameRef,
+        transientPoseTimer: transientPoseTimerRef,
+        movementFeedbackTimer: movementFeedbackTimerRef
+      },
+      cancelFrame: cancelAnimationFrame,
+      clearTimer: clearTimeout
+    })
+  }, [motionLifecycle])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      cancelPendingMotionWork()
     }
-    if (transientPoseTimerRef.current !== null) {
-      clearTimeout(transientPoseTimerRef.current)
+  }, [cancelPendingMotionWork])
+
+  useFocusEffect(useCallback(() => {
+    motionLifecycle.focus()
+    return () => {
+      cancelPendingMotionWork()
+      if (!isMountedRef.current) return
+
+      const currentPose = avatarPoseRef.current
+      const restingPose = resolveMyRoomPoseAfterBlur(currentPose)
+      if (restingPose !== currentPose) {
+        avatarPoseRef.current = restingPose
+        setAvatarPose(restingPose)
+      }
+      // A walk interrupted before arrival must not leave stale seat ownership
+      // or a partially completed seat transition behind.
+      if (currentPose.state === "walking") {
+        setSeatedFurnitureRenderId(undefined)
+        setSeatedSeatId(undefined)
+      }
+      setStageMarker(undefined)
+      setMovementFeedback(undefined)
     }
-    if (movementFeedbackTimerRef.current !== null) {
-      clearTimeout(movementFeedbackTimerRef.current)
-    }
-  }, [])
+  }, [cancelPendingMotionWork, motionLifecycle]))
 
   const showMovementFeedback = useCallback((message: string): void => {
+    if (!motionLifecycle.isFocused()) return
     if (movementFeedbackTimerRef.current !== null) {
       clearTimeout(movementFeedbackTimerRef.current)
     }
     setMovementFeedback(message)
-    movementFeedbackTimerRef.current = setTimeout(() => {
-      setMovementFeedback(undefined)
-      movementFeedbackTimerRef.current = null
-    }, MY_ROOM_MOVEMENT_FEEDBACK_DURATION_MS)
-  }, [])
+    const generation = motionLifecycle.currentGeneration()
+    movementFeedbackTimerRef.current = scheduleMyRoomMotionCallback(
+      motionLifecycle,
+      generation,
+      (callback) => setTimeout(callback, MY_ROOM_MOVEMENT_FEEDBACK_DURATION_MS),
+      () => {
+        movementFeedbackTimerRef.current = null
+        setMovementFeedback(undefined)
+      }
+    )
+  }, [motionLifecycle])
 
   useEffect(() => {
     const clearance = { clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE }
@@ -370,6 +418,7 @@ export function MyRoomScreen({
       }
     }
   ): void => {
+    if (!motionLifecycle.isFocused()) return
     if (transientPoseTimerRef.current !== null) {
       clearTimeout(transientPoseTimerRef.current)
       transientPoseTimerRef.current = null
@@ -494,8 +543,10 @@ export function MyRoomScreen({
       return
     }
 
+    const motionGeneration = motionLifecycle.begin()
     if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
     }
     if (movementFeedbackTimerRef.current !== null) {
       clearTimeout(movementFeedbackTimerRef.current)
@@ -510,6 +561,7 @@ export function MyRoomScreen({
     })
 
     const animatePathSegment = (pathIndex: number): void => {
+      if (!motionLifecycle.isCurrent(motionGeneration)) return
       const segment = plan.segments[pathIndex]
       const startedAt = Date.now()
       const segmentStartPose = getRoomWorldMovementSegmentStartPose(segment)
@@ -524,6 +576,8 @@ export function MyRoomScreen({
       setAvatarPose(startingPose)
 
       const tick = (): void => {
+        if (!motionLifecycle.isCurrent(motionGeneration)) return
+        animationFrameRef.current = null
         const frame = getRoomWorldMovementFrame({
           segment,
           startedAt,
@@ -547,7 +601,12 @@ export function MyRoomScreen({
         setAvatarPose(nextPose)
 
         if (!frame.isComplete) {
-          animationFrameRef.current = requestAnimationFrame(tick)
+          animationFrameRef.current = scheduleMyRoomMotionCallback(
+            motionLifecycle,
+            motionGeneration,
+            (callback) => requestAnimationFrame(callback),
+            tick
+          )
           return
         }
 
@@ -563,13 +622,25 @@ export function MyRoomScreen({
         hapticLight()
       }
 
-      animationFrameRef.current = requestAnimationFrame(tick)
+      animationFrameRef.current = scheduleMyRoomMotionCallback(
+        motionLifecycle,
+        motionGeneration,
+        (callback) => requestAnimationFrame(callback),
+        tick
+      )
     }
 
     animatePathSegment(0)
-  }, [copy, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
+  }, [copy, motionLifecycle, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
 
   const handlePoseAction = useCallback((state: MyRoomPoseActionState): void => {
+    if (!motionLifecycle.isFocused()) return
+    const motionGeneration = motionLifecycle.begin()
+    if (movementFeedbackTimerRef.current !== null) {
+      clearTimeout(movementFeedbackTimerRef.current)
+      movementFeedbackTimerRef.current = null
+    }
+    setMovementFeedback(undefined)
     if (transientPoseTimerRef.current !== null) {
       clearTimeout(transientPoseTimerRef.current)
       transientPoseTimerRef.current = null
@@ -589,16 +660,21 @@ export function MyRoomScreen({
 
     if (state === "idle") return
 
-    transientPoseTimerRef.current = setTimeout(() => {
-      const restingPose: MyRoomAvatarPose = {
-        ...avatarPoseRef.current,
-        state: "idle"
+    transientPoseTimerRef.current = scheduleMyRoomMotionCallback(
+      motionLifecycle,
+      motionGeneration,
+      (callback) => setTimeout(callback, MY_ROOM_TRANSIENT_POSE_DURATION_MS),
+      () => {
+        const restingPose: MyRoomAvatarPose = {
+          ...avatarPoseRef.current,
+          state: "idle"
+        }
+        avatarPoseRef.current = restingPose
+        setAvatarPose(restingPose)
+        transientPoseTimerRef.current = null
       }
-      avatarPoseRef.current = restingPose
-      setAvatarPose(restingPose)
-      transientPoseTimerRef.current = null
-    }, MY_ROOM_TRANSIENT_POSE_DURATION_MS)
-  }, [])
+    )
+  }, [motionLifecycle])
 
   const handleWalkAction = useCallback((): void => {
     const currentPose = avatarPoseRef.current

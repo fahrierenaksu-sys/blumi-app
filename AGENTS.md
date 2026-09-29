@@ -1,6 +1,6 @@
 # Blumi Project Instructions
 
-This file is the repository-wide operating contract for AI agents. Follow the current user request first, then this file, then any narrower `AGENTS.md` closer to the files being changed.
+This file is the repository-wide operating contract for AI coding agents (Claude Code, Codex, or any other). `CLAUDE.md` imports it. Follow the current user request first, then this file, then any narrower `AGENTS.md` closer to the files being changed.
 
 ## Product
 
@@ -29,15 +29,32 @@ Never redesign the character, change the product loop, or add a new runtime mere
 
 Inspect the active checkout before planning or editing. Current code, installed packages, native configuration, tests, runtime behavior, and the user's latest decisions outrank folder names, old reports, screenshots, memory, or remote history.
 
-- `apps/mobile`: Expo and React Native client.
+- `apps/mobile`: Expo and React Native client. Features live in `apps/mobile/src/features/`.
 - `apps/server`: backend services.
 - `packages/contracts`: shared boundary contracts.
 - `packages/domain`: shared domain rules.
 - `packages/realtime-client`: realtime client behavior.
+- `docs/`: `release/` (release workflow, launch control, App Store gate, database runbook), `quality/` (engineering audits), `avatar-motion-pipeline/` (avatar fit data). Check a document's date against current code before trusting it.
 
-Do not infer the Expo SDK from this checkout's directory name. Read `apps/mobile/package.json`; it currently declares Expo SDK 57. For Expo, React Native, React, Reanimated, Worklets, or another fast-moving dependency, verify the installed version and consult matching official documentation.
+Avatar and room features:
+
+- `avatarV2`: current production avatar runtime.
+- `roomWorld`: walkable geometry, interaction model, MiniRoom projection.
+- `roomV2`: My Room UI.
+- `roomStudio`: room asset manifest and QA studio.
+- `miniRoom`: in-room chat and voice lifecycle.
+
+Do not infer the Expo SDK from this checkout's directory name (`blumi-sdk54`). Read `apps/mobile/package.json`. For Expo, React Native, React, Reanimated, Worklets, or another fast-moving dependency, verify the installed version and consult matching official documentation.
 
 Before editing, read the relevant implementation and tests, inspect `git status`, locate the real runtime resolver and persistence boundary, and preserve unrelated dirty or untracked work.
+
+## Current status
+
+A snapshot, not a promise. Re-verify against the code before relying on it, and update it when a status changes.
+
+- **Implemented:** Avatar V2 layered-PNG runtime with existing motion contracts, RoomWorld geometry and interaction model, My Room and MiniRoom surfaces. Stack: Expo SDK 57, React Native 0.86, React 19, Reanimated 4, Worklets.
+- **Planned, not present:** Avatar V3 (no code yet; `docs/avatar-motion-pipeline/` holds fit data only), Spine runtime, React Native Skia (neither is a dependency). Do not describe them as implemented or import them without the gates in this file.
+- **Open:** native, physical-device, and performance evidence for the current build.
 
 ## Product and architecture invariants
 
@@ -59,13 +76,9 @@ Evolve RoomWorld concepts such as walkable geometry, footprints, blockers, seati
 
 The original sweet chibi identity is locked. Every hair, garment, hand treatment, and shoe must be designed for the current canonical base so the character reads as one drawing. A code test cannot approve visual quality.
 
-For any character, hair, wardrobe, cosmetic-fit, animation, or rig task, use the repository skill:
+For any character, hair, wardrobe, cosmetic-fit, animation, or rig task, follow the repository skill at `.agents/skills/blumi-character-asset-production/SKILL.md`. If the runtime does not load it automatically, read it directly. It covers the external Workbench, frozen production briefs, source locks, anatomy and fit gates, native evidence, promotion, and stop conditions. Use the current active model unless the user explicitly requests delegation; do not make a named model a standing blocker.
 
-`$blumi-character-asset-production`
-
-Its detailed rules cover the external Workbench, frozen production briefs, source locks, anatomy and fit gates, native evidence, promotion, and stop conditions. Use the current active Codex model unless the user explicitly requests delegation; do not make a named model a standing blocker.
-
-The non-negotiable storage boundary is:
+The non-negotiable storage boundary:
 
 - Production sources, prompts, editable masters, experiments, rejected candidates, QA renders, temporary scripts, and provenance stay under `/Users/evrenevren/BlumiArtWorkbench/`.
 - This repository receives only user-approved optimized runtime assets, required production wiring, runtime metadata actually consumed by the app, and meaningful integration tests.
@@ -77,9 +90,9 @@ Candidate and quarantine assets must not resolve in production. Preserve product
 
 Work autonomously through the requested scope. Ask only when an unresolved choice would materially change product behavior, migrate or destroy data, incur meaningful cost, contradict a locked requirement, or create a difficult-to-reverse architecture decision.
 
-Be solution-oriented. Do not stop at describing a defect, repeating a plan, or producing more diagnostics after the root cause is known. Turn evidence into a concrete fix, carry the fix through its relevant checks, and present a reviewable result. When the first approach fails, identify why it failed and choose a materially better method instead of polishing the same failure.
+Be solution-oriented. Once the root cause is known, turn evidence into a concrete fix, carry it through its relevant checks, and present a reviewable result. When the first approach fails, identify why and choose a materially better method instead of polishing the same failure.
 
-Use creative engineering judgment inside the locked product boundaries. Compare viable methods by expected visual or product gain, implementation cost, reversibility, runtime risk, and proof quality. Prefer the simplest method that can meet every acceptance gate. Prototype uncertain ideas in a bounded and disposable form, keep experiments out of production paths, and promote only the proven result.
+Compare viable methods by expected visual or product gain, implementation cost, reversibility, runtime risk, and proof quality, and prefer the simplest that meets every acceptance gate. Prototype uncertain ideas in a bounded, disposable form, keep experiments out of production paths, and promote only the proven result.
 
 For code changes:
 
@@ -90,19 +103,31 @@ For code changes:
 5. Inspect the final diff and verify the real runtime surface when visuals or interaction changed.
 6. Report the change, evidence, and open gates precisely.
 
-Keep momentum proportional to uncertainty: investigate broadly only until the decision is clear, then execute narrowly and quickly. Reuse verified measurements, manifests, utilities, and prior lessons. Do not repeat searches, generations, full test suites, or approval questions without new evidence or a changed condition.
+Keep momentum proportional to uncertainty: investigate broadly only until the decision is clear, then execute narrowly. Reuse verified measurements, manifests, utilities, and prior lessons. Do not repeat searches, generations, full test suites, or approval questions without new evidence or a changed condition.
 
 Prefer immutable state/domain updates, explicit errors, validated boundaries, stable IDs, and existing project patterns. Do not manufacture tests for trivial constants or raster pixels. The 80% coverage target applies to changed executable logic where coverage is meaningful.
 
-Useful root commands:
+### Commands
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm test`
-- `npm run verify`
-- `npm run doctor`
+- `npm run typecheck`, `npm run lint`, `npm test`: focused checks.
+- `npm run verify`: full release gate (source hygiene, operations center, audit policy, release infrastructure, package build, typecheck, lint, tests).
+- `npm run doctor`: Expo dependency health check.
+- `npm run dev:mobile` / `npm run dev:server`: start Metro or the backend. `npm run server:qa` starts the backend with QA env files.
+- `npm run db:migrate`: data-affecting; confirm the target first.
+- `npm run audit:release`, `npm run verify:source-hygiene`, `npm run verify:release-infra`, `npm run verify:postgres`, `npm run verify:operations-center`: individual gates.
+- `npm run clean-clone:verify`: `npm ci` then `npm run verify`; slow, final gate only.
 
-Choose checks based on risk. Run the broad release gate at the appropriate phase instead of repeatedly running it without new evidence.
+Choose checks by risk. Run the broad gate at the appropriate phase, not repeatedly without new evidence. For release, TestFlight, or App Store readiness work, follow `docs/release/RELEASE_CAPTAIN_WORKFLOW.md`.
+
+### Skills and plugins
+
+Skills and plugins are aids; this file wins on any conflict. Use them when they fit the task, not by default.
+
+- Debugging, verification, code review, and TDD skills (for example `systematic-debugging`, `verification-before-completion`, `test-driven-development`, `requesting-code-review`): recommended for behavior changes.
+- Expo skills (`expo-*`, `eas-*`): use for Expo, Router, EAS, and upgrade questions, then confirm against the installed SDK.
+- UI/UX and design skills: use for screen structure, hierarchy, and accessibility only. They never override the locked chibi identity or the existing design language.
+- Planning or brainstorming skills: use for new features or architecture choices, not for small fixes.
+- No skill may create worktrees, commit, push, merge, or publish without user authorization (see Git and delivery).
 
 ## Native evidence
 
@@ -135,7 +160,7 @@ Use these labels accurately:
 - **Production ready:** all required product, security, migration, native, performance, release, and external gates passed.
 - **Blocked/Open:** named evidence is missing or a gate failed.
 
-Never collapse these states. “Tested” is not visual approval; “pushed” is not a Store release.
+Never collapse these states. "Tested" is not visual approval; "pushed" is not a Store release.
 
 ## Guiding principle
 

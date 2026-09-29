@@ -1,5 +1,7 @@
 import type { RoomShellMyRoomCamera } from "./roomV2.types"
 
+export const ROOM_V2_OUTSIDE_COLOR = "#110A12"
+
 export interface ResolvedRoomV2MyRoomCamera {
   compactRendererWidth: NonNullable<RoomShellMyRoomCamera["compactRendererWidth"]>
   regularRendererWidth: NonNullable<RoomShellMyRoomCamera["regularRendererWidth"]>

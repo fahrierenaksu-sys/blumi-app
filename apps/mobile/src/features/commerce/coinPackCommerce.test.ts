@@ -64,6 +64,86 @@ test("missing RevenueCat config or native bridge fails closed", async () => {
   )
 })
 
+test("logout requested during RevenueCat login blocks purchasing and eventually clears identity", async () => {
+  let finishLogin!: () => void
+  let loginStarted!: () => void
+  const started = new Promise<void>((resolve) => { loginStarted = resolve })
+  const pendingLogin = new Promise<void>((resolve) => { finishLogin = resolve })
+  const calls: string[] = []
+  const client = createRevenueCatCoinPackClient({
+    apiKey: "rc_test_key",
+    bridge: {
+      configure: async () => undefined,
+      logIn: async () => { calls.push("login"); loginStarted(); await pendingLogin },
+      logOut: async () => { calls.push("logout") },
+      getProducts: async () => [],
+      purchaseProduct: async () => { calls.push("purchase"); return { status: "cancelled" } }
+    }
+  })
+  const login = client.syncAuthenticatedUser("user-1")
+  await started
+  const logout = client.syncAuthenticatedUser(undefined)
+  finishLogin()
+  await Promise.all([login, logout])
+  await assert.rejects(client.purchaseCoinPack("com.blumi.mobile.coins.500"), /sign in/i)
+  assert.deepEqual(calls, ["login", "logout"])
+})
+
+test("RevenueCat account transitions serialize SDK identity and reject purchases while pending", async () => {
+  let finishFirstLogin!: () => void
+  let firstLoginStarted!: () => void
+  const started = new Promise<void>((resolve) => { firstLoginStarted = resolve })
+  const pendingLogin = new Promise<void>((resolve) => { finishFirstLogin = resolve })
+  const calls: string[] = []
+  const client = createRevenueCatCoinPackClient({
+    apiKey: "rc_test_key",
+    bridge: {
+      configure: async () => { calls.push("configure") },
+      logIn: async (userId) => {
+        calls.push(`login:${userId}`)
+        if (userId === "user-1") { firstLoginStarted(); await pendingLogin }
+      },
+      logOut: async () => { calls.push("logout") },
+      getProducts: async () => [],
+      purchaseProduct: async () => { calls.push("purchase"); return { status: "cancelled" } }
+    }
+  })
+  const first = client.syncAuthenticatedUser("user-1")
+  await started
+  const second = client.syncAuthenticatedUser("user-2")
+  await assert.rejects(client.purchaseCoinPack("com.blumi.mobile.coins.500"), /sign in/i)
+  assert.deepEqual(calls, ["configure", "login:user-1"])
+  finishFirstLogin()
+  await Promise.all([first, second])
+  assert.deepEqual(calls, ["configure", "login:user-1", "logout", "login:user-2"])
+  assert.deepEqual(await client.purchaseCoinPack("com.blumi.mobile.coins.500"), { status: "cancelled" })
+})
+
+test("a failed RevenueCat identity change stays closed and does not poison retry", async () => {
+  const calls: string[] = []
+  let failSecondUser = true
+  const client = createRevenueCatCoinPackClient({
+    apiKey: "rc_test_key",
+    bridge: {
+      configure: async () => undefined,
+      logIn: async (userId) => {
+        calls.push(`login:${userId}`)
+        if (userId === "user-2" && failSecondUser) throw new Error("SDK login failed")
+      },
+      logOut: async () => { calls.push("logout") },
+      getProducts: async () => [],
+      purchaseProduct: async () => { calls.push("purchase"); return { status: "cancelled" } }
+    }
+  })
+  await client.syncAuthenticatedUser("user-1")
+  await assert.rejects(client.syncAuthenticatedUser("user-2"), /SDK login failed/)
+  await assert.rejects(client.purchaseCoinPack("com.blumi.mobile.coins.500"), /sign in/i)
+  failSecondUser = false
+  await client.syncAuthenticatedUser("user-2")
+  assert.deepEqual(await client.purchaseCoinPack("com.blumi.mobile.coins.500"), { status: "cancelled" })
+  assert.deepEqual(calls, ["login:user-1", "logout", "login:user-2", "login:user-2", "purchase"])
+})
+
 test("reconcile sends only authenticated transaction IDs and never a client coin grant", async () => {
   const requests: { url: string; init?: RequestInit }[] = []
   const result = await reconcileCoinPackPurchase({

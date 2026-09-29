@@ -5,20 +5,33 @@ export type MatchChatOpenResult =
   | { status: "opened"; thread: ChatThread }
   | { status: "failed"; errorMessage: string }
 
-export async function openMatchedChat(input: {
+export function createMatchedChatOpener(input: {
   createThread: () => Promise<ChatThread>
   onThreadReady: (thread: ChatThread) => void
-}): Promise<MatchChatOpenResult> {
-  try {
-    const thread = await input.createThread()
-    input.onThreadReady(thread)
-    return { status: "opened", thread }
-  } catch (error) {
-    return {
-      status: "failed",
-      errorMessage: getMatchChatOpenErrorMessageForDisplay(
-        error instanceof Error ? error.message : ""
-      )
-    }
+}): () => Promise<MatchChatOpenResult> {
+  let inFlight: Promise<MatchChatOpenResult> | null = null
+
+  return () => {
+    if (inFlight) return inFlight
+
+    const attempt = (async (): Promise<MatchChatOpenResult> => {
+      try {
+        const thread = await input.createThread()
+        input.onThreadReady(thread)
+        return { status: "opened", thread }
+      } catch (error) {
+        return {
+          status: "failed",
+          errorMessage: getMatchChatOpenErrorMessageForDisplay(
+            error instanceof Error ? error.message : ""
+          )
+        }
+      }
+    })()
+    inFlight = attempt
+    void attempt.then(() => {
+      if (inFlight === attempt) inFlight = null
+    })
+    return attempt
   }
 }

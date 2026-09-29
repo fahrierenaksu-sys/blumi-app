@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -26,10 +27,15 @@ import {
   assertFullWaveQaSelectionIsBounded,
   resolveNativeUiOnlyTestingArgs
 } from "./nativeUiTestSelection.mjs"
+import { assertNativeUiTestTarget } from "./nativeUiProjectContract.mjs"
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const iosRoot = resolve(mobileRoot, "ios")
-const workspace = resolve(iosRoot, "BlumiMobile.xcworkspace")
+const workspace = resolve(iosRoot, "Blumi.xcworkspace")
+assertNativeUiTestTarget(
+  readFileSync(resolve(iosRoot, "Blumi.xcodeproj/xcshareddata/xcschemes/Blumi.xcscheme"), "utf8"),
+  readFileSync(resolve(iosRoot, "Blumi.xcodeproj/project.pbxproj"), "utf8")
+)
 const simulatorId = process.env.IOS_SIMULATOR_UDID || selectSimulator()
 const screenshotDirectory =
   process.env.BLUMI_UI_SCREENSHOT_DIR ||
@@ -92,7 +98,7 @@ const xcodebuildStatus = runWithTemporaryDerivedData({
         "xcodebuild",
         [
           "-workspace", workspace,
-          "-scheme", "BlumiMobile",
+          "-scheme", "Blumi",
           "-configuration", "Release",
           "-destination", `platform=iOS Simulator,id=${simulatorId}`,
           "-derivedDataPath", derivedDataPath,

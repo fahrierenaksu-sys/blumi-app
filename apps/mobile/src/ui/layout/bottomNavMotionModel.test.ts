@@ -9,8 +9,8 @@ import {
 
 test("bottom navigation uses a subtle press response without shrinking its layout", () => {
   assert.equal(BOTTOM_NAV_PRESSED_SCALE, 0.97)
-  assert.equal(BOTTOM_NAV_PRESS_DURATION_MS, 100)
-  assert.equal(getBottomNavMotionDuration(false), 200)
+  assert.equal(BOTTOM_NAV_PRESS_DURATION_MS, 80)
+  assert.equal(getBottomNavMotionDuration(false), 150)
   assert.equal(getBottomNavMotionDuration(true), 0)
 })
 

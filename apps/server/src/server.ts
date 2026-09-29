@@ -1,6 +1,7 @@
 import cors from "@fastify/cors"
 import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
+import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
 import Fastify, {
@@ -309,7 +310,7 @@ function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request, reply) => {
     const statusCode = getErrorStatusCode(error)
     if (statusCode >= 500) {
-      request.log.error({ error }, "Unhandled request error")
+      request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Unhandled request error")
     }
 
     return reply.code(statusCode).send({

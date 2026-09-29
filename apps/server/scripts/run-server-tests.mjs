@@ -26,6 +26,18 @@ execFileSync(process.execPath, ["--test", ...testFiles], {
   stdio: "inherit"
 })
 
+// The legal-page builder consumes maintained mobile legal sources outside src.
+execFileSync(process.execPath, [
+  "--import", "tsx",
+  "--test",
+  "apps/mobile/src/features/legal/legalCopy.test.ts",
+  "apps/mobile/src/features/legal/legalPolicyMetadata.test.ts",
+  "apps/mobile/src/features/legal/legalDocumentModel.test.ts"
+], {
+  cwd: repositoryRoot,
+  stdio: "inherit"
+})
+
 function findTestFiles(directory) {
   return readdirSync(directory)
     .flatMap((entry) => {

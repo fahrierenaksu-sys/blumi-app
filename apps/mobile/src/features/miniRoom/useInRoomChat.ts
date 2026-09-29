@@ -1,14 +1,22 @@
 import type { ChatMessage } from "@blumi/contracts"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { applyChatMessageListLoading, useChatStore } from "../chat/chatStore"
 import {
+  applyChatMessageListLoading,
+  getMessageListCompletionVersion,
+  useChatStore
+} from "../chat/chatStore"
+import {
+  getGlobalStatus,
+  subscribeToStatus,
   useGlobalRealtime,
   useGlobalRealtimeEvents
 } from "../realtime/globalRealtimeProvider"
+import { createReconnectTransitionTracker } from "../realtime/reconnectTransitionTracker"
 import type { ServerEvent } from "@blumi/realtime-client"
 import {
   findLastCanonicalRoomChatMessage,
   findCanonicalRoomChatThread,
+  findMissedCanonicalRoomChatMessages,
   shouldRenderIncomingRoomChatMessage
 } from "./inRoomChatThread"
 import {
@@ -63,6 +71,8 @@ export function useInRoomChat(options: {
   const replayedEntryThreadRef = useRef<string | null>(null)
   const replayGateRef = useRef(createRoomEntryReplayGate())
   const bufferedNewEventsRef = useRef<InRoomChatMessageEvent[]>([])
+  const reconnectSnapshotPendingRef = useRef(false)
+  const reconnectCompletionBaselineRef = useRef(0)
   const [pendingEvents, setPendingEvents] = useState<InRoomChatMessageEvent[]>([])
 
   useEffect(() => {
@@ -91,7 +101,25 @@ export function useInRoomChat(options: {
     })
   }, [connectionStatus, getMessages, send, threadId])
 
+  useEffect(() => {
+    const isReconnect = createReconnectTransitionTracker(getGlobalStatus())
+    reconnectSnapshotPendingRef.current = false
+    reconnectCompletionBaselineRef.current = threadId
+      ? getMessageListCompletionVersion(threadId)
+      : 0
+    return subscribeToStatus((status) => {
+      if (!isReconnect(status)) return
+      reconnectSnapshotPendingRef.current = true
+      reconnectCompletionBaselineRef.current = threadId
+        ? getMessageListCompletionVersion(threadId)
+        : 0
+    })
+  }, [localUserId, threadId])
+
   const messageListState = threadId ? getMessageListState(threadId) : { status: "idle" as const }
+  const messageListCompletionVersion = threadId
+    ? getMessageListCompletionVersion(threadId)
+    : 0
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   const canonicalMessages = threadId ? getMessages(threadId) : []
 
@@ -133,12 +161,51 @@ export function useInRoomChat(options: {
       (event) => event.messageId !== initialEvent?.messageId
     )
     bufferedNewEventsRef.current = []
+    for (const message of canonicalMessages) {
+      seenRef.current.add(message.messageId)
+    }
     setPendingEvents((current) => [
       ...current,
       ...(initialEvent ? [initialEvent] : []),
       ...buffered
     ])
   }, [canonicalMessages, messageListState.status, threadId])
+
+  useEffect(() => {
+    if (!threadId || !reconnectSnapshotPendingRef.current) return
+    if (messageListCompletionVersion <= reconnectCompletionBaselineRef.current) return
+    if (messageListState.status === "failed") {
+      reconnectSnapshotPendingRef.current = false
+      return
+    }
+    if (messageListState.status !== "ready") return
+
+    const missedMessages = findMissedCanonicalRoomChatMessages({
+      messages: canonicalMessages,
+      baselineTimestamp: baselineRef.current,
+      localUserId,
+      alreadySeenMessageIds: seenRef.current
+    })
+    const missedEvents = missedMessages.map((message) => ({
+      messageId: message.messageId,
+      senderUserId: message.senderUserId,
+      body: message.body,
+      sentAt: Date.parse(message.sentAt)
+    }))
+    for (const message of missedMessages) {
+      seenRef.current.add(message.messageId)
+    }
+    if (missedEvents.length > 0) {
+      setPendingEvents((current) => {
+        const pendingIds = new Set(current.map((event) => event.messageId))
+        return [
+          ...current,
+          ...missedEvents.filter((event) => !pendingIds.has(event.messageId))
+        ]
+      })
+    }
+    reconnectSnapshotPendingRef.current = false
+  }, [canonicalMessages, localUserId, messageListCompletionVersion, messageListState.status, threadId])
 
   const handleIncoming = useCallback(
     (message: ChatMessage) => {

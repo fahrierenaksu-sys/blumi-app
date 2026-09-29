@@ -4,12 +4,44 @@ import type {
   MiniRoomParticipant
 } from "@blumi/contracts"
 import { sharedRoomDecorSnapshotSchema } from "@blumi/contracts"
+import { requestJson } from "../network/apiClient"
 import type {
   ChatRoomInviteStatus,
   ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
 
 export type RoomInviteDecision = "accepted" | "declined"
+
+export class RoomInviteApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: "SELF_IN_ROOM" | "PARTICIPANT_BUSY" | null,
+    readonly status: number,
+    readonly roomSessionId: string | null = null
+  ) {
+    super(message)
+    this.name = "RoomInviteApiError"
+  }
+}
+
+export interface RoomLeaveResult {
+  ended: boolean
+}
+
+export class RoomSessionJoinError extends Error {
+  constructor(message: string, readonly code: string | null, readonly status: number) {
+    super(message)
+    this.name = "RoomSessionJoinError"
+  }
+}
+
+export function isDefinitivelyUnavailableRoomSession(error: unknown): boolean {
+  return error instanceof RoomSessionJoinError && (
+    error.status === 403 ||
+    error.status === 404 ||
+    (error.status === 409 && error.code === "INVITE_NOT_AVAILABLE")
+  )
+}
 
 export interface RoomSessionJoinResult {
   miniRoom: MiniRoom
@@ -43,11 +75,12 @@ export async function fetchThreadRoomInvites(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<ChatRoomInviteTimelineItem[]> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/threads/${encodeURIComponent(threadId)}/room-invites`),
-    { headers: createAuthHeaders(sessionToken), signal }
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/threads/${encodeURIComponent(threadId)}/room-invites`,
+    { headers: createAuthHeaders(sessionToken), signal },
+    fetcher
   )
-  const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not load that room invitation."))
   }
@@ -72,7 +105,16 @@ export async function createThreadRoomInvite(
   )
   const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(payload, "We could not send that room invitation."))
+    const code = readRoomInviteBusyCode(payload)
+    throw new RoomInviteApiError(
+      getApiErrorMessage(payload, "We could not send that room invitation."),
+      code,
+      response.status,
+      code === "SELF_IN_ROOM" && payload && typeof payload === "object" &&
+        typeof (payload as Record<string, unknown>).roomSessionId === "string"
+        ? (payload as { roomSessionId: string }).roomSessionId
+        : null
+    )
   }
   return normalizeInviteResponse(payload)
 }
@@ -130,19 +172,85 @@ export async function joinRoomSession(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<RoomSessionJoinResult> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/room-sessions/${encodeURIComponent(roomSessionId)}/join`),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/room-sessions/${encodeURIComponent(roomSessionId)}/join`,
     {
       method: "POST",
       headers: createAuthHeaders(sessionToken),
       signal
-    }
+    },
+    fetcher
   )
-  const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(payload, "That Blumi Room is no longer available."))
+    const code = payload && typeof payload === "object" &&
+      typeof (payload as Record<string, unknown>).code === "string"
+      ? (payload as { code: string }).code
+      : null
+    throw new RoomSessionJoinError(
+      getApiErrorMessage(payload, "That Blumi Room is no longer available."),
+      code,
+      response.status
+    )
   }
   return normalizeRoomSessionJoinPayload(payload)
+}
+
+export async function leaveRoomSession(
+  baseHttpUrl: string,
+  sessionToken: string,
+  roomSessionId: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<RoomLeaveResult> {
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/room-sessions/${encodeURIComponent(roomSessionId)}/leave`,
+    { method: "POST", headers: createAuthHeaders(sessionToken), signal },
+    fetcher
+  )
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload, "We could not leave that room yet."))
+  }
+  return normalizeRoomLeaveResult(payload)
+}
+
+export async function leaveActiveRoom(
+  baseHttpUrl: string,
+  sessionToken: string,
+  expectedRoomSessionId: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<RoomLeaveResult> {
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/users/me/active-room/leave",
+    {
+      method: "POST",
+      headers: { ...createAuthHeaders(sessionToken), "content-type": "application/json" },
+      body: JSON.stringify({ expectedRoomSessionId }),
+      signal
+    },
+    fetcher
+  )
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload, "We could not close your previous room yet."))
+  }
+  return normalizeRoomLeaveResult(payload)
+}
+
+function normalizeRoomLeaveResult(payload: unknown): RoomLeaveResult {
+  if (!payload || typeof payload !== "object" ||
+    typeof (payload as Record<string, unknown>).ended !== "boolean") {
+    throw new Error("Blumi could not confirm that the room was closed.")
+  }
+  return { ended: (payload as { ended: boolean }).ended }
+}
+
+function readRoomInviteBusyCode(payload: unknown): RoomInviteApiError["code"] {
+  if (!payload || typeof payload !== "object") return null
+  const code = (payload as Record<string, unknown>).code
+  return code === "SELF_IN_ROOM" || code === "PARTICIPANT_BUSY" ? code : null
 }
 
 export function normalizeRoomInviteRecord(value: unknown): ChatRoomInviteTimelineItem {

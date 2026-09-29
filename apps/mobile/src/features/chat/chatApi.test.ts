@@ -21,6 +21,71 @@ test("chat refresh consumes cursor pages and rejects nonadvancing or cross-accou
   await assert.rejects(fetchChatThreads("http://localhost:4000", "token", (async () => createJsonResponse(200, { userId: ++page === 1 ? "a" : "b", threads: [], nextCursor: page === 1 ? "next" : null })) as typeof fetch), /ownership changed/)
 })
 
+test("match-aware refresh syncs the first page and paginates without repeating writes", async () => {
+  const requests: { url: string; method: string | undefined }[] = []
+  await fetchChatThreads("http://localhost:4000", "token", (async (url, init) => {
+    requests.push({ url: String(url), method: init?.method })
+    return createJsonResponse(200, {
+      userId: "ada",
+      threads: [],
+      nextCursor: requests.length === 1 ? "next" : null
+    })
+  }) as typeof fetch, undefined, { syncMatches: true })
+  assert.deepEqual(requests, [
+    { url: "http://localhost:4000/v1/threads/sync-matches", method: "POST" },
+    { url: "http://localhost:4000/v1/threads?cursor=next", method: "GET" }
+  ])
+})
+
+test("match sync failure leaves existing chats readable through the regular list route", async () => {
+  const requests: { url: string; method: string | undefined }[] = []
+  const result = await fetchChatThreads("http://localhost:4000", "token", (async (url, init) => {
+    requests.push({ url: String(url), method: init?.method })
+    return createJsonResponse(requests.length === 1 ? 503 : 200,
+      requests.length === 1
+        ? { error: "Match recovery is temporarily unavailable." }
+        : { userId: "ada", threads: [], nextCursor: null })
+  }) as typeof fetch, undefined, { syncMatches: true })
+  assert.equal(result.userId, "ada")
+  assert.deepEqual(requests, [
+    { url: "http://localhost:4000/v1/threads/sync-matches", method: "POST" },
+    { url: "http://localhost:4000/v1/threads", method: "GET" }
+  ])
+})
+
+test("match sync authentication failure is not hidden by a list fallback", async () => {
+  let requests = 0
+  await assert.rejects(fetchChatThreads("http://localhost:4000", "token", (async () => {
+    requests += 1
+    return createJsonResponse(401, { error: "Sign in again." })
+  }) as typeof fetch, undefined, { syncMatches: true }), /Sign in again/)
+  assert.equal(requests, 1)
+})
+
+test("older servers without the match-sync route still serve the normal Inbox", async () => {
+  let requests = 0
+  const result = await fetchChatThreads("http://localhost:4000", "token", (async () => {
+    requests += 1
+    return createJsonResponse(requests === 1 ? 404 : 200,
+      requests === 1 ? { error: "Not found" } : { userId: "ada", threads: [] })
+  }) as typeof fetch, undefined, { syncMatches: true })
+  assert.equal(result.userId, "ada")
+  assert.equal(requests, 2)
+})
+
+test("a cancelled match-sync request never starts a fallback read", async () => {
+  const controller = new AbortController()
+  let requests = 0
+  await assert.rejects(fetchChatThreads("http://localhost:4000", "token", (async () => {
+    requests += 1
+    controller.abort()
+    const error = new Error("Request cancelled.")
+    error.name = "AbortError"
+    throw error
+  }) as typeof fetch, controller.signal, { syncMatches: true }), /cancelled/)
+  assert.equal(requests, 1)
+})
+
 test("fetchChatThreads loads authenticated production threads", async () => {
   const calls: { url: string; init: RequestInit | undefined }[] = []
   const threads = await fetchChatThreads(

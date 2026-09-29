@@ -22,12 +22,17 @@ import {
 } from "./presenceRepository"
 
 const PRESENCE_LEASE_MS = 1000 * 60
+const REALTIME_CONNECTION_LEASE_MS = 1000 * 90
 
 export interface PresenceService {
   repository: PresenceRepository
   joinRoom(input: JoinRoomInput, now?: Date): Promise<JoinRoomResponse>
   leaveRoom(roomId: string, userId: string): Promise<void>
   leaveAllRooms(userId: string): Promise<void>
+  registerConnection(connectionId: string, userId: string): Promise<void>
+  heartbeatConnection(connectionId: string, userId: string): Promise<boolean>
+  disconnectConnection(connectionId: string, userId: string): Promise<string[]>
+  purgeExpiredConnectionLeases(): Promise<number>
   moveToSpot(
     roomId: string,
     userId: string,
@@ -74,20 +79,8 @@ export function createPresenceService(
     repository,
     async joinRoom(input, now = new Date()) {
       const layout = await roomService.getOrCreateLayout(input.roomId)
-      const existingUsers = toPresenceUsers(
-        await repository.listRoomPresence(layout.roomId, now)
-      )
       const requestedSpotId = input.initialSpotId?.trim()
-      const assignedSpotId =
-        requestedSpotId && canOccupySpot(layout, existingUsers, requestedSpotId, input.profile.userId)
-          ? requestedSpotId
-          : getFirstAvailableSpot(layout, existingUsers)
-
-      if (!assignedSpotId) {
-        throw new Error("That room is full right now.")
-      }
-
-      const previousPresence = await repository.findUserPresence(
+      let previousPresence = await repository.findUserPresence(
         layout.roomId,
         input.profile.userId,
         now
@@ -97,33 +90,93 @@ export function createPresenceService(
         loadout: input.profile.avatar.loadout,
         revision: input.profile.avatar.revision
       })
-      const record: PresenceRecord = {
-        roomId: layout.roomId,
-        userId: input.profile.userId,
-        displayName: input.profile.displayName,
-        avatar,
-        spotId: assignedSpotId,
-        inMiniRoom: previousPresence?.inMiniRoom ?? false,
-        joinedAt: previousPresence?.joinedAt ?? now.toISOString(),
-        updatedAt: now.toISOString(),
-        expiresAt: new Date(now.getTime() + PRESENCE_LEASE_MS).toISOString()
-      }
-      await repository.savePresence(record)
-      const snapshot = await this.createSnapshot(layout.roomId, now)
+      const maximumReservationAttempts = Math.max(1, layout.spots.length + 1)
 
-      return {
-        roomId: layout.roomId,
-        currentUserId: input.profile.userId,
-        assignedSpotId,
-        layout,
-        snapshot
+      for (let attempt = 0; attempt < maximumReservationAttempts; attempt += 1) {
+        const existingUsers = toPresenceUsers(
+          await repository.listRoomPresence(layout.roomId, now)
+        )
+        const requestedSpotIsAvailable = Boolean(
+          requestedSpotId && canOccupySpot(
+            layout,
+            existingUsers,
+            requestedSpotId,
+            input.profile.userId
+          )
+        )
+        const previousSpotIsAvailable = Boolean(
+          previousPresence && canOccupySpot(
+            layout,
+            existingUsers,
+            previousPresence.spotId,
+            input.profile.userId
+          )
+        )
+        const assignedSpotId = requestedSpotIsAvailable
+          ? requestedSpotId!
+          : previousSpotIsAvailable
+            ? previousPresence!.spotId
+            : getFirstAvailableSpot(layout, existingUsers)
+
+        if (!assignedSpotId) {
+          throw new Error("That room is full right now.")
+        }
+
+        const record: PresenceRecord = {
+          roomId: layout.roomId,
+          userId: input.profile.userId,
+          displayName: input.profile.displayName,
+          avatar,
+          spotId: assignedSpotId,
+          inMiniRoom: previousPresence?.inMiniRoom ?? false,
+          joinedAt: previousPresence?.joinedAt ?? now.toISOString(),
+          updatedAt: now.toISOString(),
+          expiresAt: new Date(now.getTime() + PRESENCE_LEASE_MS).toISOString()
+        }
+        if (await repository.trySavePresence(record, now)) {
+          const snapshot = await this.createSnapshot(layout.roomId, now)
+          return {
+            roomId: layout.roomId,
+            currentUserId: input.profile.userId,
+            assignedSpotId,
+            layout,
+            snapshot
+          }
+        }
+        previousPresence = await repository.findUserPresence(
+          layout.roomId,
+          input.profile.userId,
+          now
+        )
       }
+
+      throw new Error("That room is full right now.")
     },
     async leaveRoom(roomId, userId) {
       await repository.deletePresence(roomId, userId)
     },
     async leaveAllRooms(userId) {
       await repository.deleteUserPresence(userId)
+    },
+    async registerConnection(connectionId, userId) {
+      await repository.registerConnectionLease(
+        connectionId,
+        userId,
+        REALTIME_CONNECTION_LEASE_MS
+      )
+    },
+    async heartbeatConnection(connectionId, userId) {
+      return repository.heartbeatConnectionLease(
+        connectionId,
+        userId,
+        REALTIME_CONNECTION_LEASE_MS
+      )
+    },
+    async disconnectConnection(connectionId, userId) {
+      return repository.disconnectConnectionLease(connectionId, userId)
+    },
+    async purgeExpiredConnectionLeases() {
+      return repository.purgeExpiredConnectionLeases(500)
     },
     async moveToSpot(roomId, userId, spotId, now = new Date()) {
       const layout = await roomService.getOrCreateLayout(roomId)
@@ -137,12 +190,15 @@ export function createPresenceService(
         throw new Error("That spot is not available.")
       }
 
-      await repository.savePresence({
-        ...current,
+      const saved = await repository.tryMovePresence({
+        roomId,
+        userId,
         spotId,
         updatedAt: now.toISOString(),
         expiresAt: new Date(now.getTime() + PRESENCE_LEASE_MS).toISOString()
-      })
+      }, now)
+      if (saved === "missing") throw new Error("Join the room first.")
+      if (saved === "occupied") throw new Error("That spot is not available.")
       return this.createSnapshot(roomId, now)
     },
     async createSnapshot(roomId, now = new Date()) {

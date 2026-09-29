@@ -9,8 +9,38 @@ import {
   buildDiscoveryWatchQueryKey,
   createDiscoveryPageQueryOptions,
   createDiscoveryWatchQueryOptions,
-  flattenDiscoveryPages
+  flattenDiscoveryPages,
+  shouldPrefetchDiscoveryPage,
+  shouldStartDiscoveryWatch
 } from "./discoveryQueryOptions"
+
+test("the optional watch request yields to the first page, then starts for success or error", () => {
+  const ready = {
+    isProductionDiscovery: true,
+    filtersReady: true,
+    isInitialPagePending: false
+  }
+  assert.equal(shouldStartDiscoveryWatch(ready), true)
+  assert.equal(shouldStartDiscoveryWatch({ ...ready, isInitialPagePending: true }), false)
+  assert.equal(shouldStartDiscoveryWatch({ ...ready, filtersReady: false }), false)
+  assert.equal(shouldStartDiscoveryWatch({ ...ready, isProductionDiscovery: false }), false)
+})
+
+test("Discover does not drain cursor pages while the safety list is unresolved", () => {
+  const ready = {
+    isProductionDiscovery: true,
+    isSafetyListReady: true,
+    isFetchingNextPage: false,
+    hasNextPage: true,
+    isQuotaExhausted: false,
+    availableCandidateCount: 2
+  }
+  assert.equal(shouldPrefetchDiscoveryPage(ready), true)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isSafetyListReady: false, availableCandidateCount: 0 }), false)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isFetchingNextPage: true }), false)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isQuotaExhausted: true }), false)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, availableCandidateCount: 4 }), false)
+})
 
 const FILTERS = {
   ageMin: 23,

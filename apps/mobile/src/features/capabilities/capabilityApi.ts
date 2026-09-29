@@ -39,6 +39,24 @@ export function getSessionScopedCapabilities(
   return resolved.capabilities
 }
 
+/** Share only overlapping reads for the same session; a later read rechecks the server. */
+export function createCapabilityResolutionSingleFlight(
+  resolve: (sessionToken: string) => Promise<CapabilityResolution>
+): (sessionToken: string) => Promise<CapabilityResolution> {
+  const active = new Map<string, Promise<CapabilityResolution>>()
+  return (sessionToken) => {
+    const existing = active.get(sessionToken)
+    if (existing) return existing
+    const promise = Promise.resolve().then(() => resolve(sessionToken))
+    active.set(sessionToken, promise)
+    const clear = () => {
+      if (active.get(sessionToken) === promise) active.delete(sessionToken)
+    }
+    void promise.then(clear, clear)
+    return promise
+  }
+}
+
 export async function resolveProductionCapabilities(
   baseHttpUrl: string,
   sessionToken: string,

@@ -76,6 +76,9 @@ export function createRevenueCatCoinPackClient(
   const bridge = input.bridge
   let configured = false
   let authenticatedUserId: string | undefined
+  let requestedUserId: string | undefined
+  let pendingIdentityChanges = 0
+  let identityQueue = Promise.resolve()
 
   const ensureAvailable = async (): Promise<RevenueCatNativeBridge> => {
     if (!apiKey || !bridge) {
@@ -90,23 +93,30 @@ export function createRevenueCatCoinPackClient(
 
   return {
     isAvailable: Boolean(apiKey && bridge),
-    async syncAuthenticatedUser(userId: string | undefined): Promise<void> {
+    syncAuthenticatedUser(userId: string | undefined): Promise<void> {
       const normalizedUserId = userId?.trim() || undefined
-      if (!normalizedUserId) {
-        if (!authenticatedUserId) return
+      // Record intent before awaiting SDK work: a pending login must not make
+      // a later logout look like a no-op or authorize a stale-account purchase.
+      requestedUserId = normalizedUserId
+      pendingIdentityChanges += 1
+      const operation = identityQueue.then(async () => {
+        if (authenticatedUserId === normalizedUserId) return
         const resolvedBridge = await ensureAvailable()
-        await resolvedBridge.logOut()
-        authenticatedUserId = undefined
-        return
-      }
-      if (authenticatedUserId === normalizedUserId) return
-
-      const resolvedBridge = await ensureAvailable()
-      if (authenticatedUserId) {
-        await resolvedBridge.logOut()
-      }
-      await resolvedBridge.logIn(normalizedUserId)
-      authenticatedUserId = normalizedUserId
+        if (authenticatedUserId) {
+          await resolvedBridge.logOut()
+          authenticatedUserId = undefined
+        }
+        if (normalizedUserId) {
+          await resolvedBridge.logIn(normalizedUserId)
+          authenticatedUserId = normalizedUserId
+        }
+      }).finally(() => {
+        pendingIdentityChanges -= 1
+      })
+      // A failed transition rejects its caller but cannot poison later logout
+      // or retry operations. Purchasing remains closed until identity agrees.
+      identityQueue = operation.catch(() => undefined)
+      return operation
     },
     async getCoinPackProducts(): Promise<readonly CoinPackStoreProduct[]> {
       const resolvedBridge = await ensureAvailable()
@@ -118,7 +128,11 @@ export function createRevenueCatCoinPackClient(
         throw new Error("That coin pack is not available.")
       }
       const resolvedBridge = await ensureAvailable()
-      if (!authenticatedUserId) {
+      if (
+        pendingIdentityChanges > 0 ||
+        !authenticatedUserId ||
+        authenticatedUserId !== requestedUserId
+      ) {
         throw new Error("Sign in before purchasing coin packs.")
       }
       const result = await resolvedBridge.purchaseProduct(packId)

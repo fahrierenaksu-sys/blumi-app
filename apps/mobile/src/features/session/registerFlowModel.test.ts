@@ -2,11 +2,13 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   advanceRegisterFlowToCode,
+  analyzeFormattedLocalPhoneNumber,
   analyzeLocalPhoneNumber,
   createInitialRegisterFlow,
   filterPhoneCountryOptions,
   getPhoneCountryOptions,
   getRegisterFlowAvailability,
+  getRegisterFlowAvailabilityFromPhoneAnalysis,
   maskPhoneNumber,
   returnRegisterFlowToPhone,
   updateRegisterCode,
@@ -93,6 +95,31 @@ test("Türkiye accepts mobile numbers without a trunk zero", () => {
 test("Türkiye rejects landlines and non-mobile prefixes", () => {
   assert.equal(analyzeLocalPhoneNumber("212 555 12 34", "TR").error, "tr-mobile-prefix")
   assert.equal(analyzeLocalPhoneNumber("455 512 34 56", "TR").error, "tr-mobile-prefix")
+})
+
+test("analyzing the already formatted registration value preserves validation and normalization", () => {
+  const examples = [
+    { country: "TR" as const, input: "5551234567" },
+    { country: "TR" as const, input: "0555 123 45 67" },
+    { country: "TR" as const, input: "212 555 12 34" },
+    { country: "US" as const, input: "4155552671" },
+    { country: "GB" as const, input: "07400123456" },
+    { country: "TR" as const, input: "+90 555 123 45 67" },
+    { country: "US" as const, input: "+1 (415) 555-2671" },
+    { country: "GB" as const, input: "+90 555 123 45 67" }
+  ]
+
+  for (const { country, input } of examples) {
+    const flow = updateRegisterPhone(createInitialRegisterFlow(country), input)
+    const previousAnalysis = analyzeLocalPhoneNumber(flow.phoneNumber, country)
+    const formattedAnalysis = analyzeFormattedLocalPhoneNumber(
+      flow.phoneNumber,
+      country
+    )
+
+    assert.equal(flow.phoneNumber, previousAnalysis.formatted, `${country}: ${input}`)
+    assert.deepEqual(formattedAnalysis, previousAnalysis, `${country}: ${input}`)
+  }
 })
 
 test("other selected countries format and validate their local numbers", () => {
@@ -263,6 +290,43 @@ test("verification requires code step, six digits, and no active submit", () => 
   assert.equal(
     getRegisterFlowAvailability(updateRegisterCode(codeFlow, "12a34"), false)
       .canVerify,
+    false
+  )
+})
+
+test("OTP edits reuse phone analysis while keeping submit availability correct", () => {
+  const phoneFlow = updateRegisterPhone(
+    createInitialRegisterFlow(),
+    "5551234567"
+  )
+  const phoneAnalysis = analyzeLocalPhoneNumber(
+    phoneFlow.phoneNumber,
+    phoneFlow.selectedCountry
+  )
+  const codeFlow = advanceRegisterFlowToCode(phoneFlow)
+  const emptyCode = getRegisterFlowAvailabilityFromPhoneAnalysis(
+    codeFlow,
+    false,
+    phoneAnalysis
+  )
+  const completeCode = getRegisterFlowAvailabilityFromPhoneAnalysis(
+    updateRegisterCode(codeFlow, "123456"),
+    false,
+    phoneAnalysis
+  )
+
+  assert.equal(emptyCode.phoneValid, true)
+  assert.equal(emptyCode.canVerify, false)
+  assert.equal(completeCode.normalizedPhoneNumber, "+905551234567")
+  assert.equal(completeCode.phoneValid, true)
+  assert.equal(completeCode.verificationCodeValid, true)
+  assert.equal(completeCode.canVerify, true)
+  assert.equal(
+    getRegisterFlowAvailabilityFromPhoneAnalysis(
+      updateRegisterCode(codeFlow, "123456"),
+      true,
+      phoneAnalysis
+    ).canVerify,
     false
   )
 })

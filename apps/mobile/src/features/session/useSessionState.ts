@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { AppState } from "react-native"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import type {
   CapabilityMap,
   CompleteAvatarSelection
 } from "@blumi/contracts"
 import { captureProductEvent } from "../../analytics/productAnalytics"
+import { loadLocalDiscoveryFiltersFallback } from "../discovery/discoveryFiltersModel"
+import { warmDiscoveryFirstFrameAssets } from "../discovery/discoveryFirstFrameAssets"
 import {
   IS_BLUMI_DEMO_ENABLED,
   MOBILE_HTTP_BASE_URL
@@ -12,6 +15,7 @@ import {
 import { saveProductionAvatar } from "../avatarV2/avatarApi"
 import type { AvatarSaveOutcome } from "../avatarV2/avatarSaveOutcome"
 import {
+  createCapabilityResolutionSingleFlight,
   createFailClosedCapabilityResolution,
   getSessionScopedCapabilities,
   resolveProductionCapabilities,
@@ -143,6 +147,16 @@ export function getErrorMessage(error: unknown): string {
   return getSessionErrorMessageForDisplay(error)
 }
 
+function warmDiscoveryBeforeMain(actor: SessionActor | null): void {
+  if (!actor || !isOnboardingComplete(actor.session.onboarding)) return
+  if (actor.session.mode === "production") {
+    // This local override may be the user's unsynced preference. Begin its read
+    // before publishing Main, then let Lobby reuse the same account-scoped read.
+    void loadLocalDiscoveryFiltersFallback(AsyncStorage, actor.profile.userId)
+  }
+  void warmDiscoveryFirstFrameAssets()
+}
+
 function isAuthSessionError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -170,6 +184,7 @@ export function useSessionState(): UseSessionStateResult {
       current: () => sessionActorRef.current,
       save: saveSessionActor,
       publish: (actor) => {
+        warmDiscoveryBeforeMain(actor)
         sessionActorRef.current = actor
         setSessionActor(actor)
       }
@@ -226,6 +241,16 @@ export function useSessionState(): UseSessionStateResult {
   )
   const capabilitiesForToken = useCallback((sessionToken: string): CapabilityMap =>
     getSessionScopedCapabilities(sessionToken, resolvedCapabilitiesRef.current), [])
+  const capabilityReadRef = useRef<ReturnType<typeof createCapabilityResolutionSingleFlight> | null>(null)
+  if (!capabilityReadRef.current) {
+    capabilityReadRef.current = createCapabilityResolutionSingleFlight((sessionToken) =>
+      resolveProductionCapabilities(
+        MOBILE_HTTP_BASE_URL,
+        sessionToken,
+        SUPPORTED_MOBILE_CAPABILITIES
+      ))
+  }
+  const resolveCapabilitiesForSession = capabilityReadRef.current
 
   useEffect(() => {
     commitResolvedCapabilities(
@@ -234,11 +259,7 @@ export function useSessionState(): UseSessionStateResult {
     )
     if (!productionSessionToken) return
     let active = true
-    void resolveProductionCapabilities(
-      MOBILE_HTTP_BASE_URL,
-      productionSessionToken,
-      SUPPORTED_MOBILE_CAPABILITIES
-    ).then((resolution) => {
+    void resolveCapabilitiesForSession(productionSessionToken).then((resolution) => {
       if (!active) return
       const current = sessionActorRef.current
       if (
@@ -250,7 +271,7 @@ export function useSessionState(): UseSessionStateResult {
     return () => {
       active = false
     }
-  }, [commitResolvedCapabilities, productionSessionToken])
+  }, [commitResolvedCapabilities, productionSessionToken, resolveCapabilitiesForSession])
 
   useEffect(() => {
     if (isHydrating || !sessionActor) return
@@ -280,8 +301,6 @@ export function useSessionState(): UseSessionStateResult {
       if (refreshedActor.session.userId !== actor.session.userId) {
         throw new Error("Blumi could not refresh your session safely.")
       }
-      if (!mounted) return refreshedActor
-      setSessionActor(refreshedActor)
       return refreshedActor
     }
 
@@ -292,11 +311,12 @@ export function useSessionState(): UseSessionStateResult {
     ): Promise<void> {
       if (actor.session.mode !== "production") return
       try {
+        if (!mounted || signal.aborted) return
+        const mutationTicket = mutationCoordinator.capture(actor)
         const activeActor = await refreshActorIfNeeded(actor)
-        const capabilityResolution = await resolveProductionCapabilities(
-          MOBILE_HTTP_BASE_URL,
-          activeActor.session.sessionToken,
-          SUPPORTED_MOBILE_CAPABILITIES
+        if (!mounted || signal.aborted) return
+        const capabilityResolution = await resolveCapabilitiesForSession(
+          activeActor.session.sessionToken
         )
         if (!mounted || signal.aborted) return
         commitResolvedCapabilities(
@@ -323,21 +343,19 @@ export function useSessionState(): UseSessionStateResult {
           },
           profile: latestSnapshot.profile
         }
-        await saveSessionActor(nextActor)
+        // Profile hydration must use the same serialized commit as user edits:
+        // auth recovery or a foreground refresh may have rotated credentials.
+        await mutationCoordinator.commit(mutationTicket, nextActor)
         if (!mounted || signal.aborted) return
         setAccountModeration(
           needsModerationInterruption(latestSnapshot.moderation)
             ? latestSnapshot.moderation
             : null
         )
-        setSessionActor((current) =>
-          current?.session.userId === activeActor.session.userId
-            ? nextActor
-            : current
-        )
       } catch (error) {
         if (!mounted) return
         if (signal.aborted) return
+        if (error instanceof SessionMutationCancelledError) return
         if (isSessionRefreshCancelled(error)) return
         if (error instanceof AccountAccessError) {
           setAccountModeration(error.moderation)
@@ -345,6 +363,7 @@ export function useSessionState(): UseSessionStateResult {
         }
         if (isAuthSessionError(error)) {
           await clearStoredSessionActor("production")
+          if (!mounted || signal.aborted) return
           setSessionActor(null)
           return
         }
@@ -365,12 +384,13 @@ export function useSessionState(): UseSessionStateResult {
           capabilitiesForToken(actor.session.sessionToken)
         )
       } catch (error) {
+        if (!mounted || signal.aborted) throw new SessionMutationCancelledError()
         if (!isAuthSessionError(error)) throw error
         const refreshedActor = await refreshCoordinator.refresh(actor)
         if (refreshedActor.session.userId !== actor.session.userId) {
           throw new Error("Blumi could not refresh your session safely.")
         }
-        if (mounted) setSessionActor(refreshedActor)
+        if (!mounted || signal.aborted) throw new SessionMutationCancelledError()
         return fetchProductionAccountSnapshot(
           MOBILE_HTTP_BASE_URL,
           refreshedActor.session.sessionToken,
@@ -412,6 +432,7 @@ export function useSessionState(): UseSessionStateResult {
         }
 
         if (sessionResult.status === "fulfilled") {
+          warmDiscoveryBeforeMain(sessionResult.value)
           sessionActorRef.current = sessionResult.value
           setSessionActor(sessionResult.value)
           if (sessionResult.value) {
@@ -437,12 +458,20 @@ export function useSessionState(): UseSessionStateResult {
 
     return () => {
       mounted = false
+      // Invalidate queued persistence before aborting network work. A boundary
+      // that ignores abort must still be unable to save or publish afterward.
+      mutationCoordinator.invalidate()
+      accountMutationGenerationRef.current += 1
+      productionSyncRef.current?.controller.abort()
+      void refreshCoordinator.cancelAndWait()
     }
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }, [])
 
   useEffect(() => {
+    let active = true
     const subscription = AppState.addEventListener("change", (state) => {
+      if (!active) return
       const previousState = appStateRef.current
       appStateRef.current = state
       const actor = sessionActorRef.current
@@ -456,15 +485,18 @@ export function useSessionState(): UseSessionStateResult {
 
       void refreshCoordinator.refresh(actor)
         .then((refreshedActor) => {
+          if (!active) return
           if (refreshedActor.session.userId !== actor.session.userId) {
             throw new Error("Blumi could not refresh your session safely.")
           }
-          setSessionActor(refreshedActor)
         })
         .catch((error) => {
+          if (!active || error instanceof SessionMutationCancelledError) return
           if (isSessionRefreshCancelled(error)) return
           if (isAuthSessionError(error)) {
-            void clearStoredSessionActor("production").then(() => setSessionActor(null))
+            void clearStoredSessionActor("production").then(() => {
+              if (active) setSessionActor(null)
+            })
             return
           }
           if (error instanceof AccountAccessError) {
@@ -476,6 +508,7 @@ export function useSessionState(): UseSessionStateResult {
     })
 
     return () => {
+      active = false
       subscription.remove()
     }
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
@@ -599,10 +632,8 @@ export function useSessionState(): UseSessionStateResult {
               }
             )
             firebasePhoneConfirmationRef.current = null
-            const resolution = await resolveProductionCapabilities(
-              MOBILE_HTTP_BASE_URL,
-              actor.session.sessionToken,
-              SUPPORTED_MOBILE_CAPABILITIES
+            const resolution = await resolveCapabilitiesForSession(
+              actor.session.sessionToken
             )
             registrationCapabilities = resolution.capabilities
             return actor
@@ -679,7 +710,7 @@ export function useSessionState(): UseSessionStateResult {
         setIsBootstrapping(false)
       }
     },
-    [mutationCoordinator]
+    [mutationCoordinator, resolveCapabilitiesForSession]
   )
 
   const requestVerificationCode = useCallback(

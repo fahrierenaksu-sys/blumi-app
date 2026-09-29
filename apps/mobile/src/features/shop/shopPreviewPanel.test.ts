@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
+import { runInNewContext } from "node:vm"
+import ts from "typescript"
 
 const root = resolve(process.cwd())
 const panelSource = readFileSync(
@@ -24,6 +26,61 @@ const copySource = readFileSync(
   resolve(root, "src/features/shop/shopCopy.ts"),
   "utf8"
 )
+const screenFile = ts.createSourceFile("CosmeticShopScreen.tsx", screenSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const panelFile = ts.createSourceFile("ShopPreviewPanel.tsx", panelSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+
+function findOne<T extends ts.Node>(file: ts.SourceFile, predicate: (node: ts.Node) => node is T): T {
+  const matches: T[] = []
+  function visit(node: ts.Node): void {
+    if (predicate(node)) matches.push(node)
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  assert.equal(matches.length, 1, "expected one live Shop preview binding")
+  return matches[0]
+}
+
+function jsxAttributeExpression(file: ts.SourceFile, component: string, name: string): string {
+  const element = findOne(file, (node): node is ts.JsxOpeningElement | ts.JsxSelfClosingElement =>
+    (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(file) === component
+  )
+  const attribute = element.attributes.properties.find((entry): entry is ts.JsxAttribute =>
+    ts.isJsxAttribute(entry) && entry.name.getText(file) === name
+  )
+  assert.ok(attribute?.initializer && ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression)
+  return attribute.initializer.expression.getText(file)
+}
+
+function panelVariableExpression(name: string): string {
+  const declaration = findOne(panelFile, (node): node is ts.VariableDeclaration =>
+    ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name
+  )
+  assert.ok(declaration.initializer)
+  return declaration.initializer.getText(panelFile)
+}
+
+function panelActionTextExpression(): string {
+  const text = findOne(panelFile, (node): node is ts.JsxElement => {
+    if (!ts.isJsxElement(node) || node.openingElement.tagName.getText(panelFile) !== "Text") return false
+    const style = node.openingElement.attributes.properties.find((entry): entry is ts.JsxAttribute =>
+      ts.isJsxAttribute(entry) && entry.name.getText(panelFile) === "style"
+    )
+    return !!style?.initializer && ts.isJsxExpression(style.initializer) &&
+      style.initializer.expression?.getText(panelFile) === "styles.avatarHeroActionText"
+  })
+  const expression = text.children.find((child): child is ts.JsxExpression =>
+    ts.isJsxExpression(child) && !!child.expression
+  )
+  assert.ok(expression?.expression)
+  return expression.expression.getText(panelFile)
+}
+
+function evaluate(expression: string, bindings: Record<string, unknown>): unknown {
+  const compiled = ts.transpileModule(`(${expression})`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+  }).outputText
+  return runInNewContext(compiled, bindings)
+}
 
 test("shop preview presentation lives outside the screen monolith", () => {
   assert.match(panelSource, /export function ShopPreviewPanel\(/)
@@ -38,11 +95,68 @@ test("shop preview presentation lives outside the screen monolith", () => {
   assert.doesNotMatch(screenSource, /function SelectedProductPreview/)
   assert.doesNotMatch(screenSource, /function ShopAvatarLivePreview/)
   assert.match(screenSource, /previewAvatarShopItem/)
-  assert.match(screenSource, /primaryActionLabel=\{shopMode === "avatar"/)
   assert.match(screenSource, /onRemovePreview=\{handleRemoveAvatarPreview\}/)
   assert.match(screenSource, /isAvatarShopItemPreviewing/)
   assert.match(screenSource, /copy\.combination\.applyLook/)
   assert.match(copySource, /applyLook:\s*"Kombini uygula"/)
+})
+
+test("Shop action keeps inventory gating and combination labels through the actual preview binding", () => {
+  const labelExpression = jsxAttributeExpression(screenFile, "ShopPreviewPanel", "primaryActionLabel")
+  const disabledExpression = jsxAttributeExpression(screenFile, "ShopPreviewPanel", "primaryActionDisabled")
+  const actionLabelExpression = panelVariableExpression("actionLabel")
+  const disabledInPanelExpression = panelVariableExpression("disabled")
+  const unlockExpression = panelVariableExpression("isAvatarUnlock")
+  const visibleTextExpression = panelActionTextExpression()
+  const copy = {
+    combination: { buyLook: "Buy look", applyLook: "Apply look", priceNeedsRefresh: "Refresh price" },
+    unlock: "Unlock", saving: "Saving"
+  }
+  const cases = [
+    { mode: "avatar", verified: false, multi: false, items: 1, purchases: 1, total: 100, changes: true, expected: "Preparing Shop", disabled: true },
+    { mode: "avatar", verified: true, multi: true, items: 2, purchases: 2, total: 200, changes: true, expected: "Buy look", disabled: false },
+    { mode: "avatar", verified: true, multi: true, items: 2, purchases: 0, total: 0, changes: true, expected: "Apply look", disabled: false },
+    { mode: "avatar", verified: true, multi: true, items: 2, purchases: 1, total: null, changes: true, expected: "Refresh price", disabled: true },
+    { mode: "avatar", verified: true, multi: false, items: 1, purchases: 1, total: 100, changes: true, expected: "Unlock", disabled: false },
+    { mode: "home", verified: true, multi: false, items: 0, purchases: 0, total: 0, changes: true, expected: "Place item", disabled: false }
+  ] as const
+
+  for (const scenario of cases) {
+    const product = scenario.mode === "avatar"
+      ? { actionType: "avatarUnlock", priceCoins: 100 }
+      : { actionType: "roomPlace", priceCoins: 0 }
+    const screenBindings = {
+      inventoryVerified: scenario.verified,
+      inventoryGateLabel: "Preparing Shop",
+      shopMode: scenario.mode,
+      multiItemApplyEnabled: scenario.multi,
+      combinationItems: Array.from({ length: scenario.items }),
+      combinationSummary: { purchaseCount: scenario.purchases, total: scenario.total },
+      hasCombinationChanges: scenario.changes,
+      copy
+    }
+    const primaryActionLabel = evaluate(labelExpression, screenBindings)
+    const primaryActionDisabled = evaluate(disabledExpression, screenBindings)
+    const panelBindings = {
+      primaryActionLabel,
+      primaryActionDisabled,
+      product,
+      supportsCombinationAction: scenario.verified && scenario.multi,
+      combinationSummary: screenBindings.combinationSummary,
+      presentation: { actionLabel: "Place item" },
+      isPurchasing: false,
+      isActionAvailable: true,
+      copy
+    }
+    const actionLabel = evaluate(actionLabelExpression, panelBindings)
+    const disabled = evaluate(disabledInPanelExpression, panelBindings)
+    const isAvatarUnlock = evaluate(unlockExpression, panelBindings)
+    const visibleText = evaluate(visibleTextExpression, {
+      ...panelBindings, actionLabel, isAvatarUnlock
+    })
+    assert.equal(visibleText, scenario.expected, `${scenario.mode}: visible action label`)
+    assert.equal(disabled, scenario.disabled, `${scenario.mode}: action availability`)
+  }
 })
 
 test("avatar remains visible before explicit product selection", () => {

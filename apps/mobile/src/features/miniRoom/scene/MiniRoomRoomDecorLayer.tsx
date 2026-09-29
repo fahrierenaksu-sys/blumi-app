@@ -14,29 +14,15 @@ export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
   if (!scene.shell) {
     return null
   }
-  const camera = scene.shell.miniRoomCamera ?? MINI_ROOM_DECOR_CAMERA_FALLBACK
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <View
-        style={[
-          styles.decorCamera,
-          { backgroundColor: camera.backgroundColor }
-        ]}
-      >
-        <RoomRenderer2D
-          shell={scene.shell}
-          renderItems={scene.renderItems}
-          testID="mini-room-saved-room-decor"
-          style={[
-            styles.decorRenderer,
-            {
-              width: camera.rendererWidth,
-              transform: [{ translateY: camera.rendererTranslateY }]
-            }
-          ]}
-        />
-      </View>
+      <RoomRenderer2D
+        shell={scene.shell}
+        renderItems={scene.renderItems}
+        showDepthWash={false}
+        testID="mini-room-saved-room-decor"
+        style={styles.decorRenderer}
+      />
 
       {interaction.pressedPoint ? (
         <View
@@ -56,21 +42,9 @@ export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
   )
 }
 
-const MINI_ROOM_DECOR_CAMERA_FALLBACK = {
-  rendererWidth: "176%" as const,
-  rendererTranslateY: 0,
-  backgroundColor: "#F8ECF2"
-}
-
 const styles = StyleSheet.create({
-  decorCamera: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden"
-  },
   decorRenderer: {
-    width: "176%"
+    width: "100%"
   },
   tapTarget: {
     position: "absolute",

@@ -80,6 +80,11 @@ try {
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
+  execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--test", "src/features/roomV2/roomV2ProviderLifecycle.test.ts"],
+    { cwd: workspaceRoot, stdio: "inherit" }
+  )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createChatService } from "../chat/chatService"
-import { createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
+import { ChatDeliveryBlockedError, createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
 import { createSafetyService } from "../safety/safetyService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import type { NotificationService } from "../notifications/notificationService"
@@ -58,5 +58,74 @@ test("PostgreSQL chat aggregate rolls back preview/outbox failures and recovers 
     assert.equal(enqueued, 1)
     assert.ok((await pool.query("SELECT completed_at FROM blumi_chat_delivery_outbox")).rows[0].completed_at)
     await pool.query("DROP FUNCTION test_chat_fail_write()")
+  } finally { await pool.end() }
+})
+
+test("PostgreSQL ACK-loss retry after block returns the committed row without another outbox row", {
+  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+}, async () => {
+  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const threadId = `thread_${randomUUID()}`
+  const clientMessageId = "client-ack-blocked-001"
+  const repository = createPostgresChatRepository(pool)
+  const chatService = createChatService({ repository, idFactory: () => `message_${threadId}` })
+  const safetyService = createSafetyService()
+  let fanoutCount = 0
+  let signalFanout!: () => void
+  const fanout = new Promise<void>((resolve) => { signalFanout = resolve })
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService,
+    connectionManager: {
+      async sendToUsersDurably() { fanoutCount += 1; signalFanout() },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+  try {
+    await chatService.createThread({
+      threadId,
+      miniRoomId: `room_${threadId}`,
+      participantUserIds: ["user_a", "user_b"],
+      participants: [{ userId: "user_a" }, { userId: "user_b" }]
+    })
+
+    // The server persists before ACK; fanout is best-effort and may instead be
+    // picked up by the durable worker. Dispatch deterministically before the
+    // later block so this test isolates the lost-ACK idempotency contract.
+    const original = await delivery.sendMessage({
+      senderUserId: "user_a", threadId, body: "committed before lost ACK", clientMessageId
+    })
+    await delivery.dispatchDue(new Date(Date.now() + 1_000))
+    await fanout
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    await safetyService.blockUser("user_b", "user_a")
+
+    const retry = await delivery.sendMessage({
+      senderUserId: "user_a", threadId, body: "committed before lost ACK", clientMessageId
+    })
+    assert.equal(retry.created, false)
+    assert.deepEqual(retry.message, original.message)
+    await assert.rejects(
+      delivery.sendMessage({
+        senderUserId: "user_a", threadId, body: "new blocked message",
+        clientMessageId: "client-new-after-block-001"
+      }),
+      ChatDeliveryBlockedError
+    )
+
+    const rows = await pool.query(
+      `SELECT message_id FROM blumi_chat_messages
+        WHERE thread_id = $1 AND sender_user_id = $2 AND client_message_id = $3`,
+      [threadId, "user_a", clientMessageId]
+    )
+    const outbox = await pool.query(
+      `SELECT message_id FROM blumi_chat_delivery_outbox WHERE message_id = $1`,
+      [original.message.messageId]
+    )
+    assert.equal(rows.rows.length, 1)
+    assert.equal(outbox.rows.length, 1)
+    assert.equal(fanoutCount, 1)
   } finally { await pool.end() }
 })

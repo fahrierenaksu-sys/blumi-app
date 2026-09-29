@@ -45,6 +45,7 @@ export type ChatLocale = "en" | "tr"
 export interface ChatRoomInviteSurface {
   roomInvites?: readonly ChatRoomInviteTimelineItem[]
   onRoomInviteAction?: (action: ChatRoomInviteAction) => Promise<void>
+  onCloseActiveRoom?: (expectedRoomSessionId: string) => Promise<void>
   locale?: ChatLocale
 }
 
@@ -57,6 +58,13 @@ export interface RoomInvitePresentation {
 }
 
 const LEGACY_ROOM_INVITE_SENTINEL = "__room_invite__"
+
+export function getChatInitialRenderCount(viewportHeight: number): number {
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return 20
+  // A one-line grouped bubble is at least 44pt (24pt text + 16pt padding
+  // + 4pt grouping gap). Fill the visible screen, not the entire history.
+  return Math.min(32, Math.max(8, Math.ceil(viewportHeight / 44) + 2))
+}
 
 export function isLegacyRoomInviteSentinel(body: string): boolean {
   return body.trim() === LEGACY_ROOM_INVITE_SENTINEL

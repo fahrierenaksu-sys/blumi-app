@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
@@ -10,14 +11,41 @@ import {
 const mobileRoot = resolve(import.meta.dirname, "../../..")
 const nativeOverlayPath = resolve(
   mobileRoot,
-  "ios/BlumiMobile/NativeOnboardingBootOverlay.swift"
+  "ios/Blumi/NativeOnboardingBootOverlay.swift"
 )
 const read = (path: string) => readFileSync(resolve(mobileRoot, path), "utf8")
+const nativeSourcePaths = [
+  "ios/Blumi/NativeOnboardingBootOverlay.swift",
+  "ios/Blumi/BlumiBootBridge.swift",
+  "ios/Blumi/BlumiBootBridge.m",
+  "ios/Blumi/Blumi-Bridging-Header.h",
+  "ios/Blumi/AppDelegate.swift",
+  "ios/Blumi/SplashScreen.storyboard",
+  "ios/Blumi.xcodeproj/project.pbxproj"
+]
+const versionedNativePaths = new Set(execFileSync(
+  "git",
+  ["ls-files", "--", ...nativeSourcePaths],
+  { cwd: mobileRoot, encoding: "utf8" }
+).trim().split("\n"))
+const hasVersionedNativeProject = nativeSourcePaths.every(
+  (path) => versionedNativePaths.has(path)
+)
+// A local Expo prebuild is not evidence for a reproducible native contract.
+// If an Expo plugin becomes the authority, test its generated output instead.
+const nativeTest = hasVersionedNativeProject ? test : test.skip
 
-test("native boot motion starts before React and waits for explicit Blumi content readiness", () => {
+test("native boot overlay has a versioned source of truth", () => {
+  assert.ok(
+    hasVersionedNativeProject,
+    `Native boot overlay has no maintained Expo config plugin and the iOS project is not versioned. Missing tracked sources: ${nativeSourcePaths.filter((path) => !versionedNativePaths.has(path)).join(", ")}. Keep this native gate open until either the native project is checked in or a maintained plugin generates and verifies the equivalent Swift/Xcode output.`
+  )
+})
+
+nativeTest("native boot motion starts before React and waits for explicit Blumi content readiness", () => {
   assert.equal(existsSync(nativeOverlayPath), true)
 
-  const appDelegate = read("ios/BlumiMobile/AppDelegate.swift")
+  const appDelegate = read("ios/Blumi/AppDelegate.swift")
   const installIndex = appDelegate.indexOf("bootOverlay.install(in: window)")
   const reactStartIndex = appDelegate.indexOf("factory.startReactNative")
 
@@ -113,9 +141,9 @@ test("the laid-out Blumi prelude explicitly marks React content ready", () => {
   assert.doesNotMatch(prelude, /setTimeout\([^)]*markOnboardingContentReady/)
 })
 
-test("native boot handoff is idempotent and cleans up every owned resource", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
-  const appDelegate = read("ios/BlumiMobile/AppDelegate.swift")
+nativeTest("native boot handoff is idempotent and cleans up every owned resource", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
+  const appDelegate = read("ios/Blumi/AppDelegate.swift")
 
   assert.match(nativeOverlay, /guard !hasHandedOff else \{ return \}/)
   assert.match(nativeOverlay, /removeAllAnimations\(\)/)
@@ -127,8 +155,8 @@ test("native boot handoff is idempotent and cleans up every owned resource", () 
   assert.match(appDelegate, /bootOverlay\.removeImmediately\(\)/)
 })
 
-test("native scan keeps moving throughout the handoff fade", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
+nativeTest("native scan keeps moving throughout the handoff fade", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
   const handoffStart = nativeOverlay.indexOf("func handoffToReact()")
   const handoffEnd = nativeOverlay.indexOf("func removeImmediately()", handoffStart)
   const handoff = nativeOverlay.slice(handoffStart, handoffEnd)
@@ -140,8 +168,8 @@ test("native scan keeps moving throughout the handoff fade", () => {
   assert.doesNotMatch(handoff.slice(0, fadeStart), /\bstopMotion\(\)/)
 })
 
-test("native boot motion respects Reduce Motion before and during animation", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
+nativeTest("native boot motion respects Reduce Motion before and during animation", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
 
   assert.match(nativeOverlay, /UIAccessibility\.isReduceMotionEnabled/)
   assert.match(nativeOverlay, /UIAccessibility\.reduceMotionStatusDidChangeNotification/)
@@ -150,11 +178,11 @@ test("native boot motion respects Reduce Motion before and during animation", ()
   assert.match(nativeOverlay, /stopMotion\(\)/)
 })
 
-test("the boot bridge publishes the initial native motion preference synchronously", () => {
-  const nativeBridge = read("ios/BlumiMobile/BlumiBootBridge.swift")
-  const nativeBridgeExports = read("ios/BlumiMobile/BlumiBootBridge.m")
-  const bridgingHeader = read("ios/BlumiMobile/BlumiMobile-Bridging-Header.h")
-  const appDelegate = read("ios/BlumiMobile/AppDelegate.swift")
+nativeTest("the boot bridge publishes the initial native motion preference synchronously", () => {
+  const nativeBridge = read("ios/Blumi/BlumiBootBridge.swift")
+  const nativeBridgeExports = read("ios/Blumi/BlumiBootBridge.m")
+  const bridgingHeader = read("ios/Blumi/Blumi-Bridging-Header.h")
+  const appDelegate = read("ios/Blumi/AppDelegate.swift")
   const reactBridge = read("src/features/session/nativeOnboardingBootBridge.ts")
   const loadingScreen = read("src/ui/BlumiLoadingScreen.tsx")
 
@@ -169,10 +197,10 @@ test("the boot bridge publishes the initial native motion preference synchronous
   assert.match(loadingScreen, /motionPreferenceResolved\s*\|\| nativeReduceMotion !== null/)
 })
 
-test("native and React scan layers share the same continuity geometry", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
+nativeTest("native and React scan layers share the same continuity geometry", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
   const reactScan = read("src/features/session/OnboardingScanStage.tsx")
-  const storyboard = read("ios/BlumiMobile/SplashScreen.storyboard")
+  const storyboard = read("ios/Blumi/SplashScreen.storyboard")
 
   for (const contract of [
     /stageWidth: CGFloat = 286/,
@@ -211,8 +239,8 @@ test("native and React scan layers share the same continuity geometry", () => {
   assert.match(nativeOverlay, /completion: \{ \[weak self\]/)
 })
 
-test("the native scan band actually travels instead of faking motion with a fixed glow", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
+nativeTest("the native scan band actually travels instead of faking motion with a fixed glow", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
 
   assert.match(nativeOverlay, /stage\.clipsToBounds = true/)
   assert.match(nativeOverlay, /scanBand\?\.transform = CGAffineTransform\(translationX: 0, y: Layout\.scanStartOffset\)/)
@@ -222,9 +250,9 @@ test("the native scan band actually travels instead of faking motion with a fixe
   assert.match(nativeOverlay, /scanBand\?\.layer\.add\(sweep, forKey: "blumi\.native\.band\.sweep"\)/)
 })
 
-test("native delight overlaps startup work without bypassing the authored React prelude", () => {
-  const nativeOverlay = read("ios/BlumiMobile/NativeOnboardingBootOverlay.swift")
-  const appDelegate = read("ios/BlumiMobile/AppDelegate.swift")
+nativeTest("native delight overlaps startup work without bypassing the authored React prelude", () => {
+  const nativeOverlay = read("ios/Blumi/NativeOnboardingBootOverlay.swift")
+  const appDelegate = read("ios/Blumi/AppDelegate.swift")
   const bridgePath = resolve(
     mobileRoot,
     "src/features/session/nativeOnboardingBootBridge.ts"
@@ -258,15 +286,15 @@ test("the React loading scan does not freeze before Reduce Motion resolves", () 
   assert.doesNotMatch(loading, /useReducedMotion\(\)/)
 })
 
-test("the explicit boot bridge is compiled into the app target", () => {
-  const project = read("ios/BlumiMobile.xcodeproj/project.pbxproj")
+nativeTest("the explicit boot bridge is compiled into the app target", () => {
+  const project = read("ios/Blumi.xcodeproj/project.pbxproj")
 
   assert.match(project, /BlumiBootBridge\.swift in Sources/)
   assert.match(project, /BlumiBootBridge\.swift/)
 })
 
-test("the native boot overlay is compiled into the app target", () => {
-  const project = read("ios/BlumiMobile.xcodeproj/project.pbxproj")
+nativeTest("the native boot overlay is compiled into the app target", () => {
+  const project = read("ios/Blumi.xcodeproj/project.pbxproj")
 
   assert.match(project, /NativeOnboardingBootOverlay\.swift in Sources/)
   assert.match(project, /NativeOnboardingBootOverlay\.swift/)

@@ -9,19 +9,24 @@ import {
   ChatDeliveryBlockedError,
   createChatMessageDeliveryService
 } from "./chatMessageDeliveryService"
-import { createChatService } from "./chatService"
-import { createInMemoryChatRepository } from "./chatRepository"
+import { ChatMessageIdempotencyConflictError, createChatService } from "./chatService"
+import { createInMemoryChatRepository, createInMemoryChatStore } from "./chatRepository"
 
 test("failed notification enqueue remains recoverable by a fresh delivery dispatcher", async () => {
   const chatService = createChatService({ idFactory: () => "message_recover" })
   await createThread(chatService)
   let fail = true
   let enqueued = 0
+  let signalFailedPush!: () => void
+  const failedPush = new Promise<void>((resolve) => { signalFailedPush = resolve })
   const options = {
     chatService, safetyService: createSafetyService(),
     connectionManager: { async sendToUsersDurably() {}, hasUserConnections: () => false } as unknown as ConnectionManager,
     notificationService: { async sendPushToUser() {
-      if (fail) throw new Error("DB unavailable")
+      if (fail) {
+        signalFailedPush()
+        throw new Error("DB unavailable")
+      }
       enqueued += 1
     } } as unknown as NotificationService
   }
@@ -30,6 +35,8 @@ test("failed notification enqueue remains recoverable by a fresh delivery dispat
   })
   assert.equal(first.created, true)
   assert.equal((await chatService.listThreads("user_a"))[0]?.lastMessage?.messageId, first.message.messageId)
+  await failedPush
+  await new Promise<void>((resolve) => setImmediate(resolve))
   fail = false
   const restarted = createChatMessageDeliveryService(options)
   await restarted.dispatchDue(new Date(Date.now() + 60_000))
@@ -42,15 +49,25 @@ test("cross-instance fanout failure leaves the chat job pending until publicatio
   await createThread(chatService)
   let fail = true
   let attempts = 0
+  let signalFailedFanout!: () => void
+  const failedFanout = new Promise<void>((resolve) => { signalFailedFanout = resolve })
   const delivery = createChatMessageDeliveryService({
     chatService, safetyService: createSafetyService(),
     connectionManager: {
-      async sendToUsersDurably() { attempts += 1; if (fail) throw new Error("fanout unavailable") },
+      async sendToUsersDurably() {
+        attempts += 1
+        if (fail) {
+          signalFailedFanout()
+          throw new Error("fanout unavailable")
+        }
+      },
       hasUserConnections: () => true
     } as unknown as ConnectionManager,
     notificationService: { async sendPushToUser() {} } as unknown as NotificationService
   })
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "hello" })
+  await failedFanout
+  await new Promise<void>((resolve) => setImmediate(resolve))
   assert.equal(attempts, 1)
   fail = false
   await delivery.dispatchDue(new Date(Date.now() + 60_000))
@@ -91,11 +108,59 @@ test("message delivery persists once, fans out realtime, and pushes offline reci
   const { message } = firstDelivery
   assert.equal(firstDelivery.created, true)
   assert.equal(message.body, "hello there")
+  await waitFor(() => sentEvents.length === 1 && pushes.length === 1)
   assert.deepEqual(sentEvents, [{
     type: "chat.message_received",
     payload: message
   }])
   assert.deepEqual(pushes, [{ userId: "user_b", body: "You have a new message." }])
+})
+
+test("returns the persisted message acknowledgement without waiting for a slow push", async () => {
+  const chatService = createChatService({ idFactory: () => "message_ack_before_push" })
+  await createThread(chatService)
+  let signalPushStarted!: () => void
+  let releasePush!: () => void
+  let signalPushFinished!: () => void
+  const pushStarted = new Promise<void>((resolve) => { signalPushStarted = resolve })
+  const heldPush = new Promise<void>((resolve) => { releasePush = resolve })
+  const pushFinished = new Promise<void>((resolve) => { signalPushFinished = resolve })
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService: createSafetyService(),
+    connectionManager: {
+      async sendToUsersDurably() {},
+      hasUserConnections: () => false
+    } as unknown as ConnectionManager,
+    notificationService: {
+      async sendPushToUser() {
+        signalPushStarted()
+        await heldPush
+        signalPushFinished()
+      }
+    } as unknown as NotificationService
+  })
+
+  const pendingResponse = delivery.sendMessage({
+    senderUserId: "user_a",
+    threadId: "thread_one",
+    body: "hello",
+    clientMessageId: "client-ack-before-push-001"
+  })
+  await pushStarted
+  const acknowledgedBeforePushCompleted = await Promise.race([
+    pendingResponse.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 25))
+  ])
+  releasePush()
+  const response = await pendingResponse
+  await pushFinished
+
+  assert.equal(acknowledgedBeforePushCompleted, true)
+  assert.equal(response.message.messageId, "message_ack_before_push")
+  assert.deepEqual((await chatService.listMessages("user_a", "thread_one")).map((message) => message.messageId), [
+    "message_ack_before_push"
+  ])
 })
 
 test("message delivery rejects either-direction blocks before persistence or fanout", async () => {
@@ -170,6 +235,72 @@ test("retries with the same client message ID return one message and fan out onc
   assert.equal(first.created, true)
   assert.equal(retry.created, false)
   assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
+  await waitFor(() => sentEvents.length === 1)
+  assert.equal(sentEvents.length, 1)
+})
+
+test("a committed send can be ACK-retried after a block without creating or delivering again", async () => {
+  const store = createInMemoryChatStore()
+  const chatService = createChatService({
+    repository: createInMemoryChatRepository(store),
+    idFactory: () => "message_ack_lost"
+  })
+  await createThread(chatService)
+  const safetyService = createSafetyService()
+  const sentEvents: ServerEvent[] = []
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService,
+    connectionManager: {
+      async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+        sentEvents.push(event)
+      },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+  const original = await delivery.sendMessage({
+    senderUserId: "user_a",
+    threadId: "thread_one",
+    body: "persisted before ACK loss",
+    clientMessageId: "client-ack-loss-001"
+  })
+  await waitFor(() => sentEvents.length === 1)
+
+  // Simulate a lost HTTP response: persistence and the durable delivery job remain.
+  await safetyService.blockUser("user_b", "user_a")
+  const retry = await delivery.sendMessage({
+    senderUserId: "user_a",
+    threadId: "thread_one",
+    body: "persisted before ACK loss",
+    clientMessageId: "client-ack-loss-001"
+  })
+
+  assert.deepEqual(retry.message, original.message)
+  assert.equal(retry.created, false)
+  assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
+  assert.equal(store.deliveryJobs.size, 1)
+  await assert.rejects(
+    delivery.sendMessage({
+      senderUserId: "user_a",
+      threadId: "thread_one",
+      body: "different body",
+      clientMessageId: "client-ack-loss-001"
+    }),
+    ChatMessageIdempotencyConflictError
+  )
+  await assert.rejects(
+    delivery.sendMessage({
+      senderUserId: "user_a",
+      threadId: "thread_one",
+      body: "new message after block",
+      clientMessageId: "client-new-after-block-001"
+    }),
+    ChatDeliveryBlockedError
+  )
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
+  assert.equal(store.deliveryJobs.size, 1)
   assert.equal(sentEvents.length, 1)
 })
 
@@ -199,6 +330,7 @@ test("a persisted test persona replies once to a newly delivered user message", 
   })
   await send()
   await send()
+  await waitFor(() => events.length === 2)
   const messages = await chatService.listMessages("user_a", "thread_one")
   assert.deepEqual(messages.map((message) => message.senderUserId), ["user_a", "user_b"])
   assert.equal(messages[1]?.body, "Kahve iyi fikir.")
@@ -215,4 +347,12 @@ async function createThread(chatService: ReturnType<typeof createChatService>) {
       { userId: "user_b", displayName: "Bora" }
     ]
   })
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (predicate()) return
+    await new Promise<void>((resolve) => setTimeout(resolve, 5))
+  }
+  assert.fail("Timed out waiting for asynchronous chat delivery")
 }

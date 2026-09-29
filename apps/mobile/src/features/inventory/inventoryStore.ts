@@ -6,6 +6,7 @@ import { loadAccountScopedStorage } from "../persistence/accountScopedStorage"
 import { ROOM_V2_FURNITURE_CATALOG } from "../roomV2/roomV2.mock"
 import {
   claimDailyEconomyReward,
+  EconomyHttpError,
   fetchEconomyInventory,
   purchaseEconomyItem,
   type EconomyPurchaseType
@@ -36,6 +37,15 @@ import {
 
 export type { BlumiInventorySnapshot, InventoryUnlockResult } from "./inventoryModel"
 
+export type InventoryPurchaseResult = InventoryUnlockResult & {
+  /** Retained for callers; never include raw errors in analytics or user copy. */
+  error?: unknown
+  purchaseOutcome?: "unknown"
+  reconciliation?:
+    | { status: "refreshed" }
+    | { status: "failed"; error: unknown }
+}
+
 const INVENTORY_STORAGE_PREFIX = "@blumi/inventory/v2"
 const INVENTORY_MIGRATION_PREFIX = "@blumi/inventory/migrated:v2"
 const LEGACY_INVENTORY_STORAGE_KEY = "@blumi/inventory/local_inventory_v1"
@@ -52,8 +62,8 @@ export interface InventoryStoreView {
   unlockRoomItem: (itemId: string, priceCoins: number) => InventoryUnlockResult
   hydrateFromServer: (sessionToken: string) => Promise<InventoryUnlockResult>
   claimDailyRewardFromServer: (sessionToken: string) => Promise<number | null>
-  purchaseAvatarItem: (sessionToken: string, itemId: string) => Promise<InventoryUnlockResult>
-  purchaseRoomItem: (sessionToken: string, itemId: string) => Promise<InventoryUnlockResult>
+  purchaseAvatarItem: (sessionToken: string, itemId: string) => Promise<InventoryPurchaseResult>
+  purchaseRoomItem: (sessionToken: string, itemId: string) => Promise<InventoryPurchaseResult>
   unlockFeature: (featureId: string) => void
 }
 
@@ -72,6 +82,7 @@ interface OwnerInventoryCache {
   serverHydrationGeneration: number
   serverMutationGeneration: number
   serverMutationTail: Promise<void>
+  serverReconciliationPending: boolean
   serverHydrationFlight: { current: InventoryHydrationFlight<InventoryUnlockResult> | null }
 }
 
@@ -110,6 +121,7 @@ function getOwnerCache(ownerUserId: string): OwnerInventoryCache {
     serverHydrationGeneration: 0,
     serverMutationGeneration: 0,
     serverMutationTail: Promise.resolve(),
+    serverReconciliationPending: false,
     serverHydrationFlight: { current: null }
   }
   ownerCaches.set(ownerUserId, created)
@@ -240,6 +252,40 @@ async function enqueueServerInventoryMutation<Result>(
   return operation
 }
 
+async function reconcileInventoryAfterMutation(
+  ownerUserId: string,
+  sessionToken: string
+): Promise<NonNullable<InventoryPurchaseResult["reconciliation"]>> {
+  const cache = getOwnerCache(ownerUserId)
+  cache.serverReconciliationPending = true
+  cache.serverHydrationGeneration += 1
+  cache.serverHydrationFlight.current = null
+  cache.state = { ...cache.state, serverStatus: "loading" }
+  notify(ownerUserId)
+  try {
+    // Already inside the mutation queue: a direct bounded read must not join
+    // an old hydration flight or wait on this mutation's own tail.
+    const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
+    if (!replaceInventoryState(ownerUserId, inventory, "server", true)) {
+      throw new Error("Blumi could not reconcile your shop inventory.")
+    }
+    return { status: "refreshed" }
+  } catch (error) {
+    cache.state = failOwnerInventoryHydration({
+      current: cache.state,
+      ownerUserId,
+      source: "server"
+    })
+    notify(ownerUserId)
+    return { status: "failed", error }
+  } finally {
+    // Reads started during reconciliation cannot later restore stale authority.
+    cache.serverHydrationGeneration += 1
+    cache.serverHydrationFlight.current = null
+    cache.serverReconciliationPending = false
+  }
+}
+
 function updateLocalInventory(
   ownerUserId: string,
   createNext: (current: BlumiInventorySnapshot) => BlumiInventorySnapshot
@@ -338,16 +384,22 @@ export function useInventoryStore(
       }
       try {
         const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
-        if (!shouldApplyInventoryHydrationResponse({
+        if (ownerCache.serverReconciliationPending || !shouldApplyInventoryHydrationResponse({
           currentHydrationGeneration: ownerCache.serverHydrationGeneration,
           responseHydrationGeneration: hydrationGeneration,
           currentMutationGeneration: ownerCache.serverMutationGeneration,
           startedMutationGeneration
-        })) return { success: true }
+        })) return { success: false, reason: "server_error" }
         replaceInventoryState(ownerId, inventory, "server")
         return { success: true }
       } catch {
-        if (ownerCache.state.serverStatus !== "ready") {
+        if (!ownerCache.serverReconciliationPending &&
+          shouldApplyInventoryHydrationResponse({
+            currentHydrationGeneration: ownerCache.serverHydrationGeneration,
+            responseHydrationGeneration: hydrationGeneration,
+            currentMutationGeneration: ownerCache.serverMutationGeneration,
+            startedMutationGeneration
+          }) && ownerCache.state.serverStatus !== "ready") {
           ownerCache.state = failOwnerInventoryHydration({
             current: ownerCache.state,
             ownerUserId: ownerId,
@@ -363,37 +415,59 @@ export function useInventoryStore(
   const claimDailyRewardFromServer = useCallback(async (
     sessionToken: string
   ): Promise<number | null> => {
-    try {
-      return await enqueueServerInventoryMutation(ownerId, async () => {
+    return enqueueServerInventoryMutation(ownerId, async () => {
+      try {
         const result = await claimDailyEconomyReward(MOBILE_HTTP_BASE_URL, sessionToken)
-        replaceInventoryState(ownerId, result.inventory, "server", true)
+        if (!replaceInventoryState(ownerId, result.inventory, "server", true)) {
+          throw new Error("Blumi could not confirm your rewarded inventory.")
+        }
         return result.claimed ? result.rewardCoins : 0
-      })
-    } catch {
-      return null
-    }
+      } catch {
+        await reconcileInventoryAfterMutation(ownerId, sessionToken)
+        return null
+      }
+    })
   }, [ownerId])
 
   const purchaseItem = useCallback(async (
     sessionToken: string,
     itemId: string,
     type: EconomyPurchaseType
-  ): Promise<InventoryUnlockResult> => {
+  ): Promise<InventoryPurchaseResult> => {
     const validIds = type === "avatar" ? VALID_AVATAR_ITEM_IDS : VALID_ROOM_ITEM_IDS
     if (!validIds.has(itemId)) return { success: false, reason: "invalid_item" }
-    try {
-      return await enqueueServerInventoryMutation(ownerId, async () => {
+    return enqueueServerInventoryMutation(ownerId, async (): Promise<InventoryPurchaseResult> => {
+      try {
         const inventory = await purchaseEconomyItem(
           MOBILE_HTTP_BASE_URL,
           sessionToken,
           { type, itemId }
         )
-        replaceInventoryState(ownerId, inventory, "server", true)
+        if (!replaceInventoryState(ownerId, inventory, "server", true)) {
+          throw new Error("Blumi could not confirm your purchased inventory.")
+        }
         return { success: true }
-      })
-    } catch (error) {
-      return { success: false, reason: mapServerPurchaseError(error) }
-    }
+      } catch (error) {
+        const reconciliation = await reconcileInventoryAfterMutation(ownerId, sessionToken)
+        const reason = mapServerPurchaseError(error)
+        const confirmedRejection = error instanceof EconomyHttpError &&
+          error.status >= 400 && error.status < 500 &&
+          error.status !== 408 && error.status !== 429
+        // Shop treats already_owned as equip-ready, so require a fresh server
+        // snapshot containing the item before returning that reason.
+        const confirmedOwned = reconciliation.status === "refreshed" &&
+          (type === "avatar"
+            ? ownsAvatarInventoryItem(getOwnerCache(ownerId).state.inventory, itemId)
+            : ownsRoomInventoryItem(getOwnerCache(ownerId).state.inventory, itemId))
+        return {
+          success: false,
+          reason: reason === "already_owned" && !confirmedOwned ? "server_error" : reason,
+          error,
+          ...(!confirmedRejection ? { purchaseOutcome: "unknown" as const } : {}),
+          reconciliation
+        }
+      }
+    })
   }, [ownerId])
 
   const unlockFeature = useCallback((featureId: string): void => {

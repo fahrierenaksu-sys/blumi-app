@@ -79,6 +79,77 @@ test("room and presence services assign, move, filter, and clean presence immuta
   await assert.rejects(roomService.getOrCreateLayout("private-room"), /not available/i)
 })
 
+test("simultaneous joins cannot reserve the same room spot", async () => {
+  const roomService = createRoomService()
+  const presenceService = createPresenceService({ roomService })
+  const now = new Date("2026-06-28T10:00:00.000Z")
+
+  const [joinedA, joinedB] = await Promise.all([
+    presenceService.joinRoom({
+      roomId: PUBLIC_LOBBY_ROOM_ID,
+      profile: profile("concurrent_a", "Ada"),
+      initialSpotId: "seat-left"
+    }, now),
+    presenceService.joinRoom({
+      roomId: PUBLIC_LOBBY_ROOM_ID,
+      profile: profile("concurrent_b", "Bora"),
+      initialSpotId: "seat-left"
+    }, now)
+  ])
+
+  assert.notEqual(joinedA.assignedSpotId, joinedB.assignedSpotId)
+  const users = (await presenceService.createSnapshot(PUBLIC_LOBBY_ROOM_ID, now)).users
+  assert.equal(new Set(users.map((user) => user.spotId)).size, users.length)
+})
+
+test("rejoining a full room preserves the user's existing spot", async () => {
+  const roomService = createRoomService()
+  const presenceService = createPresenceService({ roomService })
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  const layout = await roomService.getOrCreateLayout(PUBLIC_LOBBY_ROOM_ID)
+  let firstSpot = ""
+
+  for (const [index] of layout.spots.entries()) {
+    const joined = await presenceService.joinRoom({
+      roomId: PUBLIC_LOBBY_ROOM_ID,
+      profile: profile(`full-room-${index}`, `User ${index}`)
+    }, now)
+    if (index === 0) firstSpot = joined.assignedSpotId
+  }
+
+  const rejoined = await presenceService.joinRoom({
+    roomId: PUBLIC_LOBBY_ROOM_ID,
+    profile: profile("full-room-0", "User 0")
+  }, now)
+  assert.equal(rejoined.assignedSpotId, firstSpot)
+  assert.equal(rejoined.snapshot.users.length, layout.spots.length)
+})
+
+test("concurrent moves cannot place two users at one room spot", async () => {
+  const roomService = createRoomService()
+  const presenceService = createPresenceService({ roomService })
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  await presenceService.joinRoom({
+    roomId: PUBLIC_LOBBY_ROOM_ID,
+    profile: profile("move-race-a", "Ada"),
+    initialSpotId: "seat-left"
+  }, now)
+  await presenceService.joinRoom({
+    roomId: PUBLIC_LOBBY_ROOM_ID,
+    profile: profile("move-race-b", "Bora"),
+    initialSpotId: "seat-right"
+  }, now)
+
+  const outcomes = await Promise.allSettled([
+    presenceService.moveToSpot(PUBLIC_LOBBY_ROOM_ID, "move-race-a", "hotspot-window", now),
+    presenceService.moveToSpot(PUBLIC_LOBBY_ROOM_ID, "move-race-b", "hotspot-window", now)
+  ])
+
+  assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 1)
+  const users = (await presenceService.createSnapshot(PUBLIC_LOBBY_ROOM_ID, now)).users
+  assert.equal(new Set(users.map((user) => user.spotId)).size, users.length)
+})
+
 test("mini room lifecycle creates chat, media sessions, and clears busy presence", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-06-28T10:00:00.000Z")

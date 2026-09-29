@@ -38,3 +38,14 @@ test("chat error fallbacks are localized without exposing transport diagnostics"
     "Bu oda daveti şu anda kullanılamıyor. Tekrar dene."
   )
 })
+
+test("room busy errors explain whose room is active without leaking transport details", () => {
+  assert.equal(
+    getRoomInvitationActionErrorMessageForDisplay("opaque", "tr", "SELF_IN_ROOM"),
+    "Önceki ortak odan hâlâ açık. Yeni davet için önce onu kapatmalısın."
+  )
+  assert.equal(
+    getRoomInvitationActionErrorMessageForDisplay("opaque", "en", "PARTICIPANT_BUSY"),
+    "The other person is currently in another room. Try again later."
+  )
+})

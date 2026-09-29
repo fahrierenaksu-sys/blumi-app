@@ -142,10 +142,18 @@ export function getRegisterFlowAvailability(
   state: RegisterFlowState,
   isSubmitting: boolean
 ): RegisterFlowAvailability {
-  const phone = analyzeLocalPhoneNumber(
-    state.phoneNumber,
-    state.selectedCountry
+  return getRegisterFlowAvailabilityFromPhoneAnalysis(
+    state,
+    isSubmitting,
+    analyzeLocalPhoneNumber(state.phoneNumber, state.selectedCountry)
   )
+}
+
+export function getRegisterFlowAvailabilityFromPhoneAnalysis(
+  state: Pick<RegisterFlowState, "stage" | "verificationCode">,
+  isSubmitting: boolean,
+  phone: LocalPhoneAnalysis
+): RegisterFlowAvailability {
   const normalizedPhoneNumber = phone.normalizedPhoneNumber
   const phoneValid = phone.valid
   const verificationCodeValid = /^\d{6}$/.test(state.verificationCode)
@@ -183,9 +191,31 @@ export function analyzeLocalPhoneNumber(
   value: string,
   countryCode: PhoneCountryCode
 ): LocalPhoneAnalysis {
+  return analyzePhoneNumberWithFormattedValue(
+    value,
+    countryCode,
+    formatLocalPhoneNumber(value, countryCode)
+  )
+}
+
+export function analyzeFormattedLocalPhoneNumber(
+  formattedValue: string,
+  countryCode: PhoneCountryCode
+): LocalPhoneAnalysis {
+  return analyzePhoneNumberWithFormattedValue(
+    formattedValue,
+    countryCode,
+    formattedValue
+  )
+}
+
+function analyzePhoneNumberWithFormattedValue(
+  value: string,
+  countryCode: PhoneCountryCode,
+  formatted: string
+): LocalPhoneAnalysis {
   const rawDigits = value.replace(/[^\d]/g, "")
   const digits = getLocalDigits(value, countryCode)
-  const formatted = formatLocalPhoneNumber(value, countryCode)
   if (!digits) {
     return {
       formatted,

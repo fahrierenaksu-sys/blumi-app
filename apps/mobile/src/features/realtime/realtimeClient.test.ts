@@ -135,6 +135,27 @@ test("remote normal close reconnects with a fresh opaque ticket", async (context
   assert.deepEqual(MockWebSocket.instances[1]?.protocols, ["ticket-opaque-ticket-2"])
 })
 
+test("fanout gap close 1012 reconnects without invalidating authentication", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const statuses: RealtimeConnectionStatus[] = []
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  client.onConnectionStatus((status) => { statuses.push(status) })
+  client.connect("token-1")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.open()
+  MockWebSocket.instances[0]?.drop(1012)
+  assert.equal(isRealtimeAuthInvalidClose(1012), false)
+  assert.equal(statuses.at(-1), "reconnecting")
+  context.mock.timers.tick(1_000)
+  await flushTicketRequest()
+  MockWebSocket.instances[1]?.open()
+  assert.equal(statuses.at(-1), "connected")
+  assert.equal(MockWebSocket.instances.length, 2)
+  client.disconnect()
+})
+
 test("successful reconnect resets exponential backoff", async (context) => {
   const restore = installWebSocketMock()
   context.after(restore)

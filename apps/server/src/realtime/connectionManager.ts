@@ -21,6 +21,7 @@ export interface ConnectionManager {
     socket: WebSocket
     profile: UserProfile
     sessionFamilyId?: string
+    connectionId?: string
   }): RealtimeConnection
   setDeliveryAuthorization(authorize: (connection: RealtimeConnection) => Promise<boolean>): void
   removeConnection(connectionId: string): RealtimeConnection | null
@@ -44,6 +45,7 @@ export interface CreateConnectionManagerOptions {
   fanout?: RealtimeFanout
   instanceId?: string
   reportFanoutError?: (error: unknown) => void
+  shutdownDrainTimeoutMs?: number
 }
 
 export function createConnectionManager(
@@ -56,8 +58,13 @@ export function createConnectionManager(
   let authorizeDelivery: ((connection: RealtimeConnection) => Promise<boolean>) | undefined
   const deliveryQueues = new Map<string, { pending: number; tail: Promise<void> }>()
   const pendingOperations = new Set<Promise<unknown>>()
+  const gapTerminationTimers = new Map<string, ReturnType<typeof setTimeout>>()
   let closingFanout = false
   let closedFanout: Promise<void> | undefined
+  function reportFanoutError(error: unknown): void {
+    try { options.reportFanoutError?.(error) }
+    catch { /* Reporting must not strand shutdown or fanout cleanup. */ }
+  }
   function track<T>(operation: Promise<T>): Promise<T> {
     pendingOperations.add(operation)
     void operation.then(() => pendingOperations.delete(operation), () => pendingOperations.delete(operation))
@@ -68,9 +75,9 @@ export function createConnectionManager(
     setDeliveryAuthorization(authorize) {
       authorizeDelivery = authorize
     },
-    addConnection({ socket, profile, sessionFamilyId }) {
+    addConnection({ socket, profile, sessionFamilyId, connectionId }) {
       const connection: RealtimeConnection = {
-        connectionId: `connection_${randomUUID()}`,
+        connectionId: connectionId ?? `connection_${randomUUID()}`,
         userId: profile.userId,
         sessionFamilyId,
         profile: {
@@ -81,12 +88,17 @@ export function createConnectionManager(
         joinedRoomIds: new Set(),
         isAlive: true
       }
+      if (connections.has(connection.connectionId)) {
+        throw new Error("Realtime connection ID is already active.")
+      }
       connections.set(connection.connectionId, connection)
       return connection
     },
     removeConnection(connectionId) {
       const connection = connections.get(connectionId) ?? null
       connections.delete(connectionId)
+      clearTimeout(gapTerminationTimers.get(connectionId))
+      gapTerminationTimers.delete(connectionId)
       deliveryQueues.delete(connectionId)
       return connection
     },
@@ -148,8 +160,26 @@ export function createConnectionManager(
       const start = options.fanout.subscribe((message) => {
         if (closingFanout || message.origin === instanceId) return
         deliverFanoutMessage(message)
+      }, () => {
+        // LISTEN gaps are instance-wide. Force clients through reconnect and
+        // authoritative reconciliation instead of leaving stale sockets live.
+        for (const connection of connections.values()) {
+          const socket = connection.socket
+          if (socket.readyState === 3 || gapTerminationTimers.has(connection.connectionId)) continue
+          if (socket.readyState === 1) socket.close(1012, "Realtime resynchronization required")
+          const timer = setTimeout(() => {
+            gapTerminationTimers.delete(connection.connectionId)
+            if (socket.readyState !== 3) socket.terminate()
+          }, 1_000)
+          timer.unref()
+          gapTerminationTimers.set(connection.connectionId, timer)
+        }
       }).then((nextUnsubscribe) => {
-        unsubscribe = nextUnsubscribe
+        if (closingFanout) {
+          return Promise.resolve().then(nextUnsubscribe).catch(reportFanoutError)
+        } else {
+          unsubscribe = nextUnsubscribe
+        }
       })
       startingFanout = start
       try {
@@ -164,21 +194,38 @@ export function createConnectionManager(
     closeFanout() {
       if (closedFanout) return closedFanout
       closingFanout = true
-      closedFanout = (async () => {
-      const pendingStart = startingFanout
-      if (pendingStart) await pendingStart.catch((error) => {
-        options.reportFanoutError?.(error)
-      })
-      // Producers have drained first. Track work independently of connections:
-      // socket removal must not discard an already-running authorization query.
-      while (pendingOperations.size) await Promise.allSettled([...pendingOperations])
-      const current = unsubscribe
-      unsubscribe = undefined
-      if (current) {
-        await current().catch((error) => {
-          options.reportFanoutError?.(error)
-        })
+      for (const [connectionId, timer] of gapTerminationTimers) {
+        clearTimeout(timer)
+        const socket = connections.get(connectionId)?.socket
+        if (socket && socket.readyState !== 3) socket.terminate()
       }
+      gapTerminationTimers.clear()
+      closedFanout = (async () => {
+        let drainTimedOut = false
+        let drainTimer: ReturnType<typeof setTimeout> | undefined
+        const deadline = new Promise<void>((resolve) => {
+          drainTimer = setTimeout(() => { drainTimedOut = true; resolve() },
+            Math.max(1, options.shutdownDrainTimeoutMs ?? 6_000))
+        })
+        try {
+          const pendingStart = startingFanout
+          if (pendingStart) await Promise.race([
+            pendingStart.catch(reportFanoutError), deadline
+          ])
+          // Preserve the ordinary drain, but a stuck publisher or authorization
+          // check must not hold the LISTEN client or process shutdown forever.
+          while (!drainTimedOut && pendingOperations.size) {
+            await Promise.race([Promise.allSettled([...pendingOperations]), deadline])
+          }
+        } finally {
+          const current = unsubscribe
+          unsubscribe = undefined
+          if (current) await Promise.race([
+            Promise.resolve().then(current).catch(reportFanoutError), deadline
+          ])
+          clearTimeout(drainTimer)
+          if (drainTimedOut) reportFanoutError(new Error("Realtime fanout shutdown drain timed out."))
+        }
       })()
       return closedFanout
     }
@@ -249,7 +296,7 @@ export function createConnectionManager(
       target,
       event
     })).catch((error) => {
-      options.reportFanoutError?.(error)
+      reportFanoutError(error)
     })
   }
 

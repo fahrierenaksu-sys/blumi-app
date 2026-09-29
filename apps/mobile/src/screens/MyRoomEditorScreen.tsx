@@ -1,6 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
+import { Image as ExpoImage } from "expo-image"
 import { memo, useMemo, useState, useCallback, useEffect, useRef } from "react"
-import { Alert, Animated, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Image, PanResponder, type GestureResponderHandlers, type LayoutChangeEvent, type GestureResponderEvent } from "react-native"
+import { Alert, Animated, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, PanResponder, type GestureResponderHandlers, type LayoutChangeEvent, type GestureResponderEvent } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { RoomRenderer2D } from "../features/roomV2/components/RoomRenderer2D"
@@ -58,6 +59,11 @@ import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { uiTheme } from "../ui/theme"
 import { hapticLight, hapticSuccess, hapticError } from "../ui/haptics"
 import { useSelectionTransition } from "../ui/animations"
+import {
+  canPlaceRoomEditorInventoryItem,
+  getRoomEditorInventoryViewState,
+  useRoomEditorInventoryEntries
+} from "./useRoomEditorInventoryEntries"
 import { projectRoomWorldPointToPolygon } from "../features/roomWorld/roomWorldGeometry"
 import { getRoomWorldMotionReadinessSummary } from "../features/roomWorld/roomWorldDiagnostics"
 import { createRoomWorldGeometryFromRoomV2Scene } from "../features/roomWorld/roomWorldRoomV2Projection"
@@ -169,7 +175,8 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   requireServerInventory?: boolean
 }) {
   const { navigation, route } = props
-  const copy = getMyRoomEditorCopy(getAppLocale())
+  const locale = getAppLocale()
+  const copy = getMyRoomEditorCopy(locale)
   const {
     userRoomDecor,
     confirmedPersistedRoomDecor,
@@ -178,7 +185,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     persistenceErrorMessage,
     retryPersistence
   } = useRoomV2()
-  const { ownsRoomItem } = useInventoryStore(
+  const { inventory, hydrationStatus: inventoryHydrationStatus, ownsRoomItem } = useInventoryStore(
     props.inventoryOwnerUserId,
     props.requireServerInventory
   )
@@ -228,7 +235,9 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   const [selectedInventoryRotation, setSelectedInventoryRotation] = useState<PlacedRoomItem["rotation"]>("front")
   const [isSavingRoom, setIsSavingRoom] = useState(false)
   const isSavingRoomRef = useRef(false)
-  const hasHydratedDraft = useRef(false)
+  // The provider can already be ready when this route mounts. Avoid a false
+  // loading frame and a second editor-session creation for the same snapshot.
+  const hasHydratedDraft = useRef(persistenceState !== "loading")
   const isRoomDraftReady = persistenceState !== "loading" && hasHydratedDraft.current
 
   useEffect(() => {
@@ -299,17 +308,10 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     [roomWorldGeometry]
   )
   const roomWorldStatus = getEditRoomWorldStatus(roomWorldReadiness.level, copy)
-  const inventoryEntries = useMemo<InventoryEntry[]>(
-    () =>
-      ACTIVE_ROOM_FURNITURE_CATALOG
-        .filter((item) =>
-          ownsRoomItem(item.id) || QA_OWNED_ROOM_ITEM_IDS.has(item.id)
-        )
-        .map((item) => ({
-        item,
-        owned: true
-      })),
-    [ownsRoomItem]
+  const inventoryEntries: InventoryEntry[] = useRoomEditorInventoryEntries(
+    ACTIVE_ROOM_FURNITURE_CATALOG,
+    inventory.ownedRoomItemIds,
+    QA_OWNED_ROOM_ITEM_IDS
   )
   const placedRoomItemIds = useMemo(
     () => new Set(draftDecor.placedItems.map((placedItem) => placedItem.itemId)),
@@ -322,6 +324,20 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
       (!normalizedQuery || normalizeRoomInventorySearchText(entry.item.name).includes(normalizedQuery))
     ))
   }, [activeInventoryCategory, inventoryEntries, inventorySearchQuery])
+  const inventoryViewState = getRoomEditorInventoryViewState(
+    inventoryHydrationStatus,
+    inventoryEntries.length,
+    filteredInventoryEntries.length
+  )
+  const canPlaceInventoryItem = canPlaceRoomEditorInventoryItem(
+    inventoryHydrationStatus,
+    props.requireServerInventory === true
+  )
+  const inventoryStatusLabel = inventoryViewState.isLoading
+    ? locale === "tr" ? "Eşya koleksiyonun yükleniyor…" : "Loading your collection…"
+    : inventoryViewState.isFailed
+      ? locale === "tr" ? "Eşya koleksiyonun doğrulanamadı." : "Your collection could not be verified."
+      : copy.piecesReady(inventoryEntries.length)
   const selectedInventoryEntry = useMemo(() => (
     filteredInventoryEntries.find((entry) => entry.item.id === selectedInventoryItemId) ??
     filteredInventoryEntries.find((entry) => entry.owned && !placedRoomItemIds.has(entry.item.id)) ??
@@ -806,6 +822,10 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     feedback: boolean,
     rotationOverride?: PlacedRoomItem["rotation"]
   ): boolean => {
+    if (!canPlaceInventoryItem) {
+      if (feedback) setPlacementFeedback(copy.feedback.roomStillLoading)
+      return false
+    }
     if (!ownsRoomItem(itemId) && !QA_OWNED_ROOM_ITEM_IDS.has(itemId)) {
       if (feedback) hapticError()
       return false
@@ -841,7 +861,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     setSelectedInstanceId(placedItem.instanceId)
     return true
 // eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [canPlaceAnotherRoomItem, copy, ownsRoomItem, scene])
+  }, [canPlaceAnotherRoomItem, canPlaceInventoryItem, copy, ownsRoomItem, scene])
 
   const handleAddSelectedInventoryItem = useCallback(() => {
     if (!selectedInventoryEntry) return
@@ -868,14 +888,14 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
 
   useEffect(() => {
     if (!placementItemId || lastAppliedPlacementItemId.current === placementItemId) return
-    if (!isRoomDraftReady) return
+    if (!canPlaceInventoryItem || !isRoomDraftReady) return
     lastAppliedPlacementItemId.current = placementItemId
     setSelectedInventoryItemId(placementItemId)
     setPlacementFeedback(undefined)
     if (addDraftItem(placementItemId, false)) {
       hapticSuccess()
     }
-  }, [addDraftItem, isRoomDraftReady, placementItemId])
+  }, [addDraftItem, canPlaceInventoryItem, isRoomDraftReady, placementItemId])
 
   const handleSave = useCallback(async (): Promise<void> => {
     const requestedExitAction = pendingEditorExitActionRef.current
@@ -1267,8 +1287,11 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
           <View style={styles.inventoryHeader}>
             <View>
               <Text style={styles.inventoryTitle}>{copy.collectionTitle}</Text>
-              <Text style={styles.inventoryEyebrow}>
-                {copy.piecesReady(inventoryEntries.length)}
+              <Text style={[
+                styles.inventoryEyebrow,
+                inventoryViewState.isFailed ? styles.inventoryStatusFailed : null
+              ]}>
+                {inventoryStatusLabel}
               </Text>
             </View>
             <Pressable
@@ -1349,7 +1372,24 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
               )
             })}
           </ScrollView>
-          {selectedInventoryEntry ? (
+          {inventoryViewState.isLoading ? (
+            <View
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={inventoryStatusLabel}
+              style={[styles.selectedInventoryPreview, styles.inventoryLoadingPreview]}
+            >
+              <View style={[styles.selectedInventoryContentRow, styles.inventoryLoadingPreviewContentRow]}>
+                <View style={[styles.selectedInventoryImageWrap, styles.inventoryLoadingPreviewImage]} />
+                <View style={styles.inventoryLoadingPreviewCopy}>
+                  <View style={styles.inventoryLoadingPreviewEyebrow} />
+                  <View style={styles.inventoryLoadingPreviewTitle} />
+                  <View style={styles.inventoryLoadingPreviewHint} />
+                </View>
+              </View>
+              <View style={styles.inventoryLoadingPreviewAction} />
+            </View>
+          ) : selectedInventoryEntry ? (
             <Animated.View
               style={[styles.selectedInventoryPreview, selectedInventoryTransition]}
               accessibilityRole="summary"
@@ -1357,12 +1397,14 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             >
               <View style={styles.selectedInventoryContentRow}>
                 <View style={styles.selectedInventoryImageWrap}>
-                  <Image
+                  <ExpoImage
                     source={resolveRoomV2InventoryPreviewSource(
                       selectedInventoryEntry.item,
                       selectedInventoryRotation
                     )}
-                    resizeMode="contain"
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                    transition={0}
                     style={styles.selectedInventoryImage}
                   />
                 </View>
@@ -1413,12 +1455,12 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={copy.placeItem(selectedInventoryEntry.item.name)}
-                  accessibilityState={{ disabled: !selectedInventoryEntry.owned }}
-                  disabled={!selectedInventoryEntry.owned}
+                  accessibilityState={{ disabled: !selectedInventoryEntry.owned || !canPlaceInventoryItem }}
+                  disabled={!selectedInventoryEntry.owned || !canPlaceInventoryItem}
                   onPress={handleAddSelectedInventoryItem}
                   style={({ pressed }) => [
                     styles.placeSelectedInventoryButton,
-                    !selectedInventoryEntry.owned
+                    !selectedInventoryEntry.owned || !canPlaceInventoryItem
                       ? styles.placeSelectedInventoryButtonDisabled
                       : null,
                     pressed ? styles.placeSelectedInventoryButtonPressed : null
@@ -1427,11 +1469,11 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                   <Ionicons
                     name="add"
                     size={18}
-                    color={selectedInventoryEntry.owned ? "#FFFFFF" : "#A68D9C"}
+                    color={selectedInventoryEntry.owned && canPlaceInventoryItem ? "#FFFFFF" : "#A68D9C"}
                   />
                   <Text style={[
                     styles.placeSelectedInventoryButtonText,
-                    !selectedInventoryEntry.owned
+                    !selectedInventoryEntry.owned || !canPlaceInventoryItem
                       ? styles.placeSelectedInventoryButtonTextDisabled
                       : null
                   ]}>{copy.placeInRoom}</Text>
@@ -1440,7 +1482,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             </Animated.View>
           ) : null}
           <FlatList
-            data={filteredInventoryEntries}
+            data={inventoryViewState.isLoading ? [] : filteredInventoryEntries}
             renderItem={renderInventoryItem}
             keyExtractor={(entry) => entry.item.id}
             horizontal
@@ -1451,23 +1493,41 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             windowSize={4}
             removeClippedSubviews
             ListEmptyComponent={(
-              <View style={styles.inventoryEmptyState}>
-                <Text style={styles.inventoryEmptyText}>
-                  {inventoryEntries.length > 0
-                    ? copy.noMatches
-                    : copy.noPieces}
-                </Text>
-                {inventoryEntries.length === 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.browseShop}
-                    onPress={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
-                    style={styles.inventoryEmptyAction}
-                  >
-                    <Text style={styles.inventoryEmptyActionText}>{copy.browseShop}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              inventoryViewState.isLoading ? (
+                <View
+                  accessible
+                  accessibilityRole="progressbar"
+                  accessibilityLabel={inventoryStatusLabel}
+                  style={styles.inventoryLoadingRow}
+                >
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <View key={`inventory-loading-${index}`} style={styles.inventoryLoadingItem}>
+                      <View style={styles.inventoryLoadingCard} />
+                      <View style={styles.inventoryLoadingLabel} />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.inventoryEmptyState}>
+                  <Text style={styles.inventoryEmptyText}>
+                    {inventoryViewState.emptyState === "no-matches"
+                      ? copy.noMatches
+                      : inventoryViewState.emptyState === "no-pieces"
+                        ? copy.noPieces
+                        : inventoryStatusLabel}
+                  </Text>
+                  {inventoryViewState.emptyState === "no-pieces" ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={copy.browseShop}
+                      onPress={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
+                      style={styles.inventoryEmptyAction}
+                    >
+                      <Text style={styles.inventoryEmptyActionText}>{copy.browseShop}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              )
             )}
           />
         </View>
@@ -1530,10 +1590,12 @@ const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
           pressed && owned && !placed ? styles.inventoryItemPressed : null
         ]}
       >
-        <Image
+        <ExpoImage
           source={item.asset.source}
           style={styles.inventoryItemImage}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          transition={0}
         />
         {!owned ? (
           <View style={styles.inventoryItemLock}>
@@ -2222,6 +2284,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700"
   },
+  inventoryStatusFailed: {
+    color: "#B75B73"
+  },
   inventorySubtitle: {
     color: "#A26484",
     fontSize: 12,
@@ -2291,6 +2356,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiTheme.spacing.md,
     gap: 10,
     paddingTop: 8
+  },
+  inventoryLoadingRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 8
+  },
+  inventoryLoadingItem: {
+    width: 72,
+    alignItems: "center"
+  },
+  inventoryLoadingCard: {
+    width: 72,
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(220,163,191,0.3)",
+    backgroundColor: "#F9EEF4"
+  },
+  inventoryLoadingLabel: {
+    width: 42,
+    height: 5,
+    marginTop: 8,
+    borderRadius: 3,
+    backgroundColor: "#F3E3EC"
+  },
+  inventoryLoadingPreview: {
+    opacity: 0.92
+  },
+  inventoryLoadingPreviewContentRow: {
+    minHeight: 72
+  },
+  inventoryLoadingPreviewImage: {
+    backgroundColor: "#F5EAF0"
+  },
+  inventoryLoadingPreviewCopy: {
+    flex: 1,
+    gap: 8
+  },
+  inventoryLoadingPreviewEyebrow: {
+    width: 64,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F0DFE8"
+  },
+  inventoryLoadingPreviewTitle: {
+    width: "76%",
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#F0DFE8"
+  },
+  inventoryLoadingPreviewHint: {
+    width: "62%",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F0DFE8"
+  },
+  inventoryLoadingPreviewAction: {
+    alignSelf: "flex-end",
+    width: 112,
+    height: 38,
+    borderRadius: 15,
+    backgroundColor: "#F3E3EC"
   },
   inventoryItemContainer: {
     alignItems: "center",

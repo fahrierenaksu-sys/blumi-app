@@ -18,6 +18,7 @@ import type { DiscoveryWatchClaim } from "./matchRepository"
 import type { EconomyService } from "../economy/economyService"
 import type { NotificationService } from "../notifications/notificationService"
 import { PublicRequestError } from "../errors/publicRequestError"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 export interface MatchService {
   repository: MatchRepository
@@ -102,6 +103,7 @@ export interface CreateMatchServiceOptions {
   idFactory?: () => string
   economyService?: EconomyService
   notificationService?: Pick<NotificationService, "sendPushToUser">
+  reportSideEffectFailure?: (kind: "reward" | "notification", error: unknown) => void
 }
 
 export function createMatchService(
@@ -279,7 +281,7 @@ export function createMatchService(
       const reciprocal = await repository.findDecision(targetUserId, currentUserId)
       if (reciprocal?.decision !== "like") {
         if (persisted.created) {
-          await notifyLike(options.notificationService, targetUserId, currentUserId)
+          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId, currentUserId))
         }
         return {
           decision: canonicalDecision,
@@ -291,7 +293,7 @@ export function createMatchService(
 
       const existing = await repository.findMatchBetween(currentUserId, targetUserId)
       if (existing) {
-        await rewardMatchParticipants(options.economyService, existing, now)
+        await runSideEffect("reward", () => rewardMatchParticipants(options.economyService, existing, now))
         return {
           decision: canonicalDecision,
           matched: true,
@@ -306,8 +308,10 @@ export function createMatchService(
         matchedAt: now.toISOString()
       }
       const canonicalMatch = await repository.createMatch(match)
-      await rewardMatchParticipants(options.economyService, canonicalMatch, now)
-      await notifyMatch(options.notificationService, canonicalMatch)
+      await Promise.all([
+        runSideEffect("reward", () => rewardMatchParticipants(options.economyService, canonicalMatch, now)),
+        runSideEffect("notification", () => notifyMatch(options.notificationService, canonicalMatch))
+      ])
 
       return {
         decision: canonicalDecision,
@@ -315,6 +319,21 @@ export function createMatchService(
         match: canonicalMatch,
         quota: persisted.quota
       }
+  }
+
+  async function runSideEffect(
+    kind: "reward" | "notification",
+    action: () => Promise<void>
+  ): Promise<void> {
+    try {
+      await action()
+    } catch (error) {
+      if (options.reportSideEffectFailure) {
+        try { options.reportSideEffectFailure(kind, error) } catch { /* Reporting must not alter a durable decision. */ }
+      } else {
+        console.error("Match side effect failed", { kind, errorKind: safeOperationalErrorKind(error) })
+      }
+    }
   }
 }
 

@@ -16,6 +16,17 @@ type NotificationsPermissionStatus =
 
 let notificationsModulePromise: Promise<NotificationsModule> | null = null
 let hasInstalledNotificationHandler = false
+const observedResponseOwners = new Map<string, { userId: string; delivered: boolean }>()
+const MAX_OBSERVED_RESPONSE_OWNERS = 256
+
+function rememberObservedResponseOwner(identifier: string, userId: string): void {
+  if (observedResponseOwners.has(identifier)) return
+  if (observedResponseOwners.size >= MAX_OBSERVED_RESPONSE_OWNERS) {
+    const oldestIdentifier = observedResponseOwners.keys().next().value
+    if (oldestIdentifier !== undefined) observedResponseOwners.delete(oldestIdentifier)
+  }
+  observedResponseOwners.set(identifier, { userId, delivered: false })
+}
 
 const SHOULD_INITIALIZE_NOTIFICATIONS = shouldInitializeNativeNotifications(
   Platform.OS,
@@ -24,7 +35,8 @@ const SHOULD_INITIALIZE_NOTIFICATIONS = shouldInitializeNativeNotifications(
 
 export function usePushRegistration(
   sessionActor: SessionActor | null,
-  onNotificationResponseData?: (data: unknown) => void
+  onNotificationResponseData?: (data: unknown, actor: SessionActor) => boolean,
+  navigationReadyGeneration = 0
 ): {
   permissionStatus: "unknown" | "undetermined" | "granted" | "denied"
   isRequestingPermission: boolean
@@ -32,8 +44,13 @@ export function usePushRegistration(
 } {
   const mode = sessionActor?.session.mode
   const userId = sessionActor?.session.userId
+  const sessionId = sessionActor?.session.sessionId
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
+  const sessionActorRef = useRef(sessionActor)
+  sessionActorRef.current = sessionActor
+  const onNotificationResponseDataRef = useRef(onNotificationResponseData)
+  onNotificationResponseDataRef.current = onNotificationResponseData
   const sessionToken = sessionActor?.session.mode === "production"
     ? sessionActor.session.sessionToken
     : undefined
@@ -42,6 +59,11 @@ export function usePushRegistration(
   >("unknown")
   const [isRequestingPermission, setIsRequestingPermission] = useState(false)
   const requestSyncRef = useRef<(() => Promise<void>) | null>(null)
+  const retryPendingResponsesRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    retryPendingResponsesRef.current?.()
+  }, [navigationReadyGeneration, onNotificationResponseData])
 
   useEffect(() => {
     if (mode !== "production" || !sessionToken) return
@@ -75,6 +97,82 @@ export function usePushRegistration(
     let syncQueue = Promise.resolve()
     let pushTokenSubscription: { remove(): void } | null = null
     let responseSubscription: { remove(): void } | null = null
+    let notificationsForDelivery: NotificationsModule | null = null
+    const pendingResponses = new Map<string, {
+      response: import("expo-notifications").NotificationResponse
+      cached: boolean
+      ownerUserId: string
+    }>()
+
+    const consumeCachedResponse = (notifications: NotificationsModule, identifier: string): void => {
+      void notifications.getLastNotificationResponseAsync().then(async (last) => {
+        if (active && last?.notification.request.identifier === identifier) {
+          await notifications.clearLastNotificationResponseAsync()
+        }
+      }).catch((error) => {
+        if (active) captureAppException(error, { feature: "push_response_consumption" })
+      })
+    }
+
+    const rememberPendingResponse = (
+      identifier: string,
+      response: import("expo-notifications").NotificationResponse,
+      cached: boolean,
+      ownerUserId: string
+    ): void => {
+      if (!pendingResponses.has(identifier) && pendingResponses.size >= MAX_OBSERVED_RESPONSE_OWNERS) {
+        const oldestIdentifier = pendingResponses.keys().next().value
+        if (oldestIdentifier !== undefined) pendingResponses.delete(oldestIdentifier)
+      }
+      pendingResponses.set(identifier, { response, cached, ownerUserId })
+    }
+
+    const deliverResponse = (
+      notifications: NotificationsModule,
+      response: import("expo-notifications").NotificationResponse,
+      cached: boolean
+    ): void => {
+      const currentActor = sessionActorRef.current
+      if (
+        !active ||
+        !currentActor ||
+        currentActor.session.mode !== mode ||
+        currentActor.session.userId !== userId ||
+        currentActor.session.sessionId !== sessionId ||
+        currentActor.session.sessionToken !== sessionToken
+      ) return
+      const identifier = response.notification.request.identifier
+      const pendingOwner = pendingResponses.get(identifier)?.ownerUserId
+      const responseOwner = observedResponseOwners.get(identifier)?.userId ?? pendingOwner
+      if (responseOwner && responseOwner !== currentActor.profile.userId) return
+      const data = response.notification.request.content.data
+      if (data && typeof data === "object" && "recipientUserId" in data &&
+        data.recipientUserId !== currentActor.profile.userId) return
+      if (!responseOwner) {
+        rememberObservedResponseOwner(identifier, currentActor.profile.userId)
+      }
+      if (observedResponseOwners.get(identifier)?.delivered) {
+        if (cached) consumeCachedResponse(notifications, identifier)
+        return
+      }
+      if (onNotificationResponseDataRef.current?.(data, currentActor) !== true) {
+        rememberPendingResponse(identifier, response, cached, currentActor.profile.userId)
+        return
+      }
+      pendingResponses.delete(identifier)
+      rememberObservedResponseOwner(identifier, currentActor.profile.userId)
+      const deliveredOwner = observedResponseOwners.get(identifier)
+      if (deliveredOwner?.userId === currentActor.profile.userId) {
+        deliveredOwner.delivered = true
+      }
+      if (cached) consumeCachedResponse(notifications, identifier)
+    }
+    retryPendingResponsesRef.current = () => {
+      if (!notificationsForDelivery) return
+      for (const { response, cached } of pendingResponses.values()) {
+        deliverResponse(notificationsForDelivery, response, cached)
+      }
+    }
 
     const sync = (allowPermissionPrompt: boolean): Promise<void> => {
       const task = syncQueue.then(async () => {
@@ -140,6 +238,7 @@ export function usePushRegistration(
     void loadNotificationsModule()
       .then(async (notifications) => {
         if (!active) return
+        notificationsForDelivery = notifications
         ensureNotificationHandler(notifications)
         requestSyncRef.current = () => sync(true)
         void sync(false).catch(() => undefined)
@@ -148,14 +247,11 @@ export function usePushRegistration(
         })
         responseSubscription =
           notifications.addNotificationResponseReceivedListener((response) => {
-            onNotificationResponseData?.(
-              response.notification.request.content.data
-            )
+            deliverResponse(notifications, response, false)
           })
         const response = await notifications.getLastNotificationResponseAsync()
         if (!active || !response) return
-        onNotificationResponseData?.(response.notification.request.content.data)
-        await notifications.clearLastNotificationResponseAsync()
+        deliverResponse(notifications, response, true)
       })
       .catch((error) => {
         if (!active || isAbortError(error)) return
@@ -164,6 +260,8 @@ export function usePushRegistration(
 
     return () => {
       active = false
+      retryPendingResponsesRef.current = null
+      pendingResponses.clear()
       requestSyncRef.current = null
       abortController.abort()
       pushTokenSubscription?.remove()
@@ -180,7 +278,7 @@ export function usePushRegistration(
         })
       }
     }
-  }, [mode, onNotificationResponseData, sessionToken, userId])
+  }, [mode, sessionId, sessionToken, userId])
 
   const requestPermission = useCallback(async (): Promise<void> => {
     const requestSync = requestSyncRef.current

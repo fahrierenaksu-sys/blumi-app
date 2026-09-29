@@ -8,6 +8,7 @@ import {
 } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
 import type { MiniRoomService } from "../miniRooms/miniRoomService"
+import type { ConnectionManager } from "../realtime/connectionManager"
 import {
   ReportIdempotencyConflictError,
   type SafetyService
@@ -19,6 +20,7 @@ export interface SafetyRouteServices {
   authService: AuthService
   safetyService: SafetyService
   miniRoomService?: MiniRoomService
+  connectionManager: ConnectionManager
 }
 
 const reporterReportResponseSchema = {
@@ -37,7 +39,7 @@ export async function registerSafetyRoutes(
   app: FastifyInstance,
   services: SafetyRouteServices
 ): Promise<void> {
-  const { authService, safetyService, miniRoomService } = services
+  const { authService, safetyService, miniRoomService, connectionManager } = services
 
   app.get("/v1/safety/reports", {
     config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
@@ -126,10 +128,15 @@ export async function registerSafetyRoutes(
         resolved.account.userId,
         blockedUserId
       )
-      await miniRoomService?.separateUserPair(
+      const endedRooms = await miniRoomService?.separateUserPair(
         resolved.account.userId,
         block.blockedUserId
       )
+      for (const ended of endedRooms ?? []) {
+        connectionManager.sendToUsers(ended.participantUserIds, {
+          type: "mini_room.ended", payload: ended
+        })
+      }
       return reply.code(201).send({ block })
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
@@ -198,10 +205,15 @@ export async function registerSafetyRoutes(
         note,
         idempotencyKey
       })
-      await miniRoomService?.separateUserPair(
+      const endedRooms = await miniRoomService?.separateUserPair(
         resolved.account.userId,
         result.block.blockedUserId
       )
+      for (const ended of endedRooms ?? []) {
+        connectionManager.sendToUsers(ended.participantUserIds, {
+          type: "mini_room.ended", payload: ended
+        })
+      }
       return reply.code(result.replayed ? 200 : 201).send(result)
     } catch (error) {
       if (error instanceof ReportIdempotencyConflictError) {

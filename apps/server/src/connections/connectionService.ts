@@ -10,6 +10,7 @@ import {
   type ConnectionRepository
 } from "./connectionRepository"
 import type { EconomyService } from "../economy/economyService"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 export interface ConnectionService {
   repository: ConnectionRepository
@@ -42,6 +43,7 @@ export interface CreateConnectionServiceOptions {
   repository?: ConnectionRepository
   miniRoomService: MiniRoomService
   economyService?: EconomyService
+  reportSideEffectFailure?: (kind: "reward", error: unknown) => void
 }
 
 export function createConnectionService(
@@ -69,7 +71,7 @@ export function createConnectionService(
       }
 
       const existing = await repository.findDecision(input.miniRoomId, actorUserId)
-      const decision: ConnectionDecisionRecord = existing ?? {
+      const proposedDecision: ConnectionDecisionRecord = existing ?? {
         miniRoomId: input.miniRoomId,
         actorUserId,
         partnerUserId: input.partnerUserId,
@@ -77,8 +79,10 @@ export function createConnectionService(
         decidedAt: now.toISOString()
       }
       if (!existing) {
-        await repository.saveDecision(decision)
+        await repository.saveDecision(proposedDecision)
       }
+      const decision = await repository.findDecision(input.miniRoomId, actorUserId)
+      if (!decision) throw new Error("Connection decision persistence did not return a canonical record.")
 
       if (decision.status !== "saved") {
         return { decision, match: null }
@@ -94,7 +98,7 @@ export function createConnectionService(
 
       const existingMatch = await repository.findMatch(input.miniRoomId)
       if (existingMatch) {
-        await rewardConnectionParticipants(options.economyService, existingMatch, now)
+        await rewardSafely(existingMatch, now)
         return { decision, match: existingMatch }
       }
 
@@ -104,8 +108,20 @@ export function createConnectionService(
         matchedAt: now.toISOString()
       }
       await repository.saveMatch(match)
-      await rewardConnectionParticipants(options.economyService, match, now)
+      await rewardSafely(match, now)
       return { decision, match }
+    }
+  }
+
+  async function rewardSafely(match: ConnectionMatch, now: Date): Promise<void> {
+    try {
+      await rewardConnectionParticipants(options.economyService, match, now)
+    } catch (error) {
+      if (options.reportSideEffectFailure) {
+        try { options.reportSideEffectFailure("reward", error) } catch { /* Preserve the durable match. */ }
+      } else {
+        console.error("Connection match reward failed", { errorKind: safeOperationalErrorKind(error) })
+      }
     }
   }
 }

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createPostgresEconomyRepository } from "./postgresEconomyRepository"
+import { createDefaultEconomyInventory } from "../economy/economyRepository"
+import { createEconomyService } from "../economy/economyService"
 
 interface QueryCall {
   text: string
@@ -19,6 +21,26 @@ function createFakePool(rows: Record<string, unknown>[] = []) {
     }
   }
 }
+
+test("complete service inventory reads issue one SELECT and no upsert", async () => {
+  const inventory = createDefaultEconomyInventory("complete_user")
+  const fake = createFakePool([{
+    user_id: inventory.userId,
+    coins: inventory.coins,
+    coin_debt: inventory.coinDebt,
+    owned_avatar_item_ids: inventory.ownedAvatarItemIds,
+    owned_room_item_ids: inventory.ownedRoomItemIds,
+    updated_at: inventory.updatedAt
+  }])
+  const service = createEconomyService({
+    repository: createPostgresEconomyRepository(fake.pool)
+  })
+
+  assert.deepEqual(await service.getInventory(inventory.userId), inventory)
+  assert.equal(fake.calls.length, 1)
+  assert.match(fake.calls[0].text, /^SELECT /)
+  assert.doesNotMatch(fake.calls[0].text, /INSERT|UPDATE/)
+})
 
 test("postgres economy repository loads persisted inventory", async () => {
   const fake = createFakePool([

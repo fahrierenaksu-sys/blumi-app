@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
@@ -12,10 +11,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { useChatStore } from "../features/chat/chatStore"
+import { useChatThreadStore } from "../features/chat/chatStore"
+import { createThread } from "../features/chat/chatApi"
+import { createMatchedChatOpener } from "../features/chat/matchChatOpening"
+import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
@@ -25,20 +28,22 @@ import { LinearGradient } from "../ui/linearGradient"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 import { hapticLight } from "../ui/haptics"
-import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
+import { useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
+import type { ChatThread } from "@blumi/contracts"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { ChatRoomInviteCard } from "../features/chat/ChatRoomInviteCard"
 import { createMatchFromPersistedThread } from "../features/matches/matchRoomModel"
+import { RoomInviteApiError } from "../features/chat/chatRoomInviteApi"
 import {
   buildChatTimeline,
   getChatMessageGroupPosition,
   getChatTimelineItemKey,
   getRoomInviteCreateLabel,
+  getChatInitialRenderCount,
   type ChatRoomInviteAction,
   type ChatRoomInviteSurface,
-  type ChatRoomInviteTimelineItem,
-  type ChatTimelineItem
+  type ChatRoomInviteTimelineItem
 } from "../features/chat/chatRoomInviteModel"
 
 type ChatThreadScreenProps = NativeStackScreenProps<
@@ -46,6 +51,7 @@ type ChatThreadScreenProps = NativeStackScreenProps<
   "ChatThread"
 > & {
   sessionActor: SessionActor
+  onThreadCreated: (thread: ChatThread) => void
 }
 
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
@@ -55,6 +61,8 @@ const CHAT_COPY: Record<"en" | "tr", {
   back: string
   unknownPartner: string
   pendingConversation: string
+  pendingCreationFailed: string
+  retryOpenChat: string
   openingChat: string
   gettingReady: string
   startSpark: string
@@ -74,6 +82,11 @@ const CHAT_COPY: Record<"en" | "tr", {
   roomInvitePendingReason: string
   roomInviteConversationReason: string
   roomInviteUnavailableReason: string
+  roomInviteClosePreviousBody: string
+  roomInviteClosePreviousAction: string
+  roomInviteCloseFailed: string
+  roomInviteRetryFailed: string
+  cancel: string
   today: string
   yesterday: string
 }> = {
@@ -82,6 +95,8 @@ const CHAT_COPY: Record<"en" | "tr", {
     back: "Go back",
     unknownPartner: "Someone",
     pendingConversation: "This conversation is still getting ready.",
+    pendingCreationFailed: "We couldn't open this chat. Check your connection and try again.",
+    retryOpenChat: "Retry opening chat",
     openingChat: "Opening your chat...",
     gettingReady: "Getting the conversation ready.",
     startSpark: "Start with a spark",
@@ -101,6 +116,11 @@ const CHAT_COPY: Record<"en" | "tr", {
     roomInvitePendingReason: "There is already a room invitation waiting for a response.",
     roomInviteConversationReason: "Wait until this conversation is ready.",
     roomInviteUnavailableReason: "Room invitations are not available in this chat yet.",
+    roomInviteClosePreviousBody: "Your previous shared room is still open. Closing it ends that room for both people. Close it and send this invitation?",
+    roomInviteClosePreviousAction: "Close room and invite",
+    roomInviteCloseFailed: "The previous room could not be closed. Check your connection and try again.",
+    roomInviteRetryFailed: "The previous room was closed, but this invitation could not be sent. Please try again.",
+    cancel: "Cancel",
     today: "Today",
     yesterday: "Yesterday"
   },
@@ -109,6 +129,8 @@ const CHAT_COPY: Record<"en" | "tr", {
     back: "Geri dön",
     unknownPartner: "Biri",
     pendingConversation: "Bu sohbet hâlâ hazırlanıyor.",
+    pendingCreationFailed: "Bu sohbet açılamadı. Bağlantını kontrol edip tekrar dene.",
+    retryOpenChat: "Sohbeti tekrar aç",
     openingChat: "Sohbetin hazırlanıyor...",
     gettingReady: "Sohbet hazırlanıyor.",
     startSpark: "Bir kıvılcımla başla",
@@ -128,6 +150,11 @@ const CHAT_COPY: Record<"en" | "tr", {
     roomInvitePendingReason: "Bu sohbette zaten yanıt bekleyen bir oda daveti var.",
     roomInviteConversationReason: "Bu sohbet hazır olana kadar bekle.",
     roomInviteUnavailableReason: "Oda davetleri bu sohbette henüz kullanılamıyor.",
+    roomInviteClosePreviousBody: "Önceki ortak odan hâlâ açık. Kapatırsan iki kişi için de sona erer. Kapatıp bu daveti göndermek ister misin?",
+    roomInviteClosePreviousAction: "Odayı kapat ve davet et",
+    roomInviteCloseFailed: "Önceki oda kapatılamadı. Bağlantını kontrol edip tekrar dene.",
+    roomInviteRetryFailed: "Önceki oda kapatıldı ancak bu davet gönderilemedi. Tekrar dene.",
+    cancel: "Vazgeç",
     today: "Bugün",
     yesterday: "Dün"
   }
@@ -154,11 +181,6 @@ function formatDateSeparator(date: Date, locale: "en" | "tr"): string {
   }).format(date)
 }
 
-function MessageBubbleAnimated({ children, index }: { children: ReactNode; index: number }) {
-  const anim = useEntranceAnimation({ delay: Math.min(index * 40, 400), duration: 300, translateY: 12 })
-  return <Animated.View style={anim}>{children}</Animated.View>
-}
-
 function getRoomInviteActionKey(action: ChatRoomInviteAction): string {
   switch (action.type) {
     case "create":
@@ -170,206 +192,37 @@ function getRoomInviteActionKey(action: ChatRoomInviteAction): string {
   }
 }
 
-export function ChatThreadScreen(props: ChatThreadScreenProps) {
-  const { navigation, route, sessionActor } = props
-  const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
-  const {
-    threads,
-    getMessages,
-    getMessageListState,
-    findThreadForPartner,
-    addOptimisticMessage,
-    getMessageDeliveryState,
-    getRetryableMessage,
-    markOptimisticMessageSending,
-    setActiveThread
-  } = useChatStore()
+function ChatComposer({
+  chatCopy,
+  partnerName,
+  chatLocale,
+  isPendingThread,
+  canCreateRoomInvite,
+  isCreatingRoomInvite,
+  roomInviteDisabledReason,
+  onRoomInvitePress,
+  onSend
+}: {
+  chatCopy: typeof CHAT_COPY["en"]
+  partnerName: string
+  chatLocale: "en" | "tr"
+  isPendingThread: boolean
+  canCreateRoomInvite: boolean
+  isCreatingRoomInvite: boolean
+  roomInviteDisabledReason: string | null
+  onRoomInvitePress: () => void
+  onSend: (body: string) => boolean
+}) {
   const [inputText, setInputText] = useState("")
-  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false)
-  const messageListRef = useRef<FlatList<ChatTimelineItem>>(null)
-  const preserveScrollOnNextHistoryLoadRef = useRef(false)
-  const newestMessageIdRef = useRef<string | undefined>(undefined)
-  const [reportVisible, setReportVisible] = useState(false)
-  const [activeRoomInviteAction, setActiveRoomInviteAction] = useState<string | null>(null)
   const sendScaleAnim = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
-  const headerAnim = useEntranceAnimation({ delay: 0, translateY: 16 })
+  const isSendDisabled = inputText.trim().length === 0 || isPendingThread
 
-  const thread = useMemo(() => {
-    if (threadId) return threads.find((t) => t.threadId === threadId)
-    if (pendingPartnerId) return findThreadForPartner(pendingPartnerId)
-    return undefined
-  }, [threadId, pendingPartnerId, threads, findThreadForPartner])
-
-  const resolvedThreadId = thread?.threadId ?? threadId
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  const messages = resolvedThreadId ? getMessages(resolvedThreadId) : []
-  const messageListState = resolvedThreadId
-    ? getMessageListState(resolvedThreadId)
-    : { status: "idle" as const }
-  const roomInviteSurface = route.params as typeof route.params & ChatRoomInviteSurface
-  const roomInvites = roomInviteSurface.roomInvites ?? EMPTY_ROOM_INVITES
-  const roomInviteActionHandler = roomInviteSurface.onRoomInviteAction
-  const chatLocale = roomInviteSurface.locale ?? (
-    Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith("tr")
-      ? "tr"
-      : "en"
-  )
-  const chatCopy = CHAT_COPY[chatLocale]
-  const threadRoomInvites = useMemo(
-    () =>
-      resolvedThreadId
-        ? roomInvites.filter((invite) => invite.threadId === resolvedThreadId)
-        : EMPTY_ROOM_INVITES,
-    [resolvedThreadId, roomInvites]
-  )
-  const timeline = useMemo(
-    () => buildChatTimeline(messages, threadRoomInvites),
-    [messages, threadRoomInvites]
-  )
-
-  const currentUserId = sessionActor.profile.userId
-
-  const partnerSummary = useMemo(() => {
-    if (!thread) return null
-    return (
-      thread.participants.find((p) => p.userId !== currentUserId) ??
-      thread.participants[0] ??
-      null
-    )
-  }, [currentUserId, thread])
-
-  const partnerName = partnerSummary?.displayName ?? pendingPartnerName ?? chatCopy.unknownPartner
-  const partnerUserId = partnerSummary?.userId ?? pendingPartnerId ?? ""
-  const partnerAvatar = partnerSummary?.avatar
-  const persistedMatch = useMemo(
-    () => thread && sessionActor.session.mode === "production"
-      ? createMatchFromPersistedThread(thread, currentUserId)
-      : null,
-    [currentUserId, sessionActor.session.mode, thread]
-  )
-
-  // Request messages from server when entering thread
-  useEffect(() => {
-    const requestMessages = route.params.requestMessages
-    if (requestMessages && resolvedThreadId) {
-      void requestMessages(resolvedThreadId).catch(() => undefined)
-    }
-  }, [route.params.requestMessages, resolvedThreadId])
-
-  const handleRetryMessages = useCallback((): void => {
-    const requestMessages = route.params.requestMessages
-    if (!requestMessages || !resolvedThreadId) return
-    void requestMessages(resolvedThreadId).catch(() => undefined)
-  }, [resolvedThreadId, route.params.requestMessages])
-
-  useEffect(() => {
-    const markThreadRead = route.params.markThreadRead
-    if (markThreadRead && resolvedThreadId) {
-      markThreadRead(resolvedThreadId)
-    }
-  }, [route.params.markThreadRead, resolvedThreadId])
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    if (messages.length > 0) {
-      const newestMessageId = messages[messages.length - 1]?.messageId
-      const isHistoryPrepend =
-        preserveScrollOnNextHistoryLoadRef.current &&
-        newestMessageId === newestMessageIdRef.current
-      newestMessageIdRef.current = newestMessageId
-      if (isHistoryPrepend) return
-      preserveScrollOnNextHistoryLoadRef.current = false
-      const timer = setTimeout(() => {
-        messageListRef.current?.scrollToEnd({ animated: true })
-      }, 80)
-      return () => clearTimeout(timer)
-    }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [messages.length])
-
-  // Mark thread as active for unread tracking
-  useEffect(() => {
-    if (resolvedThreadId) {
-      setActiveThread(resolvedThreadId)
-    }
-    return () => setActiveThread(null)
-  }, [resolvedThreadId, setActiveThread])
-
-  const handleSend = useCallback(() => {
+  const handleSend = (): void => {
     const body = inputText.trim()
-    if (!body || !resolvedThreadId) return
-
-    const pending = currentUserId
-      ? addOptimisticMessage({
-        threadId: resolvedThreadId,
-        senderUserId: currentUserId,
-        body,
-        trackDelivery: sessionActor.session.mode === "production"
-      })
-      : null
-
-    const sendChatMessage = route.params.sendChatMessage
-    if (sendChatMessage && pending) {
-      void sendChatMessage(resolvedThreadId, body, pending.clientMessageId).catch(() => undefined)
-    }
-    captureProductEvent("chat_message_sent", {
-      mode: sessionActor.session.mode,
-      kind: "text"
-    })
-    setInputText("")
-    hapticLight()
-  }, [addOptimisticMessage, currentUserId, inputText, route.params.sendChatMessage, resolvedThreadId, sessionActor.session.mode])
-
-  const handleRetry = useCallback((messageId: string): void => {
-    const retryable = getRetryableMessage(messageId)
-    const sendChatMessage = route.params.sendChatMessage
-    if (!retryable || !sendChatMessage) return
-    markOptimisticMessageSending(retryable.clientMessageId)
-    void sendChatMessage(
-      retryable.threadId,
-      retryable.body,
-      retryable.clientMessageId
-    ).catch(() => undefined)
-  }, [getRetryableMessage, markOptimisticMessageSending, route.params.sendChatMessage])
-
-  const handleLoadEarlier = useCallback(async (): Promise<void> => {
-    const requestMessages = route.params.requestMessages
-    const before = messages[0]?.messageId
-    if (!requestMessages || !resolvedThreadId || !before || isLoadingEarlier) {
-      return
-    }
-    setIsLoadingEarlier(true)
-    preserveScrollOnNextHistoryLoadRef.current = true
-    try {
-      await requestMessages(resolvedThreadId, { before, limit: 20 })
-    } finally {
-      setIsLoadingEarlier(false)
-    }
-  }, [
-    isLoadingEarlier,
-    messages,
-    resolvedThreadId,
-    route.params.requestMessages
-  ])
-
-  const handleRoomInviteAction = useCallback(
-    (action: ChatRoomInviteAction): void => {
-      if (!roomInviteActionHandler) return
-
-      const actionKey = getRoomInviteActionKey(action)
-      setActiveRoomInviteAction(actionKey)
-      hapticLight()
-      void roomInviteActionHandler(action)
-        .catch(() => undefined)
-        .finally(() => {
-          setActiveRoomInviteAction((current) =>
-            current === actionKey ? null : current
-          )
-        })
-    },
-    [roomInviteActionHandler]
-  )
+    if (!body || isPendingThread) return
+    if (onSend(body)) setInputText("")
+  }
 
   const handleSendPressIn = () => {
     sendScaleAnim.stopAnimation()
@@ -396,6 +249,331 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       ...uiTheme.animation.spring,
     }).start()
   }
+
+  return (
+    <SafeAreaView contentGutter={false} edges={["bottom"]} style={styles.composerSafe}>
+      <View style={styles.composer}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={getRoomInviteCreateLabel(chatLocale)}
+          accessibilityHint={roomInviteDisabledReason ?? undefined}
+          accessibilityState={{
+            busy: isCreatingRoomInvite,
+            disabled: isCreatingRoomInvite
+          }}
+          disabled={isCreatingRoomInvite}
+          onPress={onRoomInvitePress}
+          style={({ pressed }) => [
+            styles.roomInviteButton,
+            pressed ? styles.roomInviteButtonPressed : null,
+            !canCreateRoomInvite || isCreatingRoomInvite
+              ? styles.roomInviteButtonDisabled
+              : null
+          ]}
+        >
+          <Ionicons name="home-outline" size={20} color={uiTheme.colors.primaryDeep} />
+        </Pressable>
+        <View style={styles.inputWrap}>
+          <TextInput
+            accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder={chatCopy.messagePlaceholder}
+            placeholderTextColor={uiTheme.colors.textMuted}
+            multiline
+            maxLength={500}
+          />
+        </View>
+        <Animated.View style={{ transform: [{ scale: sendScaleAnim }] }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
+            accessibilityState={{ disabled: isSendDisabled }}
+            onPress={handleSend}
+            onPressIn={handleSendPressIn}
+            onPressOut={handleSendPressOut}
+            disabled={isSendDisabled}
+            style={({ pressed }) => [
+              styles.sendButton,
+              isSendDisabled ? styles.sendButtonDisabled : null,
+              pressed ? styles.sendButtonPressed : null
+            ]}
+          >
+            <LinearGradient
+              colors={
+                isSendDisabled
+                  ? [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
+                  : uiTheme.gradients.primary as [string, string]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sendButtonGradient}
+            >
+              <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
+      </View>
+    </SafeAreaView>
+  )
+}
+
+export function ChatThreadScreen(props: ChatThreadScreenProps) {
+  const { navigation, route, sessionActor, onThreadCreated } = props
+  const { height: windowHeight } = useWindowDimensions()
+  const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
+  const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
+  const {
+    thread,
+    messages,
+    messageListState,
+    historyReady,
+    addOptimisticMessage,
+    getMessageDeliveryState,
+    getRetryableMessage,
+    markOptimisticMessageSending,
+    setActiveThread
+  } = useChatThreadStore(threadId, pendingPartnerId)
+  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false)
+  const [isCreatingPendingThread, setIsCreatingPendingThread] = useState(false)
+  const [pendingThreadCreationFailed, setPendingThreadCreationFailed] = useState(false)
+  const [reportVisible, setReportVisible] = useState(false)
+  const [activeRoomInviteAction, setActiveRoomInviteAction] = useState<string | null>(null)
+  const pendingThreadRequestRef = useRef<{ key: string; inFlight: boolean }>({
+    key: "",
+    inFlight: false
+  })
+  const automaticAttemptKeyRef = useRef("")
+  const screenMountedRef = useRef(true)
+  const activeUserIdRef = useRef(sessionActor.profile.userId)
+  activeUserIdRef.current = sessionActor.profile.userId
+
+  const resolvedThreadId = thread?.threadId ?? threadId
+  const isPendingThread = !thread && !!pendingPartnerId
+  const roomInviteSurface = route.params as typeof route.params & ChatRoomInviteSurface
+  const roomInvites = roomInviteSurface.roomInvites ?? EMPTY_ROOM_INVITES
+  const roomInviteActionHandler = roomInviteSurface.onRoomInviteAction
+  const closeActiveRoomHandler = roomInviteSurface.onCloseActiveRoom
+  const chatLocale = roomInviteSurface.locale ?? (
+    Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith("tr")
+      ? "tr"
+      : "en"
+  )
+  const chatCopy = CHAT_COPY[chatLocale]
+  const threadRoomInvites = useMemo(
+    () =>
+      resolvedThreadId
+        ? roomInvites.filter((invite) => invite.threadId === resolvedThreadId)
+        : EMPTY_ROOM_INVITES,
+    [resolvedThreadId, roomInvites]
+  )
+  const timeline = useMemo(
+    () => buildChatTimeline(messages, threadRoomInvites),
+    [messages, threadRoomInvites]
+  )
+  // Inverted FlatList starts at offset zero with the newest message visible.
+  // The chronological timeline remains the authority for grouping and dates.
+  const newestFirstTimeline = useMemo(() => [...timeline].reverse(), [timeline])
+  // Do not mount a one-invitation list before the first history page arrives:
+  // otherwise FlatList has already spent its initial render on that lone row.
+  const awaitingInitialHistory = sessionActor.session.mode === "production" &&
+    !historyReady
+
+  const currentUserId = sessionActor.profile.userId
+  const matchedThreadOpener = useMemo(() => {
+    if (!pendingPartnerId || sessionActor.session.mode !== "production") return null
+    return createMatchedChatOpener({
+      createThread: () => createThread(
+        MOBILE_HTTP_BASE_URL,
+        sessionActor.session.sessionToken,
+        { participantUserIds: [currentUserId, pendingPartnerId] }
+      ),
+      onThreadReady: (createdThread) => {
+        if (
+          !createdThread.participantUserIds.includes(currentUserId) ||
+          !createdThread.participantUserIds.includes(pendingPartnerId)
+        ) {
+          throw new Error("That conversation is not available.")
+        }
+        if (
+          screenMountedRef.current &&
+          activeUserIdRef.current === currentUserId
+        ) {
+          onThreadCreated(createdThread)
+        }
+      }
+    })
+  }, [
+    currentUserId,
+    onThreadCreated,
+    pendingPartnerId,
+    sessionActor.session.mode,
+    sessionActor.session.sessionToken
+  ])
+
+  const openPendingMatchedThread = useCallback(async (): Promise<void> => {
+    if (!isPendingThread || !pendingPartnerId || !matchedThreadOpener) return
+    const requestKey = `${currentUserId}:${pendingPartnerId}`
+    if (
+      pendingThreadRequestRef.current.key === requestKey &&
+      pendingThreadRequestRef.current.inFlight
+    ) return
+    pendingThreadRequestRef.current = { key: requestKey, inFlight: true }
+    if (screenMountedRef.current) {
+      setPendingThreadCreationFailed(false)
+      setIsCreatingPendingThread(true)
+    }
+    try {
+      const result = await matchedThreadOpener()
+      if (screenMountedRef.current && activeUserIdRef.current === currentUserId) {
+        setPendingThreadCreationFailed(result.status === "failed")
+      }
+    } finally {
+      if (pendingThreadRequestRef.current.key === requestKey) {
+        pendingThreadRequestRef.current = { key: requestKey, inFlight: false }
+      }
+      if (screenMountedRef.current && activeUserIdRef.current === currentUserId) {
+        setIsCreatingPendingThread(false)
+      }
+    }
+  }, [currentUserId, isPendingThread, matchedThreadOpener, pendingPartnerId])
+
+  const partnerSummary = useMemo(() => {
+    if (!thread) return null
+    return (
+      thread.participants.find((p) => p.userId !== currentUserId) ??
+      thread.participants[0] ??
+      null
+    )
+  }, [currentUserId, thread])
+
+  const partnerName = partnerSummary?.displayName ?? pendingPartnerName ?? chatCopy.unknownPartner
+  const partnerUserId = partnerSummary?.userId ?? pendingPartnerId ?? ""
+  const partnerAvatar = partnerSummary?.avatar
+  const persistedMatch = useMemo(
+    () => thread && sessionActor.session.mode === "production"
+      ? createMatchFromPersistedThread(thread, currentUserId)
+      : null,
+    [currentUserId, sessionActor.session.mode, thread]
+  )
+
+  useEffect(() => {
+    screenMountedRef.current = true
+    return () => { screenMountedRef.current = false }
+  }, [])
+
+  useEffect(() => {
+    if (!isPendingThread || sessionActor.session.mode !== "production" || !pendingPartnerId) return
+    const requestKey = `${currentUserId}:${pendingPartnerId}`
+    if (automaticAttemptKeyRef.current === requestKey) return
+    automaticAttemptKeyRef.current = requestKey
+    void openPendingMatchedThread()
+  }, [
+    currentUserId,
+    isPendingThread,
+    openPendingMatchedThread,
+    pendingPartnerId,
+    sessionActor.session.mode
+  ])
+
+  // Request messages from server when entering thread
+  useEffect(() => {
+    const requestMessages = route.params.requestMessages
+    if (requestMessages && resolvedThreadId) {
+      void requestMessages(resolvedThreadId).catch(() => undefined)
+    }
+  }, [route.params.requestMessages, resolvedThreadId])
+
+  const handleRetryMessages = useCallback((): void => {
+    const requestMessages = route.params.requestMessages
+    if (!requestMessages || !resolvedThreadId) return
+    void requestMessages(resolvedThreadId).catch(() => undefined)
+  }, [resolvedThreadId, route.params.requestMessages])
+
+  useEffect(() => {
+    const markThreadRead = route.params.markThreadRead
+    if (markThreadRead && resolvedThreadId) {
+      markThreadRead(resolvedThreadId)
+    }
+  }, [route.params.markThreadRead, resolvedThreadId])
+
+  // Mark thread as active for unread tracking
+  useEffect(() => {
+    if (resolvedThreadId) {
+      setActiveThread(resolvedThreadId)
+    }
+    return () => setActiveThread(null)
+  }, [resolvedThreadId, setActiveThread])
+
+  const handleSend = useCallback((body: string): boolean => {
+    const sendChatMessage = route.params.sendChatMessage
+    if (!resolvedThreadId || !currentUserId || !sendChatMessage) return false
+
+    const pending = addOptimisticMessage({
+      threadId: resolvedThreadId,
+      senderUserId: currentUserId,
+      body,
+      trackDelivery: sessionActor.session.mode === "production"
+    })
+
+    void sendChatMessage(resolvedThreadId, body, pending.clientMessageId).catch(() => undefined)
+    captureProductEvent("chat_message_sent", {
+      mode: sessionActor.session.mode,
+      kind: "text"
+    })
+    hapticLight()
+    return true
+  }, [addOptimisticMessage, currentUserId, route.params.sendChatMessage, resolvedThreadId, sessionActor.session.mode])
+
+  const handleRetry = useCallback((messageId: string): void => {
+    const retryable = getRetryableMessage(messageId)
+    const sendChatMessage = route.params.sendChatMessage
+    if (!retryable || !sendChatMessage) return
+    markOptimisticMessageSending(retryable.clientMessageId)
+    void sendChatMessage(
+      retryable.threadId,
+      retryable.body,
+      retryable.clientMessageId
+    ).catch(() => undefined)
+  }, [getRetryableMessage, markOptimisticMessageSending, route.params.sendChatMessage])
+
+  const handleLoadEarlier = useCallback(async (): Promise<void> => {
+    const requestMessages = route.params.requestMessages
+    const before = messages[0]?.messageId
+    if (!requestMessages || !resolvedThreadId || !before || isLoadingEarlier) {
+      return
+    }
+    setIsLoadingEarlier(true)
+    try {
+      await requestMessages(resolvedThreadId, { before, limit: 20 })
+    } finally {
+      setIsLoadingEarlier(false)
+    }
+  }, [
+    isLoadingEarlier,
+    messages,
+    resolvedThreadId,
+    route.params.requestMessages
+  ])
+
+  const handleRoomInviteAction = useCallback(
+    (action: ChatRoomInviteAction, onError?: (error: unknown) => void): void => {
+      if (!roomInviteActionHandler) return
+
+      const actionKey = getRoomInviteActionKey(action)
+      setActiveRoomInviteAction(actionKey)
+      hapticLight()
+      void roomInviteActionHandler(action)
+        .catch((error: unknown) => { onError?.(error) })
+        .finally(() => {
+          setActiveRoomInviteAction((current) =>
+            current === actionKey ? null : current
+          )
+        })
+    },
+    [roomInviteActionHandler]
+  )
 
   const handleGoBack = (): void => {
     goBackOrFallback(navigation, () => navigation.replace("Inbox"))
@@ -425,7 +603,6 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     )
   }
 
-  const isPendingThread = !thread && !!pendingPartnerId
   const canCreateRoomInvite = Boolean(
     resolvedThreadId &&
       !isPendingThread &&
@@ -455,14 +632,56 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       )
       return
     }
-    handleRoomInviteAction(createRoomInviteAction)
+    const retryInvite = roomInviteActionHandler
+    if (!retryInvite) return
+    handleRoomInviteAction(createRoomInviteAction, (error) => {
+      if (!(error instanceof RoomInviteApiError) || error.code !== "SELF_IN_ROOM") return
+      if (!closeActiveRoomHandler || !error.roomSessionId) {
+        Alert.alert(chatCopy.roomInviteUnavailableTitle, chatCopy.roomInviteCloseFailed)
+        return
+      }
+      const previousRoomId = error.roomSessionId
+      Alert.alert(chatCopy.roomInviteUnavailableTitle, chatCopy.roomInviteClosePreviousBody, [
+        { text: chatCopy.cancel, style: "cancel" },
+        {
+          text: chatCopy.roomInviteClosePreviousAction,
+          onPress: () => {
+            const action = createRoomInviteAction
+            const actionKey = getRoomInviteActionKey(action)
+            const currentUserId = sessionActor.profile.userId
+            setActiveRoomInviteAction(actionKey)
+            void (async () => {
+              try {
+                await closeActiveRoomHandler(previousRoomId)
+              } catch {
+                if (!screenMountedRef.current || activeUserIdRef.current !== currentUserId) return
+                Alert.alert(chatCopy.roomInviteUnavailableTitle, chatCopy.roomInviteCloseFailed)
+                return
+              }
+              if (!screenMountedRef.current || activeUserIdRef.current !== currentUserId) return
+              try {
+                await retryInvite(action)
+              } catch {
+                if (screenMountedRef.current && activeUserIdRef.current === currentUserId) {
+                  Alert.alert(chatCopy.roomInviteUnavailableTitle, chatCopy.roomInviteRetryFailed)
+                }
+              }
+            })().finally(() => {
+              if (screenMountedRef.current && activeUserIdRef.current === currentUserId) {
+                setActiveRoomInviteAction((current) => current === actionKey ? null : current)
+              }
+            })
+          }
+        }
+      ])
+    })
   }
 
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
-        <Animated.View style={[styles.chatHeader, headerAnim]}>
+        <View style={styles.chatHeader}>
           <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={handleGoBack} size={40}>
             <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
           </ActionButtonCircle>
@@ -497,7 +716,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           >
             <Ionicons name="ellipsis-horizontal" size={20} color={uiTheme.colors.textSecondary} />
           </Pressable>
-        </Animated.View>
+        </View>
 
         <ReportModal
           visible={reportVisible}
@@ -512,10 +731,40 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
         >
-          {timeline.length === 0 || isPendingThread ? (
+          {timeline.length === 0 || isPendingThread || awaitingInitialHistory ? (
             <View style={styles.emptyChat}>
               <View style={styles.emptyChatGlow} pointerEvents="none" />
-              {messageListState.status === "failed" && !isPendingThread ? (
+              {isPendingThread && pendingThreadCreationFailed ? (
+                <View accessibilityRole="alert" style={styles.messageLoadState}>
+                  <Ionicons
+                    name="cloud-offline-outline"
+                    size={34}
+                    color={uiTheme.colors.primaryDeep}
+                  />
+                  <Text style={styles.emptyChatTitle}>{chatCopy.pendingCreationFailed}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={chatCopy.retryOpenChat}
+                    accessibilityState={{ disabled: isCreatingPendingThread }}
+                    onPress={() => { void openPendingMatchedThread() }}
+                    disabled={isCreatingPendingThread}
+                    style={({ pressed }) => [
+                      styles.retryMessagesButton,
+                      pressed ? styles.retryMessagesButtonPressed : null,
+                      isCreatingPendingThread ? styles.retryMessagesButtonDisabled : null
+                    ]}
+                  >
+                    <Ionicons
+                      name="refresh"
+                      size={18}
+                      color={uiTheme.colors.primaryDeep}
+                    />
+                    <Text style={styles.retryMessagesText}>
+                      {isCreatingPendingThread ? chatCopy.openingChat : chatCopy.retryOpenChat}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : messageListState.status === "failed" && !isPendingThread ? (
                 <View accessibilityRole="alert" style={styles.messageLoadState}>
                   <Ionicons
                     name="cloud-offline-outline"
@@ -569,15 +818,16 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             </View>
           ) : (
             <FlatList
-              ref={messageListRef}
-              data={timeline}
+              data={newestFirstTimeline}
+              inverted
+              initialNumToRender={initialMessageRenderCount}
               keyExtractor={getChatTimelineItemKey}
               style={styles.messageListContainer}
               contentContainerStyle={styles.messageListContent}
               showsVerticalScrollIndicator={false}
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              ListHeaderComponent={
-                sessionActor.session.mode === "production" && timeline.length > 0 ? (
+              maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
+              ListFooterComponent={
+                sessionActor.session.mode === "production" && messages.length > 0 ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={chatCopy.loadEarlier}
@@ -596,31 +846,23 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                   </Pressable>
                 ) : null
               }
-              onContentSizeChange={() => {
-                if (preserveScrollOnNextHistoryLoadRef.current) {
-                  preserveScrollOnNextHistoryLoadRef.current = false
-                  return
-                }
-                messageListRef.current?.scrollToEnd({ animated: true })
-              }}
               renderItem={({ item, index }) => {
+                const chronologicalIndex = timeline.length - 1 - index
                 const isRoomInvite = item.kind === "room_invite"
                 const isMe = isRoomInvite
                   ? item.senderUserId === currentUserId
                   : item.message.senderUserId === currentUserId
-                const isOptimistic =
-                  item.kind === "message" && item.message.messageId.startsWith("__local_")
                 const deliveryState = item.kind === "message"
                   ? getMessageDeliveryState(item.message.messageId)
                   : "sent"
                 const groupPosition = item.kind === "message"
-                  ? getChatMessageGroupPosition(timeline, index)
+                  ? getChatMessageGroupPosition(timeline, chronologicalIndex)
                   : "single"
                 const closesGroup = groupPosition === "single" || groupPosition === "last"
 
                 // Day separator
                 const itemDate = new Date(item.createdAt)
-                const previousItem = index > 0 ? timeline[index - 1] : null
+                const previousItem = chronologicalIndex > 0 ? timeline[chronologicalIndex - 1] : null
                 const prevDate = previousItem ? new Date(previousItem.createdAt) : null
                 const showDateSep =
                   !prevDate ||
@@ -628,7 +870,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                 const dateLabel = showDateSep ? formatDateSeparator(itemDate, chatLocale) : null
 
                 return (
-                  <MessageBubbleAnimated key={getChatTimelineItemKey(item)} index={index}>
+                  <View>
                     {dateLabel ? (
                       <View style={bubbleStyles.dateSep}>
                         <View style={bubbleStyles.dateSepPill}>
@@ -640,8 +882,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                       style={[
                         bubbleStyles.row,
                         isMe ? bubbleStyles.rowMe : bubbleStyles.rowThem,
-                        closesGroup ? bubbleStyles.rowGroupEnd : bubbleStyles.rowGroupInner,
-                        isOptimistic ? { opacity: 0.65 } : null
+                        closesGroup ? bubbleStyles.rowGroupEnd : bubbleStyles.rowGroupInner
                       ]}
                     >
                     {isRoomInvite ? (
@@ -692,106 +933,50 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                             >
                               {formatMessageTime(item.message.sentAt)}
                             </Text>
+                            {isMe && deliveryState === "sending" ? (
+                              <Ionicons
+                                accessibilityLabel={chatCopy.sending}
+                                name="time-outline"
+                                size={14}
+                                color={uiTheme.colors.textMuted}
+                              />
+                            ) : null}
                             {isMe && deliveryState === "sent" ? (
                               <Ionicons name="checkmark" size={14} color="#C4537C" />
                             ) : null}
                           </View>
                         </View>
-                        {isMe && deliveryState !== "sent" ? (
-                          deliveryState === "failed" ? (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={chatCopy.tryAgain}
-                              onPress={() => handleRetry(item.message.messageId)}
-                            >
-                              <Text style={[bubbleStyles.time, bubbleStyles.timeMe, { marginTop: 3, textDecorationLine: "underline" }]}>
-                                {chatCopy.notSent} · {chatCopy.tryAgain}
-                              </Text>
-                            </Pressable>
-                          ) : (
-                            <Text style={[bubbleStyles.time, bubbleStyles.timeMe, { marginTop: 3 }]}>
-                              {chatCopy.sending}
+                        {isMe && deliveryState === "failed" ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={chatCopy.tryAgain}
+                            onPress={() => handleRetry(item.message.messageId)}
+                          >
+                            <Text style={[bubbleStyles.time, bubbleStyles.timeMe, { marginTop: 3, textDecorationLine: "underline" }]}>
+                              {chatCopy.notSent} · {chatCopy.tryAgain}
                             </Text>
-                          )
+                          </Pressable>
                         ) : null}
                       </View>
                     )}
                     </View>
-                  </MessageBubbleAnimated>
+                  </View>
                 )
               }}
             />
           )}
 
-          <SafeAreaView contentGutter={false} edges={["bottom"]} style={styles.composerSafe}>
-            <View style={styles.composer}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={getRoomInviteCreateLabel(chatLocale)}
-                accessibilityHint={roomInviteDisabledReason ?? undefined}
-                accessibilityState={{
-                  busy: isCreatingRoomInvite,
-                  disabled: isCreatingRoomInvite
-                }}
-                disabled={isCreatingRoomInvite}
-                onPress={handleRoomInvitePress}
-                style={({ pressed }) => [
-                  styles.roomInviteButton,
-                  pressed ? styles.roomInviteButtonPressed : null,
-                  !canCreateRoomInvite || isCreatingRoomInvite
-                    ? styles.roomInviteButtonDisabled
-                    : null
-                ]}
-              >
-                <Ionicons name="home-outline" size={20} color={uiTheme.colors.primaryDeep} />
-              </Pressable>
-              <View style={styles.inputWrap}>
-                <TextInput
-                  accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
-                  style={styles.input}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder={chatCopy.messagePlaceholder}
-                  placeholderTextColor={uiTheme.colors.textMuted}
-                  multiline
-                  maxLength={500}
-                />
-              </View>
-              <Animated.View style={{ transform: [{ scale: sendScaleAnim }] }}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
-                  accessibilityState={{
-                    disabled: inputText.trim().length === 0 || isPendingThread
-                  }}
-                  onPress={handleSend}
-                  onPressIn={handleSendPressIn}
-                  onPressOut={handleSendPressOut}
-                  disabled={inputText.trim().length === 0 || isPendingThread}
-                  style={({ pressed }) => [
-                    styles.sendButton,
-                    (inputText.trim().length === 0 || isPendingThread)
-                      ? styles.sendButtonDisabled
-                      : null,
-                    pressed ? styles.sendButtonPressed : null
-                  ]}
-                >
-                  <LinearGradient
-                    colors={
-                      inputText.trim().length === 0 || isPendingThread
-                        ? [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
-                        : uiTheme.gradients.primary as [string, string]
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.sendButtonGradient}
-                  >
-                    <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
-                  </LinearGradient>
-                </Pressable>
-              </Animated.View>
-            </View>
-          </SafeAreaView>
+          <ChatComposer
+            chatCopy={chatCopy}
+            partnerName={partnerName}
+            chatLocale={chatLocale}
+            isPendingThread={isPendingThread}
+            canCreateRoomInvite={canCreateRoomInvite}
+            isCreatingRoomInvite={isCreatingRoomInvite}
+            roomInviteDisabledReason={roomInviteDisabledReason}
+            onRoomInvitePress={handleRoomInvitePress}
+            onSend={handleSend}
+          />
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -927,6 +1112,9 @@ const styles = StyleSheet.create({
   },
   retryMessagesButtonPressed: {
     opacity: 0.82,
+  },
+  retryMessagesButtonDisabled: {
+    opacity: 0.6,
   },
   retryMessagesText: {
     ...uiTheme.font.bodyBold,

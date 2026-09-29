@@ -58,7 +58,7 @@ export function MiniRoomRigPreviewScreen(props: MiniRoomRigPreviewScreenProps) {
 
   return (
     <MiniRoomScene
-      copy={getMiniRoomCopy("en")}
+      copy={getMiniRoomCopy("tr")}
       localUser={localUser}
       partnerUser={PARTNER}
       participantAvatarSnapshots={participantAvatarSnapshots}
@@ -73,8 +73,8 @@ export function MiniRoomRigPreviewScreen(props: MiniRoomRigPreviewScreenProps) {
       onToggleMic={() => undefined}
       inRoomMessages={[]}
       consumeInRoomMessage={() => undefined}
-      canChatSend={false}
-      onSendRoomMessage={() => false}
+      canChatSend={true}
+      onSendRoomMessage={() => true}
     />
   )
 }

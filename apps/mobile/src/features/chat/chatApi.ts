@@ -37,19 +37,36 @@ export async function fetchChatThreads(
   baseHttpUrl: string,
   sessionToken: string,
   fetcher: typeof fetch = fetch,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { syncMatches?: boolean } = {}
 ): Promise<ChatThreadList> {
   const threads = new Map<string, ChatThread>()
   const seenCursors = new Set<string>()
   let cursor: string | undefined
   let userId: string | undefined
   do {
-    const { response, payload } = await requestJson(
-      baseHttpUrl,
-      `/v1/threads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
-      { headers: createAuthenticatedHeaders(sessionToken), signal },
+    const regularPath = `/v1/threads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
+    const syncFirstPage = !cursor && options.syncMatches
+    const requestPage = (path: string, method: "POST" | "GET") => requestJson(
+      baseHttpUrl, path,
+      { method, headers: createAuthenticatedHeaders(sessionToken), signal },
       fetcher
     )
+    let result: Awaited<ReturnType<typeof requestPage>>
+    if (syncFirstPage) {
+      try {
+        result = await requestPage("/v1/threads/sync-matches", "POST")
+      } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error
+        result = await requestPage(regularPath, "GET")
+      }
+      if (!result.response.ok && ![401, 403, 429].includes(result.response.status)) {
+        result = await requestPage(regularPath, "GET")
+      }
+    } else {
+      result = await requestPage(regularPath, "GET")
+    }
+    const { response, payload } = result
     if (!response.ok) {
       throw new Error(getApiErrorMessage(payload, "We could not refresh your chats yet."))
     }

@@ -88,11 +88,19 @@ export function createEconomyService(
           existing?.ownedAvatarItemIds ?? []
         )
       ]
+      const requiredRoomItemIds = getDefaultOwnedItemIds("room")
+      if (
+        existing &&
+        requiredAvatarItemIds.every((itemId) => existing.ownedAvatarItemIds.includes(itemId)) &&
+        requiredRoomItemIds.every((itemId) => existing.ownedRoomItemIds.includes(itemId))
+      ) {
+        return existing
+      }
       return repository.ensureInventory({
         userId,
         starterCoins: STARTER_COIN_BALANCE,
         requiredAvatarItemIds,
-        requiredRoomItemIds: getDefaultOwnedItemIds("room"),
+        requiredRoomItemIds,
         updatedAt: now.toISOString()
       })
     },

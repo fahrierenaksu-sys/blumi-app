@@ -13,14 +13,9 @@ test("wardrobe keeps the studio header focused without the beta status pill", ()
   assert.doesNotMatch(stylesSource, /connectionPill|connectionDot|connectionPillText|statusPill/)
 })
 
-test("wardrobe slot rail gives equipped products a readable preview footprint", () => {
-  assert.match(stylesSource, /equippedSlotsRail:\s*\{[\s\S]*?width:\s*108,/)
-  assert.match(stylesSource, /equippedSlotPreview:\s*\{[\s\S]*?width:\s*46,[\s\S]*?height:\s*50,/)
-  assert.match(stylesSource, /equippedSlotLabel:\s*\{[\s\S]*?fontSize:\s*10,/)
-  assert.match(
-    readFileSync(join(here, "components/WardrobeEquippedSlotsRail.tsx"), "utf8"),
-    /getWardrobeEquippedSlotPreviewScale\(slot\.item\?\.type \?\? "accessory"\)/
-  )
+test("wardrobe places the avatar preview above the product list without the retired side rail", () => {
+  assert.match(stylesSource, /previewAndSlots:\s*\{[\s\S]*?flexDirection:\s*"column",/)
+  assert.doesNotMatch(screenSource, /WardrobeEquippedSlotsRail/)
 })
 
 test("standard wardrobe view disables vertical scroll and bounce", () => {
@@ -30,8 +25,8 @@ test("standard wardrobe view disables vertical scroll and bounce", () => {
 })
 
 test("standard wardrobe composition reserves room for the first product row", () => {
-  assert.match(screenSource, /size=\{190\}/)
-  assert.match(screenSource, /stageHeight=\{240\}/)
+  assert.match(screenSource, /size=\{180\}/)
+  assert.match(screenSource, /stageHeight=\{228\}/)
   assert.match(stylesSource, /itemPreviewStage:\s*\{[\s\S]*?height:\s*88,/)
   assert.match(stylesSource, /itemCard:\s*\{[\s\S]*?minHeight:\s*164,[\s\S]*?padding:\s*8,/)
 })

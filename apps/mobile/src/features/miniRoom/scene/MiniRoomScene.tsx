@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { BlurTargetView, BlurView } from "expo-blur"
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
 import {
   Animated,
@@ -10,7 +11,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  useWindowDimensions
 } from "react-native"
 import {
   memo,
@@ -19,11 +21,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { InRoomChatMessageEvent } from "../useInRoomChat"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
+import { ROOM_V2_OUTSIDE_COLOR } from "../../roomV2/roomV2Camera"
 import { uiTheme } from "../../../ui/theme"
 import { useReducedMotion } from "../../../ui/animations"
 import { AvatarLayer } from "./AvatarLayer"
@@ -43,6 +48,7 @@ import {
 } from "./miniRoomReducedMotion"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
 import type { MiniRoomCopy } from "../miniRoomCopy"
+import { resolveMiniRoomPresentation } from "./miniRoomPresentation"
 
 interface MiniRoomSceneProps {
   copy: MiniRoomCopy
@@ -110,9 +116,21 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     [reduceMotion]
   )
   const [stageSize, setStageSize] = useState({
-    width: ROOM_STAGE_SIZE,
-    height: ROOM_STAGE_SIZE
+    width: ROOM_STAGE_CAMERA_FALLBACK_WIDTH,
+    height: ROOM_STAGE_CAMERA_FALLBACK_HEIGHT
   })
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const viewport = useWindowDimensions()
+  const safeAreaInsets = useSafeAreaInsets()
+  const blurTargetRef = useRef<View | null>(null)
+  const presentation = useMemo(
+    () => resolveMiniRoomPresentation({
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      keyboardVisible
+    }),
+    [keyboardVisible, viewport.height, viewport.width]
+  )
   const {
     dismissSpeechBubble,
     moveLocalAvatar,
@@ -124,6 +142,17 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const welcomeValueRef = useRef(new Animated.Value(0)).current
   const [partnerJustJoined, setPartnerJustJoined] = useState(true)
   const [composerText, setComposerText] = useState("")
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true))
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false))
+    return () => {
+      showSubscription.remove()
+      hideSubscription.remove()
+    }
+  }, [])
 
   useEffect(() => {
     entryValueRef.stopAnimation()
@@ -261,94 +290,139 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     store.interaction.proximityClose && connectionStatus === "connected"
 
   const composerDisabled = !canChatSend
+  const roomCamera = roomDecorScene?.shell
+    ? {
+        width: `${presentation.cameraWidthPercent}%` as `${number}%`,
+        top: presentation.cameraTop,
+        aspectRatio:
+          roomDecorScene.shell.canvasSize.width /
+          roomDecorScene.shell.canvasSize.height,
+        backgroundColor: "transparent"
+      }
+    : null
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.roomWrap}>
-        <Animated.View
-          style={[
-            styles.roomStageFrame,
-            {
-              opacity: entryOpacity,
-              transform: [
-                { translateY: entryTranslateY },
-                { scale: entryScale }
-              ]
-            }
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.moveAvatar}
-            accessibilityHint={copy.moveAvatarHint}
-            style={styles.roomStage}
-            onLayout={handleStageLayout}
-            onPress={handleRoomPress}
+      <BlurTargetView ref={blurTargetRef} style={styles.blurTarget}>
+        <View style={styles.roomWrap}>
+          <Animated.View
+            style={[
+              styles.roomStageFrame,
+              {
+                opacity: entryOpacity,
+                transform: [
+                  { translateY: entryTranslateY },
+                  { scale: entryScale }
+                ]
+              }
+            ]}
           >
-            {roomDecorScene?.shell ? (
-              <StableMiniRoomRoomDecorLayer
-                scene={roomDecorScene}
-                interaction={store.interaction}
-              />
+            {roomCamera && roomDecorScene ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={copy.moveAvatar}
+                accessibilityHint={copy.moveAvatarHint}
+                style={[
+                  styles.roomWorldCamera,
+                  {
+                    width: roomCamera.width,
+                    top: roomCamera.top,
+                    aspectRatio: roomCamera.aspectRatio,
+                    backgroundColor: roomCamera.backgroundColor
+                  }
+                ]}
+                onLayout={handleStageLayout}
+                onPress={handleRoomPress}
+              >
+                <StableMiniRoomRoomDecorLayer
+                  scene={roomDecorScene}
+                  interaction={store.interaction}
+                />
+                <StableHotspotLayer
+                  hotspots={store.hotspots}
+                  interaction={store.interaction}
+                  stageWidth={stageSize.width}
+                  stageHeight={stageSize.height}
+                  onSelect={handleHotspotSelect}
+                  disabled={connectionStatus !== "connected"}
+                />
+                <TogetherHeartOverlay active={closeTogether} motionPolicy={motionPolicy} />
+                <AvatarLayer
+                  avatars={store.avatars}
+                  localUserId={localUser.userId}
+                  localUserLabel={copy.youLabel}
+                  bubbles={store.bubbles}
+                  onDismissBubble={dismissSpeechBubble}
+                  dismissBubbleLabel={copy.dismissRoomMessage}
+                  partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
+                  motionPolicy={motionPolicy}
+                />
+                <Animated.View
+                  style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
+                  pointerEvents="none"
+                >
+                  <Text style={styles.welcomeText} numberOfLines={1}>
+                    {copy.welcome(partnerFirstName)}
+                  </Text>
+                </Animated.View>
+              </Pressable>
             ) : (
-              <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={copy.moveAvatar}
+                accessibilityHint={copy.moveAvatarHint}
+                style={styles.legacyRoomStage}
+                onLayout={handleStageLayout}
+                onPress={handleRoomPress}
+              >
+                <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
+                <StableHotspotLayer
+                  hotspots={store.hotspots}
+                  interaction={store.interaction}
+                  stageWidth={stageSize.width}
+                  stageHeight={stageSize.height}
+                  onSelect={handleHotspotSelect}
+                  disabled={connectionStatus !== "connected"}
+                />
+                <AvatarLayer
+                  avatars={store.avatars}
+                  localUserId={localUser.userId}
+                  localUserLabel={copy.youLabel}
+                  bubbles={store.bubbles}
+                  onDismissBubble={dismissSpeechBubble}
+                  dismissBubbleLabel={copy.dismissRoomMessage}
+                  partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
+                  motionPolicy={motionPolicy}
+                />
+              </Pressable>
             )}
-            <StableHotspotLayer
-              hotspots={store.hotspots}
-              interaction={store.interaction}
-              stageWidth={stageSize.width}
-              stageHeight={stageSize.height}
-              onSelect={handleHotspotSelect}
-              disabled={connectionStatus !== "connected"}
-            />
-            <TogetherHeartOverlay
-              active={closeTogether}
-              motionPolicy={motionPolicy}
-            />
-            <AvatarLayer
-              avatars={store.avatars}
-              localUserId={localUser.userId}
-              bubbles={store.bubbles}
-              onDismissBubble={dismissSpeechBubble}
-              dismissBubbleLabel={copy.dismissRoomMessage}
-              partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
-              motionPolicy={motionPolicy}
-            />
+          </Animated.View>
+        </View>
+      </BlurTargetView>
 
-            <Animated.View
-              style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
-              pointerEvents="none"
-            >
-              <Text style={styles.welcomeText} numberOfLines={1}>
-                {copy.welcome(partnerFirstName)}
-              </Text>
-            </Animated.View>
-          </Pressable>
-        </Animated.View>
-      </View>
-
-      <SafeAreaView
-        contentGutter={false}
-        edges={["top", "left", "right"]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="box-none"
-      >
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         <StableMiniRoomHud
+          partnerFirstName={partnerFirstName}
           connectionStatus={connectionStatus}
           voiceAvailable={voiceAvailable}
           localMedia={localMedia}
           copy={copy}
           leaveDisabled={leaveDisabled}
+          horizontalInset={presentation.chromeHorizontalInset}
+          gap={presentation.chromeGap}
+          topInset={safeAreaInsets.top}
+          blurTarget={blurTargetRef}
           onLeave={onLeave}
           onOpenSafety={onOpenSafety}
           onRetryConnect={onRetryConnect}
           onToggleMic={onToggleMic}
         />
-      </SafeAreaView>
+      </View>
 
+      <View style={styles.keyboardFlex} pointerEvents="none" />
       <SafeAreaView contentGutter={false} edges={["bottom"]} style={styles.composerSafeArea}>
         <RoomChatComposer
           value={composerText}
@@ -356,6 +430,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
           onChangeText={handleComposerChange}
           onSubmit={handleSubmitComposer}
           disabled={composerDisabled}
+          blurTarget={blurTargetRef}
+          horizontalInset={presentation.composerHorizontalInset}
+          verticalInset={presentation.composerVerticalInset}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -366,28 +443,58 @@ interface RoomChatComposerProps {
   copy: MiniRoomCopy
   value: string
   disabled: boolean
+  blurTarget: RefObject<View | null>
+  horizontalInset: number
+  verticalInset: number
   onChangeText: (value: string) => void
   onSubmit: () => void
 }
 
 const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerProps) {
-  const { copy, value, disabled, onChangeText, onSubmit } = props
+  const {
+    copy,
+    value,
+    disabled,
+    blurTarget,
+    horizontalInset,
+    verticalInset,
+    onChangeText,
+    onSubmit
+  } = props
   return (
-    <View style={styles.composerWrap}>
+    <View
+      style={[
+        styles.composerWrap,
+        {
+          paddingHorizontal: horizontalInset,
+          paddingVertical: verticalInset
+        }
+      ]}
+    >
       <View style={styles.composerBar}>
+        <BlurView
+          blurTarget={blurTarget}
+          blurMethod="dimezisBlurViewSdk31Plus"
+          intensity={72}
+          tint="systemUltraThinMaterialLight"
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={styles.composerGlassTint} />
+        <View pointerEvents="none" style={styles.composerHighlight} />
         <TextInput
           accessibilityLabel={copy.roomMessage}
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmit}
           placeholder={copy.roomMessagePlaceholder}
-          placeholderTextColor="rgba(255, 255, 255, 0.4)"
+          placeholderTextColor="rgba(76, 53, 72, 0.52)"
           maxLength={140}
           returnKeyType="send"
           blurOnSubmit
           style={styles.composerInput}
           editable={!disabled}
-          keyboardAppearance="dark"
+          keyboardAppearance="light"
         />
         <Pressable
           accessibilityRole="button"
@@ -401,7 +508,7 @@ const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerP
             pressed ? styles.composerSendPressed : null
           ]}
         >
-          <Text style={styles.composerSendText}>↑</Text>
+          <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
         </Pressable>
       </View>
     </View>
@@ -483,69 +590,69 @@ const TogetherHeartOverlay = memo(function TogetherHeartOverlay(
       >
           <Ionicons
             accessible={false}
-            name="heart"
-            size={23}
-            color={uiTheme.colors.primary}
+            name="sparkles-outline"
+            size={21}
+            color={uiTheme.colors.brandLavender}
           />
       </Animated.View>
     </View>
   )
 })
 
-const ROOM_STAGE_SIZE = 390
+const ROOM_STAGE_CAMERA_FALLBACK_WIDTH = 920
+const ROOM_STAGE_CAMERA_FALLBACK_HEIGHT = 524
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#1E0F1E",
+    backgroundColor: ROOM_V2_OUTSIDE_COLOR
+  },
+  blurTarget: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: ROOM_V2_OUTSIDE_COLOR
   },
   roomWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingTop: 40,
-    paddingBottom: 40,
+    ...StyleSheet.absoluteFill,
+    overflow: "hidden",
+    alignItems: "center"
   },
   roomStageFrame: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center"
+  },
+  roomWorldCamera: {
+    position: "absolute",
+    alignSelf: "center",
+    overflow: "visible"
+  },
+  legacyRoomStage: {
     width: "100%",
     maxWidth: 420,
     aspectRatio: 1,
-  },
-  roomStage: {
-    flex: 1,
-    borderRadius: 40,
     overflow: "hidden",
-    backgroundColor: "#F8ECF2",
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.25)",
-    shadowColor: "#FF8EBE",
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
+    backgroundColor: "#F8ECF2"
   },
   /* ── Welcome Ribbon ────────────── */
   welcomeRibbon: {
     position: "absolute",
-    top: 20,
+    top: 72,
     alignSelf: "center",
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(20, 8, 18, 0.72)",
+    backgroundColor: "rgba(255, 255, 255, 0.78)",
     borderWidth: 1,
-    borderColor: "rgba(255, 180, 210, 0.35)",
+    borderColor: "rgba(255, 255, 255, 0.86)",
   },
   welcomeText: {
     ...uiTheme.font.micro,
-    color: "#FFE4F0",
+    color: uiTheme.colors.brandPlum,
     letterSpacing: 0.4,
   },
   /* ── Together Heart ────────────── */
   togetherWrap: {
     position: "absolute",
-    top: "30%",
+    top: "34%",
     left: 0,
     right: 0,
     alignItems: "center",
@@ -554,47 +661,69 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.88)",
+    backgroundColor: "rgba(255, 255, 255, 0.78)",
     borderWidth: 1,
-    borderColor: "rgba(255, 100, 160, 0.6)",
-    shadowColor: "#FF6AA1",
-    shadowOpacity: 0.3,
+    borderColor: "rgba(221, 205, 255, 0.78)",
+    shadowColor: "#B8A9E8",
+    shadowOpacity: 0.24,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
   composerSafeArea: {
     backgroundColor: "transparent",
+    zIndex: 20
+  },
+  keyboardFlex: {
+    flex: 1
   },
   composerWrap: {
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingVertical: uiTheme.spacing.md,
-    alignItems: "stretch",
-    gap: 12,
+    alignItems: "stretch"
   },
   composerBar: {
+    minHeight: 62,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingLeft: 20,
+    paddingRight: 7,
+    paddingVertical: 7,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
+    borderColor: "rgba(255, 255, 255, 0.78)",
+    shadowColor: "#D8B7E8",
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 8
+  },
+  composerGlassTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255, 247, 252, 0.76)"
+  },
+  composerHighlight: {
+    position: "absolute",
+    top: 1,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.94)"
   },
   composerInput: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 46,
     maxHeight: 80,
-    color: "#FFFFFF",
+    color: uiTheme.colors.textPrimary,
     ...uiTheme.font.bodySmall,
-    fontWeight: "500",
+    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600"
   },
   composerSend: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: uiTheme.colors.primary,
@@ -604,10 +733,5 @@ const styles = StyleSheet.create({
   },
   composerSendPressed: {
     transform: [{ scale: 0.92 }],
-  },
-  composerSendText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
   },
 })

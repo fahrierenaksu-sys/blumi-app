@@ -82,7 +82,16 @@ export type AvatarEquipResult =
   }
 
 export type AvatarSaveResult =
-  | { ok: true; selection?: CompleteAvatarSelection }
+  | {
+    ok: true
+    /** The persistence boundary accepted the selection, or it was local-only. */
+    persistence: "acknowledged" | "local"
+    /** Whether the current UI state in this Provider scope matches the canonical selection. */
+    application: "applied" | "superseded"
+    selection?: CompleteAvatarSelection
+    /** Exact avatar applied by this Provider; allows callers to reject normalized mismatches. */
+    canonicalAvatar?: UserAvatar
+  }
   | {
     ok: false
     reason: "conflict" | "error"
@@ -135,6 +144,20 @@ export function AvatarV2Provider({
   const [avatar, setAvatar] = useState<UserAvatar>(() =>
     resolveInitialSelectionAvatar(initialAvatarSelection, onboardingStarterBodyId)
   )
+  const avatarRef = useRef(avatar)
+  const storageScopeIdRef = useRef(storageScopeId)
+  // A provider is keyed by account in navigation, but keep this boundary safe
+  // if a future host changes scope without remounting it.
+  storageScopeIdRef.current = storageScopeId
+  const updateAvatar = useCallback((
+    nextOrUpdate: UserAvatar | ((current: UserAvatar) => UserAvatar)
+  ): void => {
+    const nextAvatar = typeof nextOrUpdate === "function"
+      ? nextOrUpdate(avatarRef.current)
+      : nextOrUpdate
+    avatarRef.current = nextAvatar
+    setAvatar(nextAvatar)
+  }, [])
   const [isSaving, setIsSaving] = useState(false)
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
   const saveInFlightRef = useRef(false)
@@ -171,7 +194,7 @@ export function AvatarV2Provider({
     )
     hydratedStorageKeyRef.current = null
     setHasHydratedPersistedAvatar(false)
-    setAvatar(fallbackAvatar)
+    updateAvatar(fallbackAvatar)
 
     if (!shouldUseLocalAvatarPersistence(requireServerInventory, storageKey)) {
       setHasHydratedPersistedAvatar(true)
@@ -184,7 +207,7 @@ export function AvatarV2Provider({
       .then((rawValue) => {
         if (!mounted) return
         const storedAvatar = parseStoredAvatarV2(rawValue, AVATAR_V2_CATALOG)
-        setAvatar(applyOnboardingStarterBody(
+        updateAvatar(applyOnboardingStarterBody(
           storedAvatar ?? fallbackAvatar,
           onboardingStarterBodyId,
           AVATAR_V2_CATALOG
@@ -208,7 +231,8 @@ export function AvatarV2Provider({
     initialSelectionRevision,
     onboardingStarterBodyId,
     requireServerInventory,
-    storageKey
+    storageKey,
+    updateAvatar
   ])
 
   useEffect(() => {
@@ -251,10 +275,10 @@ export function AvatarV2Provider({
     (item: AvatarCatalogItem): boolean => {
       if (!canEquipItem(item)) return false
       hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
-      setAvatar((current) => equipAvatarV2Item(current, item))
+      updateAvatar((current) => equipAvatarV2Item(current, item))
       return true
     },
-    [canEquipItem]
+    [canEquipItem, updateAvatar]
   )
 
   const saveAvatar = useCallback(
@@ -270,8 +294,8 @@ export function AvatarV2Provider({
       if (!qaPersistencePolicy.allowRemotePersistence) {
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setSaveErrorMessage(null)
-        setAvatar(nextAvatar)
-        return { ok: true }
+        updateAvatar(nextAvatar)
+        return { ok: true, persistence: "local", application: "applied", canonicalAvatar: nextAvatar }
       }
       if (!onSaveAvatar) {
         if (requireServerInventory) {
@@ -282,14 +306,15 @@ export function AvatarV2Provider({
           }
         }
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
-        setAvatar(nextAvatar)
-        return { ok: true }
+        updateAvatar(nextAvatar)
+        return { ok: true, persistence: "local", application: "applied", canonicalAvatar: nextAvatar }
       }
       setIsSaving(true)
       saveInFlightRef.current = true
       const saveStart = beginAvatarEquipSave(avatarEquipLifecycleRef.current)
       avatarEquipLifecycleRef.current = saveStart.lifecycle
       const { requestGeneration } = saveStart
+      const requestStorageScopeId = storageScopeIdRef.current
       const saveAbortController = new AbortController()
       const saveTimeout = setTimeout(
         () => saveAbortController.abort(),
@@ -311,14 +336,28 @@ export function AvatarV2Provider({
           if (!result.ok) {
             return { ...result, reason: "error" }
           }
-          return result.saved.kind === "updated"
-            ? { ok: true, selection: result.saved.selection }
-            : {
-              ok: false,
-              reason: "conflict",
-              errorMessage: result.saved.message,
-              currentSelection: result.saved.current
+          if (result.saved.kind === "updated") {
+            const canonicalAvatar = resolveAvatarV2(
+              loadoutToUserAvatar(result.saved.selection.loadout)
+            )
+            const canonicalAlreadyCurrent =
+              avatarEquipLifecycleRef.current.mounted &&
+              storageScopeIdRef.current === requestStorageScopeId &&
+              areAvatarV2SelectionsEqual(avatarRef.current, canonicalAvatar)
+            return {
+              ok: true,
+              persistence: "acknowledged",
+              application: canonicalAlreadyCurrent ? "applied" : "superseded",
+              selection: result.saved.selection,
+              ...(canonicalAlreadyCurrent ? { canonicalAvatar } : {})
             }
+          }
+          return {
+            ok: false,
+            reason: "conflict",
+            errorMessage: result.saved.message,
+            currentSelection: result.saved.current
+          }
         }
         if (!result.ok) {
           setSaveErrorMessage(result.errorMessage)
@@ -328,7 +367,7 @@ export function AvatarV2Provider({
           const currentAvatar = resolveAvatarV2(
             loadoutToUserAvatar(result.saved.current.loadout)
           )
-          setAvatar(currentAvatar)
+          updateAvatar(currentAvatar)
           setSaveErrorMessage(result.saved.message)
           return {
             ok: false,
@@ -337,8 +376,17 @@ export function AvatarV2Provider({
             currentSelection: result.saved.current
           }
         }
-        setAvatar(resolveAvatarV2(loadoutToUserAvatar(result.saved.selection.loadout)))
-        return { ok: true, selection: result.saved.selection }
+        const canonicalAvatar = resolveAvatarV2(
+          loadoutToUserAvatar(result.saved.selection.loadout)
+        )
+        updateAvatar(canonicalAvatar)
+        return {
+          ok: true,
+          persistence: "acknowledged",
+          application: "applied",
+          selection: result.saved.selection,
+          canonicalAvatar
+        }
       } finally {
         clearTimeout(saveTimeout)
         if (mayCommitAvatarEquipSave(
@@ -350,7 +398,7 @@ export function AvatarV2Provider({
         }
       }
     },
-    [onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory]
+    [onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory, updateAvatar]
   )
 
   const equipAndSaveItem = useCallback(
@@ -368,7 +416,7 @@ export function AvatarV2Provider({
       if (!qaPersistencePolicy.allowRemotePersistence) {
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setSaveErrorMessage(null)
-        setAvatar((current) => applyDisposableAvatarEquip(
+        updateAvatar((current) => applyDisposableAvatarEquip(
           current,
           item,
           equipAvatarV2Item
@@ -385,7 +433,7 @@ export function AvatarV2Provider({
           }
         }
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
-        setAvatar(nextAvatar)
+        updateAvatar(nextAvatar)
         return { ok: true }
       }
       setIsSaving(true)
@@ -426,7 +474,7 @@ export function AvatarV2Provider({
           return { ...result, reason: "error" }
         }
         if (result.saved.kind === "conflict") {
-          setAvatar(resolveAvatarV2(loadoutToUserAvatar(result.saved.current.loadout)))
+          updateAvatar(resolveAvatarV2(loadoutToUserAvatar(result.saved.current.loadout)))
           setSaveErrorMessage(result.saved.message)
           return {
             ok: false,
@@ -435,7 +483,7 @@ export function AvatarV2Provider({
             currentSelection: result.saved.current
           }
         }
-        setAvatar(resolveAvatarV2(loadoutToUserAvatar(result.saved.selection.loadout)))
+        updateAvatar(resolveAvatarV2(loadoutToUserAvatar(result.saved.selection.loadout)))
         return { ok: true }
       } finally {
         clearTimeout(saveTimeout)
@@ -448,7 +496,7 @@ export function AvatarV2Provider({
         }
       }
     },
-    [avatar, canEquipItem, onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory]
+    [avatar, canEquipItem, onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory, updateAvatar]
   )
 
   const value = useMemo<AvatarV2ContextValue>(
@@ -498,6 +546,21 @@ function resolveInitialSelectionAvatar(
     onboardingStarterBodyId,
     AVATAR_V2_CATALOG
   )
+}
+
+function areAvatarV2SelectionsEqual(left: UserAvatar, right: UserAvatar): boolean {
+  return left.bodyId === right.bodyId &&
+    left.faceId === right.faceId &&
+    left.eyesId === right.eyesId &&
+    left.noseId === right.noseId &&
+    left.mouthId === right.mouthId &&
+    left.hairId === right.hairId &&
+    left.topId === right.topId &&
+    left.bottomId === right.bottomId &&
+    left.shoesId === right.shoesId &&
+    (left.dressId ?? null) === (right.dressId ?? null) &&
+    (left.outerwearId ?? null) === (right.outerwearId ?? null) &&
+    [...left.accessoryIds].sort().join("|") === [...right.accessoryIds].sort().join("|")
 }
 
 export function useAvatarV2(): AvatarV2ContextValue {

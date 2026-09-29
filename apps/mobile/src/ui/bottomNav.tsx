@@ -60,6 +60,7 @@ export interface BottomNavProps {
   chatCount: number
   onPress: (key: BottomNavKey) => void
   appearance?: "default" | "ambient"
+  visible?: boolean
 }
 
 function NavTab(props: {
@@ -187,7 +188,7 @@ function NavTab(props: {
 }
 
 export function BottomNav(props: BottomNavProps) {
-  const { currentKey, chatCount, onPress, appearance = "default" } = props
+  const { currentKey, chatCount, onPress, appearance = "default", visible = true } = props
   const ambient = appearance === "ambient"
   const [reduceMotion, setReduceMotion] = useState(false)
   const locale = useMemo(
@@ -257,13 +258,17 @@ export function BottomNav(props: BottomNavProps) {
 
   return (
     <View
+      pointerEvents={visible ? "auto" : "none"}
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
       style={[
         styles.bottomNav,
         {
           bottom: navLayout.bottomOffset,
           height: navLayout.height,
           left: navLayout.horizontalInset,
-          right: navLayout.horizontalInset
+          right: navLayout.horizontalInset,
+          opacity: visible ? 1 : 0
         },
         ambient ? styles.bottomNavAmbient : null
       ]}

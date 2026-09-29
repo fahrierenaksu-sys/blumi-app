@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   KeyboardAvoidingView,
@@ -18,10 +18,10 @@ import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import {
   advanceRegisterFlowToCode,
-  analyzeLocalPhoneNumber,
+  analyzeFormattedLocalPhoneNumber,
   createInitialRegisterFlow,
   getPhoneCountryOptions,
-  getRegisterFlowAvailability,
+  getRegisterFlowAvailabilityFromPhoneAnalysis,
   maskPhoneNumber,
   normalizePhoneNumber,
   returnRegisterFlowToPhone,
@@ -152,7 +152,18 @@ export function RegisterScreen({
   const actionInFlightRef = useRef(false)
   const phoneInputRef = useRef<TextInput | null>(null)
   const busy = isSubmitting || localBusy
-  const availability = getRegisterFlowAvailability(flow, busy)
+  const phoneAnalysis = useMemo(
+    () => analyzeFormattedLocalPhoneNumber(flow.phoneNumber, flow.selectedCountry),
+    [flow.phoneNumber, flow.selectedCountry]
+  )
+  const availability = useMemo(
+    () => getRegisterFlowAvailabilityFromPhoneAnalysis(
+      { stage: flow.stage, verificationCode: flow.verificationCode },
+      busy,
+      phoneAnalysis
+    ),
+    [busy, flow.stage, flow.verificationCode, phoneAnalysis]
+  )
   const isCodeStep = flow.stage === "code"
   const progressTotal = authIntent === "create" ? 4 : 2
   const progressCurrent = authIntent === "create"
@@ -172,15 +183,32 @@ export function RegisterScreen({
     })
   const primaryDisabled = busy || !primaryEnabled ||
     (isCodeStep && codeRequestStatus !== "sent" && !verifiedFirebasePhone)
+  const clearInputFeedback = (clearSmsNotice = false): void => {
+    if (attemptedPrimaryAction) setAttemptedPrimaryAction(false)
+    if (clearSmsNotice && smsNotice !== null) setSmsNotice(null)
+    if (errorMessage !== null) onClearError()
+  }
   const maskedPhoneNumber = maskPhoneNumber(
     availability.normalizedPhoneNumber
   )
-  const selectedCountry = getPhoneCountryOptions().find(
-    (country) => country.countryCode === flow.selectedCountry
-  ) ?? getPhoneCountryOptions()[0]
-  const phoneAnalysis = analyzeLocalPhoneNumber(
-    flow.phoneNumber,
-    flow.selectedCountry
+  const selectedCountry = useMemo(
+    () => getPhoneCountryOptions().find(
+      (country) => country.countryCode === flow.selectedCountry
+    ) ?? getPhoneCountryOptions()[0],
+    [flow.selectedCountry]
+  )
+  const signInAvatar = useMemo(
+    () => (
+      <AvatarPreview2D
+        animationState="idle_front"
+        avatar={createFlowAvatar ?? undefined}
+        showGlow={false}
+        size={createHeroAvatarSize}
+        stageHeight={createHeroStageHeight}
+        themeTone="entry"
+      />
+    ),
+    [createFlowAvatar, createHeroAvatarSize, createHeroStageHeight]
   )
   const showPhoneError = !availability.phoneValid &&
     (phoneTouched || attemptedPrimaryAction) && flow.phoneNumber.length > 0
@@ -194,6 +222,10 @@ export function RegisterScreen({
     duration: cameFromWorld ? 260 : 0,
     translateY: cameFromWorld ? 22 : 0
   })
+  const worldHero = useMemo(
+    () => <RegisterWorldHero active={motionActive && !isCodeStep} />,
+    [motionActive, isCodeStep]
+  )
 
   useEffect(() => {
     if (!isCodeStep || resendCooldownSeconds <= 0) return
@@ -437,7 +469,7 @@ export function RegisterScreen({
           <Animated.View style={[styles.createCharacterScene, handoffEntrance]}>
             <View style={styles.createCharacterHalo} />
             <View style={styles.createCharacterFrame} />
-            <RegisterWorldHero active={motionActive && !isCodeStep} />
+            {worldHero}
           </Animated.View>
         )}
       >
@@ -512,8 +544,7 @@ export function RegisterScreen({
                       value={flow.verificationCode}
                       onChangeText={(value) => {
                         setFlow((current) => updateRegisterCode(current, value))
-                        setAttemptedPrimaryAction(false)
-                        onClearError()
+                        clearInputFeedback()
                       }}
                       onFocus={() => setOtpFocused(true)}
                       onBlur={() => {
@@ -636,9 +667,7 @@ export function RegisterScreen({
                     value={flow.phoneNumber}
                     onChangeText={(value) => {
                       setFlow((current) => updateRegisterPhone(current, value))
-                      setAttemptedPrimaryAction(false)
-                      setSmsNotice(null)
-                      onClearError()
+                      clearInputFeedback(true)
                     }}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -858,14 +887,7 @@ export function RegisterScreen({
                         size={17}
                       />
                     </View>
-                    <AvatarPreview2D
-                      animationState="idle_front"
-                      avatar={createFlowAvatar ?? undefined}
-                      showGlow={false}
-                      size={createHeroAvatarSize}
-                      stageHeight={createHeroStageHeight}
-                      themeTone="entry"
-                    />
+                    {signInAvatar}
                   </View>
                 </View>
               )}
@@ -972,8 +994,7 @@ export function RegisterScreen({
                         value={flow.verificationCode}
                         onChangeText={(value) => {
                           setFlow((current) => updateRegisterCode(current, value))
-                          setAttemptedPrimaryAction(false)
-                          onClearError()
+                          clearInputFeedback()
                         }}
                         onFocus={() => setOtpFocused(true)}
                         onBlur={() => {
@@ -1090,9 +1111,7 @@ export function RegisterScreen({
                       value={flow.phoneNumber}
                       onChangeText={(value) => {
                         setFlow((current) => updateRegisterPhone(current, value))
-                        setAttemptedPrimaryAction(false)
-                        setSmsNotice(null)
-                        onClearError()
+                        clearInputFeedback(true)
                       }}
                       autoCapitalize="none"
                       autoCorrect={false}

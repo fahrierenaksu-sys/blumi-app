@@ -5,7 +5,12 @@ import {
   createThreadRoomInvite,
   decideThreadRoomInvite,
   fetchThreadRoomInvites,
-  joinRoomSession
+  isDefinitivelyUnavailableRoomSession,
+  joinRoomSession,
+  leaveActiveRoom,
+  leaveRoomSession,
+  RoomInviteApiError,
+  RoomSessionJoinError
 } from "./chatRoomInviteApi"
 
 const invite = {
@@ -17,6 +22,26 @@ const invite = {
   createdAt: "2026-07-21T10:00:00.000Z",
   expiresAt: "2026-07-21T10:10:00.000Z"
 }
+
+test("room invite history cancellation settles even when the transport ignores abort", async () => {
+  const controller = new AbortController()
+  let transportSignal: AbortSignal | null | undefined
+  const pending = fetchThreadRoomInvites(
+    "https://example.test",
+    "session_token",
+    "thread_one",
+    (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      transportSignal = init?.signal
+      return new Promise<Response>(() => {})
+    }) as typeof fetch,
+    controller.signal
+  )
+  const rejected = assert.rejects(pending, (error: unknown) =>
+    error instanceof Error && error.name === "AbortError")
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+})
 
 test("room invite API reads and creates durable thread-scoped invites", async () => {
   const invites = await fetchThreadRoomInvites(
@@ -44,6 +69,55 @@ test("room invite API reads and creates durable thread-scoped invites", async ()
 
   assert.equal(invites[0]?.threadId, "thread one")
   assert.equal(created.status, "pending")
+})
+
+test("room invite API preserves a safe busy code for a recoverable own room", async () => {
+  await assert.rejects(
+    createThreadRoomInvite("https://example.test", "session_token", "thread_one", (async () =>
+      createJsonResponse(409, { code: "SELF_IN_ROOM", error: "You are still in a room.", roomSessionId: "room_one" })
+    ) as typeof fetch),
+    (error: unknown) => error instanceof RoomInviteApiError && error.code === "SELF_IN_ROOM" && error.roomSessionId === "room_one"
+  )
+})
+
+test("room leave APIs require authenticated server acknowledgement", async () => {
+  const left = await leaveRoomSession(
+    "https://example.test",
+    "session_token",
+    "room_one",
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal(String(url), "https://example.test/v1/room-sessions/room_one/leave")
+      assert.equal(init?.method, "POST")
+      assert.equal((init?.headers as Record<string, string>).authorization, "Bearer session_token")
+      return createJsonResponse(200, { ended: true })
+    }) as typeof fetch
+  )
+  assert.equal(left.ended, true)
+
+  const recovered = await leaveActiveRoom(
+    "https://example.test",
+    "session_token",
+    "room_one",
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal(String(url), "https://example.test/v1/users/me/active-room/leave")
+      assert.equal(init?.method, "POST")
+      assert.equal(init?.body, JSON.stringify({ expectedRoomSessionId: "room_one" }))
+      return createJsonResponse(200, { ended: false })
+    }) as typeof fetch
+  )
+  assert.equal(recovered.ended, false)
+
+  await assert.rejects(
+    leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
+      createJsonResponse(503, { error: "Rooms are temporarily unavailable." })
+    ) as typeof fetch)
+  )
+  await assert.rejects(
+    leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
+      createJsonResponse(200, {})
+    ) as typeof fetch),
+    /confirm/i
+  )
 })
 
 test("room invite API decides and cancels using authenticated actions", async () => {
@@ -114,6 +188,27 @@ test("room invite API joins an accepted session only with a server-issued room p
   assert.equal(ready.miniRoom.miniRoomId, "mini room")
   assert.equal(ready.participants[1]?.displayName, "Defne")
   assert.equal(ready.miniRoom.sharedDecor?.revision, 2)
+})
+
+test("room rejoin distinguishes a closed session from a temporary transport error", async () => {
+  assert.equal(isDefinitivelyUnavailableRoomSession(new RoomSessionJoinError("ended", "INVITE_NOT_AVAILABLE", 409)), true)
+  assert.equal(isDefinitivelyUnavailableRoomSession(new RoomSessionJoinError("blocked", null, 403)), true)
+  assert.equal(isDefinitivelyUnavailableRoomSession(new RoomSessionJoinError("missing", null, 404)), true)
+  assert.equal(isDefinitivelyUnavailableRoomSession(new RoomSessionJoinError("outage", null, 503)), false)
+  await assert.rejects(
+    joinRoomSession("https://example.test", "token", "room_one", (async () =>
+      createJsonResponse(409, { code: "INVITE_NOT_AVAILABLE", error: "That room is not available." })
+    ) as typeof fetch),
+    (error: unknown) => error instanceof RoomSessionJoinError &&
+      error.status === 409 && error.code === "INVITE_NOT_AVAILABLE"
+  )
+  await assert.rejects(
+    joinRoomSession("https://example.test", "token", "room_one", (async () =>
+      createJsonResponse(503, { error: "Rooms are temporarily unavailable." })
+    ) as typeof fetch),
+    (error: unknown) => error instanceof RoomSessionJoinError &&
+      error.status === 503 && error.code === null
+  )
 })
 
 test("room invite API rejects malformed or failed server responses", async () => {

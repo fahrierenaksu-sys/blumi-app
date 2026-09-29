@@ -40,6 +40,7 @@ const MINIMUM_VIEWPORT_WIDTH = 320
 const MINIMUM_VIEWPORT_HEIGHT = 400
 const MINIMUM_PRODUCT_CARD_WIDTH = 88
 const MINIMUM_CATEGORY_RAIL_WIDTH = 64
+export const SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO = 256 / 384
 
 export function getShopLayoutMetrics(
   viewport: ShopViewport
@@ -91,6 +92,8 @@ export function getShopLayoutMetrics(
   // Two product rows, catalog heading, header/dock, card padding and section gaps.
   const avatarStageHeight = metric(clamp(height - productCardHeight * 2 - 246,
     Math.max(140, Math.ceil(26 * (viewport.fontScale ?? 1)) + 104), 256))
+  const availableAvatarHeight = Math.min(avatarStageHeight,
+    Math.max(110, height - preferredProductCardHeight * 2 - 246))
 
   return {
     hierarchy: "live-preview",
@@ -105,8 +108,11 @@ export function getShopLayoutMetrics(
       heroGap: metric(lerp(6, 10, scaleProgress)),
       avatarStageHeight,
       roomStageHeight: avatarStageHeight,
-      avatarWidth: Math.floor(Math.min(178, contentWidth * 0.48, Math.min(avatarStageHeight,
-        Math.max(110, height - preferredProductCardHeight * 2 - 246)) / 1.4) * 10) / 10,
+      avatarWidth: Math.floor(Math.min(
+        178,
+        contentWidth * 0.48,
+        availableAvatarHeight * SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO
+      ) * 10) / 10,
       overlayInset: metric(lerp(8, 12, scaleProgress))
     },
     catalog: {

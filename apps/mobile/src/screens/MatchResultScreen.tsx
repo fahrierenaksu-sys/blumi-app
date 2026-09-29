@@ -19,12 +19,8 @@ import {
   resolveLatestMatchRoomAvatar
 } from "../features/matches/matchRoomResolvers"
 import type { SessionActor } from "../features/session/sessionModel"
-import { createThread } from "../features/chat/chatApi"
-import { applyChatThreadCreated } from "../features/chat/chatStore"
-import { openMatchedChat } from "../features/chat/matchChatOpening"
-import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { createPostMatchChatNavigationState } from "../navigation/rootNavigationModel"
+import { createPostMatchChatNavigationState, getLobbyReturnStrategy } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import {
   FloatingGlassDock,
@@ -59,8 +55,6 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     [match.matchedUser]
   )
   const canStartConversation = canOpenMatchExperience(sessionActor)
-  const [isOpeningChat, setIsOpeningChat] = useState(false)
-  const [chatOpenError, setChatOpenError] = useState<string | null>(null)
   const [reportVisible, setReportVisible] = useState(false)
   const openingChatRef = useRef(false)
 
@@ -69,39 +63,21 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const haloAnim = usePulse({ minScale: 0.9, maxScale: 1.15, duration: 2000 })
   const dockAnim = useEntranceAnimation({ delay: 600, translateY: 40 })
 
-  const handleStartChat = async (): Promise<void> => {
+  const handleStartChat = (): void => {
     if (!canStartConversation || openingChatRef.current) return
-    if (sessionActor.session.mode !== "production") {
-      navigation.reset(createPostMatchChatNavigationState({
-        partnerId: match.matchedUser.userId,
-        partnerName: match.matchedUser.displayName
-      }))
-      return
-    }
-
     openingChatRef.current = true
-    setIsOpeningChat(true)
-    setChatOpenError(null)
-    const result = await openMatchedChat({
-      createThread: () => createThread(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken,
-        {
-          participantUserIds: [
-            sessionActor.profile.userId,
-            match.matchedUser.userId
-          ]
-        }
-      ),
-      onThreadReady: (thread) => {
-        applyChatThreadCreated(thread)
-        navigation.reset(createPostMatchChatNavigationState({ threadId: thread.threadId }))
-      }
-    })
-    openingChatRef.current = false
-    setIsOpeningChat(false)
-    if (result.status === "failed") {
-      setChatOpenError(result.errorMessage)
+    navigation.reset(createPostMatchChatNavigationState({
+      partnerId: match.matchedUser.userId,
+      partnerName: match.matchedUser.displayName
+    }))
+  }
+
+  const handleKeepExploring = (): void => {
+    const strategy = getLobbyReturnStrategy(navigation.getState().routes.map((item) => item.name))
+    if (strategy === "popTo") {
+      navigation.popTo("Lobby")
+    } else {
+      navigation.replace("Lobby")
     }
   }
 
@@ -118,7 +94,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
                 accessibilityLabel="Return to Discover"
                 variant="soft"
                 size={42}
-                onPress={() => navigation.navigate("Lobby")}
+                onPress={handleKeepExploring}
               >
                 <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
               </ActionButtonCircle>
@@ -193,28 +169,17 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
         <Animated.View style={dockAnim}>
           <FloatingGlassDock style={styles.actionDock}>
             <GlassCTA
-              label={
-                isOpeningChat
-                  ? "Opening chat…"
-                  : chatOpenError
-                    ? "Try Say Hi again"
-                    : "Say Hi"
-              }
+              label="Say Hi"
               onPress={() => {
-                void handleStartChat()
+                handleStartChat()
               }}
-              disabled={!canStartConversation || isOpeningChat}
+              disabled={!canStartConversation}
             />
-            {chatOpenError ? (
-              <Text accessibilityRole="alert" style={styles.chatOpenError}>
-                {chatOpenError}
-              </Text>
-            ) : null}
             <View style={styles.secondaryActions}>
               <GlassCTA
                 label="Keep Exploring"
                 variant="secondary"
-                onPress={() => navigation.navigate("Lobby")}
+                onPress={handleKeepExploring}
                 style={styles.secondaryAction}
               />
             </View>
@@ -321,11 +286,6 @@ const styles = StyleSheet.create({
     right: uiTheme.spacing.lg,
     bottom: uiTheme.spacing.md,
     gap: uiTheme.spacing.sm
-  },
-  chatOpenError: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.danger,
-    textAlign: "center"
   },
   secondaryActions: {
     flexDirection: "row",

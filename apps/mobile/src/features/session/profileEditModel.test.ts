@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   analyzeProfileEditDraft,
-  analyzeProfilePrompts
+  analyzeProfileInterests,
+  analyzeProfilePrompts,
+  createMemoizedProfileEditDraftAnalyzer,
 } from "./profileEditModel"
 
 const current = {
@@ -114,6 +116,85 @@ test("normalized unchanged drafts do not create false saves", () => {
 
   assert.equal(result.valid, true)
   assert.equal(result.hasChanges, false)
+})
+
+test("memoized profile analysis reuses interests and prompts only across unrelated edits", () => {
+  let interestParseCount = 0
+  let promptAnalysisCount = 0
+  const memoizedAnalyze = createMemoizedProfileEditDraftAnalyzer({
+    analyzeInterests(value) {
+      interestParseCount += 1
+      return analyzeProfileInterests(value)
+    },
+    analyzePrompts(value) {
+      promptAnalysisCount += 1
+      return analyzeProfilePrompts(value)
+    }
+  })
+  const input = {
+    current: {
+      ...current,
+      prompts: [{ promptId: "small_joy" as const, answer: "Morning coffee" }]
+    },
+    draft: {
+      displayName: "Defne",
+      ageText: "24",
+      bio: "Coffee walks.",
+      gender: "woman",
+      interestsText: " coffee \n music \ncoffee",
+      prompts: [{ promptId: "small_joy" as const, answer: "  A slow   morning. " }]
+    }
+  }
+  const analyzeAndCompare = (candidate: typeof input) => {
+    const memoized = memoizedAnalyze(candidate)
+    assert.deepEqual(memoized, analyzeProfileEditDraft(candidate))
+    return memoized
+  }
+
+  const initialResult = analyzeAndCompare(input)
+  assert.equal(interestParseCount, 1)
+  assert.equal(promptAnalysisCount, 1)
+
+  initialResult.interests.push("consumer mutation")
+  initialResult.prompts[0]!.answer = "consumer mutation"
+  const afterConsumerMutation = analyzeAndCompare(input)
+  assert.deepEqual(afterConsumerMutation, analyzeProfileEditDraft(input))
+  assert.equal(interestParseCount, 1)
+  assert.equal(promptAnalysisCount, 1)
+
+  for (const draft of [
+    { ...input.draft, displayName: "Defne A." },
+    { ...input.draft, ageText: "25" },
+    { ...input.draft, bio: "A different bio." }
+  ]) {
+    analyzeAndCompare({ ...input, draft })
+  }
+  assert.equal(interestParseCount, 1)
+  assert.equal(promptAnalysisCount, 1)
+
+  const changedInterests = {
+    ...input,
+    draft: { ...input.draft, interestsText: "coffee\nmusic\nart" }
+  }
+  analyzeAndCompare(changedInterests)
+  assert.equal(interestParseCount, 2)
+  assert.equal(promptAnalysisCount, 1)
+
+  const changedPrompts = {
+    ...changedInterests,
+    draft: {
+      ...changedInterests.draft,
+      prompts: [
+        { promptId: "small_joy" as const, answer: "Updated   answer." },
+        { promptId: "small_joy" as const, answer: "Duplicate." }
+      ]
+    }
+  }
+  const invalidPromptResult = analyzeAndCompare(changedPrompts)
+  assert.equal(invalidPromptResult.promptError, "duplicate")
+  assert.equal(invalidPromptResult.valid, false)
+  assert.equal(interestParseCount, 2)
+  assert.equal(promptAnalysisCount, 2)
 })
 
 test("editing another field preserves all ten server-supported interests", () => {

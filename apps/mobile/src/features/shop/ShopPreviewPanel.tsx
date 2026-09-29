@@ -1,8 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { Image as ExpoImage } from "expo-image"
 import { useMemo, useState, useLayoutEffect } from "react"
 import {
-  Image,
-  Animated,
   useWindowDimensions,
   Pressable,
   Text,
@@ -19,6 +18,7 @@ import { resolveRoomV2Scene } from "../roomV2/roomV2Selectors"
 import type { FurnitureItem } from "../roomV2/roomV2.types"
 import type { AppLocale } from "../session/appLocale"
 import type { ShopCatalogItem } from "./shopCatalog"
+import { SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO } from "./shopLayoutMetrics"
 import { getShopCopy } from "./shopCopy"
 import { getShopProductPresentation } from "./shopProductPresentation"
 import { formatCoins } from "./shopFormatters"
@@ -28,7 +28,6 @@ import { getShopProductThumbnailBounds, getShopProductThumbnailSource } from "./
 import type { ShopMode } from "./ShopNavigationControls"
 import { getShopThumbnailLayout } from "./shopThumbnailLayout"
 import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage } from "./shopCombinationViewport"
-import { useEntranceAnimation } from "../../ui/animations"
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
 
@@ -333,13 +332,11 @@ export function ShopPreviewPanel(props: {
 }
 
 function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombinationItem; locale: AppLocale; selected: boolean; onSelect?: (id: string) => void }) {
-  const entrance = useEntranceAnimation({ duration: 200, translateY: 5 })
   const copy = getShopCopy(locale)
   const source = getShopProductThumbnailSource(item.id)
   const bounds = getShopProductThumbnailBounds(item.id)
   const frame = getShopThumbnailLayout(bounds, 34, 34)
   return (
-    <Animated.View style={entrance}>
       <Pressable
         style={[styles.combinationRow, selected ? styles.combinationRowSelected : null]}
         onPress={() => onSelect?.(item.id)}
@@ -348,14 +345,13 @@ function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombin
         accessibilityLabel={`${item.title ?? copy.combination.itemUnavailable}, ${item.owned ? copy.owned : item.price === null ? copy.combination.priceNeedsRefresh : `${formatCoins(item.price, locale)} ${copy.coins}`}`}
       >
         <View style={styles.combinationThumbnail}>
-          {source ? <Image source={source} resizeMode="contain" style={frame ? { position: "absolute", ...frame } : { width: 34, height: 34 }} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
+          {source ? <ExpoImage source={source} contentFit="contain" cachePolicy="memory-disk" priority={selected ? "high" : "normal"} transition={0} style={frame ? { position: "absolute", ...frame } : { width: 34, height: 34 }} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
         </View>
         <View style={styles.combinationRowCopy}>
           <Text style={styles.combinationItemTitle} numberOfLines={1}>{item.title ?? copy.combination.itemUnavailable}</Text>
           <Text style={styles.combinationItemPrice} numberOfLines={1}>{item.owned ? `✓ ${copy.owned}` : item.price === null ? "—" : `◇ ${formatCoins(item.price, locale)}`}</Text>
         </View>
       </Pressable>
-    </Animated.View>
   )
 }
 
@@ -373,7 +369,7 @@ function ShopAvatarLivePreview(props: { avatar: UserAvatar; avatarWidth: number 
       state: "idle"
     })
   }, [props.avatar])
-  const avatarHeight = props.avatarWidth / (256 / 384)
+  const avatarHeight = props.avatarWidth / SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO
 
   return (
     <View style={styles.shopAvatarPreview}>

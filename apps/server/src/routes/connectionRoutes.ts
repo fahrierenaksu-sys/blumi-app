@@ -12,6 +12,7 @@ import {
 } from "../connections/connectionService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import { resolveBearerSession } from "./routeHelpers"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 export interface ConnectionRouteServices {
   authService: AuthService
@@ -70,7 +71,7 @@ export async function registerConnectionRoutes(
       if (error instanceof ConnectionDecisionUnavailableError) {
         return reply.code(409).send({ error: "That connection decision is not available." })
       }
-      request.log.error({ error }, "Connection decision delivery failed")
+      request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Connection decision delivery failed")
       return reply.code(503).send({ error: "Connection decisions are temporarily unavailable." })
     }
   })

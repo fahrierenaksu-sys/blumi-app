@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from "node:http"
+import { randomUUID } from "node:crypto"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type RawData, type WebSocket } from "ws"
 import type { ClientEvent } from "@blumi/contracts"
@@ -23,9 +24,11 @@ import {
   type RealtimeSessionActor
 } from "./realtimeAuth"
 import { createRealtimeRouter } from "./realtimeRouter"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
 
 const HEARTBEAT_INTERVAL_MS = 30_000
+const CONNECTION_LEASE_CLEANUP_INTERVAL_MS = 60_000
 const MAX_REALTIME_MESSAGE_BYTES = 64 * 1024
 const REALTIME_EVENT_WINDOW_MS = 10_000
 const MAX_CONNECTION_EVENTS_PER_WINDOW = 60
@@ -82,10 +85,55 @@ export function createRealtimeServer(
   const userInFlight = new Map<string, number>()
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
+  const connectionLifecycleOperations = new Map<string, Promise<void>>()
+  const connectionRoomJoinOperations = new Map<string, Set<Promise<void>>>()
   function track<T>(operation: Promise<T>): Promise<T> {
     activeOperations.add(operation)
     void operation.then(() => activeOperations.delete(operation), () => activeOperations.delete(operation))
     return operation
+  }
+  function enqueueConnectionLifecycleOperation(
+    connectionId: string,
+    operation: () => Promise<void>
+  ): Promise<void> {
+    const previous = connectionLifecycleOperations.get(connectionId) ?? Promise.resolve()
+    const current = previous.catch(() => undefined).then(operation)
+    connectionLifecycleOperations.set(connectionId, current)
+    const clear = () => {
+      if (connectionLifecycleOperations.get(connectionId) === current) {
+        connectionLifecycleOperations.delete(connectionId)
+      }
+    }
+    void current.then(clear, clear)
+    return current
+  }
+  function trackConnectionRoomJoin(
+    connectionId: string,
+    operation: () => Promise<void>
+  ): Promise<void> {
+    let pending = connectionRoomJoinOperations.get(connectionId)
+    if (!pending) {
+      pending = new Set()
+      connectionRoomJoinOperations.set(connectionId, pending)
+    }
+    const pendingOperations = pending
+    const current = Promise.resolve().then(operation)
+    pendingOperations.add(current)
+    const clear = () => {
+      pendingOperations.delete(current)
+      if (pendingOperations.size === 0 && connectionRoomJoinOperations.get(connectionId) === pendingOperations) {
+        connectionRoomJoinOperations.delete(connectionId)
+      }
+    }
+    void current.then(clear, clear)
+    return current
+  }
+  async function waitForConnectionRoomJoins(connectionId: string): Promise<void> {
+    while (true) {
+      const pending = connectionRoomJoinOperations.get(connectionId)
+      if (!pending?.size) return
+      await Promise.allSettled([...pending])
+    }
   }
   connectionManager.setDeliveryAuthorization(authorizeConnection)
   const notificationService =
@@ -131,14 +179,77 @@ export function createRealtimeServer(
     }
     if (closing) { rejectUpgrade(socket, "503 Service Unavailable"); return }
 
-    wsServer.handleUpgrade(request, socket, head, (webSocket) => {
-      establishConnection(webSocket, actor)
-    })
+    const connectionId = `connection_${randomUUID()}`
+    let leaseRegistered = false
+    let connectionEstablished = false
+    let peerClosedBeforeUpgrade = false
+    let preUpgradeDisconnect: Promise<void> | undefined
+    const disconnectBeforeUpgrade = () => {
+      preUpgradeDisconnect ??= enqueueConnectionLifecycleOperation(
+        connectionId,
+        async () => {
+          await options.presenceService.disconnectConnection(
+            connectionId,
+            actor.profile.userId
+          )
+        }
+      )
+      return preUpgradeDisconnect
+    }
+    const onRawSocketClose = () => {
+      if (connectionEstablished) return
+      peerClosedBeforeUpgrade = true
+      if (leaseRegistered) {
+        void track(disconnectBeforeUpgrade()).catch((error) => {
+          console.error("Realtime pre-upgrade disconnect cleanup failed", safeOperationalErrorKind(error))
+        })
+      }
+    }
+    socket.once("close", onRawSocketClose)
+
+    await options.presenceService.registerConnection(connectionId, actor.profile.userId)
+    leaseRegistered = true
+    if (peerClosedBeforeUpgrade || socket.destroyed || closing) {
+      socket.off("close", onRawSocketClose)
+      await track(disconnectBeforeUpgrade())
+      if (closing && !socket.destroyed) rejectUpgrade(socket, "503 Service Unavailable")
+      return
+    }
+
+    try {
+      wsServer.handleUpgrade(request, socket, head, (webSocket) => {
+        if (peerClosedBeforeUpgrade || socket.destroyed) {
+          socket.off("close", onRawSocketClose)
+          void track(disconnectBeforeUpgrade()).catch((error) => {
+            console.error("Realtime closed-handshake lease cleanup failed", safeOperationalErrorKind(error))
+          })
+          webSocket.terminate()
+          return
+        }
+        connectionEstablished = true
+        socket.off("close", onRawSocketClose)
+        try {
+          establishConnection(webSocket, actor, connectionId)
+        } catch (error) {
+          void track(disconnectBeforeUpgrade()).catch((cleanupError) => {
+            console.error("Realtime failed-upgrade lease cleanup failed", safeOperationalErrorKind(cleanupError))
+          })
+          throw error
+        }
+      })
+    } catch (error) {
+      socket.off("close", onRawSocketClose)
+      await track(disconnectBeforeUpgrade()).catch((cleanupError) => {
+        console.error("Realtime failed-upgrade lease cleanup failed", safeOperationalErrorKind(cleanupError))
+      })
+      throw error
+    }
   }
 
   function establishConnection(
     socket: WebSocket,
-    actor: RealtimeSessionActor
+    actor: RealtimeSessionActor,
+    connectionId: string
   ): void {
     socket.on("error", () => {
       // Protocol and payload violations are closed by ws. Keep them isolated
@@ -147,12 +258,26 @@ export function createRealtimeServer(
     const connection = connectionManager.addConnection({
       socket,
       profile: actor.profile,
-      sessionFamilyId: actor.sessionFamilyId
+      sessionFamilyId: actor.sessionFamilyId,
+      connectionId
     })
 
     socket.on("pong", () => {
       const current = connectionManager.getConnection(connection.connectionId)
-      if (current) current.isAlive = true
+      if (!current) return
+      current.isAlive = true
+      void track(enqueueConnectionLifecycleOperation(connection.connectionId, async () => {
+        const renewed = await options.presenceService.heartbeatConnection(
+          connection.connectionId,
+          connection.userId
+        )
+        if (!renewed) throw new Error("Realtime connection lease is no longer registered.")
+      })).catch((error) => {
+        console.error("Realtime connection lease heartbeat failed", safeOperationalErrorKind(error))
+        if (current.socket.readyState === 1) {
+          current.socket.close(AUTHORIZATION_FAILURE_CLOSE_CODE, AUTHORIZATION_FAILURE_CLOSE_REASON)
+        }
+      })
     })
     socket.on("message", (data) => {
       if (closing) return
@@ -172,7 +297,13 @@ export function createRealtimeServer(
         userEventWindows.delete(connection.userId)
       }
       if (removed) {
-        void track(router.handleDisconnect(removed)).catch((error) => console.error("Realtime disconnect cleanup failed", error))
+        void track(enqueueConnectionLifecycleOperation(removed.connectionId, async () => {
+          // A room.join is the only client operation that can create room presence.
+          // Let those already dispatched finish before removing this connection's
+          // lease, so a late join cannot recreate presence after disconnect cleanup.
+          await waitForConnectionRoomJoins(removed.connectionId)
+          await router.handleDisconnect(removed)
+        })).catch((error) => console.error("Realtime disconnect cleanup failed", safeOperationalErrorKind(error)))
       }
     })
   }
@@ -193,6 +324,12 @@ export function createRealtimeServer(
     }
   }, HEARTBEAT_INTERVAL_MS)
   heartbeat.unref()
+  const connectionLeaseCleanup = setInterval(() => {
+    void track(options.presenceService.purgeExpiredConnectionLeases()).catch((error) => {
+      console.error("Realtime connection lease cleanup failed", safeOperationalErrorKind(error))
+    })
+  }, CONNECTION_LEASE_CLEANUP_INTERVAL_MS)
+  connectionLeaseCleanup.unref()
 
   async function closeRestrictedConnections(): Promise<void> {
     await Promise.all(
@@ -248,7 +385,14 @@ export function createRealtimeServer(
       const parsed = JSON.parse(data.toString()) as unknown
       if (!isClientEvent(parsed)) return
       if (!await authorizeConnection(connection) || connection.socket.readyState !== 1) return
-      await router.handleClientEvent(connection, parsed)
+      if (parsed.type === "room.join") {
+        await trackConnectionRoomJoin(connection.connectionId, () => {
+          if (!connectionManager.getConnection(connection.connectionId)) return Promise.resolve()
+          return router.handleClientEvent(connection, parsed)
+        })
+      } else {
+        await router.handleClientEvent(connection, parsed)
+      }
     } catch {
       return
     } finally {
@@ -298,6 +442,7 @@ export function createRealtimeServer(
     async close(closeOptions = {}) {
       closing = true
       clearInterval(heartbeat)
+      clearInterval(connectionLeaseCleanup)
       const socketsClosed = new Promise<void>((resolve) => {
         wsServer.close(() => resolve())
         for (const client of wsServer.clients) {

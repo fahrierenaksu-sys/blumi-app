@@ -136,8 +136,20 @@ export function getRoomInvitationLoadErrorMessageForDisplay(
 
 export function getRoomInvitationActionErrorMessageForDisplay(
   errorMessage: string,
-  locale?: ChatErrorLocale
+  locale?: ChatErrorLocale,
+  code?: "SELF_IN_ROOM" | "PARTICIPANT_BUSY" | null
 ): string {
+  const resolvedLocale = resolveChatErrorLocale(locale)
+  if (code === "SELF_IN_ROOM") {
+    return resolvedLocale === "tr"
+      ? "Önceki ortak odan hâlâ açık. Yeni davet için önce onu kapatmalısın."
+      : "Your previous shared room is still open. Close it before sending a new invitation."
+  }
+  if (code === "PARTICIPANT_BUSY") {
+    return resolvedLocale === "tr"
+      ? "Karşı taraf şu anda başka bir odada. Biraz sonra tekrar dene."
+      : "The other person is currently in another room. Try again later."
+  }
   return getKnownOrFallback(
     errorMessage,
     SAFE_ROOM_INVITATION_ACTION_ERROR_MESSAGES,

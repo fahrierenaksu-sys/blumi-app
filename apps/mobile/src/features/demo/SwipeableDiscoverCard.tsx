@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { AvatarSelection, UserProfilePrompt } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { Image as ExpoImage } from "expo-image"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Animated,
   Easing,
@@ -32,6 +34,11 @@ import {
   CandidateAvatarPreview,
   createCandidateAvatarSnapshot
 } from "../../components/DiscoverCard"
+import {
+  buildDiscoveryRoomShowcaseQueryKey,
+  createDiscoveryRoomShowcaseQueryOptions,
+  type DiscoveryRoomShowcaseQueryInput
+} from "../discovery/discoveryApi"
 import { useReducedMotion } from "../../ui/animations"
 import { uiTheme } from "../../ui/theme"
 import { formatDiscoveryCardBio } from "../discovery/discoveryCandidateModel"
@@ -49,6 +56,16 @@ const SWIPE_DIRECTION_DOMINANCE = 1.1
 const SWIPE_DISTANCE_RATIO = 0.22
 const SWIPE_FLICK_VELOCITY = 0.55
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
+const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
+let nextShowcaseAuthorizationId = 0
+
+interface ShowcaseAuthorization {
+  id: number
+  baseHttpUrl: string
+  viewerUserId: string
+  candidateUserId: string
+  sessionToken: string
+}
 
 export interface SwipeableDiscoverProfile {
   userId: string
@@ -66,6 +83,10 @@ export interface SwipeableDiscoverProfile {
   roomSnapshot?: ImageSourcePropType
   roomSnapshotUrl?: string
   roomHeadline?: string | null
+  showcaseRequest?: Pick<
+    DiscoveryRoomShowcaseQueryInput,
+    "baseHttpUrl" | "viewerUserId" | "sessionToken"
+  >
 }
 
 interface SwipeableDiscoverCardProps {
@@ -79,6 +100,12 @@ interface SwipeableDiscoverCardProps {
   compact?: boolean
   layoutMetrics?: DiscoveryCardLayoutMetrics
   onFlipChange?: (flipped: boolean) => void
+  showcaseRequest?: SwipeableDiscoverProfile["showcaseRequest"]
+  imagePriority: "low" | "normal" | "high"
+  onFrontDisplay?: (part: "layout" | "surface" | "avatar") => void
+  onFrontImageError?: () => void
+  deferFrontAvatar?: boolean
+  deferBackAvatar?: boolean
 }
 
 export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
@@ -92,17 +119,30 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     disableEntryAnim = false,
     compact = false,
     layoutMetrics,
-    onFlipChange
+    onFlipChange,
+    showcaseRequest,
+    imagePriority,
+    onFrontDisplay
   } = props
+  const reduceMotion = useReducedMotion()
+  const handleFrontAvatarDisplay = useCallback(() => onFrontDisplay?.("avatar"), [onFrontDisplay])
+  const [frontLayoutReady, setFrontLayoutReady] = useState(false)
+  const [frontSurfaceReady, setFrontSurfaceReady] = useState(false)
+  useEffect(() => {
+    if (frontLayoutReady) onFrontDisplay?.("layout")
+    if (frontSurfaceReady) onFrontDisplay?.("surface")
+  }, [frontLayoutReady, frontSurfaceReady, onFrontDisplay])
   const localPosition = useRef(new Animated.ValueXY()).current
   const position = swipeAnim || localPosition
-  const entryAnim = useRef(new Animated.Value(0)).current
+  // The deck disables arrival motion: its first commit must already be visible.
+  const entryAnim = useRef(new Animated.Value(disableEntryAnim || reduceMotion ? 1 : 0)).current
   const pulseAnim = useRef(new Animated.Value(0.78)).current
   const flipProgress = useRef(new Animated.Value(0)).current
   const [isBackVisible, setIsBackVisible] = useState(false)
+  const [showcaseAuthorization, setShowcaseAuthorization] = useState<ShowcaseAuthorization | null>(null)
+  const queryClient = useQueryClient()
   const { width: screenWidth } = useWindowDimensions()
   const swipeThreshold = Math.min(screenWidth * SWIPE_DISTANCE_RATIO, 96)
-  const reduceMotion = useReducedMotion()
   const copy = getDiscoverySurfaceCopy(getAppLocale())
   const cardBack = useMemo(
     () => normalizeDiscoveryCardBack({
@@ -112,6 +152,63 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     }),
     [profile.badges, profile.bio, profile.prompts, profile.signals]
   )
+  const showcaseQueryKey = useMemo(() => buildDiscoveryRoomShowcaseQueryKey({
+    baseHttpUrl: showcaseAuthorization?.baseHttpUrl ?? "",
+    viewerUserId: showcaseAuthorization?.viewerUserId ?? "",
+    candidateUserId: showcaseAuthorization?.candidateUserId ?? profile.userId,
+    authorizationId: showcaseAuthorization?.id ?? 0
+  }), [
+    showcaseAuthorization,
+    profile.userId
+  ])
+  const authorizationMatches = Boolean(
+    isBackVisible && showcaseRequest && showcaseAuthorization &&
+    showcaseAuthorization.baseHttpUrl === showcaseRequest.baseHttpUrl &&
+    showcaseAuthorization.viewerUserId === showcaseRequest.viewerUserId &&
+    showcaseAuthorization.sessionToken === showcaseRequest.sessionToken &&
+    showcaseAuthorization.candidateUserId === profile.userId
+  )
+  const showcaseQuery = useQuery(createDiscoveryRoomShowcaseQueryOptions({
+    baseHttpUrl: showcaseAuthorization?.baseHttpUrl ?? "",
+    viewerUserId: showcaseAuthorization?.viewerUserId ?? "",
+    candidateUserId: showcaseAuthorization?.candidateUserId ?? profile.userId,
+    sessionToken: showcaseAuthorization?.sessionToken ?? "",
+    authorizationId: showcaseAuthorization?.id ?? 0,
+    enabled: authorizationMatches
+  }))
+  const authorizedShowcase = authorizationMatches && showcaseQuery.isSuccess && !showcaseQuery.isFetching
+    ? showcaseQuery.data
+    : undefined
+  // Demo uses one bundled fixture. A missing production request must never
+  // make embedded profile room fields a substitute for current authorization.
+  const showEmbeddedDemoRoom = Boolean(
+    !showcaseRequest && !showcaseAuthorization &&
+    /^demo-user-\d{3}$/.test(profile.userId) &&
+    profile.roomSnapshot === bundledDemoRoomSnapshot &&
+    !profile.roomSnapshotUrl
+  )
+
+  useEffect(() => {
+    if (!isBackVisible || !showcaseRequest || authorizationMatches) return
+    // A session or account changed while the back face was open. Hide its old
+    // result immediately, then authorize this viewer with a fresh request.
+    setShowcaseAuthorization({
+      id: ++nextShowcaseAuthorizationId,
+      baseHttpUrl: showcaseRequest.baseHttpUrl,
+      viewerUserId: showcaseRequest.viewerUserId,
+      candidateUserId: profile.userId,
+      sessionToken: showcaseRequest.sessionToken
+    })
+  }, [
+    authorizationMatches,
+    isBackVisible,
+    profile.userId,
+    showcaseRequest
+  ])
+
+  useEffect(() => () => {
+    void queryClient.cancelQueries({ queryKey: showcaseQueryKey, exact: true })
+  }, [queryClient, showcaseQueryKey])
 
   // Both faces stay mounted while the card turns so no blank swap frame can appear.
   const frontRotation = flipProgress.interpolate({
@@ -138,6 +235,18 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const toggleFlip = useCallback(() => {
     if (disabled) return
     const nextVisible = !isBackVisible
+    if (!nextVisible) {
+      void queryClient.cancelQueries({ queryKey: showcaseQueryKey, exact: true })
+      setShowcaseAuthorization(null)
+    } else if (showcaseRequest) {
+      setShowcaseAuthorization({
+        id: ++nextShowcaseAuthorizationId,
+        baseHttpUrl: showcaseRequest.baseHttpUrl,
+        viewerUserId: showcaseRequest.viewerUserId,
+        candidateUserId: profile.userId,
+        sessionToken: showcaseRequest.sessionToken
+      })
+    }
     setIsBackVisible(nextVisible)
     onFlipChange?.(nextVisible)
     if (reduceMotion) {
@@ -150,7 +259,17 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: true
     }).start()
-  }, [disabled, flipProgress, isBackVisible, onFlipChange, reduceMotion])
+  }, [
+    disabled,
+    flipProgress,
+    isBackVisible,
+    onFlipChange,
+    queryClient,
+    reduceMotion,
+    showcaseQueryKey,
+    showcaseRequest,
+    profile.userId
+  ])
 
   useEffect(() => {
     flipProgress.stopAnimation()
@@ -226,7 +345,8 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         duration: reduceMotion ? 0 : SWIPE_OUT_DURATION,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true
-      }).start(() => {
+      }).start(({ finished }) => {
+        if (!finished) return
         if (direction === "right") {
           onSwipeRight(profile.userId)
         } else {
@@ -303,12 +423,12 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         ? `${profile.distance}m`
         : copy.card.nearby)
   const photoCount = Math.max(3, Math.min(5, profile.photoUrls?.length ?? 4))
-  const avatarSnapshot = createCandidateAvatarSnapshot({
+  const avatarSnapshot = useMemo(() => createCandidateAvatarSnapshot({
     userId: profile.userId,
     displayName: profile.displayName,
     avatarPresetId: profile.avatarPresetId,
     avatarSelection: profile.avatar
-  })
+  }), [profile.avatar, profile.avatarPresetId, profile.displayName, profile.userId])
   const avatarSize = layoutMetrics?.avatarSize ?? (compact ? 224 : 268)
   const avatarBottomInset = layoutMetrics?.avatarBottomInset ?? (compact ? 128 : 152)
   const infoOverlayBottom = layoutMetrics?.infoOverlayBottom ?? (compact ? 96 : 120)
@@ -319,6 +439,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
 
   return (
     <Animated.View
+      onLayout={() => setFrontLayoutReady(true)}
       style={[
         styles.card,
         {
@@ -346,9 +467,14 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         disabled={disabled}
       >
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
+          <ExpoImage
             source={discoverCardSurface}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            priority={imagePriority}
+            transition={0}
+            onDisplay={() => setFrontSurfaceReady(true)}
+            onError={props.onFrontImageError}
             style={StyleSheet.absoluteFill}
           />
         </View>
@@ -392,11 +518,14 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
             style={[styles.avatarContainer, { marginBottom: avatarBottomInset }]}
             pointerEvents="none"
           >
-            <CandidateAvatarPreview
+            {!props.deferFrontAvatar ? <CandidateAvatarPreview
               snapshot={avatarSnapshot}
               size={avatarSize}
               stage="discover"
-            />
+              imagePriority={imagePriority}
+              onDisplay={props.onFrontDisplay ? handleFrontAvatarDisplay : undefined}
+              onImageError={props.onFrontImageError}
+            /> : null}
           </View>
           <View
             style={[
@@ -444,15 +573,21 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
           ]}
         >
           <DiscoveryCardBack
+            deferAvatar={props.deferBackAvatar && !isBackVisible}
             profile={profile}
             snapshot={avatarSnapshot}
             content={cardBack}
             firstName={firstName}
-              roomSnapshot={profile.roomSnapshot ?? (
-                profile.roomSnapshotUrl ? { uri: profile.roomSnapshotUrl } : undefined
-              )}
-            roomHeadline={profile.roomHeadline ?? undefined}
-            />
+            roomSnapshot={showEmbeddedDemoRoom
+              ? profile.roomSnapshot
+              : authorizedShowcase?.roomSnapshotUrl
+                ? { uri: authorizedShowcase.roomSnapshotUrl }
+                : undefined}
+            roomHeadline={showEmbeddedDemoRoom
+              ? profile.roomHeadline ?? undefined
+              : authorizedShowcase?.roomHeadline ?? undefined}
+            imagePriority={isBackVisible ? imagePriority : "low"}
+          />
         </Animated.View>
 
         <Animated.View
@@ -475,12 +610,14 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
 }
 
 function DiscoveryCardBack(props: {
+  deferAvatar?: boolean
   profile: SwipeableDiscoverProfile
   snapshot: ReturnType<typeof createCandidateAvatarSnapshot>
   content: ReturnType<typeof normalizeDiscoveryCardBack>
   firstName: string
   roomSnapshot?: ImageSourcePropType
   roomHeadline?: string
+  imagePriority: "low" | "normal" | "high"
 }) {
   const copy = getDiscoverySurfaceCopy(getAppLocale())
   const {
@@ -489,7 +626,8 @@ function DiscoveryCardBack(props: {
     content,
     firstName,
     roomSnapshot,
-    roomHeadline
+    roomHeadline,
+    imagePriority
   } = props
   const visiblePrompt = content.prompt ?? normalizeDiscoveryCardBack({ prompt: profile.bio }).prompt
   const visibleInterests = content.interests.length > 0
@@ -505,7 +643,12 @@ function DiscoveryCardBack(props: {
       <View style={styles.backTopRow}>
         <View style={styles.backIdentity}>
           <View style={styles.backAvatarRing}>
-            <CandidateAvatarPreview snapshot={snapshot} size={54} stage="discover" />
+            {!props.deferAvatar ? <CandidateAvatarPreview
+              snapshot={snapshot}
+              size={54}
+              stage="discover"
+              imagePriority={imagePriority}
+            /> : null}
           </View>
           <View>
             <Text style={styles.backOverline}>{copy.card.overline}</Text>

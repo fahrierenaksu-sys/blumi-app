@@ -15,6 +15,7 @@ import { createChatMessageDeliveryService } from "./chat/chatMessageDeliveryServ
 import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
 import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
 import { createFirebaseUserDeletionDispatch } from "./auth/firebaseUserDeletionWorker"
+import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 
 const config = resolveServerConfig()
 const services = createConfiguredServerServices(config)
@@ -35,14 +36,14 @@ const mediaRevocationWorker = config.livekitUrl && config.livekitApiKey && confi
   ? startPeriodicWorker({
       run: () => services.mediaRevocationService.dispatchDue(),
       intervalMs: 1000,
-      reportError: (error) => console.error("Media revocation worker failed", error)
+      reportError: (error) => console.error("Media revocation worker failed", safeOperationalErrorKind(error))
     })
   : undefined
 let accepting = false
 const connectionManager = createConnectionManager({
   fanout: services.realtimeFanout,
   reportFanoutError: (error) => {
-    console.error("Realtime fanout publish failed", error)
+    console.error("Realtime fanout publish failed", safeOperationalErrorKind(error))
   }
 })
 const realtimeTicketService = createRealtimeTicketService({
@@ -52,7 +53,7 @@ const realtimeTicketService = createRealtimeTicketService({
 })
 const notificationOutboxWorker = startNotificationOutboxWorker({
   notificationService: services.notificationService,
-  reportError: (error) => console.error("Notification worker failed", error)
+  reportError: (error) => console.error("Notification worker failed", safeOperationalErrorKind(error))
 })
 const chatDeliveryWorker = startChatDeliveryWorker({
   deliveryService: createChatMessageDeliveryService({
@@ -61,27 +62,27 @@ const chatDeliveryWorker = startChatDeliveryWorker({
     notificationService: services.notificationService,
     connectionManager
   }),
-  reportError: (error) => console.error("Chat delivery worker failed", error)
+  reportError: (error) => console.error("Chat delivery worker failed", safeOperationalErrorKind(error))
 })
 const ticketCleanupWorker = startPeriodicWorker({
   run: () => services.realtimeTicketStore.purgeExpired(new Date(), 500),
   intervalMs: 60_000,
-  reportError: (error) => console.error("Realtime ticket cleanup failed", error)
+  reportError: (error) => console.error("Realtime ticket cleanup failed", safeOperationalErrorKind(error))
 })
 const rateBudgetCleanupWorker = startPeriodicWorker({
   run: () => services.sharedRateLimiter.purgeExpired(), intervalMs: 60_000,
-  reportError: (error) => console.error("Shared request budget cleanup failed", error)
+  reportError: (error) => console.error("Shared request budget cleanup failed", safeOperationalErrorKind(error))
 })
 const discoverySnapshotCleanupWorker = startPeriodicWorker({
   run: () => services.discoverySnapshots.purgeExpired(), intervalMs: 60_000,
-  reportError: (error) => console.error("Discovery snapshot cleanup failed", error)
+  reportError: (error) => console.error("Discovery snapshot cleanup failed", safeOperationalErrorKind(error))
 })
 const discoveryWatchWorker = startDiscoveryWatchWorker({
   matchService: services.matchService,
   safetyService: services.safetyService,
   notificationService: services.notificationService,
   reportError: (error) => {
-    console.error("Discovery Watch worker failed", error)
+    console.error("Discovery Watch worker failed", safeOperationalErrorKind(error))
   }
 })
 const adminTokenService = config.adminSigningKeys.length > 0
@@ -178,7 +179,7 @@ const shutdown = createGracefulShutdown({
 
 function handleShutdown() {
   void shutdown().then(() => process.exit(0), (error) => {
-    console.error("Blumi shutdown failed", error)
+    console.error("Blumi shutdown failed", safeOperationalErrorKind(error))
     process.exit(1)
   })
 }
@@ -187,7 +188,7 @@ process.once("SIGTERM", handleShutdown)
 process.once("SIGINT", handleShutdown)
 
 start().catch((error) => {
-  app.log.error(error)
-  void shutdown().catch((shutdownError) => console.error("Startup cleanup failed", shutdownError))
+  app.log.error({ errorKind: safeOperationalErrorKind(error) }, "Blumi startup failed")
+  void shutdown().catch((shutdownError) => console.error("Startup cleanup failed", safeOperationalErrorKind(shutdownError)))
     .finally(() => process.exit(1))
 })

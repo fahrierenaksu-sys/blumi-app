@@ -8,6 +8,7 @@ import {
   getRoomInviteActions,
   getRoomInvitePresentation,
   isLegacyRoomInviteSentinel,
+  getChatInitialRenderCount,
   type ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
 
@@ -21,6 +22,17 @@ const baseInvite: ChatRoomInviteTimelineItem = {
   status: "pending",
   expiresAt: "2026-07-21T10:11:00.000Z"
 }
+
+test("the first chat render covers the viewport instead of only ten short messages", () => {
+  for (const height of [568, 667, 844, 874, 956, 1024]) {
+    const count = getChatInitialRenderCount(height)
+    assert.ok(count > 10)
+    assert.ok(count * 44 >= height, "short grouped bubbles must fill the initial viewport")
+    assert.ok(count <= 32, "opening must not eagerly mount the entire long conversation")
+  }
+  assert.equal(getChatInitialRenderCount(Number.NaN), 20)
+  assert.equal(getChatInitialRenderCount(0), 20)
+})
 
 test("timeline removes the legacy invite sentinel and keeps durable invite cards ordered", () => {
   const messages: ChatMessage[] = [

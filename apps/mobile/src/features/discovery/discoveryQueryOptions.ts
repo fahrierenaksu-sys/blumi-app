@@ -12,6 +12,32 @@ import {
 const DISCOVERY_PAGE_LIMIT = 12
 const DISCOVERY_STALE_TIME_MS = 30_000
 
+export function shouldStartDiscoveryWatch(input: {
+  isProductionDiscovery: boolean
+  filtersReady: boolean
+  isInitialPagePending: boolean
+}): boolean {
+  // Watch is optional chrome; avoid competing with the first candidate request.
+  // Once the first page settles, an empty or failed deck can still read watch.
+  return input.isProductionDiscovery && input.filtersReady && !input.isInitialPagePending
+}
+
+export function shouldPrefetchDiscoveryPage(input: {
+  isProductionDiscovery: boolean
+  isSafetyListReady: boolean
+  isFetchingNextPage: boolean
+  hasNextPage: boolean
+  isQuotaExhausted: boolean
+  availableCandidateCount: number
+}): boolean {
+  return input.isProductionDiscovery &&
+    input.isSafetyListReady &&
+    !input.isFetchingNextPage &&
+    input.hasNextPage &&
+    !input.isQuotaExhausted &&
+    input.availableCandidateCount <= 3
+}
+
 interface DiscoveryQueryScope {
   baseHttpUrl: string
   userId: string

@@ -36,6 +36,7 @@ import {
   getRoomV2SeatedFurnitureRenderIds
 } from "../roomV2RenderSurface"
 import type { RoomVNextRuntimeMode } from "../roomVNextRuntimeGate"
+import { ROOM_V2_OUTSIDE_COLOR } from "../roomV2Camera"
 
 type RoomRendererPlacementState = "valid" | "invalid"
 type RoomRendererStageMarkerTone = "target" | "blocked"
@@ -137,7 +138,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           source={shell.asset.source}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={reduceMotion ? 0 : 120}
+          transition={0}
           style={styles.shell}
         />
       </View>
@@ -962,7 +963,7 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "relative",
     overflow: "hidden",
-    backgroundColor: "#110A12"
+    backgroundColor: ROOM_V2_OUTSIDE_COLOR
   },
   shell: {
     ...StyleSheet.absoluteFill,

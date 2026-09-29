@@ -63,7 +63,9 @@ test("in-memory presence repository deep-clones complete avatar selections", asy
 test("in-memory presence repository updates every active user presence without stale downgrades", async () => {
   const repository = createInMemoryPresenceRepository()
   const original = createAvatar()
-  const activeAt = new Date("2026-07-13T10:01:00.000Z")
+  const activeAt = new Date(Date.now() + 60_000)
+  const joinedAt = new Date(activeAt.getTime() - 60_000).toISOString()
+  const expiresAt = new Date(activeAt.getTime() + 9 * 60_000).toISOString()
 
   for (const roomId of ["room_one", "room_two"]) {
     await repository.savePresence({
@@ -73,9 +75,9 @@ test("in-memory presence repository updates every active user presence without s
       avatar: original,
       spotId: "spot_one",
       inMiniRoom: false,
-      joinedAt: "2026-07-13T10:00:00.000Z",
-      updatedAt: "2026-07-13T10:00:00.000Z",
-      expiresAt: "2026-07-13T10:10:00.000Z"
+      joinedAt,
+      updatedAt: joinedAt,
+      expiresAt
     })
   }
   await repository.savePresence({
@@ -85,9 +87,9 @@ test("in-memory presence repository updates every active user presence without s
     avatar: original,
     spotId: "spot_one",
     inMiniRoom: false,
-    joinedAt: "2026-07-13T09:00:00.000Z",
-    updatedAt: "2026-07-13T09:00:00.000Z",
-    expiresAt: "2026-07-13T09:10:00.000Z"
+    joinedAt: new Date(activeAt.getTime() - 60 * 60_000).toISOString(),
+    updatedAt: new Date(activeAt.getTime() - 60 * 60_000).toISOString(),
+    expiresAt: new Date(activeAt.getTime() - 60_000).toISOString()
   })
 
   const canonical: CompleteAvatarSelection = {

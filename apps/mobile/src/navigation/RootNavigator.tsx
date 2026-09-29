@@ -6,15 +6,17 @@ import type {
 , ServerEvent } from "@blumi/contracts"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
+  CommonActions,
   createNavigationContainerRef,
   NavigationContainer,
   type LinkingOptions
 } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   StyleSheet,
   View
 } from "react-native"
@@ -51,12 +53,14 @@ import {
   sendThreadMessage
 } from "../features/chat/chatApi"
 import { createChatCoordinator } from "../features/chat/chatCoordinator"
+import { createMatchThreadSyncGate, createThreadListRefreshGuard } from "../features/chat/threadListRefreshGuard"
 import {
   cancelThreadRoomInvite,
   createThreadRoomInvite,
   decideThreadRoomInvite,
   fetchThreadRoomInvites,
   joinRoomSession,
+  leaveActiveRoom,
   normalizeRoomInviteRecord
 } from "../features/chat/chatRoomInviteApi"
 import type {
@@ -70,6 +74,7 @@ import {
 } from "../features/safety/blockStore"
 import {
   applyChatMessageListed,
+  hasMessageHistory,
   applyChatMessageListFailed,
   applyChatMessageListLoading,
   applyChatMessageReceived,
@@ -84,7 +89,7 @@ import {
   markThreadRead as markLocalThreadRead,
   markOptimisticMessageFailed,
   resetChatStore,
-  useChatStore
+  useTotalUnreadCount
 } from "../features/chat/chatStore"
 import {
   recordMutualConnection,
@@ -126,6 +131,7 @@ import { MatchResultScreen } from "../screens/MatchResultScreen"
 import { WelcomeScreen } from "../screens/WelcomeScreen"
 import { AuthEntryScreen } from "../screens/AuthEntryScreen"
 import { AvatarV2Provider } from "../features/avatarV2/state/AvatarV2Provider"
+import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
 import { isAvatarQaUnlockEnabled } from "../features/avatarV2/qa/avatarQaInventory"
 import { getOnboardingStarterBodyId } from "../features/avatarV2/avatarStarterModel"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
@@ -160,17 +166,19 @@ import {
   getSessionNavigatorKey
 } from "../features/session/onboardingFlowModel"
 import {
-  getBottomNavKeyForRoute,
   getChatLocale,
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
+  shouldDispatchMainTabNavigation,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
+import { getBottomNavReturnPresentation, resolveBottomNavReturnPreview, retainBottomNavReturnPreview } from "./bottomNavReturnPreview"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
 import { ToastContainer, showToast } from "../ui/toast"
 import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
+import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
 import { BottomNav, type BottomNavKey } from "../ui/bottomNav"
 import type { BlumiMatch } from "../features/matches/matchRoomModel"
@@ -179,6 +187,14 @@ import { resolveNotificationDestination } from "../features/notifications/notifi
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
+import {
+  getRootNavigationChromeSnapshot,
+  publishRootNavigationChromeReturnPreview,
+  clearRootNavigationChromeReturnPreview,
+  settleRootNavigationChromeReturnPreview,
+  publishRootNavigationChrome,
+  subscribeToRootNavigationChrome
+} from "./rootNavigationChromeStore"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
 import { ConnectionBanner } from "../ui/connectionBanner"
 import { parseReferralCodeFromUrl } from "../features/referrals/referralModel"
@@ -300,6 +316,7 @@ export type RootStackParamList = {
     markThreadRead?: (threadId: string) => void
     roomInvites?: readonly ChatRoomInviteTimelineItem[]
     onRoomInviteAction?: (action: ChatRoomInviteAction) => Promise<void>
+    onCloseActiveRoom?: (expectedRoomSessionId: string) => Promise<void>
     locale?: ChatLocale
   }
   MatchResult: {
@@ -415,6 +432,89 @@ type ReadyMiniRoomEvent = Extract<ServerEvent, { type: "mini_room.ready" }>
 
 interface RootNavigatorProps {
   fontsReady?: boolean
+}
+
+interface RootNavigationChromeProps {
+  navigatorKey: string
+  sessionActor: SessionActor | null
+  sessionEntryRoute: string
+  isAccountRestricted: boolean
+  chatCount: number
+  onBottomNavPress: (key: BottomNavKey) => void
+}
+
+const RootNavigationChrome = memo(function RootNavigationChrome({
+  navigatorKey,
+  sessionActor,
+  sessionEntryRoute,
+  isAccountRestricted,
+  chatCount,
+  onBottomNavPress
+}: RootNavigationChromeProps) {
+  const routeSnapshot = useSyncExternalStore(
+    subscribeToRootNavigationChrome,
+    getRootNavigationChromeSnapshot,
+    getRootNavigationChromeSnapshot
+  )
+  const hasCurrentNavigatorSnapshot = routeSnapshot.navigatorKey === navigatorKey
+  const routeName = hasCurrentNavigatorSnapshot
+    ? routeSnapshot.routeName as keyof RootStackParamList | undefined
+    : undefined
+  const bottomNavRoutePresentation = getBottomNavReturnPresentation(
+    routeName,
+    hasCurrentNavigatorSnapshot ? routeSnapshot.routeKey : undefined,
+    hasCurrentNavigatorSnapshot ? routeSnapshot.returnPreview : undefined
+  )
+  const earlyReturnNavVisualOnly = bottomNavRoutePresentation.visualOnly
+  const currentBottomNavKey = sessionEntryRoute === "Main" && sessionActor
+    ? bottomNavRoutePresentation.currentKey
+    : null
+  const lastBottomNavKeyRef = useRef<BottomNavKey>("discover")
+  if (currentBottomNavKey) lastBottomNavKeyRef.current = currentBottomNavKey
+  const canWarmCurrentSceneAssets = isCurrentSceneWarmupRoute(
+    routeName,
+    sessionEntryRoute,
+    isAccountRestricted
+  )
+
+  return (
+    <>
+      {sessionActor ? (
+        <CurrentSceneAssetWarmup
+          enabled={canWarmCurrentSceneAssets}
+          initialShopMode={hasCurrentNavigatorSnapshot ? routeSnapshot.shopMode : undefined}
+          sessionMode={sessionActor.session.mode}
+          isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
+        />
+      ) : null}
+      {sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation.mounted ? (
+        <View
+          pointerEvents={earlyReturnNavVisualOnly ? "none" : "box-none"}
+          accessibilityElementsHidden={earlyReturnNavVisualOnly}
+          importantForAccessibility={earlyReturnNavVisualOnly ? "no-hide-descendants" : "auto"}
+          style={StyleSheet.absoluteFill}
+        >
+          <BottomNav
+            currentKey={currentBottomNavKey ?? lastBottomNavKeyRef.current}
+            chatCount={chatCount}
+            onPress={onBottomNavPress}
+            visible={bottomNavRoutePresentation.visible}
+            appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
+          />
+        </View>
+      ) : null}
+    </>
+  )
+})
+
+export function isCurrentSceneWarmupRoute(
+  routeName: keyof RootStackParamList | undefined,
+  sessionEntryRoute: string,
+  isAccountRestricted: boolean
+): boolean {
+  return sessionEntryRoute === "Main" &&
+    !isAccountRestricted &&
+    (routeName === "Lobby" || routeName === "CosmeticShop")
 }
 
 export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
@@ -557,10 +657,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
   const [navigationReadyGeneration, setNavigationReadyGeneration] = useState(0)
-  const [currentRouteName, setCurrentRouteName] = useState<
-    keyof RootStackParamList | undefined
-  >()
-  const { totalUnreadCount } = useChatStore()
+  const totalUnreadCount = useTotalUnreadCount()
   const { connectionStatus: rootConnectionStatus } = useGlobalRealtime()
   const demoStore = useDemoStore()
   const visibleRoomInvites = sessionActor?.session.mode === "demo"
@@ -585,7 +682,22 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     sessionEntryRoute === "Main" &&
     sessionActor !== null &&
     accountModeration !== null
+  const sessionNavigatorKey = isAccountRestricted
+    ? `restricted:${sessionActor?.profile.userId ?? "no-session"}`
+    : getSessionNavigatorKey(sessionEntryRoute, sessionActor?.profile.userId)
   const chatLocale = getChatLocale(Intl.DateTimeFormat().resolvedOptions().locale)
+  const threadListRefreshGuardRef = useRef<ReturnType<typeof createThreadListRefreshGuard> | null>(null)
+  if (!threadListRefreshGuardRef.current) threadListRefreshGuardRef.current = createThreadListRefreshGuard()
+  const matchThreadSyncGateRef = useRef<ReturnType<typeof createMatchThreadSyncGate> | null>(null)
+  if (!matchThreadSyncGateRef.current) matchThreadSyncGateRef.current = createMatchThreadSyncGate()
+  const applyRealtimeThreadList = useCallback((list: Parameters<typeof applyChatThreadListed>[0]): void => {
+    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
+    applyChatThreadListed(list)
+  }, [])
+  const applyNewThread = useCallback((thread: Parameters<typeof applyChatThreadCreated>[0]): void => {
+    threadListRefreshGuardRef.current?.observeAuthoritativeThreadChange()
+    applyChatThreadCreated(thread)
+  }, [])
 
   useEffect(() => {
     if (!IS_BLUMI_PAID_COINS_ENABLED) return
@@ -604,23 +716,42 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   const refreshProductionThreads = useCallback(async (): Promise<void> => {
     const actor = latestSessionActorRef.current
     if (actor?.session.mode !== "production") return
+    const requestRevision = threadListRefreshGuardRef.current!.beginHttpRefresh()
     applyChatThreadListLoading()
     try {
       const threadList = await fetchChatThreads(
         MOBILE_HTTP_BASE_URL,
         actor.session.sessionToken
       )
-      if (!isCurrentSession(actor)) return
+      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
       applyChatThreadListed(threadList)
+      const syncKey = `${actor.profile.userId}:${actor.session.sessionToken}`
+      if (matchThreadSyncGateRef.current?.shouldStart(syncKey, Date.now())) {
+        void fetchChatThreads(
+          MOBILE_HTTP_BASE_URL,
+          actor.session.sessionToken,
+          fetch,
+          undefined,
+          { syncMatches: true }
+        ).then((recovered) => {
+          if (!isCurrentSession(actor) || recovered.userId !== actor.profile.userId) return
+          const knownThreadIds = new Set(getThreads().map((thread) => thread.threadId))
+          for (const thread of recovered.threads) {
+            if (knownThreadIds.has(thread.threadId) || !thread.participantUserIds.includes(actor.profile.userId)) continue
+            applyNewThread(thread)
+            knownThreadIds.add(thread.threadId)
+          }
+        }).catch(() => { /* The readable Inbox remains available; retry on a later visit. */ })
+      }
     } catch (error) {
-      if (!isCurrentSession(actor)) return
+      if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
       const message = error instanceof Error
         ? error.message
         : "We could not refresh your chats yet."
       applyChatThreadListFailed(message)
       throw error
     }
-  }, [isCurrentSession])
+  }, [applyNewThread, isCurrentSession])
 
   const reconcileConnectionDecisionDelivery = useCallback<
     NonNullable<ConnectionDecisionDeliveryDependencies["onDelivered"]>
@@ -642,7 +773,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         { participantUserIds: response.match.participantUserIds }
       )
       if (!isCurrentSession(actor)) return
-      applyChatThreadCreated(thread)
+      applyNewThread(thread)
       presentConnectionMatch({
         hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
         markPresented: (miniRoomId) => {
@@ -676,7 +807,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         status: "pending"
       })
     }
-  }, [isCurrentSession, sessionActor])
+  }, [applyNewThread, isCurrentSession, sessionActor])
 
   const dismissGlobalMatch = useCallback((): void => {
     setGlobalMatch(null)
@@ -694,8 +825,9 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       payload: ReadyMiniRoomEvent["payload"],
       options: { allowReopen?: boolean } = {}
     ): void => {
-      if (!sessionActor || !navigationRef.isReady()) return
-      if (!payload.miniRoom.participantUserIds.includes(sessionActor.profile.userId)) {
+      const actor = latestSessionActorRef.current
+      if (!actor || !navigationRef.isReady()) return
+      if (!payload.miniRoom.participantUserIds.includes(actor.profile.userId)) {
         return
       }
       if (
@@ -706,7 +838,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       }
 
       const partner = payload.participants.find(
-        (participant) => participant.userId !== sessionActor.profile.userId
+        (participant) => participant.userId !== actor.profile.userId
       )
       if (!partner) return
 
@@ -721,8 +853,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         },
         participants: {
           you: {
-            userId: sessionActor.profile.userId,
-            displayName: sessionActor.profile.displayName
+            userId: actor.profile.userId,
+            displayName: actor.profile.displayName
           },
           partner: {
             userId: partner.userId,
@@ -736,7 +868,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         }
       })
     },
-    [sessionActor]
+    []
   )
 
   const handleDemoRoomInviteAction = useCallback(
@@ -806,6 +938,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
 
   const chatCoordinator = useMemo(
     () => createChatCoordinator({
+      hasMessageHistory,
       getSessionActor: () => latestSessionActorRef.current,
       isCurrentSession,
       setRoomInvites: (update) => {
@@ -816,6 +949,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       fetchThreadMessages,
       markThreadRead,
       createThreadRoomInvite,
+      leaveActiveRoom,
       decideThreadRoomInvite,
       cancelThreadRoomInvite,
       joinRoomSession,
@@ -833,11 +967,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       sendGlobal,
       baseHttpUrl: MOBILE_HTTP_BASE_URL
     }),
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-    [isCurrentSession, openReadyMiniRoom, sessionActor]
+    [isCurrentSession, openReadyMiniRoom]
   )
   const {
     handleRoomInviteAction,
+    closeMyActiveRoom,
     markChatThreadRead,
     requestMessages,
     sendChatMessage,
@@ -877,11 +1011,27 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     })
   }, [requestMessages])
 
+  const warmThreadMessagesForInbox = useCallback((threadId: string): Promise<void> => {
+    if (latestSessionActorRef.current?.session.mode !== "production") return Promise.resolve()
+    return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
+  }, [requestMessages])
+
   const syncCurrentRouteName = useCallback((): void => {
-    setCurrentRouteName(
-      navigationRef.getCurrentRoute()?.name as keyof RootStackParamList | undefined
-    )
-  }, [])
+    const currentRoute = navigationRef.getCurrentRoute()
+    const routeName = currentRoute?.name as keyof RootStackParamList | undefined
+    const shopParams = currentRoute?.params as RootStackParamList["CosmeticShop"]
+    const previousSnapshot = getRootNavigationChromeSnapshot()
+    const returnPreview = previousSnapshot.navigatorKey === sessionNavigatorKey
+      ? retainBottomNavReturnPreview(previousSnapshot.returnPreview, currentRoute?.key)
+      : undefined
+    publishRootNavigationChrome({
+      navigatorKey: sessionNavigatorKey,
+      routeName,
+      routeKey: currentRoute?.key,
+      shopMode: routeName === "CosmeticShop" ? shopParams?.initialShopMode : undefined,
+      returnPreview
+    })
+  }, [sessionNavigatorKey])
 
   const handleNavigationReady = useCallback((): void => {
     setIsNavigationReady(true)
@@ -893,17 +1043,25 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [sessionEntryRoute, syncCurrentRouteName])
 
   const handleBottomNavPress = useCallback((key: BottomNavKey): void => {
-    setGlobalMatch(null)
     if (!navigationRef.isReady()) return
-    if (key === "discover") {
-      navigationRef.navigate("Lobby")
-    } else if (key === "chats") {
-      navigationRef.navigate("Inbox")
-    } else if (key === "myroom") {
-      navigationRef.navigate("MyRoom")
-    } else if (key === "shop") {
-      navigationRef.navigate("CosmeticShop")
-    }
+    const destination = key === "discover"
+      ? "Lobby"
+      : key === "chats"
+        ? "Inbox"
+        : key === "myroom"
+          ? "MyRoom"
+          : "CosmeticShop"
+    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) return
+    setGlobalMatch(null)
+    // The bottom bar shares a native stack with detail routes. Reordering
+    // existing native controllers with RESET can leave a rapid-switching iOS
+    // transition unresponsive. StackRouter's pop navigation returns to an
+    // earlier tab, or pushes it once when absent, without reordering live
+    // controllers or accumulating another instance on every revisit.
+    navigationRef.dispatch(CommonActions.navigate(destination, undefined, {
+      pop: true,
+      merge: true
+    }))
   }, [])
 
   const goChat = useCallback(
@@ -919,12 +1077,16 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           onRoomInviteAction: sessionActor?.session.mode === "demo"
             ? handleDemoRoomInviteAction
             : handleRoomInviteAction,
+          onCloseActiveRoom: sessionActor?.session.mode === "production"
+            ? closeMyActiveRoom
+            : undefined,
           locale: chatLocale
         })
       }
     },
     [
       chatLocale,
+      closeMyActiveRoom,
       handleDemoRoomInviteAction,
       handleRoomInviteAction,
       markChatThreadRead,
@@ -935,20 +1097,28 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     ]
   )
 
-  const handleNotificationResponseData = useCallback((data: unknown): void => {
-    if (!navigationRef.isReady()) return
+  const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
+    if (
+      expectedActor.session.mode !== "production" ||
+      sessionEntryRoute !== "Main" ||
+      isAccountRestricted ||
+      !isCurrentSession(expectedActor) ||
+      !navigationRef.isReady()
+    ) return false
     const destination = resolveNotificationDestination(data)
-    if (!destination) return
+    if (!destination) return false
     if (destination.route === "ChatThread") {
       navigationRef.navigate("ChatThread", destination.params)
-      return
+      return true
     }
     navigationRef.navigate(destination.route)
-  }, [])
+    return true
+  }, [isAccountRestricted, isCurrentSession, sessionEntryRoute])
 
   const pushRegistration = usePushRegistration(
     sessionEntryRoute === "Main" && !isAccountRestricted ? sessionActor : null,
-    handleNotificationResponseData
+    handleNotificationResponseData,
+    navigationReadyGeneration
   )
 
   const inventoryHydrationSessionToken = sessionActor &&
@@ -1068,8 +1238,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   }, [])
 
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
-  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration })
-  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration }
+  const realtimeSessionCallbacksRef = useRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages })
+  realtimeSessionCallbacksRef.current = { clearSessionActor, refreshAccountModeration, resynchronizeMessages: chatCoordinator.resynchronizeMessages }
 
   useEffect(() => createGlobalRealtimeLifecycle({
     sessionActor,
@@ -1080,6 +1250,15 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     setDemoMode,
     resetInactiveSessionState,
     refreshProductionThreads,
+    resynchronizeActiveConversation: () => {
+      const route = navigationRef.getCurrentRoute()
+      const threadId = route?.name === "ChatThread"
+        ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
+        : route?.name === "MiniRoom"
+          ? (route.params as RootStackParamList["MiniRoom"] | undefined)?.readyMiniRoom.miniRoom.sourceThreadId
+          : undefined
+      return threadId ? realtimeSessionCallbacksRef.current.resynchronizeMessages(threadId) : Promise.resolve()
+    },
     hydrateBlockedUsersFromServer,
     connectGlobal,
     disconnectGlobal,
@@ -1119,7 +1298,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         recordMutualConnection,
         hydrateFromServer,
         createThread,
-        applyChatThreadCreated,
+        applyChatThreadCreated: applyNewThread,
         presentMatch: (match) => {
           presentConnectionMatch({
             hasPresented: (miniRoomId) => handledMatchIdsRef.current.has(miniRoomId),
@@ -1152,7 +1331,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           )
         })
     },
-    [hydrateFromServer, sessionActor]
+    [applyNewThread, hydrateFromServer, sessionActor]
   )
 
   const handleGlobalEvent = useMemo(
@@ -1164,11 +1343,11 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       }),
       normalizeRoomInviteRecord,
       upsertRoomInvite,
-      applyChatThreadListed,
+      applyChatThreadListed: applyRealtimeThreadList,
       applyChatThreadRead,
       requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
       requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
-      applyChatThreadCreated,
+      applyChatThreadCreated: applyNewThread,
       applyChatMessageListed,
       applyChatMessageReceived,
       getThreads,
@@ -1180,6 +1359,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }),
     [
       handleRealtimeConnectionMatch,
+      applyNewThread,
+      applyRealtimeThreadList,
       refreshProductionThreads,
       openReadyMiniRoom,
       sessionActor?.profile.userId,
@@ -1200,9 +1381,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     return <BlumiLoadingScreen onPreludeReady={handleBootPreludeReady} />
   }
 
-  const currentBottomNavKey = sessionEntryRoute === "Main" && sessionActor
-    ? getBottomNavKeyForRoute(currentRouteName)
-    : null
   const onboardingStarterBodyId =
     sessionActor?.session.onboarding.avatar === "incomplete"
       ? getOnboardingStarterBodyId(sessionActor.profile.gender)
@@ -1236,6 +1414,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           : undefined
       }
     >
+    <DiscoveryStartupBoundary key={sessionNavigatorKey} active={sessionEntryRoute === "Main" && sessionActor?.session.mode === "production" && !isAccountRestricted}>
     <View style={styles.navigatorShell}>
       {!isAccountRestricted
         ? <ConnectionBanner status={rootConnectionStatus} />
@@ -1248,11 +1427,31 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         onStateChange={syncCurrentRouteName}
       >
         <Stack.Navigator
-          key={
-            isAccountRestricted
-              ? `restricted:${sessionActor?.profile.userId ?? "no-session"}`
-              : getSessionNavigatorKey(sessionEntryRoute, sessionActor?.profile.userId)
-          }
+          screenListeners={({ route, navigation }) => ({
+            transitionStart: ({ data }) => {
+              if (sessionEntryRoute !== "Main" || isAccountRestricted) return
+              if (!data.closing) {
+                // A cancelled pop reappears on the source; the target's willAppear
+                // must not discard the preview while the gesture is still active.
+                clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
+                return
+              }
+              const preview = resolveBottomNavReturnPreview({
+                platform: Platform.OS === "ios" ? "ios" : "android",
+                closing: data.closing,
+                sourceRouteKey: route.key,
+                stack: navigation.getState()
+              })
+              if (preview) publishRootNavigationChromeReturnPreview(sessionNavigatorKey, preview)
+            },
+            transitionEnd: ({ data }) => {
+              settleRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key, data.closing)
+            },
+            gestureCancel: () => {
+              clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
+            }
+          })}
+          key={sessionNavigatorKey}
           initialRouteName={
             isAccountRestricted
               ? "AccountRestriction"
@@ -1317,7 +1516,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="MiniRoom"
-                options={{ headerShown: false }}
+                options={{ headerShown: false, gestureEnabled: false }}
               >
                 {(screenProps) => (
                   <MiniRoomScreen {...screenProps} sessionActor={sessionActor} />
@@ -1383,6 +1582,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     {...screenProps}
                     sessionActor={sessionActor}
                     onRetryThreads={refreshProductionThreads}
+                    onWarmThread={warmThreadMessagesForInbox}
                   />
                 )}
               </Stack.Screen>
@@ -1417,12 +1617,17 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="ChatThread"
-                options={{ headerShown: false }}
+                options={{
+                  headerShown: false,
+                  animation: reduceMotion ? "none" : "simple_push",
+                  animationDuration: 240
+                }}
               >
                 {(screenProps) => (
                   <ChatThreadScreen
                     {...screenProps}
                     sessionActor={sessionActor}
+                    onThreadCreated={applyNewThread}
                     route={{
                       ...screenProps.route,
                       params: {
@@ -1434,6 +1639,9 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                         onRoomInviteAction: sessionActor?.session.mode === "demo"
                           ? handleDemoRoomInviteAction
                           : handleRoomInviteAction,
+                        onCloseActiveRoom: sessionActor?.session.mode === "production"
+                          ? closeMyActiveRoom
+                          : undefined,
                         locale: chatLocale
                       }
                     }}
@@ -1757,16 +1965,17 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
           />
         ) : null}
       </NavigationContainer>
-      {currentBottomNavKey && !isAccountRestricted ? (
-        <BottomNav
-          currentKey={currentBottomNavKey}
-          chatCount={chatBadgeCount}
-          onPress={handleBottomNavPress}
-          appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
-        />
-      ) : null}
+      <RootNavigationChrome
+        navigatorKey={sessionNavigatorKey}
+        sessionActor={sessionActor}
+        sessionEntryRoute={sessionEntryRoute}
+        isAccountRestricted={isAccountRestricted}
+        chatCount={chatBadgeCount}
+        onBottomNavPress={handleBottomNavPress}
+      />
       <ToastContainer />
     </View>
+    </DiscoveryStartupBoundary>
     </RoomV2Provider>
     </AvatarV2Provider>
   )

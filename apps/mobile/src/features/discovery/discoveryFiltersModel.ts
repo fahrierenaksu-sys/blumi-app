@@ -26,6 +26,26 @@ export interface DiscoveryFiltersFallbackStorage extends DiscoveryFiltersStorage
   removeItem(key: string): Promise<void>
 }
 
+type LocalFallbackCacheEntry =
+  | { state: "pending"; promise: Promise<DiscoveryFilters | null> }
+  | { state: "ready"; value: DiscoveryFilters | null }
+
+// A resolved read can be used on the first Lobby render. The storage instance
+// and user ID both scope it; writes replace pending reads so old data cannot win.
+const localFallbackCache = new WeakMap<
+  DiscoveryFiltersStorage,
+  Map<string, LocalFallbackCacheEntry>
+>()
+
+function fallbackCacheFor(storage: DiscoveryFiltersStorage) {
+  let entries = localFallbackCache.get(storage)
+  if (!entries) {
+    entries = new Map<string, LocalFallbackCacheEntry>()
+    localFallbackCache.set(storage, entries)
+  }
+  return entries
+}
+
 const GENDER_LABELS: Record<DiscoveryGender, string> = {
   woman: "Women",
   man: "Men"
@@ -99,15 +119,47 @@ export async function loadLocalDiscoveryFiltersFallback(
   storage: DiscoveryFiltersStorage,
   userId: string
 ): Promise<DiscoveryFilters | null> {
+  const key = getLocalDiscoveryFiltersFallbackStorageKey(userId)
+  const entries = fallbackCacheFor(storage)
+  const cached = entries.get(key)
+  if (cached?.state === "ready") return cached.value
+  if (cached?.state === "pending") return cached.promise
+
+  let read: Promise<string | null>
   try {
-    const raw = await storage.getItem(
-      getLocalDiscoveryFiltersFallbackStorageKey(userId)
-    )
-    if (!raw) return null
-    return normalizeDiscoveryFilters(JSON.parse(raw) as unknown)
+    read = storage.getItem(key)
   } catch {
     return null
   }
+
+  const pending: LocalFallbackCacheEntry & { state: "pending" } = {
+    state: "pending",
+    promise: read.then((raw) => {
+        let value: DiscoveryFilters | null = null
+        try {
+          value = raw ? normalizeDiscoveryFilters(JSON.parse(raw) as unknown) : null
+        } catch {
+          // A corrupt optional override should not block the account filters.
+        }
+        if (entries.get(key) === pending) entries.set(key, { state: "ready", value })
+        return value
+      }, () => {
+        if (entries.get(key) === pending) entries.delete(key)
+        return null
+      })
+  }
+  entries.set(key, pending)
+  return pending.promise
+}
+
+export function getLoadedLocalDiscoveryFiltersFallback(
+  storage: DiscoveryFiltersStorage,
+  userId: string
+): DiscoveryFilters | null | undefined {
+  const cached = fallbackCacheFor(storage).get(
+    getLocalDiscoveryFiltersFallbackStorageKey(userId)
+  )
+  return cached?.state === "ready" ? cached.value : undefined
 }
 
 export async function persistLocalDiscoveryFiltersFallback(
@@ -120,6 +172,10 @@ export async function persistLocalDiscoveryFiltersFallback(
     getLocalDiscoveryFiltersFallbackStorageKey(userId),
     JSON.stringify(normalized)
   )
+  fallbackCacheFor(storage).set(
+    getLocalDiscoveryFiltersFallbackStorageKey(userId),
+    { state: "ready", value: normalized }
+  )
   return normalized
 }
 
@@ -127,7 +183,9 @@ export async function clearLocalDiscoveryFiltersFallback(
   storage: DiscoveryFiltersFallbackStorage,
   userId: string
 ): Promise<void> {
-  await storage.removeItem(getLocalDiscoveryFiltersFallbackStorageKey(userId))
+  const key = getLocalDiscoveryFiltersFallbackStorageKey(userId)
+  await storage.removeItem(key)
+  fallbackCacheFor(storage).set(key, { state: "ready", value: null })
 }
 
 export function resolveDiscoveryFiltersForFocus(

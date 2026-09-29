@@ -138,6 +138,19 @@ try {
       }
     }
   )
+
+  execFileSync(
+    process.execPath,
+    [
+      "--import", "tsx",
+      "--test",
+      "src/features/session/registerLegalContract.test.ts"
+    ],
+    {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    }
+  )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

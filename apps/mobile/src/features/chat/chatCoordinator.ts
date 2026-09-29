@@ -12,7 +12,7 @@ import type {
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
-import type { RoomSessionJoinResult } from "./chatRoomInviteApi"
+import { RoomInviteApiError, type RoomSessionJoinResult } from "./chatRoomInviteApi"
 import {
   getMessageListErrorMessageForDisplay,
   getMessageSendErrorMessageForDisplay,
@@ -20,11 +20,14 @@ import {
   getRoomInvitationLoadErrorMessageForDisplay
 } from "./chatErrorCopy"
 
+const pendingMessageSendsBySessionThread = new Map<string, Promise<void>>()
+
 export type RoomInvitesUpdater = (
   current: readonly ChatRoomInviteTimelineItem[]
 ) => ChatRoomInviteTimelineItem[]
 
 export interface ChatCoordinatorDependencies {
+  hasMessageHistory?: (threadId: string) => boolean
   getSessionActor: () => SessionActor | null
   isCurrentSession: (expectedActor: SessionActor) => boolean
   setRoomInvites: (update: RoomInvitesUpdater) => void
@@ -57,6 +60,11 @@ export interface ChatCoordinatorDependencies {
     sessionToken: string,
     threadId: string
   ) => Promise<ChatRoomInviteTimelineItem>
+  leaveActiveRoom: (
+    baseHttpUrl: string,
+    sessionToken: string,
+    expectedRoomSessionId: string
+  ) => Promise<{ ended: boolean }>
   decideThreadRoomInvite: (
     baseHttpUrl: string,
     sessionToken: string,
@@ -100,6 +108,7 @@ export interface ChatCoordinatorDependencies {
 }
 
 export interface ChatCoordinator {
+  resynchronizeMessages: (threadId: string) => Promise<void>
   refreshThreadRoomInvites: (threadId: string) => Promise<void>
   sendChatMessage: (
     threadId: string,
@@ -108,9 +117,11 @@ export interface ChatCoordinator {
   ) => Promise<void>
   requestMessages: (
     threadId: string,
-    options?: FetchThreadMessagesOptions
+    options?: FetchThreadMessagesOptions,
+    config?: { purpose: "prefetch" }
   ) => Promise<void>
   handleRoomInviteAction: (action: ChatRoomInviteAction) => Promise<void>
+  closeMyActiveRoom: (expectedRoomSessionId: string) => Promise<void>
   markChatThreadRead: (threadId: string) => void
   replaceThreadRoomInvites: (
     threadId: string,
@@ -122,8 +133,21 @@ export interface ChatCoordinator {
 export function createChatCoordinator(
   dependencies: ChatCoordinatorDependencies
 ): ChatCoordinator {
+  const pendingFirstPages = new Map<string, Promise<void>>()
+  const recentFirstPages = new Map<string, number>()
+  const recentRoomInvitePages = new Map<string, number>()
+  const requestEpochs = new Map<string, number>()
+  const sessionThreadKey = (actor: SessionActor, threadId: string): string =>
+    JSON.stringify([actor.profile.userId, actor.session.sessionId, actor.session.sessionToken, threadId])
   const roomInviteRevisions = new Map<string, number>()
   const roomInviteMutationRevisions = new Map<string, number>()
+  const pendingRoomInviteRefreshes = new Map<string, {
+    sessionToken: string
+    sessionId: string
+    userId: string
+    promise: Promise<void>
+  }>()
+  const handledRoomInviteRefreshFailures = new WeakSet<Promise<void>>()
 
   const getRoomInviteRevision = (threadId: string): number =>
     roomInviteRevisions.get(threadId) ?? 0
@@ -174,20 +198,44 @@ export function createChatCoordinator(
     ])
   }
 
-  const refreshThreadRoomInvites = async (threadId: string): Promise<void> => {
+  const refreshThreadRoomInvites = (threadId: string): Promise<void> => {
     const actor = getProductionActor()
-    if (!actor) return
+    if (!actor) return Promise.resolve()
+    const key = sessionThreadKey(actor, threadId)
+    const epoch = requestEpochs.get(key) ?? 0
+    const pending = pendingRoomInviteRefreshes.get(threadId)
+    if (pending?.sessionToken === actor.session.sessionToken &&
+      pending.sessionId === actor.session.sessionId &&
+      pending.userId === actor.profile.userId) {
+      return pending.promise
+    }
     const refreshStartedAt = getRoomInviteRevision(threadId)
-    const invites = await dependencies.fetchThreadRoomInvites(
-      dependencies.baseHttpUrl,
-      actor.session.sessionToken,
-      threadId
-    )
-    if (!dependencies.isCurrentSession(actor)) return
-    replaceThreadRoomInvites(threadId, invites, refreshStartedAt)
+    const promise = (async () => {
+      const invites = await dependencies.fetchThreadRoomInvites(
+        dependencies.baseHttpUrl,
+        actor.session.sessionToken,
+        threadId
+      )
+      if (!dependencies.isCurrentSession(actor) || (requestEpochs.get(key) ?? 0) !== epoch) return
+      replaceThreadRoomInvites(threadId, invites, refreshStartedAt)
+      recentRoomInvitePages.set(sessionThreadKey(actor, threadId), Date.now())
+    })()
+    pendingRoomInviteRefreshes.set(threadId, {
+      sessionToken: actor.session.sessionToken,
+      sessionId: actor.session.sessionId,
+      userId: actor.profile.userId,
+      promise
+    })
+    const clearPending = (): void => {
+      if (pendingRoomInviteRefreshes.get(threadId)?.promise === promise) {
+        pendingRoomInviteRefreshes.delete(threadId)
+      }
+    }
+    void promise.then(clearPending, clearPending)
+    return promise
   }
 
-  const sendChatMessage = async (
+  const sendChatMessage = (
     threadId: string,
     body: string,
     clientMessageId: string
@@ -198,83 +246,168 @@ export function createChatCoordinator(
         type: "chat.send_message",
         payload: { threadId, body }
       })
-      return
+      return Promise.resolve()
     }
 
-    try {
-      const message = await dependencies.sendThreadMessage(
-        dependencies.baseHttpUrl,
-        actor.session.sessionToken,
-        threadId,
-        body,
-        { clientMessageId }
-      )
-      if (dependencies.isCurrentSession(actor)) {
-        dependencies.confirmOptimisticMessage(
-          clientMessageId,
-          message,
-          actor.profile.userId
+    const queueKey = JSON.stringify([
+      actor.profile.userId,
+      actor.session.sessionId,
+      threadId
+    ])
+    const send = async (): Promise<void> => {
+      if (!dependencies.isCurrentSession(actor)) return
+      try {
+        const message = await dependencies.sendThreadMessage(
+          dependencies.baseHttpUrl,
+          actor.session.sessionToken,
+          threadId,
+          body,
+          { clientMessageId }
         )
-      }
-    } catch (error) {
-      if (dependencies.isCurrentSession(actor)) {
-        dependencies.markOptimisticMessageFailed(clientMessageId)
-        dependencies.showWarningToast({
-          title: "Message not sent",
-          body: getMessageSendErrorMessageForDisplay(
-            error instanceof Error ? error.message : ""
+        if (dependencies.isCurrentSession(actor)) {
+          dependencies.confirmOptimisticMessage(
+            clientMessageId,
+            message,
+            actor.profile.userId
           )
-        })
+        }
+      } catch (error) {
+        if (dependencies.isCurrentSession(actor)) {
+          dependencies.markOptimisticMessageFailed(clientMessageId)
+          dependencies.showWarningToast({
+            title: "Message not sent",
+            body: getMessageSendErrorMessageForDisplay(
+              error instanceof Error ? error.message : ""
+            )
+          })
+        }
+        throw error
       }
-      throw error
     }
+
+    const previous = pendingMessageSendsBySessionThread.get(queueKey)
+    const pending = previous
+      ? previous.catch(() => undefined).then(send)
+      : send()
+    pendingMessageSendsBySessionThread.set(queueKey, pending)
+    const clearQueue = (): void => {
+      if (pendingMessageSendsBySessionThread.get(queueKey) === pending) {
+        pendingMessageSendsBySessionThread.delete(queueKey)
+      }
+    }
+    void pending.then(clearQueue, clearQueue)
+    return pending
   }
 
-  const requestMessages = async (
+  const requestMessages = (
     threadId: string,
-    options: FetchThreadMessagesOptions = {}
+    options: FetchThreadMessagesOptions = {},
+    config?: { purpose: "prefetch" }
   ): Promise<void> => {
-    dependencies.applyChatMessageListLoading(threadId)
     const actor = getProductionActor()
     if (!actor) {
+      dependencies.applyChatMessageListLoading(threadId)
       dependencies.sendGlobal({
         type: "chat.list_messages",
         payload: { threadId }
       })
-      return
+      return Promise.resolve()
     }
 
-    try {
-      const messageList = await dependencies.fetchThreadMessages(
-        dependencies.baseHttpUrl,
-        actor.session.sessionToken,
-        threadId,
-        options
-      )
-      if (!dependencies.isCurrentSession(actor)) return
-      dependencies.applyChatMessageListed(messageList)
-      void refreshThreadRoomInvites(threadId).catch((error) => {
-        if (!dependencies.isCurrentSession(actor)) return
-        dependencies.showWarningToast({
-          title: "Room invitations unavailable",
-          body: getRoomInvitationLoadErrorMessageForDisplay(
-            error instanceof Error ? error.message : ""
-          )
-        })
-      })
-    } catch (error) {
-      if (dependencies.isCurrentSession(actor)) {
-        const errorMessage = getMessageListErrorMessageForDisplay(
-          error instanceof Error ? error.message : ""
-        )
-        dependencies.applyChatMessageListFailed(threadId, errorMessage)
-        dependencies.showWarningToast({
-          title: "Chat not loaded",
-          body: errorMessage
+    const key = sessionThreadKey(actor, threadId)
+    const epoch = requestEpochs.get(key) ?? 0
+    const isCurrentRequest = (): boolean => dependencies.isCurrentSession(actor) &&
+      (requestEpochs.get(key) ?? 0) === epoch
+    let openingInvites = Promise.resolve()
+    const inviteFetchedAt = recentRoomInvitePages.get(sessionThreadKey(actor, threadId))
+    if (inviteFetchedAt === undefined || Date.now() - inviteFetchedAt >= 10_000) {
+      const inviteRefresh = refreshThreadRoomInvites(threadId)
+      openingInvites = inviteRefresh.catch(() => undefined)
+      if (config?.purpose === "prefetch") {
+        // Warm the durable invite alongside history, without unsolicited alerts.
+        // Opening can attach its own error handling to the same in-flight request.
+        void inviteRefresh.catch(() => undefined)
+      } else if (!handledRoomInviteRefreshFailures.has(inviteRefresh)) {
+        handledRoomInviteRefreshFailures.add(inviteRefresh)
+        void inviteRefresh.catch((error) => {
+          if (!isCurrentRequest()) return
+          dependencies.showWarningToast({
+            title: "Room invitations unavailable",
+            body: getRoomInvitationLoadErrorMessageForDisplay(
+              error instanceof Error ? error.message : ""
+            )
+          })
         })
       }
-      throw error
     }
+
+    const firstPageKey = !options.before && options.limit === undefined
+      ? sessionThreadKey(actor, threadId)
+      : null
+    if (firstPageKey) {
+      const pending = pendingFirstPages.get(firstPageKey)
+      if (pending) return pending
+      const fetchedAt = recentFirstPages.get(firstPageKey)
+      if (fetchedAt !== undefined && Date.now() - fetchedAt < 10_000) {
+        return openingInvites
+      }
+    }
+
+    dependencies.applyChatMessageListLoading(threadId)
+    const request = (async () => {
+      try {
+        const messageList = await dependencies.fetchThreadMessages(
+          dependencies.baseHttpUrl,
+          actor.session.sessionToken,
+          threadId,
+          options
+        )
+        // Both requests start concurrently. Only the cold first page waits for
+        // its invite snapshot before publication; cached conversations and
+        // older-history pagination stay visible and independent.
+        if (!options.before && !dependencies.hasMessageHistory?.(threadId)) {
+          await openingInvites
+        }
+        if (!isCurrentRequest()) return
+        dependencies.applyChatMessageListed(messageList)
+        if (firstPageKey) recentFirstPages.set(firstPageKey, Date.now())
+      } catch (error) {
+        if (isCurrentRequest()) {
+          const errorMessage = getMessageListErrorMessageForDisplay(
+            error instanceof Error ? error.message : ""
+          )
+          dependencies.applyChatMessageListFailed(threadId, errorMessage)
+          if (config?.purpose !== "prefetch") {
+            dependencies.showWarningToast({ title: "Chat not loaded", body: errorMessage })
+          }
+        }
+        throw error
+      }
+    })()
+    if (firstPageKey) {
+      pendingFirstPages.set(firstPageKey, request)
+      const clearPending = (): void => {
+        if (pendingFirstPages.get(firstPageKey) === request) pendingFirstPages.delete(firstPageKey)
+      }
+      void request.then(clearPending, clearPending)
+    }
+    return request
+  }
+
+  const resynchronizeMessages = (threadId: string): Promise<void> => {
+    const actor = getProductionActor()
+    if (!actor) return Promise.resolve()
+    const key = sessionThreadKey(actor, threadId)
+    requestEpochs.set(key, (requestEpochs.get(key) ?? 0) + 1)
+    recentFirstPages.delete(key)
+    recentRoomInvitePages.delete(key)
+    pendingFirstPages.delete(key)
+    const pending = pendingRoomInviteRefreshes.get(threadId)
+    if (pending?.sessionToken === actor.session.sessionToken &&
+      pending.sessionId === actor.session.sessionId && pending.userId === actor.profile.userId) {
+      pendingRoomInviteRefreshes.delete(threadId)
+    }
+    return requestMessages(threadId)
   }
 
   const handleRoomInviteAction = async (
@@ -344,16 +477,30 @@ export function createChatCoordinator(
       dependencies.openReadyMiniRoom(roomReady, { allowReopen: true })
       dependencies.captureProductEvent("room_joined", { mode: actor.session.mode })
     } catch (error) {
-      if (dependencies.isCurrentSession(actor)) {
+      const busyCode = error instanceof RoomInviteApiError ? error.code : null
+      if (dependencies.isCurrentSession(actor) &&
+        !(action.type === "create" && busyCode === "SELF_IN_ROOM")) {
         dependencies.showWarningToast({
           title: "Room invitation unavailable",
           body: getRoomInvitationActionErrorMessageForDisplay(
-            error instanceof Error ? error.message : ""
+            error instanceof Error ? error.message : "",
+            undefined,
+            busyCode
           )
         })
       }
       throw error
     }
+  }
+
+  const closeMyActiveRoom = async (expectedRoomSessionId: string): Promise<void> => {
+    const actor = getProductionActor()
+    if (!actor) throw new Error("A signed-in account is required to close a room.")
+    await dependencies.leaveActiveRoom(
+      dependencies.baseHttpUrl,
+      actor.session.sessionToken,
+      expectedRoomSessionId
+    )
   }
 
   const markChatThreadRead = (threadId: string): void => {
@@ -372,10 +519,12 @@ export function createChatCoordinator(
   }
 
   return {
+    resynchronizeMessages,
     refreshThreadRoomInvites,
     sendChatMessage,
     requestMessages,
     handleRoomInviteAction,
+    closeMyActiveRoom,
     markChatThreadRead,
     replaceThreadRoomInvites,
     upsertRoomInvite

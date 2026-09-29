@@ -17,6 +17,10 @@ import type {
 } from "../auth/authStore"
 import { otpDigestsMatch } from "../auth/authStore"
 import { discoveryWatchLockSql } from "./discoveryWatchLock"
+import {
+  REALTIME_CONNECTION_LEASE_LOCK_SQL,
+  realtimeConnectionLeaseLockKey
+} from "./postgresRealtimeConnectionLeaseLock"
 
 export function createPostgresAuthRepository(pool: Pool): AuthRepository {
   return {
@@ -1237,6 +1241,9 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "SELECT user_id FROM blumi_discovery_watches WHERE user_id = $1 FOR UPDATE",
           [account.userId]
         )
+        // Match connection register/heartbeat/disconnect before touching presence;
+        // the account DELETE below keeps the FK cascade as the lease cleanup path.
+        await client.query(REALTIME_CONNECTION_LEASE_LOCK_SQL, [realtimeConnectionLeaseLockKey(account.userId)])
         await client.query(
           "DELETE FROM blumi_pending_otps WHERE phone_number = $1",
           [account.phoneNumber]

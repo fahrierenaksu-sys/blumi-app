@@ -181,6 +181,91 @@ test("does not toast a late production refresh failure after cleanup", async () 
   assert.deepEqual(dependencies.toasts, [])
 })
 
+test("reconnect refreshes safety and active history once without initial or duplicate work", async () => {
+  let resyncs = 0
+  const dependencies = createDependencies({
+    resynchronizeActiveConversation: async () => { resyncs += 1 }
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const listener = dependencies.statusListeners[0]
+  listener("connected")
+  listener("connected")
+  assert.equal(resyncs, 0)
+  listener("reconnecting", { closeCode: 1012 })
+  listener("connected")
+  listener("connected")
+  await Promise.resolve()
+  assert.equal(resyncs, 1)
+  assert.equal(dependencies.calls.filter((call) => call === "hydrate-blocks").length, 2)
+  assert.equal(dependencies.sentEvents.length, 2)
+  cleanup()
+  listener("reconnecting")
+  listener("connected")
+  assert.equal(resyncs, 1)
+})
+
+test("a superseded account does not resynchronize on reconnect", () => {
+  let current = true
+  let resyncs = 0
+  const dependencies = createDependencies({
+    isCurrentSession: () => current,
+    resynchronizeActiveConversation: async () => { resyncs += 1 }
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const listener = dependencies.statusListeners[0]
+  listener("connected")
+  current = false
+  listener("reconnecting")
+  listener("connected")
+  assert.equal(resyncs, 0)
+  assert.equal(dependencies.sentEvents.length, 1)
+  cleanup()
+})
+
+test("a superseded reconnect failure cannot show a stale warning", async () => {
+  const rejectSafety: ((error: Error) => void)[] = []
+  const dependencies = createDependencies({
+    hydrateBlockedUsersFromServer: () => new Promise<void>((_resolve, reject) => {
+      rejectSafety.push(reject)
+    }),
+    resynchronizeActiveConversation: async () => undefined
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const listener = dependencies.statusListeners[0]
+  listener("connected")
+  listener("reconnecting")
+  listener("connected")
+  listener("reconnecting")
+  listener("connected")
+  rejectSafety[1]?.(new Error("old reconnect"))
+  await Promise.resolve()
+  assert.deepEqual(dependencies.toasts, [])
+  rejectSafety[2]?.(new Error("current reconnect"))
+  await Promise.resolve()
+  assert.equal(dependencies.toasts.length, 1)
+  cleanup()
+  rejectSafety[0]?.(new Error("initial connection"))
+  await Promise.resolve()
+})
+
+test("a failed active chat resync leaves warning ownership with chat coordinator", async () => {
+  const dependencies = createDependencies({
+    resynchronizeActiveConversation: async () => {
+      dependencies.showWarningToast({ title: "Chat not loaded", body: "Retry later" })
+      throw new Error("network detail")
+    }
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const listener = dependencies.statusListeners[0]
+  listener("connected")
+  listener("reconnecting")
+  listener("connected")
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.deepEqual(dependencies.toasts, [{ title: "Chat not loaded", body: "Retry later" }])
+  cleanup()
+})
+
 test("uses safe copy instead of transport diagnostics for global refresh failures", async () => {
   let rejectThreads: ((error: Error) => void) | undefined
   let rejectBlockedUsers: ((error: Error) => void) | undefined

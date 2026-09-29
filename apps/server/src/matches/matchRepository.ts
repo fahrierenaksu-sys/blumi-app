@@ -85,6 +85,7 @@ export interface MatchRepository {
     toUserId: string
   ): Promise<DiscoveryDecisionRecord | null>
   findMatchBetween(userAId: string, userBId: string): Promise<MatchRecord | null>
+  listMatchesForUser(userId: string): Promise<MatchRecord[]>
   createMatch(match: MatchRecord): Promise<MatchRecord>
   findDiscoveryWatch(userId: string): Promise<DiscoveryWatchRecord | null>
   claimNextDiscoveryWatch(now: Date): Promise<DiscoveryWatchClaim | null>
@@ -236,6 +237,12 @@ export function createInMemoryMatchRepository(
             ]
           }
         : null
+    },
+    async listMatchesForUser(userId) {
+      return [...store.matches.values()]
+        .filter((match) => match.participantUserIds.includes(userId))
+        .sort((left, right) => right.matchedAt.localeCompare(left.matchedAt))
+        .map(cloneMatch)
     },
     async createMatch(match) {
       const key = matchKey(match.participantUserIds[0], match.participantUserIds[1])

@@ -803,6 +803,7 @@ test("navigation links and offline status remain wired to native runtime", () =>
   const navigator = read("src/navigation/RootNavigator.tsx")
   const networkStore = read("src/features/network/networkStore.ts")
   const connectionBanner = read("src/ui/connectionBanner.tsx")
+  const connectionBannerModel = read("src/ui/connectionBannerModel.ts")
 
   assert.match(navigator, /prefixes: \["blumi:\/\/"\]/)
   for (const path of [
@@ -821,9 +822,11 @@ test("navigation links and offline status remain wired to native runtime", () =>
   assert.match(navigator, /<ConnectionBanner status=\{rootConnectionStatus\}/)
   assert.match(networkStore, /NetInfo\.addEventListener/)
   assert.doesNotMatch(networkStore, /\bany\b|console\.warn|try\s*\{\s*require/)
-  assert.match(connectionBanner, /!isConnected/)
+  assert.match(connectionBanner, /resolveConnectionBannerState\(status, isConnected, initialConnectionSlow\)/)
+  assert.match(connectionBannerModel, /if \(!isConnected\) return "offline"/)
   assert.match(connectionBanner, /No internet connection/)
-  assert.match(connectionBanner, /Reconnecting to the room/)
+  assert.match(connectionBanner, /Reconnecting to Blumi/)
+  assert.doesNotMatch(connectionBanner, /Connecting to the room/)
   assert.doesNotMatch(read("src/screens/LobbyScreen.tsx"), /<ConnectionBanner/)
   assert.match(read("src/screens/SettingsScreen.tsx"), /Platform\.select/)
 })

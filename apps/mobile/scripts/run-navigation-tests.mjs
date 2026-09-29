@@ -13,6 +13,11 @@ const coverageArguments = nodeMajorVersion >= 22
 const sourceFiles = [
   "src/navigation/rootNavigationModel.ts",
   "src/navigation/rootNavigationModel.test.ts",
+  "src/navigation/bottomNavReturnPreview.ts",
+  "src/navigation/bottomNavReturnPreview.test.ts",
+  "src/navigation/rootNavigationChromeStore.ts",
+  "src/navigation/rootNavigationChromeStore.test.ts",
+  "src/navigation/mainTabSwitchStress.test.ts",
   "src/navigation/linkedProfileResolutionModel.ts",
   "src/navigation/linkedProfileResolutionModel.test.ts",
   "src/features/lobby/lobbyInviteAttempt.ts",
@@ -62,9 +67,12 @@ try {
       ...coverageArguments,
       "--test",
       join(outputDirectory, "navigation/rootNavigationModel.test.js"),
+      join(outputDirectory, "navigation/rootNavigationChromeStore.test.js"),
+      join(outputDirectory, "navigation/mainTabSwitchStress.test.js"),
       join(outputDirectory, "navigation/linkedProfileResolutionModel.test.js"),
       join(outputDirectory, "features/lobby/lobbyInviteAttempt.test.js"),
-      join(outputDirectory, "features/shop/shopCatalogRuntime.test.js")
+      join(outputDirectory, "features/shop/shopCatalogRuntime.test.js"),
+      resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs")
     ],
     {
       cwd: workspaceRoot,

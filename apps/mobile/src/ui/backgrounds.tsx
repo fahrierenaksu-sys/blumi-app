@@ -3,10 +3,10 @@ import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewSty
 import { blumiEntryTheme, uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
 import { useReducedMotion } from "./animations"
+import { HomeLiquidBackground } from "./HomeLiquidBackground"
 
 type BackgroundVariant = "lobby" | "bootstrap" | "register" | "miniRoom" | "premiumMesh" | "homeLiquid"
 
-const homeLiquidBackground = require("../../assets/ui/home-liquid-background-v2.png")
 const registerBackground = require("../../assets/ui/register-blush-to-white-background-v1.png")
 
 interface SoftBlobBackgroundProps {
@@ -125,11 +125,7 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
   }
 
   if (variant === "homeLiquid") {
-    return (
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.root, styles.homeLiquidRoot, style]}>
-        <Image source={homeLiquidBackground} resizeMode="cover" style={StyleSheet.absoluteFill} />
-      </View>
-    )
+    return <HomeLiquidBackground style={style} />
   }
 
   if (variant === "premiumMesh") {
@@ -216,9 +212,6 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
 const styles = StyleSheet.create({
   root: {
     overflow: "hidden"
-  },
-  homeLiquidRoot: {
-    backgroundColor: "#FFF8FC"
   },
   registerRoot: {
     backgroundColor: "#FFFFFF"

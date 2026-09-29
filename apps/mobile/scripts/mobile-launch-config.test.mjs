@@ -24,7 +24,7 @@ test("clean-cache, development-client, and Expo Go launch modes stay explicit", 
 })
 
 test("the mobile runtime stays aligned with Expo SDK 57", () => {
-  assert.equal(packageJson.dependencies.expo, "~57.0.25")
+  assert.equal(packageJson.dependencies.expo, "~57.0.26")
   assert.match(packageJson.dependencies["react-native"], /^0\.86\./)
   assert.match(packageJson.dependencies.react, /^19\.2\./)
   assert.match(packageJson.dependencies["react-dom"], /^19\.2\./)

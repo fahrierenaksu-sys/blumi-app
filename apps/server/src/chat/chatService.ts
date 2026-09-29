@@ -24,6 +24,12 @@ export interface ChatService {
     threadId: string,
     options?: Partial<ChatMessagePageOptions>
   ): Promise<ChatMessage[]>
+  findIdempotentMessage(
+    userId: string,
+    threadId: string,
+    body: string,
+    clientMessageId: string
+  ): Promise<ChatMessage | null>
   sendMessage(
     userId: string,
     threadId: string,
@@ -48,6 +54,15 @@ export interface CreateThreadInput {
   participants: ChatThread["participants"]
 }
 
+export class ChatMessageIdempotencyConflictError extends PublicRequestError {
+  readonly code = "CHAT_MESSAGE_IDEMPOTENCY_CONFLICT"
+
+  constructor() {
+    super("This message ID was already used with different content.")
+    this.name = "ChatMessageIdempotencyConflictError"
+  }
+}
+
 export interface CreateChatServiceOptions {
   repository?: ChatRepository
   idFactory?: () => string
@@ -68,6 +83,21 @@ export function createChatService(
     async listMessages(userId, threadId, options = {}) {
       const thread = await getParticipantThread(repository, userId, threadId)
       return repository.listMessages(thread.threadId, normalizePageOptions(options))
+    },
+    async findIdempotentMessage(userId, threadId, body, clientMessageId) {
+      const thread = await getParticipantThread(repository, userId, threadId)
+      const normalizedClientMessageId = normalizeClientMessageId(clientMessageId)
+      if (!normalizedClientMessageId) return null
+      const existing = await repository.findMessageByClientMessageId(
+        thread.threadId,
+        userId,
+        normalizedClientMessageId
+      )
+      if (!existing) return null
+      if (existing.body !== normalizeMessageBody(body)) {
+        throw new ChatMessageIdempotencyConflictError()
+      }
+      return existing
     },
     async sendMessage(userId, threadId, body, now = new Date()) {
       return (await sendMessageIdempotently(repository, idFactory, userId, threadId, body, undefined, now)).message
@@ -92,7 +122,7 @@ export function createChatService(
         createdAt: now.toISOString()
       }
       await repository.saveThread(thread)
-      return thread
+      return (await repository.findThread(thread.threadId)) ?? thread
     },
     async markThreadRead(userId, threadId, now = new Date()) {
       const thread = await getParticipantThread(repository, userId, threadId)
@@ -147,6 +177,9 @@ async function sendMessageIdempotently(
     sentAt: now.toISOString()
   }
   const persisted = await repository.createMessage(message, normalizedClientMessageId)
+  if (persisted.idempotencyConflict) {
+    throw new ChatMessageIdempotencyConflictError()
+  }
   return persisted
 }
 

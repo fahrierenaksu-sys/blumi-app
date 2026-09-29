@@ -26,7 +26,11 @@ import {
 } from "../avatar/avatarReadProjection"
 import type { AuthService } from "../auth/authService"
 import type { CapabilityService } from "../capabilities/capabilityService"
-import type { ChatService, CreateThreadInput } from "../chat/chatService"
+import {
+  ChatMessageIdempotencyConflictError,
+  type ChatService,
+  type CreateThreadInput
+} from "../chat/chatService"
 import {
   ChatDeliveryBlockedError,
   createChatMessageDeliveryService
@@ -109,6 +113,78 @@ export async function registerThreadRoutes(
     safetyService: services.safetyService,
     connectionManager: services.connectionManager,
     notificationService: services.notificationService
+  })
+
+  app.post("/v1/threads/sync-matches", {
+    schema: { response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses } }
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+    const userId = resolved.account.userId
+    const [discoveryMatches, connectionMatches] = await Promise.all([
+      matchService.repository.listMatchesForUser(userId),
+      services.connectionService?.repository.listMatchesForUser(userId) ?? Promise.resolve([])
+    ])
+    const sources = [
+      ...discoveryMatches.map((match) => ({
+        source: "match" as const,
+        sourceId: match.matchId,
+        miniRoomId: `match_${match.matchId}`,
+        participantUserIds: match.participantUserIds
+      })),
+      ...connectionMatches.map((match) => ({
+        source: "connection" as const,
+        sourceId: match.miniRoomId,
+        miniRoomId: match.miniRoomId,
+        participantUserIds: match.participantUserIds
+      }))
+    ]
+    const existingThreadIds = await chatService.repository.findExistingThreadIds(
+      sources.map(createAuthorizedThreadId)
+    )
+    const sourcesByPartner = new Map<string, typeof sources>()
+    for (const source of sources) {
+      const partnerUserId = source.participantUserIds.find((id) => id !== userId)
+      if (!partnerUserId) continue
+      const group = sourcesByPartner.get(partnerUserId) ?? []
+      group.push(source)
+      sourcesByPartner.set(partnerUserId, group)
+    }
+    for (const [partnerUserId, group] of sourcesByPartner) {
+      if (group.some((source) => existingThreadIds.has(createAuthorizedThreadId(source)))) continue
+      if (await services.safetyService.hasBlockBetween(userId, partnerUserId)) continue
+      const source = group[0]!
+      const threadId = createAuthorizedThreadId(source)
+      const participantUserIds = [...source.participantUserIds].sort() as [string, string]
+      const accounts = await Promise.all(participantUserIds.map((id) => authService.repository.findAccountByUserId(id)))
+      if (accounts.some((account) => !account?.profile.displayName)) continue
+      const thread = await chatService.createThread({
+        threadId,
+        miniRoomId: source.miniRoomId,
+        participantUserIds,
+        participants: participantUserIds.map((id, index) => ({
+          userId: id,
+          displayName: accounts[index]!.profile.displayName,
+          avatar: completeAvatarForChat(accounts[index]!.profile.avatar)
+        })) as CreateThreadInput["participants"]
+      })
+      existingThreadIds.add(threadId)
+      if (!await services.safetyService.hasBlockBetween(userId, partnerUserId)) {
+        services.connectionManager.sendToUsers(thread.participantUserIds, {
+          type: "chat.thread_created",
+          payload: thread
+        })
+      }
+    }
+    const page = await chatService.listThreadsPage(userId)
+    const allowV2 = resolveRequestCapabilities(
+      request, userId, capabilityService
+    ).capabilities.avatar_loadout_v2_read
+    return parseChatResponse(chatThreadListSchema, {
+      userId,
+      nextCursor: page.nextCursor,
+      threads: page.threads.map((thread) => projectChatThreadForAvatarRead(thread, allowV2))
+    })
   })
 
   app.get<{ Querystring: { cursor?: string; limit?: number } }>("/v1/threads", {
@@ -222,8 +298,25 @@ export async function registerThreadRoutes(
       ]
     }
 
-    const existing = await chatService.repository.findThread(input.threadId as string)
-    const thread = await chatService.createThread(input)
+    let existing = await chatService.repository.findThread(input.threadId as string)
+    if (!existing && authorization.source === "match" && services.connectionService) {
+      const connectionMatches = await services.connectionService.repository.listMatchesForUser(resolved.account.userId)
+      for (const connection of connectionMatches) {
+        if (!connection.participantUserIds.includes(canonicalParticipantUserIds[0]) ||
+            !connection.participantUserIds.includes(canonicalParticipantUserIds[1])) continue
+        existing = await chatService.repository.findThread(`thread_connection_${connection.miniRoomId}`)
+        if (existing) break
+      }
+    }
+    const thread = existing ?? await chatService.createThread(input)
+    if (!existing && !await services.safetyService.hasBlockBetween(
+      canonicalParticipantUserIds[0], canonicalParticipantUserIds[1]
+    )) {
+      services.connectionManager.sendToUsers(thread.participantUserIds, {
+        type: "chat.thread_created",
+        payload: thread
+      })
+    }
     const partnerUserId = canonicalParticipantUserIds.find(
       (userId) => userId !== resolved.account.userId
     )
@@ -297,7 +390,10 @@ export async function registerThreadRoutes(
             }
             invites = await miniRoomService.listChatInvites(resolved.account.userId, threadId)
           } catch (error) {
-            if (!(error instanceof ChatRoomInviteError) || error.code !== "PARTICIPANT_BUSY") {
+            if (
+              !(error instanceof ChatRoomInviteError) ||
+              (error.code !== "PARTICIPANT_BUSY" && error.code !== "SELF_IN_ROOM")
+            ) {
               throw error
             }
           }
@@ -420,6 +516,73 @@ export async function registerThreadRoutes(
     } catch (error) {
       return sendChatRoomInviteError(error, reply)
     }
+  })
+
+  app.post("/v1/room-sessions/:roomSessionId/leave", {
+    attachValidation: true,
+    schema: roomSessionRouteSchema
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+    const roomSessionId = readParam(request, "roomSessionId")
+    const miniRoomService = services.miniRoomService
+    if (!roomSessionId) {
+      return reply.code(400).send({ error: "Choose a room first." })
+    }
+    if (!miniRoomService) {
+      return reply.code(503).send({ error: "Rooms are temporarily unavailable." })
+    }
+    const room = await miniRoomService.findMiniRoom(roomSessionId)
+    if (!room || !room.participantUserIds.includes(resolved.account.userId)) {
+      return reply.code(404).send({ error: "That room is not available." })
+    }
+    const ended = await miniRoomService.leaveMiniRoom(roomSessionId, resolved.account.userId)
+    if (ended) {
+      services.connectionManager.sendToUsers(ended.participantUserIds, {
+        type: "mini_room.ended",
+        payload: ended
+      })
+    }
+    return { ended: Boolean(ended) }
+  })
+
+  app.post("/v1/users/me/active-room/leave", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["expectedRoomSessionId"],
+        properties: { expectedRoomSessionId: { type: "string", minLength: 1 } },
+        additionalProperties: false
+      },
+      response: {
+        200: successResponseJsonSchema,
+        ...authenticatedErrorResponses
+      }
+    }
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+    const miniRoomService = services.miniRoomService
+    if (!miniRoomService) {
+      return reply.code(503).send({ error: "Rooms are temporarily unavailable." })
+    }
+    const expectedRoomSessionId = (request.body as { expectedRoomSessionId: string }).expectedRoomSessionId
+    const activeRoom = await miniRoomService.findActiveMiniRoomForUser(resolved.account.userId)
+    if (!activeRoom) return { ended: false }
+    if (activeRoom.miniRoomId !== expectedRoomSessionId) {
+      return reply.code(409).send({ error: "Your active room changed. Nothing was closed." })
+    }
+    const ended = await miniRoomService.leaveMiniRoom(
+      activeRoom.miniRoomId,
+      resolved.account.userId
+    )
+    if (ended) {
+      services.connectionManager.sendToUsers(ended.participantUserIds, {
+        type: "mini_room.ended",
+        payload: ended
+      })
+    }
+    return { ended: Boolean(ended) }
   })
 
   app.post("/v1/room-invites/:inviteId/decision", {
@@ -610,6 +773,9 @@ export async function registerThreadRoutes(
         }))
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
+      if (error instanceof ChatMessageIdempotencyConflictError) {
+        return reply.code(409).send({ code: error.code, error: error.message })
+      }
       const message = error.message
       const statusCode = error instanceof ChatDeliveryBlockedError
         ? 403
@@ -705,17 +871,21 @@ async function resolveMutualChatInviteContext(input: {
     (userId) => userId !== input.userId
   )
   if (!partnerUserId) return null
-  const match = await input.services.matchService.repository.findMatchBetween(
-    input.userId,
-    partnerUserId
-  )
-  if (!match) return null
-  const expectedThreadId = createAuthorizedThreadId({
-    source: "match",
-    sourceId: match.matchId,
-    miniRoomId: `match_${match.matchId}`
-  })
-  if (thread.threadId !== expectedThreadId) return null
+  const [match, connection] = await Promise.all([
+    input.services.matchService.repository.findMatchBetween(input.userId, partnerUserId),
+    input.services.connectionService?.repository.findMatchBetween(input.userId, partnerUserId)
+      ?? Promise.resolve(null)
+  ])
+  const authorizedSources = [
+    ...(match ? [{ source: "match" as const, sourceId: match.matchId,
+      miniRoomId: `match_${match.matchId}` }] : []),
+    ...(connection ? [{ source: "connection" as const, sourceId: connection.miniRoomId,
+      miniRoomId: connection.miniRoomId }] : [])
+  ]
+  if (!authorizedSources.some((source) =>
+    thread.threadId === createAuthorizedThreadId(source) &&
+    thread.miniRoomId === source.miniRoomId
+  )) return null
   const partnerAccount = await input.services.authService.repository.findAccountByUserId(
     partnerUserId
   )
@@ -732,5 +902,11 @@ function sendChatRoomInviteError(error: unknown, reply: import("fastify").Fastif
     : error.code === "INVITE_EXPIRED"
       ? 410
       : 409
-  return reply.code(statusCode).send({ code: error.code, error: error.message })
+  return reply.code(statusCode).send({
+    code: error.code,
+    error: error.message,
+    ...(error.code === "SELF_IN_ROOM" && error.roomSessionId
+      ? { roomSessionId: error.roomSessionId }
+      : {})
+  })
 }

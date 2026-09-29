@@ -60,17 +60,12 @@ export function createRealtimeRouter(
 
     await Promise.all(
       snapshot.users.map(async (user) => {
-        const blockedUserIds = (
-          await Promise.all(
-            snapshot.users
-              .filter((candidate) => candidate.userId !== user.userId)
-              .map(async (candidate) =>
-                (await safetyService.hasBlockBetween(user.userId, candidate.userId))
-                  ? candidate.userId
-                  : null
-              )
-          )
-        ).filter((userId): userId is string => typeof userId === "string")
+        const blockedUserIds = await safetyService.listBlockedUserIdsBetween(
+          user.userId,
+          snapshot.users
+            .filter((candidate) => candidate.userId !== user.userId)
+            .map((candidate) => candidate.userId)
+        )
         const nearbyUsers = await presenceService.listNearbyUsers(
           roomId,
           user.userId,
@@ -114,6 +109,10 @@ export function createRealtimeRouter(
             profile: connection.profile,
             initialSpotId: event.payload.initialSpotId
           })
+          // The socket may have closed while room presence was being persisted.
+          // Disconnect cleanup waits for this join, so do not attach or fan out
+          // the completed join on behalf of a connection that is already gone.
+          if (!connectionManager.getConnection(connection.connectionId)) return
           connectionManager.joinRoom(connection.connectionId, joined.roomId)
           connectionManager.sendToConnection(connection.connectionId, {
             type: "room.joined",
@@ -345,12 +344,11 @@ export function createRealtimeRouter(
       }
     },
     async handleDisconnect(connection) {
-      if (connectionManager.hasUserConnections(connection.userId)) {
-        return
-      }
-      const joinedRoomIds = [...connection.joinedRoomIds]
-      await presenceService.leaveAllRooms(connection.userId)
-      await Promise.all(joinedRoomIds.map(publishRoomPresence))
+      const clearedRoomIds = await presenceService.disconnectConnection(
+        connection.connectionId,
+        connection.userId
+      )
+      await Promise.all(clearedRoomIds.map(publishRoomPresence))
     }
   }
 

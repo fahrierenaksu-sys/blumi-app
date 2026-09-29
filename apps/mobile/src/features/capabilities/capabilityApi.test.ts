@@ -2,11 +2,51 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { CAPABILITY_KEYS } from "@blumi/contracts"
 import {
+  createCapabilityResolutionSingleFlight,
   createFailClosedCapabilityResolution,
   getSessionScopedCapabilities,
   resolveProductionCapabilities,
   SUPPORTED_MOBILE_CAPABILITIES
 } from "./capabilityApi"
+
+test("concurrent capability reads for one session share one request without caching", async () => {
+  let requests = 0
+  let finish: ((value: ReturnType<typeof createFailClosedCapabilityResolution>) => void) | undefined
+  const resolve = createCapabilityResolutionSingleFlight(() => {
+    requests += 1
+    return new Promise((next) => { finish = next })
+  })
+
+  const first = resolve("session-a")
+  const second = resolve("session-a")
+  assert.equal(first, second)
+  await Promise.resolve()
+  assert.equal(requests, 1)
+
+  finish?.(createFailClosedCapabilityResolution())
+  await Promise.all([first, second])
+  const later = resolve("session-a")
+  await Promise.resolve()
+  assert.equal(requests, 2)
+  finish?.(createFailClosedCapabilityResolution())
+  await later
+})
+
+test("capability reads never share across sessions or clear a newer flight", async () => {
+  const completions = new Map<string, (value: ReturnType<typeof createFailClosedCapabilityResolution>) => void>()
+  const resolve = createCapabilityResolutionSingleFlight((token) =>
+    new Promise((next) => { completions.set(token, next) }))
+
+  const old = resolve("session-a")
+  const current = resolve("session-b")
+  assert.equal(resolve("session-a"), old)
+  await Promise.resolve()
+  completions.get("session-a")?.(createFailClosedCapabilityResolution())
+  await old
+  assert.equal(resolve("session-b"), current)
+  completions.get("session-b")?.(createFailClosedCapabilityResolution())
+  await current
+})
 
 test("mobile declares the complete avatar and Shop rollout surface", () => {
   assert.deepEqual(SUPPORTED_MOBILE_CAPABILITIES, [

@@ -16,7 +16,7 @@ import type {
   ChatThread,
   ChatThreadList
 } from "@blumi/contracts"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import {
   getMessageListErrorMessageForDisplay,
   getThreadListErrorMessageForDisplay
@@ -25,6 +25,9 @@ import {
 // ─── In-memory store ────────────────────────────────────────
 let threadCache: ChatThread[] = []
 let messageCache: Map<string, ChatMessage[]> = new Map()
+const loadedHistoryThreads = new Set<string>()
+const EMPTY_THREAD_MESSAGES: ChatMessage[] = []
+const IDLE_MESSAGE_LIST_STATE = { status: "idle" } as const
 export type ThreadListState =
   | { status: "idle" }
   | { status: "loading" }
@@ -39,13 +42,46 @@ export type MessageListState =
   | { status: "failed"; errorMessage: string }
 
 let messageListStateByThreadId: Map<string, MessageListState> = new Map()
+const messageListCompletionVersionByThreadId: Map<string, number> = new Map()
 
 // Track optimistic message local IDs so we can replace them on server confirmation
 const pendingLocalIds: Set<string> = new Set()
 type MessageDeliveryState = "sending" | "failed" | "sent"
 const deliveryStateByLocalMessageId: Map<string, MessageDeliveryState> = new Map()
-const pendingLocalMessageIdByClientMessageId: Map<string, string> = new Map()
+type PendingLocalMessage = {
+  clientMessageId: string
+  threadId: string
+  senderUserId: string
+}
+const pendingMessageByLocalMessageId: Map<string, PendingLocalMessage> = new Map()
 let localIdCounter = 0
+
+function findPendingLocalMessageId(
+  clientMessageId: string,
+  scope: { threadId?: string; senderUserId?: string; body?: string } = {}
+): string | undefined {
+  const matchingIds = [...pendingMessageByLocalMessageId.entries()]
+    .filter(([localMessageId, pending]) => {
+      if (!pendingLocalIds.has(localMessageId) || pending.clientMessageId !== clientMessageId) return false
+      if (scope.threadId !== undefined && pending.threadId !== scope.threadId) return false
+      if (scope.senderUserId !== undefined && pending.senderUserId !== scope.senderUserId) return false
+      if (scope.body !== undefined) {
+        const message = (messageCache.get(pending.threadId) ?? []).find((entry) => entry.messageId === localMessageId)
+        if (message?.body !== scope.body) return false
+      }
+      return true
+    })
+    .map(([localMessageId]) => localMessageId)
+  // A client id is scoped by sender and thread on the server. If a caller only
+  // supplies the id and it is ambiguous locally, do not mutate another bubble.
+  return matchingIds.length === 1 ? matchingIds[0] : undefined
+}
+
+function removePendingLocalMessage(localMessageId: string): void {
+  pendingLocalIds.delete(localMessageId)
+  deliveryStateByLocalMessageId.delete(localMessageId)
+  pendingMessageByLocalMessageId.delete(localMessageId)
+}
 
 // Unread message tracking per thread
 let unreadCounts: Map<string, number> = new Map()
@@ -147,6 +183,8 @@ export function applyChatMessageListed(payload: ChatMessageList): void {
   }
   const sorted = [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
   messageCache.set(payload.threadId, sorted)
+  loadedHistoryThreads.add(payload.threadId)
+  markMessageListCompleted(payload.threadId)
   setMessageListState(payload.threadId, { status: "ready" })
   notify()
 }
@@ -160,6 +198,7 @@ export function applyChatMessageListFailed(
   threadId: string,
   errorMessage: string
 ): void {
+  markMessageListCompleted(threadId)
   setMessageListState(threadId, {
     status: "failed",
     errorMessage: getMessageListErrorMessageForDisplay(errorMessage)
@@ -172,25 +211,27 @@ export function applyChatMessageReceived(
   options: { localUserId?: string } = {}
 ): void {
   const existing = messageCache.get(message.threadId) ?? []
+  const alreadyReceived = existing.some((entry) => entry.messageId === message.messageId)
 
-  // If we already have this exact message, skip
-  if (existing.some((m) => m.messageId === message.messageId)) return
+  // Realtime ChatMessage currently omits clientMessageId. Reconcile only a
+  // unique local candidate with the same thread, sender and body; if identical
+  // sends make this ambiguous, leave them for the exact HTTP ACK to resolve.
+  const pendingEchoCandidates = options.localUserId && message.senderUserId !== options.localUserId
+    ? []
+    : existing.filter((entry) => {
+      if (!pendingLocalIds.has(entry.messageId) || entry.senderUserId !== message.senderUserId || entry.body !== message.body) {
+        return false
+      }
+      const pending = pendingMessageByLocalMessageId.get(entry.messageId)
+      return !pending || (pending.threadId === message.threadId && pending.senderUserId === message.senderUserId)
+    })
+  const pendingEchoId = pendingEchoCandidates.length === 1 ? pendingEchoCandidates[0]?.messageId : undefined
 
-  const pendingEchoId = existing.find(
-    (m) =>
-      pendingLocalIds.has(m.messageId) &&
-      ![...pendingLocalMessageIdByClientMessageId.values()].includes(m.messageId) &&
-      m.senderUserId === message.senderUserId
-  )?.messageId
-  if (pendingEchoId) {
-    pendingLocalIds.delete(pendingEchoId)
-    deliveryStateByLocalMessageId.delete(pendingEchoId)
-  }
-  const cleaned = pendingEchoId
-    ? existing.filter((m) => m.messageId !== pendingEchoId)
-    : existing
-
-  const sorted = [...cleaned, message].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
+  if (alreadyReceived && !pendingEchoId) return
+  if (pendingEchoId) removePendingLocalMessage(pendingEchoId)
+  const cleaned = pendingEchoId ? existing.filter((entry) => entry.messageId !== pendingEchoId) : existing
+  const sorted = (alreadyReceived ? cleaned : [...cleaned, message])
+    .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
   messageCache.set(message.threadId, sorted)
 
   // Update lastMessage on thread
@@ -207,6 +248,7 @@ export function applyChatMessageReceived(
   // and the message isn't from local optimistic echo
   if (
     message.threadId !== activeThreadId &&
+    !alreadyReceived &&
     (!summaryLastMessageByThread.has(message.threadId) || compareMessageOrder(message, summaryLastMessageByThread.get(message.threadId)!) > 0) &&
     !message.messageId.startsWith("__local_") &&
     Date.parse(message.sentAt) > Date.parse(readAtByThread.get(message.threadId) ?? "1970-01-01T00:00:00Z") &&
@@ -235,7 +277,11 @@ export function addOptimisticMessage(opts: {
   pendingLocalIds.add(localId)
   deliveryStateByLocalMessageId.set(localId, "sending")
   if (opts.trackDelivery ?? Boolean(opts.clientMessageId)) {
-    pendingLocalMessageIdByClientMessageId.set(clientMessageId, localId)
+    pendingMessageByLocalMessageId.set(localId, {
+      clientMessageId,
+      threadId: opts.threadId,
+      senderUserId: opts.senderUserId
+    })
   }
 
   const optimistic: ChatMessage = {
@@ -253,14 +299,14 @@ export function addOptimisticMessage(opts: {
 }
 
 export function markOptimisticMessageFailed(clientMessageId: string): void {
-  const localMessageId = pendingLocalMessageIdByClientMessageId.get(clientMessageId)
+  const localMessageId = findPendingLocalMessageId(clientMessageId)
   if (!localMessageId) return
   deliveryStateByLocalMessageId.set(localMessageId, "failed")
   notify()
 }
 
 export function markOptimisticMessageSending(clientMessageId: string): void {
-  const localMessageId = pendingLocalMessageIdByClientMessageId.get(clientMessageId)
+  const localMessageId = findPendingLocalMessageId(clientMessageId)
   if (!localMessageId) return
   deliveryStateByLocalMessageId.set(localMessageId, "sending")
   notify()
@@ -271,14 +317,16 @@ export function confirmOptimisticMessage(
   message: ChatMessage,
   localUserId?: string
 ): void {
-  const localMessageId = pendingLocalMessageIdByClientMessageId.get(clientMessageId)
+  const localMessageId = findPendingLocalMessageId(clientMessageId, {
+    threadId: message.threadId,
+    senderUserId: message.senderUserId,
+    body: message.body
+  })
   if (!localMessageId) {
     applyChatMessageReceived(message, { localUserId })
     return
   }
-  pendingLocalMessageIdByClientMessageId.delete(clientMessageId)
-  pendingLocalIds.delete(localMessageId)
-  deliveryStateByLocalMessageId.delete(localMessageId)
+  removePendingLocalMessage(localMessageId)
   const existing = (messageCache.get(message.threadId) ?? []).filter(
     (entry) => entry.messageId !== localMessageId
   )
@@ -301,26 +349,26 @@ export function getRetryableMessage(messageId: string): {
   clientMessageId: string
   threadId: string
 } | null {
-  const clientMessageId = [...pendingLocalMessageIdByClientMessageId.entries()].find(
-    ([, localMessageId]) => localMessageId === messageId
-  )?.[0]
-  if (!clientMessageId) return null
+  const pending = pendingMessageByLocalMessageId.get(messageId)
+  if (!pending) return null
   const message = [...messageCache.values()].flat().find(
     (entry) => entry.messageId === messageId
   )
   return message
-    ? { body: message.body, clientMessageId, threadId: message.threadId }
+    ? { body: message.body, clientMessageId: pending.clientMessageId, threadId: pending.threadId }
     : null
 }
 
 export function resetChatStore(): void {
   threadCache = []
   messageCache = new Map()
+  loadedHistoryThreads.clear()
   messageListStateByThreadId = new Map()
+  messageListCompletionVersionByThreadId.clear()
   threadListState = { status: "idle" }
   pendingLocalIds.clear()
   deliveryStateByLocalMessageId.clear()
-  pendingLocalMessageIdByClientMessageId.clear()
+  pendingMessageByLocalMessageId.clear()
   unreadCounts = new Map()
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
@@ -358,6 +406,15 @@ export function getTotalUnreadCount(): number {
   return total
 }
 
+/** Subscribe only to the primitive badge value, not every chat-store update. */
+export function useTotalUnreadCount(): number {
+  return useSyncExternalStore(
+    subscribeToChatStore,
+    getTotalUnreadCount,
+    getTotalUnreadCount
+  )
+}
+
 /** Get unread count for a specific thread. */
 export function getThreadUnreadCount(threadId: string): number {
   return unreadCounts.get(threadId) ?? 0
@@ -369,11 +426,61 @@ export function getThreads(): ChatThread[] {
 }
 
 export function getMessages(threadId: string): ChatMessage[] {
-  return messageCache.get(threadId) ?? []
+  return messageCache.get(threadId) ?? EMPTY_THREAD_MESSAGES
+}
+
+export interface ChatThreadSnapshot {
+  thread: ChatThread | undefined
+  messages: ChatMessage[]
+  messageListState: MessageListState
+  historyReady: boolean
+  deliveryKey: string
+}
+
+/** Only this conversation's changes invalidate the native timeline. */
+export function createChatThreadSnapshotReader(threadId?: string, partnerId?: string): () => ChatThreadSnapshot {
+  let previous: ChatThreadSnapshot | undefined
+  return () => {
+    const thread = threadCache.find((entry) => threadId
+      ? entry.threadId === threadId
+      : Boolean(partnerId && entry.participantUserIds.includes(partnerId)))
+    const resolvedId = thread?.threadId ?? threadId
+    const messages = resolvedId ? getMessages(resolvedId) : EMPTY_THREAD_MESSAGES
+    const messageListState = (resolvedId && messageListStateByThreadId.get(resolvedId)) || IDLE_MESSAGE_LIST_STATE
+    const historyReady = Boolean(resolvedId && loadedHistoryThreads.has(resolvedId))
+    const deliveryKey = messages.map((message) => getMessageDeliveryState(message.messageId)).join("|")
+    if (previous && previous.thread === thread && previous.messages === messages &&
+      previous.messageListState === messageListState && previous.historyReady === historyReady &&
+      previous.deliveryKey === deliveryKey) return previous
+    previous = { thread, messages, messageListState, historyReady, deliveryKey }
+    return previous
+  }
+}
+
+export function useChatThreadStore(threadId?: string, partnerId?: string) {
+  const read = useMemo(() => createChatThreadSnapshotReader(threadId, partnerId), [threadId, partnerId])
+  const snapshot = useSyncExternalStore(subscribeToChatStore, read, read)
+  return {
+    ...snapshot,
+    addOptimisticMessage,
+    getMessageDeliveryState,
+    getRetryableMessage,
+    markOptimisticMessageSending,
+    setActiveThread
+  }
 }
 
 export function getMessageListState(threadId: string): MessageListState {
   return { ...(messageListStateByThreadId.get(threadId) ?? { status: "idle" }) }
+}
+
+/** Monotonic per-thread marker for completed server history requests. */
+export function getMessageListCompletionVersion(threadId: string): number {
+  return messageListCompletionVersionByThreadId.get(threadId) ?? 0
+}
+
+export function hasMessageHistory(threadId: string): boolean {
+  return loadedHistoryThreads.has(threadId)
 }
 
 export function hasThreadsFetched(): boolean {
@@ -477,4 +584,11 @@ function setMessageListState(
 ): void {
   messageListStateByThreadId = new Map(messageListStateByThreadId)
   messageListStateByThreadId.set(threadId, state)
+}
+
+function markMessageListCompleted(threadId: string): void {
+  messageListCompletionVersionByThreadId.set(
+    threadId,
+    getMessageListCompletionVersion(threadId) + 1
+  )
 }

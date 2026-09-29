@@ -38,6 +38,19 @@ function createFakePool(handler: (text: string) => Record<string, unknown>[]) {
   }
 }
 
+test("postgres match recovery lists only the authenticated participant's matches", async () => {
+  const fake = createFakePool(() => [{
+    match_id: "match_one",
+    participant_a_user_id: "ada",
+    participant_b_user_id: "bora",
+    matched_at: "2026-09-29T10:00:00.000Z"
+  }])
+  const matches = await createPostgresMatchRepository(fake.pool).listMatchesForUser("ada")
+  assert.deepEqual(matches.map((match) => match.matchId), ["match_one"])
+  assert.match(fake.calls[0]?.text ?? "", /participant_a_user_id = \$1 OR participant_b_user_id = \$1/)
+  assert.deepEqual(fake.calls[0]?.values, ["ada"])
+})
+
 test("postgres match repository lists real accounts with parameterized filters", async () => {
   const fake = createFakePool((text) => {
     if (text.includes("SELECT user_id") && text.includes("NOT EXISTS")) {

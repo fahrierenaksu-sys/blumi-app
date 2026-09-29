@@ -158,3 +158,67 @@ test("malformed client retry IDs are rejected before persistence", async () => {
     /retry ID is invalid/
   )
 })
+
+test("idempotent chat retries return the original message and reject a changed body", async () => {
+  let nextMessageId = 0
+  const service = createChatService({ idFactory: () => `message_${++nextMessageId}` })
+  await service.createThread({
+    threadId: "thread_one",
+    miniRoomId: "room_one",
+    participantUserIds: ["user_a", "user_b"],
+    participants: [
+      { userId: "user_a", displayName: "A" },
+      { userId: "user_b", displayName: "B" }
+    ]
+  })
+
+  const first = await service.sendMessageIdempotently(
+    "user_a", "thread_one", "same body", "client-message-001"
+  )
+  const repeated = await service.sendMessageIdempotently(
+    "user_a", "thread_one", "same body", "client-message-001"
+  )
+
+  assert.equal(first.created, true)
+  assert.equal(repeated.created, false)
+  assert.deepEqual(repeated.message, first.message)
+  await assert.rejects(
+    service.sendMessageIdempotently("user_a", "thread_one", "different body", "client-message-001"),
+    (error: unknown) => error instanceof Error &&
+      error.name === "ChatMessageIdempotencyConflictError" &&
+      "code" in error && error.code === "CHAT_MESSAGE_IDEMPOTENCY_CONFLICT"
+  )
+  assert.deepEqual(
+    (await service.listMessages("user_a", "thread_one")).map((message) => message.body),
+    ["same body"]
+  )
+})
+
+test("concurrent opens for one matched thread persist one canonical thread without messages", async () => {
+  const service = createChatService()
+  const threadId = "thread_match_match_chat_authorized"
+  const createdAt = new Date("2026-09-29T10:00:00.000Z")
+  const open = () => service.createThread({
+    threadId,
+    miniRoomId: "match_match_chat_authorized",
+    participantUserIds: ["user_a", "user_b"],
+    participants: [
+      { userId: "user_a", displayName: "A" },
+      { userId: "user_b", displayName: "B" }
+    ]
+  }, createdAt)
+
+  // Both callers read the missing stable ID before either save completes.
+  const [first, concurrent] = await Promise.all([open(), open()])
+  const stored = await service.repository.findThread(threadId)
+
+  assert.deepEqual(concurrent, first)
+  assert.equal(first.threadId, threadId)
+  assert.ok(stored)
+  assert.equal(stored.threadId, first.threadId)
+  assert.equal(stored.miniRoomId, first.miniRoomId)
+  assert.deepEqual(stored.participantUserIds, first.participantUserIds)
+  assert.equal(stored.createdAt, first.createdAt)
+  assert.deepEqual((await service.listThreads("user_a")).map((thread) => thread.threadId), [threadId])
+  assert.deepEqual(await service.listMessages("user_a", threadId), [])
+})

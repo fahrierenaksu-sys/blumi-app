@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Animated, Easing, StyleSheet, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNetworkStatus } from "../features/network/networkStore"
@@ -6,6 +6,7 @@ import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClie
 import { LinearGradient } from "./linearGradient"
 import { useReducedMotion } from "./animations"
 import { uiTheme } from "./theme"
+import { resolveConnectionBannerState } from "./connectionBannerModel"
 
 interface ConnectionBannerProps {
   status: RealtimeConnectionStatus
@@ -22,13 +23,18 @@ export function ConnectionBanner(props: ConnectionBannerProps) {
   const slideAnim = useRef(new Animated.Value(-60)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
+  const [initialConnectionSlow, setInitialConnectionSlow] = useState(false)
+  useEffect(() => {
+    if (status !== "connecting" || !isConnected) {
+      setInitialConnectionSlow(false)
+      return
+    }
+    const timer = setTimeout(() => setInitialConnectionSlow(true), 3_000)
+    return () => clearTimeout(timer)
+  }, [isConnected, status])
+  const bannerState = resolveConnectionBannerState(status, isConnected, initialConnectionSlow)
 
-  const shouldShow =
-    !isConnected ||
-    status === "disconnected" ||
-    status === "error" ||
-    status === "reconnecting" ||
-    status === "connecting"
+  const shouldShow = bannerState !== "hidden"
 
   useEffect(() => {
     const targetValue = shouldShow ? 0 : -60
@@ -74,14 +80,12 @@ export function ConnectionBanner(props: ConnectionBannerProps) {
     return () => loop.stop()
   }, [pulseAnim, reduceMotion, shouldShow])
 
-  if (isConnected && (status === "connected" || status === "idle")) return null
+  if (bannerState === "hidden") return null
 
-  const isError = !isConnected || status === "disconnected" || status === "error"
-  const label = !isConnected
+  const isError = bannerState === "offline" || status === "disconnected" || status === "error"
+  const label = bannerState === "offline"
     ? "No internet connection"
-    : status === "connecting"
-      ? "Connecting to the room…"
-      : "Reconnecting to the room…"
+    : status === "connecting" ? "Connecting to Blumi…" : "Reconnecting to Blumi…"
   const gradientColors = isError
     ? ["#FFE0B2", "#FFCC80"] as [string, string]
     : [uiTheme.colors.primarySoft, "#FFE2EE"] as [string, string]

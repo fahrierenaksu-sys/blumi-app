@@ -5,7 +5,7 @@ import test from "node:test"
 
 function readRegisterScreen(): string {
   return readFileSync(
-    resolve(process.cwd(), "apps/mobile/src/screens/RegisterScreen.tsx"),
+    resolve(import.meta.dirname, "../../screens/RegisterScreen.tsx"),
     "utf8"
   )
 }

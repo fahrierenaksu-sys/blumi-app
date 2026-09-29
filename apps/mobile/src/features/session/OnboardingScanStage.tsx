@@ -9,11 +9,15 @@ const SCAN_LASER = require(
 interface OnboardingScanStageProps {
   scanRows: Animated.Value
   scanSweep: Animated.Value
+  onAssetLoad?: (id: number) => void
+  onAssetError?: () => void
 }
 
 export function OnboardingScanStage({
   scanRows,
-  scanSweep
+  scanSweep,
+  onAssetLoad,
+  onAssetError
 }: OnboardingScanStageProps) {
   const scanLineTranslateY = scanSweep.interpolate({
     inputRange: [0, 1],
@@ -46,6 +50,8 @@ export function OnboardingScanStage({
           return (
             <View key={index} style={styles.scanCell}>
               <Animated.Image
+                onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
+                onError={onAssetError}
                 accessibilityIgnoresInvertColors
                 fadeDuration={0}
                 resizeMode="contain"
@@ -61,6 +67,8 @@ export function OnboardingScanStage({
       >
         <View style={styles.scanTrail} />
         <Animated.Image
+          onLoad={onAssetLoad ? () => onAssetLoad(ONBOARDING_SCAN_FRAMES.length) : undefined}
+          onError={onAssetError}
           accessibilityIgnoresInvertColors
           resizeMode="stretch"
           source={SCAN_LASER}

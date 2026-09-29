@@ -458,6 +458,27 @@ test("concurrent reciprocal likes return the same persisted match id", async () 
   )
 })
 
+test("a persisted mutual match is returned even when its reward cannot be granted", async () => {
+  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([
+    { ...createSeedDiscoverProfiles()[0]!, userId: "reward_a" },
+    { ...createSeedDiscoverProfiles()[1]!, userId: "reward_b" }
+  ]))
+  const economyService = createEconomyService()
+  const service = createMatchService({
+    repository,
+    idFactory: () => "match_reward_failure",
+    economyService: {
+      ...economyService,
+      grantEventReward: async () => { throw new Error("ledger unavailable") }
+    },
+    reportSideEffectFailure: () => undefined
+  })
+  await service.decide("reward_a", "reward_b", "like")
+  const result = await service.decide("reward_b", "reward_a", "like")
+  assert.equal(result.match?.matchId, "match_reward_failure")
+  assert.equal((await repository.findMatchBetween("reward_a", "reward_b"))?.matchId, "match_reward_failure")
+})
+
 test("unavailable target profiles are rejected", async () => {
   const service = createMatchService()
 

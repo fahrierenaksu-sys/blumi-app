@@ -55,3 +55,34 @@ test("room setup keeps its scene static and leaves continuous motion out of the 
   assert.match(screen, /motionEnabled=\{false\}/)
   assert.doesNotMatch(screen, /RoomSetupProgressRail|withRepeat|setInterval/)
 })
+
+test("room setup reports rejected placement and rotation before any success feedback", () => {
+  const screen = readFileSync(
+    resolve(mobileRoot, "screens/RoomSetupScreen.tsx"),
+    "utf8"
+  )
+
+  assert.match(
+    screen,
+    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setBedSelected\(true\)\s*setPlacementMessage\("Yatağın yerleşti\."\)/
+  )
+  assert.match(
+    screen,
+    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setPlacementMessage\("Yatak çevrildi\. Taşımak için odaya dokun\."\)/
+  )
+  assert.match(screen, /mutationRejected:\s*"Oda değişikliği uygulanamadı\. Yeniden dene\."/)
+  assert.match(screen, /mutationRejected:\s*"That room change could not be applied\. Please try again\."/)
+})
+
+test("room setup surfaces later persistence conflicts instead of leaving stale success copy", () => {
+  const screen = readFileSync(
+    resolve(mobileRoot, "screens/RoomSetupScreen.tsx"),
+    "utf8"
+  )
+
+  assert.match(
+    screen,
+    /persistenceState === "failed" \? \([\s\S]*?accessibilityLiveRegion="assertive"[\s\S]*?accessibilityRole="alert"[\s\S]*?feedbackCopy\.persistenceAttention[\s\S]*?\) : placementErrorMessage \?/)
+  assert.match(screen, /persistenceAttention:\s*"Oda kaydıyla ilgili bir sorun var\. Güncel düzeni kontrol et\."/)
+  assert.match(screen, /persistenceAttention:\s*"Room saving needs attention\. Review the current layout\."/)
+})
