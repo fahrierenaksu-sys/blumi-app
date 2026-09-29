@@ -39,17 +39,20 @@ test("invalid phone input returns focus to the field", () => {
 
 test("avatar onboarding has one progress surface and keeps identity editing separate", () => {
   const source = read("src/screens/AvatarSetupScreen.tsx")
-  assert.equal((source.match(/<OnboardingProgress/g) ?? []).length, 1)
-  assert.match(source, /<OnboardingProgress activeStep=\{1\}/)
-  assert.doesNotMatch(source, /Edit profile\. Name,/)
-  assert.match(source, /Edit profile details/)
+  const shell = read("src/features/session/setupFlow/BlumiSetupShell.tsx")
+  // The shell header fraction is the only progress surface on this step.
+  assert.match(source, /<BlumiSetupShell[\s\S]*?headerProgressStyle="fraction"[\s\S]*?hideProgressRail[\s\S]*?step="avatar"/)
+  assert.doesNotMatch(source, /<SetupFlowProgress|<OnboardingProgress/)
+  assert.match(shell, /\{!hideProgressRail \? \(/)
+  // Name and profile details are edited on the profile step, not here.
+  assert.doesNotMatch(source, /Edit profile|ProfileEdit|setDisplayName|<TextInput/)
 })
 
 test("character setup and Discover share Blumi's avatar-first low-pressure promise", () => {
   const avatar = read("src/screens/AvatarSetupScreen.tsx")
-  const discovery = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
-  assert.match(avatar, /Build the first look people meet\./)
-  assert.match(discovery, /match your vibe/)
+  const discoveryCopy = read("src/features/discovery/discoverySurfaceCopy.ts")
+  assert.match(avatar, /Bu sadece başlangıç\. Tarzını sonra da değiştirebilirsin\./)
+  assert.match(discoveryCopy, /loadingTitle: "Finding people who match your vibe…"/)
 })
 
 test("discovery distinguishes loading, error, low supply, and exhausted states", () => {
