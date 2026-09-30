@@ -899,7 +899,7 @@ async function createRealtimeHarness(options: {
     chatService,
     livekitTokenService
   })
-  const connectionService = createConnectionService({ miniRoomService })
+  const connectionService = createConnectionService({ miniRoomService, safetyService })
   const reactionService = createReactionService()
   const sharedHttpServer: HttpServer | undefined = options.shareHttpServer
     ? createHttpServer((_request, response) => {

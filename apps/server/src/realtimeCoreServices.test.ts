@@ -484,7 +484,7 @@ function createRealtimeCoreServices(
     economyService,
     idFactory: createSequenceIdFactory()
   })
-  const connectionService = createConnectionService({ miniRoomService, economyService })
+  const connectionService = createConnectionService({ miniRoomService, safetyService, economyService })
   const reactionService = createReactionService({
     idFactory: createSequenceIdFactory("reaction")
   })

@@ -528,6 +528,7 @@ export function createConfiguredServerServices(
       connectionService: createConnectionService({
         repository: createPostgresConnectionRepository(pool),
         miniRoomService,
+        safetyService,
         economyService
       }),
       reactionService: createReactionService({
@@ -636,7 +637,7 @@ export function createConfiguredServerServices(
     presenceService,
     livekitTokenService,
     miniRoomService,
-    connectionService: createConnectionService({ miniRoomService, economyService }),
+    connectionService: createConnectionService({ miniRoomService, safetyService, economyService }),
     reactionService: createReactionService(),
     notificationService,
     realtimeTicketStore: createInMemoryRealtimeTicketStore(),
