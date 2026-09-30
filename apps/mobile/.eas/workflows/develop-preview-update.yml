@@ -9,12 +9,12 @@
 # Speed matters here: the release checks run before the push (locally) and on
 # GitHub (verify.yml), not again in this workflow, so an update reaches the
 # development build in minutes. main keeps the checks before production.
+# Pushes to develop now publish from GitHub Actions
+# (.github/workflows/develop-ota-publish.yml) to skip the EAS queue; this
+# workflow is the manual fallback.
 name: Blumi develop to preview (OTA)
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch: {}
 
 concurrency:

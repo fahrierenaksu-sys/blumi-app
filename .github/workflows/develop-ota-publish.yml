@@ -1,79 +1,80 @@
+# develop -> OTA update to the `preview` channel (the owner's TestFlight
+# development build), published from GitHub Actions so it skips the EAS
+# workflow queue. It publishes only when a finished `preview` iOS build has the
+# same native runtime (fingerprint); otherwise the job fails and asks for a new
+# preview build. The EAS workflow develop-preview-update.yml stays as a manual
+# fallback. Needs the EXPO_TOKEN repository secret.
 name: Publish OTA to preview channel
 
 on:
   push:
     branches:
       - develop
+  workflow_dispatch: {}
 
 concurrency:
-  group: ota-publish
-  cancel-in-progress: false
+  group: develop-ota-publish
+  cancel-in-progress: true
 
 jobs:
-  check-fingerprint:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/mobile
+    # Must equal build.preview.env in apps/mobile/eas.json (checked by
+    # scripts/mobile-release-channels.test.mjs) or the update's runtime differs.
+    env:
+      EAS_BUILD_PROFILE: preview
+      EXPO_PUBLIC_BLUMI_BUILD_PROFILE: preview
+      EXPO_PUBLIC_BLUMI_MEDIA_MODE: native
+      EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0"
+      EXPO_PUBLIC_BLUMI_VOICE_ENABLED: "0"
+      EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED: "0"
+      EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS: "0"
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: 22.22.2
+          cache: npm
 
-      - name: Compute fingerprint
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Fingerprint the native runtime
         id: fingerprint
         run: |
-          cd apps/mobile
-          fingerprint=$(npx expo-cli@latest fingerprint:generate --json | jq -r '.fingerprint')
-          echo "fingerprint=$fingerprint" >> $GITHUB_OUTPUT
-          echo "Computed fingerprint: $fingerprint"
-
-  publish-ota:
-    needs: check-fingerprint
-    runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Check if fingerprint matches preview build
-        id: check
-        run: |
-          CURRENT=${{ needs.check-fingerprint.outputs.fingerprint }}
-          PREVIEW_BUILD_FINGERPRINT="eee97a36c871bd69a0f08431275b103476e9ceb6"
-
-          if [ "$CURRENT" == "$PREVIEW_BUILD_FINGERPRINT" ]; then
-            echo "fingerprint_matches=true" >> $GITHUB_OUTPUT
-            echo "✓ Fingerprint matches preview build 12, OTA will be published"
-          else
-            echo "fingerprint_matches=false" >> $GITHUB_OUTPUT
-            echo "✗ Fingerprint differs from preview build 12"
-            echo "  Current:  $CURRENT"
-            echo "  Expected: $PREVIEW_BUILD_FINGERPRINT"
-            echo "  Native build required; OTA publishing skipped"
+          hash=$(eas fingerprint:generate --platform ios --build-profile preview --json --non-interactive | jq -r '.hash // empty')
+          if [ -z "$hash" ]; then
+            echo "::error::Could not compute the iOS fingerprint."
+            exit 1
           fi
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "iOS fingerprint: $hash"
 
-      - name: Publish OTA update
-        if: steps.check.outputs.fingerprint_matches == 'true'
+      - name: Find a preview build with this native runtime
+        id: build
         run: |
-          npm ci
-          npx eas update \
-            --channel preview \
-            --platform ios \
-            --message "OTA from ${{ github.sha }}" \
-            --skip-submission
-
-      - name: Report OTA status
-        if: always()
-        run: |
-          if [ "${{ steps.check.outputs.fingerprint_matches }}" == "true" ]; then
-            echo "🚀 OTA published to preview channel"
-            echo "URL: https://expo.dev/accounts/blumi/projects/blumi-mobile/updates"
-          else
-            echo "⏸️  Native build required; OTA skipped"
+          build_id=$(eas build:list --platform ios --channel preview --build-profile preview \
+            --fingerprint-hash "${{ steps.fingerprint.outputs.hash }}" --status finished \
+            --limit 1 --json --non-interactive | jq -r '.[0].id // empty')
+          if [ -z "$build_id" ]; then
+            echo "::error::No finished preview build has fingerprint ${{ steps.fingerprint.outputs.hash }}. This change touches native code or config: run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
+            exit 1
           fi
+          echo "Matching preview build: $build_id"
+
+      - name: Publish the OTA update
+        run: |
+          eas update --channel preview --platform ios --environment production \
+            --message "$(git log -1 --pretty=%s)" --non-interactive

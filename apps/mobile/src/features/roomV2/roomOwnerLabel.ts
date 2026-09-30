@@ -1,6 +1,5 @@
 import type { AppLocale } from "../session/appLocale"
 
-// Test OTA publish via GitHub Actions
 const TURKISH_GENITIVE_BY_VOWEL: Record<string, string> = {
   a: "ın",
   ı: "ın",

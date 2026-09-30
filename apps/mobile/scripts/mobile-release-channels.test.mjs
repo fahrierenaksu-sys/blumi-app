@@ -50,7 +50,8 @@ test("preview and production binaries are store builds on separate channels", ()
 })
 
 test("develop publishes only to the preview channel and never builds", () => {
-  assert.deepEqual(developWorkflow.on.push.branches, ["develop"])
+  assert.equal(developWorkflow.on.push, undefined, "develop pushes publish from GitHub Actions")
+  assert.ok("workflow_dispatch" in developWorkflow.on)
   assert.equal(jobsOfType(developWorkflow, "build").length, 0)
   assert.equal(jobsOfType(developWorkflow, "testflight").length, 0)
   assert.equal(jobsOfType(developWorkflow, "submit").length, 0)
@@ -126,4 +127,17 @@ test("production and preview builds run the release checks first; develop OTA st
   }
   assert.equal(developWorkflow.jobs.checks, undefined, "develop OTA relies on local and GitHub checks")
   assert.equal(developWorkflow.jobs.fingerprint.needs, undefined)
+})
+
+test("GitHub Actions publishes develop to the preview channel with the preview build's runtime", () => {
+  const workflow = yaml.load(readFileSync(join(mobileRoot, "../../.github/workflows/develop-ota-publish.yml"), "utf8"))
+  assert.deepEqual(workflow.on.push.branches, ["develop"])
+  const job = workflow.jobs.publish
+  assert.deepEqual(job.env, easJson.build.preview.env, "env must equal build.preview.env")
+  const script = job.steps.map((step) => step.run ?? "").join("\n")
+  assert.match(script, /eas fingerprint:generate --platform ios --build-profile preview/)
+  assert.match(script, /eas build:list --platform ios --channel preview --build-profile preview/)
+  assert.match(script, /--fingerprint-hash/)
+  assert.match(script, /eas update --channel preview --platform ios --environment production/)
+  assert.doesNotMatch(script, /--channel production|eas build(?!:list)|eas submit/)
 })
