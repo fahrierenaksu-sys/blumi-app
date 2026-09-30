@@ -27,7 +27,7 @@ function message(
   return { messageId, threadId, senderUserId, body, sentAt }
 }
 
-function createHookFixture() {
+function createHookFixture(options: { withoutThread?: boolean } = {}) {
   const sourceFile = resolve(
     process.cwd().endsWith("apps/mobile") ? "src" : "apps/mobile/src",
     "features/miniRoom/useInRoomChat.ts"
@@ -96,6 +96,9 @@ function createHookFixture() {
     }
   }
   const effects: { slot: Slot; run: () => void | (() => void) }[] = []
+  const noThreads: ChatThread[] = []
+  const send = (event: unknown) => { sends.push(event); return sendAccepted }
+  let effectRuns = 0
   const getMessages = (requestedThreadId: string) => requestedThreadId === threadId ? messages : []
   const getMessageListState = (requestedThreadId: string) => ({
     status: requestedThreadId === threadId ? listStatus : "idle"
@@ -118,7 +121,7 @@ function createHookFixture() {
         confirmed.push({ clientMessageId, messageId: chatMessage.messageId })
       },
       useChatStore: () => ({
-        threads: [thread],
+        threads: options.withoutThread ? noThreads : [thread],
         getMessages,
         getMessageListState,
         addOptimisticMessage: (entry: unknown) => { optimistic.push(entry) }
@@ -130,10 +133,8 @@ function createHookFixture() {
         statusListeners.add(listener)
         return () => statusListeners.delete(listener)
       },
-      useGlobalRealtime: () => ({
-        connectionStatus: realtimeStatus,
-        send: (event: unknown) => { sends.push(event); return sendAccepted }
-      }),
+      // Like production, `send` keeps its identity across renders.
+      useGlobalRealtime: () => ({ connectionStatus: realtimeStatus, send }),
       useGlobalRealtimeEvents: (listener: (event: any) => void) => { eventHandler = listener }
     },
     "@blumi/realtime-client": { createReconnectTransitionTracker },
@@ -182,6 +183,7 @@ function createHookFixture() {
     const pendingEffects = effects.splice(0)
     for (const effect of pendingEffects) effect.slot.cleanup?.()
     for (const effect of pendingEffects) effect.slot.cleanup = effect.run() || undefined
+    effectRuns += pendingEffects.length
   }
 
   async function settle() {
@@ -194,6 +196,8 @@ function createHookFixture() {
   render()
   return {
     settle,
+    rerender: render,
+    effectRuns: () => effectRuns,
     sends,
     optimistic,
     failed,
@@ -400,4 +404,13 @@ test("a missing acknowledgement times out as failed, and a server refusal fails 
   f.emitEvent({ type: "chat.message_received", payload: { ...message("m-late", localUserId, "first", new Date().toISOString()), clientMessageId: first } })
   assert.deepEqual(f.confirmed.map((entry) => entry.clientMessageId), [first])
   f.unmount()
+})
+
+test("re-rendering without a room thread re-runs no effects", () => {
+  const f = createHookFixture({ withoutThread: true })
+  assert.equal(f.output().newMessages.length, 0)
+  const runs = f.effectRuns()
+  f.rerender()
+  f.rerender()
+  assert.equal(f.effectRuns(), runs, "the thread-less message list must keep its identity")
 })

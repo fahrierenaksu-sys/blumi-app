@@ -53,6 +53,9 @@ export interface UseInRoomChatResult {
   consume: (messageId: string) => void
 }
 
+/** Stable empty list while the room has no chat thread (an effect dependency). */
+const NO_THREAD_MESSAGES: ChatMessage[] = []
+
 /** How long a room message may stay "sending" without the server's acknowledgement. */
 export const ROOM_MESSAGE_ACK_TIMEOUT_MS = 15_000
 
@@ -186,8 +189,7 @@ export function useInRoomChat(options: {
   const messageListCompletionVersion = threadId
     ? getMessageListCompletionVersion(threadId)
     : 0
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  const canonicalMessages = threadId ? getMessages(threadId) : []
+  const canonicalMessages = threadId ? getMessages(threadId) : NO_THREAD_MESSAGES
 
   useEffect(() => {
     if (!threadId) return
