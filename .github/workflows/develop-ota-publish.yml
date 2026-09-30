@@ -162,6 +162,13 @@ jobs:
           )" || {
             echo "::error::No finished preview build was found for fingerprint ${{ steps.fingerprint.outputs.hash }}. This change touches native code or config: run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
             cat "$output_file"
+            latest_id="$(eas build:list --platform ios --channel preview --build-profile preview \
+              --status finished --limit 1 --json --non-interactive 2>/dev/null \
+              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/"id"\s*:\s*"([^"]+)"/);if(m)process.stdout.write(m[1])})')" || true
+            if [ -n "$latest_id" ]; then
+              echo "Differences from the latest preview build ($latest_id):"
+              eas fingerprint:compare --build-id "$latest_id" --environment production --non-interactive || true
+            fi
             exit 1
           }
 
