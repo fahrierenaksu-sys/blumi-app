@@ -119,7 +119,8 @@ test("postgres reward claim credits inventory only when ledger insert wins", asy
   assert.equal(result.inventory.coins, 1275)
   assert.match(fake.calls[0].text, /INSERT INTO blumi_economy_reward_ledger/)
   assert.match(fake.calls[0].text, /ON CONFLICT .* DO NOTHING/)
-  assert.match(fake.calls[0].text, /coins = coins \+ \$4/)
+  assert.match(fake.calls[0].text, /coins = coins \+ GREATEST\(\$4 - coin_debt, 0\)/)
+  assert.match(fake.calls[0].text, /coin_debt = GREATEST\(coin_debt - \$4, 0\)/)
   assert.deepEqual(fake.calls[0].values?.slice(0, 4), [
     "user_a",
     "daily_login",

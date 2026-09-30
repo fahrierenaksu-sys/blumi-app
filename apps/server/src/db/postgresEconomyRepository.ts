@@ -145,8 +145,12 @@ export function createPostgresEconomyRepository(
            ON CONFLICT (user_id, reward_type, idempotency_key) DO NOTHING
            RETURNING 1
          ), updated_inventory AS (
+           -- One statement under the row lock: the reward repays refund debt
+           -- first and only the remainder becomes spendable coins.
            UPDATE blumi_economy_inventories
-              SET coins = coins + $4, updated_at = $5
+              SET coins = coins + GREATEST($4 - coin_debt, 0),
+                  coin_debt = GREATEST(coin_debt - $4, 0),
+                  updated_at = $5
             WHERE user_id = $1 AND EXISTS (SELECT 1 FROM inserted_reward)
            RETURNING user_id, coins, coin_debt, owned_avatar_item_ids,
                      owned_room_item_ids, updated_at

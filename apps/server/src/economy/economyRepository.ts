@@ -239,11 +239,8 @@ export function createInMemoryEconomyRepository(
         return { claimed: false, inventory: cloneInventory(inventory) }
       }
       store.rewardKeys.add(ledgerKey)
-      const nextInventory = {
-        ...inventory,
-        coins: inventory.coins + input.coins,
-        updatedAt: input.createdAt
-      }
+      // Like a purchased credit, an earned reward repays refund debt first.
+      const nextInventory = applyCoinCredit(inventory, input.coins, input.createdAt)
       store.inventoriesByUserId.set(input.userId, cloneInventory(nextInventory))
       return { claimed: true, inventory: cloneInventory(nextInventory) }
     }
