@@ -2,16 +2,18 @@
 
 One TestFlight app (`com.blumi.mobile`), two binaries, two EAS Update channels.
 
-| Binary | eas.json profile | Channel | TestFlight group | Built by |
-|---|---|---|---|---|
-| Development | `preview` | `preview` | Blumi Dev | `preview-testflight-build.yml` (manual only) |
-| Stable | `production` | `production` | Blumi QA | `testflight.yml` on `main`, only when native code changed |
+| Binary | eas.json profile | Channel | Built by |
+|---|---|---|---|
+| Development | `preview` | `preview` | `preview-testflight-build.yml` (manual only) |
+| Stable | `production` | `production` | `testflight.yml` on `main`, only when native code changed |
+
+Both upload with an EAS `submit` job (App Store Connect app id in `submit.production`); `testflight-after-asc-upload.yml` adds the What to Test notes once Apple finishes processing. Pick which build a device installs in TestFlight.
 
 ## Flows
 
 - **Push to `develop`** → `develop-preview-update.yml`: release checks → iOS fingerprint → look up a `preview` build with that fingerprint → OTA to `preview`. If no build matches (native change), the `native_build_required` job fails and nothing is published. It never builds.
-- **Push to `main`** → `testflight.yml`: release checks → fingerprint → if a `production` build matches, OTA to `production`; otherwise build `production` and upload it to TestFlight (Blumi QA).
-- **Manual** → `preview-testflight-build.yml`: builds the `preview` binary and uploads it to TestFlight (Blumi Dev). Run it once to start and again whenever develop reports a native change.
+- **Push to `main`** → `testflight.yml`: release checks → fingerprint → if a `production` build matches, OTA to `production`; otherwise build `production` and upload it to App Store Connect / TestFlight.
+- **Manual** → `preview-testflight-build.yml`: builds the `preview` binary and uploads it to App Store Connect / TestFlight. Run it once to start and again whenever develop reports a native change.
 
 Other branches (including `claude/*`) trigger nothing.
 
@@ -30,6 +32,5 @@ Other branches (including `claude/*`) trigger nothing.
 ## Owner prerequisites
 
 1. A `develop` branch on GitHub.
-2. `submit.production.ascAppId` in eas.json and an App Store Connect API key in EAS credentials.
-3. TestFlight internal groups `Blumi Dev` and `Blumi QA`.
-4. The first `preview` build (manual workflow) and the first `production` build (a push to `main`).
+2. An App Store Connect API key in EAS credentials (`ascAppId` is set).
+3. The first `preview` build (manual workflow) and the first `production` build (a push to `main`).

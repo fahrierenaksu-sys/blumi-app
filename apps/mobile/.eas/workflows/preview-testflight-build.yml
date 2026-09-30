@@ -1,6 +1,6 @@
 # Manual only: builds the owner's development binary (channel `preview`) and
-# uploads it to the same TestFlight app, for the internal group that should
-# receive development OTA updates. Run it once to start, and again only when
+# uploads it to the same App Store Connect app (TestFlight). Install it on the
+# devices that should receive development OTA updates. Run it once to start, and again only when
 # develop-preview-update.yml reports a native change. It never runs on push.
 name: Blumi preview build to TestFlight
 
@@ -35,15 +35,10 @@ jobs:
       profile: preview
 
   submit_preview_ios:
-    name: Upload the preview build to TestFlight (development group)
+    name: Upload the preview build to App Store Connect
     needs: [build_preview_ios]
-    type: testflight
+    type: submit
     environment: production
     params:
-      profile: preview
       build_id: ${{ needs.build_preview_ios.outputs.build_id }}
-      internal_groups: [Blumi Dev]
-      submit_beta_review: false
-      changelog: |
-        Geliştirme sürümü (preview kanalı). develop branch'ine yapılan uyumlu değişiklikler bu uygulamaya OTA olarak gelir.
-        Kararlı test sürümü değildir; Blumi QA grubuna dağıtılmaz.
+      profile: preview
