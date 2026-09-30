@@ -75,7 +75,7 @@ const OVERSIZED_DEBT = {
   "features/session/useSessionState.ts": 1129,
   "screens/MyRoomScreen.tsx": 1082,
   "features/avatarV2/avatarV2Catalog.ts": 949,
-  "screens/ProfileEditScreen.tsx": 872,
+  "screens/ProfileEditScreen.tsx": 861,
   "features/roomV2/roomVNextFullWaveCatalog.ts": 851,
   "features/session/sessionApi.ts": 847,
   "features/avatarV2/room/avatarRoomSelectors.ts": 825,

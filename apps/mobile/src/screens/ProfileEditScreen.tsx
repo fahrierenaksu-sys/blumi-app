@@ -19,6 +19,7 @@ import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { springPressScale, useReducedMotion } from "../ui/animations"
 import { hapticMedium } from "../ui/haptics"
 import { getAppLocale } from "../features/session/appLocale"
 import { getProfileEditCopy } from "../features/session/profileEditCopy"
@@ -101,6 +102,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const saveScaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -231,21 +233,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     update
   ])
 
-  const handleSavePressIn = () => {
-    Animated.spring(saveScaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handleSavePressOut = () => {
-    Animated.spring(saveScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
+  const handleSavePressIn = () => springPressScale(saveScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
+  const handleSavePressOut = () => springPressScale(saveScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
     <View style={styles.root}>

@@ -47,3 +47,28 @@ test("wardrobe carousel scroll and thumb stay on the UI thread; one list for eve
   assert.match(list, /scrollToOffset\(\{ offset: 0, animated: false \}\)/)
   assert.match(thumb, /interpolate\(offsetX\.value, \[0, maxScroll\], \[0, maxTranslate\], Extrapolation\.CLAMP\)/)
 })
+
+test("press feedback and entrances have a non-moving Reduce Motion path from the shared store", () => {
+  const helper = read("src/ui/animations.ts")
+  assert.match(helper, /export function springPressScale\([\s\S]*?if \(reduceMotion\) \{\s*value\.stopAnimation\(\)\s*value\.setValue\(toValue\)/)
+  for (const path of [
+    "src/components/IncomingInviteCallout.tsx",
+    "src/features/settings/SettingsRow.tsx",
+    "src/ui/vibeTilePicker.tsx",
+    "src/screens/RoomDebriefScreen.tsx",
+    "src/screens/ProfilePreviewScreen.tsx",
+    "src/screens/ProfileEditScreen.tsx"
+  ]) {
+    const source = read(path)
+    assert.match(source, /const reduceMotion = useReducedMotion\(\)/, path)
+    assert.match(source, /springPressScale\(\w+, [^)]*, reduceMotion\)/, path)
+    assert.doesNotMatch(source, /Animated\.spring\(\w*[sS]caleAnim/, path)
+  }
+  // Entrances and the feedback pill fade in place (opacity only).
+  assert.match(read("src/screens/RoomDebriefScreen.tsx"), /opacity: heroAnim,[\s\S]{0,120}transform: reduceMotion \? \[\] :/)
+  assert.match(read("src/screens/ProfilePreviewScreen.tsx"), /opacity: contentAnim,[\s\S]{0,120}transform: reduceMotion \? \[\] :/)
+  assert.match(read("src/features/discovery/screen/DiscoveryFeedbackPill.tsx"), /opacity: feedbackAnim,[\s\S]{0,120}transform: reduceMotion \? \[\] :/)
+  const toast = read("src/ui/toast.tsx")
+  assert.match(toast, /if \(reduceMotion\) slideAnim\.setValue\(0\)/)
+  assert.match(toast, /\.\.\.\(reduceMotion \? \[\] : \[Animated\.spring\(slideAnim/)
+})

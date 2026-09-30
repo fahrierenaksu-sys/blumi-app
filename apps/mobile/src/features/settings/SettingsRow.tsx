@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useRef } from "react"
 import { Animated, Pressable, Text, View } from "react-native"
+import { springPressScale, useReducedMotion } from "../../ui/animations"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
 import { settingsStyles as styles } from "./settingsStyles"
@@ -20,22 +21,10 @@ export function SettingsRow(props: {
 }) {
   const { icon, iconColors, label, description, value, chevron, onPress, isLast, children } = props
   const scaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring
-    }).start()
-  }
+  const handlePressIn = () => springPressScale(scaleAnim, 0.98, uiTheme.animation.spring, reduceMotion)
+  const handlePressOut = () => springPressScale(scaleAnim, 1, uiTheme.animation.spring, reduceMotion)
 
   const content = (
     <>

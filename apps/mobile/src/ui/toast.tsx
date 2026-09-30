@@ -11,6 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import type { ComponentProps } from "react"
 import { useEffect, useRef, useState } from "react"
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import { useReducedMotion } from "./animations"
 import { uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
 
@@ -89,6 +90,7 @@ const TYPE_CONFIG: Record<ToastType, {
 
 export function ToastContainer() {
   const [toast, setToast] = useState<ToastData | null>(currentToast)
+  const reduceMotion = useReducedMotion()
   const slideAnim = useRef(new Animated.Value(100)).current
   const opacityAnim = useRef(new Animated.Value(0)).current
   const progressAnim = useRef(new Animated.Value(0)).current
@@ -102,13 +104,15 @@ export function ToastContainer() {
   useEffect(() => {
     if (toast) {
       progressAnim.setValue(1)
+      // Reduce Motion: the toast fades in place instead of sliding up.
+      if (reduceMotion) slideAnim.setValue(0)
       Animated.parallel([
-        Animated.spring(slideAnim, {
+        ...(reduceMotion ? [] : [Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
           damping: 22,
           stiffness: 280,
-        }),
+        })]),
         Animated.timing(opacityAnim, {
           toValue: 1,
           duration: 180,
@@ -125,11 +129,11 @@ export function ToastContainer() {
       }).start()
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, {
+        ...(reduceMotion ? [] : [Animated.timing(slideAnim, {
           toValue: 100,
           duration: 220,
           useNativeDriver: true
-        }),
+        })]),
         Animated.timing(opacityAnim, {
           toValue: 0,
           duration: 180,
@@ -137,7 +141,7 @@ export function ToastContainer() {
         })
       ]).start()
     }
-  }, [toast, slideAnim, opacityAnim, progressAnim])
+  }, [toast, slideAnim, opacityAnim, progressAnim, reduceMotion])
 
   if (!toast) return null
 

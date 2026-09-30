@@ -31,6 +31,25 @@ export function useReducedMotion(): boolean {
   return useReducedMotionPreference().reduceMotion
 }
 
+/**
+ * Press feedback on a native-driver scale value. Under Reduce Motion the
+ * scale changes instantly instead of springing, so the pressed state stays
+ * visible without movement.
+ */
+export function springPressScale(
+  value: Animated.Value,
+  toValue: number,
+  spring: { damping: number; stiffness: number; mass: number },
+  reduceMotion: boolean
+): void {
+  if (reduceMotion) {
+    value.stopAnimation()
+    value.setValue(toValue)
+    return
+  }
+  Animated.spring(value, { toValue, useNativeDriver: true, ...spring }).start()
+}
+
 /* ── Fade + Slide Up ───────────────────────────────────────── */
 
 interface EntranceOptions {

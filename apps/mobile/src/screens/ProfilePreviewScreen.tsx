@@ -30,6 +30,7 @@ import {
   TagChip,
 } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { springPressScale, useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { captureProductEvent } from "../analytics/productAnalytics"
@@ -101,6 +102,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const copy = getProfilePreviewCopy(getAppLocale())
   const profile = props.profileOverride ?? ("profile" in route.params ? route.params.profile : undefined)
   const likeScaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
   const contentAnim = useRef(new Animated.Value(0)).current
   const [reportVisible, setReportVisible] = useState(false)
   const [isDeciding, setIsDeciding] = useState(false)
@@ -235,21 +237,8 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     navigation.navigate("Lobby", { pendingPassUserId: profile.userId })
   }
 
-  const handleLikePressIn = () => {
-    Animated.spring(likeScaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handleLikePressOut = () => {
-    Animated.spring(likeScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
+  const handleLikePressIn = () => springPressScale(likeScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
+  const handleLikePressOut = () => springPressScale(likeScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
     <View style={styles.root}>
@@ -262,7 +251,8 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         <Animated.View
           style={{
             opacity: contentAnim,
-            transform: [
+            // Reduce Motion: the content fades in without sliding.
+            transform: reduceMotion ? [] : [
               {
                 translateY: contentAnim.interpolate({
                   inputRange: [0, 1],
