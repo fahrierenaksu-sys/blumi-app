@@ -180,6 +180,7 @@ Values and rationale (implemented in `apps/server/src/auth/authStore.ts`):
 | R8 | Legacy admin key path still available when allowed | Backward compatibility | Operations owner | Retire the legacy key |
 | R9 | Report/block abuse limits and realtime event schema validation | Audit 10I / 10E open items | Trust & safety / server owners | Wave 2 |
 | R10 | Refund and unmatched-account webhook handling | Audit 10J | Commerce owner | Before enabling payments |
+| R11 | Moderation phone bans (migration 069) are kept indefinitely and depend on one secret | A banned account that is deleted or changes number leaves an HMAC of the freed number (`blumi_moderation_phone_bans`) so the number cannot sign up again unbanned. Records stay until an administrator deletes them (no admin route); rotating `BLUMI_OTP_HMAC_SECRET` makes every record unmatchable; a banned user with a different number is not caught | Trust & safety + server auth owner | Decide a retention period and an admin removal action; document secret rotation. See [`MIGRATION_069_NOTE.md`](../release/MIGRATION_069_NOTE.md) |
 
 ## 7. Deploy note for this wave
 
@@ -189,3 +190,8 @@ the Supabase database **before** the binary that uses it (`/ready` stays 503
 until it is applied), and only with the owner's approval. The previous
 binary ignores the new columns, so the migration is safe to apply first.
 Rollback of the binary does not require rolling back the migration.
+
+Migration `apps/server/db/migrations/069_moderation_phone_bans.sql` (one new
+table for moderation phone bans) is **not applied**. It follows the same order:
+apply before the binary that ships it, whose `/ready` answers 503 without it.
+See [`MIGRATION_069_NOTE.md`](../release/MIGRATION_069_NOTE.md).

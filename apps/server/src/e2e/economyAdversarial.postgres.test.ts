@@ -61,7 +61,7 @@ function harness() {
     revenueCatWebhookSigningSecret: WEBHOOK_SECRET,
     purchaseEnvironment: "production"
   })
-  return { app, authService }
+  return { app, authService, economyService }
 }
 
 async function onboardedAccount(authService: ReturnType<typeof harness>["authService"]) {
@@ -266,5 +266,35 @@ test("PG-A16 replayed and duplicated signed coin events credit a transaction onc
   }))
   assert.equal(stolen.statusCode, 409)
   assert.deepEqual(await coins(other.userId), { coins: STARTER_COINS, coinDebt: 0 })
+  await app.close()
+})
+
+test("PG-A17 twenty concurrent rewards racing a refund repay the debt first and settle once", requirePostgres, async () => {
+  const { app, authService, economyService } = harness()
+  const user = await onboardedAccount(authService)
+  await economyService.getInventory(user.userId)
+  const now = new Date().toISOString()
+  const refund = economyService.repository.applyCoinTransaction({
+    provider: "revenuecat", eventId: "evt_pg_a17_refund", transactionId: "txn_pg_a17_refund", userId: user.userId,
+    productId: "com.blumi.mobile.coins.1500", store: "ios", kind: "reversal", coins: 1500,
+    payloadHash: "c".repeat(64), occurredAt: now, updatedAt: now
+  })
+  const rewards = Array.from({ length: 20 }, (_, index) =>
+    economyService.claimDailyReward(user.userId, new Date(Date.UTC(2026, 9, index + 1, 12))))
+  const [claims] = await Promise.all([Promise.all(rewards), refund])
+  assert.equal(claims.filter((claim) => claim.claimed).length, 20)
+  // 1250 starter - 1500 refunded + 20 x 25 earned = 250, whatever the interleaving.
+  assert.deepEqual(await coins(user.userId), { coins: 250, coinDebt: 0 })
+  const ledger = await pool.query(
+    "SELECT count(*)::int AS entries, sum(coins)::int AS total FROM blumi_economy_reward_ledger WHERE user_id = $1",
+    [user.userId]
+  )
+  assert.deepEqual(ledger.rows[0], { entries: 20, total: 500 }, "ledger rows keep the full reward amount")
+  const purchase = await app.inject({
+    method: "POST", url: "/v1/economy/purchase", headers: user.headers,
+    payload: { itemId: "avatar_v2_top_rosebud_picnic_peplum", type: "avatar" }
+  })
+  assert.equal(purchase.statusCode, 201, purchase.body)
+  assert.deepEqual(await coins(user.userId), { coins: 170, coinDebt: 0 })
   await app.close()
 })

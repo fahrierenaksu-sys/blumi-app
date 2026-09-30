@@ -10,6 +10,7 @@ import type {
   UserProfile
 } from "@blumi/contracts"
 import { isReadableProfileGender } from "@blumi/contracts"
+import type { ModerationPhoneBanRecord } from "./moderationPhoneBan"
 import {
   createAvatarSelection,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
@@ -148,6 +149,8 @@ export interface BlumiBackendStore {
   sessionsByTokenHash: Map<string, SessionRecord>
   /** Verified Firebase uid bound to each account (blumi_accounts.firebase_uid). */
   firebaseUidsByAccountId: Map<string, string>
+  /** Phone ban records keyed by the phone's keyed hash (blumi_moderation_phone_bans). */
+  moderationPhoneBans: Map<string, ModerationPhoneBanRecord>
 }
 
 export interface AccountDeletionConfirmation {
@@ -197,7 +200,8 @@ export function createBlumiBackendStore(): BlumiBackendStore {
     accountActionConfirmations: new Map(),
     accountsByPhone: new Map(),
     sessionsByTokenHash: new Map(),
-    firebaseUidsByAccountId: new Map()
+    firebaseUidsByAccountId: new Map(),
+    moderationPhoneBans: new Map()
   }
 }
 

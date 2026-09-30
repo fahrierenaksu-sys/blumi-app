@@ -188,7 +188,6 @@ test("a realtime ticket issued before a ban cannot open a socket after it", asyn
 
 test(
   "a banned member cannot shed the ban by deleting the account and signing up again with the same phone",
-  { todo: "BUG: account deletion is open to banned accounts and keeps no ban record, so the same phone re-registers as a fresh unbanned account once the Firebase user is deleted" },
   async () => {
     await withServer(async (server) => {
       const banned = await server.createAccount("evader")

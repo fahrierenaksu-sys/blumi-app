@@ -426,9 +426,7 @@ test("A14 referral claims: self, repeat, second code and twenty concurrent claim
   await app.close()
 })
 
-test("A17 earned reward coins can settle a refund debt so purchases become possible again", {
-  todo: "BUG (product decision needed): rewards add to coins but never reduce coin_debt; after a refund, earned coins stay unspendable until the user buys coins"
-}, async () => {
+test("A17 earned reward coins settle a refund debt first so purchases become possible again", async () => {
   const { app, authService, economyService } = harness()
   const user = await onboardedAccount(authService)
   await economyService.getInventory(user.userId)
@@ -441,9 +439,10 @@ test("A17 earned reward coins can settle a refund debt so purchases become possi
   for (let day = 1; day <= 20; day += 1) {
     await economyService.claimDailyReward(user.userId, new Date(Date.UTC(2026, 9, day, 12)))
   }
-  // 20 daily rewards (500 coins) exceed the 250-coin debt.
+  // 20 daily rewards (500 coins) first repay the 250-coin debt; the rest is spendable.
   const inventory = await balance(app, user.headers)
-  assert.ok(inventory.coins >= inventory.coinDebt, "the user has earned enough to cover the debt")
+  assert.equal(inventory.coinDebt, 0)
+  assert.equal(inventory.coins, 250)
   const purchase = await app.inject({ method: "POST", url: "/v1/economy/purchase", headers: user.headers, payload: { itemId: CHEAP_TOP, type: "avatar" } })
   assert.equal(purchase.statusCode, 201, purchase.body)
   await app.close()

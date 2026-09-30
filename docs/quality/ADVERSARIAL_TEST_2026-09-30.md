@@ -43,6 +43,10 @@ decision), **NOT TESTED** (not counted as pass).
 | 10 | MiniRoom (mobile) | Message sent into a just-closed socket | Message lost, call reported success, bubble stuck "sending" | Send first, report failure (`84243ee`) |
 | 11 | Realtime | `room.leave` without a room id | Server replied with an event the app's own contract rejects | Ignored (`d4ed851`) |
 | 12 | Dependencies | `ip-address` ≤10.7.0 (GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw) via `@fastify/rate-limit` | Advisories published today; release audit failed | Lockfile to 10.7.2 (`1cf3bcc`) |
+| 13 | Moderation | Banned member deletes the account (or changes number) and signs up again with the same phone | Ban evaded (`GET /v1/users/me` 200 instead of 403) | Owner decision: a keyed HMAC of the freed number is kept (migration 069, **not applied**); a new account for it starts banned; suspensions not carried (`3891af6`) |
+| 14 | Profile | `PATCH /v1/users/me` answered 200 for wrongly typed fields and saved nothing | Client bugs looked like success | 400, no write; `null` still means "not provided", unknown keys ignored (`ceccd7b`) |
+| 15 | Profile | No control-character check on display name, bio, prompt answers, interests (code review) | PostgreSQL: NUL → HTTP 500; in memory: stored | Shared control-character check → 400 (`ca91002`) |
+| 16 | Economy | Reward coins never paid off a refund debt | Purchases blocked after a refund | Owner decision: every reward repays `coin_debt` first, remainder to coins; atomic in both repositories (`293d497`) |
 
 Also fixed during integration: a 5 s child-process timeout in the navigation
 parser gate that failed on a cold container, and two test harnesses that
@@ -52,18 +56,14 @@ missed the now-required `safetyService` after the merge.
 
 | Flow | Bug | Impact | Decision |
 |---|---|---|---|
-| Moderation | Banned member deletes the account and signs up again with the same phone | Ban evaded (`GET /v1/users/me` 200 instead of 403) | Keep a ban record (e.g. phone hash) after deletion: migration + retention policy |
 | Safety | Blocked user still sees the blocker's thread (list, sync-matches, full message history) | Blocker's name/avatar/history remain visible | Hide vs read-only |
-| Profile | `PATCH /v1/users/me` returns 200 for wrongly typed fields and saves nothing | Client bugs look like success | Tighten schema (contract change for old clients) |
 | Realtime (mobile) | After 10 failed reconnects the client stops forever; banner still says "reconnecting" | Failure hidden; only network change or app restart recovers | Retry policy |
 | Realtime (mobile) | Backoff resets on every open; accept-then-close loops reconnect every 0.5–1 s | Reconnect storm against a limiting server | Retry policy |
 | Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappears until refresh | Revision numbers in list replies |
 | Chat (mobile) | Lost HTTP response: history reload shows the message twice, once failed | Retyping sends a real duplicate | Reconcile by client id |
 | MiniRoom | In-room messages have no client id or acknowledgement | Lost frame = permanent "sending", no retry | Protocol change |
-| Economy | Reward coins never pay off a refund debt | Purchases blocked after a refund; only reachable with payments on | Debt policy |
 
-Found by code review only, not reproduced: display name, bio and prompt
-answers have no control-character filter (`authService.ts`); the MiniRoom
+Found by code review only, not reproduced: the MiniRoom
 composer clears the text even when the send failed; a well-formed fake
 realtime ticket costs one database delete and is not rate-limited before
 authentication.

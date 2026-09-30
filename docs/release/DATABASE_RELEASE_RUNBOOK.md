@@ -38,6 +38,14 @@ operator commands, verification queries, rollback and stop conditions. The
 disposable mixed-version rehearsal is
 `node scripts/security/migration-068-rehearsal.mjs [old-ref] [--old-suite]`.
 
+## Pending migration 069 (2026-09-30) — NOT APPLIED
+
+Migration `069_moderation_phone_bans.sql` adds one table
+(`blumi_moderation_phone_bans`, keyed by an HMAC of the phone number). It is
+not applied anywhere. Apply it after 068 and before the binary that ships it;
+that binary's `/ready` answers 503 without it. See
+[`MIGRATION_069_NOTE.md`](./MIGRATION_069_NOTE.md).
+
 ## Safe inspection
 
 From the repository root, with the exact target project ref:
