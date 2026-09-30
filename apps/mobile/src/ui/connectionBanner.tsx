@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Animated, Easing, StyleSheet, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNetworkStatus } from "../features/network/networkStore"
@@ -6,7 +6,11 @@ import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClie
 import { LinearGradient } from "./linearGradient"
 import { useReducedMotion } from "./animations"
 import { uiTheme } from "./theme"
-import { resolveConnectionBannerState } from "./connectionBannerModel"
+import {
+  getConnectionBannerCopy,
+  resolveConnectionBannerLocale,
+  resolveConnectionBannerState
+} from "./connectionBannerModel"
 
 interface ConnectionBannerProps {
   status: RealtimeConnectionStatus
@@ -33,6 +37,10 @@ export function ConnectionBanner(props: ConnectionBannerProps) {
     return () => clearTimeout(timer)
   }, [isConnected, status])
   const bannerState = resolveConnectionBannerState(status, isConnected, initialConnectionSlow)
+  const copy = useMemo(
+    () => getConnectionBannerCopy(resolveConnectionBannerLocale(Intl.DateTimeFormat().resolvedOptions().locale)),
+    []
+  )
 
   const shouldShow = bannerState !== "hidden"
 
@@ -82,10 +90,13 @@ export function ConnectionBanner(props: ConnectionBannerProps) {
 
   if (bannerState === "hidden") return null
 
-  const isError = bannerState === "offline" || status === "disconnected" || status === "error"
+  const isError = bannerState === "offline" || bannerState === "unreachable" ||
+    status === "disconnected" || status === "error"
   const label = bannerState === "offline"
-    ? "No internet connection"
-    : status === "connecting" ? "Connecting to Blumi…" : "Reconnecting to Blumi…"
+    ? copy.offline
+    : bannerState === "unreachable"
+      ? copy.unreachable
+      : status === "connecting" ? copy.connecting : copy.reconnecting
   const gradientColors = isError
     ? ["#FFE0B2", "#FFCC80"] as [string, string]
     : [uiTheme.colors.primarySoft, "#FFE2EE"] as [string, string]
@@ -124,7 +135,13 @@ export function ConnectionBanner(props: ConnectionBannerProps) {
           />
           <View style={[styles.dot, { backgroundColor: dotColor }]} />
         </View>
-        <Text style={[styles.text, { color: textColor }]}>{label}</Text>
+        <Text
+          style={[styles.text, { color: textColor }]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          {label}
+        </Text>
       </LinearGradient>
     </Animated.View>
   )

@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http"
 import { randomUUID } from "node:crypto"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type RawData, type WebSocket } from "ws"
+import proxyAddr from "@fastify/proxy-addr"
 import type { ClientEvent } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
 import type { ChatService } from "../chat/chatService"
@@ -29,7 +30,8 @@ import {
   REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
 } from "./realtimeAuthorizationCache"
 import type { RealtimeAccessRevocation } from "../auth/realtimeAccessRevocation"
-import { createRealtimeRouter } from "./realtimeRouter"
+import { createRealtimeRouter, readRealtimeClientMessageId } from "./realtimeRouter"
+import { isPublicRequestError } from "../errors/publicRequestError"
 import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
@@ -48,6 +50,16 @@ const MODERATION_CLOSE_CODE = 4403
 const MODERATION_CLOSE_REASON = "Account restricted"
 const AUTHORIZATION_FAILURE_CLOSE_CODE = 1011
 const AUTHORIZATION_FAILURE_CLOSE_REASON = "Realtime authorization unavailable"
+/**
+ * Upgrade attempts per client address per event window, counted before the
+ * ticket is consumed: a well-formed fake ticket costs a store lookup and
+ * delete, so unauthenticated attempts need their own bound. Generous enough
+ * for a carrier NAT reconnecting after an instance restart.
+ */
+const MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW = 40
+/** Memory bound for tracked addresses; the oldest window is evicted first. */
+const MAX_TRACKED_UPGRADE_ADDRESSES = 10_000
+const CHAT_MESSAGE_NOT_SENT_MESSAGE = "Your message was not sent. Try again."
 
 interface EventRateWindow {
   startedAt: number
@@ -77,6 +89,13 @@ export interface CreateRealtimeServerOptions {
   isPresenceRoomAllowed?: RealtimePresenceRoomPolicy
   /** Test seam for the authorization cache clock; production uses Date.now. */
   authorizationClock?: () => number
+  /**
+   * Same list as the HTTP server's `trustProxy` (BLUMI_TRUST_PROXY), so the
+   * upgrade limit keys on the address Fastify reports as `request.ip`.
+   */
+  trustedProxyAddresses?: string[]
+  /** Test seam; production uses MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW. */
+  upgradeAttemptsPerAddressWindow?: number
 }
 
 export function createRealtimeServer(
@@ -92,6 +111,9 @@ export function createRealtimeServer(
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const connectionEventWindows = new Map<string, EventRateWindow>()
   const userEventWindows = new Map<string, EventRateWindow>()
+  const upgradeAddressWindows = new Map<string, EventRateWindow>()
+  const upgradeAttemptLimit = options.upgradeAttemptsPerAddressWindow ?? MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW
+  const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const connectionInFlight = new Map<string, number>()
   const userInFlight = new Map<string, number>()
   let closing = false
@@ -196,6 +218,23 @@ export function createRealtimeServer(
     const url = new URL(request.url ?? "/", "http://blumi.local")
     if (url.pathname !== "/ws") {
       socket.destroy()
+      return
+    }
+    const now = Date.now()
+    if (upgradeAddressWindows.size >= MAX_TRACKED_UPGRADE_ADDRESSES) {
+      purgeExpiredEventWindows(upgradeAddressWindows, now)
+      const oldest = upgradeAddressWindows.keys().next()
+      if (!oldest.done && upgradeAddressWindows.size >= MAX_TRACKED_UPGRADE_ADDRESSES) {
+        upgradeAddressWindows.delete(oldest.value)
+      }
+    }
+    if (!consumeEventAllowance({
+      windows: upgradeAddressWindows,
+      key: resolveClientAddress(request),
+      now,
+      limit: upgradeAttemptLimit
+    })) {
+      rejectUpgrade(socket, "429 Too Many Requests")
       return
     }
 
@@ -341,6 +380,7 @@ export function createRealtimeServer(
   let heartbeatAuthorizationPending = false
   const heartbeat = setInterval(() => {
     purgeExpiredEventWindows(userEventWindows, Date.now())
+    purgeExpiredEventWindows(upgradeAddressWindows, Date.now())
     if (!heartbeatAuthorizationPending) {
       heartbeatAuthorizationPending = true
       void track(closeRestrictedConnections()).finally(() => { heartbeatAuthorizationPending = false })
@@ -421,9 +461,11 @@ export function createRealtimeServer(
     }
     connectionInFlight.set(connection.connectionId, (connectionInFlight.get(connection.connectionId) ?? 0) + 1)
     userInFlight.set(connection.userId, (userInFlight.get(connection.userId) ?? 0) + 1)
+    let received: ClientEvent | undefined
     try {
       const parsed = JSON.parse(data.toString()) as unknown
       if (!isClientEvent(parsed)) return
+      received = parsed
       if (!await authorizeConnection(connection) || connection.socket.readyState !== 1) return
       if (parsed.type === "room.join") {
         await trackConnectionRoomJoin(connection.connectionId, () => {
@@ -433,12 +475,39 @@ export function createRealtimeServer(
       } else {
         await router.handleClientEvent(connection, parsed)
       }
-    } catch {
+    } catch (error) {
+      reportRefusedChatSend(connection, received, error)
       return
     } finally {
       releaseInFlight(connectionInFlight, connection.connectionId)
       releaseInFlight(userInFlight, connection.userId)
     }
+  }
+
+  /**
+   * A failed in-room send that carried a clientMessageId is reported to the
+   * requesting socket only, so the client can mark that bubble failed and
+   * offer a retry. Sends without an id (older clients, which do not know the
+   * error code) keep the previous silent behaviour. Only public error text
+   * is echoed; never the message body.
+   */
+  function reportRefusedChatSend(
+    connection: RealtimeConnection,
+    event: ClientEvent | undefined,
+    error: unknown
+  ): void {
+    if (event?.type !== "chat.send_message") return
+    const clientMessageId = readRealtimeClientMessageId(event.payload)
+    if (!clientMessageId || connection.socket.readyState !== 1) return
+    connectionManager.sendToConnection(connection.connectionId, {
+      type: "realtime.error",
+      payload: {
+        code: "CHAT_MESSAGE_NOT_SENT",
+        requestType: "chat.send_message",
+        message: isPublicRequestError(error) ? error.message : CHAT_MESSAGE_NOT_SENT_MESSAGE,
+        clientMessageId
+      }
+    })
   }
 
   async function authorizeConnection(connection: RealtimeConnection): Promise<boolean> {
@@ -554,6 +623,25 @@ function collectConnections(
   connectionManager: ConnectionManager
 ): RealtimeConnection[] {
   return connectionManager.listConnections()
+}
+
+/**
+ * `request.ip` semantics for raw upgrade requests: the socket address, or,
+ * with trusted proxies configured, the nearest untrusted address from
+ * X-Forwarded-For, computed by the same library Fastify uses.
+ */
+function createClientAddressResolver(trustedProxyAddresses: string[]): (request: IncomingMessage) => string {
+  if (trustedProxyAddresses.length === 0) {
+    return (request) => request.socket.remoteAddress ?? "unknown"
+  }
+  const trust = proxyAddr.compile(trustedProxyAddresses)
+  return (request) => {
+    try {
+      return proxyAddr(request, trust)
+    } catch {
+      return request.socket.remoteAddress ?? "unknown"
+    }
+  }
 }
 
 function isClientEvent(value: unknown): value is ClientEvent {

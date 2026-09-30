@@ -5,6 +5,12 @@ export type RealtimeConnectionStatus =
   | "idle"
   | "connecting"
   | "reconnecting"
+  /**
+   * The fast reconnect attempts are exhausted. The client keeps retrying
+   * with capped backoff, but the UI must say the service is unreachable
+   * rather than promise an imminent reconnect.
+   */
+  | "unreachable"
   | "connected"
   | "disconnected"
   | "error"
@@ -14,6 +20,17 @@ export interface RealtimeConnectionMeta {
 }
 
 export const REALTIME_AUTH_INVALID_CLOSE_CODE = 4401
+/** Attempts before the status changes from "reconnecting" to "unreachable". */
+export const REALTIME_FAST_RECONNECT_ATTEMPTS = 10
+const FAST_RECONNECT_CEILING_MS = 30_000
+/** Slow retries continue indefinitely, never more than this far apart. */
+export const REALTIME_SLOW_RECONNECT_CEILING_MS = 60_000
+/**
+ * A socket must stay open this long (or deliver an authenticated server
+ * event) before the backoff resets, so an accept-then-close loop keeps
+ * growing its delay instead of reconnecting every second.
+ */
+export const REALTIME_STABLE_CONNECTION_MS = 10_000
 const REALTIME_TICKET_FORBIDDEN_CLOSE_CODE = 4403
 
 export function isRealtimeAuthInvalidClose(closeCode: number | undefined): boolean {
@@ -73,7 +90,12 @@ export class RealtimeClient {
   private intentionalDisconnect = false
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
+  private ticketRequestInFlight = false
+  /** The server refused this session (401/403 ticket, 1008/4401 close); only connect() retries. */
+  private sessionRefused = false
   private networkConnected = true
+  private appActive = true
   private connectionGeneration = 0
   private readonly serverEventListeners = new Set<ServerEventListener>()
   private readonly statusListeners = new Set<StatusListener>()
@@ -109,6 +131,10 @@ export class RealtimeClient {
       return
     }
     const result = parseServerEvent(decoded)
+    if (result.kind === "valid" && result.event.type !== "realtime.error") {
+      // The server only sends product events on an authorized socket.
+      this.markConnectionHealthy()
+    }
     if (result.kind === "unknown") {
       this.recordDrop({ reason: "unknown_type", type: result.type })
       return
@@ -144,6 +170,7 @@ export class RealtimeClient {
 
   public connect(sessionToken: string): void {
     this.intentionalDisconnect = false
+    this.sessionRefused = false
     this.sessionToken = sessionToken
     this.connectionGeneration += 1
     this.clearReconnectTimer()
@@ -162,14 +189,17 @@ export class RealtimeClient {
     generation: number
   ): Promise<void> {
     let ticket: string
+    this.ticketRequestInFlight = true
     try {
       ticket = await this.ticketProvider(sessionToken)
     } catch (error) {
       if (!this.isCurrentConnectionAttempt(sessionToken, generation)) return
+      this.ticketRequestInFlight = false
       if (
         error instanceof RealtimeTicketRequestError &&
         error.statusCode === 401
       ) {
+        this.sessionRefused = true
         this.emitStatus("error", { closeCode: REALTIME_AUTH_INVALID_CLOSE_CODE })
         return
       }
@@ -177,6 +207,7 @@ export class RealtimeClient {
         error instanceof RealtimeTicketRequestError &&
         error.statusCode === 403
       ) {
+        this.sessionRefused = true
         this.emitStatus("error", {
           closeCode: REALTIME_TICKET_FORBIDDEN_CLOSE_CODE
         })
@@ -187,6 +218,7 @@ export class RealtimeClient {
       return
     }
     if (!this.isCurrentConnectionAttempt(sessionToken, generation)) return
+    this.ticketRequestInFlight = false
     if (!/^[A-Za-z0-9_-]{8,128}$/.test(ticket)) {
       this.emitStatus("error")
       this.scheduleReconnect()
@@ -201,7 +233,11 @@ export class RealtimeClient {
 
     socket.onopen = () => {
       if (this.socket !== socket) return
-      this.reconnectAttempts = 0
+      this.clearStableConnectionTimer()
+      this.stableConnectionTimer = setTimeout(() => {
+        this.stableConnectionTimer = null
+        if (this.socket === socket) this.markConnectionHealthy()
+      }, REALTIME_STABLE_CONNECTION_MS)
       this.emitStatus("connected")
     }
 
@@ -216,11 +252,13 @@ export class RealtimeClient {
     socket.onclose = (closeEvent) => {
       if (this.socket !== socket) return
       this.socket = null
+      this.clearStableConnectionTimer()
       this.emitStatus("disconnected", { closeCode: closeEvent.code })
       if (
         closeEvent.code === 1008 ||
         closeEvent.code === REALTIME_AUTH_INVALID_CLOSE_CODE
       ) {
+        this.sessionRefused = true
         this.emitStatus("error", { closeCode: closeEvent.code })
         return
       }
@@ -240,9 +278,37 @@ export class RealtimeClient {
     this.sessionToken = null
     this.connectionGeneration += 1
     this.reconnectAttempts = 0
+    this.ticketRequestInFlight = false
     this.clearReconnectTimer()
     this.closeCurrentSocket()
     this.emitStatus("disconnected")
+  }
+
+  /**
+   * App foreground/background signal. Backgrounded, no retry is scheduled;
+   * returning to the foreground retries at once when no socket is live or
+   * being opened. The backoff level is kept, so a still-unreachable server
+   * reports "unreachable" again after this attempt fails.
+   */
+  public setAppActive(isActive: boolean): void {
+    if (this.appActive === isActive) return
+    this.appActive = isActive
+    if (!isActive) {
+      this.clearReconnectTimer()
+      return
+    }
+    if (
+      this.intentionalDisconnect ||
+      this.sessionRefused ||
+      !this.sessionToken ||
+      !this.networkConnected ||
+      this.socket ||
+      this.ticketRequestInFlight
+    ) return
+    this.clearReconnectTimer()
+    this.emitStatus("reconnecting")
+    this.connectionGeneration += 1
+    void this.openSocket(this.sessionToken, this.connectionGeneration)
   }
 
   public setNetworkConnected(isConnected: boolean): void {
@@ -251,6 +317,7 @@ export class RealtimeClient {
 
     if (!isConnected) {
       this.connectionGeneration += 1
+      this.ticketRequestInFlight = false
       this.clearReconnectTimer()
       this.closeCurrentSocket()
       if (!this.intentionalDisconnect && this.sessionToken) {
@@ -259,8 +326,11 @@ export class RealtimeClient {
       return
     }
 
-    if (!this.intentionalDisconnect && this.sessionToken && !this.socket) {
+    if (!this.intentionalDisconnect && !this.sessionRefused && this.sessionToken && !this.socket) {
+      // Losing the network, not the server, caused this outage: start again
+      // with the fast attempts.
       this.reconnectAttempts = 0
+      this.clearReconnectTimer()
       this.emitStatus("reconnecting")
       this.connectionGeneration += 1
       void this.openSocket(this.sessionToken, this.connectionGeneration)
@@ -300,24 +370,42 @@ export class RealtimeClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= 10 || !this.sessionToken || !this.networkConnected) {
-      this.emitStatus("error")
-      return
-    }
+    if (this.intentionalDisconnect || !this.sessionToken || !this.networkConnected) return
 
     // A fanout gap or server restart closes every socket on an instance at
     // once. Equal jitter keeps each attempt within its exponential ceiling
-    // while spreading clients across the upper half of the window.
-    const ceiling = Math.min(1_000 * 2 ** this.reconnectAttempts, 30_000)
+    // while spreading clients across the upper half of the window. After the
+    // fast attempts the client never gives up: it keeps retrying at most
+    // REALTIME_SLOW_RECONNECT_CEILING_MS apart and says so honestly.
+    const fast = this.reconnectAttempts < REALTIME_FAST_RECONNECT_ATTEMPTS
+    const exponent = Math.min(this.reconnectAttempts, 16)
+    const ceiling = Math.min(
+      1_000 * 2 ** exponent,
+      fast ? FAST_RECONNECT_CEILING_MS : REALTIME_SLOW_RECONNECT_CEILING_MS
+    )
     const delay = Math.round(ceiling / 2 + this.random() * (ceiling / 2))
     this.reconnectAttempts += 1
-    this.emitStatus("reconnecting")
+    this.emitStatus(fast ? "reconnecting" : "unreachable")
+    this.clearReconnectTimer()
+    // Backgrounded: wait for setAppActive(true), which retries at once.
+    if (!this.appActive) return
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       if (this.intentionalDisconnect || !this.sessionToken) return
       this.connectionGeneration += 1
       void this.openSocket(this.sessionToken, this.connectionGeneration)
     }, delay)
+  }
+
+  private markConnectionHealthy(): void {
+    this.clearStableConnectionTimer()
+    this.reconnectAttempts = 0
+  }
+
+  private clearStableConnectionTimer(): void {
+    if (!this.stableConnectionTimer) return
+    clearTimeout(this.stableConnectionTimer)
+    this.stableConnectionTimer = null
   }
 
   private clearReconnectTimer(): void {
@@ -329,6 +417,7 @@ export class RealtimeClient {
   private closeCurrentSocket(): void {
     const socket = this.socket
     this.socket = null
+    this.clearStableConnectionTimer()
     socket?.close()
   }
 

@@ -1,5 +1,6 @@
 import type { ChatThread, ChatThreadList } from "@blumi/contracts"
 import { useEffect, useMemo } from "react"
+import { AppState } from "react-native"
 import { MOBILE_HTTP_BASE_URL, MOBILE_WS_BASE_URL } from "../config/env"
 import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
@@ -7,7 +8,8 @@ import {
   applyChatMessageReceived,
   applyChatThreadListed,
   applyChatThreadRead,
-  getThreads
+  getThreads,
+  noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
 import { isDemoMode, setDemoMode } from "../features/demo/demoStore"
@@ -20,6 +22,7 @@ import {
   connectGlobal,
   disconnectGlobal,
   sendGlobal,
+  setGlobalRealtimeAppActive,
   subscribeToStatus,
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
@@ -84,6 +87,15 @@ export function useGlobalRealtimeSession({
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   const realtimeSessionCallbacksRef = useLatestRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
 
+  // Reconnect retries pause in the background and run at once on foreground.
+  useEffect(() => {
+    setGlobalRealtimeAppActive(AppState.currentState === "active")
+    const subscription = AppState.addEventListener("change", (state) => {
+      setGlobalRealtimeAppActive(state === "active")
+    })
+    return () => subscription.remove()
+  }, [])
+
   useEffect(() => createGlobalRealtimeLifecycle({
     sessionActor,
     isMainRoute: sessionEntryRoute === "Main",
@@ -106,6 +118,7 @@ export function useGlobalRealtimeSession({
     connectGlobal,
     disconnectGlobal,
     sendGlobal,
+    noteThreadListRequested: noteRealtimeThreadListRequested,
     subscribeToStatus,
     applyChatThreadListed,
     getThreads,

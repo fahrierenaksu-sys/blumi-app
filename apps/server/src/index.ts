@@ -147,6 +147,7 @@ const realtimeServer = createRealtimeServer({
   notificationService: services.notificationService,
   connectionManager,
   realtimeTicketService,
+  trustedProxyAddresses: config.trustedProxyAddresses,
   httpServer: config.port === config.realtimePort ? app.server : undefined
 })
 

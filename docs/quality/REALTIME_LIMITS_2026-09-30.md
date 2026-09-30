@@ -95,3 +95,30 @@ Evidence: `apps/server/src/realtime/realtimeServer.adversarial.test.ts`.
 - Unchanged and known: a burst of more than 8 events in flight on one socket
   is closed with 4429; client frames are shape-checked by the router, not by a
   shared schema.
+
+## Reconnect policy, upgrade limit and in-room acknowledgement (group 3, 2026-09-30)
+
+Evidence: `apps/mobile/src/features/realtime/realtimeClient*.test.ts`,
+`apps/server/src/realtime/realtimeServer.adversarial.test.ts`. No device or
+load evidence.
+
+- Mobile reconnect (`realtimeClient.ts`): the first 10 attempts keep the
+  equal-jitter backoff (1 s doubling, 30 s cap) and report `reconnecting`.
+  After that the client reports `unreachable` and keeps retrying with a 60 s
+  cap for as long as the app is foregrounded and a session exists. Retries
+  pause in the background; foreground and network regain retry at once. A
+  refused session (401/403 ticket, 1008/4401 close) and sign-out stop retries.
+  The backoff resets only after a socket stayed open for 10 s or delivered an
+  authenticated server event, so an accept-then-close loop (4429, 1011, 1013)
+  keeps growing its delay.
+- Pre-authentication upgrades: at most 40 per client address per 10 s window,
+  counted before the ticket is consumed; above it the upgrade gets 429. The
+  address is the socket address, or with `BLUMI_TRUST_PROXY` set the same
+  forwarded address Fastify reports as `request.ip` (`@fastify/proxy-addr`).
+  Tracked addresses are purged by the heartbeat and capped at 10,000.
+- In-room `chat.send_message` may carry an optional `clientMessageId`. The
+  server sends it through the same idempotent send as HTTP, acknowledges on
+  the requesting socket only with `chat.message_received` plus
+  `clientMessageId`, and reports a failure there as `realtime.error`
+  `CHAT_MESSAGE_NOT_SENT` with the id. Frames without the id behave as before,
+  so clients that predate the field never receive either shape.

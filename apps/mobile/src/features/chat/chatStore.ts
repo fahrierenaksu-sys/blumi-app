@@ -83,6 +83,38 @@ function removePendingLocalMessage(localMessageId: string): void {
   pendingMessageByLocalMessageId.delete(localMessageId)
 }
 
+// Thread-list request tracking. A list reply is computed when its request is
+// served, so a slow reply must not erase threads the client learned about
+// (chat.thread_created or a newer message) after that request was issued.
+let chatEventSequence = 0
+let learnedSequenceByThreadId: Map<string, number> = new Map()
+let pendingRealtimeListRequestSequence: number | null = null
+let lastAppliedListRequestSequence = 0
+
+/** Marks the issue time of a list request whose reply is applied explicitly. */
+export function beginChatThreadListRequest(): number {
+  chatEventSequence += 1
+  return chatEventSequence
+}
+
+/**
+ * Records the first-page `chat.list_threads` sent when a socket connects.
+ * The server answers it on that socket only, and a closed socket's replies
+ * never arrive, so the newest request replaces any unanswered older one.
+ */
+export function noteRealtimeThreadListRequested(): void {
+  pendingRealtimeListRequestSequence = beginChatThreadListRequest()
+}
+
+function markThreadLearned(threadId: string): void {
+  chatEventSequence += 1
+  learnedSequenceByThreadId.set(threadId, chatEventSequence)
+}
+
+// A lost send acknowledgement is reconciled only with a committed copy close
+// to the optimistic bubble in time (allowing for device clock skew).
+const LOST_ACK_RECONCILE_WINDOW_MS = 5 * 60_000
+
 // Unread message tracking per thread
 let unreadCounts: Map<string, number> = new Map()
 let readAtByThread: Map<string, string> = new Map()
@@ -102,8 +134,28 @@ function notify(): void {
 }
 
 // ─── Server-event reducers (called from RootNavigator) ──────
-export function applyChatThreadListed(payload: ChatThreadList): void {
+export function applyChatThreadListed(
+  payload: ChatThreadList,
+  options: { requestSequence?: number } = {}
+): void {
   const merged = new Map((payload.append ? threadCache : []).map((thread) => [thread.threadId, thread]))
+  if (!payload.append) {
+    // An untracked list (demo, tests) is assumed no newer than the newest
+    // tracked list already applied.
+    let requestSequence = options.requestSequence
+    if (requestSequence === undefined) {
+      requestSequence = pendingRealtimeListRequestSequence ?? lastAppliedListRequestSequence
+      pendingRealtimeListRequestSequence = null
+    }
+    const listedIds = new Set(payload.threads.map((thread) => thread.threadId))
+    for (const thread of threadCache) {
+      if (listedIds.has(thread.threadId)) continue
+      if ((learnedSequenceByThreadId.get(thread.threadId) ?? 0) > requestSequence) merged.set(thread.threadId, thread)
+    }
+    lastAppliedListRequestSequence = Math.max(lastAppliedListRequestSequence, requestSequence)
+    learnedSequenceByThreadId = new Map([...learnedSequenceByThreadId]
+      .filter(([, sequence]) => sequence > lastAppliedListRequestSequence))
+  }
   for (const thread of payload.threads) {
     const previousSummary = summaryLastMessageByThread.get(thread.threadId)
     if (thread.lastMessage && (!previousSummary || compareMessageOrder(thread.lastMessage, previousSummary) > 0)) {
@@ -163,6 +215,7 @@ export function applyChatThreadListFailed(errorMessage: string): void {
 }
 
 export function applyChatThreadCreated(thread: ChatThread): void {
+  markThreadLearned(thread.threadId)
   // Dedupe by threadId, put newest first.
   const filtered = threadCache.filter((t) => t.threadId !== thread.threadId)
   threadCache = [cloneThread(thread), ...filtered].sort(
@@ -173,7 +226,7 @@ export function applyChatThreadCreated(thread: ChatThread): void {
 }
 
 export function applyChatMessageListed(payload: ChatMessageList): void {
-  const existing = messageCache.get(payload.threadId) ?? []
+  const existing = reconcileLostAcknowledgements(payload)
   const byId = new Map<string, ChatMessage>()
   for (const message of existing) {
     byId.set(message.messageId, message)
@@ -187,6 +240,45 @@ export function applyChatMessageListed(payload: ChatMessageList): void {
   markMessageListCompleted(payload.threadId)
   setMessageListState(payload.threadId, { status: "ready" })
   notify()
+}
+
+/**
+ * A send whose HTTP response and realtime echo were both lost stays failed
+ * (or sending) locally while the server committed it. When history lists a
+ * newly learned message from the same sender, thread and body close to the
+ * bubble's time, it is that send: drop the bubble so the message shows once,
+ * as sent. Pairs are matched oldest first; a message already known before
+ * this list never matches, so an earlier identical message is left alone.
+ */
+function reconcileLostAcknowledgements(payload: ChatMessageList): ChatMessage[] {
+  const existing = messageCache.get(payload.threadId) ?? []
+  const knownIds = new Set(existing.map((message) => message.messageId))
+  const byTime = (left: ChatMessage, right: ChatMessage) => Date.parse(left.sentAt) - Date.parse(right.sentAt)
+  const localCandidates = existing
+    .filter((message) => pendingLocalIds.has(message.messageId) &&
+      pendingMessageByLocalMessageId.get(message.messageId)?.threadId === payload.threadId)
+    .sort(byTime)
+  if (localCandidates.length === 0) return existing
+  const serverCandidates = payload.messages
+    .filter((message) => !knownIds.has(message.messageId))
+    .sort(byTime)
+  const reconciledLocalIds = new Set<string>()
+  const claimedServerIds = new Set<string>()
+  for (const local of localCandidates) {
+    const pending = pendingMessageByLocalMessageId.get(local.messageId)
+    const match = serverCandidates.find((message) =>
+      !claimedServerIds.has(message.messageId) &&
+      message.senderUserId === pending?.senderUserId &&
+      message.body === local.body &&
+      Math.abs(Date.parse(message.sentAt) - Date.parse(local.sentAt)) <= LOST_ACK_RECONCILE_WINDOW_MS)
+    if (!match) continue
+    claimedServerIds.add(match.messageId)
+    reconciledLocalIds.add(local.messageId)
+    removePendingLocalMessage(local.messageId)
+  }
+  return reconciledLocalIds.size === 0
+    ? existing
+    : existing.filter((message) => !reconciledLocalIds.has(message.messageId))
 }
 
 export function applyChatMessageListLoading(threadId: string): void {
@@ -233,6 +325,9 @@ export function applyChatMessageReceived(
   const sorted = (alreadyReceived ? cleaned : [...cleaned, message])
     .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
   messageCache.set(message.threadId, sorted)
+  if (!alreadyReceived && threadCache.some((thread) => thread.threadId === message.threadId)) {
+    markThreadLearned(message.threadId)
+  }
 
   // Update lastMessage on thread
   threadCache = threadCache.map((thread) =>
@@ -373,6 +468,9 @@ export function resetChatStore(): void {
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
   activeThreadId = null
+  learnedSequenceByThreadId = new Map()
+  pendingRealtimeListRequestSequence = null
+  lastAppliedListRequestSequence = 0
   notify()
 }
 

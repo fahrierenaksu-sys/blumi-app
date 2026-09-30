@@ -54,4 +54,12 @@ export interface ChatListMessagesCommand {
 export interface ChatSendMessageCommand {
   threadId: string;
   body: string;
+  /**
+   * Optional retry id (2026-09-30). The server deduplicates by it, like the
+   * HTTP send, and acknowledges to the requesting socket with the same id.
+   */
+  clientMessageId?: string;
 }
+
+/** A received message; `clientMessageId` only on the sender's own acknowledgement. */
+export type ChatMessageReceived = ChatMessage & { clientMessageId?: string };

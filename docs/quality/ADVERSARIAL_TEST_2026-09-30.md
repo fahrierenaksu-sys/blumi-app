@@ -48,6 +48,13 @@ decision), **NOT TESTED** (not counted as pass).
 | 15 | Profile | No control-character check on display name, bio, prompt answers, interests (code review) | PostgreSQL: NUL → HTTP 500; in memory: stored | Shared control-character check → 400 (`ca91002`) |
 | 16 | Economy | Reward coins never paid off a refund debt | Purchases blocked after a refund | Owner decision: every reward repays `coin_debt` first, remainder to coins; atomic in both repositories (`293d497`) |
 | 17 | Safety | Blocked user still saw the blocker's thread (list, sync-matches, full message history) | Blocker's name, avatar and history stayed visible | Owner decision: while a block exists in either direction the thread is hidden from both users (lists omit it; its routes answer 404 like a thread you are not in); unblocking restores it with history (`50e5115`) |
+| 18 | Realtime (mobile) | After 10 failed reconnects the client stopped forever while the banner said "reconnecting" | Failure hidden; only a network change or restart recovered | Owner decision: retries continue at most 60 s apart while foregrounded, immediately on foreground and network regain; distinct `unreachable` state with Turkish/English banner copy (`5aac73f`) |
+| 19 | Realtime (mobile) | Backoff reset on every open | Accept-then-close loops reconnected every 0.5–1 s | Reset only after 10 s open or the first authenticated server event (`5aac73f`) |
+| 20 | Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappeared until refresh | Client keeps threads learned after the list request was issued (`1de95c0`) |
+| 21 | Chat (mobile) | Lost HTTP response: history reload showed the message twice, once failed | Retyping sent a real duplicate | Resync settles the failed bubble against its committed copy; retry keeps the client id (`1de95c0`) |
+| 22 | MiniRoom | In-room messages had no client id or acknowledgement; handler errors were swallowed | Lost frame = permanent "sending", no retry | Optional `clientMessageId`, requester-only acknowledgement and `realtime.error`; failed on close or 15 s timeout (`c48f446`, `96998ca`) |
+| 23 | MiniRoom | Composer cleared the text when the send was refused (code review) | Typed text lost | Text kept on refusal (`96998ca`) |
+| 24 | Realtime | Fake well-formed tickets cost a database delete with no pre-auth limit (code review) | Cheap load on the ticket store | 40 upgrade attempts per client address per 10 s before ticket use (`c48f446`) |
 
 Also fixed during integration: a 5 s child-process timeout in the navigation
 parser gate that failed on a cold container, and two test harnesses that
@@ -57,18 +64,7 @@ lease test whose 2 s window was too tight for the full PostgreSQL gate
 
 ## Open (reproduced, `todo` tests, decision needed)
 
-| Flow | Bug | Impact | Decision |
-|---|---|---|---|
-| Realtime (mobile) | After 10 failed reconnects the client stops forever; banner still says "reconnecting" | Failure hidden; only network change or app restart recovers | Retry policy |
-| Realtime (mobile) | Backoff resets on every open; accept-then-close loops reconnect every 0.5–1 s | Reconnect storm against a limiting server | Retry policy |
-| Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappears until refresh | Revision numbers in list replies |
-| Chat (mobile) | Lost HTTP response: history reload shows the message twice, once failed | Retyping sends a real duplicate | Reconcile by client id |
-| MiniRoom | In-room messages have no client id or acknowledgement | Lost frame = permanent "sending", no retry | Protocol change |
-
-Found by code review only, not reproduced: the MiniRoom
-composer clears the text even when the send failed; a well-formed fake
-realtime ticket costs one database delete and is not rate-limited before
-authentication.
+None. Every bug reproduced in this run is fixed; the table above lists them.
 
 ## PASS (attack refused, with tests)
 

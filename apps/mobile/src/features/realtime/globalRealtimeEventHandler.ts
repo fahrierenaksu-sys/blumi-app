@@ -94,7 +94,10 @@ export function createGlobalRealtimeEventHandler(
     }
 
     if (event.type === "chat.message_received") {
-      dependencies.applyChatMessageReceived(event.payload, {
+      // The client id rides only on the sender's own in-room acknowledgement;
+      // useInRoomChat settles that bubble. The store keeps the canonical shape.
+      const { clientMessageId: _clientMessageId, ...message } = event.payload
+      dependencies.applyChatMessageReceived(message, {
         localUserId: dependencies.currentUserId
       })
 

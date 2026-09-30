@@ -1039,8 +1039,11 @@ test("navigation links and offline status remain wired to native runtime", () =>
   assert.doesNotMatch(networkStore, /\bany\b|console\.warn|try\s*\{\s*require/)
   assert.match(connectionBanner, /resolveConnectionBannerState\(status, isConnected, initialConnectionSlow\)/)
   assert.match(connectionBannerModel, /if \(!isConnected\) return "offline"/)
-  assert.match(connectionBanner, /No internet connection/)
-  assert.match(connectionBanner, /Reconnecting to Blumi/)
+  // Banner copy lives in the model (English and Turkish) since 2026-09-30.
+  assert.match(connectionBanner, /getConnectionBannerCopy\(/)
+  assert.match(connectionBannerModel, /No internet connection/)
+  assert.match(connectionBannerModel, /Reconnecting to Blumi/)
+  assert.match(connectionBannerModel, /Can't reach Blumi right now/)
   assert.doesNotMatch(connectionBanner, /Connecting to the room/)
   assert.doesNotMatch(DISCOVER_SCREEN_SOURCE_PATHS.map(read).join("\n"), /<ConnectionBanner/)
   assert.match(read("src/screens/SettingsScreen.tsx"), /Platform\.select/)

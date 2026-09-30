@@ -111,56 +111,64 @@ test("a reconnect storm from an instance restart is spread over the window and b
   for (const client of clients) client.disconnect()
 })
 
-test(
-  "after the fast reconnect attempts are exhausted the client still recovers without an app restart",
-  { todo: "BUG: after 10 failed attempts RealtimeClient stops forever (no capped retry, no foreground resume) while the banner keeps saying 'reconnecting'" },
-  async (context) => {
-    context.after(installWebSocketMock())
-    context.mock.timers.enable({ apis: ["setTimeout"] })
-    const statuses: RealtimeConnectionStatus[] = []
-    const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
-    client.onConnectionStatus((status) => { statuses.push(status) })
-    client.connect("token-outage")
+test("after the fast reconnect attempts are exhausted the client still recovers without an app restart", async (context) => {
+  // Fixed 2026-09-30 (owner decision): the client used to stop forever after
+  // ten failed attempts while the banner kept promising a reconnect. It now
+  // reports "unreachable" and keeps retrying at most 60 s apart.
+  context.after(installWebSocketMock())
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const statuses: RealtimeConnectionStatus[] = []
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  client.onConnectionStatus((status) => { statuses.push(status) })
+  client.connect("token-outage")
+  await flush()
+  // A server outage longer than the fast backoff budget (~1.5 to 3 minutes).
+  for (let attempt = 0; attempt < 11; attempt += 1) {
+    MockWebSocket.instances.at(-1)?.drop()
+    context.mock.timers.tick(30_000)
     await flush()
-    // A server outage longer than the backoff budget (~1.5 to 3 minutes).
-    for (let attempt = 0; attempt < 11; attempt += 1) {
-      MockWebSocket.instances.at(-1)?.drop()
-      context.mock.timers.tick(30_000)
-      await flush()
-    }
-    assert.equal(statuses.at(-1), "error")
-    assert.equal(resolveConnectionBannerState("error", true), "reconnecting", "the UI still promises a reconnect")
-    const afterGivingUp = MockWebSocket.instances.length
-    // The server is back. The user keeps the app open for ten minutes.
-    context.mock.timers.tick(10 * 60_000)
-    await flush()
-    assert.ok(MockWebSocket.instances.length > afterGivingUp, "no further attempt is ever made")
-    client.disconnect()
   }
-)
-
-test(
-  "a server that accepts and immediately closes the socket is retried with growing backoff",
-  { todo: "BUG: backoff resets on every onopen, so an accept-then-close loop (4429, 1011, 1013) reconnects every 0.5-1 s forever" },
-  async (context) => {
-    context.after(installWebSocketMock())
-    context.mock.timers.enable({ apis: ["setTimeout"] })
-    const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 1 - Number.EPSILON })
-    client.connect("token-flap")
+  assert.equal(statuses.at(-1), "unreachable")
+  assert.equal(resolveConnectionBannerState("unreachable", true), "unreachable", "the UI no longer promises a quick reconnect")
+  // Slow attempts continue, never more than 60 s apart.
+  for (let slow = 0; slow < 10; slow += 1) {
+    const before = MockWebSocket.instances.length
+    MockWebSocket.instances.at(-1)?.drop()
+    context.mock.timers.tick(60_000)
     await flush()
-    for (let cycle = 0; cycle < 6; cycle += 1) {
-      MockWebSocket.instances.at(-1)?.open()
-      MockWebSocket.instances.at(-1)?.drop(4429)
-      context.mock.timers.tick(1_000)
-      await flush()
-    }
-    // After six accept-then-close cycles the next retry should wait longer than 1 s.
+    assert.equal(MockWebSocket.instances.length, before + 1, `slow attempt ${slow} happened within 60 s`)
+    assert.equal(statuses.at(-1), "unreachable")
+  }
+  // The server is back.
+  MockWebSocket.instances.at(-1)?.open()
+  assert.equal(statuses.at(-1), "connected")
+  client.disconnect()
+})
+
+test("a server that accepts and immediately closes the socket is retried with growing backoff", async (context) => {
+  // Fixed 2026-09-30: backoff used to reset on every onopen, so an
+  // accept-then-close loop (4429, 1011, 1013) reconnected every 0.5-1 s.
+  context.after(installWebSocketMock())
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 1 - Number.EPSILON })
+  client.connect("token-flap")
+  await flush()
+  const delays: number[] = []
+  for (const code of [4429, 1011, 1013, 4429, 1011, 1013]) {
     const before = MockWebSocket.instances.length
     MockWebSocket.instances.at(-1)?.open()
-    MockWebSocket.instances.at(-1)?.drop(4429)
-    context.mock.timers.tick(1_000)
-    await flush()
-    assert.equal(MockWebSocket.instances.length, before, "the seventh flap reconnected within one second")
-    client.disconnect()
+    MockWebSocket.instances.at(-1)?.drop(code)
+    let waited = 0
+    while (MockWebSocket.instances.length === before && waited < 120_000) {
+      context.mock.timers.tick(250)
+      waited += 250
+      await flush()
+    }
+    delays.push(waited)
   }
-)
+  for (let index = 1; index < delays.length; index += 1) {
+    assert.ok(delays[index]! >= delays[index - 1]!, `delays grow: ${delays.join(",")}`)
+  }
+  assert.ok(delays.at(-1)! > 1_000, `the sixth flap waited ${delays.at(-1)} ms`)
+  client.disconnect()
+})
