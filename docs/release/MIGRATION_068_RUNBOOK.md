@@ -21,12 +21,13 @@ number", risks R1–R3).
 | Item | Value |
 | --- | --- |
 | Database | Supabase project "Blumi", ref `nkqcbxufbhfibrgvajim`, PostgreSQL 17.6 |
-| Classification | Test/staging database behind the Railway staging API. It is **not** production |
+| Classification | **Unresolved; owner decides.** The Railway project `blumi` has exactly one environment, named `production`, with one service `blumi-app` serving `blumi-app-production.up.railway.app`. No staging environment exists. `.railway/railway.ts` names the service `blumi-api` and allows `staging`/`production`, so the IaC file and the live project differ. Treat this database as production data until the owner classifies it |
 | Migration ledger | `blumi_migrations` holds 67 rows; the latest is `067_realtime_connection_leases.sql`. 068 is not applied |
 | Schema | `blumi_accounts.firebase_uid` does not exist |
 | Data | 18 accounts, 1 session row (1 live). `blumi_sessions` is 80 kB and `blumi_accounts` is 128 kB |
-| API | Railway runs one replica, deployed from `main` (the source is at `2a55475`; the **live deployment commit is unverified**). The healthcheck is `/ready` with a 300 s timeout (`.railway/railway.ts`). `/ready` compares every packaged migration checksum (`apps/server/src/operations/schemaReadiness.ts`) |
-| Backups | Supabase PITR and daily-backup availability for this project is **unknown**. Treat the owner-controlled `pg_dump` in step 3 as the only restore point you can rely on |
+| API | **Verified read-only 2026-09-30 via the Railway API:** the live deployment `d5f77b8e` (SUCCESS, 2026-09-29 21:30 UTC, region europe-west4, 1 replica) runs commit **`2a55475`** from `main`. `4d016d2` is an ancestor of `2a55475`, so the live server is already lease-aware and the deploy after 068 is **not** the lease cutover. `GET /health` and `GET /ready` returned 200 on 2026-09-30. The healthcheck path is `/ready`. `/ready` compares every packaged migration checksum (`apps/server/src/operations/schemaReadiness.ts`) |
+| API ↔ database link | **Indirect evidence only.** Five idle `postgres` sessions reach this database through Supavisor, opened at 2026-09-29 21:29 UTC, the window of the live deployment; they match the server's pool. Railway's `DATABASE_URL` value was not read because it contains the password. The owner confirms in the Railway dashboard that its host is `…nkqcbxufbhfibrgvajim…` and whether it uses port 5432 (session) or 6543 (transaction) |
+| Backups | **Verified 2026-09-30:** the Supabase organisation is on the **Free** plan (`get_organization`: `plan: free`). Supabase documents daily backups for Pro, Team and Enterprise only, and PITR as a paid add-on for Pro and above that needs at least Small compute. **This project has no PITR and no platform restore point.** Enabling either is a paid plan change and was not done. The owner-controlled `pg_dump` in §5 plus a passing restore gate is the only rollback source |
 
 ## 2. Schema change and locks
 
@@ -60,11 +61,46 @@ over the 67 existing files.
 **The real risk is waiting to get the lock, not holding it.** An
 `AccessExclusiveLock` request waits behind any open transaction that has touched
 either table. While it waits, it blocks every new query on those tables, and
-every authenticated request reads `blumi_sessions`. The migration therefore runs
-with `lock_timeout=5s`, passed through `PGOPTIONS`. node-postgres reads that
-variable, and the rehearsal confirmed it. If the timeout fires, the transaction
-rolls back completely: no columns are added and the ledger still has 67 rows.
-The rehearsal proved this with an open reader and a 1.5 s timeout.
+every authenticated request reads `blumi_sessions`. Supabase's default is
+`lock_timeout = 0` (no limit; read 2026-09-30), so the migrator itself now bounds
+the wait: right after `BEGIN` of every migration file it runs
+`SELECT set_config('lock_timeout', '5000ms', true)`, the same as
+`SET LOCAL lock_timeout`. Because this is an ordinary SQL statement inside the
+migration's own transaction, it does **not** depend on a pooler forwarding
+startup options (`PGOPTIONS`), and it cannot leak into the session. The value
+comes from `BLUMI_MIGRATION_LOCK_TIMEOUT_MS` (default 5000).
+
+Two separate limits apply:
+
+| Limit | Setting | Default | What it bounds |
+| --- | --- | --- | --- |
+| Pool connection wait | `BLUMI_MIGRATION_CONNECT_TIMEOUT_MS` → node-postgres `connectionTimeoutMillis` | 10 000 ms | Opening the one migrator connection: network, TLS, pooler queue, authentication. On timeout nothing has been sent to the database |
+| Database lock wait | `BLUMI_MIGRATION_LOCK_TIMEOUT_MS` → transaction-local `lock_timeout` | 5 000 ms | Each lock request inside the migration transaction. On timeout PostgreSQL raises `55P03` and the migrator rolls the whole file back |
+
+The session-level advisory lock `blumi:migrations` is taken outside the
+transaction and is not bounded by `lock_timeout`; it only waits for another
+migrator run, which the operator rules out in step 2.
+
+**Evidence (`apps/server/src/db/migrateLockTimeout.postgres.test.ts`, part of
+`npm run verify:postgres`, passed 2026-09-30 on a disposable cluster):** a
+fixture with 068's shape (ALTER on two tables plus a partial unique index, one
+transaction) runs through the real `runMigrationsWithClient` over a pooled
+node-postgres connection while another transaction holds `ACCESS SHARE` on the
+second table. The migrator stops with `55P03` after the configured limit; the
+first table's ALTER is rolled back too (no column on either table), the ledger
+has no row, and `SHOW lock_timeout` on the reused pooled connection is back to
+`0`. After the reader ends, the same file applies in full and records
+`lock_timeout = 500ms` from inside its transaction. `apps/server/src/db/migrate.test.ts`
+proves the connection wait separately: against a socket that accepts TCP but
+never answers, `runMigrations` fails with a timeout after 300 ms even though
+the lock limit is 60 s.
+
+On Supabase itself (read-only, 2026-09-30, role `postgres`):
+`set_config('lock_timeout','5000ms',true)` returned `5s` and the role has no
+`lock_timeout` override. The live pooler path was **not** exercised because
+that needs the database password; since the limit is now plain SQL inside the
+transaction, the remaining pooler requirement is only that one migrator
+connection keeps one backend for the whole run, which the session pooler does.
 
 **`CONCURRENTLY` is neither needed nor possible here.** `CREATE INDEX
 CONCURRENTLY` cannot run inside a transaction block, and the migrator always
@@ -76,9 +112,8 @@ reviewed migration; never edit 068, because applied checksums are immutable.
 `postgres.nkqcbxufbhfibrgvajim` on port 5432, and TLS (`sslmode=require` or
 `verify-full`). Never use the transaction pooler on port 6543: a session-level
 advisory lock and a multi-statement transaction are unsafe through it. The audit
-script accepts only a URL whose username ends in the project ref. Whether
-Supavisor forwards `PGOPTIONS` is **unverified**, so step 4a checks it before
-anything is applied.
+script accepts only a URL whose username ends in the project ref. `PGOPTIONS`
+is no longer needed.
 
 ## 3. Compatibility matrix
 
@@ -135,10 +170,10 @@ These results come from the rehearsal (§6) and the code in
 
 ## 5. Backup plan
 
-1. **Platform backups.** In the Supabase dashboard (Database → Backups), record
-   whether PITR or daily backups exist for `nkqcbxufbhfibrgvajim`, and the
-   latest restore point. If they are not available, write "unavailable" down;
-   do not assume they exist.
+1. **Platform backups: unavailable (verified, see §1).** Free plan: no daily
+   backups and no PITR. Do not upgrade the plan for this migration without a
+   separate owner decision. A dump that exists is not a restore proof; only a
+   passing step 3 is.
 2. **Owner-controlled archive (required).** Use PostgreSQL **17** client tools.
    `pg_dump` 16 refuses a 17.6 server.
 
@@ -215,11 +250,11 @@ chat, tickets or Git.
 | # | Step | Command / action | Pass condition | Approves |
 | --- | --- | --- | --- | --- |
 | 0 | Go/no-go and identity | Confirm in writing that the target is `nkqcbxufbhfibrgvajim` (test/staging) and that this window is authorised. In the Railway dashboard, record the **live deployment commit** (read-only). Pick the release commit that contains 068 and check `sha256sum apps/server/db/migrations/068_*.sql` = `a475eecb…e0ee`. | Target, release SHA and live SHA written down | **Owner** |
-| 1 | Realtime lease check | If the live deployment commit predates `4d016d2` (no lease code), the later deploy is also the realtime lease cutover, and the LAUNCH_CONTROL lease gate (BLOCKED) applies. Applying 068 alone is still allowed. | Recorded: "lease-aware live" or "lease cutover pending" | Owner |
+| 1 | Realtime lease check | If the live deployment commit predates `4d016d2` (no lease code), the later deploy is also the realtime lease cutover, and the LAUNCH_CONTROL lease gate (BLOCKED) applies. Applying 068 alone is still allowed. | Recorded: "lease-aware live" or "lease cutover pending". **2026-09-30: lease-aware live (`2a55475` contains `4d016d2`); re-check on the day** | Owner |
 | 2 | Read-only preflight | `node --env-file-if-exists=.env.local --import tsx apps/server/scripts/auditDatabaseRelease.ts --project-ref nkqcbxufbhfibrgvajim`, then the §9 preflight queries. | `missingMigrations: 1` (068 only), `changedMigrations: 0`, `unexpectedMigrations: 0`, no other findings; 67 ledger rows; `firebase_uid` absent; no transaction older than 60 s | Operator |
 | 3 | Backup and restore proof | §5 steps 1–3. | Archive SHA-256 recorded; restore gate `applied: 1`, `rerunApplied: 0`, no findings | Operator runs; **owner reviews the evidence** |
-| 4a | Check the session setting through the pooler | `PGOPTIONS='-c lock_timeout=5s' $PG17/psql "$DATABASE_URL" -Atc 'SHOW lock_timeout'` | Prints `5s`. Otherwise STOP (§10) | Operator |
-| 4b | **Apply 068** (from a clean checkout of the release commit; `NODE_ENV` unset) | `BLUMI_OTP_HMAC_SECRET=$(openssl rand -hex 32) PGOPTIONS='-c lock_timeout=5s' npm run db:migrate`. The migrator's config check requires a 32-character secret but never uses it, so use a throwaway value and never the real one. `DATABASE_URL` from the shell environment overrides `.env.local`. | Prints `Blumi migrations applied=1 skipped=67`. On `lock timeout`, re-run step 2's activity query, wait, and retry at most twice | **Owner, explicitly, immediately before running** |
+| 4a | Confirm the release commit carries the bounded migrator | `grep -n "set_config('lock_timeout'" apps/server/src/db/migrate.ts` | One match. Otherwise STOP (§10) | Operator |
+| 4b | **Apply 068** (from a clean checkout of the release commit; `NODE_ENV` unset) | `BLUMI_OTP_HMAC_SECRET=$(openssl rand -hex 32) BLUMI_MIGRATION_LOCK_TIMEOUT_MS=5000 BLUMI_MIGRATION_CONNECT_TIMEOUT_MS=10000 npm run db:migrate`. The migrator's config check requires a 32-character secret but never uses it, so use a throwaway value and never the real one. `DATABASE_URL` from the shell environment overrides `.env.local`. | Prints `Blumi migrations applied=1 skipped=67`. On `lock timeout`, re-run step 2's activity query, wait, and retry at most twice | **Owner, explicitly, immediately before running** |
 | 5 | Idempotent rerun | Run the same command again. | `applied=0 skipped=68` | Operator |
 | 6 | Verify | `auditDatabaseRelease.ts --project-ref nkqcbxufbhfibrgvajim --require-clean` exits 0, and the §9 post-apply queries pass. `curl -fsS https://blumi-app-production.up.railway.app/ready` still returns 200: the old binary on 068. | All pass | Operator; owner signs off |
 | 7 | Deploy the new binary (**separate phase, not approved now**) | Merge the reviewed release into `main`; Railway builds and runs the `/ready` healthcheck. Follow the LAUNCH_CONTROL lease rule if step 1 said "cutover pending". | `/ready` 200 on the new deployment; `/health` 200; unauthenticated `/v1/users/me` 401; the owner's device signs in (its uid binds) | **Owner** |
@@ -320,20 +355,23 @@ Stop, change nothing further, and report to the owner if any of these happens:
   (the migration was partly applied by hand).
 - The backup cannot be taken with PostgreSQL 17 tools, the archive SHA-256 is
   not recorded, or the restore gate fails.
-- `SHOW lock_timeout` through the pooler is not `5s`. Proceeding without a lock
-  timeout is an owner decision.
+- The release commit's migrator does not set the transaction-local lock
+  timeout (step 4a). Proceeding without a lock timeout is an owner decision.
 - `lock timeout` occurs three times, or the migrator prints anything other than
   `applied=1 skipped=67` (first run) and `applied=0 skipped=68` (rerun).
 - The old binary's `/ready` stops returning 200 after 068.
 - After the deploy, `/ready` is not 200, sustained 5xx appear on auth routes, or
   there are unexpected 409 `ACCOUNT_RECOVERY_REQUIRED` responses.
-- The deploy would be the realtime lease cutover (step 1) and the LAUNCH_CONTROL
-  lease gate is still BLOCKED.
+- The owner has not classified the target (§1: the only Railway environment is
+  named `production`), or cannot confirm the host and port of Railway's
+  `DATABASE_URL`.
 
 **Open risks, which this runbook does not close:**
 
-- Supavisor handling of `PGOPTIONS` is unverified.
-- Supabase PITR status is unknown.
+- The live pooler path was not exercised with the real password; the lock limit
+  no longer depends on it (§2).
+- No platform backup exists (Free plan); rollback depends entirely on the owner's
+  dump and restore gate (§5).
 - The rehearsal ran on PostgreSQL 16 with synthetic data; the §5 restore gate on
   PostgreSQL 17 covers this.
 - Overlap between two lease-aware versions during a Railway deploy was not
