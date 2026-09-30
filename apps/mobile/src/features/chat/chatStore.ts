@@ -88,6 +88,9 @@ function removePendingLocalMessage(localMessageId: string): void {
 // (chat.thread_created or a newer message) after that request was issued.
 let chatEventSequence = 0
 let learnedSequenceByThreadId: Map<string, number> = new Map()
+// Threads removed locally (blocked partner). A list whose request predates
+// the removal must not bring them back; a newer list (after unblock) may.
+let removedSequenceByThreadId: Map<string, number> = new Map()
 let pendingRealtimeListRequestSequence: number | null = null
 let lastAppliedListRequestSequence = 0
 
@@ -139,6 +142,7 @@ export function applyChatThreadListed(
   options: { requestSequence?: number } = {}
 ): void {
   const merged = new Map((payload.append ? threadCache : []).map((thread) => [thread.threadId, thread]))
+  let listRequestSequence = options.requestSequence ?? lastAppliedListRequestSequence
   if (!payload.append) {
     // An untracked list (demo, tests) is assumed no newer than the newest
     // tracked list already applied.
@@ -147,6 +151,7 @@ export function applyChatThreadListed(
       requestSequence = pendingRealtimeListRequestSequence ?? lastAppliedListRequestSequence
       pendingRealtimeListRequestSequence = null
     }
+    listRequestSequence = requestSequence
     const listedIds = new Set(payload.threads.map((thread) => thread.threadId))
     for (const thread of threadCache) {
       if (listedIds.has(thread.threadId)) continue
@@ -156,7 +161,13 @@ export function applyChatThreadListed(
     learnedSequenceByThreadId = new Map([...learnedSequenceByThreadId]
       .filter(([, sequence]) => sequence > lastAppliedListRequestSequence))
   }
-  for (const thread of payload.threads) {
+  const listedThreads = payload.threads.filter((thread) =>
+    (removedSequenceByThreadId.get(thread.threadId) ?? 0) <= listRequestSequence)
+  if (!payload.append) {
+    removedSequenceByThreadId = new Map([...removedSequenceByThreadId]
+      .filter(([, sequence]) => sequence > lastAppliedListRequestSequence))
+  }
+  for (const thread of listedThreads) {
     const previousSummary = summaryLastMessageByThread.get(thread.threadId)
     if (thread.lastMessage && (!previousSummary || compareMessageOrder(thread.lastMessage, previousSummary) > 0)) {
       summaryLastMessageByThread.set(thread.threadId, { ...thread.lastMessage })
@@ -223,6 +234,38 @@ export function applyChatThreadCreated(thread: ChatThread): void {
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
   notify()
+}
+
+/**
+ * Drops every thread with a partner the user just blocked (the server hides
+ * them too). Returns the removed thread ids. An unblock restores them through
+ * the next thread-list refresh.
+ */
+export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
+  const removedIds = threadCache
+    .filter((thread) => thread.participantUserIds.includes(partnerUserId))
+    .map((thread) => thread.threadId)
+  if (removedIds.length === 0) return []
+  chatEventSequence += 1
+  const removed = new Set(removedIds)
+  for (const threadId of removedIds) {
+    removedSequenceByThreadId.set(threadId, chatEventSequence)
+    learnedSequenceByThreadId.delete(threadId)
+    for (const message of messageCache.get(threadId) ?? []) {
+      if (pendingLocalIds.has(message.messageId)) removePendingLocalMessage(message.messageId)
+    }
+    loadedHistoryThreads.delete(threadId)
+    messageListCompletionVersionByThreadId.delete(threadId)
+  }
+  threadCache = threadCache.filter((thread) => !removed.has(thread.threadId))
+  messageCache = new Map([...messageCache].filter(([threadId]) => !removed.has(threadId)))
+  messageListStateByThreadId = new Map([...messageListStateByThreadId].filter(([threadId]) => !removed.has(threadId)))
+  unreadCounts = new Map([...unreadCounts].filter(([threadId]) => !removed.has(threadId)))
+  readAtByThread = new Map([...readAtByThread].filter(([threadId]) => !removed.has(threadId)))
+  summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
+  if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
+  notify()
+  return removedIds
 }
 
 export function applyChatMessageListed(payload: ChatMessageList): void {
@@ -469,6 +512,7 @@ export function resetChatStore(): void {
   summaryLastMessageByThread = new Map()
   activeThreadId = null
   learnedSequenceByThreadId = new Map()
+  removedSequenceByThreadId = new Map()
   pendingRealtimeListRequestSequence = null
   lastAppliedListRequestSequence = 0
   notify()

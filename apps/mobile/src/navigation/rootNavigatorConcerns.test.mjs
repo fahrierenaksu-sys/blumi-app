@@ -771,7 +771,14 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
   assert.match(read("./useLatestRef.ts"), /useLayoutEffect\(\(\) => \{\s*ref\.current = value\s*\}, \[value\]\)/)
 
   const navigator = read(OWNER.sessionReset)
-  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch\s*\}\)/)
+  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock\s*\}\)/)
+  // Local blocks and the server's confirmation share one chat cleanup.
+  assert.match(navigator, /const applyConfirmedPartnerBlock = useBlockedPartnerCleanup\(sessionActor\?\.profile\.userId\)/)
+  // Every block entry point (report sheet, block-only, demo report) goes through blockUser, which announces it.
+  const blockStore = read("../features/safety/blockStore.ts")
+  const blockUserBody = blockStore.slice(blockStore.indexOf("export function blockUser("), blockStore.indexOf("export function unblockUser("))
+  assert.match(blockUserBody, /publishPartnerBlocked\(\{\s*ownerUserId: normalizeOwnerUserId\(ownerUserId\),\s*blockedUserId\s*\}\)/)
+  assert.match(read("./useBlockedPartnerCleanup.ts"), /subscribeToPartnerBlocked\(\(event\) => \{\s*if \(event\.ownerUserId !== currentUserId\) return\s*applyBlockedPartner\(event\.blockedUserId\)/)
   assert.match(navigator, /const resetInactiveSessionState = useCallback\([\s\S]*?\}, \[resetMatchModal, resetRoomInviteRouting\]\)/)
 })
 

@@ -56,6 +56,8 @@ interface GlobalRealtimeSessionInput {
   openReadyMiniRoom: ReturnType<typeof useRoomInviteRouting>["openReadyMiniRoom"]
   getMatchDeduplicationState: ReturnType<typeof useMatchModal>["getMatchDeduplicationState"]
   onConnectionMatched: (payload: ConnectionMatchedPayload) => void
+  /** Server confirmation of a block by this user; drops the partner's chat. */
+  onPartnerBlocked: (blockedUserId: string) => void
 }
 
 /**
@@ -82,7 +84,8 @@ export function useGlobalRealtimeSession({
   applyNewThread,
   openReadyMiniRoom,
   getMatchDeduplicationState,
-  onConnectionMatched
+  onConnectionMatched,
+  onPartnerBlocked
 }: GlobalRealtimeSessionInput): void {
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   const realtimeSessionCallbacksRef = useLatestRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
@@ -156,12 +159,14 @@ export function useGlobalRealtimeSession({
       getThreads,
       openReadyMiniRoom,
       onConnectionMatched,
+      onPartnerBlocked,
       showIncomingMessageToast: (toast) => {
         showToast({ ...toast, type: "info" })
       }
     }),
     [
       onConnectionMatched,
+      onPartnerBlocked,
       getMatchDeduplicationState,
       applyNewThread,
       applyRealtimeThreadList,

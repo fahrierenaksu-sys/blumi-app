@@ -101,6 +101,7 @@ import { renderRouteErrorBoundary } from "./RouteErrorBoundary"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
+import { useBlockedPartnerCleanup } from "./useBlockedPartnerCleanup"
 import {
   MAIN_TAB_PAGER_ENABLED,
   MAIN_TAB_ROUTE_NAMES,
@@ -548,6 +549,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     disconnectGlobal()
   }, [resetMatchModal, resetRoomInviteRouting])
 
+  const applyConfirmedPartnerBlock = useBlockedPartnerCleanup(sessionActor?.profile.userId)
+
   useGlobalRealtimeSession({
     sessionActor,
     sessionEntryRoute,
@@ -563,7 +566,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     applyNewThread,
     openReadyMiniRoom,
     getMatchDeduplicationState,
-    onConnectionMatched: handleRealtimeConnectionMatch
+    onConnectionMatched: handleRealtimeConnectionMatch,
+    onPartnerBlocked: applyConfirmedPartnerBlock
   })
 
   const mainTabPageDependencies: MainTabPageDependencies = {
