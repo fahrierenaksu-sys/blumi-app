@@ -44,7 +44,7 @@ jobs:
 
       - uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 24.8.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
@@ -54,24 +54,89 @@ jobs:
       - name: Fingerprint the native runtime
         id: fingerprint
         run: |
-          hash=$(eas fingerprint:generate --platform ios --build-profile preview --json --non-interactive | jq -r '.hash // empty')
-          if [ -z "$hash" ]; then
-            echo "::error::Could not compute the iOS fingerprint."
+          set -euo pipefail
+
+          output_file="$(mktemp)"
+          error_file="$(mktemp)"
+
+          if ! eas fingerprint:generate \
+            --platform ios \
+            --build-profile preview \
+            --json \
+            --non-interactive \
+            >"$output_file" 2>"$error_file"; then
+            echo "::error::EAS fingerprint generation failed."
+            cat "$error_file"
+            cat "$output_file"
             exit 1
           fi
+
+          # Extract the hash even if the CLI adds non-JSON text to stdout.
+          hash="$(
+            node - "$output_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const output = fs.readFileSync(process.argv[2], "utf8");
+          const match = output.match(/"hash"\s*:\s*"([^"]+)"/);
+
+          if (!match) {
+            process.exit(1);
+          }
+
+          process.stdout.write(match[1]);
+          NODE
+          )" || {
+            echo "::error::Could not find a fingerprint hash in EAS output."
+            cat "$output_file"
+            exit 1
+          }
+
           echo "hash=$hash" >> "$GITHUB_OUTPUT"
           echo "iOS fingerprint: $hash"
 
       - name: Find a preview build with this native runtime
         id: build
         run: |
-          build_id=$(eas build:list --platform ios --channel preview --build-profile preview \
-            --fingerprint-hash "${{ steps.fingerprint.outputs.hash }}" --status finished \
-            --limit 1 --json --non-interactive | jq -r '.[0].id // empty')
-          if [ -z "$build_id" ]; then
-            echo "::error::No finished preview build has fingerprint ${{ steps.fingerprint.outputs.hash }}. This change touches native code or config: run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
+          set -euo pipefail
+
+          output_file="$(mktemp)"
+          error_file="$(mktemp)"
+
+          if ! eas build:list \
+            --platform ios \
+            --channel preview \
+            --build-profile preview \
+            --fingerprint-hash "${{ steps.fingerprint.outputs.hash }}" \
+            --status finished \
+            --limit 1 \
+            --json \
+            --non-interactive \
+            >"$output_file" 2>"$error_file"; then
+            echo "::error::EAS build lookup failed."
+            cat "$error_file"
+            cat "$output_file"
             exit 1
           fi
+
+          build_id="$(
+            node - "$output_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const output = fs.readFileSync(process.argv[2], "utf8");
+          const match = output.match(/"id"\s*:\s*"([^"]+)"/);
+
+          if (!match) {
+            process.exit(1);
+          }
+
+          process.stdout.write(match[1]);
+          NODE
+          )" || {
+            echo "::error::No finished preview build was found for fingerprint ${{ steps.fingerprint.outputs.hash }}. This change touches native code or config: run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
+            cat "$output_file"
+            exit 1
+          }
+
           echo "Matching preview build: $build_id"
 
       - name: Publish the OTA update
