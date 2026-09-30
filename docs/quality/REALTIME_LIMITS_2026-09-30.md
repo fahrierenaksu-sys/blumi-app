@@ -73,3 +73,25 @@ No migration or configuration change. Mixed-version rollout is safe: chunked
 messages are valid for old receivers. A client on a very slow link may now
 see a 1013 close and reconnect instead of the server buffering without limit.
 Open: measure real `bufferedAmount` under load before tuning the limits.
+
+## Inbound limits and request replies (adversarial pass, 2026-09-30)
+
+Evidence: `apps/server/src/realtime/realtimeServer.adversarial.test.ts`.
+
+- The per-user event window (100 events per 10 s) now outlives the socket.
+  Before, closing the last socket deleted it, so a reconnect inside the window
+  started a fresh budget (each reconnect admitted up to 60 more events). The
+  heartbeat purges expired windows, so memory stays bounded by users active in
+  the last window plus one heartbeat.
+- `chat.list_threads` and `chat.list_messages` are answered on the requesting
+  socket only. Before, the reply went to every socket of the user; the mobile
+  client requests the next page for every page with a cursor, so with two
+  devices each page doubled the requests (measured: 3 pages cost 7 page
+  queries instead of 3). Page k cost 2^(k-1) requests, so a long thread list
+  would eventually exceed the 8 in-flight limit and be closed with 4429
+  (reasoned from the limits, not measured).
+- `room.leave` without a string `roomId` is ignored instead of echoing a
+  `room.left` event the client contract rejects.
+- Unchanged and known: a burst of more than 8 events in flight on one socket
+  is closed with 4429; client frames are shape-checked by the router, not by a
+  shared schema.
