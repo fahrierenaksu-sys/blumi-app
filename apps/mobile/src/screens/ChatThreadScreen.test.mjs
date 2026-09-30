@@ -1,19 +1,34 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 
-const source = readFileSync(new URL("./ChatThreadScreen.tsx", import.meta.url), "utf8")
-const file = ts.createSourceFile("ChatThreadScreen.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const threadDirectory = new URL("../features/chat/thread/", import.meta.url)
 
-function component(name) {
-  const declaration = file.statements.find(
+function parse(url, fileName) {
+  const text = readFileSync(url, "utf8")
+  return ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+}
+
+const file = parse(new URL("./ChatThreadScreen.tsx", import.meta.url), "ChatThreadScreen.tsx")
+const threadFile = (fileName) => parse(new URL(fileName, threadDirectory), fileName)
+const composerFile = threadFile("ChatComposer.tsx")
+const rowFile = threadFile("ChatTimelineRow.tsx")
+const modelFile = threadFile("chatThreadModel.ts")
+const threadModuleNames = readdirSync(threadDirectory)
+  .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+
+function declaredFunction(sourceFile, name) {
+  const declaration = sourceFile.statements.find(
     (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name
   )
-  assert.ok(declaration?.body, `${name} must be a function component`)
+  assert.ok(declaration?.body, `${name} must be a function declaration in ${sourceFile.fileName}`)
   return declaration
 }
+
+const component = (name) => declaredFunction(file, name)
+const composerComponent = () => declaredFunction(composerFile, "ChatComposer")
 
 function containsIdentifier(node, name) {
   if (ts.isIdentifier(node) && node.text === name) return true
@@ -22,13 +37,14 @@ function containsIdentifier(node, name) {
 
 test("typing state stays inside the composer, outside the timeline owner", () => {
   const screen = component("ChatThreadScreen")
-  const composer = component("ChatComposer")
+  const composer = composerComponent()
 
-  assert.equal(containsIdentifier(screen.body, "inputText"), false)
-  assert.equal(containsIdentifier(screen.body, "setInputText"), false)
+  assert.equal(containsIdentifier(file, "inputText"), false)
+  assert.equal(containsIdentifier(file, "setInputText"), false)
   assert.equal(containsIdentifier(composer.body, "inputText"), true)
   assert.equal(containsIdentifier(composer.body, "setInputText"), true)
-  assert.match(composer.getText(file), /onChangeText=\{setInputText\}/)
+  assert.match(composer.getText(composerFile), /onChangeText=\{setInputText\}/)
+  assert.match(file.getText(), /import \{ ChatComposer \} from "\.\.\/features\/chat\/thread\/ChatComposer"/)
   assert.match(screen.getText(file), /<ChatComposer\b/)
   assert.match(screen.getText(file), /<FlatList\b/)
 })
@@ -36,9 +52,21 @@ test("typing state stays inside the composer, outside the timeline owner", () =>
 test("cached messages, room invitations, and the header paint without entrance delays", () => {
   const screen = component("ChatThreadScreen")
   const screenSource = screen.getText(file)
-  assert.doesNotMatch(screenSource, /useEntranceAnimation|MessageBubbleAnimated/)
-  assert.match(screenSource, /<View style=\{styles\.chatHeader\}>/)
-  assert.match(screenSource, /<ChatRoomInviteCard\b/)
+  for (const fileName of threadModuleNames) {
+    assert.doesNotMatch(
+      threadFile(fileName).getText(),
+      /useEntranceAnimation|MessageBubbleAnimated/,
+      `${fileName} must not delay cached chat content`
+    )
+  }
+  assert.doesNotMatch(file.getText(), /useEntranceAnimation|MessageBubbleAnimated/)
+  assert.match(screenSource, /<ChatThreadHeader\b/)
+  assert.match(
+    declaredFunction(threadFile("ChatThreadHeader.tsx"), "ChatThreadHeader").getText(),
+    /<View style=\{styles\.chatHeader\}>/
+  )
+  assert.match(screenSource, /<ChatTimelineRow\b/)
+  assert.match(declaredFunction(rowFile, "ChatTimelineRow").getText(), /<ChatRoomInviteCard\b/)
   assert.match(screenSource, /<FlatList\b/)
 })
 
@@ -49,8 +77,18 @@ test("conversation opens at the newest item without a delayed animated jump", ()
   assert.match(screenSource, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
   assert.match(screenSource, /ListFooterComponent=/)
   assert.match(screenSource, /autoscrollToTopThreshold: 80/)
-  assert.match(screenSource, /const chronologicalIndex = timeline\.length - 1 - index/)
+  assert.match(
+    screenSource,
+    /renderItem=\{\(\{ item, index \}\) => \([\s\S]*?row=\{getChatTimelineRowModel\(\{\s*item,\s*index,\s*timeline,/
+  )
+  assert.match(
+    declaredFunction(modelFile, "getChatTimelineRowModel").getText(),
+    /const chronologicalIndex = timeline\.length - 1 - index/
+  )
   assert.doesNotMatch(screenSource, /scrollToEnd\(|onContentSizeChange=|setTimeout\(/)
+  for (const fileName of threadModuleNames) {
+    assert.doesNotMatch(threadFile(fileName).getText(), /scrollToEnd\(|onContentSizeChange=|setTimeout\(/)
+  }
   assert.doesNotMatch(screenSource, /selectChatOpeningMessages|thread\?\.lastMessage/)
   assert.match(screenSource, /initialNumToRender=\{initialMessageRenderCount\}/)
   assert.match(screenSource, /getChatInitialRenderCount\(windowHeight\)/)
@@ -82,7 +120,7 @@ test("chat uses a short native push transition and respects Reduce Motion", () =
 })
 
 test("pending messages stay fully visible and only show a clock until server acknowledgement", () => {
-  const screenSource = component("ChatThreadScreen").getText(file)
+  const screenSource = declaredFunction(rowFile, "ChatTimelineRow").getText()
 
   assert.doesNotMatch(screenSource, /isOptimistic \? \{ opacity: 0\.65 \}/)
   assert.match(screenSource, /deliveryState === "sending"[\s\S]*?name="time-outline"/)
@@ -90,19 +128,20 @@ test("pending messages stay fully visible and only show a clock until server ack
   assert.match(screenSource, /isMe && deliveryState === "sent"[\s\S]*?name="checkmark"/)
   assert.match(screenSource, /isMe && deliveryState === "failed"/)
   assert.match(screenSource, /chatCopy\.notSent/)
-  assert.match(screenSource, /onPress=\{\(\) => handleRetry\(item\.message\.messageId\)\}/)
+  assert.match(screenSource, /onPress=\{\(\) => onRetry\(item\.message\.messageId\)\}/)
+  assert.match(component("ChatThreadScreen").getText(file), /onRetry=\{handleRetry\}/)
 })
 
 // Execute the actual composer expressions without requiring a native renderer.
 // This covers event logic, not React scheduling, native input, or paint timing.
 function composerExpression(name, bindings) {
-  const declaration = component("ChatComposer").body.statements
+  const declaration = composerComponent().body.statements
     .filter(ts.isVariableStatement)
     .flatMap((statement) => [...statement.declarationList.declarations])
     .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === name)
   assert.ok(declaration?.initializer, `${name} must have an initializer`)
   const executable = ts.transpileModule(
-    `(${declaration.initializer.getText(file)})`,
+    `(${declaration.initializer.getText(composerFile)})`,
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
   ).outputText
   return runInNewContext(executable, bindings)

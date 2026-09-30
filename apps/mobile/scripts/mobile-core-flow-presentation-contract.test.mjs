@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
@@ -12,6 +12,17 @@ function read(relativePath) {
       "\n" + readFileSync(resolve(mobileRoot, "src/features/lobby/useLobbyFlow.ts"), "utf8")
   }
   return readFileSync(resolve(mobileRoot, relativePath), "utf8")
+}
+
+const chatThreadDirectory = "src/features/chat/thread"
+// The whole conversation surface: the screen plus every non-test thread module.
+function readChatThreadSurface() {
+  return [
+    read("src/screens/ChatThreadScreen.tsx"),
+    ...readdirSync(resolve(mobileRoot, chatThreadDirectory))
+      .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+      .map((fileName) => read(`${chatThreadDirectory}/${fileName}`))
+  ].join("\n")
 }
 
 test("production match flow leads from Discover to chat without a room promise", () => {
@@ -44,8 +55,9 @@ test("chat opens a conversation first and renders room invitations as explicit t
   assert.match(chatCopy, /Opening your chat\.\.\./)
   assert.doesNotMatch(chatCopy, /Start a live room from Discover\./)
   assert.match(chat, /buildChatTimeline/)
-  assert.match(chat, /<ChatRoomInviteCard/)
-  assert.doesNotMatch(chat, /Start a live room from Discover\./)
+  assert.match(chat, /<ChatTimelineRow/)
+  assert.match(read("src/features/chat/thread/ChatTimelineRow.tsx"), /<ChatRoomInviteCard/)
+  assert.doesNotMatch(readChatThreadSurface(), /Start a live room from Discover\./)
 })
 
 test("chat keeps the room invitation entry visible and explains unavailable states", () => {
@@ -53,8 +65,11 @@ test("chat keeps the room invitation entry visible and explains unavailable stat
 
   assert.match(chat, /const roomInviteDisabledReason =/)
   assert.match(chat, /Alert\.alert\([\s\S]*?chatCopy\.roomInviteUnavailableTitle,[\s\S]*?roomInviteDisabledReason \?\? chatCopy\.roomInviteUnavailableReason/)
-  assert.match(chat, /accessibilityState=\{\{[\s\S]*?disabled:\s*isCreatingRoomInvite[\s\S]*?\}\}/)
-  assert.doesNotMatch(chat, /\{canCreateRoomInvite && createRoomInviteAction \? \(/)
+  assert.match(
+    read("src/features/chat/thread/ChatComposer.tsx"),
+    /accessibilityState=\{\{[\s\S]*?disabled:\s*isCreatingRoomInvite[\s\S]*?\}\}/
+  )
+  assert.doesNotMatch(readChatThreadSurface(), /\{canCreateRoomInvite && createRoomInviteAction \? \(/)
 })
 
 test("loading earlier messages preserves the current chat scroll position", () => {
@@ -64,22 +79,29 @@ test("loading earlier messages preserves the current chat scroll position", () =
   // far end in the footer and the visible messages keep their position.
   assert.match(chat, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
   assert.match(chat, /maintainVisibleContentPosition=\{\{ minIndexForVisible: 0,/)
-  assert.match(chat, /ListFooterComponent=\{[\s\S]*?chatCopy\.loadEarlier/)
+  assert.match(chat, /ListFooterComponent=\{[\s\S]*?<ChatLoadEarlierButton[\s\S]*?isLoadingEarlier=\{isLoadingEarlier\}/)
+  assert.match(
+    read("src/features/chat/thread/ChatLoadEarlierButton.tsx"),
+    /accessibilityLabel=\{chatCopy\.loadEarlier\}[\s\S]*?\{isLoadingEarlier \? chatCopy\.loading : chatCopy\.loadEarlier\}/
+  )
 })
 
 test("chat composer places the guarded room button before the text input", () => {
   const chat = read("src/screens/ChatThreadScreen.tsx")
+  const composer = read("src/features/chat/thread/ChatComposer.tsx")
 
   assert.match(chat, /if \(isCreatingRoomInvite\) return/)
-  assert.match(chat, /disabled=\{isCreatingRoomInvite\}/)
-  assert.match(chat, /<View style=\{styles\.composer\}>[\s\S]*?getRoomInviteCreateLabel[\s\S]*?<View style=\{styles\.inputWrap\}>/)
+  assert.match(composer, /disabled=\{isCreatingRoomInvite\}/)
+  assert.match(composer, /<View style=\{styles\.composer\}>[\s\S]*?getRoomInviteCreateLabel[\s\S]*?<View style=\{styles\.inputWrap\}>/)
 })
 
 test("chat header keeps the canonical avatar and bubbles use the muted WhatsApp-style palette", () => {
-  const chat = read("src/screens/ChatThreadScreen.tsx")
+  const header = read("src/features/chat/thread/ChatThreadHeader.tsx")
+  const chat = read("src/features/chat/thread/chatThreadStyles.ts")
   const inviteCard = read("src/features/chat/ChatRoomInviteCard.tsx")
 
-  assert.match(chat, /<View style=\{styles\.chatHeader\}>[\s\S]*?<ParticipantAvatar[\s\S]*?avatar=\{partnerAvatar\}[\s\S]*?size=\{44\}/)
+  assert.match(header, /<View style=\{styles\.chatHeader\}>[\s\S]*?<ParticipantAvatar[\s\S]*?avatar=\{partnerAvatar\}[\s\S]*?size=\{44\}/)
+  assert.match(read("src/screens/ChatThreadScreen.tsx"), /<ChatThreadHeader[\s\S]*?partnerAvatar=\{partnerAvatar\}/)
   assert.match(chat, /bubbleMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
   assert.match(chat, /bubbleThem: \{[\s\S]*?backgroundColor: "#FFFDFC"[\s\S]*?borderColor: "#EEE5E8"/)
   assert.match(chat, /tailMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
@@ -274,12 +296,15 @@ test("room debrief preserves the mini-room partner avatar snapshot", () => {
 
 test("chat surfaces render a canonical participant avatar and keep monograms for missing legacy data", () => {
   const inbox = read("src/screens/InboxScreen.tsx")
-  const chat = read("src/screens/ChatThreadScreen.tsx")
+  const chat = readChatThreadSurface()
 
   assert.match(inbox, /ParticipantAvatar/)
   assert.match(inbox, /avatar=\{props\.partnerAvatar\}/)
-  assert.match(chat, /ParticipantAvatar/)
-  assert.match(chat, /avatar=\{partnerAvatar\}/)
+  for (const fileName of ["ChatThreadHeader.tsx", "ChatThreadEmptyState.tsx"]) {
+    const surface = read(`src/features/chat/thread/${fileName}`)
+    assert.match(surface, /<ParticipantAvatar/, fileName)
+    assert.match(surface, /avatar=\{partnerAvatar\}/, fileName)
+  }
   assert.doesNotMatch(chat, /readCandidateAvatarSnapshot\(partnerSummary/)
 })
 

@@ -2,15 +2,11 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View
 } from "react-native"
@@ -22,24 +18,18 @@ import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
-import { ParticipantAvatar } from "../ui/participantAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
-import { LinearGradient } from "../ui/linearGradient"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 import { hapticLight } from "../ui/haptics"
-import { useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { ChatThread } from "@blumi/contracts"
 import { captureProductEvent } from "../analytics/productAnalytics"
-import { ChatRoomInviteCard } from "../features/chat/ChatRoomInviteCard"
 import { createMatchFromPersistedThread } from "../features/matches/matchRoomModel"
 import { RoomInviteApiError } from "../features/chat/chatRoomInviteApi"
 import {
   buildChatTimeline,
-  getChatMessageGroupPosition,
   getChatTimelineItemKey,
-  getRoomInviteCreateLabel,
   getChatInitialRenderCount,
   type ChatRoomInviteAction,
   type ChatRoomInviteSurface,
@@ -47,14 +37,18 @@ import {
 } from "../features/chat/chatRoomInviteModel"
 import {
   CHAT_COPY,
-  resolveChatThreadLocale,
-  type ChatThreadCopy
+  resolveChatThreadLocale
 } from "../features/chat/thread/chatThreadCopy"
 import {
-  formatDateSeparator,
-  formatMessageTime,
+  getChatTimelineRowModel,
   getRoomInviteActionKey
 } from "../features/chat/thread/chatThreadModel"
+import { ChatComposer } from "../features/chat/thread/ChatComposer"
+import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
+import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
+import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
+import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
+import { styles } from "../features/chat/thread/chatThreadStyles"
 
 type ChatThreadScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -65,133 +59,6 @@ type ChatThreadScreenProps = NativeStackScreenProps<
 }
 
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
-
-function ChatComposer({
-  chatCopy,
-  partnerName,
-  chatLocale,
-  isPendingThread,
-  canCreateRoomInvite,
-  isCreatingRoomInvite,
-  roomInviteDisabledReason,
-  onRoomInvitePress,
-  onSend
-}: {
-  chatCopy: ChatThreadCopy
-  partnerName: string
-  chatLocale: "en" | "tr"
-  isPendingThread: boolean
-  canCreateRoomInvite: boolean
-  isCreatingRoomInvite: boolean
-  roomInviteDisabledReason: string | null
-  onRoomInvitePress: () => void
-  onSend: (body: string) => boolean
-}) {
-  const [inputText, setInputText] = useState("")
-  const sendScaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-  const isSendDisabled = inputText.trim().length === 0 || isPendingThread
-
-  const handleSend = (): void => {
-    const body = inputText.trim()
-    if (!body || isPendingThread) return
-    if (onSend(body)) setInputText("")
-  }
-
-  const handleSendPressIn = () => {
-    sendScaleAnim.stopAnimation()
-    if (reduceMotion) {
-      sendScaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(sendScaleAnim, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handleSendPressOut = () => {
-    sendScaleAnim.stopAnimation()
-    if (reduceMotion) {
-      sendScaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(sendScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  return (
-    <SafeAreaView contentGutter={false} edges={["bottom"]} style={styles.composerSafe}>
-      <View style={styles.composer}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={getRoomInviteCreateLabel(chatLocale)}
-          accessibilityHint={roomInviteDisabledReason ?? undefined}
-          accessibilityState={{
-            busy: isCreatingRoomInvite,
-            disabled: isCreatingRoomInvite
-          }}
-          disabled={isCreatingRoomInvite}
-          onPress={onRoomInvitePress}
-          style={({ pressed }) => [
-            styles.roomInviteButton,
-            pressed ? styles.roomInviteButtonPressed : null,
-            !canCreateRoomInvite || isCreatingRoomInvite
-              ? styles.roomInviteButtonDisabled
-              : null
-          ]}
-        >
-          <Ionicons name="home-outline" size={20} color={uiTheme.colors.primaryDeep} />
-        </Pressable>
-        <View style={styles.inputWrap}>
-          <TextInput
-            accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={chatCopy.messagePlaceholder}
-            placeholderTextColor={uiTheme.colors.textMuted}
-            multiline
-            maxLength={500}
-          />
-        </View>
-        <Animated.View style={{ transform: [{ scale: sendScaleAnim }] }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
-            accessibilityState={{ disabled: isSendDisabled }}
-            onPress={handleSend}
-            onPressIn={handleSendPressIn}
-            onPressOut={handleSendPressOut}
-            disabled={isSendDisabled}
-            style={({ pressed }) => [
-              styles.sendButton,
-              isSendDisabled ? styles.sendButtonDisabled : null,
-              pressed ? styles.sendButtonPressed : null
-            ]}
-          >
-            <LinearGradient
-              colors={
-                isSendDisabled
-                  ? [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
-                  : uiTheme.gradients.primary as [string, string]
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sendButtonGradient}
-            >
-              <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
-            </LinearGradient>
-          </Pressable>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
-  )
-}
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated } = props
@@ -551,42 +418,18 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
-        <View style={styles.chatHeader}>
-          <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={handleGoBack} size={40}>
-            <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-          </ActionButtonCircle>
-          <ParticipantAvatar
-            name={partnerName}
-            seed={partnerUserId || partnerName}
-            avatar={partnerAvatar}
-            size={44}
-            ring="soft"
-          />
-          <View style={styles.chatHeaderCopy}>
-            <Text numberOfLines={1} style={styles.chatHeaderName}>{partnerName}</Text>
-            {persistedMatch ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
-                hitSlop={8}
-                onPress={() => navigation.navigate("MatchResult", { match: persistedMatch })}
-              >
-                <Text style={styles.matchReplayText}>
-                  {chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={chatCopy.safetyAccessibilityLabel(partnerName)}
-            onPress={() => setReportVisible(true)}
-            hitSlop={8}
-            style={styles.moreButton}
-          >
-            <Ionicons name="ellipsis-horizontal" size={20} color={uiTheme.colors.textSecondary} />
-          </Pressable>
-        </View>
+        <ChatThreadHeader
+          chatCopy={chatCopy}
+          chatLocale={chatLocale}
+          partnerName={partnerName}
+          partnerUserId={partnerUserId}
+          partnerAvatar={partnerAvatar}
+          onBack={handleGoBack}
+          onViewMatch={persistedMatch
+            ? () => navigation.navigate("MatchResult", { match: persistedMatch })
+            : null}
+          onOpenSafety={() => setReportVisible(true)}
+        />
 
         <ReportModal
           visible={reportVisible}
@@ -596,96 +439,24 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           onClose={() => setReportVisible(false)}
         />
 
-          <KeyboardAvoidingView
+        <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
         >
           {timeline.length === 0 || isPendingThread || awaitingInitialHistory ? (
-            <View style={styles.emptyChat}>
-              <View style={styles.emptyChatGlow} pointerEvents="none" />
-              {isPendingThread && pendingThreadCreationFailed ? (
-                <View accessibilityRole="alert" style={styles.messageLoadState}>
-                  <Ionicons
-                    name="cloud-offline-outline"
-                    size={34}
-                    color={uiTheme.colors.primaryDeep}
-                  />
-                  <Text style={styles.emptyChatTitle}>{chatCopy.pendingCreationFailed}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={chatCopy.retryOpenChat}
-                    accessibilityState={{ disabled: isCreatingPendingThread }}
-                    onPress={() => { void openPendingMatchedThread() }}
-                    disabled={isCreatingPendingThread}
-                    style={({ pressed }) => [
-                      styles.retryMessagesButton,
-                      pressed ? styles.retryMessagesButtonPressed : null,
-                      isCreatingPendingThread ? styles.retryMessagesButtonDisabled : null
-                    ]}
-                  >
-                    <Ionicons
-                      name="refresh"
-                      size={18}
-                      color={uiTheme.colors.primaryDeep}
-                    />
-                    <Text style={styles.retryMessagesText}>
-                      {isCreatingPendingThread ? chatCopy.openingChat : chatCopy.retryOpenChat}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : messageListState.status === "failed" && !isPendingThread ? (
-                <View accessibilityRole="alert" style={styles.messageLoadState}>
-                  <Ionicons
-                    name="cloud-offline-outline"
-                    size={34}
-                    color={uiTheme.colors.primaryDeep}
-                  />
-                  <Text style={styles.emptyChatTitle}>{chatCopy.loadFailed}</Text>
-                  <Text style={styles.emptyChatBody}>
-                    {messageListState.errorMessage}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={chatCopy.retryLoading}
-                    onPress={handleRetryMessages}
-                    style={({ pressed }) => [
-                      styles.retryMessagesButton,
-                      pressed ? styles.retryMessagesButtonPressed : null
-                    ]}
-                  >
-                    <Ionicons
-                      name="refresh"
-                      size={18}
-                      color={uiTheme.colors.primaryDeep}
-                    />
-                    <Text style={styles.retryMessagesText}>
-                      {chatCopy.retryLoading}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <>
-                  <ParticipantAvatar
-                    name={partnerName}
-                    seed={partnerUserId || partnerName}
-                    avatar={partnerAvatar}
-                    size={80}
-                    ring="soft"
-                  />
-                  <Text style={styles.emptyChatTitle}>
-                    {isPendingThread || messageListState.status !== "ready"
-                      ? chatCopy.openingChat
-                      : chatCopy.startSpark}
-                  </Text>
-                  <Text style={styles.emptyChatBody}>
-                    {isPendingThread || messageListState.status !== "ready"
-                      ? chatCopy.gettingReady
-                      : chatCopy.startSparkDetail}
-                  </Text>
-                </>
-              )}
-            </View>
+            <ChatThreadEmptyState
+              chatCopy={chatCopy}
+              isPendingThread={isPendingThread}
+              pendingThreadCreationFailed={pendingThreadCreationFailed}
+              isCreatingPendingThread={isCreatingPendingThread}
+              onRetryOpenChat={() => { void openPendingMatchedThread() }}
+              messageListState={messageListState}
+              onRetryMessages={handleRetryMessages}
+              partnerName={partnerName}
+              partnerUserId={partnerUserId}
+              partnerAvatar={partnerAvatar}
+            />
           ) : (
             <FlatList
               data={newestFirstTimeline}
@@ -698,141 +469,32 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
               ListFooterComponent={
                 sessionActor.session.mode === "production" && messages.length > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={chatCopy.loadEarlier}
-                    accessibilityState={{ disabled: isLoadingEarlier }}
+                  <ChatLoadEarlierButton
+                    chatCopy={chatCopy}
+                    isLoadingEarlier={isLoadingEarlier}
                     onPress={handleLoadEarlier}
-                    disabled={isLoadingEarlier}
-                    style={({ pressed }) => [
-                      styles.loadEarlierButton,
-                      pressed ? styles.loadEarlierButtonPressed : null,
-                      isLoadingEarlier ? styles.loadEarlierButtonDisabled : null
-                    ]}
-                  >
-                    <Text style={styles.loadEarlierText}>
-                      {isLoadingEarlier ? chatCopy.loading : chatCopy.loadEarlier}
-                    </Text>
-                  </Pressable>
+                  />
                 ) : null
               }
-              renderItem={({ item, index }) => {
-                const chronologicalIndex = timeline.length - 1 - index
-                const isRoomInvite = item.kind === "room_invite"
-                const isMe = isRoomInvite
-                  ? item.senderUserId === currentUserId
-                  : item.message.senderUserId === currentUserId
-                const deliveryState = item.kind === "message"
-                  ? getMessageDeliveryState(item.message.messageId)
-                  : "sent"
-                const groupPosition = item.kind === "message"
-                  ? getChatMessageGroupPosition(timeline, chronologicalIndex)
-                  : "single"
-                const closesGroup = groupPosition === "single" || groupPosition === "last"
-
-                // Day separator
-                const itemDate = new Date(item.createdAt)
-                const previousItem = chronologicalIndex > 0 ? timeline[chronologicalIndex - 1] : null
-                const prevDate = previousItem ? new Date(previousItem.createdAt) : null
-                const showDateSep =
-                  !prevDate ||
-                  itemDate.toDateString() !== prevDate.toDateString()
-                const dateLabel = showDateSep ? formatDateSeparator(itemDate, chatLocale) : null
-
-                return (
-                  <View>
-                    {dateLabel ? (
-                      <View style={bubbleStyles.dateSep}>
-                        <View style={bubbleStyles.dateSepPill}>
-                          <Text style={bubbleStyles.dateSepText}>{dateLabel}</Text>
-                        </View>
-                      </View>
-                    ) : null}
-                    <View
-                      style={[
-                        bubbleStyles.row,
-                        isMe ? bubbleStyles.rowMe : bubbleStyles.rowThem,
-                        closesGroup ? bubbleStyles.rowGroupEnd : bubbleStyles.rowGroupInner
-                      ]}
-                    >
-                    {isRoomInvite ? (
-                      <ChatRoomInviteCard
-                        invite={item}
-                        currentUserId={currentUserId}
-                        locale={chatLocale}
-                        isBusy={
-                          activeRoomInviteAction !== null &&
-                          activeRoomInviteAction.includes(item.inviteId)
-                        }
-                        onAction={roomInviteActionHandler ? handleRoomInviteAction : undefined}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          bubbleStyles.bubble,
-                          isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem,
-                          isMe
-                            ? bubbleGroupStyles.me[groupPosition]
-                            : bubbleGroupStyles.them[groupPosition]
-                        ]}
-                      >
-                        {closesGroup ? (
-                          <View
-                            pointerEvents="none"
-                            style={[
-                              bubbleStyles.tail,
-                              isMe ? bubbleStyles.tailMe : bubbleStyles.tailThem
-                            ]}
-                          />
-                        ) : null}
-                        <View style={bubbleStyles.contentRow}>
-                          <Text
-                            style={[
-                              bubbleStyles.body,
-                              isMe ? bubbleStyles.bodyMe : null
-                            ]}
-                          >
-                            {item.message.body}
-                          </Text>
-                          <View style={bubbleStyles.metadataRow}>
-                            <Text
-                              style={[
-                                bubbleStyles.time,
-                                isMe ? bubbleStyles.timeMe : null
-                              ]}
-                            >
-                              {formatMessageTime(item.message.sentAt)}
-                            </Text>
-                            {isMe && deliveryState === "sending" ? (
-                              <Ionicons
-                                accessibilityLabel={chatCopy.sending}
-                                name="time-outline"
-                                size={14}
-                                color={uiTheme.colors.textMuted}
-                              />
-                            ) : null}
-                            {isMe && deliveryState === "sent" ? (
-                              <Ionicons name="checkmark" size={14} color="#C4537C" />
-                            ) : null}
-                          </View>
-                        </View>
-                        {isMe && deliveryState === "failed" ? (
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={chatCopy.tryAgain}
-                            onPress={() => handleRetry(item.message.messageId)}
-                          >
-                            <Text style={[bubbleStyles.time, bubbleStyles.timeMe, { marginTop: 3, textDecorationLine: "underline" }]}>
-                              {chatCopy.notSent} · {chatCopy.tryAgain}
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    )}
-                    </View>
-                  </View>
-                )
-              }}
+              renderItem={({ item, index }) => (
+                <ChatTimelineRow
+                  item={item}
+                  row={getChatTimelineRowModel({
+                    item,
+                    index,
+                    timeline,
+                    currentUserId,
+                    getMessageDeliveryState,
+                    locale: chatLocale
+                  })}
+                  chatCopy={chatCopy}
+                  chatLocale={chatLocale}
+                  currentUserId={currentUserId}
+                  activeRoomInviteAction={activeRoomInviteAction}
+                  onRoomInviteAction={roomInviteActionHandler ? handleRoomInviteAction : undefined}
+                  onRetry={handleRetry}
+                />
+              )}
             />
           )}
 
@@ -852,350 +514,3 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: uiTheme.colors.background,
-  },
-  safe: {
-    flex: 1,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingTop: uiTheme.spacing.sm,
-  },
-  flex: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.sm,
-    minHeight: 56,
-    paddingBottom: uiTheme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(53, 27, 50, 0.08)"
-  },
-  chatHeaderCopy: {
-    flex: 1,
-    minWidth: 0
-  },
-  chatHeaderName: {
-    ...uiTheme.font.subheading,
-    color: uiTheme.colors.textPrimary,
-    fontWeight: "800"
-  },
-  matchReplayText: {
-    ...uiTheme.font.micro,
-    color: uiTheme.colors.primaryDeep,
-    fontWeight: "700",
-    marginTop: 2
-  },
-  moreButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent"
-  },
-  messageListContainer: {
-    flex: 1,
-  },
-  messageListContent: {
-    paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: 4
-  },
-  loadEarlierButton: {
-    alignSelf: "center",
-    minHeight: 34,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 7,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: uiTheme.colors.glass,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.glassBorder,
-    marginBottom: uiTheme.spacing.sm,
-  },
-  loadEarlierButtonPressed: {
-    opacity: 0.82,
-  },
-  loadEarlierButtonDisabled: {
-    opacity: 0.55,
-  },
-  loadEarlierText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textMuted,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: uiTheme.spacing.xl,
-  },
-  emptyText: {
-    ...uiTheme.font.body,
-    color: uiTheme.colors.textSecondary,
-    textAlign: "center",
-  },
-  emptyChat: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: uiTheme.spacing.sm,
-    paddingBottom: uiTheme.spacing.xxxl,
-    position: "relative",
-  },
-  emptyChatGlow: {
-    position: "absolute",
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: uiTheme.colors.accentGlow,
-  },
-  emptyChatTitle: {
-    ...uiTheme.font.subheading,
-    color: uiTheme.colors.textPrimary,
-    marginTop: uiTheme.spacing.sm,
-  },
-  emptyChatBody: {
-    ...uiTheme.font.bodySmall,
-    color: uiTheme.colors.textSecondary,
-    textAlign: "center",
-  },
-  messageLoadState: {
-    alignItems: "center",
-    gap: uiTheme.spacing.sm,
-    maxWidth: 320,
-  },
-  retryMessagesButton: {
-    minHeight: 44,
-    marginTop: uiTheme.spacing.xs,
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.full,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: uiTheme.spacing.xs,
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-  },
-  retryMessagesButtonPressed: {
-    opacity: 0.82,
-  },
-  retryMessagesButtonDisabled: {
-    opacity: 0.6,
-  },
-  retryMessagesText: {
-    ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.primaryDeep,
-  },
-  composerSafe: {
-    backgroundColor: "transparent",
-  },
-  composer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: uiTheme.spacing.xs,
-    paddingVertical: uiTheme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: uiTheme.colors.border,
-  },
-  inputWrap: {
-    flex: 1,
-    borderRadius: uiTheme.radius.xl,
-    backgroundColor: uiTheme.colors.glassStrong,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.glassBorder,
-    overflow: "hidden",
-  },
-  roomInviteButton: {
-    alignItems: "center",
-    backgroundColor: uiTheme.colors.primarySoft,
-    borderColor: "rgba(255, 79, 152, 0.22)",
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
-  roomInviteButtonPressed: {
-    backgroundColor: "#FFD3E5"
-  },
-  roomInviteButtonDisabled: {
-    opacity: uiTheme.opacity.disabled
-  },
-  input: {
-    minHeight: 44,
-    maxHeight: 100,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: uiTheme.spacing.sm,
-    ...uiTheme.font.body,
-    color: uiTheme.colors.textPrimary,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: "hidden",
-    ...uiTheme.shadow.glowSubtle,
-  },
-  sendButtonGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonDisabled: {
-    opacity: 0.6,
-  },
-  sendButtonPressed: {
-    opacity: 0.9,
-  },
-})
-
-const bubbleStyles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-  },
-  rowGroupInner: {
-    marginBottom: 4
-  },
-  rowGroupEnd: {
-    marginBottom: 16
-  },
-  rowMe: {
-    justifyContent: "flex-end",
-  },
-  rowThem: {
-    justifyContent: "flex-start",
-  },
-  bubble: {
-    maxWidth: "78%",
-    borderRadius: 17,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    position: "relative"
-  },
-  bubbleMe: {
-    backgroundColor: "#F6E7EB",
-    borderColor: "#E8D7DD"
-  },
-  bubbleThem: {
-    backgroundColor: "#FFFDFC",
-    borderColor: "#EEE5E8"
-  },
-  bubbleMefirst: {
-    borderBottomRightRadius: 6
-  },
-  bubbleMemiddle: {
-    borderTopRightRadius: 6,
-    borderBottomRightRadius: 6
-  },
-  bubbleMelast: {
-    borderTopRightRadius: 6,
-    borderBottomRightRadius: 5
-  },
-  bubbleMesingle: {
-    borderBottomRightRadius: 5
-  },
-  bubbleThemfirst: {
-    borderBottomLeftRadius: 6
-  },
-  bubbleThemmiddle: {
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 6
-  },
-  bubbleThemlast: {
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 5
-  },
-  bubbleThemsingle: {
-    borderBottomLeftRadius: 5
-  },
-  tail: {
-    position: "absolute",
-    bottom: 1,
-    width: 10,
-    height: 10,
-    transform: [{ rotate: "45deg" }]
-  },
-  tailMe: {
-    right: -4,
-    backgroundColor: "#F6E7EB",
-    borderRightWidth: 1,
-    borderTopWidth: 1,
-    borderColor: "#E8D7DD"
-  },
-  tailThem: {
-    left: -4,
-    backgroundColor: "#FFFDFC",
-    borderLeftWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#EEE5E8"
-  },
-  contentRow: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 8
-  },
-  metadataRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 2,
-    marginBottom: 1
-  },
-  body: {
-    ...uiTheme.font.body,
-    color: "#2F2630",
-    flexShrink: 1
-  },
-  bodyMe: {
-    color: "#351B32"
-  },
-  time: {
-    ...uiTheme.font.micro,
-    color: "#8D7D86",
-    fontSize: 10,
-  },
-  timeMe: {
-    color: "#876F78"
-  },
-  dateSep: {
-    alignItems: "center",
-    paddingVertical: uiTheme.spacing.md,
-  },
-  dateSepPill: {
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 5,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: uiTheme.colors.glass,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.glassBorder,
-    ...uiTheme.shadow.soft,
-  },
-  dateSepText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textMuted,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-})
-
-const bubbleGroupStyles = {
-  me: {
-    single: bubbleStyles.bubbleMesingle,
-    first: bubbleStyles.bubbleMefirst,
-    middle: bubbleStyles.bubbleMemiddle,
-    last: bubbleStyles.bubbleMelast
-  },
-  them: {
-    single: bubbleStyles.bubbleThemsingle,
-    first: bubbleStyles.bubbleThemfirst,
-    middle: bubbleStyles.bubbleThemmiddle,
-    last: bubbleStyles.bubbleThemlast
-  }
-} as const

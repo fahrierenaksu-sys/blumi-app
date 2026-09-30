@@ -801,7 +801,13 @@ test("store UI is honest, globally usable, and consistently branded", () => {
 
 test("production profile and chat actions never fall back to local demo behavior", () => {
   const profilePreview = read("src/screens/ProfilePreviewScreen.tsx")
-  const chatThread = read("src/screens/ChatThreadScreen.tsx")
+  // The conversation surface: the screen plus every non-test thread module.
+  const chatThread = [
+    read("src/screens/ChatThreadScreen.tsx"),
+    ...readdirSync(new URL("../src/features/chat/thread/", import.meta.url))
+      .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+      .map((fileName) => read(`src/features/chat/thread/${fileName}`))
+  ].join("\n")
   const matchResult = read("src/screens/MatchResultScreen.tsx")
   const discoverCard = read("src/components/DiscoverCard.tsx")
   const navigator = read("src/navigation/RootNavigator.tsx")
