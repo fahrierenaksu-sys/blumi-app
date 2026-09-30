@@ -314,7 +314,8 @@ export function useInventoryStore(
   requireServerHydration = false
 ): InventoryStoreView {
   const ownerId = normalizeOwnerId(ownerUserId)
-  const [tick, setTick] = useState(0)
+  // Notifications only re-render; the view below is keyed on the replaced state.
+  const [, setTick] = useState(0)
 
   useEffect(() => {
     const listeners = ownerListeners.get(ownerId) ?? new Set<Listener>()
@@ -328,11 +329,17 @@ export function useInventoryStore(
     }
   }, [ownerId])
 
-  const cache = getOwnerCache(ownerId)
-  const isReady = isOwnerInventoryReady(cache.state, ownerId, requireServerHydration)
-  const visibleInventory = isReady
-    ? copyInventorySnapshot(cache.state.inventory)
-    : createDefaultInventorySnapshot()
+  // Every change replaces the owner state (and a new inventory object), so the
+  // copies handed to consumers are keyed on those identities.
+  const ownerState = getOwnerCache(ownerId).state
+  const ownerInventory = ownerState.inventory
+  const isReady = isOwnerInventoryReady(ownerState, ownerId, requireServerHydration)
+  const hydrationStatus = requireServerHydration
+    ? ownerState.serverStatus
+    : ownerState.localStatus
+  const visibleInventory = useMemo(() => isReady
+    ? copyInventorySnapshot(ownerInventory)
+    : createDefaultInventorySnapshot(), [isReady, ownerInventory])
 
   const ownsAvatarItem = useCallback((itemId: string) =>
     ownsAvatarInventoryItem(
@@ -485,9 +492,7 @@ export function useInventoryStore(
   return useMemo(() => ({
     inventory: visibleInventory,
     isReady,
-    hydrationStatus: requireServerHydration
-      ? cache.state.serverStatus
-      : cache.state.localStatus,
+    hydrationStatus,
     ownsAvatarItem,
     ownsRoomItem,
     unlockAvatarItem: (itemId: string, priceCoins: number) =>
@@ -501,14 +506,10 @@ export function useInventoryStore(
     purchaseRoomItem: (sessionToken: string, itemId: string) =>
       purchaseItem(sessionToken, itemId, "room"),
     unlockFeature
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }), [
-    tick,
-    ownerId,
-    requireServerHydration,
+    visibleInventory,
     isReady,
-    cache.state.localStatus,
-    cache.state.serverStatus,
+    hydrationStatus,
     ownsAvatarItem,
     ownsRoomItem,
     unlockItem,

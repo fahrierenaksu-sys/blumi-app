@@ -81,7 +81,7 @@ try {
   )
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/inventory/inventoryStore.test.ts"],
+    ["--import", "tsx", "--test", "src/features/inventory/inventoryStore.test.ts", "src/features/inventory/useInventoryStoreView.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
