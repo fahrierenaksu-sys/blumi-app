@@ -29,10 +29,26 @@ test("horizontal sub-content owns its drags through one Gesture Handler relation
   assert.match(pager, /\.withRef\(pagerGestureRef\)/)
   assert.match(pager, /<MainTabPagerGestureProvider value=\{pagerGestureRef\}>/)
   const closet = read("../../features/shop/screen/ClosetBrowser.tsx")
-  assert.match(closet, /<MainTabPagerHorizontalScrollOwner enabled=\{shelfOwnsHorizontalDrags\}>\s*<FlatList[\s\S]*?horizontal[\s\S]*?pagingEnabled[\s\S]*?scrollEnabled=\{shelfOwnsHorizontalDrags\}[\s\S]*?<\/MainTabPagerHorizontalScrollOwner>/)
+  // The product shelf keeps a drag only while it can still scroll that way;
+  // past its first or last page the drag goes to the main pager.
+  assert.match(closet, /<MainTabPagerEdgeHandoffScrollOwner\s+enabled=\{shelfOwnsHorizontalDrags\}\s+scrollOffset=\{shelfScrollOffset\}\s+maxScrollOffset=\{shelfMaxScrollOffset\}\s*>\s*<Reanimated\.FlatList[\s\S]*?horizontal[\s\S]*?pagingEnabled[\s\S]*?scrollEnabled=\{shelfOwnsHorizontalDrags\}[\s\S]*?onScroll=\{handleShelfScroll\}[\s\S]*?<\/MainTabPagerEdgeHandoffScrollOwner>/)
+  assert.match(closet, /const shelfMaxScrollOffset = getShopShelfMaxScrollOffset\(productPages\.length, productShelfWidth\)/)
+  assert.match(closet, /const handleShelfScroll = useAnimatedScrollHandler\(\{\s*onScroll: \(event\) => \{\s*shelfScrollOffset\.value = event\.contentOffset\.x/)
   // A single-page shelf (1/1) has nothing to scroll: the page swipe works there.
   assert.match(closet, /const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags\(productPages\.length\)/)
   assert.match(ownership, /if \(!nativeScrollGesture \|\| !enabled\) return children/)
+  // Edge hand-off: a manual-activation pan decides on the UI thread; the
+  // pager waits for it, and the native scroll waits for the pager.
+  assert.match(ownership, /Gesture\.Native\(\)\.enabled\(enabled\)\.requireExternalGestureToFail\(pagerGestureRef\)/)
+  assert.match(ownership, /Gesture\.Pan\(\)\s*\.enabled\(enabled\)\s*\.manualActivation\(true\)\s*\.blocksExternalGesture\(pagerGestureRef\)\s*\.simultaneousWithExternalGesture\(native\)/)
+  assert.match(ownership, /const owner = resolveHorizontalScrollerDragOwner\(\{[\s\S]*?scrollOffset: scrollOffset\.value,\s*maxScrollOffset: maxOffset\.value\s*\}\)\s*if \(owner === "scroller"\) stateManager\.activate\(\)\s*else if \(owner === "release"\) stateManager\.fail\(\)/)
+  // A 1/1 shelf turns the gestures off instead of unwrapping the scroller:
+  // unwrapping would remount it at offset 0 with a stale shared offset.
+  assert.match(ownership, /if \(!gestures\) return children/)
+  assert.match(closet, /shelfScrollOffset\.value = 0\s*productScrollerRef\.current\?\.scrollToOffset\(\{ offset: 0, animated: false \}\)/)
+  const handoffMove = ownership.slice(ownership.indexOf(".onTouchesMove("), ownership.indexOf("return { native, handoff }"))
+  assert.match(handoffMove, /"worklet"/)
+  assert.doesNotMatch(handoffMove, /scheduleOnRN|runOnJS/, "decided on the UI thread")
   const rail = read("../../features/shop/screen/VerticalShopCategoryRail.tsx")
   assert.match(rail, /<MainTabPagerHorizontalScrollOwner>\s*<ScrollView horizontal/)
   // No second ownership mechanism (flags, PanResponder capture) in the pager.
@@ -104,22 +120,6 @@ test("the bottom-bar indicator follows drags and settles on the UI thread", () =
   assert.match(bottomNav, /useReducedMotion\(\)/)
 })
 
-test("Reduce Motion uses the shared store and switches without finger-follow", () => {
-  assert.match(pager, /import \{ useReducedMotion \} from "\.\.\/\.\.\/ui\/animations"/)
-  assert.match(pager, /if \(reduceMotionValue\.value\) return/)
-  assert.match(pager, /if \(reduceMotionValue\.value\) \{\s*animating\.value = false\s*position\.value = targetPosition/)
-})
-
-test("interruptions: backgrounding, Android back and layout changes settle on a valid page", () => {
-  assert.match(pager, /AppState\.addEventListener\("change"[\s\S]*?reduceMainTabPagerSettleToCommitted/)
-  assert.match(pager, /BackHandler\.addEventListener\("hardwareBackPress"/)
-  assert.match(pager, /\.onBegin\([\s\S]*?cancelAnimation\(position\)/, "a touch catches a running settle")
-})
-
-test("one flag restores the stack-tab behaviour", () => {
-  assert.match(config, /export const MAIN_TAB_PAGER_ENABLED: boolean = true/)
-  assert.match(navigator, /UNSTABLE_router=\{MAIN_TAB_PAGER_ENABLED \? withMainTabPagerRouter : undefined\}/)
-  // Every main tab keeps its own stack route; with the flag off each renders
 test("the bottom bar belongs to the pager's slot screen, beneath every pushed route", () => {
   // An iOS edge back reveals the slot screen under the finger. The bar is
   // part of that screen (as on Instagram), so it is already in place during
@@ -139,6 +139,22 @@ test("the bottom bar belongs to the pager's slot screen, beneath every pushed ro
   assert.match(rootChrome, /\{overlayOwnsBottomNav && sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation\.mounted \? \(/)
 })
 
+test("Reduce Motion uses the shared store and switches without finger-follow", () => {
+  assert.match(pager, /import \{ useReducedMotion \} from "\.\.\/\.\.\/ui\/animations"/)
+  assert.match(pager, /if \(reduceMotionValue\.value\) return/)
+  assert.match(pager, /if \(reduceMotionValue\.value\) \{\s*animating\.value = false\s*position\.value = targetPosition/)
+})
+
+test("interruptions: backgrounding, Android back and layout changes settle on a valid page", () => {
+  assert.match(pager, /AppState\.addEventListener\("change"[\s\S]*?reduceMainTabPagerSettleToCommitted/)
+  assert.match(pager, /BackHandler\.addEventListener\("hardwareBackPress"/)
+  assert.match(pager, /\.onBegin\([\s\S]*?cancelAnimation\(position\)/, "a touch catches a running settle")
+})
+
+test("one flag restores the stack-tab behaviour", () => {
+  assert.match(config, /export const MAIN_TAB_PAGER_ENABLED: boolean = true/)
+  assert.match(navigator, /UNSTABLE_router=\{MAIN_TAB_PAGER_ENABLED \? withMainTabPagerRouter : undefined\}/)
+  // Every main tab keeps its own stack route; with the flag off each renders
   // its page directly instead of the pager.
   assert.match(config, /routeName: "Lobby"[\s\S]*?routeName: "Inbox"[\s\S]*?routeName: "MyRoom"[\s\S]*?routeName: "CosmeticShop"[\s\S]*?MAIN_TAB_ROUTE_NAMES[\s\S]*?MAIN_TAB_PAGES\.map\(\(page\) => page\.routeName\)/)
   assert.match(navigator, /MAIN_TAB_ROUTE_NAMES\.map\(\(routeName\) => \([\s\S]*?name=\{routeName\}[\s\S]*?\(screenProps\) => MAIN_TAB_PAGER_ENABLED \? \([\s\S]*?<MainTabPager[\s\S]*?\) : renderMainTabPage\(sessionActor, routeName, screenProps\)/)

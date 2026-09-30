@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { FurnitureItem, UserRoomDecor } from "../../roomV2/roomV2.types"
 import type { ShopCatalogItem } from "../shopCatalog"
+import { resolveHorizontalScrollerDragOwner } from "../../../ui/mainTabPagerEdgeHandoffModel"
 import {
   buildShopCategoryOptions,
   createRoomPreviewDecor,
@@ -12,6 +13,7 @@ import {
   getDefaultFurnitureRotation,
   getDefaultShopCategoryId,
   getPrimaryProductCategoryId,
+  getShopShelfMaxScrollOffset,
   getShopSurfacePolicy,
   shouldShopShelfOwnHorizontalDrags,
   maskUnverifiedProductOwnership,
@@ -270,4 +272,31 @@ test("the product shelf owns horizontal drags only when it has another page to s
   assert.equal(shouldShopShelfOwnHorizontalDrags(2), true)
   assert.equal(shouldShopShelfOwnHorizontalDrags(12), true)
   assert.equal(shouldShopShelfOwnHorizontalDrags(Number.NaN), false)
+})
+
+test("the product shelf hands a drag past its first or last page to the main pager", () => {
+  const shelfWidth = 212
+  const maxScrollOffset = getShopShelfMaxScrollOffset(3, shelfWidth)
+  assert.equal(maxScrollOffset, 2 * shelfWidth)
+  assert.equal(getShopShelfMaxScrollOffset(1, shelfWidth), 0, "1/1")
+  assert.equal(getShopShelfMaxScrollOffset(0, shelfWidth), 0, "empty category")
+  assert.equal(getShopShelfMaxScrollOffset(Number.NaN, shelfWidth), 0)
+  assert.equal(getShopShelfMaxScrollOffset(3, Number.NaN), 0)
+  const drag = (dx: number, page: number) => resolveHorizontalScrollerDragOwner({
+    dx,
+    dy: 0,
+    scrollOffset: page * shelfWidth,
+    maxScrollOffset
+  })
+  // 1/3: dragging right (towards a previous page that does not exist) moves
+  // the main page to Chats; dragging left shows 2/3.
+  assert.equal(drag(20, 0), "release")
+  assert.equal(drag(-20, 0), "scroller")
+  // 2/3: the shelf keeps both directions.
+  assert.equal(drag(20, 1), "scroller")
+  assert.equal(drag(-20, 1), "scroller")
+  // 3/3: dragging left (past the last page) goes to the main pager, which
+  // rubber-bands because Shop is the last main page.
+  assert.equal(drag(-20, 2), "release")
+  assert.equal(drag(20, 2), "scroller")
 })
