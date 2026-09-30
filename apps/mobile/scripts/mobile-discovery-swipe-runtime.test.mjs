@@ -13,6 +13,23 @@ function readSwipeCardSource() {
   )
 }
 
+// The swipe moved from PanResponder to a Gesture Handler pan on the UI thread
+// (useDiscoverCardSwipe) with its rules in discoverySwipeModel; these pins
+// follow the rules to their new home.
+function readSwipeHookSource() {
+  return readFileSync(
+    resolve(mobileRoot, "src/features/demo/useDiscoverCardSwipe.ts"),
+    "utf8"
+  )
+}
+
+function readSwipeModelSource() {
+  return readFileSync(
+    resolve(mobileRoot, "src/features/discovery/discoverySwipeModel.ts"),
+    "utf8"
+  )
+}
+
 function readDeckSource() {
   return readFileSync(
     resolve(mobileRoot, "src/features/discovery/DiscoveryDeckView.tsx"),
@@ -28,13 +45,14 @@ function readLobbySource() {
 }
 
 test("discover swipe waits for a horizontal-dominant move before claiming touch", () => {
-  const source = readSwipeCardSource()
+  const hook = readSwipeHookSource()
+  const model = readSwipeModelSource()
 
-  assert.match(source, /onStartShouldSetPanResponder:\s*\(\)\s*=>\s*false/)
-  assert.match(source, /onMoveShouldSetPanResponderCapture:\s*shouldClaimSwipe/)
-  assert.match(source, /Math\.abs\(gesture\.dx\)\s*>\s*SWIPE_CAPTURE_THRESHOLD/)
-  assert.match(source, /Math\.abs\(gesture\.dx\)\s*>\s*Math\.abs\(gesture\.dy\)\s*\*\s*SWIPE_DIRECTION_DOMINANCE/)
-  assert.match(source, /const SWIPE_CAPTURE_THRESHOLD = 4/)
+  assert.match(hook, /\.manualActivation\(true\)/)
+  assert.match(hook, /shouldClaimDiscoverSwipe\(touch\.absoluteX - touchStartX\.value, touch\.absoluteY - touchStartY\.value\)[\s\S]*?stateManager\.activate\(\)/)
+  assert.match(model, /Math\.abs\(dx\)\s*>\s*SWIPE_CAPTURE_THRESHOLD/)
+  assert.match(model, /Math\.abs\(dx\)\s*>\s*Math\.abs\(dy\)\s*\*\s*SWIPE_DIRECTION_DOMINANCE/)
+  assert.match(model, /const SWIPE_CAPTURE_THRESHOLD = 4/)
 })
 
 test("the lobby locks a clearly horizontal card gesture before vertical scrolling can steal it", () => {
@@ -53,38 +71,41 @@ test("only the active card receives a one-shot arrival pulse", () => {
 
 test("swipe exit stays responsive and honors reduced-motion", () => {
   const source = readSwipeCardSource()
+  const hook = readSwipeHookSource()
 
-  assert.match(source, /const SWIPE_OUT_DURATION = 190/)
+  assert.match(readSwipeModelSource(), /const SWIPE_OUT_DURATION = 190/)
   assert.match(source, /useReducedMotion\(\)/)
-  assert.match(source, /duration:\s*reduceMotion \? 0 : SWIPE_OUT_DURATION/)
+  assert.match(hook, /duration:\s*reduceMotion \? 0 : SWIPE_OUT_DURATION/)
+  assert.match(hook, /x\.value = reduceMotion\s*\?\s*0\s*:\s*withSpring\(0/)
   assert.match(source, /if \(disabled \|\| reduceMotion\)/)
   assert.match(source, /useNativeDriver:\s*true/)
 })
 
 test("an interrupted gesture always returns the active card to rest", () => {
-  const source = readSwipeCardSource()
+  const hook = readSwipeHookSource()
 
-  assert.match(source, /onPanResponderTerminate:\s*resetPosition/)
-  assert.match(source, /onPanResponderTerminationRequest:\s*\(\) => false/)
+  assert.match(hook, /\.onEnd\(\(event, success\) => \{[\s\S]*?if \(!success\) \{\s*resetPosition\(\)/)
+  assert.match(hook, /if \(finished\) scheduleOnRN\(commitSwipe, direction\)/)
 })
 
 test("a deliberate short swipe can complete without a hard throw", () => {
-  const source = readSwipeCardSource()
+  const model = readSwipeModelSource()
 
-  assert.match(source, /const SWIPE_DISTANCE_RATIO = 0\.22/)
-  assert.match(source, /const SWIPE_FLICK_VELOCITY = 0\.55/)
-  assert.match(source, /screenWidth \* SWIPE_DISTANCE_RATIO/)
+  assert.match(model, /const SWIPE_DISTANCE_RATIO = 0\.22/)
+  assert.match(model, /const SWIPE_FLICK_VELOCITY = 0\.55/)
+  assert.match(model, /screenWidth \* SWIPE_DISTANCE_RATIO/)
 })
 
 test("the active card translates without rotating at every drag distance", () => {
   const source = readSwipeCardSource()
+  const hook = readSwipeHookSource()
 
-  assert.doesNotMatch(source, /const rotate = position\.x\.interpolate/)
+  assert.doesNotMatch(source, /const rotate = /)
   assert.doesNotMatch(source, /\{ rotate \}/)
-  assert.match(
-    source,
-    /transform:\s*\[[\s\S]*?translateX:\s*position\.x[\s\S]*?translateY:\s*position\.y[\s\S]*?rotate:\s*"0deg"/
-  )
+  assert.doesNotMatch(hook, /rotate/)
+  assert.match(hook, /transform: \[\{ translateX: getDiscoverSwipeTranslateX\(ownerId\.value, cardId, x\.value\) \}\]/)
+  assert.match(source, /<Reanimated\.View style=\{\[styles\.swipeFrame, cardSwipeStyle\]\}>/)
+  assert.match(source, /transform:\s*\[\s*\{ rotate: "0deg" \},/)
 })
 
 test("card face transition is a complete native-safe 3D turn", () => {
@@ -104,13 +125,13 @@ test("card face transition is a complete native-safe 3D turn", () => {
 test("the next card stays upright while it advances and only deeper cards fan out", () => {
   const source = readDeckSource()
 
-  assert.doesNotMatch(source, /const middleCardRotate = swipeAnim\.x\.interpolate/)
+  assert.doesNotMatch(source, /middleCardRotate/)
   assert.match(
     source,
-    /styles\.middleCardContainer[\s\S]*?translateX:\s*middleCardTranslateX[\s\S]*?translateY:\s*middleCardTranslateY[\s\S]*?rotate:\s*"0deg"[\s\S]*?scale:\s*middleCardScale/
+    /getDiscoverMiddleCardMotion\([\s\S]*?translateX: middle\.translateX[\s\S]*?translateY: middle\.translateY[\s\S]*?rotate: "0deg"[\s\S]*?scale: middle\.scale/
   )
   assert.match(
     source,
-    /bottomCardContainer:[\s\S]*?rotate:\s*"-3deg"/
+    /BOTTOM_CARD_MOTION = \{[\s\S]*?rotate:\s*"-3deg"/
   )
 })

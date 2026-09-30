@@ -1,5 +1,6 @@
-import { useCallback, type ReactElement } from "react"
-import { Animated, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native"
+import { useCallback, useLayoutEffect, useRef, type ReactElement } from "react"
+import { Animated, type FlatList, View } from "react-native"
+import Reanimated, { type ScrollHandlerProcessed } from "react-native-reanimated"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import {
   getWardrobeCarouselItemLayout,
@@ -23,8 +24,8 @@ export function WardrobeCatalogList(props: {
   reduceMotion: boolean
   onEquip: (item: AvatarCatalogItem) => void
   onExploreShop: () => void
-  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void
-  onScrollSettled: (event: NativeSyntheticEvent<NativeScrollEvent>) => void
+  /** UI-thread scroll handler (useWardrobeCarousel); it also reports settles. */
+  onScroll: ScrollHandlerProcessed<Record<string, unknown>>
   onContentSizeChange: (width: number) => void
   onLayout: (event: { nativeEvent: { layout: { width: number } } }) => void
 }) {
@@ -37,7 +38,6 @@ export function WardrobeCatalogList(props: {
     onEquip,
     onExploreShop,
     onScroll,
-    onScrollSettled,
     onContentSizeChange,
     onLayout
   } = props
@@ -57,30 +57,40 @@ export function WardrobeCatalogList(props: {
     />
   ), [onEquip, reduceMotion, copy.wearing])
 
+  // One list for every category: a category change swaps the data and jumps
+  // back to the start without animation, instead of remounting the list.
+  const listRef = useRef<FlatList<WardrobeCatalogCardModel>>(null)
+  const shownCategoryRef = useRef(activeCategory)
+  useLayoutEffect(() => {
+    if (shownCategoryRef.current === activeCategory) return
+    shownCategoryRef.current = activeCategory
+    listRef.current?.scrollToOffset({ offset: 0, animated: false })
+  }, [activeCategory])
+
   return (
-    <Animated.FlatList
-      key={activeCategory}
-      style={{ opacity: catalogOpacity }}
-      horizontal
-      data={cards}
-      ListEmptyComponent={
-        <WardrobeCatalogEmpty copy={copy} onExploreShop={onExploreShop} />
-      }
-      keyExtractor={(entry) => entry.item.id}
-      initialNumToRender={4}
-      maxToRenderPerBatch={4}
-      windowSize={5}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.carouselContent}
-      ItemSeparatorComponent={WardrobeCarouselGap}
-      renderItem={renderWardrobeItem}
-      getItemLayout={getWardrobeCarouselItemLayout}
-      scrollEventThrottle={16}
-      onScroll={onScroll}
-      onScrollEndDrag={onScrollSettled}
-      onMomentumScrollEnd={onScrollSettled}
-      onContentSizeChange={onContentSizeChange}
-      onLayout={onLayout}
-    />
+    // The category fade stays on the native-driver opacity around the list.
+    <Animated.View style={{ opacity: catalogOpacity }}>
+      <Reanimated.FlatList
+        ref={listRef}
+        horizontal
+        data={cards}
+        ListEmptyComponent={
+          <WardrobeCatalogEmpty copy={copy} onExploreShop={onExploreShop} />
+        }
+        keyExtractor={(entry) => entry.item.id}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.carouselContent}
+        ItemSeparatorComponent={WardrobeCarouselGap}
+        renderItem={renderWardrobeItem}
+        getItemLayout={getWardrobeCarouselItemLayout}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        onContentSizeChange={onContentSizeChange}
+        onLayout={onLayout}
+      />
+    </Animated.View>
   )
 }

@@ -88,6 +88,7 @@ export function getWideStageRendererTranslateY(input: {
   shellCanvasHeight: number
   avatarWorldY: number
 }): number {
+  "worklet"
   const rendererHeight =
     input.stageWidth * input.shellCanvasHeight / input.shellCanvasWidth
   const avatarFeetY = rendererHeight * input.avatarWorldY

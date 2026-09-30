@@ -1,12 +1,17 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
-  Animated,
-  Easing,
   StyleSheet,
   Text,
   View
 } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  withTiming
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { SwipeableDiscoverCard, type SwipeableDiscoverProfile } from "../demo/SwipeableDiscoverCard"
 import { ActionButtonCircle } from "../../ui/primitives"
 import { LinearGradient } from "../../ui/linearGradient"
@@ -16,12 +21,14 @@ import { resolveDiscoveryLayoutMetrics } from "./discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "./discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
 import type { DiscoveryRoomShowcaseQueryInput } from "./discoveryApi"
+import { getDiscoverMiddleCardMotion, getDiscoverSwipeTranslateX } from "./discoverySwipeModel"
+import type { DiscoverSwipeValues } from "./useDiscoverSwipeValues"
 
 const ACTION_SWIPE_DURATION = 190
 
 interface DiscoveryDeckViewProps {
   profiles: readonly SwipeableDiscoverProfile[]
-  swipeAnim: Animated.ValueXY
+  swipeAnim: DiscoverSwipeValues
   onSwipeRight: (userId: string) => void
   onSwipeLeft: (userId: string) => void
   progressLabel: string
@@ -63,21 +70,23 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
     [featured, profiles]
   )
 
-  const middleCardScale = swipeAnim.x.interpolate({
-    inputRange: [-400, 0, 400],
-    outputRange: [1, 0.98, 1],
-    extrapolate: "clamp"
-  })
-  const middleCardTranslateX = swipeAnim.x.interpolate({
-    inputRange: [-400, 0, 400],
-    outputRange: [0, -8, 0],
-    extrapolate: "clamp"
-  })
-  const middleCardTranslateY = swipeAnim.x.interpolate({
-    inputRange: [-400, 0, 400],
-    outputRange: [0, -12, 0],
-    extrapolate: "clamp"
-  })
+  const finishActionSwipe = useCallback((
+    direction: "left" | "right",
+    finished: boolean,
+    userId: string
+  ): void => {
+    actionSwipeInFlightRef.current = false
+    setActionSwipeInFlight(false)
+    if (!finished) {
+      swipeAnim.x.value = 0
+      return
+    }
+    if (direction === "right") {
+      onSwipeRight(userId)
+    } else {
+      onSwipeLeft(userId)
+    }
+  }, [onSwipeLeft, onSwipeRight, swipeAnim])
   const runActionSwipe = useCallback(
     (direction: "left" | "right"): void => {
       if (
@@ -92,41 +101,30 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
       actionSwipeInFlightRef.current = true
       setActionSwipeInFlight(true)
       const distance = screenWidth * 1.2
-      Animated.timing(swipeAnim, {
-        toValue: {
-          x: direction === "right" ? distance : -distance,
-          y: 0
-        },
+      const userId = featured.userId
+      // The exit runs on the UI thread; JS hears once when it ends.
+      swipeAnim.ownerId.value = userId
+      swipeAnim.x.value = withTiming(direction === "right" ? distance : -distance, {
         duration: ACTION_SWIPE_DURATION,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
-      }).start(({ finished }) => {
-        actionSwipeInFlightRef.current = false
-        setActionSwipeInFlight(false)
-        if (!finished) {
-          swipeAnim.setValue({ x: 0, y: 0 })
-          return
-        }
-        if (direction === "right") {
-          onSwipeRight(featured.userId)
-        } else {
-          onSwipeLeft(featured.userId)
-        }
+        reduceMotion: ReduceMotion.Never
+      }, (finished) => {
+        "worklet"
+        scheduleOnRN(finishActionSwipe, direction, finished === true, userId)
       })
     },
     [
       actionsDisabled,
       featured,
+      finishActionSwipe,
       likeDisabled,
-      onSwipeLeft,
-      onSwipeRight,
       screenWidth,
       swipeAnim
     ]
   )
 
   useLayoutEffect(() => {
-    swipeAnim.setValue({ x: 0, y: 0 })
+    swipeAnim.x.value = 0
     actionSwipeInFlightRef.current = false
     setActionSwipeInFlight(false)
     setIsFeaturedFlipped(false)
@@ -144,27 +142,13 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
           {visibleProfiles.map((profile) => {
             const isTop = profile.userId === featured.userId
             const isMiddle = profile.userId === profiles[1]?.userId
-            const containerStyle = isTop
-              ? styles.topCardContainer
-              : isMiddle
-                ? [
-                    styles.middleCardContainer,
-                    {
-                      transform: [
-                        { translateX: middleCardTranslateX },
-                        { translateY: middleCardTranslateY },
-                        { rotate: "0deg" },
-                        { scale: middleCardScale }
-                      ]
-                    }
-                  ]
-                : styles.bottomCardContainer
 
             return (
-              <Animated.View
+              <DeckCardContainer
                 key={profile.userId}
-                style={containerStyle}
-                pointerEvents={isTop ? "auto" : "none"}
+                role={isTop ? "top" : isMiddle ? "middle" : "bottom"}
+                featuredUserId={featured.userId}
+                swipe={swipeAnim}
               >
                 <SwipeableDiscoverCard
                   profile={profile}
@@ -184,7 +168,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                   deferBackAvatar={props.deferSecondaryImages}
                 />
                 {!isTop ? <GlassDeckOverlay /> : null}
-              </Animated.View>
+              </DeckCardContainer>
             )
           })}
 
@@ -242,6 +226,71 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
   )
 }
 
+const BOTTOM_CARD_MOTION = {
+  translateX: -10,
+  translateY: -30,
+  rotate: "-3deg",
+  scale: 0.98,
+  opacity: 0.96
+} as const
+
+/**
+ * One stack slot. Every role goes through the same animated style so a card
+ * keeps one style shape as it moves bottom -> middle -> top: the top card is
+ * at rest (it moves inside SwipeableDiscoverCard), the middle card advances
+ * with the featured card's drag on the UI thread, the bottom card fans out.
+ */
+function DeckCardContainer(props: {
+  role: "top" | "middle" | "bottom"
+  featuredUserId: string
+  swipe: DiscoverSwipeValues
+  children: ReactNode
+}) {
+  const { role, featuredUserId, swipe } = props
+  const swipeX = swipe.x
+  const swipeOwnerId = swipe.ownerId
+  const motionStyle = useAnimatedStyle(() => {
+    if (role === "bottom") {
+      return {
+        opacity: BOTTOM_CARD_MOTION.opacity,
+        transform: [
+          { translateX: BOTTOM_CARD_MOTION.translateX },
+          { translateY: BOTTOM_CARD_MOTION.translateY },
+          { rotate: BOTTOM_CARD_MOTION.rotate },
+          { scale: BOTTOM_CARD_MOTION.scale }
+        ]
+      }
+    }
+    const middle = role === "middle"
+      ? getDiscoverMiddleCardMotion(getDiscoverSwipeTranslateX(swipeOwnerId.value, featuredUserId, swipeX.value))
+      : { translateX: 0, translateY: 0, scale: 1 }
+    return {
+      opacity: 1,
+      transform: [
+        { translateX: middle.translateX },
+        { translateY: middle.translateY },
+        { rotate: "0deg" },
+        { scale: middle.scale }
+      ]
+    }
+  })
+  return (
+    <Animated.View
+      style={[
+        role === "top"
+          ? styles.topCardContainer
+          : role === "middle"
+            ? styles.middleCardContainer
+            : styles.bottomCardContainer,
+        motionStyle
+      ]}
+      pointerEvents={role === "top" ? "auto" : "none"}
+    >
+      {props.children}
+    </Animated.View>
+  )
+}
+
 function GlassDeckOverlay() {
   return (
     <View style={styles.glassOverlay}>
@@ -280,15 +329,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     position: "relative"
   },
+  // Transforms and opacity per role live in DeckCardContainer's animated style.
   topCardContainer: {
     ...StyleSheet.absoluteFill,
-    transform: [
-      { translateX: 0 },
-      { translateY: 0 },
-      { rotate: "0deg" },
-      { scale: 1 }
-    ],
-    opacity: 1,
     zIndex: 3
   },
   middleCardContainer: {
@@ -297,13 +340,6 @@ const styles = StyleSheet.create({
   },
   bottomCardContainer: {
     ...StyleSheet.absoluteFill,
-    transform: [
-      { translateX: -10 },
-      { translateY: -30 },
-      { rotate: "-3deg" },
-      { scale: 0.98 }
-    ],
-    opacity: 0.96,
     zIndex: 0
   },
   glassOverlay: {

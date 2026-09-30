@@ -1,8 +1,8 @@
 import type { ComponentProps } from "react"
-import type { Animated } from "react-native"
 import { StyleSheet, View } from "react-native"
 import type { DiscoveryDecisionQuota } from "@blumi/contracts"
 import type { BlockStoreView } from "../../safety/blockStore"
+import type { DiscoverSwipeValues } from "../useDiscoverSwipeValues"
 import type { SessionActor } from "../../session/sessionModel"
 import { getAppLocale } from "../../session/appLocale"
 import { DiscoveryDeckView } from "../DiscoveryDeckView"
@@ -32,7 +32,7 @@ export function DiscoverDeckSurface(props: {
   visibleDiscoverDeck: DiscoveryCandidate[]
   featuredCandidate: DiscoveryCandidate | null
   showcaseRequest: ComponentProps<typeof DiscoveryDeckView>["showcaseRequest"]
-  cardDragX: Animated.ValueXY
+  cardDragX: DiscoverSwipeValues
   handlePrimaryLike: () => void
   handleSkipFeatured: () => void
   progressLabel: string | null

@@ -1,5 +1,6 @@
 import { useRef } from "react"
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import { springPressScale, useReducedMotion } from "../ui/animations"
 import { Avatar } from "../ui/avatar"
 import { LinearGradient } from "../ui/linearGradient"
 import { uiTheme } from "../ui/theme"
@@ -14,22 +15,10 @@ interface IncomingInviteCalloutProps {
 export function IncomingInviteCallout(props: IncomingInviteCalloutProps) {
   const { senderDisplayName, senderUserId, onAccept, onDecline } = props
   const acceptScaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
 
-  const handleAcceptPressIn = () => {
-    Animated.spring(acceptScaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handleAcceptPressOut = () => {
-    Animated.spring(acceptScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
+  const handleAcceptPressIn = () => springPressScale(acceptScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
+  const handleAcceptPressOut = () => springPressScale(acceptScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
     <View style={styles.card}>

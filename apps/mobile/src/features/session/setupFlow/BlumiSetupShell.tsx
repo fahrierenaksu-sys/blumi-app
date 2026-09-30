@@ -16,6 +16,13 @@ import {
   View,
   useWindowDimensions
 } from "react-native"
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  ReduceMotion
+} from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { SoftBlobBackground } from "../../../ui/backgrounds"
 import { useReducedMotion } from "../../../ui/animations"
@@ -33,6 +40,19 @@ import {
   getSetupProgress,
   type PreAuthSetupStep
 } from "./setupFlowShellModel"
+
+// When the keyboard opens or closes, the collapsible stage and heading fade
+// out/in and the rest of the column glides to its new place on the UI thread
+// (Reanimated layout animations) instead of snapping. The animations are only
+// attached around a keyboard toggle, so step transitions keep their own
+// crossfade; Reduce Motion keeps the instant layout change.
+const SETUP_KEYBOARD_MOTION_MS = 250
+const SETUP_KEYBOARD_EXITING = FadeOut.duration(160).reduceMotion(ReduceMotion.Never)
+const SETUP_KEYBOARD_ENTERING = FadeIn.duration(SETUP_KEYBOARD_MOTION_MS).reduceMotion(ReduceMotion.Never)
+const SETUP_KEYBOARD_LAYOUT = LinearTransition
+  .duration(SETUP_KEYBOARD_MOTION_MS)
+  .easing(Easing.out(Easing.cubic))
+  .reduceMotion(ReduceMotion.Never)
 
 interface BlumiSetupShellProps {
   step: PreAuthSetupStep
@@ -105,6 +125,7 @@ export function BlumiSetupShell({
   const reduceMotion = reduceMotionOverride ?? systemReduceMotion
   const { width, height, fontScale } = useWindowDimensions()
   const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const [keyboardMotion, setKeyboardMotion] = useState(false)
   const scrollRef = useRef<ScrollView | null>(null)
   const metrics = useMemo(
     () => getSetupLayoutMetrics({ width, height, fontScale }),
@@ -116,9 +137,20 @@ export function BlumiSetupShell({
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
-    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true))
-    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false))
+    let keyboardMotionTimer: ReturnType<typeof setTimeout> | null = null
+    const setKeyboard = (visible: boolean): void => {
+      if (keyboardMotionTimer !== null) clearTimeout(keyboardMotionTimer)
+      setKeyboardMotion(true)
+      setKeyboardVisible(visible)
+      keyboardMotionTimer = setTimeout(() => {
+        keyboardMotionTimer = null
+        setKeyboardMotion(false)
+      }, SETUP_KEYBOARD_MOTION_MS + 50)
+    }
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboard(true))
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboard(false))
     return () => {
+      if (keyboardMotionTimer !== null) clearTimeout(keyboardMotionTimer)
       showSubscription.remove()
       hideSubscription.remove()
     }
@@ -135,13 +167,15 @@ export function BlumiSetupShell({
     ? keyboardBottomPadding
     : scrollBottomInset ?? keyboardBottomPadding
   const scrollContentTopPadding = keyboardVisible ? 0 : uiTheme.spacing.sm
+  const animateKeyboardLayout = keyboardMotion && !reduceMotion
+  const keyboardLayout = animateKeyboardLayout ? SETUP_KEYBOARD_LAYOUT : undefined
+  const keyboardEntering = animateKeyboardLayout ? SETUP_KEYBOARD_ENTERING : undefined
+  const keyboardExiting = animateKeyboardLayout ? SETUP_KEYBOARD_EXITING : undefined
 
   useEffect(() => {
     if (!stageCollapsed) return
-    const animationFrame = requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 0, animated: false })
-    })
-    return () => cancelAnimationFrame(animationFrame)
+    // Effects run after the collapsed layout is committed; no frame wait.
+    scrollRef.current?.scrollTo({ y: 0, animated: false })
   }, [stageCollapsed])
 
   useLayoutEffect(() => {
@@ -153,41 +187,55 @@ export function BlumiSetupShell({
   }, [motionActive])
 
   const stagePanel = !stageCollapsed ? (
-    <SetupFlowMotionSwap
-      kind="stage"
-      reduceMotion={reduceMotion}
-      transitionKey={step}
+    <Animated.View
+      entering={keyboardEntering}
+      exiting={keyboardExiting}
+      layout={keyboardLayout}
+      style={styles.keyboardSlot}
     >
-      <SetupFlowStage
-        height={stageHeight ?? metrics.stageHeight}
-        interactive={stageInteractive}
+      <SetupFlowMotionSwap
+        kind="stage"
+        reduceMotion={reduceMotion}
+        transitionKey={step}
       >
-        {stage}
-      </SetupFlowStage>
-    </SetupFlowMotionSwap>
+        <SetupFlowStage
+          height={stageHeight ?? metrics.stageHeight}
+          interactive={stageInteractive}
+        >
+          {stage}
+        </SetupFlowStage>
+      </SetupFlowMotionSwap>
+    </Animated.View>
   ) : null
 
   const headingPanel = !hideHeading && !headingCollapsed ? (
-    <SetupFlowMotionSwap
-      kind="panel"
-      reduceMotion={reduceMotion}
-      transitionKey={`${step}-heading`}
+    <Animated.View
+      entering={keyboardEntering}
+      exiting={keyboardExiting}
+      layout={keyboardLayout}
+      style={styles.keyboardSlot}
     >
-      <View
-        style={[
-          styles.headingBlock,
-          headingOffsetY !== 0 ? { transform: [{ translateY: headingOffsetY }] } : null
-        ]}
+      <SetupFlowMotionSwap
+        kind="panel"
+        reduceMotion={reduceMotion}
+        transitionKey={`${step}-heading`}
       >
-        <Text accessibilityRole="header" style={styles.title}>
-          {effectiveTitle}
-        </Text>
-        <Text style={styles.description}>{effectiveDescription}</Text>
-      </View>
-    </SetupFlowMotionSwap>
+        <View
+          style={[
+            styles.headingBlock,
+            headingOffsetY !== 0 ? { transform: [{ translateY: headingOffsetY }] } : null
+          ]}
+        >
+          <Text accessibilityRole="header" style={styles.title}>
+            {effectiveTitle}
+          </Text>
+          <Text style={styles.description}>{effectiveDescription}</Text>
+        </View>
+      </SetupFlowMotionSwap>
+    </Animated.View>
   ) : null
 
-  const taskPanel = !hideTaskCard ? (
+  const taskPanelContent = !hideTaskCard ? (
     <SetupFlowMotionSwap
       kind="panel"
       reduceMotion={reduceMotion}
@@ -226,6 +274,11 @@ export function BlumiSetupShell({
     >
       {feedback}
     </View>
+  )
+  const taskPanel = (
+    <Animated.View layout={keyboardLayout} style={styles.keyboardSlot}>
+      {taskPanelContent}
+    </Animated.View>
   )
 
   const primaryAction = (
@@ -276,7 +329,8 @@ export function BlumiSetupShell({
             {immersiveBottomSheet ? (
               <View style={styles.immersiveFlow}>
                 {stagePanel}
-                <View
+                <Animated.View
+                  layout={keyboardLayout}
                   style={[
                     styles.bottomSheetSurface,
                     { marginHorizontal: -metrics.horizontalInset }
@@ -312,7 +366,7 @@ export function BlumiSetupShell({
                   >
                     {primaryAction}
                   </View>
-                </View>
+                </Animated.View>
               </View>
             ) : (
               <>
@@ -405,6 +459,9 @@ const styles = StyleSheet.create({
     gap: uiTheme.spacing.md,
     paddingBottom: uiTheme.spacing.sm,
     paddingTop: uiTheme.spacing.sm
+  },
+  keyboardSlot: {
+    width: "100%"
   },
   panel: {
     gap: uiTheme.spacing.sm,

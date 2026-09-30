@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import { Animated, Easing, StyleSheet, Text } from "react-native"
+import { useReducedMotion } from "../../../ui/animations"
 import { uiTheme } from "../../../ui/theme"
 
 export type DiscoverFeedbackTone = "soft" | "warm"
@@ -58,6 +59,7 @@ export function DiscoveryFeedbackPill(props: {
   feedbackAnim: Animated.Value
 }) {
   const { discoverFeedback, feedbackAnim } = props
+  const reduceMotion = useReducedMotion()
   return (
     <Animated.View
       style={[
@@ -67,7 +69,8 @@ export function DiscoveryFeedbackPill(props: {
           : styles.feedbackPillSoft,
         {
           opacity: feedbackAnim,
-          transform: [
+          // Reduce Motion: the pill fades without rising.
+          transform: reduceMotion ? [] : [
             {
               translateY: feedbackAnim.interpolate({
                 inputRange: [0, 1],

@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useRef } from "react"
 import { Animated, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native"
+import { springPressScale, useReducedMotion } from "./animations"
 import { LinearGradient } from "./linearGradient"
 import { uiTheme } from "./theme"
 
@@ -34,22 +35,10 @@ function VibeTile(props: {
 }) {
   const { option, selected, onPress } = props
   const scaleAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.92,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
+  const handlePressIn = () => springPressScale(scaleAnim, 0.92, uiTheme.animation.spring, reduceMotion)
+  const handlePressOut = () => springPressScale(scaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
     <Animated.View style={[styles.tileOuter, { transform: [{ scale: scaleAnim }] }]}>

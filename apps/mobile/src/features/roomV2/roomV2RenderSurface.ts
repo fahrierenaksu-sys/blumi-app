@@ -17,8 +17,41 @@ export const ROOM_V2_FURNITURE_MOBILE_RENDER_SCALE = 1
  * contacts in the same coordinate system.
  */
 export function getRoomV2DepthPerspectiveScale(y: number): number {
+  "worklet"
   void y
   return 1
+}
+
+/**
+ * The transform that moves an avatar laid out at its React (base) point onto
+ * the box the renderer would lay out at its live UI-thread point, so a walk
+ * moves on the UI thread without a React render per frame. Transforms use
+ * the view centre as origin, hence the centre delta.
+ */
+export function getRoomV2LiveAvatarOffset(input: {
+  baseX: number
+  baseY: number
+  liveX: number
+  liveY: number
+  width: number
+  height: number
+  anchorX: number
+  anchorY: number
+  stageWidthPx: number
+  stageHeightPx: number
+}): { translateX: number; translateY: number; scale: number } {
+  "worklet"
+  const baseScale = getRoomV2DepthPerspectiveScale(input.baseY)
+  const liveScale = getRoomV2DepthPerspectiveScale(input.liveY)
+  const centerX = (x: number, scale: number): number =>
+    x + input.width * scale * (0.5 - input.anchorX)
+  const centerY = (y: number, scale: number): number =>
+    y + input.height * scale * (0.5 - input.anchorY)
+  return {
+    translateX: (centerX(input.liveX, liveScale) - centerX(input.baseX, baseScale)) * input.stageWidthPx,
+    translateY: (centerY(input.liveY, liveScale) - centerY(input.baseY, baseScale)) * input.stageHeightPx,
+    scale: liveScale / baseScale
+  }
 }
 
 export function getRoomV2FurnitureMobileRenderScale(

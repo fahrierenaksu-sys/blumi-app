@@ -146,11 +146,13 @@ test("deck transition resets the outgoing swipe before the next card paints", ()
   const demoSource = read("src/screens/DemoLobbyView.tsx")
 
   assert.match(sharedDeckSource, /useLayoutEffect\(\(\) => \{/)
-  assert.match(sharedDeckSource, /swipeAnim\.setValue\(\{ x: 0, y: 0 \}\)/)
+  // The deck drag is a Reanimated shared value (UI-thread swipe); the reset
+  // stays in the layout effect.
+  assert.match(sharedDeckSource, /useLayoutEffect\(\(\) => \{\s*swipeAnim\.x\.value = 0/)
   assert.match(sharedDeckSource, /\[featured\?\.userId, swipeAnim\]/)
   assert.doesNotMatch(lobbySource, /cardEntryAnim/)
   assert.doesNotMatch(lobbySource, /cardAnimationKey/)
-  assert.match(demoSource, /useRef\(new Animated\.ValueXY\(\)\)\.current/)
+  assert.match(demoSource, /const swipeAnim = useDiscoverSwipeValues\(\)/)
   assert.doesNotMatch(demoSource, /setSwipeAnim|setFeaturedId/)
   assert.match(sharedDeckSource, /key=\{profile\.userId\}/)
 })
@@ -166,7 +168,7 @@ test("production decisions advance optimistically without locking the next profi
   assert.doesNotMatch(lobbySource, /actionsDisabled=\{decidingUserId !== null\}/)
   assert.match(
     decisionsSource,
-    /restoreCandidateAfterDecisionFailure[\s\S]{0,220}cardDragX\.setValue\(\{ x: 0, y: 0 \}\)/
+    /restoreCandidateAfterDecisionFailure[\s\S]{0,220}cardDragX\.x\.value = 0/
   )
 })
 
@@ -186,7 +188,8 @@ test("discovery action buttons use the same animated swipe path as gestures", ()
   const sharedDeckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
 
   assert.match(sharedDeckSource, /actionSwipeInFlightRef = useRef\(false\)/)
-  assert.match(sharedDeckSource, /Animated\.timing\(swipeAnim,/)
+  // Same shared drag value the card gesture writes, animated on the UI thread.
+  assert.match(sharedDeckSource, /swipeAnim\.ownerId\.value = userId\s*swipeAnim\.x\.value = withTiming\(/)
   assert.match(sharedDeckSource, /runActionSwipe\("left"\)/)
   assert.match(sharedDeckSource, /runActionSwipe\("right"\)/)
   assert.doesNotMatch(sharedDeckSource, /zIndex:\s*-/)
@@ -277,19 +280,19 @@ test("the active discovery card rests straight and only back cards form the stac
     sharedDeckSource,
     /visibleProfiles = useMemo\([\s\S]*?\[profiles\[2\], profiles\[1\], featured\]/
   )
+  // Per-role motion lives in DeckCardContainer's one animated style.
+  assert.match(sharedDeckSource, /topCardContainer:\s*\{[\s\S]*?zIndex:\s*3/)
   assert.match(
     sharedDeckSource,
-    /topCardContainer:\s*\{[\s\S]*?transform:\s*\[[\s\S]*?translateX:\s*0[\s\S]*?translateY:\s*0[\s\S]*?rotate:\s*"0deg"[\s\S]*?scale:\s*1[\s\S]*?\][\s\S]*?opacity:\s*1[\s\S]*?zIndex:\s*3/
+    /: \{ translateX: 0, translateY: 0, scale: 1 \}\s*return \{\s*opacity: 1,\s*transform: \[[\s\S]*?translateX: middle\.translateX[\s\S]*?translateY: middle\.translateY[\s\S]*?rotate: "0deg"[\s\S]*?scale: middle\.scale/
   )
+  assert.match(sharedDeckSource, /role === "middle"\s*\?\s*getDiscoverMiddleCardMotion\(/)
   assert.match(
     sharedDeckSource,
-    /isMiddle[\s\S]*?translateX:\s*middleCardTranslateX[\s\S]*?translateY:\s*middleCardTranslateY[\s\S]*?rotate:\s*"0deg"[\s\S]*?scale:\s*middleCardScale/
+    /BOTTOM_CARD_MOTION = \{\s*translateX:\s*-?\d+,\s*translateY:\s*-?\d+,\s*rotate:\s*"-?\d+deg",\s*scale:\s*0\.\d+/
   )
-  assert.match(
-    sharedDeckSource,
-    /bottomCardContainer:\s*\{[\s\S]*?translateX:\s*-?\d+[\s\S]*?translateY:\s*-?\d+[\s\S]*?rotate:\s*"-?\d+deg"[\s\S]*?scale:\s*0\.\d+/
-  )
-  assert.match(sharedDeckSource, /pointerEvents=\{isTop \? "auto" : "none"\}/)
+  assert.match(sharedDeckSource, /role=\{isTop \? "top" : isMiddle \? "middle" : "bottom"\}/)
+  assert.match(sharedDeckSource, /pointerEvents=\{role === "top" \? "auto" : "none"\}/)
   assert.match(sharedDeckSource, /\{!isTop \? <GlassDeckOverlay \/> : null\}/)
   assert.match(sharedDeckSource, /\{featured \? \(/)
   assert.match(

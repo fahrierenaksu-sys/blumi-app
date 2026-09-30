@@ -9,14 +9,15 @@
  * - Deck progress indicator
  */
 
-import { useCallback, useRef } from "react"
-import { Animated, StyleSheet, View } from "react-native"
+import { useCallback } from "react"
+import { StyleSheet, View } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { useDemoStore } from "../features/demo/demoStore"
 import type { SessionActor } from "../features/session/sessionModel"
 import { DiscoveryDeckView } from "../features/discovery/DiscoveryDeckView"
+import { useDiscoverSwipeValues } from "../features/discovery/useDiscoverSwipeValues"
 import { EmptyDiscoveryDeck } from "../features/discovery/EmptyDiscoveryDeck"
 import { createLocalDemoMatch } from "../features/matches/matchRoomModel"
 import { uiTheme } from "../ui/theme"
@@ -38,7 +39,7 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
   // The shared deck resets this stable value in a layout effect before the
   // next featured card paints. Recreating it during render remounts the back
   // cards and creates a visible one-frame flash.
-  const swipeAnim = useRef(new Animated.ValueXY()).current
+  const swipeAnim = useDiscoverSwipeValues()
 
   const handleSwipeRight = useCallback(
     (userId: string) => {

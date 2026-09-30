@@ -48,13 +48,21 @@ test("Discover card, room object drag and edge back never compete with the pager
 })
 
 test("Discover card swipe thresholds are unchanged", () => {
-  const card = read("../../features/demo/SwipeableDiscoverCard.tsx")
-  assert.match(card, /const SWIPE_OUT_DURATION = 190\n/)
-  assert.match(card, /const SWIPE_CAPTURE_THRESHOLD = 4\n/)
-  assert.match(card, /const SWIPE_DIRECTION_DOMINANCE = 1\.1\n/)
-  assert.match(card, /const SWIPE_DISTANCE_RATIO = 0\.22\n/)
-  assert.match(card, /const SWIPE_FLICK_VELOCITY = 0\.55\n/)
-  assert.match(card, /onPanResponderTerminate: resetPosition/)
+  // The swipe moved from PanResponder to a Gesture Handler pan; the thresholds
+  // now live in the pure swipe model it shares with the deck.
+  const model = read("../../features/discovery/discoverySwipeModel.ts")
+  assert.match(model, /export const SWIPE_OUT_DURATION = 190\n/)
+  assert.match(model, /export const SWIPE_CAPTURE_THRESHOLD = 4\n/)
+  assert.match(model, /export const SWIPE_DIRECTION_DOMINANCE = 1\.1\n/)
+  assert.match(model, /export const SWIPE_DISTANCE_RATIO = 0\.22\n/)
+  assert.match(model, /export const SWIPE_FLICK_VELOCITY = 0\.55\n/)
+  // Gesture Handler reports px/s; the threshold stays in PanResponder's px/ms.
+  assert.match(model, /const velocityXPerMs = input\.velocityXPerSecond \/ 1000/)
+  const swipe = read("../../features/demo/useDiscoverCardSwipe.ts")
+  // A cancelled pan returns the card to rest, as onPanResponderTerminate did.
+  assert.match(swipe, /if \(!success\) \{\s*resetPosition\(\)/)
+  // The card owns its touch only through the pan; the pager is off on Discover.
+  assert.match(swipe, /Gesture\.Pan\(\)\s*\.enabled\(!disabled\)\s*\.manualActivation\(true\)/)
 })
 
 test("drag and settle frames stay on the UI thread; JS hears once per settle", () => {

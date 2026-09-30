@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef, useState, type ComponentProps } from "react"
+import { useEffect, useState, type ComponentProps } from "react"
 import {
-  Animated,
   StyleSheet,
   Text,
   TextInput,
@@ -10,7 +9,19 @@ import {
   type TextInputProps,
   type ViewStyle
 } from "react-native"
+import Animated, {
+  interpolateColor,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "./theme"
+
+const FIELD_FOCUS_COLOR_DURATION_MS = 120
+const FIELD_BORDER_COLOR = uiTheme.colors.border
+const FIELD_FOCUSED_BORDER_COLOR = uiTheme.colors.actionDark
+const FIELD_ERROR_BORDER_COLOR = uiTheme.colors.danger
 
 interface FieldInputProps extends Omit<TextInputProps, "style"> {
   label: string
@@ -34,32 +45,32 @@ export function FieldInput(props: FieldInputProps) {
     ...inputProps
   } = props
   const [focused, setFocused] = useState(false)
-  const borderAnim = useRef(new Animated.Value(0)).current
+  // Focus colour crossfades on the UI thread. A colour fade is not movement,
+  // so it runs under Reduce Motion as the JS spring did.
+  const focusProgress = useSharedValue(0)
+  useEffect(() => {
+    focusProgress.value = withTiming(focused ? 1 : 0, {
+      duration: FIELD_FOCUS_COLOR_DURATION_MS,
+      reduceMotion: ReduceMotion.Never
+    })
+  }, [focusProgress, focused])
+  const hasError = Boolean(error)
+  // An animated style wins over static styles, so the error colour lives here too.
+  const borderStyle = useAnimatedStyle(() => ({
+    borderColor: hasError
+      ? FIELD_ERROR_BORDER_COLOR
+      : interpolateColor(focusProgress.value, [0, 1], [FIELD_BORDER_COLOR, FIELD_FOCUSED_BORDER_COLOR])
+  }))
 
   const handleFocus: NonNullable<TextInputProps["onFocus"]> = (event) => {
     setFocused(true)
-    Animated.spring(borderAnim, {
-      toValue: 1,
-      useNativeDriver: false,
-      ...uiTheme.animation.spring,
-    }).start()
     onFocus?.(event)
   }
 
   const handleBlur: NonNullable<TextInputProps["onBlur"]> = (event) => {
     setFocused(false)
-    Animated.spring(borderAnim, {
-      toValue: 0,
-      useNativeDriver: false,
-      ...uiTheme.animation.spring,
-    }).start()
     onBlur?.(event)
   }
-
-  const borderColor = borderAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [uiTheme.colors.border, uiTheme.colors.actionDark],
-  })
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -69,9 +80,9 @@ export function FieldInput(props: FieldInputProps) {
       <Animated.View
         style={[
           styles.inputWrapper,
-          { borderColor },
           focused ? styles.inputWrapperFocused : null,
           error ? styles.inputWrapperError : null,
+          borderStyle,
         ]}
       >
         {icon ? (

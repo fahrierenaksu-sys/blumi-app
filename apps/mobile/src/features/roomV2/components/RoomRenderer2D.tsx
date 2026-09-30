@@ -1,7 +1,6 @@
 import { Image as ExpoImage } from "expo-image"
 import {
   Animated,
-  Easing,
   type GestureResponderEvent,
   type AccessibilityValue,
   type LayoutChangeEvent,
@@ -12,7 +11,7 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useRef, useState } from "react"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
@@ -20,14 +19,21 @@ import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
 import type {
   RoomShell,
   RoomPlacementLane,
-  RoomV2AvatarRenderItem,
   RoomV2FurnitureRenderItem,
   RoomV2RenderItem
 } from "../roomV2.types"
+import { getRenderableRoomV2AvatarMotionProfile } from "../roomV2AvatarMotion"
 import {
-  getRenderableRoomV2AvatarMotionProfile,
-  getRoomV2AvatarSittingTranslateY
-} from "../roomV2AvatarMotion"
+  getAvatarMotionRotate,
+  getAvatarMotionScaleY,
+  getAvatarMotionTranslateX,
+  getAvatarMotionTranslateY
+} from "./roomRendererAvatarMotionStyle"
+import {
+  useRoomRendererAvatarLoops,
+  useRoomRendererMarkerPulse,
+  useRoomRendererScreenFocused
+} from "./useRoomRendererLoops"
 import { getRoomV2AvatarAccessibilityValue } from "../roomV2Accessibility"
 import {
   getRoomV2DepthPerspectiveScale,
@@ -37,6 +43,11 @@ import {
 } from "../roomV2RenderSurface"
 import type { RoomVNextRuntimeMode } from "../roomVNextRuntimeGate"
 import { ROOM_V2_OUTSIDE_COLOR } from "../roomV2Camera"
+import {
+  RoomRendererLiveAvatarFrame,
+  RoomRendererLiveAvatarLayoutContext,
+  type RoomRendererLiveAvatarPosition
+} from "./RoomRendererLiveAvatarFrame"
 
 type RoomRendererPlacementState = "valid" | "invalid"
 type RoomRendererStageMarkerTone = "target" | "blocked"
@@ -68,6 +79,8 @@ interface RoomRenderer2DProps {
   accessibilityValue?: AccessibilityValue
   motionEnabled?: boolean
   showDepthWash?: boolean
+  /** Moves the matching avatar on the UI thread from shared values. */
+  liveAvatarPosition?: RoomRendererLiveAvatarPosition
 }
 
 export function RoomRenderer2D(props: RoomRenderer2DProps) {
@@ -93,10 +106,13 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     accessibilityLabel,
     accessibilityValue,
     motionEnabled = true,
-    showDepthWash = true
+    showDepthWash = true,
+    liveAvatarPosition
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
+  // Idle loops pause while the hosting screen is not focused.
+  const motionPaused = !useRoomRendererScreenFocused()
   const handleLayout = useCallback((event: LayoutChangeEvent): void => {
     const { width, height } = event.nativeEvent.layout
     setLayoutSize({ width, height })
@@ -158,7 +174,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
         <PlacementGuideLayer shell={shell} />
       ) : null}
       {stageMarkers?.map((marker) => (
-        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} />
+        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} paused={motionPaused} />
       ))}
       {roomVNextRuntimeMode !== "disabled"
         ? renderItems.map((item) =>
@@ -184,6 +200,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             itemInteractionMode={itemInteractionMode}
             debugPlacement={debugPlacement}
             reduceMotion={reduceMotion || !motionEnabled}
+            motionPaused={motionPaused}
+            liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
             stageWidthPx={layoutSize.width}
             stageHeightPx={layoutSize.height}
             seatedFurnitureName={
@@ -348,38 +366,10 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
 const StageMarker = memo(function StageMarker(props: {
   marker: RoomRendererStageMarker
   reduceMotion: boolean
+  paused: boolean
 }) {
-  const { marker, reduceMotion } = props
-  const pulseRef = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (reduceMotion) {
-      pulseRef.stopAnimation()
-      pulseRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseRef, {
-          toValue: 1,
-          duration: 620,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(pulseRef, {
-          toValue: 0,
-          duration: 620,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      pulseRef.setValue(0)
-    }
-  }, [pulseRef, reduceMotion])
+  const { marker, reduceMotion, paused } = props
+  const pulseRef = useRoomRendererMarkerPulse({ reduceMotion, paused })
 
   return (
     <Animated.View
@@ -450,6 +440,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   itemInteractionMode: "edit" | "interact"
   debugPlacement: boolean
   reduceMotion: boolean
+  motionPaused: boolean
+  liveAvatarPosition?: RoomRendererLiveAvatarPosition
   stageWidthPx: number
   stageHeightPx: number
   seatedFurnitureName?: string
@@ -466,14 +458,13 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     itemInteractionMode,
     debugPlacement,
     reduceMotion,
+    motionPaused,
+    liveAvatarPosition,
     stageWidthPx,
     stageHeightPx,
     seatedFurnitureName,
     testID
   } = props
-  const breatheRef = useRef(new Animated.Value(0)).current
-  const walkRef = useRef(new Animated.Value(0)).current
-  const gestureRef = useRef(new Animated.Value(0)).current
   const longPressActiveRef = useRef(false)
   const suppressPressRef = useRef(false)
 
@@ -497,109 +488,29 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
       usesRuntimeGesture: false,
       usesAnimatedAssets: false
     }
-  const usesIdleBreathe =
-    item.kind === "avatar" &&
-    avatarMotion.state === "idle" &&
-    !avatarMotion.usesAnimatedAssets &&
-    !reduceMotion
-
-  useEffect(() => {
-    if (!usesIdleBreathe) {
-      breatheRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheRef, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        }),
-        Animated.timing(breatheRef, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      breatheRef.setValue(0)
-    }
-  }, [breatheRef, usesIdleBreathe])
-
-  useEffect(() => {
-    if (
-      item.kind !== "avatar" ||
-      avatarMotion.state !== "walking" ||
-      !avatarMotion.usesRuntimeLocomotion
-    ) {
-      walkRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(walkRef, {
-          toValue: 1,
-          duration: 190,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(walkRef, {
-          toValue: 0,
-          duration: 190,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      walkRef.setValue(0)
-    }
-  }, [avatarMotion.state, avatarMotion.usesRuntimeLocomotion, item.kind, walkRef])
-
-  useEffect(() => {
-    if (
-      item.kind !== "avatar" ||
-      reduceMotion ||
-      !avatarMotion.usesRuntimeGesture
-    ) {
-      gestureRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(gestureRef, {
-          toValue: 1,
-          duration: avatarMotion.state === "dancing" ? 260 : 420,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(gestureRef, {
-          toValue: 0,
-          duration: avatarMotion.state === "dancing" ? 260 : 420,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      gestureRef.setValue(0)
-    }
-  }, [avatarMotion.state, avatarMotion.usesRuntimeGesture, gestureRef, item.kind, reduceMotion])
+  const { breatheRef, walkRef, gestureRef, usesIdleBreathe } = useRoomRendererAvatarLoops({
+    isAvatar: item.kind === "avatar",
+    avatarMotion,
+    reduceMotion,
+    paused: motionPaused
+  })
 
   // If an interaction is provided, we need to allow touches. Otherwise pass through.
   const isTouchInteractive = Boolean(onItemTap || onItemLongPress || onItemLongPressMove)
   const pointerEvents = isTouchInteractive ? "auto" : "none"
 
-  const Wrapper = isTouchInteractive ? Pressable : View
+  const Wrapper = isTouchInteractive ? Pressable : liveAvatarPosition ? RoomRendererLiveAvatarFrame : View
+  const liveAvatarLayout = liveAvatarPosition && {
+    live: liveAvatarPosition,
+    baseX: item.x,
+    baseY: item.y,
+    width: item.width * mobileFurnitureScale,
+    height: item.height * mobileFurnitureScale,
+    anchorX: item.anchor.x,
+    anchorY: item.anchor.y,
+    stageWidthPx,
+    stageHeightPx
+  }
 
   const resolvePressPoint = useCallback((locationX: number, locationY: number) => ({
     x: Math.max(0, Math.min(1, left + locationX / Math.max(1, stageWidthPx))),
@@ -607,165 +518,167 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   }), [left, stageHeightPx, stageWidthPx, top])
 
   return (
-    <Wrapper
-      accessible={isTouchInteractive || item.kind === "avatar" ? true : undefined}
-      accessibilityRole={isTouchInteractive ? "button" : undefined}
-      accessibilityLabel={
-        isTouchInteractive && item.kind === "furniture"
-          ? itemInteractionMode === "edit"
-            ? `Select ${item.name} to move, rotate, or remove`
-            : item.interactionType === "seat"
-              ? `Sit on ${item.name}`
-              : `Interact with ${item.name}`
-          : item.kind === "avatar"
-            ? item.name ?? "Room avatar"
+    <RoomRendererLiveAvatarLayoutContext.Provider value={liveAvatarLayout}>
+      <Wrapper
+        accessible={isTouchInteractive || item.kind === "avatar" ? true : undefined}
+        accessibilityRole={isTouchInteractive ? "button" : undefined}
+        accessibilityLabel={
+          isTouchInteractive && item.kind === "furniture"
+            ? itemInteractionMode === "edit"
+              ? `Select ${item.name} to move, rotate, or remove`
+              : item.interactionType === "seat"
+                ? `Sit on ${item.name}`
+                : `Interact with ${item.name}`
+            : item.kind === "avatar"
+              ? item.name ?? "Room avatar"
+              : undefined
+        }
+        accessibilityValue={
+          item.kind === "avatar"
+            ? {
+                text: getRoomV2AvatarAccessibilityValue({
+                  state: item.state,
+                  direction: item.direction,
+                  seatedFurnitureName
+                })
+              }
             : undefined
-      }
-      accessibilityValue={
-        item.kind === "avatar"
-          ? {
-              text: getRoomV2AvatarAccessibilityValue({
-                state: item.state,
-                direction: item.direction,
-                seatedFurnitureName
-              })
-            }
-          : undefined
-      }
-      delayLongPress={onItemLongPressMove ? 0 : 360}
-      onLongPress={() => {
-        longPressActiveRef.current = true
-        onItemLongPress?.(item)
-      }}
-      onPress={(event) => {
-        event.stopPropagation()
-        if (suppressPressRef.current) {
-          suppressPressRef.current = false
-          return
         }
-        onItemTap?.(item)
-      }}
-      onPressOut={(event) => {
-        if (!longPressActiveRef.current) return
-        longPressActiveRef.current = false
-        suppressPressRef.current = true
-        onItemLongPressRelease?.(
-          item,
-          resolvePressPoint(event.nativeEvent.locationX, event.nativeEvent.locationY)
-        )
-      }}
-      onResponderMove={(event) => {
-        if (!longPressActiveRef.current || !onItemLongPressMove) return
-        onItemLongPressMove(item, {
-          pageX: event.nativeEvent.pageX,
-          pageY: event.nativeEvent.pageY
-        })
-      }}
-      onStartShouldSetResponder={() => Boolean(onItemLongPressMove)}
-      onMoveShouldSetResponder={() => Boolean(onItemLongPressMove)}
-      onResponderTerminationRequest={() => !onItemLongPressMove}
-      testID={testID}
-      pointerEvents={pointerEvents}
-      style={[
-        styles.item,
-        {
-          left: `${left * 100}%`,
-          top: `${top * 100}%`,
-          width: `${renderedWidth * 100}%`,
-          height: `${renderedHeight * 100}%`
-        }
-      ]}
-    >
-      <View
+        delayLongPress={onItemLongPressMove ? 0 : 360}
+        onLongPress={() => {
+          longPressActiveRef.current = true
+          onItemLongPress?.(item)
+        }}
+        onPress={(event) => {
+          event.stopPropagation()
+          if (suppressPressRef.current) {
+            suppressPressRef.current = false
+            return
+          }
+          onItemTap?.(item)
+        }}
+        onPressOut={(event) => {
+          if (!longPressActiveRef.current) return
+          longPressActiveRef.current = false
+          suppressPressRef.current = true
+          onItemLongPressRelease?.(
+            item,
+            resolvePressPoint(event.nativeEvent.locationX, event.nativeEvent.locationY)
+          )
+        }}
+        onResponderMove={(event) => {
+          if (!longPressActiveRef.current || !onItemLongPressMove) return
+          onItemLongPressMove(item, {
+            pageX: event.nativeEvent.pageX,
+            pageY: event.nativeEvent.pageY
+          })
+        }}
+        onStartShouldSetResponder={() => Boolean(onItemLongPressMove)}
+        onMoveShouldSetResponder={() => Boolean(onItemLongPressMove)}
+        onResponderTerminationRequest={() => !onItemLongPressMove}
+        testID={testID}
+        pointerEvents={pointerEvents}
         style={[
-          styles.itemContent,
-          isSelected ? styles.itemSelected : null,
-          placementState === "valid" ? styles.itemPlacementValid : null,
-          placementState === "invalid" ? styles.itemPlacementInvalid : null
+          styles.item,
+          {
+            left: `${left * 100}%`,
+            top: `${top * 100}%`,
+            width: `${renderedWidth * 100}%`,
+            height: `${renderedHeight * 100}%`
+          }
         ]}
       >
-        {isSelected && item.kind === "furniture" ? (
-          <View pointerEvents="none" style={styles.itemSelectionHalo} />
-        ) : null}
-        {placementState === "valid" ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.interactionAura,
-              isSelected ? styles.interactionAuraSelected : null,
-              styles.interactionAuraValid
-            ]}
-          />
-        ) : null}
-        {footprintStyle ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.footprintPad,
-              placementState === "valid" ? styles.footprintPadValid : null,
-              placementState === "invalid" ? styles.footprintPadInvalid : null,
-              footprintStyle
-            ]}
-          />
-        ) : null}
-        {item.kind === "avatar" ? (
-          <Animated.View
-            style={[
-              styles.avatarImage,
-              {
-                opacity: item.direction === "back" ? 0.84 : 1,
-                transform: [
-                  { translateX: getAvatarMotionTranslateX(avatarMotion, gestureRef) },
-                  { translateY: getAvatarMotionTranslateY(avatarMotion, breatheRef, walkRef, gestureRef, usesIdleBreathe, item.kind === "avatar" ? item.seatRig : undefined, stageHeightPx) },
-                  { scaleX: item.direction === "left" ? -1 : 1 },
-                  { scaleY: getAvatarMotionScaleY(avatarMotion, breatheRef, gestureRef, usesIdleBreathe) },
-                  { scale: item.direction === "back" ? 0.96 : 1 },
-                  { rotate: getAvatarMotionRotate(avatarMotion, gestureRef) }
-                ]
-              }
-            ]}
-          >
-            <RoomAvatarRenderer2D layers={item.layers} />
-          </Animated.View>
-        ) : (
-          <ExpoImage
-            source={item.asset.source}
-            contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
-            cachePolicy="memory-disk"
-            transition={0}
-            style={[
-              styles.itemImage,
-              { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }
-            ]}
-          />
-        )}
-        {debugPlacement ? (
-          <>
+        <View
+          style={[
+            styles.itemContent,
+            isSelected ? styles.itemSelected : null,
+            placementState === "valid" ? styles.itemPlacementValid : null,
+            placementState === "invalid" ? styles.itemPlacementInvalid : null
+          ]}
+        >
+          {isSelected && item.kind === "furniture" ? (
+            <View pointerEvents="none" style={styles.itemSelectionHalo} />
+          ) : null}
+          {placementState === "valid" ? (
             <View
-              testID={testID ? `${testID}-debug-bounds` : undefined}
-              style={styles.debugBounds}
-            />
-            <View
-              testID={testID ? `${testID}-debug-anchor` : undefined}
+              pointerEvents="none"
               style={[
-                styles.debugAnchor,
-                {
-                  left: `${item.anchor.x * 100}%`,
-                  top: `${item.anchor.y * 100}%`
-                }
+                styles.interactionAura,
+                isSelected ? styles.interactionAuraSelected : null,
+                styles.interactionAuraValid
               ]}
             />
-            <Text
-              testID={testID ? `${testID}-debug-label` : undefined}
-              numberOfLines={1}
-              style={styles.debugLabel}
+          ) : null}
+          {footprintStyle ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.footprintPad,
+                placementState === "valid" ? styles.footprintPadValid : null,
+                placementState === "invalid" ? styles.footprintPadInvalid : null,
+                footprintStyle
+              ]}
+            />
+          ) : null}
+          {item.kind === "avatar" ? (
+            <Animated.View
+              style={[
+                styles.avatarImage,
+                {
+                  opacity: item.direction === "back" ? 0.84 : 1,
+                  transform: [
+                    { translateX: getAvatarMotionTranslateX(avatarMotion, gestureRef) },
+                    { translateY: getAvatarMotionTranslateY(avatarMotion, breatheRef, walkRef, gestureRef, usesIdleBreathe, item.kind === "avatar" ? item.seatRig : undefined, stageHeightPx) },
+                    { scaleX: item.direction === "left" ? -1 : 1 },
+                    { scaleY: getAvatarMotionScaleY(avatarMotion, breatheRef, gestureRef, usesIdleBreathe) },
+                    { scale: item.direction === "back" ? 0.96 : 1 },
+                    { rotate: getAvatarMotionRotate(avatarMotion, gestureRef) }
+                  ]
+                }
+              ]}
             >
-              {item.name || item.renderId}
-            </Text>
-          </>
-        ) : null}
-      </View>
-    </Wrapper>
+              <RoomAvatarRenderer2D layers={item.layers} />
+            </Animated.View>
+          ) : (
+            <ExpoImage
+              source={item.asset.source}
+              contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
+              cachePolicy="memory-disk"
+              transition={0}
+              style={[
+                styles.itemImage,
+                { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }
+              ]}
+            />
+          )}
+          {debugPlacement ? (
+            <>
+              <View
+                testID={testID ? `${testID}-debug-bounds` : undefined}
+                style={styles.debugBounds}
+              />
+              <View
+                testID={testID ? `${testID}-debug-anchor` : undefined}
+                style={[
+                  styles.debugAnchor,
+                  {
+                    left: `${item.anchor.x * 100}%`,
+                    top: `${item.anchor.y * 100}%`
+                  }
+                ]}
+              />
+              <Text
+                testID={testID ? `${testID}-debug-label` : undefined}
+                numberOfLines={1}
+                style={styles.debugLabel}
+              >
+                {item.name || item.renderId}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      </Wrapper>
+    </RoomRendererLiveAvatarLayoutContext.Provider>
   )
 }, (previous, next) =>
   previous.item === next.item &&
@@ -777,102 +690,13 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.onItemLongPressRelease === next.onItemLongPressRelease &&
   previous.debugPlacement === next.debugPlacement &&
   previous.reduceMotion === next.reduceMotion &&
+  previous.motionPaused === next.motionPaused &&
+  previous.liveAvatarPosition === next.liveAvatarPosition &&
   previous.stageWidthPx === next.stageWidthPx &&
   previous.stageHeightPx === next.stageHeightPx &&
   previous.seatedFurnitureName === next.seatedFurnitureName &&
   previous.testID === next.testID
 )
-
-function getAvatarMotionTranslateY(
-  motion: ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>,
-  breatheRef: Animated.Value,
-  walkRef: Animated.Value,
-  gestureRef: Animated.Value,
-  usesIdleBreathe: boolean,
-  seatRig?: RoomV2AvatarRenderItem["seatRig"],
-  stageHeightPx?: number
-): Animated.AnimatedInterpolation<string | number> | number {
-  if (motion.state === "walking" && motion.usesRuntimeLocomotion) {
-    return walkRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -3]
-    })
-  }
-  if (motion.state === "sitting") {
-    return getRoomV2AvatarSittingTranslateY(seatRig, stageHeightPx)
-  }
-  if (motion.state === "dancing" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -5]
-    })
-  }
-  if (motion.state === "waving" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -2]
-    })
-  }
-  if (motion.usesAnimatedAssets || !usesIdleBreathe) return 0
-  return breatheRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -1.5]
-  })
-}
-
-function getAvatarMotionScaleY(
-  motion: ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>,
-  breatheRef: Animated.Value,
-  gestureRef: Animated.Value,
-  usesIdleBreathe: boolean
-): Animated.AnimatedInterpolation<string | number> | number {
-  if (motion.state === "sitting") return 1
-  if (motion.usesAnimatedAssets) return 1
-  if (motion.state === "dancing" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 1.045]
-    })
-  }
-  if (!usesIdleBreathe) return 1
-  return breatheRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.018]
-  })
-}
-
-function getAvatarMotionRotate(
-  motion: ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>,
-  gestureRef: Animated.Value
-): Animated.AnimatedInterpolation<string | number> | string {
-  if (motion.usesAnimatedAssets) return "0deg"
-  if (motion.state === "dancing" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: ["-4deg", "4deg"]
-    })
-  }
-  if (motion.state === "waving" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: ["-1deg", "3deg"]
-    })
-  }
-  return "0deg"
-}
-
-function getAvatarMotionTranslateX(
-  motion: ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>,
-  gestureRef: Animated.Value
-): Animated.AnimatedInterpolation<string | number> | number {
-  if (motion.state === "dancing" && motion.usesRuntimeGesture) {
-    return gestureRef.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-2.5, 2.5]
-    })
-  }
-  return 0
-}
 
 function getFurnitureFootprintStyle(
   item: RoomV2FurnitureRenderItem

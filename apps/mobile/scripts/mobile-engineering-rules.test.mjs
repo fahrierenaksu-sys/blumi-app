@@ -34,14 +34,11 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
 // Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
-  "features/avatarV2/room/components/RoomAvatarRenderer2D.tsx",
   "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts",
   "features/miniRoom/scene/miniRoomSceneStore.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
-  "features/session/register/useRegisterFlowController.ts",
-  "features/session/setupFlow/BlumiSetupShell.tsx",
-  "screens/MyRoomScreen.tsx"
+  "features/session/register/useRegisterFlowController.ts"
 ])
 
 test("no new requestAnimationFrame or setInterval loops in production code", () => {
@@ -70,14 +67,14 @@ const MAX_LINES = 800
 const OVERSIZED_DEBT = {
   "features/avatarV2/room/avatarRoomCatalog.ts": 1304,
   "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
-  "features/demo/SwipeableDiscoverCard.tsx": 1232,
+  "features/demo/SwipeableDiscoverCard.tsx": 1153,
   "features/roomV2/state/RoomV2Provider.tsx": 1210,
-  "features/roomV2/components/RoomRenderer2D.tsx": 1172,
+  "features/roomV2/components/RoomRenderer2D.tsx": 996,
   "navigation/RootNavigator.tsx": 1123,
   "features/session/useSessionState.ts": 1129,
-  "screens/MyRoomScreen.tsx": 1124,
+  "screens/MyRoomScreen.tsx": 1082,
   "features/avatarV2/avatarV2Catalog.ts": 949,
-  "screens/ProfileEditScreen.tsx": 872,
+  "screens/ProfileEditScreen.tsx": 861,
   "features/session/sessionApi.ts": 847,
   "features/avatarV2/room/avatarRoomSelectors.ts": 825,
   "features/session/OnboardingWorldScene.tsx": 823,
@@ -112,7 +109,7 @@ test("worklets never use identifiers in default parameters", () => {
   assert.deepEqual(offenders, [], "move the default into the worklet body")
 })
 
-const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 26
+const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 25
 
 test("react-hooks/exhaustive-deps suppressions do not grow", () => {
   const count = sources.reduce(

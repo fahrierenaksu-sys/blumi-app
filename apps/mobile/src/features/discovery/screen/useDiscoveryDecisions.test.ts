@@ -109,17 +109,12 @@ function loadHook(runtime: ReturnType<typeof createHookRuntime>, harness: Harnes
     _load: (request: string, parent: unknown, isMain: boolean) => unknown
   }
   const originalLoad = loader._load
+  const swipeValues = { x: { value: 12 }, ownerId: { value: "user-a" } }
   loader._load = function load(request, parent, isMain) {
     if (request === "react") return runtime.react
-    if (request === "react-native") {
-      return {
-        Animated: {
-          ValueXY: class {
-            value = { x: 12, y: 3 }
-            setValue(next: { x: number; y: number }) { this.value = next }
-          }
-        }
-      }
+    if (request === "../useDiscoverSwipeValues") {
+      // The card drag lives in Reanimated shared values; a plain holder stands in.
+      return { useDiscoverSwipeValues: () => swipeValues }
     }
     if (request === "@react-navigation/native") {
       return {
@@ -398,7 +393,7 @@ test("a failed production decision restores the card and resets the drag", async
 
   assert.deepEqual(view.harness.decideCalls, [{ userId: "user-a", decision: "pass" }])
   assert.equal(view.seen.size, 0)
-  assert.deepEqual((view.hook.cardDragX as unknown as { value: unknown }).value, { x: 0, y: 0 })
+  assert.equal((view.hook.cardDragX as unknown as { x: { value: number } }).x.value, 0)
   assert.deepEqual(view.harness.toasts, [{ title: "That choice wasn't saved. Check your connection and try again.", type: "warning" }])
   assert.deepEqual(view.feedback, [{ text: copy.retry, tone: "soft" }])
   assert.deepEqual(view.harness.events, [])

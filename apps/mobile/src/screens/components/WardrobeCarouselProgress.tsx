@@ -1,4 +1,10 @@
-import { Animated, Text, View } from "react-native"
+import { Text, View } from "react-native"
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
 import type { WardrobeCategoryId } from "../../features/avatarV2/wardrobeCategoryModel"
 import { getWardrobeCarouselIndicator } from "../../features/avatarV2/wardrobeCategoryModel"
 import { wardrobeV2Styles as styles } from "../../features/avatarV2/wardrobe/wardrobeV2Styles"
@@ -7,7 +13,8 @@ interface WardrobeCarouselProgressProps {
   category: WardrobeCategoryId
   contentWidth: number
   label: string
-  offsetX: Animated.Value
+  /** Live scroll offset, written on the UI thread by the carousel's scroll handler. */
+  offsetX: SharedValue<number>
   positionFraction: number
   viewportWidth: number
 }
@@ -25,13 +32,14 @@ export function WardrobeCarouselProgress(
   const thumbWidth = TRACK_WIDTH * indicator.thumbFraction
   const maxScroll = Math.max(0, props.contentWidth - props.viewportWidth)
   const maxTranslate = Math.max(0, TRACK_WIDTH - thumbWidth)
-  const translateX = maxScroll === 0
-    ? 0
-    : props.offsetX.interpolate({
-        inputRange: [0, maxScroll],
-        outputRange: [0, maxTranslate],
-        extrapolate: "clamp"
-      })
+  const offsetX = props.offsetX
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateX: maxScroll === 0
+        ? 0
+        : interpolate(offsetX.value, [0, maxScroll], [0, maxTranslate], Extrapolation.CLAMP)
+    }]
+  }))
 
   return (
     <View style={styles.carouselHeader}>
@@ -50,7 +58,8 @@ export function WardrobeCarouselProgress(
         <Animated.View
           style={[
             styles.carouselProgressThumb,
-            { width: thumbWidth, transform: [{ translateX }] }
+            { width: thumbWidth },
+            thumbStyle
           ]}
         />
       </View>

@@ -1,22 +1,29 @@
 import { Image as ExpoImage } from "expo-image"
 import { StyleSheet, View, type ImageStyle } from "react-native"
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useSyncExternalStore
-} from "react"
+import { memo, useCallback, useEffect, useMemo } from "react"
+import Animated, {
+  useAnimatedStyle,
+  useFrameCallback,
+  useSharedValue,
+  type FrameInfo,
+  type SharedValue
+} from "react-native-reanimated"
 import type {
+  RoomV2AssetRef,
   RoomV2AvatarRenderLayer
 } from "../../../roomV2/roomV2.types"
 import type {
   RoomAvatarFitProfileId,
   RoomAvatarLayerType
 } from "../avatarRoom.types"
-import { ROOM_AVATAR_FRAME_DURATION_MS } from "../avatarRoomMotionContract"
 import { useReducedMotion } from "../../../../ui/animations"
 import {
+  getRoomAvatarFrameIndex,
+  getRoomAvatarFrameTick,
+  getRoomAvatarLayerAnimationState,
   getRoomAvatarLayerFrameAsset,
+  getRoomAvatarLayerFrameSlot,
+  getRoomAvatarLayerFrameSlots,
   shouldRerenderRoomAvatarLayer
 } from "../roomAvatarLayerRenderModel"
 
@@ -27,67 +34,68 @@ interface RoomAvatarRenderer2DProps {
   onImageError?: () => void
 }
 
-interface RoomAvatarFrameTickerStore {
-  frame: number
-  intervalId: ReturnType<typeof setInterval> | null
-  listeners: Set<() => void>
+/** The frame the UI thread shows, tagged with the motion it belongs to. */
+interface RoomAvatarFrameState {
+  signature: string
+  index: number
 }
 
-const roomAvatarFrameTickerStores = new Map<number, RoomAvatarFrameTickerStore>()
+const STATIC_FRAME_STATE: RoomAvatarFrameState = { signature: "static", index: 0 }
 
+/**
+ * Layered avatar with frame-by-frame motion. Frame selection runs on the UI
+ * thread: a frame callback reads the shared UI frame timestamp, advances one
+ * frame per frame duration (every avatar changes on the same tick boundary)
+ * and each frame image's opacity follows it. React renders only when the
+ * layers or the motion change, never per animation frame. Reduce Motion and
+ * still avatars show frame 0 with the frame callback inactive.
+ */
 export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
   const { layers, imagePriority = "high" } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
-    () => getLayerAnimationState(layers, !reduceMotion),
+    () => getRoomAvatarLayerAnimationState(layers, !reduceMotion),
     [layers, reduceMotion]
   )
-  const subscribeToFrameTicker = useCallback(
-    (listener: () => void) =>
-      animation.hasAnimation
-        ? subscribeRoomAvatarFrameTicker(animation.frameDurationMs, listener)
-        : () => undefined,
-    [animation.frameDurationMs, animation.hasAnimation]
-  )
-  const getFrameTickerSnapshot = useCallback(
-    () =>
-      animation.hasAnimation
-        ? getRoomAvatarFrameTickerSnapshot(animation.frameDurationMs)
-        : 0,
-    [animation.frameDurationMs, animation.hasAnimation]
-  )
-  const frameBaseline = useMemo(
-    () =>
-      animation.hasAnimation
-        ? getRoomAvatarFrameTickerSnapshot(animation.frameDurationMs)
-        : 0,
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional external-store invalidation; dependency shape is covered by runtime contracts.
-    [
-      animation.frameDurationMs,
-      animation.hasAnimation,
-      animation.signature
-    ]
-  )
-  const frameTick = useSyncExternalStore(
-    subscribeToFrameTicker,
-    getFrameTickerSnapshot,
-    () => 0
-  )
+  const { hasAnimation, frameCount, frameDurationMs, loops, signature } = animation
+  const frameState = useSharedValue<RoomAvatarFrameState>(STATIC_FRAME_STATE)
+  const baseTick = useSharedValue(0)
 
-  const frameOffset = Math.max(0, frameTick - frameBaseline)
-  const frameIndex = !animation.hasAnimation
-    ? 0
-    : animation.loops
-      ? frameOffset % animation.frameCount
-      : Math.min(frameOffset, animation.frameCount - 1)
+  const advanceFrame = useCallback((frameInfo: FrameInfo): void => {
+    "worklet"
+    const tick = getRoomAvatarFrameTick(frameInfo.timestamp, frameDurationMs)
+    const current = frameState.value
+    if (current.signature !== signature) {
+      // A new motion starts at frame 0 on the current tick.
+      baseTick.value = tick
+      frameState.value = { signature, index: 0 }
+      return
+    }
+    const index = getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
+    if (index !== current.index) frameState.value = { signature, index }
+  }, [baseTick, frameCount, frameDurationMs, frameState, loops, signature])
+  // useFrameCallback reads `autostart` only on its first render, and the
+  // shared Reduce Motion store starts reduced until the OS answers, so the
+  // clock is switched on and off explicitly whenever `hasAnimation` changes.
+  const frameClock = useFrameCallback(advanceFrame, false)
+  useEffect(() => {
+    frameClock.setActive(hasAnimation)
+  }, [advanceFrame, frameClock, hasAnimation])
+
+  useEffect(() => {
+    // Returning to a motion after a still pose restarts it from frame 0.
+    if (!hasAnimation) frameState.value = STATIC_FRAME_STATE
+  }, [frameState, hasAnimation])
 
   return (
     <View pointerEvents="none" style={styles.root}>
       {layers.map((layer) => (
-        <RoomAvatarLayerImage
+        <RoomAvatarLayer
           key={`${layer.type}:${layer.id}`}
           layer={layer}
-          frameIndex={frameIndex}
+          animated={hasAnimation}
+          signature={signature}
+          frameState={frameState}
           imagePriority={imagePriority}
           onLayerDisplay={props.onLayerDisplay}
           onImageError={props.onImageError}
@@ -97,20 +105,84 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
   )
 })
 
-interface RoomAvatarLayerImageProps {
+interface RoomAvatarLayerProps {
   layer: RoomV2AvatarRenderLayer
-  frameIndex: number
+  animated: boolean
+  signature: string
+  frameState: SharedValue<RoomAvatarFrameState>
   imagePriority: "low" | "normal" | "high"
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
 }
 
-const RoomAvatarLayerImage = memo(
-  function RoomAvatarLayerImage(props: RoomAvatarLayerImageProps) {
-    const { layer, frameIndex, imagePriority } = props
-    const asset = getRoomAvatarLayerFrameAsset(layer, frameIndex)
-
+/**
+ * One layer: each distinct frame image mounts once (slot 0 is the frame the
+ * layer shows first and is reused across motions, as the single image was);
+ * a still layer is just slot 0.
+ */
+const RoomAvatarLayer = memo(
+  function RoomAvatarLayer(props: RoomAvatarLayerProps) {
+    const { layer, animated, signature, frameState, imagePriority } = props
+    const { assets, slotByFrame } = useMemo(
+      () => animated
+        ? getRoomAvatarLayerFrameSlots(layer)
+        : { assets: [getRoomAvatarLayerFrameAsset(layer, 0)], slotByFrame: [0] },
+      [animated, layer]
+    )
     return (
+      <>
+        {assets.map((asset, slot) => (
+          <RoomAvatarLayerImage
+            key={slot}
+            asset={asset}
+            layer={layer}
+            slot={slot}
+            slotByFrame={slotByFrame}
+            signature={signature}
+            // A single image never changes, so it does not follow the clock.
+            frameState={assets.length > 1 ? frameState : undefined}
+            imagePriority={imagePriority}
+            onLayerDisplay={slot === 0 ? props.onLayerDisplay : undefined}
+            onImageError={props.onImageError}
+          />
+        ))}
+      </>
+    )
+  },
+  (previous, next) =>
+    previous.animated === next.animated &&
+    (!next.animated || previous.signature === next.signature) &&
+    previous.frameState === next.frameState &&
+    previous.imagePriority === next.imagePriority &&
+    previous.onLayerDisplay === next.onLayerDisplay &&
+    previous.onImageError === next.onImageError &&
+    !shouldRerenderRoomAvatarLayer(
+      { layer: previous.layer, frameIndex: 0 },
+      { layer: next.layer, frameIndex: 0 }
+    )
+)
+
+function RoomAvatarLayerImage(props: {
+  asset: RoomV2AssetRef
+  layer: RoomV2AvatarRenderLayer
+  slot: number
+  slotByFrame: number[]
+  signature: string
+  frameState?: SharedValue<RoomAvatarFrameState>
+  imagePriority: "low" | "normal" | "high"
+  onLayerDisplay?: (id: string) => void
+  onImageError?: () => void
+}) {
+  const { asset, layer, slot, slotByFrame, signature, frameState, imagePriority } = props
+  const visibility = useAnimatedStyle(() => {
+    if (!frameState) return { opacity: 1 }
+    const state = frameState.value
+    // Until the UI thread starts this motion, it is on frame 0.
+    const frameIndex = state.signature === signature ? state.index : 0
+    return { opacity: getRoomAvatarLayerFrameSlot(slotByFrame, frameIndex) === slot ? 1 : 0 }
+  })
+  return (
+    <Animated.View pointerEvents="none" style={[styles.layer, visibility]}>
       <ExpoImage
         source={asset.source}
         contentFit="contain"
@@ -124,94 +196,8 @@ const RoomAvatarLayerImage = memo(
           getLayerFitStyle(layer)
         ]}
       />
-    )
-  },
-  (previous, next) =>
-    previous.imagePriority === next.imagePriority &&
-    previous.onLayerDisplay === next.onLayerDisplay &&
-    previous.onImageError === next.onImageError &&
-    !shouldRerenderRoomAvatarLayer(previous, next)
-)
-
-function hasAnimatedLayerFrames(layer: RoomV2AvatarRenderLayer): boolean {
-  return (layer.animation?.frames.length ?? 0) > 1
-}
-
-function getLayerAnimationState(layers: RoomV2AvatarRenderLayer[], animate: boolean): {
-  hasAnimation: boolean
-  frameCount: number
-  frameDurationMs: number
-  loops: boolean
-  signature: string
-} {
-  const animatedLayers = animate ? layers.filter(hasAnimatedLayerFrames) : []
-  if (!animatedLayers.length) {
-    return {
-      hasAnimation: false,
-      frameCount: 1,
-      frameDurationMs: ROOM_AVATAR_FRAME_DURATION_MS,
-      loops: false,
-      signature: "static"
-    }
-  }
-  const frameCount = Math.max(
-    ...animatedLayers.map((layer) => layer.animation?.frames.length ?? 1)
+    </Animated.View>
   )
-  const frameDurationMs = Math.max(
-    80,
-    Math.min(
-      ...animatedLayers.map(
-        (layer) => layer.animation?.frameDurationMs ?? ROOM_AVATAR_FRAME_DURATION_MS
-      )
-    )
-  )
-  return {
-    hasAnimation: true,
-    frameCount,
-    frameDurationMs,
-    loops: animatedLayers.some((layer) => layer.animation?.loop !== false),
-    signature: animatedLayers
-      .map((layer) => `${layer.id}:${layer.animation?.frames.map((frame) => frame.key).join("|")}`)
-      .join(";")
-  }
-}
-
-function getRoomAvatarFrameTickerStore(frameDurationMs: number): RoomAvatarFrameTickerStore {
-  const existing = roomAvatarFrameTickerStores.get(frameDurationMs)
-  if (existing) return existing
-  const created: RoomAvatarFrameTickerStore = {
-    frame: 0,
-    intervalId: null,
-    listeners: new Set()
-  }
-  roomAvatarFrameTickerStores.set(frameDurationMs, created)
-  return created
-}
-
-function subscribeRoomAvatarFrameTicker(
-  frameDurationMs: number,
-  listener: () => void
-): () => void {
-  const store = getRoomAvatarFrameTickerStore(frameDurationMs)
-  store.listeners.add(listener)
-  if (store.intervalId === null) {
-    store.intervalId = setInterval(() => {
-      store.frame += 1
-      for (const currentListener of store.listeners) currentListener()
-    }, frameDurationMs)
-  }
-  return () => {
-    const activeStore = getRoomAvatarFrameTickerStore(frameDurationMs)
-    activeStore.listeners.delete(listener)
-    if (activeStore.listeners.size === 0 && activeStore.intervalId !== null) {
-      clearInterval(activeStore.intervalId)
-      activeStore.intervalId = null
-    }
-  }
-}
-
-function getRoomAvatarFrameTickerSnapshot(frameDurationMs: number): number {
-  return getRoomAvatarFrameTickerStore(frameDurationMs).frame
 }
 
 const ROOM_AVATAR_LAYER_FIT: Record<

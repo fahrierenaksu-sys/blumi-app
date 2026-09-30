@@ -21,6 +21,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { Avatar } from "../ui/avatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { uiTheme } from "../ui/theme"
+import { springPressScale, useReducedMotion } from "../ui/animations"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getRoomDebriefCopy } from "../features/miniRoom/roomDebriefCopy"
@@ -56,6 +57,7 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const reduceMotion = useReducedMotion()
   const heroAnim = useRef(new Animated.Value(0)).current
   const saveScaleAnim = useRef(new Animated.Value(1)).current
   const passScaleAnim = useRef(new Animated.Value(1)).current
@@ -248,37 +250,11 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
 
   const buttonsLocked = decision !== "idle"
 
-  const handleSavePressIn = () => {
-    Animated.spring(saveScaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
+  const handleSavePressIn = () => springPressScale(saveScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
+  const handleSavePressOut = () => springPressScale(saveScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
-  const handleSavePressOut = () => {
-    Animated.spring(saveScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
-
-  const handlePassPressIn = () => {
-    Animated.spring(passScaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePassPressOut = () => {
-    Animated.spring(passScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
+  const handlePassPressIn = () => springPressScale(passScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
+  const handlePassPressOut = () => springPressScale(passScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
     <View style={styles.root}>
@@ -293,7 +269,8 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
             styles.hero,
             {
               opacity: heroAnim,
-              transform: [
+              // Reduce Motion: the hero fades in without sliding or scaling.
+              transform: reduceMotion ? [] : [
                 {
                   translateY: heroAnim.interpolate({
                     inputRange: [0, 1],
