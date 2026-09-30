@@ -1,8 +1,11 @@
 import type { ImageSourcePropType } from "react-native"
+import { femaleSweetCapsuleProfileLayerAssets } from "./femaleSweetCapsuleProfileAssets"
 import { femaleSweetCapsuleRoomLayerAssets } from "./femaleSweetCapsuleRoomAssets"
 
 // These older square thumbnails contain the whole character. Present the
-// existing garment-only room layer instead, using its measured alpha bounds.
+// existing garment-only layer instead, using its measured alpha bounds.
+// Shoes are tiny on the 256x384 room canvas (58x29 px) yet fill the card width,
+// so they use the 512x768 profile layer: the same artwork at twice the pixels.
 const GARMENT_THUMBNAILS: Record<string, { source: ImageSourcePropType; bounds: readonly number[] }> = {
   avatar_v2_bottom_midnight_ribbon_wide_leg_pants: {
     source: femaleSweetCapsuleRoomLayerAssets.bottomFemaleMidnightRibbonWideLegPantsV2.source,
@@ -21,20 +24,20 @@ const GARMENT_THUMBNAILS: Record<string, { source: ImageSourcePropType; bounds: 
     bounds: [256, 384, 94, 280, 68, 35]
   },
   avatar_v2_shoes_rose_satin_bow_heels: {
-    source: femaleSweetCapsuleRoomLayerAssets.shoesFemaleRoseSatinBowHeelsV2.source,
-    bounds: [256, 384, 99, 319, 58, 29]
+    source: femaleSweetCapsuleProfileLayerAssets.shoesRoseSatinBowHeels.source,
+    bounds: [512, 768, 197, 637, 118, 60]
   },
   avatar_v2_shoes_ivory_pearl_slingback_heels: {
-    source: femaleSweetCapsuleRoomLayerAssets.shoesFemaleIvoryPearlSlingbackHeelsV2.source,
-    bounds: [256, 384, 99, 319, 58, 29]
+    source: femaleSweetCapsuleProfileLayerAssets.shoesIvoryPearlSlingbackHeels.source,
+    bounds: [512, 768, 197, 637, 118, 60]
   },
   avatar_v2_shoes_lilac_star_platform_sneakers: {
-    source: femaleSweetCapsuleRoomLayerAssets.shoesFemaleLilacStarPlatformSneakersV2.source,
-    bounds: [256, 384, 99, 319, 58, 29]
+    source: femaleSweetCapsuleProfileLayerAssets.shoesLilacStarPlatformSneakers.source,
+    bounds: [512, 768, 197, 637, 118, 60]
   },
   avatar_v2_shoes_mint_ribbon_court_sneakers: {
-    source: femaleSweetCapsuleRoomLayerAssets.shoesFemaleMintRibbonCourtSneakersV2.source,
-    bounds: [256, 384, 99, 319, 58, 29]
+    source: femaleSweetCapsuleProfileLayerAssets.shoesMintRibbonCourtSneakers.source,
+    bounds: [512, 768, 197, 637, 118, 60]
   }
 }
 
