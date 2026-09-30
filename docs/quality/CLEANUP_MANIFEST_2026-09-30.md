@@ -1,11 +1,11 @@
 # Cleanup Manifest — 2026-09-30 (room QA art)
 
-Status: **evidence only**. Nothing has been archived, moved or deleted.
-- Machine list: `docs/quality/cleanup-manifest-2026-09-30.json` (1,658 entries,
-  each with path, bytes, SHA-256, decision, basis and evidence).
-- Base commit: `4ed9b40b1fb7ae9ea30a5def80037bea306ecd33`.
-- Follows [`CLEANUP_MANIFEST_2026-09-29.md`](./CLEANUP_MANIFEST_2026-09-29.md);
-  that manifest and its receipt are unchanged.
+Status: **archived and removed** (2026-09-30). The owner archived all 1,658
+files to the Workbench on the Mac (receipt
+`docs/quality/archive-verification-2026-09-30.json`, `complete: true`), then
+they were removed from the repository. Before removal, an iOS `expo export`
+with and without these files produced identical assets and identical
+unminified JavaScript, and the mobile tests passed without them.
 
 ## Owner decision applied
 
