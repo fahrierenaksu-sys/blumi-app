@@ -1,6 +1,14 @@
 # Cleanup Manifest — 2026-09-29 (P4 step A, evidence only)
 
-Status: **evidence only**. Nothing has been archived, moved or deleted. The
+Status: **archive completed (2026-09-30).** The owner's Mac archive receipt was
+committed in `299610c` (`docs/quality/archive-verification-2026-09-29.json`:
+`dryRun: false`, `complete: true`, 75 of 75 entries `copied` and verified,
+3,546,818 bytes, destination
+`/Users/evrenevren/BlumiArtWorkbench/2026-09-30/repo-cleanup-archive`), and
+`85c773f` removed those 75 receipt-verified files from the repository (12
+pink-cloud-bed candidate PNGs and 63 Python production scripts). The 5
+`REMOVED_CODE` modules were removed separately and were never part of the
+archive. Everything below was written as the pre-archive evidence manifest. The
 machine list is `docs/quality/cleanup-manifest-2026-09-29.json` (2,046 entries,
 each with path, bytes, SHA-256, decision, basis and evidence). Base commit:
 `2a55475e59d9d8efc1c54fc8c49cef918f4e6753`.

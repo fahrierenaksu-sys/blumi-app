@@ -25,25 +25,32 @@ founder-facing status remains in `LAUNCH_CONTROL.md`.
   This archive is local and covers only the application `public` schema. It is
   not the planned offsite S3 backup or a Supabase platform recovery point.
 
-## Pending migration 068 (2026-09-30) — NOT APPLIED
+## Migration 068 (2026-09-30) — APPLIED
 
 Migration `068_session_reuse_detection_and_firebase_uid.sql` (nullable
 session-rotation columns, `blumi_accounts.firebase_uid` and a partial unique
-index) is prepared but **not applied** to `nkqcbxufbhfibrgvajim`, which is at
-067 with 18 accounts and one live session. The new server binary reports
-`/ready` 503 until 068 is applied; the current binary keeps working on 068.
-Follow [`MIGRATION_068_RUNBOOK.md`](./MIGRATION_068_RUNBOOK.md) for the lock
-analysis, compatibility matrix, PostgreSQL 17 backup and restore gate,
-operator commands, verification queries, rollback and stop conditions. The
-disposable mixed-version rehearsal is
+index) was **applied** on 2026-09-30 by owner decision, recorded in commit
+`19b6ff3` ("docs: record migration 068 as applied by owner decision"). Per
+[`MIGRATION_068_RUNBOOK.md`](./MIGRATION_068_RUNBOOK.md): 68 ledger rows,
+checksum matches the file, columns and partial unique index present, 18
+accounts unchanged, `/health` and `/ready` 200 afterwards; `main` at `19b6ff3`
+was then deployed to Railway (deployment `c25660ad`, SUCCESS). The owner waived
+the pre-apply native QA and the Railway `DATABASE_URL` check; the backup
+archive path and SHA-256 are not recorded, and native QA plus the 24-hour watch
+remain open. That runbook keeps the lock analysis, compatibility matrix,
+verification queries, rollback and stop conditions. The disposable
+mixed-version rehearsal is
 `node scripts/security/migration-068-rehearsal.mjs [old-ref] [--old-suite]`.
 
-## Pending migration 069 (2026-09-30) — NOT APPLIED
+## Migration 069 (2026-09-30) — APPLIED
 
 Migration `069_moderation_phone_bans.sql` adds one table
-(`blumi_moderation_phone_bans`, keyed by an HMAC of the phone number). It is
-not applied anywhere. Apply it after 068 and before the binary that ships it;
-that binary's `/ready` answers 503 without it. See
+(`blumi_moderation_phone_bans`, keyed by an HMAC of the phone number). It was
+**applied** on 2026-09-30, recorded in commit `d283333` ("docs: record
+migration 069 as applied"): one transaction under the migrator's advisory lock,
+69 ledger rows, RLS on, no `anon`/`authenticated` SELECT, table empty. It was
+applied at the owner's request without a separate dump and restore test. The
+binary that ships 069 can now pass `/ready`. See
 [`MIGRATION_069_NOTE.md`](./MIGRATION_069_NOTE.md).
 
 ## Safe inspection
