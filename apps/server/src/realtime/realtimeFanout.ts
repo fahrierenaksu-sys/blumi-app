@@ -1,6 +1,12 @@
 import type { ServerEvent } from "@blumi/contracts"
 
 export const MAX_REALTIME_FANOUT_BYTES = 7_900
+/**
+ * Receivers reject a `users` target above this size. Publishers split larger
+ * audiences with `splitRealtimeFanoutTarget` so no recipient is dropped and
+ * every NOTIFY payload stays bounded.
+ */
+export const MAX_REALTIME_FANOUT_USER_TARGETS = 100
 
 const SERVER_EVENT_TYPES = new Set([
   "room.joined",
@@ -45,6 +51,22 @@ export interface RealtimeFanout {
   isHealthy?(): boolean
   publish(message: RealtimeFanoutMessage): Promise<void>
   subscribe(handler: RealtimeFanoutHandler, onGap?: RealtimeFanoutGapHandler): Promise<() => Promise<void>>
+}
+
+export function splitRealtimeFanoutTarget(
+  target: RealtimeFanoutTarget
+): RealtimeFanoutTarget[] {
+  if (target.kind !== "users" || target.userIds.length <= MAX_REALTIME_FANOUT_USER_TARGETS) {
+    return [target]
+  }
+  const chunks: RealtimeFanoutTarget[] = []
+  for (let start = 0; start < target.userIds.length; start += MAX_REALTIME_FANOUT_USER_TARGETS) {
+    chunks.push({
+      kind: "users",
+      userIds: target.userIds.slice(start, start + MAX_REALTIME_FANOUT_USER_TARGETS)
+    })
+  }
+  return chunks
 }
 
 export function createInMemoryRealtimeFanout(): RealtimeFanout {
@@ -109,7 +131,7 @@ function isFanoutTarget(value: unknown): value is RealtimeFanoutTarget {
   if (target.kind === "users") {
     return Array.isArray(target.userIds) &&
       target.userIds.length > 0 &&
-      target.userIds.length <= 100 &&
+      target.userIds.length <= MAX_REALTIME_FANOUT_USER_TARGETS &&
       target.userIds.every((userId) => typeof userId === "string" && isSafeId(userId, 256))
   }
   return false

@@ -2,6 +2,7 @@ import type { Pool } from "pg"
 import { randomUUID } from "node:crypto"
 import {
   MAX_REALTIME_FANOUT_BYTES,
+  MAX_REALTIME_FANOUT_USER_TARGETS,
   type RealtimeFanout,
   type RealtimeFanoutGapReason,
   validateRealtimeFanoutMessage
@@ -52,6 +53,13 @@ export function createPostgresRealtimeFanout(
   return {
     isHealthy: () => healthySubscriptions > 0,
     async publish(message) {
+      if (
+        message.target.kind === "users" &&
+        message.target.userIds.length > MAX_REALTIME_FANOUT_USER_TARGETS
+      ) {
+        // Receivers would drop this target; fail loudly instead of losing it.
+        throw new Error("Realtime fanout users target is too large; split it before publishing.")
+      }
       const payload = JSON.stringify(message)
       const bytes = Buffer.byteLength(payload, "utf8")
       if (bytes > 2_000_000) {

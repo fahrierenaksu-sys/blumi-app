@@ -137,7 +137,11 @@ export function createPostgresEconomyRepository(
         `WITH inserted_reward AS (
            INSERT INTO blumi_economy_reward_ledger (
              user_id, reward_type, idempotency_key, coins, created_at
-           ) VALUES ($1, $2, $3, $4, $5)
+           )
+           SELECT $1, $2, $3, $4::integer, $5::timestamptz
+            WHERE EXISTS (
+              SELECT 1 FROM blumi_economy_inventories WHERE user_id = $1
+            )
            ON CONFLICT (user_id, reward_type, idempotency_key) DO NOTHING
            RETURNING 1
          ), updated_inventory AS (
@@ -196,7 +200,20 @@ async function applyCoinTransaction(
        INSERT INTO blumi_store_transactions (
          provider, provider_transaction_id, user_id, product_id, store,
          payload_hash, created_at, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       )
+       -- Record nothing for a missing inventory or a replayed event ID whose
+       -- payload differs from the one first recorded.
+       SELECT $1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz
+        WHERE EXISTS (
+          SELECT 1 FROM blumi_economy_inventories WHERE user_id = $3
+        )
+          AND NOT EXISTS (
+          SELECT 1
+            FROM blumi_store_events
+           WHERE provider = $1
+             AND provider_event_id = $9
+             AND payload_hash <> $6
+        )
        ON CONFLICT (provider, provider_transaction_id) DO UPDATE SET
          updated_at = GREATEST(blumi_store_transactions.updated_at, EXCLUDED.updated_at)
        WHERE blumi_store_transactions.user_id = EXCLUDED.user_id
@@ -256,6 +273,13 @@ async function applyCoinTransaction(
                    AND provider_transaction_id = $2
                    AND (product_id <> $4 OR store <> $5)
               ) THEN 'transaction'
+              WHEN EXISTS (
+                SELECT 1
+                  FROM blumi_store_events
+                 WHERE provider = $1
+                   AND provider_event_id = $9
+                   AND payload_hash <> $6
+              ) THEN 'event'
               ELSE NULL
             END AS conflict,
             user_id, coins, coin_debt, owned_avatar_item_ids,
@@ -283,7 +307,9 @@ async function applyCoinTransaction(
   return {
     applied: row.applied === true,
     conflict:
-      row.conflict === "account" || row.conflict === "transaction"
+      row.conflict === "account" ||
+      row.conflict === "transaction" ||
+      row.conflict === "event"
         ? row.conflict
         : null,
     inventory: mapInventory(row)

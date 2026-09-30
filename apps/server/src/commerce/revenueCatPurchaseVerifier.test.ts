@@ -86,7 +86,8 @@ test("RevenueCat API reconciliation maps only server-configured consumables", as
         environment: "production",
         status: "owned",
         purchased_at: 1_784_390_400_000
-      }
+      },
+      providerPayloadKind: "snapshot"
     }
   })
 })

@@ -2,9 +2,36 @@ import { randomUUID } from "node:crypto"
 import type { ServerEvent, UserProfile } from "@blumi/contracts"
 import type { WebSocket } from "ws"
 import {
+  splitRealtimeFanoutTarget,
   type RealtimeFanout,
   type RealtimeFanoutMessage
 } from "./realtimeFanout"
+
+/**
+ * Slow-consumer policy for each socket's outbound buffer (`bufferedAmount`,
+ * bytes accepted by `ws` but not yet flushed to the kernel):
+ *
+ * - Above the soft limit, transient events that the next event or snapshot
+ *   supersedes (presence, reactions) are dropped for that socket; every other
+ *   event, including chat delivery, is still sent.
+ * - Staying above the soft limit for the sustained window, or crossing the
+ *   hard limit at any time, closes the socket with 1013 (try again later) and
+ *   terminates it one second later so its buffer is released.
+ *
+ * Nothing durable is lost: chat messages are committed with a delivery outbox
+ * before fanout, and a reconnecting client reconciles from the API. 1013 is
+ * used because the mobile client reconnects on it (it stops on 1008). Memory per
+ * slow socket stays bounded by the hard limit plus one event.
+ */
+export const REALTIME_OUTBOUND_SOFT_LIMIT_BYTES = 256 * 1024
+export const REALTIME_OUTBOUND_HARD_LIMIT_BYTES = 1024 * 1024
+export const REALTIME_OUTBOUND_SUSTAINED_MS = 10_000
+export const REALTIME_SLOW_CONSUMER_CLOSE_CODE = 1013
+const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "presence.snapshot",
+  "presence.nearby",
+  "reaction.received"
+])
 
 export interface RealtimeConnection {
   connectionId: string
@@ -46,6 +73,12 @@ export interface CreateConnectionManagerOptions {
   instanceId?: string
   reportFanoutError?: (error: unknown) => void
   shutdownDrainTimeoutMs?: number
+  outboundBuffer?: {
+    softLimitBytes?: number
+    hardLimitBytes?: number
+    sustainedMs?: number
+  }
+  now?: () => number
 }
 
 export function createConnectionManager(
@@ -59,6 +92,11 @@ export function createConnectionManager(
   const deliveryQueues = new Map<string, { pending: number; tail: Promise<void> }>()
   const pendingOperations = new Set<Promise<unknown>>()
   const gapTerminationTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const slowSince = new Map<string, number>()
+  const softLimitBytes = options.outboundBuffer?.softLimitBytes ?? REALTIME_OUTBOUND_SOFT_LIMIT_BYTES
+  const hardLimitBytes = options.outboundBuffer?.hardLimitBytes ?? REALTIME_OUTBOUND_HARD_LIMIT_BYTES
+  const sustainedMs = options.outboundBuffer?.sustainedMs ?? REALTIME_OUTBOUND_SUSTAINED_MS
+  const now = options.now ?? Date.now
   let closingFanout = false
   let closedFanout: Promise<void> | undefined
   function reportFanoutError(error: unknown): void {
@@ -100,6 +138,7 @@ export function createConnectionManager(
       clearTimeout(gapTerminationTimers.get(connectionId))
       gapTerminationTimers.delete(connectionId)
       deliveryQueues.delete(connectionId)
+      slowSince.delete(connectionId)
       return connection
     },
     getConnection(connectionId) {
@@ -145,8 +184,11 @@ export function createConnectionManager(
       sendToUsersLocally(userIdList, event)
       // Durable callers must observe transport rejection before acknowledging
       // their database job. Recipients deduplicate retries by event/message ID.
-      if (options.fanout && userIdList.length > 0) {
-        await track(options.fanout.publish({ origin: instanceId, target: { kind: "users", userIds: userIdList }, event }))
+      const fanout = options.fanout
+      if (fanout && userIdList.length > 0) {
+        const targets = splitRealtimeFanoutTarget({ kind: "users", userIds: userIdList })
+        await track(Promise.all(targets.map((target) =>
+          fanout.publish({ origin: instanceId, target, event }))))
       }
     },
     broadcastRoom(roomId, event) {
@@ -258,7 +300,7 @@ export function createConnectionManager(
     if (connection.socket.readyState !== 1) return
     const authorize = authorizeDelivery
     if (!authorize) {
-      sendEvent(connection.socket, event)
+      sendEvent(connection, event)
       return
     }
     const previous = deliveryQueues.get(connection.connectionId)
@@ -273,7 +315,7 @@ export function createConnectionManager(
       pending: (previous?.pending ?? 0) + 1,
       tail: (previous?.tail ?? Promise.resolve()).then(async () => {
         if (connections.get(connection.connectionId) !== connection || connection.socket.readyState !== 1) return
-        if (await authorize(connection)) sendEvent(connection.socket, event)
+        if (await authorize(connection)) sendEvent(connection, event)
       }).catch(() => {
         if (connection.socket.readyState === 1) connection.socket.close(1011, "Realtime authorization unavailable")
       }).finally(() => {
@@ -291,14 +333,54 @@ export function createConnectionManager(
     target: RealtimeFanoutMessage["target"],
     event: ServerEvent
   ): void {
-    if (!options.fanout || closingFanout) return
-    void track(options.fanout.publish({
-      origin: instanceId,
-      target,
-      event
-    })).catch((error) => {
-      reportFanoutError(error)
-    })
+    const fanout = options.fanout
+    if (!fanout || closingFanout) return
+    for (const chunk of splitRealtimeFanoutTarget(target)) {
+      void track(fanout.publish({
+        origin: instanceId,
+        target: chunk,
+        event
+      })).catch((error) => {
+        reportFanoutError(error)
+      })
+    }
+  }
+
+  function sendEvent(connection: RealtimeConnection, event: ServerEvent): void {
+    const socket = connection.socket
+    if (socket.readyState !== 1) return
+    const bufferedAmount = socket.bufferedAmount ?? 0
+    if (bufferedAmount > hardLimitBytes) {
+      closeSlowConsumer(connection)
+      return
+    }
+    if (bufferedAmount > softLimitBytes) {
+      const since = slowSince.get(connection.connectionId)
+      if (since === undefined) {
+        slowSince.set(connection.connectionId, now())
+      } else if (now() - since >= sustainedMs) {
+        closeSlowConsumer(connection)
+        return
+      }
+      if (TRANSIENT_EVENT_TYPES.has(event.type)) return
+    } else {
+      slowSince.delete(connection.connectionId)
+    }
+    socket.send(JSON.stringify(event))
+  }
+
+  function closeSlowConsumer(connection: RealtimeConnection): void {
+    slowSince.delete(connection.connectionId)
+    const socket = connection.socket
+    socket.close(REALTIME_SLOW_CONSUMER_CLOSE_CODE, "Realtime client is too slow")
+    if (gapTerminationTimers.has(connection.connectionId)) return
+    // The close frame queues behind the backlog; release the buffer promptly.
+    const timer = setTimeout(() => {
+      gapTerminationTimers.delete(connection.connectionId)
+      if (socket.readyState !== 3) socket.terminate()
+    }, 1_000)
+    timer.unref()
+    gapTerminationTimers.set(connection.connectionId, timer)
   }
 
   function deliverFanoutMessage(message: RealtimeFanoutMessage): void {
@@ -314,9 +396,4 @@ export function createConnectionManager(
         return
     }
   }
-}
-
-function sendEvent(socket: WebSocket, event: ServerEvent): void {
-  if (socket.readyState !== 1) return
-  socket.send(JSON.stringify(event))
 }

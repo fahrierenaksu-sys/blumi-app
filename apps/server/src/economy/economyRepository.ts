@@ -54,9 +54,17 @@ export interface EconomyCoinTransactionInput {
   updatedAt: string
 }
 
+/**
+ * `account` / `transaction`: the provider transaction is already bound to a
+ * different account or pack. `event`: the provider event ID was already
+ * recorded with a different payload hash. Every conflict leaves balances,
+ * ledgers and recorded events untouched; callers decide how to surface it.
+ */
+export type EconomyCoinTransactionConflict = "account" | "transaction" | "event"
+
 export interface EconomyCoinTransactionResult {
   applied: boolean
-  conflict: "account" | "transaction" | null
+  conflict: EconomyCoinTransactionConflict | null
   inventory: EconomyInventoryRecord
 }
 
@@ -153,6 +161,7 @@ export function createInMemoryEconomyRepository(
         : "ownedRoomItemIds"
       const ownedItemIds = inventory[ownedKey]
       if (
+        input.priceCoins < 0 ||
         ownedItemIds.includes(input.itemId) ||
         inventory.coinDebt > 0 ||
         inventory.coins < input.priceCoins
@@ -178,6 +187,11 @@ export function createInMemoryEconomyRepository(
     async applyCoinTransaction(input) {
       const inventory = store.inventoriesByUserId.get(input.userId)
       if (!inventory) throw new Error("Economy inventory is unavailable.")
+      const unchanged = (conflict: EconomyCoinTransactionConflict | null) => ({
+        applied: false,
+        conflict,
+        inventory: cloneInventory(inventory)
+      })
       const transactionKey = `${input.provider}:${input.transactionId}`
       const previousTransaction = store.commerceTransactions.get(transactionKey)
       if (previousTransaction) {
@@ -187,31 +201,29 @@ export function createInMemoryEconomyRepository(
               previousTransaction.store !== input.store
             ? "transaction"
             : null
-        if (conflict) {
-          return { conflict, applied: false, inventory: cloneInventory(inventory) }
-        }
-      } else {
+        if (conflict) return unchanged(conflict)
+      }
+      const eventKey = `${input.provider}:${input.eventId}`
+      const previousPayloadHash = store.commerceEventPayloadHashes.get(eventKey)
+      if (previousPayloadHash !== undefined) {
+        // A replay must carry the payload that was first recorded for its
+        // event ID; a different payload is reported, never silently accepted.
+        return unchanged(previousPayloadHash === input.payloadHash ? null : "event")
+      }
+      if (!previousTransaction) {
         store.commerceTransactions.set(transactionKey, {
           userId: input.userId,
           productId: input.productId,
           store: input.store
         })
       }
-      const eventKey = `${input.provider}:${input.eventId}`
-      const previousPayloadHash = store.commerceEventPayloadHashes.get(eventKey)
-      if (previousPayloadHash) {
-        if (previousPayloadHash !== input.payloadHash) {
-          throw new Error("Commerce event replay did not match its original payload.")
-        }
-        return { applied: false, conflict: null, inventory: cloneInventory(inventory) }
-      }
       store.commerceEventPayloadHashes.set(eventKey, input.payloadHash)
 
       const ledgerKey = `${input.provider}:${input.transactionId}:${input.kind}`
-      if (store.commerceLedgerKeys.has(ledgerKey)) {
-        return { applied: false, conflict: null, inventory: cloneInventory(inventory) }
-      }
+      if (store.commerceLedgerKeys.has(ledgerKey)) return unchanged(null)
       store.commerceLedgerKeys.add(ledgerKey)
+      // Mirrors PostgreSQL: a non-positive amount is recorded but moves no coins.
+      if (input.coins <= 0) return unchanged(null)
 
       const nextInventory = input.kind === "credit"
         ? applyCoinCredit(inventory, input.coins, input.updatedAt)

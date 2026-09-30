@@ -15,6 +15,13 @@ export interface VerifiedCoinTransaction {
   kind: CommerceTransactionKind
   occurredAt: string
   providerPayload: unknown
+  /**
+   * `event` (default): a signed provider event whose body is immutable per
+   * event ID, so a replay with a different body is rejected. `snapshot`: a
+   * provider lookup (reconcile) whose body may legitimately drift between
+   * lookups; a replay with a different body is an already-processed no-op.
+   */
+  providerPayloadKind?: "event" | "snapshot"
 }
 
 export interface AppliedCoinTransaction {
@@ -95,6 +102,14 @@ export function createCommerceService(input: {
       if (result.conflict === "transaction") {
         throw new CommerceVerificationError(
           "That purchase conflicts with an existing transaction."
+        )
+      }
+      if (
+        result.conflict === "event" &&
+        normalized.providerPayloadKind !== "snapshot"
+      ) {
+        throw new CommerceVerificationError(
+          "That purchase event conflicts with its recorded payload."
         )
       }
       return {

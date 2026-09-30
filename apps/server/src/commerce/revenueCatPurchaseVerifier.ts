@@ -102,7 +102,8 @@ export function createRevenueCatApiPurchaseVerifier(input: {
             store,
             kind: "credit",
             occurredAt: new Date(purchase.purchasedAt).toISOString(),
-            providerPayload: purchase.raw
+            providerPayload: purchase.raw,
+            providerPayloadKind: "snapshot"
           }
         }
       }))
