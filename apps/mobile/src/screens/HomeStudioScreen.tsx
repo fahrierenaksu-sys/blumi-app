@@ -95,17 +95,17 @@ export function HomeStudioScreen({ navigation, sessionActor }: HomeStudioScreenP
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
   const [qaHydrated, setQaHydrated] = useState(false)
   const ownerId = sessionActor?.profile?.userId ?? QA_OWNER_FALLBACK
-  const gate = resolveRoomStudioRuntimeGate({
+  // The gate reads build constants only, so it and its catalog resolve once per mount.
+  const gate = useMemo(() => resolveRoomStudioRuntimeGate({
     isDevelopmentRuntime: typeof __DEV__ === "boolean" && __DEV__,
     buildProfile: BLUMI_BUILD_PROFILE,
     rawFlag: BLUMI_HOME_STUDIO_QA_FLAG,
     visualReviewApproved: BLUMI_HOME_STUDIO_VISUAL_REVIEW_APPROVED_FLAG === "1",
     directionalAssetsApproved: false
-  })
+  }), [])
   const catalog = useMemo(
     () => resolveRoomStudioQaCatalog(gate, ROOM_STUDIO_QA_ASSET_BINDINGS),
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-    [gate.enabled, gate.canPreview, gate.canRotate, gate.mode, gate.reason]
+    [gate]
   )
   const selectedRecipe = useMemo(() => {
     const themedRecipe = getPinkCloudBedroomRecipeForTheme(selectedThemeId)
