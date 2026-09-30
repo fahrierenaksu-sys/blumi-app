@@ -38,9 +38,11 @@ test("production match flow leads from Discover to chat without a room promise",
 
 test("chat opens a conversation first and renders room invitations as explicit timeline cards", () => {
   const chat = read("src/screens/ChatThreadScreen.tsx")
+  const chatCopy = read("src/features/chat/thread/chatThreadCopy.ts")
 
-  assert.match(chat, /This conversation is still getting ready\./)
-  assert.match(chat, /Opening your chat\.\.\./)
+  assert.match(chatCopy, /This conversation is still getting ready\./)
+  assert.match(chatCopy, /Opening your chat\.\.\./)
+  assert.doesNotMatch(chatCopy, /Start a live room from Discover\./)
   assert.match(chat, /buildChatTimeline/)
   assert.match(chat, /<ChatRoomInviteCard/)
   assert.doesNotMatch(chat, /Start a live room from Discover\./)
@@ -86,7 +88,7 @@ test("chat header keeps the canonical avatar and bubbles use the muted WhatsApp-
 })
 
 test("chat localizes core empty, history, composer, and accessibility copy for Turkish", () => {
-  const chat = read("src/screens/ChatThreadScreen.tsx")
+  const chat = read("src/features/chat/thread/chatThreadCopy.ts")
 
   assert.match(chat, /Opening your chat\.\.\./)
   assert.match(chat, /Sohbetin hazırlanıyor\.\.\./)
