@@ -256,14 +256,17 @@ export function useInRoomChat(options: {
       if (!trimmed) return false
       if (!threadId) return false
       if (connectionStatus !== "connected") return false
+      // The rendered status can lag a socket that has just closed. A refused
+      // frame must not leave an optimistic bubble that never resolves.
+      const sent = send({
+        type: "chat.send_message",
+        payload: { threadId, body: trimmed }
+      })
+      if (!sent) return false
       addOptimisticMessage({
         threadId,
         senderUserId: localUserId,
         body: trimmed
-      })
-      send({
-        type: "chat.send_message",
-        payload: { threadId, body: trimmed }
       })
       return true
     },

@@ -49,6 +49,8 @@ function createHookFixture() {
   let eventHandler: ((event: any) => void) | undefined
   const statusListeners = new Set<(status: RealtimeConnectionStatus) => void>()
   const sends: unknown[] = []
+  const optimistic: unknown[] = []
+  let sendAccepted = true
   const thread: ChatThread = {
     threadId,
     miniRoomId: "mini-room",
@@ -111,7 +113,7 @@ function createHookFixture() {
         threads: [thread],
         getMessages,
         getMessageListState,
-        addOptimisticMessage: () => undefined
+        addOptimisticMessage: (entry: unknown) => { optimistic.push(entry) }
       })
     },
     "../realtime/globalRealtimeProvider": {
@@ -122,7 +124,7 @@ function createHookFixture() {
       },
       useGlobalRealtime: () => ({
         connectionStatus: realtimeStatus,
-        send: (event: unknown) => { sends.push(event); return true }
+        send: (event: unknown) => { sends.push(event); return sendAccepted }
       }),
       useGlobalRealtimeEvents: (listener: (event: any) => void) => { eventHandler = listener }
     },
@@ -174,7 +176,9 @@ function createHookFixture() {
   return {
     settle,
     sends,
-    output: () => output as { newMessages: { messageId: string }[] },
+    optimistic,
+    setSendAccepted: (accepted: boolean) => { sendAccepted = accepted },
+    output: () => output as { newMessages: { messageId: string }[]; sendRoomMessage: (body: string) => boolean },
     emitStatus: (status: RealtimeConnectionStatus) => {
       realtimeStatus = status
       for (const listener of [...statusListeners]) listener(status)
@@ -277,5 +281,24 @@ test("MiniRoom reconciles reconnect history when loading and ready are batched i
   await f.settle()
 
   assert.equal(f.output().newMessages.map((event) => event.messageId).join("|"), "entry-before-fast-reconnect|missed-fast-refresh")
+  f.unmount()
+})
+
+test("a room message the socket refused is reported unsent and leaves no endless sending bubble", async () => {
+  const f = createHookFixture()
+  await f.settle()
+  const historyRequests = f.sends.length
+  // React still says "connected" but the socket has just closed.
+  f.setSendAccepted(false)
+  assert.equal(f.output().sendRoomMessage("  lost in the gap  "), false)
+  assert.deepEqual(f.optimistic, [], "no optimistic bubble for a frame that was never sent")
+
+  f.setSendAccepted(true)
+  assert.equal(f.output().sendRoomMessage("  delivered  "), true)
+  assert.equal(f.optimistic.length, 1)
+  assert.deepEqual(f.sends.slice(historyRequests).map((event) => (event as { payload: { body: string } }).payload.body), [
+    "lost in the gap",
+    "delivered"
+  ])
   f.unmount()
 })
