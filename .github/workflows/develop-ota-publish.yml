@@ -55,7 +55,10 @@ jobs:
         run: |
           set -euo pipefail
           env_file="$RUNNER_TEMP/eas-production.env"
-          eas env:pull production --non-interactive --path "$env_file"
+          # app.config.js requires the API URLs for the preview profile, and
+          # eas reads it before it can pull them, so pull without the profile.
+          env -u EAS_BUILD_PROFILE -u EXPO_PUBLIC_BLUMI_BUILD_PROFILE \
+            eas env:pull production --non-interactive --path "$env_file"
           echo "Loaded EAS production variables:"
           grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$env_file" | cut -d= -f1
           set -a
