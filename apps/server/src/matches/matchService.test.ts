@@ -564,3 +564,62 @@ test("in-memory discovery keeps globally eligible profiles", async () => {
 
   assert.deepEqual(visible.map((profile) => profile.userId), ["radius_0", "radius_1"])
 })
+
+test("an eligible decision reads the viewer's earlier decision alongside eligibility, not after it", async () => {
+  const [target] = createSeedDiscoverProfiles()
+  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([target!]))
+  const filters: DiscoveryFilters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
+  const trace: string[] = []
+  const findEligible = repository.findEligibleDiscoverProfile.bind(repository)
+  const findDecision = repository.findDecision.bind(repository)
+  repository.findEligibleDiscoverProfile = async (...args) => {
+    trace.push("eligible:start")
+    // A database round trip: other reads may start while this one is in flight.
+    await new Promise((resolve) => setImmediate(resolve))
+    const profile = await findEligible(...args)
+    trace.push("eligible:end")
+    return profile
+  }
+  repository.findDecision = async (...args) => {
+    trace.push(`decision:${args[0]}->${args[1]}`)
+    return findDecision(...args)
+  }
+  const service = createMatchService({ repository })
+
+  const passed = await service.decideEligible("viewer", target!.userId, "pass", filters)
+  assert.equal(passed.decision.decision, "pass")
+  // One read of the viewer's own earlier decision, started before eligibility
+  // answered: one database round trip less before the quota write.
+  assert.deepEqual(
+    trace.filter((entry) => entry.startsWith("decision:")),
+    [`decision:viewer->${target!.userId}`]
+  )
+  assert.ok(
+    trace.indexOf(`decision:viewer->${target!.userId}`) < trace.indexOf("eligible:end"),
+    trace.join(", ")
+  )
+})
+
+test("a retried like whose earlier read predates its twin's commit is still answered idempotently", async () => {
+  const [target] = createSeedDiscoverProfiles()
+  const store = createInMemoryMatchStore([target!])
+  const repository = createInMemoryMatchRepository(store)
+  const filters: DiscoveryFilters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
+  const service = createMatchService({ repository })
+  await service.decideEligible("viewer", target!.userId, "like", filters)
+  // The retry's decision read ran before the first like committed (a stale
+  // snapshot), while its eligibility read already saw the like.
+  const findDecision = repository.findDecision.bind(repository)
+  let staleReads = 1
+  repository.findDecision = async (...args) => {
+    if (staleReads > 0) {
+      staleReads -= 1
+      return null
+    }
+    return findDecision(...args)
+  }
+
+  const retried = await service.decideEligible("viewer", target!.userId, "like", filters)
+  assert.equal(retried.decision.decision, "like")
+  assert.equal(retried.quota.used, 1, "the retry spends no second decision")
+})
