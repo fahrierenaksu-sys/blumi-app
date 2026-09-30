@@ -20,7 +20,9 @@ test("actual navigation parser retains deep links and bounds malformed input", (
     assert.equal(result.routes[0].params.name,'Blumi Test');
     assert.deepEqual(result.routes[0].params.tag,['a','b']);
     assert.ok(getStateFromPath('/profile/alice?q='+('%EA'.repeat(2000)),config));
-  `], { cwd: new URL("../../", import.meta.url), encoding: "utf8", timeout: 5000 })
+  // The child cold-loads @react-navigation/core; 5 s timed out on a fresh
+  // container (ETIMEDOUT, passes in ~1 s when warm). The assertions are unchanged.
+  `], { cwd: new URL("../../", import.meta.url), encoding: "utf8", timeout: 30000 })
   assert.ifError(result.error)
   assert.equal(result.status, 0, result.stderr)
 })
