@@ -108,6 +108,8 @@ For code changes:
 
 Keep momentum proportional to uncertainty: investigate broadly only until the decision is clear, then execute narrowly. Reuse verified measurements, manifests, utilities, and prior lessons. Do not repeat searches, generations, full test suites, or approval questions without new evidence or a changed condition.
 
+**Engineering rules are binding:** read `docs/quality/ENGINEERING_RULES.md` before adding or changing code. It defines where new code goes (screen → feature hooks, views and pure models), the network, realtime, server, database, performance, motion and privacy rules, and the known debt not to copy. `apps/mobile/scripts/mobile-engineering-rules.test.mjs` ratchets the measurable ones (no raw `fetch`, no new JS frame loops, shared Reduce Motion source, file-size caps, `exhaustive-deps` suppression count); its allowlists may only shrink unless a commit justifies the exception.
+
 Prefer immutable state/domain updates, explicit errors, validated boundaries, stable IDs, and existing project patterns. Do not manufacture tests for trivial constants or raster pixels. The 80% coverage target applies to changed executable logic where coverage is meaningful.
 
 ### Commands
