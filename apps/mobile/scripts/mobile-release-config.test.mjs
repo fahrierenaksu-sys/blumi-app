@@ -942,7 +942,9 @@ test("production profile and chat actions never fall back to local demo behavior
   assert.doesNotMatch(chatThread, /createLocalDemoMatch/)
   assert.doesNotMatch(chatThread, /TypingIndicator/)
   assert.doesNotMatch(chatThread, /setTimeout\(\(\) => setIsLoadingEarlier\(false\), 700\)/)
-  assert.match(navigator, /requestMessages[\s\S]*Promise<void>/)
+  // The chat callbacks reach ChatThread as a prop typed by chatThreadBindings, not as route params.
+  assert.match(read("src/features/chat/thread/chatThreadBindings.ts"), /requestMessages: \(threadId: string, options\?: FetchThreadMessagesOptions\) => Promise<void>/)
+  assert.match(navigator, /bindings=\{chatThreadBindings\}/)
   assert.match(matchResult, /const canStartConversation = canOpenMatchExperience\(sessionActor\)/)
   assert.match(matchResult, /navigation\.reset\(/)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|Go to Room|SharedMatchRoom/)
