@@ -1,4 +1,5 @@
 import type { ReportReason } from "@blumi/contracts"
+import { requestJson } from "../network/apiClient"
 
 export interface SafetyBlockRecord {
   actorUserId: string
@@ -42,22 +43,16 @@ export interface MySafetyReportRecord {
   response: string
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function fetchSafetyBlocks(
   baseHttpUrl: string,
   sessionToken: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SafetyBlockRecord[]> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/safety/blocks"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/safety/blocks", {
     headers: createAuthHeaders(sessionToken),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not refresh hidden people yet."))
@@ -73,7 +68,7 @@ export async function blockSafetyUser(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SafetyBlockRecord> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/safety/blocks"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/safety/blocks", {
     method: "POST",
     headers: {
       ...createAuthHeaders(sessionToken),
@@ -81,8 +76,7 @@ export async function blockSafetyUser(
     },
     body: JSON.stringify({ blockedUserId }),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "That person could not be hidden."))
@@ -98,17 +92,18 @@ export async function unblockSafetyUser(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/safety/blocks/${encodeURIComponent(blockedUserId)}`),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/safety/blocks/${encodeURIComponent(blockedUserId)}`,
     {
       method: "DELETE",
       headers: createAuthHeaders(sessionToken),
       signal
-    }
+    },
+    fetcher
   )
 
   if (!response.ok) {
-    const payload: unknown = await response.json().catch(() => ({}))
     throw new Error(getApiErrorMessage(payload, "That person could not be shown again."))
   }
 }
@@ -120,7 +115,7 @@ export async function reportSafetyUser(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ report: SafetyReportRecord; block: SafetyBlockRecord }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/safety/reports"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/safety/reports", {
     method: "POST",
     headers: {
       ...createAuthHeaders(sessionToken),
@@ -133,8 +128,7 @@ export async function reportSafetyUser(
       ...(input.note ? { note: input.note } : {})
     }),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "That report could not be sent."))
@@ -149,11 +143,10 @@ export async function fetchMySafetyReports(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<MySafetyReportRecord[]> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/safety/reports"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/safety/reports", {
     headers: createAuthHeaders(sessionToken),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not load your reports."))
   }

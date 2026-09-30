@@ -7,6 +7,7 @@ import {
   normalizeCompleteAvatarSelection,
   projectAvatarLoadoutV1
 } from "./avatarSelectionModel"
+import { requestJson } from "../network/apiClient"
 
 export type SaveProductionAvatarResult =
   | { kind: "updated"; selection: CompleteAvatarSelection }
@@ -23,9 +24,6 @@ export async function saveProductionAvatar(
   resolvedCapabilities?: Partial<CapabilityMap>
 ): Promise<SaveProductionAvatarResult> {
   if (signal?.aborted) throw new Error(AVATAR_SAVE_ABORTED_ERROR)
-  const baseUrl = baseHttpUrl.endsWith("/")
-    ? baseHttpUrl.slice(0, -1)
-    : baseHttpUrl
   const canWriteV2 = resolvedCapabilities?.avatar_loadout_v2_write === true
   const declaredCapabilities = [
     ...(resolvedCapabilities?.avatar_loadout_v2_read
@@ -36,8 +34,9 @@ export async function saveProductionAvatar(
   const wireLoadout = canWriteV2
     ? input.loadout
     : projectAvatarLoadoutV1(input.loadout)
-  const response = await awaitAvatarSaveResponse(
-    fetcher(`${baseUrl}/v1/users/me/avatar`, {
+  let result: Awaited<ReturnType<typeof requestJson>>
+  try {
+    result = await requestJson(baseHttpUrl, "/v1/users/me/avatar", {
       method: "PUT",
       headers: {
         authorization: `Bearer ${sessionToken}`,
@@ -48,10 +47,13 @@ export async function saveProductionAvatar(
       },
       body: JSON.stringify({ loadout: wireLoadout, revision: input.revision }),
       signal
-    }),
-    signal
-  )
-  const payload = await readJsonPayload(response)
+    }, fetcher)
+  } catch (error) {
+    // Keep the established avatar-save cancellation error for callers.
+    if (signal?.aborted) throw new Error(AVATAR_SAVE_ABORTED_ERROR)
+    throw error
+  }
+  const { response, payload } = result
   if (
     response.status === 409 &&
     isRecord(payload) &&
@@ -75,39 +77,6 @@ export async function saveProductionAvatar(
     throw new Error("Blumi could not confirm your saved avatar.")
   }
   return { kind: "updated", selection }
-}
-
-function awaitAvatarSaveResponse(
-  responsePromise: Promise<Response>,
-  signal?: AbortSignal
-): Promise<Response> {
-  if (!signal) return responsePromise
-  if (signal.aborted) return Promise.reject(new Error(AVATAR_SAVE_ABORTED_ERROR))
-
-  return new Promise((resolve, reject) => {
-    const onAbort = (): void => reject(new Error(AVATAR_SAVE_ABORTED_ERROR))
-    const removeAbortListener = (): void => signal.removeEventListener("abort", onAbort)
-
-    signal.addEventListener("abort", onAbort, { once: true })
-    void responsePromise.then(
-      (response) => {
-        removeAbortListener()
-        resolve(response)
-      },
-      (error: unknown) => {
-        removeAbortListener()
-        reject(error)
-      }
-    )
-  })
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
 }
 
 function getApiErrorMessage(payload: unknown): string {

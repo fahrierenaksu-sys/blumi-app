@@ -1,4 +1,5 @@
 import type { ClientEvent, ServerEvent } from "@blumi/realtime-client"
+import { parseServerEvent } from "@blumi/contracts"
 
 export type RealtimeConnectionStatus =
   | "idle"
@@ -26,6 +27,8 @@ export type RealtimeTicketProvider = (sessionToken: string) => Promise<string>
 export interface RealtimeClientOptions {
   /** Uniform random source in [0, 1); injectable for deterministic tests. */
   random?: () => number
+  /** Observer for dropped inbound events; defaults to a development-only warning. */
+  onDroppedEvent?: (drop: RealtimeEventDrop) => void
 }
 
 export class RealtimeTicketRequestError extends Error {
@@ -40,13 +43,28 @@ function createWebSocketUrl(baseUrl: string): string {
   return `${trimmed}/ws`
 }
 
-function isServerEvent(value: unknown): value is ServerEvent {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Record<string, unknown>).type === "string" &&
-    "payload" in (value as Record<string, unknown>)
-  )
+/**
+ * Why an inbound realtime message was not delivered to listeners. It carries
+ * only the event type and failing field paths, never payload values, so it
+ * is safe to log.
+ */
+export type RealtimeEventDrop =
+  | { reason: "unparseable" }
+  | { reason: "invalid"; type: string | null; issuePaths: string[] }
+  | { reason: "unknown_type"; type: string }
+
+export interface RealtimeEventDropCounts {
+  unparseable: number
+  invalid: number
+  unknownType: number
+}
+
+function reportDroppedEventInDevelopment(drop: RealtimeEventDrop): void {
+  // Unknown types are expected from newer servers; only malformed input is
+  // worth surfacing, and only in development builds.
+  if (drop.reason === "unknown_type") return
+  if ((globalThis as { __DEV__?: unknown }).__DEV__ !== true) return
+  console.warn("[realtime] dropped inbound event", drop)
 }
 
 export class RealtimeClient {
@@ -66,9 +84,63 @@ export class RealtimeClient {
     options: RealtimeClientOptions = {}
   ) {
     this.random = options.random ?? Math.random
+    this.onDroppedEvent = options.onDroppedEvent ?? reportDroppedEventInDevelopment
   }
 
   private readonly random: () => number
+  private readonly onDroppedEvent: (drop: RealtimeEventDrop) => void
+  private readonly droppedEventCounts: RealtimeEventDropCounts = {
+    unparseable: 0,
+    invalid: 0,
+    unknownType: 0
+  }
+
+  /** Snapshot of inbound events dropped by validation for this client. */
+  public getDroppedEventCounts(): RealtimeEventDropCounts {
+    return { ...this.droppedEventCounts }
+  }
+
+  private handleInboundMessage(data: string): void {
+    let decoded: unknown
+    try {
+      decoded = JSON.parse(data) as unknown
+    } catch {
+      this.recordDrop({ reason: "unparseable" })
+      return
+    }
+    const result = parseServerEvent(decoded)
+    if (result.kind === "unknown") {
+      this.recordDrop({ reason: "unknown_type", type: result.type })
+      return
+    }
+    if (result.kind === "invalid") {
+      this.recordDrop({
+        reason: "invalid",
+        type: result.type,
+        issuePaths: result.issuePaths
+      })
+      return
+    }
+    try {
+      for (const listener of this.serverEventListeners) {
+        listener(result.event)
+      }
+    } catch {
+      // Preserve the socket handler contract: a listener failure never
+      // escapes into the WebSocket callback.
+    }
+  }
+
+  private recordDrop(drop: RealtimeEventDrop): void {
+    if (drop.reason === "unparseable") this.droppedEventCounts.unparseable += 1
+    else if (drop.reason === "invalid") this.droppedEventCounts.invalid += 1
+    else this.droppedEventCounts.unknownType += 1
+    try {
+      this.onDroppedEvent(drop)
+    } catch {
+      // Diagnostics must never break event delivery.
+    }
+  }
 
   public connect(sessionToken: string): void {
     this.intentionalDisconnect = false
@@ -138,18 +210,7 @@ export class RealtimeClient {
       if (typeof messageEvent.data !== "string") {
         return
       }
-
-      try {
-        const parsed = JSON.parse(messageEvent.data) as unknown
-        if (!isServerEvent(parsed)) {
-          return
-        }
-        for (const listener of this.serverEventListeners) {
-          listener(parsed)
-        }
-      } catch {
-        return
-      }
+      this.handleInboundMessage(messageEvent.data)
     }
 
     socket.onclose = (closeEvent) => {

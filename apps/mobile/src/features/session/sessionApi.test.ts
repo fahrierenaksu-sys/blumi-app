@@ -25,6 +25,7 @@ import {
 import * as sessionApi from "./sessionApi"
 import { createDemoSessionActor } from "./sessionModel"
 import { LEGAL_DOCUMENT_VERSION } from "../legal/legalPolicyMetadata"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
 
 const TEST_TERMS_ACCEPTANCE = Object.freeze({
   version: LEGAL_DOCUMENT_VERSION,
@@ -1051,4 +1052,149 @@ test("production setup completion uses the authenticated durable boundary", asyn
     avatar: "complete",
     room: "incomplete"
   })
+})
+
+const API = "https://api.blumi.test"
+
+registerBoundedRequestTests([
+  {
+    name: "register account POST",
+    run: (fetcher) => registerAccount(API, {
+      phoneNumber: "+905551112233",
+      verificationCode: "482931",
+      termsAcceptance: TEST_TERMS_ACCEPTANCE
+    }, fetcher)
+  },
+  {
+    name: "Firebase account completion POST",
+    run: (fetcher) => sessionApi.completeFirebaseAccount(API, {
+      idToken: "firebase-id-token",
+      authIntent: "sign-in"
+    }, fetcher)
+  },
+  {
+    name: "verification code POST",
+    timeoutMs: 10_000,
+    rejection: { name: "TimeoutError", message: /connection timed out/i },
+    run: (fetcher) => sendVerificationCode(API, { phoneNumber: "+905551112233" }, fetcher)
+  },
+  {
+    name: "account deletion DELETE",
+    run: (fetcher) => deleteProductionAccount(API, "token", "confirmation", fetcher)
+  },
+  {
+    name: "Firebase reauth POST",
+    run: (fetcher) => sessionApi.verifyFirebaseAccountAction(API, "token", {
+      idToken: "firebase-id-token",
+      challengeId: "challenge-1",
+      purpose: "account_deletion"
+    }, fetcher)
+  },
+  {
+    name: "Firebase challenge POST",
+    run: (fetcher) => sessionApi.requestFirebaseAccountActionChallenge(API, "token", {
+      purpose: "account_deletion"
+    }, fetcher)
+  },
+  {
+    name: "deletion challenge POST",
+    run: (fetcher) => requestAccountDeletionChallenge(API, "token", fetcher)
+  },
+  {
+    name: "deletion confirm POST",
+    run: (fetcher) => verifyAccountDeletionCode(API, "token", { verificationCode: "123456" }, fetcher)
+  },
+  {
+    name: "recovery challenge POST",
+    run: (fetcher) => sessionApi.requestAccountRecoveryChallenge(API, "+905551112233", fetcher)
+  },
+  {
+    name: "recovery request POST",
+    run: (fetcher) => submitAccountRecoveryRequest(API, {
+      oldPhoneNumber: "+905551112233",
+      newPhoneNumber: "+905551112244",
+      idToken: "firebase-id-token"
+    }, fetcher)
+  },
+  {
+    name: "account action challenge POST",
+    run: (fetcher) => requestAccountDataExportChallenge(API, "token", fetcher)
+  },
+  {
+    name: "account action confirm POST",
+    run: (fetcher) => verifyAccountDataExportCode(API, "token", "123456", fetcher)
+  },
+  {
+    name: "phone change new-number challenge POST",
+    run: (fetcher) => requestPhoneChangeNewNumberChallenge(API, "token", "+905551112244", "current", fetcher)
+  },
+  {
+    name: "phone change confirm POST",
+    run: (fetcher) => confirmPhoneChange(API, "token", "current", "next", fetcher)
+  },
+  {
+    name: "moderation acknowledgement POST",
+    run: (fetcher) => acknowledgeAccountModeration(API, "token", fetcher)
+  },
+  {
+    name: "session revoke DELETE",
+    run: (fetcher) => revokeProductionSession(API, "token", fetcher)
+  },
+  {
+    name: "profile PATCH",
+    run: (fetcher) => updateProductionProfile(API, "token", { displayName: "Defne" }, fetcher)
+  },
+  {
+    name: "onboarding step PATCH",
+    run: (fetcher) => sessionApi.completeProductionOnboardingStep(API, "token", "profile", fetcher)
+  },
+  {
+    name: "account snapshot GET",
+    run: (fetcher) => sessionApi.fetchProductionAccountSnapshot(API, "token", fetcher)
+  }
+])
+
+test("session API forwards caller cancellation and skips pre-aborted requests", async () => {
+  const controller = new AbortController()
+  let calls = 0
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = sessionApi.fetchProductionAccountSnapshot(API, "token", async (_url, init) => {
+    calls += 1
+    transportSignal = init?.signal
+    entered()
+    return new Promise<Response>(() => {})
+  }, controller.signal)
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+  await assert.rejects(
+    revokeProductionSession(API, "token", async () => {
+      calls += 1
+      return new Response(null, { status: 204 })
+    }, controller.signal),
+    { name: "AbortError" }
+  )
+  assert.equal(calls, 1)
+})
+
+test("session API keeps unreadable error bodies on their existing fallback copy", async () => {
+  await assert.rejects(
+    updateProductionProfile(API, "token", { displayName: "Defne" },
+      async () => new Response("<html>bad gateway</html>", { status: 502 })),
+    /could not save your profile yet/i
+  )
+  await assert.rejects(
+    sessionApi.fetchProductionAccountSnapshot(API, "token",
+      async () => new Response("", { status: 503 })),
+    (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error instanceof AccountAccessError, false)
+      assert.match(error.message, /could not refresh your profile yet/i)
+      return true
+    }
+  )
 })

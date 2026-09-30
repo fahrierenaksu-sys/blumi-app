@@ -122,3 +122,35 @@ test("malformed JSON preserves the existing null-payload contract", async () => 
   const result = await requestJson("https://api.test", "/bad-json", {}, async () => new Response("not json"))
   assert.equal(result.payload, null)
 })
+
+test("per-call timeout override bounds the whole operation without changing the default", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  let signal: AbortSignal | null | undefined
+  const request = requestJson("https://api.test", "/short", {}, async (_url, init) => {
+    signal = init?.signal
+    return new Promise<Response>(() => {})
+  }, { timeoutMs: 10_000 })
+  const rejected = assert.rejects(request, { name: "TimeoutError" })
+  context.mock.timers.tick(10_000)
+  await rejected
+  assert.equal(signal?.aborted, true)
+
+  let defaultSignal: AbortSignal | null | undefined
+  const defaultRequest = requestJson("https://api.test", "/default", {}, async (_url, init) => {
+    defaultSignal = init?.signal
+    return new Promise<Response>(() => {})
+  })
+  const defaultRejected = assert.rejects(defaultRequest, { name: "TimeoutError" })
+  context.mock.timers.tick(10_000)
+  assert.equal(defaultSignal?.aborted, false)
+  context.mock.timers.tick(5_000)
+  await defaultRejected
+  assert.equal(defaultSignal?.aborted, true)
+})
+
+test("empty 204 bodies resolve with a null payload", async () => {
+  const result = await requestJson("https://api.test", "/empty", { method: "DELETE" },
+    async () => new Response(null, { status: 204 }))
+  assert.equal(result.response.status, 204)
+  assert.equal(result.payload, null)
+})

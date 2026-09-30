@@ -3,6 +3,7 @@ import {
   normalizeSessionActor,
   type SessionActor
 } from "./sessionModel"
+import { requestJson } from "../network/apiClient"
 
 interface SessionRefreshPersistence {
   save: (actor: SessionActor) => Promise<void>
@@ -20,27 +21,27 @@ export interface SessionRefreshCoordinator {
   cancelAndWait(): Promise<void>
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function refreshSession(
   baseHttpUrl: string,
   sessionToken: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SessionActor> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/auth/refresh"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/auth/refresh", {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionToken}`
     },
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
+    // An unreadable error body (gateway HTML, empty 5xx) was never an auth
+    // signal; only a readable server error may fall back to "sign in again",
+    // which callers treat as a reason to clear the stored session.
+    if (payload === null) {
+      throw new Error("Blumi could not refresh your secure session.")
+    }
     throw new Error(getApiErrorMessage(payload, "Sign in again to continue."))
   }
 

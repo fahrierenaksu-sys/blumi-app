@@ -2,6 +2,7 @@ import type {
   CoinPackId,
   RevenueCatCoinPackClient
 } from "./revenueCatCoinPackClient"
+import { requestJson } from "../network/apiClient"
 
 export type CoinPackReconcileStatus = "credited" | "already_processed" | "pending"
 export type CoinPackPurchaseStatus =
@@ -36,8 +37,9 @@ export interface ReconcileCoinPackPurchaseInput {
 export async function reconcileCoinPackPurchase(
   input: ReconcileCoinPackPurchaseInput
 ): Promise<{ status: CoinPackReconcileStatus }> {
-  const response = await (input.fetcher ?? fetch)(
-    withBaseUrl(input.baseHttpUrl, "/v1/commerce/coin-packs/reconcile"),
+  const { response, payload } = await requestJson(
+    requireCommerceBaseUrl(input.baseHttpUrl),
+    "/v1/commerce/coin-packs/reconcile",
     {
       method: "POST",
       headers: {
@@ -48,9 +50,9 @@ export async function reconcileCoinPackPurchase(
       // quantity, receipt payload, or local wallet balance is trusted here.
       body: JSON.stringify({ transactionIds: [input.transactionId] }),
       signal: input.signal
-    }
+    },
+    input.fetcher ?? fetch
   )
-  const payload: unknown = await readJson(response)
   if (!response.ok) {
     throw new CoinPackReconcileError(
       getApiErrorMessage(payload, "We could not verify that purchase yet."),
@@ -102,18 +104,10 @@ export async function runCoinPackPurchase(input: {
     : reconciliation
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
+function requireCommerceBaseUrl(baseHttpUrl: string): string {
   const base = baseHttpUrl.trim().replace(/\/+$/, "")
   if (!base) throw new Error("A commerce API URL is required.")
-  return `${base}${path}`
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
+  return base
 }
 
 function readReconcileStatus(

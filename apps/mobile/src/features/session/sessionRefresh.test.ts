@@ -8,6 +8,7 @@ import {
 } from "./sessionRefresh"
 import { createDemoSessionActor } from "./sessionModel"
 import type { SessionActor } from "./sessionModel"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
 
 test("refreshSession rotates a production token through the auth boundary", async () => {
   const calls: { url: string; init: RequestInit | undefined }[] = []
@@ -251,6 +252,58 @@ test("shouldRefreshSessionSoon only targets expiring production sessions", () =>
 
   assert.equal(shouldRefreshSessionSoon(productionActor), true)
 })
+
+test("refresh keeps readable 401 errors as the sign-in-again auth signal", async () => {
+  await assert.rejects(
+    refreshSession("https://api.blumi.test", "old_token", (async () =>
+      createJsonResponse(401, { error: "Sign in again to continue." })) as typeof fetch),
+    /sign in again/i
+  )
+  await assert.rejects(
+    refreshSession("https://api.blumi.test", "old_token", (async () =>
+      createJsonResponse(401, {})) as typeof fetch),
+    /sign in again/i
+  )
+})
+
+test("refresh does not turn an unreadable gateway error into a sign-out signal", async () => {
+  await assert.rejects(
+    refreshSession("https://api.blumi.test", "old_token", (async () =>
+      new Response("<html>bad gateway</html>", { status: 502 })) as typeof fetch),
+    (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.doesNotMatch(error.message, /sign in again/i)
+      return true
+    }
+  )
+})
+
+test("refresh forwards caller cancellation to the transport", async () => {
+  const controller = new AbortController()
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = refreshSession("https://api.blumi.test", "old_token", (async (
+    _url: RequestInfo | URL,
+    init?: RequestInit
+  ) => {
+    transportSignal = init?.signal
+    entered()
+    return new Promise<Response>(() => {})
+  }) as typeof fetch, controller.signal)
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+})
+
+registerBoundedRequestTests([
+  {
+    name: "session refresh POST",
+    run: (fetcher) => refreshSession("https://api.blumi.test", "old_token", fetcher)
+  }
+])
 
 function createJsonResponse(status: number, payload: unknown): Response {
   return {

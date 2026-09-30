@@ -1,6 +1,14 @@
 export type ApiFetcher = typeof fetch
 export const JSON_REQUEST_TIMEOUT_MS = 15_000
 
+export interface RequestJsonOptions {
+  /**
+   * Whole-operation deadline (transport + body read). Defaults to
+   * JSON_REQUEST_TIMEOUT_MS; only override for an established, shorter budget.
+   */
+  timeoutMs?: number
+}
+
 export interface ApiJsonResponse<Payload> {
   response: Response
   payload: Payload
@@ -28,8 +36,10 @@ export async function requestJson<Payload = unknown>(
   baseHttpUrl: string,
   path: string,
   init: RequestInit,
-  fetcher: ApiFetcher = fetch
+  fetcher: ApiFetcher = fetch,
+  options: RequestJsonOptions = {}
 ): Promise<ApiJsonResponse<Payload>> {
+  const timeoutMs = options.timeoutMs ?? JSON_REQUEST_TIMEOUT_MS
   const callerSignal = init.signal
   if (callerSignal?.aborted) throw requestCancelledError()
   const controller = new AbortController()
@@ -46,7 +56,7 @@ export async function requestJson<Payload = unknown>(
       error.name = "TimeoutError"
       reject(error)
       controller.abort()
-    }, JSON_REQUEST_TIMEOUT_MS)
+    }, timeoutMs)
   })
   try {
     // Race the whole operation, not just fetch headers. Some transports ignore

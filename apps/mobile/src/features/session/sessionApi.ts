@@ -21,6 +21,7 @@ import {
   normalizeAccountModeration,
   type AccountModerationState
 } from "./accountModeration"
+import { requestJson } from "../network/apiClient"
 
 export class AccountAccessError extends Error {
   readonly moderation: AccountModerationState
@@ -78,6 +79,8 @@ export type FirebaseAccountActionPurpose =
   | "phone_change_new"
 
 const VERIFICATION_CODE_REQUEST_TIMEOUT_MS = 10_000
+const VERIFICATION_CODE_TIMEOUT_MESSAGE =
+  "The connection timed out. Check your connection and try again."
 
 export interface SubmitAccountRecoveryRequestInput {
   oldPhoneNumber: string
@@ -127,26 +130,20 @@ export function updateSessionActorProfile(
   }
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function registerAccount(
   baseHttpUrl: string,
   input: RegisterAccountInput,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SessionActor> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/accounts/register"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/accounts/register", {
     method: "POST",
     headers: {
       "content-type": "application/json"
     },
     body: JSON.stringify(input),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(
@@ -179,15 +176,14 @@ export async function completeFirebaseAccount(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SessionActor> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/auth/firebase/complete"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/auth/firebase/complete", {
     method: "POST",
     headers: {
       "content-type": "application/json"
     },
     body: JSON.stringify(input),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(
@@ -221,55 +217,46 @@ export async function sendVerificationCode(
   signal?: AbortSignal,
   timeoutMs = VERIFICATION_CODE_REQUEST_TIMEOUT_MS
 ): Promise<{ expiresAt: string }> {
-  const timeoutController = new AbortController()
-  const abortFromCaller = () => timeoutController.abort(signal?.reason)
-  if (signal?.aborted) abortFromCaller()
-  else signal?.addEventListener("abort", abortFromCaller, { once: true })
-
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error("The connection timed out. Check your connection and try again."))
-      timeoutController.abort()
-    }, timeoutMs)
-  })
+  let result: Awaited<ReturnType<typeof requestJson>>
   try {
-    const response = await Promise.race([
-      fetcher(withBaseUrl(baseHttpUrl, "/v1/auth/send-code"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify(input),
-        signal: timeoutController.signal
-      }),
-      timeout
-    ])
-    const payload: unknown = await Promise.race([response.json(), timeout])
-
-    if (!response.ok) {
-      throw new Error(getApiErrorMessage(
-        payload,
-        "We could not send that SMS code yet.",
-        [input.phoneNumber]
-      ))
+    // The SMS CTA keeps its shorter established budget (transport + body).
+    result = await requestJson(baseHttpUrl, "/v1/auth/send-code", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(input),
+      signal
+    }, fetcher, { timeoutMs })
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      const timeoutError = new Error(VERIFICATION_CODE_TIMEOUT_MESSAGE)
+      timeoutError.name = "TimeoutError"
+      throw timeoutError
     }
-
-    if (
-      typeof payload === "object" &&
-      payload !== null &&
-      typeof (payload as Record<string, unknown>).expiresAt === "string"
-    ) {
-      return {
-        expiresAt: (payload as Record<string, unknown>).expiresAt as string
-      }
-    }
-
-    throw new Error("Blumi could not confirm the SMS code window.")
-  } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId)
-    signal?.removeEventListener("abort", abortFromCaller)
+    throw error
   }
+  const { response, payload } = result
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(
+      payload,
+      "We could not send that SMS code yet.",
+      [input.phoneNumber]
+    ))
+  }
+
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    typeof (payload as Record<string, unknown>).expiresAt === "string"
+  ) {
+    return {
+      expiresAt: (payload as Record<string, unknown>).expiresAt as string
+    }
+  }
+
+  throw new Error("Blumi could not confirm the SMS code window.")
 }
 
 export async function deleteProductionAccount(
@@ -279,7 +266,7 @@ export async function deleteProductionAccount(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<"deleted" | "pending_firebase_deletion"> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account", {
     method: "DELETE",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -287,9 +274,8 @@ export async function deleteProductionAccount(
     },
     body: JSON.stringify({ confirmationToken }),
     signal
-  })
+  }, fetcher)
   if (!response.ok) {
-    const payload = await readJsonPayload(response)
     throw new Error(getApiErrorMessage(payload, "We could not delete your account yet."))
   }
   return response.status === 202 ? "pending_firebase_deletion" : "deleted"
@@ -307,7 +293,7 @@ export async function verifyFirebaseAccountAction(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ confirmationToken: string; expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/firebase/reauth"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/firebase/reauth", {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -315,8 +301,7 @@ export async function verifyFirebaseAccountAction(
     },
     body: JSON.stringify(input),
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (
     !response.ok ||
     typeof (payload as { confirmationToken?: unknown } | null)?.confirmationToken !== "string" ||
@@ -333,15 +318,14 @@ export async function requestFirebaseAccountActionChallenge(
   input: { purpose: FirebaseAccountActionPurpose; targetPhoneNumber?: string },
   fetcher: typeof fetch = fetch
 ): Promise<{ challengeId: string; expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/firebase/challenge"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/firebase/challenge", {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionToken}`,
       "content-type": "application/json"
     },
     body: JSON.stringify(input)
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok ||
     typeof (payload as { challengeId?: unknown } | null)?.challengeId !== "string" ||
     typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
@@ -356,12 +340,11 @@ export async function requestAccountDeletionChallenge(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/deletion/challenge"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/deletion/challenge", {
     method: "POST",
     headers: { authorization: `Bearer ${sessionToken}` },
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok || typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not send a deletion code yet."))
   }
@@ -375,13 +358,12 @@ export async function verifyAccountDeletionCode(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ confirmationToken: string; expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/deletion/confirm"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/deletion/confirm", {
     method: "POST",
     headers: { authorization: `Bearer ${sessionToken}`, "content-type": "application/json" },
     body: JSON.stringify(input),
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (
     !response.ok ||
     typeof (payload as { confirmationToken?: unknown } | null)?.confirmationToken !== "string" ||
@@ -398,13 +380,12 @@ export async function requestAccountRecoveryChallenge(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/recovery/challenge"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/recovery/challenge", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ phoneNumber: newPhoneNumber }),
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok || typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not send a recovery code yet."))
   }
@@ -417,13 +398,12 @@ export async function submitAccountRecoveryRequest(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/account/recovery/requests"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/recovery/requests", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not verify that recovery code."))
   }
@@ -490,8 +470,9 @@ export async function requestPhoneChangeNewNumberChallenge(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<{ expiresAt: string }> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/account/phone-change/new/challenge"),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/account/phone-change/new/challenge",
     {
       method: "POST",
       headers: {
@@ -503,9 +484,9 @@ export async function requestPhoneChangeNewNumberChallenge(
         currentPhoneConfirmationToken
       }),
       signal
-    }
+    },
+    fetcher
   )
-  const payload = await readJsonPayload(response)
   if (
     !response.ok ||
     typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string"
@@ -542,8 +523,9 @@ export async function confirmPhoneChange(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/account/phone-change/confirm"),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/account/phone-change/confirm",
     {
       method: "POST",
       headers: {
@@ -555,10 +537,10 @@ export async function confirmPhoneChange(
         newPhoneConfirmationToken
       }),
       signal
-    }
+    },
+    fetcher
   )
   if (!response.ok) {
-    const payload = await readJsonPayload(response)
     throw new Error(
       getApiErrorMessage(payload, "We could not change your sign-in phone yet.")
     )
@@ -572,8 +554,12 @@ async function requestAccountActionChallenge(
   fetcher: typeof fetch,
   signal?: AbortSignal
 ): Promise<{ expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, path), { method: "POST", headers: { authorization: `Bearer ${sessionToken}` }, signal })
-  const payload = await readJsonPayload(response)
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    path,
+    { method: "POST", headers: { authorization: `Bearer ${sessionToken}` }, signal },
+    fetcher
+  )
   if (!response.ok || typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not send a security code yet."))
   }
@@ -588,10 +574,9 @@ async function verifyAccountActionCode(
   fetcher: typeof fetch,
   signal?: AbortSignal
 ): Promise<{ confirmationToken: string; expiresAt: string }> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, path), {
+  const { response, payload } = await requestJson(baseHttpUrl, path, {
     method: "POST", headers: { authorization: `Bearer ${sessionToken}`, "content-type": "application/json" }, body: JSON.stringify({ verificationCode }), signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok || typeof (payload as { confirmationToken?: unknown } | null)?.confirmationToken !== "string" || typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not verify that security code."))
   }
@@ -604,15 +589,16 @@ export async function acknowledgeAccountModeration(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<AccountModerationState> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/account/moderation/acknowledge"),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/account/moderation/acknowledge",
     {
       method: "POST",
       headers: { authorization: `Bearer ${sessionToken}` },
       signal
-    }
+    },
+    fetcher
   )
-  const payload = await readJsonPayload(response)
   const moderation = normalizeAccountModeration(
     (payload as { moderation?: unknown } | null)?.moderation
   )
@@ -631,15 +617,14 @@ export async function revokeProductionSession(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/auth/session"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/auth/session", {
     method: "DELETE",
     headers: {
       authorization: `Bearer ${sessionToken}`
     },
     signal
-  })
+  }, fetcher)
   if (!response.ok) {
-    const payload = await readJsonPayload(response)
     throw new Error(getApiErrorMessage(payload, "We could not revoke your session yet."))
   }
 }
@@ -651,7 +636,7 @@ export async function updateProductionProfile(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<UserProfile> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/users/me"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/users/me", {
     method: "PATCH",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -669,8 +654,7 @@ export async function updateProductionProfile(
       prompts: input.prompts
     }),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "We could not save your profile yet."))
@@ -686,8 +670,9 @@ export async function completeProductionOnboardingStep(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<OnboardingStatus> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/users/me/onboarding"),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/users/me/onboarding",
     {
       method: "PATCH",
       headers: {
@@ -696,9 +681,9 @@ export async function completeProductionOnboardingStep(
       },
       body: JSON.stringify({ step }),
       signal
-    }
+    },
+    fetcher
   )
-  const payload: unknown = await response.json()
   if (!response.ok) {
     throw new Error(
       getApiErrorMessage(payload, "We could not save your setup progress yet.")
@@ -744,7 +729,7 @@ export async function fetchProductionAccountSnapshot(
   const declaredCapabilities = resolvedCapabilities?.avatar_loadout_v2_read
     ? "avatar_loadout_v2_read"
     : undefined
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/users/me"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/users/me", {
     headers: {
       authorization: `Bearer ${sessionToken}`,
       ...(declaredCapabilities
@@ -752,8 +737,7 @@ export async function fetchProductionAccountSnapshot(
         : {})
     },
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw createSessionApiError(payload, "We could not refresh your profile yet.")
@@ -816,13 +800,6 @@ function getApiErrorMessage(
   )
 }
 
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"

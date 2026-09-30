@@ -5,8 +5,10 @@ import {
   REALTIME_AUTH_INVALID_CLOSE_CODE,
   isRealtimeAuthInvalidClose,
   RealtimeTicketRequestError,
-  type RealtimeConnectionStatus
+  type RealtimeConnectionStatus,
+  type RealtimeEventDrop
 } from "./realtimeClient"
+import { SERVER_EVENT_TYPES } from "@blumi/contracts"
 
 class MockWebSocket {
   public static readonly OPEN = 1
@@ -57,6 +59,31 @@ function installWebSocketMock(): () => void {
   globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
   return () => { globalThis.WebSocket = original }
 }
+
+async function openValidatingClient(
+  options: ConstructorParameters<typeof RealtimeClient>[2] = {}
+): Promise<{
+  client: RealtimeClient
+  socket: MockWebSocket
+  events: unknown[]
+  drops: RealtimeEventDrop[]
+}> {
+  const events: unknown[] = []
+  const drops: RealtimeEventDrop[] = []
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), {
+    onDroppedEvent: (drop) => { drops.push(drop) },
+    ...options
+  })
+  client.onServerEvent((event) => { events.push(event) })
+  client.connect("validation-session")
+  await flushTicketRequest()
+  const socket = MockWebSocket.instances.at(-1)
+  assert.ok(socket)
+  socket.open()
+  return { client, socket, events, drops }
+}
+
+const PRIVATE_BODY = "meet me at 5, my number is +905551112233"
 
 function createTicketProvider() {
   let count = 0
@@ -391,4 +418,147 @@ test("clients disconnected together spread their reconnect attempts", async (con
   context.mock.timers.tick(495)
   await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 4)
+})
+
+test("valid server events are delivered unchanged", async (context) => {
+  context.after(installWebSocketMock())
+  const { client, socket, events, drops } = await openValidatingClient()
+  const message = {
+    type: "chat.message_received",
+    payload: {
+      messageId: "message-1",
+      threadId: "thread-1",
+      senderUserId: "ada",
+      body: PRIVATE_BODY,
+      sentAt: "2026-09-30T12:00:00.000Z"
+    }
+  }
+  const realtimeError = {
+    type: "realtime.error",
+    payload: {
+      code: "PRESENCE_ROOM_UNAVAILABLE",
+      requestType: "room.join",
+      message: "The shared lobby is no longer available."
+    }
+  }
+  socket.message(JSON.stringify(message))
+  socket.message(JSON.stringify(realtimeError))
+
+  assert.deepEqual(events, [message, realtimeError])
+  assert.deepEqual(drops, [])
+  assert.deepEqual(client.getDroppedEventCounts(), { unparseable: 0, invalid: 0, unknownType: 0 })
+})
+
+test("every known event type with a malformed payload is dropped and counted", async (context) => {
+  context.after(installWebSocketMock())
+  const { client, socket, events, drops } = await openValidatingClient()
+  for (const type of SERVER_EVENT_TYPES) {
+    socket.message(JSON.stringify({ type, payload: {} }))
+  }
+  assert.deepEqual(events, [])
+  assert.equal(client.getDroppedEventCounts().invalid, SERVER_EVENT_TYPES.length)
+  assert.deepEqual(
+    drops.map((drop) => drop.reason === "invalid" ? drop.type : null),
+    [...SERVER_EVENT_TYPES]
+  )
+})
+
+test("invalid event diagnostics carry field paths but no payload values", async (context) => {
+  context.after(installWebSocketMock())
+  const { socket, events, drops } = await openValidatingClient()
+  socket.message(JSON.stringify({
+    type: "chat.message_received",
+    payload: {
+      messageId: "message-1",
+      threadId: "thread-1",
+      senderUserId: "",
+      body: PRIVATE_BODY,
+      sentAt: "yesterday"
+    }
+  }))
+  assert.deepEqual(events, [])
+  assert.equal(drops.length, 1)
+  assert.deepEqual(drops[0], {
+    reason: "invalid",
+    type: "chat.message_received",
+    issuePaths: ["senderUserId", "sentAt"]
+  })
+  assert.equal(JSON.stringify(drops).includes(PRIVATE_BODY), false)
+  assert.equal(JSON.stringify(drops).includes("+905551112233"), false)
+})
+
+test("unknown event types from a newer server are ignored safely", async (context) => {
+  context.after(installWebSocketMock())
+  const { client, socket, events, drops } = await openValidatingClient()
+  socket.message(JSON.stringify({ type: "room.decor_updated", payload: { body: PRIVATE_BODY } }))
+  socket.message(JSON.stringify({ type: "safety.user_blocked", payload: { blockedUserId: "bora" } }))
+
+  assert.deepEqual(events, [{ type: "safety.user_blocked", payload: { blockedUserId: "bora" } }])
+  assert.deepEqual(drops, [{ reason: "unknown_type", type: "room.decor_updated" }])
+  assert.deepEqual(client.getDroppedEventCounts(), { unparseable: 0, invalid: 0, unknownType: 1 })
+})
+
+test("unparseable and malformed envelopes are dropped without reaching listeners", async (context) => {
+  context.after(installWebSocketMock())
+  const { client, socket, events } = await openValidatingClient()
+  socket.message("{not json")
+  socket.message(JSON.stringify({ type: "room.left" }))
+  socket.message(JSON.stringify([1, 2, 3]))
+  socket.message(new ArrayBuffer(4))
+
+  assert.deepEqual(events, [])
+  assert.deepEqual(client.getDroppedEventCounts(), { unparseable: 1, invalid: 2, unknownType: 0 })
+})
+
+test("listener or diagnostics failures never escape the socket handler", async (context) => {
+  context.after(installWebSocketMock())
+  const { socket, events } = await openValidatingClient({
+    onDroppedEvent: () => { throw new Error("observer failed") }
+  })
+  assert.doesNotThrow(() => socket.message("{not json"))
+  const failing = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  failing.onServerEvent(() => { throw new Error("listener failed") })
+  failing.connect("listener-session")
+  await flushTicketRequest()
+  const failingSocket = MockWebSocket.instances.at(-1)
+  failingSocket?.open()
+  assert.doesNotThrow(() => failingSocket?.message(JSON.stringify({
+    type: "room.left",
+    payload: { roomId: "lobby" }
+  })))
+  assert.deepEqual(events, [])
+})
+
+test("default diagnostics warn only in development and never include payload values", async (context) => {
+  context.after(installWebSocketMock())
+  const warnings: unknown[][] = []
+  const warn = context.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args) })
+  const globals = globalThis as { __DEV__?: unknown }
+  const previousDev = globals.__DEV__
+  context.after(() => {
+    warn.mock.restore()
+    if (previousDev === undefined) delete globals.__DEV__
+    else globals.__DEV__ = previousDev
+  })
+
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  client.connect("dev-session")
+  await flushTicketRequest()
+  const socket = MockWebSocket.instances.at(-1)
+  socket?.open()
+  const invalid = JSON.stringify({
+    type: "chat.message_received",
+    payload: { body: PRIVATE_BODY }
+  })
+
+  globals.__DEV__ = false
+  socket?.message(invalid)
+  assert.equal(warnings.length, 0)
+
+  globals.__DEV__ = true
+  socket?.message(invalid)
+  socket?.message(JSON.stringify({ type: "room.decor_updated", payload: {} }))
+  assert.equal(warnings.length, 1)
+  assert.equal(JSON.stringify(warnings).includes(PRIVATE_BODY), false)
+  assert.deepEqual(client.getDroppedEventCounts(), { unparseable: 0, invalid: 2, unknownType: 1 })
 })

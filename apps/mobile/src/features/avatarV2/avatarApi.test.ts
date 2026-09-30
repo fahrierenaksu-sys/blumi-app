@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { saveProductionAvatar } from "./avatarApi"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
 
 const LOADOUT = {
   schemaVersion: 2 as const,
@@ -84,22 +85,60 @@ test("avatar API sends V2 only when write is resolved and declares read/write su
 test("avatar API forwards a caller cancellation signal to the save request", async () => {
   const controller = new AbortController()
   let receivedSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
 
-  await saveProductionAvatar(
+  const saving = saveProductionAvatar(
     "https://api.blumi.test",
     "session-token",
     { loadout: LOADOUT, revision: 2 },
     async (_url, init) => {
       receivedSignal = init?.signal
-      return new Response(JSON.stringify({
-        avatar: { presetId: LOADOUT.bodyId, loadout: LOADOUT, revision: 3 }
-      }), { status: 200 })
+      entered()
+      return new Promise<Response>(() => {})
     },
     controller.signal
   )
-
-  assert.equal(receivedSignal, controller.signal)
+  const rejected = assert.rejects(saving, /operation was aborted/)
+  await started
+  assert.equal(receivedSignal?.aborted, false)
+  controller.abort()
+  await rejected
+  assert.equal(receivedSignal?.aborted, true)
 })
+
+test("avatar API cancellation also covers a stalled response body", async () => {
+  const controller = new AbortController()
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const saving = saveProductionAvatar(
+    "https://api.blumi.test",
+    "session-token",
+    { loadout: LOADOUT, revision: 2 },
+    async () => ({
+      ok: true,
+      status: 200,
+      json: () => { entered(); return new Promise<unknown>(() => {}) }
+    } as Response),
+    controller.signal
+  )
+  const rejected = assert.rejects(saving, /operation was aborted/)
+  await started
+  controller.abort()
+  await rejected
+})
+
+registerBoundedRequestTests([
+  {
+    name: "avatar save PUT",
+    run: (fetcher) => saveProductionAvatar(
+      "https://api.blumi.test",
+      "session-token",
+      { loadout: LOADOUT, revision: 2 },
+      fetcher
+    )
+  }
+])
 
 test("avatar API stops waiting when its caller cancels a stalled save", async () => {
   const controller = new AbortController()

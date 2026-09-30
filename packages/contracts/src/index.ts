@@ -26,5 +26,6 @@ export * from "./safety/ReportUserCommand";
 export * from "./safety/ReportReason";
 export * from "./realtime/ClientEvents";
 export * from "./realtime/ServerEvents";
+export * from "./realtime/ServerEventSchemas";
 export * from "./api/CoreApiSchemas";
 export * from "./capabilities/Capabilities";
