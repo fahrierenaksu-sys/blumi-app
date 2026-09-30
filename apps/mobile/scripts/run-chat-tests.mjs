@@ -110,6 +110,13 @@ try {
       }
     }
   )
+
+  // Hook lifecycle tests read production sources through the hook harness.
+  execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts"],
+    { cwd: workspaceRoot, stdio: "inherit" }
+  )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }
