@@ -173,9 +173,11 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     navigation,
     copy,
     draftDecor,
+    isDirty: editorSession.isDirty,
     isRoomDraftReady,
     editorSessionRef: session.editorSessionRef,
     saveUserRoomDecorConfirmed,
+    cancelActiveDrag: drag.cancelActiveDrag,
     selection
   })
 

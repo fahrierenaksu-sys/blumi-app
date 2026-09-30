@@ -1,3 +1,4 @@
+import { usePreventRemove } from "@react-navigation/native"
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { Alert } from "react-native"
 import { goBackOrFallback } from "../../../navigation/rootNavigationModel"
@@ -30,14 +31,21 @@ import type { RoomEditorSelection } from "./useRoomEditorSelection"
  * Confirmed save and exit: validates the draft (including the live preview and
  * avatar path), persists through RoomV2Provider, and guards unsaved exits with
  * a Stay / Discard / Save dialog that routes Save through the same validation.
+ * The guard also covers the iOS edge swipe (the swipe is cancelled natively
+ * while there are unsaved changes), and any drag in progress is cancelled
+ * when the editor starts closing or loses focus.
  */
 export function useRoomEditorSave(input: {
   navigation: MyRoomEditorNavigation
   copy: MyRoomEditorCopy
   draftDecor: UserRoomDecor
+  /** Rendered dirty flag; drives the native swipe-back block. */
+  isDirty: boolean
   isRoomDraftReady: boolean
   editorSessionRef: RefObject<RoomV2EditorSession>
   saveUserRoomDecorConfirmed: ReturnType<typeof useRoomV2>["saveUserRoomDecorConfirmed"]
+  /** Cancels a drag in progress (restores the piece, hides the ghost). */
+  cancelActiveDrag: () => void
   selection: Pick<
     RoomEditorSelection,
     "placementPreview" | "setPlacementPreview" | "setPlacementFeedback" | "setSelectedInstanceId"
@@ -47,9 +55,11 @@ export function useRoomEditorSave(input: {
     navigation,
     copy,
     draftDecor,
+    isDirty,
     isRoomDraftReady,
     editorSessionRef,
-    saveUserRoomDecorConfirmed
+    saveUserRoomDecorConfirmed,
+    cancelActiveDrag
   } = input
   const {
     placementPreview,
@@ -165,14 +175,19 @@ export function useRoomEditorSave(input: {
     setSelectedInstanceId
   ])
 
-  useEffect(() => navigation.addListener("beforeRemove", (event) => {
-    if (allowEditorExitRef.current) {
+  // The guard must be usePreventRemove, not a bare `beforeRemove` listener:
+  // native-stack forwards only usePreventRemove as `preventNativeDismiss`, so
+  // UIKit cancels the iOS edge swipe and the dialog opens on the editor. With a
+  // bare listener the native page was already gone when JS prevented the pop,
+  // leaving My Room frozen under a stale editor route. A prevented action keeps
+  // its visited-route mark, so re-dispatching it passes this guard once.
+  usePreventRemove(isDirty, ({ data }) => {
+    cancelActiveDrag()
+    if (allowEditorExitRef.current || !editorSessionRef.current.isDirty) {
       allowEditorExitRef.current = false
+      navigation.dispatch(data.action)
       return
     }
-    if (!editorSessionRef.current.isDirty) return
-
-    event.preventDefault()
     Alert.alert(
       copy.unsavedDialog.title,
       copy.unsavedDialog.body,
@@ -186,19 +201,32 @@ export function useRoomEditorSave(input: {
           style: "destructive",
           onPress: () => {
             allowEditorExitRef.current = true
-            navigation.dispatch(event.data.action)
+            navigation.dispatch(data.action)
           }
         },
         {
           text: copy.save,
           onPress: () => {
-            pendingEditorExitActionRef.current = event.data.action
+            pendingEditorExitActionRef.current = data.action
             handleSave()
           }
         }
       ]
     )
-  }), [copy, editorSessionRef, handleSave, navigation])
+  })
+
+  // A drag must never outlive the page: cancel it when the iOS back swipe (or
+  // any closing transition) starts and when another route covers the editor.
+  useEffect(() => {
+    const unsubscribeTransition = navigation.addListener("transitionStart", (event) => {
+      if (event.data.closing) cancelActiveDrag()
+    })
+    const unsubscribeBlur = navigation.addListener("blur", cancelActiveDrag)
+    return () => {
+      unsubscribeTransition()
+      unsubscribeBlur()
+    }
+  }, [cancelActiveDrag, navigation])
 
   const handleCancel = useCallback(() => {
     hapticLight()

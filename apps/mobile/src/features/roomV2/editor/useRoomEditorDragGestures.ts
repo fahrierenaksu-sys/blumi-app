@@ -344,15 +344,21 @@ export function useRoomEditorDragGestures(input: {
     handlersRef.current.cancelDrag(session)
   }, [])
 
+  // Restores the piece and hides the ghost for whatever drag is active. Later
+  // frames of that gesture carry its old session and are ignored.
+  const cancelActiveDrag = useCallback(() => {
+    const drag = activeDragRef.current
+    if (drag) cancelDrag(drag.session)
+  }, [cancelDrag])
+
   // Backgrounding mid-drag restores the piece even if the touch is never
   // cancelled back to the gesture.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
-      const drag = activeDragRef.current
-      if (state !== "active" && drag) cancelDrag(drag.session)
+      if (state !== "active") cancelActiveDrag()
     })
     return () => subscription.remove()
-  }, [cancelDrag])
+  }, [cancelActiveDrag])
 
   const stageDragGesture = useMemo(() => Gesture.Pan()
     .activateAfterLongPress(ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS)
@@ -518,6 +524,7 @@ export function useRoomEditorDragGestures(input: {
   return {
     stageDragGesture,
     createTrayDragGesture,
+    cancelActiveDrag,
     ghost,
     ghostValues
   }
