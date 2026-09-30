@@ -11,7 +11,7 @@ Both upload with an EAS `submit` job (App Store Connect app id in `submit.produc
 
 ## Flows
 
-- **Push to `develop`** → `develop-preview-update.yml`: release checks → iOS fingerprint → look up a `preview` build with that fingerprint → OTA to `preview`. If no build matches (native change), the `native_build_required` job fails and nothing is published. It never builds.
+- **Push to `develop`** → `develop-preview-update.yml` (no checks job; checks run before the push and on GitHub): iOS fingerprint → look up a `preview` build with that fingerprint → OTA to `preview`. If no build matches (native change), the `native_build_required` job fails and nothing is published. It never builds.
 - **Push to `main`** → `testflight.yml`: release checks → fingerprint → if a `production` build matches, OTA to `production`; otherwise build `production` and upload it to App Store Connect / TestFlight.
 - **Manual** → `preview-testflight-build.yml`: builds the `preview` binary and uploads it to App Store Connect / TestFlight. Run it once to start and again whenever develop reports a native change.
 
@@ -21,6 +21,7 @@ Other branches (including `claude/*`) trigger nothing.
 
 - `runtimeVersion` uses the `fingerprint` policy, so an update is only served to binaries with identical native code.
 - A channel is embedded in the binary at build time; `preview` updates never reach `production` binaries.
+- The fingerprint includes `apps/mobile/package.json` **scripts**: editing a `test:*` script line changes it and stops develop OTAs until a new preview build. Register new tests in the `scripts/run-*.mjs` runners instead.
 - Fingerprint and update jobs replicate `build.<profile>.env` from eas.json, pinned by `apps/mobile/scripts/mobile-release-channels.test.mjs`.
 
 ## On the device
