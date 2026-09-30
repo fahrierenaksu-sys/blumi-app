@@ -221,8 +221,10 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     walkBobRef
   ])
 
+  // Keyed on the bubble id: a re-created bubble object must not replay the pop.
+  const bubbleId = bubble?.id
   useEffect(() => {
-    if (!bubble) {
+    if (bubbleId === undefined) {
       bubblePopRef.stopAnimation()
       bubblePopRef.setValue(0)
       return
@@ -241,8 +243,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     })
     animation.start()
     return () => animation.stop()
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [bubble?.id, bubblePopRef, motionPolicy.animateBubble])
+  }, [bubbleId, bubblePopRef, motionPolicy.animateBubble])
 
   useEffect(() => {
     if (!motionPolicy.animateSpeaking || avatar.motion !== "speaking") {
