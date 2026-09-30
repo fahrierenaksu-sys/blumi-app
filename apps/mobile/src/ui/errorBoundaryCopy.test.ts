@@ -14,6 +14,12 @@ test("Turkish and English recovery text never promises saved data or delivered r
   assert.equal(getErrorBoundaryCopy("en").retryLabel, "Try again")
 })
 
+test("route recovery offers a localized way back", () => {
+  assert.equal(getErrorBoundaryCopy("tr").backLabel, "Geri dön")
+  assert.equal(getErrorBoundaryCopy("en").backLabel, "Go back")
+  assert.equal(getErrorBoundaryCopy("tr", true).backLabel, "Geri dön")
+})
+
 test("a repeated render error explains manual restart without promising an endless reset", () => {
   assert.match(getErrorBoundaryCopy("tr", true).body, /kapatıp yeniden aç/)
   assert.match(getErrorBoundaryCopy("en", true).body, /close and reopen/)

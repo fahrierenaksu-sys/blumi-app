@@ -293,8 +293,10 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
     {
       relativePath: "src/components/MatchResultModal.tsx",
       patterns: [
-        /if \(reduceMotion\) \{[\s\S]*scaleAnim\.setValue\(1\)[\s\S]*return[\s\S]*const animation = Animated\.sequence/,
-        /<ConfettiOverlay playing=\{visible && !reduceMotion\}/
+        /const motion = getMatchCelebrationMotion\(reduceMotion\)/,
+        /if \(!motion\.entranceSpring\) \{[\s\S]*scaleAnim\.setValue\(1\)[\s\S]*return[\s\S]*const animation = Animated\.sequence/,
+        /<ConfettiOverlay playing=\{visible && motion\.confetti\}/,
+        /animationType=\{motion\.modalAnimationType\}/
       ]
     },
     {

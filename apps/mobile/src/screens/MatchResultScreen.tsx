@@ -14,6 +14,7 @@ import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import {
   canOpenMatchExperience
 } from "../features/matches/matchRoomModel"
+import { getMatchResultPresentation } from "../features/matches/matchResultPresentation"
 import {
   createStableMatchedUserAvatar,
   resolveLatestMatchRoomAvatar
@@ -55,6 +56,12 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     [match.matchedUser]
   )
   const canStartConversation = canOpenMatchExperience(sessionActor)
+  const presentation = getMatchResultPresentation({
+    entry: "discovery_route",
+    matchedUserName: match.matchedUser.displayName,
+    canStartConversation
+  })
+  const [sendMessageAction, keepDiscoveringAction] = presentation.actions
   const [reportVisible, setReportVisible] = useState(false)
   const openingChatRef = useRef(false)
 
@@ -64,7 +71,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const dockAnim = useEntranceAnimation({ delay: 600, translateY: 40 })
 
   const handleStartChat = (): void => {
-    if (!canStartConversation || openingChatRef.current) return
+    if (!sendMessageAction.enabled || openingChatRef.current) return
     openingChatRef.current = true
     navigation.reset(createPostMatchChatNavigationState({
       partnerId: match.matchedUser.userId,
@@ -87,11 +94,11 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
       <SafeAreaView contentGutter style={styles.safe} edges={["top", "left", "right", "bottom"]}>
         <Animated.View style={headerAnim}>
           <GlassHeader
-            title="It’s a vibe."
-            eyebrow="New match"
+            title={presentation.headline}
+            eyebrow={presentation.eyebrow}
             leftSlot={
               <ActionButtonCircle
-                accessibilityLabel="Return to Discover"
+                accessibilityLabel={presentation.backLabel}
                 variant="soft"
                 size={42}
                 onPress={handleKeepExploring}
@@ -101,7 +108,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
             }
             rightSlot={
               <ActionButtonCircle
-                accessibilityLabel={`Safety options for ${match.matchedUser.displayName}`}
+                accessibilityLabel={presentation.safetyLabel}
                 variant="soft"
                 size={42}
                 onPress={() => setReportVisible(true)}
@@ -129,10 +136,8 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
               <Animated.View style={[styles.matchHaloContainer, haloAnim]} pointerEvents="none">
                 <Ionicons name="heart" size={260} color="rgba(255, 79, 152, 0.16)" />
               </Animated.View>
-              <Text style={styles.heroTitle}>You two just matched.</Text>
-              <Text style={styles.heroBody}>
-                Start with a message and get to know each other at your pace.
-              </Text>
+              <Text style={styles.heroTitle}>{presentation.title}</Text>
+              <Text style={styles.heroBody}>{presentation.body}</Text>
               <View style={styles.avatarRow}>
                 <AvatarSpotlight
                   label={sessionActor.profile.displayName}
@@ -159,25 +164,23 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
           </Animated.View>
 
           <GlassCard style={styles.nextCard}>
-            <Text style={styles.nextTitle}>Make the first move feel natural.</Text>
-            <Text style={styles.nextBody}>
-              A thoughtful hello is enough to get the conversation going.
-            </Text>
+            <Text style={styles.nextTitle}>{presentation.nextStepTitle}</Text>
+            <Text style={styles.nextBody}>{presentation.nextStepBody}</Text>
           </GlassCard>
         </ScrollView>
 
         <Animated.View style={dockAnim}>
           <FloatingGlassDock style={styles.actionDock}>
             <GlassCTA
-              label="Say Hi"
+              label={sendMessageAction.label}
               onPress={() => {
                 handleStartChat()
               }}
-              disabled={!canStartConversation}
+              disabled={!sendMessageAction.enabled}
             />
             <View style={styles.secondaryActions}>
               <GlassCTA
-                label="Keep Exploring"
+                label={keepDiscoveringAction.label}
                 variant="secondary"
                 onPress={handleKeepExploring}
                 style={styles.secondaryAction}

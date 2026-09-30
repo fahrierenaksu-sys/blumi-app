@@ -651,6 +651,27 @@ test("the match modal opens the synced thread, a pending partner chat, or Discov
   )
 })
 
+test("the match modal presents each match once and reports match_created through the shared model", () => {
+  const { presentConnectionMatch } = loadModule("../features/connections/connectionMatchPresentation.ts")
+  const { getMatchCreatedProperties } = loadModule("../features/matches/matchResultPresentation.ts")
+  const handledMatchIdsRef = { current: new Set() }
+  const events = []
+  const shown = []
+  const presentMatch = evaluate(findInitializer(OWNER.matchModal, "presentMatch"), {
+    presentConnectionMatch,
+    getMatchCreatedProperties,
+    handledMatchIdsRef,
+    captureProductEvent: (name, properties) => events.push([name, properties]),
+    showToast: () => undefined,
+    setGlobalMatch: (value) => shown.push(value)
+  })
+  const match = { miniRoomId: "match-1", matchedUserId: "user-two", matchedUserName: "Two", mode: "production" }
+  presentMatch(match)
+  presentMatch(match)
+  assert.deepEqual(plain(events), [["match_created", { source: "mini_room_mutual_save", mode: "production" }]])
+  assert.deepEqual(plain(shown), [{ miniRoomId: "match-1", matchedUserName: "Two", matchedUserId: "user-two" }])
+})
+
 test("ending a session forgets presented and reconciling matches and closes the modal", () => {
   const handledMatchIdsRef = { current: new Set(["match-1"]) }
   const reconcilingMatchIdsRef = { current: new Set(["match-2"]) }

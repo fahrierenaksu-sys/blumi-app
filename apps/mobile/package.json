@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "eas-build-post-install": "node --import tsx scripts/legal-preflight.ts",
-    "test:privacy-recovery": "node --import tsx --test src/observability/crashPrivacy.test.ts src/ui/errorBoundaryCopy.test.ts src/ui/errorBoundary.test.ts",
+    "test:privacy-recovery": "node --import tsx --test src/observability/crashPrivacy.test.ts src/ui/errorBoundaryCopy.test.ts src/ui/errorBoundaryScope.test.ts src/ui/errorBoundary.test.ts",
     "start": "EXPO_PUBLIC_BLUMI_MEDIA_MODE=demo expo start --dev-client --host lan --scheme blumi --port 8081",
     "start:go": "EXPO_PUBLIC_BLUMI_MEDIA_MODE=demo EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS=1 expo start --go --host lan --port 8081",
     "start:clear": "EXPO_PUBLIC_BLUMI_MEDIA_MODE=demo expo start --clear --dev-client --host lan --scheme blumi --port 8081",

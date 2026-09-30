@@ -17,6 +17,10 @@ import {
 } from "./DiscoverCard"
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
 import { useReducedMotion } from "../ui/animations"
+import {
+  getMatchCelebrationMotion,
+  getMatchResultPresentation
+} from "../features/matches/matchResultPresentation"
 import { uiTheme } from "../ui/theme"
 
 interface MatchResultModalProps {
@@ -186,6 +190,13 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const heartPulse = useRef(new Animated.Value(1)).current
   const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
   const reduceMotion = useReducedMotion()
+  const motion = getMatchCelebrationMotion(reduceMotion)
+  const presentation = getMatchResultPresentation({
+    entry: "connection_modal",
+    matchedUserName,
+    canStartConversation: true
+  })
+  const [sendMessageAction, keepDiscoveringAction] = presentation.actions
   const resolvedMatchedAvatarSnapshot = createCandidateAvatarSnapshot({
     userId: matchedUserId ?? matchedUserName,
     displayName: matchedUserName,
@@ -204,7 +215,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
     scaleAnim.setValue(0)
     heartPulse.setValue(1)
 
-    if (reduceMotion) {
+    if (!motion.entranceSpring) {
       scaleAnim.setValue(1)
       return
     }
@@ -235,7 +246,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
     ])
     entranceAnimationRef.current = animation
     animation.start()
-  }, [heartPulse, reduceMotion, scaleAnim, stopEntrance])
+  }, [heartPulse, motion.entranceSpring, scaleAnim, stopEntrance])
 
   useEffect(() => {
     if (visible) {
@@ -247,11 +258,11 @@ export function MatchResultModal(props: MatchResultModalProps) {
   }, [runEntrance, stopEntrance, visible])
 
   return (
-    <Modal visible={visible} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={motion.modalAnimationType} onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close match result"
+          accessibilityLabel={presentation.closeLabel}
           style={styles.backdrop}
           onPress={onClose}
         />
@@ -263,25 +274,23 @@ export function MatchResultModal(props: MatchResultModalProps) {
             }
           ]}
         >
-          <ConfettiOverlay playing={visible && !reduceMotion} />
+          <ConfettiOverlay playing={visible && motion.confetti} />
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close match result"
+            accessibilityLabel={presentation.closeLabel}
             style={styles.closeButton}
             onPress={onClose}
           >
             <Ionicons accessible={false} name="close" size={20} color={uiTheme.colors.secondaryText} />
           </Pressable>
 
-          <Text style={styles.headline}>It&apos;s a vibe.</Text>
-          <Text style={styles.supportText}>
-            You and {matchedUserName} both felt it. Start with a message when you are ready.
-          </Text>
+          <Text style={styles.headline}>{presentation.headline}</Text>
+          <Text style={styles.supportText}>{presentation.body}</Text>
 
           <View style={styles.confirmedPill}>
             <View style={styles.confirmedDot} />
-            <Text style={styles.confirmedText}>Mutual match</Text>
+            <Text style={styles.confirmedText}>{presentation.badgeLabel}</Text>
           </View>
 
           <View style={styles.connectionRow}>
@@ -328,11 +337,11 @@ export function MatchResultModal(props: MatchResultModalProps) {
 
           <View style={styles.actions}>
             <PrimaryButton
-              label="Start chatting"
+              label={sendMessageAction.label}
               onPress={onSendMessage}
             />
             <SecondaryButton
-              label="Keep exploring"
+              label={keepDiscoveringAction.label}
               onPress={onKeepDiscovering}
             />
           </View>
