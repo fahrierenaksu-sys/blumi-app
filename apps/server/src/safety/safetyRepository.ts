@@ -125,14 +125,18 @@ export function createInMemorySafetyRepository(
       return block ? { ...block } : null
     },
     async saveBlock(block) {
-      store.blocks.set(blockKey(block.actorUserId, block.blockedUserId), {
-        ...block
-      })
+      // Mirrors PostgreSQL ON CONFLICT DO NOTHING: the first block wins.
+      const key = blockKey(block.actorUserId, block.blockedUserId)
+      if (!store.blocks.has(key)) store.blocks.set(key, { ...block })
     },
     async deleteBlock(actorUserId, blockedUserId) {
       store.blocks.delete(blockKey(actorUserId, blockedUserId))
     },
     async saveReport(report) {
+      // Mirrors the PostgreSQL primary key: a report is never overwritten.
+      if (store.reports.has(report.reportId)) {
+        throw new Error("Safety report already exists.")
+      }
       store.reports.set(report.reportId, cloneReport(report))
     },
     async saveReportAndBlock(report, block) {

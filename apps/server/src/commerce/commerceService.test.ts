@@ -132,3 +132,39 @@ test("a later credit pays coin debt before increasing spendable coins", async ()
   assert.equal(credited.inventory.coinDebt, 0)
   assert.equal(credited.inventory.coins, 320)
 })
+
+test("a signed event replayed with a different payload is rejected without touching the wallet", async () => {
+  const repository = createInMemoryEconomyRepository()
+  const commerceService = createCommerceService({
+    economyService: createEconomyService({ repository })
+  })
+  await commerceService.applyVerifiedTransaction(createVerifiedPurchase(), CREATED_AT)
+
+  await assert.rejects(
+    commerceService.applyVerifiedTransaction(
+      { ...createVerifiedPurchase(), providerPayload: { verified: "tampered" } },
+      CREATED_AT
+    ),
+    /conflicts with its recorded payload/i
+  )
+  assert.equal((await repository.getInventory("user_a"))?.coins, 1750)
+})
+
+test("a reconcile snapshot whose provider body drifted replays as already processed", async () => {
+  const commerceService = createCommerceService({
+    economyService: createEconomyService()
+  })
+  const snapshot = {
+    ...createVerifiedPurchase({ eventId: "reconcile:purchase_1" }),
+    providerPayloadKind: "snapshot" as const
+  }
+  const first = await commerceService.applyVerifiedTransaction(snapshot, CREATED_AT)
+  const drifted = await commerceService.applyVerifiedTransaction(
+    { ...snapshot, providerPayload: { verified: true, refreshed: true } },
+    CREATED_AT
+  )
+
+  assert.equal(first.applied, true)
+  assert.equal(drifted.applied, false)
+  assert.equal(drifted.inventory.coins, 1750)
+})

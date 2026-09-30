@@ -76,18 +76,20 @@ test("postgres chat repository saves threads with ordered participants", async (
     createdAt: "2026-06-27T10:00:00.000Z"
   })
 
+  assert.equal(fake.calls.length, 1)
   assert.match(fake.calls[0].text, /INSERT INTO blumi_chat_threads/)
   assert.match(fake.calls[0].text, /ON CONFLICT \(thread_id\) DO NOTHING/)
+  assert.match(fake.calls[0].text, /INSERT INTO blumi_chat_thread_participants/)
+  assert.match(fake.calls[0].text, /FROM inserted_thread/)
+  assert.doesNotMatch(fake.calls[0].text, /DO UPDATE/)
   assert.deepEqual(fake.calls[0].values?.slice(0, 2), [
     "thread_one",
     "room_one"
   ])
-  assert.match(
-    fake.calls[1].text,
-    /INSERT INTO blumi_chat_thread_participants/
-  )
-  assert.deepEqual(fake.calls[1].values, ["thread_one", "user_a", "A", 0])
-  assert.deepEqual(fake.calls[2].values, ["thread_one", "user_b", "B", 1])
+  assert.deepEqual(fake.calls[0].values?.slice(4), [
+    ["user_a", "user_b"],
+    ["A", "B"]
+  ])
 })
 
 test("match sync checks existing chat IDs in one parameterized query", async () => {

@@ -121,36 +121,33 @@ export function createPostgresChatRepository(
     },
 
     async saveThread(thread) {
+      // One statement: participants are written only when this call created
+      // the thread, so a concurrent or repeated save can never add or rename
+      // participants of an existing thread (matches the in-memory contract).
       await pool.query(
-        `INSERT INTO blumi_chat_threads (
-            thread_id, mini_room_id, created_at, last_message_id
-          ) VALUES ($1, $2, $3, $4)
-          ON CONFLICT (thread_id) DO NOTHING`,
+        `WITH inserted_thread AS (
+           INSERT INTO blumi_chat_threads (
+             thread_id, mini_room_id, created_at, last_message_id
+           ) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (thread_id) DO NOTHING
+           RETURNING thread_id
+         )
+         INSERT INTO blumi_chat_thread_participants (
+           thread_id, user_id, display_name, participant_order
+         )
+         SELECT inserted_thread.thread_id, participant.user_id,
+                participant.display_name, participant.participant_order - 1
+           FROM inserted_thread
+          CROSS JOIN unnest($5::text[], $6::text[])
+                WITH ORDINALITY AS participant(user_id, display_name, participant_order)`,
         [
           thread.threadId,
           thread.miniRoomId,
           new Date(thread.createdAt),
-          thread.lastMessage?.messageId ?? null
+          thread.lastMessage?.messageId ?? null,
+          thread.participants.map((participant) => participant.userId),
+          thread.participants.map((participant) => participant.displayName ?? null)
         ]
-      )
-
-      await Promise.all(
-        thread.participants.map((participant, index) =>
-          pool.query(
-            `INSERT INTO blumi_chat_thread_participants (
-                thread_id, user_id, display_name, participant_order
-              ) VALUES ($1, $2, $3, $4)
-              ON CONFLICT (thread_id, user_id) DO UPDATE SET
-                display_name = EXCLUDED.display_name,
-                participant_order = EXCLUDED.participant_order`,
-            [
-              thread.threadId,
-              participant.userId,
-              participant.displayName ?? null,
-              index
-            ]
-          )
-        )
       )
     },
 
@@ -162,7 +159,7 @@ export function createPostgresChatRepository(
                     delivered_at, read_at, edited_at
                FROM blumi_chat_messages
               WHERE thread_id = $1
-              ORDER BY sent_at ASC`,
+              ORDER BY sent_at ASC, message_id ASC`,
             [threadId]
           )
       return result.rows.map(mapMessage)
