@@ -100,7 +100,7 @@ test("MiniRoom movement rerenders only the live avatar layer", () => {
   ]) {
     assert.match(
       miniRoomSceneSource,
-      new RegExp(`const ${componentName} = memo\\(`)
+      new RegExp(`(?:const |, )${componentName} = memo\\(`)
     )
   }
   assert.match(

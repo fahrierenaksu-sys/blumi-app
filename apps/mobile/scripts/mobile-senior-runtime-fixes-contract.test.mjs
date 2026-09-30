@@ -26,11 +26,11 @@ test("scene and snapshot resets cancel the active movement loop first", () => {
 
   assert.match(
     store,
-    /useEffect\(\(\) => \{\s*cancelActiveMiniRoomMovement\(activeMovementRef, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = createInitialAvatars[\s\S]*?snapMiniRoomAvatarPosition\(/
+    /useEffect\(\(\) => \{\s*for \(const ref of movementsRef\.current\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = createInitialAvatars[\s\S]*?snapMiniRoomAvatarPosition\(/
   )
   assert.match(
     store,
-    /cancelActiveMiniRoomMovement\(activeMovementRef, cancelMiniRoomMovementRun\)/
+    /for \(const ref of movements\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)/
   )
   assert.match(store, /scheduleMiniRoomMovementCompletion\(/)
 })

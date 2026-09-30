@@ -76,6 +76,10 @@ deploy veya fiziksel cihaz push denemesi yapılmadı.
   mobil hareket/lifecycle paketi 9 geçti; oda paketi 387 geçti;
   contracts 82, domain 24, realtime-client 43, tema/mühendislik 27 geçti.
   Typecheck ve lint geçti.
+- İlk pre-push tam kontrolü, iki eski kaynak kodu beklentisinde durdu.
+  Memo kontrolleri ortak `const` bildirimini; reset kontrolü iki avatarın
+  ayrı hareket sürücülerini artık tanır. İlgili kontroller 12/12 ve iki
+  yürüyüşün reset sırasında iptalini de kapsayan lifecycle testleri 8/8 geçti.
 - Native kontrolü kullanıcı üstlendi. Ayrı `Blumi Motion QA` Simulator'ı ve
   bu checkout'tan 8083 Metro başlatıldı; bundle yüklendi, fakat gerçek oda
   akışında hareket/presence native kabulü yapılmadı. Bu nedenle

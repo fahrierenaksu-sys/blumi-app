@@ -89,6 +89,20 @@ test("both avatars walk concurrently; retargeting one cancels only its own UI-th
   assert.ok(f.cancelledDrivers.includes(f.store().avatarPositions.partner), "unmount cancels the remote animator too")
 })
 
+test("participant reset cancels both walking drivers before creating the new scene", () => {
+  const f = mount()
+  f.render()
+  assert.equal(f.store().moveLocalAvatar({ x: .35, y: .70 }), true)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
+  const previous = f.store().avatarPositions
+  f.render({ partnerUser: { userId: "partner-2", displayName: "Other" } })
+  assert.deepEqual(f.cancelledDrivers, [previous.local, previous.partner])
+  assert.deepEqual(Object.keys(f.store().avatars).sort(), ["local", "partner-2"])
+  assert.equal(f.store().avatars.local.motion, "idle")
+  assert.equal(f.store().avatars["partner-2"].motion, "idle")
+  f.runtime.unmount()
+})
+
 test("re-renders with the same participants keep the scene, speech and callbacks", () => {
   const f = mount()
   const first = f.render()
