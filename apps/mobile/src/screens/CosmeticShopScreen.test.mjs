@@ -6,6 +6,14 @@ import ts from "typescript"
 
 const source = readFileSync(new URL("./CosmeticShopScreen.tsx", import.meta.url), "utf8")
 const file = ts.createSourceFile("CosmeticShopScreen.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+// The screen was decomposed into features/shop/screen; each test reads the module that owns the code.
+const readScreenModule = (fileName) => readFileSync(new URL(`../features/shop/screen/${fileName}`, import.meta.url), "utf8")
+const parseScreenModule = (fileName) => ts.createSourceFile(fileName, readScreenModule(fileName), ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+const cardFile = parseScreenModule("ShopProductCard.tsx")
+const modelFile = parseScreenModule("shopScreenModel.ts")
+const purchaseActionsFile = parseScreenModule("useShopPurchaseActions.ts")
+const previewSelectionSource = readScreenModule("useShopPreviewSelection.ts")
+const combinationSessionSource = readScreenModule("useShopCombinationSession.ts")
 const layoutSource = readFileSync(new URL("../features/shop/shopThumbnailLayout.ts", import.meta.url), "utf8")
 const layout = runInNewContext(ts.transpileModule(`${layoutSource.replace(/export /g, "")}\ngetShopThumbnailLayout`, {
   compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 }
@@ -17,9 +25,9 @@ const flatten = (style) => Object.assign({}, ...[style].flat(Infinity).filter(Bo
 // Execute the real leaf render before any layout/effect callback. This proves
 // render geometry, not native image decode, React scheduling or paint timing.
 function renderThumbnail(props) {
-  const declaration = file.statements.find((entry) => ts.isFunctionDeclaration(entry) && entry.name?.text === "AvatarProductThumbnail")
+  const declaration = cardFile.statements.find((entry) => ts.isFunctionDeclaration(entry) && entry.name?.text === "AvatarProductThumbnail")
   assert.ok(declaration)
-  const code = ts.transpileModule(`${declaration.getText(file)}\nAvatarProductThumbnail(input)`, {
+  const code = ts.transpileModule(`${declaration.getText(cardFile)}\nAvatarProductThumbnail(input)`, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   return runInNewContext(code, {
@@ -54,9 +62,9 @@ test("first and repeated Shop mounts draw padded artwork at final bounds without
 })
 
 test("card passes its inner content dimensions to the thumbnail including padding and border", () => {
-  const declaration = file.statements.find((entry) => ts.isVariableStatement(entry) && entry.declarationList.declarations.some((node) => node.name.getText(file) === "ShopProductCard"))
+  const declaration = cardFile.statements.find((entry) => ts.isVariableStatement(entry) && entry.declarationList.declarations.some((node) => node.name.getText(cardFile) === "ShopProductCard"))
   const component = declaration.declarationList.declarations[0].initializer.arguments[0]
-  const code = ts.transpileModule(`const renderCard = ${component.getText(file)}; renderCard(input)`, {
+  const code = ts.transpileModule(`const renderCard = ${component.getText(cardFile)}; renderCard(input)`, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   for (const [cardWidth, cardPadding, thumbHeight] of [[88, 7, 44], [119, 9, 64], [330, 10, 70]]) {
@@ -77,10 +85,10 @@ test("card passes its inner content dimensions to the thumbnail including paddin
 })
 
 test("selecting a Shop card hands the product to the live preview without speculative image work", () => {
-  const declaration = file.statements.find((entry) => ts.isVariableStatement(entry) && entry.declarationList.declarations.some((node) => node.name.getText(file) === "ShopProductCard"))
+  const declaration = cardFile.statements.find((entry) => ts.isVariableStatement(entry) && entry.declarationList.declarations.some((node) => node.name.getText(cardFile) === "ShopProductCard"))
   assert.ok(declaration)
   const component = declaration.declarationList.declarations[0].initializer.arguments[0]
-  const code = ts.transpileModule(`const renderCard = ${component.getText(file)}; renderCard(input)`, {
+  const code = ts.transpileModule(`const renderCard = ${component.getText(cardFile)}; renderCard(input)`, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   const selected = []
@@ -105,14 +113,14 @@ test("selecting a Shop card hands the product to the live preview without specul
 })
 
 test("selected Shop previews request only added avatar layers or the furniture render source", () => {
-  assert.match(source, /getShopPreviewAddedAssets/)
-  assert.match(source, /publishSelectedShopPreviewWarmup/)
+  assert.match(previewSelectionSource, /getShopPreviewAddedAssets/)
+  assert.match(previewSelectionSource, /publishSelectedShopPreviewWarmup/)
   assert.match(
-    source,
+    previewSelectionSource,
     /getShopPreviewAddedAssets\(currentAvatar, product\.avatarItem\)\.map\(\(asset\) => asset\.source\)/
   )
-  assert.match(source, /product\.roomItem\.asset\.source/)
-  assert.match(source, /navigation\.addListener\("blur"[\s\S]*?publishSelectedShopPreviewWarmup\(\[\]\)/)
+  assert.match(previewSelectionSource, /product\.roomItem\.asset\.source/)
+  assert.match(combinationSessionSource, /navigation\.addListener\("blur"[\s\S]*?publishSelectedShopPreviewWarmup\(\[\]\)/)
 })
 
 function findFunction(sourceFile, name) {
@@ -130,11 +138,11 @@ function runShopPolicy(input) {
     ts.ScriptKind.TS
   )
   const shouldRenderShopContent = findFunction(presentationModel, "shouldRenderShopContent")
-  const policy = findFunction(file, "getShopSurfacePolicy")
-  assert.ok(policy, "the Shop screen must define its inventory/render policy")
+  const policy = findFunction(modelFile, "getShopSurfacePolicy")
+  assert.ok(policy, "the Shop screen model must define its inventory/render policy")
   assert.ok(shouldRenderShopContent)
   const code = ts.transpileModule(
-    `${shouldRenderShopContent.getText(presentationModel)}\n${policy.getText(file)}\ngetShopSurfacePolicy(input)`,
+    `${shouldRenderShopContent.getText(presentationModel)}\n${policy.getText(modelFile)}\ngetShopSurfacePolicy(input)`,
     { compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 } }
   ).outputText
   return runInNewContext(code, { input, exports: {} })
@@ -198,9 +206,9 @@ test("production Shop enables ownership and actions only after a connected serve
 })
 
 test("unverified product presentation masks ownership and price without changing preview identity", () => {
-  const mask = findFunction(file, "maskUnverifiedProductOwnership")
+  const mask = findFunction(modelFile, "maskUnverifiedProductOwnership")
   assert.ok(mask, "unverified Shop products need a neutral presentation")
-  const code = ts.transpileModule(`${mask.getText(file)}\nmaskUnverifiedProductOwnership(input.product, false, input.label)`, {
+  const code = ts.transpileModule(`${mask.getText(modelFile)}\nmaskUnverifiedProductOwnership(input.product, false, input.label)`, {
     compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 }
   }).outputText
   const product = {
@@ -209,7 +217,7 @@ test("unverified product presentation masks ownership and price without changing
     sourceItemId: "top-1", sectionId: "avatar", previewType: "avatar",
     avatarItem: { id: "top-1", type: "top" }
   }
-  const safe = runInNewContext(code, { input: { product, label: "Mağazan hazırlanıyor" } })
+  const safe = runInNewContext(code, { exports: {}, input: { product, label: "Mağazan hazırlanıyor" } })
 
   assert.equal(safe.id, product.id)
   assert.equal(safe.avatarItem, product.avatarItem)
@@ -227,6 +235,7 @@ test("Shop screen wires the inventory policy into rendering, cards, and mutation
     ts.forEachChild(node, visit)
   }
   visit(file)
+  visit(purchaseActionsFile)
 
   const policy = declarations.find((entry) => entry.name.text === "shopSurfacePolicy")
   assert.ok(policy)
@@ -237,23 +246,24 @@ test("Shop screen wires the inventory policy into rendering, cards, and mutation
 
   const applyHandler = declarations.find((entry) => entry.name.text === "handleApplyCombination")
   const primaryHandler = declarations.find((entry) => entry.name.text === "handlePrimaryAction")
-  assert.match(applyHandler.initializer.getText(file), /!inventoryVerified/)
-  assert.match(primaryHandler.initializer.getText(file), /!canPerformShopActions/)
+  assert.match(applyHandler.initializer.getText(purchaseActionsFile), /!inventoryVerified/)
+  assert.match(primaryHandler.initializer.getText(purchaseActionsFile), /!canPerformShopActions/)
+  assert.match(source, /useShopPurchaseActions\(\{[\s\S]*?inventoryVerified,[\s\S]*?canPerformShopActions,/)
 
   const screenText = file.getText()
-  assert.match(screenText, /inventoryVerified && product\.owned/)
+  assert.match(cardFile.getText(), /inventoryVerified && product\.owned/)
   assert.match(screenText, /inventoryVerified\s*\?\s*formatCoins\(inventoryStore\.inventory\.coins/)
   assert.match(screenText, /primaryActionDisabled=\{\s*!inventoryVerified/)
   assert.match(screenText, /!inventoryVerified && shopPresentationState === "error"/)
 })
 
 test("unverified catalog cards show neutral pending status, not ownership or price", () => {
-  const declaration = file.statements
+  const declaration = cardFile.statements
     .flatMap((entry) => ts.isVariableStatement(entry) ? entry.declarationList.declarations : [])
     .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === "ShopProductCard")
   assert.ok(declaration)
   const component = declaration.initializer.arguments[0]
-  const code = ts.transpileModule(`const renderCard = ${component.getText(file)}; renderCard(input)`, {
+  const code = ts.transpileModule(`const renderCard = ${component.getText(cardFile)}; renderCard(input)`, {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   const tree = runInNewContext(code, {

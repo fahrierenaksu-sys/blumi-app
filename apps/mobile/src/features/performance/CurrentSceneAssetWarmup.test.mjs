@@ -17,10 +17,14 @@ const roomEditorSource = readFileSync(
   new URL("../../screens/MyRoomEditorScreen.tsx", import.meta.url),
   "utf8"
 )
-const shopScreenSource = readFileSync(
-  new URL("../../screens/CosmeticShopScreen.tsx", import.meta.url),
+const readShopScreenModule = (fileName) => readFileSync(
+  new URL(`../shop/screen/${fileName}`, import.meta.url),
   "utf8"
 )
+const shopClosetBrowserSource = readShopScreenModule("ClosetBrowser.tsx")
+const shopScreenModelSource = readShopScreenModule("shopScreenModel.ts")
+const shopPreviewSelectionSource = readShopScreenModule("useShopPreviewSelection.ts")
+const shopCombinationSessionSource = readShopScreenModule("useShopCombinationSession.ts")
 const sourceFile = ts.createSourceFile(
   "CurrentSceneAssetWarmup.tsx",
   source,
@@ -244,16 +248,16 @@ test("home Shop route mode reaches warmup and selects the bounded room-card view
   assert.match(source, /shopMode === "home"/)
   assert.match(source, /shopLayoutMetrics\.catalog\.accessibilityLayout \? 2 : 4/)
   assert.doesNotMatch(source, /for \(const item of ROOM_V2_FURNITURE_CATALOG\)\s*\{\s*sources\.push/)
-  assert.match(shopScreenSource, /const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2/)
-  assert.match(shopScreenSource, /catalog\.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
-  assert.match(shopScreenSource, /function sortRoomShopProducts\([\s\S]*?HOME_CATEGORY_SORT_ORDER[\s\S]*?left\.title\.localeCompare\(right\.title\)/)
+  assert.match(shopClosetBrowserSource, /const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2/)
+  assert.match(shopClosetBrowserSource, /catalog\.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  assert.match(shopScreenModelSource, /function sortRoomShopProducts\([\s\S]*?HOME_CATEGORY_SORT_ORDER[\s\S]*?left\.title\.localeCompare\(right\.title\)/)
 })
 
 test("selected furniture warmup uses the full renderer source, not its thumbnail", () => {
-  assert.match(shopScreenSource, /selectedWarmupSources\.push\(product\.roomItem\.asset\.source\)/)
-  assert.match(shopScreenSource, /getShopPreviewAddedAssets\(currentAvatar, product\.avatarItem\)/)
-  assert.match(shopScreenSource, /publishSelectedShopPreviewWarmup\(selectedWarmupSources\)/)
-  assert.match(shopScreenSource, /navigation\.addListener\("blur",[\s\S]*?publishSelectedShopPreviewWarmup\(\[\]\)/)
+  assert.match(shopPreviewSelectionSource, /selectedWarmupSources\.push\(product\.roomItem\.asset\.source\)/)
+  assert.match(shopPreviewSelectionSource, /getShopPreviewAddedAssets\(currentAvatar, product\.avatarItem\)/)
+  assert.match(shopPreviewSelectionSource, /publishSelectedShopPreviewWarmup\(selectedWarmupSources\)/)
+  assert.match(shopCombinationSessionSource, /navigation\.addListener\("blur",[\s\S]*?publishSelectedShopPreviewWarmup\(\[\]\)/)
   assert.match(source, /selectedGenerationRef\.current === request\.generation/)
   assert.match(source, /onNativeNotStarted: \(uri\) => sourceDimensions\.delete\(uri\)/)
 })

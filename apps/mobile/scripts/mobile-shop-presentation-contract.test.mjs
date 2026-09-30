@@ -21,6 +21,16 @@ const shopNavigationControls = readFileSync(
   resolve(mobileRoot, "src/features/shop/ShopNavigationControls.tsx"),
   "utf8"
 )
+// Modules the Shop screen was decomposed into; each assertion reads its owner.
+const readShopScreenModule = (fileName) => readFileSync(
+  resolve(mobileRoot, "src/features/shop/screen", fileName),
+  "utf8"
+)
+const closetBrowser = readShopScreenModule("ClosetBrowser.tsx")
+const categoryRail = readShopScreenModule("VerticalShopCategoryRail.tsx")
+const productCard = readShopScreenModule("ShopProductCard.tsx")
+const shopScreenStyles = readShopScreenModule("shopScreenStyles.ts")
+const shopScreenModel = readShopScreenModule("shopScreenModel.ts")
 
 test("shop remains body-compatible through the catalog source of truth", () => {
   assert.match(shopCatalog, /getAvatarV2ShopItemsCompatibleWithBody\(/)
@@ -28,48 +38,50 @@ test("shop remains body-compatible through the catalog source of truth", () => {
 })
 
 test("compact shop shows two readable product columns per page", () => {
-  assert.match(shopScreen, /SHOP_PRODUCT_COLUMNS_PER_PAGE\s*=\s*2/)
-  assert.match(shopScreen, /productCardWidth[\s\S]*SHOP_PRODUCT_COLUMNS_PER_PAGE/)
-  assert.match(shopScreen, /index \+= catalog.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  assert.match(closetBrowser, /SHOP_PRODUCT_COLUMNS_PER_PAGE\s*=\s*2/)
+  assert.match(closetBrowser, /productCardWidth[\s\S]*SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  assert.match(closetBrowser, /index \+= catalog.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
 })
 
 test("full-canvas rig layers get a type-aware contained presentation", () => {
   assert.match(
-    shopScreen,
+    productCard,
     /getMaleRigLayerThumbnailPresentation\(item\.type, "shop"\)/
   )
-  assert.match(shopScreen, /isRigLayerSource=\{isRigLayerSource\}/)
-  assert.match(shopScreen, /contentFit="contain"/)
-  assert.match(shopScreen, /productWearableRigLayer/)
+  assert.match(productCard, /isRigLayerSource=\{isRigLayerSource\}/)
+  assert.match(productCard, /contentFit="contain"/)
+  assert.match(productCard, /productWearableRigLayer/)
 })
 
 test("shop product thumbnails stay fully contained inside their glass frame", () => {
   assert.match(
-    shopScreen,
+    shopScreenStyles,
     /productWearableImage:\s*\{[^}]*width:\s*"100%",[^}]*height:\s*"100%"/
   )
   assert.doesNotMatch(
-    shopScreen,
+    shopScreenStyles,
     /productWearableImage:\s*\{[^}]*width:\s*"108%"/
   )
   assert.match(
-    shopScreen,
+    shopScreenStyles,
     /productThumb:\s*\{[\s\S]*?overflow:\s*"hidden"/
   )
 })
 
 test("shop removes misleading affordances and keeps compact labels legible", () => {
-  assert.doesNotMatch(shopScreen, />See all</)
-  assert.doesNotMatch(shopScreen, /return "Feat"/)
-  assert.doesNotMatch(shopScreen, /return "Own"/)
-  assert.match(shopScreen, /productTitle:\s*\{[\s\S]*?fontSize:\s*11/)
+  for (const source of [shopScreen, closetBrowser, categoryRail, productCard, shopScreenModel]) {
+    assert.doesNotMatch(source, />See all</)
+    assert.doesNotMatch(source, /return "Feat"/)
+    assert.doesNotMatch(source, /return "Own"/)
+  }
+  assert.match(shopScreenStyles, /productTitle:\s*\{[\s\S]*?fontSize:\s*11/)
 })
 
 test("every compact shop action keeps a 44 point touch target", () => {
   assert.match(shopScreen, /accessibilityLabel=\{copy\.back\}[\s\S]*?size=\{44\}/)
-  assert.match(shopScreen, /coinPill:\s*\{[\s\S]*?minHeight:\s*44/)
+  assert.match(shopScreenStyles, /coinPill:\s*\{[\s\S]*?minHeight:\s*44/)
   assert.match(shopNavigationControls, /modePill:\s*\{[\s\S]*?minHeight:\s*44/)
-  assert.match(shopScreen, /verticalCategoryChip:\s*\{[\s\S]*?minHeight:\s*44/)
+  assert.match(shopScreenStyles, /verticalCategoryChip:\s*\{[\s\S]*?minHeight:\s*44/)
   assert.match(shopPreviewStyles, /roomHeroAction:\s*\{[\s\S]*?minHeight:\s*44/)
   assert.match(shopPreviewStyles, /avatarHeroAction:\s*\{[\s\S]*?minHeight:\s*44/)
 })
@@ -77,7 +89,7 @@ test("every compact shop action keeps a 44 point touch target", () => {
 test("shop makes loading, empty, offline, and retry states explicit and accessible", () => {
   assert.match(shopScreen, /useNetworkStatus/)
   assert.match(shopScreen, /const shopPresentationState = getShopPresentationState\(/)
-  assert.match(shopScreen, /showShopContent: shouldRenderShopContent\(/)
+  assert.match(shopScreenModel, /showShopContent: shouldRenderShopContent\(/)
   assert.match(shopScreen, /const \{\s*showShopContent,[\s\S]*?\} = shopSurfacePolicy/)
   assert.match(shopScreen, /isProduction: requiresServerInventory/)
   assert.match(shopScreen, /showShopContent \? \(/)

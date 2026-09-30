@@ -147,7 +147,10 @@ test("every promoted male rig layer alpha stays inside Shop and Wardrobe stages"
 
 test("shared presentation is consumed by Shop and Wardrobe without duplicating magic", () => {
   const root = process.cwd()
-  const shop = readFileSync(join(root, "src/screens/CosmeticShopScreen.tsx"), "utf8")
+  const shop = [
+    "src/screens/CosmeticShopScreen.tsx",
+    "src/features/shop/screen/ShopProductCard.tsx"
+  ].map((path) => readFileSync(join(root, path), "utf8")).join("\n")
   const wardrobe = [
     "src/screens/WardrobeV2Screen.tsx",
     "src/features/avatarV2/wardrobe/WardrobeCatalogCard.tsx"
