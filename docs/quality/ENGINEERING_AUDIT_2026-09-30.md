@@ -7,6 +7,12 @@ release certificate. Status labels follow `AGENTS.md`: **Implemented**,
 **Tested**, **Native verified**, **User approved**, **Production ready**,
 **Open/Blocked**. None of the items below is Native verified yet.
 
+> **2026-09-30 closing note:** the coverage matrix and open gates below were
+> written during wave 1 and are partly stale (for example 10I: the threat model,
+> refresh-token reuse detection and Firebase uid binding are now Implemented).
+> The current state, open work and contradictions are in
+> [`CLOSING_AUDIT_2026-09-30.md`](./CLOSING_AUDIT_2026-09-30.md).
+
 Integration branch: `claude/busy-cray-dl5wvr` (not merged to `main`).
 Environment: Linux cloud container, Node 22.22.2, no iOS Simulator. Native
 checks are performed separately on the owner's iPhone.

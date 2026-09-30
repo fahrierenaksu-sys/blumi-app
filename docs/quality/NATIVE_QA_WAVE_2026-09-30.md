@@ -1,7 +1,7 @@
 # Native QA plan: wave 2 (2026-09-30)
 
 - Baseline commit: `d230010` (wave 2 merged)
-- Delivery commit: `TBD — filled by the orchestrator at delivery`
+- Delivery commit: `8704cea` (full `npm run verify` on this commit is recorded in `CLOSING_AUDIT_2026-09-30.md`). Later commits on the branch that change only documents do not change what is tested here.
 - Branch: `claude/busy-cray-dl5wvr`
 - Runner: Codex, on the owner's physical iPhone (Xcode device tools) and on the iOS Simulator.
 - Status of this document: plan only. No item has been run. Every item starts **NOT RUN**. Nobody marks an item PASS from this document; only the runner does, with evidence attached.
@@ -87,7 +87,7 @@ Columns: ID | Pri | Plat | BE (backend group) | Preconditions | Steps | Expected
 | DSC-01 | P0 | Both | A | Signed in, deck available | Cold start into Discover. | Cards and profile cards render normally. No card flash before the safety (hidden people) list has loaded. | | NOT RUN |
 | DSC-02 | P0 | Both | A | Two accounts, partner already liked you | Like by swipe and by button. | Feedback pill shows. Mutual like opens MatchResult after a short delay. Leaving before the delay cancels it. | | NOT RUN |
 | DSC-03 | P0 | Both | A | Deck available | Like/pass by swipe and button; force a failing decision (network off). | Feedback pill on success. On failure the card returns and an error shows. | | NOT RUN |
-| DSC-04 | P0 | Both | A | Dev build, analytics consent ON, debug output visible | Produce a Discover mutual match. Then open View match (replay); then force a retry of the decision. | `match_created` emitted exactly once for the mutual match; not on View match replay; not on retry. With consent off, nothing is emitted. (Details to be confirmed by the orchestrator.) | | NOT RUN |
+| DSC-04 | P0 | Both | A | Dev build, analytics consent ON, debug output visible | Produce a Discover mutual match. Then open View match (replay); then force a retry of the decision. | `match_created` emitted exactly once for the mutual match; not on View match replay; not on retry. With consent off, nothing is emitted. Implementation (`d10179f`): emitted only from `decideProductionCandidate` after the server confirms the match; de-duplicated per account by match id in AsyncStorage key `@blumi/analytics/discovery_match_created_v1:<accountUserId>` (last 200 ids), so a retry or relaunch does not emit twice; consent read through `isProductAnalyticsCaptureEnabled()`. | | NOT RUN |
 | DSC-05 | P1 | Both | A | Safety list request forced to fail (offline at cold start) | Cold start; tap retry. | Error copy in EN and TR. Retry loads the deck. | | NOT RUN |
 | DSC-06 | P1 | Both | A | Deck available | Open ProfilePreview from a card; like; pass; return. | Like/pass work from preview and return to Discover in a consistent state. | | NOT RUN |
 | DSC-07 | P1 | Both | A | Deck available | Open filter sheet; change; apply; relaunch. | Badge shows active filters. Applied filter persists across relaunch. | | NOT RUN |
@@ -168,7 +168,7 @@ Columns: ID | Pri | Plat | BE (backend group) | Preconditions | Steps | Expected
 | ERR-02 | P1 | Sim | A | Same throw in InboxScreen (tab root) | Open Inbox; dismiss red box. | Recovery card for that tab only. No Go back button. Other tabs work. | | NOT RUN |
 | ERR-03 | P2 | Sim | A | ERR-01/02 crash active | Variants: TR, Large text. | Card copy localised and readable. | | NOT RUN |
 | ERR-04 | P1 | Sim | A | After ERR-01..03 | Revert the temporary throws. | `git diff` clean for YouScreen and InboxScreen. | | NOT RUN |
-| ERR-05 | P1 | Sim | A | Dev build pointed at the test Sentry project | Trigger the ERR-01 crash; inspect the Sentry event. | Event reaches the test project with only a `route` tag from the allowlist. No ids, params or user content. (Details to be confirmed by the orchestrator.) | | NOT RUN |
+| ERR-05 | P1 | Sim | A | Dev build pointed at the test Sentry project | Trigger the ERR-01 crash; inspect the Sentry event. | Event reaches the test project with only a `route` tag from the allowlist. No ids, params or user content. Implementation (`7434d2e`): only `boundary` (`root` or `route`) and `route` tags survive the privacy filter; a route name outside `ROOT_ROUTE_NAMES` is sent as `unknown`. | | NOT RUN |
 
 ### 3.11 Settings
 
