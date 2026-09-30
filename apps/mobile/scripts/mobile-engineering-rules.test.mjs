@@ -96,6 +96,24 @@ test("production files stay small; oversized debt may only shrink", () => {
   assert.deepEqual(offenders, [], "split screens into feature hooks, views and pure models")
 })
 
+// A worklet's default parameters are not captured by the worklet transform,
+// so a default that names a variable or import is undefined on the UI thread
+// and crashes there (it passes under node tests). Resolve defaults in the body.
+test("worklets never use identifiers in default parameters", () => {
+  const offenders = []
+  const signature = /(?:function\s+\w+|\bconst\s+\w+\s*=\s*)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?::[^{=]*)?(?:=>)?\s*\{\s*["']worklet["']/g
+  for (const { path, text } of sources) {
+    if (!/["']worklet["']/.test(text)) continue
+    for (const match of text.matchAll(signature)) {
+      for (const initializer of match[1].matchAll(/=\s*([A-Za-z_$][\w$.]*)/g)) {
+        if (["true", "false", "null", "undefined"].includes(initializer[1])) continue
+        offenders.push(`${path}:${text.slice(0, match.index).split("\n").length} default = ${initializer[1]}`)
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], "move the default into the worklet body")
+})
+
 const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 26
 
 test("react-hooks/exhaustive-deps suppressions do not grow", () => {

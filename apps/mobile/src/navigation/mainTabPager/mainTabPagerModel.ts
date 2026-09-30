@@ -33,9 +33,13 @@ function clampIndex(index: number, minIndex: number, maxIndex: number): number {
 export function rubberBand(
   overscroll: number,
   dimension: number,
-  coefficient: number = MAIN_TAB_PAGER_RUBBER_BAND_COEFFICIENT
+  coefficientOverride?: number
 ): number {
   "worklet"
+  // Resolve the default in the body: the worklet transform captures values
+  // used in the body, not in default parameters, so a default that names an
+  // imported constant is undefined on the UI thread.
+  const coefficient = coefficientOverride ?? MAIN_TAB_PAGER_RUBBER_BAND_COEFFICIENT
   if (dimension <= 0 || overscroll === 0) return 0
   const distance = Math.abs(overscroll)
   const banded = (1 - 1 / ((distance * coefficient) / dimension + 1)) * dimension
