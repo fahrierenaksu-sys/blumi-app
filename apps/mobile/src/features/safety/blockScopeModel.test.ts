@@ -9,6 +9,16 @@ import {
   shouldApplyBlockServerResponse
 } from "./blockScopeModel"
 
+test("an unchanged block list keeps its array identity for content-keyed consumers", () => {
+  const listed = replaceBlockedUsers(createBlockOwnerState("owner"), "owner", ["a", "b"])
+  const hydrated = applyBlockHydrationSuccess(listed, "owner", [" a", "b", "a"], "server")
+  assert.equal(hydrated.serverStatus, "ready")
+  assert.equal(hydrated.blockedUserIds, listed.blockedUserIds)
+  const changed = replaceBlockedUsers(hydrated, "owner", ["a"])
+  assert.notEqual(changed.blockedUserIds, listed.blockedUserIds)
+  assert.deepEqual(changed.blockedUserIds, ["a"])
+})
+
 test("switching owners never exposes the previous account's blocks", () => {
   const ownerA = replaceBlockedUsers(
     createBlockOwnerState("user-a"),

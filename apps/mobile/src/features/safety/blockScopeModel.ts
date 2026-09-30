@@ -23,9 +23,14 @@ export function replaceBlockedUsers(
   blockedUserIds: string[]
 ): BlockOwnerState {
   if (state.ownerUserId !== ownerUserId) return state
+  const next = normalizeBlockedUserIds(blockedUserIds)
+  const unchanged = next.length === state.blockedUserIds.length &&
+    next.every((userId, index) => userId === state.blockedUserIds[index])
+  // Keep the list's identity when its content is unchanged: views and the
+  // Discover deck use it as their invalidation key.
   return {
     ...state,
-    blockedUserIds: normalizeBlockedUserIds(blockedUserIds)
+    blockedUserIds: unchanged ? state.blockedUserIds : next
   }
 }
 
