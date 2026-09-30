@@ -54,11 +54,12 @@ export const deviceRemovalRequestSchema = z.object({
 
 export const personalRoomDecorSaveRequestSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
-  decor: z.unknown()
+  // Structure and ownership are validated by the room decor service.
+  decor: z.record(z.unknown())
 })
 
 export const createThreadRequestSchema = z.object({
-  participantUserIds: z.array(z.string())
+  participantUserIds: z.array(z.string()).min(2).max(2)
 })
 
 export const sendChatMessageRequestSchema = z.object({
@@ -104,7 +105,7 @@ export const phoneChangeConfirmRequestSchema = z.object({
 export const accountRecoveryRequestSchema = z.object({
   oldPhoneNumber: z.string(),
   newPhoneNumber: z.string(),
-  verificationCode: z.string()
+  idToken: z.string().min(1).max(12_000)
 })
 
 export const authPhoneRequestSchema = z.object({
@@ -139,12 +140,12 @@ export const discoverProfileParamsSchema = z.object({
 })
 
 export const discoverDeckQuerySchema = z.object({
-  ageMin: z.string().optional(),
-  ageMax: z.string().optional(),
+  ageMin: z.string().regex(/^\d{1,3}$/).optional(),
+  ageMax: z.string().regex(/^\d{1,3}$/).optional(),
   gender: z.union([z.string(), z.array(z.string())]).optional(),
   vibe: z.union([z.string(), z.array(z.string())]).optional(),
   cursor: z.string().max(515).optional(),
-  limit: z.string().optional()
+  limit: z.string().regex(/^\d{1,5}$/).optional()
 })
 
 export const errorResponseJsonSchema = {
@@ -168,9 +169,11 @@ export const noContentResponseJsonSchema = {
   type: "null"
 } as const
 
+/** JSON Schema twin of `nonEmptyString`: at least one non-whitespace character. */
 const trimmedStringJsonSchema = {
   type: "string",
-  minLength: 1
+  minLength: 1,
+  pattern: "\\S"
 } as const
 
 export const coreApiJsonSchemas = {
@@ -335,11 +338,11 @@ export const coreApiJsonSchemas = {
   },
   accountRecoveryRequest: {
     type: "object",
-    required: ["oldPhoneNumber", "newPhoneNumber", "verificationCode"],
+    required: ["oldPhoneNumber", "newPhoneNumber", "idToken"],
     properties: {
       oldPhoneNumber: { type: "string" },
       newPhoneNumber: { type: "string" },
-      verificationCode: { type: "string" }
+      idToken: { type: "string", minLength: 1, maxLength: 12_000 }
     },
     additionalProperties: false
   },
