@@ -1,13 +1,11 @@
 # Art QA gate decisions — 2026-09-30
 
-Status: **Open — owner decision needed.** Nothing here changes a threshold, an
-asset or gate code. These four gates are unwired: no `npm test` group runs
-them. They were imported with the predecessor repository in `922fe89`
-(2026-09-05) and have never passed in this repository. A code test cannot
-approve art (`AGENTS.md`), so each gate needs an art decision. See also
-[`WORKBENCH_FIXTURE_TESTS_2026-09-30.md`](./WORKBENCH_FIXTURE_TESTS_2026-09-30.md)
-and [`ENGINEERING_AUDIT_2026-09-30.md`](./ENGINEERING_AUDIT_2026-09-30.md)
-("Failing gates").
+Status: **Decided — all four gates removed by the owner on 2026-09-30.** The
+test files were deleted (recoverable from git history). The shipped art and
+its measured failures below are unchanged: nothing now checks walking-frame
+motion, sneaker/trouser overlap or tee outlines for these assets, so a
+regression there is only visible on a device. The analysis is kept as the
+record of what the gates found.
 
 ## How this was measured
 
@@ -111,7 +109,7 @@ Options:
   room scale) but fix the lace skirts, whose 35–41 green pixels per frame are
   the most visible defect.
 
-Decision (owner): ______________________________
+Decision (owner, 2026-09-30): **remove the gate.** The test file was deleted; the shipped art is unchanged and no longer checked by this gate.
 
 ---
 
@@ -159,7 +157,7 @@ Options:
   3 px / 3 px band as a documented exception for these two trousers only.
   The heel limits stay. Then wire the gate.
 
-Decision (owner): ______________________________
+Decision (owner, 2026-09-30): **remove the gate.** The test file was deleted; the shipped art is unchanged and no longer checked by this gate.
 
 ---
 
@@ -218,7 +216,7 @@ Options:
   measured closing row (220–223). Keep the torso-coverage, residue and
   palette checks as they are. Then wire the gate.
 
-Decision (owner): ______________________________
+Decision (owner, 2026-09-30): **remove the gate.** The test file was deleted; the shipped art is unchanged and no longer checked by this gate.
 
 ---
 
@@ -274,7 +272,7 @@ Options:
   - B removes the "one approved rig silhouette" guarantee that gate 4 was
     written to enforce. Choosing B is an explicit art decision.
 
-Decision (owner): ______________________________
+Decision (owner, 2026-09-30): **remove the gate.** The test file was deleted; the shipped art is unchanged and no longer checked by this gate.
 
 ---
 
