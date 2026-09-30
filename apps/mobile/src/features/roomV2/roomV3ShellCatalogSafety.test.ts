@@ -52,27 +52,25 @@ test("the live room editor no longer depends on the legacy preview screen identi
   assert.match(deferredBundlesSource, /myRoomEditorScreenBundle/)
 })
 
-test("failed shell generators stay removed while evidence-only verifiers remain", () => {
+test("failed shell generators and the retired QA shell verifiers stay removed", () => {
   const scriptsRoot = resolve(process.cwd(), "scripts")
-  const obsoleteGenerators = [
+  const obsoleteScripts = [
     "paint-room-v3-shell-variants.py",
     "prepare-room-v3-shell-candidates.py",
-    "recover-room-v3-shell-candidates.mjs"
+    "recover-room-v3-shell-candidates.mjs",
+    // Retired 2026-09-30 with the QA-only candidate shell art they verified.
+    "verify-room-v3-shell-assets.mjs",
+    "verify-room-v3-shell-geometry.py"
   ]
 
-  for (const scriptName of obsoleteGenerators) {
+  for (const scriptName of obsoleteScripts) {
     assert.equal(existsSync(resolve(scriptsRoot, scriptName)), false)
   }
-  assert.equal(existsSync(resolve(scriptsRoot, "verify-room-v3-shell-assets.mjs")), true)
-  assert.equal(existsSync(resolve(scriptsRoot, "verify-room-v3-shell-geometry.py")), true)
 })
 
-test("six current QA shells stay in the QA catalog and out of the My Room screens", () => {
+test("My Room screens use only the production shell catalog and never the retired QA shell catalog", () => {
   const roomV2Root = resolve(process.cwd(), "src/features/roomV2")
-  const qaCatalogSource = readFileSync(
-    resolve(roomV2Root, "roomV3QaShellCatalog.ts"),
-    "utf8"
-  )
+  assert.equal(existsSync(resolve(roomV2Root, "roomV3QaShellCatalog.ts")), false)
   const myRoomSource = readFileSync(
     resolve(process.cwd(), "src/screens/MyRoomScreen.tsx"),
     "utf8"
@@ -95,15 +93,6 @@ test("six current QA shells stay in the QA catalog and out of the My Room screen
   ].join("\n")
   assert.match(editorScreenSource, /from "\.\.\/features\/roomV2\/editor\/roomEditorCatalog"/)
 
-  const v6Requires = qaCatalogSource.match(/room_v3_shell_[a-z0-9_]+_candidate_v6\.png/g) ?? []
-  assert.equal(v6Requires.length, 4)
-  assert.equal(new Set(v6Requires).size, 4)
-  const v10Requires = qaCatalogSource.match(/room_v3_shell_[a-z0-9_]+_candidate_v10\.png/g) ?? []
-  assert.equal(v10Requires.length, 2)
-  assert.equal(new Set(v10Requires).size, 2)
-  assert.doesNotMatch(qaCatalogSource, /candidate_v(?:2|3|4|5|7|8|9)\.png/)
-  assert.match(qaCatalogSource, /sourceStatus: "candidate"/)
-  assert.match(qaCatalogSource, /qaStatus: "pending"/)
   for (const source of [myRoomSource, editorCatalogSource]) {
     assert.match(source, /const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG\n/)
   }
