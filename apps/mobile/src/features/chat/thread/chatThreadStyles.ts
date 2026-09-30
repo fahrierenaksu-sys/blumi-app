@@ -223,6 +223,7 @@ export const bubbleStyles = StyleSheet.create({
   bubble: {
     maxWidth: "78%",
     borderRadius: 17,
+    borderCurve: "continuous",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,

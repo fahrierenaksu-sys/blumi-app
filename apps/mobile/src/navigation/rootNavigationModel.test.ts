@@ -12,7 +12,11 @@ import {
   getLobbyReturnStrategy,
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
+  getChatThreadScreenOptions,
+  getDetailScreenOptions,
   goBackFromInbox,
+  CHAT_THREAD_SCREEN_OPTIONS,
+  DETAIL_SCREEN_OPTIONS,
   MAIN_TAB_SCREEN_OPTIONS,
   shouldDispatchMainTabNavigation,
   ROOT_STACK_SCREEN_OPTIONS
@@ -63,6 +67,30 @@ test("root routes use a stable fade transition by default", () => {
     headerShown: false,
     animation: "fade",
     animationDuration: 240
+  })
+})
+
+test("detail screens open with the platform push so the edge swipe-back closes the same way", () => {
+  assert.deepEqual(DETAIL_SCREEN_OPTIONS, { headerShown: false, animation: "default" })
+  assert.deepEqual(getDetailScreenOptions(false), { headerShown: false, animation: "default" })
+  assert.deepEqual(getDetailScreenOptions(true), { headerShown: false, animation: "none" })
+  // Detail screens keep the edge-only swipe: MyRoomEditor drags objects across the canvas.
+  assert.equal("fullScreenGestureEnabled" in getDetailScreenOptions(false), false)
+  // The stack default stays a fade for onboarding and room entry screens.
+  assert.equal(ROOT_STACK_SCREEN_OPTIONS.animation, "fade")
+})
+
+test("only the chat thread closes with a full-screen swipe, with or without motion", () => {
+  assert.deepEqual(CHAT_THREAD_SCREEN_OPTIONS, {
+    headerShown: false,
+    animation: "default",
+    fullScreenGestureEnabled: true
+  })
+  assert.deepEqual(getChatThreadScreenOptions(false), CHAT_THREAD_SCREEN_OPTIONS)
+  assert.deepEqual(getChatThreadScreenOptions(true), {
+    headerShown: false,
+    animation: "none",
+    fullScreenGestureEnabled: true
   })
 })
 

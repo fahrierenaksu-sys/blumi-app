@@ -328,6 +328,7 @@ export function EmptyDiscoverCard(props: EmptyDiscoverCardProps) {
 const cardStyles = StyleSheet.create({
   card: {
     borderRadius: 34,
+    borderCurve: "continuous",
     backgroundColor: "rgba(255, 255, 255, 0.58)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
@@ -338,6 +339,7 @@ const cardStyles = StyleSheet.create({
   heroBlock: {
     height: 430,
     borderRadius: 28,
+    borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "flex-start",
     overflow: "hidden",
@@ -401,6 +403,7 @@ const cardStyles = StyleSheet.create({
     right: 14,
     bottom: 14,
     borderRadius: 26,
+    borderCurve: "continuous",
     paddingHorizontal: 18,
     paddingVertical: 16,
     backgroundColor: "rgba(255, 255, 255, 0.48)",

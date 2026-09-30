@@ -120,6 +120,28 @@ test("the bottom-bar indicator follows drags and settles on the UI thread", () =
   assert.match(bottomNav, /useReducedMotion\(\)/)
 })
 
+test("the bottom bar is a tab list whose selected tab stays pressable for reselect", () => {
+  const bottomNav = read("../../ui/bottomNav.tsx")
+  const chrome = read("../useBottomNavChrome.ts")
+  // A11Y-2: VoiceOver reads "Chats, tab, 2 of 4, selected" rather than a
+  // button. The role and state supply "tab", the position and "selected",
+  // so the accessible name is the localized tab label alone (no "Open …
+  // tab" / "… sekmesi" wording, which would be read twice).
+  assert.match(bottomNav, /accessibilityRole="tablist"/)
+  assert.match(bottomNav, /accessibilityRole="tab"\s+accessibilityLabel=\{item\.label\}\s+accessibilityState=\{\{ selected: isCurrent \}\}/)
+  assert.doesNotMatch(bottomNav, /accessibilityRole="button"/)
+  assert.doesNotMatch(bottomNav, /getBottomNavAccessibilityLabel/)
+  // MICRO-2: the selected tab is not disabled, so a second tap reaches the
+  // chrome, which publishes a reselect (scroll to top) instead of navigating.
+  // The reselect is silent: only a real tab change plays the selection haptic.
+  assert.doesNotMatch(bottomNav, /disabled=\{isCurrent\}/)
+  assert.match(bottomNav, /if \(!isCurrent\) hapticSelection\(\)\s+onPress\(\)/)
+  assert.match(
+    chrome,
+    /if \(!shouldDispatchMainTabNavigation\(navigationRef\.getCurrentRoute\(\)\?\.name, destination\)\) \{\s*publishMainTabReselect\(key\)\s*return\s*\}/
+  )
+})
+
 test("the bottom bar belongs to the pager's slot screen, beneath every pushed route", () => {
   // An iOS edge back reveals the slot screen under the finger. The bar is
   // part of that screen (as on Instagram), so it is already in place during

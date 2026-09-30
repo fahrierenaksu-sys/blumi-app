@@ -17,7 +17,11 @@ test("starter bed becomes editable from the placed object with long-press haptic
   assert.match(screen, /onItemLongPress=\{handlePlacedBedLongPress\}/)
   assert.match(screen, /onItemLongPressMove=\{handlePlacedBedLongPressMove\}/)
   assert.match(screen, /onItemLongPressRelease=\{handlePlacedBedLongPressRelease\}/)
-  assert.match(screen, /Basılı tutup sürükleyerek taşı/)
+  // The hint is localised in roomSetupCopy.ts; the Turkish wording is unchanged.
+  assert.match(screen, /setPlacementMessage\(copy\.placement\.longPressMove\)/)
+  const copy = read("src/features/roomV2/roomSetupCopy.ts")
+  assert.match(copy, /longPressMove: "Basılı tutup sürükleyerek taşı\."/)
+  assert.match(copy, /longPressMove: "Press and hold, then drag to move\."/)
 
   assert.match(renderer, /onItemLongPress\?: \(item: RoomV2RenderItem\) => void/)
   assert.match(renderer, /onItemLongPressMove\?: \(item: RoomV2RenderItem, point: \{ pageX: number; pageY: number \}\) => void/)

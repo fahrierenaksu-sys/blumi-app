@@ -4,7 +4,9 @@ import {
   getMatchCelebrationMotion,
   getMatchCreatedProperties,
   getMatchResultPresentation,
-  MATCH_RESULT_ENTRY_POINTS
+  MATCH_RESULT_ENTRY_POINTS,
+  shouldPlayMatchHaptic,
+  springFromOrigami
 } from "./matchResultPresentation"
 
 // Characterizes the two match surfaces exactly as they ship today. The copy
@@ -75,14 +77,99 @@ test("Reduce Motion removes the celebration, pulse, and modal fade", () => {
     confetti: true,
     heartPulse: true,
     entranceSpring: true,
-    modalAnimationType: "fade"
+    modalAnimationType: "fade",
+    entranceFromOpacity: 0,
+    entranceFromScale: 0.92,
+    entranceOpacityDurationMs: 220,
+    entranceSpringConfig: {
+      tension: 70,
+      friction: 9,
+      damping: 28,
+      stiffness: 338.8,
+      mass: 1
+    },
+    contentStaggerMs: 70,
+    heartPulseIterations: 2,
+    haloPulseIterations: 2
   })
   assert.deepEqual(getMatchCelebrationMotion(true), {
     confetti: false,
     heartPulse: false,
     entranceSpring: false,
-    modalAnimationType: "none"
+    modalAnimationType: "none",
+    entranceFromOpacity: 0,
+    entranceFromScale: 1,
+    entranceOpacityDurationMs: 160,
+    entranceSpringConfig: null,
+    contentStaggerMs: 0,
+    heartPulseIterations: 0,
+    haloPulseIterations: 0
   })
+})
+
+test("the celebration entrance is a small, gently underdamped settle", () => {
+  const motion = getMatchCelebrationMotion(false)
+  const spring = motion.entranceSpringConfig
+  assert.ok(spring)
+  // A pop from 0 read as a jump; the card now settles from just below size.
+  assert.ok(motion.entranceFromScale >= 0.9 && motion.entranceFromScale < 1)
+  // Underdamped (a hint of overshoot) but far from bouncy.
+  const dampingRatio = spring.damping / (2 * Math.sqrt(spring.stiffness * spring.mass))
+  assert.ok(dampingRatio > 0.6 && dampingRatio < 0.9, `damping ratio ${dampingRatio}`)
+  // Headline first, avatars a beat later.
+  assert.ok(motion.contentStaggerMs >= 60 && motion.contentStaggerMs <= 80)
+})
+
+test("the physical spring matches React Native's origami tension/friction conversion", () => {
+  // RN SpringConfig: stiffness = (tension - 30) * 3.62 + 194, damping = (friction - 8) * 3 + 25.
+  assert.deepEqual(springFromOrigami(40, 7), { tension: 40, friction: 7, damping: 22, stiffness: 230.2, mass: 1 })
+  const spring = getMatchCelebrationMotion(false).entranceSpringConfig
+  assert.ok(spring)
+  assert.deepEqual(springFromOrigami(spring.tension, spring.friction), spring)
+})
+
+test("celebration pulses are bounded, never endless", () => {
+  for (const reduceMotion of [false, true]) {
+    const motion = getMatchCelebrationMotion(reduceMotion)
+    for (const iterations of [motion.heartPulseIterations, motion.haloPulseIterations]) {
+      assert.ok(Number.isInteger(iterations), "a negative or fractional count would loop forever in RN Animated")
+      assert.ok(iterations >= 0 && iterations <= 3)
+    }
+  }
+  const full = getMatchCelebrationMotion(false)
+  assert.ok(full.heartPulseIterations >= 2)
+  assert.ok(full.haloPulseIterations >= 1)
+})
+
+test("Reduce Motion keeps a short crossfade and drops scale, stagger, and pulses", () => {
+  const reduced = getMatchCelebrationMotion(true)
+  assert.equal(reduced.entranceFromScale, 1)
+  assert.equal(reduced.entranceSpringConfig, null)
+  assert.equal(reduced.contentStaggerMs, 0)
+  assert.equal(reduced.heartPulseIterations, 0)
+  assert.equal(reduced.haloPulseIterations, 0)
+  assert.equal(reduced.entranceFromOpacity, 0)
+  assert.ok(reduced.entranceOpacityDurationMs > 0 && reduced.entranceOpacityDurationMs <= 200)
+})
+
+test("the match haptic plays once, on the hidden-to-visible transition only", () => {
+  assert.equal(shouldPlayMatchHaptic(false, true), true)
+  // Re-renders while visible, hiding, and staying hidden stay silent.
+  assert.equal(shouldPlayMatchHaptic(true, true), false)
+  assert.equal(shouldPlayMatchHaptic(true, false), false)
+  assert.equal(shouldPlayMatchHaptic(false, false), false)
+})
+
+test("the entrance spring keeps one frozen identity so hook dependencies stay stable", () => {
+  const first = getMatchCelebrationMotion(false).entranceSpringConfig
+  const second = getMatchCelebrationMotion(false).entranceSpringConfig
+  // A fresh object per render would restart the entrance on every re-render.
+  assert.equal(first, second)
+  assert.ok(Object.isFrozen(first))
+  assert.throws(() => {
+    ;(first as { tension: number }).tension = 1
+  }, TypeError)
+  assert.equal(getMatchCelebrationMotion(false).entranceSpringConfig?.tension, 70)
 })
 
 test("presentations are fresh values so callers cannot mutate shared copy", () => {

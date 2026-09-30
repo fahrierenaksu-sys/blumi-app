@@ -17,9 +17,11 @@ import {
 } from "./DiscoverCard"
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
 import { useReducedMotion } from "../ui/animations"
+import { hapticSuccess } from "../ui/haptics"
 import {
   getMatchCelebrationMotion,
-  getMatchResultPresentation
+  getMatchResultPresentation,
+  shouldPlayMatchHaptic
 } from "../features/matches/matchResultPresentation"
 import { uiTheme } from "../ui/theme"
 
@@ -186,11 +188,14 @@ export function MatchResultModal(props: MatchResultModalProps) {
     onSendMessage
   } = props
 
-  const scaleAnim = useRef(new Animated.Value(0)).current
-  const heartPulse = useRef(new Animated.Value(1)).current
-  const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
   const reduceMotion = useReducedMotion()
   const motion = getMatchCelebrationMotion(reduceMotion)
+  const scaleAnim = useRef(new Animated.Value(motion.entranceFromScale)).current
+  const opacityAnim = useRef(new Animated.Value(motion.entranceFromOpacity)).current
+  const avatarsReveal = useRef(new Animated.Value(0)).current
+  const heartPulse = useRef(new Animated.Value(1)).current
+  const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
+  const previousVisibleRef = useRef(false)
   const presentation = getMatchResultPresentation({
     entry: "connection_modal",
     matchedUserName,
@@ -207,46 +212,83 @@ export function MatchResultModal(props: MatchResultModalProps) {
     entranceAnimationRef.current?.stop()
     entranceAnimationRef.current = null
     scaleAnim.stopAnimation()
+    opacityAnim.stopAnimation()
+    avatarsReveal.stopAnimation()
     heartPulse.stopAnimation()
-  }, [heartPulse, scaleAnim])
+  }, [avatarsReveal, heartPulse, opacityAnim, scaleAnim])
 
   const runEntrance = useCallback(() => {
     stopEntrance()
-    scaleAnim.setValue(0)
+    scaleAnim.setValue(motion.entranceFromScale)
+    opacityAnim.setValue(motion.entranceFromOpacity)
     heartPulse.setValue(1)
+    const crossfade = Animated.timing(opacityAnim, {
+      toValue: 1,
+      duration: motion.entranceOpacityDurationMs,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true
+    })
 
     if (!motion.entranceSpring) {
+      // Reduce Motion: a short crossfade only; no scale, stagger, or pulse.
       scaleAnim.setValue(1)
+      avatarsReveal.setValue(1)
+      entranceAnimationRef.current = crossfade
+      crossfade.start()
       return
     }
 
-    const animation = Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 60,
-        friction: 7,
+    avatarsReveal.setValue(0)
+    const heartBeat = Animated.sequence([
+      Animated.timing(heartPulse, {
+        toValue: 1.18,
+        duration: 500,
+        easing: Easing.inOut(Easing.ease),
         useNativeDriver: true
       }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(heartPulse, {
-            toValue: 1.18,
-            duration: 500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true
-          }),
-          Animated.timing(heartPulse, {
-            toValue: 1,
-            duration: 500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true
-          })
-        ])
-      )
+      Animated.timing(heartPulse, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true
+      })
+    ])
+    const animation = Animated.sequence([
+      Animated.parallel([
+        crossfade,
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: motion.entranceSpringConfig.tension,
+          friction: motion.entranceSpringConfig.friction,
+          useNativeDriver: true
+        }),
+        Animated.timing(avatarsReveal, {
+          toValue: 1,
+          duration: motion.entranceOpacityDurationMs,
+          delay: motion.contentStaggerMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true
+        })
+      ]),
+      // A bounded heartbeat; the heart then rests at full size.
+      Animated.loop(heartBeat, { iterations: motion.heartPulseIterations })
     ])
     entranceAnimationRef.current = animation
     animation.start()
-  }, [heartPulse, motion.entranceSpring, scaleAnim, stopEntrance])
+  }, [
+    avatarsReveal,
+    heartPulse,
+    motion.contentStaggerMs,
+    motion.entranceFromOpacity,
+    motion.entranceFromScale,
+    motion.entranceOpacityDurationMs,
+    motion.entranceSpring,
+    motion.entranceSpringConfig,
+    motion.heartPulseIterations,
+    opacityAnim,
+    scaleAnim,
+    stopEntrance
+  ])
 
   useEffect(() => {
     if (visible) {
@@ -256,6 +298,12 @@ export function MatchResultModal(props: MatchResultModalProps) {
     stopEntrance()
     return undefined
   }, [runEntrance, stopEntrance, visible])
+
+  useEffect(() => {
+    // Haptics are not motion, so Reduce Motion keeps this one success tap.
+    if (shouldPlayMatchHaptic(previousVisibleRef.current, visible)) hapticSuccess()
+    previousVisibleRef.current = visible
+  }, [visible])
 
   return (
     <Modal visible={visible} transparent animationType={motion.modalAnimationType} onRequestClose={onClose}>
@@ -270,6 +318,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
           style={[
             styles.modalCard,
             {
+              opacity: opacityAnim,
               transform: [{ scale: scaleAnim }]
             }
           ]}
@@ -293,7 +342,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
             <Text style={styles.confirmedText}>{presentation.badgeLabel}</Text>
           </View>
 
-          <View style={styles.connectionRow}>
+          <Animated.View style={[styles.connectionRow, { opacity: avatarsReveal }]}>
             <View style={styles.avatarColumn}>
               <MyAvatar
                 name={currentUserName}
@@ -333,7 +382,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
               </Text>
               <Text style={styles.avatarName}>{matchedUserName}</Text>
             </View>
-          </View>
+          </Animated.View>
 
           <View style={styles.actions}>
             <PrimaryButton

@@ -2,6 +2,9 @@ import { Animated, StyleSheet, View } from "react-native"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { ONBOARDING_SCAN_FRAMES } from "./OnboardingGreetingPair"
 
+/** Sweep progress at which the beam crosses the centre of each character row. */
+const ROW_PASS_PROGRESS = [0.34, 0.63] as const
+
 const SCAN_LASER = require(
   "./assets/onboarding-scan-beam-v3-runtime/blumi_scan_laser_v3.png"
 )
@@ -30,12 +33,20 @@ export function OnboardingScanStage({
     outputRange: [0.66, 0.88, 0.74, 0.94, 0.78],
     extrapolate: "clamp"
   })
+  // The beam eases in and out instead of appearing and vanishing at the edges.
+  const beamPresence = scanSweep.interpolate({
+    inputRange: [0, 0.08, 0.9, 1],
+    outputRange: [0, 1, 1, 0],
+    extrapolate: "clamp"
+  })
 
   return (
     <View pointerEvents="none" style={styles.scanLayer} testID="onboarding-scan-stage">
       <View style={styles.scanGrid}>
         {ONBOARDING_SCAN_FRAMES.map((source, index) => {
           const row = Math.floor(index / 3)
+          const column = index % 3
+          const pass = ROW_PASS_PROGRESS[row] ?? 1
           const cellPresence = scanRows.interpolate({
             inputRange: [row * 0.22, Math.min(1, row * 0.22 + 0.42)],
             outputRange: [0, 1],
@@ -47,23 +58,47 @@ export function OnboardingScanStage({
             extrapolate: "clamp"
           })
           const cellOpacity = Animated.multiply(cellPresence, scanColor)
+          // Each character rises a little as it appears, then gets a soft
+          // "hello" bounce when the beam passes its row (outer columns a beat
+          // later so the row reads as a wave, not a block).
+          const lift = cellPresence.interpolate({
+            inputRange: [0, 1],
+            outputRange: [12, 0]
+          })
+          const offset = column === 1 ? 0 : 0.025
+          const bounce = scanSweep.interpolate({
+            inputRange: [pass - 0.1 + offset, pass + offset, pass + 0.14 + offset],
+            outputRange: [1, 1.07, 1],
+            extrapolate: "clamp"
+          })
+          const cellGlow = scanSweep.interpolate({
+            inputRange: [pass - 0.08, pass, pass + 0.16],
+            outputRange: [0, 1, 0],
+            extrapolate: "clamp"
+          })
           return (
             <View key={index} style={styles.scanCell}>
-              <Animated.Image
-                onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
-                onError={onAssetError}
-                accessibilityIgnoresInvertColors
-                fadeDuration={0}
-                resizeMode="contain"
-                source={source}
-                style={[styles.scanCharacter, { opacity: cellOpacity }]}
-              />
+              <Animated.View pointerEvents="none" style={[styles.scanCellGlow, { opacity: cellGlow }]} />
+              <Animated.View style={{ transform: [{ translateY: lift }, { scale: bounce }] }}>
+                <Animated.Image
+                  onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
+                  onError={onAssetError}
+                  accessibilityIgnoresInvertColors
+                  fadeDuration={0}
+                  resizeMode="contain"
+                  source={source}
+                  style={[styles.scanCharacter, { opacity: cellOpacity }]}
+                />
+              </Animated.View>
             </View>
           )
         })}
       </View>
       <Animated.View
-        style={[styles.scanLine, { transform: [{ translateY: scanLineTranslateY }] }]}
+        style={[
+          styles.scanLine,
+          { opacity: beamPresence, transform: [{ translateY: scanLineTranslateY }] }
+        ]}
       >
         <View style={styles.scanTrail} />
         <Animated.Image
@@ -109,6 +144,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${uiTheme.colors.primaryDeep}1F`,
     backgroundColor: "rgba(255,255,255,0.44)"
+  },
+  scanCellGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(232,58,96,0.42)",
+    backgroundColor: "rgba(255,226,238,0.55)"
   },
   scanCharacter: {
     width: 56,

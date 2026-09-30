@@ -1,5 +1,11 @@
 export const DISCOVERY_CARD_FLIP_DURATION = 360
 export const DISCOVERY_CARD_FLIP_EASING = "easeInOut" as const
+/**
+ * The like/pass row fades out while the card shows its back and in again
+ * when it turns to the front. It is a dissolve, Apple's Reduce Motion
+ * substitute, so it keeps this duration under Reduce Motion too.
+ */
+export const DISCOVERY_ACTION_ROW_FADE_DURATION = 150
 
 export interface DiscoveryCardFlipState {
   readonly frontRotation: `${number}deg`

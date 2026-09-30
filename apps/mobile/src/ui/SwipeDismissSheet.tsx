@@ -223,7 +223,7 @@ export function SwipeDismissSheet({
           accessibilityViewIsModal={accessibilityViewIsModal}
           onAccessibilityEscape={enabled ? dismiss : undefined}
           onLayout={handleLayout}
-          style={[style, sheetStyle]}
+          style={[styles.sheetShape, style, sheetStyle]}
           testID={testID}
         >
           {children}
@@ -265,3 +265,11 @@ export function SwipeDismissSheetScrollView(props: ScrollViewProps & { children?
     </GestureDetector>
   )
 }
+
+const styles = StyleSheet.create({
+  // iOS squircle for whatever corner radius the caller gives the sheet;
+  // Android ignores it.
+  sheetShape: {
+    borderCurve: "continuous"
+  }
+})

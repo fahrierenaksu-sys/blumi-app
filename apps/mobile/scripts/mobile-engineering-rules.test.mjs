@@ -34,7 +34,6 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
 // Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
-  "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
   "features/session/register/useRegisterFlowController.ts"
@@ -58,6 +57,18 @@ test("reduce-motion is read from the shared store only", () => {
     .map(({ path }) => path)
     .filter((path) => !REDUCE_MOTION_SOURCES.has(path))
   assert.deepEqual(offenders, [], "use the shared reduced-motion hook from ui/animations")
+})
+
+// Only the shared reduce-transparency source may name the OS query or event;
+// every glass surface reads the shared store/hook.
+const REDUCE_TRANSPARENCY_SOURCES = new Set(["ui/reduceTransparency.ts", "ui/reduceTransparencyStore.ts"])
+
+test("reduce-transparency is read from the shared store only", () => {
+  const offenders = sources
+    .filter(({ text }) => /isReduceTransparencyEnabled|reduceTransparencyChanged/.test(text))
+    .map(({ path }) => path)
+    .filter((path) => !REDUCE_TRANSPARENCY_SOURCES.has(path))
+  assert.deepEqual(offenders, [], "use the shared reduce-transparency hook from ui/reduceTransparency")
 })
 
 // Large files are split into feature hooks, views and pure models. Existing

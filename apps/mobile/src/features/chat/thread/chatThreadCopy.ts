@@ -33,6 +33,10 @@ export type ChatThreadCopy = {
   cancel: string
   today: string
   yesterday: string
+  bubbleSelf: string
+  bubbleStatusSent: string
+  bubbleStatusSending: string
+  bubbleStatusFailed: string
 }
 
 export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
@@ -68,7 +72,11 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     roomInviteRetryFailed: "The previous room was closed, but this invitation could not be sent. Please try again.",
     cancel: "Cancel",
     today: "Today",
-    yesterday: "Yesterday"
+    yesterday: "Yesterday",
+    bubbleSelf: "You",
+    bubbleStatusSent: "sent",
+    bubbleStatusSending: "sending",
+    bubbleStatusFailed: "not sent"
   },
   tr: {
     chat: "Sohbet",
@@ -102,7 +110,11 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     roomInviteRetryFailed: "Önceki oda kapatıldı ancak bu davet gönderilemedi. Tekrar dene.",
     cancel: "Vazgeç",
     today: "Bugün",
-    yesterday: "Dün"
+    yesterday: "Dün",
+    bubbleSelf: "Sen",
+    bubbleStatusSent: "gönderildi",
+    bubbleStatusSending: "gönderiliyor",
+    bubbleStatusFailed: "gönderilemedi"
   }
 }
 

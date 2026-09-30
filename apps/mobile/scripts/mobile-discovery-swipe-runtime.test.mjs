@@ -73,9 +73,14 @@ test("swipe exit stays responsive and honors reduced-motion", () => {
   const source = readSwipeCardSource()
   const hook = readSwipeHookSource()
 
-  assert.match(readSwipeModelSource(), /const SWIPE_OUT_DURATION = 190/)
+  const model = readSwipeModelSource()
+  // DISC-1: the exit follows the release speed between 120 and 260 ms
+  // (values asserted in discoverySwipeModel.test.ts); Reduce Motion is instant.
+  assert.match(model, /const SWIPE_OUT_MIN_DURATION = 120/)
+  assert.match(model, /const SWIPE_OUT_MAX_DURATION = 260/)
   assert.match(source, /useReducedMotion\(\)/)
-  assert.match(hook, /duration:\s*reduceMotion \? 0 : SWIPE_OUT_DURATION/)
+  assert.match(hook, /forceSwipe\(release, reduceMotion \? 0 : getDiscoverSwipeOutDuration\(/)
+  assert.match(hook, /duration: durationMs,\s*easing: Easing\.out\(Easing\.quad\)/)
   assert.match(hook, /x\.value = reduceMotion\s*\?\s*0\s*:\s*withSpring\(0/)
   assert.match(source, /if \(disabled \|\| reduceMotion\)/)
   assert.match(source, /useNativeDriver:\s*true/)
@@ -96,16 +101,32 @@ test("a deliberate short swipe can complete without a hard throw", () => {
   assert.match(model, /screenWidth \* SWIPE_DISTANCE_RATIO/)
 })
 
-test("the active card translates without rotating at every drag distance", () => {
+// DISC-1 replaced the upright card with a lean that follows the drag on the UI
+// thread. Only the owning card leans (its translateX is the owned drag), the
+// lean is read from the drag rather than React state, and Reduce Motion keeps
+// the card upright. The chibi artwork inside the card is not transformed.
+test("only the active card leans with its drag, and Reduce Motion keeps it upright", () => {
   const source = readSwipeCardSource()
   const hook = readSwipeHookSource()
 
+  assert.match(
+    hook,
+    /const translateX = getDiscoverSwipeTranslateX\(ownerId\.value, cardId, x\.value\)[\s\S]*?transform: \[\s*\{ translateX \},\s*\{ rotate: `\$\{reduceMotion \? 0 : getDiscoverSwipeRotation\(translateX, screenWidth, grabbedLowerHalf\.value\)\}deg` \}/
+  )
+  // The grab half is fixed when the pan activates, so a tap never changes it.
+  assert.match(hook, /\.onStart\([\s\S]*?grabbedLowerHalf\.value = isDiscoverSwipeLowerHalfGrab\(touchStartLocalY\.value, cardHeight\.value\)/)
+  assert.match(source, /<Reanimated\.View style=\{\[styles\.swipeFrame, cardSwipeStyle\]\} onLayout=\{onCardLayout\}>/)
+  // The inner card keeps no rotation of its own; the swipe frame owns the lean.
+  assert.doesNotMatch(source, /\{ rotate: "0deg" \}/)
   assert.doesNotMatch(source, /const rotate = /)
-  assert.doesNotMatch(source, /\{ rotate \}/)
-  assert.doesNotMatch(hook, /rotate/)
-  assert.match(hook, /transform: \[\{ translateX: getDiscoverSwipeTranslateX\(ownerId\.value, cardId, x\.value\) \}\]/)
-  assert.match(source, /<Reanimated\.View style=\{\[styles\.swipeFrame, cardSwipeStyle\]\}>/)
-  assert.match(source, /transform:\s*\[\s*\{ rotate: "0deg" \},/)
+})
+
+test("a threshold entry pops the stamp only when motion is allowed", () => {
+  const hook = readSwipeHookSource()
+
+  assert.match(hook, /if \(reduceMotion\) return\s*stampScale\.value = withSequence\(/)
+  assert.match(hook, /opacity: getDiscoverStampOpacity\([\s\S]*?\)\.like,\s*transform: \[\{ scale: stampScale\.value \}\]/)
+  assert.match(hook, /opacity: getDiscoverStampOpacity\([\s\S]*?\)\.nope,\s*transform: \[\{ scale: stampScale\.value \}\]/)
 })
 
 test("card face transition is a complete native-safe 3D turn", () => {
@@ -124,14 +145,19 @@ test("card face transition is a complete native-safe 3D turn", () => {
 
 test("the next card stays upright while it advances and only deeper cards fan out", () => {
   const source = readDeckSource()
+  const model = readSwipeModelSource()
 
   assert.doesNotMatch(source, /middleCardRotate/)
+  // The middle pose follows the drag and is upright (rotate 0 at progress 1,
+  // asserted in discoverySwipeModel.test.ts); only the bottom slot turns.
   assert.match(
     source,
-    /getDiscoverMiddleCardMotion\([\s\S]*?translateX: middle\.translateX[\s\S]*?translateY: middle\.translateY[\s\S]*?rotate: "0deg"[\s\S]*?scale: middle\.scale/
+    /getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, dragX\)\)[\s\S]*?translateX: motion\.translateX[\s\S]*?translateY: motion\.translateY[\s\S]*?rotate: `\$\{motion\.rotateDeg\}deg`[\s\S]*?scale: motion\.scale/
   )
+  assert.match(model, /if \(role === "middle"\) return getDiscoverMiddleCardMotion\(dragX\)/)
+  assert.match(model, /rotateDeg: mix\(DISCOVER_BOTTOM_CARD_MOTION\.rotateDeg, 0, clamped\)/)
   assert.match(
-    source,
-    /BOTTOM_CARD_MOTION = \{[\s\S]*?rotate:\s*"-3deg"/
+    model,
+    /DISCOVER_BOTTOM_CARD_MOTION = \{[\s\S]*?rotateDeg:\s*-3\b/
   )
 })

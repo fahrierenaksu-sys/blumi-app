@@ -11,7 +11,7 @@ import {
 import { blockSafetyUser, reportSafetyUser } from "../features/safety/safetyApi"
 import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
-import { hapticMedium, hapticStrong } from "../ui/haptics"
+import { hapticError, hapticMedium, hapticSuccess } from "../ui/haptics"
 import { showToast } from "../ui/toast"
 import { SwipeDismissSheet } from "../ui/SwipeDismissSheet"
 import { uiTheme } from "../ui/theme"
@@ -105,12 +105,13 @@ export function ReportModal(props: ReportModalProps) {
           action: "block",
           mode: sessionActor.session.mode
         })
-        hapticStrong()
+        hapticSuccess()
         showToast({ title: copy.hiddenToast(targetDisplayName), type: "info" })
         onClose()
         resetState()
         onActionComplete?.()
       } catch {
+        hapticError()
         showToast({
           title: copy.couldNotHide,
           body: copy.tryAgain,
@@ -159,7 +160,7 @@ export function ReportModal(props: ReportModalProps) {
           reason: selectedReason,
           mode: sessionActor.session.mode
         })
-        hapticStrong()
+        hapticSuccess()
         showToast({
           title: copy.thankYouToast,
           body: copy.hiddenToast(targetDisplayName),
@@ -172,6 +173,7 @@ export function ReportModal(props: ReportModalProps) {
           onActionComplete?.()
         }, 800)
       } catch {
+        hapticError()
         showToast({
           title: copy.reportNotSent,
           body: copy.tryAgain,
@@ -414,6 +416,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: uiTheme.spacing.md,
     borderRadius: uiTheme.radius.lg,
+    borderCurve: "continuous",
     backgroundColor: "rgba(255, 255, 255, 0.42)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.74)"

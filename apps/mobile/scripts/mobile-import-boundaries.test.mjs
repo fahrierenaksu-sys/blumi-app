@@ -93,7 +93,6 @@ const UI_TO_FEATURES_BASELINE = [
   "src/ui/bottomNav.tsx -> src/features/session/authLocale",
   "src/ui/errorBoundary.tsx -> src/features/session/appLocale",
   "src/ui/errorBoundaryCopy.ts -> src/features/session/appLocale",
-  "src/ui/layout/bottomNavMotionModel.ts -> src/features/session/accountRecoveryCopy",
   "src/ui/myAvatar.tsx -> src/features/avatarV2/room/avatarRoomCatalog",
   "src/ui/myAvatar.tsx -> src/features/avatarV2/room/avatarRoomProjection",
   "src/ui/myAvatar.tsx -> src/features/avatarV2/room/avatarRoomSelectors",

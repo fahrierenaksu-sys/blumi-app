@@ -1,0 +1,39 @@
+import { useEffect, useRef } from "react"
+import type { ChatLocale, ChatTimelineItem } from "../chatRoomInviteModel"
+import {
+  buildChatTimelineRowModels,
+  type ChatMessageDeliveryState,
+  type ChatTimelineRowModels
+} from "./chatThreadModel"
+
+/**
+ * Row presentation for the whole timeline in one pass per screen render.
+ *
+ * Delivery states are read through the store's stable module getter, so no
+ * dependency list can tell when only a delivery state changed. Instead the
+ * last committed result seeds each build: unchanged rows keep their model
+ * object, and an unchanged timeline returns the same map, so memoised rows and
+ * the list's renderItem keep their identity.
+ */
+export function useChatTimelineRowModels({
+  timeline,
+  currentUserId,
+  locale,
+  getMessageDeliveryState
+}: {
+  timeline: readonly ChatTimelineItem[]
+  currentUserId: string
+  locale: ChatLocale
+  getMessageDeliveryState: (messageId: string) => ChatMessageDeliveryState
+}): ChatTimelineRowModels {
+  const committedRef = useRef<ChatTimelineRowModels | null>(null)
+  const rowModels = buildChatTimelineRowModels(
+    timeline,
+    { currentUserId, locale, getMessageDeliveryState },
+    committedRef.current
+  )
+  useEffect(() => {
+    committedRef.current = rowModels
+  }, [rowModels])
+  return rowModels
+}

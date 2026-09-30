@@ -42,6 +42,7 @@ import {
   isShopMultiItemApplyEnabled
 } from "../features/shop/shopCapabilityPolicy"
 import { ClosetBrowser } from "../features/shop/screen/ClosetBrowser"
+import { ShopCoinBalance } from "../features/shop/screen/ShopCoinBalance"
 import {
   getDefaultShopCategoryId,
   getShopSurfacePolicy
@@ -52,6 +53,7 @@ import { useShopCombinationSession } from "../features/shop/screen/useShopCombin
 import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel"
 import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewSelection"
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
+import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { hapticLight } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
@@ -124,6 +126,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   )
   const [isCoinWalletOpen, setIsCoinWalletOpen] = useState(false)
   const hydratedSessionTokenRef = useRef<string | null>(null)
+  const shopScrollRef = useShopScrollToTop()
   const shopLayoutMetrics = useMemo(
     () => getShopLayoutMetrics({
       width: viewportMetrics.safeWidth,
@@ -309,6 +312,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         edges={["top", "left", "right"]}
       >
         <ScrollView
+          ref={shopScrollRef}
           scrollEnabled={shopLayoutMetrics.catalog.accessibilityLayout || (IS_BLUMI_PAID_COINS_ENABLED && isCoinWalletOpen) || shopPresentationState === "offline"}
           bounces={false}
           showsVerticalScrollIndicator={false}
@@ -358,12 +362,11 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 pressed ? styles.coinPillPressed : null
               ]}
             >
-              <Ionicons name="diamond" size={14} color="#B9820D" />
-              <Text style={styles.coinText}>
-                {inventoryVerified
-                  ? formatCoins(inventoryStore.inventory.coins, locale)
-                  : "—"}
-              </Text>
+              <ShopCoinBalance
+                coins={inventoryStore.inventory.coins}
+                verified={inventoryVerified}
+                locale={locale}
+              />
             </Pressable>
         </View>
 

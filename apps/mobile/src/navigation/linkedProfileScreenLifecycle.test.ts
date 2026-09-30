@@ -4,17 +4,45 @@ import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact 
 
 // Characterizes LinkedProfileScreen's profile request lifecycle: one request per
 // target, aborted on target change, and never restarted by a locale change.
-function mount(options: { demoMode?: boolean } = {}) {
+type Element = { type: unknown; props: Record<string, any> }
+
+// Records the Reanimated calls the loading placeholder and reveal make.
+function createReanimatedStub(runtime: ReturnType<typeof createFakeReactRuntime>) {
+  const calls: { kind: string; args: unknown[] }[] = []
+  const useRef = runtime.react.useRef as <T>(initial: T) => { current: T }
+  const easing = () => (value: number) => value
+  return {
+    calls,
+    module: {
+      __esModule: true,
+      default: { View: "Reanimated.View" },
+      Easing: { inOut: easing, out: easing, ease: (value: number) => value, cubic: (value: number) => value },
+      useSharedValue: (initial: number) => useRef({ value: initial }).current,
+      useAnimatedStyle: (worklet: () => unknown) => worklet(),
+      cancelAnimation: (...args: unknown[]) => { calls.push({ kind: "cancelAnimation", args }) },
+      withTiming: (...args: unknown[]) => { calls.push({ kind: "withTiming", args }); return { timing: args[0] } },
+      withRepeat: (...args: unknown[]) => { calls.push({ kind: "withRepeat", args }); return { repeat: args[0] } }
+    }
+  }
+}
+
+function mount(options: { demoMode?: boolean; directProfile?: Record<string, unknown>; reduceMotion?: boolean } = {}) {
   const runtime = createFakeReactRuntime()
+  const reanimated = createReanimatedStub(runtime)
   let locale = "en"
   const requests: { userId: string; signal: AbortSignal; resolve: (value: unknown) => void }[] = []
   class DiscoveryProfileUnavailableError extends Error {}
-  const { LinkedProfileScreen } = loadSourceWithFakeReact<{ LinkedProfileScreen: (props: unknown) => any }>(
+  const { LinkedProfileScreen, LoadingProfile } = loadSourceWithFakeReact<{
+    LinkedProfileScreen: (props: unknown) => any
+    LoadingProfile: () => any
+  }>(
     "navigation/LinkedProfileScreen.tsx",
     runtime,
     {
       modules: {
         "react-native": createReactNativeStub().module,
+        "react-native-reanimated": reanimated.module,
+        "../ui/animations": { useReducedMotion: () => options.reduceMotion === true },
         "../features/avatarV2/candidateAvatarSnapshot": { createCandidateAvatarSnapshot: () => ({}) },
         "../features/demo/dummyProfiles": {
           DUMMY_PROFILES: [{ userId: "demo-1", displayName: "Demo", age: 24, bio: "Hello" }]
@@ -29,7 +57,8 @@ function mount(options: { demoMode?: boolean } = {}) {
           getProfilePreviewCopy: (current: string) => ({
             discoverProfile: `discover:${current}`,
             availableNow: `available:${current}`,
-            deepLinkHeadline: `headline:${current}`
+            deepLinkHeadline: `headline:${current}`,
+            loading: `loading:${current}`
           })
         },
         "../config/env": { MOBILE_HTTP_BASE_URL: "https://fixture.invalid" },
@@ -47,13 +76,15 @@ function mount(options: { demoMode?: boolean } = {}) {
   const render = () => runtime.render(() => LinkedProfileScreen({
     demoMode: options.demoMode === true,
     navigation: { navigate: () => undefined },
-    route: { params: { userId } },
+    route: { params: options.directProfile ? { profile: options.directProfile } : { userId } },
     sessionActor: {},
     sessionToken: "token"
   }))
   return {
     runtime,
     requests,
+    reanimated,
+    LoadingProfile,
     render,
     setLocale: (next: string) => { locale = next },
     setUserId: (next: string) => { userId = next }
@@ -84,9 +115,60 @@ test("a new target aborts the previous request and starts one for the new user",
 test("a demo profile resolves with the current locale's labels", () => {
   const f = mount({ demoMode: true })
   f.setLocale("tr")
-  const output = f.render() as { type: unknown; props: { profileOverride: Record<string, unknown> } }
-  assert.equal(output.type, "ProfilePreviewScreen")
-  assert.equal(output.props.profileOverride.headline, "discover:tr")
-  assert.equal(output.props.profileOverride.distanceLabel, "available:tr")
+  const output = f.render() as Element
+  // A profile that arrives after loading is revealed by a fade wrapper.
+  assert.equal((output.type as { name?: string }).name, "LinkedProfileReveal")
+  const content = output.props.children as Element
+  assert.equal(content.type, "ProfilePreviewScreen")
+  assert.equal(content.props.profileOverride.headline, "discover:tr")
+  assert.equal(content.props.profileOverride.distanceLabel, "available:tr")
   assert.equal(f.requests.length, 0)
+})
+
+test("a direct profile renders at once, without the loading reveal", () => {
+  const f = mount({ directProfile: { userId: "direct-1", displayName: "Direct" } })
+  const output = f.render() as Element
+  assert.equal(output.type, "ProfilePreviewScreen")
+  assert.equal(output.props.profileOverride.userId, "direct-1")
+  assert.equal(f.requests.length, 0)
+})
+
+test("a pending deep link shows the loading placeholder until the profile resolves", () => {
+  const f = mount()
+  const output = f.render() as Element
+  assert.equal(output.type, f.LoadingProfile)
+})
+
+function renderLoading(reduceMotion: boolean) {
+  const f = mount({ reduceMotion })
+  const tree = f.runtime.render(() => f.LoadingProfile()) as Element
+  return { f, tree }
+}
+
+test("the loading placeholder is one progress element labelled by the loading copy", () => {
+  const { tree } = renderLoading(false)
+  assert.equal(tree.props.accessible, true)
+  assert.equal(tree.props.accessibilityRole, "progressbar")
+  assert.equal(tree.props.accessibilityLabel, "loading:en")
+  assert.deepEqual(tree.props.accessibilityState, { busy: true })
+  const [skeleton, label] = tree.props.children as Element[]
+  assert.equal(skeleton.props.accessibilityElementsHidden, true)
+  assert.equal(skeleton.props.importantForAccessibility, "no-hide-descendants")
+  assert.equal(label.props.children, "loading:en")
+})
+
+test("the skeleton pulses on the UI thread, and stays static with Reduce Motion", () => {
+  const animated = renderLoading(false)
+  assert.deepEqual(
+    animated.f.reanimated.calls.filter(({ kind }) => kind === "withRepeat").map(({ args }) => args.slice(1)),
+    [[-1, true]]
+  )
+  animated.f.runtime.unmount()
+  assert.ok(animated.f.reanimated.calls.some(({ kind }) => kind === "cancelAnimation"))
+
+  const reduced = renderLoading(true)
+  assert.equal(reduced.f.reanimated.calls.some(({ kind }) => kind === "withRepeat"), false)
+  const skeleton = (reduced.tree.props.children as Element[])[0]
+  const pulseStyle = (skeleton.props.style as Record<string, unknown>[]).at(-1)
+  assert.deepEqual(pulseStyle, { opacity: 1 })
 })

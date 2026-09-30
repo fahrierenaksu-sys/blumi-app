@@ -9,6 +9,7 @@ import {
   createReducedMotionStore,
   type ReducedMotionPreference
 } from "./reducedMotionStore"
+import { uiTheme } from "./theme"
 
 /** Keeps product motion aligned with the OS accessibility preference. */
 const reducedMotionStore = createReducedMotionStore({
@@ -66,7 +67,7 @@ interface EntranceOptions {
  * Returns { opacity, transform } to spread onto an Animated.View.
  */
 export function useEntranceAnimation(options: EntranceOptions = {}) {
-  const { delay = 0, duration = 500, translateY = 24 } = options
+  const { delay = 0, duration = uiTheme.animation.durationEntrance, translateY = 20 } = options
   const progress = useRef(new Animated.Value(0)).current
   const reduceMotion = useReducedMotion()
 
@@ -110,7 +111,7 @@ export function useStaggeredEntrance(
   itemCount: number,
   options: { staggerMs?: number; duration?: number; translateY?: number } = {}
 ) {
-  const { staggerMs = 60, duration = 400, translateY = 20 } = options
+  const { staggerMs = uiTheme.animation.staggerMs, duration = 320, translateY = 20 } = options
   const reduceMotion = useReducedMotion()
   const anims = useMemo(
     () => Array.from({ length: itemCount }, () => new Animated.Value(0)),
@@ -188,9 +189,13 @@ export function useScaleBounce(options: { delay?: number; tension?: number; fric
 
 /**
  * Continuous pulse animation — for glowing rings, attention indicators.
+ * `iterations` bounds the pulse to that many beats (it then rests at
+ * `minScale`); the default -1 keeps the endless loop.
  */
-export function usePulse(options: { minScale?: number; maxScale?: number; duration?: number } = {}) {
-  const { minScale = 0.95, maxScale = 1.05, duration = 1500 } = options
+export function usePulse(
+  options: { minScale?: number; maxScale?: number; duration?: number; iterations?: number } = {}
+) {
+  const { minScale = 0.95, maxScale = 1.05, duration = 1500, iterations = -1 } = options
   const pulse = useRef(new Animated.Value(0)).current
   const reduceMotion = useReducedMotion()
 
@@ -214,11 +219,12 @@ export function usePulse(options: { minScale?: number; maxScale?: number; durati
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true
         })
-      ])
+      ]),
+      { iterations }
     )
     loop.start()
     return () => loop.stop()
-  }, [duration, pulse, reduceMotion])
+  }, [duration, iterations, pulse, reduceMotion])
 
   return {
     transform: [

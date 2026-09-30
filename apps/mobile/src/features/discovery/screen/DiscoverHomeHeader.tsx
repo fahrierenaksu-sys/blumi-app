@@ -4,6 +4,8 @@ import {
   type createCandidateAvatarSnapshot
 } from "../../../components/DiscoverCard"
 import { uiTheme } from "../../../ui/theme"
+import { getAppLocale } from "../../session/appLocale"
+import { getDiscoveryHomeCopy } from "../discoveryHomeCopy"
 
 // Discover header: the viewer's profile chip (opens You) and the filters
 // button with its active-filter badge.
@@ -27,11 +29,12 @@ export function DiscoverHomeHeader(props: {
     handleOpenProfileEdit,
     handleOpenFilters
   } = props
+  const copy = getDiscoveryHomeCopy(getAppLocale()).header
   return (
     <View style={styles.homeHeader}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open your Blumi profile"
+        accessibilityLabel={copy.profileAccessibilityLabel}
         onPress={handleOpenProfileEdit}
         style={({ pressed }) => [
           styles.homeProfileChip,
@@ -55,13 +58,13 @@ export function DiscoverHomeHeader(props: {
             {myDisplayName}
           </Text>
           <Text style={styles.homeProfileMeta} numberOfLines={1}>
-            Edit your vibe
+            {copy.profileMeta}
           </Text>
         </View>
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open discover filters"
+        accessibilityLabel={copy.filtersAccessibilityLabel}
         style={({ pressed }) => [
           styles.filterButton,
           pressed ? styles.filterButtonPressed : null

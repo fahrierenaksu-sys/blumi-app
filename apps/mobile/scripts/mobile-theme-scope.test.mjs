@@ -27,7 +27,7 @@ test("generic mobile theme preserves the approved Discovery palette", () => {
     'textMuted: "#9589A4"',
     'border: "#F0E7F6"',
     'borderStrong: "#E7DAF0"',
-    'primary: "#FF4F98"',
+    'primary: "#F65C9D"',
     'primaryDeep: "#D92A79"',
     'primaryPressed: "#E24486"',
     'primaryDisabled: "#F7A8CB"',
@@ -46,15 +46,15 @@ test("generic mobile theme preserves the approved Discovery palette", () => {
     'accentGlow: "rgba(255, 79, 152, 0.18)"',
     'accentGlowStrong: "rgba(255, 79, 152, 0.32)"',
     'avatarPreviewGlow: "rgba(255, 79, 152, 0.14)"',
-    'primary: ["#FF4F98", "#FF7EB3"]',
-    'primaryDeep: ["#D92A79", "#FF4F98"]',
-    'warm: ["#FF4F98", "#FFB99A"]',
+    'primary: ["#F65C9D", "#FF7EB3"]',
+    'primaryDeep: ["#D92A79", "#F65C9D"]',
+    'warm: ["#F65C9D", "#FFB99A"]',
     'cool: ["#9B59B6", "#667EEA"]',
-    'match: ["#FF4F98", "#FF7EB3", "#FFB99A"]',
-    'sunset: ["#FF6B6B", "#FF4F98", "#9B59B6"]',
+    'match: ["#F65C9D", "#FF7EB3", "#FFB99A"]',
+    'sunset: ["#FF6B6B", "#F65C9D", "#9B59B6"]',
     'heroBackground: ["#FBF8FD", "#FEF4F9", "#FFF2F8"]',
     'shadowColor: "#D92A79"',
-    'shadowColor: "#FF4F98"'
+    'shadowColor: "#F65C9D"'
   ]) {
     assert.match(
       genericThemeSource,

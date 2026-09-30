@@ -1,5 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { memo } from "react"
 import { Pressable, Text, View } from "react-native"
+import Animated from "react-native-reanimated"
 import { uiTheme } from "../../../ui/theme"
 import { ChatRoomInviteCard } from "../ChatRoomInviteCard"
 import type {
@@ -7,20 +9,29 @@ import type {
   ChatRoomInviteAction,
   ChatTimelineItem
 } from "../chatRoomInviteModel"
+import { getChatBubbleAccessibilityLabel } from "./chatBubbleAccessibility"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { formatMessageTime, type ChatTimelineRowModel } from "./chatThreadModel"
 import { bubbleGroupStyles, bubbleStyles } from "./chatThreadStyles"
+import { CHAT_INCOMING_ROW_ENTERING, CHAT_OWN_ROW_ENTERING } from "./useChatTimelineEntrances"
 
 /**
  * One timeline row: an optional day separator, then either a room invitation
  * card or a text bubble with its delivery state and retry affordance.
+ *
+ * A row that just appeared at the newest edge (`isEntering`) plays a short
+ * UI-thread entrance on mount; history, pagination and Reduce Motion never do.
+ * The bubble's words, time and delivery state are one accessibility element;
+ * the retry button stays separately focusable.
  */
-export function ChatTimelineRow({
+function ChatTimelineRow({
   item,
   row,
   chatCopy,
   chatLocale,
   currentUserId,
+  partnerName,
+  isEntering,
   activeRoomInviteAction,
   onRoomInviteAction,
   onRetry
@@ -30,6 +41,8 @@ export function ChatTimelineRow({
   chatCopy: ChatThreadCopy
   chatLocale: ChatLocale
   currentUserId: string
+  partnerName: string
+  isEntering: boolean
   activeRoomInviteAction: string | null
   onRoomInviteAction:
     | ((action: ChatRoomInviteAction, onError?: (error: unknown) => void) => void)
@@ -37,9 +50,23 @@ export function ChatTimelineRow({
   onRetry: (messageId: string) => void
 }) {
   const { isMe, deliveryState, groupPosition, closesGroup, dateLabel } = row
+  const entering = isEntering
+    ? isMe ? CHAT_OWN_ROW_ENTERING : CHAT_INCOMING_ROW_ENTERING
+    : undefined
+  const messageTime = item.kind === "message" ? formatMessageTime(item.message.sentAt) : ""
+  const bubbleAccessibilityLabel = item.kind === "message"
+    ? getChatBubbleAccessibilityLabel({
+        body: item.message.body,
+        time: messageTime,
+        isMe,
+        deliveryState,
+        partnerName,
+        copy: chatCopy
+      })
+    : undefined
 
   return (
-    <View>
+    <Animated.View entering={entering}>
       {dateLabel ? (
         <View style={bubbleStyles.dateSep}>
           <View style={bubbleStyles.dateSepPill}>
@@ -84,8 +111,15 @@ export function ChatTimelineRow({
               ]}
             />
           ) : null}
-          <View style={bubbleStyles.contentRow}>
+          <View
+            accessible
+            accessibilityLabel={bubbleAccessibilityLabel}
+            style={bubbleStyles.contentRow}
+          >
+            {/* Only the user's own words are selectable (native copy menu),
+                never the time, delivery state, or retry label. */}
             <Text
+              selectable
               style={[
                 bubbleStyles.body,
                 isMe ? bubbleStyles.bodyMe : null
@@ -100,7 +134,7 @@ export function ChatTimelineRow({
                   isMe ? bubbleStyles.timeMe : null
                 ]}
               >
-                {formatMessageTime(item.message.sentAt)}
+                {messageTime}
               </Text>
               {isMe && deliveryState === "sending" ? (
                 <Ionicons
@@ -129,6 +163,14 @@ export function ChatTimelineRow({
         </View>
       )}
       </View>
-    </View>
+    </Animated.View>
   )
 }
+
+/**
+ * Rows re-render only when their item/row models, the active invitation
+ * action, or a callback changes; `buildChatTimelineRowModels` keeps unchanged
+ * models referentially stable so the shallow comparison holds.
+ */
+const MemoizedChatTimelineRow = memo(ChatTimelineRow)
+export { MemoizedChatTimelineRow as ChatTimelineRow }

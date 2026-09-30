@@ -6,11 +6,7 @@ import type {
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useRef, useState } from "react"
-import {
-  ActivityIndicator,
-  StyleSheet,
-  View
-} from "react-native"
+import { StyleSheet, View } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
 import {
@@ -71,6 +67,8 @@ import {
 } from "../features/session/onboardingFlowModel"
 import {
   getChatLocale,
+  getChatThreadScreenOptions,
+  getDetailScreenOptions,
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
@@ -224,6 +222,7 @@ export type RootStackParamList = {
   }
   MatchResult: {
     match: BlumiMatch
+    celebrate?: boolean
   }
 }
 
@@ -270,6 +269,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   void fontsReady
   const reduceMotion = useReducedMotion()
   const reducedMotionScreenOptions = getReducedMotionScreenOptions(reduceMotion)
+  const detailScreenOptions = getDetailScreenOptions(reduceMotion)
   const {
     sessionActor,
     hasSeenIntro,
@@ -640,7 +640,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       <NavigationContainer
         ref={navigationRef}
         linking={linking}
-        fallback={<ActivityIndicator color="#F26779" />}
+        fallback={<BlumiLoadingScreen />}
         onReady={handleNavigationReady}
         onStateChange={handleNavigationStateChange}
       >
@@ -685,7 +685,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               <Stack.Screen
                 name="Legal"
                 component={legalScreenBundle.DeferredScreen}
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               />
             </>
           ) : sessionEntryRoute === "Main" && sessionActor ? (
@@ -757,7 +757,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               ) : null}
               <Stack.Screen
                 name="ProfilePreview"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <LinkedProfileScreen
@@ -787,7 +787,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               />
               <Stack.Screen
                 name="MyRoomEditor"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <myRoomEditorScreenBundle.DeferredScreen
@@ -799,11 +799,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="ChatThread"
-                options={{
-                  headerShown: false,
-                  animation: reduceMotion ? "none" : "simple_push",
-                  animationDuration: 240
-                }}
+                options={getChatThreadScreenOptions(reduceMotion)}
               >
                 {(screenProps) => (
                   <ChatThreadScreen
@@ -816,7 +812,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="MatchResult"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <MatchResultScreen
@@ -827,7 +823,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="You"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <YouScreen
@@ -839,7 +835,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="ProfileEdit"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <ProfileEditScreen
@@ -863,7 +859,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               </Stack.Screen>
               <Stack.Screen
                 name="Settings"
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               >
                 {(screenProps) => (
                   <settingsScreenBundle.DeferredScreen
@@ -882,7 +878,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               <Stack.Screen
                 name="Legal"
                 component={legalScreenBundle.DeferredScreen}
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               />
             </>
           ) : sessionEntryRoute === "AuthEntry" ? (
@@ -962,7 +958,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               <Stack.Screen
                 name="Legal"
                 component={legalScreenBundle.DeferredScreen}
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               />
             </>
           ) : onboardingEntryRoute && sessionActor ? (

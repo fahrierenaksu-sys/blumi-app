@@ -2,6 +2,11 @@
  * Discover card swipe rules, shared by the Gesture Handler pan (UI thread)
  * and the deck. The values are the ones the PanResponder implementation used.
  */
+/**
+ * The PanResponder's fixed exit. The gesture exit now follows the release
+ * speed (`getDiscoverSwipeOutDuration`) and falls back to this only for a
+ * release it cannot measure.
+ */
 export const SWIPE_OUT_DURATION = 190
 export const SWIPE_CAPTURE_THRESHOLD = 4
 export const SWIPE_DIRECTION_DOMINANCE = 1.1
@@ -46,11 +51,92 @@ export function resolveDiscoverSwipeRelease(input: {
   return "reset"
 }
 
+/** Which commit threshold the drag is past: 1 like, -1 pass, 0 neither. */
+export type DiscoverSwipeThresholdSide = -1 | 0 | 1
+
+/**
+ * px the drag must come back inside the threshold before the tick re-arms,
+ * so a finger resting on the threshold does not tick repeatedly.
+ */
+export const SWIPE_THRESHOLD_TICK_HYSTERESIS = 6
+
+/**
+ * The threshold side for the current drag, given the side of the previous
+ * frame. Entering uses the release rule's distance (`dx > threshold`); a side
+ * already entered is kept until the drag returns inside the hysteresis band.
+ * A disabled like never counts as past the like threshold.
+ */
+export function getDiscoverSwipeThresholdSide(
+  previousSide: DiscoverSwipeThresholdSide,
+  x: number,
+  threshold: number,
+  canSwipeRight: boolean
+): DiscoverSwipeThresholdSide {
+  "worklet"
+  const keep = threshold - SWIPE_THRESHOLD_TICK_HYSTERESIS
+  if (canSwipeRight && (x > threshold || (previousSide === 1 && x > keep))) return 1
+  if (x < -threshold || (previousSide === -1 && x < -keep)) return -1
+  return 0
+}
+
+/** One tick per entry into a side; leaving it is silent and re-arms the tick. */
+export function shouldTickDiscoverSwipeThreshold(
+  previousSide: DiscoverSwipeThresholdSide,
+  nextSide: DiscoverSwipeThresholdSide
+): boolean {
+  "worklet"
+  return nextSide !== 0 && nextSide !== previousSide
+}
+
 export function getDiscoverSwipeOutX(direction: DiscoverSwipeDirection, screenWidth: number): number {
   "worklet"
   return direction === "right"
     ? screenWidth * SWIPE_OUT_SCREEN_WIDTHS
     : -screenWidth * SWIPE_OUT_SCREEN_WIDTHS
+}
+
+export const SWIPE_OUT_MIN_DURATION = 120
+export const SWIPE_OUT_MAX_DURATION = 260
+/** px/s. Releases slower than this leave at the pace of a slow release. */
+export const SWIPE_OUT_MIN_VELOCITY = 1500
+
+/**
+ * ms for the card to cover the distance left to its exit point at the speed
+ * the finger released it toward that exit, within 120-260 ms. A release moving
+ * away from the exit counts as a slow one.
+ */
+export function getDiscoverSwipeOutDuration(
+  remainingDistancePx: number,
+  velocityTowardExitPxPerSecond: number
+): number {
+  "worklet"
+  if (!Number.isFinite(remainingDistancePx) || !Number.isFinite(velocityTowardExitPxPerSecond)) {
+    return SWIPE_OUT_DURATION
+  }
+  const speed = Math.max(velocityTowardExitPxPerSecond, SWIPE_OUT_MIN_VELOCITY)
+  const duration = Math.abs(remainingDistancePx) / speed * 1000
+  return Math.min(SWIPE_OUT_MAX_DURATION, Math.max(SWIPE_OUT_MIN_DURATION, duration))
+}
+
+/** Degrees the dragged card leans after a full screen width of drag. */
+export const DISCOVER_SWIPE_MAX_TILT_DEG = 8
+
+/**
+ * The lean of the dragged card: it follows the drag up to the max tilt at one
+ * screen width. A card held by its lower half pivots the other way, like a
+ * card on a table.
+ */
+export function getDiscoverSwipeRotation(x: number, screenWidth: number, grabbedLowerHalf: boolean): number {
+  "worklet"
+  if (!(screenWidth > 0)) return 0
+  const tilt = Math.min(1, Math.max(-1, x / screenWidth)) * DISCOVER_SWIPE_MAX_TILT_DEG
+  return grabbedLowerHalf ? 0 - tilt : tilt
+}
+
+/** A grab below the card's middle; an unmeasured card counts as upper half. */
+export function isDiscoverSwipeLowerHalfGrab(touchY: number, cardHeight: number): boolean {
+  "worklet"
+  return cardHeight > 0 && touchY > cardHeight / 2
 }
 
 /**
@@ -88,16 +174,108 @@ export function getDiscoverStampOpacity(x: number, threshold: number): { like: n
   return { like, nope }
 }
 
-export function getDiscoverMiddleCardMotion(x: number): {
+/** px of drag after which the next card has fully taken the top card's place. */
+const DISCOVER_MIDDLE_CARD_TRAVEL = 400
+
+export interface DiscoverMiddleCardMotion {
   scale: number
   translateX: number
   translateY: number
-} {
+}
+
+export function getDiscoverMiddleCardMotion(x: number): DiscoverMiddleCardMotion {
   "worklet"
-  const distance = Math.min(400, Math.abs(x))
+  const distance = Math.min(DISCOVER_MIDDLE_CARD_TRAVEL, Math.abs(x))
   return {
-    scale: interpolateClamped(distance, 0, 400, 0.98, 1),
-    translateX: interpolateClamped(distance, 0, 400, -8, 0),
-    translateY: interpolateClamped(distance, 0, 400, -12, 0)
+    scale: interpolateClamped(distance, 0, DISCOVER_MIDDLE_CARD_TRAVEL, 0.98, 1),
+    translateX: interpolateClamped(distance, 0, DISCOVER_MIDDLE_CARD_TRAVEL, -8, 0),
+    translateY: interpolateClamped(distance, 0, DISCOVER_MIDDLE_CARD_TRAVEL, -12, 0)
+  }
+}
+
+export type DiscoverDeckRole = "top" | "middle" | "bottom"
+
+/** The deepest visible card fans out behind the next one. */
+export const DISCOVER_BOTTOM_CARD_MOTION = {
+  translateX: -10,
+  translateY: -30,
+  rotateDeg: -3,
+  scale: 0.98,
+  opacity: 0.96
+} as const
+
+/**
+ * Moves a card to its new deck slot when the card above it leaves or comes
+ * back. Short and critically damped (damping = 2 * sqrt(stiffness * mass)),
+ * so the card settles without overshooting its slot.
+ */
+export const DISCOVER_PROMOTION_SPRING = {
+  stiffness: 400,
+  damping: 40,
+  mass: 1
+} as const
+
+/** A slot as one number the deck can spring between: bottom 0, middle 1, top 2. */
+export function getDiscoverDeckRoleProgress(role: DiscoverDeckRole): number {
+  "worklet"
+  return role === "top" ? 2 : role === "middle" ? 1 : 0
+}
+
+/**
+ * The middle-slot pose a card blends through. Only the middle card follows
+ * the featured card's drag; a card that just became the top card was carried
+ * fully forward by the drag that removed its predecessor.
+ */
+export function getDiscoverDeckDragMotion(role: DiscoverDeckRole, dragX: number): DiscoverMiddleCardMotion {
+  "worklet"
+  if (role === "middle") return getDiscoverMiddleCardMotion(dragX)
+  return getDiscoverMiddleCardMotion(role === "top" ? DISCOVER_MIDDLE_CARD_TRAVEL : 0)
+}
+
+export interface DiscoverDeckRoleMotion {
+  translateX: number
+  translateY: number
+  rotateDeg: number
+  scale: number
+  opacity: number
+  /** The frosted layer over cards behind the top card. */
+  overlayOpacity: number
+}
+
+/** Linear blend that lands exactly on `from` at 0 and on `to` at 1. */
+function mix(from: number, to: number, amount: number): number {
+  "worklet"
+  return from * (1 - amount) + to * amount
+}
+
+/**
+ * The pose of a deck card at a role progress: 0 is the bottom fan-out, 1 the
+ * middle card at `dragMotion` (upright), 2 the top card at rest. Between two
+ * slots the pose blends linearly, so a promotion is a move, not a jump.
+ */
+export function getDiscoverDeckRoleMotion(
+  progress: number,
+  dragMotion: DiscoverMiddleCardMotion
+): DiscoverDeckRoleMotion {
+  "worklet"
+  const clamped = Math.min(2, Math.max(0, progress))
+  if (clamped <= 1) {
+    return {
+      translateX: mix(DISCOVER_BOTTOM_CARD_MOTION.translateX, dragMotion.translateX, clamped),
+      translateY: mix(DISCOVER_BOTTOM_CARD_MOTION.translateY, dragMotion.translateY, clamped),
+      rotateDeg: mix(DISCOVER_BOTTOM_CARD_MOTION.rotateDeg, 0, clamped),
+      scale: mix(DISCOVER_BOTTOM_CARD_MOTION.scale, dragMotion.scale, clamped),
+      opacity: mix(DISCOVER_BOTTOM_CARD_MOTION.opacity, 1, clamped),
+      overlayOpacity: 1
+    }
+  }
+  const toTop = clamped - 1
+  return {
+    translateX: mix(dragMotion.translateX, 0, toTop),
+    translateY: mix(dragMotion.translateY, 0, toTop),
+    rotateDeg: 0,
+    scale: mix(dragMotion.scale, 1, toTop),
+    opacity: 1,
+    overlayOpacity: 1 - toTop
   }
 }

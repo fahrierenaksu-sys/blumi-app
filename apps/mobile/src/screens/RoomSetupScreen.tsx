@@ -50,17 +50,7 @@ import {
   useOnboardingSignOut
 } from "./components/onboardingScreenActions"
 import { getAppLocale } from "../features/session/appLocale"
-
-const ROOM_SETUP_FEEDBACK_COPY = {
-  tr: {
-    mutationRejected: "Oda değişikliği uygulanamadı. Yeniden dene.",
-    persistenceAttention: "Oda kaydıyla ilgili bir sorun var. Güncel düzeni kontrol et."
-  },
-  en: {
-    mutationRejected: "That room change could not be applied. Please try again.",
-    persistenceAttention: "Room saving needs attention. Review the current layout."
-  }
-} as const
+import { getRoomSetupCopy } from "../features/roomV2/roomSetupCopy"
 
 export interface RoomSetupScreenProps {
   isSubmitting: boolean
@@ -80,7 +70,7 @@ export function RoomSetupScreen({
   onBackToAvatar,
   onEditProfile: _onEditProfile,
   onSignOut,
-  completionLabel = "Odam hazır",
+  completionLabel,
   motionActive = true
 }: RoomSetupScreenProps) {
   const { fontScale, height, width } = useWindowDimensions()
@@ -91,7 +81,8 @@ export function RoomSetupScreen({
     userRoomDecor,
     setUserRoomDecor
   } = useRoomV2()
-  const feedbackCopy = ROOM_SETUP_FEEDBACK_COPY[getAppLocale()]
+  const copy = getRoomSetupCopy(getAppLocale())
+  const feedbackCopy = copy.feedback
   const { avatar, catalog: avatarCatalog } = useAvatarV2()
   const roomFrameRef = useRef<View>(null)
   const [bedSelected, setBedSelected] = useState(false)
@@ -176,7 +167,7 @@ export function RoomSetupScreen({
     const avatarItem = createRoomV2AvatarRenderItem({
       avatarId: "setup-avatar",
       renderId: "setup-avatar",
-      name: "Blumi karakterin",
+      name: copy.avatarName,
       layers,
       x: bed ? Math.min(0.84, Math.max(0.16, bed.x + 0.22)) : 0.72,
       y: bed ? Math.min(0.84, Math.max(0.62, bed.y + 0.04)) : 0.76,
@@ -189,7 +180,7 @@ export function RoomSetupScreen({
       ...scene,
       renderItems: insertRoomV2RenderItemSorted(scene.renderItems, avatarItem)
     }
-  }, [roomAvatarAppearance, scene])
+  }, [copy.avatarName, roomAvatarAppearance, scene])
   const placedBed = useMemo(
     () => storyScene.renderItems.find(
       (item) => item.kind === "furniture" && item.itemId === STARTER_ROOM_BED_ITEM_ID
@@ -198,7 +189,7 @@ export function RoomSetupScreen({
   )
   const placeBedAtPoint = useCallback((point: { x: number; y: number }): void => {
     if (persistenceState === "loading") {
-      setPlacementMessage("Odan hazırlanıyor. Birazdan yeniden dene.")
+      setPlacementMessage(copy.placement.roomLoading)
       return
     }
     if (!starterBed) return
@@ -228,7 +219,7 @@ export function RoomSetupScreen({
         candidate
       }).isValid
     ) {
-      setPlacementMessage("Odanın zemininde başka bir nokta seç.")
+      setPlacementMessage(copy.placement.chooseAnotherSpot)
       return
     }
     if (!setUserRoomDecor(nextDecor)) {
@@ -237,8 +228,8 @@ export function RoomSetupScreen({
     }
     setPlacementErrorMessage("")
     setBedSelected(true)
-    setPlacementMessage("Yatağın yerleşti.")
-  }, [feedbackCopy.mutationRejected, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
+    setPlacementMessage(copy.placement.placed)
+  }, [copy, feedbackCopy.mutationRejected, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
 
   const rotatePlacedBed = useCallback((): void => {
     if (!starterBed || !hasPlacedStarterBed(userRoomDecor)) return
@@ -263,7 +254,7 @@ export function RoomSetupScreen({
         candidate
       }).isValid
     ) {
-      setPlacementMessage("Çevirmeden önce yatağı biraz içeri taşı.")
+      setPlacementMessage(copy.placement.moveInBeforeRotating)
       return
     }
     if (!setUserRoomDecor(nextDecor)) {
@@ -271,14 +262,14 @@ export function RoomSetupScreen({
       return
     }
     setPlacementErrorMessage("")
-    setPlacementMessage("Yatak çevrildi. Taşımak için odaya dokun.")
-  }, [feedbackCopy.mutationRejected, setUserRoomDecor, starterBed, userRoomDecor])
+    setPlacementMessage(copy.placement.rotated)
+  }, [copy, feedbackCopy.mutationRejected, setUserRoomDecor, starterBed, userRoomDecor])
 
   const handlePlacedBedLongPress = useCallback((): void => {
     hapticMedium()
     setBedSelected(true)
-    setPlacementMessage("Basılı tutup sürükleyerek taşı.")
-  }, [])
+    setPlacementMessage(copy.placement.longPressMove)
+  }, [copy])
 
   const handlePlacedBedLongPressRelease = useCallback((
     item: RoomV2RenderItem,
@@ -298,7 +289,7 @@ export function RoomSetupScreen({
         pageY < y ||
         pageY > y + height
       ) {
-        setPlacementMessage("Yatağı oda zeminine sürükle.")
+        setPlacementMessage(copy.placement.dragToFloor)
         return
       }
       placeBedAtPoint({
@@ -306,7 +297,7 @@ export function RoomSetupScreen({
         y: (pageY - y) / height
       })
     })
-  }, [placeBedAtPoint])
+  }, [copy, placeBedAtPoint])
 
   const handlePlacedBedLongPressMove = useCallback((
     item: RoomV2RenderItem,
@@ -322,7 +313,7 @@ export function RoomSetupScreen({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         setBedSelected(true)
-        setPlacementMessage("Şimdi odada bir noktaya dokun ya da yatağı oraya sürükle.")
+        setPlacementMessage(copy.placement.tapOrDrag)
       },
       onPanResponderRelease: (_, gestureState) => {
         if (Math.abs(gestureState.dx) < 8 && Math.abs(gestureState.dy) < 8) {
@@ -332,7 +323,7 @@ export function RoomSetupScreen({
         placeBedAtWindowPoint(gestureState.moveX, gestureState.moveY)
       }
     }),
-    [placeBedAtPoint, placeBedAtWindowPoint]
+    [copy, placeBedAtPoint, placeBedAtWindowPoint]
   )
 
   const { busy } = useOnboardingSignOut(onSignOut, isSubmitting)
@@ -354,10 +345,10 @@ export function RoomSetupScreen({
       }}
       primaryActionBusy={isSubmitting}
       primaryActionDisabled={busy || !starterRoomReady}
-      primaryActionLabel={completionLabel}
+      primaryActionLabel={completionLabel ?? copy.completionLabel}
       primaryActionTestID="room-setup-submit"
       reduceMotion={reduceMotion}
-      headerTitle="İlk odan"
+      headerTitle={copy.headerTitle}
       headerProgressStyle="fraction"
       hideHeading
       hideProgressRail
@@ -382,7 +373,7 @@ export function RoomSetupScreen({
             onItemLongPressRelease={handlePlacedBedLongPressRelease}
             onStagePress={bedSelected || starterRoomReady ? placeBedAtPoint : undefined}
             showDepthWash={false}
-            accessibilityLabel="Başlangıç yatağını odaya yerleştir"
+            accessibilityLabel={copy.roomAccessibilityLabel}
             style={styles.roomSceneSurface}
             testID="onboarding-room-preview"
           />
@@ -406,14 +397,14 @@ export function RoomSetupScreen({
               <View pointerEvents="none" style={styles.bedToolbarHighlight} />
               <View
                 accessible
-                accessibilityLabel="Yatağı taşımak için yatağa basılı tutup sürükle"
+                accessibilityLabel={copy.moveBedAccessibilityLabel}
                 style={styles.bedMoveHint}
               >
                 <Ionicons color={uiTheme.colors.primary} name="move" size={16} />
               </View>
               <View pointerEvents="none" style={styles.bedToolbarDivider} />
               <Pressable
-                accessibilityLabel="Pembe Bulut Yatağı çevir"
+                accessibilityLabel={copy.rotateBedAccessibilityLabel}
                 accessibilityRole="button"
                 hitSlop={6}
                 onPress={rotatePlacedBed}
@@ -435,34 +426,34 @@ export function RoomSetupScreen({
       >
         <View style={styles.roomFirstSummary}>
           <Text accessibilityRole="header" style={styles.roomFirstTitle}>
-            İlk köşen hazır
+            {copy.summaryTitle}
           </Text>
           <Text style={styles.roomFirstDescription}>
             {starterRoomReady
-              ? "Pembe Bulut Yatak odanda."
-              : "Pembe Bulut Yatağı odana yerleştir."}
+              ? copy.bedPlacedSummary
+              : copy.bedPendingSummary}
           </Text>
           <View style={styles.giftChip}>
-            <Text style={styles.giftChipText}>HEDİYE</Text>
+            <Text style={styles.giftChipText}>{copy.giftBadge}</Text>
           </View>
         </View>
         <View style={styles.roomFirstStatus}>
           {starterRoomReady ? (
             <View
               accessible
-              accessibilityLabel="Pembe Bulut Yatak yerleştirildi"
+              accessibilityLabel={copy.bedPlacedAccessibilityLabel}
               style={styles.placementCompleteCard}
               testID="starter-bed-card"
             >
               <View style={styles.placementCompleteIcon}>
                 <Ionicons color="#FFFFFF" name="checkmark" size={14} />
               </View>
-              <Text style={styles.placementCompleteText}>Yatak yerleştirildi</Text>
+              <Text style={styles.placementCompleteText}>{copy.bedPlacedCard}</Text>
             </View>
           ) : starterBed ? (
             <View
               accessible
-              accessibilityLabel="Pembe Bulut Yatak, ücretsiz başlangıç eşyası. Yerleştirmek için dokun veya odaya sürükle."
+              accessibilityLabel={copy.starterItemAccessibilityLabel}
               accessibilityRole="button"
               accessibilityState={{ selected: bedSelected }}
               style={styles.starterItemLiquidFrame}
@@ -489,8 +480,8 @@ export function RoomSetupScreen({
                   />
                 </LinearGradient>
                 <View style={styles.starterItemCopy}>
-                  <Text style={styles.starterItemTitle}>Pembe Bulut Yatak</Text>
-                  <Text style={styles.starterItemHint}>Dokun veya odana sürükle</Text>
+                  <Text style={styles.starterItemTitle}>{copy.starterItemTitle}</Text>
+                  <Text style={styles.starterItemHint}>{copy.starterItemHint}</Text>
                 </View>
                 <View style={styles.starterItemAction}>
                   <Ionicons color="#FFFFFF" name="add" size={20} />

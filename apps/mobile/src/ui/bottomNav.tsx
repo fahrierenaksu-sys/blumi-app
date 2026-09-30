@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
   Animated,
@@ -14,6 +14,8 @@ import Reanimated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
+  withSpring,
   withTiming,
   type SharedValue
 } from "react-native-reanimated"
@@ -25,8 +27,9 @@ import {
   resolveBottomNavIndicatorIndex
 } from "./layout/bottomNavIndicatorModel"
 import { mainTabPagerIndicator } from "./mainTabPagerIndicator"
+import { usePublishToastBottomBarInset } from "./usePublishToastBottomBarInset"
 import { uiTheme } from "./theme"
-import { hapticLight } from "./haptics"
+import { hapticSelection } from "./haptics"
 import { getAppNavigationCopy } from "../features/session/appNavigationCopy"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
@@ -40,9 +43,18 @@ import {
 import {
   BOTTOM_NAV_PRESSED_SCALE,
   BOTTOM_NAV_PRESS_DURATION_MS,
-  getBottomNavAccessibilityLabel,
   getBottomNavMotionDuration,
 } from "./layout/bottomNavMotionModel"
+import {
+  formatBottomNavBadgeCount,
+  getBadgeAppearMotion,
+  getBadgeBumpMotion,
+  getBadgeExitMotion,
+  isBottomNavBadgeVisible,
+  resolveBottomNavBadgeLabelCount,
+  resolveBottomNavBadgeTransition,
+  type BottomNavBadgeTransition,
+} from "./layout/bottomNavBadgeModel"
 
 export type BottomNavKey = "discover" | "chats" | "myroom" | "shop"
 
@@ -79,16 +91,94 @@ export interface BottomNavProps {
   visible?: boolean
 }
 
+// Starts the badge's UI-thread animation for one count change. Reduce Motion
+// snaps straight to the end state.
+function playBadgeTransition(
+  transition: BottomNavBadgeTransition,
+  reduceMotion: boolean,
+  scale: SharedValue<number>,
+  opacity: SharedValue<number>
+) {
+  if (transition === "appear") {
+    const motion = getBadgeAppearMotion(reduceMotion)
+    opacity.value = motion.opacityDurationMs === 0
+      ? 1
+      : withTiming(1, { duration: motion.opacityDurationMs })
+    scale.value = motion.spring === null
+      ? 1
+      : withSequence(withTiming(motion.fromScale, { duration: 0 }), withSpring(1, motion.spring))
+    return
+  }
+  if (transition === "bump") {
+    const motion = getBadgeBumpMotion(reduceMotion)
+    if (motion === null) return
+    scale.value = withSequence(
+      withTiming(motion.peakScale, { duration: motion.peakDurationMs }),
+      withSpring(1, motion.spring)
+    )
+    return
+  }
+  if (transition === "exit") {
+    const motion = getBadgeExitMotion(reduceMotion)
+    if (motion.durationMs === 0) {
+      opacity.value = 0
+      scale.value = motion.toScale
+      return
+    }
+    opacity.value = withTiming(0, { duration: motion.durationMs })
+    scale.value = withTiming(motion.toScale, { duration: motion.durationMs })
+  }
+}
+
+// Always mounted so it can animate out; hidden from touch and from the
+// accessibility tree while the count is zero.
+function NavBadge(props: { count: number; ambient: boolean; reduceMotion: boolean }) {
+  const { count, ambient, reduceMotion } = props
+  const visible = isBottomNavBadgeVisible(count)
+  const [labelCount, setLabelCount] = useState(count)
+  const nextLabelCount = resolveBottomNavBadgeLabelCount(labelCount, count)
+  if (nextLabelCount !== labelCount) setLabelCount(nextLabelCount)
+  const scale = useSharedValue(visible ? 1 : 0)
+  const opacity = useSharedValue(visible ? 1 : 0)
+  const previousCount = useRef(count)
+
+  useEffect(() => {
+    const transition = resolveBottomNavBadgeTransition(previousCount.current, count)
+    previousCount.current = count
+    playBadgeTransition(transition, reduceMotion, scale, opacity)
+  }, [count, opacity, reduceMotion, scale])
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }]
+  }))
+
+  return (
+    <Reanimated.View
+      pointerEvents="none"
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+      style={[
+        styles.bottomNavBadge,
+        ambient ? styles.bottomNavBadgeAmbient : null,
+        badgeStyle
+      ]}
+    >
+      <Text style={styles.bottomNavBadgeText}>
+        {formatBottomNavBadgeCount(nextLabelCount)}
+      </Text>
+    </Reanimated.View>
+  )
+}
+
 function NavTab(props: {
   item: LocalizedBottomNavItem
   index: number
   indicator: SharedValue<number>
   isCurrent: boolean
-  showBadge: boolean
-  chatCount: number
+  badgeCount: number | null
   onPress: () => void
   ambient: boolean
-  accessibilityLabel: string
   reduceMotion: boolean
 }) {
   const {
@@ -96,11 +186,9 @@ function NavTab(props: {
     index,
     indicator,
     isCurrent,
-    showBadge,
-    chatCount,
+    badgeCount,
     onPress,
     ambient,
-    accessibilityLabel,
     reduceMotion,
   } = props
   const scaleAnim = useRef(new Animated.Value(1)).current
@@ -151,17 +239,19 @@ function NavTab(props: {
 
   return (
     <Animated.View style={[styles.bottomNavItemOuter, { transform: [{ scale: scaleAnim }] }]}>
+      {/* The selected tab stays pressable: a second tap is a reselect
+          (scroll to top), which is silent, so only a tab change plays the
+          selection haptic. */}
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="tab"
+        accessibilityLabel={item.label}
         accessibilityState={{ selected: isCurrent }}
         style={[
           styles.bottomNavItem,
           isCurrent ? styles.bottomNavItemActive : null,
         ]}
-        disabled={isCurrent}
         onPress={() => {
-          hapticLight()
+          if (!isCurrent) hapticSelection()
           onPress()
         }}
         onPressIn={handlePressIn}
@@ -185,18 +275,9 @@ function NavTab(props: {
             />
           </Reanimated.View>
         </View>
-        {showBadge ? (
-          <View
-            style={[
-              styles.bottomNavBadge,
-              ambient ? styles.bottomNavBadgeAmbient : null
-            ]}
-          >
-            <Text style={styles.bottomNavBadgeText}>
-              {chatCount > 99 ? "99+" : chatCount}
-            </Text>
-          </View>
-        ) : null}
+        {badgeCount === null ? null : (
+          <NavBadge count={badgeCount} ambient={ambient} reduceMotion={reduceMotion} />
+        )}
         <Reanimated.View pointerEvents="none" style={[styles.bottomNavLabelFrame, selectedLayerStyle]}>
           <Text
             accessible={false}
@@ -242,6 +323,7 @@ export function BottomNav(props: BottomNavProps) {
   })
   const tabWidth = navLayout.tabWidth
   const itemCount = localizedItems.length
+  usePublishToastBottomBarInset(navLayout.bottomOffset + navLayout.height, visible)
 
   // Indicator position in tab units. A committed selection change (tap,
   // navigation, end of a swipe) animates it on the UI thread; while the
@@ -267,6 +349,7 @@ export function BottomNav(props: BottomNavProps) {
 
   return (
     <View
+      accessibilityRole="tablist"
       pointerEvents={visible ? "auto" : "none"}
       accessibilityElementsHidden={!visible}
       importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
@@ -300,7 +383,6 @@ export function BottomNav(props: BottomNavProps) {
       </Reanimated.View>
       {localizedItems.map((item, index) => {
         const isCurrent = item.key === currentKey
-        const showBadge = item.key === "chats" && chatCount > 0
         return (
           <NavTab
             key={item.key}
@@ -308,15 +390,9 @@ export function BottomNav(props: BottomNavProps) {
             index={index}
             indicator={indicator}
             isCurrent={isCurrent}
-            showBadge={showBadge}
-            chatCount={chatCount}
+            badgeCount={item.key === "chats" ? chatCount : null}
             onPress={() => onPress(item.key)}
             ambient={ambient}
-            accessibilityLabel={getBottomNavAccessibilityLabel(
-              locale,
-              item.label,
-              isCurrent
-            )}
             reduceMotion={reduceMotion}
           />
         )

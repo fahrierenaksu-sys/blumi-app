@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react"
+import type { LayoutChangeEvent } from "react-native"
 import { Gesture, State } from "react-native-gesture-handler"
 import {
   cancelAnimation,
@@ -6,23 +7,36 @@ import {
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withSpring,
   withTiming
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
+import { hapticSelection } from "../../ui/haptics"
 import { useMainTabPagerGestureRef } from "../../ui/MainTabPagerGestureOwnership"
+import { uiTheme } from "../../ui/theme"
 import {
   DISCOVER_SWIPE_RESET_SPRING,
   getDiscoverStampOpacity,
+  getDiscoverSwipeOutDuration,
   getDiscoverSwipeOutX,
+  getDiscoverSwipeRotation,
   getDiscoverSwipeThreshold,
+  getDiscoverSwipeThresholdSide,
   getDiscoverSwipeTranslateX,
+  isDiscoverSwipeLowerHalfGrab,
   resolveDiscoverSwipeRelease,
   shouldClaimDiscoverSwipe,
-  SWIPE_OUT_DURATION,
-  type DiscoverSwipeDirection
+  shouldTickDiscoverSwipeThreshold,
+  type DiscoverSwipeDirection,
+  type DiscoverSwipeThresholdSide
 } from "../discovery/discoverySwipeModel"
 import { useDiscoverSwipeValues, type DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
+
+/** The LIKE/PASS stamp starts this large when the drag enters its side. */
+const STAMP_POP_SCALE = 1.08
+const STAMP_POP_START = { duration: 0, reduceMotion: ReduceMotion.Never } as const
+const STAMP_POP_SETTLE = { ...uiTheme.animation.springSnappy, reduceMotion: ReduceMotion.Never } as const
 
 /**
  * The Discover card's horizontal swipe as a Gesture Handler pan. Every frame
@@ -37,6 +51,15 @@ import { useDiscoverSwipeValues, type DiscoverSwipeValues } from "../discovery/u
  * On the main-page pager the card owns every drag that starts on it: the
  * pan blocks the pager, which moves the page only for drags that start
  * elsewhere on Discover.
+ *
+ * Crossing the commit threshold ticks once (selection haptic) and pops the
+ * stamp; the side is tracked in a shared value, so JS hears only when it
+ * changes. The like/pass commit haptic belongs to the decision
+ * (useDiscoveryDecisions), which the action buttons share.
+ *
+ * The owning card leans with its drag (the other way when held by its lower
+ * half, fixed when the pan activates) and leaves at its release speed. Reduce
+ * Motion keeps it upright, skips the stamp pop and exits instantly.
  */
 export function useDiscoverCardSwipe(input: {
   swipe?: DiscoverSwipeValues
@@ -53,6 +76,11 @@ export function useDiscoverCardSwipe(input: {
   const { x, ownerId } = input.swipe ?? localSwipe
   const touchStartX = useSharedValue(0)
   const touchStartY = useSharedValue(0)
+  const touchStartLocalY = useSharedValue(0)
+  const cardHeight = useSharedValue(0)
+  const grabbedLowerHalf = useSharedValue(false)
+  const stampScale = useSharedValue(1)
+  const thresholdSide = useSharedValue<DiscoverSwipeThresholdSide>(0)
   const pagerGestureRef = useMainTabPagerGestureRef()
   const swipeThreshold = getDiscoverSwipeThreshold(screenWidth)
 
@@ -64,26 +92,41 @@ export function useDiscoverCardSwipe(input: {
     }
   }, [cardId, onSwipeLeft, onSwipeRight])
 
-  const forceSwipe = useCallback((direction: DiscoverSwipeDirection): void => {
+  const forceSwipe = useCallback((direction: DiscoverSwipeDirection, durationMs: number): void => {
     "worklet"
     ownerId.value = cardId
     x.value = withTiming(getDiscoverSwipeOutX(direction, screenWidth), {
-      duration: reduceMotion ? 0 : SWIPE_OUT_DURATION,
-      easing: Easing.out(Easing.cubic),
+      duration: durationMs,
+      easing: Easing.out(Easing.quad),
       reduceMotion: ReduceMotion.Never
     }, (finished) => {
       "worklet"
       // An interrupted exit never submits a like or pass.
       if (finished) scheduleOnRN(commitSwipe, direction)
     })
-  }, [cardId, commitSwipe, ownerId, reduceMotion, screenWidth, x])
+  }, [cardId, commitSwipe, ownerId, screenWidth, x])
 
   const resetPosition = useCallback((): void => {
     "worklet"
     x.value = reduceMotion
       ? 0
-      : withSpring(0, { ...DISCOVER_SWIPE_RESET_SPRING, reduceMotion: ReduceMotion.Never })
-  }, [reduceMotion, x])
+      : withSpring(0, { ...DISCOVER_SWIPE_RESET_SPRING, reduceMotion: ReduceMotion.Never }, (finished) => {
+        "worklet"
+        // At rest the card forgets its grab, so an action-button exit leans
+        // like a card held from above.
+        if (finished) grabbedLowerHalf.value = false
+      })
+  }, [grabbedLowerHalf, reduceMotion, x])
+
+  const popStamp = useCallback((): void => {
+    "worklet"
+    if (reduceMotion) return
+    stampScale.value = withSequence(withTiming(STAMP_POP_SCALE, STAMP_POP_START), withSpring(1, STAMP_POP_SETTLE))
+  }, [reduceMotion, stampScale])
+
+  const onCardLayout = useCallback((event: LayoutChangeEvent): void => {
+    cardHeight.value = event.nativeEvent.layout.height
+  }, [cardHeight])
 
   const gesture = useMemo(() => Gesture.Pan()
     .enabled(!disabled)
@@ -95,6 +138,7 @@ export function useDiscoverCardSwipe(input: {
       if (!touch) return
       touchStartX.value = touch.absoluteX
       touchStartY.value = touch.absoluteY
+      touchStartLocalY.value = touch.y
     })
     .onTouchesMove((event, stateManager) => {
       "worklet"
@@ -108,11 +152,25 @@ export function useDiscoverCardSwipe(input: {
       "worklet"
       cancelAnimation(x)
       ownerId.value = cardId
+      grabbedLowerHalf.value = isDiscoverSwipeLowerHalfGrab(touchStartLocalY.value, cardHeight.value)
       x.value = event.translationX
+      thresholdSide.value = 0
     })
     .onUpdate((event) => {
       "worklet"
       x.value = event.translationX
+      const previousSide = thresholdSide.value
+      const nextSide = getDiscoverSwipeThresholdSide(
+        previousSide,
+        event.translationX,
+        swipeThreshold,
+        canSwipeRight
+      )
+      if (nextSide === previousSide) return
+      thresholdSide.value = nextSide
+      if (!shouldTickDiscoverSwipeThreshold(previousSide, nextSide)) return
+      scheduleOnRN(hapticSelection)
+      popStamp()
     })
     .onEnd((event, success) => {
       "worklet"
@@ -129,32 +187,49 @@ export function useDiscoverCardSwipe(input: {
       })
       if (release === "reset") {
         resetPosition()
-      } else {
-        forceSwipe(release)
+        return
       }
+      const remaining = getDiscoverSwipeOutX(release, screenWidth) - x.value
+      const velocityTowardExit = release === "right" ? event.velocityX : -event.velocityX
+      forceSwipe(release, reduceMotion ? 0 : getDiscoverSwipeOutDuration(remaining, velocityTowardExit))
     }), [
     canSwipeRight,
+    cardHeight,
     cardId,
     disabled,
     forceSwipe,
+    grabbedLowerHalf,
     ownerId,
     pagerGestureRef,
+    popStamp,
+    reduceMotion,
     resetPosition,
+    screenWidth,
     swipeThreshold,
+    thresholdSide,
+    touchStartLocalY,
     touchStartX,
     touchStartY,
     x
   ])
 
-  const cardSwipeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value) }]
-  }))
+  const cardSwipeStyle = useAnimatedStyle(() => {
+    const translateX = getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
+    return {
+      transform: [
+        { translateX },
+        { rotate: `${reduceMotion ? 0 : getDiscoverSwipeRotation(translateX, screenWidth, grabbedLowerHalf.value)}deg` }
+      ]
+    }
+  })
   const likeStampStyle = useAnimatedStyle(() => ({
-    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).like
+    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).like,
+    transform: [{ scale: stampScale.value }]
   }))
   const nopeStampStyle = useAnimatedStyle(() => ({
-    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).nope
+    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).nope,
+    transform: [{ scale: stampScale.value }]
   }))
 
-  return { gesture, cardSwipeStyle, likeStampStyle, nopeStampStyle }
+  return { gesture, cardSwipeStyle, likeStampStyle, nopeStampStyle, onCardLayout }
 }

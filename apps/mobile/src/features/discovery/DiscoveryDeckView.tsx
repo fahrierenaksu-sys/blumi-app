@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
   StyleSheet,
@@ -9,10 +9,13 @@ import Animated, {
   Easing,
   ReduceMotion,
   useAnimatedStyle,
+  useSharedValue,
+  withSpring,
   withTiming
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { SwipeableDiscoverCard, type SwipeableDiscoverProfile } from "../demo/SwipeableDiscoverCard"
+import { useReducedMotion } from "../../ui/animations"
 import { ActionButtonCircle } from "../../ui/primitives"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
@@ -21,7 +24,15 @@ import { resolveDiscoveryLayoutMetrics } from "./discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "./discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
 import type { DiscoveryRoomShowcaseQueryInput } from "./discoveryApi"
-import { getDiscoverMiddleCardMotion, getDiscoverSwipeTranslateX } from "./discoverySwipeModel"
+import { DISCOVERY_ACTION_ROW_FADE_DURATION } from "./discoveryCardFlipModel"
+import {
+  DISCOVER_PROMOTION_SPRING,
+  getDiscoverDeckDragMotion,
+  getDiscoverDeckRoleMotion,
+  getDiscoverDeckRoleProgress,
+  getDiscoverSwipeTranslateX,
+  type DiscoverDeckRole
+} from "./discoverySwipeModel"
 import type { DiscoverSwipeValues } from "./useDiscoverSwipeValues"
 
 const ACTION_SWIPE_DURATION = 190
@@ -65,6 +76,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
   const actionSwipeInFlightRef = useRef(false)
   const [actionSwipeInFlight, setActionSwipeInFlight] = useState(false)
   const [isFeaturedFlipped, setIsFeaturedFlipped] = useState(false)
+  const actionRowOpacity = useSharedValue(1)
   const visibleProfiles = useMemo(
     () => [profiles[2], profiles[1], featured].filter(isProfile),
     [featured, profiles]
@@ -124,11 +136,27 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
   )
 
   useLayoutEffect(() => {
-    swipeAnim.x.value = 0
+    // A new top card starts at rest and nothing owns the drag yet. A card that
+    // comes back after a refused decision already owns it (see
+    // returnDiscoverSwipeCard) and keeps its return spring.
+    if (swipeAnim.ownerId.value !== featured?.userId) {
+      swipeAnim.x.value = 0
+      swipeAnim.ownerId.value = ""
+    }
     actionSwipeInFlightRef.current = false
     setActionSwipeInFlight(false)
     setIsFeaturedFlipped(false)
   }, [featured?.userId, swipeAnim])
+
+  // The actions dissolve while the card shows its back. A dissolve is the
+  // Reduce Motion substitute itself, so it runs in both modes.
+  useEffect(() => {
+    actionRowOpacity.value = withTiming(isFeaturedFlipped ? 0 : 1, {
+      duration: DISCOVERY_ACTION_ROW_FADE_DURATION,
+      reduceMotion: ReduceMotion.Never
+    })
+  }, [actionRowOpacity, isFeaturedFlipped])
+  const actionRowFadeStyle = useAnimatedStyle(() => ({ opacity: actionRowOpacity.value }))
 
   return (
     <View style={styles.container}>
@@ -167,20 +195,19 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                   deferFrontAvatar={!isTop && props.deferSecondaryImages}
                   deferBackAvatar={props.deferSecondaryImages}
                 />
-                {!isTop ? <GlassDeckOverlay /> : null}
               </DeckCardContainer>
             )
           })}
 
-          <View
+          <Animated.View
             style={[
               styles.actionRow,
               {
-                opacity: isFeaturedFlipped ? 0 : 1,
                 bottom: viewportLayout.action.bottom,
                 paddingHorizontal: viewportLayout.action.horizontalPadding,
                 paddingVertical: viewportLayout.action.verticalPadding
-              }
+              },
+              actionRowFadeStyle
             ]}
             pointerEvents={isFeaturedFlipped ? "none" : "box-none"}
           >
@@ -210,7 +237,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
               </ActionButtonCircle>
               <Text style={[styles.actionLabel, styles.primaryActionLabel]}>{copy.actions.like}</Text>
             </View>
-          </View>
+          </Animated.View>
         </View>
       ) : (
         emptyContent ?? null
@@ -226,22 +253,18 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
   )
 }
 
-const BOTTOM_CARD_MOTION = {
-  translateX: -10,
-  translateY: -30,
-  rotate: "-3deg",
-  scale: 0.98,
-  opacity: 0.96
-} as const
-
 /**
  * One stack slot. Every role goes through the same animated style so a card
- * keeps one style shape as it moves bottom -> middle -> top: the top card is
- * at rest (it moves inside SwipeableDiscoverCard), the middle card advances
- * with the featured card's drag on the UI thread, the bottom card fans out.
+ * keeps one style shape as it moves bottom -> middle -> top. The role is a
+ * shared progress (bottom 0, middle 1, top 2) that springs to the new slot
+ * when the card above leaves or comes back, so a promoted card moves instead
+ * of jumping; under Reduce Motion it takes the new slot at once. The top card
+ * is at rest (it moves inside SwipeableDiscoverCard), the middle card
+ * advances with the featured card's drag on the UI thread, the bottom card
+ * fans out, and the frosted overlay fades out as a card reaches the top.
  */
 function DeckCardContainer(props: {
-  role: "top" | "middle" | "bottom"
+  role: DiscoverDeckRole
   featuredUserId: string
   swipe: DiscoverSwipeValues
   children: ReactNode
@@ -249,31 +272,33 @@ function DeckCardContainer(props: {
   const { role, featuredUserId, swipe } = props
   const swipeX = swipe.x
   const swipeOwnerId = swipe.ownerId
+  const reduceMotion = useReducedMotion()
+  // A card mounts in its slot; only later role changes move it.
+  const roleProgress = useSharedValue(getDiscoverDeckRoleProgress(role))
+  useEffect(() => {
+    const target = getDiscoverDeckRoleProgress(role)
+    roleProgress.value = reduceMotion
+      ? target
+      : withSpring(target, { ...DISCOVER_PROMOTION_SPRING, reduceMotion: ReduceMotion.Never })
+  }, [reduceMotion, role, roleProgress])
   const motionStyle = useAnimatedStyle(() => {
-    if (role === "bottom") {
-      return {
-        opacity: BOTTOM_CARD_MOTION.opacity,
-        transform: [
-          { translateX: BOTTOM_CARD_MOTION.translateX },
-          { translateY: BOTTOM_CARD_MOTION.translateY },
-          { rotate: BOTTOM_CARD_MOTION.rotate },
-          { scale: BOTTOM_CARD_MOTION.scale }
-        ]
-      }
-    }
-    const middle = role === "middle"
-      ? getDiscoverMiddleCardMotion(getDiscoverSwipeTranslateX(swipeOwnerId.value, featuredUserId, swipeX.value))
-      : { translateX: 0, translateY: 0, scale: 1 }
+    const dragX = role === "middle"
+      ? getDiscoverSwipeTranslateX(swipeOwnerId.value, featuredUserId, swipeX.value)
+      : 0
+    const motion = getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, dragX))
     return {
-      opacity: 1,
+      opacity: motion.opacity,
       transform: [
-        { translateX: middle.translateX },
-        { translateY: middle.translateY },
-        { rotate: "0deg" },
-        { scale: middle.scale }
+        { translateX: motion.translateX },
+        { translateY: motion.translateY },
+        { rotate: `${motion.rotateDeg}deg` },
+        { scale: motion.scale }
       ]
     }
   })
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, 0)).overlayOpacity
+  }))
   return (
     <Animated.View
       style={[
@@ -287,13 +312,15 @@ function DeckCardContainer(props: {
       pointerEvents={role === "top" ? "auto" : "none"}
     >
       {props.children}
+      <GlassDeckOverlay style={overlayStyle} />
     </Animated.View>
   )
 }
 
-function GlassDeckOverlay() {
+/** Frosts cards behind the top card; never takes a touch, even when faded out on top. */
+function GlassDeckOverlay(props: { style: ReturnType<typeof useAnimatedStyle> }) {
   return (
-    <View style={styles.glassOverlay}>
+    <Animated.View pointerEvents="none" style={[styles.glassOverlay, props.style]}>
       <LinearGradient
         colors={[
           "rgba(255, 255, 255, 0.40)",
@@ -304,7 +331,7 @@ function GlassDeckOverlay() {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-    </View>
+    </Animated.View>
   )
 }
 

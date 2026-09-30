@@ -108,6 +108,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     maxWidth: "86%",
     borderRadius: 18,
+    borderCurve: "continuous",
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#EBCDD7"

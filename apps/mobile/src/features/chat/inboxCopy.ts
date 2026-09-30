@@ -16,6 +16,7 @@ export interface InboxCopy {
   discoverPeople: string
   goToDiscover: string
   back: string
+  unknownPartner: string
   conversationCount: (count: number) => string
   openChatWith: (name: string, hasUnread: boolean) => string
 }
@@ -37,6 +38,7 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     discoverPeople: "Discover people",
     goToDiscover: "Go to Discover",
     back: "Go back",
+    unknownPartner: "Someone",
     conversationCount: (count) => `${count} conversation${count === 1 ? "" : "s"}`,
     openChatWith: (name, hasUnread) =>
       `Open chat with ${name}${hasUnread ? ", unread messages" : ""}`
@@ -57,6 +59,7 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     discoverPeople: "Keşfet",
     goToDiscover: "Keşfet'e git",
     back: "Geri dön",
+    unknownPartner: "Biri",
     conversationCount: (count) => `${count} konuşma`,
     openChatWith: (name, hasUnread) =>
       `${name} ile sohbeti aç${hasUnread ? ", okunmamış mesajlar" : ""}`

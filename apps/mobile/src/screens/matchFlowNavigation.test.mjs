@@ -61,6 +61,50 @@ test("both match surfaces read copy and actions from the one presentation model"
   assert.match(modal, /getMatchCelebrationMotion\(reduceMotion\)/)
 })
 
+test("match celebrations pulse a bounded number of times and tap success once", () => {
+  const modal = readFileSync(new URL("../components/MatchResultModal.tsx", import.meta.url), "utf8")
+  const screen = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
+
+  // Every modal loop is bounded by the celebration model (rules: matchResultPresentation).
+  const loops = modal.match(/Animated\.loop\(/g) ?? []
+  const boundedLoops = modal.match(/Animated\.loop\([^)]*\{ iterations: motion\.heartPulseIterations \}\)/g) ?? []
+  assert.ok(loops.length > 0)
+  assert.equal(boundedLoops.length, loops.length)
+  assert.match(modal, /new Animated\.Value\(motion\.entranceFromScale\)/)
+  assert.match(modal, /opacity: opacityAnim/)
+  assert.match(modal, /delay: motion\.contentStaggerMs/)
+  assert.match(modal, /shouldPlayMatchHaptic\(previousVisibleRef\.current, visible\)\) hapticSuccess\(\)/)
+
+  assert.match(screen, /iterations: celebrationMotion\.haloPulseIterations/)
+  assert.match(screen, /matchHapticPlayedRef\.current = true\s*hapticSuccess\(\)/)
+})
+
+test("a match re-opened from chat is shown without a second success tap", () => {
+  const modelPath = "../features/matches/matchResultPresentation.ts"
+  const source = readFileSync(new URL(modelPath, import.meta.url), "utf8")
+  const file = ts.createSourceFile(modelPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const declaration = file.statements.find((node) =>
+    ts.isFunctionDeclaration(node) && node.name?.text === "shouldCelebrateMatchResult"
+  )
+  assert.ok(declaration, "expected shouldCelebrateMatchResult in the match presentation model")
+  const shouldCelebrateMatchResult = runInNewContext(ts.transpileModule(`(${declaration.getText(file).replace(/^export\s+/, "")})`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 }
+  }).outputText)
+
+  // A fresh match (discovery, profile preview, demo) passes nothing and celebrates.
+  assert.equal(shouldCelebrateMatchResult({ match: {} }), true)
+  assert.equal(shouldCelebrateMatchResult({ match: {}, celebrate: true }), true)
+  assert.equal(shouldCelebrateMatchResult(undefined), true)
+  // Re-opening an existing match opts out explicitly.
+  assert.equal(shouldCelebrateMatchResult({ match: {}, celebrate: false }), false)
+
+  const screen = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
+  assert.match(screen, /const shouldCelebrate = shouldCelebrateMatchResult\(route\.params\)/)
+  assert.match(screen, /shouldPlayMatchHaptic\(matchHapticPlayedRef\.current, shouldCelebrate\)/)
+  const navigator = readFileSync(new URL("../navigation/RootNavigator.tsx", import.meta.url), "utf8")
+  assert.match(navigator, /MatchResult: \{\s*match: BlumiMatch\s*celebrate\?: boolean\s*\}/)
+})
+
 test("profile decision rejects a rapid second tap while the first request is in flight", async () => {
   let resolveRequest
   let requests = 0

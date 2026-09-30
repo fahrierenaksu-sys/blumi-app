@@ -35,17 +35,15 @@ test("setup keyboard collapse animates layout on the UI thread except under Redu
   assert.match(shell, /<Animated\.View layout=\{keyboardLayout\} style=\{styles\.keyboardSlot\}>/)
 })
 
-test("wardrobe carousel scroll and thumb stay on the UI thread; one list for every category", () => {
-  const carousel = read("src/features/avatarV2/wardrobe/useWardrobeCarousel.ts")
+test("wardrobe uses one paged grid for every category and animates zoom on the UI thread", () => {
   const list = read("src/features/avatarV2/wardrobe/WardrobeCatalogList.tsx")
-  const thumb = read("src/screens/components/WardrobeCarouselProgress.tsx")
-  assert.match(carousel, /useAnimatedScrollHandler\(\{\s*onScroll: \(event\) => \{\s*carouselOffsetX\.value = event\.contentOffset\.x/)
-  assert.doesNotMatch(carousel, /Animated\.event|useNativeDriver/)
-  // The accessibility value still updates on settle only.
-  assert.match(carousel, /onMomentumEnd: \(event\) => \{\s*scheduleOnRN\(handleCarouselSettled/)
+  const stage = read("src/features/avatarV2/wardrobe/WardrobePreviewStage.tsx")
+  const motion = read("src/features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts")
   assert.doesNotMatch(list, /key=\{activeCategory\}/)
   assert.match(list, /scrollToOffset\(\{ offset: 0, animated: false \}\)/)
-  assert.match(thumb, /interpolate\(offsetX\.value, \[0, maxScroll\], \[0, maxTranslate\], Extrapolation\.CLAMP\)/)
+  assert.match(stage, /useSharedValue\(1\)/)
+  assert.match(stage, /reduceMotion\s*\?\s*target\s*:\s*withTiming\(target/)
+  assert.doesNotMatch(motion, /requestAnimationFrame\(/)
 })
 
 test("press feedback and entrances have a non-moving Reduce Motion path from the shared store", () => {

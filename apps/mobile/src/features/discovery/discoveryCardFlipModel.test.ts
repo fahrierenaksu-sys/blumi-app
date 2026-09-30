@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  DISCOVERY_ACTION_ROW_FADE_DURATION,
   DISCOVERY_CARD_FLIP_DURATION,
   DISCOVERY_CARD_FLIP_EASING,
   getDiscoveryCardFlipState,
@@ -67,4 +68,10 @@ test("card back content is bounded and hides absent optional sections", () => {
     interests: [],
     badges: []
   })
+})
+
+test("the action row dissolves in 150 ms while the card turns, also under Reduce Motion", () => {
+  // A dissolve is the Reduce Motion substitute, so the duration does not change.
+  assert.equal(DISCOVERY_ACTION_ROW_FADE_DURATION, 150)
+  assert.ok(DISCOVERY_ACTION_ROW_FADE_DURATION < DISCOVERY_CARD_FLIP_DURATION)
 })

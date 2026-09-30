@@ -194,3 +194,28 @@ test("prefetch selects only the first six eligible conversations and warms at mo
   assert.equal(started.length, 4, "blur stops additional warming")
   cleanup()
 })
+
+test("re-tapping the Chats tab scrolls the list to the top, without animation under Reduce Motion", () => {
+  assert.match(source, /useMainTabReselect\("chats", scrollToTop\)/)
+  assert.match(source, /<FlatList[\s\S]*?ref=\{listRef\}/)
+  for (const reduceMotion of [false, true]) {
+    const calls = []
+    const scrollToTop = evaluate(initializer("scrollToTop"), {
+      useCallback: (fn) => fn, reduceMotion, listRef: { current: { scrollToOffset: (options) => calls.push(options) } }
+    })
+    scrollToTop()
+    assert.deepEqual(calls.map(({ offset, animated }) => ({ offset, animated })), [{ offset: 0, animated: !reduceMotion }])
+  }
+  const idle = evaluate(initializer("scrollToTop"), { useCallback: (fn) => fn, reduceMotion: false, listRef: { current: null } })
+  assert.doesNotThrow(() => idle())
+})
+
+test("unread glow pulses a bounded number of times and the list supports pull-to-refresh", () => {
+  assert.match(source, /getInboxUnreadPulse\(reduceMotion\)/)
+  assert.match(source, /Animated\.loop\([\s\S]*?\{ iterations: unreadPulse\.iterations \}\s*\)/)
+  assert.doesNotMatch(source, /toValue: 1\.45/)
+  assert.match(source, /useInboxPullToRefresh\(onRetryThreads\)/)
+  assert.match(source, /<RefreshControl[\s\S]*?refreshing=\{refreshing\}[\s\S]*?onRefresh=\{onRefresh\}[\s\S]*?tintColor=\{uiTheme\.colors\.primary\}/)
+  assert.match(source, /copy\.unknownPartner/)
+  assert.doesNotMatch(source, /"Someone"/)
+})

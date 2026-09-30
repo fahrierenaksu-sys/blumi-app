@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   ScrollView,
@@ -14,7 +14,12 @@ import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import {
   canOpenMatchExperience
 } from "../features/matches/matchRoomModel"
-import { getMatchResultPresentation } from "../features/matches/matchResultPresentation"
+import {
+  getMatchCelebrationMotion,
+  getMatchResultPresentation,
+  shouldCelebrateMatchResult,
+  shouldPlayMatchHaptic
+} from "../features/matches/matchResultPresentation"
 import {
   createStableMatchedUserAvatar,
   resolveLatestMatchRoomAvatar
@@ -32,7 +37,8 @@ import {
 } from "../ui/glass"
 import { uiTheme } from "../ui/theme"
 import { ActionButtonCircle } from "../ui/primitives"
-import { useEntranceAnimation, useScaleBounce, usePulse } from "../ui/animations"
+import { useEntranceAnimation, useReducedMotion, useScaleBounce, usePulse } from "../ui/animations"
+import { hapticSuccess } from "../ui/haptics"
 import { AvatarFrame, type AvatarFrameVariant } from "../ui/AvatarFrame"
 import { ReportModal } from "../components/ReportModal"
 
@@ -65,10 +71,27 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const [reportVisible, setReportVisible] = useState(false)
   const openingChatRef = useRef(false)
 
+  const reduceMotion = useReducedMotion()
+  const celebrationMotion = getMatchCelebrationMotion(reduceMotion)
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 20 })
   const heroAnim = useScaleBounce({ delay: 200, tension: 60, friction: 7 })
-  const haloAnim = usePulse({ minScale: 0.9, maxScale: 1.15, duration: 2000 })
+  // usePulse itself stays still under Reduce Motion; otherwise the halo beats a bounded number of times.
+  const haloAnim = usePulse({
+    minScale: 0.9,
+    maxScale: 1.15,
+    duration: 2000,
+    iterations: celebrationMotion.haloPulseIterations
+  })
   const dockAnim = useEntranceAnimation({ delay: 600, translateY: 40 })
+  const matchHapticPlayedRef = useRef(false)
+  const shouldCelebrate = shouldCelebrateMatchResult(route.params)
+
+  useEffect(() => {
+    // One success tap per fresh match (haptic map: match → success); Reduce Motion keeps it.
+    if (!shouldPlayMatchHaptic(matchHapticPlayedRef.current, shouldCelebrate)) return
+    matchHapticPlayedRef.current = true
+    hapticSuccess()
+  }, [shouldCelebrate])
 
   const handleStartChat = (): void => {
     if (!sendMessageAction.enabled || openingChatRef.current) return

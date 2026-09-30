@@ -20,6 +20,7 @@ import { DiscoveryDeckView } from "../features/discovery/DiscoveryDeckView"
 import { useDiscoverSwipeValues } from "../features/discovery/useDiscoverSwipeValues"
 import { EmptyDiscoveryDeck } from "../features/discovery/EmptyDiscoveryDeck"
 import { createLocalDemoMatch } from "../features/matches/matchRoomModel"
+import { hapticLight } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
 import { getAppLocale } from "../features/session/appLocale"
 
@@ -43,6 +44,7 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
 
   const handleSwipeRight = useCallback(
     (userId: string) => {
+      hapticLight()
       const result = demo.like(
         userId,
         {
@@ -76,6 +78,7 @@ export function DemoLobbyView({ sessionActor }: DemoLobbyViewProps) {
 
   const handleSwipeLeft = useCallback(
     (userId: string) => {
+      hapticLight()
       demo.skip(userId)
     },
     [demo]

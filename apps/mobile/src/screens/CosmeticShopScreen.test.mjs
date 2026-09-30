@@ -288,3 +288,30 @@ test("unverified catalog cards show neutral pending status, not ownership or pri
   assert.equal(metaPill.props.children[0], null)
   assert.equal(metaPill.props.children[1].props.children, "Mağazan hazırlanıyor")
 })
+
+test("re-tapping the Shop tab scrolls to the top, without motion under Reduce Motion", () => {
+  const scrollHook = readScreenModule("useShopScrollToTop.ts")
+  assert.match(scrollHook, /useMainTabReselect\("shop", scrollToTop\)/)
+  assert.match(scrollHook, /useReducedMotion\(\)/)
+  assert.match(scrollHook, /scrollTo\(\{ y: 0, animated: !reduceMotion \}\)/)
+  assert.match(source, /const shopScrollRef = useShopScrollToTop\(\)/)
+  assert.match(source, /<ScrollView\s+ref=\{shopScrollRef\}/)
+})
+
+test("the coin balance counts on the UI thread and announces only the confirmed value", () => {
+  const view = readScreenModule("ShopCoinBalance.tsx")
+  const motion = readScreenModule("useShopCoinBalanceMotion.ts")
+  assert.match(view, /Animated\.createAnimatedComponent\(TextInput\)/)
+  assert.match(view, /editable=\{false\}/)
+  assert.match(view, /animatedProps=\{motion\.textProps\}/)
+  assert.match(motion, /useAnimatedProps\(/)
+  assert.match(motion, /formatCoinCount\(/)
+  assert.match(motion, /withTiming\(/)
+  assert.match(motion, /withSequence\(/)
+  assert.match(motion, /getNextCoinBalance\(/)
+  assert.match(motion, /useReducedMotion\(\)/)
+  assert.doesNotMatch(motion, /requestAnimationFrame|setInterval|Animated\.timing/)
+  // The pill label keeps reading the server-confirmed target, never the count.
+  assert.match(source, /accessibilityLabel=\{`\$\{inventoryVerified \? formatCoins\(inventoryStore\.inventory\.coins, locale\) : "—"\} \$\{coinPackCopy\.coins\}`\}/)
+  assert.match(source, /<ShopCoinBalance\s+coins=\{inventoryStore\.inventory\.coins\}\s+verified=\{inventoryVerified\}\s+locale=\{locale\}/)
+})

@@ -9,6 +9,7 @@ import type { NativeStackNavigationEventMap } from "@react-navigation/native-sta
 import { useCallback } from "react"
 import { Platform } from "react-native"
 import type { BottomNavKey } from "../ui/bottomNav"
+import { publishMainTabReselect } from "../ui/layout/mainTabReselectStore"
 import {
   resolveBottomNavReturnPreview,
   retainBottomNavReturnPreview
@@ -76,7 +77,12 @@ export function useBottomNavChrome({
         : key === "myroom"
           ? "MyRoom"
           : "CosmeticShop"
-    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) return
+    // Tapping the already-focused tab is a reselect: the page scrolls to top
+    // (iOS convention) and nothing navigates.
+    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) {
+      publishMainTabReselect(key)
+      return
+    }
     dismissGlobalMatch()
     // With the pager, a tap commits through the same selection path as a
     // swipe (one selected-page state, one navigation per change). The stack

@@ -16,11 +16,15 @@ test("room setup uses a room-first surface while keeping the shared CTA dock", (
   assert.match(screen, /taskCardTone="sheet"/)
   assert.match(screen, /primaryActionTestID="room-setup-submit"/)
   assert.doesNotMatch(screen, /position:\s*["']absolute["'][\s\S]*room-setup-submit/)
-  assert.match(screen, /headerTitle="İlk odan"/)
+  assert.match(screen, /headerTitle=\{copy\.headerTitle\}/)
   assert.match(screen, /headerProgressStyle="fraction"/)
   assert.match(screen, /hideHeading/)
   assert.match(screen, /hideProgressRail/)
-  assert.match(screen, /Yatak yerleştirildi/)
+  assert.match(screen, /\{copy\.bedPlacedCard\}/)
+  // Room setup text lives in roomSetupCopy.ts (Turkish and English).
+  const copy = readFileSync(resolve(mobileRoot, "features/roomV2/roomSetupCopy.ts"), "utf8")
+  assert.match(copy, /headerTitle: "İlk odan"/)
+  assert.match(copy, /bedPlacedCard: "Yatak yerleştirildi"/)
 })
 
 test("room setup follows the approved open-room composition", () => {
@@ -64,14 +68,18 @@ test("room setup reports rejected placement and rotation before any success feed
 
   assert.match(
     screen,
-    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setBedSelected\(true\)\s*setPlacementMessage\("Yatağın yerleşti\."\)/
+    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setBedSelected\(true\)\s*setPlacementMessage\(copy\.placement\.placed\)/
   )
   assert.match(
     screen,
-    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setPlacementMessage\("Yatak çevrildi\. Taşımak için odaya dokun\."\)/
+    /if \(!setUserRoomDecor\(nextDecor\)\) \{\s*setPlacementErrorMessage\(feedbackCopy\.mutationRejected\)\s*return\s*\}\s*setPlacementErrorMessage\(""\)\s*setPlacementMessage\(copy\.placement\.rotated\)/
   )
-  assert.match(screen, /mutationRejected:\s*"Oda değişikliği uygulanamadı\. Yeniden dene\."/)
-  assert.match(screen, /mutationRejected:\s*"That room change could not be applied\. Please try again\."/)
+  const copy = readFileSync(resolve(mobileRoot, "features/roomV2/roomSetupCopy.ts"), "utf8")
+  assert.match(screen, /const feedbackCopy = copy\.feedback/)
+  assert.match(copy, /placed: "Yatağın yerleşti\."/)
+  assert.match(copy, /rotated: "Yatak çevrildi\. Taşımak için odaya dokun\."/)
+  assert.match(copy, /mutationRejected:\s*"Oda değişikliği uygulanamadı\. Yeniden dene\."/)
+  assert.match(copy, /mutationRejected:\s*"That room change could not be applied\. Please try again\."/)
 })
 
 test("room setup surfaces later persistence conflicts instead of leaving stale success copy", () => {
@@ -83,6 +91,7 @@ test("room setup surfaces later persistence conflicts instead of leaving stale s
   assert.match(
     screen,
     /persistenceState === "failed" \? \([\s\S]*?accessibilityLiveRegion="assertive"[\s\S]*?accessibilityRole="alert"[\s\S]*?feedbackCopy\.persistenceAttention[\s\S]*?\) : placementErrorMessage \?/)
-  assert.match(screen, /persistenceAttention:\s*"Oda kaydıyla ilgili bir sorun var\. Güncel düzeni kontrol et\."/)
-  assert.match(screen, /persistenceAttention:\s*"Room saving needs attention\. Review the current layout\."/)
+  const copy = readFileSync(resolve(mobileRoot, "features/roomV2/roomSetupCopy.ts"), "utf8")
+  assert.match(copy, /persistenceAttention:\s*"Oda kaydıyla ilgili bir sorun var\. Güncel düzeni kontrol et\."/)
+  assert.match(copy, /persistenceAttention:\s*"Room saving needs attention\. Review the current layout\."/)
 })

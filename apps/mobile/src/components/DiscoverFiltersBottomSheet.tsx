@@ -18,29 +18,18 @@ import {
   DISCOVERY_MAXIMUM_AGE,
   DISCOVERY_MINIMUM_AGE
 } from "../features/discovery/discoveryFiltersModel"
+import {
+  DISCOVERY_VIBE_OPTIONS,
+  getDiscoveryHomeCopy
+} from "../features/discovery/discoveryHomeCopy"
+import { getAppLocale } from "../features/session/appLocale"
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
 import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
 import { uiTheme } from "../ui/theme"
 
 export type DiscoverFilters = DiscoveryFilters
 
-const VIBE_OPTIONS = [
-  "Coffee dates",
-  "Slow burn",
-  "Bookish",
-  "Outdoors",
-  "Creative",
-  "Fitness",
-  "Night owl",
-  "Pets"
-] as const
-const GENDER_OPTIONS: readonly {
-  label: string
-  value: DiscoveryGender
-}[] = [
-  { label: "Women", value: "woman" },
-  { label: "Men", value: "man" }
-]
+const GENDER_OPTIONS: readonly DiscoveryGender[] = ["woman", "man"]
 
 export const DEFAULT_DISCOVER_FILTERS: DiscoverFilters = DEFAULT_DISCOVERY_FILTERS
 
@@ -79,6 +68,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
   const { visible, initialFilters, onClose, onApply } = props
   const [draftFilters, setDraftFilters] = useState<DiscoverFilters>(initialFilters)
   const insets = useSafeAreaInsets()
+  const copy = getDiscoveryHomeCopy(getAppLocale()).filters
 
   useEffect(() => {
     if (visible) {
@@ -119,7 +109,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           backdrop={{
             style: styles.backdrop,
             onPress: onClose,
-            accessibilityLabel: "Close discovery filters"
+            accessibilityLabel: copy.closeAccessibilityLabel
           }}
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
         >
@@ -127,12 +117,12 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           <View style={styles.sheetGlowBottom} pointerEvents="none" />
           <View style={styles.headerRow}>
             <View style={styles.headerCopy}>
-              <Text style={styles.headerEyebrow}>DISCOVERY</Text>
-              <Text style={styles.headerTitle}>Set your vibe</Text>
+              <Text style={styles.headerEyebrow}>{copy.eyebrow}</Text>
+              <Text style={styles.headerTitle}>{copy.title}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close discovery filters"
+              accessibilityLabel={copy.closeAccessibilityLabel}
               style={styles.closeButton}
               onPress={onClose}
             >
@@ -146,11 +136,11 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Show me</Text>
+              <Text style={styles.sectionTitle}>{copy.showMe}</Text>
               <View style={styles.segmentRow}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Show everyone"
+                  accessibilityLabel={copy.showEveryoneAccessibilityLabel}
                   accessibilityState={{ selected: draftFilters.genders.length === 0 }}
                   style={[
                     styles.segment,
@@ -168,22 +158,23 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                         : null
                     ]}
                   >
-                    Everyone
+                    {copy.everyone}
                   </Text>
                 </Pressable>
-                {GENDER_OPTIONS.map((option) => {
-                  const active = draftFilters.genders.includes(option.value)
+                {GENDER_OPTIONS.map((gender) => {
+                  const active = draftFilters.genders.includes(gender)
+                  const genderCopy = copy.genders[gender]
                   return (
                     <Pressable
-                      key={option.value}
+                      key={gender}
                       accessibilityRole="button"
-                      accessibilityLabel={`Show ${option.label.toLowerCase()}`}
+                      accessibilityLabel={genderCopy.accessibilityLabel}
                       accessibilityState={{ selected: active }}
                       style={[styles.segment, active ? styles.segmentActive : null]}
                       onPress={() => {
                         setDraftFilters((previous) => ({
                           ...previous,
-                          genders: toggleGender(previous.genders, option.value)
+                          genders: toggleGender(previous.genders, gender)
                         }))
                       }}
                     >
@@ -193,7 +184,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                           active ? styles.segmentTextActive : null
                         ]}
                       >
-                        {option.label}
+                        {genderCopy.label}
                       </Text>
                     </Pressable>
                   )
@@ -202,16 +193,16 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Age window</Text>
+              <Text style={styles.sectionTitle}>{copy.ageWindow}</Text>
               <View style={styles.ageCard}>
                 <Text style={styles.ageValue}>{ageSummary}</Text>
                 <View style={styles.ageControls}>
                   <View style={styles.ageControlGroup}>
-                    <Text style={styles.ageLabel}>Min</Text>
+                    <Text style={styles.ageLabel}>{copy.minimum}</Text>
                     <View style={styles.ageStepper}>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Decrease minimum age, currently ${draftFilters.ageMin}`}
+                        accessibilityLabel={copy.decreaseMinimumAge(draftFilters.ageMin)}
                         style={styles.stepperButton}
                         onPress={() => updateAgeMin(-1)}
                       >
@@ -220,7 +211,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                       <Text style={styles.stepperValue}>{draftFilters.ageMin}</Text>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Increase minimum age, currently ${draftFilters.ageMin}`}
+                        accessibilityLabel={copy.increaseMinimumAge(draftFilters.ageMin)}
                         style={styles.stepperButton}
                         onPress={() => updateAgeMin(1)}
                       >
@@ -230,11 +221,11 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                   </View>
 
                   <View style={styles.ageControlGroup}>
-                    <Text style={styles.ageLabel}>Max</Text>
+                    <Text style={styles.ageLabel}>{copy.maximum}</Text>
                     <View style={styles.ageStepper}>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Decrease maximum age, currently ${draftFilters.ageMax}`}
+                        accessibilityLabel={copy.decreaseMaximumAge(draftFilters.ageMax)}
                         style={styles.stepperButton}
                         onPress={() => updateAgeMax(-1)}
                       >
@@ -243,7 +234,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                       <Text style={styles.stepperValue}>{draftFilters.ageMax}</Text>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Increase maximum age, currently ${draftFilters.ageMax}`}
+                        accessibilityLabel={copy.increaseMaximumAge(draftFilters.ageMax)}
                         style={styles.stepperButton}
                         onPress={() => updateAgeMax(1)}
                       >
@@ -256,15 +247,16 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Vibes you like</Text>
+              <Text style={styles.sectionTitle}>{copy.vibesTitle}</Text>
               <View style={styles.tagsWrap}>
-                {VIBE_OPTIONS.map((vibe) => {
+                {DISCOVERY_VIBE_OPTIONS.map((vibe) => {
                   const selected = draftFilters.vibes.includes(vibe)
+                  const vibeLabel = copy.vibeLabels[vibe]
                   return (
                     <Pressable
                       key={vibe}
                       accessibilityRole="button"
-                      accessibilityLabel={`${vibe} vibe`}
+                      accessibilityLabel={copy.vibeAccessibilityLabel(vibeLabel)}
                       accessibilityState={{ selected }}
                       style={[styles.vibeChip, selected ? styles.vibeChipSelected : null]}
                       onPress={() => {
@@ -280,7 +272,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                           selected ? styles.vibeChipTextSelected : null
                         ]}
                       >
-                        {vibe}
+                        {vibeLabel}
                       </Text>
                     </Pressable>
                   )
@@ -293,7 +285,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           <View style={[styles.footer, { marginBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.footerButton}>
               <SecondaryButton
-                label="Reset"
+                label={copy.reset}
                 onPress={() => {
                   setDraftFilters(DEFAULT_DISCOVER_FILTERS)
                 }}
@@ -301,7 +293,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             </View>
             <View style={styles.footerButton}>
               <PrimaryButton
-                label="Show matches"
+                label={copy.apply}
                 onPress={() => {
                   onApply(draftFilters)
                 }}
@@ -438,6 +430,7 @@ const styles = StyleSheet.create({
   },
   ageCard: {
     borderRadius: uiTheme.radius.xl,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
     backgroundColor: "rgba(255, 255, 255, 0.30)",
@@ -477,6 +470,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 13,
+    borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255, 232, 244, 0.82)",
@@ -523,6 +517,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
     borderRadius: 28,
+    borderCurve: "continuous",
     padding: 8,
     flexDirection: "row",
     gap: uiTheme.spacing.sm,

@@ -23,7 +23,7 @@ export const uiTheme = {
     actionDarkPressed: "#20162A",
     border: "#F0E7F6",
     borderStrong: "#E7DAF0",
-    primary: "#FF4F98",
+    primary: "#F65C9D",
     primaryDeep: "#D92A79",
     primaryPressed: "#E24486",
     primaryDisabled: "#F7A8CB",
@@ -80,12 +80,12 @@ export const uiTheme = {
     blush: "rgba(255, 229, 240, 0.56)",
   },
   gradients: {
-    primary: ["#FF4F98", "#FF7EB3"] as [string, string],
-    primaryDeep: ["#D92A79", "#FF4F98"] as [string, string],
-    warm: ["#FF4F98", "#FFB99A"] as [string, string],
+    primary: ["#F65C9D", "#FF7EB3"] as [string, string],
+    primaryDeep: ["#D92A79", "#F65C9D"] as [string, string],
+    warm: ["#F65C9D", "#FFB99A"] as [string, string],
     cool: ["#9B59B6", "#667EEA"] as [string, string],
-    match: ["#FF4F98", "#FF7EB3", "#FFB99A"] as [string, string, string],
-    sunset: ["#FF6B6B", "#FF4F98", "#9B59B6"] as [string, string, string],
+    match: ["#F65C9D", "#FF7EB3", "#FFB99A"] as [string, string, string],
+    sunset: ["#FF6B6B", "#F65C9D", "#9B59B6"] as [string, string, string],
     glass: ["rgba(255,255,255,0.12)", "rgba(255,255,255,0.03)"] as [string, string],
     cardOverlay: ["transparent", "rgba(28, 16, 34, 0.65)"] as [string, string],
     heroBackground: ["#FBF8FD", "#FEF4F9", "#FFF2F8"] as [string, string, string],
@@ -159,14 +159,14 @@ export const uiTheme = {
     },
     /* ── Premium additions ────────────────────── */
     glow: {
-      shadowColor: "#FF4F98",
+      shadowColor: "#F65C9D",
       shadowOpacity: 0.35,
       shadowRadius: 32,
       shadowOffset: { width: 0, height: 8 },
       elevation: 12
     },
     glowSubtle: {
-      shadowColor: "#FF4F98",
+      shadowColor: "#F65C9D",
       shadowOpacity: 0.15,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 6 },
@@ -197,6 +197,18 @@ export const uiTheme = {
     durationEntrance: 350,
     scalePress: 0.965,
     scalePop: 1.05,
+    // Named Reanimated springs: `withSpring(target, uiTheme.animation.springSnappy)`.
+    // Use a spring for motion the user starts (press, drag release, selection,
+    // sheet/card settle); use timing (`duration*` above) for opacity and
+    // crossfades. `duration` is Reanimated's perceptual duration.
+    /** Taps, toggles, selection and small settles. */
+    springSnappy: { duration: 350, dampingRatio: 0.85 },
+    /** Larger surfaces (sheets, panels) settling without overshoot. */
+    springGentleTimed: { duration: 500, dampingRatio: 1 },
+    /** Rare celebratory moments (match, unlock) with a visible overshoot. */
+    springCelebrate: { duration: 550, dampingRatio: 0.7 },
+    /** Delay between consecutive items of a staggered list entrance. */
+    staggerMs: 35,
   },
   opacity: {
     disabled: 0.5,

@@ -126,18 +126,114 @@ export function getDiscoveryMatchCreatedProperties(
   return { source: "discovery", mode }
 }
 
-export interface MatchCelebrationMotion {
-  confetti: boolean
-  heartPulse: boolean
-  entranceSpring: boolean
-  modalAnimationType: "fade" | "none"
+/**
+ * One spring in both vocabularies: `tension`/`friction` for the React Native
+ * Animated (native driver) surfaces that play it today, and the equivalent
+ * `damping`/`stiffness`/`mass` for a Reanimated `withSpring` port.
+ */
+export interface MatchEntranceSpring {
+  readonly tension: number
+  readonly friction: number
+  readonly damping: number
+  readonly stiffness: number
+  readonly mass: number
 }
 
-export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrationMotion {
+/** React Native's own origami conversion (Libraries/Animated/SpringConfig). */
+export function springFromOrigami(tension: number, friction: number): MatchEntranceSpring {
+  const roundTo2 = (value: number): number => Math.round(value * 100) / 100
   return {
-    confetti: !reduceMotion,
-    heartPulse: !reduceMotion,
-    entranceSpring: !reduceMotion,
-    modalAnimationType: reduceMotion ? "none" : "fade"
+    tension,
+    friction,
+    damping: roundTo2((friction - 8) * 3 + 25),
+    stiffness: roundTo2((tension - 30) * 3.62 + 194),
+    mass: 1
   }
+}
+
+// Damping ratio ≈ 0.76: a hint of overshoot on a 0.92 → 1 settle.
+const ENTRANCE_SPRING_TENSION = 70
+const ENTRANCE_SPRING_FRICTION = 9
+const ENTRANCE_FROM_SCALE = 0.92
+const ENTRANCE_OPACITY_MS = 220
+const REDUCED_CROSSFADE_MS = 160
+const CONTENT_STAGGER_MS = 70
+const HEART_PULSE_ITERATIONS = 2
+const HALO_PULSE_ITERATIONS = 2
+
+// Frozen and shared so the value keeps one identity across renders (it sits in
+// hook dependency lists) and callers cannot mutate it.
+const MATCH_ENTRANCE_SPRING: MatchEntranceSpring = Object.freeze(
+  springFromOrigami(ENTRANCE_SPRING_TENSION, ENTRANCE_SPRING_FRICTION)
+)
+
+interface MatchCelebrationMotionBase {
+  confetti: boolean
+  heartPulse: boolean
+  modalAnimationType: "fade" | "none"
+  /** The card enters from this opacity and scale and settles at 1. */
+  entranceFromOpacity: number
+  entranceFromScale: number
+  entranceOpacityDurationMs: number
+  /** Delay between the headline group and the avatar row. */
+  contentStaggerMs: number
+  /** Finite pulse counts (RN Animated.loop `iterations`); 0 means no pulse. */
+  heartPulseIterations: number
+  haloPulseIterations: number
+}
+
+/** Under Reduce Motion there is no spring: no scale movement, only the crossfade. */
+export type MatchCelebrationMotion =
+  | (MatchCelebrationMotionBase & { entranceSpring: true; entranceSpringConfig: MatchEntranceSpring })
+  | (MatchCelebrationMotionBase & { entranceSpring: false; entranceSpringConfig: null })
+
+export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrationMotion {
+  if (reduceMotion) {
+    return {
+      confetti: false,
+      heartPulse: false,
+      entranceSpring: false,
+      modalAnimationType: "none",
+      entranceFromOpacity: 0,
+      entranceFromScale: 1,
+      entranceOpacityDurationMs: REDUCED_CROSSFADE_MS,
+      entranceSpringConfig: null,
+      contentStaggerMs: 0,
+      heartPulseIterations: 0,
+      haloPulseIterations: 0
+    }
+  }
+  return {
+    confetti: true,
+    heartPulse: true,
+    entranceSpring: true,
+    modalAnimationType: "fade",
+    entranceFromOpacity: 0,
+    entranceFromScale: ENTRANCE_FROM_SCALE,
+    entranceOpacityDurationMs: ENTRANCE_OPACITY_MS,
+    entranceSpringConfig: MATCH_ENTRANCE_SPRING,
+    contentStaggerMs: CONTENT_STAGGER_MS,
+    heartPulseIterations: HEART_PULSE_ITERATIONS,
+    haloPulseIterations: HALO_PULSE_ITERATIONS
+  }
+}
+
+/**
+ * The match haptic (haptic map: match → success) fires on the hidden →
+ * visible transition only, so re-renders and Strict Mode effect replays stay
+ * silent. Haptics are not motion: Reduce Motion does not silence them.
+ */
+export function shouldPlayMatchHaptic(previousVisible: boolean, visible: boolean): boolean {
+  return visible && !previousVisible
+}
+
+/**
+ * A fresh match celebrates by default. Re-opening an existing match (for
+ * example "View match" in a chat) passes `celebrate: false` so the success
+ * haptic does not fire again for a moment the user already had.
+ */
+export function shouldCelebrateMatchResult(
+  params: { celebrate?: boolean } | undefined
+): boolean {
+  return params?.celebrate !== false
 }

@@ -39,6 +39,8 @@ import { resolveRoomV2MyRoomCamera } from "../features/roomV2/roomV2Camera"
 import { resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetrics"
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import { getMyRoomCopy, getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
+import { getMyRoomStageAccessibilityValue } from "../features/roomV2/myRoomStageModel"
+import { MyRoomStageLoadingStatus, MyRoomStageVeil } from "../features/roomV2/components/MyRoomStageVeil"
 import { formatRoomOwnerLabel } from "../features/roomV2/roomOwnerLabel"
 import { getAppLocale } from "../features/session/authLocale"
 import {
@@ -773,9 +775,7 @@ export function MyRoomScreen({
           >
             <View style={styles.stageBackdrop} pointerEvents="none" />
             {persistenceState === "loading" ? (
-              <Text style={styles.stageLoading} accessibilityRole="text">
-                {getMyRoomEditorCopy(getAppLocale()).preparing}
-              </Text>
+              <MyRoomStageLoadingStatus label={getMyRoomEditorCopy(getAppLocale()).preparing} />
             ) : <Animated.View style={stageCameraStyle}><RoomRenderer2D
               shell={baseRoomScene.shell}
               liveAvatarPosition={liveAvatarPosition}
@@ -783,13 +783,12 @@ export function MyRoomScreen({
               stageMarkers={stageMarker ? [stageMarker] : undefined}
               testID="my-room-production-stage"
               roomVNextRuntimeMode="disabled"
-              accessibilityValue={{
-                text: `shellId: ${baseRoomScene.shell?.id ?? "missing"}; savedItemCount: ${userRoomDecor.placedItems.length}; renderedFurnitureCount: ${baseRoomScene.renderItems.filter((item) => item.kind === "furniture").length}`
-              }}
+              accessibilityValue={{ text: getMyRoomStageAccessibilityValue({ savedItemCount: userRoomDecor.placedItems.length, locale: getAppLocale() }) }}
               onStagePress={moveAvatarToPoint}
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
             /></Animated.View>}
+            <MyRoomStageVeil isLoading={persistenceState === "loading"} />
             {roomOwnerLabel ? (
               <View style={styles.stageHud} pointerEvents="none">
                 <Ionicons name="heart" size={13} color="#D92A79" />
@@ -1007,11 +1006,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     backgroundColor: "#E8B698",
-  },
-  stageLoading: {
-    color: "#702344",
-    fontSize: 16,
-    fontWeight: "600"
   },
   stageRenderer: {
     backgroundColor: "#E8B698",

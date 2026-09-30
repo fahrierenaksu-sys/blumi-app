@@ -1,9 +1,10 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   FlatList,
   KeyboardAvoidingView,
+  type ListRenderItem,
   Platform,
   Text,
   useWindowDimensions,
@@ -24,16 +25,14 @@ import {
   buildChatTimeline,
   getChatTimelineItemKey,
   getChatInitialRenderCount,
-  type ChatRoomInviteTimelineItem
+  type ChatRoomInviteTimelineItem,
+  type ChatTimelineItem
 } from "../features/chat/chatRoomInviteModel"
 import {
   CHAT_COPY,
   resolveChatThreadLocale
 } from "../features/chat/thread/chatThreadCopy"
-import {
-  getChatTimelineRowModel,
-  selectChatPartnerSummary
-} from "../features/chat/thread/chatThreadModel"
+import { selectChatPartnerSummary } from "../features/chat/thread/chatThreadModel"
 import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindings"
 import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
@@ -45,6 +44,8 @@ import { useChatMessageSending } from "../features/chat/thread/useChatMessageSen
 import { useChatRoomInviteActions } from "../features/chat/thread/useChatRoomInviteActions"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
+import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
+import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
 
 type ChatThreadScreenProps = NativeStackScreenProps<
@@ -103,6 +104,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   // otherwise FlatList has already spent its initial render on that lone row.
   const awaitingInitialHistory = sessionActor.session.mode === "production" &&
     !historyReady
+  const showsTimelineEmptyState = timeline.length === 0 || isPendingThread || awaitingInitialHistory
 
   const {
     isCreatingPendingThread,
@@ -177,6 +179,50 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     activeUserIdRef
   })
 
+  const rowModels = useChatTimelineRowModels({
+    timeline,
+    currentUserId,
+    locale: chatLocale,
+    getMessageDeliveryState
+  })
+
+  const enteringRowKeys = useChatTimelineEntrances({
+    timeline,
+    isListPresented: !showsTimelineEmptyState
+  })
+
+  const renderTimelineRow = useCallback<ListRenderItem<ChatTimelineItem>>(
+    ({ item }) => {
+      const entry = rowModels.get(getChatTimelineItemKey(item))
+      if (!entry) return null
+      return (
+        <ChatTimelineRow
+          item={entry.item}
+          row={entry.row}
+          chatCopy={chatCopy}
+          chatLocale={chatLocale}
+          currentUserId={currentUserId}
+          partnerName={partnerName}
+          isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
+          activeRoomInviteAction={activeRoomInviteAction}
+          onRoomInviteAction={handleRoomInviteAction}
+          onRetry={handleRetry}
+        />
+      )
+    },
+    [
+      rowModels,
+      chatCopy,
+      chatLocale,
+      currentUserId,
+      partnerName,
+      enteringRowKeys,
+      activeRoomInviteAction,
+      handleRoomInviteAction,
+      handleRetry
+    ]
+  )
+
   const handleGoBack = (): void => {
     goBackOrFallback(navigation, () => navigation.replace("Inbox"))
   }
@@ -217,7 +263,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           partnerAvatar={partnerAvatar}
           onBack={handleGoBack}
           onViewMatch={persistedMatch
-            ? () => navigation.navigate("MatchResult", { match: persistedMatch })
+            ? () => navigation.navigate("MatchResult", { match: persistedMatch, celebrate: false })
             : null}
           onOpenSafety={() => setReportVisible(true)}
         />
@@ -235,7 +281,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
         >
-          {timeline.length === 0 || isPendingThread || awaitingInitialHistory ? (
+          {showsTimelineEmptyState ? (
             <ChatThreadEmptyState
               chatCopy={chatCopy}
               isPendingThread={isPendingThread}
@@ -257,6 +303,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               style={styles.messageListContainer}
               contentContainerStyle={styles.messageListContent}
               showsVerticalScrollIndicator={false}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
               maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
               ListFooterComponent={
                 sessionActor.session.mode === "production" && messages.length > 0 ? (
@@ -267,25 +315,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                   />
                 ) : null
               }
-              renderItem={({ item, index }) => (
-                <ChatTimelineRow
-                  item={item}
-                  row={getChatTimelineRowModel({
-                    item,
-                    index,
-                    timeline,
-                    currentUserId,
-                    getMessageDeliveryState,
-                    locale: chatLocale
-                  })}
-                  chatCopy={chatCopy}
-                  chatLocale={chatLocale}
-                  currentUserId={currentUserId}
-                  activeRoomInviteAction={activeRoomInviteAction}
-                  onRoomInviteAction={handleRoomInviteAction}
-                  onRetry={handleRetry}
-                />
-              )}
+              renderItem={renderTimelineRow}
             />
           )}
 

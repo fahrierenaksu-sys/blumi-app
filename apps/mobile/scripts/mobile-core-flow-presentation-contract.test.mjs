@@ -251,8 +251,12 @@ test("room setup exposes only the free starter bed and shop does not claim unpla
   ].map(read).join("\n")
 
   assert.match(roomSetup, /STARTER_ROOM_BED_ITEM_ID/)
-  assert.match(roomSetup, /ücretsiz başlangıç eşyası/)
-  assert.match(roomSetup, /Pembe Bulut Yatak/)
+  // Room setup text is localised in roomSetupCopy.ts; the Turkish wording is unchanged.
+  const roomSetupCopy = read("src/features/roomV2/roomSetupCopy.ts")
+  assert.match(roomSetup, /accessibilityLabel=\{copy\.starterItemAccessibilityLabel\}/)
+  assert.match(roomSetupCopy, /ücretsiz başlangıç eşyası/)
+  assert.match(roomSetup, /\{copy\.starterItemTitle\}/)
+  assert.match(roomSetupCopy, /starterItemTitle: "Pembe Bulut Yatak"/)
   assert.match(roomSetup, /testID="starter-bed-card"/)
   assert.match(roomSetup, /testID="starter-bed-rotate"/)
   assert.match(roomSetup, /primaryActionTestID="room-setup-submit"/)

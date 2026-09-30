@@ -1,12 +1,32 @@
 /**
  * Haptic feedback helpers — wraps expo-haptics for native
  * iOS Taptic Engine / Android vibration support.
+ *
+ * Haptic map (one meaning per pattern; keep new call sites on this map):
+ * - Threshold crossing (Discover card drag) → hapticSelection, once per
+ *   crossing; re-arms when the drag returns inside the threshold.
+ * - Like / pass commit                      → hapticLight
+ * - Match                                   → hapticSuccess
+ * - Mic toggle                              → hapticLight
+ * - Partner joins the shared room           → hapticLight, once per partner
+ * - Tab tap                                 → hapticSelection
+ * - Report / block submitted                → hapticSuccess
+ * - Failed action                           → hapticError
+ *
+ * Haptics are not motion: Reduce Motion does not silence them. Web is a
+ * no-op; the Simulator has no Taptic Engine, so feel is checked on a device.
  */
 
 import { Platform } from "react-native"
 import * as Haptics from "expo-haptics"
 
-/** Light tap for button presses, tab switches */
+/** Selection tick for tab taps and crossing a drag threshold */
+export function hapticSelection(): void {
+  if (Platform.OS === "web") return
+  void Haptics.selectionAsync()
+}
+
+/** Light tap for button presses, like/pass commit, mic toggle */
 export function hapticLight(): void {
   if (Platform.OS === "web") return
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)

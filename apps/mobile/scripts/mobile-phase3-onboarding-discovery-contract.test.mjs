@@ -80,9 +80,13 @@ test("discovery distinguishes loading, error, low supply, and exhausted states",
 test("room onboarding offers only the free starter bed before discovery", () => {
   const source = read("src/screens/RoomSetupScreen.tsx")
   assert.match(source, /STARTER_ROOM_BED_ITEM_ID/)
-  assert.match(source, /ücretsiz başlangıç eşyası/)
+  // Room setup text is localised in roomSetupCopy.ts; the Turkish wording is unchanged.
+  const copy = read("src/features/roomV2/roomSetupCopy.ts")
+  assert.match(source, /accessibilityLabel=\{copy\.starterItemAccessibilityLabel\}/)
+  assert.match(copy, /ücretsiz başlangıç eşyası/)
   assert.match(source, /testID="starter-bed-card"/)
-  assert.match(source, /Dokun veya odana sürükle/)
+  assert.match(source, /\{copy\.starterItemHint\}/)
+  assert.match(copy, /starterItemHint: "Dokun veya odana sürükle"/)
   assert.match(source, /testID="starter-bed-rotate"/)
   assert.match(source, /primaryActionTestID="room-setup-submit"/)
   assert.doesNotMatch(source, /STARTER_ROOM_PRESETS/)

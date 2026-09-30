@@ -79,9 +79,21 @@ test("conversation opens at the newest item without a delayed animated jump", ()
   assert.match(screenSource, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
   assert.match(screenSource, /ListFooterComponent=/)
   assert.match(screenSource, /autoscrollToTopThreshold: 80/)
+  // Rows get prebuilt models from the chronological timeline (node-tested in
+  // chatThreadModel.test.ts), through a stable renderItem.
   assert.match(
     screenSource,
-    /renderItem=\{\(\{ item, index \}\) => \([\s\S]*?row=\{getChatTimelineRowModel\(\{\s*item,\s*index,\s*timeline,/
+    /const rowModels = useChatTimelineRowModels\(\{\s*timeline,\s*currentUserId,/
+  )
+  assert.match(
+    screenSource,
+    /const renderTimelineRow = useCallback[\s\S]*?rowModels\.get\(getChatTimelineItemKey\(item\)\)[\s\S]*?item=\{entry\.item\}\s*row=\{entry\.row\}/
+  )
+  assert.match(screenSource, /renderItem=\{renderTimelineRow\}/)
+  assert.doesNotMatch(screenSource, /getChatTimelineRowModel\(/, "rows are not rebuilt inside renderItem")
+  assert.match(
+    declaredFunction(modelFile, "buildChatTimelineRowModels").getText(),
+    /index: timeline\.length - 1 - chronologicalIndex,\s*timeline/
   )
   assert.match(
     declaredFunction(modelFile, "getChatTimelineRowModel").getText(),
@@ -97,6 +109,54 @@ test("conversation opens at the newest item without a delayed animated jump", ()
   assert.match(screenSource, /const awaitingInitialHistory[\s\S]*?!historyReady/)
   assert.match(screenSource, /useChatThreadStore\(threadId, pendingPartnerId\)/)
   assert.match(screenSource, /isPendingThread \|\| awaitingInitialHistory/)
+})
+
+test("the timeline dismisses the keyboard by drag and keeps row taps working while it is open", () => {
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(screenSource, /<FlatList[\s\S]*?keyboardDismissMode="interactive"/)
+  assert.match(screenSource, /<FlatList[\s\S]*?keyboardShouldPersistTaps="handled"/)
+})
+
+test("re-opening the match from the chat header does not replay the celebration", () => {
+  assert.match(
+    component("ChatThreadScreen").getText(file),
+    /navigation\.navigate\("MatchResult", \{ match: persistedMatch, celebrate: false \}\)/
+  )
+})
+
+test("timeline rows are memoised and only message bodies are selectable", () => {
+  const rowSource = rowFile.getText()
+  assert.match(rowSource, /const MemoizedChatTimelineRow = memo\(ChatTimelineRow\)/)
+  assert.match(rowSource, /export \{ MemoizedChatTimelineRow as ChatTimelineRow \}/)
+  const selectableTexts = rowSource.match(/<Text\s+selectable\b[\s\S]*?<\/Text>/g) ?? []
+  assert.equal(selectableTexts.length, 1, "exactly one selectable text")
+  assert.match(selectableTexts[0], /\{item\.message\.body\}/)
+})
+
+test("only newest-edge rows enter, on the UI thread, and a bubble reads as one element", () => {
+  // Which rows enter is node-tested in chatTimelineEntranceModel.test.ts and the
+  // spoken phrase in chatBubbleAccessibility.test.ts; these pins keep the wiring.
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(
+    screenSource,
+    /const enteringRowKeys = useChatTimelineEntrances\(\{\s*timeline,\s*isListPresented: !showsTimelineEmptyState\s*\}\)/
+  )
+  assert.match(screenSource, /isEntering=\{enteringRowKeys\.has\(getChatTimelineItemKey\(item\)\)\}/)
+  const hook = declaredFunction(threadFile("useChatTimelineEntrances.ts"), "useChatTimelineEntrances").getText()
+  assert.match(hook, /const reduceMotion = useReducedMotion\(\)/)
+  assert.match(hook, /useEffect\(\(\) => \{\s*if \(!plan\) return\s*committedRef\.current =/)
+  const row = declaredFunction(rowFile, "ChatTimelineRow").getText()
+  assert.match(row, /const entering = isEntering\s*\?\s*isMe \? CHAT_OWN_ROW_ENTERING : CHAT_INCOMING_ROW_ENTERING\s*:\s*undefined/)
+  assert.match(row, /<Animated\.View entering=\{entering\}>/)
+  assert.match(row, /<View\s+accessible\s+accessibilityLabel=\{bubbleAccessibilityLabel\}\s+style=\{bubbleStyles\.contentRow\}/)
+  // The retry button sits outside the grouped content so it stays focusable.
+  const insideGroup = row.slice(
+    row.indexOf("style={bubbleStyles.contentRow}"),
+    row.indexOf('isMe && deliveryState === "failed"')
+  )
+  const opened = (insideGroup.match(/<View\b/g) ?? []).length
+  const closed = (insideGroup.match(/<\/View>/g) ?? []).length
+  assert.equal(closed, opened + 1, "the grouped content closes before the retry button")
 })
 
 test("inbox warms a bounded set of conversations and starts selected history before navigation", () => {
@@ -142,12 +202,15 @@ test("thread hooks run their effects in the original order", () => {
   )
 })
 
-test("chat uses a short native push transition and respects Reduce Motion", () => {
+test("chat uses the platform push with a full-screen swipe back and respects Reduce Motion", () => {
   const rootSource = readFileSync(new URL("../navigation/RootNavigator.tsx", import.meta.url), "utf8")
   const chatRoute = rootSource.match(/<Stack\.Screen\s+name="ChatThread"([\s\S]*?)<\/Stack\.Screen>/)
   assert.ok(chatRoute, "expected ChatThread in the native stack")
-  assert.match(chatRoute[1], /animation:\s*reduceMotion\s*\?\s*"none"\s*:\s*"simple_push"/)
-  assert.match(chatRoute[1], /animationDuration:\s*240/)
+  // Values (default push, full-screen gesture, "none" under Reduce Motion) are pinned in rootNavigationModel.test.ts.
+  assert.match(chatRoute[1], /options=\{getChatThreadScreenOptions\(reduceMotion\)\}/)
+  const model = readFileSync(new URL("../navigation/rootNavigationModel.ts", import.meta.url), "utf8")
+  assert.match(model, /CHAT_THREAD_SCREEN_OPTIONS = \{\s*\.\.\.DETAIL_SCREEN_OPTIONS,\s*fullScreenGestureEnabled: true\s*\}/)
+  assert.match(model, /DETAIL_SCREEN_OPTIONS = \{\s*headerShown: false,\s*animation: "default"\s*\}/)
 })
 
 test("pending messages stay fully visible and only show a clock until server acknowledgement", () => {

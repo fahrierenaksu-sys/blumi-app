@@ -98,6 +98,9 @@ interface Harness {
   decide: (userId: string, decision: "like" | "pass") => Promise<DiscoveryDecisionResult>
   events: { name: string; properties: unknown }[]
   toasts: { title: string; body?: string }[]
+  haptics: string[]
+  swipeReturns: { cardId: string; direction: "left" | "right"; reduceMotion: boolean }[]
+  reduceMotion: boolean
   skipped: { ownerUserId: string; userId: string }[]
   hydrations: string[]
   scheduledNavigations: { navigate: () => void; cancelled: boolean }[]
@@ -109,12 +112,26 @@ function loadHook(runtime: ReturnType<typeof createHookRuntime>, harness: Harnes
     _load: (request: string, parent: unknown, isMain: boolean) => unknown
   }
   const originalLoad = loader._load
-  const swipeValues = { x: { value: 12 }, ownerId: { value: "user-a" } }
+  const swipeValues = { x: { value: 12 }, ownerId: { value: "user-b" } }
   loader._load = function load(request, parent, isMain) {
     if (request === "react") return runtime.react
     if (request === "../useDiscoverSwipeValues") {
       // The card drag lives in Reanimated shared values; a plain holder stands in.
-      return { useDiscoverSwipeValues: () => swipeValues }
+      return {
+        useDiscoverSwipeValues: () => swipeValues,
+        // The return spring runs on the UI thread; record it and land where it settles.
+        returnDiscoverSwipeCard: (
+          values: typeof swipeValues,
+          input: Harness["swipeReturns"][number]
+        ) => {
+          harness.swipeReturns.push(input)
+          values.ownerId.value = input.cardId
+          values.x.value = 0
+        }
+      }
+    }
+    if (request === "../../../ui/animations") {
+      return { useReducedMotion: () => harness.reduceMotion }
     }
     if (request === "@react-navigation/native") {
       return {
@@ -148,6 +165,12 @@ function loadHook(runtime: ReturnType<typeof createHookRuntime>, harness: Harnes
     if (request === "../../../ui/toast") {
       return {
         showToast: (toast: { title: string; body?: string }) => { harness.toasts.push(toast) }
+      }
+    }
+    if (request === "../../../ui/haptics") {
+      return {
+        hapticLight: () => { harness.haptics.push("light") },
+        hapticError: () => { harness.haptics.push("error") }
       }
     }
     if (request === "../matchResultNavigation") {
@@ -243,6 +266,7 @@ function mount(options: {
   /** Shared across mounts to model the device's persisted analytics store over an app restart. */
   analyticsStorage?: Map<string, string>
   analyticsConsent?: () => boolean
+  reduceMotion?: boolean
 } = {}) {
   const runtime = createHookRuntime()
   const analyticsStorage = options.analyticsStorage ?? new Map<string, string>()
@@ -252,6 +276,9 @@ function mount(options: {
     decide: options.decide ?? (async (userId, decision) => decisionResult(userId, decision)),
     events,
     toasts: [],
+    haptics: [],
+    swipeReturns: [],
+    reduceMotion: options.reduceMotion ?? false,
     skipped: [],
     hydrations: [],
     scheduledNavigations: [],
@@ -393,7 +420,12 @@ test("a failed production decision restores the card and resets the drag", async
 
   assert.deepEqual(view.harness.decideCalls, [{ userId: "user-a", decision: "pass" }])
   assert.equal(view.seen.size, 0)
-  assert.equal((view.hook.cardDragX as unknown as { x: { value: number } }).x.value, 0)
+  const drag = view.hook.cardDragX as unknown as { x: { value: number }; ownerId: { value: string } }
+  assert.equal(drag.x.value, 0)
+  // The restored card owns the drag, so it is the card that springs back.
+  assert.equal(drag.ownerId.value, "user-a")
+  assert.deepEqual(view.harness.swipeReturns, [{ cardId: "user-a", direction: "left", reduceMotion: false }])
+  assert.deepEqual(view.harness.haptics, ["light", "error"], "the pass commit, then one error")
   assert.deepEqual(view.harness.toasts, [{ title: "That choice wasn't saved. Check your connection and try again.", type: "warning" }])
   assert.deepEqual(view.feedback, [{ text: copy.retry, tone: "soft" }])
   assert.deepEqual(view.harness.events, [])
@@ -439,6 +471,47 @@ test("a completed ProfilePreview decision marks the card seen and records activa
     properties: { decision: "like", mode: "production" }
   }])
   assert.deepEqual(view.paramUpdates, [{ completedProductionDecision: undefined }])
+})
+
+test("a card like or pass commits with one light haptic; dropped and refused ones stay silent", async () => {
+  let release: () => void = () => undefined
+  const production = mount({
+    decide: (userId, decision) => new Promise((resolveDecision) => {
+      release = () => resolveDecision(decisionResult(userId, decision))
+    })
+  })
+  production.hook.handlePrimaryLike()
+  production.rerender()
+  // Both repeats hit the in-flight guard.
+  production.hook.handlePrimaryLike()
+  production.hook.handleSkipFeatured()
+  assert.deepEqual(production.harness.haptics, ["light"])
+  release()
+  await production.settle()
+  assert.deepEqual(production.harness.haptics, ["light"], "match and result feedback add no commit haptic")
+
+  const pass = mount()
+  pass.hook.handleSkipFeatured()
+  assert.deepEqual(pass.harness.haptics, ["light"])
+  await pass.settle()
+
+  const refused = mount({ mode: "demo", featured: liveCandidate("user-c"), sendInviteResult: false })
+  refused.hook.handlePrimaryLike()
+  assert.deepEqual(refused.harness.haptics, [])
+
+  const blocked = mount({ featured: { ...candidate("user-d"), blocked: true } })
+  blocked.hook.handlePrimaryLike()
+  assert.deepEqual(blocked.harness.haptics, [])
+
+  const lobby = mount({ mode: "demo", featured: liveCandidate("user-c") })
+  lobby.hook.handlePrimaryLike()
+  lobby.hook.handleSkipFeatured()
+  assert.deepEqual(lobby.harness.haptics, ["light", "light"])
+
+  const empty = mount({ featured: null })
+  empty.hook.handlePrimaryLike()
+  empty.hook.handleSkipFeatured()
+  assert.deepEqual(empty.harness.haptics, [])
 })
 
 test("outside production a refused lobby invite records nothing", () => {
@@ -569,4 +642,26 @@ test("with analytics consent off a mutual like emits and stores nothing", async 
   assert.deepEqual(matchCreated(view.harness.events), [])
   assert.equal(analyticsStorage.size, 0)
   assert.equal(view.harness.scheduledNavigations.length, 1, "the match itself is still shown")
+})
+
+test("a refused like springs back from the right with one error haptic; Reduce Motion lands at once", async () => {
+  const liked = mount({ decide: async () => { throw new Error("network down") } })
+  liked.hook.handlePrimaryLike()
+  await liked.settle()
+  assert.deepEqual(liked.harness.swipeReturns, [{ cardId: "user-a", direction: "right", reduceMotion: false }])
+  assert.deepEqual(liked.harness.haptics, ["light", "error"])
+
+  const { DiscoveryDecisionQuotaExhaustedError } = await import("../discoveryApi")
+  const exhausted = mount({ reduceMotion: true })
+  exhausted.harness.decide = async () => { throw new DiscoveryDecisionQuotaExhaustedError(quota(0)) }
+  exhausted.hook.handlePrimaryLike()
+  await exhausted.settle()
+  assert.deepEqual(exhausted.harness.swipeReturns, [{ cardId: "user-a", direction: "right", reduceMotion: true }])
+  assert.deepEqual(exhausted.harness.haptics, ["light", "error"])
+
+  const saved = mount()
+  saved.hook.handlePrimaryLike()
+  await saved.settle()
+  assert.deepEqual(saved.harness.swipeReturns, [], "a saved decision never brings the card back")
+  assert.deepEqual(saved.harness.haptics, ["light"])
 })

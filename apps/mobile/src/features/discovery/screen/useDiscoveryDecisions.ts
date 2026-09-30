@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useFocusEffect, type RouteProp } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { DiscoveryDecisionQuota } from "@blumi/contracts"
-import { useDiscoverSwipeValues } from "../useDiscoverSwipeValues"
+import { returnDiscoverSwipeCard, useDiscoverSwipeValues } from "../useDiscoverSwipeValues"
 import { MOBILE_HTTP_BASE_URL } from "../../../config/env"
 import { captureProductEvent } from "../../../analytics/productAnalytics"
 import type { RootStackParamList } from "../../../navigation/RootNavigator"
@@ -12,6 +12,8 @@ import { reportDiscoveryMatchCreated } from "../../matches/discoveryMatchCreated
 import type { LobbyFeedbackCopy } from "../../lobby/lobbyFeedbackCopy"
 import type { PendingInviteMemory } from "../../lobby/pendingInvitesStore"
 import type { SessionActor } from "../../session/sessionModel"
+import { useReducedMotion } from "../../../ui/animations"
+import { hapticError, hapticLight } from "../../../ui/haptics"
 import { showToast } from "../../../ui/toast"
 import {
   createMatchFromDiscoveryResult,
@@ -77,6 +79,7 @@ export function useDiscoveryDecisions(input: {
     useState<ReadonlySet<string>>(() => new Set())
   const inFlightDecisionUserIdsRef = useRef<ReadonlySet<string>>(new Set())
   const cardDragX = useDiscoverSwipeValues()
+  const reduceMotion = useReducedMotion()
   const firstDiscoveryDecisionCapturedRef = useRef(false)
 
   useFocusEffect(useCallback(() => () => {
@@ -116,12 +119,23 @@ export function useDiscoveryDecisions(input: {
     updateProductionQuota
   ])
 
-  const restoreCandidateAfterDecisionFailure = useCallback((userId: string): void => {
+  const restoreCandidateAfterDecisionFailure = useCallback((
+    userId: string,
+    decision: "like" | "pass"
+  ): void => {
+    hapticError()
+    // The card springs back from the side it left through (at once under
+    // Reduce Motion). It claims the drag before it re-enters the deck, so the
+    // deck keeps the spring instead of resetting the drag for a new card.
+    returnDiscoverSwipeCard(cardDragX, {
+      cardId: userId,
+      direction: decision === "like" ? "right" : "left",
+      reduceMotion
+    })
     setSeenThisSessionUserIds((current) =>
       rollbackOptimisticDiscoveryDecision(current, userId)
     )
-    cardDragX.x.value = 0
-  }, [cardDragX, setSeenThisSessionUserIds])
+  }, [cardDragX, reduceMotion, setSeenThisSessionUserIds])
 
   const decideProductionCandidate = useCallback(
     async (
@@ -206,7 +220,7 @@ export function useDiscoveryDecisions(input: {
           type: "warning"
         })
         showDiscoverFeedback(lobbyCopy.retry, "soft")
-        restoreCandidateAfterDecisionFailure(candidate.userId)
+        restoreCandidateAfterDecisionFailure(candidate.userId, decision)
         return false
       } finally {
         const finishedUserIds = finishInFlightDiscoveryDecision(
@@ -240,6 +254,8 @@ export function useDiscoveryDecisions(input: {
       (!isProductionDiscovery && !isLiveInviteAvailable(featuredCandidate))
     ) return
     if (isProductionDiscovery) {
+      // A repeat while the decision is in flight is dropped, so it stays silent.
+      if (!inFlightDecisionUserIdsRef.current.has(featuredCandidate.userId)) hapticLight()
       void decideProductionCandidate(featuredCandidate, "like")
       return
     }
@@ -248,6 +264,7 @@ export function useDiscoveryDecisions(input: {
       showInviteDeliveryFailure()
       return
     }
+    hapticLight()
     showDiscoverFeedback(lobbyCopy.inviteSent, "warm")
     captureProductEvent("discovery_decision", {
       decision: "like",
@@ -282,6 +299,7 @@ export function useDiscoveryDecisions(input: {
   const handleSkipFeatured = useCallback(() => {
     if (!featuredCandidate) return
     if (inFlightDecisionUserIdsRef.current.has(featuredCandidate.userId)) return
+    hapticLight()
     if (isProductionDiscovery) {
       void decideProductionCandidate(featuredCandidate, "pass")
       return

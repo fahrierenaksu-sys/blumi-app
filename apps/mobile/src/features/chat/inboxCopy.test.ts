@@ -10,6 +10,7 @@ test("inbox copy keeps the Turkish empty state honest and actionable", () => {
   assert.match(copy.emptyBody, /eşleşme/i)
   assert.equal(copy.discoverPeople, "Keşfet")
   assert.equal(copy.tryAgain, "Tekrar dene")
+  assert.equal(copy.unknownPartner, "Biri")
 })
 
 test("inbox copy retains the English journey", () => {
@@ -19,4 +20,5 @@ test("inbox copy retains the English journey", () => {
   assert.equal(copy.emptyTitle, "No chats yet")
   assert.equal(copy.discoverPeople, "Discover people")
   assert.equal(copy.tryAgain, "Try again")
+  assert.equal(copy.unknownPartner, "Someone")
 })

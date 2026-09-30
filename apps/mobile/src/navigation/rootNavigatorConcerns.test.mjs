@@ -118,6 +118,7 @@ function bottomNavPress(navigationRef, events, pager) {
       events.push(["pager", key])
       return pager?.(key) ?? false
     },
+    publishMainTabReselect: (key) => events.push(["reselect", key]),
     setGlobalMatch: (value) => events.push(["setGlobalMatch", value]),
     dismissGlobalMatch: () => events.push(["setGlobalMatch", null])
   })
@@ -160,18 +161,26 @@ test("with the pager covered by a detail route, a tab press falls back to the st
   ]])
 })
 
-test("bottom tabs ignore presses before readiness and reselection of the focused tab", () => {
+// MICRO-2: tapping the focused tab again publishes a reselect (the page
+// scrolls to top, as on iOS) instead of navigating.
+test("bottom tabs ignore presses before readiness and turn a focused-tab tap into a reselect", () => {
   const notReady = createNavigationRef({ ready: false })
   const notReadyEvents = []
   bottomNavPress(notReady, notReadyEvents)("chats")
   assert.deepEqual(notReady.calls, [])
   assert.deepEqual(notReadyEvents, [])
 
-  const focused = createNavigationRef({ routeName: "Inbox" })
-  const focusedEvents = []
-  bottomNavPress(focused, focusedEvents)("chats")
-  assert.deepEqual(focused.calls, [])
-  assert.deepEqual(focusedEvents, [], "a focused-tab reselect leaves the match modal alone")
+  for (const pager of [undefined, () => true]) {
+    const focused = createNavigationRef({ routeName: "Inbox" })
+    const focusedEvents = []
+    bottomNavPress(focused, focusedEvents, pager)("chats")
+    assert.deepEqual(focused.calls, [], "a reselect never navigates the stack")
+    assert.deepEqual(
+      focusedEvents,
+      [["reselect", "chats"]],
+      "a focused-tab reselect only publishes the reselect: no pager request, the match modal is left alone"
+    )
+  }
 })
 
 test("the root navigator wires route sync, return previews, and tab presses to the chrome", () => {
@@ -782,6 +791,26 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
   assert.match(blockUserBody, /publishPartnerBlocked\(\{\s*ownerUserId: normalizeOwnerUserId\(ownerUserId\),\s*blockedUserId\s*\}\)/)
   assert.match(read("./useBlockedPartnerCleanup.ts"), /subscribeToPartnerBlocked\(\(event\) => \{\s*if \(event\.ownerUserId !== currentUserId\) return\s*applyBlockedPartner\(event\.blockedUserId\)/)
   assert.match(navigator, /const resetInactiveSessionState = useCallback\([\s\S]*?\}, \[resetMatchModal, resetRoomInviteRouting\]\)/)
+})
+
+test("detail routes use the platform push and the chat alone opts into the full-screen swipe", () => {
+  const navigator = read("./RootNavigator.tsx")
+  const routeOptions = (name) => [...navigator.matchAll(
+    new RegExp(`<Stack\\.Screen\\s+name="${name}"[\\s\\S]*?options=\\{([^\\n]*)\\}`, "g")
+  )].map((match) => match[1])
+
+  assert.match(navigator, /const detailScreenOptions = getDetailScreenOptions\(reduceMotion\)/)
+  for (const name of ["ProfilePreview", "MyRoomEditor", "MatchResult", "You", "ProfileEdit", "Settings"]) {
+    assert.deepEqual(routeOptions(name), ["detailScreenOptions"], name)
+  }
+  assert.deepEqual(routeOptions("Legal"), ["detailScreenOptions", "detailScreenOptions", "detailScreenOptions"])
+  assert.deepEqual(routeOptions("ChatThread"), ["getChatThreadScreenOptions(reduceMotion)"])
+  // MiniRoom keeps its own gesture lock; the full-screen swipe stays chat-only.
+  assert.deepEqual(routeOptions("MiniRoom"), ["{ headerShown: false, gestureEnabled: false }"])
+  assert.doesNotMatch(navigator, /fullScreenGestureEnabled/)
+  // Linking resolves behind the same branded loading screen the splash hands off to.
+  assert.match(navigator, /fallback=\{<BlumiLoadingScreen \/>\}/)
+  assert.doesNotMatch(navigator, /ActivityIndicator/)
 })
 
 test("the realtime active-conversation resync follows the focused chat or MiniRoom thread", async () => {

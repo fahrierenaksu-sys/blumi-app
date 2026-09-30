@@ -1,12 +1,14 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatMessage } from "@blumi/contracts"
-import type {
-  ChatRoomInviteTimelineItem,
-  ChatTimelineItem
+import {
+  getChatTimelineItemKey,
+  type ChatRoomInviteTimelineItem,
+  type ChatTimelineItem
 } from "../chatRoomInviteModel"
 import { CHAT_COPY } from "./chatThreadCopy"
 import {
+  buildChatTimelineRowModels,
   formatDateSeparator,
   formatMessageTime,
   getChatTimelineRowModel,
@@ -14,7 +16,8 @@ import {
   getRoomInviteComposerState,
   normalizeOutgoingChatBody,
   selectChatPartnerSummary,
-  type ChatMessageDeliveryState
+  type ChatMessageDeliveryState,
+  type ChatTimelineRowModels
 } from "./chatThreadModel"
 import {
   addOptimisticMessage,
@@ -227,6 +230,127 @@ test("message rows read their own delivery state; invitations never do", () => {
   assert.equal(messageRow.model.isRoomInvite, false)
   assert.equal(messageRow.model.deliveryState, "sending")
   assert.deepEqual(messageRow.lookups, ["m1"])
+})
+
+const ROW_NOW = new Date(2026, 6, 21, 12, 0)
+
+function rowModels(
+  timeline: readonly ChatTimelineItem[],
+  deliveryStates: Record<string, ChatMessageDeliveryState> = {},
+  previous?: ChatTimelineRowModels | null
+) {
+  return buildChatTimelineRowModels(
+    timeline,
+    {
+      currentUserId: "user_one",
+      getMessageDeliveryState: (messageId) => deliveryStates[messageId] ?? "sent",
+      locale: "en",
+      now: ROW_NOW
+    },
+    previous
+  )
+}
+
+// buildChatTimeline wraps every message in a new timeline item on each store
+// change and passes invitation items through; the message objects are stable.
+const rewrap = (timeline: readonly ChatTimelineItem[]): ChatTimelineItem[] =>
+  timeline.map((item) => item.kind === "message" ? { ...item } : item)
+
+const conversation = (): ChatTimelineItem[] => [
+  message("m1", "user_one", new Date(2026, 6, 20, 9, 0).toISOString()),
+  message("m2", "user_one", new Date(2026, 6, 21, 9, 0).toISOString()),
+  message("m3", "user_one", new Date(2026, 6, 21, 9, 1).toISOString()),
+  invite,
+  message("m4", "user_two", new Date(2026, 6, 21, 10, 2).toISOString())
+]
+
+test("row models are built once per timeline item with the inverted-list presentation", () => {
+  const timeline = conversation()
+  const models = rowModels(timeline, { m3: "failed" })
+
+  assert.deepEqual([...models.keys()], [
+    "message:m1",
+    "message:m2",
+    "message:m3",
+    "room-invite:invite_one",
+    "message:m4"
+  ])
+  const newestFirst = [...timeline].reverse()
+  newestFirst.forEach((item, index) => {
+    const entry = models.get(getChatTimelineItemKey(item))
+    assert.equal(entry?.item, item)
+    assert.deepEqual(entry?.row, rowModel(timeline, index, { m3: "failed" }).model)
+  })
+  assert.equal(models.get("message:m3")?.row.deliveryState, "failed")
+  assert.deepEqual(rowModels(timeline, { m3: "failed" }), models, "same input, same output")
+})
+
+test("an unchanged timeline reuses the previous models and map", () => {
+  const timeline = conversation()
+  const first = rowModels(timeline)
+  const again = rowModels(rewrap(timeline), {}, first)
+
+  assert.equal(again, first, "nothing changed, so the list keeps the same map")
+  assert.equal(rowModels(timeline, {}, null).size, first.size)
+})
+
+test("a delivery change replaces only that message's row model", () => {
+  const timeline = conversation()
+  const before = rowModels(timeline, { m3: "sending" })
+  const after = rowModels(rewrap(timeline), { m3: "failed" }, before)
+
+  assert.notEqual(after, before)
+  assert.notEqual(after.get("message:m3"), before.get("message:m3"))
+  assert.equal(after.get("message:m3")?.row.deliveryState, "failed")
+  for (const key of ["message:m1", "message:m2", "room-invite:invite_one", "message:m4"]) {
+    assert.equal(after.get(key), before.get(key), `${key} keeps its model`)
+  }
+})
+
+test("an edited or appended message replaces only the rows whose presentation changed", () => {
+  const timeline = conversation()
+  const before = rowModels(timeline)
+
+  const edited = timeline.map((item) => item.kind === "message" && item.message.messageId === "m2"
+    ? { ...item, message: { ...item.message, body: "edited" } }
+    : item.kind === "message" ? { ...item } : item)
+  const afterEdit = rowModels(edited, {}, before)
+  assert.notEqual(afterEdit.get("message:m2"), before.get("message:m2"))
+  const editedItem = afterEdit.get("message:m2")?.item
+  assert.equal(editedItem?.kind === "message" ? editedItem.message.body : null, "edited")
+  for (const key of ["message:m1", "message:m3", "room-invite:invite_one", "message:m4"]) {
+    assert.equal(afterEdit.get(key), before.get(key), `${key} keeps its model after an edit`)
+  }
+
+  // A reply from the same sender turns the previous newest bubble from a
+  // closing "single" into a group "first"; every older row is untouched.
+  const appended = [
+    ...rewrap(timeline),
+    message("m5", "user_two", new Date(2026, 6, 21, 10, 3).toISOString())
+  ]
+  const afterAppend = rowModels(appended, {}, before)
+  assert.equal(afterAppend.size, before.size + 1)
+  assert.equal(afterAppend.get("message:m5")?.row.groupPosition, "last")
+  assert.notEqual(afterAppend.get("message:m4"), before.get("message:m4"))
+  assert.equal(afterAppend.get("message:m4")?.row.groupPosition, "first")
+  for (const key of ["message:m1", "message:m2", "message:m3", "room-invite:invite_one"]) {
+    assert.equal(afterAppend.get(key), before.get(key), `${key} keeps its model after an append`)
+  }
+})
+
+test("removed rows are dropped and a locale change rebuilds date labels", () => {
+  const timeline = conversation()
+  const before = rowModels(timeline)
+  const trimmed = rowModels(rewrap(timeline.slice(0, 3)), {}, before)
+  assert.deepEqual([...trimmed.keys()], ["message:m1", "message:m2", "message:m3"])
+
+  const turkish = buildChatTimelineRowModels(
+    timeline,
+    { currentUserId: "user_one", getMessageDeliveryState: () => "sent", locale: "tr", now: ROW_NOW },
+    before
+  )
+  assert.equal(turkish.get("message:m1")?.row.dateLabel, "Dün")
+  assert.notEqual(turkish.get("message:m1"), before.get("message:m1"))
 })
 
 function composerState(overrides: Partial<Parameters<typeof getRoomInviteComposerState>[0]> = {}) {

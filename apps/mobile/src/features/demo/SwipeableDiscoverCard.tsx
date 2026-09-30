@@ -136,7 +136,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const [showcaseAuthorization, setShowcaseAuthorization] = useState<ShowcaseAuthorization | null>(null)
   const queryClient = useQueryClient()
   const { width: screenWidth } = useWindowDimensions()
-  const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle } = useDiscoverCardSwipe({
+  const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle, onCardLayout } = useDiscoverCardSwipe({
     swipe: swipeAnim,
     cardId: profile.userId,
     disabled,
@@ -355,7 +355,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
 
   return (
     <GestureDetector gesture={swipeGesture}>
-    <Reanimated.View style={[styles.swipeFrame, cardSwipeStyle]}>
+    <Reanimated.View style={[styles.swipeFrame, cardSwipeStyle]} onLayout={onCardLayout}>
     <Animated.View
       onLayout={() => setFrontLayoutReady(true)}
       style={[
@@ -363,7 +363,6 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         {
           opacity: entryAnim,
           transform: [
-            { rotate: "0deg" },
             {
               scale: entryAnim.interpolate({
                 inputRange: [0, 1],

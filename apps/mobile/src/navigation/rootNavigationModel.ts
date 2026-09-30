@@ -31,6 +31,38 @@ export const MAIN_TAB_SCREEN_OPTIONS = {
   gestureEnabled: false
 } as const
 
+/**
+ * Detail screens pushed over the main tabs (profile, editor, match, settings,
+ * legal) use the platform push. iOS always closes an edge swipe-back with the
+ * native slide, so opening with the stack's fade made push and pop disagree.
+ * Detail screens keep the edge-only swipe: MyRoomEditor drags objects.
+ */
+export const DETAIL_SCREEN_OPTIONS = {
+  headerShown: false,
+  animation: "default"
+} as const
+
+/**
+ * The chat thread alone may be dismissed by a swipe anywhere on screen; its
+ * bubbles own no horizontal gesture. iOS runs that gesture as a simple push.
+ */
+export const CHAT_THREAD_SCREEN_OPTIONS = {
+  ...DETAIL_SCREEN_OPTIONS,
+  fullScreenGestureEnabled: true
+} as const
+
+export function getDetailScreenOptions(reduceMotion: boolean) {
+  return reduceMotion
+    ? { ...DETAIL_SCREEN_OPTIONS, animation: "none" as const }
+    : DETAIL_SCREEN_OPTIONS
+}
+
+export function getChatThreadScreenOptions(reduceMotion: boolean) {
+  return reduceMotion
+    ? { ...CHAT_THREAD_SCREEN_OPTIONS, animation: "none" as const }
+    : CHAT_THREAD_SCREEN_OPTIONS
+}
+
 /** Avoid rebuilding the native-stack state when the focused tab is tapped again. */
 export function shouldDispatchMainTabNavigation(
   currentRouteName: string | undefined,

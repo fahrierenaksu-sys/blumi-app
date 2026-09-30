@@ -6,6 +6,7 @@ import {
   Animated,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View
@@ -25,7 +26,13 @@ import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { useEntranceAnimation, useReducedMotion, useStaggeredEntrance } from "../ui/animations"
+import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
+import { InboxLoadingSkeleton } from "../features/inbox/InboxLoadingSkeleton"
+import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
+import { useInboxRowEntrance } from "../features/inbox/useInboxRowEntrance"
+import { getInboxUnreadPulse } from "../features/inbox/inboxUnreadPulseModel"
+import { useInboxPullToRefresh } from "../features/inbox/useInboxPullToRefresh"
+import { useMainTabReselect } from "../ui/layout/useMainTabReselect"
 import type { SessionActor } from "../features/session/sessionModel"
 
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
@@ -35,6 +42,7 @@ type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
 }
 
 const CONVERSATION_ROW_HEIGHT = 80
+const CONVERSATION_ROW_GAP = uiTheme.spacing.sm + 2
 const ItemSpacer = () => <View style={styles.itemSpacer} />
 
 function formatTimeAgo(
@@ -241,16 +249,19 @@ export function InboxScreen(props: InboxScreenProps) {
   const copy = useMemo(() => getInboxCopy(locale), [locale])
 
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 16 })
-  const getItemAnim = useStaggeredEntrance(threads.length)
   const unreadPulseAnim = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
+  const threadKeys = useMemo(() => threads.map((thread) => thread.threadId), [threads])
+  // Keyed by thread id and stable across renders: a new thread enters alone.
+  const getItemAnim = useInboxRowEntrance(threadKeys, reduceMotion)
+  const isOpeningThreads = shouldShowInboxSkeleton(threadListState.status, threads.length)
 
   const threadRows = useMemo(() => {
     return threads.map((thread) => {
       const partnerSummary = thread.participants.find(
         (p) => p.userId !== currentUserId
       ) ?? thread.participants[0]
-      const partnerName = partnerSummary?.displayName ?? "Someone"
+      const partnerName = partnerSummary?.displayName ?? copy.unknownPartner
       const partnerUserId = partnerSummary?.userId ?? ""
       const partnerAvatar = partnerSummary?.avatar
       const rawLastBody = thread.lastMessage?.body
@@ -268,7 +279,13 @@ export function InboxScreen(props: InboxScreenProps) {
         hasUnread: getThreadUnreadCount(thread.threadId) > 0
       }
     })
-  }, [copy.roomInvitation, currentUserId, getThreadUnreadCount, locale, threads])
+  }, [copy.roomInvitation, copy.unknownPartner, currentUserId, getThreadUnreadCount, locale, threads])
+  const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
+  }, [reduceMotion])
+  useMainTabReselect("chats", scrollToTop)
+  const { refreshing, onRefresh } = useInboxPullToRefresh(onRetryThreads)
 
   const warmThreadIds = useMemo(
     () => threads
@@ -313,10 +330,11 @@ export function InboxScreen(props: InboxScreenProps) {
       unreadPulseAnim.setValue(1)
       return undefined
     }
+    const unreadPulse = getInboxUnreadPulse(reduceMotion)
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(unreadPulseAnim, {
-          toValue: 1.45,
+          toValue: unreadPulse.maxScale,
           duration: 1000,
           useNativeDriver: true
         }),
@@ -325,7 +343,8 @@ export function InboxScreen(props: InboxScreenProps) {
           duration: 1000,
           useNativeDriver: true
         })
-      ])
+      ]),
+      { iterations: unreadPulse.iterations }
     )
     pulse.start()
     return () => pulse.stop()
@@ -347,11 +366,10 @@ export function InboxScreen(props: InboxScreenProps) {
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
   }, [navigation])
-  const renderThreadRow = useCallback(({ item, index }: {
+  const renderThreadRow = useCallback(({ item }: {
     item: (typeof threadRows)[number]
-    index: number
   }) => (
-    <Animated.View style={reduceMotion ? undefined : getItemAnim(index)}>
+    <Animated.View style={reduceMotion ? undefined : getItemAnim(item.thread.threadId)}>
       <ConversationCard
         threadId={item.thread.threadId}
         copy={copy}
@@ -385,11 +403,21 @@ export function InboxScreen(props: InboxScreenProps) {
         />
 
         <Animated.View style={[styles.header, headerAnim]}>
-          <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
-          <Text style={styles.headerTitle}>
-            {threads.length === 0
-              ? copy.inboxTitle
-              : copy.conversationCount(threads.length)}
+          {/* The count has its own reserved slot, so the header keeps one
+              height and one title before and after conversations arrive. */}
+          <View style={styles.eyebrowRow}>
+            <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
+            <Text
+              accessibilityElementsHidden={threads.length === 0}
+              importantForAccessibility={threads.length === 0 ? "no" : "auto"}
+              numberOfLines={1}
+              style={[styles.headerCount, threads.length === 0 ? styles.headerCountHidden : null]}
+            >
+              {copy.conversationCount(threads.length)}
+            </Text>
+          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {copy.inboxTitle}
           </Text>
           <Text style={styles.headerSubhead}>
             {copy.headerSubhead}
@@ -403,33 +431,51 @@ export function InboxScreen(props: InboxScreenProps) {
           />
         </Animated.View>
 
-        <FlatList
-          data={threadRows}
-          keyExtractor={(row) => row.thread.threadId}
-          getItemLayout={(_, index) => ({
-            length: CONVERSATION_ROW_HEIGHT,
-            offset: CONVERSATION_ROW_HEIGHT * index,
-            index
-          })}
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          windowSize={5}
-          removeClippedSubviews
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <EmptyInbox
-              threadListState={threadListState}
-              myDisplayName={sessionActor.profile.displayName}
-              myUserId={sessionActor.profile.userId}
-              copy={copy}
-              onGoDiscover={handleGoDiscover}
-              onRetryThreads={props.onRetryThreads}
-            />
-          }
-          ItemSeparatorComponent={ItemSpacer}
-          renderItem={renderThreadRow}
-        />
+        <View style={styles.listArea}>
+          <FlatList
+            ref={listRef}
+            data={threadRows}
+            keyExtractor={(row) => row.thread.threadId}
+            getItemLayout={(_, index) => ({
+              length: CONVERSATION_ROW_HEIGHT,
+              offset: CONVERSATION_ROW_HEIGHT * index,
+              index
+            })}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews
+            contentContainerStyle={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={uiTheme.colors.primary}
+                colors={[uiTheme.colors.primary]}
+              />
+            }
+            ListEmptyComponent={
+              <EmptyInbox
+                threadListState={threadListState}
+                myDisplayName={sessionActor.profile.displayName}
+                myUserId={sessionActor.profile.userId}
+                copy={copy}
+                onGoDiscover={handleGoDiscover}
+                onRetryThreads={props.onRetryThreads}
+              />
+            }
+            ItemSeparatorComponent={ItemSpacer}
+            renderItem={renderThreadRow}
+          />
+          <InboxLoadingSkeleton
+            isVisible={isOpeningThreads}
+            label={copy.opening}
+            reduceMotion={reduceMotion}
+            rowHeight={CONVERSATION_ROW_HEIGHT}
+            rowGap={CONVERSATION_ROW_GAP}
+          />
+        </View>
       </SafeAreaView>
     </View>
   )
@@ -456,16 +502,8 @@ function EmptyInbox(props: EmptyInboxProps) {
     props.threadListState.status === "idle" ||
     props.threadListState.status === "loading"
   ) {
-    return (
-      <Animated.View
-        style={[
-          emptyStyles.card,
-          entranceStyle
-        ]}
-      >
-        <Text style={emptyStyles.body}>{props.copy.opening}</Text>
-      </Animated.View>
-    )
+    // InboxLoadingSkeleton stands in for the list while it opens.
+    return null
   }
   if (props.threadListState.status === "failed") {
     return (
@@ -575,9 +613,25 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.sm,
     paddingBottom: uiTheme.spacing.md
   },
+  eyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: uiTheme.spacing.sm
+  },
   eyebrow: {
     ...uiTheme.font.overline,
     color: uiTheme.colors.primary
+  },
+  headerCount: {
+    ...uiTheme.font.caption,
+    color: uiTheme.colors.textMuted
+  },
+  headerCountHidden: {
+    opacity: 0
+  },
+  listArea: {
+    flex: 1
   },
   headerTitle: {
     ...uiTheme.font.title,
@@ -598,7 +652,7 @@ const styles = StyleSheet.create({
     paddingBottom: uiTheme.spacing.xxl
   },
   itemSpacer: {
-    height: uiTheme.spacing.sm + 2
+    height: CONVERSATION_ROW_GAP
   }
 })
 
@@ -610,6 +664,7 @@ const cardStyles = StyleSheet.create({
     padding: uiTheme.spacing.md,
     paddingLeft: uiTheme.spacing.md + 4,
     borderRadius: uiTheme.radius.xl,
+    borderCurve: "continuous",
     backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
     borderColor: uiTheme.colors.border,

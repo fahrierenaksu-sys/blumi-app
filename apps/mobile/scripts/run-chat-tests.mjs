@@ -21,6 +21,12 @@ const sourceFiles = [
   "src/features/chat/chatErrorCopy.test.ts",
   "src/features/chat/inboxCopy.ts",
   "src/features/chat/inboxCopy.test.ts",
+  "src/features/inbox/inboxEntranceModel.ts",
+  "src/features/inbox/inboxEntranceModel.test.ts",
+  "src/features/inbox/inboxUnreadPulseModel.ts",
+  "src/features/inbox/inboxUnreadPulseModel.test.ts",
+  "src/features/inbox/inboxPullRefreshModel.ts",
+  "src/features/inbox/inboxPullRefreshModel.test.ts",
   "src/features/chat/matchChatOpening.ts",
   "src/features/chat/matchChatOpening.test.ts",
   "src/features/chat/chatStore.ts",
@@ -37,7 +43,11 @@ const sourceFiles = [
   "src/features/chat/thread/chatThreadCopy.ts",
   "src/features/chat/thread/chatThreadCopy.test.ts",
   "src/features/chat/thread/chatThreadModel.ts",
-  "src/features/chat/thread/chatThreadModel.test.ts"
+  "src/features/chat/thread/chatThreadModel.test.ts",
+  "src/features/chat/thread/chatTimelineEntranceModel.ts",
+  "src/features/chat/thread/chatTimelineEntranceModel.test.ts",
+  "src/features/chat/thread/chatBubbleAccessibility.ts",
+  "src/features/chat/thread/chatBubbleAccessibility.test.ts"
 ]
 
 try {
@@ -79,6 +89,9 @@ try {
       join(outputDirectory, "features/chat/chatParticipantAvatar.test.js"),
       join(outputDirectory, "features/chat/chatErrorCopy.test.js"),
       join(outputDirectory, "features/chat/inboxCopy.test.js"),
+      join(outputDirectory, "features/inbox/inboxEntranceModel.test.js"),
+      join(outputDirectory, "features/inbox/inboxUnreadPulseModel.test.js"),
+      join(outputDirectory, "features/inbox/inboxPullRefreshModel.test.js"),
       join(outputDirectory, "features/chat/matchChatOpening.test.js"),
       join(outputDirectory, "features/chat/chatStore.test.js"),
       join(outputDirectory, "features/chat/chatStore.adversarial.test.js"),
@@ -88,6 +101,8 @@ try {
       join(outputDirectory, "features/chat/threadListRefreshGuard.test.js"),
       join(outputDirectory, "features/chat/thread/chatThreadCopy.test.js"),
       join(outputDirectory, "features/chat/thread/chatThreadModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatTimelineEntranceModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatBubbleAccessibility.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],

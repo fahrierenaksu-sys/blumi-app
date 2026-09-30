@@ -9,6 +9,8 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
 const sheet = read("./SwipeDismissSheet.tsx")
 const filters = read("../components/DiscoverFiltersBottomSheet.tsx")
 const report = read("../components/ReportModal.tsx")
+// The filters close label is localised; its English wording is unchanged.
+const filtersCopy = read("../features/discovery/discoveryHomeCopy.ts")
 
 test("every bottom sheet uses the one shared swipe-dismiss surface", () => {
   for (const [name, source] of [["filters", filters], ["report", report]]) {
@@ -32,8 +34,10 @@ test("the backdrop belongs to the sheet and fades with the drag, so nothing trai
     assert.match(source, /<SwipeDismissSheet[\s\S]*?backdrop=\{/, `${name}: backdrop is owned by the sheet`)
     assert.doesNotMatch(source, /overlay: \{[^}]*backgroundColor/, `${name}: no static tint on the modal container`)
   }
-  assert.doesNotMatch(filters, /<Pressable\s+accessibilityRole="button"\s+accessibilityLabel="Close discovery filters"\s+style=\{styles\.backdrop\}/, "filters: tap-to-close lives in the sheet backdrop")
-  assert.match(filters, /backdrop=\{\{\s*style: styles\.backdrop,\s*onPress: onClose,\s*accessibilityLabel: "Close discovery filters"\s*\}\}/)
+  assert.doesNotMatch(filters, /<Pressable\s+accessibilityRole="button"\s+accessibilityLabel=(?:"Close discovery filters"|\{copy\.closeAccessibilityLabel\})\s+style=\{styles\.backdrop\}/, "filters: tap-to-close lives in the sheet backdrop")
+  assert.match(filters, /backdrop=\{\{\s*style: styles\.backdrop,\s*onPress: onClose,\s*accessibilityLabel: copy\.closeAccessibilityLabel\s*\}\}/)
+  assert.match(filtersCopy, /closeAccessibilityLabel: "Close discovery filters"/)
+  assert.match(filtersCopy, /closeAccessibilityLabel: "Discover filtrelerini kapat"/)
   assert.match(report, /backdrop=\{\{\s*style: styles\.backdrop\s*\}\}/)
 })
 
@@ -47,7 +51,7 @@ test("inner scroll content keeps its touch unless it is at the top", () => {
 
 test("the visible close buttons stay; VoiceOver escape also closes", () => {
   // Backdrop tap (in the sheet's backdrop prop) and the visible close button.
-  assert.match(filters, /backdrop=\{\{[\s\S]*?onPress: onClose,\s*accessibilityLabel: "Close discovery filters"[\s\S]*?accessibilityLabel="Close discovery filters"[\s\S]*?onPress=\{onClose\}/)
+  assert.match(filters, /backdrop=\{\{[\s\S]*?onPress: onClose,\s*accessibilityLabel: copy\.closeAccessibilityLabel[\s\S]*?accessibilityLabel=\{copy\.closeAccessibilityLabel\}[\s\S]*?onPress=\{onClose\}/)
   assert.match(sheet, /<Pressable\s+accessibilityRole="button"\s+accessibilityLabel=\{backdrop\.accessibilityLabel\}[\s\S]*?onPress=\{backdropPress\}/)
   assert.match(report, /accessibilityLabel=\{copy\.closeAccessibilityLabel\}[\s\S]*?onPress=\{handleClose\}/)
   assert.match(sheet, /onAccessibilityEscape=\{enabled \? dismiss : undefined\}/)

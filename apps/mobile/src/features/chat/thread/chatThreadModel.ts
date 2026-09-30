@@ -1,6 +1,7 @@
 import type { ChatThread } from "@blumi/contracts"
 import {
   getChatMessageGroupPosition,
+  getChatTimelineItemKey,
   type ChatLocale,
   type ChatMessageGroupPosition,
   type ChatRoomInviteAction,
@@ -133,6 +134,73 @@ export function getChatTimelineRowModel({
     closesGroup,
     dateLabel
   }
+}
+
+export interface ChatTimelineRowEntry {
+  item: ChatTimelineItem
+  row: ChatTimelineRowModel
+}
+
+/** Row presentation keyed by `getChatTimelineItemKey`, in chronological order. */
+export type ChatTimelineRowModels = ReadonlyMap<string, ChatTimelineRowEntry>
+
+export interface ChatTimelineRowModelContext {
+  currentUserId: string
+  getMessageDeliveryState: (messageId: string) => ChatMessageDeliveryState
+  locale: ChatLocale
+  now?: Date
+}
+
+function isSameTimelineSource(left: ChatTimelineItem, right: ChatTimelineItem): boolean {
+  if (left === right) return true
+  // buildChatTimeline wraps each message in a new item on every store change;
+  // the message object itself only changes when its content does.
+  return left.kind === "message" && right.kind === "message" &&
+    left.message === right.message && left.createdAt === right.createdAt
+}
+
+function isSameRowModel(left: ChatTimelineRowModel, right: ChatTimelineRowModel): boolean {
+  return left.chronologicalIndex === right.chronologicalIndex &&
+    left.isRoomInvite === right.isRoomInvite &&
+    left.isMe === right.isMe &&
+    left.deliveryState === right.deliveryState &&
+    left.groupPosition === right.groupPosition &&
+    left.closesGroup === right.closesGroup &&
+    left.dateLabel === right.dateLabel
+}
+
+/**
+ * Presentation for every row in one pass. When `previous` is given, an entry
+ * whose source and presentation are unchanged keeps its previous object, and a
+ * fully unchanged timeline returns `previous` itself, so memoised rows (and the
+ * list's renderItem) only update where something visible changed.
+ */
+export function buildChatTimelineRowModels(
+  timeline: readonly ChatTimelineItem[],
+  context: ChatTimelineRowModelContext,
+  previous?: ChatTimelineRowModels | null
+): ChatTimelineRowModels {
+  const models = new Map<string, ChatTimelineRowEntry>()
+  let reusedAll = previous?.size === timeline.length
+
+  timeline.forEach((item, chronologicalIndex) => {
+    const key = getChatTimelineItemKey(item)
+    const row = getChatTimelineRowModel({
+      ...context,
+      item,
+      index: timeline.length - 1 - chronologicalIndex,
+      timeline
+    })
+    const earlier = previous?.get(key)
+    if (earlier && isSameTimelineSource(earlier.item, item) && isSameRowModel(earlier.row, row)) {
+      models.set(key, earlier)
+      return
+    }
+    reusedAll = false
+    models.set(key, { item, row })
+  })
+
+  return reusedAll && previous ? previous : models
 }
 
 export interface RoomInviteComposerState {
