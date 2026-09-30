@@ -1,6 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import Constants from "expo-constants"
+import * as Updates from "expo-updates"
 import { useCallback } from "react"
 import { Alert, Platform, Text, View } from "react-native"
 import { PageSafeArea as SafeAreaView, PageScrollContent } from "../ui/layout/PageContainer"
@@ -15,6 +16,7 @@ import { uiTheme } from "../ui/theme"
 import { useAnalyticsConsent } from "../analytics/analyticsConsent"
 import { DiscoverFiltersBottomSheet } from "../components/DiscoverFiltersBottomSheet"
 import { getSettingsCopy } from "../features/settings/settingsCopy"
+import { formatRunningUpdateLabel } from "../features/appUpdates/otaUpdatePolicy"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   AccountDataExportModal,
@@ -42,7 +44,17 @@ const BUILD_NUMBER = Platform.select({
   android: Constants.expoConfig?.android?.versionCode?.toString()
 })
   ?? "1"
+const RUNNING_UPDATE_LABEL = formatRunningUpdateLabel({
+  isEnabled: Updates.isEnabled,
+  channel: Updates.channel,
+  isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+  createdAt: Updates.createdAt,
+  locale: getAppLocale()
+})
 const VERSION_LABEL = `v${APP_VERSION} (${BUILD_NUMBER})`
+const FOOTER_VERSION_LABEL = RUNNING_UPDATE_LABEL
+  ? `${VERSION_LABEL} · ${RUNNING_UPDATE_LABEL}`
+  : VERSION_LABEL
 
 
 type SettingsScreenProps = NativeStackScreenProps<
@@ -200,7 +212,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             <Text style={styles.footerTagline}>
               {copy.tagline}
             </Text>
-            <Text style={styles.footerVersion}>Blumi {VERSION_LABEL}</Text>
+            <Text style={styles.footerVersion}>Blumi {FOOTER_VERSION_LABEL}</Text>
           </View>
         </PageScrollContent>
       </SafeAreaView>

@@ -36,3 +36,25 @@ export function shouldCheckForOtaUpdate(input: {
   if (input.lastCheckedAt === null) return true
   return input.now - input.lastCheckedAt >= OTA_FOREGROUND_CHECK_INTERVAL_MS
 }
+
+/**
+ * Which JavaScript the app is running, for the Settings footer: the update
+ * channel, and when the running OTA update was published ("built-in" when it
+ * runs the bundle embedded in the binary). Null in Metro/dev runtimes.
+ */
+export function formatRunningUpdateLabel(input: {
+  isEnabled: boolean
+  channel: string | null | undefined
+  isEmbeddedLaunch: boolean
+  createdAt: Date | null | undefined
+  locale: "en" | "tr"
+}): string | null {
+  if (!input.isEnabled || !input.channel) return null
+  if (input.isEmbeddedLaunch || !input.createdAt) {
+    return `${input.channel} · ${input.locale === "tr" ? "yerleşik" : "built-in"}`
+  }
+  const date = input.createdAt
+  const pad = (value: number) => String(value).padStart(2, "0")
+  const stamp = `${pad(date.getDate())}.${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${input.channel} · ${input.locale === "tr" ? "güncelleme" : "update"} ${stamp}`
+}
