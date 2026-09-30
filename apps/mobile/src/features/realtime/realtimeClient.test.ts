@@ -5,6 +5,7 @@ import {
   REALTIME_AUTH_INVALID_CLOSE_CODE,
   isRealtimeAuthInvalidClose,
   RealtimeTicketRequestError,
+  REALTIME_STABLE_CONNECTION_MS,
   type RealtimeConnectionStatus,
   type RealtimeEventDrop
 } from "./realtimeClient"
@@ -183,11 +184,14 @@ test("fanout gap close 1012 reconnects without invalidating authentication", asy
   client.disconnect()
 })
 
-test("successful reconnect resets exponential backoff", async (context) => {
+test("a reconnect that stays open for the stability window resets exponential backoff", async (context) => {
+  // Updated 2026-09-30: backoff used to reset on every onopen, which let an
+  // accept-then-close server loop reconnect every second. It now resets only
+  // after the socket stayed open for the stability window.
   const restore = installWebSocketMock()
   context.after(restore)
   context.mock.timers.enable({ apis: ["setTimeout"] })
-  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 1 - Number.EPSILON })
 
   client.connect("token-2")
   await flushTicketRequest()
@@ -195,11 +199,58 @@ test("successful reconnect resets exponential backoff", async (context) => {
   context.mock.timers.tick(1_000)
   await flushTicketRequest()
   MockWebSocket.instances[1]?.open()
+  context.mock.timers.tick(REALTIME_STABLE_CONNECTION_MS)
   MockWebSocket.instances[1]?.drop()
   context.mock.timers.tick(1_000)
   await flushTicketRequest()
 
   assert.equal(MockWebSocket.instances.length, 3)
+})
+
+test("an open socket that closes before the stability window keeps growing the backoff", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 1 - Number.EPSILON })
+
+  client.connect("token-short-open")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop()
+  context.mock.timers.tick(1_000)
+  await flushTicketRequest()
+  MockWebSocket.instances[1]?.open()
+  context.mock.timers.tick(REALTIME_STABLE_CONNECTION_MS - 1)
+  MockWebSocket.instances[1]?.drop(1011)
+  context.mock.timers.tick(1_999)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2, "the second attempt waits for its 2 s ceiling")
+  context.mock.timers.tick(1)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 3)
+  client.disconnect()
+})
+
+test("the first authenticated server event resets exponential backoff", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 1 - Number.EPSILON })
+
+  client.connect("token-event-reset")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop()
+  context.mock.timers.tick(1_000)
+  await flushTicketRequest()
+  MockWebSocket.instances[1]?.open()
+  MockWebSocket.instances[1]?.message(JSON.stringify({
+    type: "chat.thread_read",
+    payload: { userId: "ada", threadId: "thread-1", readAt: "2026-09-30T12:00:00.000Z" }
+  }))
+  MockWebSocket.instances[1]?.drop()
+  context.mock.timers.tick(1_000)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 3)
+  client.disconnect()
 })
 
 test("intentional disconnect cancels pending reconnect", async (context) => {
@@ -217,7 +268,10 @@ test("intentional disconnect cancels pending reconnect", async (context) => {
   assert.equal(MockWebSocket.instances.length, 1)
 })
 
-test("reconnect stops after ten failed attempts", async (context) => {
+test("after ten fast attempts the client reports unreachable and keeps retrying", async (context) => {
+  // Updated 2026-09-30 (owner decision): this test used to assert that the
+  // client gave up for good after ten attempts. It now reports a distinct
+  // "unreachable" status and continues with capped (60 s) backoff.
   const restore = installWebSocketMock()
   context.after(restore)
   context.mock.timers.enable({ apis: ["setTimeout"] })
@@ -229,14 +283,51 @@ test("reconnect stops after ten failed attempts", async (context) => {
   await flushTicketRequest()
   for (let attempt = 0; attempt < 10; attempt += 1) {
     MockWebSocket.instances.at(-1)?.drop()
+    assert.equal(statuses.at(-1), "reconnecting")
     context.mock.timers.tick(30_000)
     await flushTicketRequest()
   }
   MockWebSocket.instances.at(-1)?.drop()
-  context.mock.timers.tick(30_000)
+  assert.equal(statuses.at(-1), "unreachable")
+  context.mock.timers.tick(60_000)
+  await flushTicketRequest()
 
-  assert.equal(MockWebSocket.instances.length, 11)
-  assert.equal(statuses.at(-1), "error")
+  assert.equal(MockWebSocket.instances.length, 12)
+  client.disconnect()
+  context.mock.timers.tick(10 * 60_000)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 12, "signing out stops the slow retries")
+})
+
+test("returning to the foreground retries immediately and backgrounding pauses retries", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+
+  client.connect("token-foreground")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop()
+  client.setAppActive(false)
+  context.mock.timers.tick(10 * 60_000)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 1, "no attempt while backgrounded")
+
+  client.setAppActive(true)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2, "foreground retries at once")
+
+  // A live socket is left alone on foreground.
+  MockWebSocket.instances[1]?.open()
+  client.setAppActive(false)
+  client.setAppActive(true)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2)
+  client.disconnect()
+  client.setAppActive(false)
+  client.setAppActive(true)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2, "no retry after sign-out")
 })
 
 test("offline state pauses retries and reconnects immediately when network returns", async (context) => {
@@ -273,6 +364,29 @@ test("policy close does not retry with the same rejected session", async (contex
 
   assert.equal(MockWebSocket.instances.length, 1)
   assert.equal(statuses.at(-1), "error")
+})
+
+test("foreground and network regain never retry a session the server refused", async (context) => {
+  const restore = installWebSocketMock()
+  context.after(restore)
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+
+  client.connect("rejected-token")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.drop(1008)
+  client.setAppActive(false)
+  client.setAppActive(true)
+  client.setNetworkConnected(false)
+  client.setNetworkConnected(true)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 1)
+
+  // A new connect (for example after a session refresh) starts over.
+  client.connect("fresh-token")
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2)
+  client.disconnect()
 })
 
 test("disconnect invalidates an in-flight ticket request", async (context) => {

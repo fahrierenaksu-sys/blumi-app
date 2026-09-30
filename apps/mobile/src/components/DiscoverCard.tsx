@@ -282,7 +282,7 @@ export interface EmptyDiscoverCardProps {
 export function EmptyDiscoverCard(props: EmptyDiscoverCardProps) {
   const { connectionStatus, myDisplayName, myUserId, hasSeenEveryone } = props
   const connecting = connectionStatus === "connecting" || connectionStatus === "idle"
-  const offline = connectionStatus === "error" || connectionStatus === "disconnected"
+  const offline = connectionStatus === "error" || connectionStatus === "disconnected" || connectionStatus === "unreachable"
 
   const title = offline
     ? "We lost the signal"

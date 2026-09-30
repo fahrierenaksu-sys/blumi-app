@@ -69,7 +69,9 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     ? mediaState.connectionStatus
     : lifecycleConnectionStatus === "reconnecting"
       ? "connecting"
-      : lifecycleConnectionStatus
+      : lifecycleConnectionStatus === "unreachable"
+        ? "disconnected"
+        : lifecycleConnectionStatus
   const connectedAtRef = useRef<number | null>(null)
   const accumulatedConnectedMsRef = useRef<number>(0)
   const everConnectedRef = useRef<boolean>(false)

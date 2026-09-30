@@ -26,6 +26,7 @@ import { requestRealtimeTicket } from "./realtimeTicketApi"
 let globalClient: RealtimeClient | null = null
 let globalStatus: RealtimeConnectionStatus = "idle"
 let unsubscribeNetworkStatus: (() => void) | null = null
+let appActive = true
 
 type StatusListener = (status: RealtimeConnectionStatus, meta?: RealtimeConnectionMeta) => void
 type EventListener = (event: ServerEvent) => void
@@ -55,6 +56,7 @@ export function connectGlobal(
     (token) => requestRealtimeTicket(httpBaseUrl, token)
   )
   globalClient = client
+  client.setAppActive(appActive)
   client.setNetworkConnected(getIsConnected())
   unsubscribeNetworkStatus = subscribeToNetworkStatus((isConnected) => {
     if (globalClient === client) client.setNetworkConnected(isConnected)
@@ -80,6 +82,15 @@ export function disconnectGlobal(): void {
     globalClient = null
   }
   notifyStatus("idle")
+}
+
+/**
+ * App foreground signal from the navigation shell. Backgrounded, reconnect
+ * retries pause; returning to the foreground retries at once.
+ */
+export function setGlobalRealtimeAppActive(isActive: boolean): void {
+  appActive = isActive
+  globalClient?.setAppActive(isActive)
 }
 
 export function sendGlobal(event: ClientEvent): boolean {
