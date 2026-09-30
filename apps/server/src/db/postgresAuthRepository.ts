@@ -1142,16 +1142,31 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
     },
 
     async deleteSession(sessionTokenHash) {
-      await pool.query(
-        `WITH target_session AS (
-           SELECT session_id
-             FROM blumi_sessions
-            WHERE session_token_hash = $1
-         )
-         DELETE FROM blumi_sessions
-          WHERE session_id IN (SELECT session_id FROM target_session)`,
-        [sessionTokenHash]
-      )
+      const client = await pool.connect()
+      try {
+        await client.query("BEGIN")
+        const family = await client.query(
+          "SELECT session_id FROM blumi_sessions WHERE session_token_hash = $1",
+          [sessionTokenHash]
+        )
+        const sessionId = family.rows[0]?.session_id
+        if (typeof sessionId === "string") {
+          // Take the family lock rotateSession holds, so a refresh in flight
+          // commits first and this DELETE (a later statement, fresh snapshot)
+          // also removes the successor it issued.
+          await client.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            [`blumi:session-family:${sessionId}`]
+          )
+          await client.query("DELETE FROM blumi_sessions WHERE session_id = $1", [sessionId])
+        }
+        await client.query("COMMIT")
+      } catch (error) {
+        await client.query("ROLLBACK")
+        throw error
+      } finally {
+        client.release()
+      }
     },
 
     async acknowledgeModeration(input) {

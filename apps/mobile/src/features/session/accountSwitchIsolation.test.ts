@@ -19,7 +19,8 @@ stub("react", {
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
   useState: () => [0, () => undefined],
-  useEffect: () => undefined
+  useEffect: () => undefined,
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot()
 })
 stub("@react-native-async-storage/async-storage", {
   getItem: async (key: string) => storage.get(key) ?? null,
@@ -33,6 +34,9 @@ const blockStore = testRequire("../safety/blockStore") as typeof import("../safe
 const savedConnections = testRequire("../connections/savedConnectionsStore") as typeof import("../connections/savedConnectionsStore")
 const savedConnectionsPersistence = testRequire("../connections/savedConnectionsPersistence") as typeof import("../connections/savedConnectionsPersistence")
 const discoveryQueries = testRequire("../discovery/discoveryQueryOptions") as typeof import("../discovery/discoveryQueryOptions")
+const discoveryApi = testRequire("../discovery/discoveryApi") as typeof import("../discovery/discoveryApi")
+const chatStore = testRequire("../chat/chatStore") as typeof import("../chat/chatStore")
+const sessionRefresh = testRequire("./sessionRefresh") as typeof import("./sessionRefresh")
 
 test("a block recorded by one account is invisible to the next signed-in account", () => {
   blockStore.blockUser("account-a", "blocked-person", { persist: false })
@@ -82,4 +86,66 @@ test("discovery query caches are keyed by the signed-in account", () => {
   assert.notDeepEqual(first, second)
   assert.ok(first.includes("account-a"))
   assert.ok(second.includes("account-b"))
+})
+
+test("discovery watch and room-showcase caches are keyed by the signed-in account", () => {
+  const scope = (userId: string) => ({ baseHttpUrl: "https://api.test", userId, sessionToken: `token-${userId}` }) as never
+  assert.notDeepEqual(
+    discoveryQueries.buildDiscoveryWatchQueryKey(scope("account-a")),
+    discoveryQueries.buildDiscoveryWatchQueryKey(scope("account-b"))
+  )
+  const showcase = (viewerUserId: string) => discoveryApi.buildDiscoveryRoomShowcaseQueryKey({
+    baseHttpUrl: "https://api.test", viewerUserId, candidateUserId: "candidate-1", authorizationId: 1
+  })
+  assert.notDeepEqual(showcase("account-a"), showcase("account-b"))
+  assert.ok((showcase("account-a") as readonly unknown[]).includes("account-a"))
+})
+
+test("the chat reset run on sign-out leaves no threads, messages, unsent drafts or unread counts for the next account", () => {
+  chatStore.applyChatThreadListed({
+    userId: "account-a",
+    threads: [{
+      threadId: "thread-a",
+      miniRoomId: "room-a",
+      participantUserIds: ["account-a", "partner-a"],
+      participants: [
+        { userId: "account-a", displayName: "Ada" },
+        { userId: "partner-a", displayName: "Deniz" }
+      ],
+      createdAt: "2026-09-30T10:00:00.000Z",
+      unreadCount: 3
+    }]
+  } as never)
+  const pending = chatStore.addOptimisticMessage({
+    threadId: "thread-a",
+    senderUserId: "account-a",
+    body: "private draft of account a",
+    clientMessageId: "client-a-1"
+  })
+  assert.equal(chatStore.getThreads().length, 1)
+  assert.ok(chatStore.getRetryableMessage(pending.localMessageId))
+
+  chatStore.resetChatStore()
+
+  assert.deepEqual(chatStore.getThreads(), [])
+  assert.deepEqual(chatStore.getMessages("thread-a"), [])
+  assert.equal(chatStore.getRetryableMessage(pending.localMessageId), null)
+  assert.equal(chatStore.getTotalUnreadCount(), 0)
+  assert.equal(chatStore.hasThreadsFetched(), false)
+})
+
+test("a refresh started for one account is never handed to, or kept after sign-out for, the next account", async () => {
+  const actor = (userId: string) => ({
+    session: { mode: "production", userId, accountId: `acc-${userId}`, sessionId: `s-${userId}`, sessionToken: `t-${userId}`, expiresAt: "2026-10-30T00:00:00.000Z" },
+    profile: { userId, displayName: userId }
+  }) as never
+  let release: (value: unknown) => void = () => undefined
+  const coordinator = sessionRefresh.createSessionRefreshCoordinator(() =>
+    new Promise((resolve) => { release = resolve }) as never)
+  const first = coordinator.refresh(actor("account-a"))
+  await assert.rejects(coordinator.refresh(actor("account-b")), /refresh your session safely/)
+  const cancelled = coordinator.cancelAndWait()
+  release(actor("account-a"))
+  await cancelled
+  await assert.rejects(first, (error: unknown) => sessionRefresh.isSessionRefreshCancelled(error))
 })
