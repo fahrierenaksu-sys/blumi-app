@@ -91,7 +91,6 @@ const UI_TO_FEATURES_BASELINE = [
   "src/ui/bottomNav.tsx -> src/features/session/accountRecoveryCopy",
   "src/ui/bottomNav.tsx -> src/features/session/appNavigationCopy",
   "src/ui/bottomNav.tsx -> src/features/session/authLocale",
-  "src/ui/connectionBanner.tsx -> src/features/network/networkStore",
   "src/ui/errorBoundary.tsx -> src/features/session/appLocale",
   "src/ui/errorBoundaryCopy.ts -> src/features/session/appLocale",
   "src/ui/layout/bottomNavMotionModel.ts -> src/features/session/accountRecoveryCopy",

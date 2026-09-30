@@ -303,10 +303,9 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
       ]
     },
     {
-      relativePath: "src/ui/connectionBanner.tsx",
+      relativePath: "src/features/realtime/connectionBanner/ConnectionBanner.tsx",
       patterns: [
-        /if \(reduceMotion\) \{[\s\S]*slideAnim\.stopAnimation\(\)[\s\S]*slideAnim\.setValue\(targetValue\)/,
-        /if \(!shouldShow \|\| reduceMotion\) \{[\s\S]*pulseAnim\.stopAnimation\(\)[\s\S]*pulseAnim\.setValue\(1\)/
+        /if \(reduceMotion\) \{[\s\S]*progress\.stopAnimation\(\)[\s\S]*progress\.setValue\(visible \? 1 : 0\)/
       ]
     },
     {
@@ -373,13 +372,21 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
 })
 
 test("connection banner stays compact without covering safe-area content", () => {
+  // Updated 2026-09-30: the full-width strip became a compact pill below the
+  // status bar that overlays the screen without taking touches or shifting
+  // layout, and announces itself once the problem is actually shown.
   const source = readFileSync(
-    resolve(mobileRoot, "src/ui/connectionBanner.tsx"),
+    resolve(mobileRoot, "src/features/realtime/connectionBanner/ConnectionBanner.tsx"),
     "utf8"
   )
 
   assert.match(source, /useSafeAreaInsets\(\)/)
-  assert.match(source, /top: Math\.max\(0, insets\.top - 12\)/)
+  assert.match(source, /top: insets\.top \+ 6/)
+  assert.match(source, /position: "absolute"/)
+  assert.match(source, /pointerEvents="none"/)
+  assert.match(source, /accessibilityLiveRegion=/)
+  assert.match(source, /AccessibilityInfo\.announceForAccessibility\(/)
+  assert.match(source, /maxFontSizeMultiplier=/)
   assert.doesNotMatch(source, /paddingTop:\s*54/)
 })
 
