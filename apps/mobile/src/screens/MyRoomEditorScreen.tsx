@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from "react"
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native"
+import { ScrollView, View } from "react-native"
+import Animated from "react-native-reanimated"
+import { useReducedMotion } from "../ui/animations"
+import { WardrobeGlass } from "../features/avatarV2/wardrobe/WardrobeGlass"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { DEFAULT_ROOM_V2_SHELL_ID } from "../features/roomV2/roomV2Catalog"
@@ -21,10 +24,21 @@ import {
 import { EDIT_ROOM_AVATAR_SPAWN } from "../features/roomV2/editor/roomEditorPlacementModel"
 import {
   getEditRoomWorldStatus,
-  getRoomEditorPlacementStateByRenderId,
-  getRoomEditorSubtitle
+  getRoomEditorPlacementStateByRenderId
 } from "../features/roomV2/editor/roomEditorPresentationModel"
+import {
+  canToggleRoomEditorStageZoom,
+  getRoomEditorCapsuleMode,
+  getRoomEditorHighlightedTrayItemId,
+  getRoomEditorStageFrame
+} from "../features/roomV2/editor/roomEditorDockModel"
+import {
+  ROOM_EDITOR_DOCK_LAYOUT,
+  ROOM_EDITOR_FADE_IN,
+  ROOM_EDITOR_FADE_OUT
+} from "../features/roomV2/editor/roomEditorMotion"
 import { styles } from "../features/roomV2/editor/roomEditorStyles"
+import { useRoomEditorDock } from "../features/roomV2/editor/useRoomEditorDock"
 import { useRoomEditorSelection } from "../features/roomV2/editor/useRoomEditorSelection"
 import { useRoomEditorSession } from "../features/roomV2/editor/useRoomEditorSession"
 import { useRoomEditorStageLayout } from "../features/roomV2/editor/useRoomEditorStageLayout"
@@ -41,18 +55,21 @@ import { RoomEditorTopBar } from "../features/roomV2/editor/RoomEditorTopBar"
 import { RoomEditorPersistenceBanner } from "../features/roomV2/editor/RoomEditorPersistenceBanner"
 import { RoomEditorShellPicker } from "../features/roomV2/editor/RoomEditorShellPicker"
 import { RoomEditorStage } from "../features/roomV2/editor/RoomEditorStage"
+import { RoomEditorStageTools } from "../features/roomV2/editor/RoomEditorStageTools"
+import { RoomEditorStageNotice } from "../features/roomV2/editor/RoomEditorStageNotice"
+import { ROOM_EDITOR_ALL_CATEGORY_IDS } from "../features/roomV2/editor/RoomEditorCategoryTabs"
 import { RoomEditorSelectedItemActions } from "../features/roomV2/editor/RoomEditorSelectedItemActions"
 import { RoomEditorInventoryControls } from "../features/roomV2/editor/RoomEditorInventoryControls"
-import { RoomEditorInventoryPreview } from "../features/roomV2/editor/RoomEditorInventoryPreview"
 import { RoomEditorInventoryList } from "../features/roomV2/editor/RoomEditorInventoryList"
 import { RoomEditorLoadingOverlay } from "../features/roomV2/editor/RoomEditorLoadingOverlay"
 import { RoomEditorDragGhost } from "../features/roomV2/editor/RoomEditorDragGhost"
 
 /**
- * My Room editor route. Composes the editor feature (features/roomV2/editor):
- * session and persistence, owned-furniture tray, stage tap placement,
- * drag-to-move (stage and tray), item actions, Shop placement intents, and
- * confirmed save with exit guard.
+ * My Room editor route ("Yüzen Dock"). Composes the editor feature
+ * (features/roomV2/editor): session and persistence, the edge-to-edge room
+ * with its glass controls and selection capsule, the floating owned-furniture
+ * dock, stage tap placement, drag-to-move (stage and tray), item actions,
+ * Shop placement intents, and confirmed save with exit guard.
  * Hook order is deliberate: effects run in the order the hooks are called.
  */
 export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
@@ -181,21 +198,57 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     selection
   })
 
+  const dock = useRoomEditorDock()
+  const reduceMotion = useReducedMotion()
+  const dockLayout = reduceMotion ? undefined : ROOM_EDITOR_DOCK_LAYOUT
+  const fadeIn = reduceMotion ? undefined : ROOM_EDITOR_FADE_IN
+  const fadeOut = reduceMotion ? undefined : ROOM_EDITOR_FADE_OUT
+
+  const stageAreaInput = {
+    availableWidth: dock.stageArea.width,
+    availableHeight: dock.stageArea.height,
+    aspectRatio: scene.shell
+      ? scene.shell.canvasSize.width / scene.shell.canvasSize.height
+      : 0
+  }
+  const stageFrame = getRoomEditorStageFrame({ ...stageAreaInput, zoom: dock.zoom })
+  const selectedPlacedItemId = draftDecor.placedItems.find(
+    (placedItem) => placedItem.instanceId === selectedInstanceId
+  )?.itemId
+  const selectedInventoryEntry = inventoryState.selectedInventoryEntry
+  const capsuleMode = getRoomEditorCapsuleMode({
+    selectedInstanceId,
+    hasValidPlacementPreview: placementPreview?.isValid === true,
+    pickedTrayItemId: dock.pickedTrayItemId,
+    selectedInventoryEntry,
+    canPlaceSelectedInventoryItem: selectedInventoryEntry
+      ? canPlaceAnotherRoomItem(selectedInventoryEntry.item.id)
+      : false
+  })
+  const selectedRenderItem = displayRenderItems.find(
+    (item) => item.renderId === (selectedInstanceId ?? placementPreview?.item.renderId)
+  )
+  const capsuleItemName = capsuleMode === "tray"
+    ? selectedInventoryEntry?.item.name
+    : selectedRenderItem?.kind === "furniture" ? selectedRenderItem.name : undefined
+  // Every category keeps its tab, owned or not, like the wardrobe.
+  const categoryIds = ROOM_EDITOR_ALL_CATEGORY_IDS
+
+  const { setPickedTrayItemId } = dock
+  const { setSelectedInventoryItemId } = inventoryState
+  const { measureStageWindow } = stage
+  const handlePickTrayItem = useCallback((itemId: string) => {
+    setPickedTrayItemId(itemId)
+    setSelectedInventoryItemId(itemId)
+  }, [setPickedTrayItemId, setSelectedInventoryItemId])
+
   return (
     <View style={styles.root}>
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right", "bottom"]}>
         <RoomEditorTopBar
           copy={copy}
-          subtitle={getRoomEditorSubtitle({
-            copy,
-            placementFeedback,
-            selectedInstanceId,
-            canRotateSelectedPlacedItem: itemActions.canRotateSelectedPlacedItem
-          })}
-          canUndo={editorSession.canUndo}
           isSavingRoom={isSavingRoom}
           onCancel={handleCancel}
-          onUndo={session.handleUndoDraft}
           onSave={handleSave}
         />
 
@@ -207,97 +260,132 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
           />
         ) : null}
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.editorContentFlex}
-        >
+        <View style={styles.editorContentFlex}>
+          {/* The page only scrolls when a short screen or large text needs it. */}
           <ScrollView
             contentContainerStyle={styles.editorContent}
             keyboardShouldPersistTaps="handled"
+            alwaysBounceVertical={false}
             showsVerticalScrollIndicator={false}
+            // Pointer mapping uses the room's window position; refresh it
+            // whenever the page comes to rest somewhere else.
+            onScrollEndDrag={measureStageWindow}
+            onMomentumScrollEnd={measureStageWindow}
             pointerEvents={isRoomDraftReady ? "auto" : "none"}
             accessibilityElementsHidden={!isRoomDraftReady}
             importantForAccessibility={isRoomDraftReady ? "auto" : "no-hide-descendants"}
           >
-        {ACTIVE_ROOM_SHELL_CATALOG.length > 1 ? (
-          <RoomEditorShellPicker
-            copy={copy}
-            shells={ACTIVE_ROOM_SHELL_CATALOG}
-            selectedRoomShellId={draftDecor.roomShellId}
-            onSelectRoomShell={itemActions.handleSelectRoomShell}
-          />
-        ) : null}
+            {ACTIVE_ROOM_SHELL_CATALOG.length > 1 ? (
+              <RoomEditorShellPicker
+                copy={copy}
+                shells={ACTIVE_ROOM_SHELL_CATALOG}
+                selectedRoomShellId={draftDecor.roomShellId}
+                onSelectRoomShell={itemActions.handleSelectRoomShell}
+              />
+            ) : null}
 
-        <RoomEditorStage
-          copy={copy}
-          roomWorldStatus={roomWorldStatus}
-          stageRef={stage.stageRef}
-          selectedInstanceId={selectedInstanceId}
-          onLayout={stage.handleRoomLayout}
-          onPress={gestures.handleFloorTap}
-          dragGesture={drag.stageDragGesture}
-          shell={scene.shell}
-          renderItems={displayRenderItems}
-          placementStateByRenderId={placementStateByRenderId}
-          onItemTap={gestures.handleItemTap}
-        />
+            <Animated.View
+              layout={dockLayout}
+              style={styles.stageRegion}
+              onLayout={dock.handleStageAreaLayout}
+            >
+              <RoomEditorStage
+                copy={copy}
+                frame={stageFrame}
+                stageRef={stage.stageRef}
+                selectedInstanceId={selectedInstanceId}
+                onLayout={stage.handleRoomLayout}
+                onPress={gestures.handleFloorTap}
+                dragGesture={drag.stageDragGesture}
+                shell={scene.shell}
+                renderItems={displayRenderItems}
+                placementStateByRenderId={placementStateByRenderId}
+                onItemTap={gestures.handleItemTap}
+              />
+              <RoomEditorStageNotice
+                placementFeedback={placementFeedback}
+                roomWorldWarning={roomWorldReadiness.level === "ready" ? undefined : roomWorldStatus}
+              />
+              <RoomEditorStageTools
+                copy={copy}
+                canUndo={editorSession.canUndo}
+                zoom={dock.zoom}
+                canToggleZoom={canToggleRoomEditorStageZoom(stageAreaInput)}
+                onUndo={session.handleUndoDraft}
+                onToggleZoom={dock.toggleZoom}
+              />
+              {capsuleMode !== "hidden" && capsuleItemName ? (
+                <Animated.View
+                  entering={fadeIn}
+                  exiting={fadeOut}
+                  style={styles.capsuleSlot}
+                >
+                  <RoomEditorSelectedItemActions
+                    copy={copy}
+                    mode={capsuleMode}
+                    itemName={capsuleItemName}
+                    placementPreview={placementPreview}
+                    selectedInstanceId={selectedInstanceId}
+                    canRotateSelectedPlacedItem={itemActions.canRotateSelectedPlacedItem}
+                    commitTrayPlacementPreview={gestures.commitTrayPlacementPreview}
+                    handleRotate={itemActions.handleRotate}
+                    handleRemoveItem={itemActions.handleRemoveItem}
+                    trayRotation={inventoryState.selectedInventoryRotation}
+                    trayRotations={inventoryState.selectedInventoryRotations}
+                    handleSelectInventoryRotation={itemActions.handleSelectInventoryRotation}
+                    handlePlaceTrayItem={itemActions.handleAddSelectedInventoryItem}
+                  />
+                </Animated.View>
+              ) : null}
+            </Animated.View>
 
-        {placementPreview?.isValid || selectedInstanceId ? (
-          <RoomEditorSelectedItemActions
-            copy={copy}
-            placementPreview={placementPreview}
-            selectedInstanceId={selectedInstanceId}
-            canRotateSelectedPlacedItem={itemActions.canRotateSelectedPlacedItem}
-            commitTrayPlacementPreview={gestures.commitTrayPlacementPreview}
-            handleRotate={itemActions.handleRotate}
-            handleRemoveItem={itemActions.handleRemoveItem}
-          />
-        ) : null}
-
-        <View style={styles.inventoryWrap}>
-          <View style={styles.inventoryHandle} />
-          <RoomEditorInventoryControls
-            copy={copy}
-            editorSession={editorSession}
-            inventoryStatusLabel={inventoryState.inventoryStatusLabel}
-            inventoryStatusFailed={inventoryState.inventoryViewState.isFailed}
-            handleResetDraft={session.handleResetDraft}
-            inventorySearchQuery={inventoryState.inventorySearchQuery}
-            setInventorySearchQuery={inventoryState.setInventorySearchQuery}
-            activeInventoryCategory={inventoryState.activeInventoryCategory}
-            setActiveInventoryCategory={inventoryState.setActiveInventoryCategory}
-          />
-          <RoomEditorInventoryPreview
-            copy={copy}
-            inventoryViewState={inventoryState.inventoryViewState}
-            inventoryStatusLabel={inventoryState.inventoryStatusLabel}
-            selectedInventoryEntry={inventoryState.selectedInventoryEntry}
-            selectedInventoryRotation={inventoryState.selectedInventoryRotation}
-            selectedInventoryRotations={inventoryState.selectedInventoryRotations}
-            selectedInventoryTransition={inventoryState.selectedInventoryTransition}
-            canPlaceAnotherRoomItem={canPlaceAnotherRoomItem}
-            canPlaceInventoryItem={inventoryState.canPlaceInventoryItem}
-            handleSelectInventoryRotation={itemActions.handleSelectInventoryRotation}
-            handleAddSelectedInventoryItem={itemActions.handleAddSelectedInventoryItem}
-          />
-          <RoomEditorInventoryList
-            copy={copy}
-            inventoryViewState={inventoryState.inventoryViewState}
-            inventoryStatusLabel={inventoryState.inventoryStatusLabel}
-            filteredInventoryEntries={inventoryState.filteredInventoryEntries}
-            selectedInventoryEntry={inventoryState.selectedInventoryEntry}
-            selectedInventoryRotation={inventoryState.selectedInventoryRotation}
-            setSelectedInventoryItemId={inventoryState.setSelectedInventoryItemId}
-            canPlaceAnotherRoomItem={canPlaceAnotherRoomItem}
-            createInventoryItemDragGesture={drag.createTrayDragGesture}
-            onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
-          />
-        </View>
+            <Animated.View layout={dockLayout}>
+              <WardrobeGlass
+                tone="panel"
+                radius={30}
+                style={styles.dockShell}
+                contentStyle={styles.dockContent}
+              >
+                <RoomEditorInventoryControls
+                  copy={copy}
+                  editorSession={editorSession}
+                  isExpanded={dock.isExpanded}
+                  onToggleExpanded={dock.toggleExpanded}
+                  categoryIds={categoryIds}
+                  inventoryEntryCount={inventoryState.inventoryEntries.length}
+                  inventoryStatusLabel={inventoryState.inventoryStatusLabel}
+                  inventoryStatusFailed={inventoryState.inventoryViewState.isFailed}
+                  inventoryStatusLoading={inventoryState.inventoryViewState.isLoading}
+                  handleResetDraft={session.handleResetDraft}
+                  activeInventoryCategory={inventoryState.activeInventoryCategory}
+                  setActiveInventoryCategory={inventoryState.setActiveInventoryCategory}
+                />
+                <RoomEditorInventoryList
+                  copy={copy}
+                  isExpanded={dock.isExpanded}
+                  filterKey={inventoryState.activeInventoryCategory}
+                  inventoryViewState={inventoryState.inventoryViewState}
+                  inventoryStatusLabel={inventoryState.inventoryStatusLabel}
+                  filteredInventoryEntries={inventoryState.filteredInventoryEntries}
+                  highlightedItemId={getRoomEditorHighlightedTrayItemId({
+                    selectedInventoryItemId: selectedInventoryEntry?.item.id,
+                    selectedPlacedItemId,
+                    pickedTrayItemId: dock.pickedTrayItemId
+                  })}
+                  selectedInventoryEntry={selectedInventoryEntry}
+                  selectedInventoryRotation={inventoryState.selectedInventoryRotation}
+                  setSelectedInventoryItemId={handlePickTrayItem}
+                  canPlaceAnotherRoomItem={canPlaceAnotherRoomItem}
+                  createInventoryItemDragGesture={drag.createTrayDragGesture}
+                  onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
+                />
+              </WardrobeGlass>
+            </Animated.View>
           </ScrollView>
           {!isRoomDraftReady ? (
             <RoomEditorLoadingOverlay copy={copy} />
           ) : null}
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
       <RoomEditorDragGhost ghost={drag.ghost} values={drag.ghostValues} />
     </View>

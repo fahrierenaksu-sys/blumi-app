@@ -4,7 +4,8 @@ import { memo, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
 import { GestureDetector, type PanGesture } from "react-native-gesture-handler"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
-import { styles } from "./roomEditorStyles"
+import { resolveRoomV2InventoryPreviewSource } from "./roomEditorPlacementModel"
+import { roomEditorTheme, styles } from "./roomEditorStyles"
 
 /** One tray card: tap to preview, touch and hold then drag onto the stage to place. */
 export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
@@ -12,6 +13,7 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   owned: boolean
   placed: boolean
   selected: boolean
+  width: number
   previewRotation: PlacedRoomItem["rotation"]
   trayDragHint: string
   onPreviewItem: (itemId: string) => void
@@ -27,6 +29,7 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
     owned,
     placed,
     selected,
+    width,
     previewRotation,
     trayDragHint,
     onPreviewItem,
@@ -39,7 +42,7 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   )
 
   return (
-    <View style={styles.inventoryItemContainer}>
+    <View style={[styles.inventoryItemContainer, { width }]}>
       <GestureDetector gesture={dragGesture}>
         <Pressable
           accessibilityRole="button"
@@ -51,13 +54,12 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
           style={({ pressed }) => [
             styles.inventoryItem,
             !owned ? styles.inventoryItemLocked : null,
-            placed ? styles.inventoryItemPlaced : null,
-            selected && !placed ? styles.inventoryItemSelected : null,
+            selected ? styles.inventoryItemSelected : null,
             pressed && owned && !placed ? styles.inventoryItemPressed : null
           ]}
         >
           <ExpoImage
-            source={item.asset.source}
+            source={resolveRoomV2InventoryPreviewSource(item, previewRotation)}
             style={styles.inventoryItemImage}
             contentFit="contain"
             cachePolicy="memory-disk"
@@ -65,17 +67,22 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
           />
           {!owned ? (
             <View style={styles.inventoryItemLock}>
-              <Ionicons name="lock-closed" size={14} color="#FFFFFF" />
+              <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
             </View>
-          ) : null}
-          {placed ? (
-            <View style={styles.inventoryItemPlacedMark}>
-              <Ionicons name="checkmark" size={13} color="#07130E" />
+          ) : selected ? (
+            <View style={styles.inventoryItemCheck}>
+              <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+            </View>
+          ) : placed ? (
+            <View style={[styles.inventoryItemCheck, styles.inventoryItemPlacedMark]}>
+              <Ionicons name="checkmark" size={12} color={roomEditorTheme.accent} />
             </View>
           ) : null}
         </Pressable>
       </GestureDetector>
-      <Text numberOfLines={1} style={styles.inventoryItemName}>{item.name}</Text>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.inventoryItemName}>
+        {item.name}
+      </Text>
     </View>
   )
 }, (previous, next) =>
@@ -83,6 +90,7 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   previous.owned === next.owned &&
   previous.placed === next.placed &&
   previous.selected === next.selected &&
+  previous.width === next.width &&
   previous.previewRotation === next.previewRotation &&
   previous.trayDragHint === next.trayDragHint &&
   previous.onPreviewItem === next.onPreviewItem &&

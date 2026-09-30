@@ -105,7 +105,12 @@ export interface MyRoomEditorCopy {
   retrySync: string
   roomStyle: string
   collectionTitle: string
+  showAllPieces: string
+  showFewerPieces: string
+  zoomRoomIn: string
+  zoomRoomOut: string
   resetLayout: string
+  resetLayoutShort: string
   searchLabel: string
   searchHint: string
   searchPlaceholder: string
@@ -129,6 +134,7 @@ export interface MyRoomEditorCopy {
   categoryLabels: Record<"all" | "seating" | "table" | "rug" | "misc" | "lighting" | "wallDecor" | "plant", string>
   rotationLabels: Record<"front" | "right" | "back" | "left", string>
   piecesReady: (count: number) => string
+  trayPage: (page: number, pageCount: number) => string
   chooseShell: (name: string) => string
   showCategory: (label: string) => string
   previewItem: (name: string) => string
@@ -187,8 +193,13 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     saving: "Saving…",
     retrySync: "Retry room sync",
     roomStyle: "Room style",
-    collectionTitle: "Your collection",
+    collectionTitle: "My pieces",
+    showAllPieces: "All pieces",
+    showFewerPieces: "Show less",
+    zoomRoomIn: "Zoom in on the room",
+    zoomRoomOut: "Show the whole room",
     resetLayout: "Reset layout",
+    resetLayoutShort: "Reset",
     searchLabel: "Search room pieces",
     searchHint: "Filters room pieces by name",
     searchPlaceholder: "Search pieces",
@@ -212,6 +223,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     categoryLabels: { all: "All", seating: "Seating", table: "Tables", rug: "Rugs", misc: "Media", lighting: "Lighting", wallDecor: "Walls", plant: "Decor" },
     rotationLabels: { front: "Front", right: "Right", back: "Back", left: "Left" },
     piecesReady: (count) => `${count} pieces ready to place`,
+    trayPage: (page, pageCount) => `Page ${page} of ${pageCount}`,
     chooseShell: (name) => `Choose ${name}`,
     showCategory: (label) => `Show ${label} room pieces`,
     previewItem: (name) => `${name} preview`,
@@ -257,7 +269,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     }
   },
   tr: {
-    title: "Odanı düzenle",
+    title: "Odamı düzenle",
     cancel: "Oda düzenlemeyi kapat",
     undo: "Son oda değişikliğini geri al",
     confirmPlacement: "Yerleşimi onayla",
@@ -268,8 +280,13 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     saving: "Kaydediliyor…",
     retrySync: "Odayı yeniden eşitle",
     roomStyle: "Oda stili",
-    collectionTitle: "Koleksiyonun",
+    collectionTitle: "Eşyalarım",
+    showAllPieces: "Tüm eşyalar",
+    showFewerPieces: "Küçült",
+    zoomRoomIn: "Odayı yakınlaştır",
+    zoomRoomOut: "Odanın tamamını göster",
     resetLayout: "Düzeni sıfırla",
+    resetLayoutShort: "Sıfırla",
     searchLabel: "Oda eşyalarında ara",
     searchHint: "Eşyaları adına göre filtreler",
     searchPlaceholder: "Eşya ara",
@@ -290,9 +307,10 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     fixedSubtitle: "Taşımak için sürükle · sonra kaydet",
     defaultInspectorHint: "Odaya sürükle · yönünü seç",
     seatInspectorHint: "Oturmak için öne çevir · taşımak için sürükle",
-    categoryLabels: { all: "Tümü", seating: "Koltuklar", table: "Masalar", rug: "Halılar", misc: "Medya", lighting: "Aydınlatma", wallDecor: "Duvar", plant: "Dekor" },
+    categoryLabels: { all: "Tümü", seating: "Oturma", table: "Masa", rug: "Halı", misc: "Medya", lighting: "Işık", wallDecor: "Duvar", plant: "Dekor" },
     rotationLabels: { front: "Ön", right: "Sağ", back: "Arka", left: "Sol" },
     piecesReady: (count) => `Yerleştirmeye hazır ${count} eşya`,
+    trayPage: (page, pageCount) => `Sayfa ${page} / ${pageCount}`,
     chooseShell: (name) => `${name} odasını seç`,
     showCategory: (label) => `${label} eşyalarını göster`,
     previewItem: (name) => `${name} önizlemesi`,

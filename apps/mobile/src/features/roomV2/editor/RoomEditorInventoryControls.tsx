@@ -1,59 +1,102 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native"
-import { hapticLight } from "../../../ui/haptics"
+import { Pressable, Text, View } from "react-native"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { RoomV2EditorSession } from "../roomV2EditorSession"
+import { RoomEditorCategoryTabs } from "./RoomEditorCategoryTabs"
 import type { RoomEditorInventoryCategoryId } from "./roomEditorPresentationModel"
+import { wardrobeV2Styles as wardrobeStyles } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import { styles } from "./roomEditorStyles"
 
-const ROOM_EDITOR_CATEGORIES: readonly {
-  id: RoomEditorInventoryCategoryId
-  icon: keyof typeof Ionicons.glyphMap
-}[] = [
-  { id: "all", icon: "apps-outline" },
-  { id: "seating", icon: "cafe-outline" },
-  { id: "table", icon: "grid-outline" },
-  { id: "rug", icon: "color-filter-outline" },
-  { id: "misc", icon: "tv-outline" },
-  { id: "lighting", icon: "bulb-outline" },
-  { id: "wallDecor", icon: "images-outline" },
-  { id: "plant", icon: "leaf-outline" }
-]
-
-/** Collection header with reset, the tray search field, and the category rail. */
+/**
+ * Dock header, in the wardrobe panel's order: the category tabs, after the
+ * compact/all capsule, then the collection title with its piece count and a
+ * small Reset layout control. A failed ownership check is the only status text.
+ */
 export function RoomEditorInventoryControls(props: {
   copy: MyRoomEditorCopy
   editorSession: RoomV2EditorSession
+  isExpanded: boolean
+  onToggleExpanded: () => void
+  categoryIds: readonly RoomEditorInventoryCategoryId[]
+  inventoryEntryCount: number
   inventoryStatusLabel: string
   inventoryStatusFailed: boolean
+  inventoryStatusLoading: boolean
   handleResetDraft: () => void
-  inventorySearchQuery: string
-  setInventorySearchQuery: (query: string) => void
   activeInventoryCategory: RoomEditorInventoryCategoryId
   setActiveInventoryCategory: (category: RoomEditorInventoryCategoryId) => void
 }) {
   const {
     copy,
     editorSession,
+    isExpanded,
+    onToggleExpanded,
+    categoryIds,
+    inventoryEntryCount,
     inventoryStatusLabel,
     inventoryStatusFailed,
+    inventoryStatusLoading,
     handleResetDraft,
-    inventorySearchQuery,
-    setInventorySearchQuery,
     activeInventoryCategory,
     setActiveInventoryCategory
   } = props
   return (
     <>
+      {/* The wardrobe's capsule: compact collection on the left, everything on the right. */}
+      <View style={wardrobeStyles.sectionSwitcher}>
+        {[false, true].map((expanded) => {
+          const active = expanded === isExpanded
+          const label = expanded ? copy.showAllPieces : copy.collectionTitle
+          return (
+            <Pressable
+              key={expanded ? "all" : "compact"}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: active, expanded: isExpanded }}
+              onPress={active ? undefined : onToggleExpanded}
+              style={[
+                wardrobeStyles.sectionButton,
+                active ? wardrobeStyles.sectionButtonActive : null
+              ]}
+            >
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={[
+                  wardrobeStyles.sectionButtonText,
+                  active ? wardrobeStyles.sectionButtonTextActive : null
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+      <RoomEditorCategoryTabs
+        copy={copy}
+        categoryIds={categoryIds}
+        activeInventoryCategory={activeInventoryCategory}
+        setActiveInventoryCategory={setActiveInventoryCategory}
+      />
       <View style={styles.inventoryHeader}>
-        <View>
-          <Text style={styles.inventoryTitle}>{copy.collectionTitle}</Text>
-          <Text style={[
-            styles.inventoryEyebrow,
-            inventoryStatusFailed ? styles.inventoryStatusFailed : null
-          ]}>
-            {inventoryStatusLabel}
+        <View style={styles.inventoryTitleRow}>
+          <Text
+            accessibilityRole="header"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
+            style={styles.inventoryTitle}
+          >
+            {copy.collectionTitle}
           </Text>
+          {!inventoryStatusLoading && !inventoryStatusFailed ? (
+            <Text
+              accessibilityLabel={inventoryStatusLabel}
+              maxFontSizeMultiplier={1.3}
+              style={styles.inventoryCount}
+            >
+              {inventoryEntryCount}
+            </Text>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -63,76 +106,22 @@ export function RoomEditorInventoryControls(props: {
           }}
           disabled={!editorSession.canResetToPersistedBaseline}
           onPress={handleResetDraft}
-          hitSlop={8}
+          hitSlop={12}
+          style={({ pressed }) => [
+            pressed ? styles.controlPressed : null,
+            !editorSession.canResetToPersistedBaseline ? styles.controlDisabled : null
+          ]}
         >
-          <Text style={[
-            styles.inventorySubtitle,
-            !editorSession.canResetToPersistedBaseline
-              ? styles.inventorySubtitleDisabled
-              : null
-          ]}>{copy.resetLayout}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.dockToggleText}>
+            {copy.resetLayoutShort}
+          </Text>
         </Pressable>
       </View>
-      <View style={styles.inventorySearchField}>
-        <Ionicons name="search-outline" size={17} color="#967A8C" />
-        <TextInput
-          accessibilityLabel={copy.searchLabel}
-          accessibilityHint={copy.searchHint}
-          value={inventorySearchQuery}
-          onChangeText={setInventorySearchQuery}
-          placeholder={copy.searchPlaceholder}
-          placeholderTextColor="#A991A2"
-          returnKeyType="done"
-          style={styles.inventorySearchInput}
-        />
-        {inventorySearchQuery ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.clearSearch}
-            onPress={() => setInventorySearchQuery("")}
-            hitSlop={8}
-            style={styles.inventorySearchClear}
-          >
-            <Ionicons name="close-circle" size={18} color="#8B6F82" />
-          </Pressable>
-        ) : null}
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRail}
-      >
-        {ROOM_EDITOR_CATEGORIES.map((category) => {
-          const selected = activeInventoryCategory === category.id
-          const categoryLabel = copy.categoryLabels[category.id]
-          return (
-            <Pressable
-              key={category.id}
-              accessibilityRole="button"
-              accessibilityLabel={copy.showCategory(categoryLabel)}
-              accessibilityState={{ selected }}
-              onPress={() => {
-                hapticLight()
-                setActiveInventoryCategory(category.id)
-              }}
-              style={[
-                styles.categoryChip,
-                selected ? styles.categoryChipSelected : null
-              ]}
-            >
-              <Ionicons
-                name={category.icon}
-                size={14}
-                color={selected ? "#FFFFFF" : "#806579"}
-              />
-              <Text style={[
-                styles.categoryChipText,
-                selected ? styles.categoryChipTextSelected : null
-              ]}>{categoryLabel}</Text>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
+      {inventoryStatusFailed ? (
+        <Text style={[styles.inventoryStatus, styles.inventoryStatusFailed]}>
+          {inventoryStatusLabel}
+        </Text>
+      ) : null}
     </>
   )
 }

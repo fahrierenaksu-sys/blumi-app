@@ -1,68 +1,61 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Pressable, Text, View } from "react-native"
+import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
-import { styles } from "./roomEditorStyles"
+import { roomEditorTheme, styles } from "./roomEditorStyles"
 
-/** Cancel, title with live placement guidance, undo, and Save. */
+/** Close, the small title, and the rose Save capsule shared with the wardrobe. */
 export function RoomEditorTopBar(props: {
   copy: MyRoomEditorCopy
-  subtitle: string
-  canUndo: boolean
   isSavingRoom: boolean
   onCancel: () => void
-  onUndo: () => void
   onSave: () => void
 }) {
-  const { copy, subtitle, canUndo, isSavingRoom, onCancel, onUndo, onSave } = props
+  const { copy, isSavingRoom, onCancel, onSave } = props
   return (
     <View style={styles.topBar}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={copy.cancel}
         onPress={onCancel}
+        style={({ pressed }) => (pressed ? styles.controlPressed : null)}
+        hitSlop={8}
+      >
+        <WardrobeGlass
+          tone="control"
+          radius={20}
+          style={styles.closeButton}
+          contentStyle={styles.glassControl}
+        >
+          <Ionicons name="close" size={20} color={roomEditorTheme.ink} />
+        </WardrobeGlass>
+      </Pressable>
+      <Text
+        accessibilityRole="header"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+        style={styles.title}
+      >
+        {copy.title}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={copy.saveLayout}
+        accessibilityState={{ disabled: isSavingRoom, busy: isSavingRoom }}
+        disabled={isSavingRoom}
+        onPress={onSave}
         style={({ pressed }) => [
-          styles.cancelButton,
-          pressed ? styles.iconButtonPressed : null
+          pressed ? styles.controlPressed : null,
+          isSavingRoom ? styles.controlDisabled : null
         ]}
         hitSlop={8}
       >
-        <Ionicons name="close" size={24} color="#5B3A52" />
-      </Pressable>
-      <View style={styles.titleBlock}>
-        <Text style={styles.title}>{copy.title}</Text>
-        <Text style={styles.subtitle}>
-          {subtitle}
-        </Text>
-      </View>
-      <View style={styles.topActions}>
-        {canUndo ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.undo}
-            onPress={onUndo}
-            style={styles.actionButton}
-            hitSlop={8}
-          >
-            <Ionicons name="arrow-undo" size={20} color="#7C5870" />
-          </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.saveLayout}
-          accessibilityState={{ disabled: isSavingRoom }}
-          disabled={isSavingRoom}
-          onPress={onSave}
-          style={({ pressed }) => [
-            styles.saveButton,
-            pressed && styles.saveButtonPressed
-          ]}
-          hitSlop={8}
-        >
-          <Text style={styles.saveButtonText}>
+        <View style={styles.saveButton}>
+          <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.saveButtonText}>
             {isSavingRoom ? copy.saving : copy.save}
           </Text>
-        </Pressable>
-      </View>
+        </View>
+      </Pressable>
     </View>
   )
 }

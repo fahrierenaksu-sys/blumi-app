@@ -25,7 +25,6 @@ const editorTopBarSource = readEditorModule("RoomEditorTopBar.tsx")
 const editorStageSource = readEditorModule("RoomEditorStage.tsx")
 const editorSelectedActionsSource = readEditorModule("RoomEditorSelectedItemActions.tsx")
 const editorInventoryControlsSource = readEditorModule("RoomEditorInventoryControls.tsx")
-const editorInventoryPreviewSource = readEditorModule("RoomEditorInventoryPreview.tsx")
 const editorInventoryListSource = readEditorModule("RoomEditorInventoryList.tsx")
 const editorInventoryCardSource = readEditorModule("InventoryCatalogCard.tsx")
 // Screen plus every production editor module, for surface-wide negative checks.
@@ -84,7 +83,6 @@ test("the editor screen composes the room editor feature modules", () => {
     "RoomEditorStage",
     "RoomEditorSelectedItemActions",
     "RoomEditorInventoryControls",
-    "RoomEditorInventoryPreview",
     "RoomEditorInventoryList",
     "RoomEditorLoadingOverlay"
   ]) {
@@ -138,16 +136,18 @@ test("Save commits the latest valid preview before validating and persisting the
   assert.match(editorCopySource, /moveHighlighted:\s*"Move the highlighted item before saving\."/)
 })
 
-test("room editor catalog supports selecting, searching, rotating, and explicitly placing a room piece", () => {
-  assert.match(editorInventoryHookSource, /const \[inventorySearchQuery, setInventorySearchQuery\] = useState\(""\)/)
-  assert.match(editorInventoryControlsSource, /accessibilityLabel=\{copy\.searchLabel\}/)
-  assert.match(editorCopySource, /searchLabel:\s*"Search room pieces"/)
+test("room editor catalog supports selecting, rotating, and explicitly placing a room piece", () => {
+  // The floating dock has no search field (no keyboard over the room):
+  // pieces are reached through the category tabs and sideways paging.
+  assert.doesNotMatch(editorSurfaceSource, /<TextInput/)
+  assert.doesNotMatch(editorSource, /KeyboardAvoidingView/)
   assert.match(editorInventoryListSource, /onPreviewItem=\{setSelectedInventoryItemId\}/)
   assert.match(editorInventoryCardSource, /accessibilityLabel={`Preview \${item\.name}`}/)
-  assert.match(editorInventoryPreviewSource, /accessibilityLabel=\{copy\.chooseRotation\(copy\.rotationLabels\[rotation\], selectedInventoryEntry\.item\.name\)\}/)
-  assert.match(editorInventoryPreviewSource, /accessibilityLabel=\{copy\.placeItem\(selectedInventoryEntry\.item\.name\)\}/)
+  assert.match(editorSelectedActionsSource, /accessibilityLabel=\{copy\.chooseRotation\(copy\.rotationLabels\[nextTrayRotation\], itemName\)\}/)
+  assert.match(editorSelectedActionsSource, /accessibilityLabel=\{copy\.placeItem\(itemName\)\}/)
+  assert.match(editorSource, /handlePlaceTrayItem=\{itemActions\.handleAddSelectedInventoryItem\}/)
   assert.match(editorItemActionsSource, /addDraftItem\(\s*selectedInventoryEntry\.item\.id,\s*true,\s*selectedInventoryRotation\s*\)/)
-  assert.match(editorInventoryPreviewSource, /resolveRoomV2InventoryPreviewSource\(\s*selectedInventoryEntry\.item,\s*selectedInventoryRotation\s*\)/)
+  assert.match(editorInventoryCardSource, /resolveRoomV2InventoryPreviewSource\(item, previewRotation\)/)
   assert.match(editorPlacementModelSource, /rotation: input\.rotation/)
   assert.match(editorInventoryCardSource, /createDragGesture\(item, owned, placed, previewRotation\)/)
 })
@@ -162,8 +162,12 @@ test("direction buttons persist an exact valid rotation for the selected placed 
     /patchRoomV2PlacedItem\(current, selectedInstanceId, \{ rotation \}\)/
   )
   assert.match(
-    editorInventoryPreviewSource,
-    /onPress=\{\(\) => handleSelectInventoryRotation\(rotation\)\}/
+    editorSelectedActionsSource,
+    /onPress=\{\(\) => handleSelectInventoryRotation\(nextTrayRotation\)\}/
+  )
+  assert.match(
+    editorSource,
+    /handleSelectInventoryRotation=\{itemActions\.handleSelectInventoryRotation\}/
   )
   assert.match(
     editorItemActionsSource,
@@ -203,8 +207,11 @@ test("passive Shop placement intents do not surface a duplicate-placement error"
 })
 
 test("editor keeps controls reachable on short screens and only rotates through supplied asset views", () => {
-  assert.match(editorSource, /<KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === "ios" \? "padding" : undefined\}/)
   assert.match(editorSource, /<ScrollView[\s\S]*keyboardShouldPersistTaps="handled"/)
+  // The tray direction control offers only the piece's supplied asset views.
+  assert.match(editorSelectedActionsSource, /getNextRoomEditorTrayRotation\(trayRotations, trayRotation\)/)
+  assert.match(editorSource, /trayRotations=\{inventoryState\.selectedInventoryRotations\}/)
+  assert.match(editorInventoryHookSource, /getRoomV2FurnitureRotationOptions\(selectedInventoryEntry\.item\)/)
   assert.match(editorItemActionsSource, /const rotationOptions = getRoomV2FurnitureRotationOptions\(furnitureItem\)/)
   assert.match(editorItemActionsSource, /rotationOptions\[\(currentRotationIndex \+ 1\) % rotationOptions\.length\]/)
   assert.match(editorItemActionsSource, /const canRotateSelectedPlacedItem = hasMultipleRoomV2RotationOptions/)
@@ -212,29 +219,34 @@ test("editor keeps controls reachable on short screens and only rotates through 
 })
 
 test("selected room furniture has a named primary placement action instead of an ambiguous add control", () => {
-  assert.match(editorInventoryPreviewSource, /<Text style=\{styles\.selectedInventoryEyebrow\}>\{copy\.nowEditing\}<\/Text>/)
-  assert.match(editorInventoryPreviewSource, /styles\.placeSelectedInventoryButtonText[\s\S]*>\{copy\.placeInRoom\}<\/Text>/)
+  assert.match(
+    editorSelectedActionsSource,
+    /\{mode === "tray" \? \(\s*<Pressable[\s\S]*?accessibilityLabel=\{copy\.placeItem\(itemName\)\}[\s\S]*?\{copy\.placeInRoom\}/
+  )
 })
 
-test("the direction rail stays tappable instead of sitting underneath the placement CTA", () => {
-  assert.match(editorInventoryPreviewSource, /<View style=\{styles\.selectedInventoryContentRow\}>/)
+test("the tray direction control and Place sit side by side in the capsule, not in the dock", () => {
   assert.match(
-    editorInventoryPreviewSource,
-    /\{canPlaceAnotherRoomItem\(selectedInventoryEntry\.item\.id\) \? \(\s*<Pressable[\s\S]*>\{copy\.placeInRoom\}<\/Text>[\s\S]*<\/Pressable>\s*\) : null\}/
+    editorSelectedActionsSource,
+    /\{nextTrayRotation \? \(\s*<Pressable[\s\S]*?<\/Pressable>\s*\) : null\}\s*\{mode === "tray" \? \(/
   )
-  assert.match(
-    editorStylesSource,
-    /selectedInventoryPreview: \{[\s\S]*flexDirection: "column"[\s\S]*alignItems: "stretch"/
-  )
+  assert.doesNotMatch(editorSource, /RoomEditorInventoryPreview/)
 })
 
 test("editor uses the room-first collection hierarchy instead of the legacy decorate header", () => {
-  assert.match(editorTopBarSource, /<Text style=\{styles\.title\}>\{copy\.title\}<\/Text>/)
-  assert.match(editorInventoryControlsSource, /<Text style=\{styles\.inventoryTitle\}>\{copy\.collectionTitle\}<\/Text>/)
-  assert.match(editorSource, /<View style=\{styles\.inventoryHandle\} \/>/)
-  assert.match(editorInventoryPreviewSource, /copy\.defaultInspectorHint/)
-  assert.match(editorInventoryPreviewSource, /copy\.seatInspectorHint/)
-  assert.match(editorInventoryPreviewSource, />\{copy\.placeInRoom\}<\/Text>/)
+  assert.match(editorTopBarSource, /<Text[^>]*style=\{styles\.title\}\s*>\s*\{copy\.title\}\s*<\/Text>/)
+  assert.match(editorInventoryControlsSource, /<Text[^>]*style=\{styles\.inventoryTitle\}\s*>\s*\{copy\.collectionTitle\}\s*<\/Text>/)
+  // "Yüzen Dock": the collection lives in one floating glass panel under the
+  // room (no sheet handle): header, category tabs and cards only.
+  assert.match(
+    editorSource,
+    /<WardrobeGlass\s+tone="panel"[\s\S]*?<RoomEditorInventoryControls[\s\S]*?\/>\s*<RoomEditorInventoryList/
+  )
+  // The compact/all capsule replaces the old text toggle.
+  assert.match(editorInventoryControlsSource, /expanded \? copy\.showAllPieces : copy\.collectionTitle/)
+  assert.match(editorInventoryControlsSource, /onPress=\{active \? undefined : onToggleExpanded\}/)
+  assert.match(editorStylesSource, /dockShell: \{[\s\S]*?borderRadius: 30/)
+  assert.match(editorSelectedActionsSource, /\{copy\.placeInRoom\}/)
   assert.doesNotMatch(editorSurfaceSource, />Decorate<\/Text>/)
 })
 

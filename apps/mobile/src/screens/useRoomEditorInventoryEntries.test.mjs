@@ -122,16 +122,17 @@ test("room inventory distinguishes slow, failed, truly empty, and filtered state
 test("room inventory keeps fixed-size loading placeholders instead of exposing partial fallback entries", () => {
   const screen = readFileSync(resolve(directory, "MyRoomEditorScreen.tsx"), "utf8")
   const inventoryHook = readEditorModule("useRoomEditorInventory.ts")
-  const inventoryPreview = readEditorModule("RoomEditorInventoryPreview.tsx")
   const inventoryList = readEditorModule("RoomEditorInventoryList.tsx")
   const editorStyles = readEditorModule("roomEditorStyles.ts")
-  assert.match(screen, /<RoomEditorInventoryPreview[\s\S]*?inventoryViewState=\{inventoryState\.inventoryViewState\}/)
   assert.match(screen, /<RoomEditorInventoryList[\s\S]*?inventoryViewState=\{inventoryState\.inventoryViewState\}/)
   assert.match(inventoryHook, /getRoomEditorInventoryViewState\(/)
-  assert.match(inventoryList, /inventoryViewState\.isLoading\s*\?\s*\[\]\s*:\s*filteredInventoryEntries/)
+  assert.match(inventoryList, /inventoryViewState\.isLoading\s*\?\s*\[\]\s*:\s*filteredInventoryEntries\)/)
   assert.match(inventoryList, /inventoryViewState\.isLoading\s*\?\s*\(/)
-  assert.match(inventoryPreview, /inventoryViewState\.isLoading\s*\?\s*\([\s\S]*?styles\.inventoryLoadingPreview[\s\S]*?: selectedInventoryEntry \?\s*\(/)
-  assert.match(editorStyles, /inventoryLoadingCard:\s*\{[\s\S]*?width:\s*72,[\s\S]*?height:\s*52/)
+  // The dock has no inspector: while ownership hydrates the header shows no count.
+  assert.match(readEditorModule("RoomEditorInventoryControls.tsx"), /!inventoryStatusLoading && !inventoryStatusFailed \? \(/)
+  // Placeholders share the tray card's fixed art height (three per row).
+  assert.match(editorStyles, /inventoryLoadingCard:\s*\{\s*height:\s*ROOM_EDITOR_CARD_ART_HEIGHT/)
+  assert.match(editorStyles, /inventoryItem:\s*\{\s*height:\s*ROOM_EDITOR_CARD_ART_HEIGHT/)
   assert.match(inventoryList, /inventoryViewState\.emptyState === "no-pieces"/)
   assert.match(inventoryList, /: inventoryStatusLabel/)
 })

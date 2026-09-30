@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Text, View } from "react-native"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
-import { styles } from "./roomEditorStyles"
+import { roomEditorTheme, styles } from "./roomEditorStyles"
 
 /** Blocks the editor with a progress state until persisted decor hydrates. */
 export function RoomEditorLoadingOverlay(props: { copy: MyRoomEditorCopy }) {
@@ -13,7 +13,7 @@ export function RoomEditorLoadingOverlay(props: { copy: MyRoomEditorCopy }) {
       accessibilityLabel={copy.preparing}
       style={styles.roomLoadingOverlay}
     >
-      <Ionicons name="sparkles-outline" size={20} color="#7C5870" />
+      <Ionicons name="sparkles-outline" size={20} color={roomEditorTheme.muted} />
       <Text style={styles.roomLoadingOverlayText}>{copy.preparing}</Text>
     </View>
   )

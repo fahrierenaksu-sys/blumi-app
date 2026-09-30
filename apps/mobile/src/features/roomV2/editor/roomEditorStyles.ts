@@ -1,133 +1,143 @@
 import { StyleSheet } from "react-native"
+import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import { uiTheme } from "../../../ui/theme"
 
-/** My Room editor styles, moved verbatim from MyRoomEditorScreen. */
+
+/**
+ * My Room editor styles ("Yüzen Dock"): the Wardrobe's powder-pink to
+ * lavender tokens, an edge-to-edge room, and a floating glass inventory dock.
+ */
+export const roomEditorTheme = {
+  ink: wardrobeTheme.ink,
+  muted: wardrobeTheme.muted,
+  accent: wardrobeTheme.accent,
+  hairline: wardrobeTheme.hairline,
+  edge: wardrobeTheme.edge,
+  shadow: wardrobeTheme.shadow,
+  screenBase: wardrobeTheme.screenBase,
+  screenGradient: wardrobeTheme.screenGradient,
+  cardSelectedBase: wardrobeTheme.cardSelectedBase,
+  cardSelectedGradient: wardrobeTheme.cardSelectedGradient,
+  /** Product cards share the wardrobe's powder-lilac surface. */
+  cardBase: wardrobeTheme.cardBase,
+  cardGradient: wardrobeTheme.cardGradient
+} as const
+
+export const ROOM_EDITOR_DOCK_MARGIN = 12
+export const ROOM_EDITOR_DOCK_PADDING = 14
+export const ROOM_EDITOR_DOCK_GRID_GAP = 8
+export const ROOM_EDITOR_CARD_ART_HEIGHT = 92
+/** The room keeps at least this much height; the page scrolls below it. */
+export const ROOM_EDITOR_STAGE_MIN_HEIGHT = 230
+
+const CONTROL_SURFACE = "rgba(255,255,255,0.72)"
+const SOFT_ROSE = "#F8EAF0"
+
 export const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FCEAF2"
+    backgroundColor: roomEditorTheme.screenBase,
+    experimental_backgroundImage: roomEditorTheme.screenGradient
   },
   safe: {
-    flex: 1,
-    paddingHorizontal: uiTheme.spacing.lg
+    flex: 1
   },
   editorContentFlex: {
     flex: 1
   },
   editorContent: {
-    flexGrow: 1,
-    paddingBottom: uiTheme.spacing.lg
+    flexGrow: 1
   },
   roomLoadingOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
-    backgroundColor: "rgba(255, 250, 248, 0.78)",
+    backgroundColor: "rgba(251,241,246,0.84)",
     gap: 8,
     justifyContent: "center"
   },
   roomLoadingOverlayText: {
-    color: "#6D4D61",
-    fontFamily: "Nunito_700Bold",
-    fontSize: 14
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    lineHeight: 20
   },
+
+  // Header
   topBar: {
+    minHeight: 52,
+    zIndex: 3,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingTop: uiTheme.spacing.sm,
-    paddingBottom: 10
+    gap: 12,
+    paddingHorizontal: 16
   },
-  cancelButton: {
-    width: 40,
-    minHeight: 44,
-    minWidth: 44,
+  glassControl: {
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.82)",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(233,169,199,0.42)",
-    shadowColor: "#D9A0BF",
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2
+    justifyContent: "center"
   },
-  actionButton: {
+  closeButton: {
+    width: 40,
     height: 40,
-    width: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.84)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(233,169,199,0.42)"
+    borderRadius: 20
   },
-  iconButtonPressed: {
-    opacity: 0.76,
-    transform: [{ scale: 0.94 }]
+  controlPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }]
+  },
+  controlDisabled: {
+    opacity: 0.4
+  },
+  title: {
+    flex: 1,
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.5
   },
   saveButton: {
-    paddingHorizontal: 17,
-    height: 40,
+    minWidth: 84,
+    minHeight: 40,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF5F9D",
-    borderRadius: 20,
-    shadowColor: "#FF4F98",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4
-  },
-  saveButtonPressed: {
-    transform: [{ scale: 0.96 }],
-    opacity: 0.9
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    // Same solid primary pink as the wardrobe's Save.
+    backgroundColor: uiTheme.colors.primary,
+    shadowColor: uiTheme.colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3
   },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 0
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    lineHeight: 20
   },
-  titleBlock: {
-    flex: 1
-  },
-  topActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7
-  },
-  title: {
-    color: "#35213A",
-    ...uiTheme.font.heading,
-    fontWeight: "900"
-  },
-  subtitle: {
-    marginTop: 2,
-    color: "#7D6175",
-    ...uiTheme.font.caption,
-    fontWeight: "700"
-  },
+
+  // Sync failure
   persistenceBanner: {
     minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    marginBottom: uiTheme.spacing.sm,
+    marginHorizontal: 16,
+    marginTop: 4,
     paddingLeft: 12,
     paddingRight: 6,
     paddingVertical: 8,
-    borderRadius: uiTheme.radius.lg,
-    backgroundColor: "#FFF1F5",
+    borderRadius: 18,
+    backgroundColor: "#FFF0F3",
     borderWidth: 1,
-    borderColor: "#F1B8CA"
+    borderColor: "#F7C8D2"
   },
   persistenceBannerText: {
     flex: 1,
-    color: "#704054",
+    color: uiTheme.colors.dangerInk,
+    fontFamily: "Inter_600SemiBold",
     fontSize: 12,
-    fontWeight: "700",
     lineHeight: 17
   },
   persistenceRetryButton: {
@@ -137,101 +147,60 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 18
   },
-  qaPreviewBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginTop: uiTheme.spacing.xs,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 7,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "#FFF5DB",
-    borderWidth: 1,
-    borderColor: "#F2D795"
-  },
-  qaPreviewBannerText: {
-    color: "#856120",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.2
-  },
-  stageWrap: {
-    height: 280,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: uiTheme.spacing.sm,
-    paddingBottom: uiTheme.spacing.sm,
-    position: "relative"
-  },
-  selectedItemActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 6,
-    marginBottom: 10,
-    padding: 6,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.76)",
-    borderWidth: 1,
-    borderColor: "rgba(222,161,192,0.42)"
-  },
-  selectedItemAction: {
+
+  // Room stage
+  stageRegion: {
     flex: 1,
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    backgroundColor: "#FFF8FB"
+    minHeight: ROOM_EDITOR_STAGE_MIN_HEIGHT,
+    overflow: "hidden"
   },
-  selectedItemActionPrimary: {
-    flex: 1.25,
-    backgroundColor: uiTheme.colors.primaryDeep
-  },
-  selectedItemActionText: {
-    flexShrink: 1,
-    color: "#6E5064",
-    fontSize: 11,
-    fontWeight: "800",
-    textAlign: "center"
-  },
-  selectedItemActionPrimaryText: {
-    flexShrink: 1,
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  selectedItemActionDangerText: {
-    color: "#B83F5C"
-  },
-  roomWorldStatusPill: {
+  stageSurface: {
     position: "absolute",
-    top: 18,
-    left: 12,
-    zIndex: 2,
-    maxWidth: 190,
+    overflow: "hidden"
+  },
+  stagePressable: {
+    width: "100%",
+    height: "100%"
+  },
+  renderer: {
+    backgroundColor: "transparent"
+  },
+  stageTools: {
+    position: "absolute",
+    top: 8,
+    right: 16,
+    flexDirection: "row",
+    gap: 8
+  },
+  stageToolButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18
+  },
+  stageNotice: {
+    position: "absolute",
+    top: 8,
+    left: 16,
+    right: 112,
+    alignItems: "flex-start"
+  },
+  stageNoticePill: {
+    borderRadius: 18
+  },
+  stageNoticeContent: {
+    minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255,255,255,0.94)",
-    borderWidth: 1,
-    borderColor: "rgba(233,169,199,0.5)",
-    shadowColor: "#C98AA9",
-    shadowOpacity: 0.14,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2
+    paddingHorizontal: 12,
+    paddingVertical: 8
   },
-  roomWorldStatusText: {
-    color: "#5F4058",
-    fontSize: 11,
-    fontWeight: "800"
+  stageNoticeText: {
+    flexShrink: 1,
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
   },
   dragGhostAnchor: {
     position: "absolute",
@@ -241,52 +210,88 @@ export const styles = StyleSheet.create({
     height: 0,
     overflow: "visible"
   },
-  roomImageWrapper: {
-    width: "100%",
-    position: "relative",
-    borderRadius: 26,
-    backgroundColor: "#FFF9FC",
-    borderWidth: 1,
-    borderColor: "rgba(233,169,199,0.48)",
-    shadowColor: "#C98AA9",
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-    overflow: "hidden"
+
+  // Selection capsule
+  capsuleSlot: {
+    position: "absolute",
+    left: 28,
+    right: 28,
+    bottom: 10
   },
-  renderer: {
-    backgroundColor: "#FFF9FC"
+  capsule: {
+    borderRadius: 24
   },
-  inventoryWrap: {
-    marginTop: uiTheme.spacing.sm,
-    minHeight: 338,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "rgba(233,169,199,0.46)",
-    paddingTop: 9,
-    paddingBottom: uiTheme.spacing.md,
-    shadowColor: "#B57294",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 5
+  capsuleContent: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6
   },
-  inventoryHandle: {
-    alignSelf: "center",
+  capsuleName: {
+    flex: 1,
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 18
+  },
+  capsuleIconButton: {
     width: 36,
-    height: 4,
-    marginBottom: 8,
-    borderRadius: 2,
-    backgroundColor: "rgba(151, 107, 132, 0.34)"
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: CONTROL_SURFACE,
+    borderWidth: 1,
+    borderColor: roomEditorTheme.edge
   },
+  capsuleDirectionButton: {
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: CONTROL_SURFACE,
+    borderWidth: 1,
+    borderColor: roomEditorTheme.edge
+  },
+  capsuleDirectionText: {
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
+  },
+  capsulePrimaryButton: {
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: roomEditorTheme.accent
+  },
+  capsulePrimaryText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16
+  },
+
+  // Room style chooser (only with more than one shell)
   shellPicker: {
-    gap: uiTheme.spacing.xs
+    gap: uiTheme.spacing.xs,
+    paddingHorizontal: 16,
+    paddingBottom: 6
   },
   shellPickerLabel: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textSecondary
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16
   },
   shellPickerOptions: {
     flexDirection: "row",
@@ -296,407 +301,263 @@ export const styles = StyleSheet.create({
   shellPickerOption: {
     maxWidth: "48%",
     minHeight: 36,
-    borderRadius: uiTheme.radius.full,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    backgroundColor: "rgba(255,255,255,0.62)",
+    borderColor: roomEditorTheme.edge,
+    backgroundColor: CONTROL_SURFACE,
     justifyContent: "center",
     paddingHorizontal: uiTheme.spacing.sm
   },
   shellPickerOptionSelected: {
-    backgroundColor: uiTheme.colors.primary,
-    borderColor: uiTheme.colors.primary
+    backgroundColor: SOFT_ROSE,
+    borderColor: roomEditorTheme.accent
   },
   shellPickerOptionText: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textSecondary
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
   },
   shellPickerOptionTextSelected: {
-    color: "#FFFFFF"
+    color: roomEditorTheme.accent
+  },
+
+  // Dock
+  dockShell: {
+    marginHorizontal: ROOM_EDITOR_DOCK_MARGIN,
+    marginTop: 6,
+    marginBottom: 8,
+    borderRadius: 30
+  },
+  dockContent: {
+    padding: ROOM_EDITOR_DOCK_PADDING
   },
   inventoryHeader: {
+    minHeight: 30,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-end",
-    paddingHorizontal: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.sm
+    gap: 12,
+    marginHorizontal: 2,
+    marginBottom: 8
+  },
+  inventoryTitleRow: {
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6
+  },
+  inventoryCount: {
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
+  },
+  inventoryHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16
   },
   inventoryTitle: {
-    color: "#3A253D",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 0.5
+    flexShrink: 1,
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    lineHeight: 18
   },
-  inventoryEyebrow: {
-    marginTop: 2,
-    color: "#896F80",
-    fontSize: 11,
-    fontWeight: "700"
+  dockToggleText: {
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
+  },
+  inventoryStatus: {
+    marginHorizontal: 4,
+    marginBottom: 6,
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
   },
   inventoryStatusFailed: {
-    color: "#B75B73"
+    color: uiTheme.colors.dangerInk
   },
-  inventorySubtitle: {
-    color: "#A26484",
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 2
-  },
-  inventorySubtitleDisabled: {
-    color: "#B9ABB4"
-  },
-  inventorySearchField: {
-    minHeight: 36,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginHorizontal: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.sm,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: "#FFF7FA",
-    borderWidth: 1,
-    borderColor: "rgba(222,161,192,0.5)"
-  },
-  inventorySearchInput: {
-    flex: 1,
-    minHeight: 36,
-    paddingVertical: 0,
-    color: "#4B3047",
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  inventorySearchClear: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center"
+
+  // Categories
+  categoryRailFrame: {
+    marginBottom: 6,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: roomEditorTheme.hairline
   },
   categoryRail: {
     flexDirection: "row",
-    gap: 7,
-    paddingHorizontal: uiTheme.spacing.lg,
-    marginBottom: 8
+    gap: 4
   },
-  categoryChip: {
-    height: 30,
-    flexDirection: "row",
+  categoryTab: {
+    width: 78,
+    minHeight: 54,
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "rgba(219,164,191,0.52)",
-    backgroundColor: "#FFF8FB"
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    borderRadius: 16
   },
-  categoryChipSelected: {
-    borderColor: "#FF5F9D",
-    backgroundColor: "#FF5F9D"
+  categoryTabSelected: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: roomEditorTheme.shadow,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1
   },
-  categoryChipText: {
-    color: "#806579",
-    fontSize: 11,
-    fontWeight: "800"
+  categoryTabText: {
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 15
   },
-  categoryChipTextSelected: {
-    color: "#FFFFFF"
+  categoryTabTextSelected: {
+    color: roomEditorTheme.accent,
+    fontFamily: "Inter_600SemiBold"
   },
+
+  // Tray
   inventoryScroll: {
-    paddingHorizontal: uiTheme.spacing.md,
-    gap: 10,
-    paddingTop: 8
+    gap: ROOM_EDITOR_DOCK_GRID_GAP
+  },
+  inventoryColumn: {
+    gap: ROOM_EDITOR_DOCK_GRID_GAP
+  },
+  inventoryPageDots: {
+    height: 14,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 6
+  },
+  inventoryPageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: roomEditorTheme.hairline
+  },
+  inventoryPageDotActive: {
+    width: 16,
+    backgroundColor: roomEditorTheme.accent
   },
   inventoryLoadingRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingTop: 8
+    gap: ROOM_EDITOR_DOCK_GRID_GAP
   },
   inventoryLoadingItem: {
-    width: 72,
-    alignItems: "center"
+    flex: 1
   },
   inventoryLoadingCard: {
-    width: 72,
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(220,163,191,0.3)",
-    backgroundColor: "#F9EEF4"
+    height: ROOM_EDITOR_CARD_ART_HEIGHT,
+    borderRadius: 18,
+    backgroundColor: roomEditorTheme.cardBase
   },
   inventoryLoadingLabel: {
-    width: 42,
-    height: 5,
-    marginTop: 8,
-    borderRadius: 3,
-    backgroundColor: "#F3E3EC"
-  },
-  inventoryLoadingPreview: {
-    opacity: 0.92
-  },
-  inventoryLoadingPreviewContentRow: {
-    minHeight: 72
-  },
-  inventoryLoadingPreviewImage: {
-    backgroundColor: "#F5EAF0"
-  },
-  inventoryLoadingPreviewCopy: {
-    flex: 1,
-    gap: 8
-  },
-  inventoryLoadingPreviewEyebrow: {
-    width: 64,
+    width: 48,
     height: 6,
+    marginTop: 11,
+    marginBottom: 5,
+    marginLeft: 2,
     borderRadius: 3,
-    backgroundColor: "#F0DFE8"
-  },
-  inventoryLoadingPreviewTitle: {
-    width: "76%",
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#F0DFE8"
-  },
-  inventoryLoadingPreviewHint: {
-    width: "62%",
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#F0DFE8"
-  },
-  inventoryLoadingPreviewAction: {
-    alignSelf: "flex-end",
-    width: 112,
-    height: 38,
-    borderRadius: 15,
-    backgroundColor: "#F3E3EC"
+    backgroundColor: roomEditorTheme.hairline
   },
   inventoryItemContainer: {
-    alignItems: "center",
-    justifyContent: "center"
+    minWidth: 0
   },
   inventoryItem: {
-    width: 72,
-    height: 52,
-    backgroundColor: "#FFF9FC",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(220,163,191,0.42)",
+    height: ROOM_EDITOR_CARD_ART_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
-    padding: 7
+    padding: 5,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    backgroundColor: roomEditorTheme.cardBase,
+    experimental_backgroundImage: roomEditorTheme.cardGradient
   },
   inventoryItemLocked: {
     opacity: 0.46
   },
-  inventoryItemPlaced: {
-    borderColor: "rgba(42, 163, 111, 0.52)",
-    backgroundColor: "#F0FCF6"
-  },
   inventoryItemSelected: {
-    borderColor: "#FF5F9D",
-    backgroundColor: "#FFF0F6",
-    shadowColor: "#FF5F9D",
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3
+    borderColor: roomEditorTheme.accent,
+    backgroundColor: roomEditorTheme.cardSelectedBase,
+    experimental_backgroundImage: roomEditorTheme.cardSelectedGradient
   },
   inventoryItemPressed: {
-    backgroundColor: "#FCE1EC",
-    borderColor: "#EE9CC2",
-    transform: [{ scale: 0.94 }]
+    transform: [{ scale: 0.96 }]
   },
   inventoryItemImage: {
     width: "100%",
     height: "100%"
   },
   inventoryItemName: {
-    width: 72,
-    marginTop: 4,
-    color: "#5D4058",
-    fontSize: 10,
-    fontWeight: "700",
-    textAlign: "center"
+    marginTop: 6,
+    marginHorizontal: 2,
+    color: roomEditorTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16
   },
   inventoryItemLock: {
     position: "absolute",
-    right: 6,
-    top: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(85,55,78,0.76)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)"
-  },
-  inventoryItemPlacedMark: {
-    position: "absolute",
-    right: 6,
-    top: 6,
+    right: 5,
+    top: 5,
     width: 20,
     height: 20,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#BAF0D1"
+    backgroundColor: "rgba(85,55,78,0.76)"
   },
-  selectedInventoryPreview: {
-    minHeight: 90,
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 8,
-    marginHorizontal: uiTheme.spacing.md,
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    borderRadius: 20,
+  inventoryItemCheck: {
+    position: "absolute",
+    right: 5,
+    top: 5,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: roomEditorTheme.accent
+  },
+  inventoryItemPlacedMark: {
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "rgba(232,161,197,0.52)",
-    backgroundColor: "#FFF7FB"
-  },
-  selectedInventoryContentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9
-  },
-  selectedInventoryImageWrap: {
-    width: 60,
-    height: 60,
-    padding: 5,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FBE5EF"
-  },
-  selectedInventoryImage: {
-    width: "100%",
-    height: "100%"
-  },
-  selectedInventoryCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 5
-  },
-  selectedInventoryEyebrow: {
-    color: "#B26C8B",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-    textTransform: "uppercase"
-  },
-  selectedInventoryHint: {
-    color: "#8D7081",
-    fontSize: 10,
-    fontWeight: "700"
-  },
-  selectedInventoryTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  selectedInventoryName: {
-    flex: 1,
-    color: "#3C273E",
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  selectedInventoryPlacedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "#E4F8EC"
-  },
-  selectedInventoryPlacedText: {
-    color: "#208458",
-    fontSize: 9,
-    fontWeight: "800"
-  },
-  rotationRail: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5
-  },
-  rotationOption: {
-    minWidth: 36,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: "#FFF8FB",
-    borderWidth: 1,
-    borderColor: "rgba(222,161,192,0.38)"
-  },
-  rotationOptionSelected: {
-    backgroundColor: "#FFE2EF",
-    borderColor: "#FF83B8"
-  },
-  rotationOptionText: {
-    color: "#806579",
-    fontSize: 9,
-    fontWeight: "800"
-  },
-  rotationOptionTextSelected: {
-    color: "#C83B78"
-  },
-  placeSelectedInventoryButton: {
-    minHeight: 38,
-    flexDirection: "row",
-    gap: 3,
-    paddingHorizontal: 11,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF5F9D",
-    shadowColor: "#FF4F98",
-    shadowOpacity: 0.32,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5
-  },
-  placeSelectedInventoryButtonDisabled: {
-    opacity: 1,
-    backgroundColor: "#F2E7ED",
-    shadowOpacity: 0,
-    elevation: 0
-  },
-  placeSelectedInventoryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  placeSelectedInventoryButtonTextDisabled: {
-    color: "#A68D9C"
-  },
-  placeSelectedInventoryButtonPressed: {
-    transform: [{ scale: 0.94 }]
+    borderColor: roomEditorTheme.hairline
   },
   inventoryEmptyState: {
-    minWidth: 220,
-    minHeight: 58,
+    minHeight: ROOM_EDITOR_CARD_ART_HEIGHT + 22,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: uiTheme.spacing.md
   },
   inventoryEmptyText: {
-    color: "#806579",
+    color: roomEditorTheme.muted,
+    fontFamily: "Inter_500Medium",
     fontSize: 12,
-    fontWeight: "700"
+    lineHeight: 16,
+    textAlign: "center"
   },
   inventoryEmptyAction: {
-    minHeight: 36,
+    minHeight: 40,
     marginTop: 8,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: "#FFE2EF"
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: SOFT_ROSE
   },
   inventoryEmptyActionText: {
-    color: "#C83B78",
-    fontSize: 12,
-    fontWeight: "900"
+    color: roomEditorTheme.accent,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 18
   }
 })

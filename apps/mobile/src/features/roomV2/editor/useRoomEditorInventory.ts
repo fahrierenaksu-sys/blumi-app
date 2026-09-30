@@ -110,6 +110,7 @@ export function useRoomEditorInventory(input: {
     setSelectedInventoryItemId,
     selectedInventoryRotation,
     setSelectedInventoryRotation,
+    inventoryEntries,
     filteredInventoryEntries,
     inventoryViewState,
     canPlaceInventoryItem,
