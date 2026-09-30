@@ -34,6 +34,20 @@ Snapshot: 2026-09-28, with individual rows updated on 2026-09-30 (each row state
   persistence and physical-device evidence. These automations do not establish
   public-release readiness.
 
+- **EXTERNAL VERIFIED (later update):** build 5 is `Ready to Test` in `Blumi QA`.
+  Only the owner's existing App Store Connect account was invited, following
+  explicit confirmation. Build 5's Turkish test notes were saved. Submission
+  succeeded when run with production environment variables; the automated
+  TestFlight job now explicitly uses the same environment. Changes were pushed
+  in integration commit `21df9f7a` after lint, typecheck and workspace tests passed.
+- **BLOCKED:** the first local native smoke could not complete: cold Simulator
+  and build consumed the available disk space; the generated workspace also
+  retained an optional Sentry upload phase without an organization. The runner
+  disables Sentry auto-upload only for this isolated demo test, limits build jobs
+  and architecture, and now requires 24 GiB free before starting. No complete
+  Maestro run or native PASS is claimed. Only this attempt's generated build
+  cache and dedicated disposable Simulator were removed; user data was preserved.
+
 - **IMPLEMENTED / TESTED:** `apps/mobile/.eas/workflows/testflight.yml` listens
   for pushes to `claude/busy-cray-dl5wvr` and supports a manual run. Before
   building iOS, source hygiene, package builds, TypeScript, lint, tests and
