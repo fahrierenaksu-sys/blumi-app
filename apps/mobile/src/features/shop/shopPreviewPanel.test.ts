@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
@@ -18,6 +18,22 @@ const screenSource = readFileSync(
   resolve(root, "src/screens/CosmeticShopScreen.tsx"),
   "utf8"
 )
+const previewSelectionSource = readFileSync(
+  resolve(root, "src/features/shop/screen/useShopPreviewSelection.ts"),
+  "utf8"
+)
+const previewModelSource = readFileSync(
+  resolve(root, "src/features/shop/screen/useShopPreviewModel.ts"),
+  "utf8"
+)
+// Negative guards cover the screen and every module it was decomposed into.
+const screenSurfaceSource = [
+  screenSource,
+  ...readdirSync(resolve(root, "src/features/shop/screen"))
+    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+    .sort()
+    .map((fileName) => readFileSync(resolve(root, "src/features/shop/screen", fileName), "utf8"))
+].join("\n")
 const navigatorSource = readFileSync(
   resolve(root, "src/navigation/RootNavigator.tsx"),
   "utf8"
@@ -91,12 +107,14 @@ test("shop preview presentation lives outside the screen monolith", () => {
   assert.match(panelSource, /from "\.\/shopPreviewStyles"/)
   assert.match(stylesSource, /export const shopPreviewStyles/)
   assert.match(screenSource, /from "\.\.\/features\/shop\/ShopPreviewPanel"/)
-  assert.doesNotMatch(screenSource, /ROOM_VNEXT_RUNTIME_MODE/)
-  assert.doesNotMatch(screenSource, /function SelectedProductPreview/)
-  assert.doesNotMatch(screenSource, /function ShopAvatarLivePreview/)
-  assert.match(screenSource, /previewAvatarShopItem/)
+  assert.doesNotMatch(screenSurfaceSource, /ROOM_VNEXT_RUNTIME_MODE/)
+  assert.doesNotMatch(screenSurfaceSource, /function SelectedProductPreview/)
+  assert.doesNotMatch(screenSurfaceSource, /function ShopAvatarLivePreview/)
+  assert.match(previewSelectionSource, /previewAvatarShopItem/)
   assert.match(screenSource, /onRemovePreview=\{handleRemoveAvatarPreview\}/)
-  assert.match(screenSource, /isAvatarShopItemPreviewing/)
+  assert.match(screenSource, /useShopPreviewSelection\(/)
+  assert.match(previewSelectionSource, /isAvatarShopItemPreviewing/)
+  assert.match(previewModelSource, /isAvatarShopItemPreviewing/)
   assert.match(screenSource, /copy\.combination\.applyLook/)
   assert.match(copySource, /applyLook:\s*"Kombini uygula"/)
 })
@@ -163,7 +181,7 @@ test("avatar remains visible before explicit product selection", () => {
   assert.match(panelSource, /testID="shop-avatar-default-preview"/)
   assert.match(panelSource, /ShopAvatarLivePreview avatar=\{previewAvatar\}/)
   assert.match(screenSource, /<ShopPreviewPanel/)
-  assert.doesNotMatch(screenSource, /shopMode === "avatar" \|\| selectedProduct/)
+  assert.doesNotMatch(screenSurfaceSource, /shopMode === "avatar" \|\| selectedProduct/)
 })
 
 test("home preview shows the room before product selection without a purchase action", () => {
@@ -171,12 +189,12 @@ test("home preview shows the room before product selection without a purchase ac
   assert.match(panelSource, /mode === "home"/)
   assert.match(panelSource, /<ShopRoomItemPreview item=\{undefined\} scene=\{roomPreviewScene\}/)
   assert.match(screenSource, /mode=\{shopMode\}/)
-  assert.doesNotMatch(screenSource, /roomProducts\[0\]\?\.roomItem/)
+  assert.doesNotMatch(screenSurfaceSource, /roomProducts\[0\]\?\.roomItem/)
 })
 
 test("shop preview keeps one approved hierarchy across supported phone sizes", () => {
-  assert.doesNotMatch(screenSource, /height\s*<\s*880/)
-  assert.doesNotMatch(screenSource, /width\s*<\s*390/)
+  assert.doesNotMatch(screenSurfaceSource, /height\s*<\s*880/)
+  assert.doesNotMatch(screenSurfaceSource, /width\s*<\s*390/)
   assert.doesNotMatch(panelSource, /compact:\s*boolean/)
   assert.match(panelSource, /layoutMetrics:/)
   assert.match(screenSource, /getShopLayoutMetrics/)

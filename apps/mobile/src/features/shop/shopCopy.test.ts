@@ -26,9 +26,13 @@ test("shop copy covers release languages and offline restrictions", () => {
 
 test("shop combination messages come from the localized copy contract", () => {
   const source = readFileSync(join(process.cwd(), "src/screens/CosmeticShopScreen.tsx"), "utf8")
+  // The purchase confirmation moved out of the screen with the other Shop screen modules.
+  const confirmationSource = readFileSync(join(process.cwd(), "src/features/shop/screen/confirmAvatarShopPurchase.ts"), "utf8")
 
   assert.match(source, /copy\.combination\.applyLook/)
-  assert.match(source, /copy\.purchaseSummary/)
-  assert.doesNotMatch(source, /locale === "tr" \? "Kombini uygula"/)
-  assert.doesNotMatch(source, /locale === "tr" \? "Ürünü satın al"/)
+  assert.match(confirmationSource, /copy\.purchaseSummary/)
+  for (const shopSource of [source, confirmationSource]) {
+    assert.doesNotMatch(shopSource, /locale === "tr" \? "Kombini uygula"/)
+    assert.doesNotMatch(shopSource, /locale === "tr" \? "Ürünü satın al"/)
+  }
 })

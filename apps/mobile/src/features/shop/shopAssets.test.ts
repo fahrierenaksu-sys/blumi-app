@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
 import sharp from "sharp"
@@ -25,10 +25,14 @@ const shopAssetsSource = readFileSync(
   resolve(process.cwd(), "src/features/shop/shopAssets.ts"),
   "utf8"
 )
-const shopScreenSource = readFileSync(
-  resolve(process.cwd(), "src/screens/CosmeticShopScreen.tsx"),
-  "utf8"
-)
+// The screen plus every module it was decomposed into.
+const shopScreenSource = [
+  readFileSync(resolve(process.cwd(), "src/screens/CosmeticShopScreen.tsx"), "utf8"),
+  ...readdirSync(resolve(process.cwd(), "src/features/shop/screen"))
+    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+    .sort()
+    .map((fileName) => readFileSync(resolve(process.cwd(), "src/features/shop/screen", fileName), "utf8"))
+].join("\n")
 
 test("shop asset registries live outside the screen monolith", () => {
   assert.match(shopAssetsSource, /export const AVATAR_ITEM_PREVIEW_SOURCES/)

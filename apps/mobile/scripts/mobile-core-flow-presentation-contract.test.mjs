@@ -190,7 +190,11 @@ test("Phase 1 copy no longer promises a room outside technical compatibility fie
 
 test("room setup exposes only the free starter bed and shop does not claim unplaced furniture is placed", () => {
   const roomSetup = read("src/screens/RoomSetupScreen.tsx")
-  const shop = read("src/screens/CosmeticShopScreen.tsx")
+  // Product cards and their status labels moved out of the screen.
+  const shop = [
+    "src/screens/CosmeticShopScreen.tsx",
+    "src/features/shop/screen/ShopProductCard.tsx"
+  ].map(read).join("\n")
 
   assert.match(roomSetup, /STARTER_ROOM_BED_ITEM_ID/)
   assert.match(roomSetup, /ücretsiz başlangıç eşyası/)
@@ -199,7 +203,7 @@ test("room setup exposes only the free starter bed and shop does not claim unpla
   assert.match(roomSetup, /testID="starter-bed-rotate"/)
   assert.match(roomSetup, /primaryActionTestID="room-setup-submit"/)
   assert.doesNotMatch(roomSetup, /STARTER_ROOM_PRESETS/)
-  assert.match(shop, /copy\.readyToPlace/)
+  assert.match(read("src/features/shop/screen/ShopProductCard.tsx"), /copy\.readyToPlace/)
   assert.doesNotMatch(shop, /\? "Placed"/)
 })
 

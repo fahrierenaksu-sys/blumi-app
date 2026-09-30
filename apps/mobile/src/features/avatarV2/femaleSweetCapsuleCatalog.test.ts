@@ -181,8 +181,9 @@ test("female sweet capsule is visible through both wardrobe and shop thumbnail s
     join(workspaceRoot, "src/screens/WardrobeV2Screen.tsx"),
     "utf8"
   )
-  const shopScreenSource = readFileSync(
-    join(workspaceRoot, "src/screens/CosmeticShopScreen.tsx"),
+  // Shop product thumbnails render in the card extracted from CosmeticShopScreen.
+  const shopProductCardSource = readFileSync(
+    join(workspaceRoot, "src/features/shop/screen/ShopProductCard.tsx"),
     "utf8"
   )
   const shopAssetsSource = readFileSync(
@@ -194,7 +195,7 @@ test("female sweet capsule is visible through both wardrobe and shop thumbnail s
     assert.match(source, /FEMALE_SWEET_CAPSULE_RIG_PREVIEW_SOURCES/)
     assert.match(source, /FEMALE_SWEET_CAPSULE_SQUARE_THUMBNAIL_SOURCES/)
   }
-  assert.match(shopScreenSource, /from "\.\.\/features\/shop\/shopAssets"/)
+  assert.match(shopProductCardSource, /from "\.\.\/shopAssets"/)
 })
 
 test("Coral Wave is listed as three independent paid female capsule layers", () => {

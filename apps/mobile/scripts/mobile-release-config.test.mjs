@@ -491,6 +491,9 @@ test("release bundle imports only the fonts and icon family used by the app", ()
     "src/screens/AuthEntryScreen.tsx",
     "src/screens/MyRoomScreen.tsx",
     "src/screens/CosmeticShopScreen.tsx",
+    ...readdirSync(resolve(mobileRoot, "src/features/shop/screen"))
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+      .map((name) => `src/features/shop/screen/${name}`),
     "src/screens/MatchResultScreen.tsx",
     "src/screens/WardrobeV2Screen.tsx",
     "src/ui/bottomNav.tsx",
@@ -576,26 +579,33 @@ test("room runtime ships only the production shell and layered avatar", () => {
 
 test("shop cards show product cutouts while selection updates the live avatar preview", () => {
   const shop = read("src/screens/CosmeticShopScreen.tsx")
+  const shopCard = read("src/features/shop/screen/ShopProductCard.tsx")
+  const shopPreviewSelection = read("src/features/shop/screen/useShopPreviewSelection.ts")
+  const shopPurchaseActions = read("src/features/shop/screen/useShopPurchaseActions.ts")
   const shopAssets = read("src/features/shop/shopAssets.ts")
   const shopPreview = read("src/features/shop/ShopPreviewPanel.tsx")
 
   assert.match(shopAssets, /export const SHOP_THUMBNAIL_SOURCES/)
-  assert.match(shop, /getShopProductThumbnailSource\(product\.sourceItemId\)/)
-  assert.match(shop, /<AvatarProductThumbnail[\s\S]*source=\{avatarPreviewSource\}/)
-  assert.match(shop, /shopCombinationDraftToAvatar\([\s\S]*?combinationStateRef\.current\.draft,[\s\S]*?avatarV2\.avatar/)
-  assert.doesNotMatch(shop, /multiItemApplyEnabled\s*\?\s*shopCombinationDraftToAvatar/)
-  assert.match(shop, /if \(savedAvatar\) \{[\s\S]*?createShopCombinationState\([\s\S]*?equipped:\s*avatarToShopCombinationDraft\(savedAvatar\)/)
+  assert.match(shopCard, /getShopProductThumbnailSource\(product\.sourceItemId\)/)
+  assert.match(shopCard, /<AvatarProductThumbnail[\s\S]*source=\{avatarPreviewSource\}/)
+  assert.match(shopPurchaseActions, /shopCombinationDraftToAvatar\([\s\S]*?combinationStateRef\.current\.draft,[\s\S]*?avatarV2\.avatar/)
+  assert.match(shopPreviewSelection, /shopCombinationDraftToAvatar\([\s\S]*?combinationStateRef\.current\.draft,[\s\S]*?avatar/)
+  for (const source of [shop, shopPreviewSelection, shopPurchaseActions]) {
+    assert.doesNotMatch(source, /multiItemApplyEnabled\s*\?\s*shopCombinationDraftToAvatar/)
+  }
+  assert.match(shopPurchaseActions, /if \(savedAvatar\) \{[\s\S]*?createShopCombinationState\([\s\S]*?equipped:\s*avatarToShopCombinationDraft\(savedAvatar\)/)
   assert.match(shop, /<ShopPreviewPanel[\s\S]*previewAvatar=\{previewAvatar\}/)
   assert.match(shopPreview, /export function ShopPreviewPanel\(/)
 })
 
 test("shop exit discards previews and cannot interrupt an active transaction", () => {
   const shop = read("src/screens/CosmeticShopScreen.tsx")
+  const combinationSession = read("src/features/shop/screen/useShopCombinationSession.ts")
 
-  assert.match(shop, /const shopExitLocked = combinationState\.phase !== "editing"/)
-  assert.match(shop, /event\.preventDefault\(\)/)
+  assert.match(combinationSession, /const shopExitLocked = combinationState\.phase !== "editing"/)
+  assert.match(combinationSession, /event\.preventDefault\(\)/)
   assert.match(shop, /disabled=\{shopExitLocked\}/)
-  assert.match(shop, /dispatchCombination\(\{ type: "discard_draft" \}\)/)
+  assert.match(combinationSession, /dispatchCombination\(\{ type: "discard_draft" \}\)/)
 })
 
 test("release analytics requires an explicit PostHog project and secure host", () => {
