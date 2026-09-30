@@ -59,9 +59,11 @@ jobs:
           output_file="$(mktemp)"
           error_file="$(mktemp)"
 
+          # The job env carries build.preview.env; --environment loads the EAS
+          # production variables (API URLs) that app.config.js requires.
           if ! eas fingerprint:generate \
             --platform ios \
-            --build-profile preview \
+            --environment production \
             --json \
             --non-interactive \
             >"$output_file" 2>"$error_file"; then
