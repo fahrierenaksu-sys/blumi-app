@@ -163,12 +163,17 @@ test("the production top shelf resolves to the current female and male first-vie
     (id) => getShopProductThumbnailSource(id) !== undefined,
     "tr-TR"
   )
-  assert.deepEqual(firstPage("avatar_v2_body_default"), ["avatar_v2_top_buttercream_bow_tee"])
+  assert.deepEqual(firstPage("avatar_v2_body_default"), [
+    "avatar_v2_top_azure_garden_halter",
+    "avatar_v2_top_buttercream_bow_tee",
+    "avatar_v2_top_coral_wave_polo",
+    "avatar_v2_top_powder_blue_ribbon_corset_top"
+  ])
   assert.deepEqual(firstPage("avatar_v2_body_male_light"), [
+    "avatar_v2_top_male_abstract_resort_shirt",
+    "avatar_v2_top_male_asymmetric_utility_overshirt",
     "avatar_v2_top_male_cocoa_varsity_jacket",
-    "avatar_v2_top_male_cream_basic_tee",
-    "avatar_v2_top_male_dusty_navy_chore_jacket",
-    "avatar_v2_top_male_dusty_navy_tee"
+    "avatar_v2_top_male_contemporary_resort_street_top"
   ])
 })
 

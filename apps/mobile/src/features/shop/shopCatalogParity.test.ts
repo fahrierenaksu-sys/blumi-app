@@ -20,6 +20,7 @@ const { buildShopCatalogItems } =
 const {
   AVATAR_LOADOUT_CATALOG,
   ECONOMY_CATALOG,
+  resolvePublishedReleaseCatalogItemIds,
   resolveR1PublishedEconomyCatalog,
 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -125,7 +126,7 @@ test("demo Shop lists Room products even when none are owned", () => {
   assert.ok(roomProducts.every((product) => product.roomItem))
 })
 
-test("R1 Shop hides every unreceipted paid item while retaining its published starter catalog", () => {
+test("R1 Shop lists starter and receipted paid items and hides held ones", () => {
   const r1Catalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
   const publishedItemIds = new Set(r1Catalog.map((item) => item.itemId));
   const products = buildShopCatalogItems({
@@ -145,9 +146,15 @@ test("R1 Shop hides every unreceipted paid item while retaining its published st
     publishedItemIds: [...publishedItemIds],
   });
 
-  assert.ok(r1Catalog.every((item) => item.ownedByDefault));
+  const receiptedItemIds = new Set(resolvePublishedReleaseCatalogItemIds());
+  assert.ok(r1Catalog.every((item) => item.ownedByDefault || receiptedItemIds.has(item.itemId)));
   assert.ok(products.length > 0);
   assert.ok(products.every((product) => publishedItemIds.has(product.sourceItemId)));
+  const receiptedTop = products.find(
+    (product) => product.sourceItemId === "avatar_v2_top_sage_ribbon_knit_jacket",
+  );
+  assert.ok(receiptedTop, "a receipted paid top is listed");
+  assert.ok((receiptedTop.priceCoins ?? 0) > 0);
   assert.equal(
     products.some((product) => product.sourceItemId === "avatar_v2_top_cherry_heart_milkmaid_blouse"),
     false,
