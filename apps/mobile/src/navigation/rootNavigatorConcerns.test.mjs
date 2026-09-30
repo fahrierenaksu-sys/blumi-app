@@ -156,7 +156,14 @@ test("the root navigator wires route sync, return previews, and tab presses to t
   assert.match(navigator, /isFullShopCatalogQaPreview=\{IS_FULL_SHOP_CATALOG_QA_PREVIEW\}\s*onBottomNavPress/)
   const chrome = read("./useBottomNavChrome.ts")
   assert.match(chrome, /transitionStart: \(\{ data \}\) => \{\s*if \(sessionEntryRoute !== "Main" \|\| isAccountRestricted\) return/)
-  assert.match(chrome, /transitionEnd: \(\{ data \}\) => \{\s*settleRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key, data\.closing\)/)
+  // The bar must not appear while a back swipe is still sliding the page:
+  // transitionStart never publishes a return preview; transitionEnd publishes
+  // it already completed, then falls back to settling.
+  const transitionStart = chrome.slice(chrome.indexOf("transitionStart:"), chrome.indexOf("transitionEnd:"))
+  assert.doesNotMatch(transitionStart, /publishRootNavigationChromeReturnPreview|resolveBottomNavReturnPreview/)
+  const transitionEnd = chrome.slice(chrome.indexOf("transitionEnd:"), chrome.indexOf("gestureCancel:"))
+  assert.match(transitionEnd, /publishRootNavigationChromeReturnPreview\(sessionNavigatorKey, \{ \.\.\.preview, completed: true \}\)/)
+  assert.match(transitionEnd, /settleRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key, data\.closing\)/)
   assert.match(chrome, /gestureCancel: \(\) => \{\s*clearRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key\)/)
 })
 

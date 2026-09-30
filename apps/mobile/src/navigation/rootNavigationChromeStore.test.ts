@@ -77,6 +77,24 @@ test("completed and cancelled interactive pops, both native/JS orders, leave no 
   assert.equal(getBottomNavReturnPresentation("Lobby", "target", undefined).visible, true)
 })
 
+test("a back swipe keeps the bottom bar hidden until the page has fully left", () => {
+  const navigatorKey = "main:swipe-user"
+  publishRootNavigationChrome({ navigatorKey, routeName: "You", routeKey: "source" })
+  // While the page is still sliding no preview exists, so the bar stays hidden.
+  assert.equal(getBottomNavReturnPresentation("You", "source", getRootNavigationChromeSnapshot().returnPreview).visible, false)
+
+  // transitionEnd publishes the preview already completed: the bar appears now
+  // and bridges the gap until the JS pop publishes the target route.
+  assert.equal(publishRootNavigationChromeReturnPreview(navigatorKey, {
+    sourceRouteKey: "source", targetRouteKey: "target", targetRouteName: "Lobby", completed: true
+  }), true)
+  const snapshot = getRootNavigationChromeSnapshot()
+  assert.equal(getBottomNavReturnPresentation("You", "source", snapshot.returnPreview).visible, true)
+  publishRootNavigationChrome({ ...snapshot, routeKey: "target", routeName: "Lobby", returnPreview: retainBottomNavReturnPreview(snapshot.returnPreview, "target") })
+  assert.equal(getRootNavigationChromeSnapshot().returnPreview, undefined)
+  assert.equal(getBottomNavReturnPresentation("Lobby", "target", undefined).visible, true)
+})
+
 test("source reappearance cancels a preview; stale account events cannot affect a new navigator", () => {
   publishRootNavigationChrome({ navigatorKey: "main:one", routeName: "WardrobeV2", routeKey: "wardrobe" })
   publishRootNavigationChromeReturnPreview("main:one", { sourceRouteKey: "wardrobe", targetRouteKey: "room", targetRouteName: "MyRoom" })

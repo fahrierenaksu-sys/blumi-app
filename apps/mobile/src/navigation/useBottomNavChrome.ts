@@ -97,17 +97,26 @@ export function useBottomNavChrome({
         // A cancelled pop reappears on the source; the target's willAppear
         // must not discard the preview while the gesture is still active.
         clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
-        return
       }
-      const preview = resolveBottomNavReturnPreview({
-        platform: Platform.OS === "ios" ? "ios" : "android",
-        closing: data.closing,
-        sourceRouteKey: route.key,
-        stack: navigation.getState()
-      })
-      if (preview) publishRootNavigationChromeReturnPreview(sessionNavigatorKey, preview)
+      // A closing detail route does not show the bottom bar yet: the bar is
+      // fixed to the screen bottom and would appear under the sliding page
+      // before the back swipe finishes. It is shown on transitionEnd.
     },
     transitionEnd: ({ data }) => {
+      const preview = sessionEntryRoute === "Main" && !isAccountRestricted
+        ? resolveBottomNavReturnPreview({
+          platform: Platform.OS === "ios" ? "ios" : "android",
+          closing: data.closing,
+          sourceRouteKey: route.key,
+          stack: navigation.getState()
+        })
+        : undefined
+      if (preview) {
+        // The page has fully left. Native dismissal can precede the JS pop,
+        // so bridge the bar until the target route is published.
+        publishRootNavigationChromeReturnPreview(sessionNavigatorKey, { ...preview, completed: true })
+        return
+      }
       settleRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key, data.closing)
     },
     gestureCancel: () => {
