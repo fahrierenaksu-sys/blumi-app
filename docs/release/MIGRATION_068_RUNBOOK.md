@@ -15,6 +15,13 @@
 > checksum matches the file, four nullable columns and the partial unique index
 > exist, 18 accounts and 2 sessions unchanged, 0 uids bound; the live old binary
 > (`2a55475`) answered `/health` 200 and `/ready` 200 afterwards.
+>
+> **Deployed 2026-09-30:** `main` fast-forwarded to `19b6ff3` (GitHub Verify
+> passed). Railway did not auto-deploy, so the service source was reconnected
+> to `main`; deployment `c25660ad` built `19b6ff3` and reached SUCCESS at 02:11
+> UTC, replacing `d5f77b8e`. Checks: `/health` 200, `/ready` 200, unauthenticated
+> `/v1/users/me` 401, no 5xx and no error logs besides an npm config warning.
+> Native QA and the 24 h watch (step 8) remain open.
 
 This runbook covers one migration,
 `apps/server/db/migrations/068_session_reuse_detection_and_firebase_uid.sql`
