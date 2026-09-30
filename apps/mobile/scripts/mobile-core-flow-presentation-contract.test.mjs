@@ -17,11 +17,17 @@ function read(relativePath) {
 test("production match flow leads from Discover to chat without a room promise", () => {
   const matchResult = read("src/screens/MatchResultScreen.tsx")
   const matchModal = read("src/components/MatchResultModal.tsx")
+  const matchPresentation = read("src/features/matches/matchResultPresentation.ts")
   const lobby = read("src/screens/LobbyScreen.tsx")
   const lobbyCopy = read("src/features/lobby/lobbyFeedbackCopy.ts")
 
-  assert.match(matchResult, /You two just matched\./)
-  assert.match(matchResult, /Start with a message and get to know each other at your pace\./)
+  // Copy for both match surfaces lives in the shared presentation model.
+  assert.match(matchPresentation, /You two just matched\./)
+  assert.match(matchPresentation, /Start with a message and get to know each other at your pace\./)
+  assert.match(matchPresentation, /label: "Start chatting"/)
+  assert.match(matchPresentation, /label: "Keep exploring"/)
+  assert.match(matchPresentation, /Safety options for \$\{name\}/)
+  assert.doesNotMatch(matchPresentation, /Go to Room|head into the room|open a room/)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|SharedMatchRoom|Go to Room/)
   assert.match(lobby, /showDiscoverFeedback\(lobbyCopy\.liked, "warm"\)/)
   assert.match(lobbyCopy, /liked: "Like sent\."/)
@@ -29,11 +35,12 @@ test("production match flow leads from Discover to chat without a room promise",
   assert.match(lobby, /if \(isProductionDiscovery\) \{\s*clearReadyMiniRoom\(\)\s*return/)
   assert.match(lobby, /\{!isProductionDiscovery && incomingInvite && senderDisplayName \? \(/)
   assert.match(matchModal, /onSendMessage: \(\) => void/)
-  assert.match(matchModal, /<PrimaryButton\s+label="Start chatting"\s+onPress=\{onSendMessage\}/)
-  assert.match(matchModal, /<SecondaryButton\s+label="Keep exploring"\s+onPress=\{onKeepDiscovering\}/)
+  assert.match(matchModal, /<PrimaryButton\s+label=\{sendMessageAction\.label\}\s+onPress=\{onSendMessage\}/)
+  assert.match(matchModal, /<SecondaryButton\s+label=\{keepDiscoveringAction\.label\}\s+onPress=\{onKeepDiscovering\}/)
   assert.doesNotMatch(matchModal, /onViewSaved|Go to Room|head into the room/)
   assert.match(matchResult, /<ReportModal/)
-  assert.match(matchResult, /Safety options for \$\{match\.matchedUser\.displayName\}/)
+  assert.match(matchResult, /accessibilityLabel=\{presentation\.safetyLabel\}/)
+  assert.match(matchResult, /matchedUserName: match\.matchedUser\.displayName/)
 })
 
 test("chat opens a conversation first and renders room invitations as explicit timeline cards", () => {

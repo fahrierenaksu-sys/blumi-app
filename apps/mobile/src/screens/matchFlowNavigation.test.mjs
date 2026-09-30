@@ -37,9 +37,28 @@ test("Keep Exploring returns to an existing Discover screen without stacking ano
 
 test("both match-result return controls use the same bounded navigation action", () => {
   const source = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
-  const keepExploring = source.match(/label="Keep Exploring"[\s\S]*?onPress=\{([^}]+)\}/)
+  const keepExploring = source.match(/label=\{keepDiscoveringAction\.label\}[\s\S]*?onPress=\{([^}]+)\}/)
   assert.ok(keepExploring)
   assert.match(keepExploring[1], /handleKeepExploring/)
+  const back = source.match(/accessibilityLabel=\{presentation\.backLabel\}[\s\S]*?onPress=\{([^}]+)\}/)
+  assert.ok(back)
+  assert.match(back[1], /handleKeepExploring/)
+})
+
+test("both match surfaces read copy and actions from the one presentation model", () => {
+  const surfaces = [
+    ["./MatchResultScreen.tsx", "discovery_route"],
+    ["../components/MatchResultModal.tsx", "connection_modal"]
+  ]
+  for (const [path, entry] of surfaces) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8")
+    assert.match(source, /from "\.\.\/features\/matches\/matchResultPresentation"/, path)
+    assert.match(source, new RegExp(`getMatchResultPresentation\\(\\{[\\s\\S]*?entry: "${entry}"`), path)
+    // No surface keeps a private copy of the action labels.
+    assert.doesNotMatch(source, /label="(Say Hi|Keep Exploring|Start chatting|Keep exploring)"/, path)
+  }
+  const modal = readFileSync(new URL("../components/MatchResultModal.tsx", import.meta.url), "utf8")
+  assert.match(modal, /getMatchCelebrationMotion\(reduceMotion\)/)
 })
 
 test("profile decision rejects a rapid second tap while the first request is in flight", async () => {

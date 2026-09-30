@@ -25,7 +25,9 @@ const sourceFiles = [
   "src/features/lobby/lobbyInviteAttempt.ts",
   "src/features/lobby/lobbyInviteAttempt.test.ts",
   "src/features/shop/shopCatalogRuntime.ts",
-  "src/features/shop/shopCatalogRuntime.test.ts"
+  "src/features/shop/shopCatalogRuntime.test.ts",
+  "src/features/matches/matchResultPresentation.ts",
+  "src/features/matches/matchResultPresentation.test.ts"
 ]
 
 try {
@@ -75,6 +77,7 @@ try {
       join(outputDirectory, "navigation/pendingDeepLink.test.js"),
       join(outputDirectory, "features/lobby/lobbyInviteAttempt.test.js"),
       join(outputDirectory, "features/shop/shopCatalogRuntime.test.js"),
+      join(outputDirectory, "features/matches/matchResultPresentation.test.js"),
       resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-lobby-invite-fail-closed.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-core-flow-presentation-contract.test.mjs"),

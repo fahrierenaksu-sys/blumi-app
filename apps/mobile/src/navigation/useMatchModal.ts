@@ -13,6 +13,7 @@ import {
   reconcileRealtimeConnectionMatch,
   type ConnectionMatchedPayload
 } from "../features/connections/globalMatchReconciliation"
+import { getMatchCreatedProperties } from "../features/matches/matchResultPresentation"
 import {
   recordMutualConnection,
   updateSavedConnectionStatus
@@ -67,10 +68,8 @@ export function useMatchModal({
         ])
       },
       captureMatchCreated: () => {
-        captureProductEvent("match_created", {
-          source: "mini_room_mutual_save",
-          mode: match.mode
-        })
+        const properties = getMatchCreatedProperties("connection_modal", match.mode)
+        if (properties) captureProductEvent("match_created", properties)
       },
       showMatchToast: (toast) => {
         showToast({ ...toast, type: "success" })
