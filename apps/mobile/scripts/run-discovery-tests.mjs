@@ -56,7 +56,9 @@ const sourceFiles = [
   "src/features/demo/dummyProfiles.test.ts",
   "src/features/demo/demoStore.ts",
   "src/features/demo/demoStore.test.ts",
-  "src/features/matches/matchRoomModel.ts"
+  "src/features/matches/matchRoomModel.ts",
+  "src/features/matches/discoveryMatchCreatedReporter.ts",
+  "src/features/matches/discoveryMatchCreatedReporter.test.ts"
 ]
 
 try {
@@ -119,7 +121,8 @@ try {
       join(outputDirectory, "features/discovery/screen/discoveryScreenModel.test.js"),
       join(outputDirectory, "features/lobby/pendingInviteModel.test.js"),
       join(outputDirectory, "features/demo/dummyProfiles.test.js"),
-      join(outputDirectory, "features/demo/demoStore.test.js")
+      join(outputDirectory, "features/demo/demoStore.test.js"),
+      join(outputDirectory, "features/matches/discoveryMatchCreatedReporter.test.js")
     ],
     {
       cwd: workspaceRoot,

@@ -5,6 +5,10 @@ import test from "node:test"
 import type { DiscoveryDecisionQuota } from "@blumi/contracts"
 import { getLobbyFeedbackCopy } from "../../lobby/lobbyFeedbackCopy"
 import type { PendingInviteMemory } from "../../lobby/pendingInvitesStore"
+import {
+  createDiscoveryMatchCreatedReporter,
+  type DiscoveryMatchCreatedReporter
+} from "../../matches/discoveryMatchCreatedReporter"
 import type { SessionActor } from "../../session/sessionModel"
 import type { DiscoveryCandidate } from "../discoveryCandidateModel"
 import type { DiscoveryDecisionResult } from "../discoveryApi"
@@ -97,6 +101,7 @@ interface Harness {
   skipped: { ownerUserId: string; userId: string }[]
   hydrations: string[]
   scheduledNavigations: { navigate: () => void; cancelled: boolean }[]
+  matchCreatedReporter: DiscoveryMatchCreatedReporter
 }
 
 function loadHook(runtime: ReturnType<typeof createHookRuntime>, harness: Harness) {
@@ -159,6 +164,12 @@ function loadHook(runtime: ReturnType<typeof createHookRuntime>, harness: Harnes
         }
       }
     }
+    if (request === "../../matches/discoveryMatchCreatedRuntime") {
+      return {
+        reportDiscoveryMatchCreated: (input: Parameters<DiscoveryMatchCreatedReporter["report"]>[0]) =>
+          harness.matchCreatedReporter.report(input)
+      }
+    }
     if (request === "../discoveryApi") {
       const real = originalLoad.call(this, request, parent, isMain) as Record<string, unknown>
       return {
@@ -205,12 +216,22 @@ function liveCandidate(userId: string): DiscoveryCandidate {
   return { ...candidate(userId), decisionCapability: "live-invite" }
 }
 
-function decisionResult(userId: string, decision: "like" | "pass", matched = false): DiscoveryDecisionResult {
+function decisionResult(
+  userId: string,
+  decision: "like" | "pass",
+  matched = false,
+  options: { matchId?: string; fromUserId?: string } = {}
+): DiscoveryDecisionResult {
+  const fromUserId = options.fromUserId ?? "me"
   return {
-    decision: { fromUserId: "me", toUserId: userId, decision, decidedAt: "2026-09-30T10:00:00.000Z" },
+    decision: { fromUserId, toUserId: userId, decision, decidedAt: "2026-09-30T10:00:00.000Z" },
     matched,
     match: matched
-      ? { matchId: "match-1", participantUserIds: ["me", userId], matchedAt: "2026-09-30T10:00:00.000Z" }
+      ? {
+          matchId: options.matchId ?? "match-1",
+          participantUserIds: [fromUserId, userId],
+          matchedAt: "2026-09-30T10:00:00.000Z"
+        }
       : null,
     quota: quota(7)
   }
@@ -223,16 +244,31 @@ function mount(options: {
   params?: Record<string, unknown>
   sendInviteResult?: boolean
   decide?: Harness["decide"]
+  userId?: string
+  /** Shared across mounts to model the device's persisted analytics store over an app restart. */
+  analyticsStorage?: Map<string, string>
+  analyticsConsent?: () => boolean
 } = {}) {
   const runtime = createHookRuntime()
+  const analyticsStorage = options.analyticsStorage ?? new Map<string, string>()
+  const events: Harness["events"] = []
   const harness: Harness = {
     decideCalls: [],
     decide: options.decide ?? (async (userId, decision) => decisionResult(userId, decision)),
-    events: [],
+    events,
     toasts: [],
     skipped: [],
     hydrations: [],
-    scheduledNavigations: []
+    scheduledNavigations: [],
+    // Each mount is a fresh app process: in-memory state resets, storage persists.
+    matchCreatedReporter: createDiscoveryMatchCreatedReporter({
+      storage: {
+        getItem: async (key) => analyticsStorage.get(key) ?? null,
+        setItem: async (key, value) => { analyticsStorage.set(key, value) }
+      },
+      isCaptureEnabled: options.analyticsConsent ?? (() => true),
+      captureMatchCreated: (properties) => { events.push({ name: "match_created", properties }) }
+    })
   }
   const useDiscoveryDecisions = loadHook(runtime, harness)
   let seen = new Set<string>()
@@ -256,7 +292,7 @@ function mount(options: {
   }
   const sessionActor = {
     session: { mode: options.mode ?? "production", sessionToken: "token-1" },
-    profile: { userId: "me", displayName: "Me", avatar: undefined }
+    profile: { userId: options.userId ?? "me", displayName: "Me", avatar: undefined }
   } as unknown as SessionActor
   const stable = {
     markCandidateSeen: (userId: string) => setSeen((current) => new Set([...current, userId])),
@@ -443,4 +479,99 @@ test("outside production a delivered invite is pending and a skip is stored loca
     1,
     "activation is captured once per Discover session"
   )
+})
+
+const matchCreated = (events: Harness["events"]) =>
+  events.filter((event) => event.name === "match_created")
+
+test("a server-confirmed mutual like emits match_created once with source discovery", async () => {
+  const view = mount({ decide: async (userId, decision) => decisionResult(userId, decision, true) })
+
+  view.hook.handlePrimaryLike()
+  await view.settle()
+
+  assert.deepEqual(matchCreated(view.harness.events), [{
+    name: "match_created",
+    properties: { source: "discovery", mode: "production" }
+  }])
+  // Re-navigation to (and "View match" replays of) MatchResult never report.
+  view.harness.scheduledNavigations[0].navigate()
+  view.harness.scheduledNavigations[0].navigate()
+  await view.settle()
+  assert.equal(matchCreated(view.harness.events).length, 1)
+})
+
+test("a like without a server match and a pass never emit match_created", async () => {
+  const liked = mount()
+  liked.hook.handlePrimaryLike()
+  await liked.settle()
+  assert.deepEqual(matchCreated(liked.harness.events), [])
+
+  const passed = mount({ decide: async (userId, decision) => decisionResult(userId, decision, true) })
+  passed.hook.handleSkipFeatured()
+  await passed.settle()
+  assert.deepEqual(matchCreated(passed.harness.events), [], "only a like can create a match")
+})
+
+test("a retried decision and an app restart that return the same server match emit once", async () => {
+  const analyticsStorage = new Map<string, string>()
+  const mutual: Harness["decide"] = async (userId, decision) => decisionResult(userId, decision, true)
+
+  const first = mount({ decide: mutual, analyticsStorage })
+  first.hook.handlePrimaryLike()
+  await first.settle()
+  first.hook.handlePrimaryLike()
+  await first.settle()
+  assert.equal(first.harness.decideCalls.length, 2)
+  assert.equal(matchCreated(first.harness.events).length, 1)
+
+  const afterRestart = mount({ decide: mutual, analyticsStorage })
+  afterRestart.hook.handlePrimaryLike()
+  await afterRestart.settle()
+  assert.deepEqual(matchCreated(afterRestart.harness.events), [])
+
+  const newMatch = mount({
+    decide: async (userId, decision) => decisionResult(userId, decision, true, { matchId: "match-2" }),
+    analyticsStorage
+  })
+  newMatch.hook.handlePrimaryLike()
+  await newMatch.settle()
+  assert.equal(matchCreated(newMatch.harness.events).length, 1)
+})
+
+test("dedupe is scoped to the signed-in account", async () => {
+  const analyticsStorage = new Map<string, string>()
+  const mine = mount({ decide: async (userId, decision) => decisionResult(userId, decision, true), analyticsStorage })
+  mine.hook.handlePrimaryLike()
+  await mine.settle()
+
+  const other = mount({
+    userId: "other",
+    decide: async (userId, decision) => decisionResult(userId, decision, true, { fromUserId: "other" }),
+    analyticsStorage
+  })
+  other.hook.handlePrimaryLike()
+  await other.settle()
+
+  assert.equal(matchCreated(mine.harness.events).length, 1)
+  assert.equal(matchCreated(other.harness.events).length, 1)
+  for (const [key, value] of analyticsStorage) {
+    assert.doesNotMatch(value, /name|user-a/, `${key} persists only match ids`)
+  }
+})
+
+test("with analytics consent off a mutual like emits and stores nothing", async () => {
+  const analyticsStorage = new Map<string, string>()
+  const view = mount({
+    decide: async (userId, decision) => decisionResult(userId, decision, true),
+    analyticsStorage,
+    analyticsConsent: () => false
+  })
+
+  view.hook.handlePrimaryLike()
+  await view.settle()
+
+  assert.deepEqual(matchCreated(view.harness.events), [])
+  assert.equal(analyticsStorage.size, 0)
+  assert.equal(view.harness.scheduledNavigations.length, 1, "the match itself is still shown")
 })

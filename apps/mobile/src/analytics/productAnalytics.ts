@@ -55,6 +55,11 @@ export function setProductAnalyticsCaptureEnabled(enabled: boolean): void {
   captureEnabled = enabled
 }
 
+/** Whether consented capture is active: the same gate captureProductEvent applies. */
+export function isProductAnalyticsCaptureEnabled(): boolean {
+  return captureEnabled && client !== null
+}
+
 export function captureProductEvent(
   event: ProductEventName,
   properties: ProductEventProperties = {}

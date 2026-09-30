@@ -97,7 +97,7 @@ export function getMatchResultPresentation(
 }
 
 export type MatchCreatedProperties = {
-  source: "mini_room_mutual_save"
+  source: "mini_room_mutual_save" | "discovery"
   mode: "demo" | "production"
 }
 
@@ -113,6 +113,17 @@ export function getMatchCreatedProperties(
 ): MatchCreatedProperties | null {
   if (entry !== "connection_modal") return null
   return { source: "mini_room_mutual_save", mode }
+}
+
+/**
+ * Properties for `match_created` when a Discover decision response confirms a
+ * server match. Emitted from the decision path only (see
+ * discoveryMatchCreatedReporter), never from the MatchResult route.
+ */
+export function getDiscoveryMatchCreatedProperties(
+  mode: "demo" | "production"
+): MatchCreatedProperties {
+  return { source: "discovery", mode }
 }
 
 export interface MatchCelebrationMotion {
