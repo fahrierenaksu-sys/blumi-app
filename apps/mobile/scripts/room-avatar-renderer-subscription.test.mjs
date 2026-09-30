@@ -12,7 +12,9 @@ const rendererSource = readFileSync(
 // callback per avatar that flips frame-image opacity.
 test("room avatar frames advance on the UI thread, not through React renders", () => {
   assert.match(rendererSource, /const advanceFrame = useCallback\(\(frameInfo: FrameInfo\): void => \{\s*"worklet"/)
-  assert.match(rendererSource, /useFrameCallback\(advanceFrame, hasAnimation\)/)
+  // autostart is read once by useFrameCallback; the clock follows hasAnimation explicitly.
+  assert.match(rendererSource, /const frameClock = useFrameCallback\(advanceFrame, false\)/)
+  assert.match(rendererSource, /frameClock\.setActive\(hasAnimation\)\s*\}, \[advanceFrame, frameClock, hasAnimation\]\)/)
   assert.match(rendererSource, /getRoomAvatarFrameTick\(frameInfo\.timestamp, frameDurationMs\)/)
   assert.doesNotMatch(rendererSource, /useSyncExternalStore|setInterval\(|useState\(/)
 })

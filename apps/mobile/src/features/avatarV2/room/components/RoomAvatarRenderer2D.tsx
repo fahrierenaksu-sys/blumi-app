@@ -74,7 +74,13 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
     const index = getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
     if (index !== current.index) frameState.value = { signature, index }
   }, [baseTick, frameCount, frameDurationMs, frameState, loops, signature])
-  useFrameCallback(advanceFrame, hasAnimation)
+  // useFrameCallback reads `autostart` only on its first render, and the
+  // shared Reduce Motion store starts reduced until the OS answers, so the
+  // clock is switched on and off explicitly whenever `hasAnimation` changes.
+  const frameClock = useFrameCallback(advanceFrame, false)
+  useEffect(() => {
+    frameClock.setActive(hasAnimation)
+  }, [advanceFrame, frameClock, hasAnimation])
 
   useEffect(() => {
     // Returning to a motion after a still pose restarts it from frame 0.
