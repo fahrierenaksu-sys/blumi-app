@@ -85,6 +85,16 @@ test("reduce motion drops the lift and spring but the ghost still follows the fi
   assert.match(dragHookSource, /if \(reduceMotion\) \{[\s\S]*ghostX\.value = ghostOriginX\.value/)
 })
 
+test("the unsaved-exit guard can stop the iOS swipe and cancels a drag in progress", () => {
+  // native-stack turns only usePreventRemove into `preventNativeDismiss`; a
+  // bare beforeRemove listener let the native page pop while JS kept the
+  // editor route (2026-09-30 frozen My Room regression).
+  assert.doesNotMatch(editorSurfaceSource, /addListener\("beforeRemove"/)
+  assert.match(read("useRoomEditorSave.ts"), /usePreventRemove\(isDirty,/)
+  assert.match(screenSource, /isDirty: editorSession\.isDirty/)
+  assert.match(screenSource, /cancelActiveDrag: drag\.cancelActiveDrag/)
+})
+
 test("taps keep their Pressables and drag is announced where it is available", () => {
   assert.match(stageSource, /onPress=\{onPress\}/)
   assert.match(stageSource, /accessibilityHint=\{`\$\{copy\.stageHint\} \$\{copy\.stageDragHint\}`\}/)

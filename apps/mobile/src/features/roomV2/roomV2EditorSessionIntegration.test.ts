@@ -68,12 +68,15 @@ test("unsaved navigation offers save discard and stay without bypassing save val
   ].join("\n")
 
   assert.match(screen, /editorSessionRef: session\.editorSessionRef/)
-  assert.match(editor, /navigation\.addListener\("beforeRemove"/)
-  assert.match(editor, /if \(!editorSessionRef\.current\.isDirty\) return/)
+  // usePreventRemove (not a bare beforeRemove listener) so native-stack can
+  // cancel the iOS swipe-back instead of popping the native page first.
+  assert.doesNotMatch(editor, /addListener\("beforeRemove"/)
+  assert.match(editor, /usePreventRemove\(isDirty, \(\{ data \}\) => \{/)
+  assert.match(editor, /if \(allowEditorExitRef\.current \|\| !editorSessionRef\.current\.isDirty\) \{/)
   assert.match(editor, /text: copy\.unsavedDialog\.stay/)
   assert.match(editor, /text: copy\.unsavedDialog\.discard/)
   assert.match(editor, /text: copy\.save/)
-  assert.match(editor, /pendingEditorExitActionRef\.current = event\.data\.action[\s\S]*?handleSave\(\)/)
+  assert.match(editor, /pendingEditorExitActionRef\.current = data\.action[\s\S]*?handleSave\(\)/)
   assert.match(
     editor,
     /const requestedExitAction = pendingEditorExitActionRef\.current[\s\S]*?pendingEditorExitActionRef\.current = undefined/
