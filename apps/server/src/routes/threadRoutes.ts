@@ -48,7 +48,8 @@ import type { SafetyService } from "../safety/safetyService"
 import {
   readLimit,
   readParam,
-  resolveProductSession
+  resolveProductSession,
+  schemaValidationFailed
 } from "./routeHelpers"
 import {
   createAuthorizedThreadId,
@@ -251,6 +252,7 @@ export async function registerThreadRoutes(
 
   app.post("/v1/threads", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.createThread,
       response: {
@@ -269,7 +271,8 @@ export async function registerThreadRoutes(
       : []
     if (
       participantUserIds.length !== 2 ||
-      !participantUserIds.includes(resolved.account.userId)
+      !participantUserIds.includes(resolved.account.userId) ||
+      schemaValidationFailed(request)
     ) {
       return reply.code(400).send({ error: "Choose two conversation participants." })
     }
@@ -373,13 +376,14 @@ export async function registerThreadRoutes(
 
   app.get("/v1/threads/:threadId/room-invites", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: threadIdRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const threadId = readParam(request, "threadId")
     const miniRoomService = services.miniRoomService
-    if (!threadId) {
+    if (!threadId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a conversation first." })
     }
     if (!miniRoomService) {
@@ -435,13 +439,14 @@ export async function registerThreadRoutes(
 
   app.post("/v1/threads/:threadId/room-invites", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: threadIdRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const threadId = readParam(request, "threadId")
     const miniRoomService = services.miniRoomService
-    if (!threadId) {
+    if (!threadId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a conversation first." })
     }
     if (!miniRoomService) {
@@ -496,13 +501,14 @@ export async function registerThreadRoutes(
 
   app.post("/v1/room-sessions/:roomSessionId/join", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: roomSessionRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const roomSessionId = readParam(request, "roomSessionId")
     const miniRoomService = services.miniRoomService
-    if (!roomSessionId) {
+    if (!roomSessionId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a room first." })
     }
     if (!miniRoomService) {
@@ -548,13 +554,14 @@ export async function registerThreadRoutes(
 
   app.post("/v1/room-sessions/:roomSessionId/leave", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: roomSessionRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const roomSessionId = readParam(request, "roomSessionId")
     const miniRoomService = services.miniRoomService
-    if (!roomSessionId) {
+    if (!roomSessionId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a room first." })
     }
     if (!miniRoomService) {
@@ -615,6 +622,7 @@ export async function registerThreadRoutes(
 
   app.post("/v1/room-invites/:inviteId/decision", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       ...inviteIdRouteSchema,
       body: coreApiJsonSchemas.roomInviteDecision
@@ -625,7 +633,7 @@ export async function registerThreadRoutes(
     const inviteId = readParam(request, "inviteId")
     const miniRoomService = services.miniRoomService
     const parsed = roomInviteDecisionRequestSchema.safeParse(request.body)
-    if (!inviteId || !parsed.success) {
+    if (!inviteId || !parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a valid room invite decision." })
     }
     if (!miniRoomService) {
@@ -697,13 +705,14 @@ export async function registerThreadRoutes(
 
   app.post("/v1/room-invites/:inviteId/cancel", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: inviteIdRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const inviteId = readParam(request, "inviteId")
     const miniRoomService = services.miniRoomService
-    if (!inviteId) {
+    if (!inviteId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a room invite first." })
     }
     if (!miniRoomService) {
@@ -726,6 +735,7 @@ export async function registerThreadRoutes(
 
   app.get("/v1/threads/:threadId/messages", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       ...threadIdRouteSchema,
       querystring: coreApiJsonSchemas.listChatMessagesQuery
@@ -735,8 +745,11 @@ export async function registerThreadRoutes(
     if (!resolved) return
 
     const threadId = readParam(request, "threadId")
-    if (!threadId) {
+    if (!threadId || schemaValidationFailed(request, "params")) {
       return reply.code(400).send({ error: "Choose a conversation first." })
+    }
+    if (schemaValidationFailed(request, "querystring")) {
+      return reply.code(400).send({ error: "Choose valid message page options." })
     }
 
     try {
@@ -766,6 +779,7 @@ export async function registerThreadRoutes(
 
   app.post("/v1/threads/:threadId/messages", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       ...threadIdRouteSchema,
       body: coreApiJsonSchemas.sendChatMessage
@@ -775,12 +789,12 @@ export async function registerThreadRoutes(
     if (!resolved) return
 
     const threadId = readParam(request, "threadId")
-    if (!threadId) {
+    if (!threadId || schemaValidationFailed(request, "params")) {
       return reply.code(400).send({ error: "Choose a conversation first." })
     }
 
     const parsed = sendChatMessageRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request, "body")) {
       return reply.code(400).send({ error: "Write a message first." })
     }
 
@@ -816,13 +830,14 @@ export async function registerThreadRoutes(
 
   app.post("/v1/threads/:threadId/read", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: threadIdRouteSchema
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
 
     const threadId = readParam(request, "threadId")
-    if (!threadId) {
+    if (!threadId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a conversation first." })
     }
 

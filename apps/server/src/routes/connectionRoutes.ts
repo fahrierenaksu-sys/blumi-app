@@ -11,7 +11,7 @@ import {
   type ConnectionService
 } from "../connections/connectionService"
 import type { ConnectionManager } from "../realtime/connectionManager"
-import { resolveBearerSession } from "./routeHelpers"
+import { resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 export interface ConnectionRouteServices {
@@ -26,6 +26,7 @@ export async function registerConnectionRoutes(
 ): Promise<void> {
   app.post("/v1/connections/decision", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.connectionDecision,
       response: {
@@ -46,7 +47,7 @@ export async function registerConnectionRoutes(
     }
 
     const parsed = connectionDecisionRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a valid room decision." })
     }
 

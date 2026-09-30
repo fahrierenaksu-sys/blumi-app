@@ -46,6 +46,7 @@ import { registerSafetyRoutes } from "./routes/safetyRoutes"
 import { registerConnectionRoutes } from "./routes/connectionRoutes"
 import { registerThreadRoutes } from "./routes/threadRoutes"
 import { registerUserRoutes } from "./routes/userRoutes"
+import { assertRequestValidationPolicy } from "./routes/routeHelpers"
 import { createSafetyService, type SafetyService } from "./safety/safetyService"
 import {
   createConnectionManager,
@@ -185,6 +186,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
 
   const openApiRoutes: OpenApiRouteSnapshot[] = []
   app.addHook("onRoute", (route) => {
+    assertRequestValidationPolicy(route)
     openApiRoutes.push({
       method: route.method,
       url: route.url,
@@ -311,7 +313,12 @@ function registerErrorHandler(app: FastifyInstance) {
     }
 
     return reply.code(statusCode).send({
-      error: statusCode >= 500 ? "Something went wrong." : getErrorMessage(error),
+      error: statusCode >= 500
+        ? "Something went wrong."
+        : isSchemaValidationError(error)
+          // Never echo validator internals (schema paths, keywords, limits).
+          ? "Check your request and try again."
+          : getErrorMessage(error),
       statusCode,
       requestId: request.id
     })
@@ -344,6 +351,13 @@ function getErrorStatusCode(error: unknown): number {
       ? error.statusCode
       : 500
   return statusCode >= 400 && statusCode <= 599 ? statusCode : 500
+}
+
+function isSchemaValidationError(error: unknown): boolean {
+  return typeof error === "object" &&
+    error !== null &&
+    "validation" in error &&
+    Array.isArray(error.validation)
 }
 
 function getErrorMessage(error: unknown): string {

@@ -9,7 +9,7 @@ import { isAuthError } from "../auth/authErrors"
 import { toSessionActor, type AuthService } from "../auth/authService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
 import { normalizePhoneNumber } from "../auth/phone"
-import { readBearerToken } from "./routeHelpers"
+import { readBearerToken, schemaValidationFailed } from "./routeHelpers"
 import {
   parseAuthPhoneRequest,
   parseAuthVerificationRequest,
@@ -42,7 +42,7 @@ export async function registerAuthRoutes(
     "/v1/auth/send-code",
     {
       attachValidation: true,
-      config: { apiAuth: "public", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.authPhone,
         response: sendCodeResponses
@@ -53,7 +53,7 @@ export async function registerAuthRoutes(
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseAuthPhoneRequest(request.body)
-      if (!parsed) {
+      if (!parsed || schemaValidationFailed(request)) {
         return reply.code(400).send({
           error: "Enter a valid phone number with country code."
         })
@@ -79,7 +79,7 @@ export async function registerAuthRoutes(
     "/v1/auth/verify",
     {
       attachValidation: true,
-      config: { apiAuth: "public", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.authVerification,
         response: verificationResponses
@@ -97,7 +97,7 @@ export async function registerAuthRoutes(
     "/v1/accounts/register",
     {
       attachValidation: true,
-      config: { apiAuth: "public", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.registerAccount,
         response: verificationResponses
@@ -108,7 +108,7 @@ export async function registerAuthRoutes(
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseRegisterAccountRequest(request.body)
-      if (!parsed) {
+      if (!parsed || schemaValidationFailed(request)) {
         return reply.code(400).send({
           error: "Enter a valid phone number, 6-digit code, and Terms acceptance."
         })
@@ -134,7 +134,7 @@ export async function registerAuthRoutes(
     "/v1/auth/firebase/complete",
     {
       attachValidation: true,
-      config: { apiAuth: "public", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: {
           type: "object",
@@ -157,7 +157,7 @@ export async function registerAuthRoutes(
     },
     async (request, reply) => {
       const parsed = parseFirebaseAuthRequest(request.body)
-      if (!parsed) {
+      if (!parsed || schemaValidationFailed(request)) {
         return reply.code(400).send({ error: "Phone verification could not be completed." })
       }
       if (!services.firebaseAuthVerifier) {
@@ -243,7 +243,7 @@ async function verifyAndCreateSession({
   authService: AuthService
 }) {
   const parsed = parseAuthVerificationRequest(request.body)
-  if (!parsed) {
+  if (!parsed || schemaValidationFailed(request)) {
     return reply.code(400).send({
       error: "Enter a valid phone number and 6-digit code."
     })

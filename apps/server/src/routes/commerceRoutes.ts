@@ -25,7 +25,7 @@ import {
   parseRevenueCatWebhookEvent,
   verifyRevenueCatWebhookSignature
 } from "../commerce/revenueCatWebhook"
-import { resolveProductSession } from "./routeHelpers"
+import { resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 import type { PurchaseEnvironment } from "../commerce/purchaseEnvironment"
 
 const rawWebhookBodies = new WeakMap<FastifyRequest, Buffer>()
@@ -55,7 +55,7 @@ export async function registerCommerceRoutes(
     "/v1/commerce/coin-packs/reconcile",
     {
       attachValidation: true,
-      config: { apiAuth: "bearer", rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: { apiAuth: "bearer", requestValidation: "enforced", rateLimit: { max: 20, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.commerceReconcile,
         response: {
@@ -73,7 +73,7 @@ export async function registerCommerceRoutes(
       if (!resolved) return
 
       const transactionIds = parseTransactionIds(request.body)
-      if (!transactionIds) {
+      if (!transactionIds || schemaValidationFailed(request)) {
         return reply.code(400).send({
           code: "COMMERCE_TRANSACTION_IDS_INVALID",
           error: "Choose valid purchases to reconcile."
@@ -118,7 +118,10 @@ export async function registerCommerceRoutes(
     "/v1/webhooks/revenuecat",
     {
       attachValidation: true,
-      config: { apiAuth: "revenuecat-webhook", rateLimit: { max: 500, timeWindow: "1 minute" } },
+      // Advisory: RevenueCat, not the app, calls this. Signature verification
+      // must answer first (401), and malformed-but-signed events are
+      // acknowledged with 200 so the provider does not retry them forever.
+      config: { apiAuth: "revenuecat-webhook", requestValidation: "advisory", rateLimit: { max: 500, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.revenueCatWebhook,
         headers: {

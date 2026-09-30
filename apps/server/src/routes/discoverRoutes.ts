@@ -25,7 +25,7 @@ import type { PersonalRoomDecorService } from "../rooms/personalRoomDecorService
 import type { RoomSnapshotService } from "../rooms/roomSnapshotService"
 import type { DiscoverProfileRecord } from "../matches/matchRepository"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
-import { isRecord, resolveProductSession } from "./routeHelpers"
+import { isRecord, resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 
 export interface DiscoverRouteServices {
   authService: AuthService
@@ -71,6 +71,7 @@ export async function registerDiscoverRoutes(
       attachValidation: true,
       config: {
         apiAuth: "bearer",
+        requestValidation: "enforced",
         rateLimit: {
           max: DISCOVER_RATE_LIMIT_MAX,
           timeWindow: DISCOVER_RATE_LIMIT_WINDOW,
@@ -103,6 +104,9 @@ export async function registerDiscoverRoutes(
       const controls = parseDiscoveryPageControls(request.query)
       if (!controls.ok) {
         return reply.code(400).send({ error: controls.error })
+      }
+      if (schemaValidationFailed(request)) {
+        return reply.code(400).send({ error: "Choose valid Discover page options." })
       }
       let snapshotPage: Awaited<ReturnType<typeof discoverySnapshots.page>>
       let decisionQuota: Awaited<ReturnType<typeof matchService.getDecisionQuota>>
@@ -184,6 +188,7 @@ export async function registerDiscoverRoutes(
 
   app.get("/v1/discover/:userId", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       params: coreApiJsonSchemas.discoverProfileParams,
       response: {
@@ -196,7 +201,11 @@ export async function registerDiscoverRoutes(
     if (!resolved) return
     const parsedParams = discoverProfileParamsSchema.safeParse(request.params)
     const targetUserId = parsedParams.success ? parsedParams.data.userId : ""
-    if (!targetUserId || targetUserId === resolved.account.userId) {
+    if (
+      !targetUserId ||
+      targetUserId === resolved.account.userId ||
+      schemaValidationFailed(request)
+    ) {
       return reply.code(404).send({ error: "That profile is not available anymore." })
     }
     if (await safetyService.hasBlockBetween(resolved.account.userId, targetUserId)) {
@@ -235,6 +244,7 @@ export async function registerDiscoverRoutes(
 
   app.post("/v1/discover/:userId/like", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: discoverDecisionRouteSchema
   }, async (request, reply) => {
     return decideOnDiscoverProfile({
@@ -249,6 +259,7 @@ export async function registerDiscoverRoutes(
 
   app.post("/v1/discover/:userId/pass", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: discoverDecisionRouteSchema
   }, async (request, reply) => {
     return decideOnDiscoverProfile({
@@ -453,7 +464,7 @@ async function decideOnDiscoverProfile({
 
   const parsedParams = discoverProfileParamsSchema.safeParse(request.params)
   const targetUserId = parsedParams.success ? parsedParams.data.userId : ""
-  if (!targetUserId) {
+  if (!targetUserId || schemaValidationFailed(request)) {
     return reply.code(400).send({ error: "Choose a profile first." })
   }
   if (await safetyService.hasBlockBetween(resolved.account.userId, targetUserId)) {

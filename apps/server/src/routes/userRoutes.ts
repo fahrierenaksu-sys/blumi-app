@@ -32,7 +32,8 @@ import {
   readBearerToken,
   readPhoneNumber,
   readVerificationCode,
-  resolveBearerSession
+  resolveBearerSession,
+  schemaValidationFailed
 } from "./routeHelpers"
 import type {
   CompleteAvatarSelection,
@@ -82,7 +83,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/firebase/challenge", {
     attachValidation: true,
-    config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
       body: {
         type: "object",
@@ -101,7 +102,10 @@ export async function registerUserRoutes(
     if (!services.firebaseAuthVerifier) return reply.code(503).send({ error: "Phone verification is not configured yet." })
     const body = isRecord(request.body) ? request.body : null
     const purpose = typeof body?.purpose === "string" ? body.purpose : ""
-    if (!["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose)) {
+    if (
+      !["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose) ||
+      schemaValidationFailed(request)
+    ) {
       return reply.code(400).send({ error: "Invalid verification purpose." })
     }
     try {
@@ -119,7 +123,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/firebase/reauth", {
     attachValidation: true,
-    config: { rateLimit: { max: 10, timeWindow: "5 minutes" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "5 minutes" } },
     schema: {
       body: {
         type: "object",
@@ -153,7 +157,12 @@ export async function registerUserRoutes(
     const currentPhoneConfirmationToken = typeof body?.currentPhoneConfirmationToken === "string"
       ? body.currentPhoneConfirmationToken
       : undefined
-    if (!idToken || !challengeId || !["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose)) {
+    if (
+      !idToken ||
+      !challengeId ||
+      !["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"].includes(purpose) ||
+      schemaValidationFailed(request)
+    ) {
       return reply.code(400).send({ error: "Phone verification could not be completed." })
     }
 
@@ -249,6 +258,7 @@ export async function registerUserRoutes(
 
   app.patch("/v1/users/me", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.object,
       response: {
@@ -261,6 +271,9 @@ export async function registerUserRoutes(
     const resolvedSession = await resolveBearerSession({ request, reply, authService })
     if (!resolvedSession) return reply
     const sessionToken = readBearerToken(request) as string
+    if (schemaValidationFailed(request)) {
+      return reply.code(400).send({ error: "Choose valid profile details." })
+    }
 
     try {
       const body = isRecord(request.body) ? request.body : {}
@@ -303,6 +316,7 @@ export async function registerUserRoutes(
 
   app.put("/v1/users/me/avatar", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.object,
       response: {
@@ -315,6 +329,13 @@ export async function registerUserRoutes(
     const resolvedSession = await resolveBearerSession({ request, reply, authService })
     if (!resolvedSession) return reply
     const sessionToken = readBearerToken(request) as string
+    if (schemaValidationFailed(request)) {
+      // Same body the avatar service returns for a missing or invalid revision.
+      return reply.code(400).send({
+        code: "invalid_revision",
+        error: "Refresh your avatar and try again."
+      })
+    }
     const body = isRecord(request.body) ? request.body : {}
     const requestCapabilities = resolveRequestCapabilities(
       request,
@@ -363,6 +384,7 @@ export async function registerUserRoutes(
 
   app.patch("/v1/users/me/onboarding", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.onboardingStep,
       response: {
@@ -376,7 +398,7 @@ export async function registerUserRoutes(
     if (!resolvedSession) return reply
     const sessionToken = readBearerToken(request) as string
     const parsed = onboardingStepRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a valid setup step." })
     }
 
@@ -400,7 +422,6 @@ export async function registerUserRoutes(
   app.post(
     "/v1/account/deletion/challenge",
     {
-      attachValidation: true,
       config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
       schema: accountChallengeRouteSchema
     },
@@ -424,13 +445,15 @@ export async function registerUserRoutes(
     "/v1/account/deletion/confirm",
     {
       attachValidation: true,
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: accountVerificationRouteSchema
     },
     async (request, reply) => {
       const sessionToken = readBearerToken(request)
       const parsed = verificationCodeRequestSchema.safeParse(request.body)
-      const code = parsed.success ? readVerificationCode(parsed.data) : null
+      const code = parsed.success && !schemaValidationFailed(request)
+        ? readVerificationCode(parsed.data)
+        : null
       if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
       if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       if (!code) return reply.code(400).send({ error: "Enter the 6-digit deletion code." })
@@ -447,6 +470,10 @@ export async function registerUserRoutes(
 
   app.delete("/v1/account", {
     attachValidation: true,
+    // Advisory: a malformed or missing confirmation deliberately gets the same
+    // 403 REAUTH_REQUIRED answer as an expired one; this destructive/private
+    // flow has no input-400 contract to preserve.
+    config: { requestValidation: "advisory" },
     schema: accountConfirmationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -474,7 +501,6 @@ export async function registerUserRoutes(
   })
 
   app.post("/v1/account/export/challenge", {
-    attachValidation: true,
     config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: accountChallengeRouteSchema
   }, async (request, reply) => {
@@ -493,12 +519,14 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/export/confirm", {
     attachValidation: true,
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
-    const code = parsed.success ? readVerificationCode(parsed.data) : null
+    const code = parsed.success && !schemaValidationFailed(request)
+      ? readVerificationCode(parsed.data)
+      : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
     if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
@@ -514,6 +542,10 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/export", {
     attachValidation: true,
+    // Advisory: a malformed or missing confirmation deliberately gets the same
+    // 403 REAUTH_REQUIRED answer as an expired one; this destructive/private
+    // flow has no input-400 contract to preserve.
+    config: { requestValidation: "advisory" },
     schema: accountConfirmationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -532,7 +564,6 @@ export async function registerUserRoutes(
   })
 
   app.post("/v1/account/phone-change/current/challenge", {
-    attachValidation: true,
     config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: accountChallengeRouteSchema
   }, async (request, reply) => {
@@ -551,12 +582,14 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/current/confirm", {
     attachValidation: true,
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
-    const code = parsed.success ? readVerificationCode(parsed.data) : null
+    const code = parsed.success && !schemaValidationFailed(request)
+      ? readVerificationCode(parsed.data)
+      : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
     if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
@@ -572,7 +605,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/new/challenge", {
     attachValidation: true,
-    config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
       body: coreApiJsonSchemas.phoneChangeNewChallenge,
       response: {
@@ -590,7 +623,7 @@ export async function registerUserRoutes(
       : ""
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
     if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
-    if (!phoneNumber || !currentPhoneConfirmationToken) return reply.code(400).send({ error: "Enter a valid new phone number and confirm your current number first." })
+    if (!phoneNumber || !currentPhoneConfirmationToken || schemaValidationFailed(request)) return reply.code(400).send({ error: "Enter a valid new phone number and confirm your current number first." })
     try {
       const challenge = await authService.requestPhoneChangeNewNumberChallenge(sessionToken, phoneNumber.e164, currentPhoneConfirmationToken)
       if (!challenge) return reply.code(401).send({ error: "Sign in again to continue." })
@@ -604,12 +637,14 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/new/confirm", {
     attachValidation: true,
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
     const parsed = verificationCodeRequestSchema.safeParse(request.body)
-    const code = parsed.success ? readVerificationCode(parsed.data) : null
+    const code = parsed.success && !schemaValidationFailed(request)
+      ? readVerificationCode(parsed.data)
+      : null
     if (!sessionToken) return reply.code(401).send({ error: "Sign in again to continue." })
     if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     if (!code) return reply.code(400).send({ error: "Enter the 6-digit security code." })
@@ -625,6 +660,10 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/confirm", {
     attachValidation: true,
+    // Advisory: a malformed or missing confirmation deliberately gets the same
+    // 403 REAUTH_REQUIRED answer as an expired one; this destructive/private
+    // flow has no input-400 contract to preserve.
+    config: { requestValidation: "advisory" },
     schema: {
       body: coreApiJsonSchemas.phoneChangeConfirm,
       response: {
@@ -651,7 +690,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/recovery/challenge", {
     attachValidation: true,
-    config: { apiAuth: "public", rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
       body: coreApiJsonSchemas.phoneNumber,
       response: {
@@ -662,7 +701,9 @@ export async function registerUserRoutes(
   }, async (request, reply) => {
     const parsed = phoneNumberRequestSchema.safeParse(request.body)
     const phone = parsed.success ? readPhoneNumber(parsed.data) : null
-    if (!phone) return reply.code(400).send({ error: "Enter a valid new phone number." })
+    if (!phone || schemaValidationFailed(request)) {
+      return reply.code(400).send({ error: "Enter a valid new phone number." })
+    }
     try {
       const challenge = await authService.requestRecoveryPhoneVerification(phone.e164)
       return reply.code(202).send({ ok: true, expiresAt: challenge.expiresAt })
@@ -674,18 +715,11 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/recovery/requests", {
     attachValidation: true,
-    config: { apiAuth: "public", rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    // Advisory: this public route answers every unverifiable request with the
+    // same 202 so it cannot be used to probe which phone numbers have accounts.
+    config: { apiAuth: "public", requestValidation: "advisory", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
-      body: {
-        type: "object",
-        required: ["oldPhoneNumber", "newPhoneNumber", "idToken"],
-        properties: {
-          oldPhoneNumber: { type: "string" },
-          newPhoneNumber: { type: "string" },
-          idToken: { type: "string", minLength: 1, maxLength: 12_000 }
-        },
-        additionalProperties: false
-      },
+      body: coreApiJsonSchemas.accountRecoveryRequest,
       response: {
         202: successResponseJsonSchema,
         ...authenticatedErrorResponses
