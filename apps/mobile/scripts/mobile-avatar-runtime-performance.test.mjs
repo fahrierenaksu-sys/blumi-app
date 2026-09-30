@@ -48,19 +48,29 @@ test("MiniRoom avoids duplicate synthetic motion and isolates unchanged avatars"
   )
 })
 
-test("MiniRoom resolves expensive sitting asset readiness once before the frame loop", () => {
-  const tickStart = miniRoomStoreSource.indexOf("const tick = () =>")
-  const tickEnd = miniRoomStoreSource.indexOf(
-    "animationFrameRef.current = requestAnimationFrame(tick)",
-    tickStart
+test("MiniRoom resolves expensive sitting asset readiness once before the movement run", () => {
+  const runStart = miniRoomStoreSource.indexOf("run = startMiniRoomMovementRun({")
+  const runEnd = miniRoomStoreSource.indexOf(
+    "activeMovementRef.current = run",
+    runStart
   )
-  assert.ok(tickStart > 0)
-  assert.ok(tickEnd > tickStart)
+  assert.ok(runStart > 0)
+  assert.ok(runEnd > runStart)
 
-  const preTick = miniRoomStoreSource.slice(0, tickStart)
-  const tickBody = miniRoomStoreSource.slice(tickStart, tickEnd)
-  assert.match(preTick, /const arrivalMotion[\s\S]*canMiniRoomAvatarUseMotion/)
-  assert.doesNotMatch(tickBody, /canMiniRoomAvatarUseMotion/)
+  const preRun = miniRoomStoreSource.slice(0, runStart)
+  const runCallbacks = miniRoomStoreSource.slice(runStart, runEnd)
+  assert.match(preRun, /const arrivalMotion[\s\S]*canMiniRoomAvatarUseMotion/)
+  assert.doesNotMatch(runCallbacks, /canMiniRoomAvatarUseMotion/)
+})
+
+test("MiniRoom walking runs on the UI thread and commits React state only on pose changes", () => {
+  assert.doesNotMatch(miniRoomStoreSource, /requestAnimationFrame|setInterval\(/)
+  assert.match(miniRoomStoreSource, /onSegmentStart:[\s\S]*?onSegmentEnd:[\s\S]*?onArrival:/)
+  // Every avatar is positioned from its live shared values, not from React state.
+  assert.match(avatarLayerSource, /const anchorStyle = useAnimatedStyle\(\(\) => \(\{\s*left: `\$\{position\.x\.value \* 100\}%`,\s*top: `\$\{position\.y\.value \* 100\}%`/)
+  assert.match(avatarLayerSource, /transform: \[\{ scale: 0\.9 \+ position\.y\.value \* 0\.2 \}\]/)
+  assert.doesNotMatch(avatarLayerSource, /left: `\$\{avatar\.x \* 100\}%`/)
+  assert.doesNotMatch(avatarLayerSource, /const depthScale = 0\.9 \+ avatar\.y/)
 })
 
 test("MiniRoom movement actions stay stable while avatar coordinates tick", () => {

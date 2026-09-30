@@ -1,5 +1,5 @@
 import { requestJson } from "../network/apiClient"
-import { RealtimeTicketRequestError } from "./realtimeClient"
+import { RealtimeTicketRequestError } from "@blumi/realtime-client"
 
 export async function requestRealtimeTicket(
   baseHttpUrl: string,

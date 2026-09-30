@@ -42,6 +42,15 @@ test("read events stay on the current account and next chat pages are requested"
   assert.equal(refreshes, 1)
 })
 
+test("the server's block confirmation drops the blocked partner's chat", () => {
+  const blocked: string[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    onPartnerBlocked: (blockedUserId) => { blocked.push(blockedUserId) }
+  }))
+  handler({ type: "safety.user_blocked", payload: { blockedUserId: "bora" } })
+  assert.deepEqual(blocked, ["bora"])
+})
+
 function createDependencies(
   overrides: Partial<TestDependencies> = {}
 ): TestDependencies {

@@ -15,8 +15,7 @@ import {
   useGlobalRealtime,
   useGlobalRealtimeEvents
 } from "../realtime/globalRealtimeProvider"
-import { createReconnectTransitionTracker } from "../realtime/reconnectTransitionTracker"
-import type { ServerEvent } from "@blumi/realtime-client"
+import { createReconnectTransitionTracker, type ServerEvent } from "@blumi/realtime-client"
 import {
   findLastCanonicalRoomChatMessage,
   findCanonicalRoomChatThread,

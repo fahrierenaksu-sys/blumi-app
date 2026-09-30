@@ -215,7 +215,6 @@ function sendBindings(events, sendChatMessage) {
       events.push(["optimistic", message.body])
       return { localMessageId: "__local_test", clientMessageId: "client-test-001" }
     },
-    route: { params: { sendChatMessage } },
     sendChatMessage,
     sessionActor: { session: { mode: "production" } },
     sessionMode: "production",
@@ -316,7 +315,6 @@ function retryBindings(events, { retryable, sendChatMessage }) {
       return retryable
     },
     markOptimisticMessageSending: (clientMessageId) => events.push(["sending", clientMessageId]),
-    route: { params: { sendChatMessage } },
     sendChatMessage
   }
 }
@@ -363,7 +361,6 @@ function loadEarlierBindings(events, overrides = {}) {
     return overrides.result ?? Promise.resolve()
   }
   return {
-    route: { params: { requestMessages } },
     requestMessages,
     messages: [{ messageId: "oldest" }, { messageId: "newest" }],
     resolvedThreadId: "thread_one",

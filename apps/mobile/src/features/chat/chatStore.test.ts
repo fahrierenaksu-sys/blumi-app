@@ -28,7 +28,9 @@ import {
   resetChatStore,
   subscribeToChatStore,
   setActiveThread,
-  createChatThreadSnapshotReader
+  createChatThreadSnapshotReader,
+  beginChatThreadListRequest,
+  removeChatThreadsWithPartner
 } from "./chatStore"
 
 test("one realtime message is not proof that the first history page is ready", () => {
@@ -581,4 +583,57 @@ test("late delivery of an already read message does not recreate unread", () => 
   applyChatThreadRead({ userId: "user_one", threadId: "thread_one", readAt: "2026-06-27T10:01:00.000Z" })
   applyChatMessageReceived({ messageId: "late", threadId: "thread_one", senderUserId: "user_two", body: "old", sentAt: "2026-06-27T10:00:00.000Z" }, { localUserId: "user_one" })
   assert.equal(getThreadUnreadCount("thread_one"), 0)
+})
+
+// ── Blocked partner removal ────────────────────────────────
+
+function blockedPartnerThread(threadId: string, partnerUserId: string) {
+  return {
+    threadId,
+    miniRoomId: `room_${threadId}`,
+    participantUserIds: ["me", partnerUserId] as [string, string],
+    participants: [{ userId: "me", displayName: "Me" }, { userId: partnerUserId, displayName: partnerUserId }] as [
+      { userId: string; displayName: string },
+      { userId: string; displayName: string }
+    ],
+    createdAt: "2026-09-30T09:00:00.000Z",
+    unreadCount: 2,
+    lastMessage: { messageId: `last_${threadId}`, threadId, senderUserId: partnerUserId, body: "hi", sentAt: "2026-09-30T10:00:00.000Z" }
+  }
+}
+
+test("blocking a partner removes their threads, messages and unread counts at once", () => {
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_blocked", "blocked"), blockedPartnerThread("t_other", "other")] })
+  applyChatMessageListed({ userId: "me", threadId: "t_blocked", messages: [{ messageId: "m1", threadId: "t_blocked", senderUserId: "blocked", body: "hi", sentAt: "2026-09-30T10:00:00.000Z" }] })
+  setActiveThread("t_blocked")
+  let notifications = 0
+  const unsubscribe = subscribeToChatStore(() => { notifications += 1 })
+
+  const removed = removeChatThreadsWithPartner("blocked")
+  unsubscribe()
+
+  assert.deepEqual(removed, ["t_blocked"])
+  assert.deepEqual(getThreads().map((thread) => thread.threadId), ["t_other"])
+  assert.deepEqual(getMessages("t_blocked"), [])
+  assert.equal(getThreadUnreadCount("t_blocked"), 0)
+  assert.equal(getTotalUnreadCount(), 2, "only the remaining thread's unread count is left")
+  assert.equal(findThreadForPartner("blocked"), undefined)
+  assert.equal(notifications, 1)
+  assert.deepEqual(removeChatThreadsWithPartner("blocked"), [], "a repeated confirmation is a no-op")
+})
+
+test("a thread list requested before the block cannot bring the blocked thread back; a later one can", () => {
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_blocked", "blocked")] })
+  const staleRequest = beginChatThreadListRequest()
+  removeChatThreadsWithPartner("blocked")
+
+  applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_blocked", "blocked"), blockedPartnerThread("t_other", "other")] }, { requestSequence: staleRequest })
+  assert.deepEqual(getThreads().map((thread) => thread.threadId), ["t_other"])
+
+  // After an unblock the next normal refresh restores the thread.
+  const freshRequest = beginChatThreadListRequest()
+  applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_blocked", "blocked"), blockedPartnerThread("t_other", "other")] }, { requestSequence: freshRequest })
+  assert.deepEqual(getThreads().map((thread) => thread.threadId).sort(), ["t_blocked", "t_other"])
 })

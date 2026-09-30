@@ -29,7 +29,7 @@ Why this combination:
   terminated one second later rather than waiting for `ws`'s 30 s timeout.
 - Chat is never shed while the socket stays open, and closing loses nothing
   durable: messages are committed with a delivery outbox before fanout, and
-  the mobile client (`apps/mobile/src/features/realtime/realtimeClient.ts`)
+  the mobile client (`packages/realtime-client/src/realtimeClient.ts`)
   reconnects with backoff on any close code except 1008 and 4401, then
   reconciles from the API. That is why 1013 is used rather than 1008: 1008
   would stop the client from reconnecting.
@@ -98,7 +98,7 @@ Evidence: `apps/server/src/realtime/realtimeServer.adversarial.test.ts`.
 
 ## Reconnect policy, upgrade limit and in-room acknowledgement (group 3, 2026-09-30)
 
-Evidence: `apps/mobile/src/features/realtime/realtimeClient*.test.ts`,
+Evidence: `packages/realtime-client/src/realtimeClient*.test.ts`,
 `apps/server/src/realtime/realtimeServer.adversarial.test.ts`. No device or
 load evidence.
 

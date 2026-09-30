@@ -35,7 +35,6 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
   "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts",
-  "features/miniRoom/scene/miniRoomSceneStore.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
   "features/session/register/useRegisterFlowController.ts"

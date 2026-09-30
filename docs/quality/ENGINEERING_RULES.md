@@ -39,7 +39,7 @@ is not a reason.
 | Production files stay under 800 lines; listed oversized files may only shrink | Large files mixed lifecycle, UI and rules and could not be tested | `mobile-engineering-rules.test.mjs` |
 | `ui/` and `config/` never import from `features/`; the allowlist may only shrink | Layer inversions made shared UI depend on product features | `mobile-import-boundaries.test.mjs` |
 | `RootNavigator.tsx` declares routes only; app-wide lifecycles live in `navigation/use*.ts` hooks | The navigator was a 1,992-line mix of realtime, chat sync, push and deep links | Review |
-| Route params carry serialisable data only, never functions or class instances | Functions in params break state persistence, deep links and restoration (known debt: ChatThread) | Review |
+| Route params carry serialisable data only, never functions or class instances; screens get callbacks from the owning hook as props | Functions in params break state persistence, deep links and restoration | `routeParamsSerialisable.test.mjs` (type-checks `RootStackParamList`) |
 | Deep links arriving before the signed-in stack go through `navigation/pendingDeepLink.ts` | Links were silently dropped before `Main` mounted | `pendingDeepLink` tests |
 | One source of truth per piece of state; module stores are keyed by account and reset on account switch | Cached data leaked between accounts | `accountSwitchIsolation.test.ts` |
 | Production catalogues are named `*Catalog.ts`, never `*.mock.ts` | Mock names hid real product data | Review |
@@ -50,7 +50,7 @@ is not a reason.
 | Rule | Why | Enforced by |
 |---|---|---|
 | Mobile HTTP only through `requestJson` (deadline, abort, error mapping) | Raw fetches had no timeout and inconsistent errors | `mobile-engineering-rules.test.mjs` (no `fetch(`) |
-| Inbound realtime events are parsed with the shared zod schemas from `packages/contracts` | Shape checks accepted malformed events | Realtime client tests |
+| Inbound realtime events are parsed with the shared zod schemas from `packages/contracts`; the platform-independent client lives in `packages/realtime-client` (the app keeps only React, AppState/NetInfo and ticket wiring) | Shape checks accepted malformed events | `packages/realtime-client` tests |
 | Every authenticated server route resolves the session with `resolveBearerSession` | Three profile routes skipped the ban/suspension check | Route tests |
 | Routes declare request schemas and keep request validation enforced | Validation was attached but ignored | `routeHelpers` / route tests |
 | Every repository method exists in both the in-memory and PostgreSQL implementation and is covered by the shared contract suite | The two implementations drifted (economy replay) | `repositoryContract.ts` suites |
@@ -102,9 +102,6 @@ is not a reason.
 
 ## Known debt (do not copy these patterns)
 
-- ChatThread receives functions through navigation params.
-- `packages/realtime-client` is a one-line re-export; the client lives in the
-  app.
 - Module stores follow different shapes.
 - The files in the oversized and frame-loop allowlists of
   `apps/mobile/scripts/mobile-engineering-rules.test.mjs`.

@@ -1,15 +1,16 @@
-export interface MiniRoomAnimationFrameRef {
-  current: number | null
+/** Holds the active movement handle (a UI-thread movement run in the store). */
+export interface MiniRoomAnimationFrameRef<THandle = number> {
+  current: THandle | null
 }
 
 export interface MiniRoomMovementCompletionRef<TTimer> {
   current: TTimer | null
 }
 
-/** Cancels one active path loop and invalidates its shared frame handle. */
-export function cancelActiveMiniRoomMovement(
-  frameRef: MiniRoomAnimationFrameRef,
-  cancelFrame: (frame: number) => void
+/** Cancels one active movement and invalidates its shared handle. */
+export function cancelActiveMiniRoomMovement<THandle>(
+  frameRef: MiniRoomAnimationFrameRef<THandle>,
+  cancelFrame: (frame: THandle) => void
 ): void {
   const frame = frameRef.current
   if (frame === null) return

@@ -1,7 +1,9 @@
 import { memo, useEffect, useMemo, useRef } from "react"
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native"
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { getMiniRoomAvatarRenderLayers } from "../miniRoomAvatarMotion"
+import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
 import {
   MINI_ROOM_PARTNER_ARRIVAL_MS,
   type MiniRoomMotionPolicy
@@ -13,6 +15,7 @@ import type {
 
 interface AvatarLayerProps {
   avatars: Record<string, AvatarState>
+  avatarPositions: Readonly<Record<string, MiniRoomAvatarPosition>>
   localUserId: string
   localUserLabel: string
   bubbles: SpeechBubble[]
@@ -27,6 +30,7 @@ type BubblePlacement = "center" | "left" | "right"
 export function AvatarLayer(props: AvatarLayerProps) {
   const {
     avatars,
+    avatarPositions,
     localUserId,
     localUserLabel,
     bubbles,
@@ -65,11 +69,14 @@ export function AvatarLayer(props: AvatarLayerProps) {
         }
         const bubbleRaised =
           bubblesAreClose && avatar.userId !== leftBubbleUserId
+        const position = avatarPositions[avatar.userId]
+        if (!position) return null
 
         return (
           <AvatarFigure
             key={avatar.userId}
             avatar={avatar}
+            position={position}
             bubble={bubble}
             bubblePlacement={bubblePlacement}
             bubbleRaised={bubbleRaised}
@@ -88,6 +95,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
 
 interface AvatarFigureProps {
   avatar: AvatarState
+  position: MiniRoomAvatarPosition
   bubble: SpeechBubble | undefined
   bubblePlacement: BubblePlacement
   bubbleRaised: boolean
@@ -102,6 +110,7 @@ interface AvatarFigureProps {
 const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   const {
     avatar,
+    position,
     bubble,
     bubblePlacement,
     bubbleRaised,
@@ -288,7 +297,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     return () => animation.stop()
   }, [joinPulseRef, motionPolicy.animateJoin, showJoinPulse])
 
-  const depthScale = 0.9 + avatar.y * 0.2
   const facingSignX = avatar.facing === "left" ? -1 : 1
   const facingLean = avatar.facing === "left" || avatar.facing === "right" ? 1 : 0
   const facingBackDim = avatar.facing === "back" ? 0.82 : 1
@@ -327,17 +335,19 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     inputRange: [0, 0.7, 1],
     outputRange: [0.55, 0.1, 0]
   })
+  // Walking moves these on the UI thread; React renders only on pose changes.
+  const anchorStyle = useAnimatedStyle(() => ({
+    left: `${position.x.value * 100}%`,
+    top: `${position.y.value * 100}%`,
+    // Nearer avatars (larger y) draw on top, also mid-walk.
+    zIndex: Math.round(position.y.value * 1000)
+  }))
+  const depthScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.9 + position.y.value * 0.2 }]
+  }))
 
   return (
-    <View
-      style={[
-        styles.avatarAnchor,
-        {
-          left: `${avatar.x * 100}%`,
-          top: `${avatar.y * 100}%`
-        }
-      ]}
-    >
+    <Reanimated.View style={[styles.avatarAnchor, anchorStyle]}>
       {showJoinPulse ? (
         <Animated.View
           style={[
@@ -404,39 +414,47 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
           isSitting ? styles.avatarShadowSitting : null
         ]}
       />
-      <Animated.View
+      {/* Depth scale (from the live y) wraps the same box so it scales about the same centre. */}
+      <Reanimated.View
         style={[
           styles.avatarImageWrap,
           avatar.motion === "walking" ? styles.avatarWalking : null,
           isSitting ? styles.avatarSitting : null,
-          {
-            opacity: facingBackDim,
-            transform: [
-              { translateY: Animated.add(walkTranslateY, breatheTranslateY) },
-              { scaleX: facingSignX * depthScale },
-              { scaleY: Animated.multiply(breatheScaleY, depthScale * (isSitting ? 0.86 : 1)) },
-              { rotate: leanRotate },
-              { rotate: speakingRotate }
-            ]
-          }
+          depthScaleStyle
         ]}
       >
-        {roomAvatarLayers.length ? (
-          <RoomAvatarRenderer2D layers={roomAvatarLayers} />
-        ) : avatar.appearance.fullBodyAsset ? (
-          <Image
-            source={avatar.appearance.fullBodyAsset}
-            resizeMode="contain"
-            style={styles.avatarImage}
-          />
-        ) : null}
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.avatarImageFill,
+            {
+              opacity: facingBackDim,
+              transform: [
+                { translateY: Animated.add(walkTranslateY, breatheTranslateY) },
+                { scaleX: facingSignX },
+                { scaleY: Animated.multiply(breatheScaleY, isSitting ? 0.86 : 1) },
+                { rotate: leanRotate },
+                { rotate: speakingRotate }
+              ]
+            }
+          ]}
+        >
+          {roomAvatarLayers.length ? (
+            <RoomAvatarRenderer2D layers={roomAvatarLayers} />
+          ) : avatar.appearance.fullBodyAsset ? (
+            <Image
+              source={avatar.appearance.fullBodyAsset}
+              resizeMode="contain"
+              style={styles.avatarImage}
+            />
+          ) : null}
+        </Animated.View>
+      </Reanimated.View>
       <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
           {isLocal ? localUserLabel : avatar.displayName}
         </Text>
       </View>
-    </View>
+    </Reanimated.View>
   )
 })
 
@@ -454,6 +472,15 @@ const styles = StyleSheet.create({
     bottom: 22,
     width: 74,
     height: 108,
+    alignItems: "center",
+    justifyContent: "flex-end"
+  },
+  avatarImageFill: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: "center",
     justifyContent: "flex-end"
   },

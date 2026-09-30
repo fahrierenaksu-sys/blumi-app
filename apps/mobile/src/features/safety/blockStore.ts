@@ -13,6 +13,7 @@ import {
   type BlockHydrationSource,
   type BlockOwnerState
 } from "./blockScopeModel"
+import { publishPartnerBlocked } from "./partnerBlockedEvents"
 import {
   fetchSafetyBlocks,
   type BlockedProfileSummary
@@ -99,6 +100,10 @@ export function blockUser(
     replaceBlockedUsers(state, ownerUserId, [...current, blockedUserId])
   )
   if (options.persist !== false) persistBlocked(ownerUserId)
+  publishPartnerBlocked({
+    ownerUserId: normalizeOwnerUserId(ownerUserId),
+    blockedUserId
+  })
 }
 
 export function unblockUser(

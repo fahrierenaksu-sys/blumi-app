@@ -42,16 +42,10 @@ import { demoSendMessage, getDemoMessages } from "../features/demo/demoStore"
 import { sendGlobal } from "../features/realtime/globalRealtimeProvider"
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
-import type { RootStackParamList } from "./RootNavigator"
+import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindings"
 import type { useRoomInviteRouting } from "./useRoomInviteRouting"
 
 type RoomInviteRouting = ReturnType<typeof useRoomInviteRouting>
-
-/** The ChatThread params the root injects on every chat route. */
-export type ChatThreadRouteBindings = Required<Pick<
-  NonNullable<RootStackParamList["ChatThread"]>,
-  "sendChatMessage" | "requestMessages" | "markThreadRead" | "roomInvites" | "onRoomInviteAction" | "locale"
->> & Pick<NonNullable<RootStackParamList["ChatThread"]>, "onCloseActiveRoom">
 
 interface RootChatSyncInput {
   latestSessionActorRef: RefObject<SessionActor | null>
@@ -68,7 +62,7 @@ interface RootChatSyncInput {
  * Owns root chat synchronization: authoritative thread-list writes guarded
  * against stale HTTP refreshes, production thread refresh with match-thread
  * recovery, the chat coordinator (messages, read state, room invitations),
- * demo-aware route adapters, and the callbacks injected into ChatThread.
+ * demo-aware route adapters, and the callbacks handed to ChatThread.
  */
 export function useRootChatSync({
   latestSessionActorRef,
@@ -215,9 +209,8 @@ export function useRootChatSync({
     return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
   }, [latestSessionActorRef, requestMessages])
 
-  // Function-valued route params are a known follow-up; until then the same
-  // bindings are injected by the ChatThread screen and by goChat.
-  const chatThreadRouteBindings = useMemo((): ChatThreadRouteBindings => ({
+  // Handed to the ChatThread screen as a prop; route params carry ids only.
+  const chatThreadBindings = useMemo((): ChatThreadBindings => ({
     sendChatMessage: sendChatMessageForRoute,
     requestMessages: requestMessagesForRoute,
     markThreadRead: markChatThreadRead,
@@ -248,6 +241,6 @@ export function useRootChatSync({
     resynchronizeMessages,
     upsertRoomInvite,
     warmThreadMessagesForInbox,
-    chatThreadRouteBindings
+    chatThreadBindings
   }
 }

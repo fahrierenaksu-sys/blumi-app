@@ -12,7 +12,7 @@ import {
   useGlobalRealtime,
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
-import { createReconnectTransitionTracker } from "../features/realtime/reconnectTransitionTracker"
+import { createReconnectTransitionTracker } from "@blumi/realtime-client"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,

@@ -29,12 +29,6 @@ import {
   canApplyBlumiDevEntry,
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
-import type { FetchThreadMessagesOptions } from "../features/chat/chatApi"
-import type {
-  ChatLocale,
-  ChatRoomInviteAction,
-  ChatRoomInviteTimelineItem
-} from "../features/chat/chatRoomInviteModel"
 import { useBlockStore } from "../features/safety/blockStore"
 import {
   resetChatStore,
@@ -107,6 +101,7 @@ import { renderRouteErrorBoundary } from "./RouteErrorBoundary"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
+import { useBlockedPartnerCleanup } from "./useBlockedPartnerCleanup"
 import {
   MAIN_TAB_PAGER_ENABLED,
   MAIN_TAB_ROUTE_NAMES,
@@ -218,21 +213,14 @@ export type RootStackParamList = {
   Settings: undefined
   AccountRestriction: undefined
   Legal: { type: string }
+  /**
+   * Ids only. The chat callbacks come from the root as the screen's
+   * `bindings` prop (see useRootChatSync), never through route params.
+   */
   ChatThread: {
     threadId?: string
     partnerId?: string
     partnerName?: string
-    sendChatMessage?: (
-      threadId: string,
-      body: string,
-      clientMessageId: string
-    ) => Promise<void>
-    requestMessages?: (threadId: string, options?: FetchThreadMessagesOptions) => Promise<void>
-    markThreadRead?: (threadId: string) => void
-    roomInvites?: readonly ChatRoomInviteTimelineItem[]
-    onRoomInviteAction?: (action: ChatRoomInviteAction) => Promise<void>
-    onCloseActiveRoom?: (expectedRoomSessionId: string) => Promise<void>
-    locale?: ChatLocale
   }
   MatchResult: {
     match: BlumiMatch
@@ -365,7 +353,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     resynchronizeMessages,
     upsertRoomInvite,
     warmThreadMessagesForInbox,
-    chatThreadRouteBindings
+    chatThreadBindings
   } = useRootChatSync({
     latestSessionActorRef,
     isCurrentSession,
@@ -390,8 +378,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     latestSessionActorRef,
     isCurrentSession,
     applyNewThread,
-    hydrateFromServer,
-    chatThreadRouteBindings
+    hydrateFromServer
   })
 
   useEffect(() => {
@@ -562,6 +549,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     disconnectGlobal()
   }, [resetMatchModal, resetRoomInviteRouting])
 
+  const applyConfirmedPartnerBlock = useBlockedPartnerCleanup(sessionActor?.profile.userId)
+
   useGlobalRealtimeSession({
     sessionActor,
     sessionEntryRoute,
@@ -577,7 +566,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     applyNewThread,
     openReadyMiniRoom,
     getMatchDeduplicationState,
-    onConnectionMatched: handleRealtimeConnectionMatch
+    onConnectionMatched: handleRealtimeConnectionMatch,
+    onPartnerBlocked: applyConfirmedPartnerBlock
   })
 
   const mainTabPageDependencies: MainTabPageDependencies = {
@@ -813,13 +803,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     {...screenProps}
                     sessionActor={sessionActor}
                     onThreadCreated={applyNewThread}
-                    route={{
-                      ...screenProps.route,
-                      params: {
-                        ...screenProps.route.params,
-                        ...chatThreadRouteBindings
-                      }
-                    }}
+                    bindings={chatThreadBindings}
                   />
                 )}
               </Stack.Screen>

@@ -16,7 +16,9 @@ const sourceFiles = [
   "src/features/safety/reportModalCopy.ts",
   "src/features/safety/reportModalCopy.test.ts",
   "src/features/safety/blockScopeModel.ts",
-  "src/features/safety/blockScopeModel.test.ts"
+  "src/features/safety/blockScopeModel.test.ts",
+  "src/features/safety/partnerBlockedEvents.ts",
+  "src/features/safety/partnerBlockedEvents.test.ts"
 ]
 
 try {
@@ -55,7 +57,8 @@ try {
       "--test",
       join(outputDirectory, "features/safety/safetyApi.test.js"),
       join(outputDirectory, "features/safety/reportModalCopy.test.js"),
-      join(outputDirectory, "features/safety/blockScopeModel.test.js")
+      join(outputDirectory, "features/safety/blockScopeModel.test.js"),
+      join(outputDirectory, "features/safety/partnerBlockedEvents.test.js")
     ],
     {
       cwd: workspaceRoot,

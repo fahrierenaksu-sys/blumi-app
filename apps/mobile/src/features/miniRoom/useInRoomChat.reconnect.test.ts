@@ -12,8 +12,7 @@ import {
   shouldRenderIncomingRoomChatMessage
 } from "./inRoomChatThread"
 import { createRoomEntryReplayGate, advanceRoomEntryReplayGate } from "./roomEntryReplayGate"
-import { createReconnectTransitionTracker } from "../realtime/reconnectTransitionTracker"
-import type { RealtimeConnectionStatus } from "../realtime/realtimeClient"
+import { createReconnectTransitionTracker, type RealtimeConnectionStatus } from "@blumi/realtime-client"
 
 const localUserId = "room-owner"
 const partnerUserId = "room-partner"
@@ -137,7 +136,7 @@ function createHookFixture() {
       }),
       useGlobalRealtimeEvents: (listener: (event: any) => void) => { eventHandler = listener }
     },
-    "../realtime/reconnectTransitionTracker": { createReconnectTransitionTracker },
+    "@blumi/realtime-client": { createReconnectTransitionTracker },
     // Same contract as chatThreadModel.normalizeOutgoingChatBody (tested there).
     "../chat/thread/chatThreadModel": {
       normalizeOutgoingChatBody: (body: string) => body.trim().replace(/\s+/g, " ")

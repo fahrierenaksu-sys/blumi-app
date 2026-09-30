@@ -44,6 +44,8 @@ export interface GlobalRealtimeEventHandlerDependencies {
   getThreads: () => readonly ChatThread[]
   openReadyMiniRoom: (payload: ReadyMiniRoomPayload) => void
   onConnectionMatched: (payload: ConnectionMatchedPayload) => void
+  /** `safety.user_blocked`: the server confirmed a block by this user. */
+  onPartnerBlocked?: (blockedUserId: string) => void
   showIncomingMessageToast: (toast: IncomingMessageToast) => void
 }
 
@@ -75,6 +77,11 @@ export function createGlobalRealtimeEventHandler(
         dependencies.applyChatThreadRead?.(event.payload)
         dependencies.requestThreadRefresh?.()
       }
+      return
+    }
+
+    if (event.type === "safety.user_blocked") {
+      dependencies.onPartnerBlocked?.(event.payload.blockedUserId)
       return
     }
 

@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from "react-native"
 import type { RoomAvatarAppearance } from "../../avatarV2/room/avatarRoom.types"
 import type { RoomV2AvatarRenderLayer } from "../../roomV2/roomV2.types"
+import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
 
 export interface RoomPoint {
   x: number
@@ -142,7 +143,10 @@ export interface InteractionState {
 export interface MiniRoomStore {
   scene: RoomScene
   hotspots: RoomHotspot[]
+  /** Committed pose per avatar: changes on segment starts/ends and arrival, never per frame. */
   avatars: Record<string, AvatarState>
+  /** Live on-screen position per avatar id, animated on the UI thread. */
+  avatarPositions: Readonly<Record<string, MiniRoomAvatarPosition>>
   bubbles: SpeechBubble[]
   interaction: InteractionState
   moveLocalAvatar: (point: RoomPoint) => boolean

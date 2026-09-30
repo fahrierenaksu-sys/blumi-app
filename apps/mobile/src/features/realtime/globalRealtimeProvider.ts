@@ -10,16 +10,17 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { ClientEvent, ServerEvent } from "@blumi/realtime-client"
+import {
+  RealtimeClient,
+  type ClientEvent,
+  type RealtimeConnectionMeta,
+  type RealtimeConnectionStatus,
+  type ServerEvent
+} from "@blumi/realtime-client"
 import {
   getIsConnected,
   subscribeToNetworkStatus
 } from "../network/networkStore"
-import {
-  RealtimeClient,
-  type RealtimeConnectionMeta,
-  type RealtimeConnectionStatus
-} from "./realtimeClient"
 import { requestRealtimeTicket } from "./realtimeTicketApi"
 
 // ─── Singleton state ────────────────────────────────────────

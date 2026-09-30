@@ -1,5 +1,4 @@
-import type { ClientEvent } from "@blumi/realtime-client"
-import type { RealtimeConnectionStatus } from "../realtime/realtimeClient"
+import type { ClientEvent, RealtimeConnectionStatus } from "@blumi/realtime-client"
 
 export interface LobbyInviteAttempt {
   connectionStatus: RealtimeConnectionStatus
