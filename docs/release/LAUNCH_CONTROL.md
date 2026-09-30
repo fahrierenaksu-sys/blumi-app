@@ -4,6 +4,13 @@
 
 Snapshot: 2026-09-28, with individual rows updated on 2026-09-30 (each row states its own date). Recheck volatile statuses before acting. The status table and ordered checklist below this infrastructure update are historical release-planning items, not live provider telemetry.
 
+2026-10-01: local chat push/retry/read-sync fixes are implemented and tested in
+`blumison/develop`; see the [backend progress record](../quality/BACKEND_REALTIME_PUSH_PROGRESS_2026-10-01.md).
+Room movement synchronization and presence/reconnect are now IMPLEMENTED / TESTED
+in the local single-process server and mobile client. Physical-device push delivery,
+owner native verification and delivery/read receipts remain OPEN. No deployment
+was performed; shared motion state for multiple replicas is unverified.
+
 ## TestFlight branch automation — 2026-09-30
 
 ### Operations automation expansion — 2026-09-30

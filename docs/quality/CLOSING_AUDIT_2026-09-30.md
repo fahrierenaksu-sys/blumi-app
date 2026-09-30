@@ -8,6 +8,10 @@ dayanır. Durum etiketleri `AGENTS.md` ile aynıdır: **Implemented**, **Tested*
 
 Bu belge main merge, migration veya deploy onayı değildir.
 
+2026-10-01 yerel backend/push düzeltmelerinin kapsamı ve açık kalan işler
+[ayrı ilerleme kaydında](./BACKEND_REALTIME_PUSH_PROGRESS_2026-10-01.md) bulunur.
+Bu kayıt aşağıdaki tarihsel canlı ortam kanıtlarını güncellemez.
+
 ## 1. Sürüm ve ortam
 
 | Öğe | Değer | Nasıl doğrulandı |
