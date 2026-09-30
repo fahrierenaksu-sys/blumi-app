@@ -5,6 +5,14 @@ export type MiniRoomConnectionStatus =
   | "disconnected"
   | "error"
 
+export function createTextOnlyMiniRoomMediaState(roomInfo: MiniRoomMediaRoomInfo): MiniRoomMediaState {
+  return {
+    ...createInitialMiniRoomMediaState(roomInfo),
+    connectionStatus: "connected",
+    localMedia: { micEnabled: false, speakerEnabled: false }
+  }
+}
+
 export interface MiniRoomLocalMediaState {
   micEnabled: boolean
   speakerEnabled: boolean
