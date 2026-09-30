@@ -299,13 +299,12 @@ test("release builds require native media and reject QA inventory unlocks", () =
     }),
     /Development entry routes cannot be enabled/
   )
-  assert.throws(
+  assert.doesNotThrow(
     () => resolveMobileReleaseEnvironment({
       ...secureReleaseEnvironment,
       EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
       EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0"
-    }),
-    /EXPO_PUBLIC_SENTRY_DSN/
+    })
   )
   assert.equal(
     resolveMobileReleaseEnvironment({
@@ -676,7 +675,7 @@ test("shop exit discards previews and cannot interrupt an active transaction", (
   assert.match(combinationSession, /dispatchCombination\(\{ type: "discard_draft" \}\)/)
 })
 
-test("release analytics requires an explicit PostHog project and secure host", () => {
+test("release telemetry is optional and validates supplied configuration", () => {
   const release = {
     EAS_BUILD_PROFILE: "production",
     EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.blumi.app",
@@ -685,7 +684,24 @@ test("release analytics requires an explicit PostHog project and secure host", (
     EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
     EXPO_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/123"
   }
-  assert.throws(() => resolveMobileReleaseEnvironment(release), /POSTHOG_API_KEY/)
+  for (const profile of ["preview", "production"]) {
+    const result = resolveMobileReleaseEnvironment({
+      ...release,
+      EAS_BUILD_PROFILE: profile,
+      EXPO_PUBLIC_SENTRY_DSN: ""
+    })
+    assert.equal(result.sentryDsn, undefined)
+    assert.equal(result.posthogApiKey, undefined)
+    assert.equal(result.posthogHost, undefined)
+  }
+  assert.throws(() => resolveMobileReleaseEnvironment({
+    ...release,
+    EXPO_PUBLIC_SENTRY_DSN: "http://example.ingest.sentry.io/123"
+  }), /Sentry DSN must use HTTPS/)
+  assert.throws(() => resolveMobileReleaseEnvironment({
+    ...release,
+    EXPO_PUBLIC_POSTHOG_API_KEY: "phc_public"
+  }), /POSTHOG_HOST/)
   assert.throws(
     () => resolveMobileReleaseEnvironment({
       ...release,
@@ -694,6 +710,33 @@ test("release analytics requires an explicit PostHog project and secure host", (
     }),
     /PostHog host must use HTTPS/
   )
+})
+
+test("unconfigured Sentry omits native upload plugins while configured Sentry retains them", () => {
+  for (const configured of [false, true]) {
+    const env = {
+      ...process.env,
+      EAS_BUILD_PROFILE: "production",
+      EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.blumi.app",
+      EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://realtime.blumi.app",
+      EXPO_PUBLIC_BLUMI_MEDIA_MODE: "native",
+      EXPO_PUBLIC_BLUMI_ENABLE_DEMO: "0",
+      EXPO_PUBLIC_SENTRY_DSN: configured ? "https://public@example.ingest.sentry.io/123" : "",
+      EXPO_PUBLIC_POSTHOG_API_KEY: "",
+      EXPO_PUBLIC_POSTHOG_HOST: ""
+    }
+    const result = spawnSync(process.execPath, ["-e", `
+      const app = require('./app.config.js');
+      const input = require('./app.json').expo;
+      const output = app({config: input});
+      console.log(JSON.stringify(output.plugins));
+    `], { cwd: mobileRoot, env, encoding: "utf8" })
+    assert.equal(result.status, 0, result.stderr)
+    const plugins = JSON.parse(result.stdout)
+    assert.equal(plugins.includes("@sentry/react-native"), configured)
+    assert.equal(plugins.includes("./plugins/withSentryDebugSettings"), configured)
+    assert.ok(plugins.includes("@react-native-firebase/app"))
+  }
 })
 
 test("production UI and session runtime hide and reject demo entry", () => {

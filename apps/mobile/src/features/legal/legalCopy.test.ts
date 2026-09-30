@@ -132,7 +132,7 @@ test("legal bundle is versioned, bilingual, consent-safe, and effective", () => 
   assert.match(documents.tr.guidelines.body, /çocukların cinsel istismarı|reşit olmayan|kişisel bilgi|kayıt/i)
 
   const blockers = getLegalReleaseBlockers(JSON.stringify(documents))
-  assert.ok(blockers.some((blocker) => /hosted legal copy/i.test(blocker)))
+  assert.deepEqual(blockers, [])
 })
 
 test("user-facing legal copy contains no draft or production-review language", () => {

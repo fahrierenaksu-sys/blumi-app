@@ -5,7 +5,6 @@ const {
 const {
   assertNoCandidateAssetImportsInSourceRoot
 } = require("./scripts/mobile-release-assets.cjs")
-
 const { assertNoMediaDependencies } = require("./scripts/mobile-no-media.cjs")
 
 module.exports = ({ config }) => {
@@ -21,7 +20,13 @@ module.exports = ({ config }) => {
     assertNoCandidateAssetImportsInSourceRoot(`${__dirname}/src`)
   }
 
-  const plugins = config.plugins ?? []
+  const plugins = (config.plugins ?? []).filter((plugin) => {
+    const name = Array.isArray(plugin) ? plugin[0] : plugin
+    return releaseEnvironment.sentryDsn || ![
+      "@sentry/react-native",
+      "./plugins/withSentryDebugSettings"
+    ].includes(name)
+  })
   const iosInfoPlist = { ...(config.ios?.infoPlist ?? {}) }
   delete iosInfoPlist.NSMicrophoneUsageDescription
   delete iosInfoPlist.NSCameraUsageDescription
