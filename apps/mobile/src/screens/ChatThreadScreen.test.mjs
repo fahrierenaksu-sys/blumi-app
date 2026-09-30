@@ -171,7 +171,9 @@ function sendBindings(events, sendChatMessage) {
       return { localMessageId: "__local_test", clientMessageId: "client-test-001" }
     },
     route: { params: { sendChatMessage } },
+    sendChatMessage,
     sessionActor: { session: { mode: "production" } },
+    sessionMode: "production",
     captureProductEvent: () => events.push(["analytics"]),
     hapticLight: () => events.push(["haptic"])
   }
@@ -199,6 +201,146 @@ test("send is not accepted when the navigator did not provide an ACK-capable cal
 
   assert.equal(send("hello"), false)
   assert.deepEqual(events, [])
+})
+
+// Objects created inside the vm context carry that realm's prototypes.
+const plain = (value) => JSON.parse(JSON.stringify(value))
+
+test("send reports the session mode and requests delivery tracking only in production", () => {
+  for (const mode of ["production", "demo"]) {
+    const optimistic = []
+    const analytics = []
+    const bindings = {
+      ...sendBindings([], () => new Promise(() => undefined)),
+      addOptimisticMessage: (message) => {
+        optimistic.push(message)
+        return { localMessageId: "__local_test", clientMessageId: "client-test-001" }
+      },
+      sessionActor: { session: { mode } },
+      sessionMode: mode,
+      captureProductEvent: (...args) => analytics.push(args)
+    }
+    assert.equal(screenCallback("handleSend", bindings)("hi"), true)
+    assert.deepEqual(plain(optimistic), [{
+      threadId: "thread_one",
+      senderUserId: "user_one",
+      body: "hi",
+      trackDelivery: mode === "production"
+    }])
+    assert.deepEqual(plain(analytics), [["chat_message_sent", { mode, kind: "text" }]])
+  }
+})
+
+test("send is refused without a resolved thread or signed-in user", () => {
+  for (const missing of [{ resolvedThreadId: undefined }, { currentUserId: "" }]) {
+    const events = []
+    const send = screenCallback("handleSend", {
+      ...sendBindings(events, () => Promise.resolve()),
+      ...missing
+    })
+    assert.equal(send("hello"), false)
+    assert.deepEqual(events, [])
+  }
+})
+
+test("send swallows a rejected request so the optimistic row owns the failure", async () => {
+  const events = []
+  const send = screenCallback("handleSend", sendBindings(events, () => Promise.reject(new Error("offline"))))
+  assert.equal(send("hello"), true)
+  await new Promise((resolve) => setImmediate(resolve))
+})
+
+function retryBindings(events, { retryable, sendChatMessage }) {
+  return {
+    getRetryableMessage: (messageId) => {
+      events.push(["lookup", messageId])
+      return retryable
+    },
+    markOptimisticMessageSending: (clientMessageId) => events.push(["sending", clientMessageId]),
+    route: { params: { sendChatMessage } },
+    sendChatMessage
+  }
+}
+
+test("retry marks the row sending, then resends with the original client message id", async () => {
+  const events = []
+  const sendChatMessage = (...args) => {
+    events.push(["network", ...args])
+    return Promise.reject(new Error("still offline"))
+  }
+  const retry = screenCallback("handleRetry", retryBindings(events, {
+    retryable: { threadId: "thread_one", body: "hello", clientMessageId: "client-test-001" },
+    sendChatMessage
+  }))
+
+  retry("__local_test")
+  assert.deepEqual(events, [
+    ["lookup", "__local_test"],
+    ["sending", "client-test-001"],
+    ["network", "thread_one", "hello", "client-test-001"]
+  ])
+  await new Promise((resolve) => setImmediate(resolve))
+})
+
+test("retry is a no-op for unknown rows or without an ACK-capable callback", () => {
+  const unknown = []
+  screenCallback("handleRetry", retryBindings(unknown, {
+    retryable: null,
+    sendChatMessage: () => assert.fail("unknown row was resent")
+  }))("__missing")
+  assert.deepEqual(unknown, [["lookup", "__missing"]])
+
+  const noSender = []
+  screenCallback("handleRetry", retryBindings(noSender, {
+    retryable: { threadId: "thread_one", body: "hello", clientMessageId: "client-test-001" },
+    sendChatMessage: undefined
+  }))("__local_test")
+  assert.deepEqual(noSender, [["lookup", "__local_test"]])
+})
+
+function loadEarlierBindings(events, overrides = {}) {
+  const requestMessages = (...args) => {
+    events.push(["request", ...args])
+    return overrides.result ?? Promise.resolve()
+  }
+  return {
+    route: { params: { requestMessages } },
+    requestMessages,
+    messages: [{ messageId: "oldest" }, { messageId: "newest" }],
+    resolvedThreadId: "thread_one",
+    isLoadingEarlier: false,
+    setIsLoadingEarlier: (value) => events.push(["loading", value]),
+    ...overrides.bindings
+  }
+}
+
+test("load earlier pages 20 messages before the oldest loaded one and always clears loading", async () => {
+  const events = []
+  await screenCallback("handleLoadEarlier", loadEarlierBindings(events))()
+  assert.deepEqual(plain(events), [
+    ["loading", true],
+    ["request", "thread_one", { before: "oldest", limit: 20 }],
+    ["loading", false]
+  ])
+
+  const failed = []
+  await assert.rejects(
+    screenCallback("handleLoadEarlier", loadEarlierBindings(failed, { result: Promise.reject(new Error("offline")) }))(),
+    /offline/
+  )
+  assert.deepEqual(failed.at(-1), ["loading", false])
+})
+
+test("load earlier ignores taps while loading, without history, or without a thread", async () => {
+  for (const bindings of [
+    { isLoadingEarlier: true },
+    { messages: [] },
+    { resolvedThreadId: undefined }
+  ]) {
+    const events = []
+    await screenCallback("handleLoadEarlier", loadEarlierBindings(events, { bindings }))()
+    assert.deepEqual(events, [])
+  }
 })
 
 test("composer clears only accepted sends and submits trimmed text", () => {
@@ -229,4 +371,183 @@ test("composer blocks empty and pending sends without losing the draft", () => {
   assert.equal(composerExpression("isSendDisabled", {
     inputText: "hello", isPendingThread: false
   }), false)
+})
+
+function screenExpression(name, bindings) {
+  const declaration = component("ChatThreadScreen").body.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => [...statement.declarationList.declarations])
+    .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === name)
+  assert.ok(declaration?.initializer, `${name} must have an initializer`)
+  const executable = ts.transpileModule(
+    `(${declaration.initializer.getText(file)})`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
+  ).outputText
+  return runInNewContext(executable, bindings)
+}
+
+class FakeRoomInviteApiError extends Error {
+  constructor(code, roomSessionId) {
+    super(code)
+    this.code = code
+    this.roomSessionId = roomSessionId
+  }
+}
+
+const inviteCopy = {
+  roomInviteUnavailableTitle: "title",
+  roomInviteUnavailableReason: "unavailable",
+  roomInviteClosePreviousBody: "close previous?",
+  roomInviteClosePreviousAction: "close and invite",
+  roomInviteCloseFailed: "close failed",
+  roomInviteRetryFailed: "retry failed",
+  cancel: "cancel"
+}
+
+function roomInvitePressHarness(overrides = {}) {
+  const events = []
+  const alerts = []
+  let activeAction = null
+  const createAction = { type: "create", threadId: "thread_one" }
+  const screenMountedRef = { current: true }
+  const activeUserIdRef = { current: "user_one" }
+  const bindings = {
+    isCreatingRoomInvite: false,
+    canCreateRoomInvite: true,
+    createRoomInviteAction: createAction,
+    roomInviteDisabledReason: null,
+    chatCopy: inviteCopy,
+    Alert: { alert: (...args) => alerts.push(args) },
+    RoomInviteApiError: FakeRoomInviteApiError,
+    getRoomInviteActionKey: (action) => `${action.type}:${action.threadId}`,
+    sessionActor: { profile: { userId: "user_one" } },
+    currentUserId: "user_one",
+    screenMountedRef,
+    activeUserIdRef,
+    setActiveRoomInviteAction: (next) => {
+      activeAction = typeof next === "function" ? next(activeAction) : next
+      events.push(["active", activeAction])
+    },
+    roomInviteActionHandler: (action) => {
+      events.push(["invite", action.type])
+      return overrides.retryResult ?? Promise.resolve()
+    },
+    closeActiveRoomHandler: (roomId) => {
+      events.push(["close", roomId])
+      return overrides.closeResult ?? Promise.resolve()
+    },
+    handleRoomInviteAction: (action, onError) => {
+      events.push(["action", action.type])
+      onError?.(overrides.error)
+    },
+    ...overrides.bindings
+  }
+  return {
+    press: () => screenExpression("handleRoomInvitePress", bindings)(),
+    events,
+    alerts,
+    screenMountedRef,
+    activeUserIdRef
+  }
+}
+
+const settle = () => new Promise((resolve) => setImmediate(resolve))
+
+test("room invite entry explains why it is unavailable instead of hiding", () => {
+  const harness = roomInvitePressHarness({
+    bindings: { canCreateRoomInvite: false, roomInviteDisabledReason: "pending invite" }
+  })
+  harness.press()
+  assert.deepEqual(harness.alerts, [["title", "pending invite"]])
+  assert.deepEqual(harness.events, [])
+
+  const noReason = roomInvitePressHarness({ bindings: { createRoomInviteAction: null } })
+  noReason.press()
+  assert.deepEqual(noReason.alerts, [["title", "unavailable"]])
+
+  const busy = roomInvitePressHarness({ bindings: { isCreatingRoomInvite: true, canCreateRoomInvite: false } })
+  busy.press()
+  assert.deepEqual([busy.alerts, busy.events], [[], []])
+})
+
+test("room invite ignores errors other than an open previous room", () => {
+  for (const error of [new Error("offline"), new FakeRoomInviteApiError("RATE_LIMITED", "room_1")]) {
+    const harness = roomInvitePressHarness({ error })
+    harness.press()
+    assert.deepEqual(harness.events, [["action", "create"]])
+    assert.deepEqual(harness.alerts, [])
+  }
+})
+
+test("an open previous room without a closer or id reports the close failure", () => {
+  for (const [error, bindings] of [
+    [new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1"), { closeActiveRoomHandler: undefined }],
+    [new FakeRoomInviteApiError("SELF_IN_ROOM", ""), {}]
+  ]) {
+    const harness = roomInvitePressHarness({ error, bindings })
+    harness.press()
+    assert.deepEqual(harness.alerts, [["title", "close failed"]])
+  }
+})
+
+test("confirming closes the previous room, then retries the same invitation once", async () => {
+  const harness = roomInvitePressHarness({ error: new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1") })
+  harness.press()
+  const [[title, body, buttons]] = harness.alerts
+  assert.deepEqual([title, body], ["title", "close previous?"])
+  assert.deepEqual(plain(buttons.map(({ text, style }) => ({ text, style }))), [
+    { text: "cancel", style: "cancel" },
+    { text: "close and invite" }
+  ])
+
+  buttons[1].onPress()
+  await settle()
+  assert.deepEqual(plain(harness.events), [
+    ["action", "create"],
+    ["active", "create:thread_one"],
+    ["close", "room_1"],
+    ["invite", "create"],
+    ["active", null]
+  ])
+  assert.equal(harness.alerts.length, 1)
+})
+
+test("close and retry failures alert, and an unmounted screen stays silent", async () => {
+  const closeFails = roomInvitePressHarness({
+    error: new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1"),
+    closeResult: Promise.reject(new Error("offline"))
+  })
+  closeFails.press()
+  closeFails.alerts[0][2][1].onPress()
+  await settle()
+  assert.deepEqual(closeFails.alerts.slice(1), [["title", "close failed"]])
+  assert.equal(closeFails.events.some(([event]) => event === "invite"), false)
+
+  const retryFails = roomInvitePressHarness({
+    error: new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1"),
+    retryResult: Promise.reject(new Error("offline"))
+  })
+  retryFails.press()
+  retryFails.alerts[0][2][1].onPress()
+  await settle()
+  assert.deepEqual(retryFails.alerts.slice(1), [["title", "retry failed"]])
+  assert.deepEqual(retryFails.events.at(-1), ["active", null])
+
+  const unmounted = roomInvitePressHarness({ error: new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1") })
+  unmounted.press()
+  unmounted.alerts[0][2][1].onPress()
+  unmounted.screenMountedRef.current = false
+  await settle()
+  assert.equal(unmounted.events.some(([event]) => event === "invite"), false)
+  assert.deepEqual(unmounted.events.at(-1), ["close", "room_1"])
+
+  const switchedUser = roomInvitePressHarness({
+    error: new FakeRoomInviteApiError("SELF_IN_ROOM", "room_1"),
+    closeResult: Promise.reject(new Error("offline"))
+  })
+  switchedUser.press()
+  switchedUser.alerts[0][2][1].onPress()
+  switchedUser.activeUserIdRef.current = "user_two"
+  await settle()
+  assert.equal(switchedUser.alerts.length, 1)
 })
