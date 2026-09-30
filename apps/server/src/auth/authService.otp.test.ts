@@ -139,6 +139,24 @@ test("a provider outage during resend preserves the previous active code", async
   assert.equal(verified.account.phoneNumber, PHONE_NUMBER)
 })
 
+test("concurrent refreshes whose clocks differ still leave exactly one usable token", async () => {
+  const service = createAuthService({
+    store: createBlumiBackendStore(),
+    codeFactory: () => OTP_CODE
+  })
+  await service.sendCode(PHONE_NUMBER)
+  const signedIn = await service.verifyCode(PHONE_NUMBER, OTP_CODE)
+  const first = new Date()
+  const second = new Date(first.getTime() + 5)
+
+  const refreshed = await Promise.all([
+    service.refreshSession(signedIn.sessionToken, first),
+    service.refreshSession(signedIn.sessionToken, second)
+  ])
+
+  assert.equal(refreshed.filter(Boolean).length, 1)
+})
+
 test("a pending OTP is consumed exactly once under concurrent verification", async () => {
   const service = createAuthService({
     store: createBlumiBackendStore(),

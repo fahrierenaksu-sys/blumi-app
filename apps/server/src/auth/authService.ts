@@ -638,7 +638,10 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
 
     async getSessionByTokenHash(sessionTokenHash, now = new Date()) {
       const session = await repository.getSessionByTokenHash(sessionTokenHash)
-      if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) {
+      // A rotated token only survives for the refresh grace window, never for
+      // requests: its expiry is the rotating request's clock, which can be
+      // later than a concurrent request's `now`.
+      if (!session || session.rotatedAt || new Date(session.expiresAt).getTime() <= now.getTime()) {
         return null
       }
 
