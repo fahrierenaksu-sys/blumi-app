@@ -116,7 +116,8 @@ try {
     [
       "--import", "tsx",
       "--test",
-      "src/navigation/linkedProfileScreenLifecycle.test.ts"
+      "src/navigation/linkedProfileScreenLifecycle.test.ts",
+      "src/navigation/globalRealtimeSessionLifecycle.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

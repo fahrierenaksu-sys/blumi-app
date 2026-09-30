@@ -759,16 +759,18 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
     source,
     /useEffect\(\(\) => createGlobalRealtimeLifecycle\(\{[\s\S]*?\}\)\(\), \[\s*isAccountRestricted,\s*refreshProductionThreads,\s*resetInactiveSessionState,\s*realtimeSessionIdentity,\s*sessionEntryRoute\s*\]\)/
   )
-  assert.match(source, /clearSessionActor: \(\) => realtimeSessionCallbacksRef\.current\.clearSessionActor\(\)/)
-  assert.match(source, /refreshAccountModeration: \(\) => realtimeSessionCallbacksRef\.current\.refreshAccountModeration\(\)/)
+  assert.match(source, /sessionActor: readLifecycleSessionActor\(\),/)
+  assert.match(source, /isCurrentSession: \(expectedActor\) => isLatestSession\(expectedActor\),/)
+  assert.match(source, /clearSessionActor: \(\) => clearLatestSessionActor\(\)/)
+  assert.match(source, /refreshAccountModeration: \(\) => refreshLatestAccountModeration\(\)/)
   assert.match(source, /useGlobalRealtimeEvents\(handleGlobalEvent\)/)
-  // Session callbacks are read from the latest commit, never written during render.
-  assert.match(
-    source,
-    /const realtimeSessionCallbacksRef = useLatestRef\(\{ clearSessionActor, refreshAccountModeration, resynchronizeMessages \}\)/
-  )
-  assert.doesNotMatch(source, /realtimeSessionCallbacksRef\.current = /)
-  assert.match(read("./useLatestRef.ts"), /useLayoutEffect\(\(\) => \{\s*ref\.current = value\s*\}, \[value\]\)/)
+  // Session callbacks are effect events (latest commit), never refs written during render.
+  for (const name of ["readLifecycleSessionActor", "isLatestSession", "clearLatestSessionActor", "refreshLatestAccountModeration", "resynchronizeLatestMessages"]) {
+    assert.match(source, new RegExp(`const ${name} = useEffectEvent\\(`))
+  }
+  assert.doesNotMatch(source, /\.current = /)
+  // Behaviour (reconnect only on identity, latest callbacks) is covered by
+  // globalRealtimeSessionLifecycle.test.ts.
 
   const navigator = read(OWNER.sessionReset)
   assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock\s*\}\)/)
@@ -792,9 +794,7 @@ test("the realtime active-conversation resync follows the focused chat or MiniRo
   const resynchronized = []
   const resync = (route) => evaluate(body, {
     navigationRef: { getCurrentRoute: () => route },
-    realtimeSessionCallbacksRef: {
-      current: { resynchronizeMessages: async (threadId) => { resynchronized.push(threadId) } }
-    }
+    resynchronizeLatestMessages: async (threadId) => { resynchronized.push(threadId) }
   })
   await resync({ name: "ChatThread", params: { threadId: "thread-chat" } })()
   await resync({ name: "MiniRoom", params: { readyMiniRoom: { miniRoom: { sourceThreadId: "thread-room" } } } })()
