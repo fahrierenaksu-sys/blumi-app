@@ -294,13 +294,13 @@ export function useDiscoveryDecisions(input: {
         mode: sessionActor.session.mode
       })
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }, [
     decideProductionCandidate,
     featuredCandidate,
     isProductionDiscovery,
     lobbyCopy,
     markCandidateSeen,
+    sessionActor.profile.userId,
     sessionActor.session.mode,
     showDiscoverFeedback
   ])
@@ -332,7 +332,6 @@ export function useDiscoveryDecisions(input: {
     })
     markCandidateSeen(target)
     navigation.setParams({ pendingLikeUserId: undefined })
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }, [
     addPendingInvite,
     decideProductionCandidate,
@@ -343,6 +342,7 @@ export function useDiscoveryDecisions(input: {
     navigation,
     route.params?.pendingLikeUserId,
     sendInvite,
+    showDiscoverFeedback,
     showInviteDeliveryFailure
   ])
 

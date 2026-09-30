@@ -320,8 +320,12 @@ test("global Discovery pagination prefetches without replacing the deck", () => 
   assert.match(querySource, /fetchDiscoverPage/)
   assert.match(querySource, /getNextPageParam/)
   assert.match(discoveryQuerySource, /useInfiniteQuery/)
-  assert.match(discoveryQuerySource, /productionDiscoveryQuery\.hasNextPage/)
-  assert.match(discoveryQuerySource, /productionDiscoveryQuery\.fetchNextPage\(\)/)
+  assert.match(
+    discoveryQuerySource,
+    /const \{\s*fetchNextPage,\s*hasNextPage,\s*isFetchingNextPage\s*\} = productionDiscoveryQuery/
+  )
+  assert.match(discoveryQuerySource, /hasNextPage: Boolean\(hasNextPage\)/)
+  assert.match(discoveryQuerySource, /void fetchNextPage\(\)\.catch\(\(\) => undefined\)/)
   assert.match(discoveryQuerySource, /flattenDiscoveryPages/)
   assert.match(discoveryQuerySource, /const productionSupplyState = lastProductionPage\?\.supply\.state/)
   assert.match(

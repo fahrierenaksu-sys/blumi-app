@@ -103,12 +103,14 @@ export function useProductionDiscoveryQuery(input: {
       }
     )
   }, [productionDiscoveryQueryKey, queryClient])
+  // `refetch` is bound to its observer by TanStack Query, so reading it once
+  // per render is the same call the member expression made.
+  const refetchProductionDiscovery = productionDiscoveryQuery.refetch
   const refreshProductionDiscover = useCallback(async (): Promise<void> => {
     if (!isProductionDiscovery || !filtersReady) return
-    const result = await productionDiscoveryQuery.refetch()
+    const result = await refetchProductionDiscovery()
     if (result.error) throw result.error
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [filtersReady, isProductionDiscovery, productionDiscoveryQuery.refetch])
+  }, [filtersReady, isProductionDiscovery, refetchProductionDiscovery])
 
   return {
     productionDiscoveryQuery,
@@ -143,24 +145,30 @@ export function useDiscoveryPrefetchAdmission(input: {
     discoveryQuotaExhausted,
     availableCandidateCount
   } = input
+  // fetchNextPage is bound to its observer, so this is the same call the
+  // member expression made; the effect keys on the same three values.
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = productionDiscoveryQuery
   useEffect(() => {
     if (!shouldPrefetchDiscoveryPage({
       isProductionDiscovery,
       isSafetyListReady,
-      isFetchingNextPage: productionDiscoveryQuery.isFetchingNextPage,
-      hasNextPage: Boolean(productionDiscoveryQuery.hasNextPage),
+      isFetchingNextPage,
+      hasNextPage: Boolean(hasNextPage),
       isQuotaExhausted: discoveryQuotaExhausted,
       availableCandidateCount
     })) return
-    void productionDiscoveryQuery.fetchNextPage().catch(() => undefined)
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
+    void fetchNextPage().catch(() => undefined)
   }, [
     availableCandidateCount,
     isProductionDiscovery,
     isSafetyListReady,
     discoveryQuotaExhausted,
-    productionDiscoveryQuery.fetchNextPage,
-    productionDiscoveryQuery.hasNextPage,
-    productionDiscoveryQuery.isFetchingNextPage
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
   ])
 }
