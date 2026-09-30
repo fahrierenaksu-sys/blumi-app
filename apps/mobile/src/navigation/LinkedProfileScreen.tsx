@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useEffect, useState } from "react"
+import { useEffect, useEffectEvent, useState } from "react"
 import { ActivityIndicator, Pressable, Text, View } from "react-native"
 import { createCandidateAvatarSnapshot } from "../features/avatarV2/candidateAvatarSnapshot"
 import { DUMMY_PROFILES } from "../features/demo/dummyProfiles"
@@ -91,6 +91,25 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
     )
   )
   const [retryNonce, setRetryNonce] = useState(0)
+  // Demo labels follow the current locale without restarting the request.
+  const createDemoLinkedProfile = useEffectEvent((
+    demoProfile: (typeof DUMMY_PROFILES)[number]
+  ): ProfilePreviewData => ({
+    userId: demoProfile.userId,
+    displayName: demoProfile.displayName,
+    age: demoProfile.age,
+    headline: copy.discoverProfile,
+    vibeLine: demoProfile.bio,
+    tags: [],
+    bio: demoProfile.bio,
+    cues: [],
+    prompts: [],
+    decisionCapability: "live-invite",
+    blocked: false,
+    isSelf: false,
+    spotId: `demo:${demoProfile.userId}`,
+    distanceLabel: copy.availableNow
+  }))
 
   useEffect(() => {
     if (directProfile || !deepLinkedUserId) {
@@ -112,22 +131,8 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
           )
           return
         }
-        setLoadState((state) => resolveLinkedProfileRequest(state, userId, {
-          userId: demoProfile.userId,
-          displayName: demoProfile.displayName,
-          age: demoProfile.age,
-          headline: copy.discoverProfile,
-          vibeLine: demoProfile.bio,
-          tags: [],
-          bio: demoProfile.bio,
-          cues: [],
-          prompts: [],
-          decisionCapability: "live-invite",
-          blocked: false,
-          isSelf: false,
-          spotId: `demo:${demoProfile.userId}`,
-          distanceLabel: copy.availableNow
-        }))
+        const profile = createDemoLinkedProfile(demoProfile)
+        setLoadState((state) => resolveLinkedProfileRequest(state, userId, profile))
         return
       }
 
@@ -166,7 +171,6 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
       isActive = false
       controller.abort()
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   }, [deepLinkedUserId, demoMode, directProfile, retryNonce, sessionToken])
 
   const viewState = target
