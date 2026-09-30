@@ -74,7 +74,8 @@ test("page and shared shell code never imports React Native's deprecated SafeAre
   const files = [
     ...directPageScreens,
     "features/session/setupFlow/BlumiSetupShell.tsx",
-    "features/miniRoom/scene/MiniRoomScene.tsx"
+    "features/miniRoom/scene/MiniRoomScene.tsx",
+    "features/chat/thread/ChatComposer.tsx"
   ]
 
   for (const relativePath of files) {
@@ -91,7 +92,8 @@ test("every canonical safe-area boundary declares its gutter policy explicitly",
   const files = [
     ...directPageScreens,
     "features/session/setupFlow/BlumiSetupShell.tsx",
-    "features/miniRoom/scene/MiniRoomScene.tsx"
+    "features/miniRoom/scene/MiniRoomScene.tsx",
+    "features/chat/thread/ChatComposer.tsx"
   ]
 
   for (const relativePath of files) {
