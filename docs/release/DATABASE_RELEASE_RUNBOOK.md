@@ -25,6 +25,19 @@ founder-facing status remains in `LAUNCH_CONTROL.md`.
   This archive is local and covers only the application `public` schema. It is
   not the planned offsite S3 backup or a Supabase platform recovery point.
 
+## Pending migration 068 (2026-09-30) — NOT APPLIED
+
+Migration `068_session_reuse_detection_and_firebase_uid.sql` (nullable
+session-rotation columns, `blumi_accounts.firebase_uid` and a partial unique
+index) is prepared but **not applied** to `nkqcbxufbhfibrgvajim`, which is at
+067 with 18 accounts and one live session. The new server binary reports
+`/ready` 503 until 068 is applied; the current binary keeps working on 068.
+Follow [`MIGRATION_068_RUNBOOK.md`](./MIGRATION_068_RUNBOOK.md) for the lock
+analysis, compatibility matrix, PostgreSQL 17 backup and restore gate,
+operator commands, verification queries, rollback and stop conditions. The
+disposable mixed-version rehearsal is
+`node scripts/security/migration-068-rehearsal.mjs [old-ref] [--old-suite]`.
+
 ## Safe inspection
 
 From the repository root, with the exact target project ref:
