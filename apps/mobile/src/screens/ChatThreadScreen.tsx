@@ -24,7 +24,6 @@ import {
   buildChatTimeline,
   getChatTimelineItemKey,
   getChatInitialRenderCount,
-  type ChatRoomInviteSurface,
   type ChatRoomInviteTimelineItem
 } from "../features/chat/chatRoomInviteModel"
 import {
@@ -35,6 +34,7 @@ import {
   getChatTimelineRowModel,
   selectChatPartnerSummary
 } from "../features/chat/thread/chatThreadModel"
+import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindings"
 import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
 import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
@@ -53,12 +53,13 @@ type ChatThreadScreenProps = NativeStackScreenProps<
 > & {
   sessionActor: SessionActor
   onThreadCreated: (thread: ChatThread) => void
+  bindings: ChatThreadBindings
 }
 
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
-  const { navigation, route, sessionActor, onThreadCreated } = props
+  const { navigation, route, sessionActor, onThreadCreated, bindings } = props
   const { height: windowHeight } = useWindowDimensions()
   const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
   const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
@@ -79,11 +80,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
 
   const resolvedThreadId = thread?.threadId ?? threadId
   const isPendingThread = !thread && !!pendingPartnerId
-  const roomInviteSurface = route.params as typeof route.params & ChatRoomInviteSurface
-  const roomInvites = roomInviteSurface.roomInvites ?? EMPTY_ROOM_INVITES
-  const roomInviteActionHandler = roomInviteSurface.onRoomInviteAction
-  const closeActiveRoomHandler = roomInviteSurface.onCloseActiveRoom
-  const chatLocale = resolveChatThreadLocale(roomInviteSurface.locale)
+  const roomInvites = bindings.roomInvites
+  const roomInviteActionHandler = bindings.onRoomInviteAction
+  const closeActiveRoomHandler = bindings.onCloseActiveRoom
+  const chatLocale = resolveChatThreadLocale(bindings.locale)
   const chatCopy = CHAT_COPY[chatLocale]
   const threadRoomInvites = useMemo(
     () =>
@@ -136,8 +136,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
 
   const { handleRetryMessages } = useChatThreadSync({
     resolvedThreadId,
-    requestMessages: route.params.requestMessages,
-    markThreadRead: route.params.markThreadRead,
+    requestMessages: bindings.requestMessages,
+    markThreadRead: bindings.markThreadRead,
     setActiveThread
   })
 
@@ -151,8 +151,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     currentUserId,
     sessionMode: sessionActor.session.mode,
     messages,
-    sendChatMessage: route.params.sendChatMessage,
-    requestMessages: route.params.requestMessages,
+    sendChatMessage: bindings.sendChatMessage,
+    requestMessages: bindings.requestMessages,
     addOptimisticMessage,
     getRetryableMessage,
     markOptimisticMessageSending
@@ -282,7 +282,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
                   chatLocale={chatLocale}
                   currentUserId={currentUserId}
                   activeRoomInviteAction={activeRoomInviteAction}
-                  onRoomInviteAction={roomInviteActionHandler ? handleRoomInviteAction : undefined}
+                  onRoomInviteAction={handleRoomInviteAction}
                   onRetry={handleRetry}
                 />
               )}

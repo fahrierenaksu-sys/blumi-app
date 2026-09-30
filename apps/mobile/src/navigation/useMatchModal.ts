@@ -21,7 +21,6 @@ import {
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
-import type { ChatThreadRouteBindings } from "./useRootChatSync"
 
 export interface GlobalMatchState {
   miniRoomId: string
@@ -37,7 +36,6 @@ interface MatchModalInput {
   isCurrentSession: (expectedActor: SessionActor) => boolean
   applyNewThread: (thread: ChatThread) => void
   hydrateFromServer: HydrateInventory
-  chatThreadRouteBindings: ChatThreadRouteBindings
 }
 
 /**
@@ -51,8 +49,7 @@ export function useMatchModal({
   latestSessionActorRef,
   isCurrentSession,
   applyNewThread,
-  hydrateFromServer,
-  chatThreadRouteBindings
+  hydrateFromServer
 }: MatchModalInput) {
   const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
   const handledMatchIdsRef = useRef(new Set<string>())
@@ -167,13 +164,10 @@ export function useMatchModal({
     (params: { threadId?: string; partnerId?: string; partnerName?: string }): void => {
       setGlobalMatch(null)
       if (navigationRef.isReady()) {
-        navigationRef.navigate("ChatThread", {
-          ...params,
-          ...chatThreadRouteBindings
-        })
+        navigationRef.navigate("ChatThread", params)
       }
     },
-    [chatThreadRouteBindings]
+    []
   )
 
   const handleMatchSendMessage = useCallback((): void => {

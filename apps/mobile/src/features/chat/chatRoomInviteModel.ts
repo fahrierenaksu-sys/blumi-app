@@ -38,17 +38,6 @@ export type ChatRoomInviteAction =
 
 export type ChatLocale = "en" | "tr"
 
-/**
- * Navigation can supply this surface while transport and realtime ownership
- * stays outside the chat presentation layer.
- */
-export interface ChatRoomInviteSurface {
-  roomInvites?: readonly ChatRoomInviteTimelineItem[]
-  onRoomInviteAction?: (action: ChatRoomInviteAction) => Promise<void>
-  onCloseActiveRoom?: (expectedRoomSessionId: string) => Promise<void>
-  locale?: ChatLocale
-}
-
 export interface RoomInvitePresentation {
   title: string
   detail: string

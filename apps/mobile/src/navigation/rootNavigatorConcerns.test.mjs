@@ -334,7 +334,7 @@ test("demo room invitations open the local MiniRoom only once accepted", async (
 
 // ── Chat route bindings ────────────────────────────────────
 
-function chatThreadRouteBindings(sessionMode) {
+function chatThreadBindings(sessionMode) {
   const handlers = {
     sendChatMessageForRoute: () => "send",
     requestMessagesForRoute: () => "request",
@@ -343,7 +343,7 @@ function chatThreadRouteBindings(sessionMode) {
     handleRoomInviteAction: () => "production-invite",
     closeMyActiveRoom: () => "close-room"
   }
-  const bindings = evaluate(findInitializer(OWNER.chat, "chatThreadRouteBindings"), {
+  const bindings = evaluate(findInitializer(OWNER.chat, "chatThreadBindings"), {
     ...handlers,
     visibleRoomInvites: ["invite"],
     sessionMode,
@@ -353,7 +353,7 @@ function chatThreadRouteBindings(sessionMode) {
 }
 
 test("chat routes receive demo-aware invite handlers and production-only room closing", () => {
-  const production = chatThreadRouteBindings("production")
+  const production = chatThreadBindings("production")
   assert.deepEqual(Object.keys(production.bindings), [
     "sendChatMessage",
     "requestMessages",
@@ -371,17 +371,20 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
   assert.equal(production.bindings.onCloseActiveRoom, production.handlers.closeMyActiveRoom)
   assert.equal(production.bindings.locale, "tr")
 
-  const demo = chatThreadRouteBindings("demo")
+  const demo = chatThreadBindings("demo")
   assert.equal(demo.bindings.onRoomInviteAction, demo.handlers.handleDemoRoomInviteAction)
   assert.equal(demo.bindings.onCloseActiveRoom, undefined)
 })
 
-test("the ChatThread screen and match-modal chat navigation inject the same bindings", () => {
+test("the ChatThread screen receives the chat bindings as a prop, never through route params", () => {
   const navigator = read("./RootNavigator.tsx")
   const chatRoute = navigator.match(/<Stack\.Screen\s+name="ChatThread"([\s\S]*?)<\/Stack\.Screen>/)?.[1] ?? ""
-  assert.match(chatRoute, /params: \{\s*\.\.\.screenProps\.route\.params,\s*\.\.\.chatThreadRouteBindings\s*\}/)
+  assert.match(chatRoute, /bindings=\{chatThreadBindings\}/)
   assert.match(chatRoute, /onThreadCreated=\{applyNewThread\}/)
-  assert.match(read(OWNER.matchModal), /navigationRef\.navigate\("ChatThread", \{\s*\.\.\.params,\s*\.\.\.chatThreadRouteBindings\s*\}\)/)
+  assert.doesNotMatch(chatRoute, /route=\{/, "the chat route must not rewrite its params")
+  // Opening chat from the match modal navigates with ids only.
+  assert.match(read(OWNER.matchModal), /navigationRef\.navigate\("ChatThread", params\)/)
+  assert.doesNotMatch(read(OWNER.matchModal), /chatThreadBindings|chatThreadRouteBindings/)
 })
 
 // ── Linking: referral capture and pending deep links ───────

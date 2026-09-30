@@ -39,7 +39,7 @@ is not a reason.
 | Production files stay under 800 lines; listed oversized files may only shrink | Large files mixed lifecycle, UI and rules and could not be tested | `mobile-engineering-rules.test.mjs` |
 | `ui/` and `config/` never import from `features/`; the allowlist may only shrink | Layer inversions made shared UI depend on product features | `mobile-import-boundaries.test.mjs` |
 | `RootNavigator.tsx` declares routes only; app-wide lifecycles live in `navigation/use*.ts` hooks | The navigator was a 1,992-line mix of realtime, chat sync, push and deep links | Review |
-| Route params carry serialisable data only, never functions or class instances | Functions in params break state persistence, deep links and restoration (known debt: ChatThread) | Review |
+| Route params carry serialisable data only, never functions or class instances; screens get callbacks from the owning hook as props | Functions in params break state persistence, deep links and restoration | `routeParamsSerialisable.test.mjs` (type-checks `RootStackParamList`) |
 | Deep links arriving before the signed-in stack go through `navigation/pendingDeepLink.ts` | Links were silently dropped before `Main` mounted | `pendingDeepLink` tests |
 | One source of truth per piece of state; module stores are keyed by account and reset on account switch | Cached data leaked between accounts | `accountSwitchIsolation.test.ts` |
 | Production catalogues are named `*Catalog.ts`, never `*.mock.ts` | Mock names hid real product data | Review |
@@ -104,7 +104,6 @@ is not a reason.
 
 - Avatar frame ticker (`RoomAvatarRenderer2D.tsx`) and My Room movement
   (`MyRoomScreen.tsx`) still use JS timers and React state.
-- ChatThread receives functions through navigation params.
 - `packages/realtime-client` is a one-line re-export; the client lives in the
   app.
 - Module stores follow different shapes.
