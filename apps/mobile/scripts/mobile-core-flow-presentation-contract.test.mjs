@@ -61,9 +61,10 @@ test("chat opens a conversation first and renders room invitations as explicit t
 })
 
 test("chat keeps the room invitation entry visible and explains unavailable states", () => {
-  const chat = read("src/screens/ChatThreadScreen.tsx")
+  const chat = read("src/features/chat/thread/useChatRoomInviteActions.ts")
 
-  assert.match(chat, /const roomInviteDisabledReason =/)
+  assert.match(read("src/features/chat/thread/chatThreadModel.ts"), /const roomInviteDisabledReason =/)
+  assert.match(chat, /roomInviteDisabledReason\n\s*\} = getRoomInviteComposerState\(/)
   assert.match(chat, /Alert\.alert\([\s\S]*?chatCopy\.roomInviteUnavailableTitle,[\s\S]*?roomInviteDisabledReason \?\? chatCopy\.roomInviteUnavailableReason/)
   assert.match(
     read("src/features/chat/thread/ChatComposer.tsx"),
@@ -87,10 +88,11 @@ test("loading earlier messages preserves the current chat scroll position", () =
 })
 
 test("chat composer places the guarded room button before the text input", () => {
-  const chat = read("src/screens/ChatThreadScreen.tsx")
+  const chat = read("src/features/chat/thread/useChatRoomInviteActions.ts")
   const composer = read("src/features/chat/thread/ChatComposer.tsx")
 
   assert.match(chat, /if \(isCreatingRoomInvite\) return/)
+  assert.match(read("src/screens/ChatThreadScreen.tsx"), /onRoomInvitePress=\{handleRoomInvitePress\}/)
   assert.match(composer, /disabled=\{isCreatingRoomInvite\}/)
   assert.match(composer, /<View style=\{styles\.composer\}>[\s\S]*?getRoomInviteCreateLabel[\s\S]*?<View style=\{styles\.inputWrap\}>/)
 })

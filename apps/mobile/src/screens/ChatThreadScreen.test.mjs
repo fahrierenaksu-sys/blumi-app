@@ -16,6 +16,8 @@ const threadFile = (fileName) => parse(new URL(fileName, threadDirectory), fileN
 const composerFile = threadFile("ChatComposer.tsx")
 const rowFile = threadFile("ChatTimelineRow.tsx")
 const modelFile = threadFile("chatThreadModel.ts")
+const sendingFile = threadFile("useChatMessageSending.ts")
+const roomInviteFile = threadFile("useChatRoomInviteActions.ts")
 const threadModuleNames = readdirSync(threadDirectory)
   .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
 
@@ -111,6 +113,31 @@ test("inbox warms a bounded set of conversations and starts selected history bef
   assert.match(root, /onWarmThread=\{warmThreadMessagesForInbox\}/)
 })
 
+test("thread hooks run their effects in the original order", () => {
+  const screenSource = component("ChatThreadScreen").getText(file)
+  const order = [
+    "useChatThreadStore(",
+    "useChatThreadLifecycle(",
+    "usePendingMatchedThread(",
+    "useChatThreadSync(",
+    "useChatMessageSending(",
+    "useChatRoomInviteActions("
+  ].map((call) => {
+    const position = screenSource.indexOf(call)
+    assert.ok(position >= 0, `${call} must be called by the screen`)
+    return position
+  })
+  assert.deepEqual(order, [...order].sort((left, right) => left - right))
+  const earlyReturn = screenSource.indexOf("if (!thread && !pendingPartnerId)")
+  assert.ok(earlyReturn > order.at(-1), "every hook runs before the missing-thread early return")
+
+  const sync = declaredFunction(threadFile("useChatThreadSync.ts"), "useChatThreadSync").getText()
+  assert.match(
+    sync,
+    /useEffect\(\(\) => \{\s*if \(requestMessages[\s\S]*?useEffect\(\(\) => \{\s*if \(markThreadRead[\s\S]*?useEffect\(\(\) => \{\s*if \(resolvedThreadId\) \{\s*setActiveThread\(resolvedThreadId\)[\s\S]*?return \(\) => setActiveThread\(null\)/
+  )
+})
+
 test("chat uses a short native push transition and respects Reduce Motion", () => {
   const rootSource = readFileSync(new URL("../navigation/RootNavigator.tsx", import.meta.url), "utf8")
   const chatRoute = rootSource.match(/<Stack\.Screen\s+name="ChatThread"([\s\S]*?)<\/Stack\.Screen>/)
@@ -147,19 +174,33 @@ function composerExpression(name, bindings) {
   return runInNewContext(executable, bindings)
 }
 
-function screenCallback(name, bindings) {
-  const declaration = component("ChatThreadScreen").body.statements
+// Execute a hook's own local declarations without a React renderer.
+function hookDeclaration(sourceFile, hookName, name) {
+  const declaration = declaredFunction(sourceFile, hookName).body.statements
     .filter(ts.isVariableStatement)
     .flatMap((statement) => [...statement.declarationList.declarations])
     .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === name)
-  assert.ok(declaration?.initializer && ts.isCallExpression(declaration.initializer), `${name} must be a callback`)
-  const callback = declaration.initializer.arguments[0]
-  assert.ok(callback, `${name} must pass a callback to useCallback`)
+  assert.ok(declaration?.initializer, `${name} must be declared in ${hookName}`)
+  return declaration.initializer
+}
+
+function evaluate(sourceFile, node, bindings) {
   const executable = ts.transpileModule(
-    `(${callback.getText(file)})`,
+    `(${node.getText(sourceFile)})`,
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
   ).outputText
   return runInNewContext(executable, bindings)
+}
+
+function sendingCallback(name, bindings) {
+  const initializer = hookDeclaration(sendingFile, "useChatMessageSending", name)
+  assert.ok(
+    ts.isCallExpression(initializer) && initializer.expression.getText(sendingFile) === "useCallback",
+    `${name} must be a callback`
+  )
+  const callback = initializer.arguments[0]
+  assert.ok(callback, `${name} must pass a callback to useCallback`)
+  return evaluate(sendingFile, callback, bindings)
 }
 
 function sendBindings(events, sendChatMessage) {
@@ -187,7 +228,7 @@ test("send publishes the optimistic row before starting the request and does not
     events.push(["network", ...args])
     return pendingAck
   }
-  const send = screenCallback("handleSend", sendBindings(events, sendChatMessage))
+  const send = sendingCallback("handleSend", sendBindings(events, sendChatMessage))
 
   assert.equal(send("hello"), true)
   assert.deepEqual(events.map(([event]) => event), ["optimistic", "network", "analytics", "haptic"])
@@ -197,7 +238,7 @@ test("send publishes the optimistic row before starting the request and does not
 
 test("send is not accepted when the navigator did not provide an ACK-capable callback", () => {
   const events = []
-  const send = screenCallback("handleSend", sendBindings(events, undefined))
+  const send = sendingCallback("handleSend", sendBindings(events, undefined))
 
   assert.equal(send("hello"), false)
   assert.deepEqual(events, [])
@@ -220,7 +261,7 @@ test("send reports the session mode and requests delivery tracking only in produ
       sessionMode: mode,
       captureProductEvent: (...args) => analytics.push(args)
     }
-    assert.equal(screenCallback("handleSend", bindings)("hi"), true)
+    assert.equal(sendingCallback("handleSend", bindings)("hi"), true)
     assert.deepEqual(plain(optimistic), [{
       threadId: "thread_one",
       senderUserId: "user_one",
@@ -234,7 +275,7 @@ test("send reports the session mode and requests delivery tracking only in produ
 test("send is refused without a resolved thread or signed-in user", () => {
   for (const missing of [{ resolvedThreadId: undefined }, { currentUserId: "" }]) {
     const events = []
-    const send = screenCallback("handleSend", {
+    const send = sendingCallback("handleSend", {
       ...sendBindings(events, () => Promise.resolve()),
       ...missing
     })
@@ -245,7 +286,7 @@ test("send is refused without a resolved thread or signed-in user", () => {
 
 test("send swallows a rejected request so the optimistic row owns the failure", async () => {
   const events = []
-  const send = screenCallback("handleSend", sendBindings(events, () => Promise.reject(new Error("offline"))))
+  const send = sendingCallback("handleSend", sendBindings(events, () => Promise.reject(new Error("offline"))))
   assert.equal(send("hello"), true)
   await new Promise((resolve) => setImmediate(resolve))
 })
@@ -268,7 +309,7 @@ test("retry marks the row sending, then resends with the original client message
     events.push(["network", ...args])
     return Promise.reject(new Error("still offline"))
   }
-  const retry = screenCallback("handleRetry", retryBindings(events, {
+  const retry = sendingCallback("handleRetry", retryBindings(events, {
     retryable: { threadId: "thread_one", body: "hello", clientMessageId: "client-test-001" },
     sendChatMessage
   }))
@@ -284,14 +325,14 @@ test("retry marks the row sending, then resends with the original client message
 
 test("retry is a no-op for unknown rows or without an ACK-capable callback", () => {
   const unknown = []
-  screenCallback("handleRetry", retryBindings(unknown, {
+  sendingCallback("handleRetry", retryBindings(unknown, {
     retryable: null,
     sendChatMessage: () => assert.fail("unknown row was resent")
   }))("__missing")
   assert.deepEqual(unknown, [["lookup", "__missing"]])
 
   const noSender = []
-  screenCallback("handleRetry", retryBindings(noSender, {
+  sendingCallback("handleRetry", retryBindings(noSender, {
     retryable: { threadId: "thread_one", body: "hello", clientMessageId: "client-test-001" },
     sendChatMessage: undefined
   }))("__local_test")
@@ -316,7 +357,7 @@ function loadEarlierBindings(events, overrides = {}) {
 
 test("load earlier pages 20 messages before the oldest loaded one and always clears loading", async () => {
   const events = []
-  await screenCallback("handleLoadEarlier", loadEarlierBindings(events))()
+  await sendingCallback("handleLoadEarlier", loadEarlierBindings(events))()
   assert.deepEqual(plain(events), [
     ["loading", true],
     ["request", "thread_one", { before: "oldest", limit: 20 }],
@@ -325,7 +366,7 @@ test("load earlier pages 20 messages before the oldest loaded one and always cle
 
   const failed = []
   await assert.rejects(
-    screenCallback("handleLoadEarlier", loadEarlierBindings(failed, { result: Promise.reject(new Error("offline")) }))(),
+    sendingCallback("handleLoadEarlier", loadEarlierBindings(failed, { result: Promise.reject(new Error("offline")) }))(),
     /offline/
   )
   assert.deepEqual(failed.at(-1), ["loading", false])
@@ -338,7 +379,7 @@ test("load earlier ignores taps while loading, without history, or without a thr
     { resolvedThreadId: undefined }
   ]) {
     const events = []
-    await screenCallback("handleLoadEarlier", loadEarlierBindings(events, { bindings }))()
+    await sendingCallback("handleLoadEarlier", loadEarlierBindings(events, { bindings }))()
     assert.deepEqual(events, [])
   }
 })
@@ -373,17 +414,12 @@ test("composer blocks empty and pending sends without losing the draft", () => {
   }), false)
 })
 
-function screenExpression(name, bindings) {
-  const declaration = component("ChatThreadScreen").body.statements
-    .filter(ts.isVariableStatement)
-    .flatMap((statement) => [...statement.declarationList.declarations])
-    .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === name)
-  assert.ok(declaration?.initializer, `${name} must have an initializer`)
-  const executable = ts.transpileModule(
-    `(${declaration.initializer.getText(file)})`,
-    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
-  ).outputText
-  return runInNewContext(executable, bindings)
+function roomInviteExpression(name, bindings) {
+  return evaluate(
+    roomInviteFile,
+    hookDeclaration(roomInviteFile, "useChatRoomInviteActions", name),
+    bindings
+  )
 }
 
 class FakeRoomInviteApiError extends Error {
@@ -443,7 +479,7 @@ function roomInvitePressHarness(overrides = {}) {
     ...overrides.bindings
   }
   return {
-    press: () => screenExpression("handleRoomInvitePress", bindings)(),
+    press: () => roomInviteExpression("handleRoomInvitePress", bindings)(),
     events,
     alerts,
     screenMountedRef,
