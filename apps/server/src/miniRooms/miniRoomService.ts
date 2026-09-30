@@ -348,6 +348,21 @@ export function createMiniRoomService(
         miniRoom
       })
       if (accepted === "accepted") {
+        // A block can commit while the accept statement is in flight. The
+        // block's pair separation then runs on a snapshot without this room and
+        // cannot end it, so re-check after the commit and close it here.
+        if (
+          await options.safetyService.hasBlockBetween(
+            invite.senderUserId,
+            invite.recipientUserId
+          )
+        ) {
+          await separatePair(invite.recipientUserId, invite.senderUserId, now)
+          throw new ChatRoomInviteError(
+            "PAIR_BLOCKED",
+            "That room invite is not available."
+          )
+        }
         const persistedRoom = await repository.findMiniRoom(miniRoom.miniRoomId)
         if (!persistedRoom) throw new Error("Accepted room did not persist.")
         const acceptedInvite = await repository.findInvite(invite.inviteId)
@@ -775,24 +790,32 @@ export function createMiniRoomService(
       return repository.findMiniRoom(miniRoomId)
     },
     async separateUserPair(actorUserId, otherUserId, now = new Date()) {
-      const endedRooms = await repository.separateUserPair({
-        actorUserId,
-        otherUserId,
-        endedAt: now.toISOString()
-      })
-      await Promise.all(
-        endedRooms.map((room) =>
-          options.presenceService.setMiniRoomStatus(room.participantUserIds, false)
-        )
-      )
-      return endedRooms.map((room) => ({
-        miniRoomId: room.miniRoomId,
-        lobbyRoomId: room.lobbyRoomId,
-        participantUserIds: [...room.participantUserIds] as [string, string],
-        endedByUserId: actorUserId,
-        endedAt: room.endedAt ?? now.toISOString()
-      }))
+      return separatePair(actorUserId, otherUserId, now)
     }
+  }
+
+  async function separatePair(
+    actorUserId: string,
+    otherUserId: string,
+    now: Date
+  ): Promise<MiniRoomEnded[]> {
+    const endedRooms = await repository.separateUserPair({
+      actorUserId,
+      otherUserId,
+      endedAt: now.toISOString()
+    })
+    await Promise.all(
+      endedRooms.map((room) =>
+        options.presenceService.setMiniRoomStatus(room.participantUserIds, false)
+      )
+    )
+    return endedRooms.map((room) => ({
+      miniRoomId: room.miniRoomId,
+      lobbyRoomId: room.lobbyRoomId,
+      participantUserIds: [...room.participantUserIds] as [string, string],
+      endedByUserId: actorUserId,
+      endedAt: room.endedAt ?? now.toISOString()
+    }))
   }
 }
 
