@@ -32,17 +32,11 @@ import {
   updateRoomV2EditorPersistedBaseline
 } from "../features/roomV2/roomV2EditorSession"
 import { saveRoomV2EditorDraftConfirmed } from "../features/roomV2/roomV2EditorConfirmedSave"
-import { getRoomV2FurniturePlacementSurface } from "../features/roomV2/roomV2PlacementSurface"
-import { clampRoomV2FloorFootprintToPolygon } from "../features/roomV2/roomV2FloorPlacement"
-import { getRoomV2DraftPlacementCandidates } from "../features/roomV2/roomV2DraftPlacementCandidates"
 import { resolveRoomV2ExactRotationPreview } from "../features/roomV2/roomV2ExactRotation"
 import {
   hasMultipleRoomV2RotationOptions
 } from "../features/roomV2/roomV2EditorPresentation"
-import {
-  getMyRoomEditorCopy,
-  type MyRoomEditorCopy
-} from "../features/roomV2/myRoomCopy"
+import { getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   canPlaceRoomV2ItemInstance,
@@ -64,15 +58,27 @@ import {
   getRoomEditorInventoryViewState,
   useRoomEditorInventoryEntries
 } from "./useRoomEditorInventoryEntries"
-import { projectRoomWorldPointToPolygon } from "../features/roomWorld/roomWorldGeometry"
+import {
+  EDIT_ROOM_AVATAR_SPAWN,
+  arePlacementPreviewsEqual,
+  clampRoomV2PlacementPointForItem,
+  createRoomV2PlacementPreviewResult,
+  createValidDraftPlacement,
+  getDefaultRoomV2FurnitureRotation,
+  getRoomPlacementFeedback,
+  getRoomPlacementSurfaceDropFeedback,
+  getRoomV2FurnitureRotationOptions,
+  resolveRoomV2InventoryPreviewSource,
+  type PlacementPreview,
+  type StageWindowBounds
+} from "../features/roomV2/editor/roomEditorPlacementModel"
+import { getEditRoomWorldStatus } from "../features/roomV2/editor/roomEditorPresentationModel"
 import { getRoomWorldMotionReadinessSummary } from "../features/roomWorld/roomWorldDiagnostics"
 import { createRoomWorldGeometryFromRoomV2Scene } from "../features/roomWorld/roomWorldRoomV2Projection"
 import type {
   FurnitureItem,
   FurnitureCategory,
   PlacedRoomItem,
-  ResolvedRoomV2Scene,
-  RoomShell,
   RoomV2RenderItem,
   UserRoomDecor
 } from "../features/roomV2/roomV2.types"
@@ -81,29 +87,6 @@ type MyRoomEditorScreenProps = NativeStackScreenProps<
   RootStackParamList,
   "MyRoomEditor"
 >
-
-const ROOM_V2_PLACEMENT_SNAP_STEP = 0.01
-const EDIT_ROOM_AVATAR_SPAWN = {
-  x: 0.47,
-  y: 0.76
-} as const
-
-interface PlacementPreview {
-  item: RoomV2RenderItem
-  isValid: boolean
-  feedback?: string
-  blockingRenderIds?: string[]
-  supportingRenderIds?: string[]
-  supportParentRotation?: PlacedRoomItem["supportParentRotation"]
-  supportLocalPosition?: PlacedRoomItem["supportLocalPosition"]
-}
-
-interface StageWindowBounds {
-  x: number
-  y: number
-  width: number
-  height: number
-}
 
 interface InventoryEntry {
   item: FurnitureItem
@@ -127,48 +110,6 @@ const ROOM_EDITOR_CATEGORIES: readonly {
 const ACTIVE_ROOM_FURNITURE_CATALOG = ROOM_V2_FURNITURE_CATALOG
 const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG
 const QA_OWNED_ROOM_ITEM_IDS = new Set<string>()
-
-function arePlacementPreviewsEqual(
-  left: PlacementPreview | undefined,
-  right: PlacementPreview | undefined
-): boolean {
-  if (left === right) return true
-  if (!left || !right) return false
-  if (left.isValid !== right.isValid || left.feedback !== right.feedback) {
-    return false
-  }
-  if (left.item.renderId !== right.item.renderId) return false
-  if (left.item.kind !== right.item.kind) return false
-  if (
-    left.item.x !== right.item.x ||
-    left.item.y !== right.item.y ||
-    left.item.width !== right.item.width ||
-    left.item.height !== right.item.height
-  ) {
-    return false
-  }
-  if (left.item.depth !== right.item.depth) return false
-  if (
-    left.item.anchor.x !== right.item.anchor.x ||
-    left.item.anchor.y !== right.item.anchor.y
-  ) {
-    return false
-  }
-  if (left.item.kind === "furniture" && right.item.kind === "furniture") {
-    if (
-      left.item.rotation !== right.item.rotation ||
-      left.item.asset.key !== right.item.asset.key ||
-      left.item.footprint?.width !== right.item.footprint?.width ||
-      left.item.footprint?.height !== right.item.footprint?.height
-    ) {
-      return false
-    }
-  }
-  const leftBlocking = left.blockingRenderIds ?? []
-  const rightBlocking = right.blockingRenderIds ?? []
-  if (leftBlocking.length !== rightBlocking.length) return false
-  return leftBlocking.every((renderId, index) => renderId === rightBlocking[index])
-}
 
 export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   inventoryOwnerUserId?: string
@@ -1620,346 +1561,6 @@ const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   previous.onPreviewItem === next.onPreviewItem &&
   previous.createPanHandlers === next.createPanHandlers
 )
-
-function createValidDraftPlacement(input: {
-  copy: MyRoomEditorCopy
-  item: FurnitureItem
-  itemId: string
-  scene: ReturnType<typeof resolveRoomV2Scene>
-  rotationOverride?: PlacedRoomItem["rotation"]
-}): PlacedRoomItem | null {
-  const instanceId = `${input.itemId}_${Date.now()}`
-  const rotation = input.rotationOverride ?? getDefaultRoomV2FurnitureRotation(input.item)
-  const candidates = getRoomV2DraftPlacementCandidates(input.item, input.scene)
-
-  for (const candidate of candidates) {
-    const placedItem: PlacedRoomItem = {
-      instanceId,
-      itemId: input.itemId,
-      x: candidate.x,
-      y: candidate.y,
-      rotation
-    }
-    const renderItem = resolvePlacedFurnitureRenderItem(placedItem, input.item)
-    if (!renderItem) continue
-    const validation = validateRoomV2FurniturePlacement({
-      scene: input.scene,
-      candidate: renderItem
-    })
-    const preview = createRoomV2PlacementPreviewResult({
-      copy: input.copy,
-      scene: input.scene,
-      candidate: renderItem,
-      placementIsValid: validation.isValid,
-      placementFeedback: validation.isValid
-        ? undefined
-        : getRoomPlacementFeedback(validation.issueIds[0], input.copy),
-      blockingRenderIds: validation.blockingRenderIds,
-      supportingRenderIds: validation.supportingRenderIds
-    })
-    if (preview.isValid) {
-      return {
-        ...placedItem,
-        ...getRoomV2PlacedItemPersistenceMetadata({
-          ...renderItem,
-          supportInstanceId: validation.supportingRenderIds[0],
-          supportParentRotation: preview.supportParentRotation,
-          supportLocalPosition: preview.supportLocalPosition
-        })
-      }
-    }
-  }
-
-  return null
-}
-
-function getRoomPlacementSurfaceDropFeedback(
-  item: FurnitureItem,
-  copy: MyRoomEditorCopy
-): string {
-  const surface = getRoomV2FurniturePlacementSurface(item)
-  return copy.surfaceDrop[surface]
-}
-
-function getDefaultRoomV2FurnitureRotation(
-  item: FurnitureItem
-): PlacedRoomItem["rotation"] {
-  const rotations = getRoomV2FurnitureRotationOptions(item)
-  if (rotations.length === 0 || rotations.includes("front")) return "front"
-  return rotations[0]
-}
-
-function getRoomV2FurnitureRotationOptions(
-  item: FurnitureItem
-): PlacedRoomItem["rotation"][] {
-  return item.assetsByRotation
-    ? (Object.keys(item.assetsByRotation) as PlacedRoomItem["rotation"][])
-    : []
-}
-
-function resolveRoomV2InventoryPreviewSource(
-  item: FurnitureItem,
-  rotation: PlacedRoomItem["rotation"]
-) {
-  return item.assetsByRotation?.[rotation]?.source ?? item.asset.source
-}
-
-function getRoomPlacementFeedback(
-  issueId: string | undefined,
-  copy: MyRoomEditorCopy
-): string {
-  if (issueId === "overlaps_blocking_furniture") {
-    return copy.feedback.overlapsFurniture
-  }
-  if (issueId === "outside_placeable_area") {
-    return copy.feedback.outsideFloor
-  }
-  if (issueId === "invalid_placement_surface") {
-    return copy.feedback.invalidSurface
-  }
-  if (issueId === "missing_support_surface") {
-    return copy.feedback.missingSupport
-  }
-  return copy.feedback.chooseClearSpot
-}
-
-function createRoomV2PlacementPreviewResult(input: {
-  copy: MyRoomEditorCopy
-  scene: ResolvedRoomV2Scene
-  candidate: RoomV2RenderItem
-  placementIsValid: boolean
-  placementFeedback?: string
-  blockingRenderIds?: string[]
-  supportingRenderIds?: string[]
-}): PlacementPreview {
-  const supportInstanceId = input.supportingRenderIds?.[0]
-  const supportLocalPosition = getRoomV2SupportLocalPosition(
-    input.scene,
-    input.candidate,
-    supportInstanceId
-  )
-  const support = supportInstanceId
-    ? input.scene.renderItems.find((item) => item.renderId === supportInstanceId)
-    : undefined
-  const supportParentRotation = support?.kind === "furniture"
-    ? support.rotation
-    : undefined
-  if (!input.placementIsValid || input.candidate.kind !== "furniture") {
-    return {
-      item: input.candidate,
-      isValid: false,
-      feedback: input.placementFeedback,
-      blockingRenderIds: input.blockingRenderIds,
-      supportingRenderIds: input.supportingRenderIds,
-      supportParentRotation,
-      supportLocalPosition
-    }
-  }
-
-  const previewScene = createRoomV2SceneWithPreviewItem({
-    scene: input.scene,
-    candidate: input.candidate
-  })
-  const geometry = createRoomWorldGeometryFromRoomV2Scene(previewScene)
-  const readiness = getRoomWorldMotionReadinessSummary({
-    geometry,
-    spawn: EDIT_ROOM_AVATAR_SPAWN
-  })
-
-  if (readiness.level === "blocked") {
-    return {
-      item: input.candidate,
-      isValid: false,
-      feedback: input.copy.feedback.blocksAvatarPath,
-      blockingRenderIds: [input.candidate.renderId],
-      supportingRenderIds: input.supportingRenderIds,
-      supportParentRotation,
-      supportLocalPosition
-    }
-  }
-
-  return {
-    item: input.candidate,
-    isValid: true,
-    feedback: readiness.level === "constrained"
-      ? input.copy.feedback.tightButUsable
-      : undefined,
-    supportingRenderIds: input.supportingRenderIds,
-    supportParentRotation,
-    supportLocalPosition
-  }
-}
-
-function candidateIsFurniture(
-  item: RoomV2RenderItem
-): item is Extract<RoomV2RenderItem, { kind: "furniture" }> {
-  return item.kind === "furniture"
-}
-
-function getRoomV2SupportLocalPosition(
-  scene: ResolvedRoomV2Scene,
-  candidate: RoomV2RenderItem,
-  supportInstanceId: string | undefined
-): PlacedRoomItem["supportLocalPosition"] {
-  if (!supportInstanceId || !candidateIsFurniture(candidate)) return undefined
-  const support = scene.renderItems.find((item) => item.renderId === supportInstanceId)
-  if (!support || support.kind !== "furniture" || support.width <= 0 || support.height <= 0) {
-    return undefined
-  }
-  return {
-    x: (candidate.x - (support.x - support.width * support.anchor.x)) / support.width,
-    y: (candidate.y - (support.y - support.height * support.anchor.y)) / support.height
-  }
-}
-
-function createRoomV2SceneWithPreviewItem(input: {
-  scene: ResolvedRoomV2Scene
-  candidate: RoomV2RenderItem
-}): ResolvedRoomV2Scene {
-  return {
-    ...input.scene,
-    renderItems: upsertRoomV2RenderItemSorted(
-      input.scene.renderItems,
-      input.candidate
-    )
-  }
-}
-
-function getEditRoomWorldStatus(
-  level: ReturnType<typeof getRoomWorldMotionReadinessSummary>["level"],
-  copy: MyRoomEditorCopy
-): {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  color: string
-} {
-  switch (level) {
-    case "ready":
-      return {
-        icon: "walk",
-        label: copy.readiness.ready,
-        color: "#8FFFD1"
-      }
-    case "constrained":
-      return {
-        icon: "resize",
-        label: copy.readiness.constrained,
-        color: "#FFE1A8"
-      }
-    case "blocked":
-      return {
-        icon: "alert-circle",
-        label: copy.readiness.blocked,
-        color: "#FFB4C8"
-      }
-  }
-}
-
-function clampRoomV2PlacementPointForItem(
-  point: { x: number; y: number },
-  item: Pick<FurnitureItem, "placementSurface" | "width" | "height" | "anchor" | "footprint" | "placementFootprint" | "placementFootprintByRotation"> & {
-    anchor?: FurnitureItem["anchor"]
-  },
-  shell: RoomShell | null | undefined,
-  rotation: PlacedRoomItem["rotation"] = "front"
-): { x: number; y: number } {
-  const surface = getRoomV2FurniturePlacementSurface(item)
-  if (surface === "floor") {
-    const floorPoint = clampRoomV2PlacementPointToFloor(point, shell)
-    const polygon = shell?.walkablePolygon
-    if (!polygon?.length) return floorPoint
-    return clampRoomV2FloorFootprintToPolygon({
-      point: floorPoint,
-      polygon,
-      footprint: item.placementFootprintByRotation?.[rotation] ??
-        item.placementFootprint ??
-        item.footprint ?? {
-        width: item.width,
-        height: item.height
-      },
-      anchor: item.anchor ?? { x: 0.5, y: 1 }
-    })
-  }
-
-  const region = shell?.surfacePlacementAreas?.[surface]
-  const normalized = {
-    x: Math.max(0, Math.min(1, point.x)),
-    y: Math.max(0, Math.min(1, point.y))
-  }
-  if (!region) return normalized
-
-  const width = item.width
-  const height = item.height
-  const anchor = item.anchor ?? { x: 0.5, y: 1 }
-  const minX = region.minX + width * anchor.x
-  const maxX = region.maxX - width * (1 - anchor.x)
-  const minY = region.minY + height * anchor.y
-  const maxY = region.maxY - height * (1 - anchor.y)
-
-  return {
-    x: clampRoomV2PlacementValue(normalized.x, minX, maxX),
-    y: clampRoomV2PlacementValue(normalized.y, minY, maxY)
-  }
-}
-
-function clampRoomV2PlacementValue(value: number, min: number, max: number): number {
-  if (min > max) return (min + max) / 2
-  return Math.max(min, Math.min(max, value))
-}
-
-function clampRoomV2PlacementPointToFloor(
-  point: { x: number; y: number },
-  shell: RoomShell | null | undefined
-): { x: number; y: number } {
-  const walkablePolygon = shell?.walkablePolygon
-  const placeableArea = shell?.placeableArea
-  const normalized = {
-    x: Math.max(0, Math.min(1, point.x)),
-    y: Math.max(0, Math.min(1, point.y))
-  }
-  if (walkablePolygon?.length) {
-    return projectRoomWorldPointToPolygon({
-      x: snapRoomV2PlacementValue(normalized.x),
-      y: snapRoomV2PlacementValue(normalized.y)
-    }, walkablePolygon)
-  }
-
-  if (!placeableArea) {
-    return {
-      x: snapRoomV2PlacementValue(normalized.x),
-      y: snapRoomV2PlacementValue(normalized.y)
-    }
-  }
-
-  const { minX, maxX, minY, maxY } = placeableArea
-  const cx = (minX + maxX) / 2
-  const cy = (minY + maxY) / 2
-  const halfW = (maxX - minX) / 2
-  const halfH = (maxY - minY) / 2
-  let dx = (normalized.x - cx) / halfW
-  let dy = (normalized.y - cy) / halfH
-  const dist = Math.abs(dx) + Math.abs(dy)
-
-  if (dist > 1) {
-    dx /= dist
-    dy /= dist
-  }
-
-  const clamped = {
-    x: cx + dx * halfW,
-    y: cy + dy * halfH
-  }
-
-  return {
-    x: Math.max(minX, Math.min(maxX, snapRoomV2PlacementValue(clamped.x))),
-    y: Math.max(minY, Math.min(maxY, snapRoomV2PlacementValue(clamped.y)))
-  }
-}
-
-function snapRoomV2PlacementValue(value: number): number {
-  return Math.round(value / ROOM_V2_PLACEMENT_SNAP_STEP) *
-    ROOM_V2_PLACEMENT_SNAP_STEP
-}
 
 const styles = StyleSheet.create({
   root: {
