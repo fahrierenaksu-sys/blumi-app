@@ -1,9 +1,20 @@
 # Migration 068 runbook — session reuse detection and Firebase uid binding
 
-> **STATUS: NOT APPLIED — awaiting owner approval.**
-> Prepared 2026-09-30. The owner decided that this phase applies nothing to
-> Supabase and deploys nothing. Every step below that writes to a database or
-> deploys a binary needs a separate, explicit owner approval at the time it runs.
+> **STATUS: APPLIED 2026-09-30 by owner decision.** The owner explicitly
+> instructed applying 068 and merging to `main`, and waived the pre-apply native
+> QA and the Railway `DATABASE_URL` check. Owner-reported before apply: PostgreSQL
+> 17 dump taken and restored locally with `applied: 1`, `rerunApplied: 0`,
+> `accounts: 18` (archive path and SHA-256 not recorded here).
+>
+> How it was applied: the orchestrator had no database password, so it ran the
+> migrator's exact transaction through the Supabase connector as role
+> `postgres`: `BEGIN`, transaction-local `lock_timeout = 5000ms`,
+> `pg_advisory_xact_lock('blumi:migrations')`, the 068 statements, the ledger
+> row with checksum `a475eecb…e0ee`, `COMMIT`. Preflight: 67 ledger rows, no 068
+> columns or index, no transaction older than 60 s. Post-check: 68 ledger rows,
+> checksum matches the file, four nullable columns and the partial unique index
+> exist, 18 accounts and 2 sessions unchanged, 0 uids bound; the live old binary
+> (`2a55475`) answered `/health` 200 and `/ready` 200 afterwards.
 
 This runbook covers one migration,
 `apps/server/db/migrations/068_session_reuse_detection_and_firebase_uid.sql`
