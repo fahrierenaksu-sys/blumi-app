@@ -37,7 +37,9 @@ export const LEGAL_HOSTED_PAGE_URLS: Readonly<LegalHostedPageUrls> = Object.free
 })
 
 export const LEGAL_ACCEPTANCE_CAPTURE_MODE = "server_recorded" as const
-export const LEGAL_HOSTED_COPY_ALIGNMENT = "update-required" as const
+// 2026-09-30: all five hosted routes in tr/en returned HTTP 200 and matched
+// build-legal-pages.mjs output byte-for-byte (main 19b6ff3b).
+export const LEGAL_HOSTED_COPY_ALIGNMENT = "aligned" as const
 
 export const LEGAL_RELEASE_REQUIREMENTS = Object.freeze([
   "Provide a verified operator legal name, country and working contact method in every published legal surface.",

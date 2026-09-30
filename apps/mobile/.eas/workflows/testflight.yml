@@ -1,0 +1,35 @@
+name: Blumi branch to TestFlight
+
+on:
+  push:
+    branches:
+      - claude/busy-cray-dl5wvr
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Verify and build iOS
+    type: build
+    environment: production
+    params:
+      platform: ios
+      profile: production
+    hooks:
+      after_install_node_modules:
+        - name: Check source, types, lint, tests and dependency audit
+          working_directory: ../..
+          run: |
+            set -euo pipefail
+            npm run verify:source-hygiene
+            npm run build:packages
+            npm run typecheck
+            npm run lint
+            npm test
+            npm run audit:release
+  submit_ios:
+    name: Upload this build to TestFlight
+    needs: [build_ios]
+    type: submit
+    params:
+      profile: production
+      build_id: ${{ needs.build_ios.outputs.build_id }}
