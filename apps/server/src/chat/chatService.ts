@@ -8,7 +8,10 @@ import {
   type ChatRepository
 } from "./chatRepository"
 import { PublicRequestError } from "../errors/publicRequestError"
-import { assertPublicTextAllowed } from "../safety/publicTextFilter"
+import {
+  assertPublicTextAllowed,
+  containsControlCharacters
+} from "../safety/publicTextFilter"
 import type { ChatThreadPageOptions } from "./chatThreadPagination"
 
 const MAX_MESSAGE_LENGTH = 500
@@ -152,6 +155,9 @@ function normalizeMessageBody(body: string): string {
   }
   if (trimmed.length > MAX_MESSAGE_LENGTH) {
     throw new PublicRequestError("Keep messages under 500 characters.")
+  }
+  if (containsControlCharacters(trimmed)) {
+    throw new PublicRequestError("Remove unsupported characters from your message.")
   }
   assertPublicTextAllowed(trimmed)
   return trimmed

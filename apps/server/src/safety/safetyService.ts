@@ -7,6 +7,7 @@ import {
   type SafetyRepository
 } from "./safetyRepository"
 import { PublicRequestError } from "../errors/publicRequestError"
+import { containsControlCharacters } from "./publicTextFilter"
 import {
   createRealtimeAccessRevocationChannel,
   type RealtimeAccessRevocationListener
@@ -283,6 +284,9 @@ function normalizeReportNote(note: string | undefined): string | undefined {
   if (trimmed.length > MAX_REPORT_NOTE_LENGTH) {
     throw new PublicRequestError("Keep report details under 1000 characters.")
   }
+  if (containsControlCharacters(trimmed)) {
+    throw new PublicRequestError("Remove unsupported characters from the report details.")
+  }
   return trimmed
 }
 
@@ -342,6 +346,9 @@ function normalizeResolutionNote(note: string | undefined): string | undefined {
   if (!trimmed) return undefined
   if (trimmed.length > MAX_REPORT_NOTE_LENGTH) {
     throw new PublicRequestError("Keep moderation notes under 1000 characters.")
+  }
+  if (containsControlCharacters(trimmed)) {
+    throw new PublicRequestError("Remove unsupported characters from the moderation note.")
   }
   return trimmed
 }
