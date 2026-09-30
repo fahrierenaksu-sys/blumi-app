@@ -42,6 +42,7 @@ export class ChatRoomInviteError extends Error {
 }
 
 export interface MiniRoomService {
+  onRoomInvalidated?(listener: (miniRoomId: string) => void): void
   repository: MiniRoomRepository
   createInvite(input: CreateInviteInput, now?: Date): Promise<MiniRoomInviteRecord>
   decideInvite(
@@ -164,9 +165,11 @@ export function createMiniRoomService(
   options: CreateMiniRoomServiceOptions
 ): MiniRoomService {
   const repository = options.repository ?? createInMemoryMiniRoomRepository(undefined, options.getPersonalRoomDecor)
+  const roomInvalidationListeners = new Set<(id: string) => void>()
   const idFactory = options.idFactory ?? (() => randomUUID())
 
   return {
+    onRoomInvalidated(listener) { roomInvalidationListeners.add(listener) },
     repository,
     async createChatInvite(input, now = new Date()) {
       assertDistinctChatProfiles(input.senderProfile, input.recipientProfile)
@@ -789,6 +792,7 @@ export function createMiniRoomService(
         endedAt
       )
       if (!endedRoom?.endedAt || !endedRoom.endedByUserId) return null
+      for (const listener of roomInvalidationListeners) listener(miniRoomId)
       await options.presenceService.setMiniRoomStatus(
         endedRoom.participantUserIds,
         false
@@ -823,6 +827,7 @@ export function createMiniRoomService(
       otherUserId,
       endedAt: now.toISOString()
     })
+    for (const room of endedRooms) for (const listener of roomInvalidationListeners) listener(room.miniRoomId)
     await Promise.all(
       endedRooms.map((room) =>
         options.presenceService.setMiniRoomStatus(room.participantUserIds, false)

@@ -76,6 +76,18 @@ const INVITE = {
  * The invalid payloads break a field a consumer relies on.
  */
 const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = {
+  "mini_room.motion_snapshot": {
+    valid: { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"], avatars: [
+      { userId: "a", x: .38, y: .76, present: true, revision: 1 },
+      { userId: "b", x: .62, y: .76, present: false, revision: 0 }] },
+    invalid: { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"], avatars: [] }
+  },
+  "mini_room.avatar_moved": {
+    valid: { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"],
+      avatar: { userId: "a", x: .5, y: .7, present: true, revision: 2 } },
+    invalid: { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"],
+      avatar: { userId: "a", x: 2, y: .7, present: true, revision: 2 } }
+  },
   "room.joined": {
     valid: {
       roomId: "lobby",
@@ -211,7 +223,7 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 19);
+  assert.equal(SERVER_EVENT_TYPES.length, 21);
 });
 
 for (const type of SERVER_EVENT_TYPES) {

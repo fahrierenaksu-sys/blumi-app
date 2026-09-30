@@ -1,4 +1,5 @@
 import type { ServerEvent } from "@blumi/contracts"
+import { parseServerEvent } from "@blumi/contracts"
 
 export const MAX_REALTIME_FANOUT_BYTES = 7_900
 /**
@@ -9,6 +10,8 @@ export const MAX_REALTIME_FANOUT_BYTES = 7_900
 export const MAX_REALTIME_FANOUT_USER_TARGETS = 100
 
 const SERVER_EVENT_TYPES = new Set([
+  "mini_room.avatar_moved",
+  "mini_room.motion_snapshot",
   "room.joined",
   "room.left",
   "presence.snapshot",
@@ -98,6 +101,11 @@ export function validateRealtimeFanoutMessage(
   }
   if (!isServerEvent(record.event)) return false
   if (!isFanoutTarget(record.target)) return false
+  if (record.event.type === "mini_room.avatar_moved" || record.event.type === "mini_room.motion_snapshot") {
+    const allowed = record.event.payload.participantUserIds
+    return record.target.kind === "user" ? allowed.includes(record.target.userId) :
+      record.target.kind === "users" && record.target.userIds.every(id => allowed.includes(id))
+  }
   if (record.event.type === "chat.thread_read") {
     return record.target.kind === "user" && record.target.userId === record.event.payload.userId
   }
@@ -150,6 +158,9 @@ function isServerEventPayload(type: string, value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false
   const payload = value as Record<string, unknown>
   switch (type) {
+    case "mini_room.avatar_moved":
+    case "mini_room.motion_snapshot":
+      return parseServerEvent({ type, payload: value }).kind === "valid"
     case "room.joined":
       return hasStrings(payload, ["roomId", "currentUserId", "assignedSpotId"]) &&
         isRecord(payload.layout) && isRecord(payload.snapshot)

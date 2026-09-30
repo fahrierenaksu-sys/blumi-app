@@ -820,6 +820,49 @@ test("the periodic authorization sweep has bounded concurrency and fails closed 
   }
 })
 
+test("two room sockets share motion immediately, reconnect at the accepted target, and chat survives movement bursts", async () => {
+  const harness = await createRealtimeHarness()
+  try {
+    const a = await harness.createSession("+905551110121", "Motion A")
+    const b = await harness.createSession("+905551110122", "Motion B")
+    const startedAt = new Date().toISOString()
+    await harness.miniRoomService.repository.saveInvite({ inviteId: "motion-invite", senderUserId: a.userId,
+      recipientUserId: b.userId, status: "pending", createdAt: startedAt })
+    assert.equal(await harness.miniRoomService.repository.acceptPendingInvite({ inviteId: "motion-invite",
+      decidedAt: startedAt, miniRoom: { miniRoomId: "motion-room", lobbyRoomId: "retired",
+        livekitRoomName: "motion-test", participantUserIds: [a.userId, b.userId], startedAt } }), "accepted")
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const ea = collectEvents(sa), eb = collectEvents(sb)
+    const enter = (socket: WebSocket) => socket.send(JSON.stringify({ type: "mini_room.scene_enter", payload: { miniRoomId: "motion-room" } }))
+    enter(sa); enter(sb)
+    await eb.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+    const began = performance.now()
+    sa.send(JSON.stringify({ type: "mini_room.move", payload: { miniRoomId: "motion-room", sequence: 1, x: .5, y: .7 } }))
+    const received = await eb.waitFor("mini_room.avatar_moved")
+    assert.equal(received.payload.avatar.userId, a.userId)
+    assert.equal(received.payload.avatar.x, .5)
+    assert.ok(performance.now() - began < 1000, "no four-second queue or polling")
+    for (let sequence = 2; sequence <= 100; sequence++) sa.send(JSON.stringify({ type: "mini_room.move",
+      payload: { miniRoomId: "motion-room", sequence, x: .5, y: .7 } }))
+    sa.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+    await ea.waitFor("chat.thread_listed")
+    assert.equal(sa.readyState, WebSocket.OPEN, "movement never consumes or closes the chat budget")
+    const revision = received.payload.avatar.revision
+    sa.close()
+    await eb.waitForMatching("mini_room.motion_snapshot", event =>
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && !avatar.present && avatar.revision > revision))
+    const reconnected = await harness.connect(a.sessionToken), er = collectEvents(reconnected)
+    enter(reconnected)
+    const snapshot = await er.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+    assert.equal(snapshot.payload.avatars.find(avatar => avatar.userId === a.userId)?.x, .5)
+    await harness.miniRoomService.leaveMiniRoom("motion-room", a.userId)
+    const count = eb.all().filter(event => event.type === "mini_room.avatar_moved").length
+    reconnected.send(JSON.stringify({ type: "mini_room.move", payload: { miniRoomId: "motion-room", sequence: 1, x: .6, y: .7 } }))
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(eb.all().filter(event => event.type === "mini_room.avatar_moved").length, count)
+  } finally { await harness.close() }
+})
+
 async function createRealtimeHarness(options: {
   pauseTicketConsumption?: boolean
   rejectTicketConsumption?: boolean
@@ -960,6 +1003,7 @@ async function createRealtimeHarness(options: {
 
   return {
     authService,
+    miniRoomService,
     safetyService,
     authorizationQueries,
     presenceService,

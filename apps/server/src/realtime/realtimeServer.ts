@@ -111,11 +111,14 @@ export function createRealtimeServer(
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const connectionEventWindows = new Map<string, EventRateWindow>()
   const userEventWindows = new Map<string, EventRateWindow>()
+  const movementEventWindows = new Map<string, EventRateWindow>()
   const upgradeAddressWindows = new Map<string, EventRateWindow>()
   const upgradeAttemptLimit = options.upgradeAttemptsPerAddressWindow ?? MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const connectionInFlight = new Map<string, number>()
   const userInFlight = new Map<string, number>()
+  const connectionMovementInFlight = new Map<string, number>()
+  const userMovementInFlight = new Map<string, number>()
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
   const connectionLifecycleOperations = new Map<string, Promise<void>>()
@@ -439,35 +442,46 @@ export function createRealtimeServer(
       return
     }
     const now = Date.now()
-    const connectionAllowed = consumeEventAllowance({
+    let frame: unknown
+    try { frame = JSON.parse(data.toString()) } catch { frame = undefined }
+    const movement = isClientEvent(frame) && frame.type === "mini_room.move"
+    if (movement) {
+      purgeExpiredEventWindows(movementEventWindows, now)
+      if (!consumeEventAllowance({ windows: movementEventWindows, key: connection.userId, now, limit: 60 }) ||
+        (connectionMovementInFlight.get(connection.connectionId) ?? 0) >= 2 ||
+        (userMovementInFlight.get(connection.userId) ?? 0) >= 4) return
+    }
+    const connectionAllowed = movement || consumeEventAllowance({
       windows: connectionEventWindows,
       key: connection.connectionId,
       now,
       limit: MAX_CONNECTION_EVENTS_PER_WINDOW
     })
-    const userAllowed = consumeEventAllowance({
+    const userAllowed = movement || consumeEventAllowance({
       windows: userEventWindows,
       key: connection.userId,
       now,
       limit: MAX_USER_EVENTS_PER_WINDOW
     })
-    if (!connectionAllowed || !userAllowed ||
+    if (!movement && (!connectionAllowed || !userAllowed ||
       (connectionInFlight.get(connection.connectionId) ?? 0) >= MAX_CONNECTION_IN_FLIGHT ||
-      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT) {
+      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT)) {
       if (connection.socket.readyState === 1) {
         connection.socket.close(RATE_LIMIT_CLOSE_CODE, RATE_LIMIT_CLOSE_REASON)
       }
       return
     }
-    connectionInFlight.set(connection.connectionId, (connectionInFlight.get(connection.connectionId) ?? 0) + 1)
-    userInFlight.set(connection.userId, (userInFlight.get(connection.userId) ?? 0) + 1)
+    const connectionSlots = movement ? connectionMovementInFlight : connectionInFlight
+    const userSlots = movement ? userMovementInFlight : userInFlight
+    connectionSlots.set(connection.connectionId, (connectionSlots.get(connection.connectionId) ?? 0) + 1)
+    userSlots.set(connection.userId, (userSlots.get(connection.userId) ?? 0) + 1)
     let received: ClientEvent | undefined
     try {
-      const parsed = JSON.parse(data.toString()) as unknown
+      const parsed = frame
       if (!isClientEvent(parsed)) return
       received = parsed
       if (!await authorizeConnection(connection) || connection.socket.readyState !== 1) return
-      if (parsed.type === "room.join") {
+      if (parsed.type === "room.join" || parsed.type === "mini_room.scene_enter") {
         await trackConnectionRoomJoin(connection.connectionId, () => {
           if (!connectionManager.getConnection(connection.connectionId)) return Promise.resolve()
           return router.handleClientEvent(connection, parsed)
@@ -479,8 +493,8 @@ export function createRealtimeServer(
       reportRefusedChatSend(connection, received, error)
       return
     } finally {
-      releaseInFlight(connectionInFlight, connection.connectionId)
-      releaseInFlight(userInFlight, connection.userId)
+      releaseInFlight(connectionSlots, connection.connectionId)
+      releaseInFlight(userSlots, connection.userId)
     }
   }
 

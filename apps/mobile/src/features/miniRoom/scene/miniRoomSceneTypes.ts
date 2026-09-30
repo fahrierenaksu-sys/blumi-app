@@ -105,6 +105,7 @@ export interface MiniRoomParticipantAvatarSnapshots {
 }
 
 export interface AvatarState {
+  present?: boolean
   userId: string
   displayName: string
   x: number
@@ -151,6 +152,8 @@ export interface MiniRoomStore {
   interaction: InteractionState
   moveLocalAvatar: (point: RoomPoint) => boolean
   moveLocalAvatarToHotspot: (hotspotId: string) => boolean
+  applyRemoteAvatar: (avatar: import("@blumi/contracts").MiniRoomAvatarMotion, snap?: boolean) => void
+  setRemotePresence: (userId: string, present: boolean) => void
   addSpeechBubble: (bubble: Omit<SpeechBubble, "id" | "createdAt" | "expiresAt">) => void
   sayPhrase: (userId: string, body: string, tone?: SpeechBubbleTone) => void
   dismissSpeechBubble: (bubbleId: string) => void

@@ -26,10 +26,8 @@ export function enqueueMiniRoomSpeech(
   speech: MiniRoomSpeechInput,
   now: number
 ): MiniRoomSpeechQueue {
-  if (current.active) {
-    return { active: current.active, pending: [...current.pending, speech] }
-  }
-  return { active: activate(speech, now), pending: current.pending }
+  if (current.active?.key === speech.key) return current
+  return { active: activate(speech, now), pending: [] }
 }
 
 export function expireMiniRoomSpeech(

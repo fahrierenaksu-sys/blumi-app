@@ -1,5 +1,7 @@
 import type { ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
+import { useIsFocused } from "@react-navigation/native"
+import { useMiniRoomMotion } from "../features/miniRoom/useMiniRoomMotion"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
@@ -50,6 +52,10 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor } = props
   const { readyMiniRoom, participants } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
+  const isFocused = useIsFocused()
+  const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,
+    localUserId: sessionActor.profile.userId, partnerUserId: participants.partner.userId,
+    enabled: sessionActor.session.mode === "production", isFocused })
   const locale = resolveAccountRecoveryLocale(
       getNativeAppLocale(),
       Intl.DateTimeFormat().resolvedOptions().locale
@@ -326,6 +332,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         onActionComplete={handleSafetyActionComplete}
       />
       <MiniRoomScene
+        roomMotion={roomMotion}
         copy={roomCopy}
         localUser={participants.you}
         partnerUser={participants.partner}

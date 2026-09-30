@@ -11,6 +11,7 @@ type StoreInput = Parameters<typeof UseMiniRoomSceneStore>[0]
 
 function mount() {
   const runtime = createFakeReactRuntime()
+  const cancelledDrivers: unknown[] = []
   const timers = new Map<number, { run: () => void; delay: number }>()
   let timerId = 0
   const { cozyPinkBedroomScene } = loadSourceWithFakeReact<{ cozyPinkBedroomScene: unknown }>(
@@ -27,7 +28,7 @@ function mount() {
         "../miniRoomAvatarMotion": { canMiniRoomAvatarUseMotion: () => true },
         "./miniRoomAvatarPositions": {
           createMiniRoomAvatarPosition: (point: { x: number; y: number }) => ({ x: { value: point.x }, y: { value: point.y } }),
-          createMiniRoomSegmentAnimator: () => ({ animate: () => undefined, cancel: () => undefined }),
+          createMiniRoomSegmentAnimator: (position: unknown) => ({ animate: () => undefined, cancel: () => { cancelledDrivers.push(position) } }),
           readMiniRoomAvatarPosition: (position: { x: { value: number }; y: { value: number } }) =>
             ({ x: position.x.value, y: position.y.value }),
           snapMiniRoomAvatarPosition: (position: { x: { value: number }; y: { value: number } }, point: { x: number; y: number }) => {
@@ -37,6 +38,7 @@ function mount() {
         }
       },
       real: [
+        "./miniRoomInitialAvatars",
         "../../roomWorld/roomWorldGeometry",
         "../../roomWorld/roomWorldRoomV2Projection",
         "../../roomWorld/roomWorldMiniRoomProjection",
@@ -69,8 +71,23 @@ function mount() {
     return runtime.render(() => useMiniRoomSceneStore({ ...input }))
   }
   const store = () => runtime.output as MiniRoomStore
-  return { runtime, timers, render, store }
+  return { runtime, timers, render, store, cancelledDrivers }
 }
+
+test("both avatars walk concurrently; retargeting one cancels only its own UI-thread driver", () => {
+  const f = mount()
+  f.render()
+  assert.equal(f.store().moveLocalAvatar({ x: .35, y: .70 }), true)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
+  assert.equal(f.store().avatars.local.motion, "walking")
+  assert.equal(f.store().avatars.partner.motion, "walking")
+  assert.equal(f.cancelledDrivers.length, 0, "remote walk does not cancel local walk")
+  assert.equal(f.store().moveLocalAvatar({ x: .40, y: .70 }), true)
+  assert.deepEqual(f.cancelledDrivers, [f.store().avatarPositions.local])
+  assert.equal(f.store().avatars.partner.motion, "walking")
+  f.runtime.unmount()
+  assert.ok(f.cancelledDrivers.includes(f.store().avatarPositions.partner), "unmount cancels the remote animator too")
+})
 
 test("re-renders with the same participants keep the scene, speech and callbacks", () => {
   const f = mount()
@@ -113,15 +130,28 @@ test("speech uses the current bubble lifetime", () => {
   assert.equal(bubble.expiresAt - bubble.createdAt, 9000)
 })
 
-test("the queued next bubble shows after the active one expires", () => {
+test("a burst shows the newest bubble immediately without accumulating timers", () => {
   const f = mount()
   f.render()
   f.store().sayPhrase("partner", "First")
   f.store().sayPhrase("local", "Second")
-  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["First"])
-  const expiry = [...f.timers.entries()].find(([, timer]) => timer.delay > 1200)
-  assert.ok(expiry)
-  f.timers.delete(expiry[0])
-  expiry[1].run()
+  const firstId = f.store().bubbles[0].id
+  f.store().sayPhrase("partner", "Third")
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Third"])
+  assert.equal(f.timers.size, 2)
+  f.store().dismissSpeechBubble(firstId)
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Third"])
+  f.runtime.unmount()
+  assert.equal(f.timers.size, 0)
+})
+
+test("a replaced speaker leaves speaking state and the new speaker starts immediately", () => {
+  const f = mount()
+  f.render()
+  f.store().sayPhrase("partner", "First")
+  f.store().sayPhrase("local", "Second")
   assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Second"])
+  assert.equal(f.store().avatars.partner.motion, "idle")
+  assert.equal(f.store().avatars.local.motion, "speaking")
+  f.runtime.unmount()
 })

@@ -1,3 +1,4 @@
+import { MINI_ROOM_FLOOR } from "@blumi/domain"
 import { roomV2ProductionAssets as roomV2Assets } from "./roomV2ProductionAssets"
 import { ROOM_V2_APPROVED_MY_ROOM_CAMERA } from "./roomV2Camera"
 import type {
@@ -112,15 +113,7 @@ const BASE_ROOM_V2_SHELL_CATALOG: RoomShell[] = [
       // clock, artwork, mirror, or other wall-mounted prop.
       wall: [{ minX: 0.33, maxX: 0.43, minY: 0.2, maxY: 0.46 }]
     },
-    walkablePolygon: [
-      { x: 0.48, y: 0.42 },
-      { x: 0.8, y: 0.55 },
-      { x: 0.83, y: 0.72 },
-      { x: 0.7, y: 0.9 },
-      { x: 0.3, y: 0.9 },
-      { x: 0.17, y: 0.72 },
-      { x: 0.2, y: 0.55 }
-    ],
+    walkablePolygon: MINI_ROOM_FLOOR,
     placementLanes: [
       {
         id: "room_v2_world_lane_wall",

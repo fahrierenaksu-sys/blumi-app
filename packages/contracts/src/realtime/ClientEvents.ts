@@ -13,6 +13,8 @@ import type { ReactionType } from "../reactions/ReactionEvent";
 import type { ReportReason } from "../safety/ReportReason";
 
 export type ClientEvent =
+  | { type: "mini_room.scene_enter" | "mini_room.scene_exit"; payload: { miniRoomId: string } }
+  | { type: "mini_room.move"; payload: import("../miniRooms/MiniRoomMotion").MiniRoomMove }
   | { type: "room.join"; payload: JoinRoomRequest }
   | { type: "room.leave"; payload: LeaveRoomRequest }
   | { type: "presence.move_to_spot"; payload: MoveToSpotCommand }

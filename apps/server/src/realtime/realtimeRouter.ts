@@ -1,4 +1,5 @@
 import type { ClientEvent, ServerEvent } from "@blumi/contracts"
+import { miniRoomSceneCommandSchema } from "@blumi/contracts"
 import type { ChatService } from "../chat/chatService"
 import { createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
 import type { ConnectionService } from "../connections/connectionService"
@@ -18,6 +19,7 @@ import {
   type RealtimePresenceRoomPolicy
 } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
+import { createMiniRoomMotionService } from "../miniRooms/miniRoomMotionService"
 
 export interface RealtimeRouter {
   handleClientEvent(
@@ -60,6 +62,12 @@ export function createRealtimeRouter(
   } = options
   const isPresenceRoomAllowed =
     options.isPresenceRoomAllowed ?? isRealtimePresenceRoomAllowed
+  const motion = createMiniRoomMotionService({
+    findRoom: id => miniRoomService.findMiniRoom(id),
+    hasBlockBetween: (a, b) => safetyService.hasBlockBetween(a, b),
+    emit: (users, event) => connectionManager.sendToUsers(users, event)
+  })
+  miniRoomService.onRoomInvalidated?.(id => motion.invalidate(id))
   const chatMessageDeliveryService = createChatMessageDeliveryService({
     chatService,
     safetyService,
@@ -164,6 +172,21 @@ export function createRealtimeRouter(
   return {
     async handleClientEvent(connection, event) {
       switch (event.type) {
+        case "mini_room.scene_enter": {
+          const parsed = miniRoomSceneCommandSchema.safeParse(event.payload)
+          if (!parsed.success) return
+          await motion.enter(connection.connectionId, connection.userId, parsed.data.miniRoomId)
+          return
+        }
+        case "mini_room.scene_exit": {
+          const parsed = miniRoomSceneCommandSchema.safeParse(event.payload)
+          if (!parsed.success) return
+          motion.disconnect(connection.connectionId, parsed.data.miniRoomId)
+          return
+        }
+        case "mini_room.move":
+          await motion.move(connection.connectionId, connection.userId, event.payload)
+          return
         case "room.join": {
           if (!(await canUsePresenceRoom(connection, event.payload.roomId))) {
             rejectPresenceRoomRequest(connection, event.type)
@@ -497,6 +520,7 @@ export function createRealtimeRouter(
       }
     },
     async handleDisconnect(connection) {
+      motion.disconnect(connection.connectionId)
       const clearedRoomIds = await presenceService.disconnectConnection(
         connection.connectionId,
         connection.userId

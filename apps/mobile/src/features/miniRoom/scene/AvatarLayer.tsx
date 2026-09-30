@@ -348,7 +348,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   }))
 
   return (
-    <Reanimated.View style={[styles.avatarAnchor, anchorStyle]}>
+    <Reanimated.View style={[styles.avatarAnchor, anchorStyle, { opacity: avatar.present === false ? 0.35 : 1 }]}>
       {showJoinPulse ? (
         <Animated.View
           style={[

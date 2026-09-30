@@ -1,9 +1,6 @@
+import { createInitialAvatars, deriveFacing } from "./miniRoomInitialAvatars"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import {
-  deriveRoomWorldFacing,
-  omitRoomWorldBlockers,
-  type RoomWorldGeometry
-} from "../../roomWorld/roomWorldGeometry"
+import { omitRoomWorldBlockers } from "../../roomWorld/roomWorldGeometry"
 import {
   createRoomWorldGeometryFromRoomV2Scene,
   createRoomWorldHotspotsFromRoomV2Scene
@@ -71,66 +68,11 @@ interface UseMiniRoomSceneStoreInput {
   participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
   scene?: RoomScene
   roomDecorScene?: ResolvedRoomV2Scene
+  onLocalMove?: (point: RoomPoint, hotspotId?: string) => boolean
   bubbleLifetimeMs?: number
 }
 
 const PROXIMITY_CLOSE_DISTANCE = 0.18
-const ROOM_V2_MINI_ROOM_SPAWN_SEEDS = {
-  local: {
-    x: 0.38,
-    y: 0.76,
-    facing: "right" as AvatarFacing
-  },
-  partner: {
-    x: 0.62,
-    y: 0.74,
-    facing: "left" as AvatarFacing
-  }
-} as const
-
-function deriveFacing(from: RoomPoint, to: RoomPoint): AvatarFacing {
-  return deriveRoomWorldFacing(from, to)
-}
-
-function createInitialAvatars(
-  input: {
-    localUserId: string
-    partnerUserId: string
-    participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
-  },
-  scene: RoomScene,
-  geometry: RoomWorldGeometry,
-  usesRoomV2Scene: boolean
-): Record<string, AvatarState> {
-  const { localSpawn, partnerSpawn } = createInitialSpawnPair({
-    scene,
-    geometry,
-    usesRoomV2Scene
-  })
-  const { local, partner } = input.participantAvatarSnapshots
-
-  return {
-    [input.localUserId]: {
-      userId: input.localUserId,
-      displayName: local.displayName,
-      x: localSpawn.x,
-      y: localSpawn.y,
-      facing: localSpawn.facing,
-      motion: "idle",
-      appearance: local.appearance
-    },
-    [input.partnerUserId]: {
-      userId: input.partnerUserId,
-      displayName: partner.displayName,
-      x: partnerSpawn.x,
-      y: partnerSpawn.y,
-      facing: partnerSpawn.facing,
-      motion: "idle",
-      appearance: partner.appearance
-    }
-  }
-}
-
 function cancelMiniRoomMovementRun(run: MiniRoomMovementRun): void {
   run.cancel()
 }
@@ -153,6 +95,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const partnerDisplayName = input.partnerUser.displayName
   const participantAvatarSnapshots = input.participantAvatarSnapshots
   const bubbleLifetimeMs = input.bubbleLifetimeMs
+  const onLocalMove = input.onLocalMove
   const usesRoomV2Scene = Boolean(input.roomDecorScene?.shell)
   const geometry = useMemo(
     () => usesRoomV2Scene && input.roomDecorScene
@@ -200,7 +143,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const [bubbles, setBubbles] = useState<SpeechBubble[]>([])
   const [pressedPoint, setPressedPoint] = useState<RoomPoint | undefined>()
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | undefined>()
-  const activeMovementRef = useRef<MiniRoomMovementRun | null>(null)
+  const movementsRef = useRef(new Map<string, { current: MiniRoomMovementRun | null }>())
+  const movementRefFor = useCallback((id: string) => {
+    let ref = movementsRef.current.get(id)
+    if (!ref) { ref = { current: null }; movementsRef.current.set(id, ref) }
+    return ref
+  }, [])
   const movementCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bubbleCounterRef = useRef(0)
   const speechQueueRef = useRef(createMiniRoomSpeechQueue())
@@ -210,7 +158,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const speechMotionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   useEffect(() => {
-    cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
+    for (const ref of movementsRef.current.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
     cancelPendingMiniRoomMovementCompletion(
       movementCompletionTimerRef,
       clearTimeout
@@ -251,8 +199,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   useEffect(() => {
     // The timer map is created once and only cleared, never replaced.
     const speechMotionTimers = speechMotionTimersRef.current
+    const movements = movementsRef.current
     return () => {
-      cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
+      for (const ref of movements.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
       cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
@@ -269,9 +218,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   }, [])
 
   const runMovement = useCallback(
-    (point: RoomPoint, options?: MoveOptions): boolean => {
+    (userId: string, point: RoomPoint, options?: MoveOptions): boolean => {
       const currentAvatars = avatarsRef.current
-      const committedLocalAvatar = currentAvatars[input.localUser.userId]
+      const committedLocalAvatar = currentAvatars[userId]
       if (!committedLocalAvatar) return false
       const motionDriver = getMotionDriver(committedLocalAvatar)
       // A retarget during a walk starts from where the avatar is on screen.
@@ -300,7 +249,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         isRoomWorldTargetOccupied({
           target: seatTarget,
           occupants,
-          movingOccupantId: input.localUser.userId
+          movingOccupantId: userId
         })
       ) {
         return false
@@ -320,7 +269,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
           timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
           occupants,
-          movingOccupantId: input.localUser.userId
+          movingOccupantId: userId
         })
         : undefined
       if (seatHotspot?.approachPoint && currentSeatExit && !seatDeparturePlan) return false
@@ -334,7 +283,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
           timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
           occupants,
-          movingOccupantId: input.localUser.userId
+          movingOccupantId: userId
         })
         : null
       if (seatHotspot?.approachPoint && !seatPlan) return false
@@ -342,7 +291,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         geometry: currentSeatGeometry,
         target: point,
         occupants,
-        movingOccupantId: input.localUser.userId,
+        movingOccupantId: userId,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
       })
       if (!target) return false
@@ -356,7 +305,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
           timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
           occupants,
-          movingOccupantId: input.localUser.userId
+          movingOccupantId: userId
         })
         : null
       if (!seatPlan && currentSeatExit && !exitPlan) return false
@@ -371,17 +320,20 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
           timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
           occupants,
-          movingOccupantId: input.localUser.userId
+          movingOccupantId: userId
         })
       if (!plan) return false
 
+      const activeMovementRef = movementRefFor(userId)
+      if (userId === localUserId && onLocalMove &&
+        !onLocalMove(target, options?.hotspot?.id)) return false
       cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
-      cancelPendingMiniRoomMovementCompletion(
+      if (userId === localUserId) cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
       )
 
-      const localUserId = input.localUser.userId
+      const movingUserId = userId
       const finalSegment = plan.segments[plan.segments.length - 1]
       if (!finalSegment) return false
       const arrivalFacing =
@@ -396,7 +348,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           ? "sitting"
           : "idle"
 
-      setPressedPoint(target)
+      if (userId === localUserId) setPressedPoint(target)
 
       const arrivalSeatedHotspotId =
         options?.hotspot?.kind === "seat"
@@ -412,11 +364,11 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         animator: motionDriver.animator,
         onSegmentStart: (segmentStartPose) => {
           setAvatars((current) => {
-            const avatar = current[localUserId]
+            const avatar = current[movingUserId]
             if (!avatar) return current
             return {
               ...current,
-              [localUserId]: {
+              [movingUserId]: {
                 ...avatar,
                 targetX: target.x,
                 targetY: target.y,
@@ -429,12 +381,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         },
         onSegmentEnd: (runtimePose, segment) => {
           setAvatars((current) => {
-            const avatar = current[localUserId]
+            const avatar = current[movingUserId]
             if (!avatar) return current
             if (!segment.isFinal) {
               return {
                 ...current,
-                [localUserId]: {
+                [movingUserId]: {
                   ...avatar,
                   x: runtimePose.x,
                   y: runtimePose.y,
@@ -447,7 +399,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
             }
             return {
               ...current,
-              [localUserId]: {
+              [movingUserId]: {
                 ...avatar,
                 x: runtimePose.x,
                 y: runtimePose.y,
@@ -462,7 +414,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         },
         onArrival: () => {
           if (activeMovementRef.current === run) activeMovementRef.current = null
-          scheduleMiniRoomMovementCompletion(
+          if (userId === localUserId) scheduleMiniRoomMovementCompletion(
             movementCompletionTimerRef,
             setTimeout,
             clearTimeout,
@@ -474,15 +426,15 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       activeMovementRef.current = run
       return true
     },
-    [geometry, getMotionDriver, input.localUser.userId, roomWorldHotspots]
+    [geometry, getMotionDriver, localUserId, onLocalMove, movementRefFor, roomWorldHotspots]
   )
 
   const moveLocalAvatar = useCallback(
     (point: RoomPoint): boolean => {
       setSelectedHotspotId(undefined)
-      return runMovement(point)
+      return runMovement(localUserId, point)
     },
-    [runMovement]
+    [localUserId, runMovement]
   )
 
   const moveLocalAvatarToHotspot = useCallback(
@@ -497,10 +449,39 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         }
         : hotspot.approachPoint ?? { x: hotspot.x, y: hotspot.y }
       setSelectedHotspotId(hotspotId)
-      return runMovement(target, { hotspot, roomWorldHotspot })
+      return runMovement(localUserId, target, { hotspot, roomWorldHotspot })
     },
-    [hotspots, roomWorldHotspots, runMovement]
+    [hotspots, localUserId, roomWorldHotspots, runMovement]
   )
+
+  const applyRemoteAvatar = useCallback((next: import("@blumi/contracts").MiniRoomAvatarMotion, snap = false) => {
+    const avatar = avatarsRef.current[next.userId]
+    if (!avatar) return
+    if (snap || !next.present) {
+      cancelActiveMiniRoomMovement(movementRefFor(next.userId), cancelMiniRoomMovementRun)
+      const driver = getMotionDriver(avatar)
+      const position = snap ? resolveRoomWorldInteractiveTarget({ geometry, target: next }) ?? next
+        : readMiniRoomAvatarPosition(driver.position)
+      snapMiniRoomAvatarPosition(driver.position, position)
+      setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
+        x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
+        seatedHotspotId: undefined, present: next.present } }))
+      return
+    }
+    setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId], present: true } }))
+    const hotspot = hotspots.find(h => h.id === next.hotspotId)
+    const roomWorldHotspot = roomWorldHotspots.find(h => h.id === next.hotspotId)
+    runMovement(next.userId, next, hotspot ? { hotspot, roomWorldHotspot } : undefined)
+  }, [geometry, getMotionDriver, hotspots, movementRefFor, roomWorldHotspots, runMovement])
+
+  const setRemotePresence = useCallback((userId: string, present: boolean) => {
+    if (!present) cancelActiveMiniRoomMovement(movementRefFor(userId), cancelMiniRoomMovementRun)
+    setAvatars(current => {
+      const avatar = current[userId]
+      if (!avatar || avatar.present === present) return current
+      return { ...current, [userId]: { ...avatar, present, ...(!present ? { motion: "idle" as const } : {}) } }
+    })
+  }, [movementRefFor])
 
   const returnAvatarToIdle = useCallback((speakerUserId: string): void => {
     const speechTimer = speechMotionTimersRef.current.get(speakerUserId)
@@ -533,9 +514,14 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   }, [returnAvatarToIdle])
 
   const showNextSpeechBubble = useCallback((): void => {
-    if (activeBubbleRef.current) return
     const next = speechQueueRef.current.active
     if (!next) return
+    const previous = activeBubbleRef.current
+    if (previous?.id === next.key) return
+    if (previous) {
+      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
+      returnAvatarToIdle(previous.speakerUserId)
+    }
     const bubble: SpeechBubble = {
       id: next.key,
       speakerUserId: next.speakerUserId,
@@ -576,10 +562,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     speechMotionTimersRef.current.set(next.speakerUserId, timer)
 
     bubbleTimerRef.current = setTimeout(
-      finishActiveSpeechBubble,
+      () => { if (activeBubbleRef.current?.id === bubble.id) finishActiveSpeechBubble() },
       Math.max(0, next.expiresAt - Date.now())
     )
-  }, [finishActiveSpeechBubble])
+  }, [finishActiveSpeechBubble, returnAvatarToIdle])
   // finishActiveSpeechBubble reaches this callback through the ref; it is set
   // at commit, before any effect or timer can finish a bubble.
   useLayoutEffect(() => {
@@ -618,14 +604,14 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   )
 
   const proximityClose = useMemo(() => {
-    const list = Object.values(avatars)
+    const list = Object.values(avatars).filter(avatar => avatar.present !== false)
     if (list.length < 2) return false
     const [a, b] = list
     return Math.hypot(a.x - b.x, a.y - b.y) <= PROXIMITY_CLOSE_DISTANCE
   }, [avatars])
 
   useEffect(() => {
-    const list = Object.values(avatars)
+    const list = Object.values(avatars).filter(avatar => avatar.present !== false)
     if (list.length < 2) return
     const [a, b] = list
     const dist = Math.hypot(a.x - b.x, a.y - b.y)
@@ -680,6 +666,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     interaction,
     moveLocalAvatar,
     moveLocalAvatarToHotspot,
+    applyRemoteAvatar,
+    setRemotePresence,
     addSpeechBubble,
     sayPhrase,
     dismissSpeechBubble
@@ -689,74 +677,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
 function createMiniRoomOccupants(
   avatars: Record<string, AvatarState>
 ): RoomWorldOccupant[] {
-  return Object.values(avatars).map((avatar) => ({
+  return Object.values(avatars).filter(avatar => avatar.present !== false).map((avatar) => ({
     id: avatar.userId,
     x: avatar.targetX ?? avatar.x,
     y: avatar.targetY ?? avatar.y,
     blocksMovement: true
   }))
-}
-
-function createInitialSpawnPair(input: {
-  scene: RoomScene
-  geometry: RoomWorldGeometry
-  usesRoomV2Scene: boolean
-}): {
-  localSpawn: {
-    x: number
-    y: number
-    facing: AvatarFacing
-  }
-  partnerSpawn: {
-    x: number
-    y: number
-    facing: AvatarFacing
-  }
-} {
-  const fallbackLocal =
-    input.scene.spawnPoints.find((point) => point.role === "local") ??
-    input.scene.spawnPoints[0]
-  const fallbackPartner =
-    input.scene.spawnPoints.find((point) => point.role === "partner") ??
-    input.scene.spawnPoints[1] ??
-    fallbackLocal
-
-  if (!input.usesRoomV2Scene) {
-    return {
-      localSpawn: fallbackLocal,
-      partnerSpawn: fallbackPartner
-    }
-  }
-
-  const localTarget = resolveRoomWorldInteractiveTarget({
-    geometry: input.geometry,
-    target: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.local,
-    clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
-  }) ?? ROOM_V2_MINI_ROOM_SPAWN_SEEDS.local
-  const partnerTarget = resolveRoomWorldInteractiveTarget({
-    geometry: input.geometry,
-    target: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.partner,
-    occupants: [
-      {
-        id: "local_spawn",
-        x: localTarget.x,
-        y: localTarget.y,
-        blocksMovement: true
-      }
-    ],
-    clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
-  }) ?? ROOM_V2_MINI_ROOM_SPAWN_SEEDS.partner
-
-  return {
-    localSpawn: {
-      ...localTarget,
-      facing: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.local.facing
-    },
-    partnerSpawn: {
-      ...partnerTarget,
-      facing: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.partner.facing
-    }
-  }
 }
 
 function createMiniRoomHotspotsFromRoomWorldHotspots(

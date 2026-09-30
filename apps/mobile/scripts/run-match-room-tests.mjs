@@ -306,6 +306,8 @@ try {
     [
       "--import", "tsx",
       "--test",
+      "src/features/miniRoom/miniRoomMotionSession.test.ts",
+      "src/features/miniRoom/useMiniRoomMotion.test.ts",
       "src/features/miniRoom/scene/avatarBubblePopLifecycle.test.ts",
       "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts"
     ],

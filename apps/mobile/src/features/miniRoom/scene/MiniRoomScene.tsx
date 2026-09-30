@@ -57,8 +57,10 @@ import {
   type MiniRoomPanelMode
 } from "./miniRoomLayout"
 import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
+import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
 
 interface MiniRoomSceneProps {
+  roomMotion?: ReturnType<typeof import("../useMiniRoomMotion").useMiniRoomMotion>
   copy: MiniRoomCopy
   localUser: {
     userId: string
@@ -95,10 +97,8 @@ const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
 const MAX_ROOM_MESSAGE_LENGTH = 140
 const NO_HISTORY: readonly RoomChatHistoryItem[] = []
 const NO_NOTICES: readonly string[] = []
-const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer)
-const StableRoomMapLayer = memo(RoomMapLayer)
-const StableHotspotLayer = memo(HotspotLayer)
-const StableMiniRoomHud = memo(MiniRoomHud)
+const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer), StableRoomMapLayer = memo(RoomMapLayer)
+const StableHotspotLayer = memo(HotspotLayer), StableMiniRoomHud = memo(MiniRoomHud)
 
 export function MiniRoomScene(props: MiniRoomSceneProps) {
   const {
@@ -128,9 +128,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     localUser,
     partnerUser,
     participantAvatarSnapshots,
+    onLocalMove: props.roomMotion?.onLocalMove,
     roomDecorScene,
     bubbleLifetimeMs: ROOM_CHAT_BUBBLE_LIFETIME_MS
   })
+  const partnerPresent = useMiniRoomMotionPresentation(props.roomMotion, store, localUser.userId, partnerUser.userId)
   const reduceMotion = useReducedMotion()
   const motionPolicy = useMemo(
     () => resolveMiniRoomMotionPolicy(reduceMotion),
@@ -183,7 +185,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const entryValueRef = useRef(new Animated.Value(0)).current
   const welcomeValueRef = useRef(new Animated.Value(0)).current
-  const [partnerJustJoined, setPartnerJustJoined] = useState(true)
+  const [partnerJustJoined, setPartnerJustJoined] = useState(false)
   const [composerText, setComposerText] = useState("")
 
   useEffect(() => {
@@ -204,6 +206,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   useEffect(() => {
     welcomeValueRef.stopAnimation()
+    if (!partnerPresent) { welcomeValueRef.setValue(0); return }
     welcomeValueRef.setValue(motionPolicy.animateJoin ? 0 : 1)
 
     const animation = motionPolicy.animateJoin
@@ -233,10 +236,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
     animation.start()
     return () => animation.stop()
-  }, [motionPolicy.animateJoin, partnerUser.userId, welcomeValueRef])
+  }, [motionPolicy.animateJoin, partnerPresent, partnerUser.userId, welcomeValueRef])
 
   useEffect(() => {
-    if (!motionPolicy.animateJoin) {
+    if (!motionPolicy.animateJoin || !partnerPresent) {
       setPartnerJustJoined(false)
       return
     }
@@ -246,18 +249,19 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       MINI_ROOM_PARTNER_ARRIVAL_MS
     )
     return () => clearTimeout(timer)
-  }, [motionPolicy.animateJoin, partnerUser.userId])
+  }, [motionPolicy.animateJoin, partnerPresent, partnerUser.userId])
 
   const announcedPartnerUserIdRef = useRef<string | null>(null)
   useEffect(() => {
+    if (!partnerPresent) { announcedPartnerUserIdRef.current = null; return }
     if (!shouldAnnouncePartnerJoin({
-      connected: connectionStatus === "connected",
+      connected: partnerPresent,
       partnerUserId: partnerUser.userId,
       announcedPartnerUserId: announcedPartnerUserIdRef.current
     })) return
     announcedPartnerUserIdRef.current = partnerUser.userId
     hapticLight()
-  }, [connectionStatus, partnerUser.userId])
+  }, [partnerPresent, partnerUser.userId])
 
   useEffect(() => {
     if (inRoomMessages.length === 0) return
@@ -381,7 +385,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       bubbles={store.bubbles}
       onDismissBubble={dismissSpeechBubble}
       dismissBubbleLabel={copy.dismissRoomMessage}
-      partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
+      partnerJustJoined={partnerJustJoined && partnerPresent}
       motionPolicy={motionPolicy}
     />
   )

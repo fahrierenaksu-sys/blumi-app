@@ -24,6 +24,8 @@ import type {
 import type { ReactionEvent } from "../reactions/ReactionEvent";
 
 export type ServerEvent =
+  | { type: "mini_room.motion_snapshot"; payload: import("../miniRooms/MiniRoomMotion").MiniRoomMotionSnapshot }
+  | { type: "mini_room.avatar_moved"; payload: { miniRoomId: string; epoch: string; participantUserIds: [string, string]; avatar: import("../miniRooms/MiniRoomMotion").MiniRoomAvatarMotion } }
   | { type: "room.joined"; payload: JoinRoomResponse }
   | { type: "room.left"; payload: { roomId: string } }
   | { type: "presence.snapshot"; payload: RoomPresenceSnapshot }
