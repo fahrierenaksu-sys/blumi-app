@@ -337,6 +337,47 @@ test("a persisted test persona replies once to a newly delivered user message", 
   assert.equal(events.length, 2)
 })
 
+test("a message queued before a block is never pushed or fanned out after it, and the block error matches a foreign thread", async () => {
+  const store = createInMemoryChatStore()
+  const chatService = createChatService({
+    repository: createInMemoryChatRepository(store),
+    idFactory: () => "message_queued_before_block"
+  })
+  await createThread(chatService)
+  const safetyService = createSafetyService()
+  let fanoutCount = 0
+  const pushes: PushNotification[] = []
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService,
+    connectionManager: {
+      async sendToUsersDurably() { fanoutCount += 1 },
+      hasUserConnections: () => false
+    } as unknown as ConnectionManager,
+    notificationService: {
+      async sendPushToUser(_userId: string, notification: PushNotification) { pushes.push(notification) }
+    } as unknown as NotificationService
+  })
+  // Persisted with its outbox job, but not dispatched yet (e.g. the process restarted).
+  await chatService.sendMessage("user_a", "thread_one", "queued")
+  await safetyService.blockUser("user_a", "user_b")
+
+  await delivery.dispatchDue(new Date(Date.now() + 60_000))
+  assert.equal(fanoutCount, 0)
+  assert.deepEqual(pushes, [])
+  assert.equal(store.deliveryJobs.get("message_queued_before_block")?.completed, true,
+    "the job is settled, so it is not pushed after an unblock either")
+
+  for (const senderUserId of ["user_a", "user_b"]) {
+    const blocked = await delivery.sendMessage({ senderUserId, threadId: "thread_one", body: "after" })
+      .then(() => null, (error: unknown) => error)
+    const foreign = await delivery.sendMessage({ senderUserId: "user_c", threadId: "thread_one", body: "after" })
+      .then(() => null, (error: unknown) => error)
+    assert.ok(blocked instanceof ChatDeliveryBlockedError)
+    assert.equal((blocked as Error).message, (foreign as Error).message)
+  }
+})
+
 async function createThread(chatService: ReturnType<typeof createChatService>) {
   await chatService.createThread({
     threadId: "thread_one",

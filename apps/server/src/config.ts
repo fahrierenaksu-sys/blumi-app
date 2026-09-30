@@ -456,11 +456,15 @@ export function createConfiguredServerServices(
       authService,
       repository: createPostgresAccountRecoveryRepository(pool)
     })
+    const safetyService = createSafetyService({
+      repository: createPostgresSafetyRepository(pool)
+    })
     const chatService = createChatService({
       repository: applyTestPersonaPolicy(
         createPostgresChatRepository(pool),
         config.deployEnvironment
-      )
+      ),
+      blockPolicy: safetyService
     })
     const economyService = createEconomyService({
       repository: createPostgresEconomyRepository(pool)
@@ -490,9 +494,6 @@ export function createConfiguredServerServices(
       repository: createPostgresMatchRepository(pool),
       economyService,
       notificationService
-    })
-    const safetyService = createSafetyService({
-      repository: createPostgresSafetyRepository(pool)
     })
     const referralService = createReferralService({
       repository: createPostgresReferralRepository(pool)
@@ -575,7 +576,8 @@ export function createConfiguredServerServices(
     ]
   })
   const accountRecoveryService = createAccountRecoveryService({ authService })
-  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const chatService = createChatService({ blockPolicy: safetyService })
   const economyService = createEconomyService()
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({
@@ -608,7 +610,6 @@ export function createConfiguredServerServices(
     economyService
   })
   const matchService = createMatchService({ economyService, notificationService })
-  const safetyService = createSafetyService()
   const referralService = createReferralService()
   const roomService = createRoomService()
   const presenceService = createPresenceService({

@@ -1745,7 +1745,9 @@ test("thread endpoints require session access and send messages", async () => {
     },
     payload: { body: "must not be persisted" }
   })
-  assert.equal(blockedSend.statusCode, 403)
+  // A block hides the thread from both users: 404 like a thread the sender is not in.
+  assert.equal(blockedSend.statusCode, 404)
+  assert.equal(blockedSend.json().error, "That conversation is not available.")
   assert.deepEqual(
     (await chatService.listMessages(userId, "thread_server")).map(
       (message) => message.messageId
@@ -1834,7 +1836,7 @@ test("thread endpoints require session access and send messages", async () => {
     headers: { authorization: `Bearer ${token}` },
     payload: { body: "new blocked message", clientMessageId: "client-server-new-001" }
   })
-  assert.equal(newMessageAfterBlock.statusCode, 403)
+  assert.equal(newMessageAfterBlock.statusCode, 404)
   await safetyService.unblockUser(partnerUserId, userId)
   assert.equal(
     (await chatService.listMessages(userId, "thread_server")).filter(

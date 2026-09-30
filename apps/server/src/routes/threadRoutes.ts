@@ -394,8 +394,8 @@ export async function registerThreadRoutes(
       threadId,
       userId: resolved.account.userId
     })
-    if (!context) {
-      return reply.code(403).send({ error: "That room invite is not available." })
+    if (!context || context === "hidden") {
+      return sendUnavailableInviteContext(context, reply, "That room invite is not available.")
     }
     try {
       let invites = await miniRoomService.listChatInvites(
@@ -457,8 +457,8 @@ export async function registerThreadRoutes(
       threadId,
       userId: resolved.account.userId
     })
-    if (!context || !context.partnerAccount) {
-      return reply.code(403).send({ error: "That room invite is not available." })
+    if (!context || context === "hidden") {
+      return sendUnavailableInviteContext(context, reply, "That room invite is not available.")
     }
     try {
       const result = await miniRoomService.createChatInvite({
@@ -523,8 +523,8 @@ export async function registerThreadRoutes(
       threadId: miniRoom.sourceThreadId,
       userId: resolved.account.userId
     })
-    if (!context) {
-      return reply.code(403).send({ error: "That room is not available." })
+    if (!context || context === "hidden") {
+      return sendUnavailableInviteContext(context, reply, "That room is not available.")
     }
     const senderAccount = await authService.repository.findAccountByUserId(
       miniRoom.participantUserIds[0]
@@ -648,8 +648,8 @@ export async function registerThreadRoutes(
       threadId: invite.sourceThreadId,
       userId: resolved.account.userId
     })
-    if (!context) {
-      return reply.code(403).send({ error: "That room invite is not available." })
+    if (!context || context === "hidden") {
+      return sendUnavailableInviteContext(context, reply, "That room invite is not available.")
     }
     const senderAccount = await authService.repository.findAccountByUserId(
       invite.senderUserId
@@ -818,12 +818,12 @@ export async function registerThreadRoutes(
       if (error instanceof ChatMessageIdempotencyConflictError) {
         return reply.code(409).send({ code: error.code, error: error.message })
       }
+      // A block hides the thread from both users: answered like a thread the
+      // sender is not in (the delivery error carries the same message).
       const message = error.message
-      const statusCode = error instanceof ChatDeliveryBlockedError
-        ? 403
-        : /conversation/.test(message)
-          ? 404
-          : 400
+      const statusCode = error instanceof ChatDeliveryBlockedError || /conversation/.test(message)
+        ? 404
+        : 400
       return reply.code(statusCode).send({ error: message })
     }
   })
@@ -903,17 +903,26 @@ function parseChatResponse<T>(schema: z.ZodType<T>, payload: unknown): T {
   return parsed.data
 }
 
+type MutualChatInviteContext =
+  | { thread: ChatThread; partnerAccount: NonNullable<Awaited<ReturnType<AuthService["repository"]["findAccountByUserId"]>>> }
+  // The thread is missing, not the caller's, or hidden by a block in either
+  // direction: answered 404 like any conversation the caller cannot see.
+  | "hidden"
+  // A visible thread that no longer authorizes invites (source or partner): 403.
+  | null
+
 async function resolveMutualChatInviteContext(input: {
   services: ThreadRouteServices
   threadId: string
   userId: string
-}) {
+}): Promise<MutualChatInviteContext> {
   const thread = await input.services.chatService.repository.findThread(input.threadId)
-  if (!thread || !thread.participantUserIds.includes(input.userId)) return null
+  if (!thread || !thread.participantUserIds.includes(input.userId)) return "hidden"
   const partnerUserId = thread.participantUserIds.find(
     (userId) => userId !== input.userId
   )
   if (!partnerUserId) return null
+  if (await input.services.safetyService.hasBlockBetween(input.userId, partnerUserId)) return "hidden"
   const [match, connection] = await Promise.all([
     input.services.matchService.repository.findMatchBetween(input.userId, partnerUserId),
     input.services.connectionService?.repository.findMatchBetween(input.userId, partnerUserId)
@@ -936,6 +945,14 @@ async function resolveMutualChatInviteContext(input: {
     return null
   }
   return { thread, partnerAccount }
+}
+
+function sendUnavailableInviteContext(
+  context: "hidden" | null,
+  reply: import("fastify").FastifyReply,
+  error: string
+) {
+  return reply.code(context === "hidden" ? 404 : 403).send({ error })
 }
 
 function sendChatRoomInviteError(error: unknown, reply: import("fastify").FastifyReply) {

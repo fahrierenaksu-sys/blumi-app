@@ -134,8 +134,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   }
   const authService = options.authService ?? createAuthService()
   const accountRecoveryService = options.accountRecoveryService ?? createAccountRecoveryService({ authService })
-  const chatService = options.chatService ?? createChatService()
   const safetyService = options.safetyService ?? createSafetyService()
+  const chatService = options.chatService ?? createChatService({ blockPolicy: safetyService })
   const economyService = options.economyService ?? createEconomyService()
   const commerceService = options.commerceService ?? createCommerceService({
     economyService

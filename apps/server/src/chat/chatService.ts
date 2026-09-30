@@ -12,11 +12,15 @@ import {
   assertPublicTextAllowed,
   containsControlCharacters
 } from "../safety/publicTextFilter"
-import type { ChatThreadPageOptions } from "./chatThreadPagination"
+import { normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
 
 const MAX_MESSAGE_LENGTH = 500
 const DEFAULT_MESSAGE_PAGE_LIMIT = 50
 const MAX_MESSAGE_PAGE_LIMIT = 100
+const CONVERSATION_NOT_AVAILABLE = "That conversation is not available."
+// A thread page read tops up past hidden (blocked) threads so pages stay full
+// and the cursor exact; this bounds the extra rounds for a user with many blocks.
+const MAX_THREAD_PAGE_ROUNDS = 5
 
 export interface ChatService {
   repository: ChatRepository
@@ -66,9 +70,22 @@ export class ChatMessageIdempotencyConflictError extends PublicRequestError {
   }
 }
 
+/**
+ * Block lookups the chat service needs; `SafetyService` satisfies it. While a
+ * block exists in either direction the pair's thread is hidden from both users
+ * (owner decision 2026-09-30). Nothing is deleted, so removing the block
+ * restores the thread with its history. Sends are refused by the delivery
+ * service, which checks blocks before persisting.
+ */
+export interface ChatBlockPolicy {
+  listBlockedUserIdsBetween(viewerUserId: string, candidateUserIds: readonly string[]): Promise<string[]>
+  hasBlockBetween(userAId: string, userBId: string): Promise<boolean>
+}
+
 export interface CreateChatServiceOptions {
   repository?: ChatRepository
   idFactory?: () => string
+  blockPolicy?: ChatBlockPolicy
 }
 
 export function createChatService(
@@ -76,15 +93,48 @@ export function createChatService(
 ): ChatService {
   const repository = options.repository ?? createInMemoryChatRepository()
   const idFactory = options.idFactory ?? createMessageId
+  const blockPolicy = options.blockPolicy
+
+  const getVisibleThread = async (userId: string, threadId: string): Promise<ChatThread> => {
+    const thread = await getParticipantThread(repository, userId, threadId)
+    const partnerUserId = thread.participantUserIds.find((id) => id !== userId)
+    if (blockPolicy && partnerUserId && await blockPolicy.hasBlockBetween(userId, partnerUserId)) {
+      // Same answer as a thread the caller is not in.
+      throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
+    }
+    return thread
+  }
+
+  const listVisibleThreadsPage = async (
+    userId: string,
+    pageOptions?: ChatThreadPageOptions
+  ): Promise<ChatThreadPage> => {
+    const first = await repository.listThreadsPage(userId, pageOptions)
+    if (!blockPolicy) return first
+    const { limit } = normalizeThreadPage(userId, pageOptions)
+    const threads: ChatThread[] = []
+    let page = first
+    for (let round = 1; ; round += 1) {
+      threads.push(...await withoutBlockedPartners(blockPolicy, userId, page.threads))
+      if (!page.nextCursor || threads.length >= limit || round >= MAX_THREAD_PAGE_ROUNDS) {
+        return { threads, nextCursor: page.nextCursor }
+      }
+      page = await repository.listThreadsPage(userId, {
+        cursor: page.nextCursor,
+        limit: limit - threads.length
+      })
+    }
+  }
 
   return {
     repository,
     async listThreads(userId) {
-      return repository.listThreads(userId)
+      const threads = await repository.listThreads(userId)
+      return blockPolicy ? withoutBlockedPartners(blockPolicy, userId, threads) : threads
     },
-    async listThreadsPage(userId, options) { return repository.listThreadsPage(userId, options) },
+    async listThreadsPage(userId, options) { return listVisibleThreadsPage(userId, options) },
     async listMessages(userId, threadId, options = {}) {
-      const thread = await getParticipantThread(repository, userId, threadId)
+      const thread = await getVisibleThread(userId, threadId)
       return repository.listMessages(thread.threadId, normalizePageOptions(options))
     },
     async findIdempotentMessage(userId, threadId, body, clientMessageId) {
@@ -128,7 +178,7 @@ export function createChatService(
       return (await repository.findThread(thread.threadId)) ?? thread
     },
     async markThreadRead(userId, threadId, now = new Date()) {
-      const thread = await getParticipantThread(repository, userId, threadId)
+      const thread = await getVisibleThread(userId, threadId)
       const readAt = now.toISOString()
       await repository.markThreadRead(thread.threadId, userId, readAt)
       return { readAt }
@@ -143,9 +193,23 @@ async function getParticipantThread(
 ): Promise<ChatThread> {
   const thread = await repository.findThread(threadId)
   if (!thread || !thread.participantUserIds.includes(userId)) {
-    throw new PublicRequestError("That conversation is not available.")
+    throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
   }
   return thread
+}
+
+/** Drops threads whose partner has a block with `userId`: one batched block query (no N+1). */
+async function withoutBlockedPartners(
+  blockPolicy: ChatBlockPolicy,
+  userId: string,
+  threads: ChatThread[]
+): Promise<ChatThread[]> {
+  const partnerOf = (thread: ChatThread) => thread.participantUserIds.find((id) => id !== userId)
+  const partnerUserIds = [...new Set(threads.flatMap((thread) => partnerOf(thread) ?? []))]
+  if (partnerUserIds.length === 0) return threads
+  const blocked = new Set(await blockPolicy.listBlockedUserIdsBetween(userId, partnerUserIds))
+  if (blocked.size === 0) return threads
+  return threads.filter((thread) => !blocked.has(partnerOf(thread) ?? ""))
 }
 
 function normalizeMessageBody(body: string): string {

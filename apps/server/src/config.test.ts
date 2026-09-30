@@ -209,6 +209,27 @@ test("RevenueCat reconciliation fails closed until the server-only provider conf
   await configuredServices.close()
 })
 
+test("configured chat hides a blocked pair's thread from both users, including for the realtime server", async () => {
+  // index.ts hands this same chatService to createServer and createRealtimeServer.
+  const services = createConfiguredServerServices(resolveServerConfig({ NODE_ENV: "development" }))
+  try {
+    await services.chatService.createThread({
+      threadId: "thread_config_block", miniRoomId: "room_config_block",
+      participantUserIds: ["user_a", "user_b"], participants: [{ userId: "user_a" }, { userId: "user_b" }]
+    })
+    await services.safetyService.blockUser("user_b", "user_a")
+    for (const userId of ["user_a", "user_b"]) {
+      assert.deepEqual((await services.chatService.listThreadsPage(userId)).threads, [])
+      await assert.rejects(services.chatService.listMessages(userId, "thread_config_block"), /not available/)
+    }
+    await services.safetyService.unblockUser("user_b", "user_a")
+    assert.deepEqual((await services.chatService.listThreadsPage("user_a")).threads.map((thread) => thread.threadId),
+      ["thread_config_block"])
+  } finally {
+    await services.close()
+  }
+})
+
 test("admin signing keyrings rotate by kid and legacy access is explicit development-only", () => {
   const oldSecret = Buffer.alloc(32, 3).toString("base64url")
   const activeSecret = Buffer.alloc(32, 4).toString("base64url")

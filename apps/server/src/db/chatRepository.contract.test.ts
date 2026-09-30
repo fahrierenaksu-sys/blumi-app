@@ -146,6 +146,22 @@ runRepositoryContract<ChatRepository>({
       assert.equal(unread?.unreadCount, 1, "read marker never moves backwards")
       assert.equal(unread?.lastReadAt, "2026-09-30T10:01:30.000Z")
       assert.equal(all.find((item) => item.threadId === older.threadId)?.unreadCount, 0)
+    },
+
+    "a thread cursor continues with a different page size without gaps or repeats": async (backend) => {
+      // The chat service tops up a page past threads hidden by a block by
+      // reading on from the cursor with the remaining size.
+      const viewer = backend.id("viewer")
+      const threads = ["a", "b", "c", "d", "e"].map((suffix, index) =>
+        thread(backend, suffix, `2026-09-30T10:0${index}:00.000Z`, [viewer, backend.id(`peer_${suffix}`)]))
+      for (const item of threads) await backend.repository.saveThread(item)
+      const newestFirst = threads.map((item) => item.threadId).reverse()
+
+      const first = await backend.repository.listThreadsPage(viewer, { limit: 2 })
+      const second = await backend.repository.listThreadsPage(viewer, { limit: 1, cursor: first.nextCursor! })
+      const third = await backend.repository.listThreadsPage(viewer, { limit: 5, cursor: second.nextCursor! })
+      assert.deepEqual([...first.threads, ...second.threads, ...third.threads].map((item) => item.threadId), newestFirst)
+      assert.equal(third.nextCursor, null)
     }
   }
 })
