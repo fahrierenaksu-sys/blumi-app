@@ -58,8 +58,9 @@ function nextAddress(): string {
   return `10.${(addressCounter >> 16) & 255}.${(addressCounter >> 8) & 255}.${addressCounter & 255}`
 }
 
-export function createAdversarialServer() {
-  const authService = createAuthService()
+export function createAdversarialServer(options: { authService?: AuthService } = {}) {
+  // An injected service lets a suite run the same routes on the PostgreSQL repository.
+  const authService = options.authService ?? createAuthService()
   const chatService = createChatService()
   const safetyService = createSafetyService()
   const matchService = createMatchService({

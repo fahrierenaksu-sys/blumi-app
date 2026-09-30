@@ -47,7 +47,7 @@ import {
   type SmsProvider
 } from "./smsProvider"
 import { PublicRequestError } from "../errors/publicRequestError"
-import { assertPublicTextAllowed } from "../safety/publicTextFilter"
+import { assertPublicTextAllowed, containsControlCharacters } from "../safety/publicTextFilter"
 import {
   createEmptyAccountDataExporter,
   type AccountDataExporter,
@@ -769,6 +769,18 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
           : {})
       }
 
+      const publicTexts = [
+        updatedProfile.displayName,
+        updatedProfile.bio,
+        ...(updatedProfile.interests ?? []),
+        ...(updatedProfile.prompts ?? []).map((prompt) => prompt.answer),
+        ...(updatedProfile.discoveryPreferences?.vibes ?? [])
+      ]
+      // Same shared check as chat bodies and report notes: PostgreSQL text
+      // rejects NUL, and other C0 controls have no place in public text.
+      if (publicTexts.some((text) => typeof text === "string" && containsControlCharacters(text))) {
+        throw new PublicRequestError("Remove unsupported characters from your profile.")
+      }
       if (typeof updatedProfile.displayName === "string") assertPublicTextAllowed(updatedProfile.displayName)
       if (typeof updatedProfile.bio === "string") assertPublicTextAllowed(updatedProfile.bio)
       for (const interest of updatedProfile.interests ?? []) assertPublicTextAllowed(interest)
