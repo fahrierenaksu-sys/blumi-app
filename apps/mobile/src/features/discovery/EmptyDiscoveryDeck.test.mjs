@@ -6,8 +6,13 @@ import ts from "typescript"
 
 const source = readFileSync(new URL("./EmptyDiscoveryDeck.tsx", import.meta.url), "utf8")
 const file = ts.createSourceFile("EmptyDiscoveryDeck.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const lobbySource = readFileSync(new URL("../../screens/LobbyScreen.tsx", import.meta.url), "utf8")
-const lobbyFile = ts.createSourceFile("LobbyScreen.tsx", lobbySource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const readScreenModule = (name) => readFileSync(new URL(`./screen/${name}`, import.meta.url), "utf8")
+const screenModelSource = readScreenModule("discoveryScreenModel.ts")
+const lobbyFile = ts.createSourceFile("discoveryScreenModel.ts", screenModelSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+const lobbyScreenSource = readFileSync(new URL("../../screens/LobbyScreen.tsx", import.meta.url), "utf8")
+const deckStateSource = readScreenModule("useDiscoveryDeck.ts")
+const deckSurfaceSource = readScreenModule("DiscoverDeckSurface.tsx")
+const safetyListSource = readScreenModule("useDiscoverySafetyList.ts")
 
 function loadLobbyPureFunction(name) {
   const declaration = lobbyFile.statements.find((node) =>
@@ -155,17 +160,18 @@ test("production query error and settled-empty branches remain distinct", () => 
 })
 
 test("production candidate list remains closed until safety readiness", () => {
-  const safetyGate = lobbySource.indexOf("if (isProductionDiscovery && !isSafetyListReady) return []")
-  const candidateBuild = lobbySource.indexOf("return buildAvailableDiscoveryCandidates(discoverSourceUsers")
+  const safetyGate = deckStateSource.indexOf("if (isProductionDiscovery && !isSafetyListReady) return []")
+  const candidateBuild = deckStateSource.indexOf("return buildAvailableDiscoveryCandidates(discoverSourceUsers")
   assert.notEqual(safetyGate, -1)
   assert.ok(candidateBuild > safetyGate)
-  assert.match(lobbySource, /profiles=\{visibleDiscoverDeck\}/)
+  assert.match(deckSurfaceSource, /profiles=\{visibleDiscoverDeck\}/)
+  assert.match(lobbyScreenSource, /visibleDiscoverDeck=\{visibleDiscoverDeck\}/)
 })
 
 test("a failed safety hydration shows an actionable error without revealing cached cards", () => {
-  assert.match(lobbySource, /hydrationStatus: safetyHydrationStatus/)
-  assert.match(lobbySource, /safetyHydrationFailed: safetyHydrationStatus === "failed"/)
-  assert.match(lobbySource, /productionDiscoverError \|\| discoveryPlaceholderState === "error"/)
-  assert.match(lobbySource, /if \(safetyHydrationStatus === "failed"\) handleRetrySafetyList\(\)/)
-  assert.match(lobbySource, /hydrateBlockedUsersFromServer\(/)
+  assert.match(safetyListSource, /hydrationStatus: safetyHydrationStatus/)
+  assert.match(lobbyScreenSource, /safetyHydrationFailed: safetyHydrationStatus === "failed"/)
+  assert.match(deckSurfaceSource, /productionDiscoverError \|\| discoveryPlaceholderState === "error"/)
+  assert.match(deckSurfaceSource, /if \(safetyHydrationStatus === "failed"\) handleRetrySafetyList\(\)/)
+  assert.match(safetyListSource, /hydrateBlockedUsersFromServer\(/)
 })

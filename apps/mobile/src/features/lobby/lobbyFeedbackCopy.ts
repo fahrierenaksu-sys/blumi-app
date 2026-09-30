@@ -28,3 +28,5 @@ const COPY = {
 export function getLobbyFeedbackCopy(locale: AppLocale) {
   return COPY[locale]
 }
+
+export type LobbyFeedbackCopy = ReturnType<typeof getLobbyFeedbackCopy>

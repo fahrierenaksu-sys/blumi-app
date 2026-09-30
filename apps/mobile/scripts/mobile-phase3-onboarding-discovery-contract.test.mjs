@@ -67,7 +67,7 @@ test("character setup and Discover share Blumi's avatar-first low-pressure promi
 test("discovery distinguishes loading, error, low supply, and exhausted states", () => {
   const empty = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
   const surfaceCopy = read("src/features/discovery/discoverySurfaceCopy.ts")
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobby = read("src/features/discovery/screen/DiscoverDeckSurface.tsx")
   assert.match(empty, /state\?: "exhausted" \| "low-supply"/)
   assert.match(empty, /copy\.empty\.lowSupplyTitle/)
   assert.match(surfaceCopy, /lowSupplyTitle: "No new people to meet right now\."/)
@@ -104,7 +104,7 @@ test("phase 3 control targets stay at or above 44 points", () => {
 
 test("activation milestones are captured as explicit product events", () => {
   const analytics = read("src/analytics/productAnalytics.ts")
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobby = read("src/features/discovery/screen/useDiscoveryDecisions.ts")
   const room = read("src/features/session/useSessionState.ts")
   assert.match(analytics, /"activation_first_discovery_decision"/)
   assert.match(analytics, /"activation_first_room_change"/)

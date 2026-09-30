@@ -48,6 +48,10 @@ const sourceFiles = [
   "src/features/discovery/profilePreviewCopy.test.ts",
   "src/features/discovery/roomShowcaseApi.ts",
   "src/features/discovery/roomShowcaseApi.test.ts",
+  "src/features/discovery/screen/discoveryScreenModel.ts",
+  "src/features/discovery/screen/discoveryScreenModel.test.ts",
+  "src/features/lobby/pendingInviteModel.ts",
+  "src/features/lobby/pendingInviteModel.test.ts",
   "src/features/demo/dummyProfiles.ts",
   "src/features/demo/dummyProfiles.test.ts",
   "src/features/demo/demoStore.ts",
@@ -112,6 +116,8 @@ try {
       join(outputDirectory, "features/discovery/discoveryCardFlipModel.test.js"),
       join(outputDirectory, "features/discovery/profilePreviewCopy.test.js"),
       join(outputDirectory, "features/discovery/roomShowcaseApi.test.js"),
+      join(outputDirectory, "features/discovery/screen/discoveryScreenModel.test.js"),
+      join(outputDirectory, "features/lobby/pendingInviteModel.test.js"),
       join(outputDirectory, "features/demo/dummyProfiles.test.js"),
       join(outputDirectory, "features/demo/demoStore.test.js")
     ],
@@ -140,6 +146,20 @@ try {
       resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-settings-matching-preferences-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-phase3-onboarding-discovery-contract.test.mjs")
+    ],
+    {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    }
+  )
+
+  // Hook tests load their module graph through tsx with native modules stubbed.
+  execFileSync(
+    process.execPath,
+    [
+      "--import", "tsx",
+      "--test",
+      "src/features/discovery/screen/useDiscoveryDecisions.test.ts"
     ],
     {
       cwd: workspaceRoot,

@@ -12,6 +12,25 @@ import releaseAssets from "./mobile-release-assets.cjs"
 const { resolveMobileReleaseEnvironment } = releaseConfig
 const { assertNoCandidateAssetImportsInSourceRoot, findCandidateAssetImports } = releaseAssets
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+
+const DISCOVER_SCREEN_SOURCE_PATHS = [
+  "src/screens/LobbyScreen.tsx",
+  "src/features/discovery/screen/DiscoverDeckSurface.tsx",
+  "src/features/discovery/screen/DiscoverHomeHeader.tsx",
+  "src/features/discovery/screen/DiscoveryFeedbackPill.tsx",
+  "src/features/discovery/screen/discoveryScreenModel.ts",
+  "src/features/discovery/screen/useDiscoveryDecisions.ts",
+  "src/features/discovery/screen/useDiscoveryDeck.ts",
+  "src/features/discovery/screen/useDiscoveryFilters.ts",
+  "src/features/discovery/screen/useDiscoveryRefresh.ts",
+  "src/features/discovery/screen/useDiscoverySafetyList.ts",
+  "src/features/discovery/screen/useDiscoveryStartup.ts",
+  "src/features/discovery/screen/useDiscoveryWatch.ts",
+  "src/features/discovery/screen/useProductionDiscoveryQuery.ts",
+  "src/features/lobby/useLegacyLobbyInvites.ts",
+  "src/features/lobby/useLegacyMiniRoomNavigation.ts",
+  "src/features/lobby/PendingInviteStrip.tsx"
+]
 const require = createRequire(import.meta.url)
 const legacyBrand = ["Date", "Vibe"].join("")
 
@@ -715,7 +734,7 @@ test("unreachable Saved Connections UI and its orphan profile context are remove
 })
 
 test("production MiniRoom carries and renders the partner avatar instead of a demo stand-in", () => {
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobby = read("src/features/lobby/useLegacyMiniRoomNavigation.ts")
   const miniRoom = read("src/screens/MiniRoomScreen.tsx")
   const miniRoomAssetsPath = "src/features/miniRoom/scene/miniRoomAssets.ts"
   const miniRoomAssets = read(miniRoomAssetsPath)
@@ -745,7 +764,8 @@ test("production MiniRoom carries and renders the partner avatar instead of a de
 
 test("store UI is honest, globally usable, and consistently branded", () => {
   const environment = read("src/config/env.ts")
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  // Discover is LobbyScreen plus the feature modules it composes.
+  const lobby = DISCOVER_SCREEN_SOURCE_PATHS.map(read).join("\n")
   const myRoom = read("src/screens/MyRoomScreen.tsx")
   const registerFeature = "src/features/session/register"
   const registerPhoneEntry = read(`${registerFeature}/RegisterPhoneEntry.tsx`)
@@ -918,7 +938,7 @@ test("navigation links and offline status remain wired to native runtime", () =>
   assert.match(connectionBanner, /No internet connection/)
   assert.match(connectionBanner, /Reconnecting to Blumi/)
   assert.doesNotMatch(connectionBanner, /Connecting to the room/)
-  assert.doesNotMatch(read("src/screens/LobbyScreen.tsx"), /<ConnectionBanner/)
+  assert.doesNotMatch(DISCOVER_SCREEN_SOURCE_PATHS.map(read).join("\n"), /<ConnectionBanner/)
   assert.match(read("src/screens/SettingsScreen.tsx"), /Platform\.select/)
 })
 
@@ -1011,7 +1031,8 @@ test("production economy has one wallet and never grants local-only rewards", ()
 test("the complete server avatar persists and drives exact remote cards", () => {
   const avatarSetup = read("src/screens/AvatarSetupScreen.tsx")
   const sessionState = read("src/features/session/useSessionState.ts")
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  const discoveryDeckState = read("src/features/discovery/screen/useDiscoveryDeck.ts")
+  const discoveryDeckSurface = read("src/features/discovery/screen/DiscoverDeckSurface.tsx")
   const navigator = read("src/navigation/RootNavigator.tsx")
   const linkedProfile = read("src/navigation/LinkedProfileScreen.tsx")
   const avatarPersistence = read(
@@ -1050,8 +1071,8 @@ test("the complete server avatar persists and drives exact remote cards", () => 
   assert.match(discoveryCandidate, /avatar:\s*cloneAvatarSelection\(profile\.avatar\)/)
   assert.match(discoveryCandidate, /age:\s*profile\.age/)
   assert.match(discoveryCandidate, /bio:\s*profile\.bio/)
-  assert.match(lobby, /productionProfiles\.map\(createProductionDiscoveryCandidate\)/)
-  assert.match(lobby, /profiles=\{visibleDiscoverDeck\}/)
+  assert.match(discoveryDeckState, /productionProfiles\.map\(createProductionDiscoveryCandidate\)/)
+  assert.match(discoveryDeckSurface, /profiles=\{visibleDiscoverDeck\}/)
   assert.match(candidateAvatar, /MALE_AVATAR_PRESET_ID/)
   assert.match(candidateAvatar, /normalizeCompleteAvatarSelection/)
   assert.match(candidateAvatar, /projectAvatarV2ToRoomAvatarAppearance/)

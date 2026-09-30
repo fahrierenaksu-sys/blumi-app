@@ -42,6 +42,7 @@ test("critical product funnels emit only named analytics events", () => {
     "src/screens/AuthEntryScreen.tsx",
     "src/features/session/useSessionState.ts",
     "src/screens/LobbyScreen.tsx",
+    "src/features/discovery/screen/useDiscoveryDecisions.ts",
     "src/navigation/RootNavigator.tsx",
     "src/navigation/rootLinking.ts",
     "src/navigation/useMatchModal.ts",

@@ -10,14 +10,43 @@ function read(relativePath) {
   return readFileSync(resolve(mobileRoot, relativePath), "utf8")
 }
 
+// The Discover screen is LobbyScreen plus the modules it composes. Positive
+// assertions read the module that owns the code; absence checks cover all.
+const discoverScreen = "src/features/discovery/screen"
+const discoverScreenPaths = [
+  "src/screens/LobbyScreen.tsx",
+  `${discoverScreen}/DiscoverDeckSurface.tsx`,
+  `${discoverScreen}/DiscoverHomeHeader.tsx`,
+  `${discoverScreen}/DiscoveryFeedbackPill.tsx`,
+  `${discoverScreen}/discoveryScreenModel.ts`,
+  `${discoverScreen}/useDiscoveryDecisions.ts`,
+  `${discoverScreen}/useDiscoveryDeck.ts`,
+  `${discoverScreen}/useDiscoveryFilters.ts`,
+  `${discoverScreen}/useDiscoveryRefresh.ts`,
+  `${discoverScreen}/useDiscoverySafetyList.ts`,
+  `${discoverScreen}/useDiscoveryStartup.ts`,
+  `${discoverScreen}/useDiscoveryWatch.ts`,
+  `${discoverScreen}/useProductionDiscoveryQuery.ts`,
+  "src/features/lobby/useLegacyLobbyInvites.ts",
+  "src/features/lobby/useLegacyMiniRoomNavigation.ts",
+  "src/features/lobby/PendingInviteStrip.tsx"
+]
+
+function readDiscoverScreen() {
+  return discoverScreenPaths.map(read).join("\n")
+}
+
 test("production Discover reuses the approved demo deck presentation", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
+  const surfaceSource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
+  const deckStateSource = read(`${discoverScreen}/useDiscoveryDeck.ts`)
+  const headerSource = read(`${discoverScreen}/DiscoverHomeHeader.tsx`)
   const deckSource = read("src/screens/DemoLobbyView.tsx")
   const sharedDeckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
   const viewportLayoutSource = read("src/features/discovery/discoveryLayoutMetrics.ts")
 
-  assert.match(lobbySource, /<DiscoveryDeckView[\s\S]*?profiles=\{visibleDiscoverDeck\}/)
-  assert.match(lobbySource, /const visibleDiscoverDeck = discoveryQuotaExhausted \? \[\] : discoverDeck/)
+  assert.match(surfaceSource, /<DiscoveryDeckView[\s\S]*?profiles=\{visibleDiscoverDeck\}/)
+  assert.match(deckStateSource, /const visibleDiscoverDeck = discoveryQuotaExhausted \? \[\] : discoverDeck/)
   assert.doesNotMatch(lobbySource, /<DiscoverCard\b/)
   assert.doesNotMatch(lobbySource, /DUMMY_PROFILES|useDemoStore/)
 
@@ -35,21 +64,22 @@ test("production Discover reuses the approved demo deck presentation", () => {
   assert.match(sharedDeckSource, /actionRow:\s*\{[\s\S]*?position:\s*"absolute"[\s\S]*?bottom:\s*30/)
   assert.match(sharedDeckSource, /progressRow:\s*\{[\s\S]*?marginTop:\s*-uiTheme\.spacing\.xs/)
   assert.doesNotMatch(deckSource, /demoContainer:\s*\{[\s\S]*?paddingHorizontal:\s*20/)
-  assert.match(lobbySource, /<View style=\{styles\.homeProfileSheen\}/)
-  assert.match(lobbySource, /homeProfileChip:\s*\{[\s\S]*?paddingHorizontal:\s*8[\s\S]*?paddingVertical:\s*7[\s\S]*?backgroundColor:\s*uiTheme\.ambientGlass\.surface/)
+  assert.match(headerSource, /<View style=\{styles\.homeProfileSheen\}/)
+  assert.match(headerSource, /homeProfileChip:\s*\{[\s\S]*?paddingHorizontal:\s*8[\s\S]*?paddingVertical:\s*7[\s\S]*?backgroundColor:\s*uiTheme\.ambientGlass\.surface/)
 })
 
 test("production Discover reserves the shared responsive bottom navigation inset", () => {
   const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const discoverScreenSource = readDiscoverScreen()
 
   assert.match(lobbySource, /useAppViewportMetrics\(\{[\s\S]*?bottomNavVisible:\s*true[\s\S]*?\}\)/)
   assert.match(lobbySource, /paddingBottom:\s*viewportMetrics\.bottomContentInset\s*\+\s*uiTheme\.spacing\.lg/)
-  assert.doesNotMatch(lobbySource, /const\s+BOTTOM_NAV_HEIGHT\s*=/)
-  assert.doesNotMatch(lobbySource, /useSafeAreaInsets/)
+  assert.doesNotMatch(discoverScreenSource, /const\s+BOTTOM_NAV_HEIGHT\s*=/)
+  assert.doesNotMatch(discoverScreenSource, /useSafeAreaInsets/)
 })
 
 test("returning to Discover keeps same-account filters ready while refreshing them", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = read(`${discoverScreen}/useDiscoveryFilters.ts`)
   const focusBody = lobbySource.match(/useFocusEffect\(useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[\n    isProductionDiscovery,/)
 
   assert.ok(focusBody, "expected the filter hydration focus effect")
@@ -112,7 +142,7 @@ test("discovery actions stay on the front face while the card back is open", () 
 
 test("deck transition resets the outgoing swipe before the next card paints", () => {
   const sharedDeckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
   const demoSource = read("src/screens/DemoLobbyView.tsx")
 
   assert.match(sharedDeckSource, /useLayoutEffect\(\(\) => \{/)
@@ -126,20 +156,22 @@ test("deck transition resets the outgoing swipe before the next card paints", ()
 })
 
 test("production decisions advance optimistically without locking the next profile", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
+  const decisionsSource = read(`${discoverScreen}/useDiscoveryDecisions.ts`)
+  const surfaceSource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
 
-  assert.match(lobbySource, /inFlightDecisionUserIdsRef/)
-  assert.match(lobbySource, /markCandidateSeen\(candidate\.userId\)[\s\S]*?await decideDiscoverProfile/)
-  assert.match(lobbySource, /actionsDisabled=\{discoveryQuotaExhausted \|\| \(featuredCandidate \? inFlightDecisionUserIds\.has\(featuredCandidate\.userId\) : false\)\}/)
+  assert.match(decisionsSource, /inFlightDecisionUserIdsRef/)
+  assert.match(decisionsSource, /markCandidateSeen\(candidate\.userId\)[\s\S]*?await decideDiscoverProfile/)
+  assert.match(surfaceSource, /actionsDisabled=\{discoveryQuotaExhausted \|\| \(featuredCandidate \? inFlightDecisionUserIds\.has\(featuredCandidate\.userId\) : false\)\}/)
   assert.doesNotMatch(lobbySource, /actionsDisabled=\{decidingUserId !== null\}/)
   assert.match(
-    lobbySource,
+    decisionsSource,
     /restoreCandidateAfterDecisionFailure[\s\S]{0,220}cardDragX\.setValue\(\{ x: 0, y: 0 \}\)/
   )
 })
 
 test("quota exhaustion is separate from candidate supply and never promises an unconfigured reward", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
   const copySource = read("src/features/discovery/discoverySurfaceCopy.ts")
 
@@ -166,7 +198,7 @@ test("discovery action buttons use the same animated swipe path as gestures", ()
 
 test("Discover ambient glass shares one shadowless light system", () => {
   const themeSource = read("src/ui/theme.ts")
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = read(`${discoverScreen}/DiscoverHomeHeader.tsx`)
   const cardSource = read("src/features/demo/SwipeableDiscoverCard.tsx")
   const deckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
   const bottomNavSource = read("src/ui/bottomNav.tsx")
@@ -278,20 +310,26 @@ test("Discovery card geometry consumes continuous numeric layout metrics", () =>
 })
 
 test("global Discovery pagination prefetches without replacing the deck", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
+  const discoveryQuerySource = read(`${discoverScreen}/useProductionDiscoveryQuery.ts`)
+  const surfaceSource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
   const querySource = read("src/features/discovery/discoveryQueryOptions.ts")
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
   const copySource = read("src/features/discovery/discoverySurfaceCopy.ts")
 
   assert.match(querySource, /fetchDiscoverPage/)
   assert.match(querySource, /getNextPageParam/)
-  assert.match(lobbySource, /useInfiniteQuery/)
-  assert.match(lobbySource, /productionDiscoveryQuery\.hasNextPage/)
-  assert.match(lobbySource, /productionDiscoveryQuery\.fetchNextPage\(\)/)
-  assert.match(lobbySource, /flattenDiscoveryPages/)
-  assert.match(lobbySource, /const productionSupplyState = lastProductionPage\?\.supply\.state/)
+  assert.match(discoveryQuerySource, /useInfiniteQuery/)
   assert.match(
-    lobbySource,
+    discoveryQuerySource,
+    /const \{\s*fetchNextPage,\s*hasNextPage,\s*isFetchingNextPage\s*\} = productionDiscoveryQuery/
+  )
+  assert.match(discoveryQuerySource, /hasNextPage: Boolean\(hasNextPage\)/)
+  assert.match(discoveryQuerySource, /void fetchNextPage\(\)\.catch\(\(\) => undefined\)/)
+  assert.match(discoveryQuerySource, /flattenDiscoveryPages/)
+  assert.match(discoveryQuerySource, /const productionSupplyState = lastProductionPage\?\.supply\.state/)
+  assert.match(
+    surfaceSource,
     /state=\{discoveryQuotaExhausted[\s\S]*?productionSupplyState === "low"[\s\S]*?"low-supply"[\s\S]*?"exhausted"/
   )
   assert.doesNotMatch(emptySource, /onExpandRadius/)
@@ -300,12 +338,15 @@ test("global Discovery pagination prefetches without replacing the deck", () => 
 })
 
 test("production cards use real discovery signals without synthetic fit metadata", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
   const candidateSource = read("src/features/discovery/discoveryCandidateModel.ts")
   const previewSource = read("src/screens/ProfilePreviewScreen.tsx")
 
   assert.match(candidateSource, /signals:\s*\[\.\.\.profile\.signals\]/)
-  assert.match(lobbySource, /productionProfiles\.map\(createProductionDiscoveryCandidate\)/)
+  assert.match(
+    read(`${discoverScreen}/useDiscoveryDeck.ts`),
+    /productionProfiles\.map\(createProductionDiscoveryCandidate\)/
+  )
   assert.doesNotMatch(lobbySource, /featuredCandidate\.signals\?\.slice\(0, 3\)/)
   assert.doesNotMatch(lobbySource, /Discovery fit|In your preferences|Open to connect/)
   assert.doesNotMatch(lobbySource, /Open to a mutual match/)
@@ -356,15 +397,16 @@ test("profile edit separates identity, discovery preferences, and avatar body ro
 })
 
 test("low-supply Vibe Card is server-backed, expiring, and cancellable", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const discoveryQuerySource = read(`${discoverScreen}/useProductionDiscoveryQuery.ts`)
+  const lobbySource = read(`${discoverScreen}/useDiscoveryWatch.ts`)
   const querySource = read("src/features/discovery/discoveryQueryOptions.ts")
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
   const routeSource = read("../server/src/routes/discoverRoutes.ts")
   const copySource = read("src/features/discovery/discoverySurfaceCopy.ts")
 
   assert.match(querySource, /fetchDiscoveryWatch/)
-  assert.match(lobbySource, /useQuery/)
-  assert.match(lobbySource, /discoveryWatchQuery/)
+  assert.match(discoveryQuerySource, /useQuery/)
+  assert.match(discoveryQuerySource, /discoveryWatchQuery/)
   assert.match(lobbySource, /activateDiscoveryWatch/)
   assert.match(lobbySource, /cancelDiscoveryWatch/)
   assert.match(lobbySource, /isDiscoveryWatchActive\(discoveryWatch\)/)
@@ -377,7 +419,8 @@ test("low-supply Vibe Card is server-backed, expiring, and cancellable", () => {
 })
 
 test("production and demo share the approved end-of-deck screen", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
+  const headerSource = read(`${discoverScreen}/DiscoverHomeHeader.tsx`)
   const demoSource = read("src/screens/DemoLobbyView.tsx")
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
   const sharedDeckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
@@ -398,7 +441,7 @@ test("production and demo share the approved end-of-deck screen", () => {
   assert.match(emptySource, /backgroundColor:\s*"#FFF7FC"/)
   assert.doesNotMatch(emptySource, /emptyPhotoProgress/, "loading must not imply profile-photo progress")
   assert.doesNotMatch(emptySource, /cardWash|heroGlow/)
-  assert.match(lobbySource, /<CandidateAvatarPreview[\s\S]*?snapshot=\{myAvatarSnapshot\}/)
+  assert.match(headerSource, /<CandidateAvatarPreview[\s\S]*?snapshot=\{myAvatarSnapshot\}/)
   assert.match(emptySource, /refreshing\?:\s*boolean/)
   assert.match(emptySource, /disabled=\{props\.refreshing\}/)
   assert.match(emptySource, /<ActivityIndicator/)
@@ -407,34 +450,43 @@ test("production and demo share the approved end-of-deck screen", () => {
 
 test("production discovery keeps loading distinct from a genuinely exhausted deck", () => {
   const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const surfaceSource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
   const emptySource = read("src/features/discovery/EmptyDiscoveryDeck.tsx")
 
-  assert.match(lobbySource, /discoveryPlaceholderState === "loading"/)
+  assert.match(surfaceSource, /discoveryPlaceholderState === "loading"/)
   assert.match(lobbySource, /resolveProductionDiscoveryPlaceholderState\(/)
-  assert.match(lobbySource, /<LoadingDiscoveryDeck/)
+  assert.match(surfaceSource, /<LoadingDiscoveryDeck/)
   assert.match(emptySource, /export function LoadingDiscoveryDeck/)
   assert.match(emptySource, /accessibilityState=\{\{ busy: true \}\}/)
   assert.doesNotMatch(emptySource, /emptyPhotoProgress|loadingIndicatorWrap/)
-  assert.match(lobbySource, /refreshInFlightRef\.current/)
+  assert.match(read(`${discoverScreen}/useDiscoveryRefresh.ts`), /refreshInFlightRef\.current/)
 })
 
 test("production Discover error surfaces stay actionable without raw diagnostics", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = readDiscoverScreen()
+  const errorCopyImport = /import \{ getDiscoveryErrorMessageForDisplay \} from "\.\.\/discoveryErrorCopy"/
+  const discoveryQuerySource = read(`${discoverScreen}/useProductionDiscoveryQuery.ts`)
+  const refreshSource = read(`${discoverScreen}/useDiscoveryRefresh.ts`)
+  const decisionsSource = read(`${discoverScreen}/useDiscoveryDecisions.ts`)
 
-  assert.match(lobbySource, /import \{ getDiscoveryErrorMessageForDisplay \} from "\.\.\/features\/discovery\/discoveryErrorCopy"/)
-  assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("load", productionDiscoveryQuery\.error\)/)
-  assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("refresh", error\)/)
-  assert.match(lobbySource, /getDiscoveryErrorMessageForDisplay\("decision", error\)/)
-  assert.match(lobbySource, /error instanceof DiscoveryDecisionQuotaExhaustedError[\s\S]*?lobbyCopy\.quota/)
+  for (const source of [discoveryQuerySource, refreshSource, decisionsSource]) {
+    assert.match(source, errorCopyImport)
+  }
+  assert.match(discoveryQuerySource, /getDiscoveryErrorMessageForDisplay\("load", productionDiscoveryQuery\.error\)/)
+  assert.match(refreshSource, /getDiscoveryErrorMessageForDisplay\("refresh", error\)/)
+  assert.match(decisionsSource, /getDiscoveryErrorMessageForDisplay\("decision", error\)/)
+  assert.match(decisionsSource, /error instanceof DiscoveryDecisionQuotaExhaustedError[\s\S]*?lobbyCopy\.quota/)
   assert.doesNotMatch(lobbySource, /error\.message/)
 })
 
 test("production discovery waits for account-scoped persisted filters", () => {
-  const lobbySource = read("src/screens/LobbyScreen.tsx")
+  const lobbySource = read(`${discoverScreen}/useDiscoveryFilters.ts`)
 
   assert.match(lobbySource, /filterPreferencesGenerationRef/)
   assert.match(lobbySource, /filtersReadyForUserId === sessionActor\.profile\.userId/)
-  assert.match(lobbySource, /if \(!isProductionDiscovery \|\| !filtersReady\) return/)
+  for (const owner of ["useProductionDiscoveryQuery.ts", "useDiscoveryDeck.ts"]) {
+    assert.match(read(`${discoverScreen}/${owner}`), /if \(!isProductionDiscovery \|\| !filtersReady\) return/)
+  }
   assert.match(lobbySource, /generation !== filterPreferencesGenerationRef\.current/)
   assert.match(lobbySource, /filterPreferencesGenerationRef\.current \+= 1[\s\S]*?setFiltersReadyForUserId\(sessionActor\.profile\.userId\)/)
 })
