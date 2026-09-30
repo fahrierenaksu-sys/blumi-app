@@ -9,6 +9,7 @@ import type {
   getRetryableMessage as GetRetryableMessage,
   markOptimisticMessageSending as MarkOptimisticMessageSending
 } from "../chatStore"
+import { normalizeOutgoingChatBody } from "./chatThreadModel"
 
 /**
  * Optimistic send, idempotent retry and history paging for one thread.
@@ -44,8 +45,9 @@ export function useChatMessageSending({
 }) {
   const [isLoadingEarlier, setIsLoadingEarlier] = useState(false)
 
-  const handleSend = useCallback((body: string): boolean => {
-    if (!resolvedThreadId || !currentUserId || !sendChatMessage) return false
+  const handleSend = useCallback((draft: string): boolean => {
+    const body = normalizeOutgoingChatBody(draft)
+    if (!body || !resolvedThreadId || !currentUserId || !sendChatMessage) return false
 
     const pending = addOptimisticMessage({
       threadId: resolvedThreadId,
