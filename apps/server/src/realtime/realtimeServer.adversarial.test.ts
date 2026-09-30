@@ -370,7 +370,7 @@ async function createHarness() {
     safetyService,
     presenceService,
     miniRoomService,
-    connectionService: createConnectionService({ miniRoomService }),
+    connectionService: createConnectionService({ miniRoomService, safetyService }),
     reactionService: createReactionService(),
     realtimeTicketService: ticketService
   })

@@ -74,7 +74,7 @@ export function createAdversarialServer() {
     livekitTokenService: createLivekitTokenService(),
     idFactory: () => `adv_${++roomIndex}`
   })
-  const connectionService = createConnectionService({ miniRoomService })
+  const connectionService = createConnectionService({ miniRoomService, safetyService })
   const connectionManager = createConnectionManager()
   const realtimeTicketService = createRealtimeTicketService({ authService })
   const adminTokenService = createAdminTokenService({ keys: [ADMIN_KEY] })
