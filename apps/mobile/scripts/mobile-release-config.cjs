@@ -78,17 +78,15 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     if (mediaMode !== "native") {
       throw new Error("Preview and production builds require native media.")
     }
-    if (!sentryDsn) {
-      throw new Error("EXPO_PUBLIC_SENTRY_DSN is required for preview and production builds.")
+    if (sentryDsn) {
+      requireProtocol(sentryDsn, "https:", "Release Sentry DSN must use HTTPS.")
     }
-    requireProtocol(sentryDsn, "https:", "Release Sentry DSN must use HTTPS.")
-    if (!posthogApiKey) {
-      throw new Error("EXPO_PUBLIC_POSTHOG_API_KEY is required for preview and production builds.")
+    if (posthogApiKey && !posthogHost) {
+      throw new Error("EXPO_PUBLIC_POSTHOG_HOST is required when PostHog is configured.")
     }
-    if (!posthogHost) {
-      throw new Error("EXPO_PUBLIC_POSTHOG_HOST is required for preview and production builds.")
+    if (posthogHost) {
+      requireProtocol(posthogHost, "https:", "Release PostHog host must use HTTPS.")
     }
-    requireProtocol(posthogHost, "https:", "Release PostHog host must use HTTPS.")
   }
 
   return {

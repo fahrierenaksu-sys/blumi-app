@@ -75,8 +75,16 @@ test("legal release guard blocks stale hosted product copy", () => {
   assert.throws(
     () => assertLegalReleaseReady({
       buildProfile: "production",
-      serializedDocuments: "effective legal content"
+      serializedDocuments: "effective legal content",
+      hostedCopyAlignment: "update-required"
     }),
     /hosted legal copy/i
   )
+})
+
+test("current hosted publication evidence permits production legal preflight", () => {
+  assert.doesNotThrow(() => assertLegalReleaseReady({
+    buildProfile: "production",
+    serializedDocuments: "effective legal content"
+  }))
 })

@@ -4,6 +4,30 @@
 
 Snapshot: 2026-09-28, with individual rows updated on 2026-09-30 (each row states its own date). Recheck volatile statuses before acting. The status table and ordered checklist below this infrastructure update are historical release-planning items, not live provider telemetry.
 
+## TestFlight branch automation — 2026-09-30
+
+- **IMPLEMENTED / TESTED:** `apps/mobile/.eas/workflows/testflight.yml` listens
+  for pushes to `claude/busy-cray-dl5wvr` and supports a manual run. Before
+  building iOS, source hygiene, package builds, TypeScript, lint, tests and
+  dependency audit must pass. Submission uses only that job's exact build ID.
+- **EXTERNAL VERIFIED:** Expo project `@erenaksu/blumi` is connected to
+  `fahrierenaksu-sys/blumi-app` with base directory `/apps/mobile`. The workflow
+  passed the official JSON schema and EAS server-side validation. The CLI's
+  job-type validation currently crashes on the server's custom-job schema;
+  validation was completed directly with the CLI's schema validator and
+  authenticated server validation API instead.
+- **EXTERNAL VERIFIED:** all five hosted legal/support/deletion routes in both
+  languages again returned HTTP 200 and matched generated HTML byte-for-byte.
+  The existing legal publication evidence and optional telemetry configuration
+  are included as prerequisites for unattended production builds.
+- **OPEN:** first automatic signed build, submission and Apple processing.
+  A push starts a new binary build; this workflow does not publish OTA updates,
+  submit an App Store review or release the app publicly. Build numbers use
+  the existing remote auto-increment setting. Future branches need an explicit
+  change to the workflow's branch filter.
+- **Next action (Codex):** push the automation commit and verify its automatic
+  workflow run in Expo; Apple acceptance remains a separate gate.
+
 **Database release gate (2026-09-28): BLOCKED.** The existing Supabase test project now contains 18 accounts, not the previously recorded 17. Its 65 applied migration checksums match source, but new integrity migration 066 is not live. A local owner-only `public`-schema archive was restored and upgraded in an isolated PostgreSQL 17 instance; offsite S3 backup, independent staging, cleanup, live migration, measured load and recovery drill remain OPEN. See [database release runbook](./DATABASE_RELEASE_RUNBOOK.md). The newly observed 18th account must be classified as disposable or preserved before any cleanup decision.
 
 ## Infrastructure setup update — 2026-09-28
