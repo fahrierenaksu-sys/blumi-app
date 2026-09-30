@@ -43,6 +43,40 @@ test("room invite history cancellation settles even when the transport ignores a
   assert.equal(transportSignal?.aborted, true)
 })
 
+test("sending, answering and cancelling a room invite settle even when the transport stalls", async () => {
+  // A stalled request must not keep the invite button or the accept button
+  // busy forever: these calls share requestJson's deadline and cancellation.
+  const actions: Array<[string, (fetcher: typeof fetch, signal: AbortSignal) => Promise<unknown>]> = [
+    ["create", (fetcher, signal) =>
+      createThreadRoomInvite("https://example.test", "session_token", "thread_one", fetcher, signal)],
+    ["decide", (fetcher, signal) =>
+      decideThreadRoomInvite("https://example.test", "session_token", "invite_one", "accepted", fetcher, signal)],
+    ["cancel", (fetcher, signal) =>
+      cancelThreadRoomInvite("https://example.test", "session_token", "invite_one", fetcher, signal)]
+  ]
+  for (const [name, run] of actions) {
+    const controller = new AbortController()
+    let transportSignal: AbortSignal | null | undefined
+    const pending = run((async (_url: RequestInfo | URL, init?: RequestInit) => {
+      transportSignal = init?.signal
+      return new Promise<Response>(() => {})
+    }) as typeof fetch, controller.signal)
+    const outcome = pending.then(
+      () => "resolved",
+      (error: unknown) => error instanceof Error ? error.name : "unknown"
+    )
+    controller.abort()
+    let stalled: ReturnType<typeof setTimeout> | undefined
+    const settled = await Promise.race([
+      outcome,
+      new Promise<string>((resolve) => { stalled = setTimeout(() => resolve("stalled"), 500) })
+    ])
+    clearTimeout(stalled)
+    assert.equal(settled, "AbortError", `${name} must settle as cancelled`)
+    assert.equal(transportSignal?.aborted, true, `${name} must abort its transport`)
+  }
+})
+
 test("room invite API reads and creates durable thread-scoped invites", async () => {
   const invites = await fetchThreadRoomInvites(
     "http://localhost:4000/",

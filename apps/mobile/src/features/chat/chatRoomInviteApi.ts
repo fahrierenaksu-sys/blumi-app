@@ -61,13 +61,6 @@ interface RoomInviteRecord {
   decidedAt?: string
 }
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/")
-    ? baseHttpUrl.slice(0, -1)
-    : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function fetchThreadRoomInvites(
   baseHttpUrl: string,
   sessionToken: string,
@@ -94,16 +87,17 @@ export async function createThreadRoomInvite(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<ChatRoomInviteTimelineItem> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/threads/${encodeURIComponent(threadId)}/room-invites`),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/threads/${encodeURIComponent(threadId)}/room-invites`,
     {
       method: "POST",
       headers: { ...createAuthHeaders(sessionToken), "content-type": "application/json" },
       body: JSON.stringify({}),
       signal
-    }
+    },
+    fetcher
   )
-  const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
     const code = readRoomInviteBusyCode(payload)
     throw new RoomInviteApiError(
@@ -127,16 +121,17 @@ export async function decideThreadRoomInvite(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<ChatRoomInviteTimelineItem> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/room-invites/${encodeURIComponent(inviteId)}/decision`),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/room-invites/${encodeURIComponent(inviteId)}/decision`,
     {
       method: "POST",
       headers: { ...createAuthHeaders(sessionToken), "content-type": "application/json" },
       body: JSON.stringify({ status }),
       signal
-    }
+    },
+    fetcher
   )
-  const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "That room invitation is no longer available."))
   }
@@ -150,15 +145,12 @@ export async function cancelThreadRoomInvite(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<ChatRoomInviteTimelineItem> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, `/v1/room-invites/${encodeURIComponent(inviteId)}/cancel`),
-    {
-      method: "POST",
-      headers: createAuthHeaders(sessionToken),
-      signal
-    }
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/room-invites/${encodeURIComponent(inviteId)}/cancel`,
+    { method: "POST", headers: createAuthHeaders(sessionToken), signal },
+    fetcher
   )
-  const payload: unknown = await readJsonPayload(response)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "That room invitation is no longer available."))
   }
@@ -381,14 +373,6 @@ function isInviteStatus(value: unknown): value is ChatRoomInviteStatus {
 
 function createAuthHeaders(sessionToken: string): Record<string, string> {
   return { authorization: `Bearer ${sessionToken}` }
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
