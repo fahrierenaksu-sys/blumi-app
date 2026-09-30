@@ -4,12 +4,12 @@
  * and recovery rules are testable on their own.
  */
 
-const REPORTABLE_ROUTE_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/
+import {
+  toReportableRouteName,
+  type CrashReportTags
+} from "../observability/crashPrivacy"
 
-/** Route names are code identifiers; anything else is withheld as "unknown". */
-export function toReportableRouteName(routeName: string): string {
-  return REPORTABLE_ROUTE_NAME.test(routeName) ? routeName : "unknown"
-}
+export { toReportableRouteName }
 
 export interface ErrorBoundaryReportInput {
   componentStack: string | undefined
@@ -17,16 +17,21 @@ export interface ErrorBoundaryReportInput {
   routeName?: string
 }
 
-export function createErrorBoundaryReportContext(
-  input: ErrorBoundaryReportInput
-): Record<string, string | undefined> {
+export interface ErrorBoundaryReport {
+  /** Local diagnostics only; crash privacy strips contexts before send. */
+  context: Record<string, string | undefined>
+  /** The only reported scope data: boundary kind and an allowlisted route. */
+  tags: CrashReportTags
+}
+
+export function createErrorBoundaryReport(input: ErrorBoundaryReportInput): ErrorBoundaryReport {
+  const context = { componentStack: input.componentStack }
   if (input.routeName === undefined) {
-    return { componentStack: input.componentStack }
+    return { context, tags: { boundary: "root" } }
   }
   return {
-    componentStack: input.componentStack,
-    boundary: "route",
-    route: toReportableRouteName(input.routeName)
+    context,
+    tags: { boundary: "route", route: toReportableRouteName(input.routeName) }
   }
 }
 

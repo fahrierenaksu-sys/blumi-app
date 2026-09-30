@@ -12,7 +12,9 @@ interface RouteLayoutArgs {
  * ErrorBoundary, so a render crash replaces only that screen with the
  * localized recovery card. The session, navigator, bottom navigation and
  * global overlays stay mounted, and the app-root boundary remains the last
- * resort. Only `route.name` is handed over; params stay out of reports.
+ * resort. Only `route.name` is handed over; params stay out of reports. The
+ * boundary reports it as the `route` crash tag, and only when it is one of
+ * `ROOT_ROUTE_NAMES` (rootRouteNames.ts); any other value becomes "unknown".
  */
 export function renderRouteErrorBoundary({ route, navigation, children }: RouteLayoutArgs): ReactElement {
   return (

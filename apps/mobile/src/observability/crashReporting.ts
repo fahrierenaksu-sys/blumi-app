@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react-native"
-import { sanitizeCrashEvent } from "./crashPrivacy"
+import { sanitizeCrashEvent, toReportableRouteName, type CrashReportTags } from "./crashPrivacy"
 import {
   BLUMI_BUILD_PROFILE,
   BLUMI_SENTRY_DSN
@@ -26,13 +26,23 @@ export function initializeCrashReporting(): void {
   })
 }
 
+/**
+ * `context` stays local diagnostics only: `sanitizeCrashEvent` strips all
+ * contexts before send. `tags` is the one reportable channel, limited to the
+ * boundary scope and an allowlisted root route name.
+ */
 export function captureAppException(
   error: unknown,
-  context?: Record<string, string | undefined>
+  context?: Record<string, string | undefined>,
+  tags?: CrashReportTags
 ): void {
   if (!BLUMI_SENTRY_DSN) return
   Sentry.withScope((scope) => {
     if (context) scope.setContext("app_error", context)
+    if (tags) {
+      scope.setTag("boundary", tags.boundary)
+      if (tags.route !== undefined) scope.setTag("route", toReportableRouteName(tags.route))
+    }
     Sentry.captureException(error)
   })
 }

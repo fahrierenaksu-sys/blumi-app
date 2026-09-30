@@ -1,34 +1,38 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-  createErrorBoundaryReportContext,
+  createErrorBoundaryReport,
   getErrorBoundaryActions,
   toReportableRouteName
 } from "./errorBoundaryScope"
 
-test("route names are reported only when they are plain navigator identifiers", () => {
+test("only typed root stack route names are reportable; everything else is unknown", () => {
   assert.equal(toReportableRouteName("ChatThread"), "ChatThread")
   assert.equal(toReportableRouteName("MyRoomEditor"), "MyRoomEditor")
-  for (const unsafe of ["", "chat/thread_1?partner=Ada", "Ada Lovelace", "user@example.com", "a".repeat(80), "1Lobby"]) {
+  for (const unsafe of [
+    "", "chat/thread_1?partner=Ada", "Ada Lovelace", "user@example.com", "a".repeat(80), "1Lobby",
+    // Identifier-shaped but not a registered route: still withheld.
+    "ProfileScreen", "chatThread", "CHATTHREAD", "ChatThread ", "AdaLovelace", "toString", "__proto__", "constructor"
+  ]) {
     assert.equal(toReportableRouteName(unsafe), "unknown", unsafe)
   }
 })
 
-test("a route boundary reports its scope and route name, never params", () => {
+test("a route boundary reports its scope and allowlisted route as tags, never params", () => {
   assert.deepEqual(
-    createErrorBoundaryReportContext({ componentStack: "in ChatThreadScreen", routeName: "ChatThread" }),
-    { componentStack: "in ChatThreadScreen", boundary: "route", route: "ChatThread" }
+    createErrorBoundaryReport({ componentStack: "in ChatThreadScreen", routeName: "ChatThread" }),
+    { context: { componentStack: "in ChatThreadScreen" }, tags: { boundary: "route", route: "ChatThread" } }
   )
   assert.deepEqual(
-    createErrorBoundaryReportContext({ componentStack: undefined, routeName: "partnerName=Ada" }),
-    { componentStack: undefined, boundary: "route", route: "unknown" }
+    createErrorBoundaryReport({ componentStack: undefined, routeName: "partnerName=Ada" }),
+    { context: { componentStack: undefined }, tags: { boundary: "route", route: "unknown" } }
   )
 })
 
-test("the root boundary keeps its original report context", () => {
+test("the root boundary reports only its root scope", () => {
   assert.deepEqual(
-    createErrorBoundaryReportContext({ componentStack: "in App" }),
-    { componentStack: "in App" }
+    createErrorBoundaryReport({ componentStack: "in App" }),
+    { context: { componentStack: "in App" }, tags: { boundary: "root" } }
   )
 })
 
