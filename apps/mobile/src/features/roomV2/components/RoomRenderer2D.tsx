@@ -1,7 +1,6 @@
 import { Image as ExpoImage } from "expo-image"
 import {
   Animated,
-  Easing,
   type GestureResponderEvent,
   type AccessibilityValue,
   type LayoutChangeEvent,
@@ -12,7 +11,7 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useRef, useState } from "react"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
@@ -30,6 +29,11 @@ import {
   getAvatarMotionTranslateX,
   getAvatarMotionTranslateY
 } from "./roomRendererAvatarMotionStyle"
+import {
+  useRoomRendererAvatarLoops,
+  useRoomRendererMarkerPulse,
+  useRoomRendererScreenFocused
+} from "./useRoomRendererLoops"
 import { getRoomV2AvatarAccessibilityValue } from "../roomV2Accessibility"
 import {
   getRoomV2DepthPerspectiveScale,
@@ -107,6 +111,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
+  // Idle loops pause while the hosting screen is not focused.
+  const motionPaused = !useRoomRendererScreenFocused()
   const handleLayout = useCallback((event: LayoutChangeEvent): void => {
     const { width, height } = event.nativeEvent.layout
     setLayoutSize({ width, height })
@@ -168,7 +174,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
         <PlacementGuideLayer shell={shell} />
       ) : null}
       {stageMarkers?.map((marker) => (
-        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} />
+        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} paused={motionPaused} />
       ))}
       {roomVNextRuntimeMode !== "disabled"
         ? renderItems.map((item) =>
@@ -194,6 +200,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             itemInteractionMode={itemInteractionMode}
             debugPlacement={debugPlacement}
             reduceMotion={reduceMotion || !motionEnabled}
+            motionPaused={motionPaused}
             liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
             stageWidthPx={layoutSize.width}
             stageHeightPx={layoutSize.height}
@@ -359,38 +366,10 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
 const StageMarker = memo(function StageMarker(props: {
   marker: RoomRendererStageMarker
   reduceMotion: boolean
+  paused: boolean
 }) {
-  const { marker, reduceMotion } = props
-  const pulseRef = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (reduceMotion) {
-      pulseRef.stopAnimation()
-      pulseRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseRef, {
-          toValue: 1,
-          duration: 620,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(pulseRef, {
-          toValue: 0,
-          duration: 620,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      pulseRef.setValue(0)
-    }
-  }, [pulseRef, reduceMotion])
+  const { marker, reduceMotion, paused } = props
+  const pulseRef = useRoomRendererMarkerPulse({ reduceMotion, paused })
 
   return (
     <Animated.View
@@ -461,6 +440,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   itemInteractionMode: "edit" | "interact"
   debugPlacement: boolean
   reduceMotion: boolean
+  motionPaused: boolean
   liveAvatarPosition?: RoomRendererLiveAvatarPosition
   stageWidthPx: number
   stageHeightPx: number
@@ -478,15 +458,13 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     itemInteractionMode,
     debugPlacement,
     reduceMotion,
+    motionPaused,
     liveAvatarPosition,
     stageWidthPx,
     stageHeightPx,
     seatedFurnitureName,
     testID
   } = props
-  const breatheRef = useRef(new Animated.Value(0)).current
-  const walkRef = useRef(new Animated.Value(0)).current
-  const gestureRef = useRef(new Animated.Value(0)).current
   const longPressActiveRef = useRef(false)
   const suppressPressRef = useRef(false)
 
@@ -510,103 +488,12 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
       usesRuntimeGesture: false,
       usesAnimatedAssets: false
     }
-  const usesIdleBreathe =
-    item.kind === "avatar" &&
-    avatarMotion.state === "idle" &&
-    !avatarMotion.usesAnimatedAssets &&
-    !reduceMotion
-
-  useEffect(() => {
-    if (!usesIdleBreathe) {
-      breatheRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheRef, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        }),
-        Animated.timing(breatheRef, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      breatheRef.setValue(0)
-    }
-  }, [breatheRef, usesIdleBreathe])
-
-  useEffect(() => {
-    if (
-      item.kind !== "avatar" ||
-      avatarMotion.state !== "walking" ||
-      !avatarMotion.usesRuntimeLocomotion
-    ) {
-      walkRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(walkRef, {
-          toValue: 1,
-          duration: 190,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(walkRef, {
-          toValue: 0,
-          duration: 190,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      walkRef.setValue(0)
-    }
-  }, [avatarMotion.state, avatarMotion.usesRuntimeLocomotion, item.kind, walkRef])
-
-  useEffect(() => {
-    if (
-      item.kind !== "avatar" ||
-      reduceMotion ||
-      !avatarMotion.usesRuntimeGesture
-    ) {
-      gestureRef.setValue(0)
-      return undefined
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(gestureRef, {
-          toValue: 1,
-          duration: avatarMotion.state === "dancing" ? 260 : 420,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(gestureRef, {
-          toValue: 0,
-          duration: avatarMotion.state === "dancing" ? 260 : 420,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      gestureRef.setValue(0)
-    }
-  }, [avatarMotion.state, avatarMotion.usesRuntimeGesture, gestureRef, item.kind, reduceMotion])
+  const { breatheRef, walkRef, gestureRef, usesIdleBreathe } = useRoomRendererAvatarLoops({
+    isAvatar: item.kind === "avatar",
+    avatarMotion,
+    reduceMotion,
+    paused: motionPaused
+  })
 
   // If an interaction is provided, we need to allow touches. Otherwise pass through.
   const isTouchInteractive = Boolean(onItemTap || onItemLongPress || onItemLongPressMove)
@@ -803,6 +690,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.onItemLongPressRelease === next.onItemLongPressRelease &&
   previous.debugPlacement === next.debugPlacement &&
   previous.reduceMotion === next.reduceMotion &&
+  previous.motionPaused === next.motionPaused &&
   previous.liveAvatarPosition === next.liveAvatarPosition &&
   previous.stageWidthPx === next.stageWidthPx &&
   previous.stageHeightPx === next.stageHeightPx &&

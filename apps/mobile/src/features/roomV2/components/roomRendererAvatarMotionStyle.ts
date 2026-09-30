@@ -9,7 +9,7 @@ import {
 // (walk bob, idle breathe, wave and dance gestures), split out of
 // RoomRenderer2D so the renderer stays under its size cap.
 
-type RoomRendererAvatarMotion = ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>
+export type RoomRendererAvatarMotion = ReturnType<typeof getRenderableRoomV2AvatarMotionProfile>
 
 export function getAvatarMotionTranslateY(
   motion: RoomRendererAvatarMotion,

@@ -330,12 +330,14 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
         /if \(!hasUnreadThread \|\| reduceMotion\) \{[\s\S]*unreadPulseAnim\.stopAnimation\(\)[\s\S]*unreadPulseAnim\.setValue\(1\)/
       ]
     },
+    // The room renderer reads the preference and hands it to its idle-loop
+    // hooks (useRoomRendererLoops, rules in roomRendererLoopModel; checked
+    // below), which also pause the loops while the screen is unfocused.
     {
       relativePath: "src/features/roomV2/components/RoomRenderer2D.tsx",
       patterns: [
-        /if \(reduceMotion\) \{[\s\S]*pulseRef\.stopAnimation\(\)[\s\S]*pulseRef\.setValue\(0\)/,
-        /!avatarMotion\.usesAnimatedAssets &&[\s\S]*!reduceMotion/,
-        /item\.kind !== "avatar" \|\|[\s\S]*reduceMotion \|\|[\s\S]*!avatarMotion\.usesRuntimeGesture/
+        /useRoomRendererMarkerPulse\(\{ reduceMotion, paused \}\)/,
+        /useRoomRendererAvatarLoops\(\{[\s\S]*?reduceMotion,[\s\S]*?paused: motionPaused/
       ]
     },
     {
@@ -359,6 +361,15 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
       assert.match(source, pattern, `${relativePath} must stop and stabilize its motion path`)
     }
   }
+
+  const roomLoops = readFileSync(resolve(mobileRoot, "src/features/roomV2/components/useRoomRendererLoops.ts"), "utf8")
+  assert.match(roomLoops, /if \(!runs\) \{[\s\S]*pulseRef\.stopAnimation\(\)[\s\S]*pulseRef\.setValue\(0\)/)
+  assert.match(roomLoops, /!avatarMotion\.usesAnimatedAssets &&[\s\S]*!reduceMotion/)
+  assert.match(roomLoops, /if \(!loops\.gesture\) \{\s*gestureRef\.setValue\(0\)/)
+  const roomLoopModel = readFileSync(resolve(mobileRoot, "src/features/roomV2/components/roomRendererLoopModel.ts"), "utf8")
+  assert.match(roomLoopModel, /breathe: active && input\.state === "idle" && !input\.usesAnimatedAssets && !input\.reduceMotion/)
+  assert.match(roomLoopModel, /gesture: active && !input\.reduceMotion && input\.usesRuntimeGesture/)
+  assert.match(roomLoopModel, /return !input\.reduceMotion && !input\.paused/)
 })
 
 test("connection banner stays compact without covering safe-area content", () => {
