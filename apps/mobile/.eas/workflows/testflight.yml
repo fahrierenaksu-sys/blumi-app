@@ -1,15 +1,10 @@
-# main → stable Blumi for testers (and later the App Store).
-# Runs the checks, then compares the native fingerprint with existing
-# production builds. Same native runtime: publish an OTA update to the
-# `production` channel only (no new build). Native change: build a new iOS
-# production binary and upload it to TestFlight. Development updates never
-# reach this channel; they go to `preview` (see develop-preview-update.yml).
+# Run this production workflow manually when you want to release. A matching
+# native runtime publishes an OTA update; otherwise it builds and submits an
+# iOS binary to TestFlight. A push to `main` does not start this workflow.
+# Development updates go to `preview`.
 name: Blumi main to production
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 
 concurrency:

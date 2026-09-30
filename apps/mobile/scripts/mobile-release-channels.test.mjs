@@ -1,7 +1,7 @@
 // Guards the OTA/TestFlight channel split:
 //   develop -> OTA to the `preview` channel only, never builds.
-//   main    -> OTA to `production` when the native runtime matches an existing
-//              production build, otherwise a new production build to TestFlight.
+//   main    -> manual production workflow; matching native runtime publishes
+//              OTA, otherwise it builds and submits to TestFlight.
 //   manual  -> the preview binary (channel `preview`) to TestFlight.
 // It also pins the environment parity that keeps fingerprints (runtime
 // versions) identical between a build and the updates published for it.
@@ -69,8 +69,11 @@ test("develop publishes only to the preview channel and never builds", () => {
   assert.match(stop.steps.at(-1).run, /exit 1/)
 })
 
-test("main builds only on a native change and otherwise updates the production channel", () => {
-  assert.deepEqual(mainWorkflow.on.push.branches, ["main"])
+test("the production workflow runs only on manual dispatch", () => {
+  assert.equal(mainWorkflow.on.push, undefined)
+  assert.ok("workflow_dispatch" in mainWorkflow.on)
+  const build = jobsOfType(mainWorkflow, "build")[0]
+  assert.match(build.if, /!needs\.get_production_build\.outputs\.build_id/)
   const updates = jobsOfType(mainWorkflow, "update")
   assert.equal(updates.length, 1)
   assert.equal(updates[0].params.channel, "production")
@@ -99,6 +102,7 @@ test("the preview binary is built only on demand and uploaded with the preview p
 
 test("no workflow builds on pushes to the working branch", () => {
   const workflows = [mainWorkflow, developWorkflow, previewBuildWorkflow]
+  assert.equal(mainWorkflow.on.push, undefined, "production/TestFlight must stay manual")
   for (const workflow of workflows) {
     for (const branch of workflow.on.push?.branches ?? []) {
       assert.ok(["main", "develop"].includes(branch), `unexpected push trigger ${branch}`)
