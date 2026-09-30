@@ -70,7 +70,9 @@ test("develop publishes only to the preview channel and never builds", () => {
 })
 
 test("main builds only on a native change and otherwise updates the production channel", () => {
-  assert.deepEqual(mainWorkflow.on.push.branches, ["main"])
+  // Manual only: a push to main must not start a build or an upload.
+  assert.equal(mainWorkflow.on.push, undefined)
+  assert.deepEqual(Object.keys(mainWorkflow.on), ["workflow_dispatch"])
   const updates = jobsOfType(mainWorkflow, "update")
   assert.equal(updates.length, 1)
   assert.equal(updates[0].params.channel, "production")

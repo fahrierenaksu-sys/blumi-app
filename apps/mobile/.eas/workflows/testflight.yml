@@ -4,12 +4,11 @@
 # `production` channel only (no new build). Native change: build a new iOS
 # production binary and upload it to TestFlight. Development updates never
 # reach this channel; they go to `preview` (see develop-preview-update.yml).
+# Started by hand only (EAS dashboard or `eas workflow:run testflight.yml`)
+# so pushes to main never spend EAS build quota or upload on their own.
 name: Blumi main to production
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 
 concurrency:
