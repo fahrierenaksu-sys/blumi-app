@@ -115,8 +115,8 @@ test("fingerprint and update jobs use exactly the build profile's environment", 
   }
 })
 
-test("every workflow runs the release checks before fingerprinting or building", () => {
-  for (const workflow of [mainWorkflow, developWorkflow, previewBuildWorkflow]) {
+test("production and preview builds run the release checks first; develop OTA stays fast", () => {
+  for (const workflow of [mainWorkflow, previewBuildWorkflow]) {
     const script = workflow.jobs.checks.steps.at(-1).run
     for (const command of ["verify:source-hygiene", "typecheck", "lint", "npm test", "audit:release"]) {
       assert.ok(script.includes(command), `checks must run ${command}`)
@@ -124,4 +124,6 @@ test("every workflow runs the release checks before fingerprinting or building",
     const first = workflow.jobs.fingerprint ?? workflow.jobs.build_preview_ios
     assert.deepEqual(first.needs, ["checks"])
   }
+  assert.equal(developWorkflow.jobs.checks, undefined, "develop OTA relies on local and GitHub checks")
+  assert.equal(developWorkflow.jobs.fingerprint.needs, undefined)
 })

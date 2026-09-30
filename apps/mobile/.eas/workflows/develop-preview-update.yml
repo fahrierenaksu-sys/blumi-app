@@ -1,11 +1,14 @@
 # develop → the owner's development build on TestFlight, over the air.
-# Runs the checks, then publishes the JavaScript and assets as an OTA update
+# Publishes the JavaScript and assets as an OTA update
 # to the `preview` channel only, and only when a preview build with the same
 # native runtime (fingerprint) already exists. It never builds: a native
 # change (new native module, permission, entitlement, plugin or app config
 # that affects native code) stops the run and asks for a new preview build
 # (preview-testflight-build.yml). Production testers never receive these
 # updates because their binaries listen to the `production` channel.
+# Speed matters here: the release checks run before the push (locally) and on
+# GitHub (verify.yml), not again in this workflow, so an update reaches the
+# development build in minutes. main keeps the checks before production.
 name: Blumi develop to preview (OTA)
 
 on:
@@ -19,26 +22,8 @@ concurrency:
   group: ${{ workflow.filename }}-${{ github.ref }}
 
 jobs:
-  checks:
-    name: Check source, types, lint, tests and dependency audit
-    environment: production
-    steps:
-      - uses: eas/checkout
-      - uses: eas/install_node_modules
-      - name: Run release checks
-        working_directory: ../..
-        run: |
-          set -euo pipefail
-          npm run verify:source-hygiene
-          npm run build:packages
-          npm run typecheck
-          npm run lint
-          npm test
-          npm run audit:release
-
   fingerprint:
     name: Fingerprint the native runtime
-    needs: [checks]
     type: fingerprint
     environment: production
     # Must equal build.preview.env in eas.json (checked by
