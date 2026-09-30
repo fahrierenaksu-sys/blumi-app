@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import type { ReportReason } from "@blumi/contracts"
 import {
   blockUser,
@@ -12,6 +13,7 @@ import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { hapticMedium, hapticStrong } from "../ui/haptics"
 import { showToast } from "../ui/toast"
+import { SwipeDismissSheet } from "../ui/SwipeDismissSheet"
 import { uiTheme } from "../ui/theme"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getNativeAppLocale } from "../features/session/authLocale"
@@ -202,8 +204,13 @@ export function ReportModal(props: ReportModalProps) {
       transparent
       onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View accessibilityViewIsModal style={styles.sheet}>
+      <GestureHandlerRootView style={styles.overlay}>
+        <SwipeDismissSheet
+          onDismiss={handleClose}
+          enabled={!isSubmitting && step !== "done"}
+          accessibilityViewIsModal
+          style={styles.sheet}
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.handle} />
@@ -341,8 +348,8 @@ export function ReportModal(props: ReportModalProps) {
               </Text>
             </View>
           )}
-        </View>
-      </View>
+        </SwipeDismissSheet>
+      </GestureHandlerRootView>
     </Modal>
   )
 }
