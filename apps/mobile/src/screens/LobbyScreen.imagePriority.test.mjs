@@ -3,8 +3,10 @@ import { readFileSync } from "node:fs"
 import test from "node:test"
 import ts from "typescript"
 
-const lobbySource = readFileSync(new URL("./LobbyScreen.tsx", import.meta.url), "utf8")
-const lobbyFile = ts.createSourceFile("LobbyScreen.tsx", lobbySource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+// LobbyScreen renders the profile chip through DiscoverHomeHeader.
+const lobbySource = readFileSync(new URL("../features/discovery/screen/DiscoverHomeHeader.tsx", import.meta.url), "utf8")
+const lobbyFile = ts.createSourceFile("DiscoverHomeHeader.tsx", lobbySource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const lobbyScreenSource = readFileSync(new URL("./LobbyScreen.tsx", import.meta.url), "utf8")
 const frontDeckSource = readFileSync(new URL("../features/discovery/DiscoveryDeckView.tsx", import.meta.url), "utf8")
 
 function findHeaderAvatar(node) {
@@ -20,6 +22,7 @@ function findHeaderAvatar(node) {
 test("Lobby's decorative 48px avatar yields to the visible front Discover card", () => {
   const headerAvatar = findHeaderAvatar(lobbyFile)
   assert.ok(headerAvatar, "expected the Lobby profile-chip avatar")
+  assert.match(lobbyScreenSource, /<DiscoverHomeHeader\b/)
   const priority = headerAvatar.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(lobbyFile) === "imagePriority")
 
   assert.equal(priority?.initializer && ts.isStringLiteral(priority.initializer) ? priority.initializer.text : undefined, "normal")

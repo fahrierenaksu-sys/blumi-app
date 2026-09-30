@@ -6,10 +6,31 @@ import { fileURLToPath } from "node:url"
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
+// Discover is LobbyScreen plus the feature modules it composes.
+const DISCOVER_SCREEN_SOURCE_PATHS = [
+  "src/screens/LobbyScreen.tsx",
+  "src/features/discovery/screen/DiscoverDeckSurface.tsx",
+  "src/features/discovery/screen/DiscoverHomeHeader.tsx",
+  "src/features/discovery/screen/DiscoveryFeedbackPill.tsx",
+  "src/features/discovery/screen/discoveryScreenModel.ts",
+  "src/features/discovery/screen/useDiscoveryDecisions.ts",
+  "src/features/discovery/screen/useDiscoveryDeck.ts",
+  "src/features/discovery/screen/useDiscoveryFilters.ts",
+  "src/features/discovery/screen/useDiscoveryRefresh.ts",
+  "src/features/discovery/screen/useDiscoverySafetyList.ts",
+  "src/features/discovery/screen/useDiscoveryStartup.ts",
+  "src/features/discovery/screen/useDiscoveryWatch.ts",
+  "src/features/discovery/screen/useProductionDiscoveryQuery.ts",
+  "src/features/lobby/useLegacyLobbyInvites.ts",
+  "src/features/lobby/useLegacyMiniRoomNavigation.ts",
+  "src/features/lobby/PendingInviteStrip.tsx"
+]
+
 function read(relativePath) {
   if (relativePath === "src/screens/LobbyScreen.tsx") {
-    return readFileSync(resolve(mobileRoot, "src/screens/LobbyScreen.tsx"), "utf8") +
-      "\n" + readFileSync(resolve(mobileRoot, "src/features/lobby/useLobbyFlow.ts"), "utf8")
+    return [...DISCOVER_SCREEN_SOURCE_PATHS, "src/features/lobby/useLobbyFlow.ts"]
+      .map((path) => readFileSync(resolve(mobileRoot, path), "utf8"))
+      .join("\n")
   }
   return readFileSync(resolve(mobileRoot, relativePath), "utf8")
 }

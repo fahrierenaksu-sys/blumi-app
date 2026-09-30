@@ -12,7 +12,8 @@ test("core navigation and status surfaces use Ionicons instead of text glyph ico
   const files = [
     "screens/ProfileEditScreen.tsx",
     "screens/InboxScreen.tsx",
-    "screens/LobbyScreen.tsx",
+    // Discover's only icon (legacy lobby pending invites) lives here.
+    "features/lobby/PendingInviteStrip.tsx",
     "features/miniRoom/scene/MiniRoomHud.tsx"
   ]
   const prohibitedGlyphs = /[←→‹›❤♥♡●✓✦]/u
@@ -33,6 +34,23 @@ test("core navigation and status surfaces use Ionicons instead of text glyph ico
 
   const profileSource = await readSource("screens/ProfileEditScreen.tsx")
   assert.match(profileSource, /name=\{selected\s*\?\s*"checkmark"\s*:\s*"add"\}/)
+
+  // Discover (LobbyScreen and the modules it composes) renders no glyph icons.
+  const discoverFiles = [
+    "screens/LobbyScreen.tsx",
+    "features/discovery/screen/DiscoverDeckSurface.tsx",
+    "features/discovery/screen/DiscoverHomeHeader.tsx",
+    "features/discovery/screen/DiscoveryFeedbackPill.tsx",
+    "features/discovery/screen/discoveryScreenModel.ts",
+    "features/lobby/pendingInviteModel.ts"
+  ]
+  for (const file of discoverFiles) {
+    assert.doesNotMatch(
+      await readSource(file),
+      prohibitedGlyphs,
+      `${file} must not render navigation or status icons as text glyphs`
+    )
+  }
 })
 
 test("critical selection and modal controls do not fall back to font glyph icons", async () => {

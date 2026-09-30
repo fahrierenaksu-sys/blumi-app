@@ -14,7 +14,7 @@ function read(relativePath) {
 }
 
 test("ProfilePreview bounce never records optimistic success after a refused invite", () => {
-  const lobby = read("src/screens/LobbyScreen.tsx")
+  const lobby = read("src/features/discovery/screen/useDiscoveryDecisions.ts")
 
   assert.match(
     lobby,

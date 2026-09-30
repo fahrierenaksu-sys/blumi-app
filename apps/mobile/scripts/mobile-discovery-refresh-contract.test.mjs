@@ -70,7 +70,7 @@ function callsIdentifier(node, identifier) {
 }
 
 test("Lobby refresh awaits the refresh operation and never uses a cosmetic timer", () => {
-  const callback = findCallback(parse("src/screens/LobbyScreen.tsx"), "handleRefresh")
+  const callback = findCallback(parse("src/features/discovery/screen/useDiscoveryRefresh.ts"), "handleRefresh")
 
   assert.equal(
     callsIdentifier(callback, "setTimeout"),
@@ -90,7 +90,7 @@ test("Lobby refresh awaits the refresh operation and never uses a cosmetic timer
 })
 
 test("Lobby refresh clears pending state in finally and exposes a visible failure path", () => {
-  const callback = findCallback(parse("src/screens/LobbyScreen.tsx"), "handleRefresh")
+  const callback = findCallback(parse("src/features/discovery/screen/useDiscoveryRefresh.ts"), "handleRefresh")
   let refreshTry = null
 
   function visit(node) {

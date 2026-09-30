@@ -150,7 +150,7 @@ test("entry and onboarding surfaces use their scoped Blumi palette", () => {
 
 test("Discovery deck keeps biography concise inside the swipe card", () => {
   const cardSource = readSource("src/components/DiscoverCard.tsx")
-  const lobbySource = readSource("src/screens/LobbyScreen.tsx")
+  const lobbySource = readSource("src/features/discovery/screen/DiscoverDeckSurface.tsx")
   const swipeCardSource = readSource("src/features/demo/SwipeableDiscoverCard.tsx")
 
   assert.doesNotMatch(cardSource, /bio\?: string/)
