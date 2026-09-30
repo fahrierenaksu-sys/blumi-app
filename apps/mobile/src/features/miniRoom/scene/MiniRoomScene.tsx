@@ -362,6 +362,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
                 <TogetherHeartOverlay active={closeTogether} motionPolicy={motionPolicy} />
                 <AvatarLayer
                   avatars={store.avatars}
+                  avatarPositions={store.avatarPositions}
                   localUserId={localUser.userId}
                   localUserLabel={copy.youLabel}
                   bubbles={store.bubbles}
@@ -399,6 +400,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
                 />
                 <AvatarLayer
                   avatars={store.avatars}
+                  avatarPositions={store.avatarPositions}
                   localUserId={localUser.userId}
                   localUserLabel={copy.youLabel}
                   bubbles={store.bubbles}

@@ -17,9 +17,6 @@ import {
   createRoomWorldMovementPlan,
   createRoomWorldSeatExitMovementPlan,
   createRoomWorldSeatMovementPlan,
-  getRoomWorldMovementFrame,
-  getRoomWorldMovementFramePose,
-  getRoomWorldMovementSegmentStartPose,
   isRoomWorldTargetOccupied,
   ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
   ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
@@ -30,10 +27,22 @@ import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
 import { cozyPinkBedroomScene } from "./roomMaps"
 import {
+  createMiniRoomAvatarPosition,
+  createMiniRoomSegmentAnimator,
+  readMiniRoomAvatarPosition,
+  snapMiniRoomAvatarPosition,
+  type MiniRoomAvatarPosition
+} from "./miniRoomAvatarPositions"
+import {
   cancelActiveMiniRoomMovement,
   cancelPendingMiniRoomMovementCompletion,
   scheduleMiniRoomMovementCompletion
 } from "./miniRoomMovementLifecycle"
+import {
+  startMiniRoomMovementRun,
+  type MiniRoomMovementRun,
+  type MiniRoomSegmentAnimator
+} from "./miniRoomMovementRun"
 import {
   createMiniRoomSpeechQueue,
   dismissMiniRoomSpeech,
@@ -118,6 +127,15 @@ function createInitialAvatars(
   }
 }
 
+function cancelMiniRoomMovementRun(run: MiniRoomMovementRun): void {
+  run.cancel()
+}
+
+interface MiniRoomAvatarMotionDriver {
+  position: MiniRoomAvatarPosition
+  animator: MiniRoomSegmentAnimator
+}
+
 interface MoveOptions {
   hotspot?: RoomHotspot
   roomWorldHotspot?: ReturnType<typeof createRoomWorldHotspotsFromRoomV2Scene>[number]
@@ -149,10 +167,21 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   )
   const avatarsRef = useRef(avatars)
   avatarsRef.current = avatars
+  // Live per-frame positions, keyed by avatar id, animate on the UI thread;
+  // `avatars` holds the committed pose (segment starts/ends and arrival).
+  const [motionDrivers] = useState(() => new Map<string, MiniRoomAvatarMotionDriver>())
+  const getMotionDriver = useCallback((avatar: AvatarState): MiniRoomAvatarMotionDriver => {
+    const existing = motionDrivers.get(avatar.userId)
+    if (existing) return existing
+    const position = createMiniRoomAvatarPosition(avatar)
+    const driver = { position, animator: createMiniRoomSegmentAnimator(position) }
+    motionDrivers.set(avatar.userId, driver)
+    return driver
+  }, [motionDrivers])
   const [bubbles, setBubbles] = useState<SpeechBubble[]>([])
   const [pressedPoint, setPressedPoint] = useState<RoomPoint | undefined>()
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | undefined>()
-  const animationFrameRef = useRef<number | null>(null)
+  const activeMovementRef = useRef<MiniRoomMovementRun | null>(null)
   const movementCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bubbleCounterRef = useRef(0)
   const speechQueueRef = useRef(createMiniRoomSpeechQueue())
@@ -162,7 +191,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const speechMotionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   useEffect(() => {
-    cancelActiveMiniRoomMovement(animationFrameRef, cancelAnimationFrame)
+    cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
     cancelPendingMiniRoomMovementCompletion(
       movementCompletionTimerRef,
       clearTimeout
@@ -170,6 +199,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const nextAvatars = createInitialAvatars(input, scene, geometry, usesRoomV2Scene)
     avatarsRef.current = nextAvatars
     setAvatars(nextAvatars)
+    for (const avatar of Object.values(nextAvatars)) {
+      snapMiniRoomAvatarPosition(getMotionDriver(avatar).position, avatar)
+    }
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     bubbleTimerRef.current = null
     speechQueueRef.current = createMiniRoomSpeechQueue()
@@ -193,7 +225,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
 
   useEffect(() => {
     return () => {
-      cancelActiveMiniRoomMovement(animationFrameRef, cancelAnimationFrame)
+      cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
       cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
@@ -213,8 +245,14 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const runMovement = useCallback(
     (point: RoomPoint, options?: MoveOptions): boolean => {
       const currentAvatars = avatarsRef.current
-      const localAvatar = currentAvatars[input.localUser.userId]
-      if (!localAvatar) return false
+      const committedLocalAvatar = currentAvatars[input.localUser.userId]
+      if (!committedLocalAvatar) return false
+      const motionDriver = getMotionDriver(committedLocalAvatar)
+      // A retarget during a walk starts from where the avatar is on screen.
+      const localAvatar = {
+        ...committedLocalAvatar,
+        ...readMiniRoomAvatarPosition(motionDriver.position)
+      }
       const occupants = createMiniRoomOccupants(currentAvatars)
       const seatHotspot = options?.roomWorldHotspot?.kind === "seat"
         ? options.roomWorldHotspot
@@ -311,7 +349,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         })
       if (!plan) return false
 
-      cancelActiveMiniRoomMovement(animationFrameRef, cancelAnimationFrame)
+      cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
       cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
@@ -334,46 +372,40 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
 
       setPressedPoint(target)
 
-      const animatePathSegment = (pathIndex: number): void => {
-        const segment = plan.segments[pathIndex]
-        const segmentStartPose = getRoomWorldMovementSegmentStartPose(segment)
-        const startedAt = Date.now()
-
-        setAvatars((current) => {
-          const avatar = current[localUserId]
-          if (!avatar) return current
-          return {
-            ...current,
-            [localUserId]: {
-              ...avatar,
-              targetX: target.x,
-              targetY: target.y,
-              facing: segmentStartPose.facing,
-              motion: segmentStartPose.motion,
-              seatedHotspotId: undefined
-            }
-          }
-        })
-
-        const tick = () => {
-          const frame = getRoomWorldMovementFrame({
-            segment,
-            startedAt,
-            now: Date.now()
-          })
-
+      const arrivalSeatedHotspotId =
+        options?.hotspot?.kind === "seat"
+          ? options?.hotspot?.id
+          : undefined
+      let run: MiniRoomMovementRun | null = null
+      run = startMiniRoomMovementRun({
+        segments: plan.segments,
+        arrival: {
+          facing: arrivalFacing,
+          motion: arrivalMotion
+        },
+        animator: motionDriver.animator,
+        onSegmentStart: (segmentStartPose) => {
           setAvatars((current) => {
             const avatar = current[localUserId]
             if (!avatar) return current
-            const runtimePose = getRoomWorldMovementFramePose({
-              frame,
-              segment,
-              arrival: {
-                facing: arrivalFacing,
-                motion: arrivalMotion
+            return {
+              ...current,
+              [localUserId]: {
+                ...avatar,
+                targetX: target.x,
+                targetY: target.y,
+                facing: segmentStartPose.facing,
+                motion: segmentStartPose.motion,
+                seatedHotspotId: undefined
               }
-            })
-            if (!frame.isComplete || !segment.isFinal) {
+            }
+          })
+        },
+        onSegmentEnd: (runtimePose, segment) => {
+          setAvatars((current) => {
+            const avatar = current[localUserId]
+            if (!avatar) return current
+            if (!segment.isFinal) {
               return {
                 ...current,
                 [localUserId]: {
@@ -397,25 +429,13 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
                 facing: runtimePose.facing,
                 targetX: undefined,
                 targetY: undefined,
-                seatedHotspotId:
-                  options?.hotspot?.kind === "seat"
-                    ? options?.hotspot?.id
-                    : undefined
+                seatedHotspotId: arrivalSeatedHotspotId
               }
             }
           })
-
-          if (!frame.isComplete) {
-            animationFrameRef.current = requestAnimationFrame(tick)
-            return
-          }
-
-          if (!segment.isFinal) {
-            animatePathSegment(pathIndex + 1)
-            return
-          }
-
-          animationFrameRef.current = null
+        },
+        onArrival: () => {
+          if (activeMovementRef.current === run) activeMovementRef.current = null
           scheduleMiniRoomMovementCompletion(
             movementCompletionTimerRef,
             setTimeout,
@@ -424,14 +444,11 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
             180
           )
         }
-
-        animationFrameRef.current = requestAnimationFrame(tick)
-      }
-
-      animatePathSegment(0)
+      })
+      activeMovementRef.current = run
       return true
     },
-    [geometry, input.localUser.userId, roomWorldHotspots]
+    [geometry, getMotionDriver, input.localUser.userId, roomWorldHotspots]
   )
 
   const moveLocalAvatar = useCallback(
@@ -615,10 +632,22 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     [pressedPoint, proximityClose, selectedHotspotId]
   )
 
+  const avatarIdsKey = Object.keys(avatars).join("\u0000")
+  // Stable per avatar id: the layer re-subscribes only when the set changes.
+  const avatarPositions = useMemo(() => {
+    const positions: Record<string, MiniRoomAvatarPosition> = {}
+    for (const userId of avatarIdsKey.split("\u0000")) {
+      const avatar = avatarsRef.current[userId]
+      if (avatar) positions[userId] = getMotionDriver(avatar).position
+    }
+    return positions
+  }, [avatarIdsKey, getMotionDriver])
+
   return {
     scene,
     hotspots,
     avatars,
+    avatarPositions,
     bubbles,
     interaction,
     moveLocalAvatar,

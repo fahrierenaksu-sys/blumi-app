@@ -36,7 +36,6 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
 const FRAME_LOOP_DEBT = new Set([
   "features/avatarV2/room/components/RoomAvatarRenderer2D.tsx",
   "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts",
-  "features/miniRoom/scene/miniRoomSceneStore.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
   "features/session/register/useRegisterFlowController.ts",
