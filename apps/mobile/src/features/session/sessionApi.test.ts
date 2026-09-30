@@ -26,6 +26,7 @@ import * as sessionApi from "./sessionApi"
 import { createDemoSessionActor } from "./sessionModel"
 import { LEGAL_DOCUMENT_VERSION } from "../legal/legalPolicyMetadata"
 import { registerBoundedRequestTests } from "../network/boundedRequestContract"
+import { ACCOUNT_RECOVERY_REQUIRED_MESSAGE } from "./accountRecoveryCopy"
 
 const TEST_TERMS_ACCEPTANCE = Object.freeze({
   version: LEGAL_DOCUMENT_VERSION,
@@ -1196,5 +1197,16 @@ test("session API keeps unreadable error bodies on their existing fallback copy"
       assert.match(error.message, /could not refresh your profile yet/i)
       return true
     }
+  )
+})
+
+test("Firebase completion maps 409 ACCOUNT_RECOVERY_REQUIRED to the recovery message", async () => {
+  const fetcher = (async () => new Response(
+    JSON.stringify({ code: "ACCOUNT_RECOVERY_REQUIRED", error: "Server wording" }),
+    { status: 409, headers: { "content-type": "application/json" } }
+  )) as typeof fetch
+  await assert.rejects(
+    sessionApi.completeFirebaseAccount(API, { idToken: "firebase-id-token", authIntent: "sign-in" }, fetcher),
+    (error: Error) => error.message === ACCOUNT_RECOVERY_REQUIRED_MESSAGE
   )
 })

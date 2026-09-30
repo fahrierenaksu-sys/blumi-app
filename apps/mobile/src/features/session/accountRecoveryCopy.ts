@@ -23,7 +23,17 @@ export interface AccountRecoveryCopy {
   codeNotAccepted: string
   link: string
   linkAccessibilityLabel: string
+  recoveryRequired: string
 }
+
+/**
+ * Message the session API throws when the server answers 409
+ * ACCOUNT_RECOVERY_REQUIRED (a verified phone whose Firebase identity differs
+ * from the one bound to the account). The server has already queued a manual
+ * review; the screen replaces this with localized copy.
+ */
+export const ACCOUNT_RECOVERY_REQUIRED_MESSAGE =
+  "Sign-in was paused for a security review of this phone number."
 
 const COPY: Record<AccountRecoveryLocale, AccountRecoveryCopy> = {
   en: {
@@ -45,7 +55,8 @@ const COPY: Record<AccountRecoveryLocale, AccountRecoveryCopy> = {
     submitReviewUnavailable: "We couldn't submit your support review right now. Check your connection and try again.",
     codeNotAccepted: "That code wasn't accepted. Check the 6-digit code and try again.",
     link: "Can’t use your old phone number?",
-    linkAccessibilityLabel: "Get help with a lost phone number"
+    linkAccessibilityLabel: "Get help with a lost phone number",
+    recoveryRequired: "This phone number needs a security review before you can sign in. We paused sign-in to protect the account and started a private support review automatically. Please try again later."
   },
   tr: {
     title: "Telefon erişim desteği",
@@ -66,7 +77,8 @@ const COPY: Record<AccountRecoveryLocale, AccountRecoveryCopy> = {
     submitReviewUnavailable: "Destek incelemesi isteğini şu anda gönderemedik. Bağlantını kontrol edip tekrar dene.",
     codeNotAccepted: "Bu kod kabul edilmedi. 6 haneli kodu kontrol edip tekrar dene.",
     link: "Eski telefon numarana erişemiyor musun?",
-    linkAccessibilityLabel: "Eski telefon numarası için destek al"
+    linkAccessibilityLabel: "Eski telefon numarası için destek al",
+    recoveryRequired: "Bu telefon numarasıyla giriş yapmadan önce bir güvenlik incelemesi gerekiyor. Hesabı korumak için girişi durdurduk ve özel bir destek incelemesini otomatik olarak başlattık. Lütfen daha sonra tekrar dene."
   }
 }
 
@@ -86,6 +98,16 @@ export function getAccountRecoveryErrorMessageForDisplay(
   return kind === "requestCode"
     ? copy.requestCodeUnavailable
     : copy.submitReviewUnavailable
+}
+
+/** Replaces the session API's recovery-required message with localized copy. */
+export function localizeSessionErrorMessage(
+  message: string | null,
+  locale: AccountRecoveryLocale
+): string | null {
+  return message === ACCOUNT_RECOVERY_REQUIRED_MESSAGE
+    ? getAccountRecoveryCopy(locale).recoveryRequired
+    : message
 }
 
 export function resolveAccountRecoveryLocale(

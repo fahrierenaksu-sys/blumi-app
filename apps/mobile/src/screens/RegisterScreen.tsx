@@ -1,7 +1,10 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import type { RegisterAccountInput } from "../features/session/sessionApi"
-import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
+import {
+  localizeSessionErrorMessage,
+  resolveAccountRecoveryLocale
+} from "../features/session/accountRecoveryCopy"
 import { getAuthEntryCopy } from "../features/session/authEntryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -37,7 +40,7 @@ export function RegisterScreen({
   route,
   navigation,
   isSubmitting,
-  errorMessage,
+  errorMessage: sessionErrorMessage,
   onRequestVerificationCode,
   onRegister,
   onClearError,
@@ -51,6 +54,7 @@ export function RegisterScreen({
     getNativeAppLocale(),
     Intl.DateTimeFormat().resolvedOptions().locale
   )
+  const errorMessage = localizeSessionErrorMessage(sessionErrorMessage, locale)
   const authCopy = getAuthEntryCopy(locale)
   const layout = useRegisterLayout()
   const register = useRegisterFlowController({

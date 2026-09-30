@@ -1,3 +1,4 @@
+import { ACCOUNT_RECOVERY_REQUIRED_MESSAGE } from "./accountRecoveryCopy"
 import {
   normalizeOnboardingStatus,
   normalizeSessionActor,
@@ -184,6 +185,13 @@ export async function completeFirebaseAccount(
     body: JSON.stringify(input),
     signal
   }, fetcher)
+
+  if (
+    response.status === 409 &&
+    (payload as { code?: unknown } | null)?.code === "ACCOUNT_RECOVERY_REQUIRED"
+  ) {
+    throw new Error(ACCOUNT_RECOVERY_REQUIRED_MESSAGE)
+  }
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  ACCOUNT_RECOVERY_REQUIRED_MESSAGE,
   getAccountRecoveryCopy,
+  localizeSessionErrorMessage,
   getAccountRecoveryErrorMessageForDisplay,
   resolveAccountRecoveryLocale
 } from "./accountRecoveryCopy"
@@ -41,4 +43,11 @@ test("account recovery errors preserve privacy and never expose transport diagno
     getAccountRecoveryErrorMessageForDisplay("submitReview", invalidCodeError, "en"),
     "That code wasn't accepted. Check the 6-digit code and try again."
   )
+})
+
+test("a server-required account recovery is shown in the user's language", () => {
+  assert.match(localizeSessionErrorMessage(ACCOUNT_RECOVERY_REQUIRED_MESSAGE, "tr") ?? "", /güvenlik incelemesi/)
+  assert.match(localizeSessionErrorMessage(ACCOUNT_RECOVERY_REQUIRED_MESSAGE, "en") ?? "", /security review/)
+  assert.equal(localizeSessionErrorMessage("Other error", "tr"), "Other error")
+  assert.equal(localizeSessionErrorMessage(null, "tr"), null)
 })
