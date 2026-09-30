@@ -68,7 +68,6 @@ test("reduce-motion is read from the shared store only", () => {
 // oversized files may not grow; no new file may exceed the limit.
 const MAX_LINES = 800
 const OVERSIZED_DEBT = {
-  "features/roomV2/roomV3FurnitureCandidateGate.ts": 1686,
   "features/avatarV2/room/avatarRoomCatalog.ts": 1304,
   "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
   "features/demo/SwipeableDiscoverCard.tsx": 1232,
@@ -79,7 +78,6 @@ const OVERSIZED_DEBT = {
   "screens/MyRoomScreen.tsx": 1124,
   "features/avatarV2/avatarV2Catalog.ts": 949,
   "screens/ProfileEditScreen.tsx": 872,
-  "features/roomV2/roomVNextFullWaveCatalog.ts": 851,
   "features/session/sessionApi.ts": 847,
   "features/avatarV2/room/avatarRoomSelectors.ts": 825,
   "features/session/OnboardingWorldScene.tsx": 823,
