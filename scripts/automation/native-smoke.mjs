@@ -1,9 +1,13 @@
 import { spawnSync } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, openSync, closeSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, openSync, closeSync, statfsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "../..")
+const disk = statfsSync(homedir())
+if (disk.bavail * disk.bsize < 12 * 1024 ** 3) {
+  throw new Error("Native smoke BLOCKED: at least 12 GiB free space is required before creating a simulator or building.")
+}
 const directory = join(homedir(), "BlumiOperations", "native-smoke", new Date().toISOString().replaceAll(":", "-"))
 mkdirSync(directory, { recursive: true, mode: 0o700 })
 chmodSync(directory, 0o700)
@@ -45,7 +49,7 @@ run("xcrun", ["simctl", "bootstatus", simulator.udid, "-b"], { timeout: 180000 }
 const derived = join(homedir(), "BlumiOperations", "native-smoke", "DerivedData")
 const log = openSync(join(directory, "build.log"), "wx", 0o600)
 try {
-  run("xcodebuild", ["-workspace", workspace, "-scheme", "Blumi", "-configuration", "Release", "-destination", `id=${simulator.udid}`, "-derivedDataPath", derived, "CODE_SIGNING_ALLOWED=NO", "build"], { timeout: 1200000, stdio: ["ignore", log, log] })
+  run("xcodebuild", ["-workspace", workspace, "-scheme", "Blumi", "-configuration", "Release", "-destination", `id=${simulator.udid}`, "-derivedDataPath", derived, "-jobs", "2", "CODE_SIGNING_ALLOWED=NO", "ONLY_ACTIVE_ARCH=YES", "build"], { timeout: 1200000, stdio: ["ignore", log, log] })
 } finally { closeSync(log) }
 run("xcrun", ["simctl", "install", simulator.udid, join(derived, "Build/Products/Release-iphonesimulator/Blumi.app")])
 run("maestro", ["--device", simulator.udid, "test", "-e", `EVIDENCE_DIR=${directory}`, "--format", "junit", "--output", join(directory, "results.xml"), "--debug-output", directory, join(root, ".maestro/demo-smoke.yml")], { timeout: 600000, stdio: "inherit" })
