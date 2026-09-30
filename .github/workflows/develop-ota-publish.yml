@@ -1,0 +1,79 @@
+name: Publish OTA to preview channel
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: ota-publish
+  cancel-in-progress: false
+
+jobs:
+  check-fingerprint:
+    runs-on: ubuntu-latest
+    outputs:
+      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Compute fingerprint
+        id: fingerprint
+        run: |
+          cd apps/mobile
+          fingerprint=$(npx expo-cli@latest fingerprint:generate --json | jq -r '.fingerprint')
+          echo "fingerprint=$fingerprint" >> $GITHUB_OUTPUT
+          echo "Computed fingerprint: $fingerprint"
+
+  publish-ota:
+    needs: check-fingerprint
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Check if fingerprint matches preview build
+        id: check
+        run: |
+          CURRENT=${{ needs.check-fingerprint.outputs.fingerprint }}
+          PREVIEW_BUILD_FINGERPRINT="eee97a36c871bd69a0f08431275b103476e9ceb6"
+
+          if [ "$CURRENT" == "$PREVIEW_BUILD_FINGERPRINT" ]; then
+            echo "fingerprint_matches=true" >> $GITHUB_OUTPUT
+            echo "✓ Fingerprint matches preview build 12, OTA will be published"
+          else
+            echo "fingerprint_matches=false" >> $GITHUB_OUTPUT
+            echo "✗ Fingerprint differs from preview build 12"
+            echo "  Current:  $CURRENT"
+            echo "  Expected: $PREVIEW_BUILD_FINGERPRINT"
+            echo "  Native build required; OTA publishing skipped"
+          fi
+
+      - name: Publish OTA update
+        if: steps.check.outputs.fingerprint_matches == 'true'
+        run: |
+          npm ci
+          npx eas update \
+            --channel preview \
+            --platform ios \
+            --message "OTA from ${{ github.sha }}" \
+            --skip-submission
+
+      - name: Report OTA status
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.fingerprint_matches }}" == "true" ]; then
+            echo "🚀 OTA published to preview channel"
+            echo "URL: https://expo.dev/accounts/blumi/projects/blumi-mobile/updates"
+          else
+            echo "⏸️  Native build required; OTA skipped"
+          fi
