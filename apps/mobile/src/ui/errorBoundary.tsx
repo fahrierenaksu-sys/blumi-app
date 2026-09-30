@@ -5,7 +5,7 @@ import { uiTheme } from "./theme"
 import { captureAppException } from "../observability/crashReporting"
 import { getAppLocale, type AppLocale } from "../features/session/appLocale"
 import { getErrorBoundaryCopy } from "./errorBoundaryCopy"
-import { createErrorBoundaryReportContext, getErrorBoundaryActions } from "./errorBoundaryScope"
+import { createErrorBoundaryReport, getErrorBoundaryActions } from "./errorBoundaryScope"
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -47,10 +47,11 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    captureAppException(error, createErrorBoundaryReportContext({
+    const report = createErrorBoundaryReport({
       componentStack: info.componentStack ?? undefined,
       routeName: this.props.routeName
-    }))
+    })
+    captureAppException(error, report.context, report.tags)
 
     console.error("[Blumi ErrorBoundary]", error, info.componentStack)
   }

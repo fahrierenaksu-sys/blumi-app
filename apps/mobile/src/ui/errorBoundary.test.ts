@@ -31,8 +31,8 @@ function boundaryFixture(locale: "tr" | "en", reportingEnabled: boolean) {
       if (name === "@expo/vector-icons/Ionicons") return { default: "Ionicons" }
       if (name === "./theme") return { uiTheme: { colors: {}, spacing: {}, radius: {}, shadow: {}, font: {} } }
       if (name === "../observability/crashReporting") return {
-        captureAppException: (_error: unknown, context: unknown) => {
-          if (reportingEnabled) { reports += 1; contexts.push(context) }
+        captureAppException: (_error: unknown, context: unknown, tags: unknown) => {
+          if (reportingEnabled) { reports += 1; contexts.push({ context, tags }) }
         }
       }
       if (name === "../features/session/appLocale") return { getAppLocale: () => locale }
@@ -102,7 +102,10 @@ for (const locale of ["tr", "en"] as const) {
     const error = new Error("private diagnostic")
     boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
     boundary.componentDidCatch(error, { componentStack: "synthetic" })
-    assert.deepEqual(fixture.contexts(), [{ componentStack: "synthetic", boundary: "route", route: "ChatThread" }])
+    assert.deepEqual(fixture.contexts(), [{
+      context: { componentStack: "synthetic" },
+      tags: { boundary: "route", route: "ChatThread" }
+    }])
 
     const copy = getErrorBoundaryCopy(locale)
     const first = boundary.render()
@@ -125,12 +128,24 @@ for (const locale of ["tr", "en"] as const) {
   })
 }
 
-test("the root boundary never offers back and keeps its original report context", () => {
+test("a route boundary with a name outside the route allowlist reports it as unknown", () => {
+  const fixture = boundaryFixture("en", true)
+  const boundary = new fixture.Boundary({ children: "screen", routeName: "chat/abc?partner=Ada" })
+  const error = new Error("private diagnostic")
+  boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
+  boundary.componentDidCatch(error, { componentStack: "synthetic" })
+  assert.deepEqual(fixture.contexts(), [{
+    context: { componentStack: "synthetic" },
+    tags: { boundary: "route", route: "unknown" }
+  }])
+})
+
+test("the root boundary never offers back and reports only its root scope", () => {
   const fixture = boundaryFixture("en", true)
   const boundary = new fixture.Boundary({ children: "app" })
   const error = new Error("private diagnostic")
   boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
   boundary.componentDidCatch(error, { componentStack: "synthetic" })
-  assert.deepEqual(fixture.contexts(), [{ componentStack: "synthetic" }])
+  assert.deepEqual(fixture.contexts(), [{ context: { componentStack: "synthetic" }, tags: { boundary: "root" } }])
   assert.equal(findPressable(boundary.render(), getErrorBoundaryCopy("en").backLabel), undefined)
 })
