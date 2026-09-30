@@ -23,8 +23,12 @@ import {
 import type { SafetyService } from "../safety/safetyService"
 import type { PersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import type { RoomSnapshotService } from "../rooms/roomSnapshotService"
-import type { DiscoverProfileRecord } from "../matches/matchRepository"
+import type { DiscoverProfileRecord, MatchRecord } from "../matches/matchRepository"
+import type { ChatService } from "../chat/chatService"
+import type { ConnectionService } from "../connections/connectionService"
+import type { ConnectionManager } from "../realtime/connectionManager"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
+import { announceNewMatchThread } from "./matchThreadAnnouncement"
 import { isRecord, resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 
 export interface DiscoverRouteServices {
@@ -35,6 +39,10 @@ export interface DiscoverRouteServices {
   personalRoomDecorService?: PersonalRoomDecorService
   roomSnapshotService?: RoomSnapshotService
   capabilityService?: CapabilityService
+  /** With these, a new match opens its chat and announces it to both people. */
+  chatService?: ChatService
+  connectionService?: ConnectionService
+  connectionManager?: ConnectionManager
 }
 
 const DISCOVER_RATE_LIMIT_MAX = 30
@@ -242,6 +250,18 @@ export async function registerDiscoverRoutes(
     }
   })
 
+  const { chatService, connectionService, connectionManager } = services
+  const announceMatch = chatService && connectionManager
+    ? (match: MatchRecord) =>
+        announceNewMatchThread({
+          chatService,
+          authRepository: authService.repository,
+          safetyService,
+          connectionManager,
+          connectionRepository: connectionService?.repository
+        }, match)
+    : undefined
+
   app.post("/v1/discover/:userId/like", {
     attachValidation: true,
     config: { requestValidation: "enforced" },
@@ -253,7 +273,8 @@ export async function registerDiscoverRoutes(
       authService,
       matchService,
       safetyService,
-      decision: "like"
+      decision: "like",
+      announceMatch
     })
   })
 
@@ -450,7 +471,8 @@ async function decideOnDiscoverProfile({
   authService,
   matchService,
   safetyService,
-  decision
+  decision,
+  announceMatch
 }: {
   request: FastifyRequest
   reply: FastifyReply
@@ -458,6 +480,7 @@ async function decideOnDiscoverProfile({
   matchService: MatchService
   safetyService: SafetyService
   decision: "like" | "pass"
+  announceMatch?: (match: MatchRecord) => Promise<unknown>
 }) {
   const resolved = await resolveProductSession({ request, reply, authService })
   if (!resolved) return
@@ -472,7 +495,7 @@ async function decideOnDiscoverProfile({
   }
 
   try {
-    return await matchService.decideEligible(
+    const result = await matchService.decideEligible(
       resolved.account.userId,
       targetUserId,
       decision,
@@ -481,6 +504,15 @@ async function decideOnDiscoverProfile({
         resolved.account.profile.identityGender ?? resolved.account.profile.gender
       )
     )
+    if (result.matched && result.match && announceMatch) {
+      try {
+        await announceMatch(result.match)
+      } catch (error) {
+        // The match is durable; sync-matches opens the chat on the next visit.
+        request.log.warn({ errorKind: safeOperationalErrorKind(error) }, "Match chat announcement failed")
+      }
+    }
+    return result
   } catch (error) {
     if (error instanceof DiscoveryDecisionNotEligibleError) {
       return reply.code(409).send({
