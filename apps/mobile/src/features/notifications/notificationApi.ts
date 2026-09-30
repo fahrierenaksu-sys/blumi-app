@@ -45,7 +45,9 @@ export async function registerDevice(
   }, fetcher)
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(payload, "This device could not be registered."))
+    throw Object.assign(new Error(getApiErrorMessage(payload, "This device could not be registered.")), {
+      status: response.status
+    })
   }
 
   return normalizeDevicePayload(payload)

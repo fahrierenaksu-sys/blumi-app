@@ -101,7 +101,9 @@ test("conversation opens at the newest item without a delayed animated jump", ()
   )
   assert.doesNotMatch(screenSource, /scrollToEnd\(|onContentSizeChange=|setTimeout\(/)
   for (const fileName of threadModuleNames) {
-    assert.doesNotMatch(threadFile(fileName).getText(), /scrollToEnd\(|onContentSizeChange=|setTimeout\(/)
+    assert.doesNotMatch(threadFile(fileName).getText(), /scrollToEnd\(|onContentSizeChange=/)
+    // The read-state hook now debounces receipts; its timer never scrolls.
+    if (fileName !== "useChatThreadSync.ts") assert.doesNotMatch(threadFile(fileName).getText(), /setTimeout\(/)
   }
   assert.doesNotMatch(screenSource, /selectChatOpeningMessages|thread\?\.lastMessage/)
   assert.match(screenSource, /initialNumToRender=\{initialMessageRenderCount\}/)
@@ -198,8 +200,9 @@ test("thread hooks run their effects in the original order", () => {
   const sync = declaredFunction(threadFile("useChatThreadSync.ts"), "useChatThreadSync").getText()
   assert.match(
     sync,
-    /useEffect\(\(\) => \{\s*if \(requestMessages[\s\S]*?useEffect\(\(\) => \{\s*if \(markThreadRead[\s\S]*?useEffect\(\(\) => \{\s*if \(resolvedThreadId\) \{\s*setActiveThread\(resolvedThreadId\)[\s\S]*?return \(\) => setActiveThread\(null\)/
+    /useEffect\(\(\) => \{\s*if \(requestMessages[\s\S]*?useEffect\(\(\) => \{\s*if \(!resolvedThreadId\) return/
   )
+  assert.match(sync, /setActiveThread\(next \? resolvedThreadId : null\)/)
 })
 
 test("chat uses the platform push with a full-screen swipe back and respects Reduce Motion", () => {

@@ -221,9 +221,9 @@ export function createPostgresNotificationRepository(
                SELECT 1 FROM blumi_notification_policy_events
                 WHERE user_id = $1 AND notification_type = $2 AND dedupe_key = $3
              ) THEN 'duplicate'
-             WHEN (
+             WHEN $2 <> 'message' AND (
                SELECT count(*) FROM blumi_notification_policy_events
-                WHERE user_id = $1 AND created_at > $4::timestamptz - INTERVAL '1 hour'
+                WHERE user_id = $1 AND notification_type <> 'message' AND created_at > $4::timestamptz - INTERVAL '1 hour'
              ) >= max_pushes_per_hour THEN 'frequency_cap'
              ELSE 'queued'
            END AS reason
@@ -324,9 +324,9 @@ export function createPostgresNotificationRepository(
                SELECT 1 FROM blumi_notification_policy_events
                 WHERE user_id = $1 AND notification_type = $2 AND dedupe_key = $3
              ) THEN 'duplicate'
-             WHEN (
+             WHEN $2 <> 'message' AND (
                SELECT count(*) FROM blumi_notification_policy_events
-                WHERE user_id = $1 AND created_at > $4::timestamptz - INTERVAL '1 hour'
+                WHERE user_id = $1 AND notification_type <> 'message' AND created_at > $4::timestamptz - INTERVAL '1 hour'
              ) >= max_pushes_per_hour THEN 'frequency_cap'
              ELSE 'queued'
            END AS reason

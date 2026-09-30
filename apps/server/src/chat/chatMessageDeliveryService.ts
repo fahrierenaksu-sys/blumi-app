@@ -5,6 +5,7 @@ import type { ConnectionManager } from "../realtime/connectionManager"
 import type { SafetyService } from "../safety/safetyService"
 import { PublicRequestError } from "../errors/publicRequestError"
 import type { ChatDeliveryJob } from "./chatRepository"
+import { createChatLatencyDiagnostics, type ChatPhaseMeasure } from "./chatLatencyDiagnostics"
 
 export class ChatDeliveryBlockedError extends PublicRequestError {}
 
@@ -25,6 +26,7 @@ export function createChatMessageDeliveryService(options: {
   connectionManager: ConnectionManager
   notificationService: NotificationService
   reportError?: (error: unknown) => void
+  measure?: ChatPhaseMeasure
 }): ChatMessageDeliveryService {
   const {
     chatService,
@@ -32,6 +34,10 @@ export function createChatMessageDeliveryService(options: {
     connectionManager,
     notificationService
   } = options
+  const measure = options.measure ?? createChatLatencyDiagnostics({
+    nodeEnv: process.env.NODE_ENV ?? "unknown",
+    enabled: process.env.BLUMI_CHAT_LATENCY_DIAGNOSTICS === "1"
+  })
 
   const dispatchPostPersistEffects = async (
     message: ChatMessage,
@@ -94,12 +100,12 @@ export function createChatMessageDeliveryService(options: {
         throw new ChatDeliveryBlockedError("That conversation is not available.")
       }
 
-      const delivery = await chatService.sendMessageIdempotently(
+      const delivery = await measure("persist", () => chatService.sendMessageIdempotently(
         input.senderUserId,
         input.threadId,
         input.body,
         input.clientMessageId
-      )
+      ))
       // The persisted message plus durable outbox row is the send ACK. Push/realtime
       // fanout and synthetic test-persona replies must not delay that confirmation.
       // The periodic worker recovers the outbox if this process exits mid-dispatch.
@@ -128,13 +134,12 @@ export function createChatMessageDeliveryService(options: {
       const recipients = thread.participantUserIds.filter((id) => id !== message.senderUserId)
       const blocked = await Promise.all(recipients.map((id) => safetyService.hasBlockBetween(message.senderUserId, id)))
       if (!blocked.some(Boolean)) {
-        await connectionManager.sendToUsersDurably(thread.participantUserIds, { type: "chat.message_received", payload: message })
+        await measure("fanout", () => connectionManager.sendToUsersDurably(thread.participantUserIds, { type: "chat.message_received", payload: message }))
         await Promise.all(recipients.map(async (userId) => {
-          if (connectionManager.hasUserConnections(userId)) return
-          await notificationService.sendPushToUser(userId, {
+          await measure("push_enqueue", () => notificationService.sendPushToUser(userId, {
             title: "Blumi", body: "You have a new message.",
             data: { type: "chat.message", threadId: message.threadId, messageId: message.messageId }
-          })
+          }))
         }))
       }
       await chatService.repository.completeDelivery(message.messageId, leaseToken, now)

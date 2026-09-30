@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
+import { useIsFocused } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useState } from "react"
 import {
@@ -47,6 +48,7 @@ import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
+import { ChatNotificationPermissionCard, type ChatPushRegistration } from "../features/notifications/ChatNotificationPermissionCard"
 
 type ChatThreadScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -55,12 +57,14 @@ type ChatThreadScreenProps = NativeStackScreenProps<
   sessionActor: SessionActor
   onThreadCreated: (thread: ChatThread) => void
   bindings: ChatThreadBindings
+  pushRegistration: ChatPushRegistration
 }
 
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
+  const isFocused = useIsFocused()
   const { height: windowHeight } = useWindowDimensions()
   const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
   const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
@@ -138,6 +142,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
 
   const { handleRetryMessages } = useChatThreadSync({
     resolvedThreadId,
+    currentUserId,
+    isFocused,
+    latestIncomingMessageId: messages.filter((message) => message.senderUserId !== currentUserId).at(-1)?.messageId,
     requestMessages: bindings.requestMessages,
     markThreadRead: bindings.markThreadRead,
     setActiveThread
@@ -281,6 +288,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
         >
+          <ChatNotificationPermissionCard key={currentUserId} userId={currentUserId}
+            mode={sessionActor.session.mode} isFocused={isFocused} locale={chatLocale}
+            registration={props.pushRegistration} />
           {showsTimelineEmptyState ? (
             <ChatThreadEmptyState
               chatCopy={chatCopy}

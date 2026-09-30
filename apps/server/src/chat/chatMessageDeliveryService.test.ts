@@ -75,7 +75,7 @@ test("cross-instance fanout failure leaves the chat job pending until publicatio
   assert.equal(attempts, 2)
 })
 
-test("message delivery persists once, fans out realtime, and pushes offline recipients", async () => {
+test("message delivery persists once and queues push even when the recipient has a socket", async () => {
   const chatService = createChatService({ idFactory: () => "message_one" })
   await createThread(chatService)
   const sentEvents: ServerEvent[] = []
@@ -88,7 +88,7 @@ test("message delivery persists once, fans out realtime, and pushes offline reci
         sentEvents.push(event)
       },
       hasUserConnections() {
-        return false
+        return true
       }
     } as unknown as ConnectionManager,
     notificationService: {

@@ -129,7 +129,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

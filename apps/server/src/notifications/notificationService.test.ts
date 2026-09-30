@@ -230,10 +230,10 @@ test("notification preferences suppress disabled, quiet-hour, duplicate, and rat
   })
 
   await service.dispatchDue()
-  assert.deepEqual(sent, [{ pushToken: "policy_token", type: "chat.message" }])
+  assert.deepEqual(sent, [{ pushToken: "policy_token", type: "chat.message" }, { pushToken: "policy_token", type: "discovery.match" }])
   assert.deepEqual(
     (await service.repository.listPolicyAudits()).map((entry) => entry.reason),
-    ["disabled", "quiet_hours", "queued", "duplicate", "frequency_cap"]
+    ["disabled", "quiet_hours", "queued", "duplicate", "queued"]
   )
 })
 

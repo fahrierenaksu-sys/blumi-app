@@ -401,9 +401,10 @@ function resolvePolicyReason(input: {
   if (!isEnabled(preferences, notificationType)) return "disabled"
   if (isWithinQuietHours(now, preferences)) return "quiet_hours"
   if (existing) return "duplicate"
-  if (policyEvents.filter((event) =>
+  if (notificationType !== "message" && policyEvents.filter((event) =>
     event.userId === userId &&
     event.reason === "queued" &&
+    event.notificationType !== "message" &&
     Date.parse(event.occurredAt) > oneHourAgo
   ).length >= preferences.maxPushesPerHour) return "frequency_cap"
   return "queued"

@@ -806,7 +806,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     {...screenProps}
                     sessionActor={sessionActor}
                     onThreadCreated={applyNewThread}
-                    bindings={chatThreadBindings}
+                    bindings={chatThreadBindings} pushRegistration={pushRegistration}
                   />
                 )}
               </Stack.Screen>

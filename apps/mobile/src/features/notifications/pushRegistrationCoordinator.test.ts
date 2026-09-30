@@ -146,3 +146,43 @@ test("an undetermined permission waits for a contextual user action", async () =
   })
   assert.deepEqual(dependencies.calls, ["get-permission"])
 })
+
+test("temporary registration failures retry with a bounded exponential delay", async () => {
+  let attempts = 0
+  const delays: number[] = []
+  const dependencies = createDependencies({
+    getPermissionStatus: async () => "granted",
+    registerDevice: async () => { if (++attempts < 3) throw new Error("Offline") }
+  })
+  const result = await syncPushRegistration({ mode: "production", allowPermissionPrompt: false,
+    dependencies, waitForRetry: async (delay) => { delays.push(delay) } })
+  assert.equal(result.status, "registered")
+  assert.equal(attempts, 3)
+  assert.deepEqual(delays, [1000, 2000])
+  assert.equal(dependencies.calls.filter((call) => call === "get-token").length, 1)
+})
+
+test("registration gives up after three failures and never retries rejected credentials", async () => {
+  for (const status of [undefined, 401, 403, 400, 429, 503]) {
+    let attempts = 0
+    const error = Object.assign(new Error("Registration failed"), { status })
+    const dependencies = createDependencies({ getPermissionStatus: async () => "granted",
+      registerDevice: async () => { attempts++; throw error } })
+    await assert.rejects(syncPushRegistration({ mode: "production", allowPermissionPrompt: false,
+      dependencies, waitForRetry: async () => {} }), (actual) => actual === error)
+    assert.equal(attempts, status === undefined || status === 429 || status >= 500 ? 3 : 1)
+  }
+})
+
+test("account cleanup cancels retry delays and prevents another registration", async () => {
+  const controller = new AbortController()
+  let attempts = 0
+  const dependencies = createDependencies({ getPermissionStatus: async () => "granted",
+    registerDevice: async () => { attempts++; throw new Error("Offline") } })
+  const pending = syncPushRegistration({ mode: "production", allowPermissionPrompt: false,
+    dependencies, signal: controller.signal })
+  await new Promise((resolve) => setImmediate(resolve))
+  controller.abort()
+  await assert.rejects(pending, { name: "AbortError" })
+  assert.equal(attempts, 1)
+})

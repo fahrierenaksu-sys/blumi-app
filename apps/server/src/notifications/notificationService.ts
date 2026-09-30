@@ -51,6 +51,15 @@ export interface CreateNotificationServiceOptions {
   now?: () => Date
   deliveryIdFactory?: () => string
   providerTimeoutMs?: number
+  reportPushFailure?: (failure: SafePushFailure) => void
+}
+
+export interface SafePushFailure {
+  stage: "ticket" | "receipt"
+  errorCode: string
+  notificationType: string
+  attempt: number
+  count: number
 }
 
 export function createNotificationService(
@@ -62,6 +71,15 @@ export function createNotificationService(
   const now = options.now ?? (() => new Date())
   const deliveryIdFactory = options.deliveryIdFactory ?? createDeliveryId
   const providerTimeoutMs = options.providerTimeoutMs ?? 10_000
+  const reportPushFailure = (stage: SafePushFailure["stage"], errorCode: string, attempt: number, type?: string) => {
+    const notificationType = ["chat.message", "chat.room_invite", "discovery.match", "discovery.like", "discovery.watch_match"].includes(type ?? "")
+      ? type! : "unknown"
+    const failure = { stage, errorCode, notificationType, attempt, count: 1 }
+    try {
+      if (options.reportPushFailure) options.reportPushFailure(failure)
+      else console.warn("Push provider failure", failure)
+    } catch { /* Diagnostics must not change durable delivery state. */ }
+  }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
   }
@@ -194,6 +212,7 @@ export function createNotificationService(
       await repository.markDeliverySent({ deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt, now: dispatchAt,
         ...(ticket?.ticketId ? { ticketId: ticket.ticketId } : {}) })
     } catch (error) {
+      reportPushFailure("ticket", toSafeErrorCode(error), attempt, delivery.notification.data?.type)
       if (error instanceof PushProviderRejection && error.code === "DeviceNotRegistered" && delivery.registrationId) {
         if (delivery.leaseToken) await repository.markDeliveryFailed({ deliveryId: delivery.deliveryId,
           leaseToken: delivery.leaseToken, attempt, now: dispatchAt, errorCode: "DeviceNotRegistered" })
@@ -237,11 +256,13 @@ export function createNotificationService(
         await repository.retryReceipt({ ...identity, availableAt: new Date(dispatchAt.getTime() + 15 * 60_000) })
         return
       }
+      if (result.status === "error") reportPushFailure("receipt", safeReceiptCode(result.errorCode ?? ""), 1)
       if (result.status === "error" && result.errorCode === "DeviceNotRegistered") await repository.removeDeviceRegistration(receipt)
       await repository.finishReceipt({ ...identity,
         outcome: result.status === "ok" ? "provider_handoff" : "rejected",
         ...(result.errorCode ? { errorCode: safeReceiptCode(result.errorCode) } : {}) })
     } catch {
+      reportPushFailure("receipt", "provider_unavailable", 1)
       await repository.retryReceipt({ ...identity, availableAt: new Date(dispatchAt.getTime() + 15 * 60_000) })
     } finally {
       clearTimeout(timer)
@@ -419,6 +440,7 @@ function retryDelayMs(attempt: number): number {
 }
 
 function toSafeErrorCode(error: unknown): string {
+  if (error instanceof PushProviderRejection) return safeReceiptCode(error.code)
   const message = error instanceof Error ? error.message : "push_failed"
   const normalized = message.toLowerCase()
   if (normalized.includes("unavailable")) return "provider_unavailable"

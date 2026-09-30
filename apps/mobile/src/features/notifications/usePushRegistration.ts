@@ -9,6 +9,7 @@ import { registerDevice, removeDevice, updateNotificationPreferences } from "./n
 import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
+import { getActiveChatThreadId } from "../chat/chatStore"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -182,18 +183,21 @@ export function usePushRegistration(
         const result = await syncPushRegistration({
           mode,
           allowPermissionPrompt,
+          signal: abortController.signal,
           dependencies: {
             isPhysicalDevice: Device.isDevice,
             platform: Platform.OS === "android" ? "android" : "ios",
             createAndroidChannel: createAndroidNotificationChannel,
-            getPermissionStatus: async () =>
-              normalizePermissionStatus(
-                (await notifications.getPermissionsAsync()).status
-              ),
-            requestPermission: async () =>
-              normalizePermissionStatus(
-                (await notifications.requestPermissionsAsync()).status
-              ),
+            getPermissionStatus: async () => {
+              const status = normalizePermissionStatus((await notifications.getPermissionsAsync()).status)
+              if (active) setPermissionStatus(status)
+              return status
+            },
+            requestPermission: async () => {
+              const status = normalizePermissionStatus((await notifications.requestPermissionsAsync()).status)
+              if (active) setPermissionStatus(status)
+              return status
+            },
             getExpoPushToken: async () => {
               const projectId =
                 Constants.expoConfig?.extra?.eas?.projectId ??
@@ -235,6 +239,10 @@ export function usePushRegistration(
       return task
     }
 
+    const foregroundSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void sync(false).catch(() => undefined)
+    })
+
     void loadNotificationsModule()
       .then(async (notifications) => {
         if (!active) return
@@ -264,6 +272,7 @@ export function usePushRegistration(
       pendingResponses.clear()
       requestSyncRef.current = null
       abortController.abort()
+      foregroundSubscription.remove()
       pushTokenSubscription?.remove()
       responseSubscription?.remove()
       // Credential rotation is not logout: its old effect must not remove the
@@ -332,12 +341,14 @@ async function loadNotificationsModule(): Promise<NotificationsModule> {
 function ensureNotificationHandler(notifications: NotificationsModule): void {
   if (hasInstalledNotificationHandler) return
   notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true
-    })
+    handleNotification: async (notification) => {
+      const data = notification.request.content.data
+      const activeThreadId = getActiveChatThreadId()
+      const viewingChat = AppState.currentState === "active" && activeThreadId !== null &&
+        data?.type === "chat.message" && data.threadId === activeThreadId
+      return { shouldPlaySound: false, shouldSetBadge: false,
+        shouldShowBanner: !viewingChat, shouldShowList: !viewingChat }
+    }
   })
   hasInstalledNotificationHandler = true
 }

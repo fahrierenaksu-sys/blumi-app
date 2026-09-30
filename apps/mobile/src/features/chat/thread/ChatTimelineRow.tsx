@@ -145,7 +145,7 @@ function ChatTimelineRow({
                 />
               ) : null}
               {isMe && deliveryState === "sent" ? (
-                <Ionicons name="checkmark" size={14} color="#C4537C" />
+                <Ionicons name="checkmark" size={14} color={uiTheme.colors.textMuted} />
               ) : null}
             </View>
           </View>

@@ -29,7 +29,7 @@ function rootCallback(name, bindings, sourceFile = rootFile) {
 
 // Execute production event logic with injected native APIs. This does not model
 // React scheduling, notification OS persistence, or native navigation rendering.
-function createRuntime({ ready = true, response = null, onResponse } = {}) {
+function createRuntime({ ready = true, response = null, onResponse, physicalDevice = false } = {}) {
   let hookIndex = 0
   let scheduledEffects = []
   const hookValues = []
@@ -43,8 +43,18 @@ function createRuntime({ ready = true, response = null, onResponse } = {}) {
   let responseSubscriptionCount = 0
   let responseUnsubscriptionCount = 0
   let readyGeneration = 0
+  let permission = "undetermined"
+  const foregroundListeners = new Set()
+  const registrations = []
+  let permissionRequests = 0
+  let currentAppState = "active"
+  let notificationHandler
+  let activeThreadId = null
   const notifications = {
-    setNotificationHandler: () => {},
+    getPermissionsAsync: async () => ({ status: permission }),
+    requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
+    getExpoPushTokenAsync: async () => ({ data: "ExponentPushToken[test]" }),
+    setNotificationHandler: (handler) => { notificationHandler = handler },
     addPushTokenListener: () => ({ remove: () => {} }),
     addNotificationResponseReceivedListener: (callback) => {
       responseSubscriptionCount += 1
@@ -83,17 +93,21 @@ function createRuntime({ ready = true, response = null, onResponse } = {}) {
   }
   const mocks = {
     react,
-    "react-native": { Platform: { OS: "ios" }, AppState: { addEventListener: () => ({ remove: () => {} }) } },
-    "expo-constants": {},
-    "expo-device": { isDevice: false },
+    "react-native": { Platform: { OS: "ios" }, AppState: { get currentState() { return currentAppState }, addEventListener: (_event, callback) => {
+      foregroundListeners.add(callback)
+      return { remove: () => foregroundListeners.delete(callback) }
+    } } },
+    "expo-constants": { expoConfig: { extra: { eas: { projectId: "test-project" } } } },
+    "expo-device": { isDevice: physicalDevice },
     "expo-notifications": notifications,
     "../../config/env": { MOBILE_HTTP_BASE_URL: "https://api.blumi.test" },
     "../../observability/crashReporting": { captureAppException: (error) => errors.push(error) },
     "./notificationApi": {
       updateNotificationPreferences: async () => {},
-      registerDevice: async () => { throw new Error("Unexpected device registration") },
+      registerDevice: async (_base, token, input) => { registrations.push({ token, ...input }) },
       removeDevice: async () => { throw new Error("Unexpected device removal") }
-    }
+    },
+    "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId }
   }
   const modules = new Map()
   function load(name) {
@@ -110,7 +124,8 @@ function createRuntime({ ready = true, response = null, onResponse } = {}) {
     }).outputText
     const context = {
       module, exports: module.exports, require: load, __DEV__: false,
-      AbortController, fetch: () => { throw new Error("Network access is forbidden in this test") }
+      AbortController, setTimeout, clearTimeout,
+      fetch: () => { throw new Error("Network access is forbidden in this test") }
     }
     if (name === "./usePushRegistration") {
       context.Map = class TrackedMap extends Map {
@@ -161,6 +176,13 @@ function createRuntime({ ready = true, response = null, onResponse } = {}) {
   renderHook(actor)
   return {
     navigations, errors,
+    registrations,
+    setActiveThread: (id) => { activeThreadId = id },
+    handleForegroundNotification: (data) => notificationHandler.handleNotification({ request: { content: { data } } }),
+    get permissionRequests() { return permissionRequests },
+    get foregroundListenerCount() { return foregroundListeners.size },
+    setPermission: (status) => { permission = status },
+    appState: (state) => { currentAppState = state; for (const callback of foregroundListeners) callback(state) },
     get observedResponseOwnerCount() { return responseOwnerMaps[0]?.size ?? 0 },
     get pendingResponseCount() { return responseOwnerMaps[1]?.size ?? 0 },
     get responseSubscriptionCount() { return responseSubscriptionCount },
@@ -200,6 +222,46 @@ test("a cached response delivered after navigation readiness opens its thread an
   assert.equal(runtime.navigations[0][0], "ChatThread")
   assert.equal(runtime.navigations[0][1].threadId, "thread-one")
   assert.equal(runtime.clearCount, 1)
+})
+
+test("foreground banners are hidden only for messages in the actively viewed conversation", async () => {
+  const runtime = createRuntime()
+  await settle()
+  runtime.setActiveThread("thread-one")
+  const visibleChat = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-one" })
+  assert.equal(visibleChat.shouldShowBanner, false)
+  assert.equal(visibleChat.shouldShowList, false)
+  const otherChat = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two" })
+  assert.equal(otherChat.shouldShowBanner, true)
+  const match = await runtime.handleForegroundNotification({ type: "discovery.match", threadId: "thread-one" })
+  assert.equal(match.shouldShowBanner, true)
+  runtime.appState("background")
+  assert.equal((await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-one" })).shouldShowBanner, true)
+  runtime.appState("active")
+  runtime.setActiveThread(null)
+  assert.equal((await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-one" })).shouldShowBanner, true)
+  runtime.dispose()
+})
+
+test("foreground registers permission granted in iOS Settings without prompting, and cleans up on logout", async () => {
+  const runtime = createRuntime({ physicalDevice: true })
+  await settle()
+  assert.equal(runtime.registrations.length, 0)
+  runtime.setPermission("granted")
+  runtime.appState("background")
+  await settle()
+  assert.equal(runtime.registrations.length, 0)
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  assert.equal(runtime.permissionRequests, 0)
+  assert.equal(runtime.registrations[0].token, "token-one")
+  runtime.startSession(null)
+  assert.equal(runtime.foregroundListenerCount, 0)
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  runtime.dispose()
 })
 
 test("a rejected cached response remains available instead of being consumed", async (t) => {

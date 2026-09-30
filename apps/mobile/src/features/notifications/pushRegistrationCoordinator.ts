@@ -37,6 +37,8 @@ export async function syncPushRegistration(input: {
   mode: "demo" | "production"
   allowPermissionPrompt: boolean
   dependencies: PushRegistrationDependencies
+  signal?: AbortSignal
+  waitForRetry?: (delayMs: number) => Promise<void>
 }): Promise<PushRegistrationResult> {
   const { dependencies } = input
   if (input.mode !== "production") {
@@ -62,9 +64,31 @@ export async function syncPushRegistration(input: {
   }
 
   const pushToken = await dependencies.getExpoPushToken()
-  await dependencies.registerDevice({
-    platform: dependencies.platform,
-    pushToken
-  })
+  for (let attempt = 0; attempt < 3; attempt++) {
+    input.signal?.throwIfAborted()
+    try {
+      await dependencies.registerDevice({ platform: dependencies.platform, pushToken })
+      break
+    } catch (error) {
+      input.signal?.throwIfAborted()
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined
+      if (attempt === 2 || (error instanceof Error && error.name === "AbortError") ||
+        (typeof status === "number" && status < 500 && status !== 429)) throw error
+      const delay = 1000 * 2 ** attempt
+      await (input.waitForRetry ? input.waitForRetry(delay) : waitForRetry(delay, input.signal))
+    }
+  }
   return { status: "registered", pushToken }
+}
+
+function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const onAbort = () => { clearTimeout(timer); reject(signal?.reason) }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }, delayMs)
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
 }

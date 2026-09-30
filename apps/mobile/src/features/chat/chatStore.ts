@@ -539,6 +539,9 @@ export function setActiveThread(threadId: string | null): void {
   }
 }
 
+/** Only a focused, foreground ChatThread screen registers itself as active. */
+export function getActiveChatThreadId(): string | null { return activeThreadId }
+
 /** Clear unread count for a specific thread. */
 export function markThreadRead(threadId: string): void {
   if (unreadCounts.get(threadId)) {
