@@ -1,3 +1,4 @@
+/* global __dirname */
 const {
   resolveMobileReleaseEnvironment
 } = require("./scripts/mobile-release-config.cjs")
@@ -5,7 +6,10 @@ const {
   assertNoCandidateAssetImportsInSourceRoot
 } = require("./scripts/mobile-release-assets.cjs")
 
+const { assertNoMediaDependencies } = require("./scripts/mobile-no-media.cjs")
+
 module.exports = ({ config }) => {
+  assertNoMediaDependencies(require("./package.json"), require("../../package-lock.json"))
   const releaseEnvironment = resolveMobileReleaseEnvironment(process.env)
   if (
     (releaseEnvironment.buildProfile === "preview" || releaseEnvironment.buildProfile === "production") &&

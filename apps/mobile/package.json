@@ -46,8 +46,6 @@
     "@blumi/realtime-client": "1.0.0",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
-    "@livekit/react-native": "^2.12.0",
-    "@livekit/react-native-webrtc": "^144.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-firebase/app": "^26.4.0",
@@ -78,7 +76,6 @@
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
     "libphonenumber-js": "^1.13.12",
-    "livekit-client": "^2.22.1",
     "posthog-react-native": "^4.66.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -100,6 +97,13 @@
     "eslint-config-expo": "~57.0.2",
     "proxy-from-env": "^1.1.0",
     "typescript": "~6.0.3"
+  },
+  "expo": {
+    "autolinking": {
+      "ios": {
+        "buildFromSource": ["expo-file-system", "expo-image"]
+      }
+    }
   },
   "private": true
 }

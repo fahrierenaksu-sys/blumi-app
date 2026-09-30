@@ -8,10 +8,33 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import releaseConfig from "./mobile-release-config.cjs"
 import releaseAssets from "./mobile-release-assets.cjs"
+import noMedia from "./mobile-no-media.cjs"
 
 const { resolveMobileReleaseEnvironment } = releaseConfig
 const { assertNoCandidateAssetImportsInSourceRoot, findCandidateAssetImports } = releaseAssets
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+
+test("build config rejects direct and transitive native capture dependencies before upload", () => {
+  const { assertNoMediaDependencies } = noMedia
+  assert.doesNotThrow(() => assertNoMediaDependencies({ dependencies: { "expo-file-system": "1" } }, { packages: {} }))
+  assert.throws(() => assertNoMediaDependencies({ dependencies: { "@livekit/react-native": "1" } }, { packages: {} }), /camera\/audio SDKs/)
+  assert.throws(() => assertNoMediaDependencies({ dependencies: {} }, {
+    packages: { "node_modules/parent/node_modules/react-native-webrtc": {} }
+  }), /react-native-webrtc/)
+  assert.throws(() => assertNoMediaDependencies({ devDependencies: { "expo-camera": "1" } }, { packages: {} }), /expo-camera/)
+  assert.match(read("app.config.js"), /assertNoMediaDependencies\(require\("\.\/package\.json"\), require\("\.\.\/\.\.\/package-lock\.json"\)\)/)
+})
+
+test("iOS builds package file-system and SDWebImage privacy manifests using source pods", () => {
+  const pkg = JSON.parse(read("package.json"))
+  assert.ok(pkg.expo.autolinking.ios.buildFromSource.includes("expo-file-system"))
+  assert.ok(pkg.expo.autolinking.ios.buildFromSource.includes("expo-image"))
+  const require = createRequire(import.meta.url)
+  const packagePath = require.resolve("expo-file-system/package.json")
+  const manifest = readFileSync(join(dirname(packagePath), "ios/PrivacyInfo.xcprivacy"), "utf8")
+  assert.match(manifest, /NSPrivacyAccessedAPICategoryDiskSpace/)
+  assert.match(manifest, /E174\.1/)
+})
 
 const DISCOVER_SCREEN_SOURCE_PATHS = [
   "src/screens/LobbyScreen.tsx",
@@ -546,7 +569,7 @@ test("release bundle imports only the fonts and icon family used by the app", ()
 test("Blumi Room keeps text chat and declares no live audio or camera permission", () => {
   const appConfig = read("app.json")
   const app = JSON.parse(appConfig)
-  const livekitClient = read("src/features/miniRoom/livekitClient.ts")
+  const mobilePackage = JSON.parse(read("package.json"))
   const mediaHook = read("src/features/miniRoom/useMiniRoomMedia.ts")
   const miniRoomScreen = read("src/screens/MiniRoomScreen.tsx")
   const miniRoomScene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
@@ -562,7 +585,15 @@ test("Blumi Room keeps text chat and declares no live audio or camera permission
   ])
   assert.doesNotMatch(appConfig, /NSCameraUsageDescription/)
   assert.doesNotMatch(appConfig, /NSMicrophoneUsageDescription/)
-  assert.doesNotMatch(livekitClient, /setCameraEnabled/)
+  for (const name of ["@livekit/react-native", "@livekit/react-native-webrtc", "livekit-client", "react-native-webrtc", "expo-camera", "expo-av", "expo-audio"]) {
+    assert.equal(mobilePackage.dependencies[name], undefined, `${name} must not ship in text-only Blumi`)
+  }
+  const lock = JSON.parse(readFileSync(resolve(mobileRoot, "../../package-lock.json"), "utf8"))
+  const mediaPackages = Object.keys(lock.packages).filter((path) =>
+    /(?:^|\/)node_modules\/(?:@livekit\/[^/]+|livekit-client|react-native-webrtc|expo-camera|expo-av|expo-audio)$/.test(path)
+  )
+  assert.deepEqual(mediaPackages, [], "Transitive capture packages must not enter the native binary")
+  assert.doesNotMatch(mediaHook, /createLivekitClient|setMicrophoneEnabled/)
   assert.doesNotMatch(mediaHook, /toggleCamera|cameraEnabled/)
   assert.match(miniRoomScreen, /useInRoomChat/)
   assert.match(miniRoomScene, /<TextInput/)
