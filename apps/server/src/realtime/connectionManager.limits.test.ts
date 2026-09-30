@@ -88,6 +88,21 @@ test("a backed-up socket sheds transient events but still receives chat delivery
   assert.deepEqual(sentTypes(socket), ["chat.message_received", "presence.nearby"])
 })
 
+test("a backed-up socket sheds superseded avatar steps but keeps the authoritative room snapshot", () => {
+  const manager = createConnectionManager()
+  const socket = createSocket()
+  const connection = manager.addConnection({ socket: socket as never, profile: createProfile("user_a") })
+  const avatar = { userId: "user_a", x: .5, y: .7, present: true, revision: 2 }
+  const moved = { type: "mini_room.avatar_moved", payload: { miniRoomId: "room", epoch: "e",
+    participantUserIds: ["user_a", "user_b"], avatar } } as ServerEvent
+  const snapshot = { type: "mini_room.motion_snapshot", payload: { miniRoomId: "room", epoch: "e",
+    participantUserIds: ["user_a", "user_b"], avatars: [avatar, { ...avatar, userId: "user_b" }] } } as ServerEvent
+  socket.bufferedAmount = REALTIME_OUTBOUND_SOFT_LIMIT_BYTES + 1
+  manager.sendToConnection(connection.connectionId, moved)
+  manager.sendToConnection(connection.connectionId, snapshot)
+  assert.deepEqual(sentTypes(socket), ["mini_room.motion_snapshot"])
+})
+
 test("a socket that stays above the soft limit for the sustained window is closed with 1013 and terminated", (context) => {
   context.mock.timers.enable({ apis: ["setTimeout"] })
   let clock = 0

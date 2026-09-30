@@ -13,7 +13,7 @@ test("room motion relays immediately, snapshots recover positions, and disconnec
   await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
   assert.equal(events.at(-1).event.type, "mini_room.avatar_moved")
   assert.equal(events.at(-1).event.payload.avatar.x, .5)
-  assert.deepEqual(events.at(-1).users, ["a", "b"])
+  assert.deepEqual(events.at(-1).users, ["ca", "cb"])
   await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .6, y: .7 })
   assert.equal(events.length, 1, "stale sequence cannot rewind a target")
   await service.enter("ca2", "a", "room")
@@ -42,11 +42,110 @@ test("foreign actors, invalid points, ended rooms and blocked pairs never relay 
   assert.equal(events.length, 0)
   blocked = true
   service.invalidate("room")
-  await assert.rejects(service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .5, y: .7 }))
+  // Invalidation removes the scene: the socket is no longer in it, so the move
+  // is ignored without a lookup, and entering again is refused for the pair.
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .5, y: .7 })
+  await assert.rejects(service.enter("ca", "a", "room"))
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 3, x: .5, y: .7 })
   blocked = false
   room.endedAt = new Date().toISOString()
   await assert.rejects(service.enter("ca", "a", "room"))
   assert.equal(events.length, 0)
+})
+
+test("a seat move is relayed with its hotspot even where the seat overhangs the walkable floor", async () => {
+  // A chair turned to face the back wall near the front edge puts its seat at
+  // y≈0.93, below the floor polygon (y ≤ 0.9). The mobile planner accepts that
+  // seat; rejecting it here left the partner's phone showing the sitter standing.
+  const events: any[] = []
+  const room = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const service = createMiniRoomMotionService({ findRoom: async () => room as any,
+    hasBlockBetween: async () => false, emit: (_, event) => events.push(event) })
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  events.length = 0
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .4, y: .93, hotspotId: "chair:front_edge" })
+  assert.equal(events.length, 1)
+  assert.equal(events[0].payload.avatar.hotspotId, "chair:front_edge")
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .4, y: .93 })
+  assert.equal(events.length, 1, "a plain walk target must still be on the floor")
+})
+
+test("motion reaches only the sockets that entered the scene, never every device of both users", async () => {
+  const deliveries: { connectionIds: string[]; type: string }[] = []
+  const room = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const service = createMiniRoomMotionService({ findRoom: async () => room as any,
+    hasBlockBetween: async () => false,
+    emit: (connectionIds, event) => deliveries.push({ connectionIds: [...connectionIds].sort(), type: event.type }) })
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  deliveries.length = 0
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
+  assert.deepEqual(deliveries, [{ connectionIds: ["ca", "cb"], type: "mini_room.avatar_moved" }])
+})
+
+test("re-entering on the same socket never flashes the avatar as absent to the partner", async () => {
+  const events: any[] = []
+  const room = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const service = createMiniRoomMotionService({ findRoom: async () => room as any,
+    hasBlockBetween: async () => false, emit: (_, event) => events.push(event) })
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 3, x: .5, y: .7 })
+  events.length = 0
+  await service.enter("ca", "a", "room")
+  assert.ok(events.length > 0, "the retried entry is answered with a snapshot")
+  for (const event of events) {
+    assert.equal(event.type, "mini_room.motion_snapshot")
+    assert.equal(event.payload.avatars.find((avatar: any) => avatar.userId === "a").present, true)
+  }
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .6, y: .7 })
+  assert.equal(events.at(-1).payload.avatar?.x, .6, "a fresh entry restarts the socket's sequence")
+})
+
+test("a stranger's lookup of the same room cannot fail a participant's concurrent entry", async () => {
+  let release: (() => void) | undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const events: any[] = []
+  const service = createMiniRoomMotionService({ findRoom: async () => {
+    await gate
+    return { miniRoomId: "room", participantUserIds: ["a", "b"] } as any
+  }, hasBlockBetween: async () => false, emit: (_, event) => events.push(event) })
+  const stranger = service.enter("cx", "x", "room")
+  const participant = service.enter("ca", "a", "room")
+  release!()
+  await assert.rejects(stranger)
+  await participant
+  assert.equal(events.at(-1).payload.avatars.find((avatar: any) => avatar.userId === "a").present, true)
+})
+
+test("a move from a socket outside the scene costs no room lookup and creates no cached room", async () => {
+  let lookups = 0
+  const events: any[] = []
+  const service = createMiniRoomMotionService({ findRoom: async () => {
+    lookups++
+    return { miniRoomId: "room", participantUserIds: ["a", "b"] } as any
+  }, hasBlockBetween: async () => false, emit: (_, event) => events.push(event) })
+  for (let sequence = 1; sequence <= 20; sequence++) {
+    await service.move("ca", "a", { miniRoomId: `room-${sequence}`, sequence, x: .5, y: .7 })
+  }
+  assert.equal(lookups, 0)
+  assert.equal(events.length, 0)
+})
+
+test("rooms looked up without an entered socket expire like idle rooms", async () => {
+  let clock = 0
+  const lookups: string[] = []
+  const service = createMiniRoomMotionService({ now: () => clock, findRoom: async (id) => {
+    lookups.push(id)
+    return { miniRoomId: id, participantUserIds: ["a", "b"] } as any
+  }, hasBlockBetween: async () => false, emit: () => undefined })
+  // A stranger probing a real room caches it without a connection.
+  await assert.rejects(service.enter("cx", "x", "probe"))
+  clock += 61_000
+  await service.enter("ca", "a", "other")
+  await service.enter("ca", "a", "probe")
+  assert.deepEqual(lookups, ["probe", "other", "probe"], "the probed room was evicted and checked again")
 })
 
 test("concurrent scene entry shares one authorization lookup and invalidation cancels an in-flight entry", async () => {

@@ -44,6 +44,8 @@ const MAX_CONNECTION_EVENTS_PER_WINDOW = 60
 const MAX_USER_EVENTS_PER_WINDOW = 100
 const MAX_CONNECTION_IN_FLIGHT = 8
 const MAX_USER_IN_FLIGHT = 16
+/** Room movement steps per user per window; the client sends at most 5/s per device. */
+const MAX_USER_MOVEMENTS_PER_WINDOW = 60
 const RATE_LIMIT_CLOSE_CODE = 4429
 const RATE_LIMIT_CLOSE_REASON = "Too many realtime actions"
 const MODERATION_CLOSE_CODE = 4403
@@ -117,8 +119,8 @@ export function createRealtimeServer(
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const connectionInFlight = new Map<string, number>()
   const userInFlight = new Map<string, number>()
-  const connectionMovementInFlight = new Map<string, number>()
-  const userMovementInFlight = new Map<string, number>()
+  const movementInFlight = new Set<string>()
+  const deferredMovements = new Map<string, ClientEvent>()
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
   const connectionLifecycleOperations = new Map<string, Promise<void>>()
@@ -366,6 +368,7 @@ export function createRealtimeServer(
     socket.on("close", () => {
       const removed = connectionManager.removeConnection(connection.connectionId)
       connectionEventWindows.delete(connection.connectionId)
+      deferredMovements.delete(connection.connectionId)
       // The user's window outlives the socket: a reconnect inside the window must
       // not reset the per-user budget. The heartbeat purges expired windows.
       if (removed) {
@@ -383,6 +386,7 @@ export function createRealtimeServer(
   let heartbeatAuthorizationPending = false
   const heartbeat = setInterval(() => {
     purgeExpiredEventWindows(userEventWindows, Date.now())
+    purgeExpiredEventWindows(movementEventWindows, Date.now())
     purgeExpiredEventWindows(upgradeAddressWindows, Date.now())
     if (!heartbeatAuthorizationPending) {
       heartbeatAuthorizationPending = true
@@ -444,37 +448,36 @@ export function createRealtimeServer(
     const now = Date.now()
     let frame: unknown
     try { frame = JSON.parse(data.toString()) } catch { frame = undefined }
-    const movement = isClientEvent(frame) && frame.type === "mini_room.move"
-    if (movement) {
-      purgeExpiredEventWindows(movementEventWindows, now)
-      if (!consumeEventAllowance({ windows: movementEventWindows, key: connection.userId, now, limit: 60 }) ||
-        (connectionMovementInFlight.get(connection.connectionId) ?? 0) >= 2 ||
-        (userMovementInFlight.get(connection.userId) ?? 0) >= 4) return
+    if (isClientEvent(frame) && frame.type === "mini_room.move") {
+      // Movement has its own budget: it never consumes the chat allowance or
+      // closes the socket. Over budget, a step is dropped (abusive rate only).
+      if (!consumeEventAllowance({ windows: movementEventWindows, key: connection.userId, now,
+        limit: MAX_USER_MOVEMENTS_PER_WINDOW })) return
+      await handleMovement(connection, frame)
+      return
     }
-    const connectionAllowed = movement || consumeEventAllowance({
+    const connectionAllowed = consumeEventAllowance({
       windows: connectionEventWindows,
       key: connection.connectionId,
       now,
       limit: MAX_CONNECTION_EVENTS_PER_WINDOW
     })
-    const userAllowed = movement || consumeEventAllowance({
+    const userAllowed = consumeEventAllowance({
       windows: userEventWindows,
       key: connection.userId,
       now,
       limit: MAX_USER_EVENTS_PER_WINDOW
     })
-    if (!movement && (!connectionAllowed || !userAllowed ||
+    if (!connectionAllowed || !userAllowed ||
       (connectionInFlight.get(connection.connectionId) ?? 0) >= MAX_CONNECTION_IN_FLIGHT ||
-      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT)) {
+      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT) {
       if (connection.socket.readyState === 1) {
         connection.socket.close(RATE_LIMIT_CLOSE_CODE, RATE_LIMIT_CLOSE_REASON)
       }
       return
     }
-    const connectionSlots = movement ? connectionMovementInFlight : connectionInFlight
-    const userSlots = movement ? userMovementInFlight : userInFlight
-    connectionSlots.set(connection.connectionId, (connectionSlots.get(connection.connectionId) ?? 0) + 1)
-    userSlots.set(connection.userId, (userSlots.get(connection.userId) ?? 0) + 1)
+    connectionInFlight.set(connection.connectionId, (connectionInFlight.get(connection.connectionId) ?? 0) + 1)
+    userInFlight.set(connection.userId, (userInFlight.get(connection.userId) ?? 0) + 1)
     let received: ClientEvent | undefined
     try {
       const parsed = frame
@@ -493,8 +496,37 @@ export function createRealtimeServer(
       reportRefusedChatSend(connection, received, error)
       return
     } finally {
-      releaseInFlight(connectionSlots, connection.connectionId)
-      releaseInFlight(userSlots, connection.userId)
+      releaseInFlight(connectionInFlight, connection.connectionId)
+      releaseInFlight(userInFlight, connection.userId)
+    }
+  }
+
+  /**
+   * Movement is a stream of targets in which only the newest matters. Each
+   * socket handles one step at a time, in order; a step that arrives while one
+   * is pending (for example on an expired authorization check) replaces a
+   * single deferred slot rather than being dropped, so the final target always
+   * reaches the partner and an older one can never be applied after it.
+   */
+  async function handleMovement(connection: RealtimeConnection, frame: ClientEvent): Promise<void> {
+    if (movementInFlight.has(connection.connectionId)) {
+      deferredMovements.set(connection.connectionId, frame)
+      return
+    }
+    movementInFlight.add(connection.connectionId)
+    try {
+      if (!await authorizeConnection(connection) || connection.socket.readyState !== 1) return
+      await router.handleClientEvent(connection, frame)
+    } catch {
+      // A refused step is dropped; the client keeps walking locally and its next
+      // target or the scene snapshot re-synchronizes the partner.
+    } finally {
+      movementInFlight.delete(connection.connectionId)
+      const next = deferredMovements.get(connection.connectionId)
+      deferredMovements.delete(connection.connectionId)
+      if (next && !closing && connectionManager.getConnection(connection.connectionId) === connection) {
+        void track(handleMovement(connection, next))
+      }
     }
   }
 

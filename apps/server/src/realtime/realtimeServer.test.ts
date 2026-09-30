@@ -21,6 +21,8 @@ import {
   REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
 } from "./realtimeAuthorizationCache"
 import { createRealtimeServer } from "./realtimeServer"
+import { createConnectionManager } from "./connectionManager"
+import type { RealtimeFanout } from "./realtimeFanout"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
 const AUTHORIZED_TEST_ROOM_ID = "authorized-test-room"
@@ -863,7 +865,72 @@ test("two room sockets share motion immediately, reconnect at the accepted targe
   } finally { await harness.close() }
 })
 
+async function createMotionRoomPair(harness: Awaited<ReturnType<typeof createRealtimeHarness>>, suffix: string) {
+  const a = await harness.createSession(`+90555111${suffix}1`, "Motion A")
+  const b = await harness.createSession(`+90555111${suffix}2`, "Motion B")
+  const startedAt = new Date().toISOString()
+  const miniRoomId = `motion-room-${suffix}`
+  await harness.miniRoomService.repository.saveInvite({ inviteId: `motion-invite-${suffix}`, senderUserId: a.userId,
+    recipientUserId: b.userId, status: "pending", createdAt: startedAt })
+  assert.equal(await harness.miniRoomService.repository.acceptPendingInvite({ inviteId: `motion-invite-${suffix}`,
+    decidedAt: startedAt, miniRoom: { miniRoomId, lobbyRoomId: "retired",
+      livekitRoomName: `motion-${suffix}`, participantUserIds: [a.userId, b.userId], startedAt } }), "accepted")
+  const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+  const ea = collectEvents(sa), eb = collectEvents(sb)
+  for (const socket of [sa, sb]) {
+    socket.send(JSON.stringify({ type: "mini_room.scene_enter", payload: { miniRoomId } }))
+  }
+  await eb.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+  await ea.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+  return { a, b, sa, sb, ea, eb, miniRoomId }
+}
+
+test("a burst of targets during a slow authorization check still delivers the final target, in order", async () => {
+  let clock = Date.now()
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock })
+  try {
+    const { sa, eb, miniRoomId, a } = await createMotionRoomPair(harness, "31")
+    const original = harness.authService.isRealtimeSessionAllowed.bind(harness.authService)
+    const gate = deferred()
+    harness.authService.isRealtimeSessionAllowed = async (identity) => {
+      await gate.promise
+      return original(identity)
+    }
+    // The cached decision expires, so every queued step waits on one slow check.
+    clock += REALTIME_AUTHORIZATION_CACHE_TTL_MS + 1
+    for (let sequence = 1; sequence <= 5; sequence++) {
+      sa.send(JSON.stringify({ type: "mini_room.move",
+        payload: { miniRoomId, sequence, x: .4 + sequence / 100, y: .7 } }))
+    }
+    await new Promise(resolve => setTimeout(resolve, 30))
+    gate.resolve()
+    const final = await eb.waitForMatching("mini_room.avatar_moved", event => event.payload.avatar.x === .45)
+    assert.equal(final.payload.avatar.userId, a.userId)
+    await new Promise(resolve => setTimeout(resolve, 30))
+    const xs = eb.all().filter(event => event.type === "mini_room.avatar_moved")
+      .map(event => (event as Extract<ServerEvent, { type: "mini_room.avatar_moved" }>).payload.avatar.x)
+    assert.equal(xs.at(-1), .45, "no older target is applied after the final one")
+    assert.deepEqual([...xs].sort(), xs, "targets arrive in the order they were sent")
+    assert.equal(sa.readyState, WebSocket.OPEN)
+  } finally { await harness.close() }
+})
+
+test("room motion is delivered locally and never published through cross-instance fanout", async () => {
+  const published: string[] = []
+  const harness = await createRealtimeHarness({ fanout: {
+    async publish(message) { published.push(message.event.type) },
+    async subscribe() { return async () => undefined }
+  } })
+  try {
+    const { sa, eb, miniRoomId } = await createMotionRoomPair(harness, "32")
+    sa.send(JSON.stringify({ type: "mini_room.move", payload: { miniRoomId, sequence: 1, x: .5, y: .7 } }))
+    await eb.waitFor("mini_room.avatar_moved")
+    assert.deepEqual(published.filter(type => type.startsWith("mini_room.")), [])
+  } finally { await harness.close() }
+})
+
 async function createRealtimeHarness(options: {
+  fanout?: RealtimeFanout
   pauseTicketConsumption?: boolean
   rejectTicketConsumption?: boolean
   rejectRealtimeAuthorization?: boolean
@@ -974,7 +1041,8 @@ async function createRealtimeHarness(options: {
     ...(options.allowAuthorizedTestRoom
       ? { isPresenceRoomAllowed: (_actor: unknown, roomId: string) => roomId === AUTHORIZED_TEST_ROOM_ID }
       : {}),
-    ...(options.authorizationClock ? { authorizationClock: options.authorizationClock } : {})
+    ...(options.authorizationClock ? { authorizationClock: options.authorizationClock } : {}),
+    ...(options.fanout ? { connectionManager: createConnectionManager({ fanout: options.fanout }) } : {})
   })
   let realtimeServer: ReturnType<typeof createRealtimeServer>
   if (options.captureIntervals || options.captureIntervalCallbacks) {
