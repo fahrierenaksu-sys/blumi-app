@@ -30,6 +30,7 @@ import {
   applyChatThreadListed,
   applyChatThreadListFailed,
   applyChatThreadListLoading,
+  beginChatThreadListRequest,
   confirmOptimisticMessage,
   getThreads,
   hasMessageHistory,
@@ -96,6 +97,7 @@ export function useRootChatSync({
     const actor = latestSessionActorRef.current
     if (actor?.session.mode !== "production") return
     const requestRevision = threadListRefreshGuardRef.current!.beginHttpRefresh()
+    const listRequestSequence = beginChatThreadListRequest()
     applyChatThreadListLoading()
     try {
       const threadList = await fetchChatThreads(
@@ -103,7 +105,7 @@ export function useRootChatSync({
         actor.session.sessionToken
       )
       if (!isCurrentSession(actor) || !threadListRefreshGuardRef.current?.isCurrentHttpRefresh(requestRevision)) return
-      applyChatThreadListed(threadList)
+      applyChatThreadListed(threadList, { requestSequence: listRequestSequence })
       const syncKey = `${actor.profile.userId}:${actor.session.sessionToken}`
       if (matchThreadSyncGateRef.current?.shouldStart(syncKey, Date.now())) {
         void fetchChatThreads(

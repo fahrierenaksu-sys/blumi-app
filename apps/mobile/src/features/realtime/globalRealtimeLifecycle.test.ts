@@ -322,3 +322,24 @@ test("a hundred lifecycle restarts leave no status listener and pair every conne
   assert.equal(connects, 100)
   assert.equal(disconnects, 100, "a repeated cleanup must not disconnect a newer lifecycle")
 })
+
+test("the connect-time thread list request is recorded only when the socket accepted it", () => {
+  let accepted = false
+  const noted: string[] = []
+  const dependencies = createDependencies({
+    sendGlobal: (event) => {
+      dependencies.sentEvents.push(event)
+      return accepted
+    },
+    noteThreadListRequested: () => { noted.push("noted") }
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const [connectedListener] = [...dependencies.statusListeners]
+  connectedListener("connected")
+  assert.deepEqual(noted, [], "a refused send has no reply to match")
+  connectedListener("disconnected")
+  accepted = true
+  connectedListener("connected")
+  assert.deepEqual(noted, ["noted"])
+  cleanup()
+})

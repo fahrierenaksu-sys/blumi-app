@@ -11,6 +11,7 @@ import {
   applyChatThreadCreated,
   applyChatThreadListed,
   applyChatThreadRead,
+  beginChatThreadListRequest,
   confirmOptimisticMessage,
   getMessageDeliveryState,
   getMessages,
@@ -18,6 +19,7 @@ import {
   getThreadUnreadCount,
   getThreads,
   markOptimisticMessageFailed,
+  noteRealtimeThreadListRequested,
   resetChatStore
 } from "./chatStore"
 
@@ -115,64 +117,107 @@ test("HTTP acknowledgement and realtime echo of one send render one bubble in ei
   }
 })
 
-test(
-  "a send whose response was lost is not shown as a failed duplicate after history resync",
-  { todo: "BUG: applyChatMessageListed never reconciles a failed optimistic bubble with its committed server copy (lost ACK), so the user sees the message twice, once as failed" },
-  () => {
+test("a send whose response was lost is not shown as a failed duplicate after history resync", () => {
+  // Fixed 2026-09-30: history resync now reconciles a failed or pending
+  // optimistic bubble with its newly listed committed copy (same thread,
+  // sender and body), so the message shows once, as sent.
+  resetChatStore()
+  try {
+    const pending = addOptimisticMessage({ threadId: "thread_lost_ack", senderUserId: ME, body: "see you at 8", clientMessageId: "client_lost_ack" })
+    // The server committed the message but the HTTP response and the
+    // realtime echo were lost with the network; the send is marked failed.
+    markOptimisticMessageFailed(pending.clientMessageId)
+    assert.equal(getRetryableMessage(pending.localMessageId)?.clientMessageId, "client_lost_ack", "retry reuses the same client id")
+    applyChatMessageListed({
+      userId: ME,
+      threadId: "thread_lost_ack",
+      messages: [message("m_committed", "thread_lost_ack", ME, "see you at 8", new Date().toISOString())]
+    })
+    const messages = getMessages("thread_lost_ack")
+    assert.deepEqual(messages.map((entry) => entry.body), ["see you at 8"], "one bubble for one committed message")
+    assert.equal(messages[0]?.messageId, "m_committed")
+    assert.equal(getMessageDeliveryState("m_committed"), "sent")
+    assert.equal(getRetryableMessage(pending.localMessageId), null)
+  } finally {
     resetChatStore()
-    try {
-      const pending = addOptimisticMessage({ threadId: "thread_lost_ack", senderUserId: ME, body: "see you at 8", clientMessageId: "client_lost_ack" })
-      // The server committed the message but the HTTP response and the
-      // realtime echo were lost with the network; the send is marked failed.
-      markOptimisticMessageFailed(pending.clientMessageId)
-      applyChatMessageListed({
-        userId: ME,
-        threadId: "thread_lost_ack",
-        messages: [message("m_committed", "thread_lost_ack", ME, "see you at 8", "2026-09-30T10:00:00.000Z")]
-      })
-      const bodies = getMessages("thread_lost_ack").map((entry) => entry.body)
-      assert.deepEqual(bodies, ["see you at 8"], "one bubble for one committed message")
-    } finally {
-      resetChatStore()
-    }
   }
-)
+})
 
-test(
-  "an in-room message lost with the socket does not stay 'sending' forever",
-  { todo: "BUG: in-room chat.send_message has no ACK or clientMessageId, so a frame lost on disconnect leaves a permanent 'sending' bubble with no retry" },
-  () => {
+test("history resync never merges a failed bubble into an older identical message or a partner message", () => {
+  resetChatStore()
+  try {
+    const earlier = message("m_earlier_ok", "thread_same_body", ME, "ok", new Date(Date.now() - 60_000).toISOString())
+    applyChatMessageListed({ userId: ME, threadId: "thread_same_body", messages: [earlier] })
+    const pending = addOptimisticMessage({ threadId: "thread_same_body", senderUserId: ME, body: "ok", clientMessageId: "client_second_ok" })
+    markOptimisticMessageFailed(pending.clientMessageId)
+    // The same history (already known) and a partner "ok" arrive again.
+    applyChatMessageListed({
+      userId: ME,
+      threadId: "thread_same_body",
+      messages: [earlier, message("m_partner_ok", "thread_same_body", PARTNER, "ok", new Date().toISOString())]
+    })
+    assert.deepEqual(getMessages("thread_same_body").map((entry) => entry.messageId).sort(), [pending.localMessageId, "m_earlier_ok", "m_partner_ok"].sort())
+    assert.equal(getMessageDeliveryState(pending.localMessageId), "failed")
+    // A days-old identical message loaded cold is not this send either.
+    applyChatMessageListed({
+      userId: ME,
+      threadId: "thread_same_body",
+      messages: [message("m_old_ok", "thread_same_body", ME, "ok", "2026-01-01T10:00:00.000Z")]
+    })
+    assert.equal(getMessageDeliveryState(pending.localMessageId), "failed")
+  } finally {
     resetChatStore()
-    try {
-      // useInRoomChat adds an untracked optimistic bubble and sends over the socket.
-      const pending = addOptimisticMessage({ threadId: "thread_room", senderUserId: ME, body: "brb" })
-      // The socket dropped before the server read the frame; reconnect history
-      // is authoritative and does not contain it.
-      applyChatMessageListed({ userId: ME, threadId: "thread_room", messages: [] })
-      const state = getMessageDeliveryState(pending.localMessageId)
-      assert.ok(
-        state !== "sending" || getRetryableMessage(pending.localMessageId) !== null,
-        "a lost room message must become failed or retryable"
-      )
-    } finally {
-      resetChatStore()
-    }
   }
-)
+})
 
-test(
-  "a stale first thread-list page applied after chat.thread_created keeps the new thread",
-  { todo: "BUG: a non-append chat.thread_listed replaces the cache; a page computed before a match erases the newer chat.thread_created" },
-  () => {
+test("an in-room message lost with the socket becomes failed and retryable with the same client id", () => {
+  // Fixed 2026-09-30: in-room sends are tracked by clientMessageId; the
+  // MiniRoom hook marks them failed on socket close or acknowledgement
+  // timeout (see useInRoomChat.reconnect.test.ts).
+  resetChatStore()
+  try {
+    const pending = addOptimisticMessage({ threadId: "thread_room", senderUserId: ME, body: "brb", clientMessageId: "room_client_1" })
+    markOptimisticMessageFailed(pending.clientMessageId)
+    applyChatMessageListed({ userId: ME, threadId: "thread_room", messages: [] })
+    assert.equal(getMessageDeliveryState(pending.localMessageId), "failed")
+    assert.equal(getRetryableMessage(pending.localMessageId)?.clientMessageId, "room_client_1")
+  } finally {
     resetChatStore()
-    try {
-      applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
-      applyChatThreadCreated(thread("thread_new_match", "2026-09-30T10:00:00.000Z"))
-      // The reply to the reconnect list request was computed before the match.
-      applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
-      assert.deepEqual(getThreads().map((entry) => entry.threadId).sort(), ["thread_new_match", "thread_old"])
-    } finally {
-      resetChatStore()
-    }
   }
-)
+})
+
+test("a stale first thread-list page applied after chat.thread_created keeps the new thread", () => {
+  // Fixed 2026-09-30: a non-append list keeps threads the client learned
+  // about after that list request was issued.
+  resetChatStore()
+  try {
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
+    applyChatThreadCreated(thread("thread_new_match", "2026-09-30T10:00:00.000Z"))
+    // The reply to the reconnect list request was computed before the match.
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
+    assert.deepEqual(getThreads().map((entry) => entry.threadId).sort(), ["thread_new_match", "thread_old"])
+  } finally {
+    resetChatStore()
+  }
+})
+
+test("tracked list requests keep threads learned after issue and drop them once a newer list omits them", () => {
+  resetChatStore()
+  try {
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
+    noteRealtimeThreadListRequested()
+    const httpRequest = beginChatThreadListRequest()
+    applyChatThreadCreated(thread("thread_new_match", "2026-09-30T10:00:00.000Z"))
+    // Both replies were computed before the match.
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] }, { requestSequence: httpRequest })
+    assert.deepEqual(getThreads().map((entry) => entry.threadId).sort(), ["thread_new_match", "thread_old"])
+    // A list requested after the match is authoritative: the thread is gone
+    // (for example unmatched or blocked meanwhile).
+    noteRealtimeThreadListRequested()
+    applyChatThreadListed({ userId: ME, threads: [thread("thread_old")] })
+    assert.deepEqual(getThreads().map((entry) => entry.threadId), ["thread_old"])
+  } finally {
+    resetChatStore()
+  }
+})

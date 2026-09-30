@@ -35,7 +35,10 @@ export interface GlobalRealtimeLifecycleDependencies {
     sessionToken: string
   ) => void
   disconnectGlobal: () => void
-  sendGlobal: (event: ClientEvent) => void
+  /** Returns false when the socket refused the event. */
+  sendGlobal: (event: ClientEvent) => boolean | void
+  /** Records a first-page thread list request so a stale reply cannot erase newer threads. */
+  noteThreadListRequested?: () => void
   subscribeToStatus: (
     listener: (status: RealtimeConnectionStatus, meta?: RealtimeConnectionMeta) => void
   ) => () => void
@@ -141,7 +144,9 @@ export function createGlobalRealtimeLifecycle(
       const generation = ++connectionGeneration
       const reconnect = hasConnected
       hasConnected = true
-      dependencies.sendGlobal({ type: "chat.list_threads", payload: {} })
+      if (dependencies.sendGlobal({ type: "chat.list_threads", payload: {} }) !== false) {
+        dependencies.noteThreadListRequested?.()
+      }
       if (!reconnect) return
       void dependencies.hydrateBlockedUsersFromServer(actor.profile.userId, actor.session.sessionToken)
         .catch(() => {
