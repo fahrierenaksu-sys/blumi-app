@@ -8,6 +8,10 @@
 // Usage (run on the owner's Mac from the repository root):
 //   node tools/workbench/archive-from-manifest.mjs [--manifest <file>] [--dest <dir>]
 //        [--repo-root <dir>] [--record-in-repo] [--dry-run]
+//
+// A manifest may declare `archiveDestinationDefault` (used when --dest is not
+// given) and `archiveVerificationPath` (the repository receipt written by
+// --record-in-repo), so a later manifest never overwrites an earlier receipt.
 
 import { createHash } from "node:crypto"
 import { constants as fsConstants } from "node:fs"
@@ -24,7 +28,7 @@ export const RECEIPT_SCHEMA = "blumi-workbench-archive-verification-v1"
 const DEFAULT_REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 export function parseArgs(argv) {
-  const options = { manifest: DEFAULT_MANIFEST, dest: DEFAULT_DESTINATION, repoRoot: DEFAULT_REPO_ROOT, recordInRepo: false, dryRun: false, help: false }
+  const options = { manifest: DEFAULT_MANIFEST, dest: undefined, repoRoot: DEFAULT_REPO_ROOT, recordInRepo: false, dryRun: false, help: false }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     const value = () => {
@@ -64,13 +68,23 @@ function assertSafeRelativePath(relative) {
   }
 }
 
+// The repository receipt path for a manifest: its declared
+// `archiveVerificationPath`, or the 2026-09-29 default.
+export function resolveRepoRecordPath(manifest) {
+  const declared = manifest?.archiveVerificationPath
+  if (declared === undefined) return REPO_RECORD_PATH
+  assertSafeRelativePath(declared)
+  return declared
+}
+
 export async function archiveFromManifest(options) {
   const repoRoot = path.resolve(options.repoRoot ?? DEFAULT_REPO_ROOT)
   const manifestPath = path.resolve(repoRoot, options.manifest ?? DEFAULT_MANIFEST)
-  const destination = path.resolve(options.dest ?? DEFAULT_DESTINATION)
   const manifestBytes = await readFile(manifestPath)
   const manifest = JSON.parse(manifestBytes.toString("utf8"))
   if (!Array.isArray(manifest.entries)) throw new Error("Manifest must contain an entries array")
+  const destination = path.resolve(options.dest ?? manifest.archiveDestinationDefault ?? DEFAULT_DESTINATION)
+  const repoRecordPath = resolveRepoRecordPath(manifest)
 
   const archiveEntries = manifest.entries.filter((entry) => entry.decision === "ARCHIVE")
   const results = []
@@ -145,7 +159,7 @@ export async function archiveFromManifest(options) {
     await writeFile(receiptPath, json)
     written.push(receiptPath)
     if (options.recordInRepo) {
-      const repoRecord = path.join(repoRoot, REPO_RECORD_PATH)
+      const repoRecord = path.join(repoRoot, repoRecordPath)
       await mkdir(path.dirname(repoRecord), { recursive: true })
       await writeFile(repoRecord, json)
       written.push(repoRecord)
@@ -165,7 +179,7 @@ async function main() {
   }
   if (options.help) {
     console.log("Usage: node tools/workbench/archive-from-manifest.mjs [--manifest <file>] [--dest <dir>] [--repo-root <dir>] [--record-in-repo] [--dry-run]")
-    console.log(`Default destination: ${DEFAULT_DESTINATION}`)
+    console.log(`Default destination: the manifest's archiveDestinationDefault, else ${DEFAULT_DESTINATION}`)
     console.log("Copies ARCHIVE entries and verifies SHA-256. Never deletes anything.")
     return
   }

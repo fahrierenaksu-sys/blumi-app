@@ -103,3 +103,24 @@ test("fails clearly when no receipt has been recorded", async () => {
     await assert.rejects(planRemoval({ repoRoot: repo }), /No archive receipt/)
   } finally { rmSync(repo, { recursive: true, force: true }) }
 })
+
+test("uses the receipt path a manifest declares, so each manifest has its own receipt", async () => {
+  const { repo, cleanup } = fixture()
+  try {
+    const second = "docs/quality/cleanup-manifest-second.json"
+    const receiptPath = "docs/quality/archive-verification-second.json"
+    writeFileSync(path.join(repo, second), JSON.stringify({ archiveVerificationPath: receiptPath, entries: [] }))
+    // Without a receipt at the declared path the tool refuses, even though the
+    // default 2026-09-29 receipt exists.
+    await assert.rejects(planRemoval({ repoRoot: repo, manifest: second }), /No archive receipt/)
+    const defaultReceipt = JSON.parse(readFileSync(path.join(repo, REPO_RECORD_PATH), "utf8"))
+    writeFileSync(path.join(repo, receiptPath), JSON.stringify({
+      ...defaultReceipt,
+      manifestSha256: sha(readFileSync(path.join(repo, second)))
+    }))
+    const plan = await planRemoval({ repoRoot: repo, manifest: second })
+    assert.deepEqual(plan.remove, ["art/one.png", "art/two.py"])
+    // The default receipt no longer matches the second manifest.
+    await assert.rejects(planRemoval({ repoRoot: repo, manifest: second, receipt: REPO_RECORD_PATH }), /different manifest/)
+  } finally { cleanup() }
+})
