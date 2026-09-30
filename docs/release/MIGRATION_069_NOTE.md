@@ -1,13 +1,16 @@
 # Migration 069 note — moderation phone bans
 
-> **STATUS: NOT APPLIED** anywhere (2026-09-30). Nothing was run against
-> Supabase or Railway. Apply it **before** deploying the binary that ships it:
-> that binary's `/ready` compares every packaged migration checksum
-> (`apps/server/src/operations/schemaReadiness.ts`) and answers 503 until 069
-> is in the ledger. Same ordering and approvals as 068: owner approval,
-> PostgreSQL 17 dump plus restore test, migrate, then a separate deploy
-> approval ([`MIGRATION_068_RUNBOOK.md`](./MIGRATION_068_RUNBOOK.md),
-> [`DATABASE_RELEASE_RUNBOOK.md`](./DATABASE_RELEASE_RUNBOOK.md)).
+> **STATUS: APPLIED** to the Supabase project `Blumi` on 2026-09-30, in one
+> transaction under the migrator's advisory lock, with the ledger row
+> `069_moderation_phone_bans.sql` / checksum
+> `2fc97b071b0f06fbffa94a85ee4e904b79f3148d53175cc31f76b018f7dceaa1`
+> (the file's SHA-256, as `apps/server/src/db/migrate.ts` records it).
+> Verified: RLS on, `anon`/`authenticated` have no SELECT, table empty,
+> 69 ledger rows. Applied at the owner's request without a separate dump and
+> restore test: the change only creates an empty table and is reversible with
+> `DROP TABLE blumi_moderation_phone_bans` plus deleting its ledger row.
+> The binary that ships 069 can now pass `/ready`
+> (`apps/server/src/operations/schemaReadiness.ts`).
 
 File: `apps/server/db/migrations/069_moderation_phone_bans.sql`. It requires
 068 (the migrator applies files in order).
