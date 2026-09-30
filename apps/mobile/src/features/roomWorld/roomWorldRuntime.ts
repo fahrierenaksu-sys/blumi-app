@@ -514,6 +514,7 @@ export function getRoomWorldMovementFramePose(input: {
 }
 
 export function easeOutRoomWorldMovement(value: number): number {
+  "worklet"
   return 1 - Math.pow(1 - value, 3)
 }
 

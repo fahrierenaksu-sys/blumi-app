@@ -400,5 +400,10 @@ test("production provider grants no QA-only room ownership", () => {
 })
 
 test("sitting avatars keep the approved sitting-frame scale without a runtime squash", () => {
-  assert.match(rendererSource, /if \(motion\.state === "sitting"\) return 1/)
+  // The avatar motion interpolations live next to the renderer.
+  const avatarMotionStyleSource = readFileSync(
+    resolve(process.cwd(), "src/features/roomV2/components/roomRendererAvatarMotionStyle.ts"),
+    "utf8"
+  )
+  assert.match(avatarMotionStyleSource, /if \(motion\.state === "sitting"\) return 1/)
 })

@@ -4,6 +4,7 @@ import {
   getRoomV2DepthPerspectiveScale,
   getRoomV2FurnitureMobileRenderScale,
   getRoomV2FurnitureImageResizeMode,
+  getRoomV2LiveAvatarOffset,
   getRoomV2SeatedFurnitureRenderIds,
   ROOM_V2_FURNITURE_MOBILE_RENDER_SCALE,
   shouldShowRoomV2FurnitureGroundShadow
@@ -88,4 +89,41 @@ test("front-seat occlusion is limited to furniture hosting a seated avatar", () 
   ])
 
   assert.deepEqual([...seatedFurnitureRenderIds], ["loveseat-1"])
+})
+
+test("a live avatar offset moves the base-laid-out box onto the box the renderer lays out at the live point", () => {
+  const item = { width: 0.2, height: 0.34, anchorX: 0.5, anchorY: 0.92 }
+  const stage = { stageWidthPx: 390, stageHeightPx: 292 }
+  const layout = (x: number, y: number) => {
+    const scale = getRoomV2DepthPerspectiveScale(y)
+    const width = item.width * scale
+    const height = item.height * scale
+    const left = x - width * item.anchorX
+    const top = y - height * item.anchorY
+    return {
+      centerX: (left + width / 2) * stage.stageWidthPx,
+      centerY: (top + height / 2) * stage.stageHeightPx,
+      width: width * stage.stageWidthPx
+    }
+  }
+  const base = { x: 0.42, y: 0.61 }
+  for (const live of [{ x: 0.42, y: 0.61 }, { x: 0.5, y: 0.7 }, { x: 0.2, y: 0.45 }]) {
+    const offset = getRoomV2LiveAvatarOffset({
+      ...item,
+      ...stage,
+      baseX: base.x,
+      baseY: base.y,
+      liveX: live.x,
+      liveY: live.y
+    })
+    const from = layout(base.x, base.y)
+    const to = layout(live.x, live.y)
+    assert.ok(Math.abs(from.centerX + offset.translateX - to.centerX) < 1e-9)
+    assert.ok(Math.abs(from.centerY + offset.translateY - to.centerY) < 1e-9)
+    assert.ok(Math.abs(from.width * offset.scale - to.width) < 1e-9)
+  }
+  assert.deepEqual(
+    getRoomV2LiveAvatarOffset({ ...item, ...stage, baseX: 0.3, baseY: 0.6, liveX: 0.3, liveY: 0.6 }),
+    { translateX: 0, translateY: 0, scale: 1 }
+  )
 })

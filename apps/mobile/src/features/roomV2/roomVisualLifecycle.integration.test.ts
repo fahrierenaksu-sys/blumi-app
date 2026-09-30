@@ -14,5 +14,7 @@ test("account changes remount the room scope and loading never paints default de
     /<RoomV2Provider[\s\S]*?key=\{`\$\{sessionActor\?\.profile\.userId \?\? preAuthDraftScopeId\}:production`\}/
   )
   assert.match(room, /const \{ userRoomDecor, persistenceState \} = useRoomV2\(\)/)
-  assert.match(room, /persistenceState === "loading" \? \([\s\S]*?\) : <RoomRenderer2D/)
+  // The renderer may sit inside the UI-thread camera wrapper; nothing else
+  // renders in the non-loading branch.
+  assert.match(room, /persistenceState === "loading" \? \([\s\S]*?\) : (?:<Animated\.View style=\{stageCameraStyle\}>)?<RoomRenderer2D/)
 })

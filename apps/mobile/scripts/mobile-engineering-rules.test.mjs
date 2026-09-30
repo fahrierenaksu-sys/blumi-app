@@ -40,8 +40,7 @@ const FRAME_LOOP_DEBT = new Set([
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
   "features/session/register/useRegisterFlowController.ts",
-  "features/session/setupFlow/BlumiSetupShell.tsx",
-  "screens/MyRoomScreen.tsx"
+  "features/session/setupFlow/BlumiSetupShell.tsx"
 ])
 
 test("no new requestAnimationFrame or setInterval loops in production code", () => {
@@ -73,10 +72,10 @@ const OVERSIZED_DEBT = {
   "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
   "features/demo/SwipeableDiscoverCard.tsx": 1232,
   "features/roomV2/state/RoomV2Provider.tsx": 1210,
-  "features/roomV2/components/RoomRenderer2D.tsx": 1172,
+  "features/roomV2/components/RoomRenderer2D.tsx": 1108,
   "navigation/RootNavigator.tsx": 1123,
   "features/session/useSessionState.ts": 1129,
-  "screens/MyRoomScreen.tsx": 1124,
+  "screens/MyRoomScreen.tsx": 1082,
   "features/avatarV2/avatarV2Catalog.ts": 949,
   "screens/ProfileEditScreen.tsx": 872,
   "features/roomV2/roomVNextFullWaveCatalog.ts": 851,

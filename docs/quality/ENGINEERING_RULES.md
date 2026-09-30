@@ -71,7 +71,7 @@ is not a reason.
 
 | Rule | Why | Enforced by |
 |---|---|---|
-| Animation runs on the UI thread with Reanimated shared values; never drive motion through React state or the JS bridge per frame | Per-frame React renders drop frames (known debt: avatar frame ticker, My Room movement) | `mobile-engineering-rules.test.mjs` (no new `requestAnimationFrame`/`setInterval`) |
+| Animation runs on the UI thread with Reanimated shared values; never drive motion through React state or the JS bridge per frame | Per-frame React renders drop frames (known debt: avatar frame ticker) | `mobile-engineering-rules.test.mjs` (no new `requestAnimationFrame`/`setInterval`) |
 | Every name a worklet uses must exist on the UI thread: values reach it through the closure (used in the body) or parameters, never through default parameters; a worklet calls only other worklets or UI-thread library APIs (Reanimated, Worklets, Gesture Handler), and reaches JS with `scheduleOnRN` | These fail only on the device ("Property … doesn't exist"); node tests run plain JavaScript. The main-tab pager crashed this way on 2026-09-30 | `mobile-worklet-closure.test.mjs` compiles the app with the real Babel/Worklets plugin and checks each worklet's UI-thread code; `mobile-engineering-rules.test.mjs` |
 | Gestures use React Native Gesture Handler with explicit ownership (relations such as `blocksExternalGesture`), not scattered boolean flags | Competing gestures stole touches | Review; gesture tests |
 | Reduce Motion is read from the shared store (`ui/animations.ts`), never from a new `AccessibilityInfo` subscription | 30 components each subscribed and flashed motion on mount | `mobile-engineering-rules.test.mjs`, `reducedMotionStore.test.ts` |
@@ -102,8 +102,9 @@ is not a reason.
 
 ## Known debt (do not copy these patterns)
 
-- Avatar frame ticker (`RoomAvatarRenderer2D.tsx`) and My Room movement
-  (`MyRoomScreen.tsx`) still use JS timers and React state.
+- Avatar frame ticker (`RoomAvatarRenderer2D.tsx`) still uses a JS timer and
+  React state. (My Room movement moved to the UI thread in
+  `features/roomWorld/useMyRoomAvatarWalk.ts`; follow that pattern.)
 - ChatThread receives functions through navigation params.
 - `packages/realtime-client` is a one-line re-export; the client lives in the
   app.

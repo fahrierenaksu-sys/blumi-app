@@ -1,17 +1,16 @@
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { useFocusEffect } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import * as Sentry from "@sentry/react-native"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   type LayoutChangeEvent,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View
 } from "react-native"
+import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { uiTheme } from "../ui/theme"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
@@ -56,7 +55,6 @@ import {
   createRoomWorldMovementPlan,
   createRoomWorldSeatExitMovementPlan,
   createRoomWorldSeatMovementPlan,
-  getRoomWorldMovementFrame,
   getRoomWorldMovementFramePose,
   getRoomWorldMovementSegmentStartPose,
   ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
@@ -74,6 +72,11 @@ import {
   MY_ROOM_MOVEMENT_NO_OP_DISTANCE,
   MY_ROOM_TRANSIENT_POSE_DURATION_MS
 } from "../features/roomWorld/myRoomInteractionModel"
+import {
+  createMyRoomAvatarDepthNeighbours,
+  createMyRoomWalkTimeline
+} from "../features/roomWorld/myRoomAvatarWalkModel"
+import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
 import type {
   RoomFurnitureRotation,
   RoomV2AvatarMotionState,
@@ -83,12 +86,8 @@ import type { SessionActor } from "../features/session/sessionApi"
 import type { CapabilityMap } from "@blumi/contracts"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { hapticError, hapticLight } from "../ui/haptics"
-import {
-  MOBILE_HTTP_BASE_URL
-} from "../config/env"
-import { showToast } from "../ui/toast"
 import { useAppViewportMetrics } from "../ui/layout/useAppViewportMetrics"
-import { updateRoomShowcaseVisibility } from "../features/discovery/roomShowcaseApi"
+import { useMyRoomShowcase } from "../features/roomV2/useMyRoomShowcase"
 import {
   cancelMyRoomMotionTasks,
   createMyRoomMotionLifecycle,
@@ -108,6 +107,7 @@ type MyRoomScreenProps = MyRoomNavProps & {
 
 const ACTIVE_ROOM_FURNITURE_CATALOG = ROOM_V2_FURNITURE_CATALOG
 const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG
+const MY_ROOM_OWNER_AVATAR_RENDER_ID = "my_room_owner_avatar"
 interface MyRoomAvatarPose extends RoomWorldPoint {
   direction: RoomFurnitureRotation
   state: RoomV2AvatarMotionState
@@ -139,85 +139,18 @@ export function MyRoomScreen({
   const avatarPoseRef = useRef(avatarPose)
   const motionLifecycle = useMemo(() => createMyRoomMotionLifecycle(), [])
   const isMountedRef = useRef(false)
-  const animationFrameRef = useRef<number | null>(null)
+  // The generation of the UI-thread walk in flight, or null when none runs.
+  const liveWalkRef = useRef<number | null>(null)
   const transientPoseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const movementFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [movementFeedback, setMovementFeedback] = useState<string | undefined>()
   const [stageMarker, setStageMarker] = useState<RoomRendererStageMarker | undefined>()
   const [stageWidth, setStageWidth] = useState(0)
-  const [roomShowcasePublic, setRoomShowcasePublic] = useState(false)
-  const roomShowcaseEnabled = sessionActor.session.mode === "production" &&
-    resolvedCapabilities?.discovery_room_showcase === true
-
-  const setRoomShowcase = useCallback(async (
-    isPublic: boolean,
-    headline: string | null
-  ): Promise<void> => {
-    try {
-      const result = await updateRoomShowcaseVisibility(
-        MOBILE_HTTP_BASE_URL,
-        sessionActor.session.sessionToken,
-        { isPublic, headline }
-      )
-      setRoomShowcasePublic(result.isPublic)
-      showToast({
-        title: result.isPublic ? "Kart vitrini güncellendi" : "Oda karttan kaldırıldı",
-        body: result.isPublic
-          ? "Son kaydettiğin oda, kartının arkasında gösterilecek."
-          : "Odan artık Discovery kartlarında görünmeyecek.",
-        type: "success"
-      })
-    } catch (error) {
-      Sentry.captureException(error, { tags: { feature: "room_showcase" } })
-      showToast({
-        title: "Kart vitrini kullanılamıyor",
-        body: error instanceof Error ? error.message : copy.tryAgain,
-        type: "warning"
-      })
-    }
-  }, [copy.tryAgain, sessionActor])
-
-  const openRoomShowcase = useCallback((): void => {
-    if (!roomShowcaseEnabled) {
-      showToast({
-        title: "Kart vitrini henüz açık değil",
-        body: "Bu özellik kademeli olarak açılıyor.",
-        type: "info"
-      })
-      return
-    }
-    if (roomShowcasePublic) {
-      Alert.alert(
-        "Oda vitrini",
-        "Son kaydettiğin oda Discovery kartının arkasında gösteriliyor.",
-        [
-          { text: "Kapat", style: "cancel" },
-          {
-            text: "Karttan kaldır",
-            style: "destructive",
-            onPress: () => { void setRoomShowcase(false, null) }
-          }
-        ]
-      )
-      return
-    }
-    Alert.prompt(
-      "Oda vitrini",
-      "Kartının yanında görünecek kısa başlık (isteğe bağlı, en fazla 30 karakter).",
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Kartında göster",
-          onPress: (value?: string) => {
-            const headline = value?.trim() || null
-            void setRoomShowcase(true, headline)
-          }
-        }
-      ],
-      "plain-text",
-      ""
-    )
-  }, [roomShowcaseEnabled, roomShowcasePublic, setRoomShowcase])
+  const { roomShowcasePublic, openRoomShowcase } = useMyRoomShowcase({
+    sessionActor,
+    resolvedCapabilities,
+    tryAgainCopy: copy.tryAgain
+  })
   const [seatedFurnitureRenderId, setSeatedFurnitureRenderId] = useState<string>()
   const [seatedSeatId, setSeatedSeatId] = useState<string>()
 
@@ -253,15 +186,54 @@ export function MyRoomScreen({
   const stageHeight = layoutMetrics.stageHeight
   const usesWideStageCamera = layoutMetrics.usesWideStageCamera
   const stageRendererWidth = layoutMetrics.rendererWidth
-  const stageRendererTranslateY = usesWideStageCamera && baseRoomScene.shell
-    ? getWideStageRendererTranslateY({
+  const seatedHotspot = useMemo(() => seatedFurnitureRenderId
+    ? roomWorldHotspots.find((hotspot) =>
+      hotspot.kind === "seat" &&
+      hotspot.sourceRenderId === seatedFurnitureRenderId &&
+      (!seatedSeatId || hotspot.seatId === seatedSeatId)
+    )
+    : undefined, [roomWorldHotspots, seatedFurnitureRenderId, seatedSeatId])
+  const avatarDepthNeighbours = useMemo(() => createMyRoomAvatarDepthNeighbours(
+    baseRoomScene.renderItems,
+    { layer: "furniture", renderId: MY_ROOM_OWNER_AVATAR_RENDER_ID }
+  ), [baseRoomScene.renderItems])
+  // The walk runs on the UI thread; React takes the live point only when the
+  // avatar passes in front of or behind furniture (render order changes).
+  const syncAvatarRenderOrder = useCallback((x: number, y: number): void => {
+    if (liveWalkRef.current === null) return
+    const nextPose = { ...avatarPoseRef.current, x, y }
+    avatarPoseRef.current = nextPose
+    setAvatarPose(nextPose)
+  }, [])
+  const avatarWalk = useMyRoomAvatarWalk({
+    initial: MY_ROOM_AVATAR_SPAWN,
+    depthNeighbours: avatarDepthNeighbours,
+    fixedDepth: seatedHotspot?.renderDepth,
+    onDepthIndexChange: syncAvatarRenderOrder
+  })
+  const liveAvatarY = avatarWalk.y
+  const liveAvatarPosition = useMemo(() => ({
+    renderId: MY_ROOM_OWNER_AVATAR_RENDER_ID,
+    x: avatarWalk.x,
+    y: avatarWalk.y
+  }), [avatarWalk.x, avatarWalk.y])
+  const wideStageCamera = usesWideStageCamera && baseRoomScene.shell
+    ? {
         stageWidth: resolvedStageWidth,
         stageHeight,
         shellCanvasWidth: baseRoomScene.shell.canvasSize.width,
-        shellCanvasHeight: baseRoomScene.shell.canvasSize.height,
-        avatarWorldY: avatarPose.y
-      })
-    : layoutMetrics.rendererTranslateY
+        shellCanvasHeight: baseRoomScene.shell.canvasSize.height
+      }
+    : null
+  const fixedRendererTranslateY = layoutMetrics.rendererTranslateY
+  // The wide-stage camera follows the live avatar point on the UI thread.
+  const stageCameraStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateY: wideStageCamera
+        ? getWideStageRendererTranslateY({ ...wideStageCamera, avatarWorldY: liveAvatarY.value })
+        : fixedRendererTranslateY
+    }]
+  }))
 
   const projectedRoomAvatar = useMemo(
     () =>
@@ -276,13 +248,6 @@ export function MyRoomScreen({
     const avatarSize = usesWideStageCamera
       ? MY_ROOM_AVATAR_SIZE.wide
       : MY_ROOM_AVATAR_SIZE.compact
-    const seatedHotspot = seatedFurnitureRenderId
-      ? roomWorldHotspots.find((hotspot) =>
-        hotspot.kind === "seat" &&
-        hotspot.sourceRenderId === seatedFurnitureRenderId &&
-        (!seatedSeatId || hotspot.seatId === seatedSeatId)
-      )
-      : undefined
     return createRoomAvatarRenderItem({
       avatarId: "my-room-owner",
       name: sessionActor.profile.displayName,
@@ -291,7 +256,7 @@ export function MyRoomScreen({
       y: avatarPose.y,
       width: avatarSize.width,
       height: avatarSize.height,
-      renderId: "my_room_owner_avatar",
+      renderId: MY_ROOM_OWNER_AVATAR_RENDER_ID,
       direction: avatarPose.direction,
       state: avatarPose.state,
       depth: seatedHotspot?.renderDepth ?? avatarPose.y,
@@ -310,10 +275,9 @@ export function MyRoomScreen({
     avatarPose.x,
     avatarPose.y,
     projectedRoomAvatar,
-    roomWorldHotspots,
+    seatedHotspot,
     sessionActor.profile.displayName,
     seatedFurnitureRenderId,
-    seatedSeatId,
     usesWideStageCamera
   ])
 
@@ -326,18 +290,31 @@ export function MyRoomScreen({
     avatarPoseRef.current = avatarPose
   }, [avatarPose])
 
+  // A running walk stops where the avatar is, and React takes that point.
+  const stopLiveWalk = useCallback((): void => {
+    const point = avatarWalk.stop()
+    const stoppedPose = { ...avatarPoseRef.current, x: point.x, y: point.y }
+    avatarPoseRef.current = stoppedPose
+    setAvatarPose(stoppedPose)
+  }, [avatarWalk])
+
+  // The avatar pose including the live point of a walk in flight.
+  const readAvatarPose = useCallback((): MyRoomAvatarPose => liveWalkRef.current === null
+    ? avatarPoseRef.current
+    : { ...avatarPoseRef.current, x: avatarWalk.x.value, y: avatarWalk.y.value }, [avatarWalk])
+
   const cancelPendingMotionWork = useCallback((): void => {
     motionLifecycle.blur()
     cancelMyRoomMotionTasks({
       refs: {
-        animationFrame: animationFrameRef,
+        animationFrame: liveWalkRef,
         transientPoseTimer: transientPoseTimerRef,
         movementFeedbackTimer: movementFeedbackTimerRef
       },
-      cancelFrame: cancelAnimationFrame,
+      cancelFrame: stopLiveWalk,
       clearTimer: clearTimeout
     })
-  }, [motionLifecycle])
+  }, [motionLifecycle, stopLiveWalk])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -390,17 +367,24 @@ export function MyRoomScreen({
 
   useEffect(() => {
     const clearance = { clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE }
-    if (isRoomWorldPointWalkable(roomWorldGeometry, avatarPoseRef.current, clearance)) return
+    if (isRoomWorldPointWalkable(roomWorldGeometry, readAvatarPose(), clearance)) return
     if (!isRoomWorldPointWalkable(roomWorldGeometry, MY_ROOM_AVATAR_SPAWN, clearance)) return
+    if (liveWalkRef.current !== null) {
+      // Placing the avatar cancels the UI-thread walk; its steps must not land.
+      liveWalkRef.current = null
+      motionLifecycle.begin()
+      setStageMarker(undefined)
+    }
     const nextPose = {
       ...MY_ROOM_AVATAR_SPAWN,
       state: "idle" as const
     }
     avatarPoseRef.current = nextPose
     setAvatarPose(nextPose)
+    avatarWalk.place(nextPose)
     setSeatedFurnitureRenderId(undefined)
     setSeatedSeatId(undefined)
-  }, [roomWorldGeometry])
+  }, [avatarWalk, motionLifecycle, readAvatarPose, roomWorldGeometry])
 
   const moveAvatarToPoint = useCallback((
     target: RoomWorldPoint,
@@ -423,7 +407,7 @@ export function MyRoomScreen({
       clearTimeout(transientPoseTimerRef.current)
       transientPoseTimerRef.current = null
     }
-    const start = avatarPoseRef.current
+    const start = readAvatarPose()
     const currentSeatHotspots = seatedFurnitureRenderId
       ? roomWorldHotspots.filter((hotspot) =>
         hotspot.kind === "seat" && hotspot.sourceRenderId === seatedFurnitureRenderId
@@ -499,8 +483,12 @@ export function MyRoomScreen({
         direction: arrival?.direction ?? start.direction,
         state: arrival?.state ?? "idle"
       }
-      avatarPoseRef.current = restingPose
-      setAvatarPose(restingPose)
+      // A walk in flight keeps walking, as the next animation frame used to
+      // overwrite this pose immediately.
+      if (liveWalkRef.current === null) {
+        avatarPoseRef.current = restingPose
+        setAvatarPose(restingPose)
+      }
       setSeatedFurnitureRenderId(arrival?.seatedFurnitureRenderId)
       setSeatedSeatId(arrival?.seatedSeatId ?? arrival?.seat?.seatId)
       setStageMarker(undefined)
@@ -544,9 +532,10 @@ export function MyRoomScreen({
     }
 
     const motionGeneration = motionLifecycle.begin()
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = null
+    if (liveWalkRef.current !== null) {
+      // The new walk continues from wherever the running one has reached.
+      liveWalkRef.current = null
+      avatarWalk.stop()
     }
     if (movementFeedbackTimerRef.current !== null) {
       clearTimeout(movementFeedbackTimerRef.current)
@@ -560,13 +549,11 @@ export function MyRoomScreen({
       tone: "target"
     })
 
-    const animatePathSegment = (pathIndex: number): void => {
-      if (!motionLifecycle.isCurrent(motionGeneration)) return
-      const segment = plan.segments[pathIndex]
-      const startedAt = Date.now()
-      const segmentStartPose = getRoomWorldMovementSegmentStartPose(segment)
-
-      const startingPose = {
+    // React takes a pose at each step start and on arrival; every frame in
+    // between runs on the UI thread (useMyRoomAvatarWalk).
+    const commitSegmentStartPose = (pathIndex: number): void => {
+      const segmentStartPose = getRoomWorldMovementSegmentStartPose(plan.segments[pathIndex]!)
+      const startingPose: MyRoomAvatarPose = {
         x: segmentStartPose.x,
         y: segmentStartPose.y,
         direction: segmentStartPose.facing,
@@ -574,64 +561,39 @@ export function MyRoomScreen({
       }
       avatarPoseRef.current = startingPose
       setAvatarPose(startingPose)
-
-      const tick = (): void => {
-        if (!motionLifecycle.isCurrent(motionGeneration)) return
-        animationFrameRef.current = null
-        const frame = getRoomWorldMovementFrame({
-          segment,
-          startedAt,
-          now: Date.now()
-        })
-        const runtimePose = getRoomWorldMovementFramePose({
-          frame,
-          segment,
-          arrival: {
-            facing: arrival?.direction,
-            motion: arrival?.state
-          }
-        })
-        const nextPose: MyRoomAvatarPose = {
-          x: runtimePose.x,
-          y: runtimePose.y,
-          direction: runtimePose.facing,
-          state: runtimePose.motion
-        }
-        avatarPoseRef.current = nextPose
-        setAvatarPose(nextPose)
-
-        if (!frame.isComplete) {
-          animationFrameRef.current = scheduleMyRoomMotionCallback(
-            motionLifecycle,
-            motionGeneration,
-            (callback) => requestAnimationFrame(callback),
-            tick
-          )
-          return
-        }
-
-        if (!segment.isFinal) {
-          animatePathSegment(pathIndex + 1)
-          return
-        }
-
-        animationFrameRef.current = null
-        setSeatedFurnitureRenderId(arrival?.seatedFurnitureRenderId)
-        setSeatedSeatId(arrival?.seatedSeatId ?? arrival?.seat?.seatId)
-        setStageMarker(undefined)
-        hapticLight()
-      }
-
-      animationFrameRef.current = scheduleMyRoomMotionCallback(
-        motionLifecycle,
-        motionGeneration,
-        (callback) => requestAnimationFrame(callback),
-        tick
-      )
     }
-
-    animatePathSegment(0)
-  }, [copy, motionLifecycle, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
+    commitSegmentStartPose(0)
+    liveWalkRef.current = motionGeneration
+    avatarWalk.start(createMyRoomWalkTimeline(plan), (pathIndex) => {
+      if (!motionLifecycle.isCurrent(motionGeneration)) return
+      const segment = plan.segments[pathIndex]!
+      if (!segment.isFinal) {
+        commitSegmentStartPose(pathIndex + 1)
+        return
+      }
+      liveWalkRef.current = null
+      const runtimePose = getRoomWorldMovementFramePose({
+        frame: { x: segment.to.x, y: segment.to.y, facing: segment.facing, progress: 1, isComplete: true },
+        segment,
+        arrival: {
+          facing: arrival?.direction,
+          motion: arrival?.state
+        }
+      })
+      const arrivedPose: MyRoomAvatarPose = {
+        x: runtimePose.x,
+        y: runtimePose.y,
+        direction: runtimePose.facing,
+        state: runtimePose.motion
+      }
+      avatarPoseRef.current = arrivedPose
+      setAvatarPose(arrivedPose)
+      setSeatedFurnitureRenderId(arrival?.seatedFurnitureRenderId)
+      setSeatedSeatId(arrival?.seatedSeatId ?? arrival?.seat?.seatId)
+      setStageMarker(undefined)
+      hapticLight()
+    })
+  }, [avatarWalk, copy, motionLifecycle, readAvatarPose, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
 
   const handlePoseAction = useCallback((state: MyRoomPoseActionState): void => {
     if (!motionLifecycle.isFocused()) return
@@ -645,9 +607,9 @@ export function MyRoomScreen({
       clearTimeout(transientPoseTimerRef.current)
       transientPoseTimerRef.current = null
     }
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = null
+    if (liveWalkRef.current !== null) {
+      liveWalkRef.current = null
+      stopLiveWalk()
     }
 
     const nextPose: MyRoomAvatarPose = {
@@ -674,10 +636,10 @@ export function MyRoomScreen({
         transientPoseTimerRef.current = null
       }
     )
-  }, [motionLifecycle])
+  }, [motionLifecycle, stopLiveWalk])
 
   const handleWalkAction = useCallback((): void => {
-    const currentPose = avatarPoseRef.current
+    const currentPose = readAvatarPose()
     const target = getMyRoomWalkActionTarget({
       geometry: roomWorldGeometry,
       from: currentPose
@@ -691,7 +653,7 @@ export function MyRoomScreen({
       direction: "front",
       state: "idle"
     })
-  }, [copy.nearbyTile, moveAvatarToPoint, roomWorldGeometry, showMovementFeedback])
+  }, [copy.nearbyTile, moveAvatarToPoint, readAvatarPose, roomWorldGeometry, showMovementFeedback])
   const handleAvatarTap = useCallback(() => {
     const currentState = avatarPoseRef.current.state
     if (currentState === "idle") {
@@ -706,14 +668,14 @@ export function MyRoomScreen({
   }, [handlePoseAction, handleWalkAction])
 
   const handleRoomItemTap = useCallback((item: RoomV2RenderItem): void => {
-    if (item.renderId === "my_room_owner_avatar") {
+    if (item.renderId === MY_ROOM_OWNER_AVATAR_RENDER_ID) {
       handleAvatarTap()
       return
     }
     if (item.kind !== "furniture" || item.interactionType !== "seat") return
     const seatCandidate = resolveRoomWorldSeatSelection({
       geometry: roomWorldGeometry,
-      from: avatarPoseRef.current,
+      from: readAvatarPose(),
       hotspots: roomWorldHotspots,
       seatedFurnitureRenderId: item.renderId,
       clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
@@ -760,6 +722,7 @@ export function MyRoomScreen({
     handleAvatarTap,
     moveAvatarToPoint,
     projectedRoomAvatar,
+    readAvatarPose,
     roomWorldGeometry,
     roomWorldHotspots,
     showMovementFeedback
@@ -812,8 +775,9 @@ export function MyRoomScreen({
               <Text style={styles.stageLoading} accessibilityRole="text">
                 {getMyRoomEditorCopy(getAppLocale()).preparing}
               </Text>
-            ) : <RoomRenderer2D
+            ) : <Animated.View style={stageCameraStyle}><RoomRenderer2D
               shell={baseRoomScene.shell}
+              liveAvatarPosition={liveAvatarPosition}
               renderItems={renderItems}
               stageMarkers={stageMarker ? [stageMarker] : undefined}
               testID="my-room-production-stage"
@@ -823,14 +787,8 @@ export function MyRoomScreen({
               }}
               onStagePress={moveAvatarToPoint}
               onItemTap={handleRoomItemTap}
-              style={[
-                styles.stageRenderer,
-                {
-                  width: stageRendererWidth,
-                  transform: [{ translateY: stageRendererTranslateY }]
-                }
-              ]}
-            />}
+              style={[styles.stageRenderer, { width: stageRendererWidth }]}
+            /></Animated.View>}
             <View style={styles.stageHud} pointerEvents="none">
               <Ionicons name="heart" size={13} color="#D92A79" />
               <Text style={styles.stageHeaderText} numberOfLines={1}>
