@@ -135,11 +135,11 @@ test("blocked accounts receive no presence, snapshot, nearby, or reaction data a
     await adaEvents.waitForCount("realtime.error", 1)
     await boraEvents.waitForCount("realtime.error", 1)
     const reinvite = await harness.http("POST", `/v1/threads/${threadId}/room-invites`, bora.sessionToken, {})
-    assert.equal(reinvite.statusCode, 403)
+    // While the block stands the pair's thread is hidden from both users, so
+    // re-inviting and rejoining answer 404 like a thread they are not in.
+    assert.equal(reinvite.statusCode, 404)
     const rejoin = await harness.http("POST", `/v1/room-sessions/${miniRoomId}/join`, bora.sessionToken, {})
-    // The block ended the room, so rejoining is refused (INVITE_NOT_AVAILABLE).
-    assert.equal(rejoin.statusCode, 409)
-    assert.equal(rejoin.json().code, "INVITE_NOT_AVAILABLE")
+    assert.equal(rejoin.statusCode, 404)
     assert.equal(
       await harness.miniRoomService.findActiveMiniRoomForUser(bora.userId),
       null
