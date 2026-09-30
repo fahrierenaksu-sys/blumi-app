@@ -106,11 +106,18 @@ function createNavigationRef({ ready = true, routeName = "Lobby", params } = {})
 
 // ── Bottom navigation dispatch ─────────────────────────────
 
-function bottomNavPress(navigationRef, events) {
+// `pager` models the main-page pager: undefined means the rollback path
+// (MAIN_TAB_PAGER_ENABLED = false); otherwise it answers pager requests.
+function bottomNavPress(navigationRef, events, pager) {
   return evaluate(findInitializer(OWNER.bottomNav, "handleBottomNavPress"), {
     navigationRef,
     CommonActions,
     shouldDispatchMainTabNavigation,
+    MAIN_TAB_PAGER_ENABLED: pager !== undefined,
+    requestMainTabPagerPage: (key) => {
+      events.push(["pager", key])
+      return pager?.(key) ?? false
+    },
     setGlobalMatch: (value) => events.push(["setGlobalMatch", value]),
     dismissGlobalMatch: () => events.push(["setGlobalMatch", null])
   })
@@ -132,6 +139,25 @@ test("bottom tabs dispatch StackRouter NAVIGATE with pop and merge to the mapped
       CommonActions.navigate(destination, undefined, { pop: true, merge: true })
     ]])
   }
+})
+
+test("with the pager, a tab press selects the page through the pager and never also navigates the stack", () => {
+  const navigationRef = createNavigationRef({ routeName: "Inbox" })
+  const events = []
+  bottomNavPress(navigationRef, events, () => true)("shop")
+  assert.deepEqual(events, [["setGlobalMatch", null], ["pager", "shop"]])
+  assert.deepEqual(navigationRef.calls, [], "one navigation per tap: the pager's commit")
+})
+
+test("with the pager covered by a detail route, a tab press falls back to the stack navigate", () => {
+  const navigationRef = createNavigationRef({ routeName: "ChatThread" })
+  const events = []
+  bottomNavPress(navigationRef, events, () => false)("myroom")
+  assert.deepEqual(events, [["setGlobalMatch", null], ["pager", "myroom"]])
+  assert.deepEqual(navigationRef.calls, [[
+    "dispatch",
+    CommonActions.navigate("MyRoom", undefined, { pop: true, merge: true })
+  ]])
 })
 
 test("bottom tabs ignore presses before readiness and reselection of the focused tab", () => {

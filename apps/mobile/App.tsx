@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { InteractionManager } from "react-native"
+import { InteractionManager, StyleSheet } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import {
   SafeAreaProvider,
   initialWindowMetrics
@@ -60,13 +61,22 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <QueryClientProvider client={queryClient}>
-          <RootNavigator fontsReady={fontsLoaded} />
-        </QueryClientProvider>
-      </SafeAreaProvider>
+      {/* Required for Gesture Handler gestures (the main-page pager). */}
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <QueryClientProvider client={queryClient}>
+            <RootNavigator fontsReady={fontsLoaded} />
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   )
 }
+
+const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1
+  }
+})
 
 export default Sentry.wrap(App)

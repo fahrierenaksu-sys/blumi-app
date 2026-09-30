@@ -20,6 +20,8 @@ import {
   publishRootNavigationChromeReturnPreview,
   settleRootNavigationChromeReturnPreview
 } from "./rootNavigationChromeStore"
+import { MAIN_TAB_PAGER_ENABLED } from "./mainTabPager/mainTabPagerConfig"
+import { requestMainTabPagerPage } from "./mainTabPager/mainTabPagerController"
 import { shouldDispatchMainTabNavigation } from "./rootNavigationModel"
 import { navigationRef } from "./rootNavigationRef"
 import type { RootStackParamList } from "./RootNavigator"
@@ -76,6 +78,11 @@ export function useBottomNavChrome({
           : "CosmeticShop"
     if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) return
     dismissGlobalMatch()
+    // With the pager, a tap commits through the same selection path as a
+    // swipe (one selected-page state, one navigation per change). The stack
+    // navigation below remains the rollback path and the fallback when a
+    // detail route covers the pager.
+    if (MAIN_TAB_PAGER_ENABLED && requestMainTabPagerPage(key)) return
     // The bottom bar shares a native stack with detail routes. Reordering
     // existing native controllers with RESET can leave a rapid-switching iOS
     // transition unresponsive. StackRouter's pop navigation returns to an

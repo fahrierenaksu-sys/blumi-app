@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, Text, View } from "react-native"
+import { MainTabPagerHorizontalScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
 import type { AppLocale } from "../../session/appLocale"
 import { useReducedMotion } from "../../../ui/animations"
 import { uiTheme } from "../../../ui/theme"
@@ -153,31 +154,35 @@ export function ClosetBrowser(props: {
           accessibilityLayout={catalog.accessibilityLayout}
           height={catalog.productCardHeight * 2 + 8}
         />
-        <FlatList
-          ref={productScrollerRef}
-          data={productPages}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          onMomentumScrollEnd={(event) => {
-            const nextPageIndex = Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth)))
-            setPageIndex(nextPageIndex)
-          }}
-          initialNumToRender={2}
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          removeClippedSubviews
-          showsHorizontalScrollIndicator={false}
-          style={[styles.closetProductScroller, { width: productShelfWidth, height: catalog.productCardHeight * 2 + 8 }]}
-          contentContainerStyle={styles.closetProductShelf}
-          keyExtractor={(item, index) => item[0]?.[0]?.id ?? `shop-page-${index}`}
-          getItemLayout={(_data, index) => ({
-            length: productShelfWidth,
-            offset: productShelfWidth * index,
-            index
-          })}
-          renderItem={renderProductPage}
-        />
+        {/* The product shelf pages horizontally; it owns horizontal drags
+            that start on it, so the main-page pager never takes them. */}
+        <MainTabPagerHorizontalScrollOwner>
+          <FlatList
+            ref={productScrollerRef}
+            data={productPages}
+            horizontal
+            pagingEnabled
+            bounces={false}
+            onMomentumScrollEnd={(event) => {
+              const nextPageIndex = Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth)))
+              setPageIndex(nextPageIndex)
+            }}
+            initialNumToRender={2}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            removeClippedSubviews
+            showsHorizontalScrollIndicator={false}
+            style={[styles.closetProductScroller, { width: productShelfWidth, height: catalog.productCardHeight * 2 + 8 }]}
+            contentContainerStyle={styles.closetProductShelf}
+            keyExtractor={(item, index) => item[0]?.[0]?.id ?? `shop-page-${index}`}
+            getItemLayout={(_data, index) => ({
+              length: productShelfWidth,
+              offset: productShelfWidth * index,
+              index
+            })}
+            renderItem={renderProductPage}
+          />
+        </MainTabPagerHorizontalScrollOwner>
       </View>
     </View>
   )

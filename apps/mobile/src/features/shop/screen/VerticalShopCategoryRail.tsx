@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { memo } from "react"
 import { Pressable, ScrollView, Text, View } from "react-native"
+import { MainTabPagerHorizontalScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
 import type { AppLocale } from "../../session/appLocale"
 import { uiTheme } from "../../../ui/theme"
 import { getShopCopy } from "../shopCopy"
@@ -85,9 +86,12 @@ export const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(p
     </View>
   )
   return props.accessibilityLayout ? (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalCategoryScroller}>
-      {rail}
-    </ScrollView>
+    // Accessibility layout: a horizontal rail owns drags that start on it.
+    <MainTabPagerHorizontalScrollOwner>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalCategoryScroller}>
+        {rail}
+      </ScrollView>
+    </MainTabPagerHorizontalScrollOwner>
   ) : (
     <ScrollView
       style={{ width: props.width, height: props.height, flexGrow: 0, flexShrink: 0 }}
