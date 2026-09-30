@@ -3,6 +3,7 @@ import type {
   ConnectionDecisionStatus,
   ConnectionMatch
 } from "@blumi/contracts"
+import { requestJson } from "../network/apiClient"
 
 export interface ConnectionDecisionRequest {
   miniRoomId: string
@@ -32,7 +33,7 @@ export async function submitConnectionDecision(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<ConnectionDecisionResponse> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/connections/decision"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/connections/decision", {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -40,8 +41,7 @@ export async function submitConnectionDecision(
     },
     body: JSON.stringify(input),
     signal
-  })
-  const payload: unknown = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok) {
     throw new ConnectionDecisionApiError(
       readApiError(payload, "We could not save that connection choice yet."),
@@ -109,14 +109,6 @@ function normalizeMatch(value: unknown): ConnectionMatch | null {
     participantUserIds: [record.participantUserIds[0].trim(), record.participantUserIds[1].trim()],
     matchedAt: record.matchedAt
   }
-}
-
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  return `${baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl}${path}`
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  return response.json().catch(() => ({}))
 }
 
 function readApiError(payload: unknown, fallback: string): string {

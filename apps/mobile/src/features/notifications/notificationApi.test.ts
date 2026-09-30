@@ -6,6 +6,48 @@ import {
   removeDevice,
   updateNotificationPreferences
 } from "./notificationApi"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
+
+registerBoundedRequestTests([
+  {
+    name: "device registration POST",
+    run: (fetcher) => registerDevice("https://api.blumi.test", "token", {
+      platform: "ios",
+      pushToken: "push-token"
+    }, fetcher)
+  },
+  {
+    name: "device removal DELETE",
+    run: (fetcher) => removeDevice("https://api.blumi.test", "token", "push-token", fetcher)
+  },
+  {
+    name: "notification preferences GET",
+    run: (fetcher) => getNotificationPreferences("https://api.blumi.test", "token", fetcher)
+  },
+  {
+    name: "notification preferences PUT",
+    run: (fetcher) => updateNotificationPreferences("https://api.blumi.test", "token", {
+      likesEnabled: false
+    }, fetcher)
+  }
+])
+
+test("notification API keeps caller aborts recognisable as AbortError", async () => {
+  const controller = new AbortController()
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = removeDevice("https://api.blumi.test", "token", "push-token", async (_url, init) => {
+    transportSignal = init?.signal
+    entered()
+    return new Promise<Response>(() => {})
+  }, controller.signal)
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+})
 
 test("registerDevice posts the platform and push token with auth", async () => {
   const calls: { url: string; init: RequestInit | undefined }[] = []

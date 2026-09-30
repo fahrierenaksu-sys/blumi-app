@@ -7,6 +7,68 @@ import {
   reportSafetyUser,
   unblockSafetyUser
 } from "./safetyApi"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
+
+registerBoundedRequestTests([
+  {
+    name: "safety blocks GET",
+    run: (fetcher) => fetchSafetyBlocks("https://api.blumi.test", "token", fetcher)
+  },
+  {
+    name: "safety block POST",
+    run: (fetcher) => blockSafetyUser("https://api.blumi.test", "token", "user-2", fetcher)
+  },
+  {
+    name: "safety unblock DELETE",
+    run: (fetcher) => unblockSafetyUser("https://api.blumi.test", "token", "user-2", fetcher)
+  },
+  {
+    name: "safety report POST",
+    run: (fetcher) => reportSafetyUser("https://api.blumi.test", "token", {
+      reportedUserId: "user-2",
+      reason: "spam",
+      idempotencyKey: "report-key-1"
+    }, fetcher)
+  },
+  {
+    name: "my safety reports GET",
+    run: (fetcher) => fetchMySafetyReports("https://api.blumi.test", "token", fetcher)
+  }
+])
+
+test("safety API forwards caller cancellation and skips pre-aborted requests", async () => {
+  const controller = new AbortController()
+  let calls = 0
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = blockSafetyUser("https://api.blumi.test", "token", "user-2", async (_url, init) => {
+    calls += 1
+    transportSignal = init?.signal
+    entered()
+    return new Promise<Response>(() => {})
+  }, controller.signal)
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+  await assert.rejects(unblockSafetyUser("https://api.blumi.test", "token", "user-2", async () => {
+    calls += 1
+    return new Response(null, { status: 204 })
+  }, controller.signal), { name: "AbortError" })
+  assert.equal(calls, 1)
+})
+
+test("safety unblock accepts an empty 204 and keeps fallback copy for unreadable errors", async () => {
+  await unblockSafetyUser("https://api.blumi.test", "token", "user-2",
+    async () => new Response(null, { status: 204 }))
+  await assert.rejects(
+    unblockSafetyUser("https://api.blumi.test", "token", "user-2",
+      async () => new Response("<html>bad gateway</html>", { status: 502 })),
+    /could not be shown again/
+  )
+})
 
 test("fetchMySafetyReports returns only the caller-facing status and generic response", async () => {
   const reports = await fetchMySafetyReports(

@@ -5,6 +5,50 @@ import {
   isRetryableConnectionDecisionError,
   submitConnectionDecision
 } from "./connectionDecisionApi"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
+
+registerBoundedRequestTests([
+  {
+    name: "connection decision POST",
+    // A timeout stays an outbox-retryable transport failure (never a terminal
+    // API rejection), and requestJson itself never re-sends the mutation.
+    rejection: (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.name, "TimeoutError")
+      assert.equal(isRetryableConnectionDecisionError(error), true)
+      return true
+    },
+    run: (fetcher) => submitConnectionDecision(
+      "https://api.blumi.test",
+      "session_token",
+      { miniRoomId: "room_1", partnerUserId: "bora", status: "saved" },
+      fetcher
+    )
+  }
+])
+
+test("connection decision forwards caller cancellation to the transport", async () => {
+  const controller = new AbortController()
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = submitConnectionDecision(
+    "https://api.blumi.test",
+    "session_token",
+    { miniRoomId: "room_1", partnerUserId: "bora", status: "saved" },
+    async (_url, init) => {
+      transportSignal = init?.signal
+      entered()
+      return new Promise<Response>(() => {})
+    },
+    controller.signal
+  )
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+})
 
 test("submits a connection decision with bearer auth and validates the response", async () => {
   const calls: { url: string; init?: RequestInit }[] = []

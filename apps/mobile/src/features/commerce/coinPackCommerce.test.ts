@@ -10,6 +10,73 @@ import {
   runCoinPackPurchase,
   type CoinPackReconcileClient
 } from "./coinPackPurchaseCoordinator"
+import { registerBoundedRequestTests } from "../network/boundedRequestContract"
+
+registerBoundedRequestTests([
+  {
+    name: "coin pack reconcile POST",
+    run: (fetcher) => reconcileCoinPackPurchase({
+      baseHttpUrl: "https://api.blumi.test",
+      sessionToken: "token",
+      transactionId: "tx_1",
+      fetcher
+    })
+  }
+])
+
+test("reconcile keeps its base URL guard and forwards caller cancellation", async () => {
+  let calls = 0
+  await assert.rejects(reconcileCoinPackPurchase({
+    baseHttpUrl: "  /// ",
+    sessionToken: "token",
+    transactionId: "tx_1",
+    fetcher: async () => { calls += 1; return new Response("{}") }
+  }), /commerce API URL is required/)
+  assert.equal(calls, 0)
+
+  const controller = new AbortController()
+  let transportSignal: AbortSignal | null | undefined
+  let entered!: () => void
+  const started = new Promise<void>((resolve) => { entered = resolve })
+  const request = reconcileCoinPackPurchase({
+    baseHttpUrl: "https://api.blumi.test/",
+    sessionToken: "token",
+    transactionId: "tx_1",
+    fetcher: async (url, init) => {
+      assert.equal(String(url), "https://api.blumi.test/v1/commerce/coin-packs/reconcile")
+      transportSignal = init?.signal
+      entered()
+      return new Promise<Response>(() => {})
+    },
+    signal: controller.signal
+  })
+  const rejected = assert.rejects(request, { name: "AbortError" })
+  await started
+  controller.abort()
+  await rejected
+  assert.equal(transportSignal?.aborted, true)
+})
+
+test("a reconcile timeout keeps the purchase pending instead of failing it", async () => {
+  const timeout = new Error("This is taking too long.")
+  timeout.name = "TimeoutError"
+  const result = await runCoinPackPurchase({
+    client: {
+      syncAuthenticatedUser: async () => {},
+      purchaseCoinPack: async () => ({
+        status: "purchased",
+        transaction: { transactionId: "tx_1" }
+      })
+    } as unknown as Parameters<typeof runCoinPackPurchase>[0]["client"],
+    reconcileClient: { reconcile: async () => { throw timeout } },
+    sessionToken: "token",
+    userId: "user-1",
+    packId: COIN_PACKS[0].id,
+    isConnected: true,
+    refreshWallet: async () => { assert.fail("timeout must not refresh as credited") }
+  })
+  assert.deepEqual(result, { status: "pending", transactionId: "tx_1" })
+})
 
 test("R1 exposes only the three consumable coin packs", () => {
   assert.deepEqual(

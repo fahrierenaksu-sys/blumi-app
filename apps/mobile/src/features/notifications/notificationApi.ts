@@ -1,3 +1,5 @@
+import { requestJson } from "../network/apiClient"
+
 export type PushPlatform = "ios" | "android"
 
 export interface DeviceRegistration {
@@ -25,11 +27,6 @@ export interface NotificationPreferences {
 
 export type UpdateNotificationPreferencesInput = Partial<NotificationPreferences>
 
-function withBaseUrl(baseHttpUrl: string, path: string): string {
-  const trimmed = baseHttpUrl.endsWith("/") ? baseHttpUrl.slice(0, -1) : baseHttpUrl
-  return `${trimmed}${path}`
-}
-
 export async function registerDevice(
   baseHttpUrl: string,
   sessionToken: string,
@@ -37,7 +34,7 @@ export async function registerDevice(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<DeviceRegistration> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/devices"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/devices", {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -45,8 +42,7 @@ export async function registerDevice(
     },
     body: JSON.stringify(input),
     signal
-  })
-  const payload: unknown = await response.json()
+  }, fetcher)
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "This device could not be registered."))
@@ -62,8 +58,9 @@ export async function removeDevice(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetcher(
-    withBaseUrl(baseHttpUrl, "/v1/devices"),
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    "/v1/devices",
     {
       method: "DELETE",
       headers: {
@@ -72,10 +69,10 @@ export async function removeDevice(
       },
       body: JSON.stringify({ pushToken }),
       signal
-    }
+    },
+    fetcher
   )
   if (!response.ok) {
-    const payload = await readJsonPayload(response)
     throw new Error(getApiErrorMessage(payload, "This device could not be removed."))
   }
 }
@@ -86,12 +83,11 @@ export async function getNotificationPreferences(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<NotificationPreferences> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/notification-preferences"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/notification-preferences", {
     method: "GET",
     headers: { authorization: `Bearer ${sessionToken}` },
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "Notification settings could not be loaded."))
   }
@@ -105,7 +101,7 @@ export async function updateNotificationPreferences(
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<NotificationPreferences> {
-  const response = await fetcher(withBaseUrl(baseHttpUrl, "/v1/notification-preferences"), {
+  const { response, payload } = await requestJson(baseHttpUrl, "/v1/notification-preferences", {
     method: "PUT",
     headers: {
       authorization: `Bearer ${sessionToken}`,
@@ -113,8 +109,7 @@ export async function updateNotificationPreferences(
     },
     body: JSON.stringify({ ...input, quietHoursTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
     signal
-  })
-  const payload = await readJsonPayload(response)
+  }, fetcher)
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "Notification settings could not be saved."))
   }
@@ -183,14 +178,6 @@ function normalizePreferencesPayload(payload: unknown): NotificationPreferences 
     quietHoursUtcOffsetMinutes: record.quietHoursUtcOffsetMinutes as number,
     ...(typeof record.quietHoursTimeZone === "string" ? { quietHoursTimeZone: record.quietHoursTimeZone } : {}),
     maxPushesPerHour: record.maxPushesPerHour as number
-  }
-}
-
-async function readJsonPayload(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
   }
 }
 
