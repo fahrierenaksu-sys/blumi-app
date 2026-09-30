@@ -21,7 +21,7 @@ number", risks R1–R3).
 | Item | Value |
 | --- | --- |
 | Database | Supabase project "Blumi", ref `nkqcbxufbhfibrgvajim`, PostgreSQL 17.6 |
-| Classification | **Unresolved; owner decides.** The Railway project `blumi` has exactly one environment, named `production`, with one service `blumi-app` serving `blumi-app-production.up.railway.app`. No staging environment exists. `.railway/railway.ts` names the service `blumi-api` and allows `staging`/`production`, so the IaC file and the live project differ. Treat this database as production data until the owner classifies it |
+| Classification | **Owner decision 2026-09-30:** all 18 accounts are the owner's own test accounts; they are kept, and this database and the Railway `production` environment are the release target. Handle it as production: backup, restore proof and explicit approval before any write. The Railway project has exactly one environment, `production`, with one service `blumi-app`; `.railway/railway.ts` (`blumi-api`, `staging`) does not match it |
 | Migration ledger | `blumi_migrations` holds 67 rows; the latest is `067_realtime_connection_leases.sql`. 068 is not applied |
 | Schema | `blumi_accounts.firebase_uid` does not exist |
 | Data | 18 accounts, 1 session row (1 live). `blumi_sessions` is 80 kB and `blumi_accounts` is 128 kB |
@@ -189,6 +189,14 @@ These results come from the rehearsal (§6) and the code in
    The archive covers the whole `public` schema, which includes both affected
    tables. It is local owner-only material and not an offsite backup. Record
    its path and SHA-256 in `DATABASE_RELEASE_RUNBOOK.md`.
+   **Owner-reported result 2026-09-30 (Codex, owner's Mac):** a PostgreSQL 17
+   dump was taken and restored into a separate local database; the restore gate
+   reported `applied: 1`, `rerunApplied: 0`, `accounts: 18` and a passing
+   integrity audit. The live database was not changed. Still to record: the
+   archive path and SHA-256 in `DATABASE_RELEASE_RUNBOOK.md` (step 0 needs it).
+   Codex also confirmed the Mac's local `DATABASE_URL` points at
+   `nkqcbxufbhfibrgvajim` on port 5432. **Railway's `DATABASE_URL` is still
+   unverified** (open).
 3. **Restore verification (required before step 4).** From a clean checkout of
    the release commit:
 

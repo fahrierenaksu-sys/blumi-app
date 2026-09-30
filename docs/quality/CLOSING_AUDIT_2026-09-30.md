@@ -22,7 +22,7 @@ Bu belge main merge, migration veya deploy onayı değildir.
 | Supabase migration | 67 kayıt, son `067_realtime_connection_leases.sql`. **068 uygulanmadı**, `firebase_uid` sütunu yok | SQL, salt okunur, bugün |
 | Supabase yedek | **PITR yok, platform günlük yedeği yok** (Free plan; Supabase belgesi: günlük yedek Pro ve üstü) | `get_organization` + resmi belge |
 | EAS iOS build | **Hiç yok** (Expo API `build_list` iOS: boş liste) | Expo API, bugün |
-| Native testte kullanılan build | **Bilinmiyor.** Bana hangi binary'nin iPhone'da kurulu olduğu ya da hangi commit'ten derlendiği bildirilmedi | — |
+| Native testte kullanılan build | **Kısmen bilinir (sahip bildirimi).** iPhone'a Metro ile `8704cea` JavaScript'i yüklendi. Kurulu native binary'nin kaynak commit'i doğrulanmadı. Bağlı backend canlıdaki `2a55475` | Codex bildirimi |
 | Sentry projesi, olay akışı | **Kontrol edilmedi** | — |
 | App Store Connect, Apple Developer hesabı | **Kontrol edilmedi** (LAUNCH_CONTROL §4 "WAITING ON USER") | belge |
 
@@ -149,16 +149,16 @@ değildir:
 
 | İş | Neden açık | Kullanıcıya etkisi | Sorumlu | Bağımlılık | Sonraki adım | Kapanış kanıtı | Yayını engelliyor mu? |
 |---|---|---|---|---|---|---|---|
-| Ortam sınıflandırması | Railway'de yalnızca `production` var; belgeler "staging" varsayıyordu | Test verisi mi gerçek kullanıcı verisi mi olduğu bilinmiyor | Sahip | — | Supabase ve Railway ortamının rolünü yazılı belirlemek | Runbook §1 güncel karar | Evet (migration) |
-| `DATABASE_URL` host ve port | Parola nedeniyle okunmadı | Yanlış veritabanına migration riski | Sahip | — | Railway panelinde host `…nkqcbxufbhfibrgvajim…` ve port 5432 kontrolü | Sahip notu | Evet (migration) |
-| Yedek ve geri yükleme provası | Free plan, platform yedeği yok | Hata olursa veri geri dönüşü yalnızca bu yedeğe bağlı | Sahip / Codex (Mac) | PostgreSQL 17 araçları | Runbook §5 adım 2–3 | `restore-upgrade-gate` çıktısı: `applied: 1`, `rerunApplied: 0`, 18 hesap | Evet (migration) |
+| Ortam sınıflandırması | **Kapandı (sahip kararı).** 18 hesap sahibin test hesabı, korunacak; hedef bu ortamla yayın | — | — | — | — | Runbook §1 | Hayır |
+| Railway `DATABASE_URL` host ve port | Mac'teki yerel adres doğrulandı (proje `nkqcbxufbhfibrgvajim`, port 5432); Railway'deki değişken doğrulanmadı | Server yanlış veritabanına bağlıysa migration ile server ayrışır | Sahip | — | Railway panelinde host ve portu kontrol etmek, parolayı paylaşmadan | Sahip notu | Evet (migration) |
+| Yedek arşivinin kaydı | Prova Codex tarafından geçti (sahip bildirimi: `applied: 1`, `rerunApplied: 0`, 18 hesap, bütünlük geçti); arşiv yolu ve SHA-256 henüz kayıtlı değil | Geri dönüş dosyasının kimliği belirsiz kalır | Codex | — | Yolu ve SHA-256'yı `DATABASE_RELEASE_RUNBOOK.md`'ye yazmak | Kayıt | Evet (migration) |
 | Migration 068 uygulanması | Sahip onayı yok | Yeni oturum güvenliği ve uid bağlama kapalı | Sahip | Üç satır yukarısı | Runbook §7 | Kayıt 68, `/ready` 200 | Evet (deploy) |
 | Main merge | Karar bekliyor | Hiçbir düzeltme canlıda değil | Sahip | Kod incelemesi | Branch'in incelenmesi | `main` = teslim commit'i | Evet |
 | Server deploy | Main merge ve 068'e bağlı | F-05, F-06, F-08, oturum güvenliği, şema doğrulaması, realtime sınırları canlıda yok | Sahip | 068, main merge | Runbook §7 adım 7 | Deploy commit'i, `/ready` 200, 24 saat log | Evet |
 | İstek doğrulamasının canlı kontrolü | Staging ortamı yok | Eski istemciler 400 alabilir | Codex + sahip | Deploy | Deploy sonrası eski ve yeni app ile ana akışlar | Loglarda beklenmeyen 400 yok | Evet |
 | Native QA, 105 madde | Hiçbiri çalıştırılmadı | Değişen akışlar cihazda denenmedi | Codex | Build kimliği | Önce 24 P0 madde | QA belgesinde madde başına kanıt | Evet |
 | iOS build ve dağıtım | EAS'te iOS build yok; Apple hesabı "WAITING ON USER" | TestFlight mümkün değil | Sahip | Apple Developer hesabı | Hesap, sertifika, ilk EAS iOS build | EAS build kimliği, TestFlight yüklemesi | Evet |
-| Native build kimliği | Cihazdaki binary'nin commit'i bilinmiyor | QA sonucu yanlış sürüme ait olabilir | Codex | — | Kurulu build'in commit'ini kaydetmek | QA belgesinde commit | Evet (QA için) |
+| Native build kimliği | JS `8704cea` Metro'dan yüklendi; binary'nin commit'i doğrulanmadı; alt bar düzeltmesi `746ac49` sonrası | QA sonucu yanlış sürüme ait olabilir | Codex | — | Binary commit'i, JS commit'i (en az `746ac49`) ve backend sürümünü QA belgesine ayrı yazmak | QA belgesi başlığı | Evet (QA için) |
 | Performans ölçümü | Cihazda ölçülmedi | Takılma ve açılış süresi bilinmiyor | Codex | Build | Instruments ile baz ölçüm | Ölçüm tablosu | Hayır (ama iyileşme iddiası yapılamaz) |
 | Avatar ticker ve MyRoom hareketi | Hâlâ `setInterval`/`requestAnimationFrame` + React state | Oda ve avatarda kare kaybı riski | Orkestratör | Performans ölçümü | Reanimated'e taşımak | Önce/sonra kare süresi | Hayır |
 | ChatThread'e navigasyonla fonksiyon geçirme | Yapılmadı | State kaybı, React Navigation uyarısı | Orkestratör | Bütçe kararı | Tek dar kapsamlı ajan | Test ve native chat akışı | Hayır |
