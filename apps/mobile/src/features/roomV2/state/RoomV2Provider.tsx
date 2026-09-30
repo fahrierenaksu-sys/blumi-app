@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -153,8 +154,8 @@ export function RoomV2Provider({
     decorJson: string
   } | null>(null)
   const providerMountedRef = useRef(true)
-  const ownedRoomItemIds = inventoryStore.inventory.ownedRoomItemIds
-  const ownedRoomItemIdKey = ownedRoomItemIds.join("|")
+  // Content key: the inventory snapshot is also replaced for unrelated changes.
+  const ownedRoomItemIdKey = JSON.stringify(inventoryStore.inventory.ownedRoomItemIds)
   const runtimeConfig = useMemo(
     () => resolveRoomV2ProviderRuntimeConfig({
       storageScopeId,
@@ -165,10 +166,9 @@ export function RoomV2Provider({
       allowStarterOnboardingEdits,
       excludedRoomItemIds,
       inventoryIsReady: inventoryStore.isReady,
-      inventoryOwnedItemIds: ownedRoomItemIds,
+      inventoryOwnedItemIds: JSON.parse(ownedRoomItemIdKey) as string[],
       qaOnlyOwnedRoomItemIds
     }),
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
     [
       ownedRoomItemIdKey,
       inventoryStore.isReady,
@@ -251,7 +251,10 @@ export function RoomV2Provider({
     }
   }, [])
 
+  // Hydration samples the draft only when credentials or storage identity change.
+  const readUserRoomDecor = useEffectEvent(() => userRoomDecor)
   useEffect(() => {
+    const sampledUserRoomDecor = readUserRoomDecor()
     let mounted = true
     const generation = ++hydrationGenerationRef.current
     const sameOwner = hydrationStorageKeyRef.current === storageKey
@@ -260,7 +263,7 @@ export function RoomV2Provider({
     sameOwnerHydrationRef.current = sameOwner && Boolean(storageKey)
     const currentRoomDecor = roomDecorIntentRef.current.storageKey === storageKey
       ? roomDecorIntentRef.current.decor
-      : userRoomDecor
+      : sampledUserRoomDecor
     const pendingLocalDraft = sameOwner
       ? conflictedDraftRef.current?.storageKey === storageKey
         ? conflictedDraftRef.current.decor
@@ -348,7 +351,7 @@ export function RoomV2Provider({
           ? retainedDraftRef.current.decor
           : pendingLocalDraft
         publishRoomDecor(
-          latestPendingDraft ?? (sameOwner ? userRoomDecor : localDecor) ?? createDefaultRoomV2Decor()
+          latestPendingDraft ?? (sameOwner ? sampledUserRoomDecor : localDecor) ?? createDefaultRoomV2Decor()
         )
         retainedDraftRef.current = null
         sameOwnerHydrationRef.current = false
@@ -451,7 +454,7 @@ export function RoomV2Provider({
           ? retainedDraftRef.current.decor
           : pendingLocalDraft
         publishRoomDecor(
-          latestPendingDraft ?? (sameOwner ? userRoomDecor : localDecor) ?? createDefaultRoomV2Decor()
+          latestPendingDraft ?? (sameOwner ? sampledUserRoomDecor : localDecor) ?? createDefaultRoomV2Decor()
         )
         retainedDraftRef.current = null
         sameOwnerHydrationRef.current = false
@@ -471,9 +474,6 @@ export function RoomV2Provider({
       hydrationGenerationRef.current += 1
       abortController.abort()
     }
-  // Sample the current draft only when credentials or storage identity change.
-  // Including userRoomDecor would restart hydration on every room edit.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     baseHttpUrl,
     migrationMarkerKey,
