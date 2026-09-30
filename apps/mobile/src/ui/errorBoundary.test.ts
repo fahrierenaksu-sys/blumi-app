@@ -5,6 +5,7 @@ import { resolve } from "node:path"
 import vm from "node:vm"
 import ts from "typescript"
 import { getErrorBoundaryCopy } from "./errorBoundaryCopy"
+import * as errorBoundaryScope from "./errorBoundaryScope"
 
 // Execute the real class against minimal host elements. These tests prove its
 // recovery state/copy, not native layout or a mounted React tree.
@@ -15,6 +16,7 @@ function boundaryFixture(locale: "tr" | "en", reportingEnabled: boolean) {
   const element = (type: unknown, props: unknown) => ({ type, props })
   const exports: Record<string, any> = {}
   let reports = 0
+  const contexts: unknown[] = []
   const context = vm.createContext({ exports, console: { error: () => {} },
     require: (name: string) => {
       if (name === "react/jsx-runtime") return { jsx: element, jsxs: element }
@@ -29,17 +31,20 @@ function boundaryFixture(locale: "tr" | "en", reportingEnabled: boolean) {
       if (name === "@expo/vector-icons/Ionicons") return { default: "Ionicons" }
       if (name === "./theme") return { uiTheme: { colors: {}, spacing: {}, radius: {}, shadow: {}, font: {} } }
       if (name === "../observability/crashReporting") return {
-        captureAppException: () => { if (reportingEnabled) reports += 1 }
+        captureAppException: (_error: unknown, context: unknown) => {
+          if (reportingEnabled) { reports += 1; contexts.push(context) }
+        }
       }
       if (name === "../features/session/appLocale") return { getAppLocale: () => locale }
       if (name === "./errorBoundaryCopy") return { getErrorBoundaryCopy }
+      if (name === "./errorBoundaryScope") return errorBoundaryScope
       throw new Error(`Unexpected import ${name}`)
     }
   })
   vm.runInContext(ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX
   } }).outputText, context)
-  return { Boundary: exports.ErrorBoundary, reports: () => reports }
+  return { Boundary: exports.ErrorBoundary, reports: () => reports, contexts: () => JSON.parse(JSON.stringify(contexts)) }
 }
 
 for (const locale of ["tr", "en"] as const) {
@@ -66,3 +71,66 @@ for (const locale of ["tr", "en"] as const) {
     })
   }
 }
+
+type HostElement = { type: unknown; props: { children?: unknown; accessibilityLabel?: string; onPress?: () => void } }
+
+function findPressable(tree: unknown, label: string): HostElement | undefined {
+  if (!tree || typeof tree !== "object") return undefined
+  if (Array.isArray(tree)) {
+    for (const child of tree) {
+      const found = findPressable(child, label)
+      if (found) return found
+    }
+    return undefined
+  }
+  const element = tree as HostElement
+  if (element.type === "Pressable" && element.props.accessibilityLabel === label) return element
+  return findPressable(element.props?.children, label)
+}
+
+for (const locale of ["tr", "en"] as const) {
+  test(`${locale}: a route boundary reports its route, retries once, and can go back`, () => {
+    const fixture = boundaryFixture(locale, true)
+    let backs = 0
+    let canGoBack = true
+    const boundary = new fixture.Boundary({
+      children: "screen",
+      routeName: "ChatThread",
+      canGoBack: () => canGoBack,
+      onBack: () => { backs += 1 }
+    })
+    const error = new Error("private diagnostic")
+    boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
+    boundary.componentDidCatch(error, { componentStack: "synthetic" })
+    assert.deepEqual(fixture.contexts(), [{ componentStack: "synthetic", boundary: "route", route: "ChatThread" }])
+
+    const copy = getErrorBoundaryCopy(locale)
+    const first = boundary.render()
+    assert.ok(findPressable(first, copy.retryLabel))
+    const back = findPressable(first, copy.backLabel)
+    assert.ok(back)
+    back.props.onPress?.()
+    assert.equal(backs, 1)
+    assert.doesNotMatch(JSON.stringify(first), /private diagnostic/)
+
+    boundary.handleRecover()
+    assert.equal(boundary.render(), "screen")
+    boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
+    const repeated = boundary.render()
+    assert.equal(findPressable(repeated, copy.retryLabel), undefined)
+    assert.ok(findPressable(repeated, copy.backLabel), "a repeated route error still offers a way out")
+
+    canGoBack = false
+    assert.equal(findPressable(boundary.render(), copy.backLabel), undefined)
+  })
+}
+
+test("the root boundary never offers back and keeps its original report context", () => {
+  const fixture = boundaryFixture("en", true)
+  const boundary = new fixture.Boundary({ children: "app" })
+  const error = new Error("private diagnostic")
+  boundary.setState(fixture.Boundary.getDerivedStateFromError(error))
+  boundary.componentDidCatch(error, { componentStack: "synthetic" })
+  assert.deepEqual(fixture.contexts(), [{ componentStack: "synthetic" }])
+  assert.equal(findPressable(boundary.render(), getErrorBoundaryCopy("en").backLabel), undefined)
+})

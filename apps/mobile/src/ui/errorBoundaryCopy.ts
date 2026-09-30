@@ -7,6 +7,7 @@ export function getErrorBoundaryCopy(locale: AppLocale, repeated = false) {
       ? "Sorun devam ediyor. Blumi'yi kapatıp yeniden aç. Kaydedilmemiş değişiklikleri yeniden girmen gerekebilir."
       : "Bu ekranı açamadık. Tekrar deneyebilirsin. Kaydedilmemiş değişiklikleri yeniden girmen gerekebilir.",
     retryLabel: "Tekrar dene",
+    backLabel: "Geri dön",
     canRetry: !repeated
   } : {
     title: "Something went wrong",
@@ -14,6 +15,7 @@ export function getErrorBoundaryCopy(locale: AppLocale, repeated = false) {
       ? "The problem is still happening. Please close and reopen Blumi. You may need to enter unsaved changes again."
       : "We couldn't open this screen. You can try again. You may need to enter unsaved changes again.",
     retryLabel: "Try again",
+    backLabel: "Go back",
     canRetry: !repeated
   }
 }

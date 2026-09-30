@@ -104,6 +104,7 @@ import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
 import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
 import { useMatchModal } from "./useMatchModal"
+import { renderRouteErrorBoundary } from "./RouteErrorBoundary"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
@@ -629,6 +630,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       >
         <Stack.Navigator
           screenListeners={screenListeners}
+          screenLayout={renderRouteErrorBoundary}
           key={sessionNavigatorKey}
           initialRouteName={
             isAccountRestricted

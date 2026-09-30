@@ -81,7 +81,8 @@ try {
       resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-lobby-invite-fail-closed.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-core-flow-presentation-contract.test.mjs"),
-      resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs")
+      resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs"),
+      resolve(workspaceRoot, "src/navigation/routeErrorBoundary.test.mjs")
     ],
     {
       cwd: workspaceRoot,
