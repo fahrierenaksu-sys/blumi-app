@@ -1,11 +1,6 @@
 import { useCallback } from "react"
-import {
-  FlatList,
-  Pressable,
-  Text,
-  View,
-  type GestureResponderHandlers
-} from "react-native"
+import { FlatList, Pressable, Text, View } from "react-native"
+import type { PanGesture } from "react-native-gesture-handler"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
 import { InventoryCatalogCard } from "./InventoryCatalogCard"
@@ -27,11 +22,12 @@ export function RoomEditorInventoryList(props: {
   selectedInventoryRotation: PlacedRoomItem["rotation"]
   setSelectedInventoryItemId: (itemId: string) => void
   canPlaceAnotherRoomItem: (itemId: string) => boolean
-  createInventoryItemPanHandlers: (
+  createInventoryItemDragGesture: (
     item: FurnitureItem,
     owned: boolean,
+    placed: boolean,
     rotation: PlacedRoomItem["rotation"]
-  ) => GestureResponderHandlers
+  ) => PanGesture
   onBrowseShop: () => void
 }) {
   const {
@@ -43,7 +39,7 @@ export function RoomEditorInventoryList(props: {
     selectedInventoryRotation,
     setSelectedInventoryItemId,
     canPlaceAnotherRoomItem,
-    createInventoryItemPanHandlers,
+    createInventoryItemDragGesture,
     onBrowseShop
   } = props
 
@@ -56,12 +52,14 @@ export function RoomEditorInventoryList(props: {
       previewRotation={selectedInventoryEntry?.item.id === entry.item.id
         ? selectedInventoryRotation
         : getDefaultRoomV2FurnitureRotation(entry.item)}
+      trayDragHint={copy.trayDragHint}
       onPreviewItem={setSelectedInventoryItemId}
-      createPanHandlers={createInventoryItemPanHandlers}
+      createDragGesture={createInventoryItemDragGesture}
     />
   ), [
     canPlaceAnotherRoomItem,
-    createInventoryItemPanHandlers,
+    copy.trayDragHint,
+    createInventoryItemDragGesture,
     selectedInventoryEntry?.item.id,
     selectedInventoryRotation,
     setSelectedInventoryItemId

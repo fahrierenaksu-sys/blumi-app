@@ -111,8 +111,12 @@ export function unblockUser(
   blockedUserId: string,
   options: { persist?: boolean } = {}
 ): void {
-  getOwnerCache(ownerUserId).mutationGeneration += 1
-  delete getOwnerCache(ownerUserId).blockedProfilesById[blockedUserId]
+  const cache = getOwnerCache(ownerUserId)
+  cache.mutationGeneration += 1
+  // Replace, never mutate: views memoize on this object's identity.
+  cache.blockedProfilesById = Object.fromEntries(
+    Object.entries(cache.blockedProfilesById).filter(([userId]) => userId !== blockedUserId)
+  )
   const current = getOwnerCache(ownerUserId).state.blockedUserIds
   updateOwnerState(ownerUserId, (state) =>
     replaceBlockedUsers(
@@ -277,31 +281,50 @@ export function useBlockStore(
     void hydrateLocal(normalizedOwner)
   }, [normalizedOwner])
 
-  return useMemo(() => {
-    const state = cache.state
-    const relevantStatus = requireServerHydration
-      ? state.serverStatus
-      : state.localStatus
-    return {
-      blockedUserIds: [...state.blockedUserIds],
-      blockedProfilesById: { ...cache.blockedProfilesById },
-      isReady: Boolean(normalizedOwner) && isBlockOwnerReady(state, requireServerHydration),
-      hydrationStatus: relevantStatus,
-      isBlocked: (blockedUserId: string) =>
-        isUserBlocked(normalizedOwner, blockedUserId),
-      blockUser: (blockedUserId: string, options?: { persist?: boolean }) =>
-        blockUser(normalizedOwner, blockedUserId, options),
-      unblockUser: (blockedUserId: string, options?: { persist?: boolean }) =>
-        unblockUser(normalizedOwner, blockedUserId, options)
-    }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [
-    cache,
-    cache.state.blockedUserIds,
-    cache.state.localStatus,
-    cache.state.serverStatus,
-    cache.blockedProfilesById,
-    normalizedOwner,
-    requireServerHydration
+  // The owner state and profile map are replaced on every change, so their
+  // identities are the invalidation keys for the copies handed to callers.
+  const ownerState = cache.state
+  const ownerBlockedUserIds = ownerState.blockedUserIds
+  const ownerBlockedProfilesById = cache.blockedProfilesById
+  const isReady = Boolean(normalizedOwner) && isBlockOwnerReady(ownerState, requireServerHydration)
+  const hydrationStatus = requireServerHydration
+    ? ownerState.serverStatus
+    : ownerState.localStatus
+  const blockedUserIds = useMemo(() => [...ownerBlockedUserIds], [ownerBlockedUserIds])
+  const blockedProfilesById = useMemo(
+    () => ({ ...ownerBlockedProfilesById }),
+    [ownerBlockedProfilesById]
+  )
+  const isBlocked = useCallback(
+    (blockedUserId: string) => isUserBlocked(normalizedOwner, blockedUserId),
+    [normalizedOwner]
+  )
+  const blockOwnerUser = useCallback(
+    (blockedUserId: string, options?: { persist?: boolean }) =>
+      blockUser(normalizedOwner, blockedUserId, options),
+    [normalizedOwner]
+  )
+  const unblockOwnerUser = useCallback(
+    (blockedUserId: string, options?: { persist?: boolean }) =>
+      unblockUser(normalizedOwner, blockedUserId, options),
+    [normalizedOwner]
+  )
+
+  return useMemo(() => ({
+    blockedUserIds,
+    blockedProfilesById,
+    isReady,
+    hydrationStatus,
+    isBlocked,
+    blockUser: blockOwnerUser,
+    unblockUser: unblockOwnerUser
+  }), [
+    blockedUserIds,
+    blockedProfilesById,
+    isReady,
+    hydrationStatus,
+    isBlocked,
+    blockOwnerUser,
+    unblockOwnerUser
   ])
 }

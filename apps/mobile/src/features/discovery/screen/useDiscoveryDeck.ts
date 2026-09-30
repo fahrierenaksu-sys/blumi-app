@@ -46,8 +46,8 @@ export function useDiscoveryDeck(input: {
   productionQuota: DiscoveryDecisionQuota | null
   nearbyUsers: UseLobbyFlowResult["nearbyUsers"]
   isSafetyListReady: boolean
-  isUserBlocked: (userId: string) => boolean
-  blockedUserKey: string
+  /** Content-stable: keeps its identity while the block list is unchanged. */
+  blockedUserIds: readonly string[]
   pendingInviteUserIds: ReadonlySet<string>
   seenThisSessionUserIds: Set<string>
   setSeenThisSessionUserIds: SetSeenCandidateIds
@@ -61,8 +61,7 @@ export function useDiscoveryDeck(input: {
     productionQuota,
     nearbyUsers,
     isSafetyListReady,
-    isUserBlocked,
-    blockedUserKey,
+    blockedUserIds,
     pendingInviteUserIds,
     seenThisSessionUserIds,
     setSeenThisSessionUserIds
@@ -86,6 +85,8 @@ export function useDiscoveryDeck(input: {
     [savedConnections]
   )
 
+  const blockedUserIdSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds])
+
   const discoverSourceUsers = useMemo<DiscoveryCandidate[]>(
     () =>
       isProductionDiscovery
@@ -98,7 +99,7 @@ export function useDiscoveryDeck(input: {
     if (isProductionDiscovery && !isSafetyListReady) return []
     const locallyBlockedUserIds = new Set(
       discoverSourceUsers
-        .filter((user) => isUserBlocked(user.userId))
+        .filter((user) => blockedUserIdSet.has(user.userId))
         .map((user) => user.userId)
     )
     return buildAvailableDiscoveryCandidates(discoverSourceUsers, {
@@ -108,10 +109,9 @@ export function useDiscoveryDeck(input: {
       seenUserIds: seenThisSessionUserIds,
       pendingInviteUserIds
     })
-// eslint-disable-next-line react-hooks/exhaustive-deps -- blockedUserKey is the block list's content key; isUserBlocked's identity also changes with hydration status, so listing it would rebuild the deck (a new array for DiscoveryDeckView) without a content change.
   }, [
     discoverSourceUsers,
-    blockedUserKey,
+    blockedUserIdSet,
     isProductionDiscovery,
     isSafetyListReady,
     pendingInviteUserIds,
@@ -141,9 +141,8 @@ export function useDiscoveryDeck(input: {
   const nearbyCount = useMemo(
     () => isProductionDiscovery && !isSafetyListReady
       ? 0
-      : discoverSourceUsers.filter((u) => !u.blocked && !isUserBlocked(u.userId)).length,
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Same content key as discoverDeck: blockedUserKey, not isUserBlocked, whose identity also changes with hydration status.
-    [blockedUserKey, discoverSourceUsers, isProductionDiscovery, isSafetyListReady]
+      : discoverSourceUsers.filter((u) => !u.blocked && !blockedUserIdSet.has(u.userId)).length,
+    [blockedUserIdSet, discoverSourceUsers, isProductionDiscovery, isSafetyListReady]
   )
 
   return {

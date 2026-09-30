@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useEffectEvent } from "react"
 import { Alert } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
 import { showToast } from "../../ui/toast"
@@ -22,20 +22,23 @@ export function useHiddenPeople(input: {
 }) {
   const { copy, locale, sessionActor, unblockUser } = input
 
+  // Locale only formats the failure toast: it is read when the refresh fails
+  // and must not trigger another server hydration.
+  const showRefreshFailure = useEffectEvent((error: unknown) => {
+    showToast({
+      title: "Hidden list not refreshed",
+      body: getSettingsActionErrorMessageForDisplay("refreshHiddenList", error, locale),
+      type: "warning"
+    })
+  })
+
   useEffect(() => {
     if (sessionActor.session.mode !== "production") return
     void hydrateBlockedUsersFromServer(
       sessionActor.profile.userId,
       sessionActor.session.sessionToken
     )
-      .catch((error) => {
-        showToast({
-          title: "Hidden list not refreshed",
-          body: getSettingsActionErrorMessageForDisplay("refreshHiddenList", error, locale),
-          type: "warning"
-        })
-      })
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Refresh once per session actor; locale only formats the failure toast and must not trigger another server hydration.
+      .catch((error) => showRefreshFailure(error))
   }, [sessionActor])
 
   return useCallback(

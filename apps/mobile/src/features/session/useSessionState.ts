@@ -178,19 +178,16 @@ export function useSessionState(): UseSessionStateResult {
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
   const firebasePhoneConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
-  const mutationCoordinatorRef = useRef<ReturnType<typeof createSessionMutationCoordinator> | null>(null)
-  if (!mutationCoordinatorRef.current) {
-    mutationCoordinatorRef.current = createSessionMutationCoordinator({
-      current: () => sessionActorRef.current,
-      save: saveSessionActor,
-      publish: (actor) => {
-        warmDiscoveryBeforeMain(actor)
-        sessionActorRef.current = actor
-        setSessionActor(actor)
-      }
-    })
-  }
-  const mutationCoordinator = mutationCoordinatorRef.current
+  // Coordinators are created once per mount (stable effect dependencies).
+  const [mutationCoordinator] = useState(() => createSessionMutationCoordinator({
+    current: () => sessionActorRef.current,
+    save: saveSessionActor,
+    publish: (actor) => {
+      warmDiscoveryBeforeMain(actor)
+      sessionActorRef.current = actor
+      setSessionActor(actor)
+    }
+  }))
   const capturedSessionStartUserIdRef = useRef<string | null>(null)
   const appStateRef = useRef(AppState.currentState)
   const accountMutationGenerationRef = useRef(0)
@@ -209,23 +206,17 @@ export function useSessionState(): UseSessionStateResult {
     resolvedCapabilitiesRef.current = next
     setResolvedCapabilityState(next)
   }, [])
-  const refreshCoordinatorRef = useRef<ReturnType<
-    typeof createSessionRefreshCoordinator
-  > | null>(null)
-  if (!refreshCoordinatorRef.current) {
-    refreshCoordinatorRef.current = createSessionRefreshCoordinator(
-      async (actor, signal) => {
-        const ticket = mutationCoordinator.capture(actor, false)
-        const refreshed = await refreshAndPersistSession(MOBILE_HTTP_BASE_URL, actor, {
-          signal,
-          persistence: { save: async () => {} }
-        })
-        if (signal.aborted) throw new SessionMutationCancelledError()
-        return mutationCoordinator.rotate(ticket, refreshed)
-      }
-    )
-  }
-  const refreshCoordinator = refreshCoordinatorRef.current
+  const [refreshCoordinator] = useState(() => createSessionRefreshCoordinator(
+    async (actor, signal) => {
+      const ticket = mutationCoordinator.capture(actor, false)
+      const refreshed = await refreshAndPersistSession(MOBILE_HTTP_BASE_URL, actor, {
+        signal,
+        persistence: { save: async () => {} }
+      })
+      if (signal.aborted) throw new SessionMutationCancelledError()
+      return mutationCoordinator.rotate(ticket, refreshed)
+    }
+  ))
 
   useEffect(() => {
     sessionActorRef.current = sessionActor
@@ -241,16 +232,13 @@ export function useSessionState(): UseSessionStateResult {
   )
   const capabilitiesForToken = useCallback((sessionToken: string): CapabilityMap =>
     getSessionScopedCapabilities(sessionToken, resolvedCapabilitiesRef.current), [])
-  const capabilityReadRef = useRef<ReturnType<typeof createCapabilityResolutionSingleFlight> | null>(null)
-  if (!capabilityReadRef.current) {
-    capabilityReadRef.current = createCapabilityResolutionSingleFlight((sessionToken) =>
+  const [resolveCapabilitiesForSession] = useState(() =>
+    createCapabilityResolutionSingleFlight((sessionToken) =>
       resolveProductionCapabilities(
         MOBILE_HTTP_BASE_URL,
         sessionToken,
         SUPPORTED_MOBILE_CAPABILITIES
-      ))
-  }
-  const resolveCapabilitiesForSession = capabilityReadRef.current
+      )))
 
   useEffect(() => {
     commitResolvedCapabilities(
@@ -465,8 +453,13 @@ export function useSessionState(): UseSessionStateResult {
       productionSyncRef.current?.controller.abort()
       void refreshCoordinator.cancelAndWait()
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [])
+  }, [
+    capabilitiesForToken,
+    commitResolvedCapabilities,
+    mutationCoordinator,
+    refreshCoordinator,
+    resolveCapabilitiesForSession
+  ])
 
   useEffect(() => {
     let active = true
@@ -511,8 +504,7 @@ export function useSessionState(): UseSessionStateResult {
       active = false
       subscription.remove()
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [])
+  }, [refreshCoordinator])
 
   const completeIntro = useCallback(async (): Promise<void> => {
     setIsBootstrapping(true)
@@ -595,8 +587,7 @@ export function useSessionState(): UseSessionStateResult {
         setIsBootstrapping(false)
       }
     },
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-    [claimPendingReferral, mutationCoordinator]
+    [mutationCoordinator]
   )
 
   const registerSessionActorWithDraft = useCallback(
@@ -872,8 +863,7 @@ export function useSessionState(): UseSessionStateResult {
         setIsBootstrapping(false)
       }
     },
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-    [beginAccountMutation, mutationCoordinator, sessionActor]
+    [beginAccountMutation, capabilitiesForToken, mutationCoordinator, sessionActor]
   )
 
   const updateSessionProfile = useCallback(
@@ -956,8 +946,7 @@ export function useSessionState(): UseSessionStateResult {
         throw error
       }
     },
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-    [beginAccountMutation, mutationCoordinator, sessionActor]
+    [beginAccountMutation, capabilitiesForToken, mutationCoordinator, sessionActor]
   )
 
   const saveAvatarSelection = useCallback(
@@ -1099,8 +1088,7 @@ export function useSessionState(): UseSessionStateResult {
         setAccountModeration(error.moderation)
       }
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [sessionActor])
+  }, [capabilitiesForToken, sessionActor])
 
   return {
     sessionActor,

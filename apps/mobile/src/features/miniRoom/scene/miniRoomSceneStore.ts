@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   deriveRoomWorldFacing,
   omitRoomWorldBlockers,
@@ -93,7 +93,11 @@ function deriveFacing(from: RoomPoint, to: RoomPoint): AvatarFacing {
 }
 
 function createInitialAvatars(
-  input: UseMiniRoomSceneStoreInput,
+  input: {
+    localUserId: string
+    partnerUserId: string
+    participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
+  },
   scene: RoomScene,
   geometry: RoomWorldGeometry,
   usesRoomV2Scene: boolean
@@ -106,8 +110,8 @@ function createInitialAvatars(
   const { local, partner } = input.participantAvatarSnapshots
 
   return {
-    [input.localUser.userId]: {
-      userId: input.localUser.userId,
+    [input.localUserId]: {
+      userId: input.localUserId,
       displayName: local.displayName,
       x: localSpawn.x,
       y: localSpawn.y,
@@ -115,8 +119,8 @@ function createInitialAvatars(
       motion: "idle",
       appearance: local.appearance
     },
-    [input.partnerUser.userId]: {
-      userId: input.partnerUser.userId,
+    [input.partnerUserId]: {
+      userId: input.partnerUserId,
       displayName: partner.displayName,
       x: partnerSpawn.x,
       y: partnerSpawn.y,
@@ -143,6 +147,12 @@ interface MoveOptions {
 
 export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRoomStore {
   const scene = input.scene ?? cozyPinkBedroomScene
+  const localUserId = input.localUser.userId
+  const localDisplayName = input.localUser.displayName
+  const partnerUserId = input.partnerUser.userId
+  const partnerDisplayName = input.partnerUser.displayName
+  const participantAvatarSnapshots = input.participantAvatarSnapshots
+  const bubbleLifetimeMs = input.bubbleLifetimeMs
   const usesRoomV2Scene = Boolean(input.roomDecorScene?.shell)
   const geometry = useMemo(
     () => usesRoomV2Scene && input.roomDecorScene
@@ -163,10 +173,19 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     [roomWorldHotspots, scene.hotspots, usesRoomV2Scene]
   )
   const [avatars, setAvatars] = useState<Record<string, AvatarState>>(() =>
-    createInitialAvatars(input, scene, geometry, usesRoomV2Scene)
+    createInitialAvatars(
+      { localUserId, partnerUserId, participantAvatarSnapshots },
+      scene,
+      geometry,
+      usesRoomV2Scene
+    )
   )
+  // Committed avatars for callbacks. The scene reset below writes it before
+  // publishing new avatars, so reads during render see the current id set.
   const avatarsRef = useRef(avatars)
-  avatarsRef.current = avatars
+  useLayoutEffect(() => {
+    avatarsRef.current = avatars
+  }, [avatars])
   // Live per-frame positions, keyed by avatar id, animate on the UI thread;
   // `avatars` holds the committed pose (segment starts/ends and arrival).
   const [motionDrivers] = useState(() => new Map<string, MiniRoomAvatarMotionDriver>())
@@ -196,7 +215,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       movementCompletionTimerRef,
       clearTimeout
     )
-    const nextAvatars = createInitialAvatars(input, scene, geometry, usesRoomV2Scene)
+    const nextAvatars = createInitialAvatars(
+      { localUserId, partnerUserId, participantAvatarSnapshots },
+      scene,
+      geometry,
+      usesRoomV2Scene
+    )
     avatarsRef.current = nextAvatars
     setAvatars(nextAvatars)
     for (const avatar of Object.values(nextAvatars)) {
@@ -211,30 +235,32 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     speechMotionTimersRef.current.clear()
     setPressedPoint(undefined)
     setSelectedHotspotId(undefined)
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
+    // Display names are not read here, but a renamed participant restarts the scene.
   }, [
     geometry,
-    input.localUser.displayName,
-    input.localUser.userId,
-    input.participantAvatarSnapshots,
-    input.partnerUser.displayName,
-    input.partnerUser.userId,
+    getMotionDriver,
+    localDisplayName,
+    localUserId,
+    participantAvatarSnapshots,
+    partnerDisplayName,
+    partnerUserId,
     scene,
     usesRoomV2Scene
   ])
 
   useEffect(() => {
+    // The timer map is created once and only cleared, never replaced.
+    const speechMotionTimers = speechMotionTimersRef.current
     return () => {
       cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
       cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
       )
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-      for (const timer of speechMotionTimersRef.current.values()) {
+      for (const timer of speechMotionTimers.values()) {
         clearTimeout(timer)
       }
-      speechMotionTimersRef.current.clear()
+      speechMotionTimers.clear()
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
       bubbleTimerRef.current = null
       speechQueueRef.current = createMiniRoomSpeechQueue()
@@ -553,9 +579,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       finishActiveSpeechBubble,
       Math.max(0, next.expiresAt - Date.now())
     )
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [finishActiveSpeechBubble, input.bubbleLifetimeMs])
-  showNextSpeechBubbleRef.current = showNextSpeechBubble
+  }, [finishActiveSpeechBubble])
+  // finishActiveSpeechBubble reaches this callback through the ref; it is set
+  // at commit, before any effect or timer can finish a bubble.
+  useLayoutEffect(() => {
+    showNextSpeechBubbleRef.current = showNextSpeechBubble
+  }, [showNextSpeechBubble])
 
   const addSpeechBubble = useCallback<MiniRoomStore["addSpeechBubble"]>((bubble) => {
     const now = Date.now()
@@ -566,13 +595,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         key,
         speakerUserId: bubble.speakerUserId,
         body: bubble.body,
-        lifetimeMs: input.bubbleLifetimeMs
+        lifetimeMs: bubbleLifetimeMs
       },
       now
     )
     showNextSpeechBubbleRef.current()
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [])
+  }, [bubbleLifetimeMs])
 
   const sayPhrase = useCallback<MiniRoomStore["sayPhrase"]>(
     (userId, body, tone = "chat") => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { captureProductEvent } from "../../analytics/productAnalytics"
@@ -97,7 +97,8 @@ export function OnboardingBrandPrelude({
     shouldReduceMotion && showGreetingBubble
   )
 
-  const captureBeat = (
+  // Stable per motion mode (already a timeline dependency via its inputs).
+  const captureBeat = useCallback((
     beat: "scan" | "brand" | "characters" | "actions" | "world",
     resumed: boolean
   ) => {
@@ -108,9 +109,9 @@ export function OnboardingBrandPrelude({
       resumed
     })
     if (event) captureProductEvent(event.name, event.properties)
-  }
+  }, [shouldReduceMotion, telemetry])
 
-  const capturePerformance = (resumed: boolean) => {
+  const capturePerformance = useCallback((resumed: boolean) => {
     const nowMs = Date.now()
     const event = getOnboardingIntroPerformanceEvent(telemetry, {
       nowMs,
@@ -119,7 +120,7 @@ export function OnboardingBrandPrelude({
       coldStartMs: nowMs - telemetry.startedAtMs
     })
     captureProductEvent(event.name, event.properties)
-  }
+  }, [shouldReduceMotion, telemetry])
 
   const handleLayout = () => {
     setHasLaidOut(true)
@@ -415,8 +416,7 @@ export function OnboardingBrandPrelude({
       animation.stop()
       timers.forEach(clearTimeout)
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }, [brandReveal, characterReveal, charactersStarted, initialElapsedMs, motionEnabled, motionPreferenceResolved, onActionsVisible, onFinished, onSecondaryActionVisible, reduceMotion, scanOpacity, scanRows, scanSweep, sceneReady])
+  }, [brandReveal, captureBeat, capturePerformance, characterReveal, charactersStarted, initialElapsedMs, motionEnabled, motionPreferenceResolved, onActionsVisible, onFinished, onSecondaryActionVisible, reduceMotion, scanOpacity, scanRows, scanSweep, sceneReady])
 
   const pairLift = characterReveal.interpolate({
     inputRange: [0, 0.62, 0.82, 1],

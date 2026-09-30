@@ -1,5 +1,5 @@
 import type { ChatThread, ChatThreadList } from "@blumi/contracts"
-import { useEffect, useMemo } from "react"
+import { useEffect, useEffectEvent, useMemo } from "react"
 import { AppState } from "react-native"
 import { MOBILE_HTTP_BASE_URL, MOBILE_WS_BASE_URL } from "../config/env"
 import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
@@ -32,7 +32,6 @@ import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
 import type { RootStackParamList } from "./RootNavigator"
-import { useLatestRef } from "./useLatestRef"
 import type { useMatchModal } from "./useMatchModal"
 import type { useRootChatSync } from "./useRootChatSync"
 import type { useRoomInviteRouting } from "./useRoomInviteRouting"
@@ -65,9 +64,10 @@ interface GlobalRealtimeSessionInput {
  * routing of its events into chat, room invitations, MiniRoom, and matches.
  *
  * The lifecycle restarts only when the session identity, main-route access,
- * restriction, or the stable refresh/reset callbacks change. Session callbacks
- * that may change identity without warranting a reconnect are read through a
- * latest-committed ref instead.
+ * restriction, or the stable refresh/reset callbacks change. The actor is
+ * sampled when the lifecycle starts; session callbacks that may change identity
+ * without warranting a reconnect are effect events, so they run their latest
+ * committed version.
  */
 export function useGlobalRealtimeSession({
   sessionActor,
@@ -88,7 +88,13 @@ export function useGlobalRealtimeSession({
   onPartnerBlocked
 }: GlobalRealtimeSessionInput): void {
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
-  const realtimeSessionCallbacksRef = useLatestRef({ clearSessionActor, refreshAccountModeration, resynchronizeMessages })
+  // A new actor object with the same identity (for example a profile edit)
+  // must not reconnect, so the lifecycle reads the actor when it starts.
+  const readLifecycleSessionActor = useEffectEvent(() => sessionActor)
+  const isLatestSession = useEffectEvent((expectedActor: SessionActor) => isCurrentSession(expectedActor))
+  const clearLatestSessionActor = useEffectEvent(() => clearSessionActor())
+  const refreshLatestAccountModeration = useEffectEvent(() => refreshAccountModeration())
+  const resynchronizeLatestMessages = useEffectEvent((threadId: string) => resynchronizeMessages(threadId))
 
   // Reconnect retries pause in the background and run at once on foreground.
   useEffect(() => {
@@ -100,10 +106,10 @@ export function useGlobalRealtimeSession({
   }, [])
 
   useEffect(() => createGlobalRealtimeLifecycle({
-    sessionActor,
+    sessionActor: readLifecycleSessionActor(),
     isMainRoute: sessionEntryRoute === "Main",
     isAccountRestricted,
-    isCurrentSession,
+    isCurrentSession: (expectedActor) => isLatestSession(expectedActor),
     isDemoMode,
     setDemoMode,
     resetInactiveSessionState,
@@ -115,7 +121,7 @@ export function useGlobalRealtimeSession({
         : route?.name === "MiniRoom"
           ? (route.params as RootStackParamList["MiniRoom"] | undefined)?.readyMiniRoom.miniRoom.sourceThreadId
           : undefined
-      return threadId ? realtimeSessionCallbacksRef.current.resynchronizeMessages(threadId) : Promise.resolve()
+      return threadId ? resynchronizeLatestMessages(threadId) : Promise.resolve()
     },
     hydrateBlockedUsersFromServer,
     connectGlobal,
@@ -126,14 +132,13 @@ export function useGlobalRealtimeSession({
     applyChatThreadListed,
     getThreads,
     isRealtimeAuthInvalidClose,
-    clearSessionActor: () => realtimeSessionCallbacksRef.current.clearSessionActor(),
-    refreshAccountModeration: () => realtimeSessionCallbacksRef.current.refreshAccountModeration(),
+    clearSessionActor: () => clearLatestSessionActor(),
+    refreshAccountModeration: () => refreshLatestAccountModeration(),
     showWarningToast: (toast) => {
       showToast({ ...toast, type: "warning" })
     },
     wsBaseUrl: MOBILE_WS_BASE_URL,
     httpBaseUrl: MOBILE_HTTP_BASE_URL
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
   })(), [
     isAccountRestricted,
     refreshProductionThreads,

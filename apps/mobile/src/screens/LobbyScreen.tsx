@@ -112,8 +112,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   ])
 
   const {
-    blockedUserKey,
-    isUserBlocked,
+    blockedUserIds,
     isSafetyListReady,
     safetyHydrationStatus,
     safetyRetrying,
@@ -185,8 +184,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
     productionQuota,
     nearbyUsers,
     isSafetyListReady,
-    isUserBlocked,
-    blockedUserKey,
+    blockedUserIds,
     pendingInviteUserIds,
     seenThisSessionUserIds,
     setSeenThisSessionUserIds

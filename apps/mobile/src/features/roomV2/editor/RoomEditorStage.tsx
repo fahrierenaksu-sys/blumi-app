@@ -5,9 +5,9 @@ import {
   Text,
   View,
   type GestureResponderEvent,
-  type GestureResponderHandlers,
   type LayoutChangeEvent
 } from "react-native"
+import { GestureDetector, type PanGesture } from "react-native-gesture-handler"
 import { RoomRenderer2D } from "../components/RoomRenderer2D"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { RoomShell, RoomV2RenderItem } from "../roomV2.types"
@@ -16,7 +16,8 @@ import { styles } from "./roomEditorStyles"
 
 /**
  * The editable room stage: avatar-path status pill plus the renderer inside a
- * pressable surface that owns the tap and drag-to-move gestures.
+ * pressable surface. Taps stay on the Pressable (and the pieces inside it);
+ * the Gesture Handler pan owns touch-and-hold drag-to-move of placed pieces.
  */
 export function RoomEditorStage(props: {
   copy: MyRoomEditorCopy
@@ -25,7 +26,7 @@ export function RoomEditorStage(props: {
   selectedInstanceId: string | undefined
   onLayout: (event: LayoutChangeEvent) => void
   onPress: (event: GestureResponderEvent) => void
-  panHandlers: GestureResponderHandlers
+  dragGesture: PanGesture
   shell: RoomShell | null
   renderItems: RoomV2RenderItem[]
   placementStateByRenderId: Record<string, "valid" | "invalid"> | undefined
@@ -38,7 +39,7 @@ export function RoomEditorStage(props: {
     selectedInstanceId,
     onLayout,
     onPress,
-    panHandlers,
+    dragGesture,
     shell,
     renderItems,
     placementStateByRenderId,
@@ -56,30 +57,31 @@ export function RoomEditorStage(props: {
           {roomWorldStatus.label}
         </Text>
       </View>
-      <Pressable
-        accessible={Boolean(selectedInstanceId)}
-        accessibilityRole="button"
-        accessibilityLabel={copy.stageLabel}
-        accessibilityHint={copy.stageHint}
-        ref={stageRef}
-        style={styles.roomImageWrapper}
-        onLayout={onLayout}
-        onPress={onPress}
-        {...panHandlers}
-      >
-        <RoomRenderer2D
-          shell={shell}
-          renderItems={renderItems}
-          selectedInstanceId={selectedInstanceId}
-          placementStateByRenderId={placementStateByRenderId}
-          onItemTap={onItemTap}
-          itemInteractionMode="edit"
-          roomVNextRuntimeMode="disabled"
-          debugPlacement={false}
-          testID="edit-room-v1"
-          style={styles.renderer}
-        />
-      </Pressable>
+      <GestureDetector gesture={dragGesture}>
+        <Pressable
+          accessible={Boolean(selectedInstanceId)}
+          accessibilityRole="button"
+          accessibilityLabel={copy.stageLabel}
+          accessibilityHint={`${copy.stageHint} ${copy.stageDragHint}`}
+          ref={stageRef}
+          style={styles.roomImageWrapper}
+          onLayout={onLayout}
+          onPress={onPress}
+        >
+          <RoomRenderer2D
+            shell={shell}
+            renderItems={renderItems}
+            selectedInstanceId={selectedInstanceId}
+            placementStateByRenderId={placementStateByRenderId}
+            onItemTap={onItemTap}
+            itemInteractionMode="edit"
+            roomVNextRuntimeMode="disabled"
+            debugPlacement={false}
+            testID="edit-room-v1"
+            style={styles.renderer}
+          />
+        </Pressable>
+      </GestureDetector>
     </View>
   )
 }

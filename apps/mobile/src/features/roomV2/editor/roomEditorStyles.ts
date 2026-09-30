@@ -233,6 +233,14 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800"
   },
+  dragGhostAnchor: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    overflow: "visible"
+  },
   roomImageWrapper: {
     width: "100%",
     position: "relative",

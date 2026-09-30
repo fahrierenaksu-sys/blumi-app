@@ -63,6 +63,7 @@ function providerFixture(options?: {
     return current.value
   }
   const ownedItems: string[] = []
+  const runtimeConfigInputs: string[][] = []
   const react = {
     createContext: () => ({ Provider: "provider" }), useContext: () => null,
     useState: (initial: any) => {
@@ -83,6 +84,13 @@ function providerFixture(options?: {
     useEffect: (run: () => void | (() => void), deps: readonly unknown[]) => {
       const current = slot()
       if (!same(current.deps, deps)) { current.deps = deps; effects.push({ slot: current, run }) }
+    },
+    // Stable identity, latest committed closure (effects run after render here).
+    useEffectEvent: (callback: (...args: any[]) => any) => {
+      const current = slot() as Slot & { latest?: (...args: any[]) => any }
+      current.latest = callback
+      current.value ??= (...args: any[]) => current.latest!(...args)
+      return current.value
     }
   }
   const writeCache = async (entries: [string, string][]) => {
@@ -117,8 +125,9 @@ function providerFixture(options?: {
       }
     },
     "../../realtime/reconnectTransitionTracker": { createReconnectTransitionTracker },
+    // A fresh array per render, as an inventory snapshot replaced for a coin change.
     "../../inventory/inventoryStore": { useInventoryStore: () => ({
-      inventory: { ownedRoomItemIds: ownedItems }, isReady: true
+      inventory: { ownedRoomItemIds: [...ownedItems] }, isReady: true
     }) },
     "../roomV2Persistence": {
       LEGACY_ROOM_V2_DECOR_STORAGE_KEY: "legacy",
@@ -128,10 +137,15 @@ function providerFixture(options?: {
     "../roomV2EditGate": { canEditRoomV2Decor },
     "../roomV2ExistingDecorEditGate": { isRoomV2ExistingDecorOnlyEdit: () => true },
     "../roomV2DecorActions": { selectRoomV2Shell: (room: UserRoomDecor, id: string) => ({ ...room, roomShellId: id }) },
-    "../roomV2ProviderRuntime": { resolveRoomV2ProviderRuntimeConfig: (input: { storageScopeId: string }) => ({
-      storageKey: input.storageScopeId, migrationMarkerKey: "migration", ownedRoomItemIds: ownedItems,
-      inventoryReadyForRoomEdits: true
-    }) },
+    "../roomV2ProviderRuntime": { resolveRoomV2ProviderRuntimeConfig: (input: {
+      storageScopeId: string; inventoryOwnedItemIds: readonly string[]
+    }) => {
+      runtimeConfigInputs.push([...input.inventoryOwnedItemIds])
+      return {
+        storageKey: input.storageScopeId, migrationMarkerKey: "migration", ownedRoomItemIds: ownedItems,
+        inventoryReadyForRoomEdits: true
+      }
+    } },
     "../personalRoomDecorApi": {
       fetchPersonalRoomDecor: async (_url: string, sessionToken: string, _fetch: unknown, signal?: AbortSignal) => {
         reads.push({ token: sessionToken, signal })
@@ -176,6 +190,9 @@ function providerFixture(options?: {
   return {
     settle, saves, reads, cache, cacheWrites, stateWrites,
     localReadCount: () => localReadCount,
+    runtimeConfigInputs,
+    rerender: () => render(),
+    ownItem: (itemId: string) => { ownedItems.push(itemId); render() },
     value: () => output.props.value as any,
     rotate: () => { token = `${token}-rotated`; render() },
     changeScope: () => { scope = "fixture-other-owner"; render() },
@@ -216,6 +233,25 @@ test("production room retries one same-owner hydration on reconnect and keeps a 
   assert.equal(f.realtimeStatusListenerCount(), 1, "rerenders must not duplicate the account/token subscription")
   f.unmount()
   assert.equal(f.realtimeStatusListenerCount(), 0, "unmount must clean up the reconnect subscription")
+})
+
+test("a room edit neither restarts hydration nor re-resolves the runtime config", async () => {
+  const f = providerFixture()
+  await f.settle()
+  assert.equal(f.reads.length, 1)
+  assert.equal(f.localReadCount(), 1)
+  const configs = f.runtimeConfigInputs.length
+  assert.equal(f.value().setUserRoomDecor(decor("edited-room")), true)
+  await f.settle()
+  f.rerender()
+  assert.equal(f.reads.length, 1, "an edit must not restart server hydration")
+  assert.equal(f.localReadCount(), 1, "an edit must not reread the local cache")
+  assert.equal(f.runtimeConfigInputs.length, configs, "same owned ids (new array) keep the runtime config")
+  f.ownItem("room-lamp")
+  assert.deepEqual(f.runtimeConfigInputs.at(-1), ["room-lamp"])
+  assert.equal(f.runtimeConfigInputs.length, configs + 1)
+  assert.equal(f.value().userRoomDecor.roomShellId, "edited-room")
+  f.unmount()
 })
 
 test("initial room GET starts alongside local decor read after hydration drains", async () => {

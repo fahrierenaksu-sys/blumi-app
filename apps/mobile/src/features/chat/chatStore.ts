@@ -16,7 +16,7 @@ import type {
   ChatThread,
   ChatThreadList
 } from "@blumi/contracts"
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { useMemo, useSyncExternalStore } from "react"
 import {
   getMessageListErrorMessageForDisplay,
   getThreadListErrorMessageForDisplay
@@ -132,7 +132,15 @@ export function subscribeToChatStore(listener: Listener): () => void {
   return () => { listeners.delete(listener) }
 }
 
+// Increments on every notification; the reactive view is keyed on it.
+let chatStoreVersion = 0
+
+function getChatStoreVersion(): number {
+  return chatStoreVersion
+}
+
 function notify(): void {
+  chatStoreVersion += 1
   for (const l of listeners) l()
 }
 
@@ -676,6 +684,8 @@ export function findThreadForPartner(
 
 // ─── Reactive hook ──────────────────────────────────────────
 export interface ChatStoreView {
+  /** Store notification this view was built for; equal versions carry equal data. */
+  storeVersion: number
   threads: ChatThread[]
   threadsFetched: boolean
   threadListState: ThreadListState
@@ -693,15 +703,14 @@ export interface ChatStoreView {
 }
 
 export function useChatStore(): ChatStoreView {
-  const [tick, setTick] = useState(0)
-
-  const sync = useCallback(() => {
-    setTick((t) => t + 1)
-  }, [])
-
-  useEffect(() => subscribeToChatStore(sync), [sync])
+  const storeVersion = useSyncExternalStore(
+    subscribeToChatStore,
+    getChatStoreVersion,
+    getChatStoreVersion
+  )
 
   return useMemo(() => ({
+    storeVersion,
     threads: getThreads(),
     threadsFetched: threadListState.status === "ready",
     threadListState: getThreadListState(),
@@ -716,8 +725,7 @@ export function useChatStore(): ChatStoreView {
     setActiveThread,
     markThreadRead,
     markOptimisticMessageSending
-// eslint-disable-next-line react-hooks/exhaustive-deps -- Preserve intentional lifecycle and external-store invalidation semantics.
-  }), [tick])
+  }), [storeVersion])
 }
 
 function setMessageListState(

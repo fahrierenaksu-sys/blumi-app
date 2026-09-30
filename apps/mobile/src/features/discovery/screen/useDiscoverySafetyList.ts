@@ -11,14 +11,12 @@ export function useDiscoverySafetyList(input: {
   const { sessionActor, isProductionDiscovery } = input
   const {
     blockedUserIds,
-    isBlocked: isUserBlocked,
     isReady: isSafetyListReady,
     hydrationStatus: safetyHydrationStatus
   } = useBlockStore(
     sessionActor.profile.userId,
     sessionActor.session.mode === "production"
   )
-  const blockedUserKey = blockedUserIds.join("|")
   const [safetyRetrying, setSafetyRetrying] = useState(false)
   const handleRetrySafetyList = useCallback(() => {
     if (safetyRetrying || !isProductionDiscovery) return
@@ -30,8 +28,8 @@ export function useDiscoverySafetyList(input: {
   }, [isProductionDiscovery, safetyRetrying, sessionActor.profile.userId, sessionActor.session.sessionToken])
 
   return {
-    blockedUserKey,
-    isUserBlocked,
+    // Keeps its identity while the list's content is unchanged (block store).
+    blockedUserIds,
     isSafetyListReady,
     safetyHydrationStatus,
     safetyRetrying,

@@ -93,6 +93,8 @@ const sourceFiles = [
   "src/features/roomV2/editor/roomEditorTestFixtures.ts",
   "src/features/roomV2/editor/roomEditorPlacementModel.ts",
   "src/features/roomV2/editor/roomEditorPlacementModel.test.ts",
+  "src/features/roomV2/editor/roomEditorDragModel.ts",
+  "src/features/roomV2/editor/roomEditorDragModel.test.ts",
   "src/features/roomV2/editor/roomEditorPresentationModel.ts",
   "src/features/roomV2/editor/roomEditorPresentationModel.test.ts",
   "src/features/roomV2/roomSetupLayoutModel.ts",
@@ -229,6 +231,7 @@ try {
       join(outputDirectory, "features/roomV2/roomV2DraftPlacementCandidates.test.js"),
       join(outputDirectory, "features/roomV2/myRoomCopy.test.js"),
       join(outputDirectory, "features/roomV2/editor/roomEditorPlacementModel.test.js"),
+      join(outputDirectory, "features/roomV2/editor/roomEditorDragModel.test.js"),
       join(outputDirectory, "features/roomV2/editor/roomEditorPresentationModel.test.js"),
       join(outputDirectory, "features/roomV2/roomSetupLayoutModel.test.js"),
       join(outputDirectory, "features/roomV2/roomV2Accessibility.test.js"),
@@ -283,6 +286,18 @@ try {
       cwd: workspaceRoot,
       stdio: "inherit"
     }
+  )
+
+  // Hook lifecycle tests read production sources through the hook harness.
+  execFileSync(
+    process.execPath,
+    [
+      "--import", "tsx",
+      "--test",
+      "src/features/miniRoom/scene/avatarBubblePopLifecycle.test.ts",
+      "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts"
+    ],
+    { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
