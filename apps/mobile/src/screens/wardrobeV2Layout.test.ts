@@ -1,12 +1,21 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
 
 const here = dirname(fileURLToPath(import.meta.url))
-const screenSource = readFileSync(join(here, "WardrobeV2Screen.tsx"), "utf8")
-const stylesSource = readFileSync(join(here, "wardrobeV2Styles.ts"), "utf8")
+const wardrobeFolder = join(here, "../features/avatarV2/wardrobe")
+// The screen composes components from features/avatarV2/wardrobe; layout
+// contracts read the screen and every module it delegates to.
+const screenSource = [
+  join(here, "WardrobeV2Screen.tsx"),
+  ...readdirSync(wardrobeFolder)
+    .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\./.test(file) && file !== "wardrobeV2Styles.ts")
+    .sort()
+    .map((file) => join(wardrobeFolder, file))
+].map((file) => readFileSync(file, "utf8")).join("\n")
+const stylesSource = readFileSync(join(here, "../features/avatarV2/wardrobe/wardrobeV2Styles.ts"), "utf8")
 
 test("wardrobe keeps the studio header focused without the beta status pill", () => {
   assert.doesNotMatch(screenSource, /wardrobeReady|connectionPill/)

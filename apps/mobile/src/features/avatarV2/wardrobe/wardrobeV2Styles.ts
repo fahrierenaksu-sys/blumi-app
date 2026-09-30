@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { uiTheme } from "../ui/theme"
+import { uiTheme } from "../../../ui/theme"
 
 export const wardrobeV2Styles = StyleSheet.create({
   root: {

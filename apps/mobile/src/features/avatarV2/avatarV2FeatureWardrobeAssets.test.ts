@@ -104,7 +104,10 @@ test("soft doll feature assets are wired through avatar, room, shop, and motion 
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),
     readProjectFile("src/features/shop/shopAssets.ts")
   ].join("\n")
-  const wardrobeScreen = readProjectFile("src/screens/WardrobeV2Screen.tsx")
+  const wardrobeScreen = [
+    readProjectFile("src/screens/WardrobeV2Screen.tsx"),
+    readProjectFile("src/features/avatarV2/wardrobe/wardrobePreviewSources.ts")
+  ].join("\n")
   const economyCatalog = readProjectFile(
     "../../packages/domain/src/economy/economyCatalog.ts"
   )
@@ -215,7 +218,10 @@ test("female accessory assets are wired through avatar, room, shop, and motion l
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),
     readProjectFile("src/features/shop/shopAssets.ts")
   ].join("\n")
-  const wardrobeScreen = readProjectFile("src/screens/WardrobeV2Screen.tsx")
+  const wardrobeScreen = [
+    readProjectFile("src/screens/WardrobeV2Screen.tsx"),
+    readProjectFile("src/features/avatarV2/wardrobe/wardrobePreviewSources.ts")
+  ].join("\n")
   const economyCatalog = readProjectFile(
     "../../packages/domain/src/economy/economyCatalog.ts"
   )
@@ -247,7 +253,10 @@ test("supported tops retain assets while retired tops remain hidden under stable
     readProjectFile("src/screens/CosmeticShopScreen.tsx"),
     readProjectFile("src/features/shop/shopAssets.ts")
   ].join("\n")
-  const wardrobeScreen = readProjectFile("src/screens/WardrobeV2Screen.tsx")
+  const wardrobeScreen = [
+    readProjectFile("src/screens/WardrobeV2Screen.tsx"),
+    readProjectFile("src/features/avatarV2/wardrobe/wardrobePreviewSources.ts")
+  ].join("\n")
   const economyCatalog = readProjectFile(
     "../../packages/domain/src/economy/economyCatalog.ts"
   )

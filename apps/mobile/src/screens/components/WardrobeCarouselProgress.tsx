@@ -1,7 +1,7 @@
 import { Animated, Text, View } from "react-native"
 import type { WardrobeCategoryId } from "../../features/avatarV2/wardrobeCategoryModel"
 import { getWardrobeCarouselIndicator } from "../../features/avatarV2/wardrobeCategoryModel"
-import { wardrobeV2Styles as styles } from "../wardrobeV2Styles"
+import { wardrobeV2Styles as styles } from "../../features/avatarV2/wardrobe/wardrobeV2Styles"
 
 interface WardrobeCarouselProgressProps {
   category: WardrobeCategoryId
