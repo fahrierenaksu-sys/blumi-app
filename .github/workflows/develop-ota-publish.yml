@@ -51,6 +51,13 @@ jobs:
         working-directory: .
         run: npm ci
 
+      - name: Check the app config with the EAS production variables
+        run: |
+          set -euo pipefail
+          echo "EAS production variable names:"
+          eas env:list production --format short --non-interactive 2>/dev/null | cut -d= -f1 || true
+          eas env:exec production 'npx expo config --json > /dev/null' --non-interactive
+
       - name: Fingerprint the native runtime
         id: fingerprint
         run: |
