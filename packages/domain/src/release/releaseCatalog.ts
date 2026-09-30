@@ -13,9 +13,16 @@ export interface ReleaseCatalogAssetBinding {
 }
 
 /**
- * An item is publishable only when this receipt and every bound runtime asset
- * are both present at the same immutable source commit. The CI verifier opens
- * the commit tree as well as the current working tree before accepting it.
+ * An item is publishable only with this receipt. `assets` lists every runtime
+ * file the mobile app resolves for the item (Shop thumbnail and preview,
+ * AvatarV2 layer, Room/MiniRoom layers and motion frames, furniture sprites),
+ * each with its SHA-256; `evidence` points at the decision record.
+ *
+ * `apps/mobile/src/features/shop/shopReleaseCatalog.test.ts` (run by
+ * `npm test`) enforces this: it hashes every bound file and the evidence
+ * manifest in the working tree, re-resolves each item's assets from the live
+ * resolvers, and, when `sourceCommit` is present in the local clone, checks
+ * that the commit tree holds the same bytes. Nothing checks at runtime.
  */
 export interface AssetPromotionReceipt {
   readonly schemaVersion: typeof ASSET_PROMOTION_RECEIPT_SCHEMA_VERSION
@@ -55,9 +62,11 @@ export interface ReleaseCatalog {
 }
 
 /**
- * This is the only R1 publication source. It begins deliberately empty: the
- * existing Room V3 candidates and male redesign have no immutable promotion
- * receipt, so neither the Shop nor the economy service may publish them.
+ * This is the only R1 publication source for paid items. The owner-approved
+ * items (decision record `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md`)
+ * are listed with receipts. Held scopes name items that must stay out of
+ * production (Room V3 candidates, QA/dev IDs, promotion holds). Retired avatar
+ * items (`RETIRED_AVATAR_ITEM_IDS`) are never published.
  */
 export const BLUMI_R1_RELEASE_CATALOG =
   blumiR1ReleaseCatalog as unknown as ReleaseCatalog
