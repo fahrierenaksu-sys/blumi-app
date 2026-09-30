@@ -324,9 +324,8 @@ export function createRealtimeServer(
     socket.on("close", () => {
       const removed = connectionManager.removeConnection(connection.connectionId)
       connectionEventWindows.delete(connection.connectionId)
-      if (!connectionManager.hasUserConnections(connection.userId)) {
-        userEventWindows.delete(connection.userId)
-      }
+      // The user's window outlives the socket: a reconnect inside the window must
+      // not reset the per-user budget. The heartbeat purges expired windows.
       if (removed) {
         void track(enqueueConnectionLifecycleOperation(removed.connectionId, async () => {
           // A room.join is the only client operation that can create room presence.
@@ -341,6 +340,7 @@ export function createRealtimeServer(
 
   let heartbeatAuthorizationPending = false
   const heartbeat = setInterval(() => {
+    purgeExpiredEventWindows(userEventWindows, Date.now())
     if (!heartbeatAuthorizationPending) {
       heartbeatAuthorizationPending = true
       void track(closeRestrictedConnections()).finally(() => { heartbeatAuthorizationPending = false })
@@ -542,6 +542,12 @@ function consumeEventAllowance(input: {
     count: current.count + 1
   })
   return true
+}
+
+function purgeExpiredEventWindows(windows: Map<string, EventRateWindow>, now: number): void {
+  for (const [key, window] of windows) {
+    if (window.startedAt + REALTIME_EVENT_WINDOW_MS <= now) windows.delete(key)
+  }
 }
 
 function collectConnections(

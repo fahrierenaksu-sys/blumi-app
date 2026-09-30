@@ -305,3 +305,20 @@ test("restricted main sessions use the inactive reset path", () => {
 
   assert.deepEqual(dependencies.calls, ["reset-inactive"])
 })
+
+test("a hundred lifecycle restarts leave no status listener and pair every connect with a disconnect", async () => {
+  const dependencies = createDependencies()
+  for (let cycle = 0; cycle < 100; cycle += 1) {
+    const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+    assert.equal(dependencies.statusListeners.length, 2, `cycle ${cycle} subscribes exactly twice`)
+    for (const listener of [...dependencies.statusListeners]) listener(cycle % 2 ? "connected" : "reconnecting")
+    cleanup()
+    cleanup()
+    assert.equal(dependencies.statusListeners.length, 0, `cycle ${cycle} leaked a listener`)
+  }
+  await Promise.resolve()
+  const connects = dependencies.calls.filter((call) => call.startsWith("connect:")).length
+  const disconnects = dependencies.calls.filter((call) => call === "disconnect").length
+  assert.equal(connects, 100)
+  assert.equal(disconnects, 100, "a repeated cleanup must not disconnect a newer lifecycle")
+})

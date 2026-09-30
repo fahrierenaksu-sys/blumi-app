@@ -206,6 +206,9 @@ export function createRealtimeRouter(
           return
         }
         case "room.leave": {
+          // Client frames are not schema-checked; never echo a room.left the
+          // client contract rejects (roomId is required).
+          if (typeof event.payload.roomId !== "string" || !event.payload.roomId.trim()) return
           await presenceService.leaveRoom(event.payload.roomId, connection.userId)
           connectionManager.leaveRoom(connection.connectionId, event.payload.roomId)
           connectionManager.sendToConnection(connection.connectionId, {
@@ -415,9 +418,12 @@ export function createRealtimeRouter(
           }
           return
         }
+        // List requests are answered on the requesting socket only. Sending a
+        // page to every socket of the user made each device request the next
+        // page, doubling the page queries per page with two devices.
         case "chat.list_threads": {
           const page = await chatService.listThreadsPage(connection.userId, event.payload)
-          connectionManager.sendToUser(connection.userId, {
+          connectionManager.sendToConnection(connection.connectionId, {
             type: "chat.thread_listed",
             payload: {
               userId: connection.userId,
@@ -428,7 +434,7 @@ export function createRealtimeRouter(
           return
         }
         case "chat.list_messages": {
-          connectionManager.sendToUser(connection.userId, {
+          connectionManager.sendToConnection(connection.connectionId, {
             type: "chat.message_listed",
             payload: {
               userId: connection.userId,
