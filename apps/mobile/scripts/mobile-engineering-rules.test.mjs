@@ -70,7 +70,7 @@ const OVERSIZED_DEBT = {
   "features/roomV2/state/RoomV2Provider.tsx": 1210,
   "features/roomV2/components/RoomRenderer2D.tsx": 996,
   "navigation/RootNavigator.tsx": 1123,
-  "features/session/useSessionState.ts": 1129,
+  "features/session/useSessionState.ts": 1117,
   "screens/MyRoomScreen.tsx": 1082,
   "features/avatarV2/avatarV2Catalog.ts": 949,
   "screens/ProfileEditScreen.tsx": 861,
@@ -108,7 +108,7 @@ test("worklets never use identifiers in default parameters", () => {
   assert.deepEqual(offenders, [], "move the default into the worklet body")
 })
 
-const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 25
+const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 1
 
 test("react-hooks/exhaustive-deps suppressions do not grow", () => {
   const count = sources.reduce(
