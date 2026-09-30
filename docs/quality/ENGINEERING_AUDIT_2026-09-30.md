@@ -181,6 +181,37 @@ isolated gate, 2 intentional skips); dependency audit passed; Expo Doctor
   missing-fixture tests; 4 art QA gates (art decision); whether the wardrobe
   gate should check `*_art_v17` frames for older items (art decision).
 
+## Cleanup follow-up (2026-09-30, after wave 2)
+
+- **F-10 (room art):** the QA-only Room VNext / Room V3 modules that were
+  the only users of `roomV2/assets/runtime/{candidates,room-vnext}` are
+  retired (`c03af39`, `505b877`). The production iOS export
+  (`EAS_BUILD_PROFILE=production`) is identical before and after: 4,634
+  modules, 1,223 asset files, same asset hash list and Hermes bundle. All
+  1,658 art files (304.61 MiB) are listed ARCHIVE in
+  [`CLEANUP_MANIFEST_2026-09-30.md`](./CLEANUP_MANIFEST_2026-09-30.md).
+  The archive run on the owner's Mac is **Open**, and the files are deleted
+  only after its receipt is committed.
+- **F-11 (unwired tests):** recount on `ca863be`:
+  - 54 Workbench-fixture tests (not 57);
+  - 4 native-project tests;
+  - 4 art gates.
+
+  Of the 54:
+  - 14 now run through `npm --workspace @blumi/mobile run test:workbench`,
+    which fails if `BLUMI_WORKBENCH_ROOT` is unset;
+  - 39 are retired, with reasons in the commits;
+  - 1 is repaired and wired (`roomV2Catalog.test.ts`).
+
+  See
+  [`WORKBENCH_FIXTURE_TESTS_2026-09-30.md`](./WORKBENCH_FIXTURE_TESTS_2026-09-30.md).
+  `test:workbench` on the Mac is **Open**.
+- **Art gates:** the four gates fail identically at `922fe89` and now, with
+  every value measured; the owner's decision is **Open**. See
+  [`ART_GATE_DECISIONS_2026-09-30.md`](./ART_GATE_DECISIONS_2026-09-30.md).
+- The permanently skipped `shopCatalogParity` subtest is removed, so the
+  intentional skips drop from 2 to 1.
+
 ## Things that must not change
 
 - Migrations: `apps/server/db/migrations` has two `032_*` files and no `044`.

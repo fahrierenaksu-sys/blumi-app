@@ -114,3 +114,47 @@ test("the tool source contains no delete or move operations", () => {
   const source = readFileSync(script, "utf8")
   assert.doesNotMatch(source, /\b(unlink|rmSync|rmdir|rename|\brm\()/)
 })
+
+test("a manifest may declare its own destination and repository receipt path, leaving the 2026-09-29 receipt untouched", async () => {
+  const f = fixture()
+  try {
+    const manifestPath = path.join(f.repo, "docs/quality/manifest.json")
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+    const declaredDestination = path.join(f.root, "workbench", "second-archive")
+    manifest.archiveDestinationDefault = declaredDestination
+    manifest.archiveVerificationPath = "docs/quality/archive-verification-second.json"
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+    const { receipt, written } = await archiveFromManifest({ repoRoot: f.repo, manifest: "docs/quality/manifest.json", recordInRepo: true })
+    assert.equal(receipt.complete, true)
+    assert.equal(receipt.destination, declaredDestination)
+    assert.ok(existsSync(path.join(declaredDestination, "apps/a/one.png")))
+    assert.deepEqual(written, [
+      path.join(declaredDestination, "archive-verification.json"),
+      path.join(f.repo, "docs/quality/archive-verification-second.json")
+    ])
+    assert.equal(existsSync(path.join(f.repo, REPO_RECORD_PATH)), false)
+
+    // An explicit --dest still wins over the manifest default.
+    const explicit = await archiveFromManifest({ repoRoot: f.repo, manifest: "docs/quality/manifest.json", dest: f.dest, dryRun: true })
+    assert.equal(explicit.receipt.destination, f.dest)
+  } finally {
+    f.cleanup()
+  }
+})
+
+test("an unsafe declared receipt path is rejected before anything is copied", async () => {
+  const f = fixture()
+  try {
+    const manifestPath = path.join(f.repo, "docs/quality/manifest.json")
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+    manifest.archiveVerificationPath = "../outside.json"
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+    await assert.rejects(
+      archiveFromManifest({ repoRoot: f.repo, manifest: "docs/quality/manifest.json", dest: f.dest, recordInRepo: true }),
+      /Unsafe manifest path/
+    )
+    assert.equal(existsSync(path.join(f.dest, "apps/a/one.png")), false)
+  } finally {
+    f.cleanup()
+  }
+})

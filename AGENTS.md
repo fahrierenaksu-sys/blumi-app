@@ -127,7 +127,8 @@ Prefer immutable state/domain updates, explicit errors, validated boundaries, st
 
 - Migrations in `apps/server/db/migrations` are checksummed and applied: two files share prefix 032 and 044 is missing. Never rename or renumber them.
 - Railway staging requires `BLUMI_TRUST_PROXY=100.64.0.0/10` (set in `.railway/railway.ts`).
-- Cleanup of archived production sources follows `docs/quality/CLEANUP_MANIFEST_2026-09-29.md`: archive on the owner's Mac first, then run `tools/workbench/remove-archived-from-manifest.mjs`.
+- Cleanup of archived production sources follows `docs/quality/CLEANUP_MANIFEST_2026-09-29.md` and, for the retired room QA art, `docs/quality/CLEANUP_MANIFEST_2026-09-30.md` (pass `--manifest`): archive on the owner's Mac first, then run `tools/workbench/remove-archived-from-manifest.mjs`.
+- Avatar tests whose fixtures live only in the Workbench run with `BLUMI_WORKBENCH_ROOT=… npm --workspace @blumi/mobile run test:workbench` (`docs/quality/WORKBENCH_FIXTURE_TESTS_2026-09-30.md`).
 
 Choose checks by risk. Run the broad gate at the appropriate phase, not repeatedly without new evidence. For release, TestFlight, or App Store readiness work, follow `docs/release/RELEASE_CAPTAIN_WORKFLOW.md`.
 

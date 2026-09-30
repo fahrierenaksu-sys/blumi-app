@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { RECEIPT_SCHEMA, REPO_RECORD_PATH } from "./archive-from-manifest.mjs"
+import { RECEIPT_SCHEMA, resolveRepoRecordPath } from "./archive-from-manifest.mjs"
 
 const DEFAULT_MANIFEST = "docs/quality/cleanup-manifest-2026-09-29.json"
 const REMOVABLE_STATUSES = new Set(["copied", "already-archived"])
@@ -49,8 +49,14 @@ function assertSafeRelativePath(relative) {
 
 export async function planRemoval(options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd())
-  const receiptPath = path.resolve(repoRoot, options.receipt ?? REPO_RECORD_PATH)
   const manifestPath = path.resolve(repoRoot, options.manifest ?? DEFAULT_MANIFEST)
+  const manifestBytes = existsSync(manifestPath) ? await readFile(manifestPath) : null
+  // Each manifest has its own receipt: its declared archiveVerificationPath,
+  // or the 2026-09-29 default. --receipt overrides it.
+  const receiptPath = path.resolve(
+    repoRoot,
+    options.receipt ?? resolveRepoRecordPath(manifestBytes ? JSON.parse(manifestBytes.toString("utf8")) : {})
+  )
   if (!existsSync(receiptPath)) {
     throw new Error(`No archive receipt at ${receiptPath}. Run archive-from-manifest.mjs --record-in-repo on the owner's machine first.`)
   }
@@ -58,7 +64,8 @@ export async function planRemoval(options = {}) {
   if (receipt.schemaVersion !== RECEIPT_SCHEMA) throw new Error("Unsupported archive receipt schema")
   if (receipt.dryRun) throw new Error("The archive receipt is from a dry run; nothing was archived")
   if (receipt.complete !== true) throw new Error("The archive receipt is not complete; fix failed entries and archive again")
-  const manifestSha256 = sha256(await readFile(manifestPath))
+  if (!manifestBytes) throw new Error(`No cleanup manifest at ${manifestPath}`)
+  const manifestSha256 = sha256(manifestBytes)
   if (receipt.manifestSha256 !== manifestSha256) {
     throw new Error("The archive receipt was produced from a different manifest version")
   }
