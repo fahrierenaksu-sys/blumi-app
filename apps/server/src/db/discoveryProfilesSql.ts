@@ -47,6 +47,7 @@ export function discoveryProfilesSql(): string {
              FROM blumi_accounts
              CROSS JOIN viewer
             WHERE user_id <> $1
+            AND moderation_status NOT IN ('suspended', 'banned')
             AND display_name <> ''
             AND age IS NOT NULL
             AND char_length(trim(display_name)) >= 2
