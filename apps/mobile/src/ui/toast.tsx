@@ -116,11 +116,12 @@ export function ToastContainer() {
         })
       ]).start()
 
-      // Progress bar countdown
+      // Progress bar countdown: a native-driver scaleX from the left edge
+      // instead of animating layout width on the JS thread.
       Animated.timing(progressAnim, {
         toValue: 0,
         duration: toast.durationMs ?? 3000,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start()
     } else {
       Animated.parallel([
@@ -141,10 +142,6 @@ export function ToastContainer() {
   if (!toast) return null
 
   const config = TYPE_CONFIG[toast.type]
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0%", "100%"],
-  })
 
   return (
     <Animated.View
@@ -195,7 +192,7 @@ export function ToastContainer() {
             style={[
               styles.progressBar,
               {
-                width: progressWidth,
+                transform: [{ scaleX: progressAnim }],
                 backgroundColor: config.textColor,
               }
             ]}
@@ -252,7 +249,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.06)",
   },
   progressBar: {
+    width: "100%",
     height: 3,
+    transformOrigin: "left center",
     opacity: 0.35,
     borderRadius: 2,
   },

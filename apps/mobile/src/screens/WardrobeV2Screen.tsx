@@ -71,7 +71,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     carouselContentWidth,
     carouselViewportWidth,
     handleAnimatedCarouselScroll,
-    handleCarouselSettled,
     handleCarouselContentSizeChange,
     handleCarouselLayout
   } = useWardrobeCarousel(activeCategory)
@@ -211,7 +210,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
                 onEquip={handleEquip}
                 onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
                 onScroll={handleAnimatedCarouselScroll}
-                onScrollSettled={handleCarouselSettled}
                 onContentSizeChange={handleCarouselContentSizeChange}
                 onLayout={handleCarouselLayout}
               />

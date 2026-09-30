@@ -38,8 +38,7 @@ const FRAME_LOOP_DEBT = new Set([
   "features/miniRoom/scene/miniRoomSceneStore.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
   "features/session/OnboardingBrandPrelude.tsx",
-  "features/session/register/useRegisterFlowController.ts",
-  "features/session/setupFlow/BlumiSetupShell.tsx"
+  "features/session/register/useRegisterFlowController.ts"
 ])
 
 test("no new requestAnimationFrame or setInterval loops in production code", () => {
