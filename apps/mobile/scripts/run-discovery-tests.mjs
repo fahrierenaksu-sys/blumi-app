@@ -152,6 +152,20 @@ try {
       stdio: "inherit"
     }
   )
+
+  // Hook tests load their module graph through tsx with native modules stubbed.
+  execFileSync(
+    process.execPath,
+    [
+      "--import", "tsx",
+      "--test",
+      "src/features/discovery/screen/useDiscoveryDecisions.test.ts"
+    ],
+    {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    }
+  )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }
