@@ -47,26 +47,56 @@ test("a deck card is visible at its first commit, before passive effects", () =>
   }
 })
 
+// The exit animation moved to the UI-thread swipe hook; run its real
+// forceSwipe/commitSwipe with a timing stub that reports how the exit ended.
+const swipeHookSource = readFileSync(new URL("./useDiscoverCardSwipe.ts", import.meta.url), "utf8")
+const swipeHookFile = ts.createSourceFile("useDiscoverCardSwipe.ts", swipeHookSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+const swipeHook = swipeHookFile.statements.find((node) =>
+  ts.isFunctionDeclaration(node) && node.name?.text === "useDiscoverCardSwipe"
+)
+
+function hookCallback(name, bindings) {
+  const declaration = swipeHook.body.statements.filter(ts.isVariableStatement)
+    .flatMap((node) => [...node.declarationList.declarations])
+    .find((node) => ts.isIdentifier(node.name) && node.name.text === name)
+  assert.ok(declaration?.initializer && ts.isCallExpression(declaration.initializer))
+  const executable = ts.transpileModule(`(${declaration.initializer.arguments[0].getText(swipeHookFile)})`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 }
+  }).outputText
+  return runInNewContext(executable, bindings)
+}
+
 test("an interrupted swipe never submits a like or pass", () => {
   let onAnimationEnd
   const delivered = []
-  const forceSwipe = callback("forceSwipe", {
-    useCallback: (fn) => fn,
-    Animated: { timing: () => ({ start: (handler) => { onAnimationEnd = handler } }) },
-    position: {},
-    reduceMotion: false,
-    SWIPE_OUT_DURATION: 200,
-    Easing: { out: () => undefined, cubic: undefined },
-    screenWidth: 400,
-    profile: { userId: "candidate" },
+  const commitSwipe = hookCallback("commitSwipe", {
+    cardId: "candidate",
     onSwipeRight: (id) => delivered.push(`like:${id}`),
     onSwipeLeft: (id) => delivered.push(`pass:${id}`)
   })
+  const x = { value: 0 }
+  const ownerId = { value: "" }
+  const forceSwipe = hookCallback("forceSwipe", {
+    x,
+    ownerId,
+    cardId: "candidate",
+    reduceMotion: false,
+    screenWidth: 400,
+    SWIPE_OUT_DURATION: 190,
+    ReduceMotion: { Never: "never" },
+    Easing: { out: () => undefined, cubic: undefined },
+    getDiscoverSwipeOutX: (direction, width) => direction === "right" ? width * 1.2 : -width * 1.2,
+    withTiming: (toValue, _config, callback) => { onAnimationEnd = callback; return toValue },
+    scheduleOnRN: (fn, ...args) => fn(...args),
+    commitSwipe
+  })
   forceSwipe("right")
-  onAnimationEnd({ finished: false })
+  assert.equal(ownerId.value, "candidate")
+  assert.equal(x.value, 480)
+  onAnimationEnd(false)
   assert.deepEqual(delivered, [])
   forceSwipe("left")
-  onAnimationEnd({ finished: true })
+  onAnimationEnd(true)
   assert.deepEqual(delivered, ["pass:candidate"])
 })
 

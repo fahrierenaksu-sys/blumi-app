@@ -2,7 +2,7 @@
  * SwipeableDiscoverCard – a swipeable card for the discover deck.
  *
  * Supports:
- * - PanResponder-based horizontal drag gestures
+ * - Horizontal drag on the UI thread (Gesture Handler pan, useDiscoverCardSwipe)
  * - Upright translation while dragging
  * - Stamp overlays (LIKE / NOPE) that fade in with swipe direction
  * - Animated spring exit on release (if threshold met)
@@ -16,15 +16,14 @@ import type { AvatarSelection, UserProfilePrompt } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { GestureDetector } from "react-native-gesture-handler"
+import Reanimated from "react-native-reanimated"
 import {
   Animated,
   Easing,
   Image,
-  PanResponder,
   Pressable,
-  type GestureResponderEvent,
   type ImageSourcePropType,
-  type PanResponderGestureState,
   StyleSheet,
   Text,
   View,
@@ -49,12 +48,9 @@ import {
 import type { DiscoveryCardLayoutMetrics } from "../discovery/discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "../discovery/discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
+import type { DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
+import { useDiscoverCardSwipe } from "./useDiscoverCardSwipe"
 
-const SWIPE_OUT_DURATION = 190
-const SWIPE_CAPTURE_THRESHOLD = 4
-const SWIPE_DIRECTION_DOMINANCE = 1.1
-const SWIPE_DISTANCE_RATIO = 0.22
-const SWIPE_FLICK_VELOCITY = 0.55
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
 const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
 let nextShowcaseAuthorizationId = 0
@@ -93,7 +89,7 @@ interface SwipeableDiscoverCardProps {
   profile: SwipeableDiscoverProfile
   onSwipeRight: (userId: string) => void
   onSwipeLeft: (userId: string) => void
-  swipeAnim?: Animated.ValueXY
+  swipeAnim?: DiscoverSwipeValues
   disabled?: boolean
   canSwipeRight?: boolean
   disableEntryAnim?: boolean
@@ -132,8 +128,6 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     if (frontLayoutReady) onFrontDisplay?.("layout")
     if (frontSurfaceReady) onFrontDisplay?.("surface")
   }, [frontLayoutReady, frontSurfaceReady, onFrontDisplay])
-  const localPosition = useRef(new Animated.ValueXY()).current
-  const position = swipeAnim || localPosition
   // The deck disables arrival motion: its first commit must already be visible.
   const entryAnim = useRef(new Animated.Value(disableEntryAnim || reduceMotion ? 1 : 0)).current
   const pulseAnim = useRef(new Animated.Value(0.78)).current
@@ -142,7 +136,16 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const [showcaseAuthorization, setShowcaseAuthorization] = useState<ShowcaseAuthorization | null>(null)
   const queryClient = useQueryClient()
   const { width: screenWidth } = useWindowDimensions()
-  const swipeThreshold = Math.min(screenWidth * SWIPE_DISTANCE_RATIO, 96)
+  const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle } = useDiscoverCardSwipe({
+    swipe: swipeAnim,
+    cardId: profile.userId,
+    disabled,
+    canSwipeRight,
+    reduceMotion,
+    screenWidth,
+    onSwipeRight,
+    onSwipeLeft
+  })
   const copy = getDiscoverySurfaceCopy(getAppLocale())
   const cardBack = useMemo(
     () => normalizeDiscoveryCardBack({
@@ -324,93 +327,6 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     }
   }, [disabled, profile.userId, pulseAnim, reduceMotion])
 
-  const resetPosition = useCallback(() => {
-    if (reduceMotion) {
-      position.setValue({ x: 0, y: 0 })
-      return
-    }
-    Animated.spring(position, {
-      toValue: { x: 0, y: 0 },
-      tension: 120,
-      friction: 7,
-      useNativeDriver: true
-    }).start()
-  }, [position, reduceMotion])
-
-  const forceSwipe = useCallback(
-    (direction: "left" | "right") => {
-      const x = direction === "right" ? screenWidth * 1.2 : -screenWidth * 1.2
-      Animated.timing(position, {
-        toValue: { x, y: 0 },
-        duration: reduceMotion ? 0 : SWIPE_OUT_DURATION,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
-      }).start(({ finished }) => {
-        if (!finished) return
-        if (direction === "right") {
-          onSwipeRight(profile.userId)
-        } else {
-          onSwipeLeft(profile.userId)
-        }
-      })
-    },
-    [onSwipeLeft, onSwipeRight, position, profile.userId, reduceMotion, screenWidth]
-  )
-
-  const panResponder = useMemo(
-    () => {
-      const shouldClaimSwipe = (
-        _: GestureResponderEvent,
-        gesture: PanResponderGestureState
-      ): boolean =>
-        !disabled &&
-        Math.abs(gesture.dx) > SWIPE_CAPTURE_THRESHOLD &&
-        Math.abs(gesture.dx) > Math.abs(gesture.dy) * SWIPE_DIRECTION_DOMINANCE
-
-      return PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: shouldClaimSwipe,
-        onMoveShouldSetPanResponderCapture: shouldClaimSwipe,
-        onPanResponderGrant: () => position.stopAnimation(),
-        // PanResponder move events stay on JS, but the mapper avoids creating a
-        // new React callback for every frame and keeps vertical drift removed.
-        onPanResponderMove: Animated.event(
-          [null, { dx: position.x }],
-          { useNativeDriver: false }
-        ),
-        onPanResponderRelease: (_, gesture) => {
-          const isFlickRight =
-            gesture.vx > SWIPE_FLICK_VELOCITY && gesture.dx > 0
-          const isFlickLeft =
-            gesture.vx < -SWIPE_FLICK_VELOCITY && gesture.dx < 0
-
-          if ((gesture.dx > swipeThreshold || isFlickRight) && canSwipeRight) {
-            forceSwipe("right")
-          } else if (gesture.dx < -swipeThreshold || isFlickLeft) {
-            forceSwipe("left")
-          } else {
-            resetPosition()
-          }
-        },
-        onPanResponderTerminate: resetPosition,
-        onPanResponderTerminationRequest: () => false
-      })
-    },
-    [canSwipeRight, disabled, forceSwipe, position, resetPosition, swipeThreshold]
-  )
-
-  // Stamp opacity
-  const likeOpacity = position.x.interpolate({
-    inputRange: [0, swipeThreshold * 0.5, swipeThreshold],
-    outputRange: [0, 0.5, 1],
-    extrapolate: "clamp"
-  })
-  const nopeOpacity = position.x.interpolate({
-    inputRange: [-swipeThreshold, -swipeThreshold * 0.5, 0],
-    outputRange: [1, 0.5, 0],
-    extrapolate: "clamp"
-  })
-
   const firstName = profile.displayName.trim().split(/\s+/)[0] || profile.displayName
   const bio = formatDiscoveryCardBio(profile.bio)
   const distanceLabel =
@@ -438,6 +354,8 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const ageFontSize = layoutMetrics?.ageFontSize ?? (compact ? 18 : 20)
 
   return (
+    <GestureDetector gesture={swipeGesture}>
+    <Reanimated.View style={[styles.swipeFrame, cardSwipeStyle]}>
     <Animated.View
       onLayout={() => setFrontLayoutReady(true)}
       style={[
@@ -445,8 +363,6 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         {
           opacity: entryAnim,
           transform: [
-            { translateX: position.x },
-            { translateY: position.y },
             { rotate: "0deg" },
             {
               scale: entryAnim.interpolate({
@@ -457,7 +373,6 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
           ]
         }
       ]}
-      {...(disabled ? {} : panResponder.panHandlers)}
     >
       <Pressable
         accessibilityRole="button"
@@ -493,16 +408,16 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
             }
           ]}
         >
-          <Animated.View style={[styles.stampContainer, styles.stampRight, { opacity: likeOpacity }]}>
+          <Reanimated.View style={[styles.stampContainer, styles.stampRight, likeStampStyle]}>
             <View style={styles.likeStamp}>
               <Text style={styles.likeStampText}>{copy.card.likeStamp}</Text>
             </View>
-          </Animated.View>
-          <Animated.View style={[styles.stampContainer, styles.stampLeft, { opacity: nopeOpacity }]}>
+          </Reanimated.View>
+          <Reanimated.View style={[styles.stampContainer, styles.stampLeft, nopeStampStyle]}>
             <View style={styles.nopeStamp}>
               <Text style={styles.nopeStampText}>{copy.card.passStamp}</Text>
             </View>
-          </Animated.View>
+          </Reanimated.View>
           <View style={styles.photoProgress} pointerEvents="none">
             {Array.from({ length: photoCount }).map((_, index) => (
               <View
@@ -606,6 +521,8 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         </View>
         </Pressable>
     </Animated.View>
+    </Reanimated.View>
+    </GestureDetector>
   )
 }
 
@@ -729,6 +646,10 @@ export function useSwipeRef() {
 }
 
 const styles = StyleSheet.create({
+  // Carries the UI-thread swipe translation; the card inside keeps its entry motion.
+  swipeFrame: {
+    ...StyleSheet.absoluteFill,
+  },
   card: {
     position: "absolute",
     top: 0,

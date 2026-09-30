@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Animated } from "react-native"
 import { useFocusEffect, type RouteProp } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { DiscoveryDecisionQuota } from "@blumi/contracts"
+import { useDiscoverSwipeValues } from "../useDiscoverSwipeValues"
 import { MOBILE_HTTP_BASE_URL } from "../../../config/env"
 import { captureProductEvent } from "../../../analytics/productAnalytics"
 import type { RootStackParamList } from "../../../navigation/RootNavigator"
@@ -76,7 +76,7 @@ export function useDiscoveryDecisions(input: {
   const [inFlightDecisionUserIds, setInFlightDecisionUserIds] =
     useState<ReadonlySet<string>>(() => new Set())
   const inFlightDecisionUserIdsRef = useRef<ReadonlySet<string>>(new Set())
-  const cardDragX = useRef(new Animated.ValueXY()).current
+  const cardDragX = useDiscoverSwipeValues()
   const firstDiscoveryDecisionCapturedRef = useRef(false)
 
   useFocusEffect(useCallback(() => () => {
@@ -120,7 +120,7 @@ export function useDiscoveryDecisions(input: {
     setSeenThisSessionUserIds((current) =>
       rollbackOptimisticDiscoveryDecision(current, userId)
     )
-    cardDragX.setValue({ x: 0, y: 0 })
+    cardDragX.x.value = 0
   }, [cardDragX, setSeenThisSessionUserIds])
 
   const decideProductionCandidate = useCallback(
