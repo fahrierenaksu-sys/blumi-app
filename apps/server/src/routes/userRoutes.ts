@@ -23,10 +23,7 @@ import {
   OnboardingPrerequisiteError,
   type AuthService
 } from "../auth/authService"
-import {
-  isPublicRequestError,
-  PublicRequestError
-} from "../errors/publicRequestError"
+import { isPublicRequestError } from "../errors/publicRequestError"
 import {
   isRecord,
   readBearerToken,
@@ -35,11 +32,9 @@ import {
   resolveBearerSession,
   schemaValidationFailed
 } from "./routeHelpers"
-import type {
-  CompleteAvatarSelection,
-  UserProfilePrompt
-} from "@blumi/contracts"
+import type { CompleteAvatarSelection } from "@blumi/contracts"
 import { isAuthError } from "../auth/authErrors"
+import { readProfileUpdateBody } from "./profileUpdateBody"
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
 
@@ -276,31 +271,11 @@ export async function registerUserRoutes(
     }
 
     try {
-      const body = isRecord(request.body) ? request.body : {}
-      const profile = await authService.updateProfile(sessionToken, {
-        displayName:
-          typeof body.displayName === "string" ? body.displayName : undefined,
-        age:
-          typeof body.age === "number" ? body.age : undefined,
-        avatarPresetId:
-          typeof body.avatarPresetId === "string" ? body.avatarPresetId : undefined,
-        bio:
-          typeof body.bio === "string" ? body.bio : undefined,
-        gender:
-          typeof body.gender === "string" ? body.gender : undefined,
-        identityGender:
-          typeof body.identityGender === "string" ? body.identityGender : undefined,
-        discoveryPreferences:
-          isRecord(body.discoveryPreferences)
-            ? body.discoveryPreferences as never
-            : undefined,
-        interests:
-          Array.isArray(body.interests) &&
-          body.interests.every((interest) => typeof interest === "string")
-            ? body.interests
-            : undefined,
-        prompts: readProfilePrompts(body)
-      })
+      const update = readProfileUpdateBody(isRecord(request.body) ? request.body : {})
+      if (!update) {
+        return reply.code(400).send({ error: "Choose valid profile details." })
+      }
+      const profile = await authService.updateProfile(sessionToken, update)
       if (!profile) {
         return reply.code(401).send({ error: "Sign in again to continue." })
       }
@@ -758,29 +733,4 @@ function readConfirmationToken(body: unknown, key: string): string {
   if (!isRecord(body) || typeof body[key] !== "string") return ""
   const token = body[key].trim()
   return /^dv_[0-9a-f-]{36}_[0-9a-f-]{36}$/.test(token) ? token : ""
-}
-
-function readProfilePrompts(
-  body: Record<string, unknown>
-): UserProfilePrompt[] | undefined {
-  if (!Object.hasOwn(body, "prompts")) return undefined
-  if (!Array.isArray(body.prompts)) {
-    throw new PublicRequestError("Profile prompts must be a list.")
-  }
-  return body.prompts.map((candidate) => {
-    if (!candidate || typeof candidate !== "object") {
-      throw new PublicRequestError("Choose a valid profile prompt.")
-    }
-    const prompt = candidate as Record<string, unknown>
-    if (
-      typeof prompt.promptId !== "string" ||
-      typeof prompt.answer !== "string"
-    ) {
-      throw new PublicRequestError("Choose a valid profile prompt.")
-    }
-    return {
-      promptId: prompt.promptId,
-      answer: prompt.answer
-    } as UserProfilePrompt
-  })
 }

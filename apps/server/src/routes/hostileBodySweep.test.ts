@@ -52,7 +52,7 @@ async function stateFingerprint(server: AdversarialServer, token: string) {
     server.call("GET", "/v1/economy/balance", { token }),
     server.call("GET", "/v1/notification-preferences", { token })
   ])
-  // updatedAt is ignored: an all-ignored PATCH /v1/users/me still touches it (todo below).
+  // updatedAt is ignored: an all-ignored PATCH /v1/users/me (nulls, unknown keys) still touches it.
   return JSON.stringify(
     [me.json(), blocks.json(), reports.json(), threads.json(), balance.json(), prefs.json()],
     (key, value: unknown) => key === "updatedAt" ? undefined : value
@@ -122,23 +122,42 @@ test("bodyless and session-ending routes ignore hostile bodies without a 5xx", a
   }
 })
 
-test(
-  "PATCH /v1/users/me rejects wrongly typed profile fields instead of answering 200",
-  { todo: "BUG: the body schema is a bare object and the handler drops wrongly typed fields, so {displayName: []} or {age: 'twenty'} gets 200 with nothing saved (hidden client failure)" },
-  async () => {
-    const server = createAdversarialServer()
-    try {
-      await server.app.ready()
-      const member = await server.createAccount("typed")
-      for (const payload of [{ displayName: [] }, { age: "twenty" }, { bio: 42 }, { interests: [1, 2] }]) {
-        const response = await server.call("PATCH", "/v1/users/me", { token: member.sessionToken, payload })
-        assert.equal(response.statusCode, 400, JSON.stringify(payload))
-      }
-    } finally {
-      await server.app.close()
+test("PATCH /v1/users/me rejects wrongly typed profile fields with 400 and writes nothing", async () => {
+  const server = createAdversarialServer()
+  try {
+    await server.app.ready()
+    const member = await server.createAccount("typed")
+    const stored = () => server.authService.repository.findAccountById(member.accountId)
+    const before = await stored()
+    assert.ok(before)
+    const wrong: Array<Record<string, unknown>> = [
+      { displayName: [] }, { displayName: 5 }, { age: "twenty" }, { age: [25] }, { bio: 42 },
+      { bio: { text: "x" } }, { gender: 1 }, { identityGender: true }, { avatarPresetId: 7 },
+      { discoveryPreferences: "all" }, { discoveryPreferences: [1] }, { interests: [1, 2] },
+      { interests: "music" }, { prompts: "none" },
+      // One wrong field fails the whole update, even next to valid ones.
+      { displayName: "Renamed", age: "twenty" }, { bio: "fine", interests: ["ok", 3] }
+    ]
+    for (const payload of wrong) {
+      const response = await server.call("PATCH", "/v1/users/me", { token: member.sessionToken, payload })
+      assert.equal(response.statusCode, 400, JSON.stringify(payload))
     }
+    assert.deepEqual(await stored(), before, "no field and no updatedAt changed")
+
+    // Explicit null keeps its previous meaning (not provided) and unknown keys stay ignored.
+    const tolerated = await server.call("PATCH", "/v1/users/me", {
+      token: member.sessionToken,
+      payload: { displayName: "Kept Name", age: null, bio: null, gender: null, interests: null, futureField: { x: 1 } }
+    })
+    assert.equal(tolerated.statusCode, 200, tolerated.body)
+    const after = await stored()
+    assert.equal(after?.profile.displayName, "Kept Name")
+    assert.equal(after?.profile.age, before.profile.age)
+    assert.equal(after?.profile.gender, before.profile.gender)
+  } finally {
+    await server.app.close()
   }
-)
+})
 
 // Swept separately with a throwaway session: they end or rotate the caller's session.
 const SESSION_ENDING = new Set(["POST /v1/auth/refresh", "DELETE /v1/auth/session"])
@@ -168,13 +187,12 @@ const ACCEPTED_BY_CONTRACT = new Set([
   "POST /v1/users/me/active-room/leave [wrong field types]",
   "POST /v1/commerce/coin-packs/reconcile [wrong field types]",
   "DELETE /v1/devices [wrong field types]",
-  // Partial-update contracts ignore unknown keys; PATCH /v1/users/me also
-  // drops wrongly typed known keys (todo above).
+  // Partial-update contracts ignore unknown keys and treat null as "not
+  // provided"; PATCH /v1/users/me answers 400 for wrongly typed known keys.
   "PUT /v1/notification-preferences [wrong field types]",
   "PUT /v1/notification-preferences [nulls]",
   "PUT /v1/notification-preferences [deeply nested]",
   "PUT /v1/notification-preferences [unknown fields only]",
-  "PATCH /v1/users/me [wrong field types]",
   "PATCH /v1/users/me [nulls]",
   "PATCH /v1/users/me [deeply nested]",
   "PATCH /v1/users/me [unknown fields only]"
