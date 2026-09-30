@@ -19,32 +19,24 @@ const miniRoomSceneSource = read(
   "src/features/miniRoom/scene/MiniRoomScene.tsx"
 )
 
-test("room avatar animation starts without a post-paint baseline state update", () => {
-  assert.match(rendererSource, /const frameBaseline = useMemo\(/)
-  assert.doesNotMatch(
-    rendererSource,
-    /\[frameBaseline,\s*setFrameBaseline\]\s*=\s*useState/
-  )
+// The avatar frame ticker moved to the UI thread (see
+// room-avatar-renderer-subscription.test.mjs); these pin the same guarantees
+// on the new implementation.
+test("room avatar animation starts at frame 0 without a post-paint state update", () => {
+  assert.doesNotMatch(rendererSource, /useState\(/)
+  assert.match(rendererSource, /if \(current\.signature !== signature\) \{[\s\S]*?baseTick\.value = tick[\s\S]*?index: 0/)
+  assert.match(rendererSource, /const frameIndex = state\.signature === signature \? state\.index : 0/)
 })
 
-test("static room avatar image layers are memoized across animation ticks", () => {
-  assert.match(rendererSource, /const RoomAvatarLayerImage = memo\(/)
-  assert.match(rendererSource, /<RoomAvatarLayerImage\b/)
-  assert.match(rendererSource, /hasAnimatedLayerFrames/)
+test("room avatar layers are memoized and mount each distinct frame image once", () => {
+  assert.match(rendererSource, /const RoomAvatarLayer = memo\(/)
+  assert.match(rendererSource, /<RoomAvatarLayer\b/)
+  assert.match(rendererSource, /getRoomAvatarLayerFrameSlots\(layer\)/)
 })
 
-test("shared ticker preserves its frame when the last subscriber changes motion", () => {
-  const unsubscribeStart = rendererSource.indexOf("return () => {")
-  const snapshotStart = rendererSource.indexOf(
-    "function getRoomAvatarFrameTickerSnapshot",
-    unsubscribeStart
-  )
-  assert.ok(unsubscribeStart > 0)
-  assert.ok(snapshotStart > unsubscribeStart)
-  assert.doesNotMatch(
-    rendererSource.slice(unsubscribeStart, snapshotStart),
-    /roomAvatarFrameTickerStores\.delete/
-  )
+test("avatars share one frame clock phase from the UI frame timestamp", () => {
+  assert.match(rendererSource, /getRoomAvatarFrameTick\(frameInfo\.timestamp, frameDurationMs\)/)
+  assert.doesNotMatch(rendererSource, /roomAvatarFrameTickerStores/)
 })
 
 test("MiniRoom avoids duplicate synthetic motion and isolates unchanged avatars", () => {

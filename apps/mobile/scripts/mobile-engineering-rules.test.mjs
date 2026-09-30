@@ -34,7 +34,6 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
 // Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
-  "features/avatarV2/room/components/RoomAvatarRenderer2D.tsx",
   "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts",
   "features/miniRoom/scene/miniRoomSceneStore.ts",
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
@@ -113,7 +112,7 @@ test("worklets never use identifiers in default parameters", () => {
   assert.deepEqual(offenders, [], "move the default into the worklet body")
 })
 
-const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 26
+const MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS = 25
 
 test("react-hooks/exhaustive-deps suppressions do not grow", () => {
   const count = sources.reduce(

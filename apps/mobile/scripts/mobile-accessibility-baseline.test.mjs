@@ -341,9 +341,9 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
     {
       relativePath: "src/features/avatarV2/room/components/RoomAvatarRenderer2D.tsx",
       patterns: [
-        /getLayerAnimationState\(layers, !reduceMotion\)/,
-        /animation\.hasAnimation[\s\S]*subscribeRoomAvatarFrameTicker[\s\S]*: \(\) => undefined/,
-        /const frameIndex = !animation\.hasAnimation[\s\S]*\? 0/
+        /getRoomAvatarLayerAnimationState\(layers, !reduceMotion\)/,
+        /useFrameCallback\(advanceFrame, hasAnimation\)/,
+        /if \(!hasAnimation\) frameState\.value = STATIC_FRAME_STATE/
       ]
     }
   ]
