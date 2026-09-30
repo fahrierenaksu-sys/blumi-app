@@ -114,6 +114,66 @@ test("PostgreSQL blocks and reports stay single under concurrency and NUL report
   }
 })
 
+test("PostgreSQL hides a blocked pair's thread from both users with full pages and batched block lookups, and an unblock restores its history", requirePostgres, async () => {
+  const pool = openPool()
+  const suffix = randomUUID()
+  const viewer = `hide_viewer_${suffix}`
+  const partners = Array.from({ length: 6 }, (_, index) => `hide_p${index}_${suffix}`)
+  let blockQueries = 0
+  const countingPool = {
+    query(text: string, values?: readonly unknown[]) {
+      if (text.includes("blumi_safety_blocks")) blockQueries += 1
+      return pool.query(text, values as unknown[])
+    }
+  }
+  const safetyService = createSafetyService({ repository: createPostgresSafetyRepository(countingPool) })
+  const chatService = createChatService({
+    repository: createPostgresChatRepository(pool),
+    blockPolicy: safetyService
+  })
+  const threadOf = (partner: string) => `thread_${partner}`
+  try {
+    const base = Date.parse("2026-09-30T10:00:00.000Z")
+    for (const [index, partner] of partners.entries()) {
+      await chatService.createThread({
+        threadId: threadOf(partner), miniRoomId: `room_${partner}`,
+        participantUserIds: [viewer, partner], participants: [{ userId: viewer }, { userId: partner }]
+      }, new Date(base + index * 1000))
+    }
+    await chatService.sendMessage(partners[4]!, threadOf(partners[4]!), "kept through the block")
+    // Newest first: p5 p4 p3 p2 p1 p0. Blocks in both directions hide p4, p3, p1.
+    await safetyService.blockUser(viewer, partners[4]!)
+    await safetyService.blockUser(partners[3]!, viewer)
+    await safetyService.blockUser(viewer, partners[1]!)
+
+    blockQueries = 0
+    const first = await chatService.listThreadsPage(viewer, { limit: 2 })
+    assert.deepEqual(first.threads.map((thread) => thread.threadId), [threadOf(partners[5]!), threadOf(partners[2]!)])
+    const second = await chatService.listThreadsPage(viewer, { limit: 2, cursor: first.nextCursor! })
+    assert.deepEqual(second.threads.map((thread) => thread.threadId), [threadOf(partners[0]!)])
+    assert.equal(second.nextCursor, null)
+    blockQueries = 0
+    assert.equal((await chatService.listThreadsPage(viewer)).threads.length, 3)
+    assert.equal(blockQueries, 1, "one batched block query for the whole page")
+
+    for (const userId of [viewer, partners[4]!]) {
+      await assert.rejects(chatService.listMessages(userId, threadOf(partners[4]!)), PublicRequestError)
+      await assert.rejects(chatService.markThreadRead(userId, threadOf(partners[4]!)), PublicRequestError)
+    }
+    assert.deepEqual((await chatService.listThreadsPage(partners[4]!)).threads, [])
+
+    await safetyService.unblockUser(viewer, partners[4]!)
+    const restored = await chatService.listThreadsPage(partners[4]!)
+    assert.deepEqual(restored.threads.map((thread) => thread.threadId), [threadOf(partners[4]!)])
+    assert.equal(restored.threads[0]?.lastMessage?.body, "kept through the block")
+    assert.deepEqual((await chatService.listMessages(viewer, threadOf(partners[4]!))).map((message) => message.body),
+      ["kept through the block"])
+    assert.equal((await chatService.listThreadsPage(viewer)).threads.length, 4)
+  } finally {
+    await pool.end()
+  }
+})
+
 test("PostgreSQL concurrent reciprocal likes create one match and spend one decision per side", requirePostgres, async () => {
   const pool = openPool()
   const suffix = randomUUID()

@@ -67,6 +67,21 @@ runRepositoryContract<SafetyRepository>({
       assert.deepEqual(await backend.repository.listBlockedUserIdsBetween(viewer, []), [])
     },
 
+    "deleting a block clears the pair from listBlockedUserIdsBetween only when no reverse block remains": async (backend) => {
+      // Chat hides a pair's thread while this returns the partner, so an
+      // unblock must restore visibility exactly when no block is left.
+      const viewer = backend.id("viewer")
+      const partner = backend.id("partner")
+      await backend.repository.saveBlock({ actorUserId: viewer, blockedUserId: partner, createdAt: AT })
+      await backend.repository.saveBlock({ actorUserId: partner, blockedUserId: viewer, createdAt: AT })
+      await backend.repository.deleteBlock(viewer, partner)
+      assert.deepEqual(await backend.repository.listBlockedUserIdsBetween(viewer, [partner]), [partner])
+      assert.deepEqual(await backend.repository.listBlockedUserIdsBetween(partner, [viewer]), [viewer])
+      await backend.repository.deleteBlock(partner, viewer)
+      assert.deepEqual(await backend.repository.listBlockedUserIdsBetween(viewer, [partner]), [])
+      assert.deepEqual(await backend.repository.listBlockedUserIdsBetween(partner, [viewer]), [])
+    },
+
     "saveReportAndBlock creates once, replays the original and rejects a changed payload": async (backend) => {
       const original = report(backend)
       const created = await backend.repository.saveReportAndBlock(original, blockFor(original))

@@ -89,9 +89,9 @@ export function createChatMessageDeliveryService(options: {
           )
           : null
         if (committedRetry) return { message: committedRetry, created: false }
-        throw new ChatDeliveryBlockedError(
-          "That conversation is not available anymore."
-        )
+        // Same message as a thread the sender is not in: a block hides the
+        // thread from both users and must not be revealed by the answer.
+        throw new ChatDeliveryBlockedError("That conversation is not available.")
       }
 
       const delivery = await chatService.sendMessageIdempotently(

@@ -26,8 +26,8 @@ type Harness = ReturnType<typeof createHarness>
 
 function createHarness(seedProfiles: Parameters<typeof createInMemoryMatchStore>[0] = []) {
   const authService = createAuthService({ codeFactory: () => "482931" })
-  const chatService = createChatService()
   const safetyService = createSafetyService()
+  const chatService = createChatService({ blockPolicy: safetyService })
   const matchService = createMatchService({
     repository: createInMemoryMatchRepository(createInMemoryMatchStore(seedProfiles))
   })
@@ -163,11 +163,13 @@ test("chat routes refuse outsiders, forged fields and malformed bodies without p
     const outsiderInvites = await harness.app.inject({
       method: "GET", url: `/v1/threads/${threadId}/room-invites`, headers: stranger.headers
     })
-    assert.equal(outsiderInvites.statusCode, 403)
+    // A thread the caller cannot see answers 404 on every thread route (also
+    // when a block hides it), so invites match messages and read receipts.
+    assert.equal(outsiderInvites.statusCode, 404)
     const outsiderInvite = await harness.app.inject({
       method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: stranger.headers, payload: {}
     })
-    assert.equal(outsiderInvite.statusCode, 403)
+    assert.equal(outsiderInvite.statusCode, 404)
     const outsiderThread = await harness.app.inject({
       method: "POST", url: "/v1/threads", headers: stranger.headers,
       payload: { participantUserIds: [ada.userId, bora.userId] }
@@ -369,7 +371,8 @@ test("room invite decisions are recipient-only and yield one outcome under concu
       method: "POST", url: `/v1/room-invites/${inviteId}/decision`, headers: stranger.headers,
       payload: { status: "accepted" }
     })
-    assert.equal(strangerAccepts.statusCode, 403)
+    // The stranger is not in the invite's thread: 404, like the thread itself.
+    assert.equal(strangerAccepts.statusCode, 404)
     const strangerCancels = await harness.app.inject({
       method: "POST", url: `/v1/room-invites/${inviteId}/cancel`, headers: stranger.headers, payload: {}
     })
@@ -497,11 +500,12 @@ test("a block stops the pair on every social-loop route, including room connecti
         method: "POST", url: `/v1/threads/${threadId}/messages`, headers: actor.headers,
         payload: { body: "still there?" }
       })
-      assert.equal(send.statusCode, 403)
+      // The block hides the thread from both users: 404, not a block-revealing 403.
+      assert.equal(send.statusCode, 404)
       const inviteAgain = await harness.app.inject({
         method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: actor.headers, payload: {}
       })
-      assert.equal(inviteAgain.statusCode, 403)
+      assert.equal(inviteAgain.statusCode, 404)
       const join = await harness.app.inject({
         method: "POST", url: `/v1/room-sessions/${roomId}/join`, headers: actor.headers, payload: {}
       })
@@ -512,14 +516,14 @@ test("a block stops the pair on every social-loop route, including room connecti
       })
       assert.equal(reopen.statusCode, 403)
     }
-    // The block cancelled the pending invite (pair separation), so a later
-    // accept finds nothing to accept.
+    // The block cancelled the pending invite (pair separation), and the hidden
+    // thread answers a later accept with 404 before any invite state is read.
     assert.equal((await harness.miniRoomService.repository.findInvite(pendingInviteId))?.status, "cancelled")
     const acceptAfterBlock = await harness.app.inject({
       method: "POST", url: `/v1/room-invites/${pendingInviteId}/decision`, headers: bora.headers,
       payload: { status: "accepted" }
     })
-    assert.equal(acceptAfterBlock.statusCode, 409)
+    assert.equal(acceptAfterBlock.statusCode, 404)
     assert.equal(await harness.miniRoomService.findActiveMiniRoomForUser(bora.userId), null)
 
     // The blocked partner completes the room's "save" handshake after the block.
@@ -532,7 +536,8 @@ test("a block stops the pair on every social-loop route, including room connecti
     assert.equal(harness.eventsOfType("connection.matched").length, 0)
     assert.equal(harness.events.slice(eventCountAtBlock)
       .filter((entry) => entry.userIds.includes(ada.userId) && entry.event.type !== "chat.room_invite_updated").length, 0)
-    assert.equal((await harness.chatService.listMessages(ada.userId, threadId)).length, 0)
+    // Read from storage: the service now hides the blocked pair's thread.
+    assert.equal((await harness.chatService.repository.listMessages(threadId)).length, 0)
   } finally {
     await harness.app.close()
   }
@@ -634,31 +639,136 @@ test("discovery decisions refuse self and unknown targets and spend quota once f
   }
 })
 
-test("a blocked partner no longer sees the blocker's conversation, name or history", {
-  todo: "BUG: after a block, GET /v1/threads, sync-matches and GET messages still return the thread, the blocker's display name/avatar and full history to the blocked user (product decision: hide vs keep read-only)"
-}, async () => {
+// Owner decision (2026-09-30): while a block exists in either direction the
+// pair's thread is hidden from both users; removing the block restores it with
+// its history. Hidden answers match a thread the caller is not in (404).
+async function visibleThreadState(harness: Harness, actor: { headers: Record<string, string> }, threadId: string) {
+  const listed = await harness.app.inject({ method: "GET", url: "/v1/threads", headers: actor.headers })
+  const synced = await harness.app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: actor.headers })
+  const history = await harness.app.inject({
+    method: "GET", url: `/v1/threads/${threadId}/messages`, headers: actor.headers
+  })
+  return {
+    listed: listed.json().threads.map((thread: { threadId: string }) => thread.threadId),
+    synced: synced.json().threads.map((thread: { threadId: string }) => thread.threadId),
+    historyStatus: history.statusCode,
+    history: history.statusCode === 200
+      ? history.json().messages.map((message: { body: string }) => message.body)
+      : []
+  }
+}
+
+test("a block hides the pair's conversation, name and history from both users on every thread route", async () => {
   const harness = createHarness()
   try {
-    const { ada, bora, threadId } = await createMatchedPair(harness, "40010")
+    const { ada, bora, stranger, threadId } = await createMatchedPair(harness, "40010")
     const sent = await harness.app.inject({
       method: "POST", url: `/v1/threads/${threadId}/messages`, headers: ada.headers,
       payload: { body: "before the block" }
     })
     assert.equal(sent.statusCode, 201)
+    const pending = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: bora.headers, payload: {}
+    })
+    assert.equal(pending.statusCode, 201)
     const blocked = await harness.app.inject({
       method: "POST", url: "/v1/safety/blocks", headers: ada.headers, payload: { blockedUserId: bora.userId }
     })
     assert.equal(blocked.statusCode, 201)
-    const listed = await harness.app.inject({ method: "GET", url: "/v1/threads", headers: bora.headers })
-    const synced = await harness.app.inject({ method: "POST", url: "/v1/threads/sync-matches", headers: bora.headers })
-    const history = await harness.app.inject({
-      method: "GET", url: `/v1/threads/${threadId}/messages`, headers: bora.headers
+    const eventCountAtBlock = harness.events.length
+
+    for (const actor of [bora, ada]) {
+      assert.deepEqual(await visibleThreadState(harness, actor, threadId),
+        { listed: [], synced: [], historyStatus: 404, history: [] })
+      // The realtime `chat.list_threads` / `chat.list_messages` handlers use the same service.
+      assert.deepEqual((await harness.chatService.listThreadsPage(actor.userId)).threads, [])
+      await assert.rejects(harness.chatService.listMessages(actor.userId, threadId), /not available/)
+      const hidden = await Promise.all([
+        harness.app.inject({ method: "POST", url: `/v1/threads/${threadId}/messages`, headers: actor.headers,
+          payload: { body: "after the block" } }),
+        harness.app.inject({ method: "POST", url: `/v1/threads/${threadId}/read`, headers: actor.headers, payload: {} }),
+        harness.app.inject({ method: "GET", url: `/v1/threads/${threadId}/room-invites`, headers: actor.headers }),
+        harness.app.inject({ method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: actor.headers, payload: {} })
+      ])
+      assert.deepEqual(hidden.map((response) => response.statusCode), [404, 404, 404, 404])
+      // Same body as for a thread the caller is not in.
+      const outsider = await harness.app.inject({
+        method: "GET", url: `/v1/threads/${threadId}/messages`, headers: stranger.headers
+      })
+      assert.equal(outsider.statusCode, 404)
+      assert.deepEqual(hidden[0]!.json(), outsider.json())
+    }
+    const decision = await harness.app.inject({
+      method: "POST", url: `/v1/room-invites/${pending.json().invite.inviteId}/decision`, headers: ada.headers,
+      payload: { status: "accepted" }
     })
-    assert.deepEqual({
-      listed: listed.json().threads.map((thread: { threadId: string }) => thread.threadId),
-      synced: synced.json().threads.map((thread: { threadId: string }) => thread.threadId),
-      historyStatus: history.statusCode
-    }, { listed: [], synced: [], historyStatus: 404 })
+    assert.equal(decision.statusCode, 404)
+    // Creation between the blocked pair stays refused (unchanged 403).
+    const reopen = await harness.app.inject({
+      method: "POST", url: "/v1/threads", headers: bora.headers,
+      payload: { participantUserIds: [ada.userId, bora.userId] }
+    })
+    assert.equal(reopen.statusCode, 403)
+    await settle()
+    assert.deepEqual(harness.events.slice(eventCountAtBlock)
+      .filter((entry) => entry.event.type !== "chat.room_invite_updated")
+      .map((entry) => entry.event.type), [])
+    // Nothing was deleted: the history is still stored.
+    assert.deepEqual((await harness.chatService.repository.listMessages(threadId)).map((message) => message.body),
+      ["before the block"])
+  } finally {
+    await harness.app.close()
+  }
+})
+
+test("removing a block restores the hidden thread with its history for both users", async () => {
+  const harness = createHarness()
+  try {
+    const { ada, bora, threadId } = await createMatchedPair(harness, "40011")
+    const sent = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/messages`, headers: ada.headers,
+      payload: { body: "kept through the block" }
+    })
+    assert.equal(sent.statusCode, 201)
+    // The blocked side blocks back, so both directions must be removed.
+    for (const [actor, target] of [[bora, ada], [ada, bora]] as const) {
+      const blocked = await harness.app.inject({
+        method: "POST", url: "/v1/safety/blocks", headers: actor.headers, payload: { blockedUserId: target.userId }
+      })
+      assert.equal(blocked.statusCode, 201)
+    }
+    const unblockBora = await harness.app.inject({
+      method: "DELETE", url: `/v1/safety/blocks/${ada.userId}`, headers: bora.headers
+    })
+    assert.equal(unblockBora.statusCode, 204)
+    assert.deepEqual((await visibleThreadState(harness, ada, threadId)).listed, [],
+      "still hidden while ada's block remains")
+    const unblockAda = await harness.app.inject({
+      method: "DELETE", url: `/v1/safety/blocks/${bora.userId}`, headers: ada.headers
+    })
+    assert.equal(unblockAda.statusCode, 204)
+
+    for (const actor of [ada, bora]) {
+      assert.deepEqual(await visibleThreadState(harness, actor, threadId), {
+        listed: [threadId], synced: [threadId], historyStatus: 200, history: ["kept through the block"]
+      })
+    }
+    const listed = await harness.app.inject({ method: "GET", url: "/v1/threads", headers: bora.headers })
+    assert.deepEqual(listed.json().threads[0].participants.map((participant: { displayName: string }) => participant.displayName).sort(),
+      ["Ada", "Bora"])
+    const reply = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/messages`, headers: bora.headers,
+      payload: { body: "hello again" }
+    })
+    assert.equal(reply.statusCode, 201)
+    const read = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/read`, headers: ada.headers, payload: {}
+    })
+    assert.equal(read.statusCode, 200)
+    const invite = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: ada.headers, payload: {}
+    })
+    assert.equal(invite.statusCode, 201)
   } finally {
     await harness.app.close()
   }

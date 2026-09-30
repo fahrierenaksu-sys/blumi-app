@@ -222,3 +222,95 @@ test("concurrent opens for one matched thread persist one canonical thread witho
   assert.deepEqual((await service.listThreads("user_a")).map((thread) => thread.threadId), [threadId])
   assert.deepEqual(await service.listMessages("user_a", threadId), [])
 })
+
+function createBlockPolicy(blockedPairs: Array<[string, string]>) {
+  const queries: Array<{ viewer: string; candidates: readonly string[] }> = []
+  const blocked = (a: string, b: string) =>
+    blockedPairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a))
+  return {
+    queries,
+    blockedPairs,
+    policy: {
+      async listBlockedUserIdsBetween(viewer: string, candidates: readonly string[]) {
+        queries.push({ viewer, candidates: [...candidates] })
+        return candidates.filter((candidate) => blocked(viewer, candidate))
+      },
+      async hasBlockBetween(a: string, b: string) { return blocked(a, b) }
+    }
+  }
+}
+
+async function createPairThreads(
+  service: ReturnType<typeof createChatService>,
+  viewer: string,
+  partners: string[]
+) {
+  const base = Date.parse("2026-09-30T10:00:00.000Z")
+  for (const [index, partner] of partners.entries()) {
+    await service.createThread({
+      threadId: `thread_${partner}`,
+      miniRoomId: `room_${partner}`,
+      participantUserIds: [viewer, partner],
+      participants: [{ userId: viewer }, { userId: partner }]
+    }, new Date(base + index * 1000))
+  }
+}
+
+test("a block in either direction hides the thread from both users on every chat read path", async () => {
+  const blocks = createBlockPolicy([])
+  const service = createChatService({ blockPolicy: blocks.policy })
+  await createPairThreads(service, "viewer", ["friend", "blocked_partner"])
+  await service.sendMessage("blocked_partner", "thread_blocked_partner", "sent before the block")
+  blocks.blockedPairs.push(["viewer", "blocked_partner"])
+
+  for (const [userId, visible] of [
+    ["viewer", ["thread_friend"]],
+    ["blocked_partner", []],
+    ["friend", ["thread_friend"]]
+  ] as const) {
+    assert.deepEqual((await service.listThreadsPage(userId)).threads.map((thread) => thread.threadId), visible)
+    assert.deepEqual((await service.listThreads(userId)).map((thread) => thread.threadId), visible)
+  }
+  for (const userId of ["viewer", "blocked_partner"]) {
+    // Same answer as a thread the caller is not in, so the block is not revealed.
+    await assert.rejects(service.listMessages(userId, "thread_blocked_partner"), /That conversation is not available\./)
+    await assert.rejects(service.markThreadRead(userId, "thread_blocked_partner"), /That conversation is not available\./)
+  }
+  await assert.rejects(service.listMessages("friend", "thread_blocked_partner"), /That conversation is not available\./)
+})
+
+test("removing the block restores the hidden thread with its history and unread count intact", async () => {
+  const blocks = createBlockPolicy([])
+  const service = createChatService({ blockPolicy: blocks.policy })
+  await createPairThreads(service, "viewer", ["partner"])
+  await service.sendMessage("partner", "thread_partner", "kept")
+  blocks.blockedPairs.push(["partner", "viewer"])
+  assert.deepEqual((await service.listThreadsPage("viewer")).threads, [])
+
+  blocks.blockedPairs.length = 0
+  const restored = await service.listThreadsPage("viewer")
+  assert.deepEqual(restored.threads.map((thread) => thread.threadId), ["thread_partner"])
+  assert.equal(restored.threads[0]?.unreadCount, 1)
+  assert.equal(restored.threads[0]?.lastMessage?.body, "kept")
+  assert.deepEqual((await service.listMessages("viewer", "thread_partner")).map((message) => message.body), ["kept"])
+})
+
+test("hidden threads never shorten a thread page or break its cursor, with one batched block lookup per page read", async () => {
+  // Newest first: p5 p4 p3 p2 p1 p0; p4, p3 and p1 are blocked in either direction.
+  const partners = ["p0", "p1", "p2", "p3", "p4", "p5"]
+  const blocks = createBlockPolicy([["viewer", "p4"], ["p3", "viewer"], ["viewer", "p1"]])
+  const service = createChatService({ blockPolicy: blocks.policy })
+  await createPairThreads(service, "viewer", partners)
+
+  const first = await service.listThreadsPage("viewer", { limit: 2 })
+  assert.deepEqual(first.threads.map((thread) => thread.threadId), ["thread_p5", "thread_p2"])
+  assert.ok(first.nextCursor)
+  const second = await service.listThreadsPage("viewer", { limit: 2, cursor: first.nextCursor! })
+  assert.deepEqual(second.threads.map((thread) => thread.threadId), ["thread_p0"])
+  assert.equal(second.nextCursor, null)
+
+  blocks.queries.length = 0
+  await service.listThreadsPage("viewer", { limit: 50 })
+  assert.equal(blocks.queries.length, 1, "one block query covers every partner on a page")
+  assert.deepEqual([...blocks.queries[0]!.candidates].sort(), [...partners].sort())
+})
