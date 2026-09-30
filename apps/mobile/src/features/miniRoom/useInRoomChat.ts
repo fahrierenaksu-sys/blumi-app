@@ -2,7 +2,10 @@ import type { ChatMessage } from "@blumi/contracts"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   applyChatMessageListLoading,
+  confirmOptimisticMessage,
   getMessageListCompletionVersion,
+  markOptimisticMessageFailed,
+  markOptimisticMessageSending,
   useChatStore
 } from "../chat/chatStore"
 import { normalizeOutgoingChatBody } from "../chat/thread/chatThreadModel"
@@ -32,12 +35,35 @@ export interface InRoomChatMessageEvent {
   sentAt: number
 }
 
+export interface FailedRoomMessage {
+  clientMessageId: string
+  body: string
+}
+
 export interface UseInRoomChatResult {
   threadId: string | undefined
   canSend: boolean
+  /**
+   * Sends over the room socket. Sending the text of the latest failed
+   * message again is its retry and reuses that message's clientMessageId.
+   */
   sendRoomMessage: (body: string) => boolean
+  /** The latest room message that was not acknowledged, until retried. */
+  failedRoomMessage: FailedRoomMessage | null
   newMessages: InRoomChatMessageEvent[]
   consume: (messageId: string) => void
+}
+
+/** How long a room message may stay "sending" without the server's acknowledgement. */
+export const ROOM_MESSAGE_ACK_TIMEOUT_MS = 15_000
+
+interface InFlightRoomMessage {
+  body: string
+  timer: ReturnType<typeof setTimeout>
+}
+
+function createRoomClientMessageId(): string {
+  return `room_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
 /**
@@ -75,6 +101,46 @@ export function useInRoomChat(options: {
   const reconnectSnapshotPendingRef = useRef(false)
   const reconnectCompletionBaselineRef = useRef(0)
   const [pendingEvents, setPendingEvents] = useState<InRoomChatMessageEvent[]>([])
+  const inFlightRef = useRef<Map<string, InFlightRoomMessage>>(new Map())
+  const failedRef = useRef<(FailedRoomMessage & { threadId: string }) | null>(null)
+  const [failedRoomMessage, setFailedRoomMessage] = useState<FailedRoomMessage | null>(null)
+
+  const failRoomMessage = useCallback((clientMessageId: string): void => {
+    const inFlight = inFlightRef.current.get(clientMessageId)
+    if (!inFlight) return
+    clearTimeout(inFlight.timer)
+    inFlightRef.current.delete(clientMessageId)
+    markOptimisticMessageFailed(clientMessageId)
+    if (!threadId) return
+    failedRef.current = { clientMessageId, body: inFlight.body, threadId }
+    setFailedRoomMessage({ clientMessageId, body: inFlight.body })
+  }, [threadId])
+
+  const settleRoomMessage = useCallback((clientMessageId: string, message: ChatMessage): void => {
+    const inFlight = inFlightRef.current.get(clientMessageId)
+    if (inFlight) clearTimeout(inFlight.timer)
+    inFlightRef.current.delete(clientMessageId)
+    // A late acknowledgement after a timeout still settles the bubble as sent.
+    confirmOptimisticMessage(clientMessageId, message, localUserId)
+    if (failedRef.current?.clientMessageId === clientMessageId) {
+      failedRef.current = null
+      setFailedRoomMessage(null)
+    }
+  }, [localUserId])
+
+  // A closed socket loses unacknowledged frames: fail them now instead of
+  // leaving "sending" bubbles. Leaving the room fails what is still open.
+  useEffect(() => {
+    const inFlight = inFlightRef.current
+    const unsubscribe = subscribeToStatus((status) => {
+      if (status === "connected") return
+      for (const clientMessageId of [...inFlight.keys()]) failRoomMessage(clientMessageId)
+    })
+    return () => {
+      unsubscribe()
+      for (const clientMessageId of [...inFlight.keys()]) failRoomMessage(clientMessageId)
+    }
+  }, [failRoomMessage])
 
   useEffect(() => {
     if (!threadId) return
@@ -240,10 +306,20 @@ export function useInRoomChat(options: {
 
   const handleServerEvent = useCallback(
     (event: ServerEvent) => {
+      if (event.type === "realtime.error") {
+        if (event.payload.code === "CHAT_MESSAGE_NOT_SENT" && event.payload.clientMessageId) {
+          failRoomMessage(event.payload.clientMessageId)
+        }
+        return
+      }
       if (event.type !== "chat.message_received") return
-      handleIncoming(event.payload)
+      const { clientMessageId, ...message } = event.payload
+      if (clientMessageId && message.senderUserId === localUserId) {
+        settleRoomMessage(clientMessageId, message)
+      }
+      handleIncoming(message)
     },
-    [handleIncoming]
+    [failRoomMessage, handleIncoming, localUserId, settleRoomMessage]
   )
   useGlobalRealtimeEvents(handleServerEvent)
 
@@ -257,27 +333,44 @@ export function useInRoomChat(options: {
       if (!trimmed) return false
       if (!threadId) return false
       if (connectionStatus !== "connected") return false
+      const retry = failedRef.current?.threadId === threadId && failedRef.current.body === trimmed
+        ? failedRef.current
+        : null
+      const clientMessageId = retry?.clientMessageId ?? createRoomClientMessageId()
       // The rendered status can lag a socket that has just closed. A refused
       // frame must not leave an optimistic bubble that never resolves.
       const sent = send({
         type: "chat.send_message",
-        payload: { threadId, body: trimmed }
+        payload: { threadId, body: trimmed, clientMessageId }
       })
       if (!sent) return false
-      addOptimisticMessage({
-        threadId,
-        senderUserId: localUserId,
-        body: trimmed
+      if (retry) {
+        failedRef.current = null
+        setFailedRoomMessage(null)
+        markOptimisticMessageSending(clientMessageId)
+      } else {
+        addOptimisticMessage({
+          threadId,
+          senderUserId: localUserId,
+          body: trimmed,
+          clientMessageId,
+          trackDelivery: true
+        })
+      }
+      inFlightRef.current.set(clientMessageId, {
+        body: trimmed,
+        timer: setTimeout(() => failRoomMessage(clientMessageId), ROOM_MESSAGE_ACK_TIMEOUT_MS)
       })
       return true
     },
-    [addOptimisticMessage, connectionStatus, localUserId, send, threadId]
+    [addOptimisticMessage, connectionStatus, failRoomMessage, localUserId, send, threadId]
   )
 
   return {
     threadId,
     canSend: Boolean(threadId) && connectionStatus === "connected",
     sendRoomMessage,
+    failedRoomMessage,
     newMessages: pendingEvents,
     consume
   }

@@ -50,6 +50,10 @@ function createHookFixture() {
   const statusListeners = new Set<(status: RealtimeConnectionStatus) => void>()
   const sends: unknown[] = []
   const optimistic: unknown[] = []
+  const failed: string[] = []
+  const markedSending: string[] = []
+  const confirmed: { clientMessageId: string; messageId: string }[] = []
+  const timers: { run: () => void; delay: number; cleared: boolean }[] = []
   let sendAccepted = true
   const thread: ChatThread = {
     threadId,
@@ -109,6 +113,11 @@ function createHookFixture() {
     "../chat/chatStore": {
       applyChatMessageListLoading: applyLoading,
       getMessageListCompletionVersion,
+      markOptimisticMessageFailed: (clientMessageId: string) => { failed.push(clientMessageId) },
+      markOptimisticMessageSending: (clientMessageId: string) => { markedSending.push(clientMessageId) },
+      confirmOptimisticMessage: (clientMessageId: string, chatMessage: ChatMessage) => {
+        confirmed.push({ clientMessageId, messageId: chatMessage.messageId })
+      },
       useChatStore: () => ({
         threads: [thread],
         getMessages,
@@ -151,7 +160,14 @@ function createHookFixture() {
     },
     Date,
     Set,
-    Map
+    Map,
+    Math,
+    setTimeout: (run: () => void, delay: number) => {
+      const timer = { run, delay, cleared: false }
+      timers.push(timer)
+      return timer
+    },
+    clearTimeout: (timer: { cleared: boolean } | undefined) => { if (timer) timer.cleared = true }
   })
 
   function render() {
@@ -181,8 +197,20 @@ function createHookFixture() {
     settle,
     sends,
     optimistic,
+    failed,
+    markedSending,
+    confirmed,
+    runTimers: () => {
+      for (const timer of timers.splice(0)) if (!timer.cleared) timer.run()
+      dirty = true
+    },
+    emitEvent: (event: unknown) => { eventHandler?.(event) },
     setSendAccepted: (accepted: boolean) => { sendAccepted = accepted },
-    output: () => output as { newMessages: { messageId: string }[]; sendRoomMessage: (body: string) => boolean },
+    output: () => output as {
+      newMessages: { messageId: string }[]
+      sendRoomMessage: (body: string) => boolean
+      failedRoomMessage: { clientMessageId: string; body: string } | null
+    },
     emitStatus: (status: RealtimeConnectionStatus) => {
       realtimeStatus = status
       for (const listener of [...statusListeners]) listener(status)
@@ -304,5 +332,73 @@ test("a room message the socket refused is reported unsent and leaves no endless
     "lost in the gap",
     "delivered"
   ])
+  f.unmount()
+})
+
+/** Objects built inside the vm realm have foreign prototypes; compare their data. */
+function plain(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value)) as unknown
+}
+
+function lastSendPayload(f: ReturnType<typeof createHookFixture>) {
+  return (f.sends.at(-1) as { payload: { body: string; clientMessageId?: string } }).payload
+}
+
+test("an in-room send carries a client id and stays sending until its acknowledgement", async () => {
+  const f = createHookFixture()
+  await f.settle()
+  assert.equal(f.output().sendRoomMessage("hello room"), true)
+  const { clientMessageId } = lastSendPayload(f)
+  assert.match(clientMessageId ?? "", /^room_[A-Za-z0-9_-]{8,}$/)
+  assert.deepEqual(plain(f.optimistic), [{ threadId, senderUserId: localUserId, body: "hello room", clientMessageId, trackDelivery: true }])
+  f.emitEvent({ type: "chat.message_received", payload: { ...message("m-ack", localUserId, "hello room", new Date().toISOString()), clientMessageId } })
+  assert.deepEqual(f.confirmed, [{ clientMessageId, messageId: "m-ack" }])
+  f.runTimers()
+  f.emitStatus("reconnecting")
+  await f.settle()
+  assert.deepEqual(f.failed, [], "an acknowledged message is never marked failed")
+  f.unmount()
+})
+
+test("a socket close marks in-flight room messages failed and the retry reuses the same client id", async () => {
+  const f = createHookFixture()
+  await f.settle()
+  f.output().sendRoomMessage("brb")
+  const { clientMessageId } = lastSendPayload(f)
+  f.emitStatus("reconnecting")
+  await f.settle()
+  assert.deepEqual(f.failed, [clientMessageId])
+  assert.deepEqual(plain(f.output().failedRoomMessage), { clientMessageId, body: "brb" })
+  f.emitStatus("connected")
+  await f.settle()
+  assert.equal(f.output().sendRoomMessage(" brb "), true)
+  assert.equal(lastSendPayload(f).clientMessageId, clientMessageId, "retry keeps the id so the server deduplicates")
+  assert.deepEqual(f.markedSending, [clientMessageId])
+  assert.equal(f.optimistic.length, 1, "the failed bubble is reused, not duplicated")
+  await f.settle()
+  assert.equal(f.output().failedRoomMessage, null)
+  // A different text is a new message with a new id.
+  f.output().sendRoomMessage("something else")
+  assert.notEqual(lastSendPayload(f).clientMessageId, clientMessageId)
+  f.unmount()
+})
+
+test("a missing acknowledgement times out as failed, and a server refusal fails only its own message", async () => {
+  const f = createHookFixture()
+  await f.settle()
+  f.output().sendRoomMessage("first")
+  const first = lastSendPayload(f).clientMessageId
+  f.output().sendRoomMessage("second")
+  const second = lastSendPayload(f).clientMessageId
+  f.emitEvent({
+    type: "realtime.error",
+    payload: { code: "CHAT_MESSAGE_NOT_SENT", requestType: "chat.send_message", message: "Not sent", clientMessageId: second }
+  })
+  assert.deepEqual(f.failed, [second])
+  f.runTimers()
+  assert.deepEqual(f.failed, [second, first], "the unacknowledged message fails after the timeout")
+  // A late acknowledgement still settles the bubble as sent.
+  f.emitEvent({ type: "chat.message_received", payload: { ...message("m-late", localUserId, "first", new Date().toISOString()), clientMessageId: first } })
+  assert.deepEqual(f.confirmed.map((entry) => entry.clientMessageId), [first])
   f.unmount()
 })

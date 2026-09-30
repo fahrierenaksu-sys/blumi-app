@@ -143,6 +143,20 @@ test("applies incoming messages and shortens only other-user notification copy",
   }])
 })
 
+test("the sender's in-room acknowledgement is stored without its client id", () => {
+  const dependencies = createDependencies()
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  const acknowledged = {
+    messageId: "message_ack",
+    threadId: "thread_1",
+    senderUserId: "ada",
+    body: "hi",
+    sentAt: "2026-09-30T10:00:00.000Z"
+  }
+  handler({ type: "chat.message_received", payload: { ...acknowledged, clientMessageId: "room_client_1" } })
+  assert.deepEqual(dependencies.receivedMessages, [acknowledged])
+})
+
 test("ignores malformed room invites and deduplicated or foreign match events", () => {
   const dependencies = createDependencies({
     normalizeRoomInviteRecord: () => {

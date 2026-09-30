@@ -26,7 +26,7 @@ import {
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
-import type { InRoomChatMessageEvent } from "../useInRoomChat"
+import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { ROOM_V2_OUTSIDE_COLOR } from "../../roomV2/roomV2Camera"
 import { uiTheme } from "../../../ui/theme"
@@ -74,6 +74,8 @@ interface MiniRoomSceneProps {
   consumeInRoomMessage: (messageId: string) => void
   canChatSend: boolean
   onSendRoomMessage: (body: string) => boolean
+  /** Latest room message the server did not acknowledge (useInRoomChat). */
+  failedRoomMessage?: FailedRoomMessage | null
 }
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
@@ -101,7 +103,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     inRoomMessages,
     consumeInRoomMessage,
     canChatSend,
-    onSendRoomMessage
+    onSendRoomMessage,
+    failedRoomMessage
   } = props
   const store = useMiniRoomSceneStore({
     localUser,
@@ -247,12 +250,19 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       return
     }
     const accepted = onSendRoomMessage(body)
-    if (accepted) {
-      sayPhrase(localUser.userId, body, "chat")
-    }
+    if (!accepted) return
+    sayPhrase(localUser.userId, body, "chat")
     setComposerText("")
     Keyboard.dismiss()
   }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
+
+  // An unacknowledged message comes back into an empty composer: sending the
+  // same text again retries it with the same client id. The hook publishes a
+  // new object only per failure, so this runs once per failed message.
+  useEffect(() => {
+    if (!failedRoomMessage?.clientMessageId) return
+    setComposerText((current) => current || failedRoomMessage.body)
+  }, [failedRoomMessage])
 
   const handleComposerChange = useCallback((value: string): void => {
     setComposerText(value.slice(0, MAX_ROOM_MESSAGE_LENGTH))

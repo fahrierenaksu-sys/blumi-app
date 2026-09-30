@@ -348,6 +348,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         consumeInRoomMessage={roomChat.consume}
         canChatSend={roomChat.canSend}
         onSendRoomMessage={roomChat.sendRoomMessage}
+        failedRoomMessage={roomChat.failedRoomMessage}
       />
     </View>
   )

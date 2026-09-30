@@ -353,3 +353,18 @@ test("MiniRoom uses durable speech bubbles without the legacy reaction UI", () =
   assert.match(scene, /ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000/)
   assert.match(scene, /onDismissBubble/)
 })
+
+test("the MiniRoom composer keeps refused text and restores a failed message for retry", () => {
+  const screen = read("src/screens/MiniRoomScreen.tsx")
+  const scene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
+  const submit = scene.slice(scene.indexOf("const handleSubmitComposer"), scene.indexOf("const handleComposerChange"))
+
+  // A refused send returns before the text is cleared (adversarial run 2026-09-30).
+  assert.match(submit, /const accepted = onSendRoomMessage\(body\)\s*if \(!accepted\) return/)
+  assert.ok(submit.indexOf("if (!accepted) return") < submit.indexOf("setComposerText(\"\")"))
+  // An unacknowledged message comes back into an empty composer; sending the
+  // same text again is the retry with the same client id (useInRoomChat).
+  assert.match(screen, /failedRoomMessage=\{roomChat\.failedRoomMessage\}/)
+  assert.match(scene, /failedRoomMessage\?\.clientMessageId\) return/)
+  assert.match(scene, /current \|\| failedRoomMessage\.body/)
+})
