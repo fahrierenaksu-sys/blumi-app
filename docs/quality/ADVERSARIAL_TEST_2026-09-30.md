@@ -55,18 +55,19 @@ missed the now-required `safetyService` after the merge.
 | Moderation | Banned member deletes the account and signs up again with the same phone | Ban evaded (`GET /v1/users/me` 200 instead of 403) | Keep a ban record (e.g. phone hash) after deletion: migration + retention policy |
 | Safety | Blocked user still sees the blocker's thread (list, sync-matches, full message history) | Blocker's name/avatar/history remain visible | Hide vs read-only |
 | Profile | `PATCH /v1/users/me` returns 200 for wrongly typed fields and saves nothing | Client bugs look like success | Tighten schema (contract change for old clients) |
-| Realtime (mobile) | After 10 failed reconnects the client stops forever; banner still says "reconnecting" | Failure hidden; only network change or app restart recovers | Retry policy |
-| Realtime (mobile) | Backoff resets on every open; accept-then-close loops reconnect every 0.5–1 s | Reconnect storm against a limiting server | Retry policy |
-| Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappears until refresh | Revision numbers in list replies |
-| Chat (mobile) | Lost HTTP response: history reload shows the message twice, once failed | Retyping sends a real duplicate | Reconcile by client id |
-| MiniRoom | In-room messages have no client id or acknowledgement | Lost frame = permanent "sending", no retry | Protocol change |
+| Realtime (mobile) | After 10 failed reconnects the client stops forever; banner still says "reconnecting" | Failure hidden; only network change or app restart recovers | FIXED (group 3): retries continue at most 60 s apart while foregrounded, immediately on foreground and network regain; distinct `unreachable` status with Turkish/English banner copy |
+| Realtime (mobile) | Backoff resets on every open; accept-then-close loops reconnect every 0.5–1 s | Reconnect storm against a limiting server | FIXED (group 3): backoff resets only after 10 s open or the first authenticated server event |
+| Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappears until refresh | FIXED (group 3), client only: threads learned after a list request was issued survive its reply |
+| Chat (mobile) | Lost HTTP response: history reload shows the message twice, once failed | Retyping sends a real duplicate | FIXED (group 3): history resync settles the bubble against its newly listed committed copy (sender, thread, body, time); retry keeps the client id |
+| MiniRoom | In-room messages have no client id or acknowledgement | Lost frame = permanent "sending", no retry | FIXED (group 3): optional `clientMessageId` on `chat.send_message`, requester-only acknowledgement and `realtime.error`; failed on close or 15 s timeout, retry with the same id |
 | Economy | Reward coins never pay off a refund debt | Purchases blocked after a refund; only reachable with payments on | Debt policy |
 
 Found by code review only, not reproduced: display name, bio and prompt
 answers have no control-character filter (`authService.ts`); the MiniRoom
-composer clears the text even when the send failed; a well-formed fake
-realtime ticket costs one database delete and is not rate-limited before
-authentication.
+composer clears the text even when the send failed (FIXED, group 3); a
+well-formed fake realtime ticket costs one database delete and is not
+rate-limited before authentication (FIXED, group 3: per-address upgrade
+limit, see `REALTIME_LIMITS_2026-09-30.md`).
 
 ## PASS (attack refused, with tests)
 
