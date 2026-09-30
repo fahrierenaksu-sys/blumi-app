@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
 
@@ -35,8 +35,14 @@ test("the provider exposes a baseline only from confirmed server snapshots", () 
 })
 
 test("the editor routes draft actions through the immutable session", () => {
-  const editor = read("src/screens/MyRoomEditorScreen.tsx")
+  const screen = read("src/screens/MyRoomEditorScreen.tsx")
+  // The session lifecycle lives in the editor feature hook the screen composes.
+  const editor = read("src/features/roomV2/editor/useRoomEditorSession.ts")
+  const controls = read("src/features/roomV2/editor/RoomEditorInventoryControls.tsx")
 
+  assert.match(screen, /const session = useRoomEditorSession\(\{/)
+  assert.match(screen, /handleResetDraft=\{session\.handleResetDraft\}/)
+  assert.match(screen, /onUndo=\{session\.handleUndoDraft\}/)
   assert.match(
     editor,
     /createRoomV2EditorSession\(userRoomDecor, confirmedPersistedRoomDecor\)/
@@ -47,12 +53,21 @@ test("the editor routes draft actions through the immutable session", () => {
   )
   assert.match(editor, /undoRoomV2EditorSession\(current\)/)
   assert.match(editor, /resetRoomV2EditorSession\(current\)/)
-  assert.match(editor, /disabled=\{!editorSession\.canResetToPersistedBaseline\}/)
+  assert.match(controls, /disabled=\{!editorSession\.canResetToPersistedBaseline\}/)
 })
 
 test("unsaved navigation offers save discard and stay without bypassing save validation", () => {
-  const editor = read("src/screens/MyRoomEditorScreen.tsx")
+  const screen = read("src/screens/MyRoomEditorScreen.tsx")
+  // Save and the exit guard live together in the editor feature save hook.
+  const editor = read("src/features/roomV2/editor/useRoomEditorSave.ts")
+  const editorSurface = [
+    screen,
+    ...readdirSync(resolve(mobileRoot, "src/features/roomV2/editor"))
+      .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+      .map((fileName) => read(`src/features/roomV2/editor/${fileName}`))
+  ].join("\n")
 
+  assert.match(screen, /editorSessionRef: session\.editorSessionRef/)
   assert.match(editor, /navigation\.addListener\("beforeRemove"/)
   assert.match(editor, /if \(!editorSessionRef\.current\.isDirty\) return/)
   assert.match(editor, /text: copy\.unsavedDialog\.stay/)
@@ -67,5 +82,5 @@ test("unsaved navigation offers save discard and stay without bypassing save val
     editor,
     /const confirmedSave = await saveRoomV2EditorDraftConfirmed\([\s\S]*?if \(confirmedSave\.status !== "saved"\)[\s\S]*?allowEditorExitRef\.current = true/
   )
-  assert.doesNotMatch(editor, /setUserRoomDecor\(decorToSave\)/)
+  assert.doesNotMatch(editorSurface, /setUserRoomDecor\(decorToSave\)/)
 })

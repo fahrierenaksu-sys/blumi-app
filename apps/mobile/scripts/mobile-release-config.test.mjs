@@ -499,6 +499,14 @@ test("release bundle imports only the fonts and icon family used by the app", ()
   const app = read("App.tsx")
   const sourceFiles = [
     "src/screens/MyRoomEditorScreen.tsx",
+    "src/features/roomV2/editor/RoomEditorTopBar.tsx",
+    "src/features/roomV2/editor/RoomEditorPersistenceBanner.tsx",
+    "src/features/roomV2/editor/RoomEditorStage.tsx",
+    "src/features/roomV2/editor/RoomEditorSelectedItemActions.tsx",
+    "src/features/roomV2/editor/RoomEditorInventoryControls.tsx",
+    "src/features/roomV2/editor/RoomEditorInventoryPreview.tsx",
+    "src/features/roomV2/editor/InventoryCatalogCard.tsx",
+    "src/features/roomV2/editor/RoomEditorLoadingOverlay.tsx",
     "src/screens/LegalScreen.tsx",
     "src/screens/RegisterScreen.tsx",
     "src/features/session/register/RegisterCreateView.tsx",
@@ -869,7 +877,13 @@ test("production profile and chat actions never fall back to local demo behavior
 
 test("Room sync alerts are actionable without raw backend diagnostics", () => {
   const provider = read("src/features/roomV2/state/RoomV2Provider.tsx")
-  const preview = read("src/screens/MyRoomEditorScreen.tsx")
+  const editorScreen = read("src/screens/MyRoomEditorScreen.tsx")
+  // The editor's sync banner is the RoomEditorPersistenceBanner it composes.
+  const preview = read("src/features/roomV2/editor/RoomEditorPersistenceBanner.tsx")
+  assert.match(
+    editorScreen,
+    /persistenceState === "failed" && persistenceErrorMessage \? \(\s*<RoomEditorPersistenceBanner/
+  )
 
   assert.match(
     provider,

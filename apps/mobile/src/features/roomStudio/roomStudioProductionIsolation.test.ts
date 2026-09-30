@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
 
@@ -14,7 +14,12 @@ const PRODUCTION_ENTRYPOINTS = [
 ] as const
 
 test("production dependency roots do not import Home Studio QA bitmap bindings", () => {
-  for (const relativePath of PRODUCTION_ENTRYPOINTS) {
+  // MyRoomEditorScreen composes the production modules in features/roomV2/editor.
+  const editorModules = readdirSync(resolve(process.cwd(), "src/features/roomV2/editor"))
+    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+    .map((fileName) => `src/features/roomV2/editor/${fileName}`)
+  assert.ok(editorModules.length > 0)
+  for (const relativePath of [...PRODUCTION_ENTRYPOINTS, ...editorModules]) {
     const source = readFileSync(resolve(process.cwd(), relativePath), "utf8")
     assert.doesNotMatch(source, /roomStudioQaAssetBindings/)
     assert.doesNotMatch(source, /roomStudio\/assets\/qa/)
