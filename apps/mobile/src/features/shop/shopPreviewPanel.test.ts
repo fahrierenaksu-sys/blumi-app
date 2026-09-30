@@ -225,9 +225,15 @@ test("shop scroll viewport ends above the floating bottom navigation", () => {
 })
 
 test("room VNext QA stays isolated from the approved Shop presentation", () => {
-  assert.match(navigatorSource, /roomFurnitureCatalog=\{undefined\}/)
-  assert.match(navigatorSource, /qaOnlyOwnedRoomItemIds=\{\[\]\}/)
-  assert.match(navigatorSource, /isRoomCatalogQaPreview=\{false\}/)
-  assert.match(navigatorSource, /initialShopMode=\{undefined\}/)
+  // The approved Shop tab page is rendered by the main-tab page factory.
+  const mainTabPageSource = readFileSync(
+    resolve(root, "src/navigation/mainTabPager/renderMainTabPage.tsx"),
+    "utf8"
+  )
+  assert.match(mainTabPageSource, /roomFurnitureCatalog=\{undefined\}/)
+  assert.match(mainTabPageSource, /qaOnlyOwnedRoomItemIds=\{\[\]\}/)
+  assert.match(mainTabPageSource, /isRoomCatalogQaPreview=\{false\}/)
+  assert.match(mainTabPageSource, /initialShopMode=\{undefined\}/)
+  assert.doesNotMatch(mainTabPageSource, /ROOM_V3_QA_INTERACTION_CATALOG/)
   assert.doesNotMatch(navigatorSource, /ROOM_V3_QA_INTERACTION_CATALOG/)
 })

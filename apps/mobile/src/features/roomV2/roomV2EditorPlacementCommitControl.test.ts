@@ -342,10 +342,13 @@ test("the approved Shop stays isolated from Room candidate catalogs", () => {
   )
   assert.match(shopSource, /useInventoryStore\(\s*sessionActor\.profile\.userId,\s*requiresServerInventory\s*\)/)
   assert.match(shopSource, /if \(!requiresServerInventory\) return/)
-  assert.match(
-    navigatorSource,
-    /isRoomCatalogQaPreview=\{false\}/
+  // The Shop tab page is rendered by the main-tab page factory.
+  const mainTabPageSource = readFileSync(
+    resolve(process.cwd(), "src/navigation/mainTabPager/renderMainTabPage.tsx"),
+    "utf8"
   )
+  assert.match(mainTabPageSource, /isRoomCatalogQaPreview=\{false\}/)
+  assert.match(navigatorSource, /isFullShopCatalogQaPreview: IS_FULL_SHOP_CATALOG_QA_PREVIEW/)
   assert.match(
     navigatorSource,
     /isFullShopCatalogQaPreview=\{IS_FULL_SHOP_CATALOG_QA_PREVIEW\}/

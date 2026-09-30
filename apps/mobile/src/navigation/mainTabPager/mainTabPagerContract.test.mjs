@@ -44,7 +44,7 @@ test("Discover card, room object drag and edge back never compete with the pager
   assert.match(read("../../screens/RoomSetupScreen.tsx"), /onItemLongPressMove=/)
   // The pager slot has no back gesture; detail routes above it keep theirs.
   assert.match(navigationModel, /MAIN_TAB_SCREEN_OPTIONS = \{[\s\S]*?gestureEnabled: false/)
-  assert.match(navigator, /MAIN_TAB_ROUTE_NAMES\.map\(\(routeName\) => \([\s\S]*?options=\{\{ \.\.\.MAIN_TAB_SCREEN_OPTIONS, \.\.\.reducedMotionScreenOptions \}\}/)
+  assert.match(navigator, /MAIN_TAB_ROUTE_NAMES\.map\(\(routeName\) => \([\s\S]*?\.\.\.MAIN_TAB_SCREEN_OPTIONS,\s*\.\.\.reducedMotionScreenOptions/)
 })
 
 test("Discover card swipe thresholds are unchanged", () => {
@@ -83,10 +83,10 @@ test("interruptions: backgrounding, Android back and layout changes settle on a 
 test("one flag restores the stack-tab behaviour", () => {
   assert.match(config, /export const MAIN_TAB_PAGER_ENABLED: boolean = true/)
   assert.match(navigator, /UNSTABLE_router=\{MAIN_TAB_PAGER_ENABLED \? withMainTabPagerRouter : undefined\}/)
-  assert.match(navigator, /\{MAIN_TAB_PAGER_ENABLED \? \(/)
-  for (const name of ["Lobby", "Inbox", "MyRoom", "CosmeticShop"]) {
-    assert.match(navigator, new RegExp(`name="${name}"[\\s\\S]*?renderMainTabPage\\(sessionActor, "${name}", screenProps\\)`), `${name} keeps its stack route`)
-  }
+  // Every main tab keeps its own stack route; with the flag off each renders
+  // its page directly instead of the pager.
+  assert.match(config, /routeName: "Lobby"[\s\S]*?routeName: "Inbox"[\s\S]*?routeName: "MyRoom"[\s\S]*?routeName: "CosmeticShop"[\s\S]*?MAIN_TAB_ROUTE_NAMES[\s\S]*?MAIN_TAB_PAGES\.map\(\(page\) => page\.routeName\)/)
+  assert.match(navigator, /MAIN_TAB_ROUTE_NAMES\.map\(\(routeName\) => \([\s\S]*?name=\{routeName\}[\s\S]*?\(screenProps\) => MAIN_TAB_PAGER_ENABLED \? \([\s\S]*?<MainTabPager[\s\S]*?\) : renderMainTabPage\(sessionActor, routeName, screenProps\)/)
   assert.match(chrome, /if \(MAIN_TAB_PAGER_ENABLED && requestMainTabPagerPage\(key\)\) return/)
   assert.match(chrome, /CommonActions\.navigate\(destination, undefined, \{\s*pop: true,\s*merge: true\s*\}\)/)
 })

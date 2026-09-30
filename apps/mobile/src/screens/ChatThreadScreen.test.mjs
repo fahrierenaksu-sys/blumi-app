@@ -110,7 +110,11 @@ test("inbox warms a bounded set of conversations and starts selected history bef
   assert.match(inbox, /onWarmThread\(threadId\)[\s\S]*?navigation\.navigate\("ChatThread"/)
   assert.match(inbox, /const handlePressIn = useCallback\(\(\) => \{\s*onWarm\(\)/)
   assert.match(rootChatSync, /requestMessages\(threadId, \{\}, \{ purpose: "prefetch" \}\)/)
-  assert.match(root, /onWarmThread=\{warmThreadMessagesForInbox\}/)
+  // RootNavigator hands the warm-up to the main-tab page factory, which wires
+  // it into InboxScreen.
+  assert.match(root, /onWarmThread: warmThreadMessagesForInbox/)
+  const mainTabPage = readFileSync(new URL("../navigation/mainTabPager/renderMainTabPage.tsx", import.meta.url), "utf8")
+  assert.match(mainTabPage, /<InboxScreen[\s\S]*?onWarmThread=\{dependencies\.onWarmThread\}/)
 })
 
 test("thread hooks run their effects in the original order", () => {
