@@ -6,6 +6,34 @@ Snapshot: 2026-09-28, with individual rows updated on 2026-09-30 (each row state
 
 ## TestFlight branch automation — 2026-09-30
 
+### Operations automation expansion — 2026-09-30
+
+- **EXTERNAL VERIFIED:** Codex thread heartbeats are active: build/Apple and
+  server checks every 10 minutes, local backup daily at 02:00, isolated restore
+  rehearsal Sunday at 03:00 and local Simulator smoke daily at 20:00 (Istanbul).
+  Ordinary unchanged/successful runs stay quiet. Local jobs require an available Mac.
+- **EXTERNAL VERIFIED:** GitHub Dependabot alerts and security-update PRs are
+  enabled for `fahrierenaksu-sys/blumi-app`. Existing pull-request CI verifies
+  proposals; dependency PRs are not automatically merged.
+- **TESTED:** a new owner-only public-schema archive of the existing Supabase
+  test database was taken and restored into a disposable socket-only PG17
+  cluster. SHA256 `c6cb8355c8cf8fabe2addf9cf2025279d2908e6fb14ffd9f7dc24e9334603020`,
+  250130 bytes, 68 migrations, 0 additional migrations, idempotent rerun,
+  0 remaining integrity findings. No live migration was performed.
+- **EXTERNAL VERIFIED:** `/health` and `/ready` returned HTTP 200; Apple internal
+  group `Blumi QA` was created with automatic distribution, initially 0 testers.
+- **IMPLEMENTED / OPEN:** TestFlight workflow now includes processing, internal
+  group assignment and test notes; official schema and EAS server validation pass.
+  Actual Apple acceptance/distribution and group membership remain open.
+- **IMPLEMENTED / OPEN:** `.maestro/demo-smoke.yml` and the dedicated local
+  `scripts/automation/native-smoke.mjs` exercise demo entry, match, text chat,
+  My Room and Shop. Native execution remains open until a complete successful run.
+  EAS rejected cloud Maestro because the account lacks a paid plan; no plan was
+  purchased. Local smoke uses only `Blumi Automation QA`, not the owner's device.
+- **OPEN:** offsite backups, Supabase auth/storage backup, real OTP, server chat
+  persistence and physical-device evidence. These automations do not establish
+  public-release readiness.
+
 - **IMPLEMENTED / TESTED:** `apps/mobile/.eas/workflows/testflight.yml` listens
   for pushes to `claude/busy-cray-dl5wvr` and supports a manual run. Before
   building iOS, source hygiene, package builds, TypeScript, lint, tests and
