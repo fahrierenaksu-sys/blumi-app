@@ -70,6 +70,9 @@ export function createPersonalRoomDecorService(options: {
         decor,
         updatedAt: now.toISOString()
       })
+      if (result.kind === "missing") {
+        throw new PublicRequestError("Refresh your room and try again.")
+      }
       if (result.kind === "saved" && options.roomSnapshotService) {
         try {
           await options.roomSnapshotService.publishForRoomSave(result.snapshot)

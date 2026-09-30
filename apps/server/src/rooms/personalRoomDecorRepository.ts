@@ -31,6 +31,10 @@ export interface PersonalRoomDecorSnapshot {
 
 export interface PersonalRoomDecorRepository {
   get(userId: string): Promise<PersonalRoomDecorSnapshot | null>
+  /**
+   * `missing`: the caller expected a saved revision, but this owner has no
+   * saved room (for example a revision cached before the room was removed).
+   */
   save(input: {
     userId: string
     expectedRevision: number
@@ -39,6 +43,7 @@ export interface PersonalRoomDecorRepository {
   }): Promise<
     | { kind: "saved"; snapshot: PersonalRoomDecorSnapshot }
     | { kind: "conflict"; current: PersonalRoomDecorSnapshot }
+    | { kind: "missing" }
   >
 }
 
@@ -54,6 +59,7 @@ PersonalRoomDecorRepository {
     async save(input) {
       const current = snapshots.get(input.userId)
       const currentRevision = current?.revision ?? 0
+      if (!current && input.expectedRevision !== 0) return { kind: "missing" }
       if (currentRevision !== input.expectedRevision) {
         return {
           kind: "conflict",
