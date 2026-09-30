@@ -122,6 +122,8 @@ export interface MyRoomEditorCopy {
   preparing: string
   stageLabel: string
   stageHint: string
+  stageDragHint: string
+  trayDragHint: string
   defaultSubtitle: string
   rotatableSubtitle: string
   fixedSubtitle: string
@@ -203,6 +205,8 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     preparing: "Preparing your room…",
     stageLabel: "Room placement surface",
     stageHint: "Tap a clear place to move the selected item",
+    stageDragHint: "or touch and hold a piece and drag it.",
+    trayDragHint: "Touch and hold, then drag onto the room to place it.",
     defaultSubtitle: "Choose a piece, then place it your way",
     rotatableSubtitle: "Drag to move · rotate or save",
     fixedSubtitle: "Drag to move · then save",
@@ -282,6 +286,8 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     preparing: "Odan hazırlanıyor…",
     stageLabel: "Oda yerleşim alanı",
     stageHint: "Seçili eşyayı taşımak için açık bir noktaya dokun",
+    stageDragHint: "ya da bir eşyaya basılı tutup sürükle.",
+    trayDragHint: "Basılı tut, sonra yerleştirmek için odaya sürükle.",
     defaultSubtitle: "Bir eşya seç ve odana yerleştir",
     rotatableSubtitle: "Taşımak için sürükle · döndür veya kaydet",
     fixedSubtitle: "Taşımak için sürükle · sonra kaydet",

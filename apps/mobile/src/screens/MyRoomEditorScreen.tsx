@@ -30,6 +30,7 @@ import { useRoomEditorSession } from "../features/roomV2/editor/useRoomEditorSes
 import { useRoomEditorStageLayout } from "../features/roomV2/editor/useRoomEditorStageLayout"
 import { useRoomEditorInventory } from "../features/roomV2/editor/useRoomEditorInventory"
 import { useRoomEditorPlacementGestures } from "../features/roomV2/editor/useRoomEditorPlacementGestures"
+import { useRoomEditorDragGestures } from "../features/roomV2/editor/useRoomEditorDragGestures"
 import { useRoomEditorItemActions } from "../features/roomV2/editor/useRoomEditorItemActions"
 import {
   useShopPlacementIntent,
@@ -45,11 +46,13 @@ import { RoomEditorInventoryControls } from "../features/roomV2/editor/RoomEdito
 import { RoomEditorInventoryPreview } from "../features/roomV2/editor/RoomEditorInventoryPreview"
 import { RoomEditorInventoryList } from "../features/roomV2/editor/RoomEditorInventoryList"
 import { RoomEditorLoadingOverlay } from "../features/roomV2/editor/RoomEditorLoadingOverlay"
+import { RoomEditorDragGhost } from "../features/roomV2/editor/RoomEditorDragGhost"
 
 /**
  * My Room editor route. Composes the editor feature (features/roomV2/editor):
- * session and persistence, owned-furniture tray, stage placement gestures,
- * item actions, Shop placement intents, and confirmed save with exit guard.
+ * session and persistence, owned-furniture tray, stage tap placement,
+ * drag-to-move (stage and tray), item actions, Shop placement intents, and
+ * confirmed save with exit guard.
  * Hook order is deliberate: effects run in the order the hooks are called.
  */
 export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
@@ -133,7 +136,16 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     scene,
     placedItems: draftDecor.placedItems,
     setDraftDecor,
+    selection,
+    stage,
+    inventory: inventoryState
+  })
+  const drag = useRoomEditorDragGestures({
+    copy,
+    scene,
+    placedItems: draftDecor.placedItems,
     canPlaceAnotherRoomItem,
+    commitTrayPlacementPreview: gestures.commitTrayPlacementPreview,
     selection,
     stage,
     inventory: inventoryState
@@ -221,7 +233,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
           selectedInstanceId={selectedInstanceId}
           onLayout={stage.handleRoomLayout}
           onPress={gestures.handleFloorTap}
-          panHandlers={gestures.stagePanResponder.panHandlers}
+          dragGesture={drag.stageDragGesture}
           shell={scene.shell}
           renderItems={displayRenderItems}
           placementStateByRenderId={placementStateByRenderId}
@@ -275,7 +287,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             selectedInventoryRotation={inventoryState.selectedInventoryRotation}
             setSelectedInventoryItemId={inventoryState.setSelectedInventoryItemId}
             canPlaceAnotherRoomItem={canPlaceAnotherRoomItem}
-            createInventoryItemPanHandlers={gestures.createInventoryItemPanHandlers}
+            createInventoryItemDragGesture={drag.createTrayDragGesture}
             onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
           />
         </View>
@@ -285,6 +297,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
           ) : null}
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <RoomEditorDragGhost ghost={drag.ghost} values={drag.ghostValues} />
     </View>
   )
 }

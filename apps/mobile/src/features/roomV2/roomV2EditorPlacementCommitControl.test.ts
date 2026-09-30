@@ -149,7 +149,7 @@ test("room editor catalog supports selecting, searching, rotating, and explicitl
   assert.match(editorItemActionsSource, /addDraftItem\(\s*selectedInventoryEntry\.item\.id,\s*true,\s*selectedInventoryRotation\s*\)/)
   assert.match(editorInventoryPreviewSource, /resolveRoomV2InventoryPreviewSource\(\s*selectedInventoryEntry\.item,\s*selectedInventoryRotation\s*\)/)
   assert.match(editorPlacementModelSource, /rotation: input\.rotation/)
-  assert.match(editorInventoryCardSource, /createPanHandlers\(item, owned, previewRotation\)/)
+  assert.match(editorInventoryCardSource, /createDragGesture\(item, owned, placed, previewRotation\)/)
 })
 
 test("direction buttons persist an exact valid rotation for the selected placed item", () => {
