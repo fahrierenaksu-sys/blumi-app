@@ -10,7 +10,7 @@ import type { CapabilityService } from "../capabilities/capabilityService"
 import { resolveRequestCapabilities } from "../avatar/avatarReadProjection"
 import type { PersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import type { RoomSnapshotService } from "../rooms/roomSnapshotService"
-import { resolveBearerSession } from "./routeHelpers"
+import { resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
 
 const ROOM_SNAPSHOT_ASSET_KEY = /^[a-f0-9]{64}$/
 const visibilityBodySchema = z.object({
@@ -31,6 +31,7 @@ export async function registerRoomSnapshotRoutes(
     "/v1/users/me/room-showcase",
     {
       attachValidation: true,
+      config: { requestValidation: "enforced" },
       // Do not coerce booleans or silently strip unknown fields before validation.
       validatorCompiler: () => (data) => {
         const result = visibilityBodySchema.safeParse(data)
@@ -59,7 +60,7 @@ export async function registerRoomSnapshotRoutes(
         authService: services.authService
       })
       if (!resolved) return
-      if (request.validationError) {
+      if (schemaValidationFailed(request)) {
         return reply.code(400).send({ error: "Choose valid room showcase settings." })
       }
       if (services.capabilityService && !resolveRequestCapabilities(

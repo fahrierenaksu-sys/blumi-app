@@ -14,7 +14,7 @@ import {
   type SafetyService
 } from "../safety/safetyService"
 import { isPublicRequestError } from "../errors/publicRequestError"
-import { readParam, resolveBearerSession } from "./routeHelpers"
+import { readParam, resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
 
 export interface SafetyRouteServices {
   authService: AuthService
@@ -111,6 +111,7 @@ export async function registerSafetyRoutes(
 
   app.post("/v1/safety/blocks", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.blockUser,
       response: {
@@ -123,7 +124,11 @@ export async function registerSafetyRoutes(
     if (!resolved) return
 
     const parsed = blockUserRequestSchema.safeParse(request.body)
-    const blockedUserId = parsed.success ? parsed.data.blockedUserId : ""
+    if (!parsed.success || schemaValidationFailed(request)) {
+      // Same answer the safety service gives for a missing person.
+      return reply.code(400).send({ error: "Choose a person first." })
+    }
+    const blockedUserId = parsed.data.blockedUserId
 
     try {
       const block = await safetyService.blockUser(
@@ -150,6 +155,7 @@ export async function registerSafetyRoutes(
 
   app.delete("/v1/safety/blocks/:blockedUserId", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       params: {
         type: "object",
@@ -167,7 +173,7 @@ export async function registerSafetyRoutes(
     if (!resolved) return
 
     const blockedUserId = readParam(request, "blockedUserId")
-    if (!blockedUserId) {
+    if (!blockedUserId || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a person first." })
     }
 
@@ -177,6 +183,7 @@ export async function registerSafetyRoutes(
 
   app.post("/v1/safety/reports", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.reportUser,
       headers: {
@@ -195,9 +202,14 @@ export async function registerSafetyRoutes(
     if (!resolved) return
 
     const parsed = reportUserRequestSchema.safeParse(request.body)
-    const reportedUserId = parsed.success ? parsed.data.reportedUserId : ""
-    const reason = parsed.success ? parsed.data.reason : ""
-    const note = parsed.success ? parsed.data.note : undefined
+    if (!parsed.success || schemaValidationFailed(request, "body")) {
+      // Same answer the safety service gives for a malformed report.
+      return reply.code(400).send({ error: "Choose a person first." })
+    }
+    if (schemaValidationFailed(request, "headers")) {
+      return reply.code(400).send({ error: "Use a valid idempotency key." })
+    }
+    const { reportedUserId, reason, note } = parsed.data
     const idempotencyKey = readIdempotencyKey(request.headers["idempotency-key"])
 
     try {

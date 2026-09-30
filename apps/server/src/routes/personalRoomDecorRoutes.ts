@@ -12,7 +12,7 @@ import {
 import type {
   PersonalRoomDecorService
 } from "../rooms/personalRoomDecorService"
-import { resolveBearerSession } from "./routeHelpers"
+import { resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
 
 export async function registerPersonalRoomDecorRoutes(
   app: FastifyInstance,
@@ -44,6 +44,7 @@ export async function registerPersonalRoomDecorRoutes(
 
   app.put("/v1/users/me/room-decor", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.personalRoomDecorSave,
       response: {
@@ -59,7 +60,7 @@ export async function registerPersonalRoomDecorRoutes(
     })
     if (!resolved) return
     const parsed = personalRoomDecorSaveRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Refresh your room and try again." })
     }
     try {

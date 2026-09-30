@@ -58,6 +58,51 @@ export async function resolveProductSession(input: {
   return resolved
 }
 
+/**
+ * True when Fastify's JSON Schema validation failed for a route that declares
+ * `config.requestValidation: "enforced"` (with `attachValidation: true`).
+ *
+ * Handlers call this where they already reject malformed input, after
+ * authentication and availability checks, so each route keeps its existing
+ * status code, error body, and auth-first ordering. Validator details are
+ * never sent to the client. Advisory routes always get `false`.
+ *
+ * Pass `part` when a route answers differently per request part (Fastify
+ * reports the first failing part: params, body, querystring, then headers).
+ */
+export function schemaValidationFailed(
+  request: FastifyRequest,
+  part?: "body" | "querystring" | "params" | "headers"
+): boolean {
+  const error = request.validationError
+  if (error === undefined || error === null) return false
+  if (request.routeOptions.config.requestValidation !== "enforced") return false
+  return part === undefined || error.validationContext === part
+}
+
+/**
+ * Registration guard: a route that defers schema errors to its handler must
+ * say whether that handler enforces them, and an enforced route must defer.
+ */
+export function assertRequestValidationPolicy(route: {
+  method: string | string[]
+  url: string
+  attachValidation?: boolean
+  config?: { requestValidation?: string }
+}): void {
+  const policy = route.config?.requestValidation
+  if (route.attachValidation && policy !== "enforced" && policy !== "advisory") {
+    throw new Error(
+      `Route ${String(route.method)} ${route.url} sets attachValidation without config.requestValidation.`
+    )
+  }
+  if (!route.attachValidation && policy !== undefined) {
+    throw new Error(
+      `Route ${String(route.method)} ${route.url} declares requestValidation without attachValidation.`
+    )
+  }
+}
+
 export function readPhoneNumber(body: unknown) {
   return normalizePhoneNumber(isRecord(body) ? body.phoneNumber : undefined)
 }

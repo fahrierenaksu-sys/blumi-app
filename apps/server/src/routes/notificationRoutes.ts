@@ -12,7 +12,7 @@ import type { AuthService } from "../auth/authService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { NotificationPreferences } from "../notifications/notificationRepository"
 import { isPublicRequestError } from "../errors/publicRequestError"
-import { resolveProductSession } from "./routeHelpers"
+import { resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 
 export interface NotificationRouteServices {
   authService: AuthService
@@ -41,6 +41,7 @@ export async function registerNotificationRoutes(
 
   app.put("/v1/notification-preferences", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.notificationPreferences,
       response: {
@@ -52,7 +53,7 @@ export async function registerNotificationRoutes(
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const parsed = notificationPreferencesPatchSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose valid notification preferences." })
     }
     try {
@@ -71,6 +72,7 @@ export async function registerNotificationRoutes(
 
   app.post("/v1/devices", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.deviceRegistration,
       response: {
@@ -83,7 +85,7 @@ export async function registerNotificationRoutes(
     if (!resolved) return
 
     const parsed = deviceRegistrationRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a valid device platform." })
     }
 
@@ -106,6 +108,7 @@ export async function registerNotificationRoutes(
 
   app.delete("/v1/devices", {
     attachValidation: true,
+    config: { requestValidation: "enforced" },
     schema: {
       body: coreApiJsonSchemas.deviceRemoval,
       response: {
@@ -118,7 +121,7 @@ export async function registerNotificationRoutes(
     if (!resolved) return
 
     const parsed = deviceRemovalRequestSchema.safeParse(request.body)
-    if (!parsed.success) {
+    if (!parsed.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a valid push token." })
     }
 
