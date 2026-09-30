@@ -220,9 +220,23 @@ function sendBindings(events, sendChatMessage) {
     sessionActor: { session: { mode: "production" } },
     sessionMode: "production",
     captureProductEvent: () => events.push(["analytics"]),
-    hapticLight: () => events.push(["haptic"])
+    hapticLight: () => events.push(["haptic"]),
+    // Module binding for chatThreadModel.normalizeOutgoingChatBody (node-tested there).
+    normalizeOutgoingChatBody: (body) => body.trim().replace(/\s+/g, " ")
   }
 }
+
+test("send publishes and transmits the server-normalized body of a multi-line draft", () => {
+  const events = []
+  const send = sendingCallback("handleSend", sendBindings(events, (...args) => {
+    events.push(["network", ...args])
+    return new Promise(() => undefined)
+  }))
+  assert.equal(send("  first line\nsecond   line \n"), true)
+  assert.deepEqual(events[0], ["optimistic", "first line second line"])
+  assert.deepEqual(events[1], ["network", "thread_one", "first line second line", "client-test-001"])
+  assert.equal(send(" \n\t "), false)
+})
 
 test("send publishes the optimistic row before starting the request and does not wait for ACK", () => {
   const events = []

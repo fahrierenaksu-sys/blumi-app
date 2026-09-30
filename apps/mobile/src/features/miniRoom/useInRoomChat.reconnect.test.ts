@@ -127,6 +127,10 @@ function createHookFixture() {
       useGlobalRealtimeEvents: (listener: (event: any) => void) => { eventHandler = listener }
     },
     "../realtime/reconnectTransitionTracker": { createReconnectTransitionTracker },
+    // Same contract as chatThreadModel.normalizeOutgoingChatBody (tested there).
+    "../chat/thread/chatThreadModel": {
+      normalizeOutgoingChatBody: (body: string) => body.trim().replace(/\s+/g, " ")
+    },
     "./inRoomChatThread": {
       findLastCanonicalRoomChatMessage,
       findCanonicalRoomChatThread,

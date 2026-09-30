@@ -11,6 +11,17 @@ import { CHAT_COPY, type ChatThreadCopy } from "./chatThreadCopy"
 
 export type ChatMessageDeliveryState = "sending" | "failed" | "sent"
 
+/**
+ * Mirrors the server's message normalization (trim, then collapse every
+ * whitespace run to one space). The optimistic bubble must hold exactly the
+ * body the server stores: realtime echoes and HTTP acknowledgements are
+ * reconciled by body, so a multi-line draft otherwise left a duplicate bubble
+ * stuck in "sending" next to the delivered message.
+ */
+export function normalizeOutgoingChatBody(body: string): string {
+  return body.trim().replace(/\s+/g, " ")
+}
+
 export function formatMessageTime(isoDate: string): string {
   const d = new Date(isoDate)
   if (Number.isNaN(d.getTime())) return ""

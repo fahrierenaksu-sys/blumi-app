@@ -11,6 +11,7 @@ import {
 } from "./connectionRepository"
 import type { EconomyService } from "../economy/economyService"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
+import type { SafetyService } from "../safety/safetyService"
 
 export interface ConnectionService {
   repository: ConnectionRepository
@@ -42,6 +43,8 @@ export class ConnectionDecisionUnavailableError extends Error {
 export interface CreateConnectionServiceOptions {
   repository?: ConnectionRepository
   miniRoomService: MiniRoomService
+  /** A blocked pair can never record a decision or complete a room match. */
+  safetyService: Pick<SafetyService, "hasBlockBetween">
   economyService?: EconomyService
   reportSideEffectFailure?: (kind: "reward", error: unknown) => void
 }
@@ -67,6 +70,9 @@ export function createConnectionService(
         throw new ConnectionDecisionUnavailableError()
       }
       if (input.status !== "saved" && input.status !== "passed") {
+        throw new ConnectionDecisionUnavailableError()
+      }
+      if (await options.safetyService.hasBlockBetween(actorUserId, input.partnerUserId)) {
         throw new ConnectionDecisionUnavailableError()
       }
 

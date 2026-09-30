@@ -5,6 +5,7 @@ import {
   getMessageListCompletionVersion,
   useChatStore
 } from "../chat/chatStore"
+import { normalizeOutgoingChatBody } from "../chat/thread/chatThreadModel"
 import {
   getGlobalStatus,
   subscribeToStatus,
@@ -252,7 +253,7 @@ export function useInRoomChat(options: {
 
   const sendRoomMessage = useCallback(
     (body: string): boolean => {
-      const trimmed = body.trim()
+      const trimmed = normalizeOutgoingChatBody(body)
       if (!trimmed) return false
       if (!threadId) return false
       if (connectionStatus !== "connected") return false

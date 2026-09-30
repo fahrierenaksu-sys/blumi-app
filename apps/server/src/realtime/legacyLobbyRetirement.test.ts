@@ -287,7 +287,7 @@ async function createHarness() {
     chatService,
     livekitTokenService: createLivekitTokenService()
   })
-  const connectionService = createConnectionService({ miniRoomService })
+  const connectionService = createConnectionService({ miniRoomService, safetyService })
   const connectionManager = createConnectionManager()
   const realtimeTicketService = createRealtimeTicketService({ authService })
   const app = createServer({

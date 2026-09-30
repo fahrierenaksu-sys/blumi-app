@@ -62,7 +62,8 @@ export function createPostgresMatchRepository(
             AND COALESCE(identity_gender, gender) IN ('woman', 'man')
             AND onboarding_profile_complete = TRUE
             AND onboarding_avatar_complete = TRUE
-            AND onboarding_room_complete = TRUE`,
+            AND onboarding_room_complete = TRUE
+            AND moderation_status NOT IN ('suspended', 'banned')`,
         [userId]
       )
       return accountResult.rows[0]
@@ -85,6 +86,7 @@ export function createPostgresMatchRepository(
            FROM blumi_accounts
            CROSS JOIN viewer
           WHERE blumi_accounts.user_id = $2
+            AND blumi_accounts.moderation_status NOT IN ('suspended', 'banned')
             AND display_name <> ''
             AND age BETWEEN 18 AND 99
             AND char_length(trim(display_name)) >= 2

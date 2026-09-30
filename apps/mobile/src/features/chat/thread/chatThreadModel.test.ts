@@ -12,9 +12,63 @@ import {
   getChatTimelineRowModel,
   getRoomInviteActionKey,
   getRoomInviteComposerState,
+  normalizeOutgoingChatBody,
   selectChatPartnerSummary,
   type ChatMessageDeliveryState
 } from "./chatThreadModel"
+import {
+  addOptimisticMessage,
+  applyChatMessageReceived,
+  confirmOptimisticMessage,
+  getMessageDeliveryState,
+  getMessages,
+  resetChatStore
+} from "../chatStore"
+
+test("outgoing chat bodies match the server's stored form so the optimistic bubble reconciles", () => {
+  assert.equal(normalizeOutgoingChatBody("  hello\n\n  world\t "), "hello world")
+  assert.equal(normalizeOutgoingChatBody("a\r\nb  c"), "a b c")
+  assert.equal(normalizeOutgoingChatBody(" \n\t "), "")
+  assert.equal(normalizeOutgoingChatBody("single"), "single")
+
+  // The server stores "line one line two". A normalized optimistic body is
+  // replaced by the realtime echo and then confirmed by the HTTP ACK, leaving
+  // exactly one delivered bubble.
+  resetChatStore()
+  const serverMessage: ChatMessage = {
+    messageId: "message_server_1",
+    threadId: "thread_normalized",
+    senderUserId: "user_local",
+    body: "line one line two",
+    sentAt: "2026-09-30T10:00:00.000Z"
+  }
+  const pending = addOptimisticMessage({
+    threadId: "thread_normalized",
+    senderUserId: "user_local",
+    body: normalizeOutgoingChatBody("line one\nline two"),
+    trackDelivery: true
+  })
+  applyChatMessageReceived(serverMessage, { localUserId: "user_local" })
+  confirmOptimisticMessage(pending.clientMessageId, serverMessage, "user_local")
+  const delivered = getMessages("thread_normalized")
+  assert.deepEqual(delivered.map((entry) => entry.messageId), ["message_server_1"])
+  assert.equal(getMessageDeliveryState(pending.localMessageId), "sent")
+
+  // Regression: the raw multi-line draft (the old behaviour) never reconciles,
+  // leaving a second bubble stuck in "sending" beside the delivered message.
+  resetChatStore()
+  const raw = addOptimisticMessage({
+    threadId: "thread_normalized",
+    senderUserId: "user_local",
+    body: "line one\nline two",
+    trackDelivery: true
+  })
+  applyChatMessageReceived(serverMessage, { localUserId: "user_local" })
+  confirmOptimisticMessage(raw.clientMessageId, serverMessage, "user_local")
+  assert.equal(getMessages("thread_normalized").length, 2)
+  assert.equal(getMessageDeliveryState(raw.localMessageId), "sending")
+  resetChatStore()
+})
 
 function message(
   messageId: string,

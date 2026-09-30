@@ -63,6 +63,15 @@ function collapseSingleLetterRuns(words: readonly string[]): string[] {
   return result
 }
 
+// C0 controls (other than whitespace, which callers collapse first) and DEL.
+// PostgreSQL text rejects NUL outright, so without this check a NUL byte
+// surfaced as a 500 storage error instead of a validation answer.
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/
+
+export function containsControlCharacters(value: string): boolean {
+  return CONTROL_CHARACTER_PATTERN.test(value)
+}
+
 export function assertPublicTextAllowed(value: string): void {
   if (!isPublicTextAllowed(value)) {
     throw new PublicRequestError("This text cannot be shared under the community rules. Please rephrase it.")
