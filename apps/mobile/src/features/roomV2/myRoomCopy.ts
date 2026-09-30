@@ -4,7 +4,6 @@ export interface MyRoomCopy {
   title: string
   subtitle: string
   profileOptions: string
-  cozyRoom: string
   wardrobe: string
   wardrobeShort: string
   openWardrobe: string
@@ -35,7 +34,6 @@ const COPY: Record<AppLocale, MyRoomCopy> = {
     title: "My Room",
     subtitle: "Move around your little world",
     profileOptions: "Open profile options",
-    cozyRoom: "Cozy room",
     wardrobe: "Avatar Studio",
     wardrobeShort: "Avatar",
     openWardrobe: "Open Avatar Studio",
@@ -64,7 +62,6 @@ const COPY: Record<AppLocale, MyRoomCopy> = {
     title: "Odam",
     subtitle: "Küçük dünyanda dolaş",
     profileOptions: "Profil seçeneklerini aç",
-    cozyRoom: "Sıcak oda",
     wardrobe: "Avatar Stüdyosu",
     wardrobeShort: "Avatar",
     openWardrobe: "Avatar Stüdyosu’nu aç",

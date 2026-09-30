@@ -39,6 +39,7 @@ import { resolveRoomV2MyRoomCamera } from "../features/roomV2/roomV2Camera"
 import { resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetrics"
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import { getMyRoomCopy, getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
+import { formatRoomOwnerLabel } from "../features/roomV2/roomOwnerLabel"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   isRoomWorldPointWalkable,
@@ -124,6 +125,7 @@ export function MyRoomScreen({
   resolvedCapabilities
 }: MyRoomScreenProps) {
   const copy = getMyRoomCopy(getAppLocale())
+  const roomOwnerLabel = formatRoomOwnerLabel(sessionActor.profile.displayName, getAppLocale())
   const { userRoomDecor, persistenceState } = useRoomV2()
   const { avatar, catalog } = useAvatarV2()
   const displayedAvatar = useMemo(() => resolveMyRoomAvatarSource(
@@ -770,7 +772,6 @@ export function MyRoomScreen({
             style={[styles.stageCard, { height: stageHeight }]}
           >
             <View style={styles.stageBackdrop} pointerEvents="none" />
-            <View style={styles.stageTopScrim} pointerEvents="none" />
             {persistenceState === "loading" ? (
               <Text style={styles.stageLoading} accessibilityRole="text">
                 {getMyRoomEditorCopy(getAppLocale()).preparing}
@@ -789,12 +790,14 @@ export function MyRoomScreen({
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
             /></Animated.View>}
-            <View style={styles.stageHud} pointerEvents="none">
-              <Ionicons name="heart" size={13} color="#D92A79" />
-              <Text style={styles.stageHeaderText} numberOfLines={1}>
-                {copy.cozyRoom}
-              </Text>
-            </View>
+            {roomOwnerLabel ? (
+              <View style={styles.stageHud} pointerEvents="none">
+                <Ionicons name="heart" size={13} color="#D92A79" />
+                <Text style={styles.stageHeaderText} numberOfLines={1}>
+                  {roomOwnerLabel}
+                </Text>
+              </View>
+            ) : null}
             {movementFeedback ? (
               <View style={styles.movementFeedbackPill} pointerEvents="none">
                 <Ionicons name="footsteps" size={14} color="#FFB4C8" />
@@ -1009,14 +1012,6 @@ const styles = StyleSheet.create({
     color: "#702344",
     fontSize: 16,
     fontWeight: "600"
-  },
-  stageTopScrim: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 92,
-    backgroundColor: "rgba(255, 111, 174, 0.1)",
   },
   stageRenderer: {
     backgroundColor: "#E8B698",
