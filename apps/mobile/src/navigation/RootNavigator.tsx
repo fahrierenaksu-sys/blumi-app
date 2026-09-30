@@ -4,8 +4,11 @@ import type {
   MiniRoom
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
-import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps
+} from "@react-navigation/native-stack"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   ActivityIndicator,
   StyleSheet,
@@ -62,6 +65,7 @@ import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
 import { RoomV2Provider } from "../features/roomV2/state/RoomV2Provider"
 import { AccountRestrictionScreen } from "../screens/AccountRestrictionScreen"
 import { useSessionState } from "../features/session/useSessionState"
+import type { SessionActor } from "../features/session/sessionModel"
 import { selectSessionEntryRoute } from "../features/session/sessionRouting"
 import type {
   RegisterAccountInput,
@@ -108,6 +112,13 @@ import { renderRouteErrorBoundary } from "./RouteErrorBoundary"
 import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
+import {
+  MAIN_TAB_PAGER_ENABLED,
+  MAIN_TAB_ROUTE_NAMES,
+  type MainTabRouteName
+} from "./mainTabPager/mainTabPagerConfig"
+import { MainTabPager, type MainTabPageProps } from "./mainTabPager/MainTabPager"
+import { withMainTabPagerRouter } from "./mainTabPager/mainTabPagerRouter"
 import {
   cosmeticShopScreenBundle,
   legalScreenBundle,
@@ -572,6 +583,59 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     onConnectionMatched: handleRealtimeConnectionMatch
   })
 
+  // One definition of each main page, used by the pager (one slot route) and
+  // by the rollback path (four separate stack routes).
+  const renderMainTabPage = (
+    actor: SessionActor,
+    routeName: MainTabRouteName,
+    pageProps: MainTabPageProps
+  ): ReactNode => {
+    if (routeName === "Lobby") {
+      return (
+        <LobbyScreen
+          sessionActor={actor}
+          onResetSession={clearSessionActor}
+          onUpdateDiscoveryPreferences={(discoveryPreferences) =>
+            updateSessionProfile({
+              displayName: actor.profile.displayName,
+              discoveryPreferences
+            })
+          }
+        />
+      )
+    }
+    if (routeName === "Inbox") {
+      return (
+        <InboxScreen
+          {...(pageProps as NativeStackScreenProps<RootStackParamList, "Inbox">)}
+          sessionActor={actor}
+          onRetryThreads={refreshProductionThreads}
+          onWarmThread={warmThreadMessagesForInbox}
+        />
+      )
+    }
+    if (routeName === "MyRoom") {
+      return (
+        <myRoomScreenBundle.DeferredScreen
+          {...pageProps}
+          sessionActor={actor}
+          resolvedCapabilities={resolvedCapabilities}
+        />
+      )
+    }
+    return (
+      <cosmeticShopScreenBundle.DeferredScreen
+        {...pageProps}
+        sessionActor={actor}
+        roomFurnitureCatalog={undefined}
+        qaOnlyOwnedRoomItemIds={[]}
+        isRoomCatalogQaPreview={false}
+        isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
+        initialShopMode={undefined}
+      />
+    )
+  }
+
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||
     (shouldWaitForPreAuthDraftHydration(sessionEntryRoute) &&
@@ -631,6 +695,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         <Stack.Navigator
           screenListeners={screenListeners}
           screenLayout={renderRouteErrorBoundary}
+          UNSTABLE_router={MAIN_TAB_PAGER_ENABLED ? withMainTabPagerRouter : undefined}
           key={sessionNavigatorKey}
           initialRouteName={
             isAccountRestricted
@@ -673,27 +738,39 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             </>
           ) : sessionEntryRoute === "Main" && sessionActor ? (
             <>
-              <Stack.Screen
-                name="Lobby"
-                options={{
-                  ...MAIN_TAB_SCREEN_OPTIONS,
-                  ...reducedMotionScreenOptions,
-                  title: "Discover"
-                }}
-              >
-                {() => (
-                  <LobbyScreen
-                    sessionActor={sessionActor}
-                    onResetSession={clearSessionActor}
-                    onUpdateDiscoveryPreferences={(discoveryPreferences) =>
-                      updateSessionProfile({
-                        displayName: sessionActor.profile.displayName,
-                        discoveryPreferences
-                      })
-                    }
-                  />
-                )}
-              </Stack.Screen>
+              {MAIN_TAB_PAGER_ENABLED ? (
+                // Every main tab name maps to the same pager slot route; the
+                // pager router keeps exactly one of them in the stack and only
+                // renames it, so the pager and its pages are never recreated.
+                MAIN_TAB_ROUTE_NAMES.map((routeName) => (
+                  <Stack.Screen
+                    key={routeName}
+                    name={routeName}
+                    options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
+                  >
+                    {(screenProps) => (
+                      <MainTabPager
+                        navigation={screenProps.navigation}
+                        route={screenProps.route}
+                        renderPage={(pageRouteName, pageProps) =>
+                          renderMainTabPage(sessionActor, pageRouteName, pageProps)
+                        }
+                      />
+                    )}
+                  </Stack.Screen>
+                ))
+              ) : (
+                <Stack.Screen
+                  name="Lobby"
+                  options={{
+                    ...MAIN_TAB_SCREEN_OPTIONS,
+                    ...reducedMotionScreenOptions,
+                    title: "Discover"
+                  }}
+                >
+                  {(screenProps) => renderMainTabPage(sessionActor, "Lobby", screenProps)}
+                </Stack.Screen>
+              )}
               <Stack.Screen
                 name="MiniRoom"
                 options={{ headerShown: false, gestureEnabled: false }}
@@ -753,31 +830,22 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                   />
                 )}
               </Stack.Screen>
-              <Stack.Screen
-                name="Inbox"
-                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
-              >
-                {(screenProps) => (
-                  <InboxScreen
-                    {...screenProps}
-                    sessionActor={sessionActor}
-                    onRetryThreads={refreshProductionThreads}
-                    onWarmThread={warmThreadMessagesForInbox}
-                  />
-                )}
-              </Stack.Screen>
-              <Stack.Screen
-                name="MyRoom"
-                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
-              >
-                {(screenProps) => (
-                  <myRoomScreenBundle.DeferredScreen
-                    {...screenProps}
-                    sessionActor={sessionActor}
-                    resolvedCapabilities={resolvedCapabilities}
-                  />
-                )}
-              </Stack.Screen>
+              {MAIN_TAB_PAGER_ENABLED ? null : (
+                <>
+                  <Stack.Screen
+                    name="Inbox"
+                    options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
+                  >
+                    {(screenProps) => renderMainTabPage(sessionActor, "Inbox", screenProps)}
+                  </Stack.Screen>
+                  <Stack.Screen
+                    name="MyRoom"
+                    options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
+                  >
+                    {(screenProps) => renderMainTabPage(sessionActor, "MyRoom", screenProps)}
+                  </Stack.Screen>
+                </>
+              )}
               <Stack.Screen
                 name="WardrobeV2"
                 component={wardrobeV2ScreenBundle.DeferredScreen}
@@ -841,22 +909,14 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                   />
                 )}
               </Stack.Screen>
-              <Stack.Screen
-                name="CosmeticShop"
-                options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
-              >
-                {(screenProps) => (
-                  <cosmeticShopScreenBundle.DeferredScreen
-                    {...screenProps}
-                    sessionActor={sessionActor}
-                    roomFurnitureCatalog={undefined}
-                    qaOnlyOwnedRoomItemIds={[]}
-                    isRoomCatalogQaPreview={false}
-                    isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
-                    initialShopMode={undefined}
-                  />
-                )}
-              </Stack.Screen>
+              {MAIN_TAB_PAGER_ENABLED ? null : (
+                <Stack.Screen
+                  name="CosmeticShop"
+                  options={{ ...MAIN_TAB_SCREEN_OPTIONS, ...reducedMotionScreenOptions }}
+                >
+                  {(screenProps) => renderMainTabPage(sessionActor, "CosmeticShop", screenProps)}
+                </Stack.Screen>
+              )}
               <Stack.Screen
                 name="ProfileEdit"
                 options={{ headerShown: false }}
