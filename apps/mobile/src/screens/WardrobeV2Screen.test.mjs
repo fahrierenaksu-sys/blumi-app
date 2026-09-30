@@ -932,7 +932,7 @@ test("category changes and navigation blur dismiss the visual preview", () => {
   assert.equal(harness.state, null)
 
   assert.match(screenSource, /navigation\.addListener\("blur",[\s\S]*?type: "dismiss-preview"/)
-  assert.match(screenSource, /dismissTryOnPreview\(\)\s*setActiveCategory\(categoryId\)/)
+  assert.match(screenSource, /dismissTryOnPreview\(\)\s*setSelectedCategory\(categoryId\)/)
   assert.match(screenSource, /clearQueuedWardrobeTryOn\(\{[\s\S]*?dispatch: dispatchTryOn/)
   assert.match(screenSource, /!canEquipItem\(item\)/)
   assert.match(screenSource, /isMountedRef\.current = false[\s\S]*?activeTryOnRequestRef\.current = null/)

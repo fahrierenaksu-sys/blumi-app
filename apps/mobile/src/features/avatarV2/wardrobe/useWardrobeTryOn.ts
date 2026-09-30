@@ -15,6 +15,7 @@ import {
   shouldHandleWardrobeTryOnCompletion,
   takeQueuedWardrobeTryOnIfReady,
   wardrobeTryOnReducer,
+  type WardrobeTryOnAction,
   type WardrobeTryOnActiveRequest,
   type WardrobeTryOnPending,
   type WardrobeTryOnQueuedRequest
@@ -44,7 +45,14 @@ export function useWardrobeTryOn(input: {
   saveAvatar: (avatar: UserAvatar) => Promise<SaveAvatarResult>
 }) {
   const { navigation, avatar, isSaving, canEquipItem, saveAvatar } = input
-  const [pendingTryOn, dispatchTryOn] = useReducer(wardrobeTryOnReducer, null)
+  const [pendingTryOn, dispatchReducer] = useReducer(wardrobeTryOnReducer, null)
+  // Sticky until the next equip: "Done" must not close over a rejected save.
+  const [hasFailedSave, setHasFailedSave] = useState(false)
+  const dispatchTryOn = useCallback((action: WardrobeTryOnAction): void => {
+    if (action.type === "begin") setHasFailedSave(false)
+    if (action.type === "failed") setHasFailedSave(true)
+    dispatchReducer(action)
+  }, [])
   const activeTryOnRequestRef = useRef<WardrobeTryOnActiveRequest | null>(null)
   const queuedTryOnRequestRef = useRef<WardrobeTryOnQueuedRequest | null>(null)
   const previewAvatarRef = useRef<UserAvatar | null>(null)
@@ -69,7 +77,7 @@ export function useWardrobeTryOn(input: {
     queuedTryOnRequestRef.current = null
     previewAvatarRef.current = null
     dispatchTryOn({ type: "dismiss-preview" })
-  }), [navigation])
+  }), [dispatchTryOn, navigation])
 
   const displayedAvatar = pendingTryOn?.previewAvatar ?? avatar
 
@@ -109,7 +117,7 @@ export function useWardrobeTryOn(input: {
         if (!queuedTryOnRequestRef.current) hapticError()
       }
     })
-  }, [saveAvatar])
+  }, [dispatchTryOn, saveAvatar])
 
   useEffect(() => {
     const requestBeforeConfirmation = activeTryOnRequestRef.current
@@ -163,7 +171,7 @@ export function useWardrobeTryOn(input: {
       previewAvatar: nextPreview,
       status: "saving"
     }, avatar)
-  }, [avatar, canEquipItem, isSaving, pendingTryOn, saveSequence, startTryOnSave])
+  }, [avatar, canEquipItem, dispatchTryOn, isSaving, pendingTryOn, saveSequence, startTryOnSave])
 
   const handleEquip = useCallback((item: AvatarCatalogItem): void => {
     if (!canEquipItem(item)) return
@@ -196,7 +204,13 @@ export function useWardrobeTryOn(input: {
       return
     }
     startTryOnSave(pending, avatar)
-  }, [avatar, canEquipItem, isSaving, startTryOnSave])
+  }, [avatar, canEquipItem, dispatchTryOn, isSaving, startTryOnSave])
 
-  return { pendingTryOn, displayedAvatar, dismissTryOnPreview, handleEquip }
+  return {
+    pendingTryOn,
+    displayedAvatar,
+    hasFailedSave,
+    dismissTryOnPreview,
+    handleEquip
+  }
 }

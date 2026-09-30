@@ -4,17 +4,17 @@ import { memo } from "react"
 import { type ImageSourcePropType, Pressable, Text, View } from "react-native"
 import { getShopProductThumbnailBounds } from "../../shop/shopAssets"
 import { getShopThumbnailLayout } from "../../shop/shopThumbnailLayout"
-import { uiTheme } from "../../../ui/theme"
 import { getGarmentThumbnailOverride } from "../garmentThumbnailOverrides"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import { getMaleRigLayerThumbnailPresentation } from "../maleRigThumbnailPresentation"
 import { MALE_CAPSULE_PREVIEW_SOURCES } from "../maleCapsulePreviewSources"
 import { getWardrobeThumbnailPresentation } from "../wardrobeThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../qa/avatarQaInventory"
-import { getAvatarItemPreviewImageStyle } from "./wardrobeCatalogModel"
+import { getAvatarItemPreviewImageStyle, getStarterLayerThumbnail } from "./wardrobeCatalogModel"
+import { WARDROBE_ART_ASPECT, WARDROBE_THUMB_BOX } from "./wardrobeStageLayout"
 import { CATEGORY_ICONS } from "./wardrobeCopy"
 import { WARDROBE_SQUARE_THUMBNAIL_SOURCES } from "./wardrobePreviewSources"
-import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
 export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   item: AvatarCatalogItem
@@ -22,11 +22,15 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   itemStateLabel: string
   wearingLabel: string
   locked: boolean
+  width: number
   onEquip: (item: AvatarCatalogItem) => void
   previewSource?: ImageSourcePropType
   thumbnailTransition: number
 }) {
-  const { item, equipped, itemStateLabel, wearingLabel, locked, onEquip, previewSource, thumbnailTransition } = props
+  const {
+    item, equipped, itemStateLabel, wearingLabel, locked, width, onEquip,
+    previewSource, thumbnailTransition
+  } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
     ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
     : undefined
@@ -38,12 +42,44 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       Boolean(getGarmentThumbnailOverride(item.id)) ||
       ["face", "eyes", "nose", "mouth"].includes(item.type)
   })
-  const visibleThumbnailLayout = thumbnailPresentation.frame === "square"
-    ? getShopThumbnailLayout(getShopProductThumbnailBounds(item.id), 100, 68)
+  const starterThumbnail = thumbnailPresentation.frame === "legacy"
+    ? getStarterLayerThumbnail(item.id)
     : undefined
-  const thumbnailLayout = visibleThumbnailLayout
-    ? { ...visibleThumbnailLayout, left: visibleThumbnailLayout.left + 16, top: visibleThumbnailLayout.top + 10 }
+  const thumbnailBounds = thumbnailPresentation.frame === "square"
+    ? getShopProductThumbnailBounds(item.id)
+    : starterThumbnail?.bounds
+  const thumbnailBox = starterThumbnail?.box ?? WARDROBE_THUMB_BOX
+  const thumbnailLayout = thumbnailBounds
+    ? getShopThumbnailLayout(thumbnailBounds, thumbnailBox.width, thumbnailBox.height)
     : undefined
+  const isBoxed = Boolean(thumbnailLayout)
+
+  const image = previewSource ? (
+    <ExpoImage
+      source={previewSource}
+      contentFit="contain"
+      cachePolicy="memory-disk"
+      transition={thumbnailTransition}
+      style={[
+        thumbnailPresentation.frame === "rig"
+          ? styles.itemPreviewRigLayer
+          : thumbnailPresentation.frame === "portrait"
+            ? styles.itemPreviewFeaturePortrait
+            : thumbnailPresentation.frame === "square" || thumbnailLayout
+              ? styles.itemPreviewSquare
+              : styles.itemPreviewImage,
+        thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
+        rigLayerPresentation
+          ? {
+              top: rigLayerPresentation.top,
+              transform: [{ scale: rigLayerPresentation.scale }]
+            }
+          : thumbnailPresentation.frame === "legacy" && !thumbnailLayout
+            ? getAvatarItemPreviewImageStyle(item)
+            : null
+      ]}
+    />
+  ) : null
 
   return (
     <Pressable
@@ -58,72 +94,51 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       onPress={() => onEquip(item)}
       style={({ pressed }) => [
         styles.itemCard,
-        equipped ? styles.itemCardEquipped : null,
-        locked ? styles.itemCardLocked : null,
+        { width },
         pressed ? styles.itemCardPressed : null
       ]}
     >
-      <View style={styles.itemPreviewStage}>
-        <View style={styles.itemPreviewHalo} />
+      <View
+        style={[
+          styles.itemArt,
+          { height: Math.round(width * WARDROBE_ART_ASPECT) },
+          equipped ? styles.itemArtSelected : null,
+          locked ? styles.itemArtLocked : null
+        ]}
+      >
         {previewSource ? (
-          <ExpoImage
-            source={previewSource}
-            contentFit="contain"
-            cachePolicy="memory-disk"
-            transition={thumbnailTransition}
-            style={[
-              thumbnailPresentation.frame === "rig"
-                ? styles.itemPreviewRigLayer
-                : thumbnailPresentation.frame === "portrait"
-                  ? styles.itemPreviewFeaturePortrait
-                : thumbnailPresentation.frame === "square"
-                  ? styles.itemPreviewSquare
-                  : styles.itemPreviewImage,
-              thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
-              rigLayerPresentation
-                ? {
-                    top: rigLayerPresentation.top,
-                    transform: [{ scale: rigLayerPresentation.scale }]
-                  }
-                : thumbnailPresentation.frame === "legacy"
-                  ? getAvatarItemPreviewImageStyle(item)
-                  : null
-            ]}
-          />
+          isBoxed
+            ? (
+              <View style={[styles.itemThumbBox, thumbnailBox]}>{image}</View>
+            )
+            : image
         ) : (
-          <View
-            style={[
-              styles.itemIconShell,
-              equipped ? styles.itemIconShellEquipped : null
-            ]}
-          >
+          <View style={styles.itemIconShell}>
             <Ionicons
-              name={locked ? "lock-closed" : CATEGORY_ICONS[item.type]}
+              name={locked ? "lock-closed-outline" : CATEGORY_ICONS[item.type]}
               size={20}
-              color={equipped ? "#FFFFFF" : uiTheme.colors.primary}
+              color={wardrobeTheme.muted}
             />
           </View>
         )}
         {equipped ? (
           <View style={styles.itemCheckBadge}>
-            <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+            <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+          </View>
+        ) : null}
+        {locked && previewSource ? (
+          <View style={styles.itemLock}>
+            <Ionicons name="lock-closed-outline" size={14} color={wardrobeTheme.muted} />
           </View>
         ) : null}
       </View>
-      <Text style={styles.itemName} numberOfLines={2}>
+      <Text
+        maxFontSizeMultiplier={1.3}
+        numberOfLines={2}
+        style={styles.itemName}
+      >
         {item.name}
       </Text>
-      <View
-        style={[
-          styles.itemMetaPill,
-          equipped ? styles.itemMetaPillEquipped : null,
-          locked ? styles.itemMetaLocked : null
-        ]}
-      >
-        <Text style={styles.itemMeta} numberOfLines={1}>
-          {equipped ? wearingLabel : itemStateLabel}
-        </Text>
-      </View>
     </Pressable>
   )
 }, (previous, next) =>
@@ -132,6 +147,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   previous.itemStateLabel === next.itemStateLabel &&
   previous.wearingLabel === next.wearingLabel &&
   previous.locked === next.locked &&
+  previous.width === next.width &&
   previous.onEquip === next.onEquip &&
   previous.previewSource === next.previewSource
 )

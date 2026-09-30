@@ -1,10 +1,9 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import { Pressable, Text, View } from "react-native"
-import { uiTheme } from "../../../ui/theme"
 import { AVATAR_STUDIO_SECTIONS, type AvatarStudioSectionId } from "../wardrobeCategoryModel"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
+/** Dolabım / Karakterim: a centred capsule whose selected half is dark plum. */
 export function WardrobeSectionSwitcher(props: {
   activeSection: AvatarStudioSectionId
   copy: WardrobeStudioCopy
@@ -28,15 +27,14 @@ export function WardrobeSectionSwitcher(props: {
               active ? styles.sectionButtonActive : null
             ]}
           >
-            <Ionicons
-              name={section.id === "appearance" ? "happy" : "shirt"}
-              size={16}
-              color={active ? "#FFFFFF" : uiTheme.colors.textSecondary}
-            />
-            <Text style={[
-              styles.sectionButtonText,
-              active ? styles.sectionButtonTextActive : null
-            ]}>
+            <Text
+              maxFontSizeMultiplier={1.3}
+              numberOfLines={1}
+              style={[
+                styles.sectionButtonText,
+                active ? styles.sectionButtonTextActive : null
+              ]}
+            >
               {copy[section.id]}
             </Text>
           </Pressable>

@@ -1,29 +1,37 @@
 import type Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarItemType } from "../avatarV2.types"
-import type { WardrobeCategoryId } from "../wardrobeCategoryModel"
+import type { AvatarStudioTabId } from "../wardrobeCategoryModel"
 
 export const AVATAR_STUDIO_COPY = {
   en: {
-    title: "Blumi",
-    subtitle: "Live Closet",
-    progress: "2 / 4",
-    appearance: "Avatar",
+    title: "Wardrobe",
+    done: "Save",
+    headline: "A little more you.",
+    tagline: "Complete your look with pieces you love.",
+    doneSaving: "Saving your look",
+    back: "Go back",
+    zoomIn: "Zoom in on your character",
+    zoomOut: "Zoom out",
+    optionCount: (count: number) => (count === 1 ? "1 option" : `${count} options`),
+    saveFailed: "Your look could not be saved. Try again.",
+    appearance: "My Character",
     closet: "My Closet",
-    body: "Bases",
+    body: "Base",
     face: "Face",
     eyes: "Eyes",
     nose: "Nose",
-    mouth: "Lips",
+    mouth: "Mouth",
     hair: "Hair",
     top: "Tops",
     dress: "Dresses",
     bottom: "Bottoms",
     shoes: "Shoes",
-    accessory: "Extras",
+    accessory: "Accessories",
     sectionA11ySuffix: "section",
-    categoryA11ySuffix: "Avatar Studio category",
+    categoryA11ySuffix: "category",
     bodySwitchHint: "Switching your base refits the complete starter look.",
     wearing: "Wearing",
+    pageOf: (page: number, total: number) => `Page ${page} of ${total}`,
     savingLook: "Saving your look…",
     tryOn: "Try on",
     equipped: "equipped",
@@ -36,26 +44,34 @@ export const AVATAR_STUDIO_COPY = {
     exploreShop: "Explore Shop"
   },
   tr: {
-    title: "Blumi",
-    subtitle: "Canlı Gardırop",
-    progress: "2 / 4",
-    appearance: "Avatar",
+    title: "Gardırop",
+    done: "Kaydet",
+    headline: "Biraz daha sen.",
+    tagline: "Sevdiğin parçalarla kendini tamamla.",
+    doneSaving: "Görünümün kaydediliyor",
+    back: "Geri dön",
+    zoomIn: "Karakteri yakınlaştır",
+    zoomOut: "Uzaklaştır",
+    optionCount: (count: number) => `${count} seçenek`,
+    saveFailed: "Görünümün kaydedilemedi. Tekrar dene.",
+    appearance: "Karakterim",
     closet: "Dolabım",
-    body: "Bazlar",
+    body: "Baz",
     face: "Yüz",
-    eyes: "Gözler",
+    eyes: "Göz",
     nose: "Burun",
     mouth: "Ağız",
     hair: "Saç",
     top: "Üstler",
     dress: "Elbiseler",
     bottom: "Altlar",
-    shoes: "Ayakkabılar",
-    accessory: "Ekstralar",
+    shoes: "Ayakkabı",
+    accessory: "Aksesuar",
     sectionA11ySuffix: "bölümünü aç",
-    categoryA11ySuffix: "Avatar Stüdyosu kategorisini aç",
+    categoryA11ySuffix: "kategorisini aç",
     bodySwitchHint: "Bazı değiştirince başlangıç görünümü birlikte yeniden uyarlanır.",
     wearing: "Giyiliyor",
+    pageOf: (page: number, total: number) => `Sayfa ${page} / ${total}`,
     savingLook: "Görünümün kaydediliyor…",
     tryOn: "Dene",
     equipped: "giyiliyor",
@@ -82,21 +98,16 @@ export const CATEGORY_ICONS: Record<AvatarItemType, keyof typeof Ionicons.glyphM
   accessory: "glasses"
 }
 
-export const WARDROBE_CATEGORY_ICONS: Record<
-  WardrobeCategoryId,
-  keyof typeof Ionicons.glyphMap
-> = {
-  body: "body",
-  face: "happy",
-  top: "shirt",
-  dress: "sparkles",
-  bottom: "layers",
-  shoes: "walk",
-  eyes: "eye",
-  nose: "ellipse",
-  mouth: "chatbubble-ellipses",
-  hair: "cut",
-  accessory: "glasses"
+/** Thin line icons for the four tabs of each section. */
+export const WARDROBE_TAB_ICONS: Record<AvatarStudioTabId, keyof typeof Ionicons.glyphMap> = {
+  top: "shirt-outline",
+  bottom: "layers-outline",
+  shoes: "footsteps-outline",
+  accessory: "glasses-outline",
+  hair: "cut-outline",
+  face: "happy-outline",
+  eyes: "eye-outline",
+  nose: "ellipse-outline"
 }
 
 export type WardrobeStudioCopy = (typeof AVATAR_STUDIO_COPY)[keyof typeof AVATAR_STUDIO_COPY]

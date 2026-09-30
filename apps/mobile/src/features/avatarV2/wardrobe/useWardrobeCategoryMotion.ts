@@ -1,28 +1,6 @@
 import { useEffect, useRef } from "react"
-import { Animated, type ScrollView } from "react-native"
-import type { AvatarStudioSectionId, WardrobeCategoryId } from "../wardrobeCategoryModel"
-
-/** Keeps the active category tab in view; honours Reduce Motion. */
-export function useWardrobeCategoryTabScroll(input: {
-  activeCategory: WardrobeCategoryId
-  activeSection: AvatarStudioSectionId
-  reduceMotion: boolean
-}) {
-  const { activeCategory, activeSection, reduceMotion } = input
-  const categoryScrollRef = useRef<ScrollView>(null)
-  const categoryOffsetsRef = useRef<Record<string, number>>({})
-
-  useEffect(() => {
-    const offset = categoryOffsetsRef.current[activeCategory]
-    if (offset === undefined) return
-    const frame = requestAnimationFrame(() => {
-      categoryScrollRef.current?.scrollTo({ x: Math.max(0, offset - 16), animated: !reduceMotion })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [activeCategory, activeSection, reduceMotion])
-
-  return { categoryScrollRef, categoryOffsetsRef }
-}
+import { Animated } from "react-native"
+import type { WardrobeCategoryId } from "../wardrobeCategoryModel"
 
 /** Fades the catalog in when the category changes; skipped under Reduce Motion. */
 export function useWardrobeCatalogFade(input: {

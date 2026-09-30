@@ -1,8 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Pressable, Text, View } from "react-native"
-import { uiTheme } from "../../../ui/theme"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
-import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
 export function WardrobeCatalogEmpty(props: {
   copy: WardrobeStudioCopy
@@ -11,7 +10,7 @@ export function WardrobeCatalogEmpty(props: {
   const { copy, onExploreShop } = props
   return (
     <View style={styles.catalogEmpty}>
-      <Ionicons name="sparkles-outline" size={23} color={uiTheme.colors.primary} />
+      <Ionicons name="sparkles-outline" size={22} color={wardrobeTheme.accent} />
       <View style={styles.catalogEmptyCopy}>
         <Text style={styles.catalogEmptyTitle}>{copy.emptyTitle}</Text>
         <Text style={styles.catalogEmptyBody}>{copy.emptyBody}</Text>

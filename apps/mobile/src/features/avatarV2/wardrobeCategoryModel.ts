@@ -43,18 +43,80 @@ export const AVATAR_STUDIO_SECTIONS = [
   { id: "appearance", label: "Avatar" }
 ] as const satisfies readonly { id: AvatarStudioSectionId; label: string }[]
 
-const AVATAR_STUDIO_CATEGORY_IDS: Record<
-  AvatarStudioSectionId,
-  readonly WardrobeCategoryId[]
-> = {
-  appearance: ["body", "face", "eyes", "nose", "mouth"],
-  closet: ["hair", "top", "dress", "bottom", "shoes", "accessory"]
+export type AvatarStudioTabId =
+  | "top"
+  | "bottom"
+  | "shoes"
+  | "accessory"
+  | "hair"
+  | "face"
+  | "eyes"
+  | "nose"
+
+export interface AvatarStudioTab {
+  id: AvatarStudioTabId
+  /** First entry is the default filter; more than one renders a sub filter. */
+  categories: readonly WardrobeCategoryId[]
+}
+
+// Each section exposes four tabs. A tab may group related catalog categories
+// behind a sub filter: dresses live under Tops; lips and the base body live
+// under Face.
+const AVATAR_STUDIO_TABS: Record<AvatarStudioSectionId, readonly AvatarStudioTab[]> = {
+  closet: [
+    { id: "top", categories: ["top", "dress"] },
+    { id: "bottom", categories: ["bottom"] },
+    { id: "shoes", categories: ["shoes"] },
+    { id: "accessory", categories: ["accessory"] }
+  ],
+  appearance: [
+    { id: "hair", categories: ["hair"] },
+    { id: "face", categories: ["face", "mouth", "body"] },
+    { id: "eyes", categories: ["eyes"] },
+    { id: "nose", categories: ["nose"] }
+  ]
 }
 
 export function getAvatarStudioDefaultCategory(
   section: AvatarStudioSectionId
 ): WardrobeCategoryId {
-  return section === "appearance" ? "face" : "top"
+  return section === "appearance" ? "hair" : "top"
+}
+
+/**
+ * The section's tabs, keeping only categories with a body-compatible choice
+ * and dropping tabs that end up with none.
+ */
+export function getAvatarStudioTabs(
+  section: AvatarStudioSectionId,
+  catalog: AvatarCatalogItem[],
+  avatar: UserAvatar
+): readonly AvatarStudioTab[] {
+  return AVATAR_STUDIO_TABS[section].flatMap((tab) => {
+    const categories = tab.categories.filter((categoryId) =>
+      getWardrobeCategoryItems(catalog, categoryId).some((item) =>
+        isAvatarV2ItemCompatibleWithBody(item, avatar.bodyId)
+      )
+    )
+    return categories.length > 0 ? [{ id: tab.id, categories }] : []
+  })
+}
+
+/** The tab that owns a category, or undefined when the category is hidden. */
+export function findAvatarStudioTab(
+  tabs: readonly AvatarStudioTab[],
+  category: WardrobeCategoryId
+): AvatarStudioTab | undefined {
+  return tabs.find((tab) => tab.categories.includes(category))
+}
+
+/** Keeps the active category valid after the available tabs change. */
+export function resolveAvatarStudioCategory(
+  tabs: readonly AvatarStudioTab[],
+  category: WardrobeCategoryId
+): WardrobeCategoryId {
+  if (findAvatarStudioTab(tabs, category)) return category
+  return tabs[0]?.categories[0] ?? category
 }
 
 export function getAvatarStudioCategories(
@@ -65,14 +127,12 @@ export function getAvatarStudioCategories(
   const categoriesById = new Map(
     WARDROBE_CATEGORIES.map((category) => [category.id, category] as const)
   )
-  return AVATAR_STUDIO_CATEGORY_IDS[section].flatMap((categoryId) => {
-    const category = categoriesById.get(categoryId)
-    if (!category) return []
-    const hasCompatibleChoice = getWardrobeCategoryItems(catalog, categoryId).some(
-      (item) => isAvatarV2ItemCompatibleWithBody(item, avatar.bodyId)
-    )
-    return hasCompatibleChoice ? [category] : []
-  })
+  return getAvatarStudioTabs(section, catalog, avatar).flatMap((tab) =>
+    tab.categories.flatMap((categoryId) => {
+      const category = categoriesById.get(categoryId)
+      return category ? [category] : []
+    })
+  )
 }
 
 export const WARDROBE_EQUIPPED_SLOTS: readonly {
@@ -93,22 +153,6 @@ export interface WardrobeVisibleSlot {
   item?: AvatarCatalogItem
   itemCount?: number
   accessibilitySummary?: string
-}
-
-export const WARDROBE_CAROUSEL_CARD_WIDTH = 148
-export const WARDROBE_CAROUSEL_GAP = 10
-export const WARDROBE_CAROUSEL_INSET = 20
-
-export function getWardrobeCarouselItemLayout(
-  _data: ArrayLike<unknown> | null | undefined,
-  index: number
-): { length: number; offset: number; index: number } {
-  const stride = WARDROBE_CAROUSEL_CARD_WIDTH + WARDROBE_CAROUSEL_GAP
-  return {
-    length: WARDROBE_CAROUSEL_CARD_WIDTH,
-    offset: WARDROBE_CAROUSEL_INSET + stride * index,
-    index
-  }
 }
 
 export function getWardrobeSecondaryCategories(
@@ -189,41 +233,6 @@ export function getWardrobeEquippedSlotItem(
           : avatar.shoesId
 
   return catalog.find((item) => item.id === equippedId && item.type === slot)
-}
-
-export function getWardrobeCarouselProgress(
-  offsetX: number,
-  contentWidth: number,
-  viewportWidth: number
-): number {
-  const scrollableWidth = Math.max(0, contentWidth - viewportWidth)
-  if (scrollableWidth === 0) return 1
-  return Math.max(0, Math.min(1, offsetX / scrollableWidth))
-}
-
-export function getWardrobeCarouselIndicator(
-  offsetX: number,
-  contentWidth: number,
-  viewportWidth: number
-): { thumbFraction: number; positionFraction: number } {
-  if (contentWidth <= 0 || viewportWidth <= 0 || contentWidth <= viewportWidth) {
-    return { thumbFraction: 1, positionFraction: 0 }
-  }
-  return {
-    thumbFraction: Math.max(0, Math.min(1, viewportWidth / contentWidth)),
-    positionFraction: getWardrobeCarouselProgress(
-      offsetX,
-      contentWidth,
-      viewportWidth
-    )
-  }
-}
-
-export function shouldUseWardrobeVerticalFallback(
-  viewportHeight: number,
-  fontScale: number
-): boolean {
-  return viewportHeight < 760 || fontScale > 1.15
 }
 
 export function getWardrobeVisibleSlots(

@@ -1,72 +1,54 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import type { MutableRefObject, RefObject } from "react"
-import { Pressable, ScrollView, Text } from "react-native"
-import { uiTheme } from "../../../ui/theme"
-import type { WardrobeCategoryId } from "../wardrobeCategoryModel"
-import { WARDROBE_CATEGORY_ICONS, type WardrobeStudioCopy } from "./wardrobeCopy"
-import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+import { Pressable, Text, View } from "react-native"
+import {
+  findAvatarStudioTab,
+  type AvatarStudioTab,
+  type WardrobeCategoryId
+} from "../wardrobeCategoryModel"
+import { WARDROBE_TAB_ICONS, type WardrobeStudioCopy } from "./wardrobeCopy"
+import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
+/** Four thin-line tabs; the active one is rose with a fine underline. */
 export function WardrobeCategoryTabs(props: {
-  categories: readonly { id: WardrobeCategoryId }[]
+  tabs: readonly AvatarStudioTab[]
   activeCategory: WardrobeCategoryId
   copy: WardrobeStudioCopy
-  scrollRef: RefObject<ScrollView | null>
-  offsetsRef: MutableRefObject<Record<string, number>>
-  getCategoryLabel: (categoryId: WardrobeCategoryId) => string
   onSelectCategory: (categoryId: WardrobeCategoryId) => void
 }) {
-  const {
-    categories,
-    activeCategory,
-    copy,
-    scrollRef,
-    offsetsRef,
-    getCategoryLabel,
-    onSelectCategory
-  } = props
+  const { tabs, activeCategory, copy, onSelectCategory } = props
+  const activeTab = findAvatarStudioTab(tabs, activeCategory)
   return (
-    <ScrollView
-      ref={scrollRef}
-      horizontal
-      style={styles.categoryScroll}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.categoryRow}
-    >
-      {categories.map((category) => {
-        const active = category.id === activeCategory
+    <View style={styles.tabRow}>
+      {tabs.map((tab) => {
+        const active = tab.id === activeTab?.id
+        const label = copy[tab.id]
         return (
           <Pressable
-            key={category.id}
-            testID={`wardrobe-category-${category.id}`}
+            key={tab.id}
+            testID={`wardrobe-category-${tab.id}`}
             accessibilityRole="button"
-            accessibilityLabel={`${copy[category.id]} ${copy.categoryA11ySuffix}`}
+            accessibilityLabel={`${label} ${copy.categoryA11ySuffix}`}
             accessibilityState={{ selected: active }}
-            onLayout={(event) => {
-              offsetsRef.current[category.id] = event.nativeEvent.layout.x
-            }}
-            onPress={() => onSelectCategory(category.id)}
-            style={[
-              styles.categoryTab,
-              active ? styles.categoryTabActive : null
-            ]}
+            onPress={() => onSelectCategory(tab.categories[0])}
+            style={[styles.tab, active ? styles.tabActive : null]}
           >
             <Ionicons
-              name={WARDROBE_CATEGORY_ICONS[category.id]}
-              size={15}
-              color={active ? uiTheme.colors.primaryDeep : uiTheme.colors.textSecondary}
+              name={WARDROBE_TAB_ICONS[tab.id]}
+              size={21}
+              color={active ? wardrobeTheme.accent : wardrobeTheme.muted}
             />
             <Text
-              maxFontSizeMultiplier={1.4}
-              style={[
-                styles.categoryTabText,
-                active ? styles.categoryTabTextActive : null
-              ]}
+              maxFontSizeMultiplier={1.3}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[styles.tabLabel, active ? styles.tabLabelActive : null]}
             >
-              {getCategoryLabel(category.id)}
+              {label}
             </Text>
           </Pressable>
         )
       })}
-    </ScrollView>
+    </View>
   )
 }

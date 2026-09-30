@@ -1,381 +1,439 @@
 import { StyleSheet } from "react-native"
 import { uiTheme } from "../../../ui/theme"
 
+
+/**
+ * Pudra Glass wardrobe tokens: powder pink to pale lavender, a soft glass
+ * panel and a rose accent. Text and product art stay on near-opaque surfaces.
+ */
+export const wardrobeTheme = {
+  ink: uiTheme.colors.actionDark,
+  muted: "#725F70",
+  // The app primary pink, used for every selection and the Save action.
+  accent: uiTheme.colors.primary,
+  hairline: "#E9E0E9",
+  screenBase: "#FBF1F6",
+  screenGradient:
+    "linear-gradient(165deg, #FBE3EC 0%, #FAEEF4 34%, #F1ECFA 72%, #FBF7FB 100%)",
+  panelGradient:
+    "linear-gradient(145deg, rgba(255,255,255,0.94) 0%, rgba(255,250,252,0.88) 48%, rgba(244,239,250,0.92) 100%)",
+  panelSolid: "#FFFCFD",
+  controlGradient:
+    "linear-gradient(145deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 100%)",
+  controlSolid: "#FFFFFF",
+  sheenGradient:
+    "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 100%)",
+  cardGradient: "linear-gradient(145deg, #F7F1F6 0%, #F0EAF2 100%)",
+  cardSelectedGradient: "linear-gradient(145deg, #FBEEF4 0%, #F4E3EE 100%)",
+  cardBase: "#F3EDF2",
+  cardSelectedBase: "#F7E7EE",
+  edge: "rgba(255,255,255,0.95)",
+  shadow: "#76566F",
+  segmentInk: "#4A3448",
+  segmentTrack:
+    "linear-gradient(155deg, rgba(233,223,235,0.85) 0%, rgba(244,238,245,0.8) 55%, rgba(231,221,237,0.85) 100%)",
+  segmentTrackSolid: "#F0E9F1",
+} as const
+
+const FILL = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } as const
+
+export const WARDROBE_PANEL_MARGIN = 12
+export const WARDROBE_PANEL_PADDING = 14
+export const WARDROBE_GRID_GAP = 8
+export const WARDROBE_GRID_ROW_GAP = 8
+
 export const wardrobeV2Styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: wardrobeTheme.screenBase,
+    experimental_backgroundImage: wardrobeTheme.screenGradient,
   },
   safe: {
     flex: 1,
   },
-  screenBody: {
-    flex: 1,
-  },
-  screenBodyContent: {
-    flexGrow: 1,
-  },
-  screenBodyContentCompact: {
-    paddingBottom: uiTheme.spacing.lg,
-  },
-  wardrobeFrame: {
-    flex: 1,
-    marginTop: uiTheme.spacing.sm,
-    marginHorizontal: uiTheme.spacing.sm,
-    borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.84)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.94)",
-    overflow: "hidden",
-    ...uiTheme.shadow.soft,
+
+  // Header
+  topBarFrame: {
+    zIndex: 3,
+    paddingBottom: 4,
   },
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingTop: uiTheme.spacing.sm,
-    paddingBottom: uiTheme.spacing.sm,
-  },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
-  },
-  iconButtonPressed: {
-    opacity: 0.76,
-    transform: [{ scale: 0.96 }],
-  },
-  titleBlock: {
-    flex: 1,
-  },
-  title: {
-    ...uiTheme.font.heading,
-    color: uiTheme.colors.textPrimary,
-  },
-  subtitle: {
-    ...uiTheme.font.caption,
-    marginTop: 2,
-    color: uiTheme.colors.textSecondary,
-  },
-  progressPill: {
-    minWidth: 56,
-    height: 36,
-    paddingHorizontal: 12,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.82)",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
-  },
-  progressPillText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textSecondary,
-  },
-  sectionSwitcher: {
     minHeight: 52,
     flexDirection: "row",
-    gap: 6,
-    marginHorizontal: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.sm,
-    padding: 4,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
   },
-  sectionButton: {
+  topBarSpacer: {
     flex: 1,
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 14,
   },
-  sectionButtonActive: {
-    backgroundColor: uiTheme.colors.primary,
-  },
-  sectionButtonText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textSecondary,
-  },
-  sectionButtonTextActive: {
-    color: "#FFFFFF",
-  },
-  previewPanel: {
-    paddingHorizontal: uiTheme.spacing.md,
-  },
-  previewAndSlots: {
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 0,
-  },
-  previewAndSlotsCompact: {
-    gap: 6,
-  },
-  avatarPreviewColumn: {
-    flexGrow: 0,
-    minWidth: 0,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,244,250,0.58)",
-    borderWidth: 1,
-    borderColor: "#FFFFFF",
-  },
-  equippedSlotsRail: {
-    width: "100%",
-    minHeight: 68,
-    flexDirection: "row",
-    alignItems: "stretch",
-    padding: 4,
-    gap: 3,
-    borderRadius: 19,
-    backgroundColor: "#FFF7FB",
-    borderWidth: 1,
-    borderColor: "#F5E4EE",
-  },
-  equippedSlotsRailCompact: {
-    minHeight: 64,
-  },
-  equippedSlot: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 58,
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    paddingHorizontal: 2,
-    borderRadius: 15,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  equippedSlotCompact: {
-    minHeight: 54,
-  },
-  equippedSlotActive: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#F3B9D4",
-  },
-  equippedSlotPressed: {
-    opacity: 0.78,
-  },
-  equippedSlotPreview: {
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.78)",
-    overflow: "hidden",
-  },
-  equippedSlotImage: {
-    width: "100%",
-    height: "100%",
-  },
-  equippedSlotLabel: {
-    ...uiTheme.font.micro,
-    color: uiTheme.colors.textSecondary,
-    fontSize: 10,
-    lineHeight: 12,
+  headline: {
+    marginTop: -2,
+    paddingHorizontal: 20,
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.8,
     textAlign: "center",
   },
-  equippedSlotLabelActive: {
-    color: uiTheme.colors.primaryDeep,
+  tagline: {
+    marginTop: 3,
+    paddingHorizontal: 20,
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  glassControl: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  pressedControl: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
+  },
+  doneButton: {
+    minWidth: 84,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    // The app's primary pink, solid, as on the active tab and main actions.
+    backgroundColor: uiTheme.colors.primary,
+    shadowColor: uiTheme.colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  doneText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Stage
+  heroRegion: {
+    flex: 1,
+    minHeight: 150,
+  },
+  hero: {
+    ...FILL,
+  },
+  heroCircle: {
+    position: "absolute",
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
+    experimental_backgroundImage:
+      "linear-gradient(135deg, rgba(255,234,241,0.35) 0%, rgba(231,227,245,0.4) 100%)",
+  },
+  heroAvatar: {
+    ...FILL,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 10,
+  },
+  zoomButtonSurface: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  savingPill: {
+    position: "absolute",
+    left: 20,
+    bottom: 16,
+    minHeight: 28,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  savingText: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  saveErrorSlot: {
+    position: "absolute",
+    top: 0,
+    left: 16,
+    right: 16,
+    zIndex: 4,
   },
   saveError: {
-    minHeight: 42,
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginHorizontal: uiTheme.spacing.lg,
-    marginTop: uiTheme.spacing.sm,
     paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: uiTheme.spacing.sm,
-    borderRadius: uiTheme.radius.lg,
+    paddingVertical: 8,
+    borderRadius: 16,
     backgroundColor: "#FFF0F3",
     borderWidth: 1,
     borderColor: "#F7C8D2",
   },
   saveErrorText: {
-    ...uiTheme.font.captionBold,
     flex: 1,
-    color: uiTheme.colors.danger,
+    color: uiTheme.colors.dangerInk,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16,
   },
-  catalogShelf: {
+
+  // Panel
+  panelShell: {
+    marginHorizontal: WARDROBE_PANEL_MARGIN,
+    marginBottom: 8,
+    borderRadius: 30,
+  },
+  panelContent: {
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: WARDROBE_PANEL_PADDING,
+  },
+
+  // Dolabım / Karakterim
+  sectionSwitcher: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignSelf: "center",
+    width: "64%",
+    minWidth: 220,
+    padding: 4,
+    marginBottom: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.85)",
+    backgroundColor: wardrobeTheme.segmentTrackSolid,
+    experimental_backgroundImage: wardrobeTheme.segmentTrack,
+  },
+  sectionButton: {
     flex: 1,
-    minHeight: 214,
-    marginTop: uiTheme.spacing.sm,
-  },
-  categoryRow: {
-    gap: 6,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: 6,
-  },
-  categoryScroll: {
-    flexGrow: 0,
-    height: 76,
-    maxHeight: 76,
-  },
-  bodySwitchHint: {
-    ...uiTheme.font.caption,
-    marginHorizontal: uiTheme.spacing.lg,
-    marginBottom: 6,
-    color: uiTheme.colors.textSecondary,
-  },
-  categoryTab: {
-    minWidth: 78,
-    minHeight: 64,
-    borderRadius: 18,
-    flexDirection: "column",
+    minHeight: 38,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 7,
+    borderRadius: 20,
+  },
+  sectionButtonActive: {
+    backgroundColor: wardrobeTheme.segmentInk,
+    shadowColor: wardrobeTheme.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  sectionButtonText: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  sectionButtonTextActive: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  // Categories
+  tabRow: {
+    flexDirection: "row",
     gap: 4,
-    paddingHorizontal: 12,
+    paddingBottom: 8,
+    marginBottom: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: wardrobeTheme.hairline,
+  },
+  tab: {
+    flex: 1,
+    maxWidth: 84,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 6,
     paddingVertical: 7,
-    backgroundColor: "rgba(255,255,255,0.76)",
-    borderWidth: 1,
-    borderColor: "#F2E2EB",
+    borderRadius: 16,
   },
-  categoryTabActive: {
-    backgroundColor: "#FFF0F8",
-    borderColor: "#F5A9CB",
-    ...uiTheme.shadow.soft,
+  tabActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: wardrobeTheme.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
   },
-  categoryTabText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textSecondary,
+  tabLabel: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 14,
   },
-  categoryTabTextActive: {
-    color: uiTheme.colors.primaryDeep,
+  tabLabelActive: {
+    color: wardrobeTheme.accent,
+    fontFamily: "Inter_600SemiBold",
   },
-  carouselHeader: {
-    minHeight: 32,
+
+  // Sub filter and count
+  catalogHeader: {
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
-    gap: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: 5,
+    justifyContent: "space-between",
+    gap: 8,
+    paddingTop: 2,
   },
-  carouselTitle: {
-    ...uiTheme.font.captionBold,
+  filterRow: {
     flex: 1,
     minWidth: 0,
-    color: uiTheme.colors.textPrimary,
-  },
-  carouselProgressTrack: {
-    width: 82,
-    height: 4,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "#F1DDE8",
-    overflow: "hidden",
-  },
-  carouselProgressThumb: {
-    height: "100%",
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: uiTheme.colors.primary,
-  },
-  carouselContent: {
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.sm,
-  },
-  catalogEmpty: {
-    width: 260,
-    height: 164,
-    maxHeight: 164,
-    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 10,
-    padding: 16,
+    gap: 16,
+  },
+  filterButton: {
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  filterText: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  filterTextActive: {
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_600SemiBold",
+  },
+  countText: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  bodySwitchHint: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+
+  // Product grid
+  catalogArea: {
+    paddingTop: 4,
+  },
+  gridPage: {
+    gap: WARDROBE_GRID_ROW_GAP,
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: WARDROBE_GRID_GAP,
+  },
+  countGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pageDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  pageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: wardrobeTheme.hairline,
+  },
+  pageDotActive: {
+    width: 16,
+    backgroundColor: wardrobeTheme.accent,
+  },
+  catalogEmpty: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 28,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: "#FFF7FB",
-    borderWidth: 1,
-    borderColor: "#F3DDE9",
+    backgroundColor: wardrobeTheme.cardBase,
   },
   catalogEmptyCopy: {
-    flex: 1,
-    minWidth: 160,
+    alignItems: "center",
     gap: 3,
   },
   catalogEmptyTitle: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textPrimary,
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    lineHeight: 18,
+    textAlign: "center",
   },
   catalogEmptyBody: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textSecondary,
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   catalogEmptyAction: {
-    minHeight: 36,
+    minHeight: 40,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 13,
-    borderRadius: 18,
-    backgroundColor: "#FCE2EF",
+    marginTop: 4,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#F8EAF0",
   },
   catalogEmptyActionText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.primaryDeep,
+    color: wardrobeTheme.accent,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 18,
   },
-  carouselGap: {
-    width: uiTheme.spacing.sm,
-  },
+
+  // Product card
   itemCard: {
-    width: 148,
-    minHeight: 164,
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 6,
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
-    overflow: "hidden",
-    ...uiTheme.shadow.float,
-  },
-  itemCardEquipped: {
-    backgroundColor: "#FFF3FA",
-    borderColor: uiTheme.colors.primary,
-    shadowColor: "#FF4F98",
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  itemCardLocked: {
-    opacity: 0.48,
+    minWidth: 0,
   },
   itemCardPressed: {
     transform: [{ scale: 0.97 }],
   },
-  itemPreviewStage: {
+  itemArt: {
     position: "relative",
-    width: "100%",
-    height: 88,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
-    backgroundColor: "#FFF2F8",
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    backgroundColor: wardrobeTheme.cardBase,
+    experimental_backgroundImage: wardrobeTheme.cardGradient,
     overflow: "hidden",
   },
-  itemPreviewHalo: {
-    position: "absolute",
-    bottom: 12,
-    width: 78,
-    height: 44,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "#EAC3D9",
-    opacity: 0.7,
+  itemArtSelected: {
+    borderColor: wardrobeTheme.accent,
+    backgroundColor: wardrobeTheme.cardSelectedBase,
+    experimental_backgroundImage: wardrobeTheme.cardSelectedGradient,
+  },
+  itemArtLocked: {
+    opacity: 0.6,
+  },
+  itemThumbBox: {
+    width: 100,
+    height: 68,
   },
   itemPreviewSquare: {
     width: "100%",
@@ -393,69 +451,39 @@ export const wardrobeV2Styles = StyleSheet.create({
     alignSelf: "center",
   },
   itemPreviewRigLayer: {
-    ...StyleSheet.absoluteFill,
+    ...FILL,
     width: "100%",
     height: "100%",
   },
   itemIconShell: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF7FB",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
-  },
-  itemIconShellEquipped: {
-    backgroundColor: uiTheme.colors.primary,
   },
   itemCheckBadge: {
     position: "absolute",
-    right: 8,
-    top: 8,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    right: 5,
+    top: 5,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#31B67A",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.28)",
+    backgroundColor: wardrobeTheme.accent,
+  },
+  itemLock: {
+    position: "absolute",
+    right: 6,
+    bottom: 6,
   },
   itemName: {
-    ...uiTheme.font.bodySmall,
-    fontSize: 13,
-    lineHeight: 18,
-    maxWidth: "100%",
-    color: uiTheme.colors.textPrimary,
-    fontWeight: "900",
-    textAlign: "left",
-  },
-  itemMetaPill: {
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    minHeight: 24,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: uiTheme.colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: "#F4DDEB",
-  },
-  itemMetaPillEquipped: {
-    backgroundColor: "#EFFFF7",
-    borderColor: "#BFEEDB",
-  },
-  itemMeta: {
-    ...uiTheme.font.captionBold,
-    fontSize: 11,
-    lineHeight: 14,
-    maxWidth: "100%",
-    color: uiTheme.colors.chipText,
-    textAlign: "center",
-  },
-  itemMetaLocked: {
-    opacity: 0.78,
+    marginTop: 6,
+    marginHorizontal: 2,
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
   },
 })

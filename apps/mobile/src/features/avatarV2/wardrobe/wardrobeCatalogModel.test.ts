@@ -20,10 +20,10 @@ const {
 const {
   buildWardrobeCards,
   getAvatarItemPreviewImageStyle,
+  getStarterLayerThumbnail,
   getWardrobeActiveItems,
   isAvatarItemRoomPreviewSupported,
-  resolveWardrobeEquippedLabel,
-  sortWardrobeItemsEquippedFirst
+  resolveWardrobeEquippedLabel
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./wardrobeCatalogModel") as typeof import("./wardrobeCatalogModel")
 const {
@@ -57,25 +57,6 @@ test("active items keep only body-compatible, room-supported, equippable entries
     canEquipItem: (item) => canEquipAvatarV2Item(ownNothing, item, DEFAULT_AVATAR_V2.bodyId)
   })
   assert.ok(noneOwned.every((item) => item.ownedByDefault === true))
-})
-
-test("equipped items sort first and the rest keep their order", () => {
-  const hair = getWardrobeActiveItems({
-    catalog: AVATAR_V2_CATALOG,
-    category: "hair",
-    bodyId: DEFAULT_AVATAR_V2.bodyId,
-    canEquipItem: () => true
-  })
-  assert.ok(hair.length >= 2)
-  const target = hair[hair.length - 1]
-  const avatar = equipAvatarV2Item(DEFAULT_AVATAR_V2, target)
-  const sorted = sortWardrobeItemsEquippedFirst(hair, avatar)
-  assert.equal(sorted[0].id, target.id)
-  assert.deepEqual(
-    sorted.slice(1).map((item) => item.id),
-    hair.filter((item) => item.id !== target.id).map((item) => item.id)
-  )
-  assert.notEqual(sorted, hair)
 })
 
 test("equipped label names the equipped item or asks to choose", () => {
@@ -197,4 +178,15 @@ test("legacy preview image styles keep their per-type frames", () => {
   assert.deepEqual(style("a", "accessory"), {
     width: 142, height: 213, transform: [{ translateY: -32 }]
   })
+})
+
+test("starter garments previewed from their room layer are fitted by measured bounds", () => {
+  for (const id of ["avatar_v2_top_default", "avatar_v2_bottom_default"]) {
+    const fit = getStarterLayerThumbnail(id)
+    assert.ok(fit, id)
+    assert.equal(fit.bounds.length, 6)
+    assert.deepEqual(fit.bounds.slice(0, 2), [256, 384])
+    assert.ok(fit.box.width <= 100 && fit.box.height <= 68, "fits the card art box")
+  }
+  assert.equal(getStarterLayerThumbnail("avatar_v2_hair_mocha_ribbon_blowout"), undefined)
 })

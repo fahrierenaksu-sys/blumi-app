@@ -34,9 +34,6 @@ const {
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
 const {
-  getWardrobeCarouselProgress,
-  getWardrobeCarouselIndicator,
-  getWardrobeCarouselItemLayout,
   getWardrobeCategoryItems,
   getWardrobeEquippedSlotItem,
   getWardrobeEquippedSlotPreviewScale,
@@ -44,7 +41,9 @@ const {
   getWardrobeSecondaryCategories,
   getAvatarStudioCategories,
   getAvatarStudioDefaultCategory,
-  shouldUseWardrobeVerticalFallback,
+  getAvatarStudioTabs,
+  findAvatarStudioTab,
+  resolveAvatarStudioCategory,
   shouldUseWardrobeSlotCompactLayout,
   AVATAR_STUDIO_SECTIONS,
   WARDROBE_EQUIPPED_SLOTS,
@@ -89,15 +88,38 @@ test("Avatar Studio separates identity editing from the owned closet", () => {
   assert.deepEqual(
     getAvatarStudioCategories("appearance", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
       .map((category) => category.id),
-    ["body", "face", "eyes", "nose", "mouth"]
+    ["hair", "face", "mouth", "body", "eyes", "nose"]
   )
   assert.deepEqual(
     getAvatarStudioCategories("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
       .map((category) => category.id),
-    ["hair", "top", "dress", "bottom", "shoes", "accessory"]
+    ["top", "dress", "bottom", "shoes", "accessory"]
   )
-  assert.equal(getAvatarStudioDefaultCategory("appearance"), "face")
+  assert.equal(getAvatarStudioDefaultCategory("appearance"), "hair")
   assert.equal(getAvatarStudioDefaultCategory("closet"), "top")
+})
+
+test("each Studio section shows four tabs and hair lives only under My Character", () => {
+  const closet = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
+  const appearance = getAvatarStudioTabs("appearance", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
+  assert.deepEqual(closet.map((tab) => tab.id), ["top", "bottom", "shoes", "accessory"])
+  assert.deepEqual(appearance.map((tab) => tab.id), ["hair", "face", "eyes", "nose"])
+  assert.equal(closet.some((tab) => tab.categories.includes("hair")), false)
+  assert.deepEqual(closet[0].categories, ["top", "dress"], "dresses are a filter under Tops")
+  assert.deepEqual(
+    appearance[1].categories,
+    ["face", "mouth", "body"],
+    "mouth and the base body stay reachable as Face filters"
+  )
+})
+
+test("a tab is found from any of its categories and the active category stays valid", () => {
+  const tabs = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
+  assert.equal(findAvatarStudioTab(tabs, "dress")?.id, "top")
+  assert.equal(findAvatarStudioTab(tabs, "hair"), undefined)
+  assert.equal(resolveAvatarStudioCategory(tabs, "dress"), "dress")
+  assert.equal(resolveAvatarStudioCategory(tabs, "hair"), "top")
+  assert.equal(resolveAvatarStudioCategory([], "hair"), "hair")
 })
 
 test("female identity parts and the rendered male face are free Studio choices", () => {
@@ -119,7 +141,7 @@ test("female identity parts and the rendered male face are free Studio choices",
   assert.deepEqual(
     getAvatarStudioCategories("appearance", AVATAR_V2_CATALOG, maleAvatar)
       .map((category) => category.id),
-    ["body", "face"]
+    ["hair", "face", "body"]
   )
   const maleFaces = getWardrobeCategoryItems(AVATAR_V2_CATALOG, "face")
     .filter((item) => item.compatibleBodyIds?.includes(maleAvatar.bodyId))
@@ -131,9 +153,10 @@ test("female identity parts and the rendered male face are free Studio choices",
 
 test("Avatar Studio exposes real Avatar and My Closet controls", () => {
   const source = readWardrobeSources()
-  assert.match(source, /Avatar Studio/)
-  assert.match(source, /Avatar/)
+  assert.match(source, /My Character/)
   assert.match(source, /My Closet/)
+  assert.match(source, /Karakterim/)
+  assert.match(source, /Dolabım/)
   assert.match(source, /activeSection/)
   assert.match(source, /useState<AvatarStudioSectionId>\("closet"\)/)
   assert.match(source, /getAvatarStudioDefaultCategory\("closet"\)/)
@@ -241,48 +264,6 @@ test("equipped wardrobe slots resolve only the item worn in their category", () 
   )
 })
 
-test("horizontal wardrobe progress clamps and handles non-scrollable content", () => {
-  assert.equal(getWardrobeCarouselProgress(0, 640, 320), 0)
-  assert.equal(getWardrobeCarouselProgress(160, 640, 320), 0.5)
-  assert.equal(getWardrobeCarouselProgress(320, 640, 320), 1)
-  assert.equal(getWardrobeCarouselProgress(900, 640, 320), 1)
-  assert.equal(getWardrobeCarouselProgress(-20, 640, 320), 0)
-  assert.equal(getWardrobeCarouselProgress(20, 280, 320), 1)
-})
-
-test("carousel relayout preserves the real scroll offset instead of resetting accessibility progress", () => {
-  const actualOffsetX = 160
-  assert.equal(getWardrobeCarouselProgress(actualOffsetX, 640, 320), 0.5)
-  assert.equal(
-    getWardrobeCarouselProgress(actualOffsetX, 640, 400),
-    2 / 3,
-    "a viewport relayout must recompute from the preserved native offset"
-  )
-
-  const source = readWardrobeSources()
-  assert.match(source, /carouselOffsetXRef\.current/)
-  assert.match(source, /getWardrobeCarouselProgress\(\s*carouselOffsetXRef\.current,/)
-})
-
-test("carousel indicator exposes honest thumb size and position", () => {
-  assert.deepEqual(getWardrobeCarouselIndicator(0, 640, 320), {
-    thumbFraction: 0.5,
-    positionFraction: 0
-  })
-  assert.deepEqual(getWardrobeCarouselIndicator(160, 640, 320), {
-    thumbFraction: 0.5,
-    positionFraction: 0.5
-  })
-  assert.deepEqual(getWardrobeCarouselIndicator(320, 640, 320), {
-    thumbFraction: 0.5,
-    positionFraction: 1
-  })
-  assert.deepEqual(getWardrobeCarouselIndicator(10, 280, 320), {
-    thumbFraction: 1,
-    positionFraction: 0
-  })
-})
-
 test("an equipped dress is represented by one atomic Look slot", () => {
   const dressTop = AVATAR_V2_CATALOG.find((item) =>
     item.type === "top" && Boolean(item.outfitKey)
@@ -346,10 +327,7 @@ test("the compact Extra slot honestly summarizes every equipped accessory", () =
   assert.equal(extra?.accessibilitySummary, `${extra?.item?.name} and 2 more`)
 })
 
-test("standard viewport stays fixed while short and large-text layouts scroll safely", () => {
-  assert.equal(shouldUseWardrobeVerticalFallback(844, 1), false)
-  assert.equal(shouldUseWardrobeVerticalFallback(759, 1), true)
-  assert.equal(shouldUseWardrobeVerticalFallback(844, 1.16), true)
+test("the compact slot layout starts at large text sizes", () => {
   assert.equal(shouldUseWardrobeSlotCompactLayout(1.29), false)
   assert.equal(shouldUseWardrobeSlotCompactLayout(1.3), true)
 })
@@ -361,17 +339,4 @@ test("equipped slot previews enlarge transparent room layers by category", () =>
   assert.equal(getWardrobeEquippedSlotPreviewScale("shoes"), 3.1)
   assert.equal(getWardrobeEquippedSlotPreviewScale("accessory"), 1.9)
   assert.equal(getWardrobeEquippedSlotPreviewScale("face"), 1)
-})
-
-test("horizontal wardrobe cards expose deterministic virtualization geometry", () => {
-  assert.deepEqual(getWardrobeCarouselItemLayout(undefined, 0), {
-    length: 148,
-    offset: 20,
-    index: 0
-  })
-  assert.deepEqual(getWardrobeCarouselItemLayout(undefined, 3), {
-    length: 148,
-    offset: 494,
-    index: 3
-  })
 })

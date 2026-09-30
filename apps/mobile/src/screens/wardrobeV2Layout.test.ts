@@ -22,22 +22,47 @@ test("wardrobe keeps the studio header focused without the beta status pill", ()
   assert.doesNotMatch(stylesSource, /connectionPill|connectionDot|connectionPillText|statusPill/)
 })
 
-test("wardrobe places the avatar preview above the product list without the retired side rail", () => {
-  assert.match(stylesSource, /previewAndSlots:\s*\{[\s\S]*?flexDirection:\s*"column",/)
+test("wardrobe places the character stage above a glass panel without the retired side rail", () => {
   assert.doesNotMatch(screenSource, /WardrobeEquippedSlotsRail/)
+  const stage = screenSource.indexOf("<WardrobePreviewStage")
+  const panel = screenSource.indexOf('<WardrobeGlass tone="panel"')
+  assert.ok(stage > 0 && panel > stage, "the panel follows the stage")
+  assert.match(stylesSource, /panelShell:\s*\{[\s\S]*?marginHorizontal:\s*WARDROBE_PANEL_MARGIN,/)
+  assert.match(stylesSource, /panelShell:\s*\{[\s\S]*?borderRadius:\s*30,/)
 })
 
-test("standard wardrobe view disables vertical scroll and bounce", () => {
-  assert.match(screenSource, /scrollEnabled=\{useCompactVerticalFallback\}/)
-  assert.match(screenSource, /bounces=\{useCompactVerticalFallback\}/)
-  assert.match(screenSource, /alwaysBounceVertical=\{false\}/)
+test("wardrobe shows its headline with a back button and a Save capsule, and no step indicator", () => {
+  assert.match(screenSource, /copy\.headline/)
+  assert.match(screenSource, /copy\.tagline/)
+  assert.match(screenSource, /testID="wardrobe-back"/)
+  assert.match(screenSource, /testID="wardrobe-done"/)
+  assert.doesNotMatch(screenSource, /copy\.progress|progressPill/)
+  assert.doesNotMatch(screenSource, /Tasarım önizlemesi|örnek envanter/)
 })
 
-test("standard wardrobe composition reserves room for the first product row", () => {
-  assert.match(screenSource, /size=\{180\}/)
-  assert.match(screenSource, /stageHeight=\{228\}/)
-  assert.match(stylesSource, /itemPreviewStage:\s*\{[\s\S]*?height:\s*88,/)
-  assert.match(stylesSource, /itemCard:\s*\{[\s\S]*?minHeight:\s*164,[\s\S]*?padding:\s*8,/)
+test("the product list pages three-column rows sideways with names under the cards", () => {
+  assert.match(screenSource, /const GRID_COLUMNS = 3/)
+  assert.match(screenSource, /chunkWardrobePages\(page, GRID_COLUMNS\)/)
+  assert.match(screenSource, /horizontal\s+pagingEnabled/)
+  assert.match(screenSource, /pageCount > 1 \? \(/)
+  assert.match(screenSource, /onPageChange=\{setCatalogPage\}/)
+  assert.doesNotMatch(screenSource, /sortWardrobeItemsEquippedFirst/)
+  assert.match(stylesSource, /itemName:\s*\{[\s\S]*?marginTop:\s*6,/)
+  assert.match(screenSource, /\{item\.name\}/)
+})
+
+test("glass falls back to a solid surface for Reduce Transparency or a missing native blur", () => {
+  assert.match(screenSource, /useReduceTransparency\(\)/)
+  assert.match(screenSource, /!reduceTransparency && OptionalBlurView/)
+  assert.match(screenSource, /panelSolid/)
+  assert.doesNotMatch(screenSource, /from "expo-blur"/)
+})
+
+test("the stage sizes the canonical character from its measured area", () => {
+  assert.match(screenSource, /getWardrobeStageLayout\(/)
+  assert.match(screenSource, /animationState="idle_front"/)
+  assert.match(screenSource, /showGlow=\{false\}/)
+  assert.match(screenSource, /testID="wardrobe-zoom"/)
 })
 
 test("wardrobe keeps the preview uncluttered without the motion selector row", () => {

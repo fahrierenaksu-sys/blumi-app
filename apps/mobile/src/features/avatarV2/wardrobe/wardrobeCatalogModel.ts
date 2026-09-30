@@ -48,19 +48,6 @@ export function getWardrobeActiveItems(input: {
   )
 }
 
-/** Equipped items first; otherwise the incoming order is preserved. */
-export function sortWardrobeItemsEquippedFirst(
-  items: readonly AvatarCatalogItem[],
-  avatar: UserAvatar
-): AvatarCatalogItem[] {
-  return [...items].sort((left, right) => {
-    const leftEquipped = isAvatarV2ItemEquipped(avatar, left)
-    const rightEquipped = isAvatarV2ItemEquipped(avatar, right)
-    if (leftEquipped === rightEquipped) return 0
-    return leftEquipped ? -1 : 1
-  })
-}
-
 export function resolveWardrobeEquippedLabel(input: {
   items: readonly AvatarCatalogItem[]
   displayedAvatar: UserAvatar
@@ -116,6 +103,35 @@ export function buildWardrobeCards(input: {
       previewSource
     }
   })
+}
+
+/**
+ * Measured alpha bounds ([canvasW, canvasH, x, y, w, h]) of the starter
+ * garments that are previewed straight from their 256x384 room layer, and the
+ * box each is fitted into. Presenting the visible garment, not the transparent
+ * canvas, keeps them centred in a card; the small shorts get a smaller box so
+ * the low-resolution layer is not enlarged into a blur.
+ */
+const STARTER_LAYER_THUMBNAILS: Readonly<Record<string, {
+  bounds: readonly number[]
+  box: { readonly width: number; readonly height: number }
+}>> = {
+  avatar_v2_top_default: {
+    bounds: [256, 384, 87, 222, 85, 76],
+    box: { width: 100, height: 68 }
+  },
+  avatar_v2_top_cream_basic_tee: {
+    bounds: [256, 384, 87, 222, 85, 76],
+    box: { width: 100, height: 68 }
+  },
+  avatar_v2_bottom_default: {
+    bounds: [256, 384, 99, 288, 58, 38],
+    box: { width: 72, height: 48 }
+  }
+}
+
+export function getStarterLayerThumbnail(id: string) {
+  return STARTER_LAYER_THUMBNAILS[id]
 }
 
 export function getAvatarItemPreviewImageStyle(
