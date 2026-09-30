@@ -56,7 +56,7 @@ export const chatParticipantSummarySchema = z.object({
   avatar: completeAvatarSelectionSchema.optional()
 })
 
-export const chatMessageSchema = z.object({
+const chatMessageShape = {
   messageId: z.string().min(1),
   threadId: z.string().min(1),
   senderUserId: z.string().min(1),
@@ -65,7 +65,12 @@ export const chatMessageSchema = z.object({
   deliveredAt: isoDateSchema.optional(),
   readAt: isoDateSchema.optional(),
   editedAt: isoDateSchema.optional()
-}).strict().superRefine((message, context) => {
+}
+
+function refineChatMessageTimes(
+  message: { sentAt: string; deliveredAt?: string; readAt?: string; editedAt?: string },
+  context: z.RefinementCtx
+): void {
   const sentAt = Date.parse(message.sentAt)
   const deliveredAt = message.deliveredAt
     ? Date.parse(message.deliveredAt)
@@ -97,7 +102,20 @@ export const chatMessageSchema = z.object({
       message: "Edit must stay inside the five-minute window."
     })
   }
-})
+}
+
+export const chatMessageSchema = z.object(chatMessageShape).strict().superRefine(refineChatMessageTimes)
+
+/**
+ * `chat.message_received` payload. The optional `clientMessageId` is present
+ * only on the acknowledgement sent to the socket that sent the message with
+ * that id (in-room sends, 2026-09-30); the fanout copy never carries it, so
+ * clients that predate the field never receive it.
+ */
+export const chatMessageReceivedSchema = z.object({
+  ...chatMessageShape,
+  clientMessageId: z.string().min(1).max(128).optional()
+}).strict().superRefine(refineChatMessageTimes)
 
 export const chatThreadSchema = z.object({
   threadId: z.string().min(1),

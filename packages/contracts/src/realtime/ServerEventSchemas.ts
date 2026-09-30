@@ -6,7 +6,7 @@ import {
 } from "../avatar/AvatarSelection";
 import {
   chatMessageListSchema,
-  chatMessageSchema,
+  chatMessageReceivedSchema,
   chatThreadListSchema,
   chatThreadReadSchema,
   chatThreadSchema,
@@ -96,6 +96,7 @@ const miniRoomParticipantSchema = z.object({
 
 const realtimeErrorCodes = [
   "PRESENCE_ROOM_UNAVAILABLE",
+  "CHAT_MESSAGE_NOT_SENT",
 ] as const satisfies readonly RealtimeErrorCode[];
 
 export const serverEventPayloadSchemas = {
@@ -188,7 +189,7 @@ export const serverEventPayloadSchemas = {
   "chat.message_listed":
     chatMessageListSchema satisfies z.ZodType<PayloadOf<"chat.message_listed">, z.ZodTypeDef, unknown>,
   "chat.message_received":
-    chatMessageSchema satisfies z.ZodType<PayloadOf<"chat.message_received">, z.ZodTypeDef, unknown>,
+    chatMessageReceivedSchema satisfies z.ZodType<PayloadOf<"chat.message_received">, z.ZodTypeDef, unknown>,
   "reaction.received": z.object({
     roomId: id,
     actorUserId: id,
@@ -203,6 +204,7 @@ export const serverEventPayloadSchemas = {
     code: z.enum(realtimeErrorCodes),
     requestType: id,
     message: z.string(),
+    clientMessageId: z.string().min(1).max(128).optional(),
   }) satisfies z.ZodType<PayloadOf<"realtime.error">, z.ZodTypeDef, unknown>,
 } as const satisfies { [Type in ServerEvent["type"]]: z.ZodTypeAny };
 

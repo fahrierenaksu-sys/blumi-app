@@ -270,6 +270,29 @@ test("prototype keys are never treated as known event types", () => {
   assert.equal(parseServerEvent({ type: "__proto__", payload: {} }).kind, "unknown");
 });
 
+test("the sender's in-room acknowledgement may carry its optional clientMessageId", () => {
+  const acknowledged = { type: "chat.message_received", payload: { ...MESSAGE, clientMessageId: "room_client_12345678" } };
+  assert.equal(parseServerEvent(acknowledged).kind, "valid");
+  // Old payloads without the field stay valid; other unknown keys stay rejected.
+  assert.equal(parseServerEvent({ type: "chat.message_received", payload: MESSAGE }).kind, "valid");
+  assert.equal(parseServerEvent({ type: "chat.message_received", payload: { ...MESSAGE, clientMessageId: "" } }).kind, "invalid");
+  assert.equal(parseServerEvent({ type: "chat.message_received", payload: { ...MESSAGE, extra: true } }).kind, "invalid");
+});
+
+test("a refused in-room send is reported to the requester with its clientMessageId", () => {
+  const refused = {
+    type: "realtime.error",
+    payload: {
+      code: "CHAT_MESSAGE_NOT_SENT",
+      requestType: "chat.send_message",
+      message: "Your message was not sent. Try again.",
+      clientMessageId: "room_client_12345678",
+    },
+  };
+  assert.equal(parseServerEvent(refused).kind, "valid");
+  assert.equal(parseServerEvent({ type: "realtime.error", payload: { ...refused.payload, code: "NOPE" } }).kind, "invalid");
+});
+
 test("malformed envelopes are invalid", () => {
   for (const value of [null, "room.left", 42, [], {}, { type: "" , payload: {} }, { type: 7, payload: {} }, { payload: {} }]) {
     assert.deepEqual(parseServerEvent(value), { kind: "invalid", type: null, issuePaths: [] });

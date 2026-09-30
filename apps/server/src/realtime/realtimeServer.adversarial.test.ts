@@ -279,8 +279,13 @@ test("a message-list reply goes only to the requesting socket", async () => {
 })
 
 test(
-  "a realtime thread list computed before a new thread cannot erase that thread from the client",
-  { todo: "BUG: chat.thread_listed carries no revision, so a stale first page replaces a newer chat.thread_created (mobile applyChatThreadListed drops it)" },
+  "a realtime thread list computed before a new thread arrives after chat.thread_created on the requesting socket only",
+  // Fixed 2026-09-30 on the client (owner decision: no server revision). The
+  // race below is real and stays: the reply omits the new thread. The mobile
+  // store records when it issued the list request and keeps threads learned
+  // after it (chatStore.adversarial.test.ts, "stale first thread-list page").
+  // This test pins the server facts that fix relies on: one reply per
+  // request, on the requesting socket, computed at request time.
   async () => {
     const harness = await createHarness()
     try {
@@ -307,19 +312,119 @@ test(
       await events.waitFor("chat.thread_created")
       releaseList()
       await events.waitFor("chat.thread_listed")
-      // The client applies events in order with a non-append replace; the last
-      // authoritative-looking list must still contain the created thread.
-      const lastList = events.all().filter((event) => event.type === "chat.thread_listed").at(-1)
+      const types = events.all().map((event) => event.type)
+      assert.deepEqual(types, ["chat.thread_created", "chat.thread_listed"])
+      const lastList = events.all().find((event) => event.type === "chat.thread_listed")
       assert.ok(lastList?.type === "chat.thread_listed")
-      assert.ok(
+      assert.equal(lastList.payload.append, false)
+      assert.equal(
         lastList.payload.threads.some((entry) => entry.threadId === thread.threadId),
-        "the list delivered after chat.thread_created omits the new thread"
+        false,
+        "the reply reflects the request time, which the client compares with the thread's arrival"
       )
     } finally {
       await harness.close()
     }
   }
 )
+
+test("an in-room send with a clientMessageId is acknowledged to the requesting socket and deduplicated", async () => {
+  const harness = await createHarness()
+  try {
+    const ada = await harness.createSession("+905553330070", "Ada")
+    const bora = await harness.createSession("+905553330071", "Bora")
+    const thread = await harness.saveThread(ada, bora, "thread_room_ack", "2026-09-30T10:00:00.000Z")
+    const phone = await harness.connect(ada.sessionToken)
+    const tablet = await harness.connect(ada.sessionToken)
+    const partner = await harness.connect(bora.sessionToken)
+    const phoneEvents = collectEvents(phone)
+    const tabletEvents = collectEvents(tablet)
+    const partnerEvents = collectEvents(partner)
+    const send = { type: "chat.send_message", payload: { threadId: thread.threadId, body: "see you in the room", clientMessageId: "room_client_ack_1" } }
+    phone.send(JSON.stringify(send))
+    await waitUntil(() => phoneEvents.all().some((event) => event.type === "chat.message_received" && event.payload.clientMessageId === "room_client_ack_1"))
+    // A retry after a lost acknowledgement reuses the id: one committed row.
+    phone.send(JSON.stringify(send))
+    await waitUntil(() => phoneEvents.all().filter((event) => event.type === "chat.message_received" && event.payload.clientMessageId).length === 2)
+    const acknowledgements = phoneEvents.all().filter((event) => event.type === "chat.message_received" && event.payload.clientMessageId)
+    assert.equal(new Set(acknowledgements.map((event) => event.type === "chat.message_received" ? event.payload.messageId : "")).size, 1)
+    const messages = await harness.chatService.listMessages(ada.userId, thread.threadId)
+    assert.deepEqual(messages.map((message) => message.body), ["see you in the room"])
+    await partnerEvents.waitFor("chat.message_received")
+    await tabletEvents.waitFor("chat.message_received")
+    // The id never leaves the requesting socket: the fanout copy is unchanged.
+    for (const event of [...partnerEvents.all(), ...tabletEvents.all()]) {
+      if (event.type === "chat.message_received") assert.equal(event.payload.clientMessageId, undefined)
+    }
+  } finally {
+    await harness.close()
+  }
+})
+
+test("a refused in-room send reports realtime.error with its clientMessageId to the requester only", async () => {
+  const harness = await createHarness()
+  try {
+    const ada = await harness.createSession("+905553330080", "Ada")
+    const bora = await harness.createSession("+905553330081", "Bora")
+    const intruder = await harness.createSession("+905553330082", "Intruder")
+    const thread = await harness.saveThread(ada, bora, "thread_room_refused", "2026-09-30T10:00:00.000Z")
+    const socket = await harness.connect(intruder.sessionToken)
+    const other = await harness.connect(intruder.sessionToken)
+    const events = collectEvents(socket)
+    const otherEvents = collectEvents(other)
+    socket.send(JSON.stringify({ type: "chat.send_message", payload: { threadId: thread.threadId, body: "injected", clientMessageId: "room_client_refused" } }))
+    const refused = await events.waitFor("realtime.error")
+    assert.equal(refused.payload.code, "CHAT_MESSAGE_NOT_SENT")
+    assert.equal(refused.payload.requestType, "chat.send_message")
+    assert.equal(refused.payload.clientMessageId, "room_client_refused")
+    assert.equal(JSON.stringify(refused).includes("injected"), false)
+    // A send without a client id (older clients) keeps the old silent behaviour.
+    socket.send(JSON.stringify({ type: "chat.send_message", payload: { threadId: thread.threadId, body: "injected" } }))
+    socket.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+    await events.waitFor("chat.thread_listed")
+    assert.equal(events.all().filter((event) => event.type === "realtime.error").length, 1)
+    assert.equal(socket.readyState, WebSocket.OPEN)
+    assert.deepEqual(otherEvents.all(), [])
+  } finally {
+    await harness.close()
+  }
+})
+
+test("pre-authentication upgrade attempts are limited per client address before any ticket is consumed", async () => {
+  const harness = await createHarness({ upgradeAttemptsPerAddressWindow: 5 })
+  try {
+    let consumed = 0
+    const consume = harness.ticketService.consume.bind(harness.ticketService)
+    harness.ticketService.consume = async (ticket, now) => {
+      consumed += 1
+      return consume(ticket, now)
+    }
+    const fake = "f".repeat(43)
+    const statuses: (number | "open")[] = []
+    for (let attempt = 0; attempt < 8; attempt += 1) statuses.push(await upgradeStatus(harness.url, fake))
+    assert.deepEqual(statuses, [401, 401, 401, 401, 401, 429, 429, 429])
+    assert.equal(consumed, 5, "refused attempts never reach the ticket store")
+    // A spoofed X-Forwarded-For is ignored without a trusted proxy.
+    assert.equal(await upgradeStatus(harness.url, fake, { "x-forwarded-for": "203.0.113.9" }), 429)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("behind a trusted proxy the upgrade limit keys on the forwarded client address", async () => {
+  const harness = await createHarness({ upgradeAttemptsPerAddressWindow: 2, trustedProxyAddresses: ["127.0.0.1"] })
+  try {
+    const fake = "f".repeat(43)
+    const first = { "x-forwarded-for": "203.0.113.10" }
+    const second = { "x-forwarded-for": "203.0.113.11" }
+    assert.equal(await upgradeStatus(harness.url, fake, first), 401)
+    assert.equal(await upgradeStatus(harness.url, fake, first), 401)
+    assert.equal(await upgradeStatus(harness.url, fake, first), 429)
+    assert.equal(await upgradeStatus(harness.url, fake, second), 401, "another client behind the same proxy is unaffected")
+  } finally {
+    await harness.close()
+  }
+})
 
 test("fanout chunking is exact at the 100-recipient receiver boundary", () => {
   const ids = (count: number) => Array.from({ length: count }, (_, index) => `user_${index}`)
@@ -351,7 +456,10 @@ test("fanout chunking is exact at the 100-recipient receiver boundary", () => {
 
 type Session = { userId: string; sessionToken: string; displayName: string }
 
-async function createHarness() {
+async function createHarness(options: {
+  upgradeAttemptsPerAddressWindow?: number
+  trustedProxyAddresses?: string[]
+} = {}) {
   const authService = createAuthService({ codeFactory: () => "123456" })
   const ticketService = createRealtimeTicketService({ authService })
   const chatService = createChatService()
@@ -372,7 +480,8 @@ async function createHarness() {
     miniRoomService,
     connectionService: createConnectionService({ miniRoomService, safetyService }),
     reactionService: createReactionService(),
-    realtimeTicketService: ticketService
+    realtimeTicketService: ticketService,
+    ...options
   })
   await server.listen({ port: 0, host: "127.0.0.1" })
   const address = server.address() as AddressInfo
@@ -438,8 +547,12 @@ async function createHarness() {
   }
 }
 
-async function upgradeStatus(url: string, ticket: string): Promise<number | "open"> {
-  const socket = new WebSocket(`${url}/ws`, [`ticket-${ticket}`])
+async function upgradeStatus(
+  url: string,
+  ticket: string,
+  headers: Record<string, string> = {}
+): Promise<number | "open"> {
+  const socket = new WebSocket(`${url}/ws`, [`ticket-${ticket}`], { headers })
   try {
     return await new Promise<number | "open">((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("upgrade did not settle")), 1_000)

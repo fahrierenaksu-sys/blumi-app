@@ -448,12 +448,23 @@ export function createRealtimeRouter(
           return
         }
         case "chat.send_message": {
-          await chatMessageDeliveryService.sendMessage({
+          // Optional retry id (2026-09-30): the same idempotent send as the
+          // HTTP route, acknowledged only to this socket with the id so the
+          // client can settle its bubble. The fanout copy never carries it.
+          const clientMessageId = readRealtimeClientMessageId(event.payload)
+          const delivery = await chatMessageDeliveryService.sendMessage({
             senderUserId: connection.userId,
             senderDisplayName: connection.profile.displayName,
             threadId: event.payload.threadId,
-            body: event.payload.body
+            body: event.payload.body,
+            ...(clientMessageId ? { clientMessageId } : {})
           })
+          if (clientMessageId) {
+            connectionManager.sendToConnection(connection.connectionId, {
+              type: "chat.message_received",
+              payload: { ...delivery.message, clientMessageId }
+            })
+          }
           return
         }
         case "safety.block": {
@@ -509,6 +520,16 @@ export function createRealtimeRouter(
       return
     }
   }
+}
+
+/**
+ * The in-room retry id when it can be echoed safely (the contract bounds it to
+ * 1–128 characters). Format validation stays with the chat service.
+ */
+export function readRealtimeClientMessageId(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined
+  const value = (payload as Record<string, unknown>).clientMessageId
+  return typeof value === "string" && value.length > 0 && value.length <= 128 ? value : undefined
 }
 
 function displayNameForPush(displayName: string | undefined): string {

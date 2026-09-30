@@ -16,7 +16,7 @@ import type {
 } from "../connections/ConnectionDecision";
 import type {
   ChatMessageList,
-  ChatMessage,
+  ChatMessageReceived,
   ChatThread,
   ChatThreadList,
   ChatThreadRead,
@@ -53,7 +53,7 @@ export type ServerEvent =
   | { type: "chat.thread_listed"; payload: ChatThreadList }
   | { type: "chat.thread_read"; payload: ChatThreadRead }
   | { type: "chat.message_listed"; payload: ChatMessageList }
-  | { type: "chat.message_received"; payload: ChatMessage }
+  | { type: "chat.message_received"; payload: ChatMessageReceived }
   | { type: "reaction.received"; payload: ReactionEvent }
   | { type: "safety.user_blocked"; payload: { blockedUserId: string } }
   | { type: "realtime.error"; payload: RealtimeErrorPayload };
@@ -70,10 +70,16 @@ export type ServerEvent =
  * union for compatibility with older clients and future authorized presence
  * rooms; authenticated sessions no longer receive them for the public lobby.
  */
-export type RealtimeErrorCode = "PRESENCE_ROOM_UNAVAILABLE";
+export type RealtimeErrorCode = "PRESENCE_ROOM_UNAVAILABLE" | "CHAT_MESSAGE_NOT_SENT";
 
 export interface RealtimeErrorPayload {
   code: RealtimeErrorCode;
   requestType: string;
   message: string;
+  /**
+   * `CHAT_MESSAGE_NOT_SENT` (2026-09-30): an in-room `chat.send_message`
+   * carrying this id failed. Sent only to the requesting socket, and only
+   * for sends that carried a clientMessageId (clients that know the code).
+   */
+  clientMessageId?: string;
 }
