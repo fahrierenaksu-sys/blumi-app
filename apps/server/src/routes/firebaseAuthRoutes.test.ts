@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createAccountRecoveryService, createInMemoryAccountRecoveryRepository } from "../account/accountRecoveryService"
 import { createAuthService } from "../auth/authService"
 import { createServer } from "../server"
 
@@ -74,4 +75,50 @@ test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a 
       assert.equal(response.json().code, "FIREBASE_PHONE_AUTH_REQUIRED")
     }
   } finally { await app.close() }
+})
+
+test("a different Firebase uid for a bound phone is routed to manual account recovery", async () => {
+  const authService = createAuthService()
+  const recoveryRepository = createInMemoryAccountRecoveryRepository()
+  let uid = "firebase-user-1"
+  const app = createServer({
+    authService,
+    accountRecoveryService: createAccountRecoveryService({ authService, repository: recoveryRepository }),
+    firebaseAuthVerifier: { async verifyIdToken() {
+      return { uid, phoneNumber: PHONE, authTime: Math.floor(Date.now() / 1000) }
+    } }
+  })
+  try {
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/auth/firebase/complete",
+      payload: { idToken: "t", authIntent: "create", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }
+    })
+    assert.equal(created.statusCode, 200)
+
+    uid = "firebase-user-2"
+    const recycled = await app.inject({
+      method: "POST",
+      url: "/v1/auth/firebase/complete",
+      payload: { idToken: "t", authIntent: "sign-in" }
+    })
+    assert.equal(recycled.statusCode, 409)
+    assert.equal(recycled.json().code, "ACCOUNT_RECOVERY_REQUIRED")
+    assert.equal(recycled.json().session, undefined)
+    const requests = await recoveryRepository.list(10)
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0]?.accountId, created.json().session.accountId)
+    assert.equal(requests[0]?.status, "pending")
+
+    uid = "firebase-user-1"
+    const owner = await app.inject({
+      method: "POST",
+      url: "/v1/auth/firebase/complete",
+      payload: { idToken: "t", authIntent: "sign-in" }
+    })
+    assert.equal(owner.statusCode, 200)
+    assert.equal(owner.json().session.accountId, created.json().session.accountId)
+  } finally {
+    await app.close()
+  }
 })

@@ -8,6 +8,7 @@ export type AuthErrorCode =
   | "OTP_STORAGE_UNAVAILABLE"
   | "ACCOUNT_DELETION_REAUTH_REQUIRED"
   | "ACCOUNT_DELETION_CONFIRMATION_INVALID"
+  | "ACCOUNT_RECOVERY_REQUIRED"
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode

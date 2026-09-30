@@ -7,7 +7,7 @@ import {
   type UserProfile
 } from "@blumi/contracts"
 import { normalizeStoredAvatarSelection } from "../avatar/avatarSelectionPersistence"
-import type { AuthRepository } from "../auth/authRepository"
+import { planSessionRotation, type AuthRepository } from "../auth/authRepository"
 import type {
   AccountActionPurpose,
   AccountRecord,
@@ -15,7 +15,7 @@ import type {
   PendingOtp,
   SessionRecord,
 } from "../auth/authStore"
-import { otpDigestsMatch } from "../auth/authStore"
+import { SESSION_REFRESH_REUSE_GRACE_MS, otpDigestsMatch } from "../auth/authStore"
 import { discoveryWatchLockSql } from "./discoveryWatchLock"
 import {
   REALTIME_CONNECTION_LEASE_LOCK_SQL,
@@ -593,8 +593,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         if (!account) { await client.query("COMMIT"); return { kind: "reauth_required" } }
         const collision = await client.query("SELECT 1 FROM blumi_accounts WHERE phone_number = $1 AND account_id <> $2", [replacement.target_phone_number, input.accountId])
         if (collision.rows[0]) { await client.query("COMMIT"); return { kind: "conflict" } }
+        // The bound uid belongs to the previous number's Firebase user; the next
+        // sign-in with the verified new number binds its uid.
         await client.query(
-          "UPDATE blumi_accounts SET phone_number = $2, updated_at = $3 WHERE account_id = $1",
+          "UPDATE blumi_accounts SET phone_number = $2, updated_at = $3, firebase_uid = NULL WHERE account_id = $1",
           [input.accountId, replacement.target_phone_number, input.now]
         )
         const updated = await client.query(`${accountSelectSql()} WHERE account_id = $1`, [input.accountId])
@@ -730,6 +732,23 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         let account = existingAccountResult.rows[0]
           ? mapAccount(existingAccountResult.rows[0])
           : null
+        if (input.firebaseUid) {
+          const uidOwners = await client.query(
+            `SELECT account_id, firebase_uid
+               FROM blumi_accounts
+              WHERE firebase_uid = $1 OR account_id = $2`,
+            [input.firebaseUid, account?.accountId ?? null]
+          )
+          const conflict = uidOwners.rows.some((row) =>
+            row.account_id === account?.accountId
+              ? row.firebase_uid !== null && row.firebase_uid !== input.firebaseUid
+              : true
+          )
+          if (conflict) {
+            await client.query("COMMIT")
+            return { kind: "identity_mismatch", accountId: account?.accountId ?? null }
+          }
+        }
         if (!account) {
           if (input.requireExistingAccount) {
             await client.query("COMMIT")
@@ -806,18 +825,29 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           throw new Error("The verified account could not be finalized.")
         }
 
+        if (input.firebaseUid) {
+          // First verified completion (new or legacy account) binds the uid.
+          await client.query(
+            `UPDATE blumi_accounts
+                SET firebase_uid = $2
+              WHERE account_id = $1 AND firebase_uid IS NULL`,
+            [account.accountId, input.firebaseUid]
+          )
+        }
         const session = input.createSession(account)
         assertSessionMatchesAccount(session, account)
         await client.query(
           `INSERT INTO blumi_sessions (
-              session_token_hash, session_id, account_id, user_id, expires_at
-            ) VALUES ($1, $2, $3, $4, $5)`,
+              session_token_hash, session_id, account_id, user_id, expires_at,
+              family_expires_at
+            ) VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             session.sessionTokenHash,
             session.sessionId,
             session.accountId,
             session.userId,
-            session.expiresAt
+            session.expiresAt,
+            session.familyExpiresAt ?? null
           ]
         )
         await client.query(
@@ -1071,7 +1101,7 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
 
     async getSessionByTokenHash(sessionTokenHash) {
       const result = await pool.query(
-        `SELECT account_id, session_id, user_id, session_token_hash, expires_at
+        `SELECT ${SESSION_COLUMNS}
            FROM blumi_sessions
           WHERE session_token_hash = $1`,
         [sessionTokenHash]
@@ -1090,16 +1120,23 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
     async saveSession(session) {
       await pool.query(
         `INSERT INTO blumi_sessions (
-            session_token_hash, session_id, account_id, user_id, expires_at
-          ) VALUES ($1, $2, $3, $4, $5)
+            session_token_hash, session_id, account_id, user_id, expires_at,
+            family_expires_at, rotated_at, replaced_by_token_hash
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           ON CONFLICT (session_token_hash) DO UPDATE SET
-            expires_at = EXCLUDED.expires_at`,
+            expires_at = EXCLUDED.expires_at,
+            family_expires_at = EXCLUDED.family_expires_at,
+            rotated_at = EXCLUDED.rotated_at,
+            replaced_by_token_hash = EXCLUDED.replaced_by_token_hash`,
         [
           session.sessionTokenHash,
           session.sessionId,
           session.accountId,
           session.userId,
-          session.expiresAt
+          session.expiresAt,
+          session.familyExpiresAt ?? null,
+          session.rotatedAt ?? null,
+          session.replacedByTokenHash ?? null
         ]
       )
     },
@@ -1181,31 +1218,97 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
-        const consumed = await client.query(
-          `UPDATE blumi_sessions
-              SET expires_at = $2
-            WHERE session_token_hash = $1 AND expires_at > $2
-          RETURNING session_id`,
-          [input.currentSessionTokenHash, input.now]
+        const family = await client.query(
+          "SELECT session_id FROM blumi_sessions WHERE session_token_hash = $1",
+          [input.currentSessionTokenHash]
         )
-        if (!consumed.rowCount) {
+        if (!family.rows[0]) {
           await client.query("COMMIT")
-          return false
+          return { kind: "rejected" }
+        }
+        // Serialize every exchange in one family so concurrent refreshes of the
+        // same or sibling tokens observe each other's writes.
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`blumi:session-family:${String(family.rows[0].session_id)}`]
+        )
+        const currentResult = await client.query(
+          `SELECT ${SESSION_COLUMNS}
+             FROM blumi_sessions
+            WHERE session_token_hash = $1
+            FOR UPDATE`,
+          [input.currentSessionTokenHash]
+        )
+        const current = currentResult.rows[0] ? mapSession(currentResult.rows[0]) : null
+        if (!current) {
+          await client.query("COMMIT")
+          return { kind: "rejected" }
+        }
+        const successorResult = current.replacedByTokenHash
+          ? await client.query(
+              `SELECT ${SESSION_COLUMNS}
+                 FROM blumi_sessions
+                WHERE session_token_hash = $1
+                FOR UPDATE`,
+              [current.replacedByTokenHash]
+            )
+          : null
+        const successor = successorResult?.rows[0] ? mapSession(successorResult.rows[0]) : null
+        const plan = planSessionRotation({
+          current,
+          successor,
+          now: input.now,
+          reuseGraceMs: input.reuseGraceMs ?? SESSION_REFRESH_REUSE_GRACE_MS
+        })
+        if (plan.kind === "rejected") {
+          await client.query("COMMIT")
+          return plan
+        }
+        if (plan.kind === "reuse_detected") {
+          await client.query("DELETE FROM blumi_sessions WHERE session_id = $1", [current.sessionId])
+          await client.query("COMMIT")
+          return { kind: "reuse_detected", userId: current.userId, sessionFamilyId: current.sessionId }
+        }
+        const nextHash = input.nextSession.sessionTokenHash
+        if (plan.kind === "reissue") {
+          await client.query(
+            `UPDATE blumi_sessions
+                SET expires_at = $2, rotated_at = $2, replaced_by_token_hash = $3
+              WHERE session_token_hash = $1`,
+            [plan.supersededTokenHash, input.now, nextHash]
+          )
+          await client.query(
+            `UPDATE blumi_sessions
+                SET replaced_by_token_hash = $2
+              WHERE session_token_hash = $1`,
+            [current.sessionTokenHash, nextHash]
+          )
+        } else {
+          await client.query(
+            `UPDATE blumi_sessions
+                SET expires_at = $2, rotated_at = $2, replaced_by_token_hash = $3,
+                    family_expires_at = $4
+              WHERE session_token_hash = $1`,
+            [current.sessionTokenHash, input.now, nextHash, plan.familyExpiresAt]
+          )
+        }
+        const next: SessionRecord = {
+          accountId: current.accountId,
+          userId: current.userId,
+          sessionId: current.sessionId,
+          sessionTokenHash: nextHash,
+          expiresAt: plan.expiresAt,
+          familyExpiresAt: plan.familyExpiresAt
         }
         await client.query(
           `INSERT INTO blumi_sessions (
-              session_token_hash, session_id, account_id, user_id, expires_at
-            ) VALUES ($1, $2, $3, $4, $5)`,
-          [
-            input.nextSession.sessionTokenHash,
-            consumed.rows[0].session_id,
-            input.nextSession.accountId,
-            input.nextSession.userId,
-            input.nextSession.expiresAt
-          ]
+              session_token_hash, session_id, account_id, user_id, expires_at,
+              family_expires_at
+            ) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [next.sessionTokenHash, next.sessionId, next.accountId, next.userId, next.expiresAt, next.familyExpiresAt]
         )
         await client.query("COMMIT")
-        return true
+        return { kind: "rotated", session: next }
       } catch (error) {
         await client.query("ROLLBACK")
         throw error
@@ -1617,12 +1720,18 @@ function normalizeTextArray(value: unknown): string[] | undefined {
   return normalized.length > 0 ? normalized : undefined
 }
 
+const SESSION_COLUMNS = `account_id, session_id, user_id, session_token_hash, expires_at,
+            family_expires_at, rotated_at, replaced_by_token_hash`
+
 function mapSession(row: QueryResultRow): SessionRecord {
   return {
     accountId: String(row.account_id),
     sessionId: String(row.session_id),
     userId: String(row.user_id),
     sessionTokenHash: String(row.session_token_hash),
-    expiresAt: new Date(row.expires_at).toISOString()
+    expiresAt: new Date(row.expires_at).toISOString(),
+    ...(row.family_expires_at ? { familyExpiresAt: new Date(row.family_expires_at).toISOString() } : {}),
+    ...(row.rotated_at ? { rotatedAt: new Date(row.rotated_at).toISOString() } : {}),
+    ...(row.replaced_by_token_hash ? { replacedByTokenHash: String(row.replaced_by_token_hash) } : {})
   }
 }

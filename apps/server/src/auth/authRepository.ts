@@ -9,7 +9,13 @@ import type {
   OtpSendLimit,
   SessionRecord
 } from "./authStore"
-import { createDefaultAvatarSelection, otpDigestsMatch } from "./authStore"
+import {
+  SESSION_FAMILY_MAX_LIFETIME_MS,
+  SESSION_REFRESH_REUSE_GRACE_MS,
+  capSessionExpiry,
+  createDefaultAvatarSelection,
+  otpDigestsMatch
+} from "./authStore"
 import { isProfileOnboardingReady } from "./authStore"
 import type {
   CompleteAvatarSelection,
@@ -110,11 +116,14 @@ export interface AuthRepository {
     accountId: string
     now: Date
   }): Promise<AccountRecord | null>
-  rotateSession(input: {
-    currentSessionTokenHash: string
-    nextSession: SessionRecord
-    now: Date
-  }): Promise<boolean>
+  /**
+   * Exchanges a refresh token atomically. A token that was already exchanged
+   * is accepted again only inside the reuse grace window (the previously
+   * issued successor is superseded); any later presentation deletes the whole
+   * session family and reports `reuse_detected`. The issued token inherits the
+   * family and never outlives the family's absolute lifetime.
+   */
+  rotateSession(input: SessionRotationInput): Promise<SessionRotationResult>
   deleteAccountData(
     account: AccountRecord,
     confirmation?: {
@@ -122,6 +131,65 @@ export interface AuthRepository {
       now: number
     }
   ): Promise<boolean>
+}
+
+export interface SessionRotationInput {
+  currentSessionTokenHash: string
+  /** accountId, userId and sessionTokenHash are used; family and expiry are derived. */
+  nextSession: SessionRecord
+  now: Date
+  /** Defaults to SESSION_REFRESH_REUSE_GRACE_MS. */
+  reuseGraceMs?: number
+}
+
+export type SessionRotationResult =
+  | { kind: "rotated"; session: SessionRecord }
+  | { kind: "reuse_detected"; userId: string; sessionFamilyId: string }
+  | { kind: "rejected" }
+
+export type SessionRotationPlan =
+  | { kind: "rotate"; familyExpiresAt: string; expiresAt: string }
+  | { kind: "reissue"; familyExpiresAt: string; expiresAt: string; supersededTokenHash: string }
+  | { kind: "reuse_detected" }
+  | { kind: "rejected" }
+
+/**
+ * Pure decision shared by the in-memory and PostgreSQL repositories so both
+ * apply identical reuse, grace and lifetime rules.
+ */
+export function planSessionRotation(input: {
+  current: SessionRecord
+  successor: SessionRecord | null
+  now: Date
+  reuseGraceMs: number
+}): SessionRotationPlan {
+  const { current, successor, now } = input
+  const nowMs = now.getTime()
+  const familyExpiresAt = current.familyExpiresAt ??
+    new Date(nowMs + SESSION_FAMILY_MAX_LIFETIME_MS).toISOString()
+  const familyOpen = Date.parse(familyExpiresAt) > nowMs
+  if (current.rotatedAt) {
+    const sinceRotation = nowMs - Date.parse(current.rotatedAt)
+    const successorLive = Boolean(
+      successor &&
+      successor.sessionId === current.sessionId &&
+      !successor.rotatedAt &&
+      Date.parse(successor.expiresAt) > nowMs
+    )
+    if (sinceRotation >= 0 && sinceRotation <= input.reuseGraceMs && successorLive && successor) {
+      return familyOpen
+        ? {
+            kind: "reissue",
+            familyExpiresAt,
+            expiresAt: capSessionExpiry(now, familyExpiresAt),
+            supersededTokenHash: successor.sessionTokenHash
+          }
+        : { kind: "rejected" }
+    }
+    return { kind: "reuse_detected" }
+  }
+  if (Date.parse(current.expiresAt) <= nowMs || !familyOpen) return { kind: "rejected" }
+  return { kind: "rotate", familyExpiresAt, expiresAt: capSessionExpiry(now, familyExpiresAt) }
 }
 
 export interface AccountProfileUpdate {
@@ -173,6 +241,12 @@ export interface OtpSignInFinalizationInput extends OtpVerificationInput {
   verifiedWithoutOtp?: boolean
   newAccount: AccountRecord
   createSession(account: AccountRecord): SessionRecord
+  /**
+   * Verified Firebase uid. Binds on the account's first completion (including
+   * legacy accounts without a uid); afterwards it must match, otherwise the
+   * result is `identity_mismatch` and nothing is written.
+   */
+  firebaseUid?: string
 }
 
 export interface AccountDeletionOtpSendClaimInput extends OtpSendClaimInput {
@@ -226,6 +300,7 @@ export type PhoneChangeResult =
 export type OtpSignInFinalizationResult =
   | { kind: "terms_required" }
   | { kind: "account_not_found" }
+  | { kind: "identity_mismatch"; accountId: string | null }
   | { kind: "verified"; account: AccountRecord; session: SessionRecord }
   | { kind: "invalid"; attemptsRemaining: number }
   | { kind: "missing_or_expired" }
@@ -529,6 +604,9 @@ export function createInMemoryAuthRepository(
       store.accountsByPhone.set(updated.phoneNumber, cloneAccount(updated))
       store.accountActionConfirmations.delete(currentKey)
       store.accountActionConfirmations.delete(newKey)
+      // The bound uid belongs to the previous number's Firebase user; the next
+      // sign-in with the verified new number binds its uid.
+      store.firebaseUidsByAccountId.delete(input.accountId)
       for (const [key, session] of store.sessionsByTokenHash) {
         if (session.accountId === input.accountId) store.sessionsByTokenHash.delete(key)
       }
@@ -589,6 +667,19 @@ export function createInMemoryAuthRepository(
       }
 
       const existingAccount = store.accountsByPhone.get(input.phoneNumber)
+      if (input.firebaseUid) {
+        const boundUid = existingAccount
+          ? store.firebaseUidsByAccountId.get(existingAccount.accountId)
+          : undefined
+        const uidOwner = [...store.firebaseUidsByAccountId.entries()]
+          .find(([, uid]) => uid === input.firebaseUid)?.[0]
+        if (
+          (boundUid !== undefined && boundUid !== input.firebaseUid) ||
+          (uidOwner !== undefined && uidOwner !== existingAccount?.accountId)
+        ) {
+          return { kind: "identity_mismatch", accountId: existingAccount?.accountId ?? null }
+        }
+      }
       if (!existingAccount && input.requireExistingAccount) {
         return { kind: input.verifiedWithoutOtp ? "account_not_found" : "terms_required" }
       }
@@ -601,6 +692,9 @@ export function createInMemoryAuthRepository(
 
       if (!existingAccount) {
         store.accountsByPhone.set(input.phoneNumber, cloneAccount(account))
+      }
+      if (input.firebaseUid && !store.firebaseUidsByAccountId.has(account.accountId)) {
+        store.firebaseUidsByAccountId.set(account.accountId, input.firebaseUid)
       }
       store.sessionsByTokenHash.set(session.sessionTokenHash, { ...session })
       store.pendingOtps.delete(input.phoneNumber)
@@ -765,7 +859,8 @@ export function createInMemoryAuthRepository(
       return cloneAccount(updated)
     },
     async getSessionByTokenHash(sessionTokenHash) {
-      return store.sessionsByTokenHash.get(sessionTokenHash) ?? null
+      const session = store.sessionsByTokenHash.get(sessionTokenHash)
+      return session ? { ...session } : null
     },
     async hasActiveSessionFamily(input) {
       return [...store.sessionsByTokenHash.values()].some((session) =>
@@ -823,18 +918,61 @@ export function createInMemoryAuthRepository(
     },
     async rotateSession(input) {
       const current = store.sessionsByTokenHash.get(input.currentSessionTokenHash)
-      if (!current || new Date(current.expiresAt).getTime() <= input.now.getTime()) {
-        return false
-      }
-      store.sessionsByTokenHash.set(input.currentSessionTokenHash, {
-        ...current,
-        expiresAt: input.now.toISOString()
+      if (!current) return { kind: "rejected" }
+      const successor = current.replacedByTokenHash
+        ? store.sessionsByTokenHash.get(current.replacedByTokenHash) ?? null
+        : null
+      const plan = planSessionRotation({
+        current,
+        successor,
+        now: input.now,
+        reuseGraceMs: input.reuseGraceMs ?? SESSION_REFRESH_REUSE_GRACE_MS
       })
-      store.sessionsByTokenHash.set(
-        input.nextSession.sessionTokenHash,
-        { ...input.nextSession, sessionId: current.sessionId }
-      )
-      return true
+      if (plan.kind === "rejected") return plan
+      if (plan.kind === "reuse_detected") {
+        for (const [tokenHash, session] of store.sessionsByTokenHash.entries()) {
+          if (session.sessionId === current.sessionId) store.sessionsByTokenHash.delete(tokenHash)
+        }
+        return { kind: "reuse_detected", userId: current.userId, sessionFamilyId: current.sessionId }
+      }
+      const nowIso = input.now.toISOString()
+      const nextHash = input.nextSession.sessionTokenHash
+      if (store.sessionsByTokenHash.has(nextHash)) {
+        throw new Error("The refreshed session token already exists.")
+      }
+      const next: SessionRecord = {
+        accountId: current.accountId,
+        userId: current.userId,
+        sessionId: current.sessionId,
+        sessionTokenHash: nextHash,
+        expiresAt: plan.expiresAt,
+        familyExpiresAt: plan.familyExpiresAt
+      }
+      if (plan.kind === "reissue") {
+        const superseded = store.sessionsByTokenHash.get(plan.supersededTokenHash)
+        if (superseded) {
+          store.sessionsByTokenHash.set(plan.supersededTokenHash, {
+            ...superseded,
+            expiresAt: nowIso,
+            rotatedAt: nowIso,
+            replacedByTokenHash: nextHash
+          })
+        }
+        store.sessionsByTokenHash.set(input.currentSessionTokenHash, {
+          ...current,
+          replacedByTokenHash: nextHash
+        })
+      } else {
+        store.sessionsByTokenHash.set(input.currentSessionTokenHash, {
+          ...current,
+          expiresAt: nowIso,
+          rotatedAt: nowIso,
+          replacedByTokenHash: nextHash,
+          familyExpiresAt: plan.familyExpiresAt
+        })
+      }
+      store.sessionsByTokenHash.set(nextHash, { ...next })
+      return { kind: "rotated", session: { ...next } }
     },
     async deleteAccountData(account, confirmation) {
       if (confirmation) {
@@ -860,6 +998,7 @@ export function createInMemoryAuthRepository(
       store.accountDeletionOtpSendLimits.delete(account.accountId)
       store.accountDeletionConfirmations.delete(account.accountId)
       store.accountsByPhone.delete(account.phoneNumber)
+      store.firebaseUidsByAccountId.delete(account.accountId)
       for (const [tokenHash, session] of store.sessionsByTokenHash.entries()) {
         if (session.accountId === account.accountId) {
           store.sessionsByTokenHash.delete(tokenHash)
