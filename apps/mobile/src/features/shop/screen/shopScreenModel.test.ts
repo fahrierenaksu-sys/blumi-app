@@ -13,6 +13,7 @@ import {
   getDefaultShopCategoryId,
   getPrimaryProductCategoryId,
   getShopSurfacePolicy,
+  shouldShopShelfOwnHorizontalDrags,
   maskUnverifiedProductOwnership,
   sortRoomShopProducts
 } from "./shopScreenModel"
@@ -260,4 +261,13 @@ test("default furniture rotation prefers front, then the first authored rotation
   assert.equal(getDefaultFurnitureRotation({ assetsByRotation: {} } as unknown as FurnitureItem), "front")
   assert.equal(getDefaultFurnitureRotation({ assetsByRotation: { right: {}, front: {} } } as unknown as FurnitureItem), "front")
   assert.equal(getDefaultFurnitureRotation({ assetsByRotation: { back: {}, left: {} } } as unknown as FurnitureItem), "back")
+})
+
+test("the product shelf owns horizontal drags only when it has another page to show", () => {
+  // 1/1: nothing to scroll, so a horizontal drag there switches the main page.
+  assert.equal(shouldShopShelfOwnHorizontalDrags(0), false, "empty category")
+  assert.equal(shouldShopShelfOwnHorizontalDrags(1), false, "single page")
+  assert.equal(shouldShopShelfOwnHorizontalDrags(2), true)
+  assert.equal(shouldShopShelfOwnHorizontalDrags(12), true)
+  assert.equal(shouldShopShelfOwnHorizontalDrags(Number.NaN), false)
 })

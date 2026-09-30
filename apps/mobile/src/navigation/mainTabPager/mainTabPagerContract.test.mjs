@@ -20,7 +20,7 @@ test("the pager activates on a horizontal slop and fails on vertical movement", 
   assert.match(pager, /\.failOffsetY\(\[-MAIN_TAB_PAGER_FAIL_OFFSET_Y, MAIN_TAB_PAGER_FAIL_OFFSET_Y\]\)/)
   assert.match(config, /MAIN_TAB_PAGER_ACTIVE_OFFSET_X = 12\b/)
   assert.match(config, /MAIN_TAB_PAGER_FAIL_OFFSET_Y = 12\b/)
-  assert.match(pager, /\.enabled\(swipeEnabled\)/, "disabled while a non-swipeable page (Discover) is selected")
+  assert.match(pager, /\.enabled\(swipeEnabled\)/, "disabled while a non-swipeable page is selected")
   assert.match(pager, /const swipeEnabled = selectedPage\.swipeable/)
 })
 
@@ -29,7 +29,10 @@ test("horizontal sub-content owns its drags through one Gesture Handler relation
   assert.match(pager, /\.withRef\(pagerGestureRef\)/)
   assert.match(pager, /<MainTabPagerGestureProvider value=\{pagerGestureRef\}>/)
   const closet = read("../../features/shop/screen/ClosetBrowser.tsx")
-  assert.match(closet, /<MainTabPagerHorizontalScrollOwner>\s*<FlatList[\s\S]*?horizontal[\s\S]*?pagingEnabled[\s\S]*?<\/MainTabPagerHorizontalScrollOwner>/)
+  assert.match(closet, /<MainTabPagerHorizontalScrollOwner enabled=\{shelfOwnsHorizontalDrags\}>\s*<FlatList[\s\S]*?horizontal[\s\S]*?pagingEnabled[\s\S]*?scrollEnabled=\{shelfOwnsHorizontalDrags\}[\s\S]*?<\/MainTabPagerHorizontalScrollOwner>/)
+  // A single-page shelf (1/1) has nothing to scroll: the page swipe works there.
+  assert.match(closet, /const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags\(productPages\.length\)/)
+  assert.match(ownership, /if \(!nativeScrollGesture \|\| !enabled\) return children/)
   const rail = read("../../features/shop/screen/VerticalShopCategoryRail.tsx")
   assert.match(rail, /<MainTabPagerHorizontalScrollOwner>\s*<ScrollView horizontal/)
   // No second ownership mechanism (flags, PanResponder capture) in the pager.
@@ -37,7 +40,12 @@ test("horizontal sub-content owns its drags through one Gesture Handler relation
 })
 
 test("Discover card, room object drag and edge back never compete with the pager", () => {
-  assert.match(config, /key: "discover", routeName: "Lobby", swipeable: false/)
+  // Discover is swipeable; a drag that starts on the card stays a card swipe.
+  assert.match(config, /key: "discover", routeName: "Lobby", swipeable: true/)
+  assert.match(config, /MAIN_TAB_SWIPE_MIN_INDEX = 0\b/)
+  const swipe = read("../../features/demo/useDiscoverCardSwipe.ts")
+  assert.match(swipe, /const pagerGestureRef = useMainTabPagerGestureRef\(\)/)
+  assert.match(swipe, /\.manualActivation\(true\)\s*\.blocksExternalGesture\(\.\.\.\(pagerGestureRef \? \[pagerGestureRef\] : \[\]\)\)/)
   // Room objects are dragged only on setup and editor routes, not on pages.
   const myRoom = read("../../screens/MyRoomScreen.tsx")
   assert.doesNotMatch(myRoom, /onItemLongPressMove=/)
@@ -61,7 +69,7 @@ test("Discover card swipe thresholds are unchanged", () => {
   const swipe = read("../../features/demo/useDiscoverCardSwipe.ts")
   // A cancelled pan returns the card to rest, as onPanResponderTerminate did.
   assert.match(swipe, /if \(!success\) \{\s*resetPosition\(\)/)
-  // The card owns its touch only through the pan; the pager is off on Discover.
+  // The card owns its touch through the pan, which blocks the pager.
   assert.match(swipe, /Gesture\.Pan\(\)\s*\.enabled\(!disabled\)\s*\.manualActivation\(true\)/)
 })
 
@@ -74,6 +82,26 @@ test("drag and settle frames stay on the UI thread; JS hears once per settle", (
   assert.deepEqual(jsCalls.sort(), ["scheduleOnRN(commitPage", "scheduleOnRN(mountNeighbours"])
   assert.match(pager, /useAnimatedStyle\(\(\) => \(\{[\s\S]*?translateX: index \* width\.value - position\.value/)
   assert.match(pager, /withSpring\(/)
+})
+
+test("the bottom-bar indicator follows drags and settles on the UI thread", () => {
+  // The pager publishes its fractional page position while a drag or settle
+  // moves it; the bar reads it in a UI-thread reaction (no JS per frame).
+  assert.match(pager, /useAnimatedReaction\(\s*\(\) => resolveMainTabPagerIndicatorSample\(/)
+  assert.match(pager, /publishMainTabPagerIndicator\(/)
+  const bottomNav = read("../../ui/bottomNav.tsx")
+  // Reanimated subscribes to shared values in the prepare closure, so the
+  // shared object is referenced there directly, not through a helper.
+  assert.match(bottomNav, /useAnimatedReaction\(\s*\(\) => readMainTabPagerIndicatorProgress\(mainTabPagerIndicator\)/)
+  assert.match(pager, /\(sample\) => publishMainTabPagerIndicator\(mainTabPagerIndicator, sample\)/)
+  assert.doesNotMatch(bottomNav, /AccessibilityInfo/, "Reduce Motion comes from the shared store")
+  // The pager index maps to the bar item index: both use the same order.
+  const barKeys = [...bottomNav.slice(bottomNav.indexOf("const BOTTOM_NAV_ITEMS"), bottomNav.indexOf("export interface BottomNavProps"))
+    .matchAll(/key: "(\w+)"/g)].map((match) => match[1])
+  const pagerKeys = [...config.matchAll(/key: "(\w+)", routeName/g)].map((match) => match[1])
+  assert.deepEqual(barKeys, pagerKeys)
+  assert.deepEqual(barKeys, ["discover", "chats", "myroom", "shop"])
+  assert.match(bottomNav, /useReducedMotion\(\)/)
 })
 
 test("Reduce Motion uses the shared store and switches without finger-follow", () => {

@@ -10,6 +10,7 @@ import {
   withTiming
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
+import { useMainTabPagerGestureRef } from "../../ui/MainTabPagerGestureOwnership"
 import {
   DISCOVER_SWIPE_RESET_SPRING,
   getDiscoverStampOpacity,
@@ -32,6 +33,10 @@ import { useDiscoverSwipeValues, type DiscoverSwipeValues } from "../discovery/u
  * once the finger moved more than 4 px and 1.1x more horizontally than
  * vertically, so vertical scrolling and the flip tap keep working. Reduce
  * Motion exits instantly and snaps back without a spring, as before.
+ *
+ * On the main-page pager the card owns every drag that starts on it: the
+ * pan blocks the pager, which moves the page only for drags that start
+ * elsewhere on Discover.
  */
 export function useDiscoverCardSwipe(input: {
   swipe?: DiscoverSwipeValues
@@ -48,6 +53,7 @@ export function useDiscoverCardSwipe(input: {
   const { x, ownerId } = input.swipe ?? localSwipe
   const touchStartX = useSharedValue(0)
   const touchStartY = useSharedValue(0)
+  const pagerGestureRef = useMainTabPagerGestureRef()
   const swipeThreshold = getDiscoverSwipeThreshold(screenWidth)
 
   const commitSwipe = useCallback((direction: DiscoverSwipeDirection): void => {
@@ -82,6 +88,7 @@ export function useDiscoverCardSwipe(input: {
   const gesture = useMemo(() => Gesture.Pan()
     .enabled(!disabled)
     .manualActivation(true)
+    .blocksExternalGesture(...(pagerGestureRef ? [pagerGestureRef] : []))
     .onTouchesDown((event) => {
       "worklet"
       const touch = event.allTouches[0]
@@ -131,6 +138,7 @@ export function useDiscoverCardSwipe(input: {
     disabled,
     forceSwipe,
     ownerId,
+    pagerGestureRef,
     resetPosition,
     swipeThreshold,
     touchStartX,

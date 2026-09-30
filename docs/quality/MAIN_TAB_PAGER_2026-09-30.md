@@ -12,14 +12,14 @@ Rollback: set `MAIN_TAB_PAGER_ENABLED` in `mainTabPagerConfig.ts` to `false`. Th
 
 | Page | Swipeable | Reason |
 |---|---|---|
-| Discover | No | Its main surface is the like/pass card swipe, which covers most of the screen. A pager drag there would either steal card swipes or work only on the header strip. Reached by the bottom bar; the pager gesture is disabled while Discover is selected. |
-| Chats | Yes | Vertical thread list only. First swipeable page: dragging right rubber-bands and shows background, never Discover. |
+| Discover | Yes (owner decision, 2026-09-30 follow-up) | First page: dragging right rubber-bands. A drag that starts on the like/pass card stays a card swipe (the card pan blocks the pager); a drag anywhere else on Discover (header, action row, empty or loading state) moves the page. When the card cannot be swiped (quota exhausted, decision in flight) its pan is disabled and a horizontal drag on it moves the page. |
+| Chats | Yes | Vertical thread list only. Dragging right reveals Discover. |
 | My Room | Yes | Room items are tap-only here. Object drag exists only on the editor and room setup routes, which are separate stack routes above the pager. |
-| Shop | Yes | Last swipeable page. The horizontal product shelf and the accessibility-layout category rail own drags that start on them. |
+| Shop | Yes | Last swipeable page. The horizontal product shelf owns drags that start on it only when it has more than one page; at 1/1 it cannot scroll and the drag moves the page. The accessibility-layout category rail owns drags that start on it. |
 
 ## Gesture ownership (one mechanism)
 
-A Gesture Handler `Pan` on the pager with `activeOffsetX ±12` and `failOffsetY ±12`: it follows the finger after a small horizontal slop and fails when movement is vertical first. Horizontal scrollers inside pages are wrapped in `MainTabPagerHorizontalScrollOwner` (`src/ui/MainTabPagerGestureOwnership.tsx`), whose `Gesture.Native()` `blocksExternalGesture(pager)`. The Discover card needs no relation (pager disabled on Discover), room object drag and the iOS edge back live on routes above the pager, and the slot route keeps `gestureEnabled: false`. The Discover card's `PanResponder` and thresholds are unchanged.
+A Gesture Handler `Pan` on the pager with `activeOffsetX ±12` and `failOffsetY ±12`: it follows the finger after a small horizontal slop and fails when movement is vertical first. Horizontal scrollers inside pages are wrapped in `MainTabPagerHorizontalScrollOwner` (`src/ui/MainTabPagerGestureOwnership.tsx`), whose `Gesture.Native()` `blocksExternalGesture(pager)`; `enabled={false}` drops the relation while the scroller has a single page. The Discover card pan `blocksExternalGesture(pager)` through `useMainTabPagerGestureRef`. Room object drag and the iOS edge back live on routes above the pager, and the slot route keeps `gestureEnabled: false`. The Discover card's `PanResponder` and thresholds are unchanged.
 
 ## Motion, state and interruptions
 
@@ -28,18 +28,22 @@ A Gesture Handler `Pan` on the pager with `activeOffsetX ±12` and `failOffsetY 
 - Reduce Motion (shared `useReducedMotion` store): the page does not follow the finger; a qualifying swipe switches instantly.
 - Each hosted page gets its own `isFocused()` and `focus`/`blur` events (selected page and slot focused), so existing focus-aware code (Inbox refresh and warmup, My Room motion lifecycle, Discover focus effects) pauses on mounted pages that are not selected. Only the selected page is exposed to touch and accessibility.
 
+## Bottom bar
+
+The bar's indicator position is a UI-thread shared value in tab units. While a drag or settle moves the pages, the pager publishes its fractional page (`src/ui/mainTabPagerIndicator.ts`, written from a `useAnimatedReaction`) and the bar follows it in its own reaction, so the pill, icons and label move in the same frame as the pages. Committed changes without a pager animation (taps, navigation, Reduce Motion) keep the 150 ms selection timing (instant under Reduce Motion). The bar reads Reduce Motion from the shared store.
+
 ## Mount policy
 
-Pages mount on first selection and stay mounted with focus-aware work paused. A never-visited swipe neighbour is mounted 350 ms after the selected page settles, on the next idle callback, or when a drag starts first, so a drag rarely reveals an unmounted page and never competes with a settle. Discover has no swipe neighbours, so it is never preloaded by the pager. Pages are not frozen: a frozen React subtree is hidden, which would make a revealed neighbour blank.
+Pages mount on first selection and stay mounted with focus-aware work paused. A never-visited swipe neighbour is mounted 350 ms after the selected page settles, on the next idle callback, or when a drag starts first, so a drag rarely reveals an unmounted page and never competes with a settle. Discover is Chats' swipe neighbour, so it is preloaded when Chats settles if it was not visited yet. Pages are not frozen: a frozen React subtree is hidden, which would make a revealed neighbour blank.
 
 ## Open native checks (owner's iPhone)
 
 1. Chats ↔ My Room ↔ Shop: slow drag, fast flick, short slow drag that returns, cancelled drag, direction reversal, repeated back-to-back swipes.
 2. Diagonal and vertical starts on the Chats list and the Shop page: the list scrolls and the page does not move. Small horizontal jitter does not change the page.
-3. Rubber band on Chats (dragging right) and Shop (dragging left). Discover is never revealed.
+3. Chats → Discover by dragging right; Discover → Chats by dragging left on the header, action row or empty state. Rubber band on Discover (dragging right) and Shop (dragging left).
 4. Rapid bottom-bar taps across all four pages, including during a settle. The bar selection, the visible page and VoiceOver focus agree.
-5. Discover: card like/pass, cancelled card swipe spring-back, consecutive swipes. Horizontal drags on Discover never change the page.
-6. Shop: product shelf paging and the large-text category rail scroll without moving the page.
+5. Discover: card like/pass, cancelled card swipe spring-back, consecutive swipes. A horizontal drag that starts on the card never changes the page.
+6. Shop: product shelf paging and the large-text category rail scroll without moving the page; a shelf showing 1/1 moves the page. The bottom-bar pill, icon and label follow the finger during every swipe.
 7. My Room: item taps, walk/seat; My Room editor object drag (separate route).
 8. Edge back from Chat thread, Profile, Wardrobe and My Room editor; the bottom bar still appears only after the back swipe finishes.
 9. Reduce Motion on: swipes switch instantly without finger-follow; taps switch instantly.

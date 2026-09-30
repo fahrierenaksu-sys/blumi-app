@@ -50,7 +50,7 @@ test("no new requestAnimationFrame or setInterval loops in production code", () 
 
 // Only the shared reduced-motion source may talk to AccessibilityInfo for
 // reduce-motion; everything else uses the shared store/hook.
-const REDUCE_MOTION_SOURCES = new Set(["ui/animations.ts", "ui/bottomNav.tsx"])
+const REDUCE_MOTION_SOURCES = new Set(["ui/animations.ts"])
 
 test("reduce-motion is read from the shared store only", () => {
   const offenders = sources

@@ -9,7 +9,7 @@ import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
 import type { ShopMode } from "../ShopNavigationControls"
-import type { ShopCategoryOption } from "./shopScreenModel"
+import { shouldShopShelfOwnHorizontalDrags, type ShopCategoryOption } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 import { ShopProductCard } from "./ShopProductCard"
 import { VerticalShopCategoryRail } from "./VerticalShopCategoryRail"
@@ -66,6 +66,7 @@ export function ClosetBrowser(props: {
     }
     return pages
   }, [catalog.accessibilityLayout, productColumns])
+  const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags(productPages.length)
   const renderProductPage = useCallback(
     ({ item, index }: { item: ShopCatalogItem[][]; index: number }) => (
       <View
@@ -154,14 +155,17 @@ export function ClosetBrowser(props: {
           accessibilityLayout={catalog.accessibilityLayout}
           height={catalog.productCardHeight * 2 + 8}
         />
-        {/* The product shelf pages horizontally; it owns horizontal drags
-            that start on it, so the main-page pager never takes them. */}
-        <MainTabPagerHorizontalScrollOwner>
+        {/* The product shelf pages horizontally; with more than one page it
+            owns horizontal drags that start on it, so the main-page pager
+            never takes them. A single page (1/1) cannot scroll, so a drag
+            there switches the main page instead. */}
+        <MainTabPagerHorizontalScrollOwner enabled={shelfOwnsHorizontalDrags}>
           <FlatList
             ref={productScrollerRef}
             data={productPages}
             horizontal
             pagingEnabled
+            scrollEnabled={shelfOwnsHorizontalDrags}
             bounces={false}
             onMomentumScrollEnd={(event) => {
               const nextPageIndex = Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth)))

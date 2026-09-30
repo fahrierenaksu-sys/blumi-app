@@ -47,16 +47,19 @@ function settle(baseIndex: number, moved: number, velocity: number): number {
 
 // ── Page set ────────────────────────────────────────────────────────────
 
-test("pages follow the bottom bar order and only Chats, My Room and Shop are swipeable", () => {
+test("pages follow the bottom bar order and all four pages form one swipeable range", () => {
   assert.deepEqual(MAIN_TAB_PAGES.map((page) => page.key), ["discover", "chats", "myroom", "shop"])
   assert.deepEqual(MAIN_TAB_ROUTE_NAMES, ["Lobby", "Inbox", "MyRoom", "CosmeticShop"])
   for (const [index, page] of MAIN_TAB_PAGES.entries()) {
     assert.equal(getBottomNavKeyForRoute(page.routeName), page.key)
     assert.equal(isMainTabPageSwipeable(index), page.swipeable, page.key)
   }
-  assert.equal(MAIN_TAB_PAGES[DISCOVER]!.swipeable, false, "the card swipe owns Discover")
+  // Owner decision 2026-09-30: Chats swipes right to Discover. Drags that
+  // start on the Discover card stay card swipes (Gesture Handler relation).
+  assert.equal(MAIN_TAB_PAGES[DISCOVER]!.swipeable, true)
   const swipeable = MAIN_TAB_PAGES.flatMap((page, index) => page.swipeable ? [index] : [])
-  assert.deepEqual(swipeable, [MAIN_TAB_SWIPE_MIN_INDEX, 2, MAIN_TAB_SWIPE_MAX_INDEX], "one contiguous range")
+  assert.deepEqual(swipeable, [MAIN_TAB_SWIPE_MIN_INDEX, CHATS, MYROOM, MAIN_TAB_SWIPE_MAX_INDEX], "one contiguous range")
+  assert.equal(MAIN_TAB_SWIPE_MIN_INDEX, DISCOVER)
 })
 
 // ── Finger follow and rubber band ─────────────────────────────────────
@@ -85,12 +88,12 @@ test("the first and last swipeable pages rubber-band with growing resistance", (
   let previous = 0
   // A finger can travel at most about one screen width past the edge.
   for (const overscroll of [10, 50, 150, 300, W]) {
-    const beforeChats = resolveMainTabPagerDragPosition({ rawPosition: CHATS * W - overscroll, width: W, baseIndex: CHATS })
+    const beforeDiscover = resolveMainTabPagerDragPosition({ rawPosition: DISCOVER * W - overscroll, width: W, baseIndex: DISCOVER })
     const afterShop = resolveMainTabPagerDragPosition({ rawPosition: SHOP * W + overscroll, width: W, baseIndex: SHOP })
-    const shown = CHATS * W - beforeChats
+    const shown = DISCOVER * W - beforeDiscover
     assert.ok(shown > previous, "more pull still moves further")
     assert.ok(shown < overscroll, "but less than the finger")
-    assert.ok(shown < W * 0.4, "and never close to a page: Discover is never reached by dragging")
+    assert.ok(shown < W * 0.4, "and never close to a page")
     assert.ok(Math.abs(afterShop - SHOP * W - shown) < 1e-9, "both edges resist the same way")
     previous = shown
   }
@@ -138,15 +141,27 @@ test("a mid-gesture direction reversal follows the release direction", () => {
   assert.equal(settle(CHATS, W * 0.6, -400), CHATS)
 })
 
+test("Chats swipes right to Discover and Discover swipes left to Chats", () => {
+  assert.equal(
+    resolveMainTabPagerDragPosition({ rawPosition: CHATS * W - 200, width: W, baseIndex: CHATS }),
+    CHATS * W - 200,
+    "the drag toward Discover follows the finger 1:1 (no rubber band)"
+  )
+  assert.equal(settle(CHATS, -W * 0.55, 0), DISCOVER)
+  assert.equal(settle(CHATS, -30, -900), DISCOVER, "a quick flick reaches Discover")
+  assert.equal(settle(DISCOVER, W * 0.55, 0), CHATS)
+  assert.equal(settle(CHATS, -80, -60), CHATS, "a short slow drag toward Discover returns")
+})
+
 test("a release in the rubber band returns to the edge page", () => {
-  const chatsOverscroll = resolveMainTabPagerDragPosition({ rawPosition: CHATS * W - 300, width: W, baseIndex: CHATS })
-  assert.equal(resolveMainTabPagerSettleIndex({ position: chatsOverscroll, velocity: -1500, width: W, baseIndex: CHATS }), CHATS)
+  const discoverOverscroll = resolveMainTabPagerDragPosition({ rawPosition: DISCOVER * W - 300, width: W, baseIndex: DISCOVER })
+  assert.equal(resolveMainTabPagerSettleIndex({ position: discoverOverscroll, velocity: -1500, width: W, baseIndex: DISCOVER }), DISCOVER)
   const shopOverscroll = resolveMainTabPagerDragPosition({ rawPosition: SHOP * W + 300, width: W, baseIndex: SHOP })
   assert.equal(resolveMainTabPagerSettleIndex({ position: shopOverscroll, velocity: 1500, width: W, baseIndex: SHOP }), SHOP)
 })
 
-test("a settle moves at most one page and never onto Discover", () => {
-  for (const base of [CHATS, MYROOM, SHOP]) {
+test("a settle moves at most one page and stays inside the swipeable range", () => {
+  for (const base of [DISCOVER, CHATS, MYROOM, SHOP]) {
     for (const moved of [-2 * W, -W, -W / 2, 0, W / 2, W, 2 * W]) {
       for (const velocity of [-5000, -500, 0, 500, 5000]) {
         const target = settle(base, moved, velocity)
@@ -155,14 +170,15 @@ test("a settle moves at most one page and never onto Discover", () => {
       }
     }
   }
-  assert.equal(resolveMainTabPagerSettleIndex({ position: 0, velocity: Number.NaN, width: W, baseIndex: DISCOVER }), CHATS)
+  assert.equal(resolveMainTabPagerSettleIndex({ position: 0, velocity: Number.NaN, width: W, baseIndex: DISCOVER }), DISCOVER)
   assert.equal(resolveMainTabPagerSettleIndex({ position: 100, velocity: 0, width: 0, baseIndex: MYROOM }), MYROOM)
 })
 
 test("a touch that catches a settle uses the nearest page as its base", () => {
   assert.equal(resolveMainTabPagerBaseIndex(1.3 * W, W), CHATS)
   assert.equal(resolveMainTabPagerBaseIndex(1.7 * W, W), MYROOM)
-  assert.equal(resolveMainTabPagerBaseIndex(0.2 * W, W), CHATS, "never Discover")
+  assert.equal(resolveMainTabPagerBaseIndex(0.2 * W, W), DISCOVER)
+  assert.equal(resolveMainTabPagerBaseIndex(-0.4 * W, W), DISCOVER, "clamped to the first page")
   assert.equal(resolveMainTabPagerBaseIndex(9 * W, W), SHOP)
 })
 
@@ -390,10 +406,12 @@ test("reducers keep the committed page and epoch rules explicit", () => {
 
 // ── Visibility and accessibility ──────────────────────────────────────
 
-test("Discover is invisible behind the Chats rubber band unless it is the committed page", () => {
-  assert.equal(getMainTabPageOpacity(DISCOVER, CHATS), 0)
-  assert.equal(getMainTabPageOpacity(DISCOVER, DISCOVER), 1)
-  for (const index of [CHATS, MYROOM, SHOP]) assert.equal(getMainTabPageOpacity(index, DISCOVER), 1)
+test("every swipeable page stays visible so a drag reveals its neighbour", () => {
+  for (const committed of [DISCOVER, CHATS, MYROOM, SHOP]) {
+    for (const index of [DISCOVER, CHATS, MYROOM, SHOP]) {
+      assert.equal(getMainTabPageOpacity(index, committed), 1, `${index} while ${committed}`)
+    }
+  }
 })
 
 test("only the selected page is exposed to touch and accessibility, matching the bottom bar", () => {
@@ -423,16 +441,14 @@ test("only the selected page is exposed to touch and accessibility, matching the
 test("pages mount lazily; visited pages stay; neighbours only when asked", () => {
   let mounted = resolveMainTabPagerMountedPages({ mounted: [], selectedIndex: DISCOVER, includeNeighbours: false })
   assert.deepEqual(mounted, [true, false, false, false], "only the first page at start")
+  mounted = resolveMainTabPagerMountedPages({ mounted, selectedIndex: SHOP, includeNeighbours: false })
+  assert.deepEqual(mounted, [true, false, false, true], "a tap mounts only its page")
   mounted = resolveMainTabPagerMountedPages({ mounted, selectedIndex: DISCOVER, includeNeighbours: true })
-  assert.deepEqual(mounted, [true, false, false, false], "Discover has no swipe neighbours to warm")
-  mounted = resolveMainTabPagerMountedPages({ mounted, selectedIndex: CHATS, includeNeighbours: false })
-  assert.deepEqual(mounted, [true, true, false, false], "a tap mounts only its page")
+  assert.deepEqual(mounted, [true, true, false, true], "after settle and idle on Discover: its neighbour Chats")
   mounted = resolveMainTabPagerMountedPages({ mounted, selectedIndex: CHATS, includeNeighbours: true })
-  assert.deepEqual(mounted, [true, true, true, false], "after settle and idle: My Room, not Discover")
-  mounted = resolveMainTabPagerMountedPages({ mounted, selectedIndex: MYROOM, includeNeighbours: true })
-  assert.deepEqual(mounted, [true, true, true, true])
-  assert.deepEqual(getMainTabPageNeighbours(CHATS), [MYROOM])
+  assert.deepEqual(mounted, [true, true, true, true], "after settle and idle on Chats: Discover and My Room")
+  assert.deepEqual(getMainTabPageNeighbours(DISCOVER), [CHATS])
+  assert.deepEqual(getMainTabPageNeighbours(CHATS), [DISCOVER, MYROOM])
   assert.deepEqual(getMainTabPageNeighbours(MYROOM), [CHATS, SHOP])
   assert.deepEqual(getMainTabPageNeighbours(SHOP), [MYROOM])
-  assert.deepEqual(getMainTabPageNeighbours(DISCOVER), [])
 })
