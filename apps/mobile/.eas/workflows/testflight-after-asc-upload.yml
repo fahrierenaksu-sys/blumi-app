@@ -1,0 +1,19 @@
+name: Add TestFlight test notes after Apple upload
+
+on:
+  app_store_connect:
+    build_upload:
+      states:
+        - complete
+
+jobs:
+  add_testflight_notes:
+    name: Add What to Test notes
+    type: testflight
+    params:
+      asc_build_id: ${{ app_store_connect.build_upload.build.id }}
+      submit_beta_review: false
+      changelog: |
+        Giriş, keşif, karşılıklı eşleşme, metin sohbeti ve sohbetten oda davetini test edin.
+        Odam ve Mağaza ekranlarında gezinme, kaydetme ve yeniden açmayı kontrol edin.
+        Kamera ve mikrofon izni istenmemeli. Hata bildirirken ekranı ve izlediğiniz adımları yazın.

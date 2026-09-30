@@ -27,16 +27,10 @@ jobs:
             npm test
             npm run audit:release
   submit_ios:
-    name: Upload, process and distribute this build to TestFlight
+    name: Upload iOS build to App Store Connect
     needs: [build_ios]
-    type: testflight
+    type: submit
     environment: production
     params:
-      profile: production
       build_id: ${{ needs.build_ios.outputs.build_id }}
-      internal_groups: [Blumi QA]
-      submit_beta_review: false
-      changelog: |
-        Giriş, keşif, karşılıklı eşleşme, metin sohbeti ve sohbetten oda davetini test edin.
-        Odam ve Mağaza ekranlarında gezinme, kaydetme ve yeniden açmayı kontrol edin.
-        Kamera ve mikrofon izni istenmemeli. Hata bildirirken ekranı ve izlediğiniz adımları yazın.
+      profile: production
