@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   SHEET_DISMISS,
+  getSheetBackdropOpacity,
   getSheetDismissDistance,
   getSheetExitOffset,
   resolveSheetDismissClaim,
@@ -62,4 +63,18 @@ test("unmeasured or tiny sheets still use a sane distance and exit fully", () =>
   assert.ok(getSheetDismissDistance(120) >= SHEET_DISMISS.minDistance)
   assert.ok(getSheetExitOffset(H) > H)
   assert.ok(getSheetExitOffset(0) > 0)
+})
+
+test("the backdrop fades in proportion to the drag and is gone when the sheet has left", () => {
+  // The Modal's own close animation runs after a swipe dismiss; the
+  // backdrop must already be invisible then, or it trails the sheet.
+  assert.equal(getSheetBackdropOpacity(0, H), 1, "at rest")
+  assert.equal(getSheetBackdropOpacity(-20, H), 1, "never above rest")
+  const half = getSheetExitOffset(H) / 2
+  assert.ok(Math.abs(getSheetBackdropOpacity(half, H) - 0.5) < 1e-9, "halfway out")
+  assert.ok(getSheetBackdropOpacity(40, H) < getSheetBackdropOpacity(20, H), "monotonic")
+  assert.equal(getSheetBackdropOpacity(getSheetExitOffset(H), H), 0, "fully out")
+  assert.equal(getSheetBackdropOpacity(getSheetExitOffset(H) + 100, H), 0)
+  assert.equal(getSheetBackdropOpacity(getSheetExitOffset(0), 0), 0, "unmeasured sheet uses the same exit offset")
+  assert.equal(getSheetBackdropOpacity(Number.NaN, H), 1)
 })

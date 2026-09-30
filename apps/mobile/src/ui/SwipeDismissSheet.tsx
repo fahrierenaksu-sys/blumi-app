@@ -8,6 +8,7 @@ import {
   type MutableRefObject,
   type ReactNode
 } from "react"
+import { Pressable, StyleSheet } from "react-native"
 import type { LayoutChangeEvent, ScrollViewProps, StyleProp, ViewStyle } from "react-native"
 import { Gesture, GestureDetector, State, type GestureType } from "react-native-gesture-handler"
 import Reanimated, {
@@ -26,6 +27,7 @@ import { useReducedMotion } from "./animations"
 import {
   SHEET_DISMISS,
   SHEET_RETURN_SPRING,
+  getSheetBackdropOpacity,
   getSheetExitOffset,
   resolveSheetDismissClaim,
   resolveSheetDismissRelease,
@@ -40,11 +42,26 @@ interface SheetScrollOwnership {
 
 const SheetScrollContext = createContext<SheetScrollOwnership | null>(null)
 
+/** The dimming layer behind the sheet, drawn and faded by the sheet itself. */
+export interface SwipeDismissSheetBackdrop {
+  /** Tint of the full-screen layer behind the sheet. */
+  style?: StyleProp<ViewStyle>
+  /** A tap on the backdrop closes the sheet (same callback as its close button). */
+  onPress?: () => void
+  accessibilityLabel?: string
+}
+
 export interface SwipeDismissSheetProps {
   /** Closes the sheet; the same callback as its close button. */
   onDismiss: () => void
   /** False while the sheet must stay open (for example, while submitting). */
   enabled?: boolean
+  /**
+   * Keep the modal's tint here rather than on the modal container: it fades
+   * in proportion to the drag and is gone once a swipe has moved the sheet
+   * out, so the Modal's close animation that follows carries nothing visible.
+   */
+  backdrop?: SwipeDismissSheetBackdrop
   style?: StyleProp<ViewStyle>
   accessibilityViewIsModal?: boolean
   testID?: string
@@ -67,6 +84,7 @@ export interface SwipeDismissSheetProps {
 export function SwipeDismissSheet({
   onDismiss,
   enabled = true,
+  backdrop,
   style,
   accessibilityViewIsModal,
   testID,
@@ -134,7 +152,9 @@ export function SwipeDismissSheet({
         ? resolveSheetDismissRelease({ offset: offset.value, velocityY: event.velocityY, sheetHeight: sheetHeight.value })
         : "return"
       if (release === "dismiss") {
+        // Reduce Motion: sheet and backdrop leave at once, before the Modal closes.
         if (reduceMotionValue.value) {
+          offset.value = getSheetExitOffset(sheetHeight.value)
           scheduleOnRN(dismiss)
           return
         }
@@ -173,12 +193,31 @@ export function SwipeDismissSheet({
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: offset.value }]
   }))
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: getSheetBackdropOpacity(offset.value, sheetHeight.value)
+  }))
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     sheetHeight.value = event.nativeEvent.layout.height
   }, [sheetHeight])
+  const backdropPress = backdrop?.onPress
 
   return (
     <SheetScrollContext.Provider value={ownership}>
+      {backdrop ? (
+        <Reanimated.View
+          pointerEvents={backdropPress ? "auto" : "none"}
+          style={[StyleSheet.absoluteFill, backdrop.style, backdropStyle]}
+        >
+          {backdropPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={backdrop.accessibilityLabel}
+              style={StyleSheet.absoluteFill}
+              onPress={backdropPress}
+            />
+          ) : null}
+        </Reanimated.View>
+      ) : null}
       <GestureDetector gesture={gesture}>
         <Reanimated.View
           accessibilityViewIsModal={accessibilityViewIsModal}
