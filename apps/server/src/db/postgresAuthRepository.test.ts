@@ -1062,15 +1062,28 @@ test("postgres OTP sign-in rolls back without consuming the code when session st
   assert.equal(queries.at(-1), "ROLLBACK")
 })
 
-test("postgres session rotation conditionally consumes and replaces one token", async () => {
+test("postgres session rotation locks the family, consumes and replaces one token", async () => {
   const queries: string[] = []
   let released = false
+  const currentRow = {
+    account_id: ACCOUNT.accountId,
+    session_id: NEXT_SESSION.sessionId,
+    user_id: ACCOUNT.userId,
+    session_token_hash: "a".repeat(64),
+    expires_at: new Date("2026-08-01T10:00:00.000Z"),
+    family_expires_at: null,
+    rotated_at: null,
+    replaced_by_token_hash: null
+  }
   const client = {
     async query(text: string) {
       const normalized = normalizeSql(text)
       queries.push(normalized)
-      if (normalized.startsWith("UPDATE blumi_sessions")) {
+      if (normalized.startsWith("SELECT session_id FROM blumi_sessions")) {
         return { rows: [{ session_id: NEXT_SESSION.sessionId }], rowCount: 1 }
+      }
+      if (normalized.startsWith("SELECT account_id, session_id")) {
+        return { rows: [currentRow], rowCount: 1 }
       }
       return { rows: [], rowCount: 0 }
     },
@@ -1090,11 +1103,13 @@ test("postgres session rotation conditionally consumes and replaces one token", 
     now: new Date("2026-07-11T10:00:00.000Z")
   })
 
-  assert.equal(rotated, true)
+  assert.equal(rotated.kind, "rotated")
+  assert.equal(rotated.kind === "rotated" && rotated.session.sessionId, NEXT_SESSION.sessionId)
   assert.equal(queries[0], "BEGIN")
-  assert.match(queries[1] ?? "", /UPDATE blumi_sessions/)
-  assert.match(queries[1] ?? "", /RETURNING session_id/)
-  assert.match(queries[2] ?? "", /INSERT INTO blumi_sessions/)
+  assert.match(queries[2] ?? "", /pg_advisory_xact_lock/)
+  assert.match(queries[3] ?? "", /FOR UPDATE/)
+  assert.match(queries[4] ?? "", /UPDATE blumi_sessions SET expires_at = \$2, rotated_at = \$2/)
+  assert.match(queries[5] ?? "", /INSERT INTO blumi_sessions/)
   assert.equal(queries.at(-1), "COMMIT")
   assert.equal(released, true)
 })

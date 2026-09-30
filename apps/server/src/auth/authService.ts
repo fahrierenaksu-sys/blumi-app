@@ -105,6 +105,8 @@ export interface AuthService {
         version: string
         locale: "en" | "tr"
       }
+      /** Verified Firebase uid; bound on first use and required to match afterwards. */
+      firebaseUid?: string
     },
     now?: Date
   ): Promise<{ account: AccountRecord; session: SessionRecord; sessionToken: string }>
@@ -148,7 +150,10 @@ export interface AuthService {
   requestPhoneChangeNewNumberChallenge(sessionToken: string, phoneNumber: string, currentPhoneConfirmationToken: string, now?: Date): Promise<{ expiresAt: string } | null>
   verifyPhoneChangeNewNumberChallenge(sessionToken: string, code: string, now?: Date): Promise<{ confirmationToken: string; expiresAt: string } | null>
   confirmPhoneChange(sessionToken: string, currentPhoneConfirmationToken: string, newPhoneConfirmationToken: string, now?: Date): Promise<{ account: AccountRecord } | "missing_session" | "reauth_required" | "phone_in_use">
-  /** Fires after sign-out, account deletion or phone change has committed. */
+  /**
+   * Fires after sign-out, account deletion, phone change or a detected
+   * refresh-token reuse (family revocation) has committed.
+   */
   subscribeRealtimeAccessRevocations(listener: RealtimeAccessRevocationListener): () => void
 }
 
@@ -515,10 +520,20 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
             : undefined
         ),
         matches: () => true,
+        firebaseUid: options.firebaseUid,
         createSession(account) {
           return createSessionRecord(account, sessionToken, now)
         }
       })
+      if (finalization.kind === "identity_mismatch") {
+        // A different Firebase user now proves this number (for example a
+        // recycled number). Never hand the account over automatically.
+        throw new AuthError({
+          code: "ACCOUNT_RECOVERY_REQUIRED",
+          message: "For your security, this phone number needs an account recovery review before you can sign in.",
+          statusCode: 409
+        })
+      }
       if (finalization.kind === "account_not_found") {
         throw new AuthError({
           code: "OTP_INVALID_OR_EXPIRED",
@@ -787,28 +802,32 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
 
     async refreshSession(sessionToken, now = new Date()) {
-      const resolved = await this.getSession(sessionToken, now)
-      if (!resolved) return null
+      const current = await repository.getSessionByTokenHash(hashSessionToken(sessionToken))
+      if (!current) return null
 
       const nextSessionToken = createSessionToken()
-      const nextSession = createSessionRecord(
-        resolved.account,
-        nextSessionToken,
-        now
-      )
-      const nextSessionInFamily = {
-        ...nextSession,
-        sessionId: resolved.session.sessionId
-      }
-      const rotated = await repository.rotateSession({
-        currentSessionTokenHash: hashSessionToken(sessionToken),
-        nextSession: nextSessionInFamily,
+      const rotation = await repository.rotateSession({
+        currentSessionTokenHash: current.sessionTokenHash,
+        nextSession: {
+          accountId: current.accountId,
+          userId: current.userId,
+          sessionId: current.sessionId,
+          sessionTokenHash: hashSessionToken(nextSessionToken),
+          expiresAt: current.expiresAt
+        },
         now
       })
-      if (!rotated) return null
+      if (rotation.kind === "reuse_detected") {
+        // The family was deleted in the same transaction; drop live sockets.
+        realtimeAccessRevocations.publish({ kind: "user", userId: rotation.userId })
+        return null
+      }
+      if (rotation.kind !== "rotated") return null
+      const resolved = await this.getSessionByTokenHash(rotation.session.sessionTokenHash, now)
+      if (!resolved) return null
       return {
         account: resolved.account,
-        session: nextSessionInFamily,
+        session: resolved.session,
         sessionToken: nextSessionToken
       }
     },

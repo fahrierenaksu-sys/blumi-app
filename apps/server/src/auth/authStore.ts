@@ -119,6 +119,16 @@ export interface SessionRecord {
   userId: string
   sessionTokenHash: string
   expiresAt: string
+  /**
+   * Absolute end of the session family (sign-in to forced re-verification).
+   * Absent only on legacy rows created before migration 068; the first
+   * rotation of such a family anchors it.
+   */
+  familyExpiresAt?: string
+  /** Set when this token was exchanged by refresh; the row is then a tombstone. */
+  rotatedAt?: string
+  /** Hash of the token issued in exchange for this one. */
+  replacedByTokenHash?: string
 }
 
 export interface BlumiBackendStore {
@@ -136,6 +146,8 @@ export interface BlumiBackendStore {
   accountActionConfirmations: Map<string, AccountActionConfirmation>
   accountsByPhone: Map<string, AccountRecord>
   sessionsByTokenHash: Map<string, SessionRecord>
+  /** Verified Firebase uid bound to each account (blumi_accounts.firebase_uid). */
+  firebaseUidsByAccountId: Map<string, string>
 }
 
 export interface AccountDeletionConfirmation {
@@ -184,7 +196,8 @@ export function createBlumiBackendStore(): BlumiBackendStore {
     accountActionOtpSendLimits: new Map(),
     accountActionConfirmations: new Map(),
     accountsByPhone: new Map(),
-    sessionsByTokenHash: new Map()
+    sessionsByTokenHash: new Map(),
+    firebaseUidsByAccountId: new Map()
   }
 }
 
@@ -266,6 +279,22 @@ export function hashSessionToken(sessionToken: string): string {
   return createHash("sha256").update(sessionToken).digest("hex")
 }
 
+/** Sliding lifetime of one session token; refresh issues a new one. */
+export const SESSION_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30
+/**
+ * Absolute lifetime of a session family. After it, refresh stops and the
+ * member re-verifies the phone. Three sliding windows: the mobile client
+ * refreshes within 24 hours of expiry, so an active member re-verifies at
+ * most once per quarter.
+ */
+export const SESSION_FAMILY_MAX_LIFETIME_MS = 1000 * 60 * 60 * 24 * 90
+/**
+ * How long a rotated token may be presented again to refresh without being
+ * treated as stolen. It covers a client retry after a lost refresh response
+ * or a cold relaunch that still holds the previous token.
+ */
+export const SESSION_REFRESH_REUSE_GRACE_MS = 1000 * 30
+
 export function createSessionRecord(
   account: AccountRecord,
   sessionToken: string,
@@ -276,6 +305,13 @@ export function createSessionRecord(
     sessionId: `session_${randomUUID()}`,
     userId: account.userId,
     sessionTokenHash: hashSessionToken(sessionToken),
-    expiresAt: new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30).toISOString()
+    expiresAt: new Date(now.getTime() + SESSION_TOKEN_TTL_MS).toISOString(),
+    familyExpiresAt: new Date(now.getTime() + SESSION_FAMILY_MAX_LIFETIME_MS).toISOString()
   }
+}
+
+/** Expiry of a token issued by refresh: sliding, but never past the family cap. */
+export function capSessionExpiry(now: Date, familyExpiresAt: string): string {
+  const sliding = now.getTime() + SESSION_TOKEN_TTL_MS
+  return new Date(Math.min(sliding, Date.parse(familyExpiresAt))).toISOString()
 }

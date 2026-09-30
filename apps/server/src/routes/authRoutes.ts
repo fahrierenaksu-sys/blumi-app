@@ -5,6 +5,7 @@ import {
   noContentResponseJsonSchema,
   successResponseJsonSchema
 } from "@blumi/contracts"
+import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import { isAuthError } from "../auth/authErrors"
 import { toSessionActor, type AuthService } from "../auth/authService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
@@ -20,6 +21,7 @@ import {
 export interface AuthRouteServices {
   authService: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
+  accountRecoveryService?: AccountRecoveryService
 }
 
 const sendCodeResponses = {
@@ -178,10 +180,24 @@ export async function registerAuthRoutes(
         }
         const result = await authService.signInWithVerifiedPhone(phoneNumber, {
           requireExistingAccount: parsed.authIntent === "sign-in",
-          acceptedTerms: parsed.authIntent === "create" ? parsed.termsAcceptance : undefined
+          acceptedTerms: parsed.authIntent === "create" ? parsed.termsAcceptance : undefined,
+          firebaseUid: identity.uid
+        }).catch(async (error: unknown) => {
+          if (isAuthError(error) && error.code === "ACCOUNT_RECOVERY_REQUIRED") {
+            // Queue the existing manual review; the phone was just verified.
+            await services.accountRecoveryService?.requestWithVerifiedPhone({
+              oldPhoneNumber: phoneNumber,
+              newPhoneNumber: phoneNumber,
+              verifiedPhoneNumber: phoneNumber
+            }).catch(() => undefined)
+          }
+          throw error
         })
         return reply.code(200).send(toSessionActor(result.account, result.session, result.sessionToken))
       } catch (error) {
+        if (isAuthError(error) && error.code === "ACCOUNT_RECOVERY_REQUIRED") {
+          return reply.code(error.statusCode).send({ code: error.code, error: error.message })
+        }
         if (isAuthError(error)) {
           return reply.code(error.statusCode).send({ error: error.message })
         }
