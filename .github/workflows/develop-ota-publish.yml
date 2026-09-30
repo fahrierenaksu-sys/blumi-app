@@ -91,16 +91,16 @@ jobs:
           node - "$output_file" <<'NODE' >> "$GITHUB_OUTPUT"
           const text = require("node:fs").readFileSync(process.argv[2], "utf8");
           const [build] = JSON.parse(text.slice(text.indexOf("[")));
-          if (!build?.id || !build?.runtimeVersion) {
-            console.error("No finished preview build with a runtime version was found.");
+          if (!build?.id) {
+            console.error("No finished preview build was found.");
             process.exit(1);
           }
           console.log(`id=${build.id}`);
-          console.log(`runtime=${build.runtimeVersion}`);
-          console.error(`Latest preview build ${build.id} (build ${build.appBuildVersion}), runtime ${build.runtimeVersion}`);
+          console.error(`Latest preview build ${build.id} (build ${build.appBuildVersion ?? "?"})`);
           NODE
 
       - name: Check that the build can run this JavaScript
+        id: compare
         run: |
           set -euo pipefail
           # EAS compares the build's recorded fingerprint with this checkout the
@@ -108,10 +108,12 @@ jobs:
           output="$(eas fingerprint:compare --build-id "${{ steps.build.outputs.id }}" \
             --environment production --non-interactive 2>&1)" || true
           echo "$output"
-          if ! grep -q "matches fingerprint" <<<"$output"; then
+          runtime="$(sed -nE 's/.*Fingerprint ([0-9a-f]+) from IOS build matches fingerprint ([0-9a-f]+).*/\1/p' <<<"$output" | head -1)"
+          if [ -z "$runtime" ]; then
             echo "::error::This change touches native code or config, so preview build ${{ steps.build.outputs.id }} cannot run it. Run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
             exit 1
           fi
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
 
       - name: Publish the OTA update
         run: |
@@ -123,7 +125,7 @@ jobs:
             cat "$RUNNER_TEMP/update.err" "$output_file"
             exit 1
           fi
-          node - "$output_file" "${{ steps.build.outputs.runtime }}" <<'NODE'
+          node - "$output_file" "${{ steps.compare.outputs.runtime }}" <<'NODE'
           const text = require("node:fs").readFileSync(process.argv[2], "utf8");
           const expected = process.argv[3];
           const runtimes = [...text.matchAll(/"runtimeVersion"\s*:\s*"([^"]+)"/g)].map((match) => match[1]);
