@@ -8,7 +8,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/realtimeClient.test.js dist/realtimeClient.adversarial.test.js dist/reconnectTransitionTracker.test.js",
+    "test": "npm run build && node --test dist/realtimeClient.test.js dist/realtimeClient.adversarial.test.js dist/realtimeClient.lifecycle.test.js dist/reconnectTransitionTracker.test.js",
     "typecheck": "tsc --noEmit"
   },
   "author": "Blumi",

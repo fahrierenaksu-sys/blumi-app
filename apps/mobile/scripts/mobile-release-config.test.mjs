@@ -1020,8 +1020,10 @@ test("navigation links and offline status remain wired to native runtime", () =>
   const navigator = read("src/navigation/RootNavigator.tsx")
   const rootLinking = read("src/navigation/rootLinking.ts")
   const networkStore = read("src/features/network/networkStore.ts")
-  const connectionBanner = read("src/ui/connectionBanner.tsx")
-  const connectionBannerModel = read("src/ui/connectionBannerModel.ts")
+  const connectionBanner = read("src/features/realtime/connectionBanner/ConnectionBanner.tsx")
+  const connectionBannerState = read("src/features/realtime/connectionBanner/useConnectionBannerState.ts")
+  const connectionBannerModel = read("src/features/realtime/connectionBanner/connectionBannerModel.ts")
+  const connectionBannerCopy = read("src/features/realtime/connectionBanner/connectionBannerCopy.ts")
 
   assert.match(rootLinking, /prefixes: \["blumi:\/\/"\]/)
   for (const path of [
@@ -1041,13 +1043,19 @@ test("navigation links and offline status remain wired to native runtime", () =>
   assert.match(navigator, /<ConnectionBanner status=\{rootConnectionStatus\}/)
   assert.match(networkStore, /NetInfo\.addEventListener/)
   assert.doesNotMatch(networkStore, /\bany\b|console\.warn|try\s*\{\s*require/)
-  assert.match(connectionBanner, /resolveConnectionBannerState\(status, isConnected, initialConnectionSlow\)/)
+  // Updated 2026-09-30 (owner feedback): the banner moved to
+  // features/realtime, waits out a foreground grace period so a resume
+  // reconnect stays invisible, and uses the app locale (TR/EN) with shorter copy.
+  assert.match(connectionBanner, /useConnectionBannerState\(status\)/)
+  assert.match(connectionBanner, /getAppLocale/)
+  assert.match(connectionBanner, /pointerEvents="none"/)
+  assert.match(connectionBannerState, /isConnected/)
   assert.match(connectionBannerModel, /if \(!isConnected\) return "offline"/)
-  // Banner copy lives in the model (English and Turkish) since 2026-09-30.
-  assert.match(connectionBanner, /getConnectionBannerCopy\(/)
-  assert.match(connectionBannerModel, /No internet connection/)
-  assert.match(connectionBannerModel, /Reconnecting to Blumi/)
-  assert.match(connectionBannerModel, /Can't reach Blumi right now/)
+  assert.match(connectionBannerModel, /CONNECTION_BANNER_GRACE_MS = 3_000/)
+  assert.match(connectionBannerCopy, /No internet connection/)
+  assert.match(connectionBannerCopy, /İnternet bağlantısı yok/)
+  assert.match(connectionBannerCopy, /Can't reach Blumi/)
+  assert.doesNotMatch(connectionBannerCopy, /Reconnecting to Blumi/)
   assert.doesNotMatch(connectionBanner, /Connecting to the room/)
   assert.doesNotMatch(DISCOVER_SCREEN_SOURCE_PATHS.map(read).join("\n"), /<ConnectionBanner/)
   assert.match(read("src/screens/SettingsScreen.tsx"), /Platform\.select/)

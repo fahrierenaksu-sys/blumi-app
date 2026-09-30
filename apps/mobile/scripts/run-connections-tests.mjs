@@ -21,6 +21,8 @@ const sourceFiles = [
   "src/features/connections/connectionDecisionApi.test.ts",
   "src/features/connections/connectionDecisionDelivery.ts",
   "src/features/connections/connectionDecisionDelivery.test.ts",
+  "src/features/connections/connectionDecisionFlushGate.ts",
+  "src/features/connections/connectionDecisionFlushGate.test.ts",
   "src/features/connections/connectionMatchPresentation.ts",
   "src/features/connections/connectionMatchPresentation.test.ts",
   "src/features/connections/connectionMatchRuntime.ts",
@@ -59,6 +61,7 @@ try {
       join(outputDirectory, "features/connections/connectionDecisionOutbox.test.js"),
       join(outputDirectory, "features/connections/connectionDecisionApi.test.js"),
       join(outputDirectory, "features/connections/connectionDecisionDelivery.test.js"),
+      join(outputDirectory, "features/connections/connectionDecisionFlushGate.test.js"),
       join(outputDirectory, "features/connections/connectionMatchPresentation.test.js"),
       join(outputDirectory, "features/connections/connectionMatchRuntime.test.js"),
       join(outputDirectory, "features/connections/globalMatchReconciliation.test.js")

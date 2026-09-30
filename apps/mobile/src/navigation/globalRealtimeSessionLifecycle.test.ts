@@ -39,7 +39,7 @@ function mount() {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
         sendGlobal: () => true,
-        setGlobalRealtimeAppActive: () => undefined,
+        setGlobalRealtimeAppState: () => undefined,
         subscribeToStatus: (listener: StatusListener) => {
           statusListeners.add(listener)
           return () => statusListeners.delete(listener)

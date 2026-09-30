@@ -21,13 +21,18 @@ import {
   getIsConnected,
   subscribeToNetworkStatus
 } from "../network/networkStore"
+import {
+  applyRealtimeAppLifecycle,
+  resolveRealtimeAppLifecycle,
+  type RealtimeAppLifecycle
+} from "./realtimeAppLifecycle"
 import { requestRealtimeTicket } from "./realtimeTicketApi"
 
 // ─── Singleton state ────────────────────────────────────────
 let globalClient: RealtimeClient | null = null
 let globalStatus: RealtimeConnectionStatus = "idle"
 let unsubscribeNetworkStatus: (() => void) | null = null
-let appActive = true
+let appLifecycle: RealtimeAppLifecycle = "foreground"
 
 type StatusListener = (status: RealtimeConnectionStatus, meta?: RealtimeConnectionMeta) => void
 type EventListener = (event: ServerEvent) => void
@@ -57,7 +62,7 @@ export function connectGlobal(
     (token) => requestRealtimeTicket(httpBaseUrl, token)
   )
   globalClient = client
-  client.setAppActive(appActive)
+  applyRealtimeAppLifecycle(client, appLifecycle)
   client.setNetworkConnected(getIsConnected())
   unsubscribeNetworkStatus = subscribeToNetworkStatus((isConnected) => {
     if (globalClient === client) client.setNetworkConnected(isConnected)
@@ -86,12 +91,15 @@ export function disconnectGlobal(): void {
 }
 
 /**
- * App foreground signal from the navigation shell. Backgrounded, reconnect
- * retries pause; returning to the foreground retries at once.
+ * AppState signal from the navigation shell. In the background the socket is
+ * closed so the server releases the connection at once; while briefly
+ * inactive retries pause; returning to the foreground reconnects at once.
  */
-export function setGlobalRealtimeAppActive(isActive: boolean): void {
-  appActive = isActive
-  globalClient?.setAppActive(isActive)
+export function setGlobalRealtimeAppState(appState: string): void {
+  const next = resolveRealtimeAppLifecycle(appState)
+  if (next === appLifecycle) return
+  appLifecycle = next
+  if (globalClient) applyRealtimeAppLifecycle(globalClient, next)
 }
 
 export function sendGlobal(event: ClientEvent): boolean {
