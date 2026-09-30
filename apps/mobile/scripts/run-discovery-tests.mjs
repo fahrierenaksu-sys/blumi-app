@@ -163,6 +163,7 @@ try {
       "--import", "tsx",
       "--test",
       "src/features/discovery/screen/useDiscoveryDecisions.test.ts",
+      "src/features/discovery/screen/useDiscoveryDeck.test.ts",
       "src/features/discovery/discoverySwipeModel.test.ts"
     ],
     {
