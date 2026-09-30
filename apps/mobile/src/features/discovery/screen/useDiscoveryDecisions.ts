@@ -18,6 +18,7 @@ import { showToast } from "../../../ui/toast"
 import {
   createMatchFromDiscoveryResult,
   decideDiscoverProfile,
+  DiscoveryDecisionNotEligibleError,
   DiscoveryDecisionQuotaExhaustedError
 } from "../discoveryApi"
 import {
@@ -209,6 +210,12 @@ export function useDiscoveryDecisions(input: {
         showDiscoverFeedback(lobbyCopy.liked, "warm")
         return true
       } catch (error) {
+        if (error instanceof DiscoveryDecisionNotEligibleError) {
+          // The server will refuse this card every time (not eligible any
+          // more), so it stays out of the deck instead of springing back.
+          showDiscoverFeedback(lobbyCopy.unavailable, "soft")
+          return false
+        }
         if (error instanceof DiscoveryDecisionQuotaExhaustedError) {
           updateProductionQuota(error.quota)
         }
