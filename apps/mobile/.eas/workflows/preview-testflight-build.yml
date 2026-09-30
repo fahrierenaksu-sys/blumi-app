@@ -1,0 +1,49 @@
+# Manual only: builds the owner's development binary (channel `preview`) and
+# uploads it to the same TestFlight app, for the internal group that should
+# receive development OTA updates. Run it once to start, and again only when
+# develop-preview-update.yml reports a native change. It never runs on push.
+name: Blumi preview build to TestFlight
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  checks:
+    name: Check source, types, lint, tests and dependency audit
+    environment: production
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Run release checks
+        working_directory: ../..
+        run: |
+          set -euo pipefail
+          npm run verify:source-hygiene
+          npm run build:packages
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run audit:release
+
+  build_preview_ios:
+    name: Build the iOS preview binary
+    needs: [checks]
+    type: build
+    environment: production
+    params:
+      platform: ios
+      profile: preview
+
+  submit_preview_ios:
+    name: Upload the preview build to TestFlight (development group)
+    needs: [build_preview_ios]
+    type: testflight
+    environment: production
+    params:
+      profile: preview
+      build_id: ${{ needs.build_preview_ios.outputs.build_id }}
+      internal_groups: [Blumi Dev]
+      submit_beta_review: false
+      changelog: |
+        Geliştirme sürümü (preview kanalı). develop branch'ine yapılan uyumlu değişiklikler bu uygulamaya OTA olarak gelir.
+        Kararlı test sürümü değildir; Blumi QA grubuna dağıtılmaz.

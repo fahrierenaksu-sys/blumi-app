@@ -14,6 +14,7 @@ import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold"
 import { Inter_800ExtraBold } from "@expo-google-fonts/inter/800ExtraBold"
 import { Inter_900Black } from "@expo-google-fonts/inter/900Black"
 import { RootNavigator } from "./src/navigation/RootNavigator"
+import { useOtaUpdates } from "./src/features/appUpdates/useOtaUpdates"
 import { ErrorBoundary } from "./src/ui/errorBoundary"
 import {
   initializeCrashReporting,
@@ -34,6 +35,7 @@ assertLegalReleaseReady({
 })
 
 function App() {
+  useOtaUpdates()
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {

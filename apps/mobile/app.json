@@ -3,6 +3,14 @@
     "name": "Blumi",
     "slug": "blumi",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/bc61197e-e1cb-478b-9f1d-61d8582d77c8",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "scheme": "blumi",
     "orientation": "portrait",
     "icon": "./assets/brand/blumi-app-icon-1024.png",

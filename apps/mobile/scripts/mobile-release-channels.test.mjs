@@ -1,0 +1,114 @@
+// Guards the OTA/TestFlight channel split:
+//   develop -> OTA to the `preview` channel only, never builds.
+//   main    -> OTA to `production` when the native runtime matches an existing
+//              production build, otherwise a new production build to TestFlight.
+//   manual  -> the preview binary (channel `preview`) to TestFlight.
+// It also pins the environment parity that keeps fingerprints (runtime
+// versions) identical between a build and the updates published for it.
+import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname, join, resolve } from "node:path"
+import test from "node:test"
+import { fileURLToPath } from "node:url"
+
+const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+const require = createRequire(join(mobileRoot, "package.json"))
+let yaml
+try {
+  yaml = require("js-yaml")
+} catch {
+  throw new Error("js-yaml (installed with ESLint) is required to read the EAS workflows")
+}
+
+const readJson = (path) => JSON.parse(readFileSync(join(mobileRoot, path), "utf8"))
+const readWorkflow = (name) => yaml.load(readFileSync(join(mobileRoot, ".eas/workflows", name), "utf8"))
+const appConfig = readJson("app.json").expo
+const easJson = readJson("eas.json")
+const mainWorkflow = readWorkflow("testflight.yml")
+const developWorkflow = readWorkflow("develop-preview-update.yml")
+const previewBuildWorkflow = readWorkflow("preview-testflight-build.yml")
+
+const jobsOfType = (workflow, type) => Object.values(workflow.jobs).filter((job) => job.type === type)
+
+test("the app ships expo-updates with a fingerprint runtime and the project's update URL", () => {
+  assert.match(readJson("package.json").dependencies["expo-updates"], /^~57\./)
+  assert.deepEqual(appConfig.runtimeVersion, { policy: "fingerprint" })
+  assert.equal(appConfig.updates.url, `https://u.expo.dev/${appConfig.extra.eas.projectId}`)
+})
+
+test("preview and production binaries are store builds on separate channels", () => {
+  const { preview, production } = easJson.build
+  assert.equal(preview.distribution, "store")
+  assert.equal(preview.channel, "preview")
+  assert.equal(production.channel, "production")
+  assert.notEqual(production.distribution, "internal")
+  assert.equal(preview.environment, "production")
+  assert.equal(production.environment, "production")
+  const withoutProfile = ({ EAS_BUILD_PROFILE, EXPO_PUBLIC_BLUMI_BUILD_PROFILE, ...rest }) => rest
+  assert.deepEqual(withoutProfile(preview.env), withoutProfile(production.env), "preview must behave like production apart from its profile name")
+  assert.ok(easJson.submit.preview, "the preview build needs a submit profile for TestFlight")
+})
+
+test("develop publishes only to the preview channel and never builds", () => {
+  assert.deepEqual(developWorkflow.on.push.branches, ["develop"])
+  assert.equal(jobsOfType(developWorkflow, "build").length, 0)
+  assert.equal(jobsOfType(developWorkflow, "testflight").length, 0)
+  assert.equal(jobsOfType(developWorkflow, "submit").length, 0)
+  const updates = jobsOfType(developWorkflow, "update")
+  assert.equal(updates.length, 1)
+  assert.equal(updates[0].params.channel, "preview")
+  assert.equal(updates[0].params.branch, undefined)
+  const lookup = developWorkflow.jobs.get_preview_build
+  assert.equal(lookup.params.profile, "preview")
+  assert.equal(lookup.params.channel, "preview")
+  assert.match(lookup.params.fingerprint_hash, /needs\.fingerprint\.outputs\.ios_fingerprint_hash/)
+  assert.match(updates[0].if, /needs\.get_preview_build\.outputs\.build_id/)
+  const stop = developWorkflow.jobs.native_build_required
+  assert.match(stop.if, /!needs\.get_preview_build\.outputs\.build_id/)
+  assert.match(stop.steps.at(-1).run, /exit 1/)
+})
+
+test("main builds only on a native change and otherwise updates the production channel", () => {
+  assert.deepEqual(mainWorkflow.on.push.branches, ["main"])
+  const updates = jobsOfType(mainWorkflow, "update")
+  assert.equal(updates.length, 1)
+  assert.equal(updates[0].params.channel, "production")
+  assert.match(updates[0].if, /needs\.get_production_build\.outputs\.build_id/)
+  const builds = jobsOfType(mainWorkflow, "build")
+  assert.equal(builds.length, 1)
+  assert.equal(builds[0].params.profile, "production")
+  assert.match(builds[0].if, /!needs\.get_production_build\.outputs\.build_id/)
+  assert.equal(mainWorkflow.jobs.get_production_build.params.channel, "production")
+  assert.deepEqual(jobsOfType(mainWorkflow, "testflight")[0].params.internal_groups, ["Blumi QA"])
+})
+
+test("the preview binary is built only on demand and never goes to the QA group", () => {
+  assert.equal(previewBuildWorkflow.on.push, undefined)
+  assert.ok("workflow_dispatch" in previewBuildWorkflow.on)
+  assert.equal(jobsOfType(previewBuildWorkflow, "build")[0].params.profile, "preview")
+  const upload = jobsOfType(previewBuildWorkflow, "testflight")[0]
+  assert.equal(upload.params.profile, "preview")
+  assert.ok(!upload.params.internal_groups.includes("Blumi QA"))
+})
+
+test("fingerprint and update jobs use exactly the build profile's environment", () => {
+  for (const [workflow, profile] of [[mainWorkflow, "production"], [developWorkflow, "preview"]]) {
+    const expected = easJson.build[profile].env
+    for (const job of [...jobsOfType(workflow, "fingerprint"), ...jobsOfType(workflow, "update")]) {
+      assert.equal(job.environment, easJson.build[profile].environment)
+      assert.deepEqual(job.env, expected, `${job.name} env must equal build.${profile}.env`)
+    }
+  }
+})
+
+test("every workflow runs the release checks before fingerprinting or building", () => {
+  for (const workflow of [mainWorkflow, developWorkflow, previewBuildWorkflow]) {
+    const script = workflow.jobs.checks.steps.at(-1).run
+    for (const command of ["verify:source-hygiene", "typecheck", "lint", "npm test", "audit:release"]) {
+      assert.ok(script.includes(command), `checks must run ${command}`)
+    }
+    const first = workflow.jobs.fingerprint ?? workflow.jobs.build_preview_ios
+    assert.deepEqual(first.needs, ["checks"])
+  }
+})

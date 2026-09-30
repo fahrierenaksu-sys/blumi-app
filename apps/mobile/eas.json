@@ -51,7 +51,9 @@
     },
     "preview": {
       "node": "22.22.2",
-      "distribution": "internal",
+      "distribution": "store",
+      "autoIncrement": true,
+      "environment": "production",
       "channel": "preview",
       "env": {
         "EAS_BUILD_PROFILE": "preview",
@@ -66,6 +68,7 @@
     "production": {
       "node": "22.22.2",
       "autoIncrement": true,
+      "environment": "production",
       "channel": "production",
       "env": {
         "EAS_BUILD_PROFILE": "production",
@@ -79,6 +82,9 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "preview": {
+      "extends": "production"
+    }
   }
 }

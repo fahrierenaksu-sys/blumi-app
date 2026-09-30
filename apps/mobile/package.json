@@ -12,7 +12,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test:release-config": "node --test scripts/mobile-release-config.test.mjs",
+    "test:release-config": "node --test scripts/mobile-release-config.test.mjs scripts/mobile-release-channels.test.mjs",
     "test:launch-config": "node --test scripts/mobile-launch-config.test.mjs scripts/mobile-env-gate-characterization.test.mjs scripts/mobile-dev-bundle-host.test.mjs scripts/mobile-package-name.test.mjs scripts/nativeUiTestSelection.test.mjs scripts/nativeUiDiskGuard.test.mjs scripts/nativeUiScreenshotDirectory.test.mjs scripts/nativeUiTemporaryData.test.mjs scripts/run-workbench-fixture-tests.test.mjs",
     "test:bundle-size": "node --test scripts/mobile-bundle-size.test.mjs",
     "test:theme": "node --test scripts/mobile-theme-scope.test.mjs scripts/mobile-core-icon-contract.test.mjs scripts/mobile-import-boundaries.test.mjs scripts/mobile-engineering-rules.test.mjs scripts/mobile-worklet-closure.test.mjs scripts/mobile-ui-thread-motion-contract.test.mjs scripts/mobile-trust-icon-contract.test.mjs scripts/mobile-celebration-icon-contract.test.mjs",
@@ -75,6 +75,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
+    "expo-updates": "~57.0.24",
     "expo-web-browser": "~57.0.3",
     "libphonenumber-js": "^1.13.12",
     "posthog-react-native": "^4.66.2",
@@ -102,7 +103,10 @@
   "expo": {
     "autolinking": {
       "ios": {
-        "buildFromSource": ["expo-file-system", "expo-image"]
+        "buildFromSource": [
+          "expo-file-system",
+          "expo-image"
+        ]
       }
     }
   },
