@@ -51,12 +51,28 @@ jobs:
         working-directory: .
         run: npm ci
 
-      - name: Check the app config with the EAS production variables
+      - name: Load the EAS production variables
         run: |
           set -euo pipefail
-          echo "EAS production variable names:"
-          eas env:list production --format short --non-interactive 2>/dev/null | cut -d= -f1 || true
-          eas env:exec production 'npx expo config --json > /dev/null' --non-interactive
+          env_file="$RUNNER_TEMP/eas-production.env"
+          eas env:pull production --non-interactive --path "$env_file"
+          echo "Loaded EAS production variables:"
+          grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$env_file" | cut -d= -f1
+          set -a
+          # shellcheck disable=SC1090
+          source "$env_file"
+          set +a
+          # Later steps see these values; the job env (build.preview.env) wins.
+          grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$env_file" | cut -d= -f1 | while read -r name; do
+            case "$name" in
+              EAS_BUILD_PROFILE|EXPO_PUBLIC_BLUMI_BUILD_PROFILE|EXPO_PUBLIC_BLUMI_MEDIA_MODE|EXPO_PUBLIC_BLUMI_ENABLE_DEMO|EXPO_PUBLIC_BLUMI_VOICE_ENABLED|EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED|EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS) continue ;;
+            esac
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+          rm -f "$env_file"
+
+      - name: Check the app config
+        run: npx expo config --json > /dev/null
 
       - name: Fingerprint the native runtime
         id: fingerprint
