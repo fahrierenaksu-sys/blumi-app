@@ -41,6 +41,7 @@ import {
   type SessionRecord
 } from "./authStore"
 import { isProfileOnboardingReady } from "./authStore"
+import { createPhoneBanHasher } from "./moderationPhoneBan"
 import {
   createDevelopmentSmsProvider,
   type SmsProvider
@@ -194,6 +195,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
   const smsProvider = options.smsProvider ?? createDevelopmentSmsProvider()
   const codeFactory = options.codeFactory ?? createSixDigitCode
   const otpHmacSecret = options.otpHmacSecret ?? randomBytes(32)
+  const phoneBanHash = createPhoneBanHasher(otpHmacSecret)
   const accountDeletionHandlers = options.accountDeletionHandlers ?? []
   const accountDataExporter = options.accountDataExporter ?? createEmptyAccountDataExporter()
   const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
@@ -333,6 +335,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       createSession(account) {
         return createSessionRecord(account, sessionToken, input.now)
       },
+      phoneBanHash,
       matches(pending) {
         return otpDigestsMatch(
           pending.codeDigest,
@@ -521,6 +524,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         ),
         matches: () => true,
         firebaseUid: options.firebaseUid,
+        phoneBanHash,
         createSession(account) {
           return createSessionRecord(account, sessionToken, now)
         }
@@ -1165,7 +1169,8 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
           code: newPhoneConfirmationToken,
           purpose: "phone_change_new"
         }),
-        now
+        now,
+        phoneBanHash
       })
       if (result.kind === "conflict") return "phone_in_use"
       if (result.kind !== "updated") return "reauth_required"
@@ -1189,7 +1194,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       const deleted = await repository.deleteAccountData(resolved.account, {
         confirmationTokenDigest,
         now: now.getTime()
-      })
+      }, { phoneBanHash })
       if (deleted) {
         realtimeAccessRevocations.publish({ kind: "user", userId: resolved.account.userId })
         await Promise.all(

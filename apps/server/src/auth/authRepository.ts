@@ -24,6 +24,7 @@ import type {
   UserProfile
 } from "@blumi/contracts"
 import { normalizeUserProfilePrompts } from "@blumi/contracts"
+import type { ModerationPhoneBanSource, PhoneBanHasher } from "./moderationPhoneBan"
 
 export interface AuthRepository {
   saveFirebaseActionChallenge(challenge: FirebaseActionChallenge): Promise<void>
@@ -124,12 +125,18 @@ export interface AuthRepository {
    * family and never outlives the family's absolute lifetime.
    */
   rotateSession(input: SessionRotationInput): Promise<SessionRotationResult>
+  /**
+   * Deletes the account. When the stored account is banned at that moment, a
+   * ban record keyed by `phoneBanHash(phone)` is kept in the same write so the
+   * freed number cannot sign up again unbanned.
+   */
   deleteAccountData(
     account: AccountRecord,
-    confirmation?: {
+    confirmation: {
       confirmationTokenDigest: string
       now: number
-    }
+    } | undefined,
+    retention: { phoneBanHash: PhoneBanHasher }
   ): Promise<boolean>
 }
 
@@ -247,6 +254,11 @@ export interface OtpSignInFinalizationInput extends OtpVerificationInput {
    * result is `identity_mismatch` and nothing is written.
    */
   firebaseUid?: string
+  /**
+   * A new account created for a phone with a recorded phone ban starts
+   * banned. Existing accounts are never changed here.
+   */
+  phoneBanHash: PhoneBanHasher
 }
 
 export interface AccountDeletionOtpSendClaimInput extends OtpSendClaimInput {
@@ -290,6 +302,8 @@ export interface CompletePhoneChangeInput {
   currentPhoneConfirmationDigest: string
   newPhoneConfirmationDigest: string
   now: Date
+  /** A banned account that moves to a new number leaves a ban on the old one. */
+  phoneBanHash: PhoneBanHasher
 }
 
 export type PhoneChangeResult =
@@ -599,6 +613,9 @@ export function createInMemoryAuthRepository(
       const account = [...store.accountsByPhone.values()].find((candidate) => candidate.accountId === input.accountId)
       if (!account) return { kind: "reauth_required" }
       if (store.accountsByPhone.has(replacement.targetPhoneNumber)) return { kind: "conflict" }
+      if (account.moderation?.status === "banned") {
+        recordPhoneBan(store, input.phoneBanHash(account.phoneNumber), "phone_change", input.now)
+      }
       const updated = { ...account, phoneNumber: replacement.targetPhoneNumber, updatedAt: input.now.toISOString() }
       store.accountsByPhone.delete(account.phoneNumber)
       store.accountsByPhone.set(updated.phoneNumber, cloneAccount(updated))
@@ -684,6 +701,9 @@ export function createInMemoryAuthRepository(
         return { kind: input.verifiedWithoutOtp ? "account_not_found" : "terms_required" }
       }
       const account = cloneAccount(existingAccount ?? input.newAccount)
+      if (!existingAccount && store.moderationPhoneBans.has(input.phoneBanHash(input.phoneNumber))) {
+        account.moderation = { status: "banned", updatedAt: new Date(input.now).toISOString() }
+      }
       const session = input.createSession(cloneAccount(account))
       assertSessionMatchesAccount(session, account)
       if (store.sessionsByTokenHash.has(session.sessionTokenHash)) {
@@ -974,7 +994,7 @@ export function createInMemoryAuthRepository(
       store.sessionsByTokenHash.set(nextHash, { ...next })
       return { kind: "rotated", session: { ...next } }
     },
-    async deleteAccountData(account, confirmation) {
+    async deleteAccountData(account, confirmation, retention) {
       if (confirmation) {
         const pending = store.accountDeletionConfirmations.get(account.accountId)
         if (
@@ -997,6 +1017,10 @@ export function createInMemoryAuthRepository(
       store.pendingAccountDeletionOtps.delete(account.accountId)
       store.accountDeletionOtpSendLimits.delete(account.accountId)
       store.accountDeletionConfirmations.delete(account.accountId)
+      const stored = store.accountsByPhone.get(account.phoneNumber)
+      if (stored?.accountId === account.accountId && stored.moderation?.status === "banned") {
+        recordPhoneBan(store, retention.phoneBanHash(stored.phoneNumber), "account_deletion", new Date())
+      }
       store.accountsByPhone.delete(account.phoneNumber)
       store.firebaseUidsByAccountId.delete(account.accountId)
       for (const [tokenHash, session] of store.sessionsByTokenHash.entries()) {
@@ -1006,6 +1030,18 @@ export function createInMemoryAuthRepository(
       }
       return true
     }
+  }
+}
+
+function recordPhoneBan(
+  store: BlumiBackendStore,
+  phoneHash: string,
+  source: ModerationPhoneBanSource,
+  now: Date
+): void {
+  // The first record wins, like ON CONFLICT DO NOTHING in PostgreSQL.
+  if (!store.moderationPhoneBans.has(phoneHash)) {
+    store.moderationPhoneBans.set(phoneHash, { source, createdAt: now.toISOString() })
   }
 }
 

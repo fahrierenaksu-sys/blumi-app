@@ -5,6 +5,7 @@ import pg from "pg"
 import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
 import { createInMemoryAuthRepository, type AuthRepository } from "./authRepository"
 import { createAuthService, type AuthService } from "./authService"
+import { createPhoneBanHasher } from "./moderationPhoneBan"
 import {
   SESSION_FAMILY_MAX_LIFETIME_MS,
   SESSION_REFRESH_REUSE_GRACE_MS,
@@ -210,7 +211,8 @@ const scenarios: Record<string, Scenario> = {
       accountId: signed.account.accountId,
       currentPhoneConfirmationDigest: "a".repeat(64),
       newPhoneConfirmationDigest: "b".repeat(64),
-      now: at(1_000)
+      now: at(1_000),
+      phoneBanHash: createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef")
     })
     assert.equal(changed.kind, "updated")
     const rebound = await harness.service.signInWithVerifiedPhone(

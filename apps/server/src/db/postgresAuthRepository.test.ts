@@ -2,11 +2,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { Pool } from "pg"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
+import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createEmptyAccountDataExporter } from "../account/accountDataExporter"
 import type { AccountRecord } from "../auth/authStore"
 import type { PendingOtp, SessionRecord } from "../auth/authStore"
 import type { CompleteAvatarSelection } from "@blumi/contracts"
 import { DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+
+const TEST_PHONE_BAN_HASH = createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef")
 
 const DEFAULT_LOADOUT = {
   schemaVersion: 1 as const,
@@ -985,7 +988,8 @@ test("postgres OTP sign-in commits account and session before consuming the code
       ...ACCOUNT,
       profile: { ...ACCOUNT.profile, location: { lat: 41.01, lng: 28.97 } }
     },
-    createSession: () => NEXT_SESSION
+    createSession: () => NEXT_SESSION,
+    phoneBanHash: TEST_PHONE_BAN_HASH
   })
 
   assert.equal(result.kind, "verified")
@@ -1050,7 +1054,8 @@ test("postgres OTP sign-in rolls back without consuming the code when session st
       maxAttempts: 5,
       matches: () => true,
       newAccount: ACCOUNT,
-      createSession: () => NEXT_SESSION
+      createSession: () => NEXT_SESSION,
+      phoneBanHash: TEST_PHONE_BAN_HASH
     }),
     /session persistence unavailable/
   )
@@ -1137,7 +1142,7 @@ test("postgres account deletion removes every user-owned domain in one transacti
   await createPostgresAuthRepository(pool).deleteAccountData(ACCOUNT, {
     confirmationTokenDigest: "d".repeat(64),
     now: Date.parse("2026-07-21T12:00:00.000Z")
-  })
+  }, { phoneBanHash: TEST_PHONE_BAN_HASH })
 
   assert.equal(queries[0], "BEGIN")
   assert.match(queries[1] ?? "", /DELETE FROM blumi_account_deletion_confirmations/)
@@ -1210,7 +1215,7 @@ test("postgres account deletion rolls back and releases the client on failure", 
   } as unknown as Pool
 
   await assert.rejects(
-    () => createPostgresAuthRepository(pool).deleteAccountData(ACCOUNT),
+    () => createPostgresAuthRepository(pool).deleteAccountData(ACCOUNT, undefined, { phoneBanHash: TEST_PHONE_BAN_HASH }),
     /database unavailable/
   )
   assert.equal(queries.at(-1), "ROLLBACK")

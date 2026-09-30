@@ -593,6 +593,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
         if (!account) { await client.query("COMMIT"); return { kind: "reauth_required" } }
         const collision = await client.query("SELECT 1 FROM blumi_accounts WHERE phone_number = $1 AND account_id <> $2", [replacement.target_phone_number, input.accountId])
         if (collision.rows[0]) { await client.query("COMMIT"); return { kind: "conflict" } }
+        if (account.moderation?.status === "banned") {
+          // The row is locked above, so the ban and the number it frees commit together.
+          await client.query(INSERT_PHONE_BAN_SQL, [input.phoneBanHash(account.phoneNumber), "phone_change"])
+        }
         // The bound uid belongs to the previous number's Firebase user; the next
         // sign-in with the verified new number binds its uid.
         await client.query(
@@ -765,10 +769,15 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
                 discovery_radius_km, interests, location_lat,
                 location_lng, created_at, updated_at,
                 onboarding_profile_complete, onboarding_avatar_complete,
-                onboarding_room_complete, onboarding_completed_at, accepted_terms
+                onboarding_room_complete, onboarding_completed_at, accepted_terms,
+                moderation_status, moderation_updated_at
               ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10,
                         $11, $12, $13, $14, $15, $16, $17, $18, $19,
-                        $20, $21, $22, $23, $24, $25, $26::jsonb)
+                        $20, $21, $22, $23, $24, $25, $26::jsonb,
+                        CASE WHEN EXISTS (SELECT 1 FROM blumi_moderation_phone_bans WHERE phone_hash = $27)
+                          THEN 'banned' ELSE 'active' END,
+                        CASE WHEN EXISTS (SELECT 1 FROM blumi_moderation_phone_bans WHERE phone_hash = $27)
+                          THEN $21::timestamptz ELSE NULL END)
               ON CONFLICT (phone_number) DO NOTHING
               RETURNING account_id, user_id, phone_number, display_name, age,
                         avatar_preset_id, avatar_selection, avatar_revision,
@@ -804,7 +813,8 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
               candidate.onboarding.avatar === "complete",
               candidate.onboarding.room === "complete",
               candidate.onboarding.completedAt ?? null,
-              candidate.acceptedTerms ? JSON.stringify(candidate.acceptedTerms) : null
+              candidate.acceptedTerms ? JSON.stringify(candidate.acceptedTerms) : null,
+              input.phoneBanHash(input.phoneNumber)
             ]
           )
           if (insertedAccount.rows[0]) {
@@ -1332,7 +1342,7 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       }
     },
 
-    async deleteAccountData(account, confirmation) {
+    async deleteAccountData(account, confirmation, retention) {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
@@ -1540,6 +1550,18 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "DELETE FROM blumi_discover_profiles WHERE user_id = $1",
           [account.userId]
         )
+        // Lock the row the DELETE below takes anyway, so a ban landing now is
+        // either seen here or waits for the deletion.
+        const stored = await client.query(
+          "SELECT phone_number, moderation_status FROM blumi_accounts WHERE account_id = $1 FOR UPDATE",
+          [account.accountId]
+        )
+        if (stored.rows[0]?.moderation_status === "banned") {
+          await client.query(INSERT_PHONE_BAN_SQL, [
+            retention.phoneBanHash(String(stored.rows[0].phone_number)),
+            "account_deletion"
+          ])
+        }
         await client.query(
           "DELETE FROM blumi_accounts WHERE account_id = $1",
           [account.accountId]
@@ -1555,6 +1577,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
     }
   }
 }
+
+const INSERT_PHONE_BAN_SQL = `INSERT INTO blumi_moderation_phone_bans (phone_hash, source)
+  VALUES ($1, $2)
+  ON CONFLICT (phone_hash) DO NOTHING`
 
 function mapPendingOtp(row: QueryResultRow): PendingOtp {
   return {

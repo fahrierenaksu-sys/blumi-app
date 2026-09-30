@@ -5,6 +5,7 @@ import pg from "pg"
 import { DEFAULT_FEMALE_AVATAR_LOADOUT, toAvatarLoadoutV2 } from "@blumi/domain"
 import type { AccountRecord } from "../auth/authStore"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
+import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createPostgresPresenceRepository } from "./postgresPresenceRepository"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
@@ -218,7 +219,7 @@ test("account deletion and last websocket disconnect use one lock order", {
 
     deletionOutcome = createPostgresAuthRepository(accountPool)
       // This repository method consumes only the account identity fields.
-      .deleteAccountData(accountIdentity as AccountRecord)
+      .deleteAccountData(accountIdentity as AccountRecord, undefined, { phoneBanHash: createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef") })
       .then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }))
     await waitForBlockedQuery(
       observerPool,

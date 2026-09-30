@@ -4,6 +4,7 @@ import { Pool } from "pg"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
 import { createPostgresNotificationRepository } from "./postgresNotificationRepository"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
+import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createNotificationService } from "../notifications/notificationService"
 import type { DiscoveryWatchClaim } from "../matches/matchRepository"
 import { createSeedDiscoverProfiles } from "../matches/matchRepository"
@@ -176,7 +177,7 @@ for (const first of ["delete", "dispatch"] as const) test(`F54 ${first}-first co
     } } as unknown as Pool
     const deleteAccount = () => createPostgresAuthRepository(authPool).deleteAccountData(account, {
       confirmationTokenDigest: "a".repeat(64), now: now.getTime()
-    })
+    }, { phoneBanHash: createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef") })
     if (first === "dispatch") {
       let providerEntered!: () => void
       const entered = new Promise<void>((resolve) => { providerEntered = resolve })
@@ -255,7 +256,7 @@ test("F56 deletion starting without a watch serializes against concurrent creati
     } } as unknown as Pool
     const deletion = createPostgresAuthRepository(authPool).deleteAccountData(account, {
       confirmationTokenDigest: "b".repeat(64), now: now.getTime()
-    })
+    }, { phoneBanHash: createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef") })
     await devicesLocked
     let sends = 0
     const contender = (async () => {
