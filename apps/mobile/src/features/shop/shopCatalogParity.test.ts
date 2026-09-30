@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-
-import type { RoomFurnitureRotation } from "../roomV2/roomV2.types";
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename;
@@ -26,16 +24,6 @@ const {
 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("@blumi/domain") as typeof import("@blumi/domain");
-const {
-  resolveEconomyCatalog,
-  UNIVERSAL_CORE_ROOM_ARTIFACT_MANIFEST_ID,
-  UNIVERSAL_CORE_ROOM_CANDIDATE_SET_DIGEST,
-  UNIVERSAL_CORE_ROOM_EVIDENCE_VERIFIER_ID,
-  UNIVERSAL_CORE_ROOM_ITEM_IDS,
-  UNIVERSAL_CORE_ROOM_PROMOTION_SCHEMA_VERSION,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("@blumi/domain") as typeof import("@blumi/domain");
-
 const workspaceRoot = process.cwd();
 const economyCatalogSource = readFileSync(
   join(workspaceRoot, "../../packages/domain/src/economy/economyCatalog.ts"),
@@ -52,29 +40,6 @@ const maleCapsulePreviewSource = readFileSync(
 const { ROOM_V2_FURNITURE_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog");
-const {
-  ROOM_V3_UNIVERSAL_CORE_ARTIFACT_HASHES_BY_CANDIDATE_ID,
-  ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../roomV2/roomV3UniversalCoreArtifactRegistry") as typeof import("../roomV2/roomV3UniversalCoreArtifactRegistry");
-const {
-  ROOM_V3_UNIVERSAL_CORE_ARTIFACT_VERIFIER_ID,
-  ROOM_V3_UNIVERSAL_CORE_RUNTIME_CANDIDATE_IDS,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../roomV2/roomV3UniversalCoreRuntimeFurniture") as typeof import("../roomV2/roomV3UniversalCoreRuntimeFurniture");
-const {
-  ROOM_V3_LOCKED_PERSPECTIVE_PROFILE,
-  ROOM_V3_UNIVERSAL_CORE_EVIDENCE_MANIFEST_VERSION,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../roomV2/roomV3UniversalCoreEvidenceManifest") as typeof import("../roomV2/roomV3UniversalCoreEvidenceManifest");
-const {
-  ROOM_V3_FURNITURE_CATEGORIES,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../roomV2/roomV3ProductionPlan") as typeof import("../roomV2/roomV3ProductionPlan");
-const {
-  ROOM_V3_UNIVERSAL_CORE_CATEGORY_BY_CANDIDATE_ID,
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../roomV2/roomV3UniversalCoreInventory") as typeof import("../roomV2/roomV3UniversalCoreInventory");
 const visibleAvatarTypes = new Set([
   "face",
   "eyes",
@@ -86,132 +51,6 @@ const visibleAvatarTypes = new Set([
   "shoes",
   "accessory",
 ]);
-
-const seatCandidateIds = new Set([
-  "universal_dining_chair_a",
-  "universal_desk_chair_a",
-  "universal_lounge_armchair_a",
-  "universal_cloud_accent_chair_b",
-  "universal_cloud_loveseat_a",
-  "universal_bench_a",
-  "universal_long_sofa_a",
-  "universal_cloud_bed_b",
-  "universal_soft_pouf_b",
-]);
-
-function getRequiredRotations(candidateId: string) {
-  const categoryId =
-    ROOM_V3_UNIVERSAL_CORE_CATEGORY_BY_CANDIDATE_ID[
-      candidateId as keyof typeof ROOM_V3_UNIVERSAL_CORE_CATEGORY_BY_CANDIDATE_ID
-    ];
-  const category = ROOM_V3_FURNITURE_CATEGORIES.find((entry) => entry.id === categoryId);
-  return category?.requiresDirectionalAssets
-    ? (["front", "back", "left", "right"] as const)
-    : (["front"] as const);
-}
-
-function createCompletePromotionRecord():
-  import("../roomV2/roomV3UniversalCorePromotion").RoomV3UniversalCorePromotionRecord {
-  const buildIdentity = `git:${"a".repeat(40)}`;
-  const evidenceBundleSha256 = `sha256:${"b".repeat(64)}`;
-  return {
-    artifactRegistry: {
-      verifierId: ROOM_V3_UNIVERSAL_CORE_ARTIFACT_VERIFIER_ID,
-      artifactManifestId: ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,
-      verifiedCandidateIds: [...ROOM_V3_UNIVERSAL_CORE_RUNTIME_CANDIDATE_IDS],
-      verifiedAssetHashesByCandidateId: Object.fromEntries(
-        ROOM_V3_UNIVERSAL_CORE_RUNTIME_CANDIDATE_IDS.map((id) => [
-          id,
-          { ...ROOM_V3_UNIVERSAL_CORE_ARTIFACT_HASHES_BY_CANDIDATE_ID[id] },
-        ]),
-      ),
-    },
-    evidenceManifestId: "room-v3-universal-core-test-evidence-manifest",
-    simulatorEvidenceId: "simulator-universal-core-v1",
-    independentReviewerEvidenceId: "reviewer-universal-core-v1",
-    collisionEvidenceId: "collision-universal-core-v1",
-    seatingEvidenceId: "seating-universal-core-v1",
-    persistenceEvidenceId: "persistence-universal-core-v1",
-    skuEvidenceManifest: {
-      manifestVersion: ROOM_V3_UNIVERSAL_CORE_EVIDENCE_MANIFEST_VERSION,
-      artifactManifestId: ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,
-      buildIdentity,
-      evidenceVerifierId: UNIVERSAL_CORE_ROOM_EVIDENCE_VERIFIER_ID,
-      evidenceBundleSha256,
-      simulatorDevice: "iPhone 17 Pro iOS 26.4 Simulator",
-      simulatorViewport: { width: 390, height: 844, orientation: "portrait" as const },
-      rows: ROOM_V3_UNIVERSAL_CORE_RUNTIME_CANDIDATE_IDS.map((candidateId, index) => {
-        const rotations = getRequiredRotations(candidateId);
-        const simulatorScreenshotEntries = rotations.map((rotation) => [
-          rotation,
-          `docs/room-v3-qa/universal-core/${candidateId}_${rotation}.png`,
-        ] as const);
-        const simulatorScreenshotPathByRotation = Object.fromEntries(
-          simulatorScreenshotEntries,
-        ) as Readonly<Partial<Record<RoomFurnitureRotation, string>>>;
-        const simulatorScreenshotPaths = simulatorScreenshotEntries.map(
-          ([, screenshotPath]) => screenshotPath,
-        );
-        return {
-        candidateId,
-        artifactManifestId: ROOM_V3_UNIVERSAL_CORE_ARTIFACT_MANIFEST_ID,
-        scaleSceneEvidenceId: `scale-${index}`,
-        perspectiveProfile: ROOM_V3_LOCKED_PERSPECTIVE_PROFILE,
-        perspectiveEvidenceId: `perspective-${index}`,
-        perspectiveResult: {
-          cameraAlignment: "pass" as const,
-          surfaceContact: "pass" as const,
-          avatarScale: "pass" as const,
-          depthOcclusion: "pass" as const,
-        },
-        depthLaneEvidenceId: `depth-${index}`,
-        collisionEvidenceId: `collision-${index}`,
-        persistenceEvidenceId: `persistence-${index}`,
-        simulatorEvidenceId: `simulator-${index}`,
-        independentReviewId: `review-${index}`,
-        rotationsReviewed: rotations,
-        placementAction: "place in canonical Room V2 mobile shell",
-        collisionResult: "pass" as const,
-        persistenceResult: "pass" as const,
-        ...(seatCandidateIds.has(candidateId)
-          ? {
-              seatingEvidenceId: `seating-${index}`,
-              seatingResult: { contact: "pass" as const, approach: "pass" as const, exit: "pass" as const },
-            }
-          : {}),
-        simulatorScreenshotPaths,
-        simulatorScreenshotPathByRotation,
-        simulatorScreenshotSha256ByPath: Object.fromEntries(
-          simulatorScreenshotPaths.map((screenshotPath, rotationIndex) => [
-            screenshotPath,
-            `sha256:${(index * 4 + rotationIndex).toString(16).padStart(64, "0")}`,
-          ]),
-        ),
-      };
-      }),
-    },
-    economyPromotion: {
-      schemaVersion: UNIVERSAL_CORE_ROOM_PROMOTION_SCHEMA_VERSION,
-      buildIdentity,
-      evidenceManifestId: "room-v3-universal-core-test-evidence-manifest",
-      evidenceVerifierId: UNIVERSAL_CORE_ROOM_EVIDENCE_VERIFIER_ID,
-      evidenceBundleSha256,
-      artifactManifestId: UNIVERSAL_CORE_ROOM_ARTIFACT_MANIFEST_ID,
-      candidateSetDigest: UNIVERSAL_CORE_ROOM_CANDIDATE_SET_DIGEST,
-      approvedItemIds: [...UNIVERSAL_CORE_ROOM_ITEM_IDS],
-    },
-  };
-}
-
-function createCompletePromotionTrust(
-  record: ReturnType<typeof createCompletePromotionRecord>,
-) {
-  return {
-    buildIdentity: record.skuEvidenceManifest.buildIdentity,
-    evidenceVerifierId: record.skuEvidenceManifest.evidenceVerifierId,
-    evidenceBundleSha256: record.skuEvidenceManifest.evidenceBundleSha256,
-  };
-}
 
 test("every mobile shop item is represented by the shared economy catalog", () => {
   const visibleAvatarItems = AVATAR_V2_CATALOG.filter(
@@ -313,48 +152,6 @@ test("R1 Shop hides every unreceipted paid item while retaining its published st
     products.some((product) => product.sourceItemId === "avatar_v2_top_cherry_heart_milkmaid_blouse"),
     false,
   );
-});
-
-test("a complete shared promotion record makes a Universal Core room product purchasable in the production shop contract", (context) => {
-  // Historical QA evidence is not part of the production checkout. Never
-  // manufacture a replacement manifest merely to make this pilot test pass.
-  if (!existsSync(join(workspaceRoot, "../../scripts/room-vnext-pilot/full-wave-catalog-spec.json"))) {
-    context.skip("Historical Room VNext pilot manifest is unavailable")
-    return
-  }
-  const { resolveHistoricalRoomV2QaFurnitureCatalog } =
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Historical QA assets are loaded only for this pilot fixture.
-    require("../roomV2/roomV2HistoricalQaCatalog") as typeof import("../roomV2/roomV2HistoricalQaCatalog");
-  const completePromotion = createCompletePromotionRecord();
-  const products = buildShopCatalogItems({
-    avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
-    inventory: {
-      coins: 1_250,
-      ownedAvatarItemIds: [],
-      ownedRoomItemIds: [],
-      unlockedFeatureIds: [],
-      updatedAt: "2026-07-26T00:00:00.000Z",
-    },
-    roomDecor: {
-      roomShellId: "room_v2_shell_blumi_world_v1",
-      placedItems: [],
-    },
-    roomFurnitureCatalog: resolveHistoricalRoomV2QaFurnitureCatalog(
-      [completePromotion],
-      createCompletePromotionTrust(completePromotion),
-    ),
-    economyCatalog: resolveEconomyCatalog(completePromotion.economyPromotion),
-  });
-
-  const loveseat = products.find(
-    (product) => product.sourceItemId === "universal_cloud_loveseat_a",
-  );
-  assert.ok(loveseat);
-  assert.equal(loveseat.sectionId, "room");
-  assert.equal(loveseat.owned, false);
-  assert.equal(loveseat.actionType, "roomUnlock");
-  assert.equal(loveseat.priceCoins, 520);
-  assert.equal(loveseat.actionLabel, "Unlock for 520 coins");
 });
 
 test("an owned room item already placed in the room is shown as placed, not offered for a duplicate placement", () => {

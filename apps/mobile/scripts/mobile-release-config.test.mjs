@@ -598,7 +598,9 @@ test("infinite UI animations stop when their surface is hidden", () => {
 })
 
 test("room runtime ships only the production shell and layered avatar", () => {
-  const assets = read("src/features/roomV2/roomV2Assets.ts")
+  // roomV2ProductionAssets.ts is the only room asset module in the production
+  // graph (the QA-only roomV2Assets.ts was retired with the Room VNext QA art).
+  const assets = read("src/features/roomV2/roomV2ProductionAssets.ts")
   const runtimeAssets = readdirSync(resolve(
     mobileRoot,
     "src/features/roomV2/assets/runtime"
