@@ -1,12 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { BlurTargetView, BlurView } from "expo-blur"
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
 import {
   Animated,
   Easing,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
+  LayoutAnimation,
   Pressable,
   StyleSheet,
   Text,
@@ -20,19 +18,20 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type RefObject,
+  useState
 } from "react"
-import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
+import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
-import { ROOM_V2_OUTSIDE_COLOR } from "../../roomV2/roomV2Camera"
+import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import { uiTheme } from "../../../ui/theme"
 import { useReducedMotion } from "../../../ui/animations"
+import { hapticLight } from "../../../ui/haptics"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
+import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
 import { MiniRoomHud } from "./MiniRoomHud"
 import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
 import { RoomMapLayer } from "./RoomMapLayer"
@@ -48,7 +47,16 @@ import {
 } from "./miniRoomReducedMotion"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
 import type { MiniRoomCopy } from "../miniRoomCopy"
-import { resolveMiniRoomPresentation } from "./miniRoomPresentation"
+import { shouldAnnouncePartnerJoin } from "./miniRoomPresentation"
+import {
+  MINI_ROOM_INPUT_LINE_HEIGHT,
+  MINI_ROOM_INPUT_VERTICAL_PADDING,
+  MINI_ROOM_MAX_TEXT_SCALE,
+  resolveComposerLineCount,
+  resolveMiniRoomLayout,
+  type MiniRoomPanelMode
+} from "./miniRoomLayout"
+import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
 
 interface MiniRoomSceneProps {
   copy: MiniRoomCopy
@@ -76,10 +84,17 @@ interface MiniRoomSceneProps {
   onSendRoomMessage: (body: string) => boolean
   /** Latest room message the server did not acknowledge (useInRoomChat). */
   failedRoomMessage?: FailedRoomMessage | null
+  /** Durable room conversation, newest first (useRoomChatHistory). */
+  chatHistory?: readonly RoomChatHistoryItem[]
+  chatHistoryStatus?: RoomChatHistoryStatus
+  /** Screen-level alerts shown under the header. */
+  notices?: readonly string[]
 }
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
 const MAX_ROOM_MESSAGE_LENGTH = 140
+const NO_HISTORY: readonly RoomChatHistoryItem[] = []
+const NO_NOTICES: readonly string[] = []
 const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer)
 const StableRoomMapLayer = memo(RoomMapLayer)
 const StableHotspotLayer = memo(HotspotLayer)
@@ -104,7 +119,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     consumeInRoomMessage,
     canChatSend,
     onSendRoomMessage,
-    failedRoomMessage
+    failedRoomMessage,
+    chatHistory = NO_HISTORY,
+    chatHistoryStatus = "ready",
+    notices = NO_NOTICES
   } = props
   const store = useMiniRoomSceneStore({
     localUser,
@@ -122,17 +140,39 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     width: ROOM_STAGE_CAMERA_FALLBACK_WIDTH,
     height: ROOM_STAGE_CAMERA_FALLBACK_HEIGHT
   })
-  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const [chatExpanded, setChatExpanded] = useState(true)
+  const [composerLines, setComposerLines] = useState(1)
+  const keyboard = useMiniRoomKeyboard(reduceMotion)
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
-  const blurTargetRef = useRef<View | null>(null)
-  const presentation = useMemo(
-    () => resolveMiniRoomPresentation({
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
-      keyboardVisible
+  const roomShell = roomDecorScene?.shell
+  const layout = useMemo(
+    () => resolveMiniRoomLayout({
+      windowWidth: viewport.width,
+      windowHeight: viewport.height,
+      safeTop: safeAreaInsets.top,
+      safeBottom: safeAreaInsets.bottom,
+      keyboardVisible: keyboard.visible,
+      keyboardInset: keyboard.inset,
+      chatExpanded,
+      fontScale: viewport.fontScale,
+      composerLines,
+      roomAspectRatio: roomShell
+        ? roomShell.canvasSize.width / roomShell.canvasSize.height
+        : 1
     }),
-    [keyboardVisible, viewport.height, viewport.width]
+    [
+      chatExpanded,
+      composerLines,
+      keyboard.inset,
+      keyboard.visible,
+      roomShell,
+      safeAreaInsets.bottom,
+      safeAreaInsets.top,
+      viewport.fontScale,
+      viewport.height,
+      viewport.width
+    ]
   )
   const {
     dismissSpeechBubble,
@@ -145,17 +185,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const welcomeValueRef = useRef(new Animated.Value(0)).current
   const [partnerJustJoined, setPartnerJustJoined] = useState(true)
   const [composerText, setComposerText] = useState("")
-
-  useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
-    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true))
-    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false))
-    return () => {
-      showSubscription.remove()
-      hideSubscription.remove()
-    }
-  }, [])
 
   useEffect(() => {
     entryValueRef.stopAnimation()
@@ -219,6 +248,17 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     return () => clearTimeout(timer)
   }, [motionPolicy.animateJoin, partnerUser.userId])
 
+  const announcedPartnerUserIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!shouldAnnouncePartnerJoin({
+      connected: connectionStatus === "connected",
+      partnerUserId: partnerUser.userId,
+      announcedPartnerUserId: announcedPartnerUserIdRef.current
+    })) return
+    announcedPartnerUserIdRef.current = partnerUser.userId
+    hapticLight()
+  }, [connectionStatus, partnerUser.userId])
+
   useEffect(() => {
     if (inRoomMessages.length === 0) return
     for (const message of inRoomMessages) {
@@ -252,8 +292,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     const accepted = onSendRoomMessage(body)
     if (!accepted) return
     sayPhrase(localUser.userId, body, "chat")
+    // The keyboard stays up for the next message; the input returns to one line.
     setComposerText("")
-    Keyboard.dismiss()
   }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
 
   // An unacknowledged message comes back into an empty composer: sending the
@@ -267,6 +307,22 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const handleComposerChange = useCallback((value: string): void => {
     setComposerText(value.slice(0, MAX_ROOM_MESSAGE_LENGTH))
   }, [])
+
+  const handleToggleHistory = useCallback((): void => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    if (layout.panelMode === "typing") {
+      // "Back to the room": close the keyboard and leave only the composer.
+      Keyboard.dismiss()
+      setChatExpanded(false)
+      return
+    }
+    setChatExpanded((expanded) => !expanded)
+  }, [layout.panelMode, reduceMotion])
+
+  const handleComposerContentSize = useCallback((contentHeight: number): void => {
+    const lines = resolveComposerLineCount({ contentHeight, fontScale: viewport.fontScale })
+    setComposerLines((current) => current === lines ? current : lines)
+  }, [viewport.fontScale])
 
   const handleStageLayout = useCallback((event: LayoutChangeEvent): void => {
     const { width, height } = event.nativeEvent.layout
@@ -300,154 +356,140 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     store.interaction.proximityClose && connectionStatus === "connected"
 
   const composerDisabled = !canChatSend
-  const roomCamera = roomDecorScene?.shell
-    ? {
-        width: `${presentation.cameraWidthPercent}%` as `${number}%`,
-        top: presentation.cameraTop,
-        aspectRatio:
-          roomDecorScene.shell.canvasSize.width /
-          roomDecorScene.shell.canvasSize.height,
-        backgroundColor: "transparent"
-      }
-    : null
+  const hudNotices = useMemo(
+    () => failedRoomMessage?.clientMessageId ? [...notices, copy.sendFailedNotice] : notices,
+    [copy.sendFailedNotice, failedRoomMessage, notices]
+  )
+
+  // One hotspot and avatar layer serve both the room-shell camera and the legacy map.
+  const hotspotLayer = (
+    <StableHotspotLayer
+      hotspots={store.hotspots}
+      interaction={store.interaction}
+      stageWidth={stageSize.width}
+      stageHeight={stageSize.height}
+      onSelect={handleHotspotSelect}
+      disabled={connectionStatus !== "connected"}
+    />
+  )
+  const avatarLayer = (
+    <AvatarLayer
+      avatars={store.avatars}
+      avatarPositions={store.avatarPositions}
+      localUserId={localUser.userId}
+      localUserLabel={copy.youLabel}
+      bubbles={store.bubbles}
+      onDismissBubble={dismissSpeechBubble}
+      dismissBubbleLabel={copy.dismissRoomMessage}
+      partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
+      motionPolicy={motionPolicy}
+    />
+  )
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <BlurTargetView ref={blurTargetRef} style={styles.blurTarget}>
-        <View style={styles.roomWrap}>
-          <Animated.View
-            style={[
-              styles.roomStageFrame,
-              {
-                opacity: entryOpacity,
-                transform: [
-                  { translateY: entryTranslateY },
-                  { scale: entryScale }
-                ]
-              }
-            ]}
-          >
-            {roomCamera && roomDecorScene ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.moveAvatar}
-                accessibilityHint={copy.moveAvatarHint}
-                style={[
-                  styles.roomWorldCamera,
-                  {
-                    width: roomCamera.width,
-                    top: roomCamera.top,
-                    aspectRatio: roomCamera.aspectRatio,
-                    backgroundColor: roomCamera.backgroundColor
-                  }
-                ]}
-                onLayout={handleStageLayout}
-                onPress={handleRoomPress}
-              >
-                <StableMiniRoomRoomDecorLayer
-                  scene={roomDecorScene}
-                  interaction={store.interaction}
-                />
-                <StableHotspotLayer
-                  hotspots={store.hotspots}
-                  interaction={store.interaction}
-                  stageWidth={stageSize.width}
-                  stageHeight={stageSize.height}
-                  onSelect={handleHotspotSelect}
-                  disabled={connectionStatus !== "connected"}
-                />
-                <TogetherHeartOverlay active={closeTogether} motionPolicy={motionPolicy} />
-                <AvatarLayer
-                  avatars={store.avatars}
-                  avatarPositions={store.avatarPositions}
-                  localUserId={localUser.userId}
-                  localUserLabel={copy.youLabel}
-                  bubbles={store.bubbles}
-                  onDismissBubble={dismissSpeechBubble}
-                  dismissBubbleLabel={copy.dismissRoomMessage}
-                  partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
-                  motionPolicy={motionPolicy}
-                />
-                <Animated.View
-                  style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
-                  pointerEvents="none"
-                >
-                  <Text style={styles.welcomeText} numberOfLines={1}>
-                    {copy.welcome(partnerFirstName)}
-                  </Text>
-                </Animated.View>
-              </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.moveAvatar}
-                accessibilityHint={copy.moveAvatarHint}
-                style={styles.legacyRoomStage}
-                onLayout={handleStageLayout}
-                onPress={handleRoomPress}
-              >
-                <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
-                <StableHotspotLayer
-                  hotspots={store.hotspots}
-                  interaction={store.interaction}
-                  stageWidth={stageSize.width}
-                  stageHeight={stageSize.height}
-                  onSelect={handleHotspotSelect}
-                  disabled={connectionStatus !== "connected"}
-                />
-                <AvatarLayer
-                  avatars={store.avatars}
-                  avatarPositions={store.avatarPositions}
-                  localUserId={localUser.userId}
-                  localUserLabel={copy.youLabel}
-                  bubbles={store.bubbles}
-                  onDismissBubble={dismissSpeechBubble}
-                  dismissBubbleLabel={copy.dismissRoomMessage}
-                  partnerJustJoined={partnerJustJoined && connectionStatus === "connected"}
-                  motionPolicy={motionPolicy}
-                />
-              </Pressable>
-            )}
-          </Animated.View>
-        </View>
-      </BlurTargetView>
-
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <StableMiniRoomHud
-          partnerFirstName={partnerFirstName}
-          connectionStatus={connectionStatus}
-          voiceAvailable={voiceAvailable}
-          localMedia={localMedia}
-          copy={copy}
-          leaveDisabled={leaveDisabled}
-          horizontalInset={presentation.chromeHorizontalInset}
-          gap={presentation.chromeGap}
-          topInset={safeAreaInsets.top}
-          blurTarget={blurTargetRef}
-          onLeave={onLeave}
-          onOpenSafety={onOpenSafety}
-          onRetryConnect={onRetryConnect}
-          onToggleMic={onToggleMic}
+    <View style={styles.root}>
+      {layout.panelMode === "typing" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.closeKeyboard}
+          style={StyleSheet.absoluteFill}
+          onPress={Keyboard.dismiss}
         />
-      </View>
+      ) : null}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.roomStageFrame,
+          {
+            opacity: entryOpacity,
+            transform: [
+              { translateY: entryTranslateY },
+              { scale: entryScale }
+            ]
+          }
+        ]}
+      >
+        {roomDecorScene?.shell ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.moveAvatar}
+            accessibilityHint={copy.moveAvatarHint}
+            style={[styles.roomWorldCamera, layout.camera]}
+            onLayout={handleStageLayout}
+            onPress={handleRoomPress}
+          >
+            <StableMiniRoomRoomDecorLayer
+              scene={roomDecorScene}
+              interaction={store.interaction}
+            />
+            {hotspotLayer}
+            <TogetherHeartOverlay active={closeTogether} motionPolicy={motionPolicy} />
+            {avatarLayer}
+            <Animated.View
+              style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
+              pointerEvents="none"
+            >
+              <Text style={styles.welcomeText} numberOfLines={1}>
+                {copy.welcome(partnerFirstName)}
+              </Text>
+            </Animated.View>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.moveAvatar}
+            accessibilityHint={copy.moveAvatarHint}
+            style={[styles.legacyRoomStage, { top: layout.camera.top }]}
+            onLayout={handleStageLayout}
+            onPress={handleRoomPress}
+          >
+            <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
+            {hotspotLayer}
+            {avatarLayer}
+          </Pressable>
+        )}
+      </Animated.View>
 
-      <View style={styles.keyboardFlex} pointerEvents="none" />
-      <SafeAreaView contentGutter={false} edges={["bottom"]} style={styles.composerSafeArea}>
+      <MiniRoomChatPanel
+        copy={copy}
+        mode={layout.panelMode}
+        margin={layout.panelMargin}
+        bottom={layout.panelBottom}
+        historyHeight={layout.historyHeight}
+        historyItems={chatHistory}
+        historyStatus={chatHistoryStatus}
+        partnerName={partnerFirstName}
+      >
         <RoomChatComposer
           value={composerText}
           copy={copy}
+          mode={layout.panelMode}
+          maxInputHeight={layout.composerMaxInputHeight}
           onChangeText={handleComposerChange}
           onSubmit={handleSubmitComposer}
+          onToggleHistory={handleToggleHistory}
+          onContentHeightChange={handleComposerContentSize}
           disabled={composerDisabled}
-          blurTarget={blurTargetRef}
-          horizontalInset={presentation.composerHorizontalInset}
-          verticalInset={presentation.composerVerticalInset}
         />
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+      </MiniRoomChatPanel>
+
+      <StableMiniRoomHud
+        partnerFirstName={partnerFirstName}
+        connectionStatus={connectionStatus}
+        voiceAvailable={voiceAvailable}
+        localMedia={localMedia}
+        copy={copy}
+        leaveDisabled={leaveDisabled}
+        horizontalInset={layout.horizontalInset}
+        headerTop={layout.headerTop}
+        headerBottom={layout.headerBottom}
+        notices={hudNotices}
+        onLeave={onLeave}
+        onOpenSafety={onOpenSafety}
+        onRetryConnect={onRetryConnect}
+        onToggleMic={onToggleMic}
+      />
+    </View>
   )
 }
 
@@ -455,11 +497,12 @@ interface RoomChatComposerProps {
   copy: MiniRoomCopy
   value: string
   disabled: boolean
-  blurTarget: RefObject<View | null>
-  horizontalInset: number
-  verticalInset: number
+  mode: MiniRoomPanelMode
+  maxInputHeight: number
   onChangeText: (value: string) => void
   onSubmit: () => void
+  onToggleHistory: () => void
+  onContentHeightChange: (contentHeight: number) => void
 }
 
 const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerProps) {
@@ -467,62 +510,71 @@ const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerP
     copy,
     value,
     disabled,
-    blurTarget,
-    horizontalInset,
-    verticalInset,
+    mode,
+    maxInputHeight,
     onChangeText,
-    onSubmit
+    onSubmit,
+    onToggleHistory,
+    onContentHeightChange
   } = props
+  const sendDisabled = disabled || value.trim().length === 0
+  const historyOpen = mode === "history"
+  const toggleLabel = mode === "typing"
+    ? copy.returnToRoom
+    : historyOpen ? copy.hideChatHistory : copy.openChatHistory
   return (
-    <View
-      style={[
-        styles.composerWrap,
-        {
-          paddingHorizontal: horizontalInset,
-          paddingVertical: verticalInset
-        }
-      ]}
-    >
-      <View style={styles.composerBar}>
-        <BlurView
-          blurTarget={blurTarget}
-          blurMethod="dimezisBlurViewSdk31Plus"
-          intensity={72}
-          tint="systemUltraThinMaterialLight"
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
+    <View style={[styles.composerRow, mode === "compact" ? null : styles.composerBox]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={toggleLabel}
+        accessibilityState={{ expanded: historyOpen }}
+        hitSlop={6}
+        onPress={onToggleHistory}
+        style={({ pressed }) => [
+          styles.historyToggle,
+          mode === "compact" ? null : styles.historyToggleOpen,
+          pressed ? styles.composerButtonPressed : null
+        ]}
+      >
+        <Ionicons
+          name={mode === "compact" ? "chatbubbles-outline" : "chevron-down"}
+          size={18}
+          color={TOGGLE_INK}
         />
-        <View pointerEvents="none" style={styles.composerGlassTint} />
-        <View pointerEvents="none" style={styles.composerHighlight} />
-        <TextInput
-          accessibilityLabel={copy.roomMessage}
-          value={value}
-          onChangeText={onChangeText}
-          onSubmitEditing={onSubmit}
-          placeholder={copy.roomMessagePlaceholder}
-          placeholderTextColor="rgba(76, 53, 72, 0.52)"
-          maxLength={140}
-          returnKeyType="send"
-          blurOnSubmit
-          style={styles.composerInput}
-          editable={!disabled}
-          keyboardAppearance="light"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.sendRoomMessage}
-          accessibilityState={{ disabled: disabled || value.trim().length === 0 }}
-          disabled={disabled || value.trim().length === 0}
-          onPress={onSubmit}
-          style={({ pressed }) => [
-            styles.composerSend,
-            (disabled || value.trim().length === 0) ? styles.composerSendDisabled : null,
-            pressed ? styles.composerSendPressed : null
-          ]}
-        >
-          <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
-        </Pressable>
-      </View>
+      </Pressable>
+      <TextInput
+        accessibilityLabel={copy.roomMessage}
+        value={value}
+        onChangeText={onChangeText}
+        onSubmitEditing={onSubmit}
+        onContentSizeChange={(event) => onContentHeightChange(event.nativeEvent.contentSize.height)}
+        placeholder={copy.roomMessagePlaceholder}
+        placeholderTextColor="#8B7A8A"
+        maxLength={MAX_ROOM_MESSAGE_LENGTH}
+        maxFontSizeMultiplier={MINI_ROOM_MAX_TEXT_SCALE}
+        multiline
+        submitBehavior="submit"
+        returnKeyType="send"
+        enablesReturnKeyAutomatically
+        style={[styles.composerInput, { maxHeight: maxInputHeight }]}
+        editable={!disabled}
+        keyboardAppearance="light"
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={copy.sendRoomMessage}
+        accessibilityState={{ disabled: sendDisabled }}
+        disabled={sendDisabled}
+        hitSlop={4}
+        onPress={onSubmit}
+        style={({ pressed }) => [
+          styles.composerSend,
+          sendDisabled ? styles.composerSendDisabled : null,
+          pressed ? styles.composerButtonPressed : null
+        ]}
+      >
+        <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+      </Pressable>
     </View>
   )
 })
@@ -613,31 +665,28 @@ const TogetherHeartOverlay = memo(function TogetherHeartOverlay(
 
 const ROOM_STAGE_CAMERA_FALLBACK_WIDTH = 920
 const ROOM_STAGE_CAMERA_FALLBACK_HEIGHT = 524
+const TOGGLE_INK = "#806780"
 
 const styles = StyleSheet.create({
+  // Powder-pink and lavender atmosphere shared with Wardrobe and the room editor.
   root: {
     flex: 1,
-    backgroundColor: ROOM_V2_OUTSIDE_COLOR
-  },
-  blurTarget: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: ROOM_V2_OUTSIDE_COLOR
-  },
-  roomWrap: {
-    ...StyleSheet.absoluteFill,
-    overflow: "hidden",
-    alignItems: "center"
+    backgroundColor: "#FFF7FA",
+    experimental_backgroundImage:
+      "radial-gradient(ellipse at 10% 34%, rgba(249, 222, 235, 1) 0%, rgba(249, 222, 235, 0) 60%), " +
+      "radial-gradient(ellipse at 92% 48%, rgba(230, 221, 240, 1) 0%, rgba(230, 221, 240, 0) 60%)"
   },
   roomStageFrame: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center"
+    ...StyleSheet.absoluteFill
   },
   roomWorldCamera: {
     position: "absolute",
-    alignSelf: "center",
-    overflow: "visible"
+    overflow: "visible",
+    backgroundColor: "transparent"
   },
   legacyRoomStage: {
+    position: "absolute",
+    alignSelf: "center",
     width: "100%",
     maxWidth: 420,
     aspectRatio: 1,
@@ -682,68 +731,65 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
-  composerSafeArea: {
-    backgroundColor: "transparent",
-    zIndex: 20
-  },
-  keyboardFlex: {
-    flex: 1
-  },
-  composerWrap: {
-    alignItems: "stretch"
-  },
-  composerBar: {
-    minHeight: 62,
+  /* ── Composer ────────────── */
+  composerRow: {
+    minHeight: 38,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingLeft: 20,
-    paddingRight: 7,
-    paddingVertical: 7,
-    borderRadius: uiTheme.radius.full,
-    overflow: "hidden",
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    alignItems: "flex-end",
+    gap: 4
+  },
+  composerBox: {
+    padding: 4,
+    borderRadius: 27,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    shadowColor: "#D8B7E8",
-    shadowOpacity: 0.24,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 8
+    borderColor: "#FFFFFF",
+    backgroundColor: "#F6F2F7",
+    experimental_backgroundImage: "linear-gradient(145deg, #F3EEF4 0%, #F9F6FB 100%)"
   },
-  composerGlassTint: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(255, 247, 252, 0.76)"
+  historyToggle: {
+    width: 32,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  composerHighlight: {
-    position: "absolute",
-    top: 1,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.94)"
+  historyToggleOpen: {
+    width: 34,
+    height: 34,
+    marginVertical: 2,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 248, 252, 0.55)"
   },
   composerInput: {
     flex: 1,
-    minHeight: 46,
-    maxHeight: 80,
-    color: uiTheme.colors.textPrimary,
-    ...uiTheme.font.bodySmall,
-    fontFamily: "Inter_600SemiBold",
-    fontWeight: "600"
+    minHeight: 38,
+    paddingTop: MINI_ROOM_INPUT_VERTICAL_PADDING,
+    paddingBottom: MINI_ROOM_INPUT_VERTICAL_PADDING,
+    paddingHorizontal: 4,
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_400Regular",
+    fontWeight: "400",
+    fontSize: 14,
+    lineHeight: MINI_ROOM_INPUT_LINE_HEIGHT,
+    textAlignVertical: "center"
   },
   composerSend: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: uiTheme.colors.brandPlum,
+    shadowColor: uiTheme.colors.brandPlum,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }
   },
   composerSendDisabled: {
-    opacity: 0.35,
+    opacity: 0.45,
   },
-  composerSendPressed: {
+  composerButtonPressed: {
     transform: [{ scale: 0.92 }],
   },
 })

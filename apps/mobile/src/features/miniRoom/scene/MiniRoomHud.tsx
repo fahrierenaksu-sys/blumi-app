@@ -1,10 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { BlurView } from "expo-blur"
-import type { RefObject } from "react"
+import { useCallback, useState, type ComponentProps } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
+import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
+import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { MiniRoomCopy } from "../miniRoomCopy"
-import { uiTheme } from "../../../ui/theme"
+import { resolveMiniRoomStatusNotice } from "./miniRoomStatusNotice"
+
+type IconName = ComponentProps<typeof Ionicons>["name"]
 
 interface MiniRoomHudProps {
   copy: MiniRoomCopy
@@ -14,274 +17,372 @@ interface MiniRoomHudProps {
   localMedia: MiniRoomLocalMediaState
   leaveDisabled: boolean
   horizontalInset: number
-  gap: number
-  topInset: number
-  blurTarget: RefObject<View | null>
+  headerTop: number
+  headerBottom: number
+  /** Screen-level alerts (leave, refresh, legacy decor, failed send). */
+  notices: readonly string[]
   onLeave: () => void
   onOpenSafety: () => void
   onRetryConnect: () => void
   onToggleMic: () => void
 }
 
+/** Small glass header: leave on the left, microphone and room menu on the right. */
 export function MiniRoomHud(props: MiniRoomHudProps) {
   const {
+    copy,
+    partnerFirstName,
     connectionStatus,
     voiceAvailable,
     localMedia,
-    copy,
-    partnerFirstName,
     leaveDisabled,
     horizontalInset,
-    gap,
-    topInset,
-    blurTarget,
+    headerTop,
+    headerBottom,
+    notices,
     onLeave,
     onOpenSafety,
     onRetryConnect,
     onToggleMic
   } = props
-
-  const mediaDisabled = connectionStatus !== "connected" || !voiceAvailable
-  const voiceLabel = localMedia.micEnabled ? copy.voiceOn : copy.voiceOff
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const statusNotice = resolveMiniRoomStatusNotice(connectionStatus)
+  const statusText = statusNotice === "connecting"
+    ? copy.connecting
+    : statusNotice === "reconnecting"
+      ? copy.reconnecting
+      : statusNotice === "failed" ? copy.connectionFailed : null
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View
-        style={[
-          styles.topHud,
-          {
-            paddingHorizontal: horizontalInset,
-            paddingTop: topInset + uiTheme.spacing.sm,
-            gap
-          }
-        ]}
+        style={[styles.header, { top: headerTop, left: horizontalInset, right: horizontalInset }]}
         pointerEvents="box-none"
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.leaveRoom}
-          accessibilityState={{ disabled: leaveDisabled }}
-          onPress={onLeave}
-          disabled={leaveDisabled}
-          style={({ pressed }) => [
-            styles.circleButton,
-            leaveDisabled ? styles.disabled : null,
-            pressed ? styles.pressed : null
-          ]}
+        <View style={styles.side} pointerEvents="box-none">
+          <GlassIconButton
+            size={42}
+            icon="arrow-back"
+            accessibilityLabel={copy.leaveRoom}
+            disabled={leaveDisabled}
+            onPress={onLeave}
+          />
+        </View>
+        <Text
+          accessibilityRole="header"
+          accessibilityLabel={`${copy.roomTitle}. ${copy.roomSubtitle(partnerFirstName)}`}
+          maxFontSizeMultiplier={1.3}
+          numberOfLines={1}
+          style={styles.title}
         >
-          <GlassBackdrop blurTarget={blurTarget} />
-          <Ionicons name="arrow-back" size={24} color={uiTheme.colors.textPrimary} />
-        </Pressable>
-
-        <View style={styles.headerRail}>
-          <GlassBackdrop blurTarget={blurTarget} />
-          <View style={styles.titleBlock}>
-            <Text style={styles.roomTitle} numberOfLines={1}>
-              {copy.roomTitle}
-            </Text>
-            <Text style={styles.roomSubtitle} numberOfLines={1}>
-              {copy.roomSubtitle(partnerFirstName)}
-            </Text>
-          </View>
-
-          {connectionStatus === "error" ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={copy.retryRoomConnection}
-              onPress={onRetryConnect}
-              style={({ pressed }) => [styles.retryButton, pressed ? styles.pressed : null]}
-            >
-              <Ionicons name="refresh" size={17} color={uiTheme.colors.primaryDeep} />
-              <Text style={styles.retryText}>{copy.retry}</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={localMedia.micEnabled ? copy.muteMicrophone : copy.turnOnMicrophone}
-              accessibilityState={{ disabled: mediaDisabled, selected: localMedia.micEnabled }}
-              onPress={onToggleMic}
-              disabled={mediaDisabled}
-              style={({ pressed }) => [
-                styles.statusAction,
-                localMedia.micEnabled ? styles.statusActionActive : null,
-                mediaDisabled ? styles.statusActionUnavailable : null,
-                pressed ? styles.pressed : null
-              ]}
-            >
-              <Ionicons
-                name={localMedia.micEnabled ? "mic" : "mic-off"}
-                size={17}
-                color={localMedia.micEnabled ? "#FFFFFF" : uiTheme.colors.brandPlum}
-              />
-              <Text
-                style={[
-                  styles.statusText,
-                  localMedia.micEnabled ? styles.statusTextActive : null
-                ]}
-                numberOfLines={1}
-              >
-                {voiceLabel}
-              </Text>
-            </Pressable>
-          )}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.openSafetyOptions}
-            onPress={onOpenSafety}
-            style={({ pressed }) => [styles.safetyButton, pressed ? styles.pressed : null]}
-          >
-            <Ionicons name="shield-outline" size={20} color={uiTheme.colors.brandPlum} />
-            <Text style={styles.safetyText} numberOfLines={1}>{copy.safety}</Text>
-          </Pressable>
+          {copy.roomTitle}
+        </Text>
+        <View style={[styles.side, styles.sideEnd]} pointerEvents="box-none">
+          <MicrophoneButton
+            copy={copy}
+            micEnabled={localMedia.micEnabled}
+            voiceAvailable={voiceAvailable}
+            connected={connectionStatus === "connected"}
+            onToggleMic={onToggleMic}
+          />
+          <GlassIconButton
+            size={38}
+            icon="ellipsis-horizontal"
+            accessibilityLabel={copy.roomOptions}
+            expanded={menuOpen}
+            onPress={() => setMenuOpen((open) => !open)}
+          />
         </View>
       </View>
+
+      {statusText || notices.length > 0 ? (
+        <View
+          style={[styles.notices, { top: headerBottom + 8, left: horizontalInset, right: horizontalInset }]}
+          pointerEvents="box-none"
+          accessibilityLiveRegion="polite"
+        >
+          {statusText ? (
+            <NoticePill
+              text={statusText}
+              icon={statusNotice === "failed" ? "cloud-offline-outline" : "sync-outline"}
+              action={statusNotice === "failed"
+                ? { label: copy.retry, accessibilityLabel: copy.retryRoomConnection, onPress: onRetryConnect }
+                : undefined}
+            />
+          ) : null}
+          {notices.map((notice) => (
+            <NoticePill key={notice} text={notice} icon="alert-circle-outline" />
+          ))}
+        </View>
+      ) : null}
+
+      {menuOpen ? (
+        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.closeRoomOptions}
+            onPress={closeMenu}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.menu, { top: headerBottom + 6, right: horizontalInset }]}>
+            <MenuItem
+              icon="shield-checkmark-outline"
+              label={copy.safetyOptions}
+              accessibilityLabel={copy.openSafetyOptions}
+              onPress={() => {
+                closeMenu()
+                onOpenSafety()
+              }}
+            />
+            <MenuItem
+              icon="exit-outline"
+              label={copy.leaveRoom}
+              accessibilityLabel={copy.leaveRoom}
+              disabled={leaveDisabled}
+              onPress={() => {
+                closeMenu()
+                onLeave()
+              }}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }
 
-function GlassBackdrop(props: { blurTarget: RefObject<View | null> }) {
+function GlassIconButton(props: {
+  size: number
+  icon: IconName
+  accessibilityLabel: string
+  disabled?: boolean
+  expanded?: boolean
+  onPress: () => void
+}) {
+  const { size, icon, accessibilityLabel, disabled = false, expanded, onPress } = props
   return (
-    <>
-      <BlurView
-        blurTarget={props.blurTarget}
-        blurMethod="dimezisBlurViewSdk31Plus"
-        intensity={68}
-        tint="systemUltraThinMaterialLight"
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
-      <View pointerEvents="none" style={styles.glassTint} />
-      <View pointerEvents="none" style={styles.glassHighlight} />
-    </>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled, expanded }}
+      disabled={disabled}
+      hitSlop={(44 - size) / 2 + 2}
+      onPress={onPress}
+      style={({ pressed }) => [disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
+    >
+      <WardrobeGlass tone="control" radius={size / 2} style={{ width: size, height: size }} contentStyle={styles.center}>
+        <Ionicons name={icon} size={size > 40 ? 20 : 18} color={wardrobeTheme.ink} />
+      </WardrobeGlass>
+    </Pressable>
   )
 }
 
+function MicrophoneButton(props: {
+  copy: MiniRoomCopy
+  micEnabled: boolean
+  voiceAvailable: boolean
+  connected: boolean
+  onToggleMic: () => void
+}) {
+  const { copy, micEnabled, voiceAvailable, connected, onToggleMic } = props
+  const disabled = !connected || !voiceAvailable
+  const hint = !voiceAvailable
+    ? copy.voiceUnavailableHint
+    : connected ? undefined : copy.voiceWaitsForConnectionHint
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={micEnabled ? copy.muteMicrophone : copy.turnOnMicrophone}
+      accessibilityHint={hint}
+      accessibilityValue={{ text: micEnabled ? copy.voiceOn : copy.voiceOff }}
+      accessibilityState={{ disabled, selected: micEnabled }}
+      disabled={disabled}
+      hitSlop={5}
+      onPress={onToggleMic}
+      style={({ pressed }) => [disabled ? styles.micUnavailable : null, pressed ? styles.pressed : null]}
+    >
+      <WardrobeGlass tone="control" radius={19} style={styles.round38} contentStyle={styles.center}>
+        {micEnabled ? <View pointerEvents="none" style={styles.micSelected} /> : null}
+        <Ionicons
+          name={micEnabled ? "mic" : "mic-off-outline"}
+          size={18}
+          color={micEnabled ? MIC_SELECTED_INK : wardrobeTheme.ink}
+        />
+      </WardrobeGlass>
+    </Pressable>
+  )
+}
+
+function NoticePill(props: {
+  text: string
+  icon: IconName
+  action?: { label: string; accessibilityLabel: string; onPress: () => void }
+}) {
+  const { text, icon, action } = props
+  return (
+    <WardrobeGlass tone="control" radius={18} contentStyle={styles.notice}>
+      <Ionicons name={icon} size={15} color={NOTICE_INK} />
+      <Text accessibilityRole="alert" maxFontSizeMultiplier={1.4} style={styles.noticeText}>
+        {text}
+      </Text>
+      {action ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.accessibilityLabel}
+          hitSlop={8}
+          onPress={action.onPress}
+          style={({ pressed }) => [styles.noticeAction, pressed ? styles.pressed : null]}
+        >
+          <Text maxFontSizeMultiplier={1.3} style={styles.noticeActionText}>{action.label}</Text>
+        </Pressable>
+      ) : null}
+    </WardrobeGlass>
+  )
+}
+
+function MenuItem(props: {
+  icon: IconName
+  label: string
+  accessibilityLabel: string
+  disabled?: boolean
+  onPress: () => void
+}) {
+  const { icon, label, accessibilityLabel, disabled = false, onPress } = props
+  return (
+    <Pressable
+      accessibilityRole="menuitem"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.menuItem,
+        pressed ? styles.menuItemPressed : null,
+        disabled ? styles.disabled : null
+      ]}
+    >
+      <Ionicons name={icon} size={18} color={MENU_ICON} />
+      <Text maxFontSizeMultiplier={1.4} style={styles.menuText}>{label}</Text>
+    </Pressable>
+  )
+}
+
+const MIC_SELECTED_INK = "#9E365B"
+const NOTICE_INK = "#806780"
+const MENU_ICON = "#7D677C"
+
 const styles = StyleSheet.create({
-  topHud: {
+  header: {
+    position: "absolute",
+    height: 42,
     flexDirection: "row",
     alignItems: "center"
   },
-  circleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    ...uiTheme.shadow.float
+  side: {
+    width: 83,
+    flexDirection: "row",
+    alignItems: "center"
   },
-  headerRail: {
+  sideEnd: {
+    justifyContent: "flex-end",
+    gap: 7
+  },
+  title: {
     flex: 1,
-    minWidth: 0,
-    minHeight: 60,
-    borderRadius: 30,
-    overflow: "hidden",
+    textAlign: "center",
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.5
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  round38: {
+    width: 38,
+    height: 38
+  },
+  micSelected: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "#F2E1EA"
+  },
+  micUnavailable: {
+    opacity: 0.62
+  },
+  notices: {
+    position: "absolute",
+    alignItems: "center",
+    gap: 6
+  },
+  notice: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    paddingLeft: 14,
-    paddingRight: 6,
-    gap: 4,
-    ...uiTheme.shadow.float
+    gap: 7,
+    paddingVertical: 7,
+    paddingLeft: 12,
+    paddingRight: 12
   },
-  glassTint: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(255, 247, 252, 0.78)"
-  },
-  glassHighlight: {
-    position: "absolute",
-    top: 1,
-    left: 12,
-    right: 12,
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.96)"
-  },
-  titleBlock: {
-    flex: 1,
-    minWidth: 88,
-    paddingRight: 4
-  },
-  roomTitle: {
-    fontFamily: "Inter_800ExtraBold",
-    fontWeight: "800",
-    fontSize: 16,
-    color: uiTheme.colors.textPrimary,
-    lineHeight: 19
-  },
-  roomSubtitle: {
-    ...uiTheme.font.caption,
-    color: "#826C8A",
+  noticeText: {
+    flexShrink: 1,
+    color: "#6A596A",
+    fontFamily: "Inter_500Medium",
+    fontWeight: "500",
+    fontSize: 12,
     lineHeight: 16
   },
-  statusAction: {
-    minHeight: 42,
-    maxWidth: 92,
-    paddingHorizontal: 6,
-    borderRadius: 21,
-    flexDirection: "row",
-    alignItems: "center",
+  noticeAction: {
+    minHeight: 28,
     justifyContent: "center",
-    gap: 5,
-    backgroundColor: "rgba(255, 255, 255, 0.30)"
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "#F2E1EA"
   },
-  statusActionActive: {
-    backgroundColor: uiTheme.colors.primary
-  },
-  statusActionUnavailable: {
-    opacity: 0.78
-  },
-  statusText: {
-    color: uiTheme.colors.brandPlum,
-    fontSize: 11,
-    lineHeight: 14,
+  noticeActionText: {
+    color: MIC_SELECTED_INK,
     fontFamily: "Inter_700Bold",
-    fontWeight: "700"
+    fontWeight: "700",
+    fontSize: 12
   },
-  statusTextActive: {
-    color: "#FFFFFF"
+  menu: {
+    position: "absolute",
+    minWidth: 196,
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 250, 253, 0.97)",
+    shadowColor: wardrobeTheme.shadow,
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8
   },
-  retryButton: {
-    minHeight: 42,
-    paddingHorizontal: 8,
-    borderRadius: 21,
+  menuItem: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.34)"
+    gap: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12
   },
-  retryText: {
-    color: uiTheme.colors.primaryDeep,
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    fontWeight: "700"
+  menuItemPressed: {
+    backgroundColor: "#F4EAF2"
   },
-  safetyButton: {
-    minWidth: 68,
-    minHeight: 42,
-    paddingHorizontal: 7,
-    borderRadius: 21,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    backgroundColor: "rgba(255, 234, 246, 0.46)"
-  },
-  safetyText: {
-    color: uiTheme.colors.brandPlum,
-    fontSize: 11,
-    lineHeight: 14,
-    fontFamily: "Inter_800ExtraBold",
-    fontWeight: "800"
+  menuText: {
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_500Medium",
+    fontWeight: "500",
+    fontSize: 14
   },
   disabled: {
     opacity: 0.42
   },
   pressed: {
     opacity: 0.72,
-    transform: [{ scale: 0.97 }]
+    transform: [{ scale: 0.96 }]
   }
 })

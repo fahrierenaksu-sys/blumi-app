@@ -2,6 +2,11 @@ import type { ChatMessage, ChatThread } from "@blumi/contracts"
 
 const ROOM_INVITE_SENTINEL = "__room_invite__"
 
+/** The chat carries room invitations as a sentinel body that is never shown as text. */
+export function isRoomInviteSentinel(body: string): boolean {
+  return body.trim() === ROOM_INVITE_SENTINEL
+}
+
 export function findLastCanonicalRoomChatMessage(
   messages: readonly ChatMessage[],
   atOrBeforeTimestamp = Number.POSITIVE_INFINITY

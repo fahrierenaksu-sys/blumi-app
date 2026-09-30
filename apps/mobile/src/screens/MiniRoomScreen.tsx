@@ -1,7 +1,7 @@
 import type { ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { StyleSheet, Text, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { ReportModal } from "../components/ReportModal"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
@@ -25,6 +25,7 @@ import { MiniRoomScene } from "../features/miniRoom/scene/MiniRoomScene"
 import { getMiniRoomCopy } from "../features/miniRoom/miniRoomCopy"
 import { useInRoomChat } from "../features/miniRoom/useInRoomChat"
 import { useMiniRoomMedia } from "../features/miniRoom/useMiniRoomMedia"
+import { useRoomChatHistory } from "../features/miniRoom/useRoomChatHistory"
 import {
   isDefinitivelyUnavailableRoomSession,
   joinRoomSession,
@@ -39,7 +40,7 @@ import type {
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
-import { uiTheme } from "../ui/theme"
+import { hapticLight } from "../ui/haptics"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -63,6 +64,10 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     localUserId: sessionActor.profile.userId,
     partnerUserId: participants.partner.userId
   })
+  const roomChatHistory = useRoomChatHistory({
+    threadId: roomChat.threadId,
+    localUserId: sessionActor.profile.userId
+  })
 
   const { connectionStatus: lifecycleConnectionStatus } = useGlobalRealtime()
   const status = voiceAvailable
@@ -79,8 +84,8 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const endRequestedRef = useRef<boolean>(false)
   const [endRequested, setEndRequested] = useState(false)
   const [safetyVisible, setSafetyVisible] = useState(false)
-  const [reconnectError, setReconnectError] = useState<string | null>(null)
-  const [leaveError, setLeaveError] = useState<string | null>(null)
+  const [reconnectError, setReconnectError] = useState(false)
+  const [leaveError, setLeaveError] = useState(false)
   const reconnectScopeKey = JSON.stringify([
     sessionActor.profile.userId,
     sessionActor.session.sessionId,
@@ -89,8 +94,6 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   ])
   const reconnectScopeRef = useRef(reconnectScopeKey)
   reconnectScopeRef.current = reconnectScopeKey
-  const localeRef = useRef(locale)
-  localeRef.current = locale
   const routeParamsRef = useRef(route.params)
   routeParamsRef.current = route.params
 
@@ -207,7 +210,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       const generation = ++refreshGeneration
       const controller = new AbortController()
       requestController = controller
-      setReconnectError(null)
+      setReconnectError(false)
 
       void joinRoomSession(
         MOBILE_HTTP_BASE_URL,
@@ -258,9 +261,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
           exitToDebrief()
           return
         }
-        setReconnectError(localeRef.current === "tr"
-          ? "Oda bilgileri yenilenemedi. Mevcut oda korunuyor; bağlantı tekrar kurulunca yeniden denenecek."
-          : "Room details could not be refreshed. Your current room is unchanged; it will retry after the next reconnection.")
+        setReconnectError(true)
       }).finally(() => {
         if (requestController === controller) requestController = null
       })
@@ -281,7 +282,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     }
     endRequestedRef.current = true
     setEndRequested(true)
-    setLeaveError(null)
+    setLeaveError(false)
     if (sessionActor.session.mode !== "production") {
       exitToDebrief()
       return
@@ -296,9 +297,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       if (exitedRef.current) return
       endRequestedRef.current = false
       setEndRequested(false)
-      setLeaveError(localeRef.current === "tr"
-        ? "Odadan çıkış sunucuda doğrulanamadı. Bağlantını kontrol edip tekrar dene."
-        : "Leaving the room could not be confirmed. Check your connection and try again.")
+      setLeaveError(true)
     })
   }, [exitToDebrief, miniRoom.miniRoomId, sessionActor.session.mode, sessionActor.session.sessionToken])
 
@@ -310,14 +309,14 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   }, [exitToDebrief])
 
   const leaveDisabled = endRequested
+  const notices = useMemo(() => [
+    leaveError ? roomCopy.leaveNotConfirmed : null,
+    reconnectError ? roomCopy.roomRefreshFailed : null,
+    sharedRoomDecor.legacyFallback ? roomCopy.legacyDecorNotice : null
+  ].filter((notice): notice is string => notice !== null), [leaveError, reconnectError, roomCopy, sharedRoomDecor.legacyFallback])
 
   return (
     <View style={styles.root}>
-      {reconnectError ? <Text accessibilityRole="alert" style={styles.reconnectNotice}>{reconnectError}</Text> : null}
-      {leaveError ? <Text accessibilityRole="alert" style={styles.reconnectNotice}>{leaveError}</Text> : null}
-      {sharedRoomDecor.legacyFallback ? <Text accessibilityRole="alert" style={styles.legacyNotice}>
-        {locale === "tr" ? "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor." : "This older session has no saved decor. A shared default room is shown."}
-      </Text> : null}
       <ReportModal
         visible={safetyVisible}
         targetUserId={participants.partner.userId}
@@ -342,6 +341,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
           void retryConnect()
         }}
         onToggleMic={() => {
+          hapticLight()
           void toggleMic()
         }}
         inRoomMessages={roomChat.newMessages}
@@ -349,24 +349,18 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         canChatSend={roomChat.canSend}
         onSendRoomMessage={roomChat.sendRoomMessage}
         failedRoomMessage={roomChat.failedRoomMessage}
+        chatHistory={roomChatHistory.items}
+        chatHistoryStatus={roomChatHistory.status}
+        notices={notices}
       />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  reconnectNotice: {
-    backgroundColor: "#fff0f2",
-    borderRadius: 12,
-    color: "#8a2f45",
-    marginHorizontal: 12,
-    marginTop: 8,
-    padding: 10,
-    textAlign: "center"
-  },
-  legacyNotice: { color: uiTheme.colors.textInverted, padding: 12, textAlign: "center" },
+  // Matches the scene's powder base so no dark frame shows before it paints.
   root: {
     flex: 1,
-    backgroundColor: uiTheme.colors.nightBackground
+    backgroundColor: "#FFF7FA"
   }
 })
