@@ -11,7 +11,8 @@ Both upload with an EAS `submit` job (App Store Connect app id in `submit.produc
 
 ## Flows
 
-- **Push to `develop`** → `develop-preview-update.yml` (no checks job; checks run before the push and on GitHub): iOS fingerprint → look up a `preview` build with that fingerprint → OTA to `preview`. If no build matches (native change), the `native_build_required` job fails and nothing is published. It never builds.
+- **Push to `develop`** → nothing publishes. The iOS bundle carries about 1220 assets (908 of them avatar room motion frames) and EAS Update accepts at most 1000 per update, so develop OTAs are paused. Daily work runs against Metro on a development build; the phone gets a new binary through a TestFlight build.
+- **Manual develop OTA** (once the asset count is under 1000) → GitHub Actions `.github/workflows/develop-ota-publish.yml` (needs the `EXPO_TOKEN` secret): latest `preview` build → `eas fingerprint:compare` against it → `eas update` to `preview`, failing unless the update's runtime equals the build's. `develop-preview-update.yml` on EAS is the manual fallback. Neither ever builds.
 - **Push to `main`** → `testflight.yml`: release checks → fingerprint → if a `production` build matches, OTA to `production`; otherwise build `production` and upload it to App Store Connect / TestFlight.
 - **Manual** → `preview-testflight-build.yml`: builds the `preview` binary and uploads it to App Store Connect / TestFlight. Run it once to start and again whenever develop reports a native change.
 

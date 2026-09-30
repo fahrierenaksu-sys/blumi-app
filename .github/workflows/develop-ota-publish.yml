@@ -4,12 +4,11 @@
 # same native runtime (fingerprint); otherwise the job fails and asks for a new
 # preview build. The EAS workflow develop-preview-update.yml stays as a manual
 # fallback. Needs the EXPO_TOKEN repository secret.
+# Manual only: the iOS bundle carries about 1220 assets and EAS Update accepts
+# at most 1000 per update, so publishing fails until that count drops.
 name: Publish OTA to preview channel
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch: {}
 
 concurrency:

@@ -131,7 +131,8 @@ test("production and preview builds run the release checks first; develop OTA st
 
 test("GitHub Actions publishes develop to the preview channel with the preview build's runtime", () => {
   const workflow = yaml.load(readFileSync(join(mobileRoot, "../../.github/workflows/develop-ota-publish.yml"), "utf8"))
-  assert.deepEqual(workflow.on.push.branches, ["develop"])
+  assert.equal(workflow.on.push, undefined, "manual until the update fits the EAS asset limit")
+  assert.ok("workflow_dispatch" in workflow.on)
   const job = workflow.jobs.publish
   assert.deepEqual(job.env, easJson.build.preview.env, "env must equal build.preview.env")
   const script = job.steps.map((step) => step.run ?? "").join("\n").replace(/\\\n\s*/g, "")
