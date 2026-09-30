@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RealtimeTicketRequestError } from "./realtimeClient"
+import { RealtimeTicketRequestError } from "@blumi/realtime-client"
 import { requestRealtimeTicket } from "./realtimeTicketApi"
 
 test("ticket API keeps the session token in the authorization header", async () => {

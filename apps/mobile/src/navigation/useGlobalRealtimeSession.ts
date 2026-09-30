@@ -26,7 +26,7 @@ import {
   subscribeToStatus,
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
-import { isRealtimeAuthInvalidClose } from "../features/realtime/realtimeClient"
+import { isRealtimeAuthInvalidClose } from "@blumi/realtime-client"
 import { hydrateBlockedUsersFromServer } from "../features/safety/blockStore"
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"

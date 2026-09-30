@@ -2,11 +2,13 @@
   "name": "@blumi/realtime-client",
   "version": "1.0.0",
   "private": true,
-  "description": "Realtime client boundary for the mobile MVP",
-  "main": "./src/index.ts",
+  "description": "Platform-independent Blumi realtime client: connection state machine, reconnect policy and validated inbound events",
+  "main": "./dist/index.js",
   "react-native": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test dist/realtimeClient.test.js dist/realtimeClient.adversarial.test.js dist/reconnectTransitionTracker.test.js",
     "typecheck": "tsc --noEmit"
   },
   "author": "Blumi",
@@ -15,9 +17,11 @@
     "@blumi/contracts": "1.0.0"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
     "typescript": "~6.0.3"
   },
   "files": [
-    "src"
+    "src",
+    "dist"
   ]
 }

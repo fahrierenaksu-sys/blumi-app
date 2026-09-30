@@ -4,7 +4,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RealtimeClient, type RealtimeConnectionStatus } from "./realtimeClient"
-import { resolveConnectionBannerState } from "../../ui/connectionBannerModel"
 
 class MockWebSocket {
   public static readonly OPEN = 1
@@ -129,7 +128,7 @@ test("after the fast reconnect attempts are exhausted the client still recovers 
     await flush()
   }
   assert.equal(statuses.at(-1), "unreachable")
-  assert.equal(resolveConnectionBannerState("unreachable", true), "unreachable", "the UI no longer promises a quick reconnect")
+  // The app banner maps "unreachable" to its own copy (connectionBannerModel.test.ts).
   // Slow attempts continue, never more than 60 s apart.
   for (let slow = 0; slow < 10; slow += 1) {
     const before = MockWebSocket.instances.length

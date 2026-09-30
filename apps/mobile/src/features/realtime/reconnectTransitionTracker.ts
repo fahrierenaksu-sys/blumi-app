@@ -1,28 +1,7 @@
-import type { RealtimeConnectionStatus } from "./realtimeClient"
-
 /**
- * Emits once for each connected edge that follows an established connection
- * dropping, while ignoring the first connection observed by a subscriber.
+ * Compatibility re-export. The tracker lives in `packages/realtime-client`;
+ * import it from `@blumi/realtime-client`. Kept only for modules outside this
+ * change's scope that still import this path (features/roomV2); do not add
+ * new importers.
  */
-export function createReconnectTransitionTracker(
-  initialStatus: RealtimeConnectionStatus
-): (status: RealtimeConnectionStatus) => boolean {
-  let hasSeenConnected = initialStatus === "connected"
-  let reconnectPending = false
-
-  return (status): boolean => {
-    if (status === "connected") {
-      if (!hasSeenConnected) {
-        hasSeenConnected = true
-        reconnectPending = false
-        return false
-      }
-      if (!reconnectPending) return false
-      reconnectPending = false
-      return true
-    }
-
-    if (hasSeenConnected) reconnectPending = true
-    return false
-  }
-}
+export { createReconnectTransitionTracker } from "@blumi/realtime-client"

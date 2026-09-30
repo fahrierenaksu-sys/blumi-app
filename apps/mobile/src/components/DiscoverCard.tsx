@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { AvatarSelection } from "@blumi/contracts"
 import { Animated, Easing, ImageBackground, StyleSheet, Text, View } from "react-native"
-import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClient"
+import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
 import {
   ROOM_AVATAR_CATALOG
 } from "../features/avatarV2/room/avatarRoomCatalog"

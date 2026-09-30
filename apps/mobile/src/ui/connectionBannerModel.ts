@@ -1,4 +1,4 @@
-import type { RealtimeConnectionStatus } from "../features/realtime/realtimeClient"
+import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
 
 export type ConnectionBannerState = "hidden" | "offline" | "reconnecting" | "unreachable"
 export type ConnectionBannerLocale = "en" | "tr"

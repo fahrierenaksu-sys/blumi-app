@@ -50,7 +50,7 @@ is not a reason.
 | Rule | Why | Enforced by |
 |---|---|---|
 | Mobile HTTP only through `requestJson` (deadline, abort, error mapping) | Raw fetches had no timeout and inconsistent errors | `mobile-engineering-rules.test.mjs` (no `fetch(`) |
-| Inbound realtime events are parsed with the shared zod schemas from `packages/contracts` | Shape checks accepted malformed events | Realtime client tests |
+| Inbound realtime events are parsed with the shared zod schemas from `packages/contracts`; the platform-independent client lives in `packages/realtime-client` (the app keeps only React, AppState/NetInfo and ticket wiring) | Shape checks accepted malformed events | `packages/realtime-client` tests |
 | Every authenticated server route resolves the session with `resolveBearerSession` | Three profile routes skipped the ban/suspension check | Route tests |
 | Routes declare request schemas and keep request validation enforced | Validation was attached but ignored | `routeHelpers` / route tests |
 | Every repository method exists in both the in-memory and PostgreSQL implementation and is covered by the shared contract suite | The two implementations drifted (economy replay) | `repositoryContract.ts` suites |
@@ -104,8 +104,6 @@ is not a reason.
 
 - Avatar frame ticker (`RoomAvatarRenderer2D.tsx`) and My Room movement
   (`MyRoomScreen.tsx`) still use JS timers and React state.
-- `packages/realtime-client` is a one-line re-export; the client lives in the
-  app.
 - Module stores follow different shapes.
 - The files in the oversized and frame-loop allowlists of
   `apps/mobile/scripts/mobile-engineering-rules.test.mjs`.

@@ -1,10 +1,10 @@
 import type { ChatThread, ChatThreadList } from "@blumi/contracts"
-import type { ClientEvent } from "@blumi/realtime-client"
+import type {
+  ClientEvent,
+  RealtimeConnectionMeta,
+  RealtimeConnectionStatus
+} from "@blumi/realtime-client"
 import type { SessionActor } from "../session/sessionModel"
-import {
-  type RealtimeConnectionMeta,
-  type RealtimeConnectionStatus
-} from "./realtimeClient"
 import {
   createLoadedDemoThreadList,
   shouldConnectGlobalRealtime
