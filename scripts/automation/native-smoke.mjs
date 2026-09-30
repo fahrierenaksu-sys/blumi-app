@@ -5,8 +5,8 @@ import { join, resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "../..")
 const disk = statfsSync(homedir())
-if (disk.bavail * disk.bsize < 12 * 1024 ** 3) {
-  throw new Error("Native smoke BLOCKED: at least 12 GiB free space is required before creating a simulator or building.")
+if (disk.bavail * disk.bsize < 24 * 1024 ** 3) {
+  throw new Error("Native smoke BLOCKED: at least 24 GiB free space is required for the simulator, native build and test runner.")
 }
 const directory = join(homedir(), "BlumiOperations", "native-smoke", new Date().toISOString().replaceAll(":", "-"))
 mkdirSync(directory, { recursive: true, mode: 0o700 })
@@ -25,6 +25,7 @@ const env = {
   EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET: "1",
   EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE: "",
   NODE_BINARY: process.execPath,
+  SENTRY_DISABLE_AUTO_UPLOAD: "true",
   RCT_NO_LAUNCH_PACKAGER: "1",
   MAESTRO_CLI_NO_ANALYTICS: "1",
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
