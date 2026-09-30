@@ -21,6 +21,7 @@ import {
 import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler"
 import Animated, {
   cancelAnimation,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring
@@ -29,6 +30,11 @@ import { scheduleOnRN, scheduleOnUI } from "react-native-worklets"
 import type { BottomNavKey } from "../../ui/bottomNav"
 import { useReducedMotion } from "../../ui/animations"
 import { ErrorBoundary } from "../../ui/errorBoundary"
+import {
+  publishMainTabPagerIndicator,
+  resolveMainTabPagerIndicatorSample
+} from "../../ui/layout/bottomNavIndicatorModel"
+import { mainTabPagerIndicator } from "../../ui/mainTabPagerIndicator"
 import { uiTheme } from "../../ui/theme"
 import {
   MAIN_TAB_PAGER_ACTIVE_OFFSET_X,
@@ -231,6 +237,21 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage }: M
   useEffect(() => {
     reduceMotionValue.value = reduceMotion
   }, [reduceMotion, reduceMotionValue])
+
+  // The bottom-bar indicator follows the pages in the same UI-thread frame
+  // while a drag or settle moves them (no JS per frame).
+  useAnimatedReaction(
+    () => resolveMainTabPagerIndicatorSample({
+      position: position.value,
+      width: width.value,
+      dragging: dragging.value,
+      animating: animating.value
+    }),
+    (sample) => publishMainTabPagerIndicator(mainTabPagerIndicator, sample)
+  )
+  useEffect(() => () => {
+    mainTabPagerIndicator.tracking.value = false
+  }, [])
 
   const applyTransition = useCallback((transition: MainTabPagerUiTransition) => {
     "worklet"

@@ -232,3 +232,12 @@ export function sortRoomShopProducts(products: ShopCatalogItem[]): ShopCatalogIt
     return left.title.localeCompare(right.title)
   })
 }
+
+/**
+ * Whether the paged product shelf owns horizontal drags that start on it.
+ * With a single page (the 1/1 counter) there is nothing to scroll, so the
+ * drag goes to the main-page pager instead of being swallowed by the shelf.
+ */
+export function shouldShopShelfOwnHorizontalDrags(pageCount: number): boolean {
+  return pageCount > 1
+}

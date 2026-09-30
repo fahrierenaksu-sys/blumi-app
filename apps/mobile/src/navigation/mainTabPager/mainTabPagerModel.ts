@@ -154,8 +154,9 @@ export function resolveMainTabPagerBaseIndex(position: number, width: number): n
 
 /**
  * Visibility of a page while the pager moves. A page outside the swipeable
- * range is shown only while it is the committed page, so the Chats rubber band
- * reveals the background instead of the unreachable Discover page.
+ * range (none today; kept for a page that opts out) is shown only while it
+ * is the committed page, so an edge rubber band reveals the background
+ * instead of an unreachable page.
  */
 export function getMainTabPageOpacity(pageIndex: number, committedIndex: number): number {
   "worklet"
@@ -274,7 +275,7 @@ export function resolveMainTabPagerCommitRoute(
 
 // ── Mount policy ─────────────────────────────────────────────────────────
 
-/** Swipe neighbours of a page: pages one drag away. Discover has none. */
+/** Swipe neighbours of a page: pages one drag away. */
 export function getMainTabPageNeighbours(index: number): number[] {
   if (!isMainTabPageSwipeable(index)) return []
   return [index - 1, index + 1].filter(isMainTabPageSwipeable)

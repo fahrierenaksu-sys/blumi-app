@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from "react"
 import {
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View
 } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type {
   DiscoveryFilters,
@@ -19,6 +19,7 @@ import {
   DISCOVERY_MINIMUM_AGE
 } from "../features/discovery/discoveryFiltersModel"
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
+import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
 import { uiTheme } from "../ui/theme"
 
 export type DiscoverFilters = DiscoveryFilters
@@ -112,14 +113,17 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <GestureHandlerRootView style={styles.overlay}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close discovery filters"
           style={styles.backdrop}
           onPress={onClose}
         />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <SwipeDismissSheet
+          onDismiss={onClose}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
+        >
           <View style={styles.sheetGlowTop} pointerEvents="none" />
           <View style={styles.sheetGlowBottom} pointerEvents="none" />
           <View style={styles.headerRow}>
@@ -137,7 +141,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             </Pressable>
           </View>
 
-          <ScrollView
+          <SwipeDismissSheetScrollView
             style={styles.content}
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
@@ -285,7 +289,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
               </View>
             </View>
 
-          </ScrollView>
+          </SwipeDismissSheetScrollView>
 
           <View style={[styles.footer, { marginBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.footerButton}>
@@ -305,8 +309,8 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
               />
             </View>
           </View>
-        </View>
-      </View>
+        </SwipeDismissSheet>
+      </GestureHandlerRootView>
     </Modal>
   )
 }

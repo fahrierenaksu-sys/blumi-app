@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Pressable,
@@ -10,7 +9,22 @@ import {
   useWindowDimensions,
   View
 } from "react-native"
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue
+} from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { useReducedMotion } from "./animations"
+import {
+  getBottomNavItemEmphasis,
+  readMainTabPagerIndicatorProgress,
+  resolveBottomNavIndicatorIndex
+} from "./layout/bottomNavIndicatorModel"
+import { mainTabPagerIndicator } from "./mainTabPagerIndicator"
 import { uiTheme } from "./theme"
 import { hapticLight } from "./haptics"
 import { getAppNavigationCopy } from "../features/session/appNavigationCopy"
@@ -40,6 +54,8 @@ interface BottomNavItem {
 
 type LocalizedBottomNavItem = BottomNavItem & { label: string }
 
+// Same order as the main-page pager (MAIN_TAB_PAGES), whose fractional page
+// index drives the selection indicator while a swipe moves the pages.
 const BOTTOM_NAV_ITEMS: readonly BottomNavItem[] = [
   {
     key: "discover",
@@ -65,6 +81,8 @@ export interface BottomNavProps {
 
 function NavTab(props: {
   item: LocalizedBottomNavItem
+  index: number
+  indicator: SharedValue<number>
   isCurrent: boolean
   showBadge: boolean
   chatCount: number
@@ -75,6 +93,8 @@ function NavTab(props: {
 }) {
   const {
     item,
+    index,
+    indicator,
     isCurrent,
     showBadge,
     chatCount,
@@ -84,7 +104,14 @@ function NavTab(props: {
     reduceMotion,
   } = props
   const scaleAnim = useRef(new Animated.Value(1)).current
-  const iconName = isCurrent ? item.activeIcon : item.icon
+  // The selected icon and label fade in as the indicator arrives, so the
+  // whole bar moves with a swipe instead of switching after it settles.
+  const selectedLayerStyle = useAnimatedStyle(() => ({
+    opacity: getBottomNavItemEmphasis(index, indicator.value)
+  }))
+  const restingLayerStyle = useAnimatedStyle(() => ({
+    opacity: 1 - getBottomNavItemEmphasis(index, indicator.value)
+  }))
 
   const handlePressIn = () => {
     scaleAnim.stopAnimation()
@@ -141,24 +168,23 @@ function NavTab(props: {
         onPressOut={handlePressOut}
         hitSlop={6}
       >
-        {isCurrent ? (
-          <View style={styles.activeIconWrap}>
+        <View style={styles.bottomNavIconWrap}>
+          <Reanimated.View pointerEvents="none" style={[styles.iconLayer, restingLayerStyle]}>
             <Ionicons
-              name={iconName}
+              name={item.icon}
+              size={22}
+              color={uiTheme.colors.textMuted}
+            />
+          </Reanimated.View>
+          <Reanimated.View pointerEvents="none" style={[styles.iconLayer, selectedLayerStyle]}>
+            <Ionicons
+              name={item.activeIcon}
               size={22}
               color={uiTheme.colors.primary}
               style={styles.iconZ}
             />
-          </View>
-        ) : (
-          <View style={styles.bottomNavIconWrap}>
-            <Ionicons
-              name={iconName}
-              size={22}
-              color={uiTheme.colors.textMuted}
-            />
-          </View>
-        )}
+          </Reanimated.View>
+        </View>
         {showBadge ? (
           <View
             style={[
@@ -171,17 +197,14 @@ function NavTab(props: {
             </Text>
           </View>
         ) : null}
-        <View pointerEvents="none" style={styles.bottomNavLabelFrame}>
+        <Reanimated.View pointerEvents="none" style={[styles.bottomNavLabelFrame, selectedLayerStyle]}>
           <Text
             accessible={false}
-            style={[
-              styles.bottomNavLabel,
-              isCurrent ? styles.bottomNavLabelActive : styles.bottomNavLabelHidden,
-            ]}
+            style={[styles.bottomNavLabel, styles.bottomNavLabelActive]}
           >
             {item.label}
           </Text>
-        </View>
+        </Reanimated.View>
       </Pressable>
     </Animated.View>
   )
@@ -190,7 +213,7 @@ function NavTab(props: {
 export function BottomNav(props: BottomNavProps) {
   const { currentKey, chatCount, onPress, appearance = "default", visible = true } = props
   const ambient = appearance === "ambient"
-  const [reduceMotion, setReduceMotion] = useState(false)
+  const reduceMotion = useReducedMotion()
   const locale = useMemo(
     () => resolveAccountRecoveryLocale(
       getNativeAppLocale(),
@@ -212,49 +235,35 @@ export function BottomNav(props: BottomNavProps) {
     0,
     localizedItems.findIndex((item) => item.key === currentKey)
   )
-  const activeIndexAnim = useRef(new Animated.Value(activeIndex)).current
   const navLayout = resolveBottomNavLayout({
     viewportWidth: windowSize.width,
     safeAreaBottom: insets.bottom,
     visible: true,
   })
+  const tabWidth = navLayout.tabWidth
+  const itemCount = localizedItems.length
 
+  // Indicator position in tab units. A committed selection change (tap,
+  // navigation, end of a swipe) animates it on the UI thread; while the
+  // main-page pager is dragged or settling, it follows the pages frame by
+  // frame instead, so the bar never trails the page.
+  const indicator = useSharedValue(activeIndex)
   useEffect(() => {
-    let mounted = true
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduceMotion
-    )
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) setReduceMotion(enabled)
-    }).catch(() => undefined)
-
-    return () => {
-      mounted = false
-      subscription.remove()
-    }
-  }, [])
-
-  useEffect(() => {
-    activeIndexAnim.stopAnimation()
     const duration = getBottomNavMotionDuration(reduceMotion)
-    if (duration === 0) {
-      activeIndexAnim.setValue(activeIndex)
-      return () => activeIndexAnim.stopAnimation()
+    indicator.value = duration === 0
+      ? activeIndex
+      : withTiming(activeIndex, { duration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
+  }, [activeIndex, indicator, reduceMotion])
+  useAnimatedReaction(
+    () => readMainTabPagerIndicatorProgress(mainTabPagerIndicator),
+    (progress) => {
+      if (progress === null) return
+      indicator.value = resolveBottomNavIndicatorIndex(progress, itemCount)
     }
-    Animated.timing(activeIndexAnim, {
-      toValue: activeIndex,
-      useNativeDriver: true,
-      duration,
-      easing: Easing.out(Easing.cubic),
-    }).start()
-    return () => activeIndexAnim.stopAnimation()
-  }, [activeIndex, activeIndexAnim, reduceMotion])
-
-  const activeTranslateX = activeIndexAnim.interpolate({
-    inputRange: localizedItems.map((_, index) => index),
-    outputRange: localizedItems.map((_, index) => index * navLayout.tabWidth)
-  })
+  )
+  const activePillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicator.value * tabWidth }]
+  }))
 
   return (
     <View
@@ -278,26 +287,26 @@ export function BottomNav(props: BottomNavProps) {
         style={[styles.navTint, ambient ? styles.navTintAmbient : null]}
       />
       <View pointerEvents="none" style={styles.navSheen} />
-      <Animated.View
+      <Reanimated.View
         pointerEvents="none"
         style={[
           styles.activeGlassPill,
           ambient ? styles.activeGlassPillAmbient : null,
-          {
-            width: navLayout.tabWidth,
-            transform: [{ translateX: activeTranslateX }]
-          }
+          { width: tabWidth },
+          activePillStyle
         ]}
       >
         <View pointerEvents="none" style={styles.activeGlassTint} />
-      </Animated.View>
-      {localizedItems.map((item) => {
+      </Reanimated.View>
+      {localizedItems.map((item, index) => {
         const isCurrent = item.key === currentKey
         const showBadge = item.key === "chats" && chatCount > 0
         return (
           <NavTab
             key={item.key}
             item={item}
+            index={index}
+            indicator={indicator}
             isCurrent={isCurrent}
             showBadge={showBadge}
             chatCount={chatCount}
@@ -384,10 +393,8 @@ const styles = StyleSheet.create({
   bottomNavItemActive: {
     backgroundColor: "transparent",
   },
-  activeIconWrap: {
-    position: "relative",
-    width: 25,
-    height: 25,
+  iconLayer: {
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -416,9 +423,6 @@ const styles = StyleSheet.create({
   bottomNavLabelActive: {
     color: uiTheme.colors.primaryDeep,
     fontWeight: "800"
-  },
-  bottomNavLabelHidden: {
-    opacity: 0,
   },
   activeIndicator: {
     position: "absolute",

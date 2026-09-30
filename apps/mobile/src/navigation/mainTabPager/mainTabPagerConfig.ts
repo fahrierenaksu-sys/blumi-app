@@ -16,23 +16,25 @@ export interface MainTabPageConfig {
   readonly key: BottomNavKey
   readonly routeName: MainTabRouteName
   /**
-   * Whether a horizontal finger drag may move this page. A page whose main
-   * surface is itself a horizontal interaction is excluded: it is reached by
-   * the bottom bar only, and the pager is disabled while it is selected.
+   * Whether a horizontal finger drag may move this page. A page that sets
+   * this to false is reached by the bottom bar only, and the pager is
+   * disabled while it is selected. Horizontal interactions inside a
+   * swipeable page own their drags through a Gesture Handler relation
+   * (ui/MainTabPagerGestureOwnership.tsx) instead.
    */
   readonly swipeable: boolean
 }
 
 /**
- * Page order equals the bottom bar order. Discover is excluded from swiping:
- * its main surface is the like/pass card swipe, which covers most of the
- * screen, so a pager drag there would either steal card swipes or only work
- * on the thin header strip. Chats, My Room and Shop form one contiguous
- * swipeable range; Chats rubber-bands at its left edge instead of revealing
- * Discover.
+ * Page order equals the bottom bar order, and all four pages form one
+ * contiguous swipeable range (owner decision 2026-09-30: Chats swipes right
+ * to Discover). A drag that starts on the Discover card stays a like/pass
+ * swipe because the card's pan blocks the pager (useDiscoverCardSwipe); a
+ * drag anywhere else on Discover moves the page. Discover and Shop
+ * rubber-band at the outer edges.
  */
 export const MAIN_TAB_PAGES: readonly MainTabPageConfig[] = Object.freeze([
-  Object.freeze({ key: "discover", routeName: "Lobby", swipeable: false }),
+  Object.freeze({ key: "discover", routeName: "Lobby", swipeable: true }),
   Object.freeze({ key: "chats", routeName: "Inbox", swipeable: true }),
   Object.freeze({ key: "myroom", routeName: "MyRoom", swipeable: true }),
   Object.freeze({ key: "shop", routeName: "CosmeticShop", swipeable: true })
@@ -43,7 +45,7 @@ export const MAIN_TAB_ROUTE_NAMES: readonly MainTabRouteName[] = Object.freeze(
 )
 
 /** First and last page index a drag can reach. The range is contiguous. */
-export const MAIN_TAB_SWIPE_MIN_INDEX = 1
+export const MAIN_TAB_SWIPE_MIN_INDEX = 0
 export const MAIN_TAB_SWIPE_MAX_INDEX = 3
 
 /**
