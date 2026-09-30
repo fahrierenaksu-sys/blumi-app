@@ -7,6 +7,11 @@ import vm from "node:vm"
 import ts from "typescript"
 
 const directory = dirname(fileURLToPath(import.meta.url))
+// MyRoomEditorScreen composes the editor feature; the tray wiring lives in
+// its inventory hook and the loading/empty presentation in its tray components.
+const editorDirectory = resolve(directory, "../features/roomV2/editor")
+const readEditorModule = (fileName) =>
+  readFileSync(resolve(editorDirectory, fileName), "utf8")
 
 function mountInventoryEntriesHook() {
   const source = readFileSync(resolve(directory, "useRoomEditorInventoryEntries.ts"), "utf8")
@@ -47,7 +52,9 @@ function mountInventoryEntriesHook() {
 
 test("the mounted room tray responds to hydration and ownership changes without unrelated recalculation", () => {
   const screen = readFileSync(resolve(directory, "MyRoomEditorScreen.tsx"), "utf8")
-  assert.match(screen, /useRoomEditorInventoryEntries\(/)
+  const inventoryHook = readEditorModule("useRoomEditorInventory.ts")
+  assert.match(screen, /const inventoryState = useRoomEditorInventory\(\{/)
+  assert.match(inventoryHook, /useRoomEditorInventoryEntries\(/)
 
   const catalog = [{ id: "chair" }, { id: "table" }, { id: "qa" }]
   const qaOwnedIds = new Set(["qa"])
@@ -114,24 +121,35 @@ test("room inventory distinguishes slow, failed, truly empty, and filtered state
 
 test("room inventory keeps fixed-size loading placeholders instead of exposing partial fallback entries", () => {
   const screen = readFileSync(resolve(directory, "MyRoomEditorScreen.tsx"), "utf8")
-  assert.match(screen, /getRoomEditorInventoryViewState\(/)
-  assert.match(screen, /inventoryViewState\.isLoading\s*\?\s*\[\]\s*:\s*filteredInventoryEntries/)
-  assert.match(screen, /inventoryViewState\.isLoading\s*\?\s*\(/)
-  assert.match(screen, /inventoryViewState\.isLoading\s*\?\s*\([\s\S]*?styles\.inventoryLoadingPreview[\s\S]*?: selectedInventoryEntry \?\s*\(/)
-  assert.match(screen, /inventoryLoadingCard:\s*\{[\s\S]*?width:\s*72,[\s\S]*?height:\s*52/)
-  assert.match(screen, /inventoryViewState\.emptyState === "no-pieces"/)
-  assert.match(screen, /: inventoryStatusLabel/)
+  const inventoryHook = readEditorModule("useRoomEditorInventory.ts")
+  const inventoryPreview = readEditorModule("RoomEditorInventoryPreview.tsx")
+  const inventoryList = readEditorModule("RoomEditorInventoryList.tsx")
+  const editorStyles = readEditorModule("roomEditorStyles.ts")
+  assert.match(screen, /<RoomEditorInventoryPreview[\s\S]*?inventoryViewState=\{inventoryState\.inventoryViewState\}/)
+  assert.match(screen, /<RoomEditorInventoryList[\s\S]*?inventoryViewState=\{inventoryState\.inventoryViewState\}/)
+  assert.match(inventoryHook, /getRoomEditorInventoryViewState\(/)
+  assert.match(inventoryList, /inventoryViewState\.isLoading\s*\?\s*\[\]\s*:\s*filteredInventoryEntries/)
+  assert.match(inventoryList, /inventoryViewState\.isLoading\s*\?\s*\(/)
+  assert.match(inventoryPreview, /inventoryViewState\.isLoading\s*\?\s*\([\s\S]*?styles\.inventoryLoadingPreview[\s\S]*?: selectedInventoryEntry \?\s*\(/)
+  assert.match(editorStyles, /inventoryLoadingCard:\s*\{[\s\S]*?width:\s*72,[\s\S]*?height:\s*52/)
+  assert.match(inventoryList, /inventoryViewState\.emptyState === "no-pieces"/)
+  assert.match(inventoryList, /: inventoryStatusLabel/)
 })
 
 test("server-required placement and Shop intents wait for authoritative inventory hydration", () => {
   const hook = mountInventoryEntriesHook()
   const screen = readFileSync(resolve(directory, "MyRoomEditorScreen.tsx"), "utf8")
+  const inventoryHook = readEditorModule("useRoomEditorInventory.ts")
+  const itemActions = readEditorModule("useRoomEditorItemActions.ts")
+  const shopIntent = readEditorModule("useShopPlacementIntent.ts")
   assert.equal(hook.canPlaceItem("idle", true), false)
   assert.equal(hook.canPlaceItem("loading", true), false)
   assert.equal(hook.canPlaceItem("failed", true), false)
   assert.equal(hook.canPlaceItem("ready", true), true)
   assert.equal(hook.canPlaceItem("failed", false), true)
-  assert.match(screen, /canPlaceRoomEditorInventoryItem\(/)
-  assert.match(screen, /if \(!canPlaceInventoryItem\) \{[\s\S]*?return false/)
-  assert.match(screen, /if \(!canPlaceInventoryItem \|\| !isRoomDraftReady\) return/)
+  assert.match(screen, /requireServerInventory: props\.requireServerInventory/)
+  assert.match(screen, /canPlaceInventoryItem: inventoryState\.canPlaceInventoryItem/)
+  assert.match(inventoryHook, /canPlaceRoomEditorInventoryItem\(\s*inventoryHydrationStatus,\s*input\.requireServerInventory === true\s*\)/)
+  assert.match(itemActions, /if \(!canPlaceInventoryItem\) \{[\s\S]*?return false/)
+  assert.match(shopIntent, /if \(!canPlaceInventoryItem \|\| !isRoomDraftReady\) return/)
 })

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
 
@@ -7,6 +7,34 @@ const editorSource = readFileSync(
   resolve(process.cwd(), "src/screens/MyRoomEditorScreen.tsx"),
   "utf8"
 )
+// The editor screen composes the modules in features/roomV2/editor; each
+// assertion below targets the module that now owns the behaviour it pins.
+const editorModuleDirectory = resolve(process.cwd(), "src/features/roomV2/editor")
+const readEditorModule = (fileName: string): string =>
+  readFileSync(resolve(editorModuleDirectory, fileName), "utf8")
+const editorCatalogSource = readEditorModule("roomEditorCatalog.ts")
+const editorStylesSource = readEditorModule("roomEditorStyles.ts")
+const editorPlacementModelSource = readEditorModule("roomEditorPlacementModel.ts")
+const editorSessionHookSource = readEditorModule("useRoomEditorSession.ts")
+const editorInventoryHookSource = readEditorModule("useRoomEditorInventory.ts")
+const editorGesturesSource = readEditorModule("useRoomEditorPlacementGestures.ts")
+const editorItemActionsSource = readEditorModule("useRoomEditorItemActions.ts")
+const editorShopIntentSource = readEditorModule("useShopPlacementIntent.ts")
+const editorSaveSource = readEditorModule("useRoomEditorSave.ts")
+const editorTopBarSource = readEditorModule("RoomEditorTopBar.tsx")
+const editorStageSource = readEditorModule("RoomEditorStage.tsx")
+const editorSelectedActionsSource = readEditorModule("RoomEditorSelectedItemActions.tsx")
+const editorInventoryControlsSource = readEditorModule("RoomEditorInventoryControls.tsx")
+const editorInventoryPreviewSource = readEditorModule("RoomEditorInventoryPreview.tsx")
+const editorInventoryListSource = readEditorModule("RoomEditorInventoryList.tsx")
+const editorInventoryCardSource = readEditorModule("InventoryCatalogCard.tsx")
+// Screen plus every production editor module, for surface-wide negative checks.
+const editorSurfaceSource = [
+  editorSource,
+  ...readdirSync(editorModuleDirectory)
+    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$|TestFixtures\.ts$/.test(fileName))
+    .map(readEditorModule)
+].join("\n")
 const editorInventoryEntriesSource = readFileSync(
   resolve(process.cwd(), "src/screens/useRoomEditorInventoryEntries.ts"),
   "utf8"
@@ -36,160 +64,200 @@ const editorCopySource = readFileSync(
   "utf8"
 )
 
+test("the editor screen composes the room editor feature modules", () => {
+  for (const moduleName of [
+    "roomEditorCatalog",
+    "roomEditorPlacementModel",
+    "roomEditorPresentationModel",
+    "roomEditorStyles",
+    "useRoomEditorSelection",
+    "useRoomEditorSession",
+    "useRoomEditorStageLayout",
+    "useRoomEditorInventory",
+    "useRoomEditorPlacementGestures",
+    "useRoomEditorItemActions",
+    "useShopPlacementIntent",
+    "useRoomEditorSave",
+    "RoomEditorTopBar",
+    "RoomEditorPersistenceBanner",
+    "RoomEditorShellPicker",
+    "RoomEditorStage",
+    "RoomEditorSelectedItemActions",
+    "RoomEditorInventoryControls",
+    "RoomEditorInventoryPreview",
+    "RoomEditorInventoryList",
+    "RoomEditorLoadingOverlay"
+  ]) {
+    assert.match(
+      editorSource,
+      new RegExp(`from "\\.\\./features/roomV2/editor/${moduleName}"`),
+      `MyRoomEditorScreen must import ${moduleName}`
+    )
+  }
+  assert.match(editorInventoryListSource, /import \{ InventoryCatalogCard \} from "\.\/InventoryCatalogCard"/)
+  // Effects run in hook-call order; keep the original listener/effect sequence.
+  assert.match(
+    editorSource,
+    /useShopPlacementIntentMemory\(navigation\)[\s\S]*useRoomEditorSession\(\{[\s\S]*useRoomEditorInventory\(\{[\s\S]*useShopPlacementIntent\(\{[\s\S]*useRoomEditorSave\(\{/
+  )
+})
+
 test("room editor exposes an explicit control that commits a valid placement preview", () => {
-  assert.match(editorSource, /accessibilityLabel=\{copy\.confirmPlacement\}/)
+  assert.match(editorSelectedActionsSource, /accessibilityLabel=\{copy\.confirmPlacement\}/)
   assert.match(editorCopySource, /confirmPlacement:\s*"Confirm room placement"/)
-  assert.match(editorSource, /commitTrayPlacementPreview\(placementPreview\)/)
+  assert.match(editorSelectedActionsSource, /commitTrayPlacementPreview\(placementPreview\)/)
+  assert.match(editorSource, /commitTrayPlacementPreview=\{gestures\.commitTrayPlacementPreview\}/)
 })
 
 test("Save commits the latest valid preview before validating and persisting the room", () => {
   assert.match(
-    editorSource,
+    editorSaveSource,
     /const saveDecision = createRoomV2EditorSaveDecor\(draftDecor, furniturePreview\)/
   )
-  assert.match(editorSource, /const decorToSave = saveDecision\.decor/)
+  assert.match(editorSaveSource, /const decorToSave = saveDecision\.decor/)
   assert.match(
-    editorSource,
+    editorSaveSource,
     /validateRoomV2DraftPlacements\(\{[\s\S]*decor: decorToSave/
   )
   assert.match(
-    editorSource,
+    editorSaveSource,
     /const confirmedSave = await saveRoomV2EditorDraftConfirmed\([\s\S]*decorToSave,[\s\S]*saveUserRoomDecorConfirmed/
   )
   assert.match(
-    editorSource,
+    editorSaveSource,
     /if \(confirmedSave\.status !== "saved"\)[\s\S]*setPlacementFeedback\(confirmedSave\.feedback\)/
   )
   assert.match(
-    editorSource,
+    editorSaveSource,
     /if \(confirmedSave\.status !== "saved"\)[\s\S]*return[\s\S]*allowEditorExitRef\.current = true/
   )
   assert.match(
-    editorSource,
+    editorSaveSource,
     /if \(saveDecision\.status === "invalid_preview"\)[\s\S]*setPlacementFeedback\(copy\.feedback\.moveHighlighted\)/
   )
   assert.match(editorCopySource, /moveHighlighted:\s*"Move the highlighted item before saving\."/)
 })
 
 test("room editor catalog supports selecting, searching, rotating, and explicitly placing a room piece", () => {
-  assert.match(editorSource, /const \[inventorySearchQuery, setInventorySearchQuery\] = useState\(""\)/)
-  assert.match(editorSource, /accessibilityLabel=\{copy\.searchLabel\}/)
+  assert.match(editorInventoryHookSource, /const \[inventorySearchQuery, setInventorySearchQuery\] = useState\(""\)/)
+  assert.match(editorInventoryControlsSource, /accessibilityLabel=\{copy\.searchLabel\}/)
   assert.match(editorCopySource, /searchLabel:\s*"Search room pieces"/)
-  assert.match(editorSource, /onPreviewItem=\{setSelectedInventoryItemId\}/)
-  assert.match(editorSource, /accessibilityLabel={`Preview \${item\.name}`}/)
-  assert.match(editorSource, /accessibilityLabel=\{copy\.chooseRotation\(copy\.rotationLabels\[rotation\], selectedInventoryEntry\.item\.name\)\}/)
-  assert.match(editorSource, /accessibilityLabel=\{copy\.placeItem\(selectedInventoryEntry\.item\.name\)\}/)
-  assert.match(editorSource, /addDraftItem\(\s*selectedInventoryEntry\.item\.id,\s*true,\s*selectedInventoryRotation\s*\)/)
-  assert.match(editorSource, /resolveRoomV2InventoryPreviewSource\(\s*selectedInventoryEntry\.item,\s*selectedInventoryRotation\s*\)/)
-  assert.match(editorSource, /rotation: input\.rotation/)
-  assert.match(editorSource, /createPanHandlers\(item, owned, previewRotation\)/)
+  assert.match(editorInventoryListSource, /onPreviewItem=\{setSelectedInventoryItemId\}/)
+  assert.match(editorInventoryCardSource, /accessibilityLabel={`Preview \${item\.name}`}/)
+  assert.match(editorInventoryPreviewSource, /accessibilityLabel=\{copy\.chooseRotation\(copy\.rotationLabels\[rotation\], selectedInventoryEntry\.item\.name\)\}/)
+  assert.match(editorInventoryPreviewSource, /accessibilityLabel=\{copy\.placeItem\(selectedInventoryEntry\.item\.name\)\}/)
+  assert.match(editorItemActionsSource, /addDraftItem\(\s*selectedInventoryEntry\.item\.id,\s*true,\s*selectedInventoryRotation\s*\)/)
+  assert.match(editorInventoryPreviewSource, /resolveRoomV2InventoryPreviewSource\(\s*selectedInventoryEntry\.item,\s*selectedInventoryRotation\s*\)/)
+  assert.match(editorPlacementModelSource, /rotation: input\.rotation/)
+  assert.match(editorInventoryCardSource, /createPanHandlers\(item, owned, previewRotation\)/)
 })
 
 test("direction buttons persist an exact valid rotation for the selected placed item", () => {
   assert.match(
-    editorSource,
+    editorItemActionsSource,
     /const applySelectedItemRotation = useCallback\(\(rotation: PlacedRoomItem\["rotation"\]\)/
   )
   assert.match(
-    editorSource,
+    editorItemActionsSource,
     /patchRoomV2PlacedItem\(current, selectedInstanceId, \{ rotation \}\)/
   )
   assert.match(
-    editorSource,
+    editorInventoryPreviewSource,
     /onPress=\{\(\) => handleSelectInventoryRotation\(rotation\)\}/
   )
   assert.match(
-    editorSource,
+    editorItemActionsSource,
     /selectedPlacedItem\?\.itemId !== selectedInventoryEntry\.item\.id[\s\S]*setSelectedInventoryRotation\(rotation\)/
   )
 })
 
 test("a directional item is placed when its current pose is valid, even if another rotation needs repositioning", () => {
   assert.doesNotMatch(
-    editorSource,
+    editorSurfaceSource,
     /preview\.isValid && hasRotationSafeDefaultPlacement\(/,
     "default placement must not reject a valid current pose because another rotation needs repositioning"
   )
 })
 
 test("room editor uses only the production Room catalog", () => {
-  assert.match(editorSource, /const ACTIVE_ROOM_FURNITURE_CATALOG = ROOM_V2_FURNITURE_CATALOG/)
-  assert.match(editorSource, /const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG/)
-  assert.doesNotMatch(editorSource, /resolveRoomV3QaFurnitureCatalogRuntime/)
-  assert.doesNotMatch(editorSource, /ROOM_VNEXT_CANDIDATE_FURNITURE_CATALOG/)
+  assert.match(editorCatalogSource, /const ACTIVE_ROOM_FURNITURE_CATALOG = ROOM_V2_FURNITURE_CATALOG/)
+  assert.match(editorCatalogSource, /const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG/)
+  assert.doesNotMatch(editorSurfaceSource, /resolveRoomV3QaFurnitureCatalogRuntime/)
+  assert.doesNotMatch(editorSurfaceSource, /ROOM_VNEXT_CANDIDATE_FURNITURE_CATALOG/)
 })
 
 test("shop placement intents are applied once per product ID, even when the editor screen is reused", () => {
-  assert.match(editorSource, /const lastAppliedPlacementItemId = useRef<string \| undefined>\(undefined\)/)
-  assert.match(editorSource, /lastAppliedPlacementItemId\.current === placementItemId/)
-  assert.match(editorSource, /lastAppliedPlacementItemId\.current = placementItemId/)
-  assert.match(editorSource, /setSelectedInventoryItemId\(placementItemId\)/)
-  assert.match(editorSource, /navigation\.addListener\("blur", \(\) => \{\s*lastAppliedPlacementItemId\.current = undefined/)
+  assert.match(editorShopIntentSource, /const lastAppliedPlacementItemId = useRef<string \| undefined>\(undefined\)/)
+  assert.match(editorShopIntentSource, /lastAppliedPlacementItemId\.current === placementItemId/)
+  assert.match(editorShopIntentSource, /lastAppliedPlacementItemId\.current = placementItemId/)
+  assert.match(editorShopIntentSource, /setSelectedInventoryItemId\(placementItemId\)/)
+  assert.match(editorShopIntentSource, /navigation\.addListener\("blur", \(\) => \{\s*lastAppliedPlacementItemId\.current = undefined/)
 })
 
 test("passive Shop placement intents do not surface a duplicate-placement error", () => {
   assert.match(
-    editorSource,
+    editorItemActionsSource,
     /if \(feedback\) \{\s*hapticError\(\)\s*setPlacementFeedback\(copy\.feedback\.alreadyPlaced\)/
   )
-  assert.match(editorSource, /setPlacementFeedback\(undefined\)\s*if \(addDraftItem\(placementItemId, false\)\)/)
+  assert.match(editorShopIntentSource, /setPlacementFeedback\(undefined\)\s*if \(addDraftItem\(placementItemId, false\)\)/)
 })
 
 test("editor keeps controls reachable on short screens and only rotates through supplied asset views", () => {
   assert.match(editorSource, /<KeyboardAvoidingView[\s\S]*behavior=\{Platform\.OS === "ios" \? "padding" : undefined\}/)
   assert.match(editorSource, /<ScrollView[\s\S]*keyboardShouldPersistTaps="handled"/)
-  assert.match(editorSource, /const rotationOptions = getRoomV2FurnitureRotationOptions\(furnitureItem\)/)
-  assert.match(editorSource, /rotationOptions\[\(currentRotationIndex \+ 1\) % rotationOptions\.length\]/)
-  assert.match(editorSource, /const canRotateSelectedPlacedItem = hasMultipleRoomV2RotationOptions/)
-  assert.match(editorSource, /\{selectedInstanceId && canRotateSelectedPlacedItem \? \(\s*<Pressable[\s\S]*accessibilityLabel=\{copy\.rotateSelected\}/)
+  assert.match(editorItemActionsSource, /const rotationOptions = getRoomV2FurnitureRotationOptions\(furnitureItem\)/)
+  assert.match(editorItemActionsSource, /rotationOptions\[\(currentRotationIndex \+ 1\) % rotationOptions\.length\]/)
+  assert.match(editorItemActionsSource, /const canRotateSelectedPlacedItem = hasMultipleRoomV2RotationOptions/)
+  assert.match(editorSelectedActionsSource, /\{selectedInstanceId && canRotateSelectedPlacedItem \? \(\s*<Pressable[\s\S]*accessibilityLabel=\{copy\.rotateSelected\}/)
 })
 
 test("selected room furniture has a named primary placement action instead of an ambiguous add control", () => {
-  assert.match(editorSource, /<Text style=\{styles\.selectedInventoryEyebrow\}>\{copy\.nowEditing\}<\/Text>/)
-  assert.match(editorSource, /styles\.placeSelectedInventoryButtonText[\s\S]*>\{copy\.placeInRoom\}<\/Text>/)
+  assert.match(editorInventoryPreviewSource, /<Text style=\{styles\.selectedInventoryEyebrow\}>\{copy\.nowEditing\}<\/Text>/)
+  assert.match(editorInventoryPreviewSource, /styles\.placeSelectedInventoryButtonText[\s\S]*>\{copy\.placeInRoom\}<\/Text>/)
 })
 
 test("the direction rail stays tappable instead of sitting underneath the placement CTA", () => {
-  assert.match(editorSource, /<View style=\{styles\.selectedInventoryContentRow\}>/)
+  assert.match(editorInventoryPreviewSource, /<View style=\{styles\.selectedInventoryContentRow\}>/)
   assert.match(
-    editorSource,
+    editorInventoryPreviewSource,
     /\{canPlaceAnotherRoomItem\(selectedInventoryEntry\.item\.id\) \? \(\s*<Pressable[\s\S]*>\{copy\.placeInRoom\}<\/Text>[\s\S]*<\/Pressable>\s*\) : null\}/
   )
   assert.match(
-    editorSource,
+    editorStylesSource,
     /selectedInventoryPreview: \{[\s\S]*flexDirection: "column"[\s\S]*alignItems: "stretch"/
   )
 })
 
 test("editor uses the room-first collection hierarchy instead of the legacy decorate header", () => {
-  assert.match(editorSource, /<Text style=\{styles\.title\}>\{copy\.title\}<\/Text>/)
-  assert.match(editorSource, /<Text style=\{styles\.inventoryTitle\}>\{copy\.collectionTitle\}<\/Text>/)
+  assert.match(editorTopBarSource, /<Text style=\{styles\.title\}>\{copy\.title\}<\/Text>/)
+  assert.match(editorInventoryControlsSource, /<Text style=\{styles\.inventoryTitle\}>\{copy\.collectionTitle\}<\/Text>/)
   assert.match(editorSource, /<View style=\{styles\.inventoryHandle\} \/>/)
-  assert.match(editorSource, /copy\.defaultInspectorHint/)
-  assert.match(editorSource, /copy\.seatInspectorHint/)
-  assert.match(editorSource, />\{copy\.placeInRoom\}<\/Text>/)
-  assert.doesNotMatch(editorSource, />Decorate<\/Text>/)
+  assert.match(editorInventoryPreviewSource, /copy\.defaultInspectorHint/)
+  assert.match(editorInventoryPreviewSource, /copy\.seatInspectorHint/)
+  assert.match(editorInventoryPreviewSource, />\{copy\.placeInRoom\}<\/Text>/)
+  assert.doesNotMatch(editorSurfaceSource, />Decorate<\/Text>/)
 })
 
 test("editor waits for persisted decor and syncs the inspector when a staged item is selected", () => {
   assert.match(editorSource, /persistenceState/)
   assert.match(editorSource, /pointerEvents=\{isRoomDraftReady \? "auto" : "none"\}/)
-  assert.match(editorSource, /if \(!canPlaceInventoryItem \|\| !isRoomDraftReady\) return\s*lastAppliedPlacementItemId\.current = placementItemId/)
-  assert.match(editorSource, /if \(!isRoomDraftReady\) \{\s*hapticError\(\)/)
-  assert.match(editorSource, /setSelectedInventoryItemId\(placedItem\?\.itemId\)/)
-  assert.match(editorSource, /setSelectedInventoryRotation\(item\.rotation\)/)
+  assert.match(editorShopIntentSource, /if \(!canPlaceInventoryItem \|\| !isRoomDraftReady\) return\s*lastAppliedPlacementItemId\.current = placementItemId/)
+  assert.match(editorSaveSource, /if \(!isRoomDraftReady\) \{\s*hapticError\(\)/)
+  assert.match(editorSessionHookSource, /const isRoomDraftReady = persistenceState !== "loading" && hasHydratedDraft\.current/)
+  assert.match(editorGesturesSource, /setSelectedInventoryItemId\(placedItem\?\.itemId\)/)
+  assert.match(editorGesturesSource, /setSelectedInventoryRotation\(item\.rotation\)/)
 })
 
 test("stage furniture is announced as an editor selection rather than an in-room interaction", () => {
-  assert.match(editorSource, /<Pressable\s+accessible=\{Boolean\(selectedInstanceId\)\}\s+accessibilityRole="button"\s+accessibilityLabel=\{copy\.stageLabel\}/)
-  assert.match(editorSource, /itemInteractionMode="edit"/)
+  assert.match(editorStageSource, /<Pressable\s+accessible=\{Boolean\(selectedInstanceId\)\}\s+accessibilityRole="button"\s+accessibilityLabel=\{copy\.stageLabel\}/)
+  assert.match(editorStageSource, /itemInteractionMode="edit"/)
   assert.match(rendererSource, /itemInteractionMode === "edit"/)
   assert.match(rendererSource, /Select \$\{item\.name\} to move, rotate, or remove/)
 })
 
 test("editor catalog contains only room furniture the current user owns", () => {
   assert.match(
-    editorSource,
+    editorInventoryHookSource,
     /useRoomEditorInventoryEntries\(\s*ACTIVE_ROOM_FURNITURE_CATALOG,\s*inventory\.ownedRoomItemIds,\s*QA_OWNED_ROOM_ITEM_IDS\s*\)/
   )
   assert.match(
@@ -201,7 +269,11 @@ test("editor catalog contains only room furniture the current user owns", () => 
 test("an empty owned collection takes the user to the Home section of Shop", () => {
   assert.match(
     editorSource,
-    /navigation\.navigate\("CosmeticShop", \{ initialShopMode: "home" \}\)/
+    /onBrowseShop=\{\(\) => navigation\.navigate\("CosmeticShop", \{ initialShopMode: "home" \}\)\}/
+  )
+  assert.match(
+    editorInventoryListSource,
+    /inventoryViewState\.emptyState === "no-pieces" \? \(\s*<Pressable[\s\S]*accessibilityLabel=\{copy\.browseShop\}\s*onPress=\{onBrowseShop\}/
   )
 })
 
@@ -225,13 +297,13 @@ test("the live Home Shop keeps the public Blumi brand instead of a legacy store 
 })
 
 test("production My Room surfaces contain no historical candidate catalog ingress", () => {
-  for (const source of [editorSource, liveRoomSource, navigatorSource]) {
+  for (const source of [editorSurfaceSource, liveRoomSource, navigatorSource]) {
     assert.doesNotMatch(source, /ROOM_VNEXT_CANDIDATE_FURNITURE_CATALOG/)
     assert.doesNotMatch(source, /resolveRoomVNextFullWaveCandidateCatalog/)
     assert.doesNotMatch(source, /resolveRoomV3QaFurnitureCatalogRuntime/)
     assert.doesNotMatch(source, /BLUMI_ROOM_VNEXT_FULL_WAVE_QA_FLAG/)
   }
-  assert.match(editorSource, /roomVNextRuntimeMode="disabled"/)
+  assert.match(editorStageSource, /roomVNextRuntimeMode="disabled"/)
   assert.match(liveRoomSource, /roomVNextRuntimeMode="disabled"/)
 })
 
@@ -285,13 +357,14 @@ test("the approved Shop stays isolated from Room candidate catalogs", () => {
 })
 
 test("editor placement is free-form and does not render lane guides", () => {
-  assert.doesNotMatch(editorSource, /snapRoomV2PointToPlacementLane/)
-  assert.doesNotMatch(editorSource, /showPlacementGuides=\{Boolean\(selectedInstanceId\)\}/)
+  assert.doesNotMatch(editorSurfaceSource, /snapRoomV2PointToPlacementLane/)
+  assert.doesNotMatch(editorSurfaceSource, /showPlacementGuides=\{Boolean\(selectedInstanceId\)\}/)
 })
 
 test("stage drag maps the pointer against the room surface, not the touched furniture child", () => {
-  assert.match(editorSource, /const eventPoint = stageWindowBounds\s*\? \{\s*x: \(pageX - stageWindowBounds\.x\) \/ stageWindowBounds\.width/)
-  assert.match(editorSource, /y: \(pageY - stageWindowBounds\.y\) \/ stageWindowBounds\.height/)
+  assert.match(editorGesturesSource, /const eventPoint = stageWindowBounds\s*\? \{\s*x: \(pageX - stageWindowBounds\.x\) \/ stageWindowBounds\.width/)
+  assert.match(editorGesturesSource, /y: \(pageY - stageWindowBounds\.y\) \/ stageWindowBounds\.height/)
+  assert.match(editorGesturesSource, /point: eventPoint/)
 })
 
 test("selected furniture has no floor marker; only active placement validation is shown", () => {

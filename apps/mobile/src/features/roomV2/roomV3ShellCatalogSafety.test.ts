@@ -77,10 +77,23 @@ test("six current QA shells stay in the QA catalog and out of the My Room screen
     resolve(process.cwd(), "src/screens/MyRoomScreen.tsx"),
     "utf8"
   )
-  const editorSource = readFileSync(
+  const editorScreenSource = readFileSync(
     resolve(process.cwd(), "src/screens/MyRoomEditorScreen.tsx"),
     "utf8"
   )
+  // The editor screen resolves its shell catalog through the editor feature.
+  const editorModuleDirectory = resolve(roomV2Root, "editor")
+  const editorCatalogSource = readFileSync(
+    resolve(editorModuleDirectory, "roomEditorCatalog.ts"),
+    "utf8"
+  )
+  const editorSurfaceSource = [
+    editorScreenSource,
+    ...readdirSync(editorModuleDirectory)
+      .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
+      .map((fileName) => readFileSync(resolve(editorModuleDirectory, fileName), "utf8"))
+  ].join("\n")
+  assert.match(editorScreenSource, /from "\.\.\/features\/roomV2\/editor\/roomEditorCatalog"/)
 
   const v6Requires = qaCatalogSource.match(/room_v3_shell_[a-z0-9_]+_candidate_v6\.png/g) ?? []
   assert.equal(v6Requires.length, 4)
@@ -91,8 +104,10 @@ test("six current QA shells stay in the QA catalog and out of the My Room screen
   assert.doesNotMatch(qaCatalogSource, /candidate_v(?:2|3|4|5|7|8|9)\.png/)
   assert.match(qaCatalogSource, /sourceStatus: "candidate"/)
   assert.match(qaCatalogSource, /qaStatus: "pending"/)
-  for (const source of [myRoomSource, editorSource]) {
+  for (const source of [myRoomSource, editorCatalogSource]) {
     assert.match(source, /const ACTIVE_ROOM_SHELL_CATALOG = ROOM_V2_SHELL_CATALOG\n/)
+  }
+  for (const source of [myRoomSource, editorSurfaceSource]) {
     assert.doesNotMatch(source, /roomV3QaShellCatalog|ROOM_V3_QA_SHELL/)
   }
 })
