@@ -415,10 +415,14 @@ test("move cannot renew a lease that expires while waiting for the presence row 
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
-  const expiresAt = new Date(now.getTime() + 2_000)
+  // The lease must still be live once the move is observed waiting on the row
+  // lock. Harness setup, seeding and the lock wait can exceed 2 s when the
+  // whole PostgreSQL gate runs back to back, so the window is 6 s.
+  const leaseMs = 6_000
+  const expiresAt = new Date(now.getTime() + leaseMs)
   let moving: Promise<unknown> | undefined
   try {
-    await seedPresence(firstPool, makePresenceRecord(roomId, userId, now, false, 2_000))
+    await seedPresence(firstPool, makePresenceRecord(roomId, userId, now, false, leaseMs))
     await holdPresenceRowLock(blocker, roomId, userId)
 
     moving = setup.presenceService.moveToSpot(

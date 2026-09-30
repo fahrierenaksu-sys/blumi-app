@@ -47,16 +47,18 @@ decision), **NOT TESTED** (not counted as pass).
 | 14 | Profile | `PATCH /v1/users/me` answered 200 for wrongly typed fields and saved nothing | Client bugs looked like success | 400, no write; `null` still means "not provided", unknown keys ignored (`ceccd7b`) |
 | 15 | Profile | No control-character check on display name, bio, prompt answers, interests (code review) | PostgreSQL: NUL → HTTP 500; in memory: stored | Shared control-character check → 400 (`ca91002`) |
 | 16 | Economy | Reward coins never paid off a refund debt | Purchases blocked after a refund | Owner decision: every reward repays `coin_debt` first, remainder to coins; atomic in both repositories (`293d497`) |
+| 17 | Safety | Blocked user still saw the blocker's thread (list, sync-matches, full message history) | Blocker's name, avatar and history stayed visible | Owner decision: while a block exists in either direction the thread is hidden from both users (lists omit it; its routes answer 404 like a thread you are not in); unblocking restores it with history (`50e5115`) |
 
 Also fixed during integration: a 5 s child-process timeout in the navigation
 parser gate that failed on a cold container, and two test harnesses that
-missed the now-required `safetyService` after the merge.
+missed the now-required `safetyService` after the merge, and a presence
+lease test whose 2 s window was too tight for the full PostgreSQL gate
+(widened to 6 s; the assertion is unchanged).
 
 ## Open (reproduced, `todo` tests, decision needed)
 
 | Flow | Bug | Impact | Decision |
 |---|---|---|---|
-| Safety | Blocked user still sees the blocker's thread (list, sync-matches, full message history) | Blocker's name/avatar/history remain visible | Hide vs read-only |
 | Realtime (mobile) | After 10 failed reconnects the client stops forever; banner still says "reconnecting" | Failure hidden; only network change or app restart recovers | Retry policy |
 | Realtime (mobile) | Backoff resets on every open; accept-then-close loops reconnect every 0.5–1 s | Reconnect storm against a limiting server | Retry policy |
 | Chat (mobile) | Stale thread-list page applied after `chat.thread_created` | New match disappears until refresh | Revision numbers in list replies |
