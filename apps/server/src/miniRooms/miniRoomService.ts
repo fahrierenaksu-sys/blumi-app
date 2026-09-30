@@ -601,6 +601,22 @@ export function createMiniRoomService(
       if (!lobbyRoomId) {
         throw new Error("That room invite is no longer available.")
       }
+      if (
+        await options.safetyService.hasBlockBetween(
+          invite.senderUserId,
+          invite.recipientUserId
+        )
+      ) {
+        // A block in either direction removes the invite without a decision,
+        // accept or decline, so neither user is sent mini_room.invite_decided
+        // (the chat-invite rule in decideChatInvite).
+        await repository.transitionPendingInvite({
+          inviteId: invite.inviteId,
+          status: "cancelled",
+          decidedAt: now.toISOString()
+        })
+        throw new Error("That room invite is no longer available.")
+      }
 
       const decision: MiniRoomInviteDecision = {
         inviteId: invite.inviteId,
@@ -632,14 +648,6 @@ export function createMiniRoomService(
         now
       )
       if (!senderPresence || !recipientPresence) {
-        throw new Error("That room invite is no longer available.")
-      }
-      if (
-        await options.safetyService.hasBlockBetween(
-          invite.senderUserId,
-          invite.recipientUserId
-        )
-      ) {
         throw new Error("That room invite is no longer available.")
       }
 
@@ -681,6 +689,17 @@ export function createMiniRoomService(
         throw new Error("That room invite is no longer available.")
       }
       try {
+        // A block can commit while the claim is in flight, and its pair
+        // separation may not see this room yet. Re-check after the claim; the
+        // rollback below removes the room and cancels the invite.
+        if (
+          await options.safetyService.hasBlockBetween(
+            invite.senderUserId,
+            invite.recipientUserId
+          )
+        ) {
+          throw new Error("That room invite is no longer available.")
+        }
         await options.presenceService.setMiniRoomStatus(
           miniRoom.participantUserIds,
           true
