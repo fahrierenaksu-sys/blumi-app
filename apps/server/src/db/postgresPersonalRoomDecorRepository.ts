@@ -51,8 +51,13 @@ export function createPostgresPersonalRoomDecorRepository(
         return { kind: "saved", snapshot: mapSnapshot(saved.rows[0]) }
       }
       const current = await this.get(input.userId)
+      // An insert (revision 0) cannot lose to a missing row; an update can
+      // when the caller holds a revision for a room that no longer exists.
       if (!current) {
-        throw new Error("Personal room revision could not be resolved.")
+        if (input.expectedRevision === 0) {
+          throw new Error("Personal room revision could not be resolved.")
+        }
+        return { kind: "missing" }
       }
       return { kind: "conflict", current }
     }
