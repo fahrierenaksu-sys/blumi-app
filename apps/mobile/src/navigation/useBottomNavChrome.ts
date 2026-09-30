@@ -105,9 +105,11 @@ export function useBottomNavChrome({
         // must not discard the preview while the gesture is still active.
         clearRootNavigationChromeReturnPreview(sessionNavigatorKey, route.key)
       }
-      // A closing detail route does not show the bottom bar yet: the bar is
-      // fixed to the screen bottom and would appear under the sliding page
-      // before the back swipe finishes. It is shown on transitionEnd.
+      // Rollback path (pager flag off) only: the root overlay bar is drawn
+      // above the stack, so a closing detail route does not show it yet (it
+      // would cover the sliding page); it is shown on transitionEnd. With the
+      // pager the bar is part of the slot screen beneath the detail route and
+      // is revealed by the back swipe itself (MainTabBottomBar).
     },
     transitionEnd: ({ data }) => {
       const preview = sessionEntryRoute === "Main" && !isAccountRestricted

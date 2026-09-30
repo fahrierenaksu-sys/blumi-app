@@ -30,6 +30,8 @@ A Gesture Handler `Pan` on the pager with `activeOffsetX ±12` and `failOffsetY 
 
 ## Bottom bar
 
+The bar is part of the pager's slot screen (`MainTabBottomBar` in `src/navigation/RootNavigationChrome.tsx`, passed to `MainTabPager` as `bottomBar` and drawn outside its gesture detector). A detail route pushed above the slot covers it; an iOS edge back swipe reveals it already in place under the finger, and a cancelled swipe covers it again, with no route-state change during the gesture. Before 2026-09-30 (follow-up) it was a root overlay above the whole stack whose visibility followed the focused route, so it could only appear after the back swipe finished. The root overlay remains only on the rollback path (`MAIN_TAB_PAGER_ENABLED = false`).
+
 The bar's indicator position is a UI-thread shared value in tab units. While a drag or settle moves the pages, the pager publishes its fractional page (`src/ui/mainTabPagerIndicator.ts`, written from a `useAnimatedReaction`) and the bar follows it in its own reaction, so the pill, icons and label move in the same frame as the pages. Committed changes without a pager animation (taps, navigation, Reduce Motion) keep the 150 ms selection timing (instant under Reduce Motion). The bar reads Reduce Motion from the shared store.
 
 ## Mount policy
@@ -45,7 +47,7 @@ Pages mount on first selection and stay mounted with focus-aware work paused. A 
 5. Discover: card like/pass, cancelled card swipe spring-back, consecutive swipes. A horizontal drag that starts on the card never changes the page.
 6. Shop: product shelf paging and the large-text category rail scroll without moving the page; a shelf showing 1/1 moves the page. The bottom-bar pill, icon and label follow the finger during every swipe.
 7. My Room: item taps, walk/seat; My Room editor object drag (separate route).
-8. Edge back from Chat thread, Profile, Wardrobe and My Room editor; the bottom bar still appears only after the back swipe finishes.
+8. Edge back (slow drag, completed and cancelled) from Chat thread, Profile preview, You, Edit Profile, Settings, Wardrobe and My Room editor (including its unsaved-changes guard): the bottom bar is visible under the incoming page for the whole gesture, is covered again after a cancelled swipe, never flashes, and a tab tap right after the gesture works.
 9. Reduce Motion on: swipes switch instantly without finger-follow; taps switch instantly.
 10. Background and foreground the app mid-drag and mid-settle: it resumes on a whole page.
 11. Frame pacing during drags on a physical device (no hitch when a neighbour mounts).

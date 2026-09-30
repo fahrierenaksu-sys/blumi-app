@@ -120,6 +120,25 @@ test("one flag restores the stack-tab behaviour", () => {
   assert.match(config, /export const MAIN_TAB_PAGER_ENABLED: boolean = true/)
   assert.match(navigator, /UNSTABLE_router=\{MAIN_TAB_PAGER_ENABLED \? withMainTabPagerRouter : undefined\}/)
   // Every main tab keeps its own stack route; with the flag off each renders
+test("the bottom bar belongs to the pager's slot screen, beneath every pushed route", () => {
+  // An iOS edge back reveals the slot screen under the finger. The bar is
+  // part of that screen (as on Instagram), so it is already in place during
+  // the whole interactive back gesture, is covered again when the gesture is
+  // cancelled, and needs no route-state change or transition event to show.
+  const rootChrome = read("../RootNavigationChrome.tsx")
+  assert.match(pager, /bottomBar\?: ReactNode/)
+  // Outside the pager's gesture detector: a drag on the bar never moves pages.
+  assert.match(pager, /<\/MainTabPagerGestureProvider>\s*\{bottomBar\}\s*<\/View>/)
+  assert.match(navigator, /<MainTabPager[\s\S]*?bottomBar=\{\s*<MainTabBottomBar\s+routeName=\{screenProps\.route\.name\}\s+chatCount=\{chatBadgeCount\}\s+onPress=\{handleBottomNavPress\}\s*\/>\s*\}/)
+  // The slot route name is always the selected tab, even while covered.
+  assert.match(rootChrome, /export const MainTabBottomBar = memo\(/)
+  assert.match(rootChrome, /const currentBottomNavKey = getBottomNavKeyForRoute\(routeName\) \?\? "discover"/)
+  // The root overlay (drawn above the whole stack) keeps the bar only on the
+  // rollback path, where each tab is its own stack route.
+  assert.match(rootChrome, /const overlayOwnsBottomNav = !MAIN_TAB_PAGER_ENABLED/)
+  assert.match(rootChrome, /\{overlayOwnsBottomNav && sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation\.mounted \? \(/)
+})
+
   // its page directly instead of the pager.
   assert.match(config, /routeName: "Lobby"[\s\S]*?routeName: "Inbox"[\s\S]*?routeName: "MyRoom"[\s\S]*?routeName: "CosmeticShop"[\s\S]*?MAIN_TAB_ROUTE_NAMES[\s\S]*?MAIN_TAB_PAGES\.map\(\(page\) => page\.routeName\)/)
   assert.match(navigator, /MAIN_TAB_ROUTE_NAMES\.map\(\(routeName\) => \([\s\S]*?name=\{routeName\}[\s\S]*?\(screenProps\) => MAIN_TAB_PAGER_ENABLED \? \([\s\S]*?<MainTabPager[\s\S]*?\) : renderMainTabPage\(sessionActor, routeName, screenProps\)/)
