@@ -1,0 +1,36 @@
+# Local demo data only. This is not proof of live OTP, persistence or server access.
+appId: com.blumi.mobile
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "(Try the demo first|Önce demoyu dene)"
+    timeout: 60000
+- tapOn: "(Try the demo first|Önce demoyu dene)"
+- extendedWaitUntil:
+    visible: "(Like profile|Profili beğen)"
+    timeout: 30000
+- takeScreenshot: ${EVIDENCE_DIR}/discover
+- tapOn: "(Like profile|Profili beğen)"
+- extendedWaitUntil:
+    visible: "Start chatting"
+    timeout: 15000
+- tapOn: "Start chatting"
+- extendedWaitUntil:
+    visible: "(Message .*|.* için mesaj yaz)"
+    timeout: 15000
+- tapOn: "(Message .*|.* için mesaj yaz)"
+- inputText: "Blumi automated demo smoke"
+- tapOn: "(Send message to .*|.* kişisine mesaj gönder)"
+- assertVisible: "Blumi automated demo smoke"
+- takeScreenshot: ${EVIDENCE_DIR}/chat
+- hideKeyboard
+- tapOn: "(Go back|Geri dön)"
+- tapOn: "(My Room|Odam)"
+- extendedWaitUntil:
+    visible:
+      id: my-room-production-stage
+    timeout: 15000
+- takeScreenshot: ${EVIDENCE_DIR}/my-room
+- tapOn: "(Shop|Mağaza)"
+- takeScreenshot: ${EVIDENCE_DIR}/shop
