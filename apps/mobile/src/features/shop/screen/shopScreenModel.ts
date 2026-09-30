@@ -241,3 +241,13 @@ export function sortRoomShopProducts(products: ShopCatalogItem[]): ShopCatalogIt
 export function shouldShopShelfOwnHorizontalDrags(pageCount: number): boolean {
   return pageCount > 1
 }
+
+/**
+ * Largest horizontal content offset (px) of the paged product shelf: its
+ * last page. Pages are exactly one shelf width wide. A drag past the first
+ * page (offset 0) or this offset is handed to the main-page pager.
+ */
+export function getShopShelfMaxScrollOffset(pageCount: number, shelfWidth: number): number {
+  if (!Number.isFinite(pageCount) || !Number.isFinite(shelfWidth) || pageCount <= 1 || shelfWidth <= 0) return 0
+  return (Math.floor(pageCount) - 1) * shelfWidth
+}

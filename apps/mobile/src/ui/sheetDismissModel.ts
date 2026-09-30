@@ -90,3 +90,15 @@ export function getSheetExitOffset(sheetHeight: number): number {
   "worklet"
   return (sheetHeight > 0 ? sheetHeight : SHEET_DISMISS.fallbackDistance * 4) + 48
 }
+
+/**
+ * Backdrop opacity (0..1) for a sheet offset: fully shown at rest, fading
+ * linearly with the drag, and gone once the sheet reaches its exit offset,
+ * so nothing is left for the Modal's own close animation to carry.
+ */
+export function getSheetBackdropOpacity(offset: number, sheetHeight: number): number {
+  "worklet"
+  if (!Number.isFinite(offset) || offset <= 0) return 1
+  const exitOffset = getSheetExitOffset(sheetHeight)
+  return Math.max(0, 1 - offset / exitOffset)
+}

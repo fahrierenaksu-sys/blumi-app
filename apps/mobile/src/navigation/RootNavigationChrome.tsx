@@ -4,6 +4,8 @@ import type { SessionActor } from "../features/session/sessionModel"
 import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
 import { BottomNav, type BottomNavKey } from "../ui/bottomNav"
 import { getBottomNavReturnPresentation } from "./bottomNavReturnPreview"
+import { MAIN_TAB_PAGER_ENABLED } from "./mainTabPager/mainTabPagerConfig"
+import { getBottomNavKeyForRoute } from "./rootNavigationModel"
 import {
   getRootNavigationChromeSnapshot,
   subscribeToRootNavigationChrome
@@ -21,9 +23,12 @@ interface RootNavigationChromeProps {
 }
 
 /**
- * Root chrome drawn above the native stack: the bottom navigation bar and the
- * current-scene asset warmup. It reads the focused route from the chrome
- * store so route changes re-render only this component, not the navigator.
+ * Root chrome drawn above the native stack: the current-scene asset warmup
+ * and, on the rollback path only (pager flag off), the bottom navigation bar.
+ * With the main-page pager the bar is part of the pager's slot screen
+ * (`MainTabBottomBar`), so it sits beneath pushed routes. It reads the
+ * focused route from the chrome store so route changes re-render only this
+ * component, not the navigator.
  */
 export const RootNavigationChrome = memo(function RootNavigationChrome({
   navigatorKey,
@@ -58,6 +63,10 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
   useLayoutEffect(() => {
     if (currentBottomNavKey) lastBottomNavKeyRef.current = currentBottomNavKey
   }, [currentBottomNavKey])
+  // An overlay above the stack cannot sit beneath a detail route: during an
+  // iOS back swipe it could only appear on top of the sliding page or after
+  // the gesture ends. With the pager the slot screen draws the bar instead.
+  const overlayOwnsBottomNav = !MAIN_TAB_PAGER_ENABLED
   const canWarmCurrentSceneAssets = isCurrentSceneWarmupRoute(
     routeName,
     sessionEntryRoute,
@@ -74,7 +83,7 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
           isFullShopCatalogQaPreview={isFullShopCatalogQaPreview}
         />
       ) : null}
-      {sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation.mounted ? (
+      {overlayOwnsBottomNav && sessionEntryRoute === "Main" && sessionActor && !isAccountRestricted && bottomNavRoutePresentation.mounted ? (
         <View
           pointerEvents={earlyReturnNavVisualOnly ? "none" : "box-none"}
           accessibilityElementsHidden={earlyReturnNavVisualOnly}
@@ -91,6 +100,37 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
         </View>
       ) : null}
     </>
+  )
+})
+
+interface MainTabBottomBarProps {
+  /** The pager slot route name: always the selected main tab. */
+  routeName: string
+  chatCount: number
+  onPress: (key: BottomNavKey) => void
+}
+
+/**
+ * The bottom bar drawn inside the main-page pager's slot screen. A detail
+ * route pushed above the slot covers it like page content; an interactive
+ * back swipe reveals it already rendered under the finger, and a cancelled
+ * swipe covers it again, with no route-state change during the gesture.
+ */
+export const MainTabBottomBar = memo(function MainTabBottomBar({
+  routeName,
+  chatCount,
+  onPress
+}: MainTabBottomBarProps) {
+  const currentBottomNavKey = getBottomNavKeyForRoute(routeName) ?? "discover"
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      <BottomNav
+        currentKey={currentBottomNavKey}
+        chatCount={chatCount}
+        onPress={onPress}
+        appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
+      />
+    </View>
   )
 })
 

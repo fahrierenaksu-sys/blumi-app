@@ -114,14 +114,13 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.overlay}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close discovery filters"
-          style={styles.backdrop}
-          onPress={onClose}
-        />
         <SwipeDismissSheet
           onDismiss={onClose}
+          backdrop={{
+            style: styles.backdrop,
+            onPress: onClose,
+            accessibilityLabel: "Close discovery filters"
+          }}
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
         >
           <View style={styles.sheetGlowTop} pointerEvents="none" />

@@ -96,6 +96,12 @@ export interface MainTabPagerProps {
   navigation: unknown
   route: SlotRoute
   renderPage: (routeName: MainTabRouteName, props: MainTabPageProps) => ReactNode
+  /**
+   * The bottom bar, drawn inside this slot screen above the pages. A detail
+   * route pushed above the slot covers it, and an interactive back swipe
+   * reveals it already in place under the finger.
+   */
+  bottomBar?: ReactNode
 }
 
 function scheduleIdle(work: () => void): () => void {
@@ -122,7 +128,7 @@ function scheduleIdle(work: () => void): () => void {
  * the UI thread follows the route, and the route changes once per settle.
  * Every frame of a drag or settle runs on the UI thread with shared values.
  */
-export function MainTabPager({ navigation: rawNavigation, route, renderPage }: MainTabPagerProps) {
+export function MainTabPager({ navigation: rawNavigation, route, renderPage, bottomBar }: MainTabPagerProps) {
   const navigation = rawNavigation as SlotNavigation
   const selectedIndex = Math.max(0, getMainTabPageIndex(route.name))
   const selectedPage = MAIN_TAB_PAGES[selectedIndex]!
@@ -469,28 +475,31 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage }: M
 
   const pageParams = pageParamsRef.current
   return (
-    <MainTabPagerGestureProvider value={pagerGestureRef}>
-      <GestureDetector gesture={pagerGesture}>
-        <View style={styles.container} onLayout={handleLayout}>
-          {MAIN_TAB_PAGES.map((page, index) => (
-            <MainTabPagerPage
-              key={page.routeName}
-              index={index}
-              routeName={page.routeName}
-              slotKey={route.key}
-              params={pageParams[page.routeName]}
-              mounted={mounted[index] === true}
-              selectedIndex={selectedIndex}
-              navigation={pageNavigations[index]}
-              renderPage={renderPage}
-              position={position}
-              width={width}
-              ui={ui}
-            />
-          ))}
-        </View>
-      </GestureDetector>
-    </MainTabPagerGestureProvider>
+    <View style={styles.slot}>
+      <MainTabPagerGestureProvider value={pagerGestureRef}>
+        <GestureDetector gesture={pagerGesture}>
+          <View style={styles.container} onLayout={handleLayout}>
+            {MAIN_TAB_PAGES.map((page, index) => (
+              <MainTabPagerPage
+                key={page.routeName}
+                index={index}
+                routeName={page.routeName}
+                slotKey={route.key}
+                params={pageParams[page.routeName]}
+                mounted={mounted[index] === true}
+                selectedIndex={selectedIndex}
+                navigation={pageNavigations[index]}
+                renderPage={renderPage}
+                position={position}
+                width={width}
+                ui={ui}
+              />
+            ))}
+          </View>
+        </GestureDetector>
+      </MainTabPagerGestureProvider>
+      {bottomBar}
+    </View>
   )
 }
 
@@ -554,6 +563,9 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
 })
 
 const styles = StyleSheet.create({
+  slot: {
+    flex: 1
+  },
   container: {
     flex: 1,
     overflow: "hidden",

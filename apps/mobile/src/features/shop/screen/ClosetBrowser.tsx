@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FlatList, Pressable, Text, View } from "react-native"
-import { MainTabPagerHorizontalScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
+import { type FlatList, Pressable, Text, View } from "react-native"
+import Reanimated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
+import { MainTabPagerEdgeHandoffScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
 import type { AppLocale } from "../../session/appLocale"
 import { useReducedMotion } from "../../../ui/animations"
 import { uiTheme } from "../../../ui/theme"
@@ -9,7 +10,11 @@ import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
 import type { ShopMode } from "../ShopNavigationControls"
-import { shouldShopShelfOwnHorizontalDrags, type ShopCategoryOption } from "./shopScreenModel"
+import {
+  getShopShelfMaxScrollOffset,
+  shouldShopShelfOwnHorizontalDrags,
+  type ShopCategoryOption
+} from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 import { ShopProductCard } from "./ShopProductCard"
 import { VerticalShopCategoryRail } from "./VerticalShopCategoryRail"
@@ -42,10 +47,15 @@ export function ClosetBrowser(props: {
   const productCardWidth = catalog.productCardWidth
   const productScrollerRef = useRef<FlatList<ShopCatalogItem[][]>>(null)
   const [pageIndex, setPageIndex] = useState(0)
+  // The live shelf offset, on the UI thread, decides whether a drag at the
+  // first or last page belongs to the main pager (no JS per scroll frame).
+  const shelfScrollOffset = useSharedValue(0)
   useEffect(() => {
     setPageIndex(0)
+    // A jump to an offset the shelf already has emits no scroll event.
+    shelfScrollOffset.value = 0
     productScrollerRef.current?.scrollToOffset({ offset: 0, animated: false })
-  }, [props.activeCategoryId, props.mode])
+  }, [props.activeCategoryId, props.mode, shelfScrollOffset])
   const productColumns = useMemo(() => {
     const columns: ShopCatalogItem[][] = []
     for (let index = 0; index < props.products.length; index += 2) {
@@ -67,6 +77,12 @@ export function ClosetBrowser(props: {
     return pages
   }, [catalog.accessibilityLayout, productColumns])
   const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags(productPages.length)
+  const shelfMaxScrollOffset = getShopShelfMaxScrollOffset(productPages.length, productShelfWidth)
+  const handleShelfScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      shelfScrollOffset.value = event.contentOffset.x
+    }
+  })
   const renderProductPage = useCallback(
     ({ item, index }: { item: ShopCatalogItem[][]; index: number }) => (
       <View
@@ -155,18 +171,26 @@ export function ClosetBrowser(props: {
           accessibilityLayout={catalog.accessibilityLayout}
           height={catalog.productCardHeight * 2 + 8}
         />
-        {/* The product shelf pages horizontally; with more than one page it
-            owns horizontal drags that start on it, so the main-page pager
-            never takes them. A single page (1/1) cannot scroll, so a drag
-            there switches the main page instead. */}
-        <MainTabPagerHorizontalScrollOwner enabled={shelfOwnsHorizontalDrags}>
-          <FlatList
+        {/* The product shelf pages horizontally. It keeps a horizontal drag
+            only while it can scroll that way: on its first page a drag
+            towards a previous page, and on its last page a drag towards a
+            next page, switches the main page instead. A single page (1/1)
+            cannot scroll at all, so every horizontal drag there switches
+            the main page. */}
+        <MainTabPagerEdgeHandoffScrollOwner
+          enabled={shelfOwnsHorizontalDrags}
+          scrollOffset={shelfScrollOffset}
+          maxScrollOffset={shelfMaxScrollOffset}
+        >
+          <Reanimated.FlatList
             ref={productScrollerRef}
             data={productPages}
             horizontal
             pagingEnabled
             scrollEnabled={shelfOwnsHorizontalDrags}
             bounces={false}
+            onScroll={handleShelfScroll}
+            scrollEventThrottle={16}
             onMomentumScrollEnd={(event) => {
               const nextPageIndex = Math.max(0, Math.min(productPages.length - 1, Math.round(event.nativeEvent.contentOffset.x / productShelfWidth)))
               setPageIndex(nextPageIndex)
@@ -186,7 +210,7 @@ export function ClosetBrowser(props: {
             })}
             renderItem={renderProductPage}
           />
-        </MainTabPagerHorizontalScrollOwner>
+        </MainTabPagerEdgeHandoffScrollOwner>
       </View>
     </View>
   )

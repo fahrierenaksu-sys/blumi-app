@@ -208,6 +208,7 @@ export function ReportModal(props: ReportModalProps) {
         <SwipeDismissSheet
           onDismiss={handleClose}
           enabled={!isSubmitting && step !== "done"}
+          backdrop={{ style: styles.backdrop }}
           accessibilityViewIsModal
           style={styles.sheet}
         >
@@ -357,7 +358,10 @@ export function ReportModal(props: ReportModalProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "flex-end"
+  },
+  // Drawn by the sheet so it fades with a swipe-down instead of trailing it.
+  backdrop: {
     backgroundColor: "rgba(35, 18, 42, 0.24)"
   },
   sheet: {

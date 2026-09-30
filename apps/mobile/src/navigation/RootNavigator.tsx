@@ -91,7 +91,7 @@ import { ConnectionBanner } from "../ui/connectionBanner"
 import { LinkedProfileScreen } from "./LinkedProfileScreen"
 import { linking } from "./rootLinking"
 import { navigationRef } from "./rootNavigationRef"
-import { RootNavigationChrome } from "./RootNavigationChrome"
+import { MainTabBottomBar, RootNavigationChrome } from "./RootNavigationChrome"
 import { useBottomNavChrome } from "./useBottomNavChrome"
 import { useCurrentSessionGuard } from "./useCurrentSessionGuard"
 import { useRoomInviteRouting } from "./useRoomInviteRouting"
@@ -709,6 +709,13 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       route={screenProps.route}
                       renderPage={(pageRouteName, pageProps) =>
                         renderMainTabPage(sessionActor, pageRouteName, pageProps)
+                      }
+                      bottomBar={
+                        <MainTabBottomBar
+                          routeName={screenProps.route.name}
+                          chatCount={chatBadgeCount}
+                          onPress={handleBottomNavPress}
+                        />
                       }
                     />
                   ) : renderMainTabPage(sessionActor, routeName, screenProps)}
