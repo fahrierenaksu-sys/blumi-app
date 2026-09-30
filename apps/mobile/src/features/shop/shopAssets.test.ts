@@ -105,7 +105,7 @@ test("garment thumbnails never substitute a full-character square image", async 
   ]) {
     const source = getShopProductThumbnailSource(id) as string
     const bounds = getShopProductThumbnailBounds(id)
-    assert.match(source, /\/assets\/room\//, `${id}: use the garment-only source`)
+    assert.match(source, /\/assets\/(?:room|layers)\//, `${id}: use the garment-only source`)
     assert.ok(bounds, `${id}: missing visible bounds`)
     const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
     let left = info.width, top = info.height, right = 0, bottom = 0
@@ -119,5 +119,22 @@ test("garment thumbnails never substitute a full-character square image", async 
       }
     }
     assert.deepEqual(bounds, [info.width, info.height, left, top, right - left, bottom - top])
+  }
+})
+
+test("sweet capsule shoe cards use the 512x768 profile layer, not the half-size room layer", () => {
+  // A wide shoe fills the card width (~100pt). The 256x384 room layer holds it in
+  // 58x29 px, a >5x upscale on a 3x iPhone; the profile layer is the same artwork
+  // at 118x60 px.
+  for (const [id, layer] of [
+    ["avatar_v2_shoes_rose_satin_bow_heels", "avatar_shoes_rose_satin_bow_heels.png"],
+    ["avatar_v2_shoes_ivory_pearl_slingback_heels", "avatar_shoes_ivory_pearl_slingback_heels.png"],
+    ["avatar_v2_shoes_lilac_star_platform_sneakers", "avatar_shoes_lilac_star_platform_sneakers.png"],
+    ["avatar_v2_shoes_mint_ribbon_court_sneakers", "avatar_shoes_mint_ribbon_court_sneakers.png"]
+  ] as const) {
+    const source = getShopProductThumbnailSource(id) as string
+    assert.ok(source.endsWith(`/assets/layers/${layer}`), `${id}: ${source}`)
+    const bounds = getShopProductThumbnailBounds(id)
+    assert.ok(bounds && bounds[4] >= 110, `${id}: visible width ${bounds?.[4]}px is too small for the card`)
   }
 })
