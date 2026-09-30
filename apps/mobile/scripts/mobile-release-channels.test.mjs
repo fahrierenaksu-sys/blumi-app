@@ -135,9 +135,8 @@ test("GitHub Actions publishes develop to the preview channel with the preview b
   const job = workflow.jobs.publish
   assert.deepEqual(job.env, easJson.build.preview.env, "env must equal build.preview.env")
   const script = job.steps.map((step) => step.run ?? "").join("\n").replace(/\\\n\s*/g, "")
-  assert.match(script, /eas fingerprint:generate\s+--platform ios\s+--environment production/)
-  assert.match(script, /eas build:list\s+--platform ios\s+--channel preview\s+--build-profile preview/)
-  assert.match(script, /--fingerprint-hash/)
+  assert.match(script, /eas build:list --platform ios --channel preview --build-profile preview/)
+  assert.match(script, /eas fingerprint:compare --build-id/)
   assert.match(script, /eas update --channel preview --platform ios --environment production/)
   assert.doesNotMatch(script, /--channel production|eas build(?!:list)|eas submit/)
 })

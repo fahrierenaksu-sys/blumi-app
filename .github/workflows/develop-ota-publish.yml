@@ -77,104 +77,61 @@ jobs:
       - name: Check the app config
         run: npx expo config --json > /dev/null
 
-      - name: Fingerprint the native runtime
-        id: fingerprint
-        run: |
-          set -euo pipefail
-
-          output_file="$(mktemp)"
-          error_file="$(mktemp)"
-
-          # The job env carries build.preview.env; --environment loads the EAS
-          # production variables (API URLs) that app.config.js requires.
-          if ! eas fingerprint:generate \
-            --platform ios \
-            --environment production \
-            --json \
-            --non-interactive \
-            >"$output_file" 2>"$error_file"; then
-            echo "::error::EAS fingerprint generation failed."
-            cat "$error_file"
-            cat "$output_file"
-            exit 1
-          fi
-
-          # Extract the hash even if the CLI adds non-JSON text to stdout.
-          hash="$(
-            node - "$output_file" <<'NODE'
-          const fs = require("node:fs");
-
-          const output = fs.readFileSync(process.argv[2], "utf8");
-          const match = output.match(/"hash"\s*:\s*"([^"]+)"/);
-
-          if (!match) {
-            process.exit(1);
-          }
-
-          process.stdout.write(match[1]);
-          NODE
-          )" || {
-            echo "::error::Could not find a fingerprint hash in EAS output."
-            cat "$output_file"
-            exit 1
-          }
-
-          echo "hash=$hash" >> "$GITHUB_OUTPUT"
-          echo "iOS fingerprint: $hash"
-
-      - name: Find a preview build with this native runtime
+      - name: Find the latest preview build
         id: build
         run: |
           set -euo pipefail
-
           output_file="$(mktemp)"
-          error_file="$(mktemp)"
-
-          if ! eas build:list \
-            --platform ios \
-            --channel preview \
-            --build-profile preview \
-            --fingerprint-hash "${{ steps.fingerprint.outputs.hash }}" \
-            --status finished \
-            --limit 1 \
-            --json \
-            --non-interactive \
-            >"$output_file" 2>"$error_file"; then
+          if ! eas build:list --platform ios --channel preview --build-profile preview \
+            --status finished --limit 1 --json --non-interactive >"$output_file" 2>"$RUNNER_TEMP/build-list.err"; then
             echo "::error::EAS build lookup failed."
-            cat "$error_file"
-            cat "$output_file"
+            cat "$RUNNER_TEMP/build-list.err" "$output_file"
+            exit 1
+          fi
+          node - "$output_file" <<'NODE' >> "$GITHUB_OUTPUT"
+          const text = require("node:fs").readFileSync(process.argv[2], "utf8");
+          const [build] = JSON.parse(text.slice(text.indexOf("[")));
+          if (!build?.id || !build?.runtimeVersion) {
+            console.error("No finished preview build with a runtime version was found.");
+            process.exit(1);
+          }
+          console.log(`id=${build.id}`);
+          console.log(`runtime=${build.runtimeVersion}`);
+          console.error(`Latest preview build ${build.id} (build ${build.appBuildVersion}), runtime ${build.runtimeVersion}`);
+          NODE
+
+      - name: Check that the build can run this JavaScript
+        run: |
+          set -euo pipefail
+          # EAS compares the build's recorded fingerprint with this checkout the
+          # same way it fingerprinted the build.
+          output="$(eas fingerprint:compare --build-id "${{ steps.build.outputs.id }}" \
+            --environment production --non-interactive 2>&1)" || true
+          echo "$output"
+          if ! grep -q "matches fingerprint" <<<"$output"; then
+            echo "::error::This change touches native code or config, so preview build ${{ steps.build.outputs.id }} cannot run it. Run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
             exit 1
           fi
 
-          build_id="$(
-            node - "$output_file" <<'NODE'
-          const fs = require("node:fs");
-
-          const output = fs.readFileSync(process.argv[2], "utf8");
-          const match = output.match(/"id"\s*:\s*"([^"]+)"/);
-
-          if (!match) {
-            process.exit(1);
-          }
-
-          process.stdout.write(match[1]);
-          NODE
-          )" || {
-            echo "::error::No finished preview build was found for fingerprint ${{ steps.fingerprint.outputs.hash }}. This change touches native code or config: run the 'Blumi preview build to TestFlight' EAS workflow, install that build, then push again. Nothing was published."
-            cat "$output_file"
-            latest_id="$(eas build:list --platform ios --channel preview --build-profile preview \
-              --status finished --limit 1 --json --non-interactive 2>/dev/null \
-              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/"id"\s*:\s*"([^"]+)"/);if(m)process.stdout.write(m[1])})')" || true
-            if [ -n "$latest_id" ]; then
-              echo "Differences from the latest preview build ($latest_id):"
-              eas fingerprint:compare --build-id "$latest_id" --environment production --non-interactive || true
-            fi
-            exit 1
-          }
-
-          echo "Matching preview build: $build_id"
-
       - name: Publish the OTA update
         run: |
-          eas update --channel preview --platform ios --environment production \
-            --message "$(git log -1 --pretty=%s)" --non-interactive
+          set -euo pipefail
+          output_file="$(mktemp)"
+          if ! eas update --channel preview --platform ios --environment production \
+            --message "$(git log -1 --pretty=%s)" --json --non-interactive >"$output_file" 2>"$RUNNER_TEMP/update.err"; then
+            echo "::error::eas update failed."
+            cat "$RUNNER_TEMP/update.err" "$output_file"
+            exit 1
+          fi
+          node - "$output_file" "${{ steps.build.outputs.runtime }}" <<'NODE'
+          const text = require("node:fs").readFileSync(process.argv[2], "utf8");
+          const expected = process.argv[3];
+          const runtimes = [...text.matchAll(/"runtimeVersion"\s*:\s*"([^"]+)"/g)].map((match) => match[1]);
+          const group = text.match(/"group"\s*:\s*"([^"]+)"/)?.[1];
+          if (runtimes.length === 0 || runtimes.some((runtime) => runtime !== expected)) {
+            console.log(text);
+            console.log(`::error::The update's runtime (${runtimes.join(", ") || "none"}) is not the preview build's (${expected}); the phone will not receive it.`);
+            process.exit(1);
+          }
+          console.log(`Published update group ${group} for runtime ${expected}.`);
+          NODE
