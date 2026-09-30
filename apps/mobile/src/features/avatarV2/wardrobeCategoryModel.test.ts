@@ -1,7 +1,20 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
+
+// The screen composes hooks and components from features/avatarV2/wardrobe;
+// source contracts read the screen and every module it delegates to.
+function readWardrobeSources(): string {
+  const folder = resolve(process.cwd(), "src/features/avatarV2/wardrobe")
+  return [
+    resolve(process.cwd(), "src/screens/WardrobeV2Screen.tsx"),
+    ...readdirSync(folder)
+      .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\./.test(file))
+      .sort()
+      .map((file) => resolve(folder, file))
+  ].map((file) => readFileSync(file, "utf8")).join("\n")
+}
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -117,10 +130,7 @@ test("female identity parts and the rendered male face are free Studio choices",
 })
 
 test("Avatar Studio exposes real Avatar and My Closet controls", () => {
-  const source = readFileSync(
-    resolve(process.cwd(), "src/screens/WardrobeV2Screen.tsx"),
-    "utf8"
-  )
+  const source = readWardrobeSources()
   assert.match(source, /Avatar Studio/)
   assert.match(source, /Avatar/)
   assert.match(source, /My Closet/)
@@ -130,10 +140,7 @@ test("Avatar Studio exposes real Avatar and My Closet controls", () => {
 })
 
 test("wardrobe announces server save rejection instead of failing silently", () => {
-  const source = readFileSync(
-    resolve(process.cwd(), "src/screens/WardrobeV2Screen.tsx"),
-    "utf8"
-  )
+  const source = readWardrobeSources()
 
   assert.match(source, /saveErrorMessage/)
   assert.match(source, /accessibilityRole="alert"/)
@@ -252,10 +259,7 @@ test("carousel relayout preserves the real scroll offset instead of resetting ac
     "a viewport relayout must recompute from the preserved native offset"
   )
 
-  const source = readFileSync(
-    resolve(process.cwd(), "src/screens/WardrobeV2Screen.tsx"),
-    "utf8"
-  )
+  const source = readWardrobeSources()
   assert.match(source, /carouselOffsetXRef\.current/)
   assert.match(source, /getWardrobeCarouselProgress\(\s*carouselOffsetXRef\.current,/)
 })

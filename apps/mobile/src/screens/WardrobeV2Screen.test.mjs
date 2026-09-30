@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { runInNewContext } from "node:vm"
@@ -9,7 +9,16 @@ import test from "node:test"
 const require = createRequire(import.meta.url)
 const ts = require("typescript")
 const here = dirname(fileURLToPath(import.meta.url))
-const screenSource = readFileSync(join(here, "WardrobeV2Screen.tsx"), "utf8")
+const wardrobeFolder = join(here, "../features/avatarV2/wardrobe")
+// The screen composes hooks and components from features/avatarV2/wardrobe;
+// source-shape contracts read the screen and every module it delegates to.
+const screenSource = [
+  join(here, "WardrobeV2Screen.tsx"),
+  ...readdirSync(wardrobeFolder)
+    .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\./.test(file))
+    .sort()
+    .map((file) => join(wardrobeFolder, file))
+].map((file) => readFileSync(file, "utf8")).join("\n")
 const providerSource = readFileSync(
   join(here, "../features/avatarV2/state/AvatarV2Provider.tsx"),
   "utf8"
@@ -18,12 +27,16 @@ const avatarEquipLifecycleSource = readFileSync(
   join(here, "../features/avatarV2/avatarEquipLifecycle.ts"),
   "utf8"
 )
+const tryOnSource = readFileSync(
+  join(here, "../features/avatarV2/wardrobe/wardrobeTryOn.ts"),
+  "utf8"
+)
 const sourceFile = ts.createSourceFile(
-  "WardrobeV2Screen.tsx",
-  screenSource,
+  "wardrobeTryOn.ts",
+  tryOnSource,
   ts.ScriptTarget.Latest,
   true,
-  ts.ScriptKind.TSX
+  ts.ScriptKind.TS
 )
 
 function loadScreenHelpers(names) {
@@ -31,7 +44,7 @@ function loadScreenHelpers(names) {
     const declaration = sourceFile.statements.find((statement) =>
       ts.isFunctionDeclaration(statement) && statement.name?.text === name
     )
-    assert.ok(declaration, `expected ${name} to be defined in the Wardrobe screen`)
+    assert.ok(declaration, `expected ${name} to be defined in the wardrobe try-on module`)
     return declaration.getText(sourceFile)
   })
   const compiled = ts.transpileModule(declarations.join("\n"), {
@@ -919,7 +932,8 @@ test("category changes and navigation blur dismiss the visual preview", () => {
   assert.equal(harness.state, null)
 
   assert.match(screenSource, /navigation\.addListener\("blur",[\s\S]*?type: "dismiss-preview"/)
-  assert.match(screenSource, /setActiveCategory\(category\.id\)[\s\S]*?type: "dismiss-preview"|type: "dismiss-preview"[\s\S]*?setActiveCategory\(category\.id\)/)
+  assert.match(screenSource, /dismissTryOnPreview\(\)\s*setActiveCategory\(categoryId\)/)
+  assert.match(screenSource, /clearQueuedWardrobeTryOn\(\{[\s\S]*?dispatch: dispatchTryOn/)
   assert.match(screenSource, /!canEquipItem\(item\)/)
   assert.match(screenSource, /isMountedRef\.current = false[\s\S]*?activeTryOnRequestRef\.current = null/)
 })

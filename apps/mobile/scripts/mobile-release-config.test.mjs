@@ -493,6 +493,16 @@ test("release bundle imports only the fonts and icon family used by the app", ()
     "src/screens/CosmeticShopScreen.tsx",
     "src/screens/MatchResultScreen.tsx",
     "src/screens/WardrobeV2Screen.tsx",
+    "src/features/avatarV2/wardrobe/wardrobeTryOn.ts",
+    "src/features/avatarV2/wardrobe/useWardrobeTryOn.ts",
+    "src/features/avatarV2/wardrobe/WardrobeCatalogCard.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeCategoryTabs.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeSectionSwitcher.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeTopBar.tsx",
+    "src/features/avatarV2/wardrobe/WardrobePreviewStage.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeSaveError.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeCatalogEmpty.tsx",
+    "src/features/avatarV2/wardrobe/WardrobeCatalogList.tsx",
     "src/ui/bottomNav.tsx",
     "src/ui/AvatarFrame.tsx"
   ].map(read).join("\n")

@@ -177,10 +177,10 @@ test("active female capsule is complete while retired products stay hidden under
 })
 
 test("female sweet capsule is visible through both wardrobe and shop thumbnail surfaces", () => {
-  const wardrobeSource = readFileSync(
-    join(workspaceRoot, "src/screens/WardrobeV2Screen.tsx"),
-    "utf8"
-  )
+  const wardrobeSource = [
+    "src/screens/WardrobeV2Screen.tsx",
+    "src/features/avatarV2/wardrobe/wardrobePreviewSources.ts"
+  ].map((file) => readFileSync(join(workspaceRoot, file), "utf8")).join("\n")
   const shopScreenSource = readFileSync(
     join(workspaceRoot, "src/screens/CosmeticShopScreen.tsx"),
     "utf8"
