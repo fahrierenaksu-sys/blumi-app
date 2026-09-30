@@ -8,6 +8,7 @@ import { captureProductEvent } from "../../../analytics/productAnalytics"
 import type { RootStackParamList } from "../../../navigation/RootNavigator"
 import { skipDiscoveryCandidate } from "../../connections/savedConnectionsStore"
 import { useInventoryStore } from "../../inventory/inventoryStore"
+import { reportDiscoveryMatchCreated } from "../../matches/discoveryMatchCreatedRuntime"
 import type { LobbyFeedbackCopy } from "../../lobby/lobbyFeedbackCopy"
 import type { PendingInviteMemory } from "../../lobby/pendingInvitesStore"
 import type { SessionActor } from "../../session/sessionModel"
@@ -174,6 +175,13 @@ export function useDiscoveryDecisions(input: {
         })
 
         if (match) {
+          // Reported here, from the server response, and never from the
+          // MatchResult route, which "View match" in chat also replays.
+          void reportDiscoveryMatchCreated({
+            accountUserId: myUserId,
+            mode: sessionActor.session.mode,
+            result
+          })
           void hydrateFromServer(sessionActor.session.sessionToken)
           showDiscoverFeedback(lobbyCopy.matched, "warm")
           cancelPendingMatchNavigationRef.current?.()
@@ -218,6 +226,7 @@ export function useDiscoveryDecisions(input: {
       navigation,
       restoreCandidateAfterDecisionFailure,
       sessionActor.profile.avatar,
+      sessionActor.session.mode,
       sessionActor.session.sessionToken,
       showDiscoverFeedback,
       updateProductionQuota

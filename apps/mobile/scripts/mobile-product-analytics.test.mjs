@@ -76,6 +76,29 @@ test("critical product funnels emit only named analytics events", () => {
   }
 })
 
+test("match_created comes only from server-confirmed matches, never from MatchResult replays", () => {
+  const policy = read("src/analytics/productAnalyticsPolicy.ts")
+  const runtime = read("src/features/matches/discoveryMatchCreatedRuntime.ts")
+  const decisions = read("src/features/discovery/screen/useDiscoveryDecisions.ts")
+
+  // The event contract is unchanged: same name, same two keys, same allowed sources.
+  assert.match(policy, /match_created: \{ mode, source: \["mini_room_mutual_save", "discovery"\] \},/)
+  assert.match(runtime, /captureProductEvent\("match_created", properties\)/)
+  assert.match(runtime, /isCaptureEnabled: isProductAnalyticsCaptureEnabled/)
+  assert.match(decisions, /reportDiscoveryMatchCreated\(\{\s*accountUserId: myUserId,/)
+
+  // MatchResult is also opened by "View match" in chat and by ProfilePreview;
+  // none of those surfaces may report a match on their own.
+  for (const path of [
+    "src/screens/MatchResultScreen.tsx",
+    "src/screens/ChatThreadScreen.tsx",
+    "src/screens/ProfilePreviewScreen.tsx"
+  ]) {
+    const source = read(path)
+    assert.doesNotMatch(source, /match_created|reportDiscoveryMatchCreated/, path)
+  }
+})
+
 function read(path) {
   return readFileSync(resolve(mobileRoot, path), "utf8")
 }
