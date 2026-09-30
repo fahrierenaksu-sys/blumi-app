@@ -465,6 +465,8 @@ test("superseded sockets cannot publish stale status or events", async (context)
   assert.notEqual(statuses.at(-1), "error")
   assert.deepEqual(events, [])
   assert.equal(MockWebSocket.instances.length, 2)
+  // The current socket never opens; stop its connect-timeout retries.
+  client.disconnect()
 })
 
 test("a transient ticket request failure retries with a newly issued ticket", async (context) => {

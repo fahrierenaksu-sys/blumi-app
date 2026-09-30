@@ -34,6 +34,12 @@ export const REALTIME_SLOW_RECONNECT_CEILING_MS = 60_000
  * growing its delay instead of reconnecting every second.
  */
 export const REALTIME_STABLE_CONNECTION_MS = 10_000
+/**
+ * A socket that has not opened within this window is abandoned and retried.
+ * Without it a stalled handshake (for example on a network that changed while
+ * the app was suspended) waits for the platform timeout, about 60 s on iOS.
+ */
+export const REALTIME_CONNECT_TIMEOUT_MS = 10_000
 const REALTIME_TICKET_FORBIDDEN_CLOSE_CODE = 4403
 
 export function isRealtimeAuthInvalidClose(closeCode: number | undefined): boolean {
@@ -60,7 +66,8 @@ export interface RealtimeSocket {
 
 export type RealtimeSocketFactory = (url: string, protocols: string[]) => RealtimeSocket
 
-/** WebSocket.OPEN in every implementation. */
+/** WebSocket.CONNECTING and WebSocket.OPEN in every implementation. */
+const SOCKET_CONNECTING = 0
 const SOCKET_OPEN = 1
 
 /** Constructs the platform's global WebSocket, read at connect time. */
@@ -123,11 +130,14 @@ export class RealtimeClient {
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
+  private connectTimeoutTimer: ReturnType<typeof setTimeout> | null = null
   private ticketRequestInFlight = false
   /** The server refused this session (401/403 ticket, 1008/4401 close); only connect() retries. */
   private sessionRefused = false
   private networkConnected = true
   private appActive = true
+  /** Backgrounded by suspend(): no socket opens until setAppActive(true). */
+  private suspended = false
   private connectionGeneration = 0
   private readonly serverEventListeners = new Set<ServerEventListener>()
   private readonly statusListeners = new Set<StatusListener>()
@@ -215,6 +225,8 @@ export class RealtimeClient {
       this.emitStatus("reconnecting")
       return
     }
+    // Backgrounded: setAppActive(true) opens the socket on return.
+    if (this.suspended) return
     void this.openSocket(sessionToken, this.connectionGeneration)
   }
 
@@ -264,9 +276,18 @@ export class RealtimeClient {
       [`ticket-${ticket}`]
     )
     this.socket = socket
+    this.clearConnectTimeoutTimer()
+    this.connectTimeoutTimer = setTimeout(() => {
+      this.connectTimeoutTimer = null
+      if (this.socket !== socket || socket.readyState === SOCKET_OPEN) return
+      this.closeCurrentSocket()
+      this.emitStatus("disconnected")
+      this.scheduleReconnect()
+    }, REALTIME_CONNECT_TIMEOUT_MS)
 
     socket.onopen = () => {
       if (this.socket !== socket) return
+      this.clearConnectTimeoutTimer()
       this.clearStableConnectionTimer()
       this.stableConnectionTimer = setTimeout(() => {
         this.stableConnectionTimer = null
@@ -287,6 +308,7 @@ export class RealtimeClient {
       if (this.socket !== socket) return
       this.socket = null
       this.clearStableConnectionTimer()
+      this.clearConnectTimeoutTimer()
       this.emitStatus("disconnected", { closeCode: closeEvent.code })
       if (
         closeEvent.code === 1008 ||
@@ -319,30 +341,59 @@ export class RealtimeClient {
   }
 
   /**
-   * App foreground/background signal. Backgrounded, no retry is scheduled;
-   * returning to the foreground retries at once when no socket is live or
-   * being opened. The backoff level is kept, so a still-unreachable server
-   * reports "unreachable" again after this attempt fails.
+   * App foreground signal. While inactive no retry is scheduled. Returning to
+   * the foreground cancels any pending backoff and reconnects at once when no
+   * socket is live or opening, including a socket the OS closed without
+   * delivering its close event. The fast backoff starts over because the
+   * outage began while the app could not retry; a server already classified
+   * unreachable keeps that level, so the status stays honest if this attempt
+   * fails too.
    */
   public setAppActive(isActive: boolean): void {
-    if (this.appActive === isActive) return
+    if (this.appActive === isActive && !(isActive && this.suspended)) return
     this.appActive = isActive
     if (!isActive) {
       this.clearReconnectTimer()
       return
     }
+    this.suspended = false
     if (
       this.intentionalDisconnect ||
       this.sessionRefused ||
       !this.sessionToken ||
       !this.networkConnected ||
-      this.socket ||
       this.ticketRequestInFlight
     ) return
+    if (this.socket) {
+      const { readyState } = this.socket
+      if (readyState === SOCKET_OPEN || readyState === SOCKET_CONNECTING) return
+      this.closeCurrentSocket()
+    }
     this.clearReconnectTimer()
+    if (this.reconnectAttempts < REALTIME_FAST_RECONNECT_ATTEMPTS) {
+      this.reconnectAttempts = 0
+    }
     this.emitStatus("reconnecting")
     this.connectionGeneration += 1
     void this.openSocket(this.sessionToken, this.connectionGeneration)
+  }
+
+  /**
+   * The app went to the background. A suspended iOS app cannot answer the
+   * server's pings, so an open socket would keep the user "connected", and
+   * chat push notifications suppressed, until the heartbeat terminates it
+   * 30-60 s later. Close it now and stay closed until setAppActive(true).
+   */
+  public suspend(): void {
+    this.appActive = false
+    this.suspended = true
+    this.clearReconnectTimer()
+    if (this.intentionalDisconnect || !this.sessionToken || this.sessionRefused) return
+    const hadConnection = this.socket !== null || this.ticketRequestInFlight
+    this.connectionGeneration += 1
+    this.ticketRequestInFlight = false
+    this.closeCurrentSocket()
+    if (hadConnection) this.emitStatus("disconnected")
   }
 
   public setNetworkConnected(isConnected: boolean): void {
@@ -360,7 +411,13 @@ export class RealtimeClient {
       return
     }
 
-    if (!this.intentionalDisconnect && !this.sessionRefused && this.sessionToken && !this.socket) {
+    if (
+      !this.intentionalDisconnect &&
+      !this.sessionRefused &&
+      !this.suspended &&
+      this.sessionToken &&
+      !this.socket
+    ) {
       // Losing the network, not the server, caused this outage: start again
       // with the fast attempts.
       this.reconnectAttempts = 0
@@ -442,6 +499,12 @@ export class RealtimeClient {
     this.stableConnectionTimer = null
   }
 
+  private clearConnectTimeoutTimer(): void {
+    if (!this.connectTimeoutTimer) return
+    clearTimeout(this.connectTimeoutTimer)
+    this.connectTimeoutTimer = null
+  }
+
   private clearReconnectTimer(): void {
     if (!this.reconnectTimer) return
     clearTimeout(this.reconnectTimer)
@@ -452,6 +515,7 @@ export class RealtimeClient {
     const socket = this.socket
     this.socket = null
     this.clearStableConnectionTimer()
+    this.clearConnectTimeoutTimer()
     socket?.close()
   }
 

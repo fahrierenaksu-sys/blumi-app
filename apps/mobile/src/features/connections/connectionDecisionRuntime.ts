@@ -7,6 +7,7 @@ import {
   type ConnectionDecisionDeliveryDependencies,
   type QueueConnectionDecisionDeliveryInput
 } from "./connectionDecisionDelivery"
+import { createCoalescedFlush } from "./connectionDecisionFlushGate"
 import { discardPendingConnectionDecision } from "./connectionDecisionOutbox"
 
 interface AuthenticatedConnectionDecisionDeliveryInput extends QueueConnectionDecisionDeliveryInput {
@@ -19,7 +20,6 @@ type AuthenticatedFlushInput = Pick<AuthenticatedConnectionDecisionDeliveryInput
 
 type FlushResult = { delivered: number; pending: number; rejectedMiniRoomIds: string[] }
 
-const activeFlushes = new Map<string, Promise<FlushResult>>()
 const DELIVERY_TIMEOUT_MS = 6000
 
 export async function queueConnectionDecisionForDelivery(
@@ -34,12 +34,8 @@ export async function discardQueuedConnectionDecision(
   await discardPendingConnectionDecision(AsyncStorage, input.actorUserId, input.miniRoomId)
 }
 
-export function flushAuthenticatedConnectionDecisionOutbox(
-  input: AuthenticatedFlushInput
-): Promise<FlushResult> {
-  const existing = activeFlushes.get(input.actorUserId)
-  if (existing) return existing
-  const flush = flushOutbox({
+const coalescedFlush = createCoalescedFlush((input: AuthenticatedFlushInput): Promise<FlushResult> =>
+  flushOutbox({
     storage: AsyncStorage,
     submit: (intent) => withDeliveryTimeout(() => submitConnectionDecision(
       MOBILE_HTTP_BASE_URL,
@@ -47,22 +43,12 @@ export function flushAuthenticatedConnectionDecisionOutbox(
       intent
     )),
     onDelivered: input.onDelivered
-  }, input.actorUserId)
-  activeFlushes.set(input.actorUserId, flush)
-  void flush.then(
-    () => releaseActiveFlush(input.actorUserId, flush),
-    () => releaseActiveFlush(input.actorUserId, flush)
-  )
-  return flush
-}
+  }, input.actorUserId))
 
-function releaseActiveFlush(
-  actorUserId: string,
-  flush: Promise<FlushResult>
-): void {
-  if (activeFlushes.get(actorUserId) === flush) {
-    activeFlushes.delete(actorUserId)
-  }
+export function flushAuthenticatedConnectionDecisionOutbox(
+  input: AuthenticatedFlushInput
+): Promise<FlushResult> {
+  return coalescedFlush(input.actorUserId, input)
 }
 
 function withDeliveryTimeout<T>(work: () => Promise<T>): Promise<T> {

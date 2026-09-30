@@ -22,7 +22,7 @@ import {
   connectGlobal,
   disconnectGlobal,
   sendGlobal,
-  setGlobalRealtimeAppActive,
+  setGlobalRealtimeAppState,
   subscribeToStatus,
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
@@ -96,12 +96,10 @@ export function useGlobalRealtimeSession({
   const refreshLatestAccountModeration = useEffectEvent(() => refreshAccountModeration())
   const resynchronizeLatestMessages = useEffectEvent((threadId: string) => resynchronizeMessages(threadId))
 
-  // Reconnect retries pause in the background and run at once on foreground.
+  // The socket closes in the background and reconnects at once on foreground.
   useEffect(() => {
-    setGlobalRealtimeAppActive(AppState.currentState === "active")
-    const subscription = AppState.addEventListener("change", (state) => {
-      setGlobalRealtimeAppActive(state === "active")
-    })
+    setGlobalRealtimeAppState(AppState.currentState)
+    const subscription = AppState.addEventListener("change", setGlobalRealtimeAppState)
     return () => subscription.remove()
   }, [])
 
