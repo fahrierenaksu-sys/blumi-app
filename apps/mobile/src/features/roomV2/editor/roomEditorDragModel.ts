@@ -30,7 +30,10 @@ export const ROOM_EDITOR_DRAG_CELL_STEP = 0.02
 /** Cell index used while a tray drag is off the stage. */
 export const ROOM_EDITOR_DRAG_OUTSIDE_CELL = -100000
 export const ROOM_EDITOR_DRAG_LIFT_SCALE = 1.06
-export const ROOM_EDITOR_DRAG_GHOST_OPACITY = 0.82
+/** The lifted piece stays fully opaque (ROOM-10); the lift scale shows it is held. */
+export const ROOM_EDITOR_DRAG_GHOST_OPACITY = 1
+/** After a valid drop the ghost settles onto the placed piece and fades. */
+export const ROOM_EDITOR_DRAG_SETTLE_FADE_MS = 140
 export const ROOM_EDITOR_DRAG_RETURN_SPRING = { damping: 20, stiffness: 260, mass: 1 } as const
 
 export type RoomEditorDragSource = "stage" | "tray"
@@ -227,6 +230,14 @@ export function resolveRoomEditorDragRelease(input: {
   if (input.source === "stage" && !input.moved) return "cancel"
   if (input.preview?.isValid && input.preview.item.kind === "furniture") return "commit"
   return "reject"
+}
+
+/** A selection tick when the spot under a drag flips valid ↔ invalid; never on entering or leaving the stage. */
+export function shouldTickRoomEditorDragValidity(
+  previous: PlacementPreview | undefined,
+  next: PlacementPreview | undefined
+): boolean {
+  return previous !== undefined && next !== undefined && previous.isValid !== next.isValid
 }
 
 export function getRoomEditorDragFeedback(

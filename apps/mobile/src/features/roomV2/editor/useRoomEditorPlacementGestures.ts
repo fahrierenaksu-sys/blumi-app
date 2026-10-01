@@ -1,6 +1,6 @@
 import { useCallback } from "react"
 import type { GestureResponderEvent } from "react-native"
-import { hapticError, hapticLight, hapticSuccess } from "../../../ui/haptics"
+import { hapticError, hapticLight } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import { commitRoomV2PlacedItem } from "../roomV2DecorActions"
 import type {
@@ -98,7 +98,8 @@ export function useRoomEditorPlacementGestures(input: {
     }
 
     const placedItem: PlacedRoomItem = createRoomEditorPlacedItemFromPreview(preview, preview.item)
-    hapticSuccess()
+    // Placing a piece is a light tap; success is kept for a real save (ROOM-10).
+    hapticLight()
     setDraftDecor((current) => commitRoomV2PlacedItem(current, placedItem))
     setSelectedInstanceId(placedItem.instanceId)
     updatePlacementFeedback(undefined)
