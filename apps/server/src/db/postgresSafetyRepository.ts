@@ -2,7 +2,10 @@ import type { QueryResultRow } from "pg"
 import { REPORT_REASONS } from "@blumi/contracts"
 import { moderationRiskRank } from "../safety/moderationQueue"
 import {
+  ESCALATION_REPLAY_WINDOW_MS,
+  isEscalatingRequestRetry,
   pendingReportEscalation,
+  storedReportAnswersKeyedRequest,
   type BlockRecord,
   type PendingReportReasonSummary,
   type ReportRecord,
@@ -134,7 +137,7 @@ export function createPostgresSafetyRepository(
           )
           if (existing.rows[0]) {
             const replay = mapReport(existing.rows[0])
-            if (!sameReportPayload(replay, report)) {
+            if (!storedReportAnswersKeyedRequest(replay, report)) {
               if (client) await executor.query("COMMIT")
               return { kind: "conflict" } as SaveReportAndBlockResult
             }
@@ -149,6 +152,34 @@ export function createPostgresSafetyRepository(
               report: replay,
               block: savedBlock
             } as SaveReportAndBlockResult
+          }
+        }
+        if (report.idempotencyKey) {
+          // The schema keeps only the first request's key, so a retry of a
+          // request that escalated a report is recognised by its content.
+          // Only reports still pending or resolved within the replay window
+          // can match; blumi_safety_reports_actor_created_at_idx serves it.
+          const candidates = await executor.query(
+            `SELECT report_id, actor_user_id, reported_user_id, reason, note,
+                    idempotency_key, created_at, status, resolution_action,
+                    resolution_note, resolved_at, resolved_by_admin_id,
+                    resolved_by_token_id, resolution_suspended_until
+               FROM blumi_safety_reports
+              WHERE actor_user_id = $1 AND reported_user_id = $2
+                AND (status = 'pending' OR resolved_at >= $3)
+              ORDER BY created_at DESC, report_id DESC
+              LIMIT 20`,
+            [
+              report.actorUserId,
+              report.reportedUserId,
+              new Date(Date.parse(report.createdAt) - ESCALATION_REPLAY_WINDOW_MS)
+            ]
+          )
+          const escalated = candidates.rows.map(mapReport).find((candidate) => isEscalatingRequestRetry(candidate, report))
+          if (escalated) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "escalated", report: escalated, block: savedBlock } as SaveReportAndBlockResult
           }
         }
         // blumi_safety_reports_actor_created_at_idx serves both reads.
@@ -506,12 +537,4 @@ async function ensureBlock(
     blocked_user_id: block.blockedUserId,
     created_at: block.createdAt
   })
-}
-
-function sameReportPayload(left: ReportRecord, right: ReportRecord): boolean {
-  return (
-    left.reportedUserId === right.reportedUserId &&
-    left.reason === right.reason &&
-    (left.note ?? undefined) === (right.note ?? undefined)
-  )
 }

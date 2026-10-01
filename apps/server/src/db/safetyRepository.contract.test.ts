@@ -163,12 +163,12 @@ runRepositoryContract<SafetyRepository>({
       if (escalated.kind === "escalated") {
         assert.equal(escalated.report.reportId, first.reportId)
         assert.equal(escalated.report.reason, "underage")
-        assert.equal(escalated.report.note, "sends links / says they are 15")
+        assert.equal(escalated.report.note, "[Önceki sebep / previous reason: spam] sends links / says they are 15")
         assert.equal(escalated.report.createdAt, AT, "the original time keeps it at the front of the queue")
       }
       const stored = await backend.repository.findReport(first.reportId)
       assert.equal(stored?.reason, "underage")
-      assert.equal(stored?.note, "sends links / says they are 15")
+      assert.equal(stored?.note, "[Önceki sebep / previous reason: spam] sends links / says they are 15")
       assert.equal(await backend.repository.findReport(urgent.reportId), null, "no second row")
       const queue = await backend.repository.listPendingReportsByRisk({ limit: 100 })
       const position = queue.findIndex((value) => value.reportId === first.reportId)
@@ -181,8 +181,105 @@ runRepositoryContract<SafetyRepository>({
         const repeat = { ...first, reportId: backend.id(`report_${name}`), reason, note, createdAt: LATER }
         const result = await backend.repository.saveReportAndBlock(repeat, blockFor(repeat), policy)
         assert.equal(result.kind, "replayed")
-        if (result.kind === "replayed") assert.equal(result.report.note, "sends links / says they are 15")
+        if (result.kind === "replayed") {
+          assert.equal(result.report.note, "[Önceki sebep / previous reason: spam] sends links / says they are 15")
+        }
       }
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
+    },
+
+    "keyed retries of the original and of the escalating request replay their own results": async (backend) => {
+      const actor = backend.id("actor")
+      const target = backend.id("target")
+      const policy = { windowStartedAt: AT, maxReportsInWindow: 20 }
+      const k1 = report(backend, { actorUserId: actor, reportedUserId: target, reason: "spam", note: "sends links", idempotencyKey: backend.id("k1") })
+      const k2 = { ...k1, reportId: backend.id("report_k2"), reason: "underage" as const, note: "says they are 15", idempotencyKey: backend.id("k2"), createdAt: LATER }
+      assert.equal((await backend.repository.saveReportAndBlock(k1, blockFor(k1), policy)).kind, "created")
+      assert.equal((await backend.repository.saveReportAndBlock(k2, blockFor(k2), policy)).kind, "escalated")
+
+      // The original request's retry is answered by the escalated row: its
+      // reason is more urgent and its note still holds the original note.
+      const k1Retry = await backend.repository.saveReportAndBlock({ ...k1, reportId: backend.id("report_k1_retry") }, blockFor(k1), policy)
+      assert.equal(k1Retry.kind, "replayed")
+      if (k1Retry.kind === "replayed") {
+        assert.equal(k1Retry.report.reportId, k1.reportId)
+        assert.equal(k1Retry.report.reason, "underage")
+      }
+      // The escalating request's retry gets the escalation result again.
+      const k2Retry = await backend.repository.saveReportAndBlock({ ...k2, reportId: backend.id("report_k2_retry") }, blockFor(k2), policy)
+      assert.equal(k2Retry.kind, "escalated")
+      if (k2Retry.kind === "escalated") assert.equal(k2Retry.report.reportId, k1.reportId)
+
+      // A changed payload under either key is still a conflict.
+      for (const changed of [{ ...k1, note: "different" }, { ...k1, reason: "harassment" as const }, { ...k1, reportedUserId: backend.id("other") }]) {
+        assert.equal((await backend.repository.saveReportAndBlock(changed, blockFor(changed), policy)).kind, "conflict")
+      }
+      // A new keyed request with a less urgent reason is not mistaken for the escalation.
+      const k3 = { ...k1, reportId: backend.id("report_k3"), reason: "spam" as const, note: "more links", idempotencyKey: backend.id("k3"), createdAt: LATER }
+      assert.equal((await backend.repository.saveReportAndBlock(k3, blockFor(k3), policy)).kind, "replayed")
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
+    },
+
+    "a retry of the escalating request after an admin resolved the report files nothing new": async (backend) => {
+      const actor = backend.id("actor")
+      const target = backend.id("target")
+      const policy = { windowStartedAt: AT, maxReportsInWindow: 20 }
+      const k1 = report(backend, { actorUserId: actor, reportedUserId: target, reason: "spam", note: "sends links", idempotencyKey: backend.id("k1") })
+      const k2 = { ...k1, reportId: backend.id("report_k2"), reason: "underage" as const, note: "says they are 15", idempotencyKey: backend.id("k2"), createdAt: LATER }
+      await backend.repository.saveReportAndBlock(k1, blockFor(k1), policy)
+      assert.equal((await backend.repository.saveReportAndBlock(k2, blockFor(k2), policy)).kind, "escalated")
+      assert.equal(await backend.repository.resolveReport(k1.reportId, {
+        action: "dismiss", resolvedAt: LATER, resolvedByAdminId: backend.id("admin"), resolvedByTokenId: backend.id("token")
+      }), "resolved")
+      await backend.repository.deleteBlock(actor, target)
+
+      const k2Retry = await backend.repository.saveReportAndBlock({ ...k2, reportId: backend.id("report_k2_retry") }, blockFor(k2), policy)
+      assert.equal(k2Retry.kind, "escalated")
+      if (k2Retry.kind === "escalated") assert.equal(k2Retry.report.reportId, k1.reportId)
+      assert.ok(await backend.repository.findBlock(actor, target), "the replay restores the block")
+      assert.equal((await backend.repository.saveReportAndBlock({ ...k1, reportId: backend.id("report_k1_retry") }, blockFor(k1), policy)).kind, "replayed")
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
+
+      // Long after the resolution the same text is a new report again.
+      const nextWeek = new Date(Date.parse(LATER) + 7 * 24 * 60 * 60_000).toISOString()
+      const fresh = { ...k2, reportId: backend.id("report_fresh"), idempotencyKey: backend.id("k_fresh"), createdAt: nextWeek }
+      assert.equal((await backend.repository.saveReportAndBlock(fresh, blockFor(fresh), { windowStartedAt: LATER, maxReportsInWindow: 20 })).kind, "created")
+    },
+
+    "two escalations keep every reason in the note and each retry replays": async (backend) => {
+      const actor = backend.id("actor")
+      const target = backend.id("target")
+      const k1 = report(backend, { actorUserId: actor, reportedUserId: target, reason: "spam", note: "sends links", idempotencyKey: backend.id("k1") })
+      const k2 = { ...k1, reportId: backend.id("report_k2"), reason: "harassment" as const, note: "rude", idempotencyKey: backend.id("k2"), createdAt: LATER }
+      const k3 = { ...k1, reportId: backend.id("report_k3"), reason: "underage" as const, note: "says 15", idempotencyKey: backend.id("k3"), createdAt: LATER }
+      await backend.repository.saveReportAndBlock(k1, blockFor(k1))
+      assert.equal((await backend.repository.saveReportAndBlock(k2, blockFor(k2))).kind, "escalated")
+      assert.equal((await backend.repository.saveReportAndBlock(k3, blockFor(k3))).kind, "escalated")
+      const stored = await backend.repository.findReport(k1.reportId)
+      assert.equal(stored?.reason, "underage")
+      assert.equal(stored?.note,
+        "[Önceki sebep / previous reason: harassment] [Önceki sebep / previous reason: spam] sends links / rude / says 15")
+      for (const [value, kind] of [[k1, "replayed"], [k2, "escalated"], [k3, "escalated"]] as const) {
+        const retry = await backend.repository.saveReportAndBlock({ ...value, reportId: backend.id(`retry_${value.reason}`) }, blockFor(value))
+        assert.equal(retry.kind, kind, value.reason)
+      }
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
+    },
+
+    "a merged note stays within 1000 characters and both long requests still replay": async (backend) => {
+      const actor = backend.id("actor")
+      const target = backend.id("target")
+      const k1 = report(backend, { actorUserId: actor, reportedUserId: target, reason: "spam", note: "a".repeat(1000), idempotencyKey: backend.id("k1") })
+      const k2 = { ...k1, reportId: backend.id("report_k2"), reason: "underage" as const, note: "b".repeat(1000), idempotencyKey: backend.id("k2"), createdAt: LATER }
+      await backend.repository.saveReportAndBlock(k1, blockFor(k1))
+      const escalated = await backend.repository.saveReportAndBlock(k2, blockFor(k2))
+      assert.equal(escalated.kind, "escalated")
+      const note = (await backend.repository.findReport(k1.reportId))?.note ?? ""
+      assert.ok(note.length <= 1000, `merged note is ${note.length} characters`)
+      assert.ok(note.startsWith("[Önceki sebep / previous reason: spam] aaa"))
+      assert.ok(note.includes("bbb"))
+      assert.equal((await backend.repository.saveReportAndBlock({ ...k1, reportId: backend.id("r1") }, blockFor(k1))).kind, "replayed")
+      assert.equal((await backend.repository.saveReportAndBlock({ ...k2, reportId: backend.id("r2") }, blockFor(k2))).kind, "escalated")
       assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
     },
 

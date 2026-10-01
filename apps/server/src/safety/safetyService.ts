@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { REPORT_REASONS, type ReportReason } from "@blumi/contracts"
 import {
   createInMemorySafetyRepository,
+  REPORT_NOTE_MAX_LENGTH,
   type BlockRecord,
   type PendingReportCursor,
   type ReportRecord,
@@ -20,7 +21,7 @@ import {
   summarizePendingModerationWorkload
 } from "./moderationQueue"
 
-const MAX_REPORT_NOTE_LENGTH = 1000
+const MAX_REPORT_NOTE_LENGTH = REPORT_NOTE_MAX_LENGTH
 const DEFAULT_ADMIN_REPORT_LIMIT = 50
 const MAX_ADMIN_REPORT_LIMIT = 100
 const DEFAULT_ACTOR_REPORT_LIMIT = 50

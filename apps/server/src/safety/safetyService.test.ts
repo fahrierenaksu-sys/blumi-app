@@ -219,7 +219,7 @@ test("spam then underage on the same person escalates the pending report into th
   assert.equal(urgent.replayed, false, "the new reason was accepted")
   assert.equal(urgent.report.reportId, first.report.reportId)
   assert.equal(urgent.report.reason, "underage")
-  assert.equal(urgent.report.note, "says 15")
+  assert.equal(urgent.report.note, "[Önceki sebep / previous reason: spam] says 15", "moderators still see the first reason")
   const queue = await service.listPendingReportQueue({})
   assert.equal(queue.reports[0]?.reportId, first.report.reportId)
   assert.equal(queue.reports[0]?.reason, "underage")
