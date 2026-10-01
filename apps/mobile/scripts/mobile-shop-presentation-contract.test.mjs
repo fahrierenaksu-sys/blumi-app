@@ -108,6 +108,19 @@ test("shop makes loading, empty, offline, and retry states explicit and accessib
   assert.match(shopScreen, /onRetry=\{handleRetryShop\}/)
 })
 
+test("the first load shows the shelf's shape and crossfades into it (SHOP-5)", () => {
+  const skeleton = readShopScreenModule("ShopShelfSkeleton.tsx")
+  assert.match(shopScreen, /const showSkeleton = !showShopContent && shopStatusState === "loading"/)
+  assert.match(shopScreen, /showSkeleton \? \(\s*<ShopShelfSkeleton/)
+  assert.match(shopScreen, /<Reanimated\.View entering=\{contentEntering\}/)
+  assert.match(skeleton, /testID="shop-status-loading"/)
+  assert.match(skeleton, /accessibilityRole="progressbar"/)
+  assert.match(skeleton, /SHOP_CONTENT_CROSSFADE_MS = 160/)
+  // Only after a skeleton the user saw, and never under Reduce Motion.
+  assert.match(skeleton, /if \(!skeletonShown \|\| input\.reduceMotion\) return undefined/)
+  assert.doesNotMatch(skeleton, /withRepeat|ActivityIndicator/)
+})
+
 test("coin packs stay hidden until the balance pill is pressed", () => {
   assert.match(
     shopScreen,
