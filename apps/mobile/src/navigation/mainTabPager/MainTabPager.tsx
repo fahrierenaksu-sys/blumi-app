@@ -57,7 +57,10 @@ import {
   getMainTabPageAccessibility,
   getMainTabPageIndex,
   getMainTabPageOpacity,
+  getMainTabPagerMountedMask,
+  isMainTabPageInMountedMask,
   isMainTabPageSwipeable,
+  reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
   reduceMainTabPagerSettled,
   reduceMainTabPagerSettleToCommitted,
@@ -211,14 +214,14 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
   )
 
   // ── Commit (JS): the only place a page change reaches navigation ──────
-  const syncFromRouteRef = useRef<(index: number) => void>(() => undefined)
+  const rejectCommitRef = useRef<(index: number) => void>(() => undefined)
   const commitPage = useCallback((index: number) => {
     const state = navigation.getState()
     const slot = state.routes.find((candidate) => candidate.key === slotKeyRef.current)
     const routeName = resolveMainTabPagerCommitRoute(slot?.name, index)
     if (routeName === null) {
       // Navigation already shows another answer (or this page); make the UI follow it.
-      syncFromRouteRef.current(getMainTabPageIndex(slot?.name))
+      rejectCommitRef.current(getMainTabPageIndex(slot?.name))
       return
     }
     ;(navigation.dispatch as unknown as (action: unknown) => void)(
@@ -239,10 +242,17 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
   const startPosition = useSharedValue(0)
   const startTranslation = useSharedValue(0)
   const reduceMotionValue = useSharedValue(reduceMotion)
+  // Mounted pages as a bitmask the UI thread reads: a tap snaps at once only
+  // to a page that is already rendered.
+  const mountedMask = getMainTabPagerMountedMask(mounted)
+  const mountedMaskValue = useSharedValue(mountedMask)
 
   useEffect(() => {
     reduceMotionValue.value = reduceMotion
   }, [reduceMotion, reduceMotionValue])
+  useEffect(() => {
+    mountedMaskValue.value = mountedMask
+  }, [mountedMask, mountedMaskValue])
 
   // The bottom-bar indicator follows the pages in the same UI-thread frame
   // while a drag or settle moves them (no JS per frame).
@@ -255,13 +265,22 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     }),
     (sample) => publishMainTabPagerIndicator(mainTabPagerIndicator, sample)
   )
-  useEffect(() => () => {
-    mainTabPagerIndicator.tracking.value = false
-  }, [])
+  useEffect(() => {
+    // The bar's selection follows the page the UI thread shows (tap, settle,
+    // route sync), so a tap moves the pill without waiting for JS.
+    mainTabPagerIndicator.selection.value = ui.value.committedIndex
+    return () => {
+      mainTabPagerIndicator.tracking.value = false
+      mainTabPagerIndicator.selection.value = -1
+    }
+  }, [ui])
 
   const applyTransition = useCallback((transition: MainTabPagerUiTransition) => {
     "worklet"
     ui.value = transition.state
+    if (mainTabPagerIndicator.selection.value !== transition.state.committedIndex) {
+      mainTabPagerIndicator.selection.value = transition.state.committedIndex
+    }
     if (transition.interrupt) {
       dragging.value = false
       caught.value = false
@@ -283,7 +302,13 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
       applyTransition(reduceMainTabPagerRouteSync(ui.value, routeIndex))
     }, index)
   }, [applyTransition, ui])
-  syncFromRouteRef.current = syncFromRoute
+  const rejectCommit = useCallback((index: number) => {
+    scheduleOnUI((routeIndex: number) => {
+      "worklet"
+      applyTransition(reduceMainTabPagerCommitRejected(ui.value, routeIndex))
+    }, index)
+  }, [applyTransition, ui])
+  rejectCommitRef.current = rejectCommit
 
   // Navigation is the source of truth: follow every route change. A change
   // produced by this pager's own settle is already committed on the UI
@@ -338,11 +363,15 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
       if (index < 0) return false
       scheduleOnUI((tappedIndex: number) => {
         "worklet"
-        applyTransition(reduceMainTabPagerTap(ui.value, tappedIndex))
+        applyTransition(reduceMainTabPagerTap(
+          ui.value,
+          tappedIndex,
+          isMainTabPageInMountedMask(mountedMaskValue.value, tappedIndex)
+        ))
       }, index)
       return true
     }
-  }), [applyTransition, navigation, ui])
+  }), [applyTransition, mountedMaskValue, navigation, ui])
 
   // ── Interruptions ───────────────────────────────────────────────────
   useEffect(() => {
@@ -366,12 +395,16 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
       const discoverIndex = getMainTabPageIndex("Lobby")
       scheduleOnUI((index: number) => {
         "worklet"
-        applyTransition(reduceMainTabPagerTap(ui.value, index))
+        applyTransition(reduceMainTabPagerTap(
+          ui.value,
+          index,
+          isMainTabPageInMountedMask(mountedMaskValue.value, index)
+        ))
       }, discoverIndex)
       return true
     })
     return () => subscription.remove()
-  }, [applyTransition, navigation, ui])
+  }, [applyTransition, mountedMaskValue, navigation, ui])
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width
@@ -487,7 +520,7 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
                 slotKey={route.key}
                 params={pageParams[page.routeName]}
                 mounted={mounted[index] === true}
-                selectedIndex={selectedIndex}
+                isSelected={index === selectedIndex}
                 navigation={pageNavigations[index]}
                 renderPage={renderPage}
                 position={position}
@@ -509,7 +542,8 @@ interface MainTabPagerPageProps {
   slotKey: string
   params: object | undefined
   mounted: boolean
-  selectedIndex: number
+  /** A boolean, not the selected index: a tab change re-renders only the two pages that flip. */
+  isSelected: boolean
   navigation: unknown
   renderPage: MainTabPagerProps["renderPage"]
   position: { value: number }
@@ -523,7 +557,7 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
   slotKey,
   params,
   mounted,
-  selectedIndex,
+  isSelected,
   navigation,
   renderPage,
   position,
@@ -534,7 +568,7 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
     () => ({ key: `${slotKey}:${routeName}`, name: routeName, params }),
     [params, routeName, slotKey]
   )
-  const accessibility = getMainTabPageAccessibility(index, selectedIndex)
+  const accessibility = getMainTabPageAccessibility(isSelected)
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: getMainTabPageOpacity(index, ui.value.committedIndex),
     transform: [{ translateX: index * width.value - position.value }]

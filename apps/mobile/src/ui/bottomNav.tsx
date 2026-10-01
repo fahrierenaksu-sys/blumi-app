@@ -24,7 +24,8 @@ import { useReducedMotion } from "./animations"
 import {
   getBottomNavItemEmphasis,
   readMainTabPagerIndicatorProgress,
-  resolveBottomNavIndicatorIndex
+  resolveBottomNavIndicatorIndex,
+  shouldAnimateBottomNavSelectionFromJs
 } from "./layout/bottomNavIndicatorModel"
 import { mainTabPagerIndicator } from "./mainTabPagerIndicator"
 import { usePublishToastBottomBarInset } from "./usePublishToastBottomBarInset"
@@ -330,18 +331,31 @@ export function BottomNav(props: BottomNavProps) {
   // main-page pager is dragged or settling, it follows the pages frame by
   // frame instead, so the bar never trails the page.
   const indicator = useSharedValue(activeIndex)
+  const selectionDuration = getBottomNavMotionDuration(reduceMotion)
   useEffect(() => {
-    const duration = getBottomNavMotionDuration(reduceMotion)
-    indicator.value = duration === 0
+    // A pager tap already moved the pill on the UI thread (reaction below).
+    if (!shouldAnimateBottomNavSelectionFromJs(mainTabPagerIndicator.selection.value, activeIndex)) return
+    indicator.value = selectionDuration === 0
       ? activeIndex
-      : withTiming(activeIndex, { duration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
-  }, [activeIndex, indicator, reduceMotion])
+      : withTiming(activeIndex, { duration: selectionDuration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
+  }, [activeIndex, indicator, selectionDuration])
   useAnimatedReaction(
     () => readMainTabPagerIndicatorProgress(mainTabPagerIndicator),
     (progress) => {
       if (progress === null) return
       indicator.value = resolveBottomNavIndicatorIndex(progress, itemCount)
     }
+  )
+  useAnimatedReaction(
+    () => mainTabPagerIndicator.selection.value,
+    (selection, previous) => {
+      if (selection < 0 || selection === previous || mainTabPagerIndicator.tracking.value) return
+      const target = resolveBottomNavIndicatorIndex(selection, itemCount)
+      indicator.value = selectionDuration === 0
+        ? target
+        : withTiming(target, { duration: selectionDuration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
+    },
+    [itemCount, selectionDuration]
   )
   const activePillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: indicator.value * tabWidth }]

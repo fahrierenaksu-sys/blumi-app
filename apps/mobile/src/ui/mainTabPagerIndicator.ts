@@ -15,5 +15,6 @@ import type { MainTabPagerIndicatorValues } from "./layout/bottomNavIndicatorMod
  */
 export const mainTabPagerIndicator: MainTabPagerIndicatorValues = {
   progress: makeMutable(0),
-  tracking: makeMutable(false)
+  tracking: makeMutable(false),
+  selection: makeMutable(-1)
 }

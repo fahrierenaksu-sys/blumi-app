@@ -171,10 +171,17 @@ export function getMainTabPageOpacity(pageIndex: number, committedIndex: number)
 // the route when navigation changed it elsewhere (tap, deep link, back).
 
 export interface MainTabPagerUiState {
-  /** Page the UI thread last settled on or synced from navigation. */
+  /** Page the UI thread shows: last settled on, tapped, or synced from navigation. */
   committedIndex: number
   /** Incremented to invalidate an in-flight gesture or settle animation. */
   epoch: number
+  /**
+   * Page a bottom-bar tap already shows on the UI thread while its
+   * navigation commit is on the way, or -1. Route syncs of earlier commits
+   * (rapid taps) are ignored until this one lands, so the pager never jumps
+   * back through intermediate pages.
+   */
+  pendingTapIndex: number
 }
 
 export interface MainTabPagerUiTransition {
@@ -189,24 +196,44 @@ export interface MainTabPagerUiTransition {
 
 export function createMainTabPagerUiState(committedIndex: number): MainTabPagerUiState {
   "worklet"
-  return { committedIndex, epoch: 0 }
+  return { committedIndex, epoch: 0, pendingTapIndex: -1 }
 }
 
 /**
  * A bottom-bar tap: stop any drag or settle so it can never commit after the
- * tap, then commit the tapped page (the route sync that follows moves the
- * pager). Tapping the committed page only returns an interrupted pager to it.
+ * tap, then commit the tapped page once. A page that is already mounted is
+ * shown at once on the UI thread (optimistic snap), so the tap never waits
+ * for the JS navigation round trip; a never-visited page waits for the route
+ * sync that mounts it, so the pager never shows an empty page. Tapping the
+ * page already shown only returns an interrupted pager to it.
  */
 export function reduceMainTabPagerTap(
   state: MainTabPagerUiState,
-  index: number
+  index: number,
+  targetMounted: boolean
 ): MainTabPagerUiTransition {
   "worklet"
-  const alreadyCommitted = index === state.committedIndex
+  const epoch = state.epoch + 1
+  if (index === state.committedIndex) {
+    return {
+      state: { committedIndex: state.committedIndex, epoch, pendingTapIndex: state.pendingTapIndex },
+      commitIndex: null,
+      snap: true,
+      interrupt: true
+    }
+  }
+  if (targetMounted) {
+    return {
+      state: { committedIndex: index, epoch, pendingTapIndex: index },
+      commitIndex: index,
+      snap: true,
+      interrupt: true
+    }
+  }
   return {
-    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1 },
-    commitIndex: alreadyCommitted ? null : index,
-    snap: alreadyCommitted,
+    state: { committedIndex: state.committedIndex, epoch, pendingTapIndex: -1 },
+    commitIndex: index,
+    snap: false,
     interrupt: true
   }
 }
@@ -221,7 +248,7 @@ export function reduceMainTabPagerSettled(
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
   return {
-    state: { committedIndex: index, epoch: state.epoch },
+    state: { committedIndex: index, epoch: state.epoch, pendingTapIndex: -1 },
     commitIndex: index,
     snap: false,
     interrupt: false
@@ -229,25 +256,56 @@ export function reduceMainTabPagerSettled(
 }
 
 /**
- * Navigation now selects `routeIndex`. When the UI already settled there (the
- * commit of its own swipe) nothing happens, so a follow-up swipe that already
- * started is not interrupted. Otherwise the change came from elsewhere and the
- * pager jumps to it, invalidating any drag or settle.
+ * Navigation now selects `routeIndex`. When the UI already shows it (the
+ * commit of its own swipe or tap) nothing moves, so a follow-up swipe that
+ * already started is not interrupted. While a tap is pending, the commits of
+ * earlier rapid taps land first and are ignored; the pending tap's own commit
+ * clears it. Otherwise the change came from elsewhere and the pager jumps to
+ * it, invalidating any drag or settle.
  */
 export function reduceMainTabPagerRouteSync(
   state: MainTabPagerUiState,
   routeIndex: number
 ): MainTabPagerUiTransition {
   "worklet"
-  if (routeIndex < 0 || routeIndex === state.committedIndex) {
+  if (routeIndex < 0) {
+    return { state, commitIndex: null, snap: false, interrupt: false }
+  }
+  if (state.pendingTapIndex >= 0) {
+    if (routeIndex !== state.pendingTapIndex) {
+      return { state, commitIndex: null, snap: false, interrupt: false }
+    }
+    return {
+      state: { committedIndex: state.committedIndex, epoch: state.epoch, pendingTapIndex: -1 },
+      commitIndex: null,
+      snap: false,
+      interrupt: false
+    }
+  }
+  if (routeIndex === state.committedIndex) {
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
   return {
-    state: { committedIndex: routeIndex, epoch: state.epoch + 1 },
+    state: { committedIndex: routeIndex, epoch: state.epoch + 1, pendingTapIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
   }
+}
+
+/**
+ * JS could not commit (navigation already shows another answer): drop any
+ * pending tap and follow the route navigation actually shows.
+ */
+export function reduceMainTabPagerCommitRejected(
+  state: MainTabPagerUiState,
+  routeIndex: number
+): MainTabPagerUiTransition {
+  "worklet"
+  return reduceMainTabPagerRouteSync(
+    { committedIndex: state.committedIndex, epoch: state.epoch, pendingTapIndex: -1 },
+    routeIndex
+  )
 }
 
 /** App backgrounding or a cancelled gesture: return to the committed page. */
@@ -256,7 +314,7 @@ export function reduceMainTabPagerSettleToCommitted(
 ): MainTabPagerUiTransition {
   "worklet"
   return {
-    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1 },
+    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1, pendingTapIndex: state.pendingTapIndex },
     commitIndex: null,
     snap: true,
     interrupt: true
@@ -305,6 +363,16 @@ export function areMainTabPagerMountedPagesEqual(a: readonly boolean[], b: reado
   return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
+/** Mounted pages as one number the UI thread can read (bit `index` set = mounted). */
+export function getMainTabPagerMountedMask(mounted: readonly boolean[]): number {
+  return mounted.reduce((mask, isMounted, index) => (isMounted ? mask | (1 << index) : mask), 0)
+}
+
+export function isMainTabPageInMountedMask(mask: number, index: number): boolean {
+  "worklet"
+  return index >= 0 && (mask & (1 << index)) !== 0
+}
+
 // ── Accessibility ────────────────────────────────────────────────────────
 
 export interface MainTabPageAccessibility {
@@ -313,12 +381,12 @@ export interface MainTabPageAccessibility {
   pointerEvents: "auto" | "none"
 }
 
-/** Only the selected page is reachable by touch and assistive technology. */
-export function getMainTabPageAccessibility(
-  pageIndex: number,
-  selectedIndex: number
-): MainTabPageAccessibility {
-  const selected = pageIndex === selectedIndex
+/**
+ * Only the selected page is reachable by touch and assistive technology. It
+ * takes the page's own selection, not the selected index, so a tab change
+ * reaches only the two pages whose selection flips.
+ */
+export function getMainTabPageAccessibility(selected: boolean): MainTabPageAccessibility {
   return {
     accessibilityElementsHidden: !selected,
     importantForAccessibility: selected ? "auto" : "no-hide-descendants",

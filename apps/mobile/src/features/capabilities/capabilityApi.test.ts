@@ -145,6 +145,15 @@ test("capabilities never leak across production session tokens", () => {
   )
 })
 
+test("unresolved capabilities are one frozen object, so memoised pages keep equal props", () => {
+  const unresolved = { sessionToken: null, capabilities: createFailClosedCapabilityResolution().capabilities }
+  const first = getSessionScopedCapabilities(null, unresolved)
+  assert.equal(getSessionScopedCapabilities(null, unresolved), first)
+  assert.equal(getSessionScopedCapabilities("session-b", { ...unresolved, sessionToken: "session-a" }), first)
+  assert.equal(Object.isFrozen(first), true)
+  assert.equal(Object.values(first).every((value) => !value), true)
+})
+
 test("a stalled capability request fails closed instead of hanging", async (context) => {
   context.mock.timers.enable({ apis: ["setTimeout"] })
   let transportSignal: AbortSignal | null | undefined

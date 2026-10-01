@@ -151,7 +151,15 @@ test("the bottom bar belongs to the pager's slot screen, beneath every pushed ro
   assert.match(pager, /bottomBar\?: ReactNode/)
   // Outside the pager's gesture detector: a drag on the bar never moves pages.
   assert.match(pager, /<\/MainTabPagerGestureProvider>\s*\{bottomBar\}\s*<\/View>/)
-  assert.match(navigator, /<MainTabPager[\s\S]*?bottomBar=\{\s*<MainTabBottomBar\s+routeName=\{screenProps\.route\.name\}\s+chatCount=\{chatBadgeCount\}\s+onPress=\{handleBottomNavPress\}\s*\/>\s*\}/)
+  assert.match(navigator, /<MainTabPager[\s\S]*?bottomBar=\{\s*<MainTabBottomBar\s+routeName=\{screenProps\.route\.name\}\s+onPress=\{handleBottomNavPress\}\s*\/>\s*\}/)
+  // SYS-3: the bar reads the unread badge itself; the navigator never does.
+  assert.match(rootChrome, /const chatCount = useMainTabChatBadgeCount\(\)/)
+  assert.doesNotMatch(navigator, /useTotalUnreadCount|chatBadgeCount|useGlobalRealtime\(/)
+  // SYS-2: one stable page renderer reaches the memoised pages.
+  assert.match(navigator, /renderPage=\{renderPagerPage\}/)
+  assert.match(navigator, /const renderPagerPage = useCallback\(/)
+  assert.match(pager, /isSelected=\{index === selectedIndex\}/)
+  assert.doesNotMatch(pager, /selectedIndex=\{selectedIndex\}/)
   // The slot route name is always the selected tab, even while covered.
   assert.match(rootChrome, /export const MainTabBottomBar = memo\(/)
   assert.match(rootChrome, /const currentBottomNavKey = getBottomNavKeyForRoute\(routeName\) \?\? "discover"/)

@@ -15,7 +15,10 @@ import {
   getMainTabPageIndex,
   getMainTabPageNeighbours,
   getMainTabPageOpacity,
+  getMainTabPagerMountedMask,
+  isMainTabPageInMountedMask,
   isMainTabPageSwipeable,
+  reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
   reduceMainTabPagerSettled,
   reduceMainTabPagerSettleToCommitted,
@@ -255,7 +258,7 @@ function createHarness(initialRoute = "Lobby") {
       const index = pendingCommits.shift()!
       const routeName = resolveMainTabPagerCommitRoute(route, index)
       if (routeName === null) {
-        apply(reduceMainTabPagerRouteSync(ui, getMainTabPageIndex(route)))
+        apply(reduceMainTabPagerCommitRejected(ui, getMainTabPageIndex(route)))
         continue
       }
       dispatches.push(routeName)
@@ -269,8 +272,9 @@ function createHarness(initialRoute = "Lobby") {
     get position() { return position },
     dispatches,
     snaps,
-    tap(key: string) {
-      apply(reduceMainTabPagerTap(ui, MAIN_TAB_PAGES.findIndex((page) => page.key === key)))
+    /** `mounted`: whether the tapped page was visited before (the pager keeps it mounted). */
+    tap(key: string, mounted = true) {
+      apply(reduceMainTabPagerTap(ui, MAIN_TAB_PAGES.findIndex((page) => page.key === key), mounted))
     },
     release(target: number) {
       animation = { target, epoch: ui.epoch }
@@ -303,11 +307,49 @@ test("a tap and a swipe change the same selected-page state with one navigation 
   assert.equal(pager.ui.committedIndex, MYROOM)
 
   pager.tap("shop")
+  assert.deepEqual(pager.snaps, [SHOP], "a tap to a mounted page jumps at once, on the UI thread")
+  assert.equal(pager.position, SHOP)
+  assert.deepEqual(pager.dispatches, ["MyRoom"], "before navigation answered")
   pager.flushJs()
   assert.deepEqual(pager.dispatches, ["MyRoom", "CosmeticShop"])
-  assert.deepEqual(pager.snaps, [SHOP], "a tap jumps once, after navigation selected the page")
+  assert.deepEqual(pager.snaps, [SHOP], "the tap's own route sync does not move the pager again")
   assert.equal(pager.position, SHOP)
+  assert.equal(pager.ui.pendingTapIndex, -1)
   assert.equal(getBottomNavKeyForRoute(pager.route), MAIN_TAB_PAGES[pager.ui.committedIndex]!.key)
+})
+
+test("a tap to a never-visited page waits for the route that mounts it", () => {
+  const pager = createHarness("Lobby")
+  pager.tap("shop", false)
+  assert.deepEqual(pager.snaps, [], "no jump to an empty page")
+  assert.equal(pager.position, DISCOVER)
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, ["CosmeticShop"])
+  assert.deepEqual(pager.snaps, [SHOP])
+  assert.equal(pager.position, SHOP)
+})
+
+test("a tap whose page another source already selected commits nothing", () => {
+  const pager = createHarness("Lobby")
+  pager.tap("chats")
+  assert.equal(pager.position, CHATS)
+  // A notification opened Chats before the tap's commit ran: the commit is
+  // rejected (the slot already shows Chats) and the pager stays put.
+  pager.external("Inbox")
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, [], "nothing to navigate")
+  assert.equal(pager.position, CHATS)
+  assert.equal(pager.ui.pendingTapIndex, -1)
+})
+
+test("a commit rejected while the slot shows another page returns the pager to it", () => {
+  const state = { committedIndex: SHOP, epoch: 4, pendingTapIndex: SHOP }
+  assert.deepEqual(reduceMainTabPagerCommitRejected(state, MYROOM), {
+    state: { committedIndex: MYROOM, epoch: 5, pendingTapIndex: -1 },
+    commitIndex: null,
+    snap: true,
+    interrupt: true
+  })
 })
 
 test("a returned swipe publishes nothing", () => {
@@ -324,11 +366,13 @@ test("rapid bottom-bar taps retarget to the latest tap", () => {
   pager.tap("chats")
   pager.tap("myroom")
   pager.tap("shop")
+  assert.deepEqual(pager.snaps, [CHATS, MYROOM, SHOP], "each tap shows its page at once")
   pager.flushJs()
   assert.equal(pager.route, "CosmeticShop")
   assert.equal(pager.position, SHOP)
   assert.equal(pager.ui.committedIndex, SHOP)
   assert.deepEqual(pager.dispatches, ["Inbox", "MyRoom", "CosmeticShop"], "each distinct tap navigates once")
+  assert.deepEqual(pager.snaps, [CHATS, MYROOM, SHOP], "earlier commits landing later never pull the pager back")
 })
 
 test("a tap during a settle cancels it so the settle can never commit afterwards", () => {
@@ -392,12 +436,27 @@ test("reducers keep the committed page and epoch rules explicit", () => {
   assert.deepEqual(reduceMainTabPagerSettled(state, CHATS), { state, commitIndex: null, snap: false, interrupt: false })
   assert.deepEqual(reduceMainTabPagerRouteSync(state, CHATS), { state, commitIndex: null, snap: false, interrupt: false })
   assert.deepEqual(reduceMainTabPagerRouteSync(state, -1).snap, false)
-  assert.deepEqual(reduceMainTabPagerTap(state, CHATS), {
-    state: { committedIndex: CHATS, epoch: 1 },
+  assert.deepEqual(reduceMainTabPagerTap(state, CHATS, true), {
+    state: { committedIndex: CHATS, epoch: 1, pendingTapIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
   }, "tapping the committed page only settles an interrupted pager")
+  assert.deepEqual(reduceMainTabPagerTap(state, SHOP, true), {
+    state: { committedIndex: SHOP, epoch: 1, pendingTapIndex: SHOP },
+    commitIndex: SHOP,
+    snap: true,
+    interrupt: true
+  }, "a mounted page is shown at once and committed once")
+  assert.deepEqual(reduceMainTabPagerTap(state, SHOP, false), {
+    state: { committedIndex: CHATS, epoch: 1, pendingTapIndex: -1 },
+    commitIndex: SHOP,
+    snap: false,
+    interrupt: true
+  }, "a never-visited page waits for navigation")
+  const pending = { committedIndex: SHOP, epoch: 1, pendingTapIndex: SHOP }
+  assert.deepEqual(reduceMainTabPagerRouteSync(pending, MYROOM).snap, false, "an earlier tap's commit is ignored")
+  assert.deepEqual(reduceMainTabPagerRouteSync(pending, SHOP).state.pendingTapIndex, -1, "its own commit clears it")
   assert.equal(resolveMainTabPagerCommitRoute("Inbox", CHATS), null)
   assert.equal(resolveMainTabPagerCommitRoute("Inbox", MYROOM), "MyRoom")
   assert.equal(resolveMainTabPagerCommitRoute(undefined, MYROOM), null)
@@ -417,7 +476,7 @@ test("every swipeable page stays visible so a drag reveals its neighbour", () =>
 test("only the selected page is exposed to touch and accessibility, matching the bottom bar", () => {
   for (const [selectedIndex, selected] of MAIN_TAB_PAGES.entries()) {
     const exposed = MAIN_TAB_PAGES.filter((_, index) => {
-      const a11y = getMainTabPageAccessibility(index, selectedIndex)
+      const a11y = getMainTabPageAccessibility(index === selectedIndex)
       return !a11y.accessibilityElementsHidden &&
         a11y.importantForAccessibility === "auto" &&
         a11y.pointerEvents === "auto"
@@ -427,7 +486,7 @@ test("only the selected page is exposed to touch and accessibility, matching the
     assert.equal(getBottomNavKeyForRoute(selected.routeName), selected.key)
     for (const [index] of MAIN_TAB_PAGES.entries()) {
       if (index === selectedIndex) continue
-      assert.deepEqual(getMainTabPageAccessibility(index, selectedIndex), {
+      assert.deepEqual(getMainTabPageAccessibility(index === selectedIndex), {
         accessibilityElementsHidden: true,
         importantForAccessibility: "no-hide-descendants",
         pointerEvents: "none"
@@ -437,6 +496,16 @@ test("only the selected page is exposed to touch and accessibility, matching the
 })
 
 // ── Mount policy ──────────────────────────────────────────────────────
+
+test("the mounted-page mask tells the UI thread which tapped page can be shown at once", () => {
+  const mask = getMainTabPagerMountedMask([true, false, false, true])
+  assert.equal(isMainTabPageInMountedMask(mask, DISCOVER), true)
+  assert.equal(isMainTabPageInMountedMask(mask, CHATS), false)
+  assert.equal(isMainTabPageInMountedMask(mask, MYROOM), false)
+  assert.equal(isMainTabPageInMountedMask(mask, SHOP), true)
+  assert.equal(isMainTabPageInMountedMask(mask, -1), false)
+  assert.equal(getMainTabPagerMountedMask([]), 0)
+})
 
 test("pages mount lazily; visited pages stay; neighbours only when asked", () => {
   let mounted = resolveMainTabPagerMountedPages({ mounted: [], selectedIndex: DISCOVER, includeNeighbours: false })

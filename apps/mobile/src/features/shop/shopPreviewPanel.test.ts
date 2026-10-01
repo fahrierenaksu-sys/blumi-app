@@ -231,7 +231,8 @@ test("room VNext QA stays isolated from the approved Shop presentation", () => {
     "utf8"
   )
   assert.match(mainTabPageSource, /roomFurnitureCatalog=\{undefined\}/)
-  assert.match(mainTabPageSource, /qaOnlyOwnedRoomItemIds=\{\[\]\}/)
+  assert.match(mainTabPageSource, /qaOnlyOwnedRoomItemIds=\{NO_QA_OWNED_ROOM_ITEM_IDS\}/)
+  assert.match(mainTabPageSource, /NO_QA_OWNED_ROOM_ITEM_IDS: readonly string\[\] = Object\.freeze\(\[\]\)/)
   assert.match(mainTabPageSource, /isRoomCatalogQaPreview=\{false\}/)
   assert.match(mainTabPageSource, /initialShopMode=\{undefined\}/)
   assert.doesNotMatch(mainTabPageSource, /ROOM_V3_QA_INTERACTION_CATALOG/)

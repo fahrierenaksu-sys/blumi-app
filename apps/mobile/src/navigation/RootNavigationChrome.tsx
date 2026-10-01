@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useRef, useSyncExternalStore } from "react"
 import { StyleSheet, View } from "react-native"
 import type { SessionActor } from "../features/session/sessionModel"
 import { CurrentSceneAssetWarmup } from "../features/performance/CurrentSceneAssetWarmup"
-import { BottomNav, type BottomNavKey } from "../ui/bottomNav"
+import { BottomNav, type BottomNavKey, type BottomNavProps } from "../ui/bottomNav"
 import { getBottomNavReturnPresentation } from "./bottomNavReturnPreview"
 import { MAIN_TAB_PAGER_ENABLED } from "./mainTabPager/mainTabPagerConfig"
 import { getBottomNavKeyForRoute } from "./rootNavigationModel"
@@ -11,16 +11,25 @@ import {
   subscribeToRootNavigationChrome
 } from "./rootNavigationChromeStore"
 import type { RootStackParamList } from "./RootNavigator"
+import { useMainTabChatBadgeCount } from "./useMainTabChatBadgeCount"
 
 interface RootNavigationChromeProps {
   navigatorKey: string
   sessionActor: SessionActor | null
   sessionEntryRoute: string
   isAccountRestricted: boolean
-  chatCount: number
   isFullShopCatalogQaPreview: boolean
   onBottomNavPress: (key: BottomNavKey) => void
 }
+
+/**
+ * The bottom bar with its Chats badge read here: an unread change re-renders
+ * only the bar, not the navigator, the pager pages or pushed screens.
+ */
+const BadgedBottomNav = memo(function BadgedBottomNav(props: Omit<BottomNavProps, "chatCount">) {
+  const chatCount = useMainTabChatBadgeCount()
+  return <BottomNav {...props} chatCount={chatCount} />
+})
 
 /**
  * Root chrome drawn above the native stack: the current-scene asset warmup
@@ -35,7 +44,6 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
   sessionActor,
   sessionEntryRoute,
   isAccountRestricted,
-  chatCount,
   isFullShopCatalogQaPreview,
   onBottomNavPress
 }: RootNavigationChromeProps) {
@@ -90,9 +98,8 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
           importantForAccessibility={earlyReturnNavVisualOnly ? "no-hide-descendants" : "auto"}
           style={StyleSheet.absoluteFill}
         >
-          <BottomNav
+          <BadgedBottomNav
             currentKey={currentBottomNavKey ?? lastBottomNavKeyRef.current}
-            chatCount={chatCount}
             onPress={onBottomNavPress}
             visible={bottomNavRoutePresentation.visible}
             appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
@@ -106,7 +113,6 @@ export const RootNavigationChrome = memo(function RootNavigationChrome({
 interface MainTabBottomBarProps {
   /** The pager slot route name: always the selected main tab. */
   routeName: string
-  chatCount: number
   onPress: (key: BottomNavKey) => void
 }
 
@@ -118,15 +124,13 @@ interface MainTabBottomBarProps {
  */
 export const MainTabBottomBar = memo(function MainTabBottomBar({
   routeName,
-  chatCount,
   onPress
 }: MainTabBottomBarProps) {
   const currentBottomNavKey = getBottomNavKeyForRoute(routeName) ?? "discover"
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <BottomNav
+      <BadgedBottomNav
         currentKey={currentBottomNavKey}
-        chatCount={chatCount}
         onPress={onPress}
         appearance={currentBottomNavKey === "discover" ? "ambient" : "default"}
       />
