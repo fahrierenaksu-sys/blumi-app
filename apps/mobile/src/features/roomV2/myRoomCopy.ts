@@ -145,6 +145,7 @@ export interface MyRoomEditorCopy {
     tapCheckToPlace: string
     releaseToPlace: string
     alreadyPlaced: string
+    lockedInShop: string
     unsupportedDirection: string
     unavailableRotation: string
     chooseClearSpot: string
@@ -234,6 +235,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
       tapCheckToPlace: "Tap the check to place it here.",
       releaseToPlace: "Release to place.",
       alreadyPlaced: "You already placed this room piece.",
+      lockedInShop: "Get this piece in the Shop to place it.",
       unsupportedDirection: "This item does not support that direction.",
       unavailableRotation: "This item cannot be rendered in that rotation.",
       chooseClearSpot: "Choose a clear room spot.",
@@ -321,6 +323,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
       tapCheckToPlace: "Buraya yerleştirmek için onaya dokun.",
       releaseToPlace: "Yerleştirmek için bırak.",
       alreadyPlaced: "Bu eşya zaten odanda.",
+      lockedInShop: "Bu eşyayı yerleştirmek için önce Mağaza'dan al.",
       unsupportedDirection: "Bu eşya o yönü desteklemiyor.",
       unavailableRotation: "Bu eşya o yönde gösterilemiyor.",
       chooseClearSpot: "Odada açık bir nokta seç.",
