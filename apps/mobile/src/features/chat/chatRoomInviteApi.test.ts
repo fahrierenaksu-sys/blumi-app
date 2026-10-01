@@ -183,7 +183,42 @@ test("room invite API decides and cancels using authenticated actions", async ()
 
   assert.equal(decided.status, "accepted")
   assert.equal(decided.roomSessionId, "mini_room_one")
+  assert.equal(decided.readyRoom, undefined, "an answer without a room falls back to joining")
   assert.equal(cancelled.status, "cancelled")
+})
+
+test("an acceptance answer carries the ready room so the room opens without a join request", async () => {
+  const room = {
+    miniRoom: {
+      miniRoomId: "mini_room_one",
+      lobbyRoomId: "thread_one",
+      sourceThreadId: "thread_one",
+      participantUserIds: ["user_one", "user_two"],
+      livekitRoomName: "blumi-mini-room"
+    },
+    mediaSession: {
+      miniRoomId: "mini_room_one",
+      token: ["opaque", "media", "fixture"].join("-"),
+      livekitUrl: "wss://livekit.example.test",
+      issuedAt: "2026-07-21T10:02:00.000Z"
+    },
+    participants: [
+      { userId: "user_one", displayName: "Mina", avatar: {} },
+      { userId: "user_two", displayName: "Defne", avatar: {} }
+    ]
+  }
+  const accepted = { ...invite, status: "accepted", roomSessionId: "mini_room_one" }
+  const decided = await decideThreadRoomInvite("http://localhost:4000", "session_token", "invite_one", "accepted",
+    (async () => createJsonResponse(200, { invite: accepted, decision: {}, ...room })) as typeof fetch)
+  assert.equal(decided.readyRoom?.miniRoom.miniRoomId, "mini_room_one")
+  assert.equal(decided.readyRoom?.participants[1]?.displayName, "Defne")
+  assert.equal(decided.readyRoom?.mediaSession.livekitUrl, "wss://livekit.example.test")
+
+  // A partial room in the answer is ignored instead of opening a broken room.
+  const partial = await decideThreadRoomInvite("http://localhost:4000", "session_token", "invite_one", "accepted",
+    (async () => createJsonResponse(200, { invite: accepted, miniRoom: room.miniRoom })) as typeof fetch)
+  assert.equal(partial.readyRoom, undefined)
+  assert.equal(partial.status, "accepted")
 })
 
 test("room invite API joins an accepted session only with a server-issued room payload", async () => {

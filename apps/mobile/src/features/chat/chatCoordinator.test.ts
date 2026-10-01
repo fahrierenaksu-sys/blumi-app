@@ -270,6 +270,28 @@ test("hydrates and immutably updates room invites through the chat coordinator",
   ])
 })
 
+test("an accepted invite opens the room from the decision answer without a second join request", async () => {
+  let joins = 0
+  const decided = { ...invite, status: "accepted" as const, roomSessionId: "room_1" }
+  const dependencies = createDependencies({
+    decideThreadRoomInvite: async () => ({ ...decided, readyRoom: roomReady }),
+    joinRoomSession: async () => {
+      joins += 1
+      return roomReady
+    }
+  })
+  const coordinator = createChatCoordinator(dependencies)
+
+  await coordinator.handleRoomInviteAction({ type: "accept", inviteId: "invite_1" })
+
+  // The decision already carries the room, participants and media session;
+  // a second join round trip only delayed the room (latency audit 2026-10-01).
+  assert.equal(joins, 0)
+  assert.deepEqual(dependencies.openedRooms, [roomReady])
+  assert.deepEqual(dependencies.roomInvites, [decided], "the stored invite carries no room payload")
+  assert.deepEqual(dependencies.analyticsEvents, ["room_invite_accepted"])
+})
+
 test("loads invitations before slow message history and shares in-flight history and invite requests", async () => {
   let finishHistory: ((value: ChatMessageList) => void) | undefined
   let finishInvites: ((value: ChatRoomInviteTimelineItem[]) => void) | undefined

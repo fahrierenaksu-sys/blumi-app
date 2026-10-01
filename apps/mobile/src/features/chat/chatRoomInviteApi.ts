@@ -113,6 +113,15 @@ export async function createThreadRoomInvite(
   return normalizeInviteResponse(payload)
 }
 
+/**
+ * The decided invite. An acceptance also carries the ready room (room,
+ * participants and this user's media session) so it opens without a second
+ * join request; it is absent for a decline or an older server.
+ */
+export type RoomInviteDecisionResult = ChatRoomInviteTimelineItem & {
+  readyRoom?: RoomSessionJoinResult
+}
+
 export async function decideThreadRoomInvite(
   baseHttpUrl: string,
   sessionToken: string,
@@ -120,7 +129,7 @@ export async function decideThreadRoomInvite(
   status: RoomInviteDecision,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal
-): Promise<ChatRoomInviteTimelineItem> {
+): Promise<RoomInviteDecisionResult> {
   const { response, payload } = await requestJson(
     baseHttpUrl,
     `/v1/room-invites/${encodeURIComponent(inviteId)}/decision`,
@@ -135,7 +144,19 @@ export async function decideThreadRoomInvite(
   if (!response.ok) {
     throw new Error(getApiErrorMessage(payload, "That room invitation is no longer available."))
   }
-  return normalizeInviteResponse(payload)
+  const decided = normalizeInviteResponse(payload)
+  const readyRoom = readDecisionReadyRoom(payload)
+  return readyRoom ? { ...decided, readyRoom } : decided
+}
+
+/** A malformed or partial room in the answer falls back to the join request. */
+function readDecisionReadyRoom(payload: unknown): RoomSessionJoinResult | undefined {
+  if (!payload || typeof payload !== "object" || !("miniRoom" in payload)) return undefined
+  try {
+    return normalizeRoomSessionJoinPayload(payload)
+  } catch {
+    return undefined
+  }
 }
 
 export async function cancelThreadRoomInvite(
