@@ -28,6 +28,51 @@ export interface TestPersona {
   replies: string[]
 }
 
+/** The part of a thread a send needs: participants never change after creation. */
+export type ChatThreadMembers = Pick<ChatThread, "threadId" | "participantUserIds">
+
+/** Block lookups the in-memory store consults; PostgreSQL reads blumi_safety_blocks. */
+export interface ChatRepositoryBlockSource {
+  hasBlockBetween(userAId: string, userBId: string): Promise<boolean>
+}
+
+export interface ChatCheckedSendInput {
+  /** Already normalized (body) and with its final id and time. */
+  message: ChatMessage
+  /** Already normalized. */
+  clientMessageId?: string
+  /** A created message's outbox job is leased to the caller until then. */
+  leaseUntil: Date
+}
+
+/**
+ * The outcome of `sendMessageChecked`, decided atomically with the write:
+ * - `unavailable`: no such thread, or the sender is not a participant.
+ * - `blocked`: a block exists between the sender and another participant;
+ *   nothing was written. `retryOf` is the sender's committed message with
+ *   the same client message ID, if any.
+ * - `created`: the message, its thread preview and its leased outbox job
+ *   were written. `recipientPersonas` are the other participants' test
+ *   personas (the delivery replies for them).
+ * - `retried`: the client message ID was used before; the stored message is
+ *   returned (`idempotencyConflict` when its body differs). A same-body retry
+ *   repairs the preview and outbox exactly like `createMessage`.
+ * - `raced`: a concurrent send with the same client message ID committed
+ *   first, after this statement's snapshot; the caller retries stepwise.
+ */
+export type ChatCheckedSendResult =
+  | { outcome: "unavailable" }
+  | { outcome: "blocked"; retryOf?: ChatMessage }
+  | {
+      outcome: "created"
+      message: ChatMessage
+      participantUserIds: [string, string]
+      job: { leaseToken: string; attempt: number }
+      recipientPersonas: TestPersona[]
+    }
+  | { outcome: "retried"; message: ChatMessage; participantUserIds: [string, string]; idempotencyConflict?: true }
+  | { outcome: "raced" }
+
 /** One participant's receipt cursors and privacy setting in one thread. */
 export interface ChatReceiptParticipant {
   threadId: string
@@ -77,6 +122,14 @@ export interface ChatRepository {
     message: ChatMessage,
     clientMessageId?: string
   ): Promise<ChatMessageCreateResult>
+  /**
+   * The whole send in one database round trip (2026-10-01): thread and
+   * participant check, block check, idempotent insert, thread preview and
+   * the outbox job, leased to the caller so its inline delivery needs no
+   * claim. A thread whose participant rows are not exactly two throws, like
+   * `findThread`.
+   */
+  sendMessageChecked(input: ChatCheckedSendInput): Promise<ChatCheckedSendResult>
   updateThreadLastMessage(threadId: string, message: ChatMessage): Promise<void>
   /**
    * Moves the reader's unread cursor forward, never back. With
@@ -88,6 +141,8 @@ export interface ChatRepository {
   advanceReadCursor(input: { threadId: string; userId: string } & ChatReadTarget): Promise<ChatReadAdvance | null>
   claimDeliveries(input: { now: Date; limit: number; leaseMs: number; messageId?: string }): Promise<ChatDeliveryJob[]>
   completeDelivery(messageId: string, leaseToken: string, now: Date): Promise<void>
+  /** Extends a lease the caller still holds; false when it was lost (another dispatcher owns the job). */
+  renewDeliveryLease(messageId: string, leaseToken: string, leaseUntil: Date): Promise<boolean>
   retryDelivery(messageId: string, leaseToken: string, availableAt: Date): Promise<void>
   /**
    * False until migration 070 is applied. Before that the receipt methods
@@ -139,14 +194,34 @@ export function createInMemoryChatStore(): InMemoryChatStore {
 
 export function createInMemoryChatRepository(
   store: InMemoryChatStore = createInMemoryChatStore(),
-  options: { receiptsSupported?: boolean } = {}
+  options: { receiptsSupported?: boolean; blockSource?: ChatRepositoryBlockSource } = {}
 ): ChatRepository {
   const receiptsSupported = options.receiptsSupported ?? true
+  const blockSource = options.blockSource
   const cursorKey = (threadId: string, userId: string) => `${threadId}\0${userId}`
   const cursorsOf = (threadId: string, userId: string): InMemoryParticipantCursors =>
     store.cursorsByParticipant.get(cursorKey(threadId, userId)) ?? {}
   const isParticipant = (threadId: string, userId: string) =>
     store.threads.get(threadId)?.participantUserIds.includes(userId) === true
+  /** Message, preview and outbox job together, synchronously (one SQL statement's worth). */
+  const insertMessage = (
+    message: ChatMessage,
+    key: string | undefined,
+    job: { availableAt: number; attempt: number; leaseToken?: string }
+  ) => {
+    const thread = store.threads.get(message.threadId)
+    if (!thread) throw new Error("Chat thread is missing.")
+    const messages = store.messagesByThread.get(message.threadId) ?? []
+    store.messagesByThread.set(message.threadId, [
+      ...messages.map((existing) => ({ ...existing })),
+      { ...message }
+    ])
+    if (key) store.messagesByClientMessageId.set(key, { ...message })
+    if (!thread.lastMessage || compareChatMessagesAscending(thread.lastMessage, message) <= 0) {
+      store.threads.set(message.threadId, { ...cloneThread(thread), lastMessage: { ...message } })
+    }
+    store.deliveryJobs.set(message.messageId, { message: { ...message }, ...job })
+  }
   const findPartnerMessage = (threadId: string, userId: string, messageId: string) =>
     (store.messagesByThread.get(threadId) ?? []).find((message) =>
       message.messageId === messageId && message.senderUserId !== userId)
@@ -214,21 +289,41 @@ export function createInMemoryChatRepository(
           ...(existing.body !== message.body ? { idempotencyConflict: true as const } : {})
         }
       }
-      const thread = store.threads.get(message.threadId)
-      if (!thread) throw new Error("Chat thread is missing.")
-      const messages = store.messagesByThread.get(message.threadId) ?? []
-      store.messagesByThread.set(message.threadId, [
-        ...messages.map((existing) => ({ ...existing })),
-        { ...message }
-      ])
-      if (key) store.messagesByClientMessageId.set(key, { ...message })
-      if (!thread.lastMessage || compareChatMessagesAscending(thread.lastMessage, message) <= 0) {
-        store.threads.set(message.threadId, { ...cloneThread(thread), lastMessage: { ...message } })
-      }
-      store.deliveryJobs.set(message.messageId, {
-        message: { ...message }, availableAt: Date.now(), attempt: 0
-      })
+      insertMessage(message, key, { availableAt: Date.now(), attempt: 0 })
       return { message: { ...message }, created: true }
+    },
+    async sendMessageChecked({ message, clientMessageId, leaseUntil }) {
+      const thread = store.threads.get(message.threadId)
+      if (!thread || !thread.participantUserIds.includes(message.senderUserId)) return { outcome: "unavailable" }
+      const participantUserIds = [...thread.participantUserIds] as [string, string]
+      const partnerUserIds = participantUserIds.filter((userId) => userId !== message.senderUserId)
+      const blocked = blockSource
+        ? (await Promise.all(partnerUserIds.map((userId) => blockSource.hasBlockBetween(message.senderUserId, userId)))).some(Boolean)
+        : false
+      // Everything below is synchronous, so it is atomic like the SQL statement.
+      const key = clientMessageId
+        ? messageIdempotencyKey(message.threadId, message.senderUserId, clientMessageId)
+        : undefined
+      const prior = key ? store.messagesByClientMessageId.get(key) : undefined
+      if (blocked) return prior ? { outcome: "blocked", retryOf: { ...prior } } : { outcome: "blocked" }
+      if (prior) {
+        return {
+          outcome: "retried",
+          message: { ...prior },
+          participantUserIds,
+          ...(prior.body !== message.body ? { idempotencyConflict: true as const } : {})
+        }
+      }
+      const leaseToken = randomUUID()
+      insertMessage(message, key, { availableAt: leaseUntil.getTime(), attempt: 1, leaseToken })
+      const personas = await Promise.all(partnerUserIds.map((userId) => this.findTestPersona(userId)))
+      return {
+        outcome: "created",
+        message: { ...message },
+        participantUserIds,
+        job: { leaseToken, attempt: 1 },
+        recipientPersonas: personas.filter((persona): persona is TestPersona => persona !== null)
+      }
     },
     async updateThreadLastMessage(threadId, message) {
       const thread = store.threads.get(threadId)
@@ -280,6 +375,12 @@ export function createInMemoryChatRepository(
     async completeDelivery(messageId, leaseToken) {
       const job = store.deliveryJobs.get(messageId)
       if (job?.leaseToken === leaseToken) store.deliveryJobs.set(messageId, { ...job, completed: true })
+    },
+    async renewDeliveryLease(messageId, leaseToken, leaseUntil) {
+      const job = store.deliveryJobs.get(messageId)
+      if (job?.leaseToken !== leaseToken || job.completed) return false
+      store.deliveryJobs.set(messageId, { ...job, availableAt: leaseUntil.getTime() })
+      return true
     },
     async retryDelivery(messageId, leaseToken, availableAt) {
       const job = store.deliveryJobs.get(messageId)

@@ -1,10 +1,10 @@
-import type { ChatMessage, ChatThread } from "@blumi/contracts"
+import type { ChatMessage } from "@blumi/contracts"
 import type { ChatService } from "./chatService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import type { SafetyService } from "../safety/safetyService"
 import { PublicRequestError } from "../errors/publicRequestError"
-import type { ChatDeliveryJob } from "./chatRepository"
+import type { ChatDeliveryJob, ChatThreadMembers, TestPersona } from "./chatRepository"
 import { createChatLatencyDiagnostics, type ChatPhaseMeasure } from "./chatLatencyDiagnostics"
 
 export class ChatDeliveryBlockedError extends PublicRequestError {}
@@ -27,6 +27,8 @@ export function createChatMessageDeliveryService(options: {
   notificationService: NotificationService
   reportError?: (error: unknown) => void
   measure?: ChatPhaseMeasure
+  /** A send-leased dispatch that waited longer than this renews its lease first (tests shorten it). */
+  leaseRenewAfterMs?: number
 }): ChatMessageDeliveryService {
   const {
     chatService,
@@ -34,6 +36,7 @@ export function createChatMessageDeliveryService(options: {
     connectionManager,
     notificationService
   } = options
+  const leaseRenewAfterMs = options.leaseRenewAfterMs ?? LEASE_RENEW_AFTER_MS
   const measure = options.measure ?? createChatLatencyDiagnostics({
     nodeEnv: process.env.NODE_ENV ?? "unknown",
     enabled: process.env.BLUMI_CHAT_LATENCY_DIAGNOSTICS === "1"
@@ -41,19 +44,22 @@ export function createChatMessageDeliveryService(options: {
 
   const dispatchPostPersistEffects = async (
     message: ChatMessage,
-    thread: ChatThread,
-    recipientUserIds: string[]
+    thread: ChatThreadMembers,
+    recipientUserIds: string[],
+    leased?: { job: { leaseToken: string; attempt: number }; leaseUntil: number; recipientPersonas: TestPersona[] }
   ): Promise<void> => {
-    const threadId = thread.threadId
     try {
-      await dispatchDue(new Date(), message.messageId, thread)
+      if (leased) await dispatchLeased(message, thread, leased.job, leased.leaseUntil)
+      else await dispatchDue(new Date(), message.messageId, thread)
     } catch (error) {
       options.reportError?.(error)
     }
 
     for (const recipientUserId of recipientUserIds) {
       try {
-        const persona = await chatService.repository.findTestPersona(recipientUserId)
+        const persona = leased
+          ? leased.recipientPersonas.find((candidate) => candidate.userId === recipientUserId) ?? null
+          : await chatService.repository.findTestPersona(recipientUserId)
         if (!persona?.replies.length) continue
         const replyIndex = stableReplyIndex(message.messageId, persona.replies.length)
         const reply = await chatService.sendMessageInThread(
@@ -73,64 +79,123 @@ export function createChatMessageDeliveryService(options: {
   return {
     async dispatchDue(now = new Date()) { await dispatchDue(now) },
     async sendMessage(input) {
-      const thread = await chatService.repository.findThread(input.threadId)
-      if (!thread || !thread.participantUserIds.includes(input.senderUserId)) {
-        throw new PublicRequestError("That conversation is not available.")
-      }
-
-      const recipientUserIds = thread.participantUserIds.filter(
-        (userId) => userId !== input.senderUserId
-      )
-      const blocked = await Promise.all(
-        recipientUserIds.map((userId) =>
-          safetyService.hasBlockBetween(input.senderUserId, userId)
-        )
-      )
-      if (blocked.some(Boolean)) {
-        const committedRetry = input.clientMessageId
-          ? await chatService.findIdempotentMessage(
-            input.senderUserId,
-            input.threadId,
-            input.body,
-            input.clientMessageId
-          )
-          : null
-        if (committedRetry) return { message: committedRetry, created: false }
-        // Same message as a thread the sender is not in: a block hides the
-        // thread from both users and must not be revealed by the answer.
-        throw new ChatDeliveryBlockedError("That conversation is not available.")
-      }
-
-      // The thread read above is reused for persistence and the inline
-      // dispatch (participants never change after creation), so a send reads
-      // it once instead of three times. The block check at dispatch stays: it
-      // guards a block that lands while the message is being persisted.
-      const delivery = await measure("persist", () => chatService.sendMessageInThread(
-        thread,
-        input.senderUserId,
-        input.body,
-        input.clientMessageId
-      ))
-      // The persisted message plus durable outbox row is the send ACK. Push/realtime
-      // fanout and synthetic test-persona replies must not delay that confirmation.
-      // The periodic worker recovers the outbox if this process exits mid-dispatch.
-      // Serialized per thread, in persist order, so a slower dispatch of an
-      // earlier message is never overtaken by the next one (live order).
-      void enqueueThreadDispatch(chatService, thread.threadId, () => dispatchPostPersistEffects(
-        delivery.message,
-        thread,
-        recipientUserIds
+      // One statement checks, persists and leases the outbox job (2026-10-01:
+      // was thread, participants, two block reads, the insert and a claim).
+      const startedAt = new Date()
+      const checked = await measure("persist", () => chatService.sendMessageChecked({
+        userId: input.senderUserId,
+        threadId: input.threadId,
+        body: input.body,
+        clientMessageId: input.clientMessageId,
+        leaseMs: DELIVERY_LEASE_MS,
+        now: startedAt
+      }))
+      if (checked.kind === "stepwise") return sendMessageStepwise(input)
+      // Same message as a thread the sender is not in: a block hides the
+      // thread from both users and must not be revealed by the answer.
+      if (checked.kind === "blocked") throw new ChatDeliveryBlockedError("That conversation is not available.")
+      if (checked.kind === "answered") return { message: checked.message, created: false }
+      const { message, members } = checked
+      const recipientUserIds = members.participantUserIds.filter((userId) => userId !== input.senderUserId)
+      // The persisted message plus durable outbox row is the send ACK; the
+      // dispatch below is serialized per thread, as in the stepwise path.
+      void enqueueThreadDispatch(chatService, members.threadId, () => dispatchPostPersistEffects(
+        message,
+        members,
+        recipientUserIds,
+        checked.job
+          ? { job: checked.job, leaseUntil: startedAt.getTime() + DELIVERY_LEASE_MS, recipientPersonas: checked.recipientPersonas ?? [] }
+          : undefined
       )).catch((error) => options.reportError?.(error))
-      return delivery
+      return { message, created: checked.created }
     }
   }
 
-  async function dispatchDue(now: Date, messageId?: string, knownThread?: ChatThread): Promise<void> {
-    const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: 30_000, messageId })
+  /**
+   * The send as separate reads and a write: for input the one-statement path
+   * refuses (its errors keep their precedence behind the conversation and
+   * block checks) and for a concurrent first send of the same client message ID.
+   */
+  async function sendMessageStepwise(input: Parameters<ChatMessageDeliveryService["sendMessage"]>[0]) {
+    const thread = await chatService.repository.findThread(input.threadId)
+    if (!thread || !thread.participantUserIds.includes(input.senderUserId)) {
+      throw new PublicRequestError("That conversation is not available.")
+    }
+
+    const recipientUserIds = thread.participantUserIds.filter(
+      (userId) => userId !== input.senderUserId
+    )
+    const blocked = await Promise.all(
+      recipientUserIds.map((userId) =>
+        safetyService.hasBlockBetween(input.senderUserId, userId)
+      )
+    )
+    if (blocked.some(Boolean)) {
+      const committedRetry = input.clientMessageId
+        ? await chatService.findIdempotentMessage(
+          input.senderUserId,
+          input.threadId,
+          input.body,
+          input.clientMessageId
+        )
+        : null
+      if (committedRetry) return { message: committedRetry, created: false }
+      // Same message as a thread the sender is not in: a block hides the
+      // thread from both users and must not be revealed by the answer.
+      throw new ChatDeliveryBlockedError("That conversation is not available.")
+    }
+
+    // The thread read above is reused for persistence and the inline
+    // dispatch (participants never change after creation), so a send reads
+    // it once instead of three times. The block check at dispatch stays: it
+    // guards a block that lands while the message is being persisted.
+    const delivery = await measure("persist", () => chatService.sendMessageInThread(
+      thread,
+      input.senderUserId,
+      input.body,
+      input.clientMessageId
+    ))
+    // The persisted message plus durable outbox row is the send ACK. Push/realtime
+    // fanout and synthetic test-persona replies must not delay that confirmation.
+    // The periodic worker recovers the outbox if this process exits mid-dispatch.
+    // Serialized per thread, in persist order, so a slower dispatch of an
+    // earlier message is never overtaken by the next one (live order).
+    void enqueueThreadDispatch(chatService, thread.threadId, () => dispatchPostPersistEffects(
+      delivery.message,
+      thread,
+      recipientUserIds
+    )).catch((error) => options.reportError?.(error))
+    return delivery
+  }
+
+  async function dispatchDue(now: Date, messageId?: string, knownThread?: ChatThreadMembers): Promise<void> {
+    const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: DELIVERY_LEASE_MS, messageId })
     await Promise.all(jobs.map((job) => dispatchJob(job, now, knownThread)))
   }
 
-  async function dispatchJob(job: ChatDeliveryJob, now: Date, knownThread?: ChatThread): Promise<void> {
+  /**
+   * Dispatches a job the send statement leased to this process. A dispatch
+   * that waited (a saturated pool or slower dispatches ahead on its thread)
+   * first renews the lease, so it always starts with at least two thirds of
+   * a lease, close to the full lease a claim gives; a lost lease means the
+   * outbox worker took the job over and delivers it instead.
+   */
+  async function dispatchLeased(
+    message: ChatMessage,
+    thread: ChatThreadMembers,
+    lease: { leaseToken: string; attempt: number },
+    leaseUntil: number
+  ): Promise<void> {
+    const now = new Date()
+    if (leaseUntil - now.getTime() < DELIVERY_LEASE_MS - leaseRenewAfterMs) {
+      const renewed = await chatService.repository.renewDeliveryLease(
+        message.messageId, lease.leaseToken, new Date(now.getTime() + DELIVERY_LEASE_MS))
+      if (!renewed) return
+    }
+    await dispatchJob({ message, leaseToken: lease.leaseToken, attempt: lease.attempt }, now, thread)
+  }
+
+  async function dispatchJob(job: ChatDeliveryJob, now: Date, knownThread?: ChatThreadMembers): Promise<void> {
     const { message, leaseToken } = job
     try {
       const thread = knownThread?.threadId === message.threadId
@@ -159,6 +224,11 @@ export function createChatMessageDeliveryService(options: {
     }
   }
 }
+
+/** How long a claimed or send-leased outbox job belongs to its dispatcher. */
+const DELIVERY_LEASE_MS = 30_000
+/** A send-leased dispatch that waited longer than this renews its lease first. */
+const LEASE_RENEW_AFTER_MS = 10_000
 
 /**
  * Inline post-persist dispatch chains, per chat service (the HTTP route and the

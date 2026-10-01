@@ -3,6 +3,7 @@ import test from "node:test"
 import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresChatRepository } from "./postgresChatRepository"
+import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
 import { createChatService } from "../chat/chatService"
 import { ChatDeliveryBlockedError, createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
 import { createSafetyService } from "../safety/safetyService"
@@ -70,7 +71,8 @@ test("PostgreSQL ACK-loss retry after block returns the committed row without an
   const clientMessageId = "client-ack-blocked-001"
   const repository = createPostgresChatRepository(pool)
   const chatService = createChatService({ repository, idFactory: () => `message_${threadId}` })
-  const safetyService = createSafetyService()
+  // Production wiring: the chat send statement reads the same block table.
+  const safetyService = createSafetyService({ repository: createPostgresSafetyRepository(pool) })
   let fanoutCount = 0
   let signalFanout!: () => void
   const fanout = new Promise<void>((resolve) => { signalFanout = resolve })
@@ -127,5 +129,66 @@ test("PostgreSQL ACK-loss retry after block returns the committed row without an
     assert.equal(rows.rows.length, 1)
     assert.equal(outbox.rows.length, 1)
     assert.equal(fanoutCount, 1)
+  } finally { await pool.end() }
+})
+
+test("PostgreSQL one-statement send: personas, a lost first-insert race, repair of a retried message and a broken thread", {
+  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+}, async () => {
+  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 })
+  const repository = createPostgresChatRepository(pool)
+  const scope = randomUUID().slice(0, 8)
+  const [sender, persona] = [`user_sender_${scope}`, `user_persona_${scope}`]
+  const threadId = `thread_checked_${scope}`
+  const send = (messageId: string, body: string, clientMessageId?: string) => repository.sendMessageChecked({
+    message: { messageId, threadId, senderUserId: sender, body, sentAt: new Date().toISOString() },
+    ...(clientMessageId ? { clientMessageId } : {}),
+    leaseUntil: new Date(Date.now() + 30_000)
+  })
+  try {
+    for (const [index, userId] of [sender, persona].entries()) {
+      await pool.query(`INSERT INTO blumi_accounts (account_id, user_id, phone_number, created_at, updated_at)
+        VALUES ($1, $2, $3, now(), now())`, [`account_${userId}`, userId, `+1555${String(Date.now()).slice(-6)}${index}`])
+    }
+    await pool.query(`INSERT INTO blumi_test_personas (user_id, greeting, replies) VALUES ($1, 'Selam!', ARRAY['Kahve?', 'Olur'])`, [persona])
+    await repository.saveThread({ threadId, miniRoomId: `room_${scope}`, createdAt: new Date().toISOString(),
+      participantUserIds: [sender, persona], participants: [{ userId: sender }, { userId: persona }] })
+
+    // The recipient's persona comes back with a created message only.
+    const created = await send(`message_${scope}_1`, "hello", "client-checked-001")
+    assert.equal(created.outcome, "created")
+    assert.deepEqual(created.outcome === "created" ? created.recipientPersonas : [],
+      [{ userId: persona, greeting: "Selam!", replies: ["Kahve?", "Olur"] }])
+
+    // A retry repairs a missing outbox row and preview, exactly like createMessage.
+    await pool.query("DELETE FROM blumi_chat_delivery_outbox WHERE message_id = $1", [`message_${scope}_1`])
+    await pool.query("UPDATE blumi_chat_threads SET last_message_id = NULL, last_message_sent_at = NULL WHERE thread_id = $1", [threadId])
+    const retried = await send(`message_${scope}_1b`, "hello", "client-checked-001")
+    assert.equal(retried.outcome, "retried")
+    assert.equal((await pool.query("SELECT count(*)::int AS count FROM blumi_chat_delivery_outbox WHERE message_id = $1",
+      [`message_${scope}_1`])).rows[0].count, 1)
+    assert.equal((await repository.findThread(threadId))?.lastMessage?.messageId, `message_${scope}_1`)
+
+    // A first insert of the same client message ID that commits after this
+    // statement's snapshot is only seen as a conflict: the caller goes stepwise.
+    const holder = await pool.connect()
+    try {
+      await holder.query("BEGIN")
+      await holder.query(`INSERT INTO blumi_chat_messages (message_id, thread_id, sender_user_id, body, sent_at, client_message_id)
+        VALUES ($1, $2, $3, 'racing', now(), 'client-checked-race')`, [`message_${scope}_race_a`, threadId, sender])
+      const racing = send(`message_${scope}_race_b`, "racing", "client-checked-race")
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await holder.query("COMMIT")
+      assert.deepEqual(await racing, { outcome: "raced" })
+    } finally {
+      holder.release()
+    }
+
+    // A thread whose participant rows are not two fails like findThread, writing nothing.
+    await pool.query("DELETE FROM blumi_chat_thread_participants WHERE thread_id = $1 AND user_id = $2", [threadId, persona])
+    await assert.rejects(send(`message_${scope}_broken`, "broken"), /missing participants/)
+    assert.equal((await pool.query("SELECT count(*)::int AS count FROM blumi_chat_messages WHERE message_id = $1",
+      [`message_${scope}_broken`])).rows[0].count, 0)
   } finally { await pool.end() }
 })

@@ -4,8 +4,10 @@ import {
   cloneChatParticipant,
   createInMemoryChatRepository,
   type ChatMessagePageOptions,
+  type ChatThreadMembers,
   type ChatThreadPage,
-  type ChatRepository
+  type ChatRepository,
+  type TestPersona
 } from "./chatRepository"
 import { PublicRequestError } from "../errors/publicRequestError"
 import {
@@ -56,12 +58,27 @@ export interface ChatService {
    * never change after creation, which makes the loaded copy authoritative.
    */
   sendMessageInThread(
-    thread: ChatThread,
+    thread: ChatThreadMembers,
     userId: string,
     body: string,
     clientMessageId?: string,
     now?: Date
   ): Promise<{ message: ChatMessage; created: boolean }>
+  /**
+   * The send as one repository statement (participant, block, idempotency,
+   * preview and leased outbox job). Answers `stepwise` when the caller must
+   * take the stepwise path instead: invalid input (so its errors keep their
+   * precedence behind the conversation and block checks) or a concurrent
+   * first send of the same client message ID.
+   */
+  sendMessageChecked(input: {
+    userId: string
+    threadId: string
+    body: string
+    clientMessageId?: string
+    leaseMs: number
+    now?: Date
+  }): Promise<ChatCheckedSend>
   createThread(input: CreateThreadInput, now?: Date): Promise<ChatThread>
   /** Unread partner messages in the threads `userId` can see (blocked pairs are hidden). */
   countUnreadMessages(userId: string): Promise<number>
@@ -77,6 +94,21 @@ export interface ChatService {
     options?: { upToMessageId?: string }
   ): Promise<ChatMarkReadResult>
 }
+
+export type ChatCheckedSend =
+  | { kind: "stepwise" }
+  | { kind: "blocked" }
+  /** A committed retry while blocked: answered, never delivered again. */
+  | { kind: "answered"; message: ChatMessage }
+  | {
+      kind: "sent"
+      message: ChatMessage
+      created: boolean
+      members: ChatThreadMembers
+      /** The leased outbox job of a created message; a retry is dispatched by claim. */
+      job?: { leaseToken: string; attempt: number }
+      recipientPersonas?: TestPersona[]
+    }
 
 export interface ChatMarkReadResult {
   readAt: string
@@ -131,9 +163,9 @@ export interface CreateChatServiceOptions {
 export function createChatService(
   options: CreateChatServiceOptions = {}
 ): ChatService {
-  const repository = options.repository ?? createInMemoryChatRepository()
-  const idFactory = options.idFactory ?? createMessageId
   const blockPolicy = options.blockPolicy
+  const repository = options.repository ?? createInMemoryChatRepository(undefined, { blockSource: blockPolicy })
+  const idFactory = options.idFactory ?? createMessageId
 
   const getVisibleThread = async (userId: string, threadId: string): Promise<ChatThread> => {
     const thread = await getParticipantThread(repository, userId, threadId)
@@ -203,6 +235,39 @@ export function createChatService(
         throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
       }
       return persistMessage(repository, idFactory, thread, userId, body, clientMessageId, now)
+    },
+    async sendMessageChecked({ userId, threadId, body, clientMessageId, leaseMs, now = new Date() }) {
+      let normalizedBody: string
+      let normalizedClientMessageId: string | undefined
+      try {
+        normalizedBody = normalizeMessageBody(body)
+        normalizedClientMessageId = normalizeClientMessageId(clientMessageId)
+      } catch {
+        return { kind: "stepwise" }
+      }
+      const result = await repository.sendMessageChecked({
+        message: { messageId: idFactory(), threadId, senderUserId: userId, body: normalizedBody, sentAt: now.toISOString() },
+        ...(normalizedClientMessageId ? { clientMessageId: normalizedClientMessageId } : {}),
+        leaseUntil: new Date(now.getTime() + leaseMs)
+      })
+      switch (result.outcome) {
+        case "unavailable":
+          throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
+        case "raced":
+          return { kind: "stepwise" }
+        case "blocked":
+          if (!result.retryOf) return { kind: "blocked" }
+          if (result.retryOf.body !== normalizedBody) throw new ChatMessageIdempotencyConflictError()
+          return { kind: "answered", message: result.retryOf }
+        case "retried":
+          if (result.idempotencyConflict) throw new ChatMessageIdempotencyConflictError()
+          return { kind: "sent", message: result.message, created: false,
+            members: { threadId, participantUserIds: result.participantUserIds } }
+        case "created":
+          return { kind: "sent", message: result.message, created: true,
+            members: { threadId, participantUserIds: result.participantUserIds },
+            job: result.job, recipientPersonas: result.recipientPersonas }
+      }
     },
     async createThread(input, now = new Date()) {
       const existing = input.threadId
@@ -306,7 +371,7 @@ async function sendMessageIdempotently(
 async function persistMessage(
   repository: ChatRepository,
   idFactory: () => string,
-  thread: ChatThread,
+  thread: ChatThreadMembers,
   userId: string,
   body: string,
   clientMessageId: string | undefined,

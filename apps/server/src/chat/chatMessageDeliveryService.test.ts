@@ -164,9 +164,10 @@ test("returns the persisted message acknowledgement without waiting for a slow p
 })
 
 test("message delivery rejects either-direction blocks before persistence or fanout", async () => {
-  const chatService = createChatService({ idFactory: () => "must_not_be_used" })
-  await createThread(chatService)
+  // Production wiring: the chat service's block policy is the safety service.
   const safetyService = createSafetyService()
+  const chatService = createChatService({ idFactory: () => "must_not_be_used", blockPolicy: safetyService })
+  await createThread(chatService)
   await safetyService.blockUser("user_b", "user_a")
   let fanoutCount = 0
   const delivery = createChatMessageDeliveryService({
@@ -195,7 +196,7 @@ test("message delivery rejects either-direction blocks before persistence or fan
     }),
     ChatDeliveryBlockedError
   )
-  assert.deepEqual(await chatService.listMessages("user_a", "thread_one"), [])
+  assert.deepEqual(await chatService.repository.listMessages("thread_one"), [])
   assert.equal(fanoutCount, 0)
 })
 
@@ -241,12 +242,13 @@ test("retries with the same client message ID return one message and fan out onc
 
 test("a committed send can be ACK-retried after a block without creating or delivering again", async () => {
   const store = createInMemoryChatStore()
+  const safetyService = createSafetyService()
   const chatService = createChatService({
-    repository: createInMemoryChatRepository(store),
-    idFactory: () => "message_ack_lost"
+    repository: createInMemoryChatRepository(store, { blockSource: safetyService }),
+    idFactory: () => "message_ack_lost",
+    blockPolicy: safetyService
   })
   await createThread(chatService)
-  const safetyService = createSafetyService()
   const sentEvents: ServerEvent[] = []
   const delivery = createChatMessageDeliveryService({
     chatService,
@@ -278,7 +280,7 @@ test("a committed send can be ACK-retried after a block without creating or deli
 
   assert.deepEqual(retry.message, original.message)
   assert.equal(retry.created, false)
-  assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
+  assert.equal((await chatService.repository.listMessages("thread_one")).length, 1)
   assert.equal(store.deliveryJobs.size, 1)
   await assert.rejects(
     delivery.sendMessage({
@@ -299,7 +301,7 @@ test("a committed send can be ACK-retried after a block without creating or deli
     ChatDeliveryBlockedError
   )
   await new Promise<void>((resolve) => setImmediate(resolve))
-  assert.equal((await chatService.listMessages("user_a", "thread_one")).length, 1)
+  assert.equal((await chatService.repository.listMessages("thread_one")).length, 1)
   assert.equal(store.deliveryJobs.size, 1)
   assert.equal(sentEvents.length, 1)
 })
@@ -339,12 +341,13 @@ test("a persisted test persona replies once to a newly delivered user message", 
 
 test("a message queued before a block is never pushed or fanned out after it, and the block error matches a foreign thread", async () => {
   const store = createInMemoryChatStore()
+  const safetyService = createSafetyService()
   const chatService = createChatService({
-    repository: createInMemoryChatRepository(store),
-    idFactory: () => "message_queued_before_block"
+    repository: createInMemoryChatRepository(store, { blockSource: safetyService }),
+    idFactory: () => "message_queued_before_block",
+    blockPolicy: safetyService
   })
   await createThread(chatService)
-  const safetyService = createSafetyService()
   let fanoutCount = 0
   const pushes: PushNotification[] = []
   const delivery = createChatMessageDeliveryService({
@@ -378,18 +381,21 @@ test("a message queued before a block is never pushed or fanned out after it, an
   }
 })
 
-test("a send reads the thread once and keeps the post-persist block check", async () => {
-  const repository = createInMemoryChatRepository()
-  let threadReads = 0
-  const findThread = repository.findThread.bind(repository)
-  repository.findThread = async (threadId) => { threadReads += 1; return findThread(threadId) }
-  const chatService = createChatService({ repository, idFactory: () => "message_counted" })
-  await createThread(chatService)
-  threadReads = 0
+test("a send checks and persists in one repository call and keeps the post-persist block check", async () => {
   const safetyService = createSafetyService()
   let blockChecks = 0
   const hasBlockBetween = safetyService.hasBlockBetween.bind(safetyService)
   safetyService.hasBlockBetween = async (a, b) => { blockChecks += 1; return hasBlockBetween(a, b) }
+  const repository = createInMemoryChatRepository(undefined, { blockSource: safetyService })
+  let threadReads = 0
+  let claims = 0
+  const findThread = repository.findThread.bind(repository)
+  repository.findThread = async (threadId) => { threadReads += 1; return findThread(threadId) }
+  const claimDeliveries = repository.claimDeliveries.bind(repository)
+  repository.claimDeliveries = async (input) => { claims += 1; return claimDeliveries(input) }
+  const chatService = createChatService({ repository, idFactory: () => "message_counted", blockPolicy: safetyService })
+  await createThread(chatService)
+  threadReads = 0
   const sentEvents: ServerEvent[] = []
   const delivery = createChatMessageDeliveryService({
     chatService,
@@ -404,8 +410,10 @@ test("a send reads the thread once and keeps the post-persist block check", asyn
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "counted" })
   await waitFor(() => sentEvents.length === 1)
 
-  assert.equal(threadReads, 1, "was three reads: route check, persistence and inline dispatch")
-  assert.equal(blockChecks, 2, "before persisting and again before fanout")
+  assert.equal(threadReads, 0, "was three reads, then one: the send statement checks the participants itself")
+  assert.equal(claims, 0, "the send statement leases the outbox job to the inline dispatch")
+  assert.equal(blockChecks, 2, "inside the send statement and again before fanout")
+  assert.equal((await repository.listMessages("thread_one")).length, 1)
 })
 
 test("a slow dispatch of one message never lets the sender's next message overtake it, across HTTP and socket senders", async () => {
@@ -413,18 +421,16 @@ test("a slow dispatch of one message never lets the sender's next message overta
   // partner out of order when an earlier message's dispatch queries were slower.
   const chatService = createChatService()
   await createThread(chatService)
-  const claimDeliveries = chatService.repository.claimDeliveries.bind(chatService.repository)
+  // The first message's dispatch is held at its fanout (the send statement
+  // leases its job, so there is no claim left to slow down).
   let releaseFirst!: () => void
-  const firstClaimGate = new Promise<void>((resolve) => { releaseFirst = resolve })
-  let claims = 0
-  chatService.repository.claimDeliveries = async (input) => {
-    claims += 1
-    if (claims === 1) await firstClaimGate
-    return claimDeliveries(input)
-  }
+  const firstFanoutGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+  let fanouts = 0
   const delivered: string[] = []
   const connectionManager = {
     async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+      fanouts += 1
+      if (fanouts === 1) await firstFanoutGate
       if (event.type === "chat.message_received") delivered.push(event.payload.body)
     },
     hasUserConnections: () => true
@@ -441,6 +447,82 @@ test("a slow dispatch of one message never lets the sender's next message overta
   releaseFirst()
   await waitFor(() => delivered.length === 2)
   assert.deepEqual(delivered, ["first", "second"])
+})
+
+test("input the one-statement send refuses keeps its answers behind the conversation and block checks", async () => {
+  const safetyService = createSafetyService()
+  const chatService = createChatService({ blockPolicy: safetyService })
+  await createThread(chatService)
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService,
+    connectionManager: { async sendToUsersDurably() {}, hasUserConnections: () => false } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+  const errorOf = (input: { senderUserId: string; body: string; clientMessageId?: string }) =>
+    delivery.sendMessage({ threadId: "thread_one", ...input }).then(() => "sent", (error: Error) => error.message)
+
+  assert.equal(await errorOf({ senderUserId: "user_c", body: "   " }), "That conversation is not available.")
+  assert.equal(await errorOf({ senderUserId: "user_a", body: "   " }), "Write a message first.")
+  assert.equal(await errorOf({ senderUserId: "user_a", body: "hi", clientMessageId: "bad id" }), "Message retry ID is invalid.")
+  await safetyService.blockUser("user_b", "user_a")
+  assert.equal(await errorOf({ senderUserId: "user_a", body: "   " }), "That conversation is not available.",
+    "a block still hides the thread before the body is judged")
+  assert.deepEqual(await chatService.repository.listMessages("thread_one"), [])
+})
+
+test("a leased dispatch that waited renews its lease, and one whose lease the worker took is delivered once, by the worker", async () => {
+  const store = createInMemoryChatStore()
+  const repository = createInMemoryChatRepository(store)
+  const renewals: boolean[] = []
+  const renewDeliveryLease = repository.renewDeliveryLease.bind(repository)
+  repository.renewDeliveryLease = async (...args) => {
+    const renewed = await renewDeliveryLease(...args)
+    renewals.push(renewed)
+    return renewed
+  }
+  let nextMessageId = 0
+  const chatService = createChatService({ repository, idFactory: () => `message_${++nextMessageId}` })
+  await createThread(chatService)
+  let releaseFirst!: () => void
+  const firstFanoutGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+  const delivered: string[] = []
+  const options = {
+    chatService,
+    safetyService: createSafetyService(),
+    connectionManager: {
+      async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+        if (event.type !== "chat.message_received") return
+        if (event.payload.messageId === "message_1") await firstFanoutGate
+        delivered.push(event.payload.messageId)
+      },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  }
+  const delivery = createChatMessageDeliveryService({ ...options, leaseRenewAfterMs: 200 })
+  await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "first" })
+  await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "second" })
+  await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "third" })
+  // The second job's lease runs out while it waits: the worker of another
+  // process claims and delivers it.
+  const worker = createChatMessageDeliveryService({ ...options, connectionManager: {
+    async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+      if (event.type === "chat.message_received") delivered.push(`worker:${event.payload.messageId}`)
+    },
+    hasUserConnections: () => true
+  } as unknown as ConnectionManager })
+  const job = store.deliveryJobs.get("message_2")!
+  store.deliveryJobs.set("message_2", { ...job, availableAt: Date.now() - 1 })
+  await worker.dispatchDue(new Date())
+  assert.deepEqual(delivered, ["worker:message_2"])
+  await new Promise<void>((resolve) => setTimeout(resolve, 300))
+  releaseFirst()
+  await waitFor(() => delivered.length === 3)
+  await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  assert.deepEqual(delivered, ["worker:message_2", "message_1", "message_3"], "message 2 is not delivered again inline")
+  assert.deepEqual(renewals, [false, true], "the waiting jobs renew first; the lost lease is not used")
+  assert.equal(store.deliveryJobs.get("message_3")?.completed, true)
 })
 
 async function createThread(chatService: ReturnType<typeof createChatService>) {

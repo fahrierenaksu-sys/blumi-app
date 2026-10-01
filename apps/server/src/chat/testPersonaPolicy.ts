@@ -16,6 +16,11 @@ export function applyTestPersonaPolicy<Repository extends ChatRepository>(
     ...repository,
     async findTestPersona() {
       return null
+    },
+    // The one-statement send reads the recipients' personas too.
+    async sendMessageChecked(input) {
+      const result = await repository.sendMessageChecked(input)
+      return result.outcome === "created" ? { ...result, recipientPersonas: [] } : result
     }
   }
 }
