@@ -3,6 +3,7 @@ import test from "node:test"
 import { createInMemoryRateBudget } from "./sharedRateBudget"
 import { createAuthService } from "../auth/authService"
 import { createServer } from "../server"
+import { AUTHENTICATED_IP_REQUESTS_PER_MINUTE } from "./requestLimits"
 
 test("an older clock window cannot reset an already consumed newer budget", async () => {
   let now = 120_000
@@ -54,8 +55,10 @@ test("cheap local limit stops excess requests before shared budget access", asyn
     async consumeUser() { sharedChecks += 1; return { allowed: true, retryAfterSeconds: 1 } }, async purgeExpired() {}
   } })
   try {
-    for (let i = 0; i < 105; i++) await app.inject({ method: "GET", url: "/v1/users/me",
+    // Signed-in traffic gets the coarse per-IP ceiling (shared addresses);
+    // the per-user budget is the real limit.
+    for (let i = 0; i < AUTHENTICATED_IP_REQUESTS_PER_MINUTE + 5; i++) await app.inject({ method: "GET", url: "/v1/users/me",
       headers: { authorization: `Bearer ${session.sessionToken}` } })
-    assert.equal(sharedChecks, 100)
+    assert.equal(sharedChecks, AUTHENTICATED_IP_REQUESTS_PER_MINUTE)
   } finally { await app.close() }
 })

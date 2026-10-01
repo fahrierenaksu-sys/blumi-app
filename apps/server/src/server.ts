@@ -3,6 +3,7 @@ import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sh
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import { PrivateRequestLogController, privateLogSerializers } from "./operations/privateRequestLog"
+import { ipRequestCeiling, registerFailedAuthLimiter } from "./operations/requestLimits"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
 import Fastify, {
@@ -314,10 +315,13 @@ function registerProductionMiddleware(
         ? options.corsOrigins
         : true
   })
+  // Strict per IP without a bearer token; a coarse ceiling with one, since
+  // signed-in traffic is limited per verified user (shared request budget).
   void app.register(rateLimit, {
-    max: 100,
+    max: ipRequestCeiling,
     timeWindow: "1 minute"
   })
+  registerFailedAuthLimiter(app)
 }
 
 function registerErrorHandler(app: FastifyInstance) {
