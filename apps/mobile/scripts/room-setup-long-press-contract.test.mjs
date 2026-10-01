@@ -31,3 +31,26 @@ test("starter bed becomes editable from the placed object with long-press haptic
   // A drag-capable host starts the move immediately; others keep the 360 ms hold.
   assert.match(renderer, /delayLongPress=\{onItemLongPressMove \? 0 : 360\}/)
 })
+
+test("the first-room bed drag follows the finger on the UI thread and writes the room once (ROOMSETUP-1)", () => {
+  const screen = read("src/screens/RoomSetupScreen.tsx")
+  const drag = read("src/features/session/setupFlow/useRoomSetupBedDrag.ts")
+
+  // Gesture Handler pan on the card; no JS PanResponder that only acted on release.
+  assert.doesNotMatch(screen, /PanResponder/)
+  assert.match(screen, /<GestureDetector gesture=\{bedDrag\.cardGesture\}>/)
+  assert.match(drag, /Gesture\.Pan\(\)/)
+  assert.match(drag, /\.onUpdate\(\(event\) => \{\s*"worklet"\s*x\.value = event\.absoluteX/)
+  const update = drag.slice(drag.indexOf(".onUpdate("), drag.indexOf(".onEnd("))
+  assert.doesNotMatch(update, /scheduleOnRN/, "no JS hop per move")
+  // A ghost shows where the bed goes; the room is placed only on release.
+  assert.match(screen, /<RoomEditorDragGhost/)
+  const move = screen.slice(screen.indexOf("const handlePlacedBedLongPressMove"), screen.indexOf("const handlePlacedBedLongPressRelease"))
+  assert.doesNotMatch(move, /placeBedAtPoint|placeBedAtWindowPoint|setUserRoomDecor/)
+  const release = screen.slice(screen.indexOf("const handlePlacedBedLongPressRelease"), screen.indexOf("const bedGhostSource"))
+  assert.match(release, /placeBedAtPoint\(point\)/)
+  // Valid and rejected drops answer physically; the placed card fades in.
+  assert.match(screen, /setPlacementMessage\(copy\.placement\.placed\)\s*hapticLight\(\)/)
+  assert.match(screen, /hapticError\(\)\s*setPlacementMessage\(copy\.placement\.chooseAnotherSpot\)/)
+  assert.match(screen, /entering=\{reduceMotion \? undefined : FadeIn\.duration\(200\)\}/)
+})

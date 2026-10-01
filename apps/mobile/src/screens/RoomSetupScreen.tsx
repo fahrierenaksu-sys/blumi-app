@@ -2,7 +2,6 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useRef, useState } from "react"
 import {
   Image,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -42,7 +41,11 @@ import {
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import { LinearGradient } from "../ui/linearGradient"
 import { useReducedMotionPreference } from "../ui/animations"
-import { hapticMedium } from "../ui/haptics"
+import { hapticError, hapticLight, hapticMedium, hapticSelection } from "../ui/haptics"
+import { GestureDetector } from "react-native-gesture-handler"
+import Animated, { FadeIn } from "react-native-reanimated"
+import { RoomEditorDragGhost } from "../features/roomV2/editor/RoomEditorDragGhost"
+import { useRoomSetupBedDrag } from "../features/session/setupFlow/useRoomSetupBedDrag"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
 import { getSetupLayoutMetrics } from "../features/session/setupFlow/setupFlowShellModel"
 import {
@@ -219,6 +222,7 @@ export function RoomSetupScreen({
         candidate
       }).isValid
     ) {
+      hapticError()
       setPlacementMessage(copy.placement.chooseAnotherSpot)
       return
     }
@@ -229,6 +233,7 @@ export function RoomSetupScreen({
     setPlacementErrorMessage("")
     setBedSelected(true)
     setPlacementMessage(copy.placement.placed)
+    hapticLight()
   }, [copy, feedbackCopy.mutationRejected, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
 
   const rotatePlacedBed = useCallback((): void => {
@@ -271,14 +276,6 @@ export function RoomSetupScreen({
     setPlacementMessage(copy.placement.longPressMove)
   }, [copy])
 
-  const handlePlacedBedLongPressRelease = useCallback((
-    item: RoomV2RenderItem,
-    point: { x: number; y: number }
-  ): void => {
-    if (item.kind !== "furniture" || item.itemId !== STARTER_ROOM_BED_ITEM_ID) return
-    placeBedAtPoint(point)
-  }, [placeBedAtPoint])
-
   const placeBedAtWindowPoint = useCallback((pageX: number, pageY: number): void => {
     roomFrameRef.current?.measureInWindow((x, y, width, height) => {
       if (
@@ -289,6 +286,7 @@ export function RoomSetupScreen({
         pageY < y ||
         pageY > y + height
       ) {
+        hapticError()
         setPlacementMessage(copy.placement.dragToFloor)
         return
       }
@@ -299,37 +297,59 @@ export function RoomSetupScreen({
     })
   }, [copy, placeBedAtPoint])
 
+  const bedDrag = useRoomSetupBedDrag({
+    enabled: Boolean(starterBed),
+    reduceMotion,
+    handlers: useMemo(() => ({
+      onLift: () => {
+        hapticSelection()
+        setBedSelected(true)
+        setPlacementMessage(copy.placement.tapOrDrag)
+      },
+      onDrop: placeBedAtWindowPoint,
+      onTap: () => {
+        setBedSelected(true)
+        placeBedAtPoint(STARTER_ROOM_BED_DEFAULT_POINT)
+      }
+    }), [copy, placeBedAtPoint, placeBedAtWindowPoint])
+  })
+  const { liftGhostAt, showGhostAt, releaseGhost } = bedDrag
+  const placedBedMovingRef = useRef(false)
+
+  // Moving the placed bed: the ghost follows the finger and the room is
+  // written once, on release (it was written on every move before).
   const handlePlacedBedLongPressMove = useCallback((
     item: RoomV2RenderItem,
     point: { pageX: number; pageY: number }
   ): void => {
     if (item.kind !== "furniture" || item.itemId !== STARTER_ROOM_BED_ITEM_ID) return
-    placeBedAtWindowPoint(point.pageX, point.pageY)
-  }, [placeBedAtWindowPoint])
+    if (!placedBedMovingRef.current) {
+      placedBedMovingRef.current = true
+      liftGhostAt(point.pageX, point.pageY)
+      return
+    }
+    showGhostAt(point.pageX, point.pageY)
+  }, [liftGhostAt, showGhostAt])
 
-  const bedCardPanResponder = useMemo(
-    () => PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setBedSelected(true)
-        setPlacementMessage(copy.placement.tapOrDrag)
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (Math.abs(gestureState.dx) < 8 && Math.abs(gestureState.dy) < 8) {
-          placeBedAtPoint(STARTER_ROOM_BED_DEFAULT_POINT)
-          return
-        }
-        placeBedAtWindowPoint(gestureState.moveX, gestureState.moveY)
-      }
-    }),
-    [copy, placeBedAtPoint, placeBedAtWindowPoint]
-  )
+  const handlePlacedBedLongPressRelease = useCallback((
+    item: RoomV2RenderItem,
+    point: { x: number; y: number }
+  ): void => {
+    if (item.kind !== "furniture" || item.itemId !== STARTER_ROOM_BED_ITEM_ID) return
+    placedBedMovingRef.current = false
+    releaseGhost()
+    placeBedAtPoint(point)
+  }, [placeBedAtPoint, releaseGhost])
+
+  const bedGhostSource = starterBed
+    ? starterBed.visualContract?.directions.front.thumbnailAsset?.source ?? starterBed.asset.source
+    : undefined
 
   const { busy } = useOnboardingSignOut(onSignOut, isSubmitting)
   useOnboardingHardwareBack(onBackToAvatar, busy)
 
   return (
+    <View style={styles.screenRoot}>
     <BlumiSetupShell
       backDisabled={busy}
       feedback={errorMessage ? (
@@ -439,9 +459,10 @@ export function RoomSetupScreen({
         </View>
         <View style={styles.roomFirstStatus}>
           {starterRoomReady ? (
-            <View
+            <Animated.View
               accessible
               accessibilityLabel={copy.bedPlacedAccessibilityLabel}
+              entering={reduceMotion ? undefined : FadeIn.duration(200)}
               style={styles.placementCompleteCard}
               testID="starter-bed-card"
             >
@@ -449,16 +470,20 @@ export function RoomSetupScreen({
                 <Ionicons color="#FFFFFF" name="checkmark" size={14} />
               </View>
               <Text style={styles.placementCompleteText}>{copy.bedPlacedCard}</Text>
-            </View>
+            </Animated.View>
           ) : starterBed ? (
+            <GestureDetector gesture={bedDrag.cardGesture}>
             <View
               accessible
+              onAccessibilityTap={() => {
+                setBedSelected(true)
+                placeBedAtPoint(STARTER_ROOM_BED_DEFAULT_POINT)
+              }}
               accessibilityLabel={copy.starterItemAccessibilityLabel}
               accessibilityRole="button"
               accessibilityState={{ selected: bedSelected }}
               style={styles.starterItemLiquidFrame}
               testID="starter-bed-card"
-              {...bedCardPanResponder.panHandlers}
             >
               <View style={[
                 styles.starterItemCard,
@@ -488,6 +513,7 @@ export function RoomSetupScreen({
                 </View>
               </View>
             </View>
+            </GestureDetector>
           ) : null}
         </View>
         {persistenceState === "failed" ? (
@@ -513,10 +539,21 @@ export function RoomSetupScreen({
         ) : null}
       </View>
     </BlumiSetupShell>
+      <RoomEditorDragGhost
+        ghost={bedGhostSource !== undefined && bedDrag.ghostSession !== null
+          ? { session: bedDrag.ghostSession, source: bedGhostSource, mirrored: false, frame: BED_GHOST_FRAME }
+          : undefined}
+        values={bedDrag.ghostValues}
+      />
+    </View>
   )
 }
 
+/** The lifted bed floats just above the finger so the finger never hides it. */
+const BED_GHOST_FRAME = { offsetX: -60, offsetY: -96, width: 120, height: 90 }
+
 const styles = StyleSheet.create({
+  screenRoot: { flex: 1 },
   stageFrame: {
     alignItems: "center",
     justifyContent: "center",
