@@ -172,17 +172,25 @@ async function legacyReadUpToMessage(pool: QueryExecutor, threadId: string, user
  * put last_read_at past a message that is read by id later; the receipt still
  * advances to it. Both comparisons read the participant row being updated, so
  * a concurrent read that committed first is re-checked (never moved back).
+ * While the reader has read receipts off, only the unread cursor moves: no
+ * receipt is stored, so turning receipts on later never reveals reads made
+ * while they were off (RECEIPTS_PRIVACY_DESIGN option A, owner decision
+ * 2026-10-01). A read racing a preference toggle uses the value its
+ * statement sees.
  */
 async function readUpToMessage(pool: QueryExecutor, threadId: string, userId: string, messageId: string): Promise<ChatReadAdvance | null> {
-  const receiptMovesForward = `(participant.last_read_message_id IS NULL OR NOT EXISTS (
+  const receiptMovesForward = `((SELECT shares FROM reader) AND (participant.last_read_message_id IS NULL OR NOT EXISTS (
          SELECT 1 FROM blumi_chat_messages AS receipt
           WHERE receipt.thread_id = participant.thread_id
             AND receipt.message_id = participant.last_read_message_id
-            AND (receipt.sent_at, receipt.message_id) >= (target.sent_at, target.message_id)))`
+            AND (receipt.sent_at, receipt.message_id) >= (target.sent_at, target.message_id))))`
   const result = await pool.query(
     `WITH target AS (
        SELECT sent_at, message_id FROM blumi_chat_messages
         WHERE thread_id = $1 AND message_id = $3 AND sender_user_id <> $2
+     ), reader AS (
+       SELECT COALESCE((SELECT read_receipts_enabled FROM blumi_chat_privacy_preferences
+                         WHERE user_id = $2), false) AS shares
      ), current AS (
        SELECT last_read_at, last_read_message_id FROM blumi_chat_thread_participants
         WHERE thread_id = $1 AND user_id = $2

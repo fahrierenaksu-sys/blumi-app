@@ -245,6 +245,9 @@ runRepositoryContract<ChatRepository>({
       const chat = thread(backend, "read", "2026-10-01T10:00:00.000Z")
       const [sender, reader] = chat.participantUserIds
       await backend.repository.saveThread(chat)
+      // The reader shares read receipts, so reads by id store the receipt.
+      await backend.ensureUsers(sender, reader)
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
       const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
       const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
       const own = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", reader)
@@ -278,6 +281,9 @@ runRepositoryContract<ChatRepository>({
       const chat = thread(backend, "instant", "2026-10-01T10:00:00.000Z")
       const [sender, reader] = chat.participantUserIds
       await backend.repository.saveThread(chat)
+      // The reader shares read receipts, so reads by id store the receipt.
+      await backend.ensureUsers(sender, reader)
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
       const shown = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
       await backend.repository.createMessage(shown)
       const read = (target: { upToMessageId: string } | { readAt: string }) =>
@@ -309,6 +315,46 @@ runRepositoryContract<ChatRepository>({
       })
       assert.deepEqual(await read({ upToMessageId: late.messageId }), { readAt: "2026-10-01T10:03:00.000Z" })
       assert.deepEqual(await receipt(), { sentAt: late.sentAt, messageId: late.messageId })
+    },
+
+    "a read while the reader has read receipts off clears unread counts but stores no read receipt": async (backend) => {
+      // Owner decision 2026-10-01 (RECEIPTS_PRIVACY_DESIGN option A): reads
+      // made while receipts are off are never stored, so turning receipts on
+      // later can never reveal them.
+      const [sender, reader] = [backend.id("sender"), backend.id("reader")]
+      await backend.ensureUsers(sender, reader)
+      const chat = thread(backend, "private_read", "2026-10-01T10:00:00.000Z", [sender, reader])
+      await backend.repository.saveThread(chat)
+      const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      for (const item of [first, second]) await backend.repository.createMessage(item)
+      const read = (upToMessageId: string) =>
+        backend.repository.advanceReadCursor({ threadId: chat.threadId, userId: reader, upToMessageId })
+      const unread = async () => (await backend.repository.listThreads(reader))
+        .find((item) => item.threadId === chat.threadId)?.unreadCount
+      const receipt = async () => (await backend.repository.listReceiptParticipants([chat.threadId]))
+        .find((row) => row.userId === reader)?.readUpTo
+
+      assert.deepEqual(await read(first.messageId), { readAt: first.sentAt })
+      assert.equal(await unread(), 1)
+      assert.deepEqual(await read(second.messageId), { readAt: second.sentAt })
+      assert.equal(await unread(), 0)
+      assert.equal(await receipt(), undefined, "nothing is stored while receipts are off")
+
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
+      assert.equal(await receipt(), undefined, "turning receipts on reveals no earlier read")
+      assert.deepEqual(await read(second.messageId), {
+        readAt: second.sentAt,
+        readUpTo: { sentAt: second.sentAt, messageId: second.messageId }
+      }, "the next read of a shown message stores the receipt")
+
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: false }, new Date())
+      const third = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", sender)
+      await backend.repository.createMessage(third)
+      assert.deepEqual(await read(third.messageId), { readAt: third.sentAt })
+      assert.equal(await unread(), 0)
+      assert.deepEqual(await receipt(), { sentAt: second.sentAt, messageId: second.messageId },
+        "a read while off again does not move the receipt")
     },
 
     "chat preferences default to read receipts off and are saved per account": async (backend) => {

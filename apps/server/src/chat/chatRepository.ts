@@ -360,9 +360,12 @@ export function createInMemoryChatRepository(
       const targetTime = Date.parse(target.sentAt)
       // The unread cursor: GREATEST(last_read_at, target), before and after 070.
       const readAt = targetTime > previousTime ? target.sentAt : current.readAt!
-      if (!receiptsSupported || target.messageId === undefined) {
-        // A read without a message never moves the read receipt: it may
-        // cover a message whose sent_at precedes it but which was not shown.
+      // A read without a message never moves the read receipt: it may cover
+      // a message whose sent_at precedes it but which was not shown. A read
+      // while the reader has receipts off stores no receipt, so turning them
+      // on later never reveals it (RECEIPTS_PRIVACY_DESIGN option A).
+      const readerSharesReceipts = store.preferencesByUser.get(input.userId)?.readReceiptsEnabled === true
+      if (!receiptsSupported || target.messageId === undefined || !readerSharesReceipts) {
         store.cursorsByParticipant.set(key, { ...current, readAt })
         return { readAt }
       }

@@ -1,6 +1,6 @@
 # Read receipts: retroactive reveal (design, owner decision)
 
-Date: 2026-10-01. Status: **Open, owner decision needed.** No code or migration in this change implements anything in this document.
+Date: 2026-10-01. Status: **Owner decided option A (2026-10-01). Implemented in code** (`postgresChatReceipts.ts` `readUpToMessage`, in-memory `advanceReadCursor`; contract case "a read while the reader has read receipts off …"). **The one-time cleanup below is Open: owner-run, after a backup. Nobody has run it.**
 
 ## What the code does today
 
@@ -56,6 +56,58 @@ Turning receipts on would then also share earlier reads. This is the cheapest op
 1. Should reads made while the reader had receipts off ever be shown? The recommendation is never.
 2. If the answer is never, choose A or B. If A, authorise the one-time cleanup and say how it should run: an owner-run SQL statement after a backup, or a guarded startup step.
 3. Should turning receipts on reveal the partner's earlier reads, if the partner had receipts on when they read? The recommendation is yes. It is the partner's consent that matters, and it matches today's behaviour.
+
+## One-time cleanup of receipts stored while off (owner-run)
+
+The code change stops new receipts from being stored while the reader has
+receipts off. Receipts stored before the change can still be revealed if
+that reader turns receipts on. This SQL removes the stored receipt of every
+participant who does not currently share read receipts. It does not touch
+`last_read_at`, so unread counts do not change. It is a data change: run it
+only after a restore-tested PostgreSQL 17 dump (`ENGINEERING_RULES.md`),
+and only after the binary with option A is deployed (otherwise new receipts
+keep being stored while off).
+
+Limit: a reader who has receipts **on** today but stored a receipt earlier
+while they were off is not covered: the schema does not record when a
+receipt moved (option B would). Their receipt is shown as it is today.
+
+1. Dry run (read-only): how many rows would change.
+
+```sql
+SELECT count(*) AS receipts_to_clear
+  FROM blumi_chat_thread_participants AS participant
+ WHERE participant.last_read_message_id IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM blumi_chat_privacy_preferences AS preference
+      WHERE preference.user_id = participant.user_id
+        AND preference.read_receipts_enabled
+   );
+```
+
+2. Cleanup, in one transaction. Compare the reported row count with the dry
+   run before `COMMIT`; on any mismatch run `ROLLBACK` instead.
+
+```sql
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+UPDATE blumi_chat_thread_participants AS participant
+   SET last_read_message_id = NULL
+ WHERE participant.last_read_message_id IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM blumi_chat_privacy_preferences AS preference
+      WHERE preference.user_id = participant.user_id
+        AND preference.read_receipts_enabled
+   );
+-- Row count must equal receipts_to_clear from step 1.
+COMMIT;   -- or ROLLBACK;
+```
+
+Rollback note: after `COMMIT` the cleared ids cannot be recovered from the
+table. The only way back is restoring the affected rows from the dump taken
+before the run. Clearing is safe for the product: a cleared receipt is
+stored again by the next read of a shown message once the reader turns
+receipts on.
 
 ## Related, already fixed (2026-10-01)
 

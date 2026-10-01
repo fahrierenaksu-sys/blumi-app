@@ -110,7 +110,11 @@ test("history and acks report delivery to the sender; read state needs both sett
       assert.deepEqual(saved.json(), { preferences: { readReceiptsEnabled: true }, available: true })
     }
     const adaView = await server.call("GET", `/v1/threads/${threadId}/messages`, { token: ada.sessionToken })
-    assert.deepEqual(adaView.json().partnerReceipts, { deliveredUpTo: cursor, readUpTo: cursor })
+    assert.deepEqual(adaView.json().partnerReceipts, { deliveredUpTo: cursor },
+      "Bora's read while receipts were off was never stored, so it is never revealed")
+    assert.equal((await readUpTo(bora)).statusCode, 200)
+    const adaViewAfterRead = await server.call("GET", `/v1/threads/${threadId}/messages`, { token: ada.sessionToken })
+    assert.deepEqual(adaViewAfterRead.json().partnerReceipts, { deliveredUpTo: cursor, readUpTo: cursor })
 
     const later = await send(server, ada, threadId, "are you there?")
     assert.equal((await server.call("POST", `/v1/threads/${threadId}/read`, {
