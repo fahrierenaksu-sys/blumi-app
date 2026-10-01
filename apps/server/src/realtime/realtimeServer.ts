@@ -65,6 +65,13 @@ const REALTIME_DISCONNECT_BATCH_WINDOW_MS = 50
 /** Graceful shutdown close: clients spread their first retry (1012 = restart). */
 export const REALTIME_RESTART_CLOSE_CODE = 1012
 const RESTART_CLOSE_REASON = "Server restarting"
+/**
+ * How long a server-initiated close waits for the client's close frame
+ * before the socket is destroyed. ws defaults to 30 s, which equals the whole
+ * graceful shutdown budget (GRACEFUL_SHUTDOWN_TIMEOUT_MS), so one half-open
+ * phone made shutdown time out, skip the disconnect cleanup and exit 1.
+ */
+export const REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS = 3_000
 const CONNECTION_LEASE_CLEANUP_INTERVAL_MS = 60_000
 const MAX_REALTIME_MESSAGE_BYTES = 64 * 1024
 const RATE_LIMIT_CLOSE_CODE = 4429
@@ -124,7 +131,8 @@ export function createRealtimeServer(
   const wsServer = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_REALTIME_MESSAGE_BYTES,
-    perMessageDeflate: false
+    perMessageDeflate: false,
+    closeTimeout: REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS
   })
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const eventBudget = createRealtimeEventBudget()
@@ -753,7 +761,13 @@ export function createRealtimeServer(
           client.close(REALTIME_RESTART_CLOSE_CODE, RESTART_CLOSE_REASON)
         }
       })
+      // Backstop for a socket whose own close timer never started (one that
+      // was already closing): nothing outlives the handshake bound.
+      const stragglers = setTimeout(() => {
+        for (const client of wsServer.clients) client.terminate()
+      }, REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS)
       await socketsClosed
+      clearTimeout(stragglers)
       clearTimeout(disconnectFlushTimer)
       disconnectFlushTimer = undefined
       await track(flushDisconnects())

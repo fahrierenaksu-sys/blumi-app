@@ -16,7 +16,7 @@ import { createPresenceService } from "../presence/presenceService"
 import { createReactionService } from "../reactions/reactionService"
 import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
-import { createGracefulShutdown } from "../operations/serviceLifecycle"
+import { createGracefulShutdown, GRACEFUL_SHUTDOWN_TIMEOUT_MS } from "../operations/serviceLifecycle"
 import {
   REALTIME_AUTHORIZATION_CACHE_TTL_MS,
   REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
@@ -25,6 +25,7 @@ import {
 import {
   createRealtimeServer,
   REALTIME_CONNECTION_LEASE_RENEW_MS,
+  REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS,
   REALTIME_HEARTBEAT_INTERVAL_MS,
   REALTIME_RESTART_CLOSE_CODE
 } from "./realtimeServer"
@@ -459,34 +460,39 @@ test("realtime close rejects an upgrade whose connection lease registration is s
   }
 })
 
-test("realtime close timeout terminates an unresponsive websocket and drains its lease", { timeout: 5000 }, async () => {
+test("shutdown tears down a websocket that ignores the close frame within the close handshake bound, far inside the shutdown deadline", { timeout: 5000 }, async (t) => {
+  // ws waits 30 s by default for a close handshake, which equals the whole
+  // graceful shutdown budget: one half-open phone made shutdown time out.
+  assert.ok(REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS * 5 <= GRACEFUL_SHUTDOWN_TIMEOUT_MS)
   const harness = await createRealtimeHarness()
   const session = await harness.createSession("+905551110074", "Unresponsive realtime peer")
   const ticket = await harness.issueTicket(session.sessionToken)
   const socket = await connectUnresponsiveWebSocket(harness.url, ticket)
   const connection = harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)
   assert.ok(connection)
+  const settleIo = async () => {
+    for (let round = 0; round < 20; round += 1) await new Promise<void>((resolve) => setImmediate(resolve))
+  }
 
-  const originalSetTimeout = globalThis.setTimeout
-  let acceleratedCloseTimeouts = 0
-  globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
-    const adjustedArgs = [...args] as Parameters<typeof setTimeout>
-    if (adjustedArgs[1] === 30_000) {
-      adjustedArgs[1] = 15
-      acceleratedCloseTimeouts += 1
-    }
-    return originalSetTimeout(...adjustedArgs)
-  }) as typeof globalThis.setTimeout
-
+  t.mock.timers.enable({ apis: ["setTimeout"] })
   try {
-    const startedAt = Date.now()
-    await harness.closeRealtime()
-    assert.equal(acceleratedCloseTimeouts, 1, "the unresponsive peer must use ws's bounded close handshake timeout")
-    assert.ok(Date.now() - startedAt < 1000, "the test-only shortened timeout should bound this regression")
-    assert.equal(socket.destroyed, true, "a peer that ignores the close frame is forcibly torn down")
-    assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false)
+    let closed = false
+    const stopping = harness.closeRealtime().then(() => { closed = true })
+    await settleIo()
+    t.mock.timers.tick(REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS - 1)
+    await settleIo()
+    assert.equal(closed, false, "a peer gets the whole handshake bound to answer")
+    t.mock.timers.tick(1)
+    // Mocked timers also stop the test's own timeout, so wait on I/O turns.
+    for (let round = 0; round < 50 && !closed; round += 1) await settleIo()
+    assert.equal(closed, true, "shutdown finished once the handshake bound passed")
+    await stopping
+    // The server destroyed its side; the peer sees the connection end.
+    await new Promise<void>((resolve) => { if (socket.destroyed) resolve(); else socket.once("close", () => resolve()) })
+    assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false,
+      "the batched disconnect cleanup still runs")
   } finally {
-    globalThis.setTimeout = originalSetTimeout
+    t.mock.timers.reset()
     socket.destroy()
     await harness.close()
   }
