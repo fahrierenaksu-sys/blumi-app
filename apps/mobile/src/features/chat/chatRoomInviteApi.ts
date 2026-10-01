@@ -35,14 +35,6 @@ export class RoomSessionJoinError extends Error {
   }
 }
 
-/** A leave the server answered without closing; the status decides what happens next. */
-export class RoomSessionLeaveError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message)
-    this.name = "RoomSessionLeaveError"
-  }
-}
-
 export function isDefinitivelyUnavailableRoomSession(error: unknown): boolean {
   return error instanceof RoomSessionJoinError && (
     error.status === 403 ||
@@ -231,10 +223,7 @@ export async function leaveRoomSession(
     fetcher
   )
   if (!response.ok) {
-    throw new RoomSessionLeaveError(
-      getApiErrorMessage(payload, "We could not leave that room yet."),
-      response.status
-    )
+    throw new Error(getApiErrorMessage(payload, "We could not leave that room yet."))
   }
   return normalizeRoomLeaveResult(payload)
 }
@@ -390,6 +379,7 @@ function isMiniRoomParticipant(value: unknown): value is MiniRoomParticipant {
   return (
     typeof record.userId === "string" &&
     typeof record.displayName === "string" &&
+    (record.profileUpdatedAt === undefined || (typeof record.profileUpdatedAt === "string" && Number.isFinite(Date.parse(record.profileUpdatedAt)))) &&
     Boolean(record.avatar) &&
     typeof record.avatar === "object"
   )

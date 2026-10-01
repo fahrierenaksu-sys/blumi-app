@@ -73,6 +73,24 @@ test("an unreadable preference keeps surfaces opaque and counts as resolved", as
   unsubscribe()
 })
 
+test("an OS change wins over a late initial query, including query failure", async () => {
+  for (const outcome of ["resolve", "reject"] as const) {
+    let resolve!: (enabled: boolean) => void
+    let reject!: (error: Error) => void
+    const fake = createSource(new Promise<boolean>((yes, no) => { resolve = yes; reject = no }))
+    const store = createReduceTransparencyStore(fake.source)
+    const unsubscribe = store.subscribe(() => undefined)
+    fake.emit(false)
+    if (outcome === "resolve") resolve(true)
+    else reject(new Error("unavailable"))
+    await flush()
+    assert.deepEqual(store.getSnapshot(), { reduceTransparency: false, isResolved: true })
+    fake.emit(true)
+    assert.equal(store.getSnapshot().reduceTransparency, true)
+    unsubscribe()
+  }
+})
+
 test("the snapshot keeps its identity until the preference changes", async () => {
   const fake = createSource(Promise.resolve(false))
   const store = createReduceTransparencyStore(fake.source)

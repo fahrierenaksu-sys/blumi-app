@@ -78,6 +78,7 @@ export function useRoomInviteRouting({
           partner: {
             userId: partner.userId,
             displayName: partner.displayName,
+            profileUpdatedAt: partner.profileUpdatedAt,
             avatarSnapshot: createCandidateAvatarSnapshot({
               userId: partner.userId,
               displayName: partner.displayName,

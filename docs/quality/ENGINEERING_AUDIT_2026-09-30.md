@@ -212,31 +212,6 @@ isolated gate, 2 intentional skips); dependency audit passed; Expo Doctor
 - The permanently skipped `shopCatalogParity` subtest is removed, so the
   intentional skips drop from 2 to 1.
 
-## MiniRoom live motion (2026-10-01)
-
-Owner report: in the shared room the partner's movement is not shown live.
-
-| App JS | Motion protocol | Result against the server |
-|---|---|---|
-| TestFlight build 14 (`9982882`, OTA paused) | none: no `mini_room.scene_enter` / `mini_room.move` (motion client first lands in `1a8f273`) | never enters the scene; its own walks stay on its own screen and it never shows the partner walking |
-| `develop` through Metro | scene enter/exit, moves, snapshots, seat claims, takeover | live both directions against the production server source `0a8795d` (wire protocol unchanged since) |
-
-Evidence: `apps/mobile/src/features/miniRoom/miniRoomMotionTwoPhones.e2e.test.ts`
-drives two phones' real motion code (realtime client, hook, session, scene
-store, presentation) over WebSocket against the real server stack: floor and
-seat taps, retargets, bursts, seat races, reconnect, background and focus.
-It passed against `0a8795d` and against this branch. A develop phone shows a
-build-14 partner as not in the room.
-
-Server fixes on this branch (live only after an authorised deploy): a scene
-entry still waiting for its access check is cancelled by a scene exit, a
-socket close or a newer entry on that socket (no ghost presence); sockets of
-one sign-in session are one phone, so a late entry from its abandoned socket
-no longer supersedes the live one and closes the room screen.
-
-Open: a new native build or OTA containing the motion client; native
-two-iPhone verification; deploy of the server fixes.
-
 ## Things that must not change
 
 - Migrations: `apps/server/db/migrations` has two `032_*` files and no `044`.

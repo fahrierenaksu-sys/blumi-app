@@ -56,6 +56,7 @@ export type ServerEvent =
   | { type: "connection.decision_recorded"; payload: ConnectionDecisionRecord }
   | { type: "connection.matched"; payload: ConnectionMatch }
   | { type: "chat.thread_created"; payload: ChatThread }
+  | { type: "chat.participant_updated"; payload: { participant: import("../chat/ChatThread").ChatParticipantSummary; updatedAt: string } }
   | { type: "chat.thread_listed"; payload: ChatThreadList }
   | { type: "chat.thread_read"; payload: ChatThreadRead }
   | { type: "chat.message_listed"; payload: ChatMessageList }

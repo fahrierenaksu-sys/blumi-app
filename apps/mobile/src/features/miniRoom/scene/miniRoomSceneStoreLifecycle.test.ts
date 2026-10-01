@@ -208,6 +208,49 @@ test("re-renders with the same participants keep the scene, speech and callbacks
   assert.equal(f.store().dismissSpeechBubble, first.dismissSpeechBubble)
 })
 
+test("a rename or outfit change during a walk preserves positions, drivers and scene epoch", () => {
+  const f = mount()
+  f.render()
+  f.store().moveLocalAvatar({ x: .35, y: .70 })
+  f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
+  const before = f.store()
+  const appearance = { base: "new-saved-outfit" }
+  f.render({ partnerUser: { userId: "partner", displayName: "Irmak" }, participantAvatarSnapshots: {
+    local: { displayName: "Local", appearance: before.avatars.local.appearance },
+    partner: { displayName: "Irmak", appearance }
+  } } as unknown as Partial<StoreInput>)
+  const after = f.store()
+  assert.equal(after.avatars.partner.displayName, "Irmak")
+  assert.equal(after.avatars.partner.appearance, appearance)
+  for (const userId of ["local", "partner"]) {
+    assert.equal(after.avatars[userId].motion, "walking")
+    assert.deepEqual({ x: after.avatars[userId].x, y: after.avatars[userId].y }, { x: before.avatars[userId].x, y: before.avatars[userId].y })
+    assert.equal(after.avatarPositions[userId], before.avatarPositions[userId])
+  }
+  assert.equal(after.sceneEpoch, before.sceneEpoch)
+  assert.deepEqual(f.cancelledDrivers, [])
+  f.runtime.unmount()
+})
+
+test("identity refresh keeps a seated avatar and active speech", () => {
+  const f = mount()
+  f.render()
+  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+  f.store().sayPhrase("local", "Hello")
+  const before = f.store()
+  const timersBefore = f.timers.size
+  f.render({ partnerUser: { userId: "partner", displayName: "Irmak" }, participantAvatarSnapshots: {
+    local: { displayName: "Local", appearance: before.avatars.local.appearance },
+    partner: { displayName: "Irmak", appearance: before.avatars.partner.appearance }
+  } } as unknown as Partial<StoreInput>)
+  assert.equal(f.store().avatars.partner.seatedHotspotId, "sofa_corner")
+  assert.equal(f.store().avatars.partner.motion, "sitting")
+  assert.deepEqual(f.store().bubbles, before.bubbles)
+  assert.equal(f.store().avatars.local.motion, "speaking")
+  assert.equal(f.timers.size, timersBefore)
+  f.runtime.unmount()
+})
+
 test("a new partner resets avatars, speech and pending speech timers", () => {
   const f = mount()
   f.render().sayPhrase("partner", "Hello")

@@ -21,13 +21,17 @@ test("Shop displays the result of the current avatar save attempt", () => {
   assert.doesNotMatch(purchase, /title: avatarV2\.saveErrorMessage/)
 })
 
-test("scene and snapshot resets cancel the active movement loop first", () => {
+test("scene resets cancel movement first while identity refresh stays outside the reset", () => {
   const store = read("apps/mobile/src/features/miniRoom/scene/miniRoomSceneStore.ts")
 
   assert.match(
     store,
-    /useEffect\(\(\) => \{\s*for \(const ref of movementsRef\.current\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = createInitialAvatars[\s\S]*?snapMiniRoomAvatarPosition\(/
+    /useEffect\(\(\) => \{\s*for \(const ref of movementsRef\.current\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = initialAvatarsForScene\(\)[\s\S]*?snapMiniRoomAvatarPosition\(/
   )
+  assert.match(store, /const initialAvatarsForScene = useEffectEvent\(\(\) => createInitialAvatars\(/)
+  const resetDependencies = store.match(/setSelectedHotspotId\(undefined\)\s*\}, \[([\s\S]*?)\]\)/)?.[1]
+  assert.ok(resetDependencies)
+  assert.doesNotMatch(resetDependencies, /localDisplayName|partnerDisplayName|participantAvatarSnapshots/)
   assert.match(
     store,
     /for \(const ref of movements\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)/
@@ -50,21 +54,11 @@ test("reduced-motion policy is wired to decorative avatar motion", () => {
   assert.match(layer, /joinPulseRef\.setValue\(1\)/)
 })
 
-test("room entry motion respects the accessibility policy", () => {
+test("room entry and together-heart motion respect the same accessibility policy", () => {
   const scene = read("apps/mobile/src/features/miniRoom/scene/MiniRoomScene.tsx")
 
   assert.match(scene, /resolveMiniRoomMotionPolicy\(reduceMotion\)/)
   assert.match(scene, /!motionPolicy\.animateJoin/)
-})
-
-test("the retired together-sparkle pill no longer floats over the room (2026-10-01)", () => {
-  // Owner report: a large round sparkle bubble pulsed above "Sen" whenever
-  // the two avatars stood close. It carried no information or action.
-  const scene = read("apps/mobile/src/features/miniRoom/scene/MiniRoomScene.tsx")
-  const policy = read("apps/mobile/src/features/miniRoom/scene/miniRoomReducedMotion.ts")
-  const types = read("apps/mobile/src/features/miniRoom/scene/miniRoomSceneTypes.ts")
-
-  assert.doesNotMatch(scene, /TogetherHeart|together(Wrap|Inner)|sparkles/)
-  assert.doesNotMatch(policy, /animateHeart/)
-  assert.doesNotMatch(types, /proximityClose/)
+  assert.match(scene, /!motionPolicy\.animateHeart/)
+  assert.match(scene, /duration: motionPolicy\.transitionDuration/)
 })

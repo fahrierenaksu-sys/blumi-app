@@ -7,6 +7,7 @@ import {
 } from "../avatar/AvatarSelection";
 import {
   chatMessageListSchema,
+  chatParticipantSummarySchema,
   chatMessageReceivedSchema,
   chatReceiptUpdatedSchema,
   chatThreadListSchema,
@@ -94,6 +95,7 @@ const miniRoomInviteShape = {
 const miniRoomParticipantSchema = z.object({
   userId: id,
   displayName: z.string(),
+  profileUpdatedAt: timestamp.optional(),
   avatar: avatarSelectionSchema,
 });
 
@@ -188,6 +190,10 @@ export const serverEventPayloadSchemas = {
   }) satisfies z.ZodType<PayloadOf<"connection.matched">, z.ZodTypeDef, unknown>,
   "chat.thread_created":
     chatThreadSchema satisfies z.ZodType<PayloadOf<"chat.thread_created">, z.ZodTypeDef, unknown>,
+  "chat.participant_updated": z.object({
+    participant: chatParticipantSummarySchema,
+    updatedAt: timestamp,
+  }) satisfies z.ZodType<PayloadOf<"chat.participant_updated">, z.ZodTypeDef, unknown>,
   "chat.thread_listed":
     chatThreadListSchema satisfies z.ZodType<PayloadOf<"chat.thread_listed">, z.ZodTypeDef, unknown>,
   "chat.thread_read":

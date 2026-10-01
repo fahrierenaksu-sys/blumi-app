@@ -128,7 +128,8 @@ test("cards, sheets and bubbles use continuous (squircle) corners; circles stay 
       "avatarHeroTopPanel",
       "avatarHeroAction"
     ],
-    "src/components/DiscoverFiltersBottomSheet.tsx": ["ageCard", "stepperButton", "footer"],
+    // The filters footer is now a plain row of shared buttons; the sheet owns its rounded surface.
+    "src/components/DiscoverFiltersBottomSheet.tsx": ["sheet", "ageCard", "stepperButton"],
     "src/components/ReportModal.tsx": ["reasonCard"]
   }
   for (const [file, styles] of Object.entries(rounded)) {

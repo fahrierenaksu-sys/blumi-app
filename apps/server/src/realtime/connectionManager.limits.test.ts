@@ -276,25 +276,3 @@ test("the PostgreSQL publisher rejects an unsplit oversized users target instead
   await fanout.publish({ origin: "sender", target: { kind: "users", userIds: userIds.slice(0, 100) }, event: CHAT_EVENT })
   assert.equal(queries.length, 1)
 })
-
-test("a shed transient event is reported to drop listeners so its owner can resynchronize the socket", () => {
-  const manager = createConnectionManager()
-  const socket = createSocket()
-  const connection = manager.addConnection({ socket: socket as never, profile: createProfile("user_a") })
-  const dropped: Array<{ connectionId: string; type: string }> = []
-  const unsubscribe = manager.onTransientEventDropped((connectionId, event) => dropped.push({ connectionId, type: event.type }))
-  const moved = { type: "mini_room.avatar_moved", payload: { miniRoomId: "room", epoch: "e",
-    participantUserIds: ["user_a", "user_b"], avatar: { userId: "user_b", x: .5, y: .7, present: true, revision: 3 } } } as ServerEvent
-
-  manager.sendToConnection(connection.connectionId, moved)
-  assert.deepEqual(dropped, [], "a delivered event is not a drop")
-  socket.bufferedAmount = REALTIME_OUTBOUND_SOFT_LIMIT_BYTES + 1
-  manager.sendToConnection(connection.connectionId, moved)
-  manager.sendToUser("user_a", CHAT_EVENT)
-  assert.deepEqual(dropped, [{ connectionId: connection.connectionId, type: "mini_room.avatar_moved" }],
-    "only the shed transient event is reported, never a delivered durable one")
-
-  unsubscribe()
-  manager.sendToConnection(connection.connectionId, moved)
-  assert.equal(dropped.length, 1)
-})

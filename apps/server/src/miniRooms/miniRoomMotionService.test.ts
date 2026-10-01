@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS } from "./miniRoomMotionService"
+import { createMiniRoomMotionService } from "./miniRoomMotionService"
 
 test("room motion relays immediately, snapshots recover positions, and disconnect is per connection", async () => {
   const events: any[] = []
@@ -283,41 +283,4 @@ test("a room just verified by its acceptance is entered without another lookup; 
   service.prime({ ...record, endedAt: new Date(0).toISOString() })
   await service.enter("ca", "a", "room")
   assert.equal(lookups, 3, "an ended record is never primed")
-})
-
-test("a socket that missed a step is re-sent the current snapshot once, alone, after a short delay", async (context) => {
-  context.mock.timers.enable({ apis: ["setTimeout"] })
-  const events: any[] = []
-  const room = { miniRoomId: "room", participantUserIds: ["a", "b"], endedAt: undefined }
-  const service = createMiniRoomMotionService({ findRoom: async () => room as any,
-    hasBlockBetween: async () => false, emit: (connections, event) => events.push({ connections, event }) })
-  await service.enter("ca", "a", "room")
-  await service.enter("cb", "b", "room")
-  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
-  events.length = 0
-
-  // "cb" dropped that step under backpressure; a burst of drops coalesces.
-  service.resyncAfterDrop("cb", "room")
-  service.resyncAfterDrop("cb", "room")
-  await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .55, y: .7 })
-  service.resyncAfterDrop("cb", "room")
-  assert.equal(events.filter(e => e.event.type === "mini_room.motion_snapshot").length, 0, "not sent synchronously")
-  context.mock.timers.tick(MINI_ROOM_MOTION_RESYNC_DELAY_MS)
-  const snapshots = events.filter(e => e.event.type === "mini_room.motion_snapshot")
-  assert.equal(snapshots.length, 1)
-  assert.deepEqual(snapshots[0].connections, ["cb"], "the partner's socket is not re-sent anything")
-  const a = snapshots[0].event.payload.avatars.find((avatar: any) => avatar.userId === "a")
-  assert.equal(a.x, .55, "the snapshot carries the latest target")
-  assert.equal(a.revision, 3, "revisions are unchanged, so latest-wins still holds on the phone")
-
-  // A socket that left, or was superseded by a newer device, gets nothing.
-  service.resyncAfterDrop("cb", "room")
-  service.disconnect("cb")
-  service.resyncAfterDrop("ca", "room")
-  await service.enter("ca2", "a", "room")
-  service.resyncAfterDrop("unknown", "room")
-  service.resyncAfterDrop("ca2", "other-room")
-  events.length = 0
-  context.mock.timers.tick(MINI_ROOM_MOTION_RESYNC_DELAY_MS)
-  assert.deepEqual(events, [])
 })

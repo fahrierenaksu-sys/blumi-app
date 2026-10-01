@@ -8,6 +8,7 @@ import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
   applyChatMessageListed,
   applyChatMessageReceived,
+  applyChatParticipantUpdated,
   applyChatReceiptUpdated,
   applyChatThreadListed,
   applyChatThreadRead,
@@ -186,10 +187,6 @@ export function useGlobalRealtimeSession({
     isActive: () => receiptsEnabled && AppState.currentState === "active"
   }), [accountUserId, receiptsEnabled])
   useEffect(() => () => deliveryAcks.dispose(), [deliveryAcks])
-  // A reconnect sends acks the dropped socket refused or may have lost.
-  useEffect(() => subscribeToStatus((status) => {
-    deliveryAcks.noteConnection(status === "connected")
-  }), [deliveryAcks])
 
   // ── Typing (2026-10-01) ─────────────────────────────────
   // Memory only, per account and rollout: a switch or sign-out resets it.
@@ -208,6 +205,7 @@ export function useGlobalRealtimeSession({
       upsertRoomInvite,
       applyChatThreadListed: applyRealtimeThreadList,
       applyChatThreadRead,
+      applyChatParticipantUpdated,
       requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
       requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
       applyChatThreadCreated: applyNewThread,

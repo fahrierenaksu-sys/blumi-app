@@ -53,6 +53,7 @@ const completeAvatarSelectionSchema = z
 export const chatParticipantSummarySchema = z.object({
   userId: z.string().min(1),
   displayName: z.string().optional(),
+  profileUpdatedAt: isoDateSchema.optional(),
   avatar: completeAvatarSelectionSchema.optional()
 })
 

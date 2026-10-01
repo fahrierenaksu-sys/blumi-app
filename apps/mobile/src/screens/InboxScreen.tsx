@@ -27,13 +27,11 @@ import {
 } from "../features/inbox/inboxRowModel"
 import { useInboxClock } from "../features/inbox/useInboxClock"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { goBackFromInbox } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
 import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { BackButton } from "../ui/backButton"
 import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
 import { InboxLoadingSkeleton } from "../features/inbox/InboxLoadingSkeleton"
 import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
@@ -203,9 +201,6 @@ export function InboxScreen(props: InboxScreenProps) {
   const warmThread = useCallback((threadId: string) => {
     if (sessionActor.session.mode === "production") void onWarmThread(threadId)
   }, [onWarmThread, sessionActor.session.mode])
-  const handleGoBack = useCallback(() => {
-    goBackFromInbox(navigation)
-  }, [navigation])
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
   }, [navigation])
@@ -239,9 +234,6 @@ export function InboxScreen(props: InboxScreenProps) {
         <TopBar
           title={copy.title}
           titleAlign="start"
-          leftSlot={
-            <BackButton accessibilityLabel={copy.back} onPress={handleGoBack} />
-          }
           rightSlot={<View style={styles.topRightSpacer} />}
         />
 

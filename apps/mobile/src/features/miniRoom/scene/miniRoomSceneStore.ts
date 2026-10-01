@@ -1,5 +1,5 @@
 import { createInitialAvatars, deriveFacing } from "./miniRoomInitialAvatars"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { omitRoomWorldBlockers } from "../../roomWorld/roomWorldGeometry"
 import {
   createRoomWorldGeometryFromRoomV2Scene,
@@ -75,6 +75,7 @@ interface UseMiniRoomSceneStoreInput {
   bubbleLifetimeMs?: number
 }
 
+const PROXIMITY_CLOSE_DISTANCE = 0.18
 function cancelMiniRoomMovementRun(run: MiniRoomMovementRun): void {
   run.cancel()
 }
@@ -171,6 +172,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showNextSpeechBubbleRef = useRef<() => void>(() => undefined)
   const speechMotionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const initialAvatarsForScene = useEffectEvent(() => createInitialAvatars(
+    { localUserId, partnerUserId, participantAvatarSnapshots }, scene, geometry, usesRoomV2Scene
+  ))
 
   useEffect(() => {
     for (const ref of movementsRef.current.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
@@ -178,12 +182,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       movementCompletionTimerRef,
       clearTimeout
     )
-    const nextAvatars = createInitialAvatars(
-      { localUserId, partnerUserId, participantAvatarSnapshots },
-      scene,
-      geometry,
-      usesRoomV2Scene
-    )
+    const nextAvatars = initialAvatarsForScene()
     avatarsRef.current = nextAvatars
     setAvatars(nextAvatars)
     for (const avatar of Object.values(nextAvatars)) {
@@ -201,18 +200,34 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     speechMotionTimersRef.current.clear()
     setPressedPoint(undefined)
     setSelectedHotspotId(undefined)
-    // Display names are not read here, but a renamed participant restarts the scene.
   }, [
     geometry,
     getMotionDriver,
-    localDisplayName,
     localUserId,
-    participantAvatarSnapshots,
-    partnerDisplayName,
     partnerUserId,
     scene,
     usesRoomV2Scene
   ])
+
+  useEffect(() => {
+    // Identity is live metadata, not a new room. Keep walks, seats and speech.
+    setAvatars((current) => {
+      const next = { ...current }
+      let changed = false
+      for (const [userId, displayName, snapshot] of [
+        [localUserId, localDisplayName, participantAvatarSnapshots.local],
+        [partnerUserId, partnerDisplayName, participantAvatarSnapshots.partner]
+      ] as const) {
+        const avatar = current[userId]
+        if (!avatar || (avatar.displayName === displayName && avatar.appearance === snapshot.appearance)) continue
+        next[userId] = { ...avatar, displayName, appearance: snapshot.appearance }
+        changed = true
+      }
+      if (!changed) return current
+      avatarsRef.current = next
+      return next
+    })
+  }, [localDisplayName, localUserId, participantAvatarSnapshots, partnerDisplayName, partnerUserId])
 
   useEffect(() => {
     // The timer map is created once and only cleared, never replaced.
@@ -667,6 +682,13 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     [finishActiveSpeechBubble]
   )
 
+  const proximityClose = useMemo(() => {
+    const list = Object.values(avatars).filter(avatar => avatar.present !== false)
+    if (list.length < 2) return false
+    const [a, b] = list
+    return Math.hypot(a.x - b.x, a.y - b.y) <= PROXIMITY_CLOSE_DISTANCE
+  }, [avatars])
+
   useEffect(() => {
     const list = Object.values(avatars).filter(avatar => avatar.present !== false)
     if (list.length < 2) return
@@ -697,9 +719,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const interaction = useMemo(
     () => ({
       pressedPoint,
-      selectedHotspotId
+      selectedHotspotId,
+      proximityClose
     }),
-    [pressedPoint, selectedHotspotId]
+    [pressedPoint, proximityClose, selectedHotspotId]
   )
 
   const avatarIdsKey = Object.keys(avatars).join("\u0000")

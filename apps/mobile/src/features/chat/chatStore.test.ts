@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import {
   addOptimisticMessage,
   applyChatMessageListed,
@@ -25,6 +26,7 @@ import {
   markThreadRead,
   findThreadForPartner,
   applyChatThreadCreated,
+  applyChatParticipantUpdated,
   resetChatStore,
   subscribeToChatStore,
   setActiveThread,
@@ -35,6 +37,55 @@ import {
   getPartnerReceipts,
   getMessageRenderKey
 } from "./chatStore"
+
+test("profile updates refresh every loaded chat without changing history or unread, and survive stale lists", () => {
+  resetChatStore()
+  const thread = { threadId: "profile_thread", miniRoomId: "room", createdAt: "2026-10-01T10:00:00Z",
+    participantUserIds: ["me", "partner"] as [string, string],
+    participants: [{ userId: "me" }, { userId: "partner", displayName: "Eren" }] as import("@blumi/contracts").ChatThread["participants"],
+    unreadCount: 3 }
+  const otherThread = { ...thread, threadId: "profile_thread_two" }
+  applyChatThreadListed({ userId: "me", threads: [thread, otherThread] })
+  const oldRequest = beginChatThreadListRequest()
+  applyChatParticipantUpdated({ participant: { userId: "partner", displayName: "Irmak", avatar: { presetId: DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId, loadout: { ...DEFAULT_FEMALE_AVATAR_LOADOUT, accessoryIds: [...DEFAULT_FEMALE_AVATAR_LOADOUT.accessoryIds] }, revision: 2 } }, updatedAt: "2026-10-01T11:00:00Z" })
+  assert.equal(getThreads()[0].participants[1].displayName, "Irmak")
+  assert.equal(getThreads()[0].participants[1].avatar?.revision, 2)
+  assert.ok(getThreads().every((entry) => entry.participants[1].displayName === "Irmak"))
+  assert.equal(getThreadUnreadCount(thread.threadId), 3)
+  applyChatThreadListed({ userId: "me", threads: [thread] }, { requestSequence: oldRequest })
+  assert.equal(getThreads()[0].participants[1].displayName, "Irmak")
+  applyChatParticipantUpdated({ participant: { userId: "partner", displayName: "Eren" }, updatedAt: "2026-10-01T10:00:00Z" })
+  assert.equal(getThreads()[0].participants[1].displayName, "Irmak")
+  resetChatStore()
+  applyChatThreadListed({ userId: "other", threads: [thread] })
+  assert.equal(getThreads()[0].participants[1].displayName, "Eren", "account reset clears profile overrides")
+  resetChatStore()
+})
+
+test("a profile event before the first thread response is retained without inventing a conversation", () => {
+  resetChatStore()
+  const requestSequence = beginChatThreadListRequest()
+  applyChatParticipantUpdated({ participant: { userId: "partner", displayName: "Irmak" }, updatedAt: "2026-10-01T11:00:00Z" })
+  assert.deepEqual(getThreads(), [])
+  applyChatThreadListed({ userId: "me", threads: [{ threadId: "first", miniRoomId: "room", createdAt: "2026-10-01T10:00:00Z",
+    participantUserIds: ["me", "partner"], participants: [{ userId: "me" }, { userId: "partner", displayName: "Eren" }] }] }, { requestSequence })
+  assert.equal(getThreads()[0].participants[1].displayName, "Irmak")
+  resetChatStore()
+})
+
+test("a newer participant read on another page updates every visible copy of that person", () => {
+  resetChatStore()
+  const thread = { threadId: "old-page", miniRoomId: "room", createdAt: "2026-10-01T10:00:00Z",
+    participantUserIds: ["me", "partner"] as [string, string], participants: [{ userId: "me" }, {
+      userId: "partner", displayName: "Eren", profileUpdatedAt: "2026-10-01T10:00:00Z"
+    }] as import("@blumi/contracts").ChatThread["participants"] }
+  applyChatThreadListed({ userId: "me", threads: [thread] })
+  applyChatThreadListed({ userId: "me", append: true, threads: [{ ...thread, threadId: "new-page",
+    participants: [thread.participants[0], { userId: "partner", displayName: "Irmak", profileUpdatedAt: "2026-10-01T12:00:00Z" }] }] })
+  assert.ok(getThreads().every((entry) => entry.participants[1].displayName === "Irmak"))
+  assert.equal(findThreadForPartner("partner")?.participants[1].displayName, "Irmak")
+  resetChatStore()
+})
 
 test("an acknowledged bubble keeps its first local render key so the row never remounts (CHT-04)", () => {
   resetChatStore()

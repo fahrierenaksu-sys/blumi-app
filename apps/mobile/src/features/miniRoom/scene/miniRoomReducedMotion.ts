@@ -1,9 +1,11 @@
 export interface MiniRoomMotionPolicy {
   animateBreathe: boolean
   animateJoin: boolean
+  animateHeart: boolean
   animateSpeaking: boolean
   animateBubble: boolean
   animateWalking: boolean
+  transitionDuration: number
 }
 
 export const MINI_ROOM_ENTRY_DURATION_MS = 440
@@ -22,8 +24,10 @@ export function resolveMiniRoomMotionPolicy(
   return {
     animateBreathe: !reduceMotion,
     animateJoin: !reduceMotion,
+    animateHeart: !reduceMotion,
     animateSpeaking: !reduceMotion,
     animateBubble: !reduceMotion,
-    animateWalking: true
+    animateWalking: true,
+    transitionDuration: reduceMotion ? 0 : 420
   }
 }

@@ -35,6 +35,7 @@ export interface GlobalRealtimeEventHandlerDependencies {
   upsertRoomInvite: (invite: ChatRoomInviteTimelineItem) => void
   applyChatThreadListed: (payload: ChatThreadList) => void
   applyChatThreadRead?: (payload: ChatThreadRead) => void
+  applyChatParticipantUpdated?: (payload: Extract<ServerEvent, { type: "chat.participant_updated" }>["payload"]) => void
   requestThreadPage?: (cursor: string) => void
   requestThreadRefresh?: () => void
   applyChatThreadCreated: (
@@ -110,6 +111,11 @@ export function createGlobalRealtimeEventHandler(
 
     if (event.type === "mini_room.ready") {
       dependencies.openReadyMiniRoom(event.payload)
+      return
+    }
+
+    if (event.type === "chat.participant_updated") {
+      dependencies.applyChatParticipantUpdated?.(event.payload)
       return
     }
 

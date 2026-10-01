@@ -85,6 +85,22 @@ test("a failed OS query resolves to reduced motion", async () => {
   unsubscribe()
 })
 
+test("an OS change wins over a late initial query, including query failure", async () => {
+  for (const outcome of ["resolve", "reject"] as const) {
+    const fake = createSource()
+    const store = createReducedMotionStore(fake.source)
+    const unsubscribe = store.subscribe(() => undefined)
+    fake.emit(false)
+    if (outcome === "resolve") fake.queries[0]!.resolve(true)
+    else fake.queries[0]!.reject(new Error("unavailable"))
+    await flush()
+    assert.deepEqual(store.getSnapshot(), { reduceMotion: false, isResolved: true })
+    fake.emit(true)
+    assert.equal(store.getSnapshot().reduceMotion, true)
+    unsubscribe()
+  }
+})
+
 test("a query that returns after every consumer left cannot publish stale state", async () => {
   const fake = createSource()
   const store = createReducedMotionStore(fake.source)

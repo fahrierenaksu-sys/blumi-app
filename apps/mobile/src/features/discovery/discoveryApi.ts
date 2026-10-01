@@ -30,6 +30,7 @@ export type DiscoveryDecision = "like" | "pass"
 export interface DiscoverProfileRecord {
   userId: string
   displayName: string
+  updatedAt?: string
   age: number
   bio?: string
   prompts?: UserProfilePrompt[]
@@ -585,6 +586,7 @@ function normalizeDiscoverProfileRecord(
     typeof record.displayName !== "string" ||
     typeof record.age !== "number" ||
     (record.bio !== undefined && typeof record.bio !== "string") ||
+    (record.updatedAt !== undefined && (typeof record.updatedAt !== "string" || !Number.isFinite(Date.parse(record.updatedAt)))) ||
     typeof record.distanceLabel !== "string" ||
     !Array.isArray(record.vibeTags) ||
     !record.vibeTags.every((tag) => typeof tag === "string") ||
@@ -600,6 +602,7 @@ function normalizeDiscoverProfileRecord(
   return {
     userId: record.userId,
     displayName: record.displayName,
+    ...(record.updatedAt ? { updatedAt: record.updatedAt } : {}),
     age: record.age,
     bio: record.bio,
     prompts: normalizeUserProfilePrompts(record.prompts),

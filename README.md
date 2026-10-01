@@ -110,7 +110,7 @@ For a closer look at behavior under failure and concurrency:
 
 ### Requirements
 
-- Node.js 22.23.3 (`nvm use`, from `.nvmrc`) and npm 10+
+- Node.js 22.22.2 (`nvm use`) and npm 10+
 - PostgreSQL tools (`initdb`, `pg_ctl`) on `PATH` for full verification
 - Xcode and CocoaPods for native iOS development
 

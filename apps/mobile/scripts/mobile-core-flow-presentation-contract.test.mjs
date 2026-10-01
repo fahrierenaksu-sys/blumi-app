@@ -326,8 +326,9 @@ test("room debrief preserves the mini-room partner avatar snapshot", () => {
 
   assert.match(
     navigator,
-    /RoomDebrief:\s*\{[\s\S]*partner:\s*\{[\s\S]*userId:\s*string[\s\S]*displayName:\s*string[\s\S]*avatarSnapshot\?:\s*CandidateAvatarSnapshot[\s\S]*\}/
+    /RoomDebrief:\s*\{[\s\S]*partner:\s*MiniRoomParticipantsRouteParam\["partner"\]/
   )
+  assert.match(navigator, /partner: Pick<MiniRoomParticipant, "userId" \| "displayName" \| "profileUpdatedAt"> & \{\s*avatarSnapshot\?: CandidateAvatarSnapshot/)
   assert.match(miniRoom, /navigation\.replace\("RoomDebrief", \{[\s\S]*partner:\s*participants\.partner/)
   assert.match(debrief, /partner\.avatarSnapshot \? \(/)
   assert.match(debrief, /<CandidateAvatarPreview/)
@@ -359,20 +360,6 @@ test("MiniRoom uses durable speech bubbles without the legacy reaction UI", () =
   assert.doesNotMatch(avatarLayer, /RoomEmote|REACTION_ICON|emoteWrap/)
   assert.match(scene, /ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000/)
   assert.match(scene, /onDismissBubble/)
-})
-
-test("a confirmed MiniRoom leave never keeps the person in the room (2026-10-01)", () => {
-  const screen = read("src/screens/MiniRoomScreen.tsx")
-  const hook = read("src/features/miniRoom/useMiniRoomLeave.ts")
-
-  // The leave goes through the bounded exit-and-confirm flow, not a bare
-  // request whose failure re-enabled the arrow behind an alarming banner.
-  assert.match(screen, /useMiniRoomLeave\(\{/)
-  assert.doesNotMatch(screen, /leaveRoomSession/)
-  assert.doesNotMatch(screen, /leaveNotConfirmed|setLeaveError/)
-  assert.match(hook, /startMiniRoomLeave\(\{/)
-  assert.match(hook, /copy\.leftRoomUnconfirmed/)
-  assert.doesNotMatch(hook, /console\./)
 })
 
 test("leaving the MiniRoom always asks first, from the arrow, the menu or Android back (ROOM-08)", () => {

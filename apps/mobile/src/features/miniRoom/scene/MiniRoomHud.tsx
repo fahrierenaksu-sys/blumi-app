@@ -19,7 +19,7 @@ interface MiniRoomHudProps {
   horizontalInset: number
   headerTop: number
   headerBottom: number
-  /** Screen-level alerts (refresh, legacy decor, presence, failed send). */
+  /** Screen-level alerts (leave, refresh, legacy decor, failed send). */
   notices: readonly string[]
   onLeave: () => void
   onOpenSafety: () => void

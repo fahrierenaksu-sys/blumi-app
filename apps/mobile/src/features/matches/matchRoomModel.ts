@@ -7,6 +7,7 @@ export type MatchMode = "demo" | "local" | "futureBackend"
 export interface MatchParticipant {
   userId: string
   displayName: string
+  profileUpdatedAt?: string
   avatarPresetId?: string
   avatarSelection?: AvatarSelection
 }
@@ -87,6 +88,7 @@ export function createMatchFromPersistedThread(
     currentUser: {
       userId: currentUser.userId,
       displayName: currentUser.displayName,
+      profileUpdatedAt: currentUser.profileUpdatedAt,
       avatarPresetId: currentUser.avatar?.loadout?.bodyId ?? currentUser.avatar?.presetId,
       ...(currentUser.avatar
         ? { avatarSelection: cloneAvatarSelection(currentUser.avatar) }
@@ -95,6 +97,7 @@ export function createMatchFromPersistedThread(
     matchedUser: {
       userId: matchedUser.userId,
       displayName: matchedUser.displayName,
+      profileUpdatedAt: matchedUser.profileUpdatedAt,
       avatarPresetId: matchedUser.avatar?.loadout?.bodyId ?? matchedUser.avatar?.presetId,
       ...(matchedUser.avatar
         ? { avatarSelection: cloneAvatarSelection(matchedUser.avatar) }
@@ -109,6 +112,7 @@ function copyParticipant(participant: MatchParticipant): MatchParticipant {
   return {
     userId: participant.userId,
     displayName: participant.displayName,
+    ...(participant.profileUpdatedAt ? { profileUpdatedAt: participant.profileUpdatedAt } : {}),
     ...(participant.avatarPresetId ? { avatarPresetId: participant.avatarPresetId } : {}),
     ...(participant.avatarSelection
       ? { avatarSelection: cloneAvatarSelection(participant.avatarSelection) }

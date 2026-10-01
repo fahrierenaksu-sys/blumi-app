@@ -676,7 +676,8 @@ test("shop exit discards previews and cannot interrupt an active transaction", (
 
   assert.match(combinationSession, /const shopExitLocked = combinationState\.phase !== "editing"/)
   assert.match(combinationSession, /event\.preventDefault\(\)/)
-  assert.match(shop, /disabled=\{shopExitLocked\}/)
+  assert.match(shop, /useShopCombinationSession\(\{\s*navigation,/)
+  assert.match(combinationSession, /navigation\.addListener\("beforeRemove",[\s\S]*combinationStateRef\.current\.phase !== "editing"[\s\S]*event\.preventDefault\(\)/)
   assert.match(combinationSession, /dispatchCombination\(\{ type: "discard_draft" \}\)/)
 })
 
@@ -855,22 +856,6 @@ test("production MiniRoom carries and renders the partner avatar instead of a de
       existsSync(absoluteAssetPath),
       true,
       `Missing MiniRoom runtime asset: ${match[1]}`
-    )
-  }
-})
-
-test("MiniRoom ships no unused room props or reference sheets (2026-10-01)", () => {
-  // The bundled prop cut-outs, a speech-emote sheet and a generated avatar
-  // reference sheet were required by miniRoomAssets.ts but never rendered,
-  // so every build carried ~0.5 MB of art nobody saw.
-  const miniRoomAssetsPath = "src/features/miniRoom/scene/miniRoomAssets.ts"
-  const miniRoomAssets = read(miniRoomAssetsPath)
-  assert.doesNotMatch(miniRoomAssets, /speech_emote_sheet|generated_avatar_sheet_reference|prop_[a-z_0-9]+\.webp/)
-  for (const folder of ["ui", "props"]) {
-    assert.equal(
-      existsSync(resolve(mobileRoot, "src/features/miniRoom/assets/runtime", folder)),
-      false,
-      `Unused MiniRoom runtime folder still ships: ${folder}`
     )
   }
 })

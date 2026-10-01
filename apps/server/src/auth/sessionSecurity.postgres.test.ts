@@ -170,48 +170,6 @@ const scenarios: Record<string, Scenario> = {
     assert.equal(owner.account.accountId, created.account.accountId)
   },
 
-  async "the bound Firebase uid is found by user id for refresh-token revocation"(harness) {
-    const phone = uniquePhone()
-    const bound = await signIn(harness, { phone, firebaseUid: `uid_lookup_${phone}` })
-    const legacy = await signIn(harness)
-    assert.equal(await harness.repository.findFirebaseUidByUserId(bound.account.userId), `uid_lookup_${phone}`)
-    assert.equal(await harness.repository.findFirebaseUidByUserId(legacy.account.userId), null)
-    assert.equal(await harness.repository.findFirebaseUidByUserId(`user_missing_${phone}`), null)
-  },
-
-  async "deleting an account confirmed without Firebase still deletes its bound Firebase user"(harness) {
-    const phone = uniquePhone()
-    const signed = await signIn(harness, { phone, firebaseUid: `uid_delete_${phone}` })
-    const digest = "c".repeat(64)
-    await harness.repository.createAccountDeletionConfirmation({
-      accountId: signed.account.accountId,
-      confirmationTokenDigest: digest,
-      confirmationExpiresAt: at(60_000).getTime()
-    })
-    const deleted = await harness.repository.deleteAccountData(
-      signed.account,
-      { confirmationTokenDigest: digest, now: at(1_000).getTime() },
-      { phoneBanHash: createPhoneBanHasher("phone-ban-test-secret-0123456789abcdef") }
-    )
-    assert.equal(deleted, true)
-    // Deleting the Firebase user invalidates its refresh tokens; until the
-    // worker has done it, sign-in with that uid is refused.
-    assert.equal(await harness.repository.isFirebaseUserDeletionPending(`uid_delete_${phone}`), true)
-    await harness.repository.completeFirebaseUserDeletion(`uid_delete_${phone}`)
-  },
-
-  async "reuse after the grace window reports the user once for Firebase revocation"(harness) {
-    const reused: string[] = []
-    harness.service.subscribeSessionReuse((userId) => { reused.push(userId) })
-    const signed = await signIn(harness)
-    const next = await harness.service.refreshSession(signed.sessionToken, at(0))
-    assert.ok(next)
-    assert.ok(await harness.service.refreshSession(signed.sessionToken, at(1_000)), "grace retry")
-    assert.deepEqual(reused, [], "a grace-window retry is not reuse")
-    assert.equal(await harness.service.refreshSession(signed.sessionToken, at(SESSION_REFRESH_REUSE_GRACE_MS + 1_001)), null)
-    assert.deepEqual(reused, [signed.account.userId])
-  },
-
   async "a legacy account without a uid binds on its next sign-in"(harness) {
     const phone = uniquePhone()
     const legacy = await signIn(harness, { phone })

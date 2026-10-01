@@ -143,7 +143,7 @@ Final checkout verification on 2026-09-28: `npm run verify` passed after the rel
 
 ## Paneli aç
 
-Repo ana klasöründe `.nvmrc` sürümü (22.23.3) seçiliyken `npm run ops:center` çalıştır. Terminalin yazdığı `http://127.0.0.1:...` adresini aç; panel yalnızca bu bilgisayarda erişilebilir. Kapatmak için terminalde `Ctrl+C` kullan. Her panel isteğinde yerel Git dalı/değişiklik sayısı yeniden hesaplanır; ürün ve dış sağlayıcı durumları bu dosyanın tarihli anlık görüntüsüdür, Railway, Supabase veya başka hesaplardan canlı veri çekilmez.
+Repo ana klasöründe Node 22.22.2 seçiliyken `npm run ops:center` çalıştır. Terminalin yazdığı `http://127.0.0.1:...` adresini aç; panel yalnızca bu bilgisayarda erişilebilir. Kapatmak için terminalde `Ctrl+C` kullan. Her panel isteğinde yerel Git dalı/değişiklik sayısı yeniden hesaplanır; ürün ve dış sağlayıcı durumları bu dosyanın tarihli anlık görüntüsüdür, Railway, Supabase veya başka hesaplardan canlı veri çekilmez.
 
 ## At a glance
 

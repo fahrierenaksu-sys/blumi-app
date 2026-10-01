@@ -14,6 +14,7 @@ import type { ChatService } from "../chat/chatService"
 import type { PresenceService } from "../presence/presenceService"
 import type { SafetyService } from "../safety/safetyService"
 import { type LivekitTokenService } from "./livekitTokenService"
+import { createChatParticipants } from "./miniRoomParticipantProfiles"
 import {
   createInMemoryMiniRoomRepository,
   type MiniRoomInviteRecord,
@@ -947,24 +948,6 @@ function buildChatInviteResult(input: {
     participants,
     mediaSessions
   }
-}
-
-function createChatParticipants(
-  senderProfile: UserProfile,
-  recipientProfile: UserProfile
-): [MiniRoomParticipant, MiniRoomParticipant] {
-  return [
-    {
-      userId: senderProfile.userId,
-      displayName: senderProfile.displayName,
-      avatar: { ...senderProfile.avatar }
-    },
-    {
-      userId: recipientProfile.userId,
-      displayName: recipientProfile.displayName,
-      avatar: { ...recipientProfile.avatar }
-    }
-  ]
 }
 
 function inviteDenialMessage(reason: string | undefined): string {

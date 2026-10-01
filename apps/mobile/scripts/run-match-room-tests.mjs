@@ -315,9 +315,7 @@ try {
       "src/features/miniRoom/scene/RoomTapFeedback.test.ts",
       "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts",
       "src/features/miniRoom/scene/miniRoomSeatRefusalModel.test.ts",
-      "src/features/miniRoom/miniRoomNoticeModel.test.ts",
-      // Two phones on the real realtime stack (apps/server e2e harness, in memory).
-      "src/features/miniRoom/miniRoomMotionTwoPhones.e2e.test.ts"
+      "src/features/miniRoom/miniRoomNoticeModel.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

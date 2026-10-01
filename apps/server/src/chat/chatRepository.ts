@@ -1,6 +1,7 @@
 import type { ChatMessage, ChatPreferences, ChatReceiptCursor, ChatThread } from "@blumi/contracts"
 import { compareChatMessagePositions } from "@blumi/domain"
 import { randomUUID } from "node:crypto"
+import { chatParticipantFromProfile, type ChatParticipantProfile } from "./chatParticipantProfile"
 import { encodeThreadCursor, normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
 
 export interface ChatThreadPage { threads: ChatThread[]; nextCursor: string | null }
@@ -194,10 +195,20 @@ export function createInMemoryChatStore(): InMemoryChatStore {
 
 export function createInMemoryChatRepository(
   store: InMemoryChatStore = createInMemoryChatStore(),
-  options: { receiptsSupported?: boolean; blockSource?: ChatRepositoryBlockSource } = {}
+  options: { receiptsSupported?: boolean; blockSource?: ChatRepositoryBlockSource;
+    profileSource?: (userIds: readonly string[]) => Promise<ChatParticipantProfile[]> } = {}
 ): ChatRepository {
   const receiptsSupported = options.receiptsSupported ?? true
   const blockSource = options.blockSource
+  const hydrateParticipants = async (threads: ChatThread[]): Promise<ChatThread[]> => {
+    if (!options.profileSource || threads.length === 0) return threads
+    const profiles = new Map((await options.profileSource([...new Set(threads.flatMap((thread) => thread.participantUserIds))]))
+      .map((profile) => [profile.userId, profile]))
+    return threads.map((thread) => ({ ...thread, participants: thread.participants.map((participant) => {
+      const profile = profiles.get(participant.userId)
+      return profile ? chatParticipantFromProfile(profile, profile.profileUpdatedAt) : participant
+    }) as ChatThread["participants"] }))
+  }
   const cursorKey = (threadId: string, userId: string) => `${threadId}\0${userId}`
   const cursorsOf = (threadId: string, userId: string): InMemoryParticipantCursors =>
     store.cursorsByParticipant.get(cursorKey(threadId, userId)) ?? {}
@@ -238,18 +249,18 @@ export function createInMemoryChatRepository(
           (Date.parse(thread.createdAt) === Date.parse(cursor.createdAt) && thread.threadId < cursor.threadId))
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
-      const threads = candidates.slice(0, limit).map((thread) => {
+      const threads = await hydrateParticipants(candidates.slice(0, limit).map((thread) => {
           const lastReadAt = cursorsOf(thread.threadId, userId).readAt
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
             .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
           return { ...cloneThread(thread), unreadCount, ...(lastReadAt ? { lastReadAt } : {}) }
-        })
+        }))
       const last = threads.at(-1)
       return { threads, nextCursor: candidates.length > limit && last ? encodeThreadCursor({ userId, createdAt: last.createdAt, threadId: last.threadId }) : null }
     },
     async findThread(threadId) {
       const thread = store.threads.get(threadId)
-      return thread ? cloneThread(thread) : null
+      return thread ? (await hydrateParticipants([cloneThread(thread)]))[0]! : null
     },
     async findExistingThreadIds(threadIds) {
       return new Set(threadIds.filter((id) => store.threads.has(id)))

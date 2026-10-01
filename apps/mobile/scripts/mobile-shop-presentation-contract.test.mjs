@@ -79,7 +79,7 @@ test("shop removes misleading affordances and keeps compact labels legible", () 
 })
 
 test("every compact shop action keeps a 44 point touch target", () => {
-  assert.match(shopScreen, /accessibilityLabel=\{copy\.back\}[\s\S]*?size=\{44\}/)
+  assert.doesNotMatch(shopScreen, /accessibilityLabel=\{copy\.back\}/, "the bottom-tab Shop has no redundant back action")
   assert.match(shopScreenStyles, /coinPill:\s*\{[\s\S]*?minHeight:\s*44/)
   assert.match(shopNavigationControls, /modePill:\s*\{[\s\S]*?minHeight:\s*44/)
   assert.match(shopScreenStyles, /verticalCategoryChip:\s*\{[\s\S]*?minHeight:\s*44/)

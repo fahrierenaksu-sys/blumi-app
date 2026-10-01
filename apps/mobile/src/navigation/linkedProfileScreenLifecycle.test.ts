@@ -125,12 +125,26 @@ test("a demo profile resolves with the current locale's labels", () => {
   assert.equal(f.requests.length, 0)
 })
 
-test("a direct profile renders at once, without the loading reveal", () => {
-  const f = mount({ directProfile: { userId: "direct-1", displayName: "Direct" } })
+test("a demo direct profile renders at once, without the loading reveal", () => {
+  const f = mount({ demoMode: true, directProfile: { userId: "direct-1", displayName: "Direct" } })
   const output = f.render() as Element
   assert.equal(output.type, "ProfilePreviewScreen")
   assert.equal(output.props.profileOverride.userId, "direct-1")
   assert.equal(f.requests.length, 0)
+})
+
+test("a production card profile is read again so name, bio and preferences reflect the current account", async () => {
+  const f = mount({ directProfile: { userId: "partner", displayName: "Eren", bio: "old", tags: ["old"] } })
+  assert.equal((f.render() as Element).type, f.LoadingProfile)
+  assert.deepEqual(f.requests.map(({ userId }) => userId), ["partner"])
+  f.requests[0].resolve({ profile: { userId: "partner", displayName: "Irmak", age: 25,
+    bio: "new", vibeTags: ["Bookish"], prompts: [], distanceLabel: "Nearby" }, decision: { capability: "mutual-like" } })
+  await new Promise((resolve) => setImmediate(resolve))
+  const content = (f.runtime.output as Element).props.children as Element
+  assert.equal(content.props.profileOverride.displayName, "Irmak")
+  assert.equal(content.props.profileOverride.bio, "new")
+  assert.deepEqual(content.props.profileOverride.tags, ["Bookish"])
+  f.runtime.unmount()
 })
 
 test("a pending deep link shows the loading placeholder until the profile resolves", () => {

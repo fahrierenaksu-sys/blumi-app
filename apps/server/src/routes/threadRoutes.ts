@@ -47,6 +47,7 @@ import {
   type MiniRoomService
 } from "../miniRooms/miniRoomService"
 import type { NotificationService } from "../notifications/notificationService"
+import { profileFromAccount, resolvePairProfiles } from "../miniRooms/miniRoomParticipantProfiles"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import type { SafetyService } from "../safety/safetyService"
 import {
@@ -419,8 +420,8 @@ export async function registerThreadRoutes(
           try {
             const result = await miniRoomService.createChatInvite({
               threadId,
-              senderProfile: context.partnerAccount.profile,
-              recipientProfile: resolved.account.profile
+              senderProfile: profileFromAccount(context.partnerAccount),
+              recipientProfile: profileFromAccount(resolved.account)
             })
             if (result.created) {
               services.connectionManager.sendToUsers(
@@ -471,8 +472,8 @@ export async function registerThreadRoutes(
     try {
       const result = await miniRoomService.createChatInvite({
         threadId,
-        senderProfile: resolved.account.profile,
-        recipientProfile: context.partnerAccount.profile
+        senderProfile: profileFromAccount(resolved.account),
+        recipientProfile: profileFromAccount(context.partnerAccount)
       })
       if (result.created) {
         services.connectionManager.sendToUsers(
@@ -963,27 +964,6 @@ async function resolveMutualChatInviteContext(input: {
     return null
   }
   return { thread, partnerAccount }
-}
-
-/**
- * The [sender, recipient] profiles of an invite or room from the caller's
- * session account and the partner the invite context already read and
- * checked; the caller's moderation was checked with the session. Null when
- * the pair is not exactly the caller and that partner (answered 403).
- */
-function resolvePairProfiles(
-  pairUserIds: readonly [string, string],
-  callerAccount: { userId: string; profile: UserProfile },
-  partnerAccount: { userId: string; profile: UserProfile }
-): [UserProfile, UserProfile] | null {
-  if (pairUserIds[0] === pairUserIds[1]) return null
-  const profiles = new Map([
-    [callerAccount.userId, callerAccount.profile],
-    [partnerAccount.userId, partnerAccount.profile]
-  ])
-  const sender = profiles.get(pairUserIds[0])
-  const recipient = profiles.get(pairUserIds[1])
-  return sender && recipient ? [sender, recipient] : null
 }
 
 function sendUnavailableInviteContext(

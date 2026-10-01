@@ -3,6 +3,8 @@ import type { CompleteAvatarSelection } from "../avatar/AvatarSelection";
 export interface ChatParticipantSummary {
   userId: string;
   displayName?: string;
+  /** Persisted account version, so delayed replies cannot restore old identity. */
+  profileUpdatedAt?: string;
   /** Available only to the two members of an authorized mutual chat. */
   avatar?: CompleteAvatarSelection;
 }
@@ -86,11 +88,8 @@ export interface ChatReceiptUpdated {
 
 /**
  * `chat.ack_delivered` (2026-10-01): the sending device holds every partner
- * message up to and including `upToMessageId`. Cumulative and idempotent:
- * the server keeps the newest ack of each thread per socket and processes
- * them in order (never dropping a burst after the second thread); the client
- * paces large bursts and re-sends refused or possibly lost acks after a
- * reconnect.
+ * message up to and including `upToMessageId`. Cumulative, so a dropped ack
+ * is covered by the next one.
  */
 export interface ChatAckDeliveredCommand {
   threadId: string;

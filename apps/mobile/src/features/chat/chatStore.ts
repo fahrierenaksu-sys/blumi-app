@@ -26,8 +26,9 @@ import {
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
 import { forgetPartnerReceipts, getPartnerReceipts, resetPartnerReceipts, setPartnerReceipts } from "./chatPartnerReceiptsState"
-export { getPartnerReceipts } from "./chatPartnerReceiptsState"
 import { compareMessageOrder, forgetReadHere, getReadHereThrough, noteReadHere, resetReadHere } from "./chatReadHere"
+import { cloneKnownParticipant, cloneParticipant, preserveNewerParticipants, recordParticipantUpdate, resetParticipantUpdates, type ParticipantUpdate } from "./chatParticipantUpdates"
+export { getPartnerReceipts } from "./chatPartnerReceiptsState"
 export { getMessageRenderKey } from "./chatMessageRenderKeys"
 
 // ─── In-memory store ────────────────────────────────────────
@@ -102,6 +103,17 @@ let learnedSequenceByThreadId: Map<string, number> = new Map()
 let removedSequenceByThreadId: Map<string, number> = new Map()
 let pendingRealtimeListRequestSequence: number | null = null
 let lastAppliedListRequestSequence = 0
+export function applyChatParticipantUpdated(payload: ParticipantUpdate): void {
+  const userId = payload.participant.userId
+  const sequence = ++chatEventSequence
+  if (!recordParticipantUpdate({ ...payload, participant: cloneParticipant(payload.participant) }, sequence)) return
+  threadCache = threadCache.map((thread) => {
+    if (!thread.participantUserIds.includes(userId)) return thread
+    learnedSequenceByThreadId.set(thread.threadId, sequence)
+    return cloneThread(preserveNewerParticipants(thread, 0))
+  })
+  notify()
+}
 
 /** Marks the issue time of a list request whose reply is applied explicitly. */
 export function beginChatThreadListRequest(): number {
@@ -197,7 +209,7 @@ export function applyChatThreadListed(
       !message.messageId.startsWith("__local_") && (!thread.lastMessage || compareMessageOrder(message, thread.lastMessage) > 0))
     const latestMessage = newerMessages.reduce<ChatMessage | undefined>((latest, message) =>
       !latest || compareMessageOrder(message, latest) > 0 ? message : latest, thread.lastMessage)
-    merged.set(thread.threadId, cloneThread({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }))
+    merged.set(thread.threadId, cloneThread(preserveNewerParticipants({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }, listRequestSequence)))
     setPartnerReceipts(thread.threadId, applyReceiptSnapshot(getPartnerReceipts(thread.threadId), thread.partnerReceipts))
     const currentReadAt = readAtByThread.get(thread.threadId)
     if (thread.lastReadAt && (!currentReadAt || Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt))) readAtByThread.set(thread.threadId, thread.lastReadAt)
@@ -264,7 +276,7 @@ export function applyChatThreadCreated(thread: ChatThread): void {
   markThreadLearned(thread.threadId)
   // Dedupe by threadId, put newest first.
   const filtered = threadCache.filter((t) => t.threadId !== thread.threadId)
-  threadCache = [cloneThread(thread), ...filtered].sort(
+  threadCache = [cloneThread(preserveNewerParticipants(thread, lastAppliedListRequestSequence)), ...filtered].sort(
     (a, b) => (b.lastMessage?.sentAt ? Date.parse(b.lastMessage.sentAt) : 0) -
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
@@ -540,6 +552,7 @@ export function getRetryableMessage(messageId: string): {
 }
 
 export function resetChatStore(): void {
+  resetParticipantUpdates()
   threadCache = []
   messageCache = new Map()
   loadedHistoryThreads.clear()
@@ -698,29 +711,10 @@ function cloneThread(thread: ChatThread): ChatThread {
     ...thread,
     participantUserIds: [...thread.participantUserIds] as [string, string],
     participants: [
-      cloneParticipant(thread.participants[0]),
-      cloneParticipant(thread.participants[1])
+      cloneKnownParticipant(thread.participants[0]),
+      cloneKnownParticipant(thread.participants[1])
     ],
     lastMessage: thread.lastMessage ? { ...thread.lastMessage } : undefined
-  }
-}
-
-function cloneParticipant(
-  participant: ChatThread["participants"][number]
-): ChatThread["participants"][number] {
-  return {
-    ...participant,
-    ...(participant.avatar
-      ? {
-          avatar: {
-            ...participant.avatar,
-            loadout: {
-              ...participant.avatar.loadout,
-              accessoryIds: [...participant.avatar.loadout.accessoryIds]
-            }
-          }
-        }
-      : {})
   }
 }
 

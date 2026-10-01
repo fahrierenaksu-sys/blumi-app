@@ -158,23 +158,6 @@ test("partner messages are acknowledged over the socket only while receipts are 
   f.runtime.unmount()
 })
 
-test("a reconnect re-sends the delivery ack sent just before the socket dropped", (context) => {
-  context.mock.timers.enable({ apis: ["setTimeout"] })
-  const f = mount()
-  f.render({ receiptsEnabled: true })
-  f.emitStatus("connected")
-  f.acknowledge("m1")
-  context.mock.timers.tick(1_000)
-  f.emitStatus("reconnecting")
-  f.emitStatus("connected")
-  context.mock.timers.tick(1_000)
-  assert.deepEqual(f.sent.filter((event) => event.type === "chat.ack_delivered"), [
-    { type: "chat.ack_delivered", payload: { threadId: "thread-1", upToMessageId: "m1" } },
-    { type: "chat.ack_delivered", payload: { threadId: "thread-1", upToMessageId: "m1" } }
-  ])
-  f.runtime.unmount()
-})
-
 test("typing signals go out over the socket only while chat_typing is rolled out, per account", () => {
   const f = mount()
   f.render()

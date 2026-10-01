@@ -158,13 +158,14 @@ export interface CreateChatServiceOptions {
   repository?: ChatRepository
   idFactory?: () => string
   blockPolicy?: ChatBlockPolicy
+  profileSource?: (userIds: readonly string[]) => Promise<import("./chatParticipantProfile").ChatParticipantProfile[]>
 }
 
 export function createChatService(
   options: CreateChatServiceOptions = {}
 ): ChatService {
   const blockPolicy = options.blockPolicy
-  const repository = options.repository ?? createInMemoryChatRepository(undefined, { blockSource: blockPolicy })
+  const repository = options.repository ?? createInMemoryChatRepository(undefined, { blockSource: blockPolicy, profileSource: options.profileSource })
   const idFactory = options.idFactory ?? createMessageId
 
   const getVisibleThread = async (userId: string, threadId: string): Promise<ChatThread> => {

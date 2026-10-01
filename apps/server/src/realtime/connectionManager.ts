@@ -33,9 +33,7 @@ const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "presence.snapshot",
   "presence.nearby",
   "reaction.received",
-  // Superseded by the next step. A shed step is reported to
-  // onTransientEventDropped, and the MiniRoom motion service re-sends that
-  // socket the room snapshot (not transient), so a last step is not lost.
+  // Superseded by the next step; the room snapshot (not transient) re-syncs.
   "mini_room.avatar_moved",
   "chat.typing_updated", // A hint that lapses on the phone; the next start renews it.
   // Receipt cursors are cumulative: the next event or list refresh covers a
@@ -51,8 +49,6 @@ export interface RealtimeConnection {
   joinedRoomIds: Set<string>
   isAlive: boolean
   sessionFamilyId?: string
-  /** Increases with each socket this instance accepts: a reconnect is newer than the socket it replaces. */
-  openedOrder?: number
 }
 
 export interface ConnectionManager {
@@ -82,11 +78,6 @@ export interface ConnectionManager {
   publishAccessRevocation(revocation: RealtimeAccessRevocation): Promise<void>
   /** Revocations announced by other instances. */
   subscribeAccessRevocations(listener: (revocation: RealtimeAccessRevocation) => void): () => void
-  /**
-   * Called synchronously whenever a transient event is shed for a backed-up
-   * socket, so the event's owner can schedule a resync. Returns unsubscribe.
-   */
-  onTransientEventDropped(listener: (connectionId: string, event: ServerEvent) => void): () => void
 }
 
 export interface CreateConnectionManagerOptions {
@@ -124,8 +115,6 @@ export function createConnectionManager(
   const pendingOperations = new Set<Promise<unknown>>()
   const gapTerminationTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const slowSince = new Map<string, number>()
-  const transientDropListeners = new Set<(connectionId: string, event: ServerEvent) => void>()
-  let openedConnections = 0
   const softLimitBytes = options.outboundBuffer?.softLimitBytes ?? REALTIME_OUTBOUND_SOFT_LIMIT_BYTES
   const hardLimitBytes = options.outboundBuffer?.hardLimitBytes ?? REALTIME_OUTBOUND_HARD_LIMIT_BYTES
   const sustainedMs = options.outboundBuffer?.sustainedMs ?? REALTIME_OUTBOUND_SUSTAINED_MS
@@ -157,8 +146,7 @@ export function createConnectionManager(
         },
         socket,
         joinedRoomIds: new Set(),
-        isAlive: true,
-        openedOrder: ++openedConnections
+        isAlive: true
       }
       if (connections.has(connection.connectionId)) {
         throw new Error("Realtime connection ID is already active.")
@@ -284,10 +272,6 @@ export function createConnectionManager(
     },
     subscribeAccessRevocations(listener) {
       return options.fanout?.subscribeAccessRevocations?.(listener) ?? (() => undefined)
-    },
-    onTransientEventDropped(listener) {
-      transientDropListeners.add(listener)
-      return () => { transientDropListeners.delete(listener) }
     },
     closeFanout() {
       if (closedFanout) return closedFanout
@@ -420,10 +404,7 @@ export function createConnectionManager(
         closeSlowConsumer(connection)
         return
       }
-      if (TRANSIENT_EVENT_TYPES.has(event.type)) {
-        reportTransientDrop(connection.connectionId, event)
-        return
-      }
+      if (TRANSIENT_EVENT_TYPES.has(event.type)) return
     } else {
       slowSince.delete(connection.connectionId)
     }
@@ -433,13 +414,6 @@ export function createConnectionManager(
       encodedEvents.set(event, encoded)
     }
     socket.send(encoded)
-  }
-
-  function reportTransientDrop(connectionId: string, event: ServerEvent): void {
-    for (const listener of transientDropListeners) {
-      try { listener(connectionId, event) }
-      catch { /* A failing resync must not break delivery to this or other sockets. */ }
-    }
   }
 
   function closeSlowConsumer(connection: RealtimeConnection): void {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -77,6 +78,20 @@ test("a trusted remote snapshot keeps its server-derived body preset", () => {
   })
 
   assert.equal(snapshot.bodyPreset, "male")
+})
+
+test("a reused snapshot reflects a rename and newer saved outfit without regressing its revision", () => {
+  const avatar = (revision: number) => ({ presetId: DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId,
+    loadout: { ...DEFAULT_FEMALE_AVATAR_LOADOUT, accessoryIds: [...DEFAULT_FEMALE_AVATAR_LOADOUT.accessoryIds] }, revision })
+  const original = createCandidateAvatarSnapshot({ userId: "partner", displayName: "Eren", avatarSelection: avatar(1) })
+  const renamed = createCandidateAvatarSnapshot({ userId: "partner", displayName: "Irmak", avatarSnapshot: original })
+  assert.equal(renamed.displayName, "Irmak")
+  assert.equal(renamed.avatarSelection?.revision, 1)
+  const equipped = createCandidateAvatarSnapshot({ userId: "partner", displayName: "Irmak", avatarSnapshot: renamed, avatarSelection: avatar(3) })
+  assert.equal(equipped.avatarSelection?.revision, 3)
+  const late = createCandidateAvatarSnapshot({ userId: "partner", displayName: "Irmak", avatarSnapshot: equipped, avatarSelection: avatar(2) })
+  assert.equal(late.avatarSelection?.revision, 3)
+  assert.equal(createMiniRoomPartnerAvatarSnapshot({ userId: "partner", displayName: "Irmakkk", candidateAvatarSnapshot: original }).displayName, "Irmakkk")
 })
 
 test("female preview seeds keep their deterministic wardrobe variants", () => {

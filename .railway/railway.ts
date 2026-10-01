@@ -35,9 +35,6 @@ export default defineRailway((ctx) => {
       // CGNAT range; trust only that range so request.ip is the edge-appended
       // client address used by rate limits (verified in staging logs).
       BLUMI_TRUST_PROXY: "100.64.0.0/10",
-      // Railpack otherwise picks the newest release inside engines.node.
-      // Keep it equal to .nvmrc (checked by railway.test.ts).
-      RAILPACK_NODE_VERSION: "22.23.3",
       REVENUECAT_PURCHASE_ENVIRONMENT:
         ctx.environment === "staging" ? "sandbox" : "production",
     },

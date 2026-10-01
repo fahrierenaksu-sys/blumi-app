@@ -104,8 +104,7 @@ Status column: **Mitigated** (control in code and tested), **Partial**,
 |---|---|---|---|
 | S | Forged or replayed ID token | `firebase-admin` `verifyIdToken(idToken, true)` (signature, audience, revocation); `phone_number` and `auth_time` required (`firebaseAuth.ts`); sensitive actions need a fresh challenge bound to the session and `auth_time` (`consumeFirebaseActionChallenge`) | Mitigated |
 | S | Different Firebase user for an existing phone | **This wave:** uid binding and recovery routing (see B1) | Mitigated for uid change; see R2 |
-| S | Revoked Blumi session silently re-created from the device's Firebase refresh token (`/v1/auth/firebase/complete` accepts any valid ID token, and the Firebase SDK mints new ones without an SMS) | **2026-10-01:** after refresh-token reuse (`AuthService.subscribeSessionReuse`) and after a `ban` resolution (`adminRoutes.ts` `onUserBanned`), the server calls `firebase-admin` `revokeRefreshTokens(uid)` for the bound uid (`apps/server/src/auth/firebaseSessionRevocation.ts`, wired in `server.ts`, best effort after the commit, no ids logged). Existing ID tokens then fail `verifyIdToken(idToken, true)` (their `auth_time` is before `tokensValidAfterTime`), so only a new SMS verification signs in. Every `verifyIdToken` call site (`authRoutes.ts`, both in `userRoutes.ts`) goes through the one verifier, which always passes `checkRevoked`. Account deletion enqueues deletion of the confirming uid or, for an OTP-confirmed deletion, the bound uid (deleting the Firebase user revokes its tokens). Tests: `apps/server/src/auth/firebaseSessionRevocation.test.ts`, `sessionSecurity.postgres.test.ts` | Mitigated (best effort: a Firebase outage at that moment leaves the refresh tokens valid; the failure is logged by error code only) |
-| I | Firebase user left behind after deletion | Deletion outbox deletes the Firebase user (`apps/server/src/auth/firebaseUserDeletionWorker.ts`, migration 063), using the bound uid when the deletion was confirmed by OTP; sign-in refused while deletion is pending (`authRoutes.ts`) | Mitigated |
+| I | Firebase user left behind after deletion | Deletion outbox deletes the Firebase user (`apps/server/src/auth/firebaseUserDeletionWorker.ts`, migration 063); sign-in refused while deletion is pending (`authRoutes.ts`) | Mitigated |
 
 ### B5 — RevenueCat ↔ API
 
@@ -156,13 +155,7 @@ Values and rationale (implemented in `apps/server/src/auth/authStore.ts`):
 - **Reuse outside the grace window** (or of a parent whose successor was
   already used) deletes every token in the family and publishes
   `{ kind: "user" }` on the realtime revocation channel. The response stays
-  `401 Sign in again to continue.` **Since 2026-10-01** it also revokes the
-  bound Firebase user's refresh tokens (`revokeRefreshTokens`), because the
-  Firebase SDK on the same device could otherwise mint a fresh ID token
-  without an SMS and `/v1/auth/firebase/complete` would issue a new family.
-  `verifyIdToken(idToken, true)` rejects ID tokens minted before the
-  revocation. The member (and the thief) must verify the phone by SMS again.
-  The same revocation runs after an administrator bans an account.
+  `401 Sign in again to continue.`
 - **Absolute family lifetime 90 days** (`SESSION_FAMILY_MAX_LIFETIME_MS`):
   three sliding windows, so an active member re-verifies the phone at most
   once per quarter. The last token's expiry is capped at the family end.
@@ -177,7 +170,7 @@ Values and rationale (implemented in `apps/server/src/auth/authStore.ts`):
 
 | ID | Risk | Why it remains | Owner | Next step |
 |---|---|---|---|---|
-| R1 | A stolen token is usable until the thief or victim refreshes | Access and refresh share one bearer; reuse is detected only at the next refresh (sliding 30 days). Correction 2026-10-01: before that date, detected reuse did not end the attacker's access if they also held the device's Firebase refresh token, because a silently minted Firebase ID token re-created a session through `/v1/auth/firebase/complete`; reuse (and a ban) now revokes the bound Firebase user's refresh tokens (B4). Residual: revocation is best effort after the commit, accounts with no bound uid (legacy, not yet re-verified) have nothing to revoke, and a Firebase outage at that moment leaves the Firebase tokens valid | Server auth owner | Consider a short-lived access token plus refresh token split (W3); add a retry queue for failed Firebase revocations if R3 security events show failures |
+| R1 | A stolen token is usable until the thief or victim refreshes | Access and refresh share one bearer; reuse is detected only at the next refresh (sliding 30 days) | Server auth owner | Consider a short-lived access token plus refresh token split (W3) |
 | R2 | Recycled numbers are only partly covered | Firebase keeps the same uid for a phone number, so a recycled number usually yields the **same** uid; the binding catches uid changes (deleted/re-created Firebase user, project change), not every recycled number | Owner (product decision) + server auth owner | Evaluate re-verification after long inactivity or a second factor; add an operator rebind action (today a rebind is a reviewed `firebase_uid = NULL` update) |
 | R3 | Reuse detection and revocation are not logged as security events | No security event sink exists | Server auth owner | Add structured, PII-free security events |
 | R4 | Cross-instance realtime revocation takes up to 2 s | Revocation signal is in-process only (`realtimeAccessRevocation.ts`) | Realtime owner | Accept or add a shared invalidation bus |

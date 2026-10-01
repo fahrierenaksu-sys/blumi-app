@@ -131,6 +131,9 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     assert.equal(accepted.statusCode, 200)
     assert.equal(accepted.json().invite.status, "accepted")
     assert.equal(accepted.json().miniRoom.sourceThreadId, threadId)
+    const renamed = await app.inject({ method: "PATCH", url: "/v1/users/me",
+      headers: { authorization: `Bearer ${recipient.sessionToken}` }, payload: { displayName: "Irmak" } })
+    assert.equal(renamed.statusCode, 200)
 
     const rejoined = await app.inject({
       method: "POST",
@@ -142,6 +145,9 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     assert.equal(rejoined.json().miniRoom.miniRoomId, accepted.json().miniRoom.miniRoomId)
     assert.equal(rejoined.json().mediaSession.miniRoomId, accepted.json().miniRoom.miniRoomId)
     assert.equal(rejoined.json().participants.length, 2)
+    const livePartner = rejoined.json().participants.find((participant: { userId: string }) => participant.userId === recipient.userId)
+    assert.equal(livePartner.displayName, "Irmak")
+    assert.equal(livePartner.profileUpdatedAt, (await authService.repository.findAccountByUserId(recipient.userId))?.updatedAt)
 
     const acceptedAgain = await app.inject({
       method: "POST",

@@ -1,3 +1,4 @@
+import type { ReactionType } from "@blumi/contracts"
 import type { AccountRecoveryLocale } from "../session/accountRecoveryCopy"
 
 export interface MiniRoomCopy {
@@ -7,6 +8,7 @@ export interface MiniRoomCopy {
   leaveRoom: string
   retryRoomConnection: string
   retry: string
+  textRoom: string
   muteMicrophone: string
   turnOnMicrophone: string
   voiceOn: string
@@ -16,6 +18,7 @@ export interface MiniRoomCopy {
   moveAvatar: string
   moveAvatarHint: string
   welcome: (partnerFirstName: string) => string
+  sendReaction: (reaction: ReactionType) => string
   roomMessage: string
   roomMessagePlaceholder: string
   sendRoomMessage: string
@@ -42,8 +45,7 @@ export interface MiniRoomCopy {
   reconnecting: string
   connectionFailed: string
   roomRefreshFailed: string
-  /** Shown after the person left when the close for both could not be confirmed. */
-  leftRoomUnconfirmed: string
+  leaveNotConfirmed: string
   legacyDecorNotice: string
   leaveConfirmTitle: string
   leaveConfirmBody: string
@@ -69,6 +71,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     leaveRoom: "Leave room",
     retryRoomConnection: "Retry room connection",
     retry: "Retry",
+    textRoom: "Text room · voice off",
     muteMicrophone: "Mute microphone",
     turnOnMicrophone: "Turn on microphone",
     voiceOn: "Voice on",
@@ -78,6 +81,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     moveAvatar: "Move your avatar in the room",
     moveAvatarHint: "Tap a clear place to walk there",
     welcome: (partnerFirstName) => `You & ${partnerFirstName} · your cozy room`,
+    sendReaction: (reaction) => `Send ${reaction} reaction`,
     roomMessage: "Room message",
     roomMessagePlaceholder: "Write something…",
     sendRoomMessage: "Send room message",
@@ -104,7 +108,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     reconnecting: "Connection lost. Reconnecting…",
     connectionFailed: "Couldn't connect to the room.",
     roomRefreshFailed: "Room details could not be refreshed. Your current room is unchanged; it will retry after the next reconnection.",
-    leftRoomUnconfirmed: "You left the room. Its closing isn't confirmed yet; you can close it with your next invite.",
+    leaveNotConfirmed: "Leaving the room could not be confirmed. Check your connection and try again.",
     legacyDecorNotice: "This older session has no saved decor. A shared default room is shown.",
     leaveConfirmTitle: "Leave the room?",
     leaveConfirmBody: "The room closes for both of you.",
@@ -122,6 +126,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     leaveRoom: "Odadan ayrıl",
     retryRoomConnection: "Oda bağlantısını yeniden dene",
     retry: "Tekrar dene",
+    textRoom: "Yazılı oda · ses kapalı",
     muteMicrophone: "Mikrofonu kapat",
     turnOnMicrophone: "Mikrofonu aç",
     voiceOn: "Ses açık",
@@ -131,6 +136,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     moveAvatar: "Avatarını odada hareket ettir",
     moveAvatarHint: "Yürümek için boş bir yere dokun",
     welcome: (partnerFirstName) => `Sen ve ${partnerFirstName} · rahat odanız`,
+    sendReaction: (reaction) => `${REACTION_LABELS.tr[reaction]} tepkisi gönder`,
     roomMessage: "Oda mesajı",
     roomMessagePlaceholder: "Bir şey yaz…",
     sendRoomMessage: "Oda mesajını gönder",
@@ -157,7 +163,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     reconnecting: "Bağlantı koptu. Yeniden bağlanılıyor…",
     connectionFailed: "Oda bağlantısı kurulamadı.",
     roomRefreshFailed: "Oda bilgileri yenilenemedi. Mevcut oda korunuyor; bağlantı tekrar kurulunca yeniden denenecek.",
-    leftRoomUnconfirmed: "Odadan çıktın. Odanın kapandığı henüz onaylanmadı; bir sonraki davetinde kapatabilirsin.",
+    leaveNotConfirmed: "Odadan çıkış sunucuda doğrulanamadı. Bağlantını kontrol edip tekrar dene.",
     legacyDecorNotice: "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor.",
     leaveConfirmTitle: "Odadan ayrılmak istiyor musun?",
     leaveConfirmBody: "Oda ikiniz için de kapanır.",
@@ -167,5 +173,20 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     partnerAway: (partnerFirstName) => `${partnerFirstName} odadan uzaklaştı`,
     seatTaken: "Bu koltuk dolu",
     continuedOnOtherDevice: "Bu oda diğer cihazında devam ediyor."
+  }
+}
+
+const REACTION_LABELS: Record<AccountRecoveryLocale, Record<ReactionType, string>> = {
+  en: {
+    wave: "wave",
+    heart: "heart",
+    laugh: "laugh",
+    fire: "fire"
+  },
+  tr: {
+    wave: "El sallama",
+    heart: "Kalp",
+    laugh: "Gülme",
+    fire: "Ateş"
   }
 }

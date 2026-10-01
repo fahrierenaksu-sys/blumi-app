@@ -46,7 +46,14 @@ export function createCandidateAvatarSnapshot(input: {
     input.avatarSnapshot.kind === "candidate_avatar_snapshot" &&
     input.avatarSnapshot.userId === input.userId
   ) {
-    return input.avatarSnapshot
+    const snapshot = input.avatarSnapshot
+    const incoming = input.avatarSelection
+    if (incoming && (!snapshot.avatarSelection ||
+        (incoming.revision ?? -1) > (snapshot.avatarSelection.revision ?? -1))) {
+      return createCandidateAvatarSnapshot({ userId: input.userId, displayName: input.displayName, avatarSelection: incoming })
+    }
+    return snapshot.displayName === input.displayName
+      ? snapshot : { ...snapshot, displayName: input.displayName }
   }
 
   return {

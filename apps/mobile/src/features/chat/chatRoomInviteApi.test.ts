@@ -10,8 +10,7 @@ import {
   leaveActiveRoom,
   leaveRoomSession,
   RoomInviteApiError,
-  RoomSessionJoinError,
-  RoomSessionLeaveError
+  RoomSessionJoinError
 } from "./chatRoomInviteApi"
 
 const invite = {
@@ -146,15 +145,7 @@ test("room leave APIs require authenticated server acknowledgement", async () =>
   await assert.rejects(
     leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
       createJsonResponse(503, { error: "Rooms are temporarily unavailable." })
-    ) as typeof fetch),
-    (error: unknown) => error instanceof RoomSessionLeaveError && error.status === 503
-  )
-  // The leave flow decides from the status: 404 means nothing is left to close.
-  await assert.rejects(
-    leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
-      createJsonResponse(404, { error: "That room is not available." })
-    ) as typeof fetch),
-    (error: unknown) => error instanceof RoomSessionLeaveError && error.status === 404
+    ) as typeof fetch)
   )
   await assert.rejects(
     leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
@@ -258,7 +249,7 @@ test("room invite API joins an accepted session only with a server-issued room p
         },
         participants: [
           { userId: "user_one", displayName: "Mina", avatar: {} },
-          { userId: "user_two", displayName: "Defne", avatar: {} }
+          { userId: "user_two", displayName: "Defne", avatar: {}, profileUpdatedAt: "2026-10-01T12:00:00.000Z" }
         ]
       })
     }) as typeof fetch
@@ -266,6 +257,7 @@ test("room invite API joins an accepted session only with a server-issued room p
 
   assert.equal(ready.miniRoom.miniRoomId, "mini room")
   assert.equal(ready.participants[1]?.displayName, "Defne")
+  assert.equal(ready.participants[1]?.profileUpdatedAt, "2026-10-01T12:00:00.000Z")
   assert.equal(ready.miniRoom.sharedDecor?.revision, 2)
 })
 

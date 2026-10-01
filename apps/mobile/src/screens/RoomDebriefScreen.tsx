@@ -31,6 +31,7 @@ import {
   queueConnectionDecisionForDelivery
 } from "../features/connections/connectionDecisionRuntime"
 import type { ConnectionDecisionDeliveryDependencies } from "../features/connections/connectionDecisionDelivery"
+import { useLiveParticipantIdentity } from "../features/chat/useLiveParticipantIdentity"
 
 type RoomDebriefScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -46,7 +47,8 @@ const SERVER_DECISION_WINDOW_MS = 1600
 
 export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
   const { navigation, onDecisionDelivered, route, sessionActor } = props
-  const { miniRoomId, partner, durationSeconds, connected } = route.params
+  const { miniRoomId, durationSeconds, connected } = route.params
+  const partner = useLiveParticipantIdentity(route.params.partner) ?? route.params.partner
   const copy = getRoomDebriefCopy(
     resolveAccountRecoveryLocale(
       getNativeAppLocale(),
