@@ -86,8 +86,11 @@ export interface ChatReceiptUpdated {
 
 /**
  * `chat.ack_delivered` (2026-10-01): the sending device holds every partner
- * message up to and including `upToMessageId`. Cumulative, so a dropped ack
- * is covered by the next one.
+ * message up to and including `upToMessageId`. Cumulative and idempotent:
+ * the server keeps the newest ack of each thread per socket and processes
+ * them in order (never dropping a burst after the second thread); the client
+ * paces large bursts and re-sends refused or possibly lost acks after a
+ * reconnect.
  */
 export interface ChatAckDeliveredCommand {
   threadId: string;

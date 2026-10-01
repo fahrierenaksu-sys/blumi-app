@@ -186,6 +186,10 @@ export function useGlobalRealtimeSession({
     isActive: () => receiptsEnabled && AppState.currentState === "active"
   }), [accountUserId, receiptsEnabled])
   useEffect(() => () => deliveryAcks.dispose(), [deliveryAcks])
+  // A reconnect sends acks the dropped socket refused or may have lost.
+  useEffect(() => subscribeToStatus((status) => {
+    deliveryAcks.noteConnection(status === "connected")
+  }), [deliveryAcks])
 
   // ── Typing (2026-10-01) ─────────────────────────────────
   // Memory only, per account and rollout: a switch or sign-out resets it.

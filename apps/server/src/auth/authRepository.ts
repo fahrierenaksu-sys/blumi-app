@@ -58,6 +58,8 @@ export interface AuthRepository {
   retryFirebaseUserDeletion(uid: string, nextAttemptAt: Date): Promise<void>
   hasPendingFirebaseUserDeletion(accountId: string): Promise<boolean>
   isFirebaseUserDeletionPending(uid: string): Promise<boolean>
+  /** The Firebase uid bound to the account of `userId`, or null (unbound or no account). */
+  findFirebaseUidByUserId(userId: string): Promise<string | null>
   verifyAndCreateAccountDeletionConfirmation(input: AccountDeletionOtpVerificationInput): Promise<OtpVerificationResult>
   consumeAccountDeletionConfirmation(input: AccountDeletionConfirmationConsumption): Promise<boolean>
   getPendingAccountActionOtp(input: { accountId: string; purpose: AccountActionPurpose }): Promise<PendingAccountActionOtp | null>
@@ -361,6 +363,10 @@ export function createInMemoryAuthRepository(
     },
     async isFirebaseUserDeletionPending(uid) {
       return store.firebaseUserDeletionOutbox.has(uid)
+    },
+    async findFirebaseUidByUserId(userId) {
+      const account = [...store.accountsByPhone.values()].find((candidate) => candidate.userId === userId)
+      return account ? store.firebaseUidsByAccountId.get(account.accountId) ?? null : null
     },
     async saveFirebaseActionChallenge(challenge) {
       store.firebaseActionChallenges.set(`${challenge.accountId}:${challenge.purpose}`, { ...challenge })
@@ -1049,7 +1055,10 @@ export function createInMemoryAuthRepository(
           return false
         }
       }
-      const firebaseUid = store.accountDeletionConfirmations.get(account.accountId)?.firebaseUid
+      // The uid that confirmed the deletion, else the bound uid (an OTP-confirmed
+      // deletion): deleting the Firebase user also kills its refresh tokens.
+      const firebaseUid = store.accountDeletionConfirmations.get(account.accountId)?.firebaseUid ??
+        store.firebaseUidsByAccountId.get(account.accountId)
       if (firebaseUid) store.firebaseUserDeletionOutbox.set(firebaseUid, {
         uid: firebaseUid, accountId: account.accountId, nextAttemptAt: Date.now(), attemptCount: 0
       })

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type RawData, type WebSocket } from "ws"
 import proxyAddr from "@fastify/proxy-addr"
-import type { ClientEvent, ServerEvent } from "@blumi/contracts"
+import { chatAckDeliveredCommandSchema, type ClientEvent, type ServerEvent } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
 import type { ChatService } from "../chat/chatService"
 import type { ConnectionService } from "../connections/connectionService"
@@ -38,6 +38,7 @@ import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
 import type { CapabilityService } from "../capabilities/capabilityService"
 import { classifyRealtimeEvent, createRealtimeEventBudget } from "./realtimeEventBudget"
+import { createDeliveryAckQueue } from "./deliveryAckQueue"
 import { createRealtimeUpgradeLimiter } from "./realtimeUpgradeLimiter"
 
 /**
@@ -127,6 +128,14 @@ export function createRealtimeServer(
   })
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const eventBudget = createRealtimeEventBudget()
+  // Delivery acks: newest per thread, in order, never dropped for being busy.
+  const deliveryAcks = createDeliveryAckQueue({
+    run: (connectionId, payload) => track((async () => {
+      const connection = connectionManager.getConnection(connectionId)
+      if (!connection || closing || !await authorizeConnection(connection) || connection.socket.readyState !== 1) return
+      await router.handleClientEvent(connection, { type: "chat.ack_delivered", payload })
+    })())
+  })
   const upgradeLimiter = createRealtimeUpgradeLimiter({
     attemptsPerAddress: options.upgradeAttemptsPerAddressWindow,
     failuresPerAddress: options.failedUpgradesPerAddressWindow,
@@ -411,6 +420,7 @@ export function createRealtimeServer(
       // The user's windows outlive the socket: a reconnect inside a window
       // must not reset the per-user budget. The heartbeat purges them.
       eventBudget.forgetConnection(connection.connectionId)
+      deliveryAcks.forgetConnection(connection.connectionId)
       if (!removed) return
       router.releaseConnection(removed)
       // Lease cleanup is batched (2026-10-01): a transaction per socket made a
@@ -441,6 +451,7 @@ export function createRealtimeServer(
   const heartbeat = setInterval(() => {
     const now = Date.now()
     eventBudget.purgeExpired(now)
+    deliveryAcks.purgeExpired(now)
     upgradeLimiter.purgeExpired(now)
     const dueForRenewal: RealtimeConnection[] = []
     for (const connection of connectionManager.listConnections()) {
@@ -581,6 +592,13 @@ export function createRealtimeServer(
       // replaces a pending one with the latest, so the slot is not held here.
       admission.release()
       await handleMovement(connection, event)
+      return
+    }
+    if (eventClass === "receipt" && admission.kind === "admit") {
+      // Malformed acks are dropped silently, as in the router.
+      admission.release()
+      const ack = chatAckDeliveredCommandSchema.safeParse(event?.payload)
+      if (ack.success) deliveryAcks.enqueue({ connectionId: connection.connectionId, userId: connection.userId, ack: ack.data })
       return
     }
     if (admission.kind === "refuse_chat") {
@@ -724,6 +742,7 @@ export function createRealtimeServer(
       closing = true
       for (const unsubscribe of unsubscribeAccessRevocations) unsubscribe?.()
       clearInterval(heartbeat)
+      deliveryAcks.close()
       clearInterval(authorizationSweep)
       clearInterval(connectionLeaseCleanup)
       const socketsClosed = new Promise<void>((resolve) => {

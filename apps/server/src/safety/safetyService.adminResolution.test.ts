@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createSafetyService, ReportResolutionConflictError } from "./safetyService"
+import {
+  createSafetyService,
+  ReportedAccountDeletedError,
+  ReportResolutionConflictError
+} from "./safetyService"
 
 test("moderation resolution requires identity and only one concurrent decision wins", async () => {
   const service = createSafetyService({ idFactory: () => "report_atomic" })
@@ -47,4 +51,30 @@ test("a suspension keeps its end time in the report-resolution audit", async () 
   }, now)
 
   assert.equal((await service.findReport("report_suspend"))?.resolution?.suspendedUntil, suspendedUntil)
+})
+
+test("a retained report about a deleted account cannot be turned into a suspension or ban", async () => {
+  const known = new Set(["reporter", "reported"])
+  const service = createSafetyService({
+    idFactory: () => "report_deleted_target",
+    isKnownUser: async (userId) => known.has(userId)
+  })
+  await service.reportUser("reporter", { reportedUserId: "reported", reason: "harassment" })
+  known.delete("reported")
+  for (const action of ["ban", "suspend"]) {
+    await assert.rejects(
+      service.resolveReport("report_deleted_target", {
+        action,
+        ...(action === "suspend" ? { suspendedUntil: new Date(Date.now() + 86_400_000).toISOString() } : {}),
+        admin: { operatorId: "moderator-a", tokenId: "token-a" }
+      }),
+      ReportedAccountDeletedError
+    )
+  }
+  assert.equal((await service.findReport("report_deleted_target"))?.status, "pending")
+  const warned = await service.resolveReport("report_deleted_target", {
+    action: "warn",
+    admin: { operatorId: "moderator-a", tokenId: "token-a" }
+  })
+  assert.equal(warned?.status, "resolved")
 })

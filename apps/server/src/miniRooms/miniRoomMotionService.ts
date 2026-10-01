@@ -17,6 +17,13 @@ const REVALIDATE_AFTER_MS = 10_000
 const MAX_STALE_MS = 60_000
 const IDLE_ROOM_RETENTION_MS = 60_000
 const MAX_IDLE_ROOMS = 128
+/**
+ * A socket that shed an avatar step under backpressure is re-sent the room
+ * snapshot after this delay (one per socket however many steps it shed), so
+ * the buffer can drain first and a partner who stopped walking is not left
+ * frozen at an older target until the next enter or exit.
+ */
+export const MINI_ROOM_MOTION_RESYNC_DELAY_MS = 250
 
 /**
  * Ephemeral scene state, never persisted room ownership or durable chat.
@@ -41,10 +48,12 @@ export function createMiniRoomMotionService(options: {
   const emitToRoom = (room: MotionRoom, event: ServerEvent) => {
     if (room.connections.size) options.emit([...room.connections.keys()], event)
   }
-  const emitSnapshot = (id: string, room: MotionRoom) => emitToRoom(room, {
+  const snapshotEvent = (id: string, room: MotionRoom): ServerEvent => ({
     type: "mini_room.motion_snapshot", payload: { miniRoomId: id, epoch,
       participantUserIds: room.participantUserIds, avatars: [...room.avatars.values()].map(a => ({ ...a })) }
   })
+  const emitSnapshot = (id: string, room: MotionRoom) => emitToRoom(room, snapshotEvent(id, room))
+  const pendingResyncs = new Set<string>()
   function createMotionRoom(stored: MiniRoomRecord): MotionRoom {
     return {
       participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
@@ -170,6 +179,23 @@ export function createMiniRoomMotionService(options: {
       rooms.set(stored.miniRoomId, room)
     },
     disconnect(connectionId: string, onlyRoomId?: string) { disconnect(connectionId, onlyRoomId) },
+    /**
+     * The connection manager shed an avatar_moved for this socket. Re-send it
+     * the current snapshot, once, after a short delay. State and revisions are
+     * untouched, so latest-wins and seat claims hold; a socket that left the
+     * scene or was superseded meanwhile gets nothing. Local delivery only.
+     */
+    resyncAfterDrop(connectionId: string, id: string) {
+      const key = `${id}\u0000${connectionId}`
+      if (pendingResyncs.has(key) || !rooms.get(id)?.connections.has(connectionId)) return
+      pendingResyncs.add(key)
+      const timer = setTimeout(() => {
+        pendingResyncs.delete(key)
+        const room = rooms.get(id)
+        if (room?.connections.has(connectionId)) options.emit([connectionId], snapshotEvent(id, room))
+      }, MINI_ROOM_MOTION_RESYNC_DELAY_MS)
+      timer.unref?.()
+    },
     async enter(connectionId: string, userId: string, id: string) {
       if (typeof id !== "string" || !id || id.length > 128) return
       evictIdleRooms()
