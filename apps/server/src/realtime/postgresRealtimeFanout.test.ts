@@ -63,10 +63,15 @@ test("postgres realtime fanout listens, ignores malformed notifications, and rel
   await waitFor(() => received.length === 1)
   assert.deepEqual(received, [message])
   await unsubscribe()
+  // The control channel (peer hellos, revocations) shares the LISTEN client;
+  // the first hello goes out on it, never through the shared pool.
   assert.deepEqual(pool.client.queries, [
     "SET statement_timeout = '5s'",
-    "LISTEN blumi_realtime"
+    "LISTEN blumi_realtime",
+    "LISTEN blumi_realtime_control",
+    "SELECT pg_notify($1, $2)"
   ])
+  assert.deepEqual(pool.queries, [])
   assert.equal(pool.client.released, true)
 })
 
