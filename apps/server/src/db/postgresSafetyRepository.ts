@@ -331,8 +331,19 @@ export function createPostgresSafetyRepository(
 
     async resolveReport(reportId, resolution) {
       const status = resolution.action === "dismiss" ? "dismissed" : "resolved"
+      // A suspend/ban first locks the reported account row. Account deletion
+      // locks the same row before it deletes it (and records a phone ban for a
+      // banned account), so a ban either commits first and is carried over,
+      // or finds the account gone and is refused instead of being recorded
+      // as an enforcement nobody received.
       const result = await pool.query(
-        `WITH resolved_report AS (
+        `WITH target_account AS (
+           SELECT account_id
+             FROM blumi_accounts
+            WHERE $3 IN ('suspend', 'ban')
+              AND user_id = (SELECT reported_user_id FROM blumi_safety_reports WHERE report_id = $1)
+            FOR UPDATE
+         ), resolved_report AS (
            UPDATE blumi_safety_reports
               SET status = $2,
                   resolution_action = $3,
@@ -343,6 +354,7 @@ export function createPostgresSafetyRepository(
                   resolution_suspended_until = $8
             WHERE report_id = $1
               AND status = 'pending'
+              AND ($3 NOT IN ('suspend', 'ban') OR EXISTS (SELECT 1 FROM target_account))
           RETURNING report_id, reported_user_id
          ), moderated_account AS (
            UPDATE blumi_accounts
@@ -400,7 +412,11 @@ export function createPostgresSafetyRepository(
           WHERE report_id = $1`,
         [reportId]
       )
-      return current.rows[0] ? "conflict" : "not_found"
+      if (!current.rows[0]) return "not_found"
+      if (current.rows[0].status === "pending" && ["suspend", "ban"].includes(resolution.action)) {
+        return "reported_account_missing"
+      }
+      return "conflict"
     }
   }
 }

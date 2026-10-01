@@ -1561,8 +1561,14 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "DELETE FROM blumi_safety_blocks WHERE actor_user_id = $1 OR blocked_user_id = $1",
           [account.userId]
         )
+        // Open reports AGAINST this account are safety evidence and stay in the
+        // moderation queue (no FK to accounts); the account's own reports and
+        // closed reports about it go. Retention period and phone linkage:
+        // docs/quality/ACCOUNT_DELETION_SAFETY_DESIGN_2026-10-01.md.
         await client.query(
-          "DELETE FROM blumi_safety_reports WHERE actor_user_id = $1 OR reported_user_id = $1",
+          `DELETE FROM blumi_safety_reports
+            WHERE actor_user_id = $1
+               OR (reported_user_id = $1 AND status <> 'pending')`,
           [account.userId]
         )
         await client.query(

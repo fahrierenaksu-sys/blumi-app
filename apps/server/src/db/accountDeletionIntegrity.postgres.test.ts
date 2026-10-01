@@ -8,6 +8,8 @@ import { createChatService } from "../chat/chatService"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createPostgresMiniRoomRepository } from "./postgresMiniRoomRepository"
+import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
+import { ReportedAccountDeletedError, createSafetyService } from "../safety/safetyService"
 
 // Account deletion against the real schema. Foreign keys (for example
 // blumi_mini_rooms.invite_id -> blumi_mini_room_invites, NO ACTION) only fail
@@ -79,6 +81,62 @@ async function remainingReferences(pool: Pool, account: AccountRecord): Promise<
   }
   return remaining
 }
+
+test("PostgreSQL account deletion keeps pending reports against the account as safety evidence and refuses a later ban", requirePostgres, async () => {
+  const pool = openPool()
+  const suffix = randomUUID()
+  try {
+    const reported = await insertAccount(pool, `del_reported_${suffix}`)
+    const reporter = await insertAccount(pool, `del_reporter_${suffix}`)
+    const other = await insertAccount(pool, `del_other_${suffix}`)
+    const safety = createSafetyService({
+      repository: createPostgresSafetyRepository(pool),
+      isKnownUser: async (userId) =>
+        Boolean((await pool.query("SELECT 1 FROM blumi_accounts WHERE user_id = $1", [userId])).rowCount)
+    })
+    let sequence = 0
+    const report = async (actor: AccountRecord, target: AccountRecord) => {
+      sequence += 1
+      return (await safety.reportUser(actor.userId, {
+        reportedUserId: target.userId, reason: "harassment", note: "evidence", idempotencyKey: `key_${sequence}_${suffix}`
+      })).report.reportId
+    }
+    const pendingAgainst = await report(reporter, reported)
+    const resolvedAgainst = await report(other, reported)
+    await safety.resolveReport(resolvedAgainst, { action: "warn", admin: { operatorId: "op", tokenId: "tok" } })
+    const filedByDeleted = await report(reported, other)
+
+    assert.equal(await createPostgresAuthRepository(pool).deleteAccountData(reported, undefined, { phoneBanHash }), true)
+
+    const rows = await pool.query<{ report_id: string; status: string }>(
+      "SELECT report_id, status FROM blumi_safety_reports WHERE report_id = ANY($1) ORDER BY report_id",
+      [[pendingAgainst, resolvedAgainst, filedByDeleted]]
+    )
+    assert.deepEqual(rows.rows, [{ report_id: pendingAgainst, status: "pending" }],
+      "only the open report against the deleted account survives; its own reports and closed ones go")
+    assert.deepEqual(await remainingReferences(pool, reported), ["blumi_safety_reports.reported_user_id"])
+
+    // The account is gone, so a ban cannot land on it (and no phone ban can be
+    // derived): the moderator is told instead of seeing a fake "banned" record.
+    for (const action of ["ban", "suspend"] as const) {
+      await assert.rejects(
+        safety.resolveReport(pendingAgainst, {
+          action,
+          ...(action === "suspend" ? { suspendedUntil: new Date(Date.now() + 86_400_000).toISOString() } : {}),
+          admin: { operatorId: "op", tokenId: "tok" }
+        }),
+        ReportedAccountDeletedError
+      )
+    }
+    assert.equal(await createPostgresSafetyRepository(pool).resolveReport(pendingAgainst, {
+      action: "ban", resolvedAt: new Date().toISOString(), resolvedByAdminId: "op", resolvedByTokenId: "tok"
+    }), "reported_account_missing", "the repository refuses atomically, not only the service pre-check")
+    const dismissed = await safety.resolveReport(pendingAgainst, { action: "dismiss", admin: { operatorId: "op", tokenId: "tok" } })
+    assert.equal(dismissed?.status, "dismissed")
+  } finally {
+    await pool.end()
+  }
+})
 
 test("PostgreSQL account deletion succeeds after an accepted chat room invite and leaves no rows naming the account", requirePostgres, async () => {
   const pool = openPool()
