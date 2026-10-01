@@ -146,6 +146,59 @@ export function getOnboardingBootGateRemainingMs(
   return plan.delayMs + plan.durationMs
 }
 
+/** How long after the boot surface leaves a loading scan may still resume it. */
+export const ONBOARDING_BOOT_RESUME_WINDOW_MS = 1_000
+
+let mountedBootSurfaces = 0
+let bootSurfaceVisibleUntilMs: number | null = null
+
+/** Called by the boot loading surface while it is on screen; returns its release. */
+export function markOnboardingBootSurfaceVisible(): () => void {
+  mountedBootSurfaces += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    mountedBootSurfaces = Math.max(0, mountedBootSurfaces - 1)
+    bootSurfaceVisibleUntilMs = Date.now()
+  }
+}
+
+export function readOnboardingBootSurfaceHandoff(): {
+  bootSurfaceVisible: boolean
+  bootSurfaceVisibleUntilMs: number | null
+} {
+  return {
+    bootSurfaceVisible: mountedBootSurfaces > 0,
+    bootSurfaceVisibleUntilMs
+  }
+}
+
+/**
+ * A loading scan that takes over directly from the boot surface (cold start
+ * into Discover) continues the same clock and skips its image gate, because
+ * the same images are on screen. Later scans (sign-in) start fresh.
+ */
+export function getOnboardingLoadingScanResume(input: {
+  nowMs: number
+  bootSurfaceVisible: boolean
+  bootSurfaceVisibleUntilMs: number | null
+  bootElapsedMs: number
+}): { startElapsedMs: number; resumesBootScan: boolean } {
+  const handsOver = input.bootSurfaceVisible || (
+    input.bootSurfaceVisibleUntilMs !== null &&
+    input.nowMs - input.bootSurfaceVisibleUntilMs <= ONBOARDING_BOOT_RESUME_WINDOW_MS
+  )
+  if (!handsOver) return { startElapsedMs: 0, resumesBootScan: false }
+  return {
+    startElapsedMs: Math.min(
+      Math.max(0, input.bootElapsedMs),
+      ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete
+    ),
+    resumesBootScan: true
+  }
+}
+
 export function beginOnboardingBootPrelude(nowMs = Date.now()): number {
   if (onboardingBootStartedAtMs === null) {
     onboardingBootStartedAtMs = nowMs

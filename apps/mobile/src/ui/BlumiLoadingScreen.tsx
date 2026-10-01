@@ -9,7 +9,10 @@ import {
   getOnboardingBootPreludeElapsedMs,
   getOnboardingBootPreludeElapsedSnapshotMs,
   getOnboardingBrandPreludeProgressAtElapsed,
+  getOnboardingLoadingScanResume,
   hydrateOnboardingBootPreludeStart,
+  markOnboardingBootSurfaceVisible,
+  readOnboardingBootSurfaceHandoff,
   shouldReduceOnboardingBootMotion
 } from "../features/session/onboardingBrandPreludeModel"
 import {
@@ -54,6 +57,8 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   const scanSweep = useRef(new Animated.Value(0)).current
   const scanOpacity = useRef(new Animated.Value(1)).current
   const initialElapsedMs = bootTiming.initialElapsedMs
+
+  useLayoutEffect(() => markOnboardingBootSurfaceVisible(), [])
 
   useLayoutEffect(() => {
     if (bootInitializedRef.current) return
@@ -164,7 +169,11 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   )
 }
 
-/** Discover has a local clock: the native onboarding clock may already be over. */
+/**
+ * Covers Discover until it is ready. Straight after the boot surface (cold
+ * start) it continues the boot scan on the shared clock with the images
+ * already on screen; later (sign-in) it plays its own scan once loaded.
+ */
 export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   onFinished: () => void
   onError: () => void
@@ -173,11 +182,18 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   const nativeReduceMotion = getNativeOnboardingBootReduceMotion()
   const motionResolved = isResolved || nativeReduceMotion !== null
   const reduced = isResolved ? reduceMotion : nativeReduceMotion ?? false
+  const [resume] = useState(() => getOnboardingLoadingScanResume({
+    nowMs: Date.now(),
+    ...readOnboardingBootSurfaceHandoff(),
+    bootElapsedMs: getOnboardingBootPreludeElapsedSnapshotMs()
+  }))
+  const startMs = resume.startElapsedMs
   const [loadedAssets, setLoadedAssets] = useState<readonly number[]>([])
   const requiredAssetCount = ONBOARDING_SCAN_FRAMES.length + 1
-  const assetsReady = loadedAssets.length === requiredAssetCount
-  const scanRows = useRef(new Animated.Value(0)).current
-  const scanSweep = useRef(new Animated.Value(0)).current
+  const assetsReady = resume.resumesBootScan || loadedAssets.length === requiredAssetCount
+  const startProgress = getOnboardingBrandPreludeProgressAtElapsed(startMs)
+  const scanRows = useRef(new Animated.Value(startProgress.scanRows)).current
+  const scanSweep = useRef(new Animated.Value(startProgress.scanSweep)).current
   const completed = useRef(false)
   const onAssetLoad = useCallback((id: number) => {
     if (!Number.isInteger(id) || id < 0 || id >= requiredAssetCount) return
@@ -186,7 +202,7 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
 
   useEffect(() => {
     if (!assetsReady || !motionResolved || completed.current) return
-    if (reduced) {
+    if (reduced || startMs >= timeline.scanDissolveComplete) {
       scanRows.setValue(1)
       scanSweep.setValue(1)
       completed.current = true
@@ -197,18 +213,19 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
     const animation = Animated.sequence([
       Animated.parallel([
         Animated.timing(scanRows, {
-          toValue: 1, duration: timeline.scanRowsComplete,
+          toValue: 1, duration: Math.max(1, timeline.scanRowsComplete - startMs),
           easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false
         }),
         Animated.sequence([
-          Animated.delay(timeline.scanSweepStart),
+          Animated.delay(Math.max(0, timeline.scanSweepStart - startMs)),
           Animated.timing(scanSweep, {
-            toValue: 1, duration: timeline.scanSweepComplete - timeline.scanSweepStart,
+            toValue: 1,
+            duration: Math.max(1, timeline.scanSweepComplete - Math.max(timeline.scanSweepStart, startMs)),
             easing: Easing.inOut(Easing.cubic), useNativeDriver: true, isInteraction: false
           })
         ])
       ]),
-      Animated.delay(timeline.scanDissolveComplete - timeline.scanSweepComplete)
+      Animated.delay(Math.max(0, timeline.scanDissolveComplete - Math.max(timeline.scanSweepComplete, startMs)))
     ])
     animation.start(({ finished }) => {
       if (!active || !finished || completed.current) return
@@ -219,7 +236,7 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
       active = false
       animation.stop()
     }
-  }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep])
+  }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep, startMs])
 
   return (
     <View style={styles.root}>

@@ -5,6 +5,7 @@ import {
   ONBOARDING_BRAND_PRELUDE_TIMELINE_MS,
   createOnboardingBrandPreludeState,
   getOnboardingBootDissolvePlan,
+  getOnboardingLoadingScanResume,
   getOnboardingBrandPreludeBeatAtElapsed,
   getOnboardingBootGateRemainingMs,
   getOnboardingBootPreludeElapsedSnapshotMs,
@@ -172,4 +173,31 @@ test("hydration hands the loading scan into the mounted prelude without restarti
     brand: 1,
     characters: 1
   })
+})
+
+test("a resumed loading scan continues from the shared clock only right after the boot surface", () => {
+  const scan = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
+  // The boot surface is still on screen or just left: resume, skip the image gate.
+  assert.deepEqual(
+    getOnboardingLoadingScanResume({ nowMs: 5_000, bootSurfaceVisibleUntilMs: null, bootSurfaceVisible: true, bootElapsedMs: 900 }),
+    { startElapsedMs: 900, resumesBootScan: true }
+  )
+  assert.deepEqual(
+    getOnboardingLoadingScanResume({ nowMs: 5_000, bootSurfaceVisibleUntilMs: 4_800, bootSurfaceVisible: false, bootElapsedMs: 1_200 }),
+    { startElapsedMs: 1_200, resumesBootScan: true }
+  )
+  // Past the dissolve the resumed scan rests complete, it never replays.
+  assert.deepEqual(
+    getOnboardingLoadingScanResume({ nowMs: 5_000, bootSurfaceVisibleUntilMs: null, bootSurfaceVisible: true, bootElapsedMs: 2_860 }),
+    { startElapsedMs: scan.scanDissolveComplete, resumesBootScan: true }
+  )
+  // Long after the boot surface (sign-in, account switch): a fresh scan with the image gate.
+  assert.deepEqual(
+    getOnboardingLoadingScanResume({ nowMs: 9_000, bootSurfaceVisibleUntilMs: 4_800, bootSurfaceVisible: false, bootElapsedMs: 2_860 }),
+    { startElapsedMs: 0, resumesBootScan: false }
+  )
+  assert.deepEqual(
+    getOnboardingLoadingScanResume({ nowMs: 9_000, bootSurfaceVisibleUntilMs: null, bootSurfaceVisible: false, bootElapsedMs: 0 }),
+    { startElapsedMs: 0, resumesBootScan: false }
+  )
 })

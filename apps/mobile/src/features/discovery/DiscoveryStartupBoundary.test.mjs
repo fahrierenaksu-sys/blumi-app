@@ -4,7 +4,7 @@ import test from "node:test"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 
-function harness() {
+function harness({ reduceMotion = false } = {}) {
   const source = readFileSync(new URL("./DiscoveryStartupBoundary.tsx", import.meta.url), "utf8")
   const output = ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX
@@ -23,6 +23,8 @@ function harness() {
       if (name === "react/jsx-runtime") return { jsx, jsxs: jsx }
       if (name === "react-native") return { View: "View", StyleSheet: { create: (x) => x, absoluteFill: {} } }
       if (name.endsWith("BlumiLoadingScreen")) return { PreparedDiscoveryLoadingScreen: "Boot" }
+      if (name === "react-native-reanimated") return { __esModule: true, default: { View: "Animated.View" }, withTiming: (toValue, config) => ({ toValue, config }) }
+      if (name.endsWith("ui/animations")) return { useReducedMotion: () => reduceMotion }
       if (name === "react") return {
         createContext: () => ({ Provider: "Provider" }),
         useState(initial) { const index = cursor++; if (!(index in states)) states[index] = initial; return [states[index], (next) => { const value = typeof next === "function" ? next(states[index]) : next; if (!Object.is(value, states[index])) { states[index] = value; revision++ } }] },
@@ -172,4 +174,16 @@ test("display callbacks are used rather than prefetch/load completion, with scop
   const card = readFileSync(new URL("../demo/SwipeableDiscoverCard.tsx", import.meta.url), "utf8")
   assert.match(card, /!props\.deferFrontAvatar/)
   assert.match(card, /deferAvatar=\{props\.deferBackAvatar && !isBackVisible\}/)
+})
+
+test("the released cover lifts off with a short fade, or at once under Reduce Motion", () => {
+  const cover = harness().render().props.children.props.children[1]
+  assert.equal(cover.type, "Animated.View")
+  assert.equal(cover.props.pointerEvents, "none")
+  const exit = JSON.parse(JSON.stringify(cover.props.exiting()))
+  assert.deepEqual(exit.initialValues, { opacity: 1, transform: [{ scale: 1 }] })
+  assert.deepEqual(exit.animations.opacity, { toValue: 0, config: { duration: 220 } })
+  assert.deepEqual(exit.animations.transform, [{ scale: { toValue: 1.03, config: { duration: 220 } } }])
+  const reduced = harness({ reduceMotion: true }).render().props.children.props.children[1]
+  assert.equal(reduced.props.exiting, undefined)
 })
