@@ -1,13 +1,115 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  combineRoomWorldMovementPlans,
+  createRoomWorldMovementPlan,
   createRoomWorldSeatExitMovementPlan,
   createRoomWorldSeatMovementPlan,
+  easeRoomWorldMovement,
+  getRoomWorldMovementFrame,
+  ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
   ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING,
   resolveRoomWorldSeatApproachPoint,
-  resolveRoomWorldSeatSelection
+  resolveRoomWorldSeatSelection,
+  timeRoomWorldMovementSegments,
+  type RoomWorldMovementSegment
 } from "./roomWorldRuntime"
 import type { RoomWorldGeometry } from "./roomWorldGeometry"
+
+// ── ROOM-02: one walking speed, no stop at corners ──────────────────────
+
+const OPEN_ROOM: RoomWorldGeometry = {
+  walkableAreas: [{ id: "room", points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] }],
+  blockers: []
+}
+
+function rawSegment(from: [number, number], to: [number, number], isFinal = false): RoomWorldMovementSegment {
+  return {
+    from: { x: from[0], y: from[1] },
+    to: { x: to[0], y: to[1] },
+    facing: "right",
+    distance: Math.hypot(to[0] - from[0], to[1] - from[1]),
+    durationMs: 0,
+    isFinal
+  }
+}
+
+/** Speed (room units per ms) at time share `p` of a segment. */
+function speedAt(segment: RoomWorldMovementSegment, p: number): number {
+  const h = 1e-4
+  const a = easeRoomWorldMovement(Math.max(0, p - h), segment.rampIn ?? 0, segment.rampOut ?? 0)
+  const b = easeRoomWorldMovement(Math.min(1, p + h), segment.rampIn ?? 0, segment.rampOut ?? 0)
+  return ((b - a) * segment.distance) / ((Math.min(1, p + h) - Math.max(0, p - h)) * segment.durationMs)
+}
+
+test("every segment of a walk moves at the same cruise speed; corners do not stop the avatar", () => {
+  const timing = ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+  const segments = timeRoomWorldMovementSegments([
+    rawSegment([0.1, 0.8], [0.3, 0.8]),
+    rawSegment([0.3, 0.8], [0.32, 0.7]),
+    rawSegment([0.32, 0.7], [0.6, 0.7]),
+    rawSegment([0.6, 0.7], [0.62, 0.6], true)
+  ], timing)
+  const cruise = 1 / timing.durationPerDistanceMs
+  // Middle segments are linear at exactly the cruise speed, however short.
+  for (const segment of segments.slice(1, -1)) {
+    assert.equal(segment.rampIn, 0)
+    assert.equal(segment.rampOut, 0)
+    assert.ok(Math.abs(segment.durationMs - segment.distance * timing.durationPerDistanceMs) < 1e-9)
+    for (const p of [0.1, 0.5, 0.9]) assert.ok(Math.abs(speedAt(segment, p) - cruise) / cruise < 1e-3)
+  }
+  // Velocity is continuous at every corner (was: ease-out restarted at full speed and stopped at each corner).
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const end = speedAt(segments[index]!, 0.9999)
+    const start = speedAt(segments[index + 1]!, 0.0001)
+    assert.ok(Math.abs(end - start) / cruise < 0.01, `corner ${index}: ${end} vs ${start}`)
+  }
+  // The walk starts from rest and ends at rest, ramping only at its two ends.
+  assert.ok(speedAt(segments[0]!, 0.0001) < cruise * 0.05)
+  assert.ok(speedAt(segments.at(-1)!, 0.9999) < cruise * 0.05)
+  assert.ok((segments[0]!.rampIn ?? 0) > 0 && (segments.at(-1)!.rampOut ?? 0) > 0)
+})
+
+test("walk duration follows distance with one cap for the whole walk (was clamped 240-760 ms per segment)", () => {
+  const timing = ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+  const total = (segments: RoomWorldMovementSegment[]) => segments.reduce((sum, segment) => sum + segment.durationMs, 0)
+  const short = timeRoomWorldMovementSegments([rawSegment([0.5, 0.5], [0.55, 0.5], true)], timing)
+  const long = timeRoomWorldMovementSegments([rawSegment([0.1, 0.5], [0.6, 0.5], true)], timing)
+  // Same speed: ten times the distance takes about ten times as long (plus the fixed ramps).
+  assert.ok(Math.abs(total(short) - (0.05 + 0.025 + 0.025) * 1_800) < 1e-6)
+  assert.ok(Math.abs(total(long) - (0.5 + 0.08) * 1_800) < 1e-6)
+  const capped = timeRoomWorldMovementSegments([
+    rawSegment([0.05, 0.9], [0.95, 0.9]),
+    rawSegment([0.95, 0.9], [0.95, 0.1]),
+    rawSegment([0.95, 0.1], [0.05, 0.1], true)
+  ], timing)
+  assert.ok(Math.abs(total(capped) - timing.maxWalkDurationMs) < 1e-6, "a long walk is walked faster as a whole")
+  assert.equal(timing.maxWalkDurationMs, ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING.maxWalkDurationMs)
+})
+
+test("the walk curve is linear without ramps and ends exactly at the segment end", () => {
+  for (const p of [0, 0.25, 0.5, 1]) assert.ok(Math.abs(easeRoomWorldMovement(p, 0, 0) - p) < 1e-12)
+  assert.equal(easeRoomWorldMovement(0, 0.3, 0.2), 0)
+  assert.ok(Math.abs(easeRoomWorldMovement(1, 0.3, 0.2) - 1) < 1e-12)
+  assert.equal(easeRoomWorldMovement(1.4, 0.3, 0), 1)
+})
+
+test("both phones time the same MiniRoom walk identically, and combining plans re-times one walk", () => {
+  const plan = () => createRoomWorldMovementPlan({
+    geometry: OPEN_ROOM, from: { x: 0.2, y: 0.7 }, to: { x: 0.7, y: 0.4 }, timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING
+  })
+  assert.deepEqual(plan(), plan())
+  const first = plan()!
+  const second = createRoomWorldMovementPlan({
+    geometry: OPEN_ROOM, from: first.target, to: { x: 0.3, y: 0.3 }, timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING
+  })!
+  const combined = combineRoomWorldMovementPlans([first, second])!
+  const ramped = combined.segments.filter((segment) => (segment.rampIn ?? 0) > 0 || (segment.rampOut ?? 0) > 0)
+  assert.ok(ramped.length <= 2, "only the walk's first and last segment ramp")
+  const last = combined.segments.at(-1)!
+  const frame = getRoomWorldMovementFrame({ segment: last, startedAt: 0, now: last.durationMs })
+  assert.deepEqual({ x: frame.x, y: frame.y }, last.to)
+})
 
 const GEOMETRY: RoomWorldGeometry = {
   walkableAreas: [{

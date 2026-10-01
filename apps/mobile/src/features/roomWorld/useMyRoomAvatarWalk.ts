@@ -12,10 +12,10 @@ import { runOnUISync, scheduleOnRN } from "react-native-worklets"
 import type { RoomWorldPoint } from "./roomWorldGeometry"
 import {
   getMyRoomAvatarDepthIndex,
-  MY_ROOM_WALK_EASING,
   type MyRoomAvatarDepthNeighbour,
   type MyRoomWalkStep
 } from "./myRoomAvatarWalkModel"
+import { easeRoomWorldMovement } from "./roomWorldRuntime"
 
 export interface MyRoomAvatarWalk {
   /** Live avatar point in room coordinates, written only on the UI thread while walking. */
@@ -60,18 +60,25 @@ export function useMyRoomAvatarWalk(input: {
 
   const start = useCallback((steps: readonly MyRoomWalkStep[], onStepEnd: (index: number) => void): void => {
     if (steps.length === 0) return
-    const config = (durationMs: number) => ({
-      duration: durationMs,
-      easing: MY_ROOM_WALK_EASING,
-      reduceMotion: ReduceMotion.Never
-    })
+    // One speed for the whole walk: linear steps, ramps only at the ends (ROOM-02).
+    const config = (step: MyRoomWalkStep) => {
+      const { rampIn, rampOut } = step
+      return {
+        duration: step.durationMs,
+        easing: (progress: number) => {
+          "worklet"
+          return easeRoomWorldMovement(progress, rampIn, rampOut)
+        },
+        reduceMotion: ReduceMotion.Never
+      }
+    }
     x.value = withSequence(
       ReduceMotion.Never,
-      ...steps.map((step) => withTiming(step.x, config(step.durationMs)))
+      ...steps.map((step) => withTiming(step.x, config(step)))
     )
     y.value = withSequence(
       ReduceMotion.Never,
-      ...steps.map((step, index) => withTiming(step.y, config(step.durationMs), (finished) => {
+      ...steps.map((step, index) => withTiming(step.y, config(step), (finished) => {
         "worklet"
         if (finished) scheduleOnRN(onStepEnd, index)
       }))

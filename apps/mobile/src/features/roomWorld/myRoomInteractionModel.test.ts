@@ -106,9 +106,9 @@ test("default My Room chair exposes a reachable seat from the avatar spawn", () 
     seatedFurnitureRenderId: chair.renderId,
     clearance: 0.012,
     timing: {
-      minDurationMs: 240,
-      maxDurationMs: 760,
-      durationPerDistanceMs: 1_800
+      durationPerDistanceMs: 1_800,
+      maxWalkDurationMs: 1_800,
+      rampDistance: 0.04
     }
   })
 

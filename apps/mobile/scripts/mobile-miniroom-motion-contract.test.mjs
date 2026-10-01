@@ -32,26 +32,22 @@ test("MiniRoom sitting gate evaluates the requested sitting slice", () => {
   assert.match(partner, /roomAvatarAppearance:\s*appearance/)
 })
 
-test("MiniRoom UI-thread walking keeps the RoomWorld speed, curve and Reduce Motion behaviour", async () => {
+test("MiniRoom UI-thread walking keeps the RoomWorld speed, curve and Reduce Motion behaviour", () => {
   const positions = read("src/features/miniRoom/scene/miniRoomAvatarPositions.ts")
-  const runtime = read("src/features/roomWorld/roomWorldRuntime.ts")
+  const walk = read("src/features/roomWorld/useMyRoomAvatarWalk.ts")
 
-  // Same duration per segment (speed and paths come from the unchanged RoomWorld plan).
+  // Same duration per segment (speed and paths come from the RoomWorld plan).
   assert.match(positions, /duration: segment\.durationMs/)
   assert.match(positions, /withTiming\(segment\.to\.x, config,/)
   assert.match(positions, /withTiming\(segment\.to\.y, config\)/)
   // Walking is state-essential: Reanimated must not skip it under the system setting.
   assert.match(positions, /reduceMotion: ReduceMotion\.Never/)
-  assert.match(positions, /export const MINI_ROOM_MOVEMENT_EASING = Easing\.out\(Easing\.cubic\)/)
-
-  // Easing.out(Easing.cubic) is the RoomWorld ease-out cubic the JS loop used.
-  assert.match(runtime, /return 1 - Math\.pow\(1 - value, 3\)/)
-  const { Easing } = await import("react-native-reanimated/lib/module/Easing.js")
-  const reanimatedCurve = Easing.out(Easing.cubic)
-  for (let step = 0; step <= 100; step += 1) {
-    const t = step / 100
-    assert.ok(Math.abs(reanimatedCurve(t) - (1 - Math.pow(1 - t, 3))) < 1e-12, `curve differs at ${t}`)
-  }
+  // ROOM-02: both rooms use the one constant-speed RoomWorld curve, the same
+  // worklet the JS movement frame evaluates (node-tested in roomWorldRuntime.test.ts).
+  assert.match(positions, /easing: createMiniRoomMovementEasing\(segment\)/)
+  assert.match(positions, /return easeRoomWorldMovement\(progress, rampIn, rampOut\)/)
+  assert.match(walk, /return easeRoomWorldMovement\(progress, rampIn, rampOut\)/)
+  assert.doesNotMatch(positions + walk, /Easing\.out\(Easing\.cubic\)/)
 })
 
 test("MiniRoom partner arrival highlight is a finite one-shot sequence", () => {
