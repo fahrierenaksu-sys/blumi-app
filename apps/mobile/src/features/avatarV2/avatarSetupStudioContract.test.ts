@@ -170,7 +170,11 @@ test("studio selection motion stays bounded and respects Reduce Motion", () => {
   assert.match(stage, /withTiming/)
   assert.match(stage, /reduceMotion/)
   assert.match(stage, /motionActive/)
-  assert.match(stage, /\[0\.982, 1\]/)
+  // ONB-10: the character never vanishes on a change; it dips to 85 % and hops.
+  assert.match(stage, /const SELECTION_MIN_OPACITY = 0\.85/)
+  assert.match(stage, /const SELECTION_HOP_FROM_SCALE = 0\.97/)
+  assert.match(stage, /interpolate\(selectionProgress\.value, \[0, 1\], \[SELECTION_MIN_OPACITY, 1\]\)/)
+  assert.doesNotMatch(stage, /opacity: selectionProgress\.value/)
   assert.match(stage, /withRepeat/)
   assert.doesNotMatch(stage, /setInterval/)
   assert.match(stage, /previousSelectionKeyRef/)

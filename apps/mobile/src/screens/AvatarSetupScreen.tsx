@@ -34,7 +34,7 @@ import type {
   AvatarCatalogItem,
   UserAvatar
 } from "../features/avatarV2/avatarV2.types"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { useReducedMotionPreference } from "../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
 import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
@@ -171,18 +171,18 @@ export function AvatarSetupScreen({
       direction
     )
     equipWithMotion(items[nextIndex])
-    hapticLight()
+    hapticSelection()
   }
 
   function equipBody(bodyId: string): void {
     equipWithMotion(bodyItems.find((item) => item.id === bodyId))
-    hapticLight()
+    hapticSelection()
   }
 
   function selectCategory(type: AvatarStudioCategory): void {
     if (type === selectedType) return
     setSelectedType(type)
-    hapticLight()
+    hapticSelection()
   }
 
   const isMale = starterAvatar.bodyId === MALE_STARTER_BODY_ID

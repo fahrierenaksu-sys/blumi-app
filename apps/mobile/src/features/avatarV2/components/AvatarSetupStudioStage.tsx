@@ -14,6 +14,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSpring,
   withTiming
 } from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
@@ -60,6 +61,8 @@ interface AvatarSetupStudioStageProps {
 }
 
 const MOTION_MS = 220
+const SELECTION_MIN_OPACITY = 0.85
+const SELECTION_HOP_FROM_SCALE = 0.97
 const POD_ARROW_VISUAL_SIZE = 26
 const POD_ARROW_HIT_SLOP = 9
 
@@ -99,12 +102,14 @@ export function AvatarSetupStudioStage({
     veryCompact
   )
   const selectionProgress = useSharedValue(1)
+  const selectionHop = useSharedValue(1)
   const ambientPulse = useSharedValue(0)
   const previousSelectionKeyRef = useRef(selectionKey)
 
   useLayoutEffect(() => {
     if (reduceMotion || !motionActive) {
       selectionProgress.value = 1
+      selectionHop.value = 1
       previousSelectionKeyRef.current = selectionKey
       return
     }
@@ -113,9 +118,13 @@ export function AvatarSetupStudioStage({
       return
     }
     previousSelectionKeyRef.current = selectionKey
+    // The character never disappears while a layer changes (ONB-10): it dips
+    // to 85 % and does a small, springy hop instead of blinking out.
     selectionProgress.value = 0
     selectionProgress.value = withTiming(1, { duration: MOTION_MS })
-  }, [motionActive, reduceMotion, selectionKey, selectionProgress])
+    selectionHop.value = SELECTION_HOP_FROM_SCALE
+    selectionHop.value = withSpring(1, { dampingRatio: 0.6, duration: 420 })
+  }, [motionActive, reduceMotion, selectionHop, selectionKey, selectionProgress])
 
   useEffect(() => {
     ambientPulse.value = 0
@@ -139,11 +148,8 @@ export function AvatarSetupStudioStage({
   }, [ambientPulse, motionActive, reduceMotion])
 
   const avatarArrivalStyle = useAnimatedStyle(() => ({
-    opacity: selectionProgress.value,
-    transform: [
-      { translateY: interpolate(selectionProgress.value, [0, 1], [10, 0]) },
-      { scale: interpolate(selectionProgress.value, [0, 1], [0.982, 1]) }
-    ]
+    opacity: interpolate(selectionProgress.value, [0, 1], [SELECTION_MIN_OPACITY, 1]),
+    transform: [{ scale: selectionHop.value }]
   }))
   const backdropVeilStyle = useAnimatedStyle(() => ({
     opacity: interpolate(ambientPulse.value, [0, 1], [0.56, 0.74])
