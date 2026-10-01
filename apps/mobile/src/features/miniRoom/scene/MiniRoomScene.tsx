@@ -86,6 +86,8 @@ interface MiniRoomSceneProps {
   chatHistoryStatus?: RoomChatHistoryStatus
   /** Screen-level alerts shown under the header. */
   notices?: readonly string[]
+  /** Typing (chat_typing): dots over the partner and this device's draft signal. */
+  typing?: { partnerTyping: boolean; draft: import("../../chat/typing/useChatDraftTyping").ChatDraftTyping }
 }
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
@@ -380,6 +382,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       onDismissBubble={dismissSpeechBubble}
       dismissBubbleLabel={copy.dismissRoomMessage}
       partnerJustJoined={partnerJustJoined && partnerPresent}
+      typingUserId={props.typing?.partnerTyping ? partnerUser.userId : undefined}
       motionPolicy={motionPolicy}
     />
   )
@@ -468,6 +471,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
           onToggleHistory={handleToggleHistory}
           onContentHeightChange={handleComposerContentSize}
           disabled={composerDisabled}
+          draftTyping={props.typing?.draft}
         />
       </MiniRoomChatPanel>
 

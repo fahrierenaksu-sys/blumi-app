@@ -3,6 +3,7 @@ import { memo } from "react"
 import { Pressable, StyleSheet, TextInput, View } from "react-native"
 import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import { uiTheme } from "../../../ui/theme"
+import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import {
   MINI_ROOM_INPUT_LINE_HEIGHT,
@@ -25,6 +26,8 @@ interface RoomChatComposerProps {
   onSubmit: () => void
   onToggleHistory: () => void
   onContentHeightChange: (contentHeight: number) => void
+  /** Typing signal for the partner (chat_typing); never sees restored text. */
+  draftTyping?: ChatDraftTyping
 }
 
 export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerProps) {
@@ -37,7 +40,8 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     onChangeText,
     onSubmit,
     onToggleHistory,
-    onContentHeightChange
+    onContentHeightChange,
+    draftTyping
   } = props
   const sendDisabled = disabled || value.trim().length === 0
   const historyOpen = mode === "history"
@@ -67,8 +71,15 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
       <TextInput
         accessibilityLabel={copy.roomMessage}
         value={value}
-        onChangeText={onChangeText}
-        onSubmitEditing={onSubmit}
+        onChangeText={(text) => {
+          onChangeText(text)
+          draftTyping?.noteDraft(text)
+        }}
+        onBlur={draftTyping?.endDraft}
+        onSubmitEditing={() => {
+          onSubmit()
+          draftTyping?.endDraft()
+        }}
         onContentSizeChange={(event) => onContentHeightChange(event.nativeEvent.contentSize.height)}
         placeholder={copy.roomMessagePlaceholder}
         placeholderTextColor="#8B7A8A"
@@ -88,7 +99,10 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         accessibilityState={{ disabled: sendDisabled }}
         disabled={sendDisabled}
         hitSlop={4}
-        onPress={onSubmit}
+        onPress={() => {
+          onSubmit()
+          draftTyping?.endDraft()
+        }}
         style={({ pressed }) => [
           styles.composerSend,
           sendDisabled ? styles.composerSendDisabled : null,

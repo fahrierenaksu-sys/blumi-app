@@ -5,6 +5,7 @@ import type {
   ChatThread,
   ChatThreadList,
   ChatThreadRead,
+  ChatTypingUpdated,
   ServerEvent
 } from "@blumi/contracts"
 import type { ChatRoomInviteTimelineItem } from "../chat/chatRoomInviteModel"
@@ -51,6 +52,10 @@ export interface GlobalRealtimeEventHandlerDependencies {
     payload: ChatReceiptUpdated,
     options: { localUserId?: string }
   ) => void
+  /** `chat.typing_updated`: the partner started or stopped typing (transient). */
+  applyChatTypingUpdated?: (payload: ChatTypingUpdated) => void
+  /** A message arrived: its sender's typing indicator in that thread ends. */
+  clearChatTypingForMessage?: (message: { threadId: string; senderUserId: string }) => void
   getThreads: () => readonly ChatThread[]
   openReadyMiniRoom: (payload: ReadyMiniRoomPayload) => void
   onConnectionMatched: (payload: ConnectionMatchedPayload) => void
@@ -125,10 +130,16 @@ export function createGlobalRealtimeEventHandler(
       return
     }
 
+    if (event.type === "chat.typing_updated") {
+      dependencies.applyChatTypingUpdated?.(event.payload)
+      return
+    }
+
     if (event.type === "chat.message_received") {
       // The client id rides only on the sender's own in-room acknowledgement;
       // useInRoomChat settles that bubble. The store keeps the canonical shape.
       const { clientMessageId: _clientMessageId, ...message } = event.payload
+      dependencies.clearChatTypingForMessage?.(message)
       dependencies.applyChatMessageReceived(message, {
         localUserId: dependencies.currentUserId
       })

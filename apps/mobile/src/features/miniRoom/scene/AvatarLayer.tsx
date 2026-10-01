@@ -12,6 +12,7 @@ import type {
   AvatarState,
   SpeechBubble
 } from "./miniRoomSceneTypes"
+import { RoomTypingBubble } from "./RoomTypingBubble"
 
 interface AvatarLayerProps {
   avatars: Record<string, AvatarState>
@@ -23,6 +24,8 @@ interface AvatarLayerProps {
   dismissBubbleLabel: string
   partnerJustJoined: boolean
   motionPolicy: MiniRoomMotionPolicy
+  /** Who is typing (the partner, from chat.typing_updated); dots over their chibi. */
+  typingUserId?: string
 }
 
 type BubblePlacement = "center" | "left" | "right"
@@ -37,7 +40,8 @@ export function AvatarLayer(props: AvatarLayerProps) {
     onDismissBubble,
     dismissBubbleLabel,
     partnerJustJoined,
-    motionPolicy
+    motionPolicy,
+    typingUserId
   } = props
   const sortedAvatars = Object.values(avatars).sort((a, b) => a.y - b.y)
   const avatarsWithBubbles = sortedAvatars.filter((avatar) =>
@@ -86,6 +90,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
             localUserLabel={localUserLabel}
             showJoinPulse={showJoinPulse}
             motionPolicy={motionPolicy}
+            typing={avatar.userId === typingUserId}
           />
         )
       })}
@@ -105,6 +110,7 @@ interface AvatarFigureProps {
   localUserLabel: string
   showJoinPulse: boolean
   motionPolicy: MiniRoomMotionPolicy
+  typing: boolean
 }
 
 const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
@@ -119,7 +125,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     isLocal,
     localUserLabel,
     showJoinPulse,
-    motionPolicy
+    motionPolicy,
+    typing
   } = props
   const breatheRef = useRef(new Animated.Value(0)).current
   const walkBobRef = useRef(new Animated.Value(0)).current
@@ -400,6 +407,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
           </Pressable>
         </Animated.View>
       ) : null}
+      {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
+      {typing && !bubble ? <RoomTypingBubble /> : null}
 
       <View
         style={[

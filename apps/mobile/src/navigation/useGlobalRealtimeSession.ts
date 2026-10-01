@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useMemo } from "react"
 import { AppState } from "react-native"
 import { MOBILE_HTTP_BASE_URL, MOBILE_WS_BASE_URL } from "../config/env"
 import { createChatDeliveryAckBatcher } from "../features/chat/chatDeliveryAckBatcher"
+import { chatTypingStore } from "../features/chat/typing/chatTypingStore"
 import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
   applyChatMessageListed,
@@ -65,6 +66,8 @@ interface GlobalRealtimeSessionInput {
   onPartnerBlocked: (blockedUserId: string) => void
   /** `chat_read_receipts` resolved for this session: acknowledge deliveries. */
   receiptsEnabled: boolean
+  /** `chat_typing` resolved for this session: send typing signals. */
+  typingEnabled: boolean
 }
 
 /**
@@ -94,7 +97,8 @@ export function useGlobalRealtimeSession({
   getMatchDeduplicationState,
   onConnectionMatched,
   onPartnerBlocked,
-  receiptsEnabled
+  receiptsEnabled,
+  typingEnabled
 }: GlobalRealtimeSessionInput): void {
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   // A new actor object with the same identity (for example a profile edit)
@@ -166,6 +170,14 @@ export function useGlobalRealtimeSession({
   }), [accountUserId, receiptsEnabled])
   useEffect(() => () => deliveryAcks.dispose(), [deliveryAcks])
 
+  // ── Typing (2026-10-01) ─────────────────────────────────
+  // Memory only, per account and rollout: a switch or sign-out resets it.
+  useEffect(() => chatTypingStore.configure({
+    ownerUserId: accountUserId,
+    enabled: typingEnabled,
+    send: (command) => sendGlobal({ type: "chat.typing", payload: command })
+  }), [accountUserId, typingEnabled])
+
   // ── Chat + match event routing ──────────────────────────
   const handleGlobalEvent = useMemo(
     () => createGlobalRealtimeEventHandler({
@@ -182,10 +194,15 @@ export function useGlobalRealtimeSession({
       applyChatMessageReceived,
       acknowledgeDelivery: (message) => deliveryAcks.note(message),
       applyChatReceiptUpdated,
+      applyChatTypingUpdated: chatTypingStore.applyUpdate,
+      clearChatTypingForMessage: chatTypingStore.noteMessage,
       getThreads,
       openReadyMiniRoom,
       onConnectionMatched,
-      onPartnerBlocked,
+      onPartnerBlocked: (blockedUserId) => {
+        chatTypingStore.clearUser(blockedUserId)
+        onPartnerBlocked(blockedUserId)
+      },
       showIncomingMessageToast: (toast) => {
         showToast({ ...toast, type: "info" })
       },

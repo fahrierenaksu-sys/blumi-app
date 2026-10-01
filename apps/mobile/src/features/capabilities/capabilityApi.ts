@@ -14,7 +14,9 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
   "discovery_badges",
   "discovery_room_showcase",
   // Delivery ticks, "görüldü" and the read receipts setting (2026-10-01).
-  "chat_read_receipts"
+  "chat_read_receipts",
+  // "yazıyor…" in chat and over the partner in the room (2026-10-01).
+  "chat_typing"
 ] as const satisfies readonly CapabilityKey[]
 
 export interface SessionScopedCapabilities {
