@@ -140,8 +140,12 @@ test("postgres report submission writes the report and automatic block through o
   assert.equal(result.kind, "created")
   assert.equal(calls[0]?.text, "BEGIN")
   assert.match(calls[1]?.text ?? "", /pg_advisory_xact_lock/)
-  assert.match(calls[3]?.text ?? "", /INSERT INTO blumi_safety_reports/)
-  assert.match(calls[4]?.text ?? "", /INSERT INTO blumi_safety_blocks/)
+  assert.deepEqual(calls[1]?.values, ["blumi:safety-report:user_a"])
+  assert.match(calls[2]?.text ?? "", /idempotency_key = \$2/)
+  // A pending report on the same person would be answered instead.
+  assert.match(calls[3]?.text ?? "", /status = 'pending'/)
+  assert.match(calls[4]?.text ?? "", /INSERT INTO blumi_safety_reports/)
+  assert.match(calls[5]?.text ?? "", /INSERT INTO blumi_safety_blocks/)
   assert.equal(calls.at(-1)?.text, "COMMIT")
 })
 

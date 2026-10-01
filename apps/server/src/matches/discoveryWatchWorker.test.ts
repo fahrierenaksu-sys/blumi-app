@@ -305,3 +305,118 @@ test("Discovery Watch batches safety checks for each candidate page", async () =
   assert.equal(delivered, 1)
   assert.deepEqual(batchCalls, [["blocked", "allowed"]])
 })
+
+test("a watch with no candidate cools down and the cycle continues to later watches", async () => {
+  const profile = (userId: string, vibe: string) => ({
+    userId, displayName: userId, age: 28, gender: "woman" as const, distanceLabel: "",
+    vibeTags: [vibe], avatar: TEST_AVATAR, avatarPresetId: "default"
+  })
+  const matchService = createMatchService({
+    repository: createInMemoryMatchRepository(createInMemoryMatchStore([
+      profile("lonely_watcher", "coffee"),
+      profile("lucky_watcher", "coffee"),
+      profile("candidate", "coffee")
+    ]))
+  })
+  // The oldest watch asks for a vibe nobody has; the later one can be served.
+  await matchService.activateDiscoveryWatch("lonely_watcher",
+    { ageMin: 18, ageMax: 99, genders: ["woman"], vibes: ["nobody_has_this"] }, new Date("2026-07-22T10:00:00.000Z"))
+  await matchService.activateDiscoveryWatch("lucky_watcher",
+    { ageMin: 18, ageMax: 99, genders: ["woman"], vibes: ["coffee"] }, new Date("2026-07-22T10:00:30.000Z"))
+
+  const scanned: string[] = []
+  const sent: string[] = []
+  const run = (now: string) => runDiscoveryWatchCycle({
+    matchService: {
+      claimNextDiscoveryWatch: (at) => matchService.claimNextDiscoveryWatch(at),
+      restoreDiscoveryWatch: (watch, options) => matchService.restoreDiscoveryWatch(watch, options),
+      completeDiscoveryWatch: (watch) => matchService.completeDiscoveryWatch(watch),
+      isDiscoveryWatchClaimCurrent: (watch, at) => matchService.isDiscoveryWatchClaimCurrent(watch, at),
+      listDiscoveryPage: async (userId, preferences, page) => {
+        scanned.push(userId)
+        return matchService.listDiscoveryPage(userId, preferences, page)
+      }
+    },
+    safetyService: { hasBlockBetween: async () => false },
+    notificationService: {
+      sendPushToUser: async (userId, _notification, watch) => {
+        sent.push(userId)
+        // The real outbox completes the watch with the queued push.
+        await matchService.completeDiscoveryWatch(watch as DiscoveryWatchClaim)
+        return { outcome: "queued", deliveryCount: 1 }
+      }
+    },
+    now: new Date(now)
+  })
+
+  assert.equal(await run("2026-07-22T10:01:00.000Z"), 1)
+  assert.deepEqual(sent, ["lucky_watcher"])
+  assert.deepEqual(scanned, ["lonely_watcher", "lucky_watcher"])
+
+  // Within the cooldown the empty watch is not rescanned every cycle.
+  assert.equal(await run("2026-07-22T10:01:15.000Z"), 0)
+  assert.deepEqual(scanned, ["lonely_watcher", "lucky_watcher"])
+
+  // After it, the watch is claimed again and still kept.
+  assert.equal(await run("2026-07-22T10:02:01.000Z"), 0)
+  assert.deepEqual(scanned, ["lonely_watcher", "lucky_watcher", "lonely_watcher"])
+  assert.notEqual(await matchService.getDiscoveryWatch("lonely_watcher", new Date("2026-07-22T10:02:01.000Z")), null)
+})
+
+test("the watch cycle stops at its time budget and never claims the same watch twice", async () => {
+  const watch = (userId: string): DiscoveryWatchClaim => ({
+    generation: `generation-${userId}`, claimToken: `claim-${userId}`, userId, status: "active",
+    preferences: { ageMin: 18, ageMax: 99, genders: ["woman"], vibes: ["coffee"] },
+    updatedAt: "2026-07-22T10:00:00.000Z", expiresAt: "2026-07-29T10:00:00.000Z"
+  })
+  let clock = 0
+  const claimed: string[] = []
+  const restored: string[] = []
+  const queue = ["a", "b", "c", "d"]
+  await runDiscoveryWatchCycle({
+    matchService: {
+      completeDiscoveryWatch: async () => true,
+      isDiscoveryWatchClaimCurrent: async () => true,
+      claimNextDiscoveryWatch: async () => {
+        const next = queue.shift()
+        if (!next) return null
+        claimed.push(next)
+        return watch(next)
+      },
+      restoreDiscoveryWatch: async (restoredWatch) => {
+        restored.push(restoredWatch.userId)
+        return restoredWatch
+      },
+      listDiscoveryPage: async () => {
+        clock += 4_000
+        return []
+      }
+    },
+    safetyService: { hasBlockBetween: async () => false },
+    notificationService: { sendPushToUser: async () => ({ outcome: "queued", deliveryCount: 1 }) },
+    now: new Date("2026-07-22T10:01:00.000Z"),
+    clock: () => clock,
+    timeBudgetMs: 10_000
+  })
+  assert.deepEqual(claimed, ["a", "b", "c"])
+  assert.deepEqual(restored, ["a", "b", "c"])
+
+  const repeating: string[] = []
+  await runDiscoveryWatchCycle({
+    matchService: {
+      completeDiscoveryWatch: async () => true,
+      isDiscoveryWatchClaimCurrent: async () => true,
+      claimNextDiscoveryWatch: async () => watch("same"),
+      restoreDiscoveryWatch: async (restoredWatch) => {
+        repeating.push(restoredWatch.userId)
+        return restoredWatch
+      },
+      listDiscoveryPage: async () => []
+    },
+    safetyService: { hasBlockBetween: async () => false },
+    notificationService: { sendPushToUser: async () => ({ outcome: "queued", deliveryCount: 1 }) },
+    now: new Date("2026-07-22T10:01:00.000Z"),
+    limit: 5
+  })
+  assert.deepEqual(repeating, ["same", "same"])
+})

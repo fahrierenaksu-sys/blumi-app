@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import type { FastifyInstance, FastifyRequest } from "fastify"
 import { CONNECTION_SETUP_RETRY_AFTER_SECONDS } from "../realtime/connectionSetupGate"
 import {
@@ -8,6 +7,13 @@ import {
 import type { AuthService } from "../auth/authService"
 import type { RealtimeTicketService } from "../realtime/realtimeTicketService"
 import { readBearerToken, resolveProductSession } from "./routeHelpers"
+import { createFixedWindowLimiter } from "../operations/requestLimits"
+
+// Per verified person (2026-10-01). A per-IP limit of 30 starved everyone
+// behind one carrier or office address; the per-IP limit is now a coarse
+// ceiling and this cap applies after the session resolves.
+const TICKETS_PER_PERSON_PER_MINUTE = 30
+const TICKET_IP_CEILING_PER_MINUTE = 300
 
 export async function registerRealtimeTicketRoutes(
   app: FastifyInstance,
@@ -16,6 +22,7 @@ export async function registerRealtimeTicketRoutes(
     realtimeTicketService: RealtimeTicketService
   }
 ): Promise<void> {
+  const ticketLimiter = createFixedWindowLimiter({ max: TICKETS_PER_PERSON_PER_MINUTE })
   // Load shedding (2026-10-01): a slot is taken before the shared request
   // budget and session lookups run, and released when the response is sent.
   const gate = services.realtimeTicketService.setupGate
@@ -27,13 +34,10 @@ export async function registerRealtimeTicketRoutes(
   app.post(
     "/v1/auth/realtime-ticket",
     {
-      // Keyed by session, not address (2026-10-01): behind a carrier NAT,
-      // hundreds of phones share an address, and after a deploy all of them
-      // need a ticket within seconds. Floods are bounded by the setup gate.
-      config: {
-        apiAuth: "bearer",
-        rateLimit: { max: 30, timeWindow: "1 minute", keyGenerator: realtimeTicketRateLimitKey }
-      },
+      // A coarse per-address ceiling only: behind a carrier NAT hundreds of
+      // phones share an address. Each person is limited after verification
+      // (ticketLimiter), and floods are bounded by the setup gate.
+      config: { apiAuth: "bearer", rateLimit: { max: TICKET_IP_CEILING_PER_MINUTE, timeWindow: "1 minute" } },
       onRequest: async (request, reply) => {
         if (!gate) return
         const acquired = gate.tryAcquire()
@@ -60,6 +64,11 @@ export async function registerRealtimeTicketRoutes(
         authService: services.authService
       })
       if (!resolved) return
+      const personLimit = ticketLimiter.consume(resolved.account.userId)
+      if (!personLimit.allowed) {
+        return reply.code(429).header("Retry-After", String(personLimit.retryAfterSeconds))
+          .send({ error: "Too many requests. Try again shortly." })
+      }
 
       const sessionToken = readBearerToken(request)
       if (!sessionToken) {
@@ -76,10 +85,4 @@ export async function registerRealtimeTicketRoutes(
         .send(issued)
     }
   )
-}
-
-/** The bearer session's digest, or the address when there is no token. */
-export function realtimeTicketRateLimitKey(request: FastifyRequest): string {
-  const token = readBearerToken(request)
-  return token ? `session:${createHash("sha256").update(token).digest("hex")}` : `ip:${request.ip}`
 }

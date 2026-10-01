@@ -1,3 +1,10 @@
+/**
+ * How long a graceful shutdown may take before it gives up. The Railway
+ * draining window (.railway/railway.ts) must stay above it, or the platform
+ * kills the process before connections and workers drain.
+ */
+export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 30_000
+
 export function createGracefulShutdown(options: {
   markNotReady(): void
   drain: readonly (() => Promise<void>)[]
@@ -15,7 +22,7 @@ export function createGracefulShutdown(options: {
       try { await options.drainOutgoing?.() } catch (error) { errors.push(error) }
       try { await options.closeData() } catch (error) { errors.push(error) }
       if (errors.length) throw new AggregateError(errors, "Service shutdown failed")
-    })(), options.timeoutMs ?? 30_000, "Service shutdown timed out")
+    })(), options.timeoutMs ?? GRACEFUL_SHUTDOWN_TIMEOUT_MS, "Service shutdown timed out")
     return shutdown
   }
 }

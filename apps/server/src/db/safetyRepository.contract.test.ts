@@ -6,6 +6,7 @@ import {
 } from "../safety/safetyRepository"
 import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
 import { runRepositoryContract, type RepositoryContractBackend } from "./repositoryContract"
+import { moderationRiskRank } from "../safety/moderationQueue"
 
 type Backend = RepositoryContractBackend<SafetyRepository>
 
@@ -121,7 +122,7 @@ runRepositoryContract<SafetyRepository>({
       assert.ok(await backend.repository.findBlock(original.actorUserId, original.reportedUserId))
     },
 
-    "a new report keeps an existing block time; reports without a key are independent": async (backend) => {
+    "a new report keeps an existing block time; a second pending report on the same person returns the first": async (backend) => {
       const actor = backend.id("actor")
       const target = backend.id("target")
       await backend.repository.saveBlock({ actorUserId: actor, blockedUserId: target, createdAt: AT })
@@ -129,9 +130,86 @@ runRepositoryContract<SafetyRepository>({
       const created = await backend.repository.saveReportAndBlock(first, blockFor(first))
       assert.equal(created.kind, "created")
       if (created.kind === "created") assert.equal(created.block.createdAt, AT)
-      const second = { ...first, reportId: backend.id("report_second") }
-      assert.equal((await backend.repository.saveReportAndBlock(second, blockFor(second))).kind, "created")
-      assert.equal((await backend.repository.listReportsForActor(actor)).length, 2)
+      // Without a key, a repeat on the same person while the first is still
+      // pending is the same report (2026-10-01), whatever its reason.
+      const second = { ...first, reportId: backend.id("report_second"), reason: "spam" as const }
+      const deduped = await backend.repository.saveReportAndBlock(second, blockFor(second))
+      assert.equal(deduped.kind, "replayed")
+      if (deduped.kind === "replayed") assert.equal(deduped.report.reportId, first.reportId)
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
+
+      // Another person is a separate report; a resolved report no longer dedupes.
+      const otherTarget = { ...first, reportId: backend.id("report_other"), reportedUserId: backend.id("other_target") }
+      assert.equal((await backend.repository.saveReportAndBlock(otherTarget, blockFor(otherTarget))).kind, "created")
+      assert.equal(await backend.repository.resolveReport(first.reportId, {
+        action: "dismiss", resolvedAt: LATER, resolvedByAdminId: backend.id("admin"), resolvedByTokenId: backend.id("token")
+      }), "resolved")
+      const afterResolution = { ...first, reportId: backend.id("report_after") }
+      assert.equal((await backend.repository.saveReportAndBlock(afterResolution, blockFor(afterResolution))).kind, "created")
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 3)
+    },
+
+    "report creation stops at the policy cap within its window": async (backend) => {
+      const actor = backend.id("actor")
+      const policy = { windowStartedAt: "2026-09-30T09:00:00.000Z", maxReportsInWindow: 2 }
+      const old = report(backend, {
+        actorUserId: actor, reportedUserId: backend.id("target_old"), idempotencyKey: undefined, createdAt: "2026-09-30T08:00:00.000Z"
+      })
+      assert.equal((await backend.repository.saveReportAndBlock(old, blockFor(old), policy)).kind, "created")
+      for (const name of ["target_one", "target_two"]) {
+        const next = report(backend, { actorUserId: actor, reportedUserId: backend.id(name), reportId: backend.id(`report_${name}`), idempotencyKey: undefined })
+        assert.equal((await backend.repository.saveReportAndBlock(next, blockFor(next), policy)).kind, "created", name)
+      }
+      const overCap = report(backend, { actorUserId: actor, reportedUserId: backend.id("target_three"), reportId: backend.id("report_three"), idempotencyKey: undefined })
+      assert.deepEqual(await backend.repository.saveReportAndBlock(overCap, blockFor(overCap), policy), { kind: "limited" })
+      assert.equal(await backend.repository.findReport(overCap.reportId), null)
+      assert.equal(await backend.repository.findBlock(actor, overCap.reportedUserId), null, "a refused report blocks nobody")
+
+      // A replay of an existing report is never refused by the cap.
+      const replay = report(backend, { actorUserId: actor, reportedUserId: backend.id("target_one"), reportId: backend.id("report_replay"), idempotencyKey: undefined })
+      assert.equal((await backend.repository.saveReportAndBlock(replay, blockFor(replay), policy)).kind, "replayed")
+    },
+
+    "countBlocks counts only the actor's own blocks": async (backend) => {
+      const actor = backend.id("actor")
+      assert.equal(await backend.repository.countBlocks(actor), 0)
+      await backend.repository.saveBlock({ actorUserId: actor, blockedUserId: backend.id("a"), createdAt: AT })
+      await backend.repository.saveBlock({ actorUserId: actor, blockedUserId: backend.id("b"), createdAt: AT })
+      await backend.repository.saveBlock({ actorUserId: backend.id("other"), blockedUserId: actor, createdAt: AT })
+      assert.equal(await backend.repository.countBlocks(actor), 2)
+    },
+
+    "the pending queue pages by risk, then oldest first, with a keyset cursor": async (backend) => {
+      const at = (minute: number) => new Date(Date.parse(AT) + minute * 60_000).toISOString()
+      const seed = async (name: string, reason: ReportRecord["reason"], minute: number) => {
+        const value = report(backend, {
+          reportId: backend.id(`report_${name}`), actorUserId: backend.id(`actor_${name}`),
+          reportedUserId: backend.id(`target_${name}`), reason, idempotencyKey: undefined, createdAt: at(minute)
+        })
+        await backend.repository.saveReportAndBlock(value, blockFor(value))
+        return value.reportId
+      }
+      const spamOldest = await seed("spam_oldest", "spam", 0)
+      const harassmentLater = await seed("harassment_later", "harassment", 5)
+      const underageNewest = await seed("underage_newest", "underage", 9)
+      const inappropriateEarlier = await seed("inappropriate_earlier", "inappropriate", 2)
+      const resolved = await seed("resolved", "underage", 1)
+      await backend.repository.resolveReport(resolved, {
+        action: "dismiss", resolvedAt: LATER, resolvedByAdminId: backend.id("admin"), resolvedByTokenId: backend.id("token")
+      })
+      const expected = [underageNewest, inappropriateEarlier, harassmentLater, spamOldest]
+
+      const seen: string[] = []
+      let after: Parameters<SafetyRepository["listPendingReportsByRisk"]>[0]["after"]
+      for (let page = 0; page < 50; page += 1) {
+        const reports = await backend.repository.listPendingReportsByRisk({ limit: 2, after })
+        // Other cases may leave pending reports; keep this case's own.
+        seen.push(...reports.map((value) => value.reportId).filter((id) => expected.includes(id) || id === resolved))
+        if (reports.length < 2) break
+        const last = reports[reports.length - 1]!
+        after = { riskRank: moderationRiskRank(last.reason), createdAt: last.createdAt, reportId: last.reportId }
+      }
+      assert.deepEqual(seen, expected)
     },
 
     "saveReport never overwrites an existing report": async (backend) => {

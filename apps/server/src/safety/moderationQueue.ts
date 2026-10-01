@@ -134,6 +134,15 @@ export function getModerationTarget(reason: ReportRecord["reason"]): {
   return { priority: "standard", targetMinutes: 24 * 60 }
 }
 
+/**
+ * The queue's risk order as a number (0 = most urgent). Pending reports are
+ * paged by (risk rank, created at, report id) so the oldest urgent work is
+ * always on the first page, however large the backlog.
+ */
+export function moderationRiskRank(reason: ReportRecord["reason"]): number {
+  return priorityRank(getModerationTarget(reason).priority)
+}
+
 function priorityRank(priority: ModerationQueueMetadata["priority"]): number {
   if (priority === "urgent") return 0
   if (priority === "high") return 1

@@ -20,6 +20,11 @@ export default defineRailway((ctx) => {
       numReplicas: 1,
       sleepApplication: false,
       restartPolicyType: "ALWAYS",
+      // Seconds between SIGTERM and SIGKILL. Railway's default of 0 killed
+      // the process before the graceful shutdown (30 s deadline in
+      // apps/server/src/operations/serviceLifecycle.ts) could close sockets,
+      // stop workers and flush the pool. Keep it a little above that deadline.
+      drainingSeconds: 35,
     },
     env: {
       NODE_ENV: "production",

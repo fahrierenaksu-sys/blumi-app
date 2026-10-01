@@ -3,6 +3,8 @@ import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sh
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import { classifyDatabaseError } from "./operations/databaseErrorStatus"
+import { PrivateRequestLogController, privateLogSerializers } from "./operations/privateRequestLog"
+import { ipRequestCeiling, registerFailedAuthLimiter } from "./operations/requestLimits"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
 import Fastify, {
@@ -114,6 +116,8 @@ interface CreateServerOptions {
   notificationService?: NotificationService
   miniRoomService?: MiniRoomService
   logger?: boolean
+  /** Test seam: where JSON log lines go instead of stdout. */
+  logDestination?: { write(line: string): void }
   nodeEnv?: string
   corsOrigins?: string[]
   trustedProxyAddresses?: string[]
@@ -138,7 +142,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   }
   const authService = options.authService ?? createAuthService()
   const accountRecoveryService = options.accountRecoveryService ?? createAccountRecoveryService({ authService })
-  const safetyService = options.safetyService ?? createSafetyService()
+  const safetyService = options.safetyService ?? createSafetyService({
+    isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
+  })
   const chatService = options.chatService ?? createChatService({ blockPolicy: safetyService })
   const economyService = options.economyService ?? createEconomyService()
   const commerceService = options.commerceService ?? createCommerceService({
@@ -188,7 +194,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     })
   const trustedProxyAddresses = options.trustedProxyAddresses ?? []
   const app = Fastify({
-    logger: createLoggerOptions(options.logger ?? false, nodeEnv),
+    logger: createLoggerOptions(options.logger ?? false, nodeEnv, options.logDestination),
+    logController: new PrivateRequestLogController(),
     genReqId: () => randomUUID(),
     trustProxy:
       trustedProxyAddresses.length > 0 ? trustedProxyAddresses : false
@@ -311,10 +318,13 @@ function registerProductionMiddleware(
         ? options.corsOrigins
         : true
   })
+  // Strict per IP without a bearer token; a coarse ceiling with one, since
+  // signed-in traffic is limited per verified user (shared request budget).
   void app.register(rateLimit, {
-    max: 100,
+    max: ipRequestCeiling,
     timeWindow: "1 minute"
   })
+  registerFailedAuthLimiter(app)
 }
 
 const DATABASE_ERROR_MESSAGES = {
@@ -356,11 +366,16 @@ function registerErrorHandler(app: FastifyInstance) {
 
 function createLoggerOptions(
   enabled: boolean,
-  nodeEnv: string
+  nodeEnv: string,
+  destination?: { write(line: string): void }
 ): FastifyServerOptions["logger"] {
   if (!enabled) return false
-  if (nodeEnv === "production") return true
+  // Raw URLs, hosts and client IPs never reach the logs (privacy rules).
+  if (nodeEnv === "production" || destination) {
+    return { serializers: privateLogSerializers, ...(destination ? { stream: destination } : {}) }
+  }
   return {
+    serializers: privateLogSerializers,
     transport: {
       target: "pino-pretty",
       options: {

@@ -256,6 +256,21 @@ async function applyCoinTransaction(
         WHERE user_id = $3
           AND $11 > 0
           AND EXISTS (SELECT 1 FROM inserted_ledger)
+          -- A refund reverses only a credit that was recorded, and a credit
+          -- arriving after its refund moves nothing. Both ledger rows are
+          -- kept either way, so the pair settles to zero in any order.
+          AND CASE WHEN $10 = 'credit'
+                THEN NOT EXISTS (
+                  SELECT 1 FROM blumi_economy_iap_ledger
+                   WHERE provider = $1 AND provider_transaction_id = $2
+                     AND entry_type = 'reversal'
+                )
+                ELSE EXISTS (
+                  SELECT 1 FROM blumi_economy_iap_ledger
+                   WHERE provider = $1 AND provider_transaction_id = $2
+                     AND entry_type = 'credit'
+                )
+              END
        RETURNING user_id, coins, coin_debt, owned_avatar_item_ids,
                  owned_room_item_ids, updated_at
      )

@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import { createHash } from "node:crypto"
 import {
   authenticatedErrorResponses,
   coreApiJsonSchemas,
@@ -28,6 +27,7 @@ import type { ChatService } from "../chat/chatService"
 import type { ConnectionService } from "../connections/connectionService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
+import { createFixedWindowLimiter } from "../operations/requestLimits"
 import { announceNewMatchThread } from "./matchThreadAnnouncement"
 import { isRecord, resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 
@@ -45,8 +45,13 @@ export interface DiscoverRouteServices {
   connectionManager?: ConnectionManager
 }
 
+// Per verified person. The per-IP limit before authentication is only a
+// coarse ceiling: many people share one carrier or office address, and an
+// unverified bearer token must never choose the rate-limit key (2026-10-01).
 const DISCOVER_RATE_LIMIT_MAX = 30
+const DISCOVER_IP_RATE_LIMIT_MAX = 300
 const DISCOVER_RATE_LIMIT_WINDOW = "1 minute"
+const DISCOVER_RATE_LIMIT_WINDOW_MS = 60_000
 const DISCOVER_RATE_LIMIT_MESSAGE =
   "You are refreshing Discover too quickly. Try again in a moment."
 
@@ -70,6 +75,10 @@ export async function registerDiscoverRoutes(
     roomSnapshotService,
     capabilityService
   } = services
+  const discoverUserLimiter = createFixedWindowLimiter({
+    max: DISCOVER_RATE_LIMIT_MAX,
+    windowMs: DISCOVER_RATE_LIMIT_WINDOW_MS
+  })
   const discoverySnapshots = services.discoverySnapshots ?? createDiscoverySnapshotService(
     createInMemoryDiscoverySnapshots((userId, filters) => matchService.listDiscovery(userId, filters)))
 
@@ -81,9 +90,8 @@ export async function registerDiscoverRoutes(
         apiAuth: "bearer",
         requestValidation: "enforced",
         rateLimit: {
-          max: DISCOVER_RATE_LIMIT_MAX,
+          max: DISCOVER_IP_RATE_LIMIT_MAX,
           timeWindow: DISCOVER_RATE_LIMIT_WINDOW,
-          keyGenerator: createDiscoverRateLimitKey,
           errorResponseBuilder: () => Object.assign(
             new Error(DISCOVER_RATE_LIMIT_MESSAGE),
             { statusCode: 429 }
@@ -101,6 +109,11 @@ export async function registerDiscoverRoutes(
     async (request, reply) => {
       const resolved = await resolveProductSession({ request, reply, authService })
       if (!resolved) return
+      const personLimit = discoverUserLimiter.consume(resolved.account.userId)
+      if (!personLimit.allowed) {
+        reply.header("Retry-After", String(personLimit.retryAfterSeconds))
+        throw Object.assign(new Error(DISCOVER_RATE_LIMIT_MESSAGE), { statusCode: 429 })
+      }
       const parsedFilters = parseDiscoveryFilters(
         request.query,
         resolved.account.profile.discoveryPreferences
@@ -386,16 +399,6 @@ function buildRoomSnapshotUrl(assetKey: string): string {
   // Never reflect Host into response data. Mobile resolves this same-origin
   // path against its configured API base URL.
   return `/v1/room-showcase/${assetKey}`
-}
-
-function createDiscoverRateLimitKey(request: FastifyRequest): string {
-  const authorization = request.headers.authorization
-  if (!authorization?.startsWith("Bearer ")) {
-    return `ip:${request.ip}`
-  }
-  const token = authorization.slice("Bearer ".length).trim()
-  if (!token) return `ip:${request.ip}`
-  return `session:${createHash("sha256").update(token).digest("hex")}`
 }
 
 const ALLOWED_DISCOVERY_GENDERS = new Set<DiscoveryGender>(DISCOVERY_GENDERS)

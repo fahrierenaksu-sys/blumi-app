@@ -14,7 +14,7 @@ import {
   type MatchRecord,
   type MatchRepository
 } from "./matchRepository"
-import type { DiscoveryWatchClaim } from "./matchRepository"
+import type { DiscoveryWatchClaim, DiscoveryWatchRestoreOptions } from "./matchRepository"
 import type { EconomyService } from "../economy/economyService"
 import type { NotificationService } from "../notifications/notificationService"
 import { PublicRequestError } from "../errors/publicRequestError"
@@ -56,7 +56,7 @@ export interface MatchService {
   ): Promise<DiscoveryDecisionResult>
   getDiscoveryWatch(userId: string, now?: Date): Promise<DiscoveryWatchRecord | null>
   claimNextDiscoveryWatch(now?: Date): Promise<DiscoveryWatchClaim | null>
-  restoreDiscoveryWatch(watch: DiscoveryWatchClaim): Promise<DiscoveryWatchRecord>
+  restoreDiscoveryWatch(watch: DiscoveryWatchClaim, options?: DiscoveryWatchRestoreOptions): Promise<DiscoveryWatchRecord>
   completeDiscoveryWatch(watch: DiscoveryWatchClaim): Promise<boolean>
   isDiscoveryWatchClaimCurrent(watch: DiscoveryWatchClaim, now?: Date): Promise<boolean>
   activateDiscoveryWatch(
@@ -165,8 +165,8 @@ export function createMatchService(
     async claimNextDiscoveryWatch(now = new Date()) {
       return repository.claimNextDiscoveryWatch(now)
     },
-    async restoreDiscoveryWatch(watch) {
-      return repository.restoreDiscoveryWatch(watch)
+    async restoreDiscoveryWatch(watch, options) {
+      return repository.restoreDiscoveryWatch(watch, options)
     },
     async completeDiscoveryWatch(watch) {
       return repository.completeDiscoveryWatch(watch)

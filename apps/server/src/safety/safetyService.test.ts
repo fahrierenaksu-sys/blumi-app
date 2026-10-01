@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createInMemorySafetyRepository } from "./safetyRepository"
-import { createSafetyService } from "./safetyService"
+import { createSafetyService, MAX_BLOCKS_PER_ACTOR, MAX_REPORTS_PER_DAY, SafetyLimitError } from "./safetyService"
 
 test("blocks are idempotent and scoped to the actor", async () => {
   const service = createSafetyService({
@@ -159,4 +159,66 @@ test("invalid safety actions are rejected", async () => {
       }),
     /1000/
   )
+})
+
+test("block and report targets must be canonical, bounded user ids", async () => {
+  const service = createSafetyService()
+  for (const target of ["x".repeat(129), "user b", "user_b\u0000", "../user_b"]) {
+    await assert.rejects(() => service.blockUser("user_a", target), /Choose a person first/, target)
+    await assert.rejects(() => service.reportUser("user_a", { reportedUserId: target, reason: "spam" }), /Choose a person first/, target)
+  }
+  assert.equal((await service.blockUser("user_a", ` ${"x".repeat(128)} `)).blockedUserId, "x".repeat(128))
+})
+
+test("block and report targets must be existing people; unblocking a missing person still works", async () => {
+  const service = createSafetyService({ isKnownUser: async (userId) => userId !== "ghost" })
+  await assert.rejects(() => service.blockUser("user_a", "ghost"), /not available/)
+  await assert.rejects(() => service.reportUser("user_a", { reportedUserId: "ghost", reason: "spam" }), /not available/)
+  assert.equal((await service.listBlocks("user_a")).length, 0)
+  await service.unblockUser("user_a", "ghost")
+  assert.equal((await service.blockUser("user_a", "user_b")).blockedUserId, "user_b")
+})
+
+test("a pending report on the same person is returned instead of a duplicate", async () => {
+  let id = 0
+  const service = createSafetyService({ idFactory: () => `report_${++id}` })
+  const first = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "spam" })
+  const repeat = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "harassment", note: "again" })
+  assert.equal(first.replayed, false)
+  assert.equal(repeat.replayed, true)
+  assert.equal(repeat.report.reportId, first.report.reportId)
+  assert.equal((await service.listReportsForActor("user_a")).length, 1)
+})
+
+test("one person can file at most 20 reports in 24 hours", async () => {
+  let id = 0
+  const service = createSafetyService({ idFactory: () => `report_${++id}` })
+  const start = new Date("2026-10-01T10:00:00.000Z")
+  assert.equal(MAX_REPORTS_PER_DAY, 20)
+  for (let index = 0; index < MAX_REPORTS_PER_DAY; index += 1) {
+    await service.reportUser("user_a", { reportedUserId: `target_${index}`, reason: "spam" },
+      new Date(start.getTime() + index * 60_000))
+  }
+  await assert.rejects(
+    () => service.reportUser("user_a", { reportedUserId: "target_over", reason: "spam" }, new Date(start.getTime() + 3_600_000)),
+    (error) => error instanceof SafetyLimitError
+  )
+  assert.equal(await service.hasBlockBetween("user_a", "target_over"), false)
+  // Another person is unaffected, and the window moves on.
+  await service.reportUser("user_c", { reportedUserId: "target_over", reason: "spam" }, new Date(start.getTime() + 3_600_000))
+  const nextDay = await service.reportUser("user_a", { reportedUserId: "target_over", reason: "spam" },
+    new Date(start.getTime() + 24 * 3_600_000 + 60_000))
+  assert.equal(nextDay.replayed, false)
+})
+
+test("one person can hold at most 1000 blocks; an existing block is still answered", async () => {
+  const service = createSafetyService()
+  assert.equal(MAX_BLOCKS_PER_ACTOR, 1000)
+  for (let index = 0; index < MAX_BLOCKS_PER_ACTOR; index += 1) {
+    await service.blockUser("user_a", `blocked_${index}`)
+  }
+  await assert.rejects(() => service.blockUser("user_a", "one_too_many"), (error) => error instanceof SafetyLimitError)
+  assert.equal((await service.blockUser("user_a", "blocked_7")).blockedUserId, "blocked_7")
+  await service.unblockUser("user_a", "blocked_7")
+  assert.equal((await service.blockUser("user_a", "one_too_many")).blockedUserId, "one_too_many")
 })

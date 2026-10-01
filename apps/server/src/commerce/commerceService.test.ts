@@ -82,6 +82,8 @@ test("refund reversals consume unused coins first, then create debt without revo
   const economyService = createEconomyService({ repository })
   const commerceService = createCommerceService({ economyService })
 
+  // A refund reverses a recorded purchase: credit it, then spend most of it.
+  await commerceService.applyVerifiedTransaction(createVerifiedPurchase(), CREATED_AT)
   await repository.saveInventory({
     ...createDefaultEconomyInventory("user_a", CREATED_AT),
     coins: 120,

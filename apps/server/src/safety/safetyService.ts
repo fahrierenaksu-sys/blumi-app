@@ -3,6 +3,7 @@ import { REPORT_REASONS, type ReportReason } from "@blumi/contracts"
 import {
   createInMemorySafetyRepository,
   type BlockRecord,
+  type PendingReportCursor,
   type ReportRecord,
   type SafetyRepository
 } from "./safetyRepository"
@@ -14,6 +15,7 @@ import {
 } from "../auth/realtimeAccessRevocation"
 import {
   getModerationTarget,
+  moderationRiskRank,
   type PendingModerationQueueSummary,
   summarizePendingModerationWorkload
 } from "./moderationQueue"
@@ -24,6 +26,13 @@ const MAX_ADMIN_REPORT_LIMIT = 100
 const DEFAULT_ACTOR_REPORT_LIMIT = 50
 const MAX_ACTOR_REPORT_LIMIT = 100
 const REPORT_STATUSES = ["pending", "resolved", "dismissed"] as const
+/** User ids are `user_<uuid>`; anything outside this shape is never a person. */
+const TARGET_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+/** Reports one person may file per rolling 24 hours (2026-10-01). */
+export const MAX_REPORTS_PER_DAY = 20
+const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000
+/** Blocks one person may hold; unblocking frees room (2026-10-01). */
+export const MAX_BLOCKS_PER_ACTOR = 1000
 const REPORT_RESOLUTION_ACTIONS = ["warn", "suspend", "ban", "dismiss"] as const
 
 export interface SafetyService {
@@ -47,6 +56,14 @@ export interface SafetyService {
   ): Promise<{ report: ReportRecord; block: BlockRecord; replayed: boolean }>
   listReportsForActor(actorUserId: string, limit?: number): Promise<ReportRecord[]>
   listAllReports(options: { status?: string; limit?: number }): Promise<ReportRecord[]>
+  /**
+   * The actionable queue: pending reports by risk, then oldest first, in
+   * pages. `nextCursor` is null on the last page.
+   */
+  listPendingReportQueue(options: { limit?: number; cursor?: string }): Promise<{
+    reports: ReportRecord[]
+    nextCursor: string | null
+  }>
   getPendingReportQueueSummary(now?: Date): Promise<PendingModerationQueueSummary>
   findReport(reportId: string): Promise<ReportRecord | null>
   resolveReport(
@@ -77,6 +94,14 @@ export class ReportIdempotencyConflictError extends PublicRequestError {
   }
 }
 
+/** A per-person safety cap was reached (answered with 429). */
+export class SafetyLimitError extends PublicRequestError {
+  constructor(message: string) {
+    super(message)
+    this.name = "SafetyLimitError"
+  }
+}
+
 export interface ReportUserInput {
   reportedUserId: string
   reason: string
@@ -87,6 +112,11 @@ export interface ReportUserInput {
 export interface CreateSafetyServiceOptions {
   repository?: SafetyRepository
   idFactory?: () => string
+  /**
+   * Whether a user id belongs to an account. Blocks and reports of anyone
+   * else are refused. Omitted in unit tests that use free-form ids.
+   */
+  isKnownUser?: (userId: string) => Promise<boolean>
 }
 
 export function createSafetyService(
@@ -95,6 +125,11 @@ export function createSafetyService(
   const repository = options.repository ?? createInMemorySafetyRepository()
   const idFactory = options.idFactory ?? createReportId
   const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
+  const assertKnownTarget = async (userId: string) => {
+    if (options.isKnownUser && !(await options.isKnownUser(userId))) {
+      throw new PublicRequestError("That person is not available.")
+    }
+  }
 
   return {
     repository,
@@ -107,6 +142,11 @@ export function createSafetyService(
 
       const existing = await repository.findBlock(actorUserId, targetUserId)
       if (existing) return existing
+      await assertKnownTarget(targetUserId)
+      // Checked before the write; concurrent blocks can pass it by a few.
+      if (await repository.countBlocks(actorUserId) >= MAX_BLOCKS_PER_ACTOR) {
+        throw new SafetyLimitError("You have reached the block limit. Unblock someone to block another person.")
+      }
 
       const block: BlockRecord = {
         actorUserId,
@@ -148,6 +188,7 @@ export function createSafetyService(
       const reason = normalizeReportReason(input.reason)
       const note = normalizeReportNote(input.note)
       const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey)
+      await assertKnownTarget(reportedUserId)
       const report: ReportRecord = {
         reportId: idFactory(),
         actorUserId,
@@ -163,9 +204,15 @@ export function createSafetyService(
         blockedUserId: reportedUserId,
         createdAt: now.toISOString()
       }
-      const saved = await repository.saveReportAndBlock(report, block)
+      const saved = await repository.saveReportAndBlock(report, block, {
+        windowStartedAt: new Date(now.getTime() - REPORT_WINDOW_MS).toISOString(),
+        maxReportsInWindow: MAX_REPORTS_PER_DAY
+      })
       if (saved.kind === "conflict") {
         throw new ReportIdempotencyConflictError()
+      }
+      if (saved.kind === "limited") {
+        throw new SafetyLimitError("You have sent many reports today. Our team is reviewing them; try again tomorrow.")
       }
       return {
         report: saved.report,
@@ -184,6 +231,17 @@ export function createSafetyService(
         status: normalizeReportStatus(options.status),
         limit: normalizeAdminReportLimit(options.limit)
       })
+    },
+    async listPendingReportQueue(options) {
+      const limit = normalizeAdminReportLimit(options.limit)
+      const after = options.cursor === undefined ? undefined : decodePendingReportCursor(options.cursor)
+      const page = await repository.listPendingReportsByRisk({ limit: limit + 1, after })
+      const reports = page.slice(0, limit)
+      const last = reports[reports.length - 1]
+      return {
+        reports,
+        nextCursor: page.length > limit && last ? encodePendingReportCursor(last) : null
+      }
     },
     async getPendingReportQueueSummary(now = new Date()) {
       const breachedBeforeByReason = REPORT_REASONS.reduce<Record<ReportReason, string>>(
@@ -254,10 +312,37 @@ function normalizeAdminIdentity(
 
 function normalizeTargetUserId(userId: string): string {
   const trimmed = userId.trim()
-  if (!trimmed) {
+  if (!TARGET_USER_ID_PATTERN.test(trimmed)) {
     throw new PublicRequestError("Choose a person first.")
   }
   return trimmed
+}
+
+function encodePendingReportCursor(report: ReportRecord): string {
+  return Buffer.from(JSON.stringify([
+    moderationRiskRank(report.reason), report.createdAt, report.reportId
+  ])).toString("base64url")
+}
+
+function decodePendingReportCursor(cursor: string): PendingReportCursor {
+  const invalid = () => new PublicRequestError("Use a valid report cursor.")
+  if (cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw invalid()
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"))
+  } catch {
+    throw invalid()
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 3) throw invalid()
+  const [riskRank, createdAt, reportId] = parsed as unknown[]
+  if (
+    typeof riskRank !== "number" || !Number.isSafeInteger(riskRank) || riskRank < 0 || riskRank > 9 ||
+    typeof createdAt !== "string" || !Number.isFinite(Date.parse(createdAt)) ||
+    typeof reportId !== "string" || !reportId || reportId.length > 200
+  ) {
+    throw invalid()
+  }
+  return { riskRank, createdAt: new Date(createdAt).toISOString(), reportId }
 }
 
 function assertDifferentUsers(

@@ -272,16 +272,23 @@ test("PG-A16 replayed and duplicated signed coin events credit a transaction onc
 test("PG-A17 twenty concurrent rewards racing a refund repay the debt first and settle once", requirePostgres, async () => {
   const { app, authService, economyService } = harness()
   const user = await onboardedAccount(authService)
-  await economyService.getInventory(user.userId)
+  const starter = await economyService.getInventory(user.userId)
   const now = new Date().toISOString()
+  const purchase1500 = {
+    provider: "revenuecat", eventId: "evt_pg_a17_purchase", transactionId: "txn_pg_a17_refund", userId: user.userId,
+    productId: "com.blumi.mobile.coins.1500", store: "ios", kind: "credit", coins: 1500,
+    payloadHash: "d".repeat(64), occurredAt: now, updatedAt: now
+  } as const
+  // A refund reverses a recorded purchase whose coins were already spent.
+  assert.equal((await economyService.repository.applyCoinTransaction(purchase1500)).applied, true)
+  await economyService.repository.saveInventory(starter)
   const refund = economyService.repository.applyCoinTransaction({
-    provider: "revenuecat", eventId: "evt_pg_a17_refund", transactionId: "txn_pg_a17_refund", userId: user.userId,
-    productId: "com.blumi.mobile.coins.1500", store: "ios", kind: "reversal", coins: 1500,
-    payloadHash: "c".repeat(64), occurredAt: now, updatedAt: now
+    ...purchase1500, eventId: "evt_pg_a17_refund", kind: "reversal", payloadHash: "c".repeat(64)
   })
   const rewards = Array.from({ length: 20 }, (_, index) =>
     economyService.claimDailyReward(user.userId, new Date(Date.UTC(2026, 9, index + 1, 12))))
-  const [claims] = await Promise.all([Promise.all(rewards), refund])
+  const [claims, refunded] = await Promise.all([Promise.all(rewards), refund])
+  assert.equal(refunded.applied, true)
   assert.equal(claims.filter((claim) => claim.claimed).length, 20)
   // 1250 starter - 1500 refunded + 20 x 25 earned = 250, whatever the interleaving.
   assert.deepEqual(await coins(user.userId), { coins: 250, coinDebt: 0 })
@@ -296,5 +303,32 @@ test("PG-A17 twenty concurrent rewards racing a refund repay the debt first and 
   })
   assert.equal(purchase.statusCode, 201, purchase.body)
   assert.deepEqual(await coins(user.userId), { coins: 170, coinDebt: 0 })
+  await app.close()
+})
+
+test("PG refund with no recorded credit keeps both ledger rows and never moves coins, in either order", requirePostgres, async () => {
+  const { app, authService, economyService } = harness()
+  const user = await onboardedAccount(authService)
+  await economyService.getInventory(user.userId)
+  const now = new Date().toISOString()
+  const event = {
+    provider: "revenuecat", transactionId: "txn_pg_refund_first", userId: user.userId,
+    productId: "com.blumi.mobile.coins.1500", store: "ios", coins: 1500, occurredAt: now, updatedAt: now
+  } as const
+  const refund = await economyService.repository.applyCoinTransaction({
+    ...event, eventId: "evt_pg_refund_first", kind: "reversal", payloadHash: "e".repeat(64)
+  })
+  assert.equal(refund.applied, false)
+  const lateCredit = await economyService.repository.applyCoinTransaction({
+    ...event, eventId: "evt_pg_credit_late", kind: "credit", payloadHash: "f".repeat(64)
+  })
+  assert.equal(lateCredit.applied, false)
+  assert.deepEqual(await coins(user.userId), { coins: STARTER_COINS, coinDebt: 0 })
+  const ledger = await pool.query(
+    `SELECT entry_type FROM blumi_economy_iap_ledger
+      WHERE provider = 'revenuecat' AND provider_transaction_id = $1 ORDER BY entry_type`,
+    [event.transactionId]
+  )
+  assert.deepEqual(ledger.rows.map((row) => row.entry_type), ["credit", "reversal"])
   await app.close()
 })

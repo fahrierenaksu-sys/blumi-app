@@ -299,9 +299,10 @@ export function createPostgresMatchRepository(
       return result.rows[0] ? { ...mapDiscoveryWatch(result.rows[0]), claimToken: String(result.rows[0].claim_token), generation: String(result.rows[0].generation) } : null
     },
 
-    async restoreDiscoveryWatch(watch) {
-      await pool.query(`UPDATE blumi_discovery_watches SET claim_token = NULL, lease_until = NULL, updated_at = $3
-        WHERE user_id = $1 AND claim_token = $2`, [watch.userId, watch.claimToken, new Date(watch.updatedAt)])
+    async restoreDiscoveryWatch(watch, options) {
+      // lease_until doubles as the cooldown: claims skip a watch until it lapses.
+      await pool.query(`UPDATE blumi_discovery_watches SET claim_token = NULL, lease_until = $4, updated_at = $3
+        WHERE user_id = $1 AND claim_token = $2`, [watch.userId, watch.claimToken, new Date(watch.updatedAt), options?.coolDownUntil ?? null])
       return watch
     },
     async completeDiscoveryWatch(watch) {

@@ -1,5 +1,6 @@
 import type { QueryResultRow } from "pg"
 import { REPORT_REASONS } from "@blumi/contracts"
+import { moderationRiskRank } from "../safety/moderationQueue"
 import type {
   BlockRecord,
   PendingReportReasonSummary,
@@ -92,6 +93,15 @@ export function createPostgresSafetyRepository(
       )
     },
 
+    async countBlocks(actorUserId) {
+      // blumi_safety_blocks_actor_created_at_idx
+      const result = await pool.query(
+        "SELECT count(*)::int AS block_count FROM blumi_safety_blocks WHERE actor_user_id = $1",
+        [actorUserId]
+      )
+      return Number(result.rows[0]?.block_count ?? 0)
+    },
+
     async saveReport(report) {
       await pool.query(
         `INSERT INTO blumi_safety_reports (
@@ -109,16 +119,18 @@ export function createPostgresSafetyRepository(
         ]
       )
     },
-    async saveReportAndBlock(report, block) {
+    async saveReportAndBlock(report, block, policy) {
       const client = pool.connect ? await pool.connect() : null
       const executor = client ?? pool
       try {
         if (client) await executor.query("BEGIN")
+        // One lock per actor: the idempotency replay, the pending-report
+        // dedupe and the window cap all see the actor's committed reports.
+        await executor.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`blumi:safety-report:${report.actorUserId}`]
+        )
         if (report.idempotencyKey) {
-          await executor.query(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-            [`${report.actorUserId}:${report.idempotencyKey}`]
-          )
           const existing = await executor.query(
             `SELECT report_id, actor_user_id, reported_user_id, reason, note,
                     idempotency_key, created_at, status, resolution_action,
@@ -145,6 +157,36 @@ export function createPostgresSafetyRepository(
               report: replay,
               block: savedBlock
             } as SaveReportAndBlockResult
+          }
+        }
+        // blumi_safety_reports_actor_created_at_idx serves both reads.
+        const pending = await executor.query(
+          `SELECT report_id, actor_user_id, reported_user_id, reason, note,
+                  idempotency_key, created_at, status, resolution_action,
+                  resolution_note, resolved_at, resolved_by_admin_id,
+                  resolved_by_token_id, resolution_suspended_until
+             FROM blumi_safety_reports
+            WHERE actor_user_id = $1 AND reported_user_id = $2 AND status = 'pending'
+            ORDER BY created_at ASC, report_id ASC
+            LIMIT 1`,
+          [report.actorUserId, report.reportedUserId]
+        )
+        if (pending.rows[0]) {
+          const existing = mapReport(pending.rows[0])
+          const savedBlock = await ensureBlock(executor, block)
+          if (client) await executor.query("COMMIT")
+          return { kind: "replayed", report: existing, block: savedBlock } as SaveReportAndBlockResult
+        }
+        if (policy) {
+          const recent = await executor.query(
+            `SELECT count(*)::int AS report_count
+               FROM blumi_safety_reports
+              WHERE actor_user_id = $1 AND created_at >= $2`,
+            [report.actorUserId, new Date(policy.windowStartedAt)]
+          )
+          if (Number(recent.rows[0]?.report_count ?? 0) >= policy.maxReportsInWindow) {
+            if (client) await executor.query("COMMIT")
+            return { kind: "limited" } as SaveReportAndBlockResult
           }
         }
         await executor.query(
@@ -207,6 +249,46 @@ export function createPostgresSafetyRepository(
           ${where}
           ORDER BY created_at DESC
           LIMIT $${values.length}`,
+        values
+      )
+      return result.rows.map(mapReport)
+    },
+
+    async listPendingReportsByRisk(options) {
+      // Rank groups come from moderationQueue so SQL and code share one order.
+      const ranks = new Map<number, string[]>()
+      for (const reason of REPORT_REASONS) {
+        const rank = moderationRiskRank(reason)
+        ranks.set(rank, [...(ranks.get(rank) ?? []), reason])
+      }
+      const rankGroups = [...ranks.entries()].sort(([left], [right]) => left - right)
+      const values: unknown[] = []
+      const rankCases = rankGroups.map(([rank, reasons]) => {
+        values.push(reasons)
+        return `WHEN reason = ANY($${values.length}::text[]) THEN ${Number(rank)}`
+      }).join(" ")
+      let afterCondition = ""
+      if (options.after) {
+        values.push(options.after.riskRank, new Date(options.after.createdAt), options.after.reportId)
+        const base = values.length - 2
+        afterCondition = `WHERE (risk_rank, created_at, report_id) > ($${base}::int, $${base + 1}::timestamptz, $${base + 2}::text)`
+      }
+      values.push(options.limit)
+      // blumi_safety_reports_status_idx narrows to pending rows; the backlog
+      // is sorted after ranking (no stored rank column; see report).
+      const result = await pool.query(
+        `SELECT * FROM (
+           SELECT report_id, actor_user_id, reported_user_id, reason, note, idempotency_key,
+                  created_at, status, resolution_action, resolution_note,
+                  resolved_at, resolved_by_admin_id, resolved_by_token_id,
+                  resolution_suspended_until,
+                  CASE ${rankCases} ELSE ${Number(rankGroups[rankGroups.length - 1]![0])} END AS risk_rank
+             FROM blumi_safety_reports
+            WHERE status = 'pending'
+         ) pending
+         ${afterCondition}
+         ORDER BY risk_rank ASC, created_at ASC, report_id ASC
+         LIMIT $${values.length}`,
         values
       )
       return result.rows.map(mapReport)
@@ -282,6 +364,9 @@ export function createPostgresSafetyRepository(
                   suspended_until = CASE
                     WHEN moderation_status = 'banned' THEN suspended_until
                     WHEN $3 = 'ban' THEN NULL
+                    -- A shorter second suspension never cuts a longer one.
+                    WHEN $3 = 'suspend' AND moderation_status = 'suspended'
+                      AND suspended_until > $8 THEN suspended_until
                     WHEN $3 = 'suspend' THEN $8
                     ELSE suspended_until
                   END,
