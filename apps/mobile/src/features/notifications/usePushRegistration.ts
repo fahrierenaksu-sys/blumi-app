@@ -10,7 +10,12 @@ import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
 import { resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
-import { claimForegroundAlert, isConversationFocused } from "./foregroundNotificationState"
+import {
+  claimForegroundAlert,
+  isConversationFocused,
+  resetForegroundNotificationAlerts
+} from "./foregroundNotificationState"
+import { rememberRegisteredPushDevice, removeRegisteredPushDevice } from "./pushDeviceRegistry"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -95,7 +100,6 @@ export function usePushRegistration(
 
     const abortController = new AbortController()
     let active = true
-    let registeredPushToken: string | null = null
     let syncQueue = Promise.resolve()
     let pushTokenSubscription: { remove(): void } | null = null
     let responseSubscription: { remove(): void } | null = null
@@ -221,7 +225,7 @@ export function usePushRegistration(
         })
         if (!active) return
         if (result.status === "registered") {
-          registeredPushToken = result.pushToken
+          if (userId) rememberRegisteredPushDevice(userId, result.pushToken)
           setPermissionStatus("granted")
         } else if (result.reason === "permission-denied") {
           setPermissionStatus("denied")
@@ -278,14 +282,18 @@ export function usePushRegistration(
       responseSubscription?.remove()
       // Credential rotation is not logout: its old effect must not remove the
       // same account's newly refreshed registration and queued notifications.
-      if (registeredPushToken && shouldRemovePushRegistration(userId, currentUserIdRef.current)) {
-        void removeDevice(
+      // Sign-out waits for this same removal before revoking the session.
+      if (userId && shouldRemovePushRegistration(userId, currentUserIdRef.current)) {
+        void removeRegisteredPushDevice(userId, (pushToken) => removeDevice(
           MOBILE_HTTP_BASE_URL,
           sessionToken,
-          registeredPushToken
-        ).catch((error) => {
+          pushToken
+        )).catch((error) => {
           captureAppException(error, { feature: "push_device_cleanup" })
         })
+        // The next person on this phone must not see this account's alerts.
+        resetForegroundNotificationAlerts()
+        if (notificationsForDelivery) clearPresentedNotifications(notificationsForDelivery)
       }
     }
   }, [mode, sessionId, sessionToken, userId])
@@ -317,6 +325,15 @@ async function createAndroidNotificationChannel(): Promise<void> {
     importance: notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 180],
     lightColor: "#F26779"
+  })
+}
+
+function clearPresentedNotifications(notifications: NotificationsModule): void {
+  void Promise.all([
+    notifications.dismissAllNotificationsAsync(),
+    notifications.setBadgeCountAsync(0)
+  ]).catch((error) => {
+    captureAppException(error, { feature: "push_presented_cleanup" })
   })
 }
 

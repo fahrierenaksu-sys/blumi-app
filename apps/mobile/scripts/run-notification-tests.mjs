@@ -24,7 +24,9 @@ const sourceFiles = [
   "src/features/notifications/notificationPreferencesModel.ts",
   "src/features/notifications/notificationPreferencesModel.test.ts",
   "src/features/notifications/notificationPresentationModel.ts",
-  "src/features/notifications/notificationPresentationModel.test.ts"
+  "src/features/notifications/notificationPresentationModel.test.ts",
+  "src/features/notifications/pushDeviceRegistry.ts",
+  "src/features/notifications/pushDeviceRegistry.test.ts"
 ]
 
 try {
@@ -68,6 +70,7 @@ try {
       join(outputDirectory, "features/notifications/notificationRouting.test.js"),
       join(outputDirectory, "features/notifications/notificationPreferencesModel.test.js"),
       join(outputDirectory, "features/notifications/notificationPresentationModel.test.js"),
+      join(outputDirectory, "features/notifications/pushDeviceRegistry.test.js"),
       resolve(workspaceRoot, "src/features/notifications/notificationResponseDelivery.test.mjs")
     ],
     {

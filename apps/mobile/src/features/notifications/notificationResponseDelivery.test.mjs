@@ -451,6 +451,23 @@ test("a room invite for the open conversation and a message the toast already sh
   runtime.dispose()
 })
 
+test("logout removes this device's registration with the still-valid session and clears its notifications", async () => {
+  const runtime = createRuntime({ physicalDevice: true })
+  await settle()
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  runtime.startSession(null)
+  await settle()
+  assert.deepEqual(runtime.removals, [{ token: "token-one", pushToken: "ExponentPushToken[test]" }])
+  assert.deepEqual([...runtime.presentedClears].sort(), ["badge:0", "dismiss"])
+  const registry = runtime.modules.get("./pushDeviceRegistry")
+  await registry.removeRegisteredPushDevice("user-one", async () => { throw new Error("must not remove twice") })
+  assert.equal(runtime.removals.length, 1)
+  runtime.dispose()
+})
+
 test("a tapped push addressed to another account is ignored", async (t) => {
   const runtime = createRuntime({ response: {
     notification: { request: { identifier: "other-account", content: {

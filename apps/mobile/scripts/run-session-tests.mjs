@@ -19,6 +19,7 @@ const testNames = [
   "accountRecoveryCopy",
   "settingsActionErrorCopy",
   "sessionLifecycle",
+  "sessionPushCleanup",
   "sessionMutationCoordinator",
   "accountDataExport",
   "sessionModel",
