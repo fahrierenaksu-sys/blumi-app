@@ -7,7 +7,9 @@ import {
   getSheetExitOffset,
   resolveSheetDismissClaim,
   resolveSheetDismissRelease,
-  resolveSheetDragOffset
+  resolveSheetDragOffset,
+  getSheetExitVelocity,
+  SHEET_EXIT_SPRING
 } from "./sheetDismissModel"
 
 const H = 520
@@ -28,7 +30,11 @@ test("a downward drag claims the sheet only when its content is scrolled to the 
 test("the sheet follows the finger down 1:1 and never rises above its resting place", () => {
   assert.equal(resolveSheetDragOffset(0), 0)
   assert.equal(resolveSheetDragOffset(137), 137)
-  assert.equal(resolveSheetDragOffset(-60), 0)
+  // An upward pull stretches with resistance instead of stopping dead (SYS-5).
+  assert.ok(resolveSheetDragOffset(-60) < 0)
+  assert.ok(resolveSheetDragOffset(-60) > -SHEET_DISMISS.rubberBandLimit)
+  assert.ok(resolveSheetDragOffset(-600) < resolveSheetDragOffset(-60))
+  assert.ok(resolveSheetDragOffset(-100_000) > -SHEET_DISMISS.rubberBandLimit)
   assert.equal(resolveSheetDragOffset(Number.NaN), 0)
 })
 
@@ -77,4 +83,11 @@ test("the backdrop fades in proportion to the drag and is gone when the sheet ha
   assert.equal(getSheetBackdropOpacity(getSheetExitOffset(H) + 100, H), 0)
   assert.equal(getSheetBackdropOpacity(getSheetExitOffset(0), 0), 0, "unmeasured sheet uses the same exit offset")
   assert.equal(getSheetBackdropOpacity(Number.NaN, H), 1)
+})
+
+test("the exit spring carries a downward flick and never bounces back into view", () => {
+  assert.equal(getSheetExitVelocity(1_400), 1_400)
+  assert.equal(getSheetExitVelocity(-300), 0)
+  assert.equal(getSheetExitVelocity(Number.NaN), 0)
+  assert.equal(SHEET_EXIT_SPRING.overshootClamping, true)
 })
