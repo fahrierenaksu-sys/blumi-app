@@ -202,7 +202,7 @@ test("empty inbox and onboarding direct people toward Discover and chat", () => 
 })
 
 test("inbox does not present unverified partner presence", () => {
-  const inbox = read("src/screens/InboxScreen.tsx")
+  const inbox = read("src/screens/InboxScreen.tsx") + read("src/features/inbox/InboxConversationRow.tsx")
 
   assert.doesNotMatch(inbox, /onlineDotOuter/)
   assert.doesNotMatch(inbox, /onlineDot/)
@@ -335,7 +335,7 @@ test("room debrief preserves the mini-room partner avatar snapshot", () => {
 })
 
 test("chat surfaces render a canonical participant avatar and keep monograms for missing legacy data", () => {
-  const inbox = read("src/screens/InboxScreen.tsx")
+  const inbox = read("src/features/inbox/InboxConversationRow.tsx")
   const chat = readChatThreadSurface()
 
   assert.match(inbox, /ParticipantAvatar/)

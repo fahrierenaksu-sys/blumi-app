@@ -115,7 +115,7 @@ test("cards, sheets and bubbles use continuous (squircle) corners; circles stay 
     "src/features/chat/thread/chatThreadStyles.ts": ["bubble"],
     "src/features/chat/ChatRoomInviteCard.tsx": ["card"],
     "src/ui/toast.tsx": ["container", "gradient"],
-    "src/screens/InboxScreen.tsx": ["cardStyles:card"],
+    "src/features/inbox/InboxConversationRow.tsx": ["cardStyles:card"],
     "src/features/shop/screen/shopScreenStyles.ts": ["showcaseCard", "closetBrowserCard", "productCard"],
     "src/features/shop/shopPreviewStyles.ts": [
       "previewCard",

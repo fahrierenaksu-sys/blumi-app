@@ -1,10 +1,9 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import type { AvatarSelection } from "@blumi/contracts"
-import { memo, useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import {
   Animated,
-  FlatList,
+  type FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -13,14 +12,23 @@ import {
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useChatStore } from "../features/chat/chatStore"
-import type { AccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
+import Reanimated from "react-native-reanimated"
+import { ConversationCard, INBOX_ROW_ESTIMATED_HEIGHT } from "../features/inbox/InboxConversationRow"
+import { INBOX_ROW_LAYOUT } from "../features/inbox/inboxMotion"
+import {
+  buildInboxRowAccessibilityLabel,
+  buildInboxRowPreview,
+  createInboxTimeFormatter,
+  formatInboxTimestamp,
+  formatInboxUnreadBadge,
+  resolveInboxDateLocale
+} from "../features/inbox/inboxRowModel"
+import { useInboxClock } from "../features/inbox/useInboxClock"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackFromInbox } from "../navigation/rootNavigationModel"
-import { ParticipantAvatar } from "../ui/participantAvatar"
-import { areChatParticipantAvatarsEquivalent } from "../features/chat/chatParticipantAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
@@ -41,181 +49,8 @@ type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
   onWarmThread: (threadId: string) => Promise<void>
 }
 
-const CONVERSATION_ROW_HEIGHT = 80
 const CONVERSATION_ROW_GAP = uiTheme.spacing.sm + 2
 const ItemSpacer = () => <View style={styles.itemSpacer} />
-
-function formatTimeAgo(
-  isoDate: string | undefined,
-  locale: AccountRecoveryLocale
-): string {
-  if (!isoDate) return ""
-  const ts = Date.parse(isoDate)
-  if (!Number.isFinite(ts)) return ""
-  const deltaMs = Math.max(0, Date.now() - ts)
-  const minutes = Math.floor(deltaMs / 60_000)
-  if (minutes < 1) return locale === "tr" ? "Şimdi" : "Just now"
-  if (minutes < 60) return locale === "tr" ? `${minutes} dk` : `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return locale === "tr" ? `${hours} sa` : `${hours}h`
-  const days = Math.floor(hours / 24)
-  return locale === "tr"
-    ? `${days} ${days === 1 ? "gün" : "gün"}`
-    : days === 1 ? "1d" : `${days}d`
-}
-
-/* ── Animated conversation card ─────────────────────────────── */
-
-interface ConversationCardProps {
-  threadId: string
-  copy: InboxCopy
-  partnerName: string
-  partnerUserId: string
-  partnerAvatar?: AvatarSelection
-  lastBody: string | undefined
-  lastTime: string
-  hasUnread: boolean
-  reduceMotion: boolean
-  unreadPulseAnim: Animated.Value
-  onPress: (threadId: string) => void
-  onWarm: (threadId: string) => void
-}
-
-const ConversationCard = memo(function ConversationCard(props: ConversationCardProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const { threadId, onPress: pressThread, onWarm: warmThread, reduceMotion } = props
-  const onPress = useCallback(() => pressThread(threadId), [pressThread, threadId])
-  const onWarm = useCallback(() => warmThread(threadId), [warmThread, threadId])
-
-  const handlePressIn = useCallback(() => {
-    onWarm()
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start()
-  }, [onWarm, reduceMotion, scaleAnim])
-
-  const handlePressOut = useCallback(() => {
-    if (props.reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4
-    }).start()
-  }, [props.reduceMotion, scaleAnim])
-
-  useEffect(() => {
-    if (props.reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-    }
-  }, [props.reduceMotion, scaleAnim])
-
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={props.copy.openChatWith(props.partnerName, props.hasUnread)}
-        style={cardStyles.card}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-      >
-        {/* Gradient left accent */}
-        <LinearGradient
-          colors={uiTheme.gradients.primary}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={cardStyles.leftAccent}
-        />
-
-        {/* The chat thread carries no verified presence state. */}
-        <View style={cardStyles.avatarWrap}>
-          <ParticipantAvatar
-            name={props.partnerName}
-            seed={props.partnerUserId}
-            avatar={props.partnerAvatar}
-            size={56}
-            ring="soft"
-          />
-        </View>
-
-        <View style={cardStyles.body}>
-          <View style={cardStyles.nameRow}>
-            <Text style={cardStyles.name} numberOfLines={1}>
-              {props.partnerName}
-            </Text>
-            {props.lastTime ? (
-              <Text style={cardStyles.time}>{props.lastTime}</Text>
-            ) : null}
-          </View>
-          {props.lastBody ? (
-            <Text style={cardStyles.preview} numberOfLines={2}>
-              {props.lastBody}
-            </Text>
-          ) : (
-            <Text style={cardStyles.previewEmpty}>
-              {props.copy.startWithSpark}
-            </Text>
-          )}
-        </View>
-
-        <View style={cardStyles.chevronWrap}>
-          {props.hasUnread ? (
-            <View style={cardStyles.unreadWrap}>
-              <Animated.View
-                style={[
-                  cardStyles.unreadGlow,
-                  { transform: [{ scale: props.unreadPulseAnim }] }
-                ]}
-              />
-              <LinearGradient
-                colors={uiTheme.gradients.primary}
-                style={cardStyles.unreadDot}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-            </View>
-          ) : (
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={uiTheme.colors.textMuted}
-            />
-          )}
-        </View>
-      </Pressable>
-    </Animated.View>
-  )
-}, (previous, next) =>
-  previous.threadId === next.threadId &&
-  previous.copy === next.copy &&
-  previous.partnerName === next.partnerName &&
-  previous.partnerUserId === next.partnerUserId &&
-  areChatParticipantAvatarsEquivalent(
-    previous.partnerAvatar,
-    next.partnerAvatar
-  ) &&
-  previous.lastBody === next.lastBody &&
-  previous.lastTime === next.lastTime &&
-  previous.hasUnread === next.hasUnread &&
-  previous.reduceMotion === next.reduceMotion &&
-  previous.unreadPulseAnim === next.unreadPulseAnim &&
-  previous.onWarm === next.onWarm &&
-  previous.onPress === next.onPress
-)
 
 /* ── Main InboxScreen ───────────────────────────────────────── */
 
@@ -247,6 +82,11 @@ export function InboxScreen(props: InboxScreenProps) {
     []
   )
   const copy = useMemo(() => getInboxCopy(locale), [locale])
+  const timeFormatter = useMemo(
+    () => createInboxTimeFormatter(resolveInboxDateLocale(locale, Intl.DateTimeFormat().resolvedOptions().locale)),
+    [locale]
+  )
+  const now = useInboxClock(navigation)
 
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 16 })
   const unreadPulseAnim = useRef(new Animated.Value(1)).current
@@ -264,22 +104,25 @@ export function InboxScreen(props: InboxScreenProps) {
       const partnerName = partnerSummary?.displayName ?? copy.unknownPartner
       const partnerUserId = partnerSummary?.userId ?? ""
       const partnerAvatar = partnerSummary?.avatar
-      const rawLastBody = thread.lastMessage?.body
-      const lastBody =
-        rawLastBody?.trim() === "__room_invite__"
-          ? copy.roomInvitation
-          : rawLastBody
+      const preview = buildInboxRowPreview({ lastMessage: thread.lastMessage, currentUserId, copy })
+      const time = formatInboxTimestamp(thread.lastMessage?.sentAt, now, copy, timeFormatter)
+      const unreadCount = getThreadUnreadCount(thread.threadId)
       return {
         thread,
         partnerName,
         partnerUserId,
         partnerAvatar,
-        lastBody,
-        lastTime: formatTimeAgo(thread.lastMessage?.sentAt, locale),
-        hasUnread: getThreadUnreadCount(thread.threadId) > 0
+        previewPrefix: preview.prefix,
+        lastBody: preview.body,
+        lastTime: time.label,
+        unreadBadge: formatInboxUnreadBadge(unreadCount),
+        accessibilityLabel: buildInboxRowAccessibilityLabel(copy, {
+          partnerName, unreadCount, preview, timeSpoken: time.spoken
+        }),
+        hasUnread: unreadCount > 0
       }
     })
-  }, [copy.roomInvitation, copy.unknownPartner, currentUserId, getThreadUnreadCount, locale, threads])
+  }, [copy, currentUserId, getThreadUnreadCount, now, threads, timeFormatter])
   const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
   const scrollToTop = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
@@ -376,9 +219,11 @@ export function InboxScreen(props: InboxScreenProps) {
         partnerName={item.partnerName}
         partnerUserId={item.partnerUserId}
         partnerAvatar={item.partnerAvatar}
+        previewPrefix={item.previewPrefix}
         lastBody={item.lastBody}
         lastTime={item.lastTime}
-        hasUnread={item.hasUnread}
+        unreadBadge={item.unreadBadge}
+        accessibilityLabel={item.accessibilityLabel}
         reduceMotion={reduceMotion}
         unreadPulseAnim={unreadPulseAnim}
         onPress={openThread}
@@ -432,15 +277,14 @@ export function InboxScreen(props: InboxScreenProps) {
         </Animated.View>
 
         <View style={styles.listArea}>
-          <FlatList
+          {/* Rows are 88–99 pt (one or two preview lines, Dynamic Type), so
+              FlatList measures them instead of assuming a fixed height. A
+              thread moving to the top slides there without a jump. */}
+          <Reanimated.FlatList
             ref={listRef}
             data={threadRows}
             keyExtractor={(row) => row.thread.threadId}
-            getItemLayout={(_, index) => ({
-              length: CONVERSATION_ROW_HEIGHT,
-              offset: CONVERSATION_ROW_HEIGHT * index,
-              index
-            })}
+            itemLayoutAnimation={reduceMotion ? undefined : INBOX_ROW_LAYOUT}
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={5}
@@ -472,7 +316,7 @@ export function InboxScreen(props: InboxScreenProps) {
             isVisible={isOpeningThreads}
             label={copy.opening}
             reduceMotion={reduceMotion}
-            rowHeight={CONVERSATION_ROW_HEIGHT}
+            rowHeight={INBOX_ROW_ESTIMATED_HEIGHT}
             rowGap={CONVERSATION_ROW_GAP}
           />
         </View>
@@ -653,86 +497,6 @@ const styles = StyleSheet.create({
   },
   itemSpacer: {
     height: CONVERSATION_ROW_GAP
-  }
-})
-
-const cardStyles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.md,
-    padding: uiTheme.spacing.md,
-    paddingLeft: uiTheme.spacing.md + 4,
-    borderRadius: uiTheme.radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    overflow: "hidden",
-    position: "relative",
-    ...uiTheme.shadow.float
-  },
-  leftAccent: {
-    position: "absolute",
-    left: 0,
-    top: 8,
-    bottom: 8,
-    width: 2.5,
-    borderRadius: 2
-  },
-  avatarWrap: {
-    position: "relative"
-  },
-  body: {
-    flex: 1,
-    gap: 3
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: uiTheme.spacing.xs
-  },
-  name: {
-    flex: 1,
-    color: uiTheme.colors.textPrimary,
-    ...uiTheme.font.subheading
-  },
-  time: {
-    color: uiTheme.colors.textMuted,
-    ...uiTheme.font.caption
-  },
-  preview: {
-    color: uiTheme.colors.textSecondary,
-    ...uiTheme.font.bodySmall
-  },
-  previewEmpty: {
-    color: uiTheme.colors.textMuted,
-    ...uiTheme.font.bodySmall,
-    fontStyle: "italic"
-  },
-  chevronWrap: {
-    width: 22,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  unreadWrap: {
-    width: 14,
-    height: 14,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  unreadGlow: {
-    position: "absolute",
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: uiTheme.colors.accentGlow
-  },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5
   }
 })
 

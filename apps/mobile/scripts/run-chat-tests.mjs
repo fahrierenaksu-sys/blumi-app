@@ -27,6 +27,8 @@ const sourceFiles = [
   "src/features/inbox/inboxUnreadPulseModel.test.ts",
   "src/features/inbox/inboxPullRefreshModel.ts",
   "src/features/inbox/inboxPullRefreshModel.test.ts",
+  "src/features/inbox/inboxRowModel.ts",
+  "src/features/inbox/inboxRowModel.test.ts",
   "src/features/chat/matchChatOpening.ts",
   "src/features/chat/matchChatOpening.test.ts",
   "src/features/chat/chatStore.ts",
@@ -98,6 +100,7 @@ try {
       join(outputDirectory, "features/inbox/inboxEntranceModel.test.js"),
       join(outputDirectory, "features/inbox/inboxUnreadPulseModel.test.js"),
       join(outputDirectory, "features/inbox/inboxPullRefreshModel.test.js"),
+      join(outputDirectory, "features/inbox/inboxRowModel.test.js"),
       join(outputDirectory, "features/chat/matchChatOpening.test.js"),
       join(outputDirectory, "features/chat/chatStore.test.js"),
       join(outputDirectory, "features/chat/chatStore.adversarial.test.js"),
@@ -138,7 +141,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/inbox/useInboxClock.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

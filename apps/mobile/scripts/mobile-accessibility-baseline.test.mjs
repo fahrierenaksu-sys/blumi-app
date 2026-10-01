@@ -13,6 +13,7 @@ const criticalFiles = [
   "src/components/MatchResultModal.tsx",
   "src/components/CountryCallingCodePicker.tsx",
   "src/screens/InboxScreen.tsx",
+  "src/features/inbox/InboxConversationRow.tsx",
   "src/screens/ChatThreadScreen.tsx",
   "src/features/chat/thread/ChatThreadHeader.tsx",
   "src/features/chat/thread/ChatThreadEmptyState.tsx",

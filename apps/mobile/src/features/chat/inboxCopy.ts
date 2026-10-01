@@ -18,7 +18,17 @@ export interface InboxCopy {
   back: string
   unknownPartner: string
   conversationCount: (count: number) => string
-  openChatWith: (name: string, hasUnread: boolean) => string
+  /** Prefix of my own last message in a row preview ("You: …"). */
+  youPrefix: string
+  unreadMessages: (count: number) => string
+  openChatHint: string
+  time: {
+    now: string
+    nowSpoken: string
+    minutes: (minutes: number) => string
+    minutesSpoken: (minutes: number) => string
+    yesterday: string
+  }
 }
 
 const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
@@ -40,8 +50,16 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     back: "Go back",
     unknownPartner: "Someone",
     conversationCount: (count) => `${count} conversation${count === 1 ? "" : "s"}`,
-    openChatWith: (name, hasUnread) =>
-      `Open chat with ${name}${hasUnread ? ", unread messages" : ""}`
+    youPrefix: "You",
+    unreadMessages: (count) => `${count} unread message${count === 1 ? "" : "s"}`,
+    openChatHint: "Opens the conversation.",
+    time: {
+      now: "Now",
+      nowSpoken: "just now",
+      minutes: (minutes) => `${minutes}m`,
+      minutesSpoken: (minutes) => `${minutes} minute${minutes === 1 ? "" : "s"} ago`,
+      yesterday: "Yesterday"
+    }
   },
   tr: {
     title: "Sohbetler",
@@ -61,8 +79,16 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     back: "Geri dön",
     unknownPartner: "Biri",
     conversationCount: (count) => `${count} konuşma`,
-    openChatWith: (name, hasUnread) =>
-      `${name} ile sohbeti aç${hasUnread ? ", okunmamış mesajlar" : ""}`
+    youPrefix: "Sen",
+    unreadMessages: (count) => `${count} okunmamış mesaj`,
+    openChatHint: "Sohbeti açar.",
+    time: {
+      now: "Şimdi",
+      nowSpoken: "şimdi",
+      minutes: (minutes) => `${minutes} dk`,
+      minutesSpoken: (minutes) => `${minutes} dakika önce`,
+      yesterday: "Dün"
+    }
   }
 }
 

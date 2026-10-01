@@ -12,6 +12,7 @@ test("core navigation and status surfaces use Ionicons instead of text glyph ico
   const files = [
     "screens/ProfileEditScreen.tsx",
     "screens/InboxScreen.tsx",
+    "features/inbox/InboxConversationRow.tsx",
     // Discover's only icon (legacy lobby pending invites) lives here.
     "features/lobby/PendingInviteStrip.tsx",
     "features/miniRoom/scene/MiniRoomHud.tsx"
