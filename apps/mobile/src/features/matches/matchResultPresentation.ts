@@ -33,6 +33,7 @@ export interface ConnectionModalPresentation extends MatchResultPresentationBase
   readonly entry: "connection_modal"
   readonly badgeLabel: string
   readonly closeLabel: string
+  readonly avatarLabel: string
   readonly safetyLabel?: undefined
 }
 
@@ -79,6 +80,7 @@ export function getMatchResultPresentation(
       body: modal.body(name),
       badgeLabel: modal.badgeLabel,
       closeLabel: modal.closeLabel,
+      avatarLabel: modal.avatarLabel,
       actions: [
         { id: "send_message", label: modal.sendMessage, enabled: true },
         { id: "keep_discovering", label: modal.keepDiscovering, enabled: true }
@@ -222,6 +224,40 @@ export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrati
     contentStaggerMs: CONTENT_STAGGER_MS,
     heartPulseIterations: HEART_PULSE_ITERATIONS,
     haloPulseIterations: HALO_PULSE_ITERATIONS
+  }
+}
+
+/**
+ * The Discover MatchResult route (DSC-2): the hero card settles from the same
+ * 0.92 + fade as the modal (it used to scale from 0), the success tap lands
+ * as the card appears (it used to fire 200 ms before), and the actions dock
+ * follows within 250 ms (was 600 ms). Reduce Motion keeps the tap and a
+ * crossfade, without scale or delays.
+ */
+export interface MatchResultRouteTimeline {
+  heroFromScale: number
+  heroFromOpacity: number
+  heroOpacityDurationMs: number
+  heroSpring: boolean
+  heroDelayMs: number
+  hapticDelayMs: number
+  dockDelayMs: number
+}
+
+const ROUTE_HERO_DELAY_MS = 60
+const ROUTE_DOCK_DELAY_MS = 220
+
+export function getMatchResultRouteTimeline(reduceMotion: boolean): MatchResultRouteTimeline {
+  const motion = getMatchCelebrationMotion(reduceMotion)
+  const heroDelayMs = reduceMotion ? 0 : ROUTE_HERO_DELAY_MS
+  return {
+    heroFromScale: motion.entranceFromScale,
+    heroFromOpacity: motion.entranceFromOpacity,
+    heroOpacityDurationMs: motion.entranceOpacityDurationMs,
+    heroSpring: motion.entranceSpring,
+    heroDelayMs,
+    hapticDelayMs: heroDelayMs,
+    dockDelayMs: reduceMotion ? 0 : ROUTE_DOCK_DELAY_MS
   }
 }
 

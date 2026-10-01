@@ -4,6 +4,7 @@ import {
   getMatchCelebrationMotion,
   getMatchCreatedProperties,
   getMatchResultPresentation,
+  getMatchResultRouteTimeline,
   MATCH_RESULT_ENTRY_POINTS,
   shouldPlayMatchHaptic,
   springFromOrigami
@@ -31,6 +32,7 @@ test("the realtime connection modal keeps its shipped copy and close control", (
   assert.equal(presentation.body, "You and Ada both felt it. Start with a message when you are ready.")
   assert.equal(presentation.badgeLabel, "Mutual match")
   assert.equal(presentation.closeLabel, "Close match result")
+  assert.equal(presentation.avatarLabel, "Blumi avatar")
   assert.equal(presentation.safetyLabel, undefined)
   assert.deepEqual(presentation.actions, [
     { id: "send_message", label: "Start chatting", enabled: true },
@@ -69,6 +71,8 @@ test("a Turkish device gets the match moment in Turkish on both surfaces (DSC-1)
   assert.equal(modal.body, "Sen ve Ada aynı şeyi hissettiniz. Hazır olduğunda bir mesajla başla.")
   assert.equal(modal.badgeLabel, "Karşılıklı eşleşme")
   assert.equal(modal.closeLabel, "Eşleşme ekranını kapat")
+  // VoiceOver reads the partner's chibi with this label (was English only).
+  assert.equal(modal.avatarLabel, "Blumi avatarı")
   assert.deepEqual(modal.actions, [
     { id: "send_message", label: "Sohbete başla", enabled: true },
     { id: "keep_discovering", label: "Keşfetmeye devam et", enabled: true }
@@ -224,4 +228,19 @@ test("presentations are fresh values so callers cannot mutate shared copy", () =
   ;(first.actions[0] as { label: string }).label = "mutated"
   const second = getMatchResultPresentation({ entry: "connection_modal", matchedUserName: "Ada", canStartConversation: true })
   assert.equal(second.actions[0].label, "Start chatting")
+})
+
+test("the Discover match screen card settles from 0.92, never from 0, with the haptic as it appears (DSC-2)", () => {
+  const timeline = getMatchResultRouteTimeline(false)
+  assert.equal(timeline.heroFromScale, 0.92)
+  assert.equal(timeline.heroFromOpacity, 0)
+  assert.equal(timeline.heroDelayMs, timeline.hapticDelayMs, "the success tap lands with the card, not before it")
+  assert.ok(timeline.dockDelayMs <= 250, `the actions arrive within 250 ms (${timeline.dockDelayMs})`)
+  assert.equal(timeline.heroSpring, true)
+
+  const reduced = getMatchResultRouteTimeline(true)
+  assert.equal(reduced.heroFromScale, 1, "Reduce Motion: a crossfade, no scale")
+  assert.equal(reduced.heroSpring, false)
+  assert.equal(reduced.heroDelayMs, reduced.hapticDelayMs, "haptics are not motion: the tap stays")
+  assert.equal(reduced.dockDelayMs, 0)
 })

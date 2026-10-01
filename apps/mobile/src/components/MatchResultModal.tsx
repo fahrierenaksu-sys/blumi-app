@@ -209,12 +209,16 @@ export function MatchResultModal(props: MatchResultModalProps) {
     locale
   })
   const [sendMessageAction, keepDiscoveringAction] = presentation.actions
-  const resolvedMatchedAvatarSnapshot = createCandidateAvatarSnapshot({
-    userId: matchedUserId ?? matchedUserName,
-    displayName: matchedUserName,
-    avatarSnapshot: matchedAvatarSnapshot,
-    avatarSelection: matchedAvatarSelection
-  })
+  const resolvedMatchedAvatarSnapshot = {
+    ...createCandidateAvatarSnapshot({
+      userId: matchedUserId ?? matchedUserName,
+      displayName: matchedUserName,
+      avatarSnapshot: matchedAvatarSnapshot,
+      avatarSelection: matchedAvatarSelection
+    }),
+    // VoiceOver reads "<name> <label>": localized with the moment (DSC-1).
+    label: presentation.avatarLabel
+  }
 
   const stopEntrance = useCallback(() => {
     entranceAnimationRef.current?.stop()

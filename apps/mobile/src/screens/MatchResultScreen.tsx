@@ -8,6 +8,14 @@ import {
   View
 } from "react-native"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import Reanimated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming
+} from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { AvatarPreview2D } from "../features/avatarV2/components/AvatarPreview2D"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
@@ -17,6 +25,7 @@ import {
 import {
   getMatchCelebrationMotion,
   getMatchResultPresentation,
+  getMatchResultRouteTimeline,
   shouldCelebrateMatchResult,
   shouldPlayMatchHaptic
 } from "../features/matches/matchResultPresentation"
@@ -38,7 +47,7 @@ import {
 } from "../ui/glass"
 import { uiTheme } from "../ui/theme"
 import { ActionButtonCircle } from "../ui/primitives"
-import { useEntranceAnimation, useReducedMotion, useScaleBounce, usePulse } from "../ui/animations"
+import { useEntranceAnimation, useReducedMotion, usePulse } from "../ui/animations"
 import { hapticSuccess } from "../ui/haptics"
 import { AvatarFrame, type AvatarFrameVariant } from "../ui/AvatarFrame"
 import { ReportModal } from "../components/ReportModal"
@@ -76,8 +85,16 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
 
   const reduceMotion = useReducedMotion()
   const celebrationMotion = getMatchCelebrationMotion(reduceMotion)
+  const timeline = getMatchResultRouteTimeline(reduceMotion)
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 20 })
-  const heroAnim = useScaleBounce({ delay: 200, tension: 60, friction: 7 })
+  // DSC-2: the card settles from 0.92 with a fade on the UI thread (it used
+  // to grow from scale 0); Reduce Motion crossfades without scale.
+  const heroOpacity = useSharedValue(timeline.heroFromOpacity)
+  const heroScale = useSharedValue(timeline.heroFromScale)
+  const heroStyle = useAnimatedStyle(() => ({
+    opacity: heroOpacity.value,
+    transform: [{ scale: heroScale.value }]
+  }))
   // usePulse itself stays still under Reduce Motion; otherwise the halo beats a bounded number of times.
   const haloAnim = usePulse({
     minScale: 0.9,
@@ -85,16 +102,37 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     duration: 2000,
     iterations: celebrationMotion.haloPulseIterations
   })
-  const dockAnim = useEntranceAnimation({ delay: 600, translateY: 40 })
+  const dockAnim = useEntranceAnimation({ delay: timeline.dockDelayMs, translateY: 40 })
   const matchHapticPlayedRef = useRef(false)
   const shouldCelebrate = shouldCelebrateMatchResult(route.params)
+  const entranceSpring = celebrationMotion.entranceSpringConfig
 
   useEffect(() => {
-    // One success tap per fresh match (haptic map: match → success); Reduce Motion keeps it.
+    heroOpacity.value = withDelay(timeline.heroDelayMs, withTiming(1, {
+      duration: timeline.heroOpacityDurationMs,
+      reduceMotion: ReduceMotion.Never
+    }))
+    heroScale.value = entranceSpring
+      ? withDelay(timeline.heroDelayMs, withSpring(1, {
+        damping: entranceSpring.damping,
+        stiffness: entranceSpring.stiffness,
+        mass: entranceSpring.mass,
+        reduceMotion: ReduceMotion.Never
+      }))
+      : 1
+  }, [entranceSpring, heroOpacity, heroScale, timeline.heroDelayMs, timeline.heroOpacityDurationMs])
+
+  useEffect(() => {
+    // One success tap per fresh match (haptic map: match → success), as the
+    // card appears; Reduce Motion keeps it.
     if (!shouldPlayMatchHaptic(matchHapticPlayedRef.current, shouldCelebrate)) return
-    matchHapticPlayedRef.current = true
-    hapticSuccess()
-  }, [shouldCelebrate])
+    const timer = setTimeout(() => {
+      if (matchHapticPlayedRef.current) return
+      matchHapticPlayedRef.current = true
+      hapticSuccess()
+    }, timeline.hapticDelayMs)
+    return () => clearTimeout(timer)
+  }, [shouldCelebrate, timeline.hapticDelayMs])
 
   const handleStartChat = (): void => {
     if (!sendMessageAction.enabled || openingChatRef.current) return
@@ -157,7 +195,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          <Animated.View style={heroAnim}>
+          <Reanimated.View style={heroStyle}>
             <GlassCard tone="accent" style={styles.heroCard}>
               <Animated.View style={[styles.matchHaloContainer, haloAnim]} pointerEvents="none">
                 <Ionicons name="heart" size={260} color="rgba(255, 79, 152, 0.16)" />
@@ -187,7 +225,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
                 />
               </View>
             </GlassCard>
-          </Animated.View>
+          </Reanimated.View>
 
           <GlassCard style={styles.nextCard}>
             <Text style={styles.nextTitle}>{presentation.nextStepTitle}</Text>
