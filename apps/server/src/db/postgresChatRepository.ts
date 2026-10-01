@@ -279,10 +279,16 @@ export function createPostgresChatRepository(
     },
 
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
+      // available_at defaults to NOW() (microseconds); a sender's own targeted
+      // claim right after commit carries a millisecond JS Date that can be
+      // earlier, so it also accepts the database clock. Leases (available_at
+      // in the future) still exclude claimed jobs.
       const result = await pool.query(
         `WITH due AS (
            SELECT message_id FROM blumi_chat_delivery_outbox
-            WHERE completed_at IS NULL AND available_at <= $1
+            WHERE completed_at IS NULL
+              AND available_at <= CASE WHEN $4::text IS NULL THEN $1::timestamptz
+                                       ELSE GREATEST($1::timestamptz, statement_timestamp()) END
               AND ($4::text IS NULL OR message_id = $4)
             ORDER BY available_at, message_id FOR UPDATE SKIP LOCKED LIMIT $2
          ), claimed AS (
