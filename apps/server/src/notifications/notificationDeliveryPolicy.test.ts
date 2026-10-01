@@ -66,6 +66,24 @@ test("pushes use the recipient's language and never carry caller-supplied names"
   assert.equal(byToken.get("device_unknown_user")?.title, "It’s a match!")
 })
 
+test("a recipient without a device costs no locale lookup, and invalid pushes still fail first", async () => {
+  let localeLookups = 0
+  const { service } = createRecordingService({
+    resolveRecipientLocale: async () => { localeLookups += 1; return "tr" }
+  })
+  assert.equal((await service.sendPushToUser("no_device_user", {
+    title: "Blumi", body: "x", data: { type: "chat.message", threadId: "t", messageId: "m" }
+  })).outcome, "no_device")
+  assert.equal(localeLookups, 0, "the locale only picks the copy of a push that will be queued")
+  await assert.rejects(service.sendPushToUser("no_device_user", { title: " ", body: "Legacy update" }),
+    /Push notification content is required/)
+  await service.registerDevice("user", { platform: "ios", pushToken: "device" }, NOW)
+  assert.equal((await service.sendPushToUser("user", {
+    title: "Blumi", body: "x", data: { type: "chat.message", threadId: "t", messageId: "m" }
+  })).outcome, "queued")
+  assert.equal(localeLookups, 1)
+})
+
 test("a failing locale lookup still queues the push in English", async () => {
   const { service, sent } = createRecordingService({
     resolveRecipientLocale: async () => { throw new Error("database unavailable") }
