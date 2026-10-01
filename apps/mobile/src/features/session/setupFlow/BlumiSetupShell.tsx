@@ -134,7 +134,14 @@ export function BlumiSetupShell({
   const progress = getSetupProgress(step)
   const copy = SETUP_FLOW_COPY[step]
 
+  // Only the visible step follows the keyboard; hidden (prepared or left)
+  // steps would otherwise re-layout and animate behind it (ONB-08).
   useEffect(() => {
+    if (!motionActive) {
+      setKeyboardVisible(false)
+      setKeyboardMotion(false)
+      return
+    }
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
     let keyboardMotionTimer: ReturnType<typeof setTimeout> | null = null
@@ -154,7 +161,7 @@ export function BlumiSetupShell({
       showSubscription.remove()
       hideSubscription.remove()
     }
-  }, [])
+  }, [motionActive])
 
   const effectiveTitle = title ?? copy.title
   const effectiveDescription = description ?? copy.description
