@@ -138,7 +138,6 @@ export interface RoomPhrase {
 export interface InteractionState {
   selectedHotspotId?: string
   pressedPoint?: RoomPoint
-  proximityClose: boolean
 }
 
 export interface MiniRoomStore {

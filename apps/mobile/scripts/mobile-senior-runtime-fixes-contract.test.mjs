@@ -50,11 +50,21 @@ test("reduced-motion policy is wired to decorative avatar motion", () => {
   assert.match(layer, /joinPulseRef\.setValue\(1\)/)
 })
 
-test("room entry and together-heart motion respect the same accessibility policy", () => {
+test("room entry motion respects the accessibility policy", () => {
   const scene = read("apps/mobile/src/features/miniRoom/scene/MiniRoomScene.tsx")
 
   assert.match(scene, /resolveMiniRoomMotionPolicy\(reduceMotion\)/)
   assert.match(scene, /!motionPolicy\.animateJoin/)
-  assert.match(scene, /!motionPolicy\.animateHeart/)
-  assert.match(scene, /duration: motionPolicy\.transitionDuration/)
+})
+
+test("the retired together-sparkle pill no longer floats over the room (2026-10-01)", () => {
+  // Owner report: a large round sparkle bubble pulsed above "Sen" whenever
+  // the two avatars stood close. It carried no information or action.
+  const scene = read("apps/mobile/src/features/miniRoom/scene/MiniRoomScene.tsx")
+  const policy = read("apps/mobile/src/features/miniRoom/scene/miniRoomReducedMotion.ts")
+  const types = read("apps/mobile/src/features/miniRoom/scene/miniRoomSceneTypes.ts")
+
+  assert.doesNotMatch(scene, /TogetherHeart|together(Wrap|Inner)|sparkles/)
+  assert.doesNotMatch(policy, /animateHeart/)
+  assert.doesNotMatch(types, /proximityClose/)
 })

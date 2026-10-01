@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
 import {
   Animated,
@@ -35,8 +34,7 @@ import {
   MINI_ROOM_WELCOME_FADE_MS,
   MINI_ROOM_WELCOME_HOLD_MS,
   MINI_ROOM_WELCOME_REVEAL_MS,
-  resolveMiniRoomMotionPolicy,
-  type MiniRoomMotionPolicy
+  resolveMiniRoomMotionPolicy
 } from "./miniRoomReducedMotion"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
 import type { MiniRoomCopy } from "../miniRoomCopy"
@@ -347,9 +345,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     [partnerUser.displayName]
   )
 
-  const closeTogether =
-    store.interaction.proximityClose && connectionStatus === "connected"
-
   const composerDisabled = !canChatSend
   const hudNotices = useMemo(
     () => failedRoomMessage?.clientMessageId ? [...notices, copy.sendFailedNotice] : notices,
@@ -419,7 +414,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
               interaction={store.interaction}
             />
             {hotspotLayer}
-            <TogetherHeartOverlay active={closeTogether} motionPolicy={motionPolicy} />
             {avatarLayer}
             <Animated.View
               style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
@@ -490,90 +484,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   )
 }
 
-interface TogetherHeartOverlayProps {
-  active: boolean
-  motionPolicy: MiniRoomMotionPolicy
-}
-
-const TogetherHeartOverlay = memo(function TogetherHeartOverlay(
-  props: TogetherHeartOverlayProps
-) {
-  const { active, motionPolicy } = props
-  const pulseRef = useRef(new Animated.Value(0)).current
-  const fadeRef = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    fadeRef.stopAnimation()
-    if (!motionPolicy.animateHeart) {
-      fadeRef.setValue(active ? 1 : 0)
-      return
-    }
-    const animation = Animated.timing(fadeRef, {
-      toValue: active ? 1 : 0,
-      duration: motionPolicy.transitionDuration,
-      useNativeDriver: true
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [active, fadeRef, motionPolicy.animateHeart, motionPolicy.transitionDuration])
-
-  useEffect(() => {
-    if (!active || !motionPolicy.animateHeart) {
-      pulseRef.stopAnimation()
-      pulseRef.setValue(0)
-      return
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseRef, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        }),
-        Animated.timing(pulseRef, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [active, motionPolicy.animateHeart, pulseRef])
-
-  const scale = pulseRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.88, 1.12]
-  })
-  const translateY = pulseRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -6]
-  })
-
-  return (
-    <View style={styles.togetherWrap} pointerEvents="none">
-      <Animated.View
-        style={[
-          styles.togetherInner,
-          {
-            opacity: fadeRef,
-            transform: [{ scale }, { translateY }]
-          }
-        ]}
-      >
-          <Ionicons
-            accessible={false}
-            name="sparkles-outline"
-            size={21}
-            color={uiTheme.colors.brandLavender}
-          />
-      </Animated.View>
-    </View>
-  )
-})
-
 const ROOM_STAGE_CAMERA_FALLBACK_WIDTH = 920
 const ROOM_STAGE_CAMERA_FALLBACK_HEIGHT = 524
 
@@ -619,26 +529,5 @@ const styles = StyleSheet.create({
     ...uiTheme.font.micro,
     color: uiTheme.colors.brandPlum,
     letterSpacing: 0.4,
-  },
-  /* ── Together Heart ────────────── */
-  togetherWrap: {
-    position: "absolute",
-    top: "34%",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  togetherInner: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.78)",
-    borderWidth: 1,
-    borderColor: "rgba(221, 205, 255, 0.78)",
-    shadowColor: "#B8A9E8",
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
   },
 })
