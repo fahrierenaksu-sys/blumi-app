@@ -102,6 +102,12 @@ export interface ChatRepository {
   /** Both participants of each thread with their cursors and read-receipt setting. */
   listReceiptParticipants(threadIds: readonly string[]): Promise<ChatReceiptParticipant[]>
   getChatPreferences(userId: string): Promise<ChatPreferences>
+  /**
+   * Unread partner messages per sender across `userId`'s threads, with the
+   * same rule as `listThreadsPage().unreadCount` (after the reader's cursor).
+   * Senders with nothing unread are left out. Feeds the push badge.
+   */
+  countUnreadMessagesBySender(userId: string): Promise<Array<{ senderUserId: string; unreadCount: number }>>
   saveChatPreferences(userId: string, preferences: ChatPreferences, now: Date): Promise<ChatPreferences>
 }
 
@@ -317,6 +323,19 @@ export function createInMemoryChatRepository(
           }
         })
       })
+    },
+    async countUnreadMessagesBySender(userId) {
+      const counts = new Map<string, number>()
+      for (const thread of store.threads.values()) {
+        if (!thread.participantUserIds.includes(userId)) continue
+        const readAt = cursorsOf(thread.threadId, userId).readAt
+        const after = readAt ? Date.parse(readAt) : Number.NEGATIVE_INFINITY
+        for (const message of store.messagesByThread.get(thread.threadId) ?? []) {
+          if (message.senderUserId === userId || Date.parse(message.sentAt) <= after) continue
+          counts.set(message.senderUserId, (counts.get(message.senderUserId) ?? 0) + 1)
+        }
+      }
+      return [...counts].map(([senderUserId, unreadCount]) => ({ senderUserId, unreadCount }))
     },
     async getChatPreferences(userId) {
       if (!receiptsSupported) return { ...DEFAULT_CHAT_PREFERENCES }

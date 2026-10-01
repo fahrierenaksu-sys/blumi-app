@@ -10,9 +10,11 @@ import {
 } from "./notificationRepository"
 import {
   createDevelopmentPushProvider,
+  PushProviderHttpError,
   PushProviderRejection,
   type PushNotification,
-  type PushProvider
+  type PushProvider,
+  type PushReceipt
 } from "./pushProvider"
 import { randomUUID } from "node:crypto"
 import { PublicRequestError } from "../errors/publicRequestError"
@@ -22,6 +24,9 @@ import {
   toOutgoingPushNotification,
   type PushLocale
 } from "./pushMessagePolicy"
+import { createPushBadgeResolver, withPushBadge } from "./pushBadge"
+import { logPushFailure, resolveTicketFailure, safePushErrorCode } from "./pushFailurePolicy"
+import { forEachWithConcurrency } from "./boundedConcurrency"
 
 const MAX_PUSH_TOKEN_LENGTH = 4096
 const MAX_PUSH_TITLE_LENGTH = 120
@@ -29,6 +34,10 @@ const MAX_PUSH_BODY_LENGTH = 240
 const DELIVERY_LEASE_MS = 30_000
 const MAX_DELIVERY_ATTEMPTS = 5
 const DELIVERY_BATCH_SIZE = 100
+/** Deliveries claimed per round; small so a lease is not spent waiting in line. */
+const DELIVERY_CLAIM_SIZE = 30
+/** At most this many provider calls (and so open dispatch transactions) at once. */
+const DEFAULT_DISPATCH_CONCURRENCY = 3
 const MIN_PUSHES_PER_HOUR = 1
 const MAX_PUSHES_PER_HOUR = 20
 
@@ -62,6 +71,10 @@ export interface CreateNotificationServiceOptions {
   reportPushFailure?: (failure: SafePushFailure) => void
   /** The recipient's app language when the server knows it; English otherwise. */
   resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
+  /** Provider calls in flight per dispatch cycle (default 3; pool max is 10). */
+  dispatchConcurrency?: number
+  /** The recipient's unread message total, read at dispatch for the iOS badge. */
+  resolveRecipientBadge?: (userId: string) => Promise<number | undefined>
   /**
    * Re-checked right before each provider call: a block, ban, deleted account
    * or answered invite since enqueue must stop a queued or retried push.
@@ -95,8 +108,13 @@ export function createNotificationService(
     const failure = { stage, errorCode, notificationType, attempt, count: 1 }
     try {
       if (options.reportPushFailure) options.reportPushFailure(failure)
-      else console.warn("Push provider failure", failure)
+      else logPushFailure(failure)
     } catch { /* Diagnostics must not change durable delivery state. */ }
+  }
+  const resolveBadge = createPushBadgeResolver(options.resolveRecipientBadge)
+  const dispatchConcurrency = options.dispatchConcurrency ?? DEFAULT_DISPATCH_CONCURRENCY
+  if (!Number.isSafeInteger(dispatchConcurrency) || dispatchConcurrency < 1) {
+    throw new Error("Push dispatch concurrency must be a positive integer.")
   }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
@@ -193,9 +211,10 @@ export function createNotificationService(
     },
     async dispatchDue(dispatchAt = now()) {
       await dispatchDue(dispatchAt)
-      if (pushProvider.getReceipt) {
+      if (pushProvider.getReceipts || pushProvider.getReceipt) {
         const receipts = await repository.claimDueReceipts({ now: dispatchAt, limit: DELIVERY_BATCH_SIZE, leaseMs: DELIVERY_LEASE_MS })
-        await Promise.all(receipts.map((receipt) => dispatchReceipt(receipt, dispatchAt)))
+        if (pushProvider.getReceipts) await dispatchReceiptBatch(receipts, dispatchAt)
+        else await forEachWithConcurrency(receipts, dispatchConcurrency, (receipt) => dispatchReceipt(receipt, dispatchAt))
       }
     }
   }
@@ -204,13 +223,15 @@ export function createNotificationService(
     for (;;) {
       const deliveries = await repository.claimDueDeliveries({
         now: dispatchAt,
-        limit: DELIVERY_BATCH_SIZE,
+        limit: DELIVERY_CLAIM_SIZE,
         leaseMs: DELIVERY_LEASE_MS
       })
       if (deliveries.length === 0) return
 
-      await Promise.all(deliveries.map((delivery) => dispatchDelivery(delivery, dispatchAt)))
-      if (deliveries.length < DELIVERY_BATCH_SIZE) return
+      // Bounded: each authorized send holds a pooled connection in an open
+      // transaction across the provider call (see withAuthorizedDelivery).
+      await forEachWithConcurrency(deliveries, dispatchConcurrency, (delivery) => dispatchDelivery(delivery, dispatchAt))
+      if (deliveries.length < DELIVERY_CLAIM_SIZE) return
     }
   }
 
@@ -250,7 +271,11 @@ export function createNotificationService(
           return
         }
       }
-      const outgoing = toOutgoingPushNotification({ userId: delivery.userId, notification: delivery.notification })
+      // Read before the authorized send, which holds a database connection.
+      const outgoing = withPushBadge(
+        toOutgoingPushNotification({ userId: delivery.userId, notification: delivery.notification }),
+        await resolveBadge(delivery.userId)
+      )
       const controller = new AbortController()
       let timer: ReturnType<typeof setTimeout> | undefined
       let ticket: void | { ticketId: string }
@@ -277,15 +302,40 @@ export function createNotificationService(
       await repository.markDeliverySent({ deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt, now: dispatchAt,
         ...(ticket?.ticketId ? { ticketId: ticket.ticketId } : {}) })
     } catch (error) {
-      reportPushFailure("ticket", toSafeErrorCode(error), attempt, delivery.notification.data?.type)
-      if (error instanceof PushProviderRejection && error.code === "DeviceNotRegistered" && delivery.registrationId) {
+      const errorCode = toSafeErrorCode(error)
+      reportPushFailure("ticket", errorCode, attempt, delivery.notification.data?.type)
+      const failure = resolveTicketFailure(errorCode, attempt, MAX_DELIVERY_ATTEMPTS)
+      if (failure.action === "unregister" && delivery.registrationId) {
         if (delivery.leaseToken) await repository.markDeliveryFailed({ deliveryId: delivery.deliveryId,
           leaseToken: delivery.leaseToken, attempt, now: dispatchAt, errorCode: "DeviceNotRegistered" })
         await repository.removeDeviceRegistration({ ...delivery, registrationId: delivery.registrationId })
         return
       }
-      await scheduleRetryOrFail(delivery, attempt, dispatchAt, toSafeErrorCode(error))
+      if (failure.action === "fail" || failure.action === "retry") {
+        await applyTicketFailure(delivery, attempt, dispatchAt, errorCode, failure)
+        return
+      }
+      await scheduleRetryOrFail(delivery, attempt, dispatchAt, errorCode)
     }
+  }
+
+  /** Configuration/payload rejections stop at once; rate limits back off slowly. */
+  async function applyTicketFailure(
+    delivery: PushDelivery,
+    attempt: number,
+    dispatchAt: Date,
+    errorCode: string,
+    failure: { action: "fail" } | { action: "retry"; delayMs: number }
+  ): Promise<void> {
+    if (!delivery.leaseToken) return
+    if (failure.action === "fail") {
+      await repository.markDeliveryFailed({ deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt, now: dispatchAt, errorCode })
+      return
+    }
+    await repository.markDeliveryRetry({
+      deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
+      availableAt: new Date(dispatchAt.getTime() + failure.delayMs), now: dispatchAt, errorCode
+    })
   }
 
   async function scheduleRetryOrFail(delivery: PushDelivery, attempt: number, dispatchAt: Date, errorCode: string): Promise<void> {
@@ -305,42 +355,84 @@ export function createNotificationService(
   }
 
   async function dispatchReceipt(receipt: PendingPushReceipt, dispatchAt: Date): Promise<void> {
-    if (!receipt.leaseToken || !pushProvider.getReceipt) return
-    const identity = { ticketId: receipt.ticketId, leaseToken: receipt.leaseToken }
-    if (dispatchAt.getTime() - Date.parse(receipt.createdAt) >= 24 * 60 * 60_000) {
-      await repository.finishReceipt({ ...identity, outcome: "receipt_unavailable" })
+    const getReceipt = pushProvider.getReceipt
+    if (!receipt.leaseToken || !getReceipt) return
+    if (await finishIfReceiptExpired(receipt, dispatchAt)) return
+    try {
+      const result = await withProviderTimeout((signal) => getReceipt(receipt.ticketId, { signal }), "Receipt timeout")
+      await applyReceiptResult(receipt, result, dispatchAt)
+    } catch {
+      reportPushFailure("receipt", "provider_unavailable", 1)
+      await retryReceiptLater(receipt, dispatchAt)
+    }
+  }
+
+  /** One getReceipts request for every due ticket (Expo accepts 1000 ids per call). */
+  async function dispatchReceiptBatch(receipts: PendingPushReceipt[], dispatchAt: Date): Promise<void> {
+    const getReceipts = pushProvider.getReceipts
+    if (!getReceipts) return
+    const due: PendingPushReceipt[] = []
+    for (const receipt of receipts) {
+      if (!receipt.leaseToken) continue
+      if (!await finishIfReceiptExpired(receipt, dispatchAt)) due.push(receipt)
+    }
+    if (due.length === 0) return
+    let results: Map<string, PushReceipt>
+    try {
+      results = await withProviderTimeout((signal) => getReceipts(due.map((receipt) => receipt.ticketId), { signal }), "Receipt timeout")
+    } catch {
+      reportPushFailure("receipt", "provider_unavailable", 1)
+      await forEachWithConcurrency(due, dispatchConcurrency, (receipt) => retryReceiptLater(receipt, dispatchAt))
       return
     }
+    await forEachWithConcurrency(due, dispatchConcurrency, (receipt) =>
+      applyReceiptResult(receipt, results.get(receipt.ticketId) ?? null, dispatchAt))
+  }
+
+  async function finishIfReceiptExpired(receipt: PendingPushReceipt, dispatchAt: Date): Promise<boolean> {
+    if (dispatchAt.getTime() - Date.parse(receipt.createdAt) < 24 * 60 * 60_000) return false
+    await repository.finishReceipt({ ticketId: receipt.ticketId, leaseToken: receipt.leaseToken!, outcome: "receipt_unavailable" })
+    return true
+  }
+
+  async function retryReceiptLater(receipt: PendingPushReceipt, dispatchAt: Date): Promise<void> {
+    await repository.retryReceipt({ ticketId: receipt.ticketId, leaseToken: receipt.leaseToken!,
+      availableAt: new Date(dispatchAt.getTime() + 15 * 60_000) })
+  }
+
+  /**
+   * DeviceNotRegistered unregisters the original registration. A receipt-level
+   * MessageRateExceeded cannot be resent: the outbox row (title, body, data)
+   * was deleted when the ticket was accepted and the receipt row keeps no
+   * content, so it is recorded and logged only.
+   */
+  async function applyReceiptResult(receipt: PendingPushReceipt, result: PushReceipt | null, dispatchAt: Date): Promise<void> {
+    if (!result) {
+      await retryReceiptLater(receipt, dispatchAt)
+      return
+    }
+    const errorCode = result.errorCode ? safePushErrorCode(result.errorCode) : undefined
+    if (result.status === "error") reportPushFailure("receipt", errorCode ?? "provider_receipt_error", 1)
+    if (result.status === "error" && result.errorCode === "DeviceNotRegistered") await repository.removeDeviceRegistration(receipt)
+    await repository.finishReceipt({ ticketId: receipt.ticketId, leaseToken: receipt.leaseToken!,
+      outcome: result.status === "ok" ? "provider_handoff" : "rejected",
+      ...(errorCode ? { errorCode } : {}) })
+  }
+
+  async function withProviderTimeout<T>(call: (signal: AbortSignal) => Promise<T>, message: string): Promise<T> {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      const result = await Promise.race([
-        pushProvider.getReceipt(receipt.ticketId, { signal: controller.signal }),
+      return await Promise.race([
+        call(controller.signal),
         new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => { controller.abort(); reject(new Error("Receipt timeout")) }, providerTimeoutMs)
+          timer = setTimeout(() => { controller.abort(); reject(new Error(message)) }, providerTimeoutMs)
         })
       ])
-      if (!result) {
-        await repository.retryReceipt({ ...identity, availableAt: new Date(dispatchAt.getTime() + 15 * 60_000) })
-        return
-      }
-      if (result.status === "error") reportPushFailure("receipt", safeReceiptCode(result.errorCode ?? ""), 1)
-      if (result.status === "error" && result.errorCode === "DeviceNotRegistered") await repository.removeDeviceRegistration(receipt)
-      await repository.finishReceipt({ ...identity,
-        outcome: result.status === "ok" ? "provider_handoff" : "rejected",
-        ...(result.errorCode ? { errorCode: safeReceiptCode(result.errorCode) } : {}) })
-    } catch {
-      reportPushFailure("receipt", "provider_unavailable", 1)
-      await repository.retryReceipt({ ...identity, availableAt: new Date(dispatchAt.getTime() + 15 * 60_000) })
     } finally {
       clearTimeout(timer)
     }
   }
-}
-
-function safeReceiptCode(code: string): string {
-  return ["DeviceNotRegistered", "MessageTooBig", "MessageRateExceeded", "MismatchSenderId", "InvalidCredentials"].includes(code)
-    ? code : "provider_receipt_error"
 }
 
 function normalizePreferences(preferences: NotificationPreferences): NotificationPreferences {
@@ -525,7 +617,8 @@ function retryDelayMs(attempt: number): number {
 }
 
 function toSafeErrorCode(error: unknown): string {
-  if (error instanceof PushProviderRejection) return safeReceiptCode(error.code)
+  if (error instanceof PushProviderRejection) return safePushErrorCode(error.code)
+  if (error instanceof PushProviderHttpError) return error.status === 429 ? "provider_rate_limited" : "provider_unavailable"
   const message = error instanceof Error ? error.message : "push_failed"
   const normalized = message.toLowerCase()
   if (normalized.includes("unavailable")) return "provider_unavailable"

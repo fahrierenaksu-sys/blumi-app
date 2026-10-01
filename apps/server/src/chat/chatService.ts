@@ -63,6 +63,8 @@ export interface ChatService {
     now?: Date
   ): Promise<{ message: ChatMessage; created: boolean }>
   createThread(input: CreateThreadInput, now?: Date): Promise<ChatThread>
+  /** Unread partner messages in the threads `userId` can see (blocked pairs are hidden). */
+  countUnreadMessages(userId: string): Promise<number>
   /**
    * Moves the reader's cursor forward: to `upToMessageId` (a partner message
    * in this thread) or, without it, to `now`. `readUpTo` is the receipt
@@ -220,6 +222,13 @@ export function createChatService(
       }
       await repository.saveThread(thread)
       return (await repository.findThread(thread.threadId)) ?? thread
+    },
+    async countUnreadMessages(userId) {
+      const counts = await repository.countUnreadMessagesBySender(userId)
+      const blocked = blockPolicy && counts.length > 0
+        ? new Set(await blockPolicy.listBlockedUserIdsBetween(userId, counts.map((entry) => entry.senderUserId)))
+        : new Set<string>()
+      return counts.reduce((total, entry) => blocked.has(entry.senderUserId) ? total : total + entry.unreadCount, 0)
     },
     async markThreadRead(userId, threadId, now = new Date(), options = {}) {
       const thread = await getVisibleThread(userId, threadId)
