@@ -429,11 +429,17 @@ test("A14 referral claims: self, repeat, second code and twenty concurrent claim
 test("A17 earned reward coins settle a refund debt first so purchases become possible again", async () => {
   const { app, authService, economyService } = harness()
   const user = await onboardedAccount(authService)
-  await economyService.getInventory(user.userId)
+  const starter = await economyService.getInventory(user.userId)
+  const purchase1500 = {
+    provider: "revenuecat", eventId: "evt_purchase", transactionId: "txn_refund", userId: user.userId,
+    productId: "com.blumi.mobile.coins.1500", store: "ios", kind: "credit", coins: 1500,
+    payloadHash: "a".repeat(64), occurredAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  } as const
+  // A refund reverses a recorded purchase whose coins were already spent.
+  await economyService.repository.applyCoinTransaction(purchase1500)
+  await economyService.repository.saveInventory(starter)
   const refund = await economyService.repository.applyCoinTransaction({
-    provider: "revenuecat", eventId: "evt_refund", transactionId: "txn_refund", userId: user.userId,
-    productId: "com.blumi.mobile.coins.1500", store: "ios", kind: "reversal", coins: 1500,
-    payloadHash: "b".repeat(64), occurredAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    ...purchase1500, eventId: "evt_refund", kind: "reversal", payloadHash: "b".repeat(64)
   })
   assert.equal(refund.inventory.coinDebt, 250)
   for (let day = 1; day <= 20; day += 1) {

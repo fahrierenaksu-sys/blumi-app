@@ -46,6 +46,33 @@ function coinEvent(
   }
 }
 
+/**
+ * A refund only reverses a recorded credit. This credits `coins` for a fresh
+ * transaction, spends exactly that amount on an item, and returns the refund
+ * event for that transaction, so the balance is unchanged until the refund
+ * is applied.
+ */
+async function spentCredit(
+  backend: Backend,
+  userId: string,
+  name: string,
+  coins: number
+): Promise<EconomyCoinTransactionInput> {
+  const transactionId = backend.id(`transaction_${name}`)
+  const credit = await backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
+    eventId: backend.id(`event_${name}_credit`), transactionId, coins
+  }))
+  assert.equal(credit.applied, true)
+  const spent = await backend.repository.purchaseItem({
+    userId, type: "avatar", itemId: `avatar_${name}`, grantedItemIds: [`avatar_${name}`],
+    priceCoins: coins, updatedAt: AT
+  })
+  assert.ok(spent, "the credited coins are spent")
+  return coinEvent(backend, userId, {
+    eventId: backend.id(`event_${name}_refund`), transactionId, kind: "reversal", coins, payloadHash: "b".repeat(64)
+  })
+}
+
 runRepositoryContract<EconomyRepository>({
   name: "economy repository",
   databaseUrl: process.env.DATABASE_URL,
@@ -101,7 +128,7 @@ runRepositoryContract<EconomyRepository>({
       assert.equal(await backend.repository.purchaseItem({ ...purchase, itemId: "avatar_coat", priceCoins: -50 }), null, "negative price")
       assert.equal(await backend.repository.purchaseItem({ ...purchase, userId: backend.id("missing") }), null, "no inventory")
 
-      await backend.repository.applyCoinTransaction(coinEvent(backend, userId, { kind: "reversal", coins: 500 }))
+      await backend.repository.applyCoinTransaction(await spentCredit(backend, userId, "pack", 500))
       const indebted = await backend.repository.getInventory(userId)
       assert.equal(indebted?.coinDebt, 400)
       assert.equal(await backend.repository.purchaseItem({ ...purchase, itemId: "avatar_free", priceCoins: 0 }), null, "debt blocks purchases")
@@ -133,7 +160,7 @@ runRepositoryContract<EconomyRepository>({
 
     "claimReward repays a refund debt first and adds only the remainder to coins": async (backend) => {
       const { userId } = await seedInventory(backend, 0)
-      await backend.repository.applyCoinTransaction(coinEvent(backend, userId, { kind: "reversal", coins: 60 }))
+      await backend.repository.applyCoinTransaction(await spentCredit(backend, userId, "first", 60))
       assert.equal((await backend.repository.getInventory(userId))?.coinDebt, 60)
       const claim = { userId, rewardType: "daily_login" as const, coins: 25, createdAt: LATER }
 
@@ -147,16 +174,16 @@ runRepositoryContract<EconomyRepository>({
       const replay = await backend.repository.claimReward({ ...claim, idempotencyKey: "2026-09-28" })
       assert.deepEqual([replay.claimed, replay.inventory.coins, replay.inventory.coinDebt], [false, 25, 0])
 
-      await backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
-        eventId: backend.id("event_second_refund"), transactionId: backend.id("transaction_second_refund"), kind: "reversal", coins: 100
-      }))
+      await backend.repository.applyCoinTransaction(await spentCredit(backend, userId, "second", 100))
       const overpaid = await backend.repository.claimReward({ ...claim, idempotencyKey: "2026-10-01", coins: 80, rewardType: "room_complete" })
       assert.deepEqual([overpaid.inventory.coins, overpaid.inventory.coinDebt], [5, 0], "debt 75 repaid, 5 left over")
     },
 
     "concurrent rewards and a refund always settle to the same balance and never hold coins and debt together": async (backend) => {
       const { userId } = await seedInventory(backend, 0)
-      await backend.repository.applyCoinTransaction(coinEvent(backend, userId, { kind: "reversal", coins: 300 }))
+      const firstRefund = await spentCredit(backend, userId, "first", 300)
+      const racingRefund = await spentCredit(backend, userId, "racing", 100)
+      await backend.repository.applyCoinTransaction(firstRefund)
       const rewards = Array.from({ length: 20 }, (_, index) => backend.repository.claimReward({
         userId,
         rewardType: "daily_login",
@@ -164,9 +191,7 @@ runRepositoryContract<EconomyRepository>({
         coins: 25,
         createdAt: LATER
       }))
-      const secondRefund = backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
-        eventId: backend.id("event_racing_refund"), transactionId: backend.id("transaction_racing_refund"), kind: "reversal", coins: 100
-      }))
+      const secondRefund = backend.repository.applyCoinTransaction(racingRefund)
       const [claims] = await Promise.all([Promise.all(rewards), secondRefund])
       assert.equal(claims.filter((claim) => claim.claimed).length, 20)
       const settled = await backend.repository.getInventory(userId)
@@ -227,15 +252,38 @@ runRepositoryContract<EconomyRepository>({
       assert.equal(reversal.applied, true)
       assert.deepEqual([reversal.inventory.coins, reversal.inventory.coinDebt], [100, 0])
 
-      const secondReversal = await backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
-        eventId: backend.id("event_two"), kind: "reversal", coins: 300, transactionId: backend.id("transaction_two")
-      }))
+      const secondReversal = await backend.repository.applyCoinTransaction(await spentCredit(backend, userId, "two", 300))
       assert.deepEqual([secondReversal.inventory.coins, secondReversal.inventory.coinDebt], [0, 200])
 
       const repay = await backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
         eventId: backend.id("event_repay"), transactionId: backend.id("transaction_three"), coins: 500
       }))
       assert.deepEqual([repay.inventory.coins, repay.inventory.coinDebt], [300, 0])
+    },
+
+    "a refund with no recorded credit moves no coins, and a credit arriving after it moves none either": async (backend) => {
+      const { userId } = await seedInventory(backend, 100)
+      const transactionId = backend.id("transaction_unseen")
+      const refund = coinEvent(backend, userId, {
+        eventId: backend.id("event_refund_first"), transactionId, kind: "reversal", coins: 500, payloadHash: "b".repeat(64)
+      })
+      const early = await backend.repository.applyCoinTransaction(refund)
+      assert.deepEqual([early.applied, early.conflict, early.inventory.coins, early.inventory.coinDebt], [false, null, 100, 0])
+      const replay = await backend.repository.applyCoinTransaction({ ...refund, updatedAt: LATER })
+      assert.deepEqual([replay.applied, replay.inventory.coins, replay.inventory.coinDebt], [false, 100, 0])
+
+      // The purchase event arriving late cannot credit a refunded purchase:
+      // the refund's ledger row is kept and settles the transaction.
+      const lateCredit = await backend.repository.applyCoinTransaction(coinEvent(backend, userId, {
+        eventId: backend.id("event_credit_late"), transactionId, coins: 500
+      }))
+      assert.deepEqual([lateCredit.applied, lateCredit.conflict, lateCredit.inventory.coins, lateCredit.inventory.coinDebt], [false, null, 100, 0])
+      const retriedRefund = await backend.repository.applyCoinTransaction({ ...refund, eventId: backend.id("event_refund_retry") })
+      assert.deepEqual([retriedRefund.applied, retriedRefund.inventory.coins, retriedRefund.inventory.coinDebt], [false, 100, 0])
+
+      // A normal purchase and refund still settle as before.
+      const refundAfterCredit = await backend.repository.applyCoinTransaction(await spentCredit(backend, userId, "normal", 300))
+      assert.deepEqual([refundAfterCredit.applied, refundAfterCredit.inventory.coins, refundAfterCredit.inventory.coinDebt], [true, 0, 200])
     },
 
     "a transaction is bound to its first account, pack and store": async (backend) => {

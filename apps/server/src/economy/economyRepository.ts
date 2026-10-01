@@ -224,6 +224,11 @@ export function createInMemoryEconomyRepository(
       store.commerceLedgerKeys.add(ledgerKey)
       // Mirrors PostgreSQL: a non-positive amount is recorded but moves no coins.
       if (input.coins <= 0) return unchanged(null)
+      // Mirrors PostgreSQL: a refund reverses only a recorded credit, and a
+      // credit arriving after its refund moves nothing; both rows are kept.
+      const creditRecorded = store.commerceLedgerKeys.has(`${transactionKey}:credit`)
+      const reversalRecorded = store.commerceLedgerKeys.has(`${transactionKey}:reversal`)
+      if (input.kind === "credit" ? reversalRecorded : !creditRecorded) return unchanged(null)
 
       const nextInventory = input.kind === "credit"
         ? applyCoinCredit(inventory, input.coins, input.updatedAt)
