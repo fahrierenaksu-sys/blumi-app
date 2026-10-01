@@ -9,6 +9,8 @@ import {
   getRoomInvitePresentation,
   isLegacyRoomInviteSentinel,
   getChatInitialRenderCount,
+  applyRoomInviteExpiry,
+  getNextRoomInviteExpiry,
   type ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
 
@@ -187,4 +189,25 @@ test("room invites and day changes break message groups", () => {
   assert.equal(getChatMessageGroupPosition(timeline, 0), "single")
   assert.equal(getChatMessageGroupPosition(timeline, 1), "single")
   assert.equal(getChatMessageGroupPosition(timeline, 2), "single")
+})
+
+test("a pending invite turns expired on both phones at its expiry, without a server event", () => {
+  const pending = { ...baseInvite, status: "pending" as const, expiresAt: "2026-07-21T10:10:00.000Z" }
+  const accepted = { ...baseInvite, inviteId: "invite_two", status: "accepted" as const, expiresAt: "2026-07-21T10:05:00.000Z" }
+  const before = Date.parse("2026-07-21T10:09:59.000Z")
+  const at = Date.parse("2026-07-21T10:10:00.000Z")
+  const invites = [pending, accepted]
+
+  assert.equal(applyRoomInviteExpiry(invites, before), invites, "nothing expired keeps the same list")
+  const expired = applyRoomInviteExpiry(invites, at)
+  assert.equal(expired[0].status, "expired")
+  assert.equal(expired[1], accepted, "decided invites never change")
+  for (const userId of [baseInvite.senderUserId, baseInvite.recipientUserId]) {
+    assert.deepEqual(getRoomInviteActions(expired[0], userId), [], "no accept or cancel on an expired card")
+    assert.equal(getRoomInvitePresentation(expired[0], userId, "tr").statusLabel, "Davetin süresi doldu")
+  }
+
+  assert.equal(getNextRoomInviteExpiry(invites, before), at)
+  assert.equal(getNextRoomInviteExpiry(expired, at), null)
+  assert.equal(getNextRoomInviteExpiry([{ ...pending, expiresAt: "not a date" }], before), null)
 })

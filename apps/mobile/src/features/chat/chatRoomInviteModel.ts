@@ -83,6 +83,42 @@ export function buildChatTimeline(
   })
 }
 
+/**
+ * The server expires a pending invite lazily and sends no event at expiry, so
+ * each phone shows it expired at its `expiresAt` (server time). Returns the
+ * same list when nothing changed, keeping memoized rows stable.
+ */
+export function applyRoomInviteExpiry<T extends ChatRoomInviteTimelineItem>(
+  invites: readonly T[],
+  nowMs: number
+): readonly T[] {
+  if (!invites.some((invite) => isRoomInviteExpiredAt(invite, nowMs))) return invites
+  return invites.map((invite) => isRoomInviteExpiredAt(invite, nowMs)
+    ? { ...invite, status: "expired" as const }
+    : invite)
+}
+
+/** The next moment a shown pending invite expires, or null when none will. */
+export function getNextRoomInviteExpiry(
+  invites: readonly ChatRoomInviteTimelineItem[],
+  nowMs: number
+): number | null {
+  let next: number | null = null
+  for (const invite of invites) {
+    if (invite.status !== "pending" || !invite.expiresAt) continue
+    const at = Date.parse(invite.expiresAt)
+    if (!Number.isFinite(at) || at <= nowMs) continue
+    next = next === null ? at : Math.min(next, at)
+  }
+  return next
+}
+
+function isRoomInviteExpiredAt(invite: ChatRoomInviteTimelineItem, nowMs: number): boolean {
+  if (invite.status !== "pending" || !invite.expiresAt) return false
+  const at = Date.parse(invite.expiresAt)
+  return Number.isFinite(at) && at <= nowMs
+}
+
 export function getChatTimelineItemKey(item: ChatTimelineItem): string {
   return item.kind === "message"
     ? `message:${item.message.messageId}`
