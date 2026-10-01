@@ -16,7 +16,7 @@ import {
   getRoomInviteComposerState,
   normalizeOutgoingChatBody,
   selectChatPartnerSummary,
-  type ChatMessageDeliveryState,
+  type LocalChatMessageDeliveryState,
   type ChatTimelineRowModels
 } from "./chatThreadModel"
 import {
@@ -162,7 +162,7 @@ test("partner summary prefers the other participant, then the first, then none",
 function rowModel(
   timeline: readonly ChatTimelineItem[],
   index: number,
-  deliveryStates: Record<string, ChatMessageDeliveryState> = {},
+  deliveryStates: Record<string, LocalChatMessageDeliveryState> = {},
   locale: "en" | "tr" = "en"
 ) {
   const newestFirst = [...timeline].reverse()
@@ -236,7 +236,7 @@ const ROW_NOW = new Date(2026, 6, 21, 12, 0)
 
 function rowModels(
   timeline: readonly ChatTimelineItem[],
-  deliveryStates: Record<string, ChatMessageDeliveryState> = {},
+  deliveryStates: Record<string, LocalChatMessageDeliveryState> = {},
   previous?: ChatTimelineRowModels | null
 ) {
   return buildChatTimelineRowModels(
@@ -351,6 +351,37 @@ test("removed rows are dropped and a locale change rebuilds date labels", () => 
   )
   assert.equal(turkish.get("message:m1")?.row.dateLabel, "Dün")
   assert.notEqual(turkish.get("message:m1"), before.get("message:m1"))
+})
+
+test("partner receipts advance my rows to delivered and read; only changed rows get new models", () => {
+  const timeline = conversation()
+  const sentAt = (key: string) => (timeline.find((item) =>
+    item.kind === "message" && item.message.messageId === key) as Extract<ChatTimelineItem, { kind: "message" }>).message.sentAt
+  const context = { currentUserId: "user_one", getMessageDeliveryState: () => "sent" as const, locale: "en" as const, now: ROW_NOW }
+  const before = buildChatTimelineRowModels(timeline, context)
+  assert.equal(before.get("message:m2")?.row.deliveryState, "sent", "no receipts: one tick")
+
+  const delivered = buildChatTimelineRowModels(timeline, {
+    ...context,
+    partnerReceipts: { deliveredUpTo: { sentAt: sentAt("m2"), messageId: "m2" } }
+  }, before)
+  assert.equal(delivered.get("message:m1")?.row.deliveryState, "delivered")
+  assert.equal(delivered.get("message:m2")?.row.deliveryState, "delivered")
+  assert.equal(delivered.get("message:m3")?.row.deliveryState, "sent")
+  assert.equal(delivered.get("message:m4")?.row.deliveryState, "sent", "the partner's message has no ticks")
+  assert.equal(delivered.get("message:m4"), before.get("message:m4"), "an unaffected row keeps its model")
+
+  const read = buildChatTimelineRowModels(timeline, {
+    ...context,
+    getMessageDeliveryState: (messageId: string) => messageId === "m3" ? "failed" as const : "sent" as const,
+    partnerReceipts: {
+      deliveredUpTo: { sentAt: sentAt("m3"), messageId: "m3" },
+      readUpTo: { sentAt: sentAt("m1"), messageId: "m1" }
+    }
+  }, delivered)
+  assert.equal(read.get("message:m1")?.row.deliveryState, "read")
+  assert.equal(read.get("message:m2")?.row.deliveryState, "delivered")
+  assert.equal(read.get("message:m3")?.row.deliveryState, "failed", "a local failure is never hidden by a receipt")
 })
 
 function composerState(overrides: Partial<Parameters<typeof getRoomInviteComposerState>[0]> = {}) {

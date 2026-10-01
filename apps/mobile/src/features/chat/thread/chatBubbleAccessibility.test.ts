@@ -45,6 +45,21 @@ test("the partner's message names the partner and never reports a delivery state
   assert.equal(label, "Deniz, Nasılsın?, 10:00")
 })
 
+test("VoiceOver hears delivered and read (iletildi, görüldü) in both languages", () => {
+  const base = { body: "Selam", time: "21:10", isMe: true, partnerName: "Deniz" }
+  assert.equal(getChatBubbleAccessibilityLabel({ ...base, deliveryState: "delivered", copy: CHAT_COPY.tr }),
+    "Sen, Selam, 21:10, iletildi")
+  assert.equal(getChatBubbleAccessibilityLabel({ ...base, deliveryState: "read", copy: CHAT_COPY.tr }),
+    "Sen, Selam, 21:10, görüldü")
+  assert.equal(getChatBubbleAccessibilityLabel({ ...base, deliveryState: "delivered", copy: CHAT_COPY.en }),
+    "You, Selam, 21:10, delivered")
+  assert.equal(getChatBubbleAccessibilityLabel({ ...base, deliveryState: "read", copy: CHAT_COPY.en }),
+    "You, Selam, 21:10, read")
+  // A partner's message never announces a receipt state.
+  assert.equal(getChatBubbleAccessibilityLabel({ ...base, isMe: false, deliveryState: "read", copy: CHAT_COPY.en }),
+    "Deniz, Selam, 21:10")
+})
+
 test("an unparseable time is left out instead of reading an empty part", () => {
   const label = getChatBubbleAccessibilityLabel({
     body: "Hey",

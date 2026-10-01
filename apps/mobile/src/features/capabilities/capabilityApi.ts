@@ -12,7 +12,9 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
   "shop_multi_item_apply",
   "discovery_public_profile",
   "discovery_badges",
-  "discovery_room_showcase"
+  "discovery_room_showcase",
+  // Delivery ticks, "görüldü" and the read receipts setting (2026-10-01).
+  "chat_read_receipts"
 ] as const satisfies readonly CapabilityKey[]
 
 export interface SessionScopedCapabilities {

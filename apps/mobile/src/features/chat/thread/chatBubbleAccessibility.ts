@@ -15,9 +15,13 @@ function getDeliveryStateLabel(
   deliveryState: ChatMessageDeliveryState,
   copy: ChatThreadCopy
 ): string {
-  if (deliveryState === "sending") return copy.bubbleStatusSending
-  if (deliveryState === "failed") return copy.bubbleStatusFailed
-  return copy.bubbleStatusSent
+  switch (deliveryState) {
+    case "sending": return copy.bubbleStatusSending
+    case "failed": return copy.bubbleStatusFailed
+    case "delivered": return copy.bubbleStatusDelivered
+    case "read": return copy.bubbleStatusRead
+    default: return copy.bubbleStatusSent
+  }
 }
 
 /**

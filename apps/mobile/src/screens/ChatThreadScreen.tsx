@@ -73,6 +73,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     messages,
     messageListState,
     historyReady,
+    partnerReceipts,
     addOptimisticMessage,
     getMessageDeliveryState,
     getRetryableMessage,
@@ -190,7 +191,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     timeline,
     currentUserId,
     locale: chatLocale,
-    getMessageDeliveryState
+    getMessageDeliveryState,
+    partnerReceipts: bindings.receiptsEnabled ? partnerReceipts : undefined
   })
 
   const enteringRowKeys = useChatTimelineEntrances({

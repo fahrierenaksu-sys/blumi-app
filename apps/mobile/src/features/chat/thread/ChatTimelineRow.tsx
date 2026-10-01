@@ -1,9 +1,8 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import { memo } from "react"
 import { Pressable, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
-import { uiTheme } from "../../../ui/theme"
 import { ChatRoomInviteCard } from "../ChatRoomInviteCard"
+import { ChatDeliveryTicks } from "./ChatDeliveryTicks"
 import type {
   ChatLocale,
   ChatRoomInviteAction,
@@ -136,17 +135,7 @@ function ChatTimelineRow({
               >
                 {messageTime}
               </Text>
-              {isMe && deliveryState === "sending" ? (
-                <Ionicons
-                  accessibilityLabel={chatCopy.sending}
-                  name="time-outline"
-                  size={14}
-                  color={uiTheme.colors.textMuted}
-                />
-              ) : null}
-              {isMe && deliveryState === "sent" ? (
-                <Ionicons name="checkmark" size={14} color={uiTheme.colors.textMuted} />
-              ) : null}
+              {isMe ? <ChatDeliveryTicks state={deliveryState} /> : null}
             </View>
           </View>
           {isMe && deliveryState === "failed" ? (

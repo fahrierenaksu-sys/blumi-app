@@ -37,6 +37,8 @@ export type ChatThreadCopy = {
   bubbleStatusSent: string
   bubbleStatusSending: string
   bubbleStatusFailed: string
+  bubbleStatusDelivered: string
+  bubbleStatusRead: string
 }
 
 export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
@@ -76,7 +78,9 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     bubbleSelf: "You",
     bubbleStatusSent: "sent",
     bubbleStatusSending: "sending",
-    bubbleStatusFailed: "not sent"
+    bubbleStatusFailed: "not sent",
+    bubbleStatusDelivered: "delivered",
+    bubbleStatusRead: "read"
   },
   tr: {
     chat: "Sohbet",
@@ -114,7 +118,9 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     bubbleSelf: "Sen",
     bubbleStatusSent: "gönderildi",
     bubbleStatusSending: "gönderiliyor",
-    bubbleStatusFailed: "gönderilemedi"
+    bubbleStatusFailed: "gönderilemedi",
+    bubbleStatusDelivered: "iletildi",
+    bubbleStatusRead: "görüldü"
   }
 }
 

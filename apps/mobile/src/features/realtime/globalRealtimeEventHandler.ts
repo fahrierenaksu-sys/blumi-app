@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatMessageList,
+  ChatReceiptUpdated,
   ChatThread,
   ChatThreadList,
   ChatThreadRead,
@@ -39,6 +40,13 @@ export interface GlobalRealtimeEventHandlerDependencies {
   applyChatMessageListed: (payload: ChatMessageList) => void
   applyChatMessageReceived: (
     payload: ChatMessage,
+    options: { localUserId?: string }
+  ) => void
+  /** A partner message reached this device: queue a debounced delivery ack. */
+  acknowledgeDelivery?: (message: ChatMessage) => void
+  /** `chat.receipt_updated`: the partner's delivery/read cursor moved. */
+  applyChatReceiptUpdated?: (
+    payload: ChatReceiptUpdated,
     options: { localUserId?: string }
   ) => void
   getThreads: () => readonly ChatThread[]
@@ -100,6 +108,13 @@ export function createGlobalRealtimeEventHandler(
       return
     }
 
+    if (event.type === "chat.receipt_updated") {
+      dependencies.applyChatReceiptUpdated?.(event.payload, {
+        localUserId: dependencies.currentUserId
+      })
+      return
+    }
+
     if (event.type === "chat.message_received") {
       // The client id rides only on the sender's own in-room acknowledgement;
       // useInRoomChat settles that bubble. The store keeps the canonical shape.
@@ -112,6 +127,7 @@ export function createGlobalRealtimeEventHandler(
         dependencies.currentUserId &&
         event.payload.senderUserId !== dependencies.currentUserId
       ) {
+        dependencies.acknowledgeDelivery?.(message)
         const senderThread = dependencies.getThreads().find(
           (thread) => thread.threadId === event.payload.threadId
         )

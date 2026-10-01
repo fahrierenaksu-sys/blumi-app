@@ -362,7 +362,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     visibleRoomInvites,
     setRoomInvites,
     openReadyMiniRoom,
-    handleDemoRoomInviteAction
+    handleDemoRoomInviteAction,
+    receiptsEnabled: resolvedCapabilities.chat_read_receipts
   })
   const {
     globalMatch,
@@ -567,7 +568,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     openReadyMiniRoom,
     getMatchDeduplicationState,
     onConnectionMatched: handleRealtimeConnectionMatch,
-    onPartnerBlocked: applyConfirmedPartnerBlock
+    onPartnerBlocked: applyConfirmedPartnerBlock,
+    receiptsEnabled: resolvedCapabilities.chat_read_receipts
   })
 
   const mainTabPageDependencies: MainTabPageDependencies = {
@@ -872,6 +874,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       pushRegistration.isRequestingPermission
                     }
                     onRequestPushPermission={pushRegistration.requestPermission}
+                    readReceiptsCapability={resolvedCapabilities.chat_read_receipts}
                   />
                 )}
               </Stack.Screen>

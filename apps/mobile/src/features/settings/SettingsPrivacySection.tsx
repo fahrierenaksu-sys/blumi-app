@@ -5,18 +5,47 @@ import { showToast } from "../../ui/toast"
 import type { SettingsCopy } from "./settingsCopy"
 import { SettingsRow } from "./SettingsRow"
 import { settingsStyles as styles } from "./settingsStyles"
+import type { useReadReceiptsSetting } from "./useReadReceiptsSetting"
 
-/** Product analytics consent toggle. */
+// The track colours every Settings switch uses.
+const SWITCH_TRACK_COLOR = { false: "#E6DCE4", true: "#FF9BC5" }
+
+/** Read receipts (when rolled out) and the product analytics consent toggle. */
 export function SettingsPrivacySection(props: {
   copy: SettingsCopy
   analyticsConsent: ReturnType<typeof useAnalyticsConsent>
+  readReceipts?: ReturnType<typeof useReadReceiptsSetting>
 }) {
-  const { analyticsConsent, copy } = props
+  const { analyticsConsent, copy, readReceipts } = props
 
   return (
     <View style={styles.sectionWrap}>
       <Text style={styles.sectionOverline}>{copy.privacy}</Text>
       <View style={styles.sectionCard}>
+        {readReceipts?.visible ? (
+          <SettingsRow
+            icon="checkmark-done"
+            iconColors={uiTheme.gradients.primary}
+            label={copy.readReceipts}
+            description={copy.readReceiptsNote}
+            value={readReceipts.readReceiptsEnabled ? copy.on : copy.off}
+          >
+            <Switch
+              accessibilityRole="switch"
+              accessibilityLabel={copy.readReceipts}
+              accessibilityHint={copy.readReceiptsNote}
+              accessibilityState={{
+                checked: readReceipts.readReceiptsEnabled,
+                disabled: readReceipts.isSaving
+              }}
+              disabled={readReceipts.isSaving}
+              value={readReceipts.readReceiptsEnabled}
+              onValueChange={readReceipts.handleToggle}
+              trackColor={SWITCH_TRACK_COLOR}
+              thumbColor="#FFFFFF"
+            />
+          </SettingsRow>
+        ) : null}
         <SettingsRow
           icon="analytics"
           iconColors={uiTheme.gradients.cool}
@@ -42,7 +71,7 @@ export function SettingsPrivacySection(props: {
                 })
               })
             }}
-            trackColor={{ false: "#E6DCE4", true: "#FF9BC5" }}
+            trackColor={SWITCH_TRACK_COLOR}
             thumbColor="#FFFFFF"
           />
         </SettingsRow>

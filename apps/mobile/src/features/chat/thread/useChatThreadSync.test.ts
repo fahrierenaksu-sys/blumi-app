@@ -8,6 +8,7 @@ function mount() {
   const timers = new Map<number, () => void>()
   const listeners = new Set<(state: string) => void>()
   const reads: string[] = []
+  const readCursors: (string | undefined)[] = []
   const active: (string | null)[] = []
   let counter = 0
   const appState = { currentState: "active", addEventListener: (_event: string, fn: (state: string) => void) => {
@@ -20,15 +21,27 @@ function mount() {
   })
   let input = { resolvedThreadId: "thread-a", currentUserId: "a", isFocused: true,
     latestIncomingMessageId: "one", requestMessages: undefined,
-    markThreadRead: (id: string) => { reads.push(id) }, setActiveThread: (id: string | null) => { active.push(id) } }
+    markThreadRead: (id: string, upToMessageId?: string) => { reads.push(id); readCursors.push(upToMessageId) },
+    setActiveThread: (id: string | null) => { active.push(id) } }
   const render = (patch: Partial<typeof input> = {}) => {
     input = { ...input, ...patch }; runtime.render(() => hook.useChatThreadSync(input))
   }
   const flush = () => { const scheduled = [...timers.values()]; timers.clear(); for (const fn of scheduled) fn() }
   const state = (value: string) => { appState.currentState = value; for (const fn of listeners) fn(value) }
   render()
-  return { render, runtime, reads, active, timers, listeners, flush, state }
+  return { render, runtime, reads, readCursors, active, timers, listeners, flush, state }
 }
+
+test("each read names the newest partner message the screen showed (the read receipt cursor)", () => {
+  const f = mount()
+  f.render({ latestIncomingMessageId: "two" })
+  f.render({ latestIncomingMessageId: "three" })
+  f.flush()
+  f.state("background")
+  f.state("active")
+  assert.deepEqual(f.readCursors, ["one", "three", "three"])
+  f.runtime.unmount()
+})
 
 test("partner message bursts debounce server read updates while the chat is visible", () => {
   const f = mount()
