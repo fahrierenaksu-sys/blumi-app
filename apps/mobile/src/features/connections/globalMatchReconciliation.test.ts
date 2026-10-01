@@ -244,7 +244,7 @@ function discoveryThread(): import("@blumi/contracts").ChatThread {
 }
 
 function createDiscoveryDependencies(overrides: Partial<DiscoveryMatchReconciliationDependencies> = {}) {
-  const calls = { presented: [] as Array<Record<string, unknown>>, claimed: [] as string[], created: 0 }
+  const calls = { presented: [] as Record<string, unknown>[], claimed: [] as string[], created: 0 }
   const dependencies: DiscoveryMatchReconciliationDependencies = {
     getCurrentSessionActor: () => actor,
     findThreadForPartner: () => discoveryThread(),

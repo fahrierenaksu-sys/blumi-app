@@ -4,8 +4,12 @@ import {
   DISCOVER_BOTTOM_CARD_MOTION,
   DISCOVER_PROMOTION_SPRING,
   DISCOVER_SWIPE_RESET_SPRING,
+  DISCOVER_DECK_ENTRANCE_MS,
+  getDiscoverActionExitDuration,
   getDiscoverDeckDragMotion,
+  getDiscoverDeckEntrance,
   getDiscoverDeckRoleMotion,
+  getDiscoverMiddleCardAdvance,
   getDiscoverDeckRoleProgress,
   getDiscoverMiddleCardMotion,
   DISCOVER_SWIPE_MAX_TILT_DEG,
@@ -285,4 +289,38 @@ test("the promotion spring is short and critically damped", () => {
   // A critically damped spring is within 1% after about 6.64 / ω seconds.
   const settleSeconds = 6.64 / Math.sqrt(stiffness / mass)
   assert.ok(settleSeconds <= 0.4, `settles in ${settleSeconds.toFixed(3)} s`)
+})
+
+test("the frosted layer clears with the drag, so it is not still frosted after the release (DSC-11)", () => {
+  assert.equal(getDiscoverMiddleCardAdvance(0), 0)
+  assert.equal(getDiscoverMiddleCardAdvance(-200), 0.5)
+  assert.equal(getDiscoverMiddleCardAdvance(900), 1)
+  const middle = getDiscoverDeckRoleMotion(1, getDiscoverMiddleCardMotion(200), getDiscoverMiddleCardAdvance(200))
+  assert.equal(middle.overlayOpacity, 0.5)
+  // The bottom slot stays fully frosted; without an advance nothing changes.
+  assert.equal(getDiscoverDeckRoleMotion(0, getDiscoverMiddleCardMotion(0), 0.7).overlayOpacity, 1)
+  assert.equal(getDiscoverDeckRoleMotion(1, getDiscoverMiddleCardMotion(200)).overlayOpacity, 1)
+})
+
+test("a card promoted at release continues from the pose and frost it had, then settles at rest", () => {
+  const releasedAt = 120
+  const advance = getDiscoverMiddleCardAdvance(releasedAt)
+  const lastMiddleFrame = getDiscoverDeckRoleMotion(1, getDiscoverDeckDragMotion("middle", releasedAt), advance)
+  const firstTopFrame = getDiscoverDeckRoleMotion(1, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
+  assert.deepEqual(firstTopFrame, lastMiddleFrame, "no jump when the deck advances at release")
+  const settled = getDiscoverDeckRoleMotion(2, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
+  assert.deepEqual(settled, { translateX: 0, translateY: 0, rotateDeg: 0, scale: 1, opacity: 1, overlayOpacity: 0 })
+})
+
+test("a card arriving at the back of the deck fades in (and grows only when motion is allowed)", () => {
+  assert.equal(DISCOVER_DECK_ENTRANCE_MS, 220)
+  assert.deepEqual(getDiscoverDeckEntrance(0, false), { opacity: 0, scale: 0.94 })
+  assert.deepEqual(getDiscoverDeckEntrance(1, false), { opacity: 1, scale: 1 })
+  assert.deepEqual(getDiscoverDeckEntrance(0, true), { opacity: 0, scale: 1 })
+  assert.deepEqual(getDiscoverDeckEntrance(1.2, false), { opacity: 1, scale: 1 })
+})
+
+test("a Like or Pass button exit takes 190 ms and is instant under Reduce Motion (DSC-10)", () => {
+  assert.equal(getDiscoverActionExitDuration(false), 190)
+  assert.equal(getDiscoverActionExitDuration(true), 0)
 })

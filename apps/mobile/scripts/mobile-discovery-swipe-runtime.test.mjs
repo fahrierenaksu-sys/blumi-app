@@ -90,7 +90,11 @@ test("an interrupted gesture always returns the active card to rest", () => {
   const hook = readSwipeHookSource()
 
   assert.match(hook, /\.onEnd\(\(event, success\) => \{[\s\S]*?if \(!success\) \{\s*resetPosition\(\)/)
-  assert.match(hook, /if \(finished\) scheduleOnRN\(commitSwipe, direction\)/)
+  // DSC-10: the release commits (haptic + decision) at once; the card then
+  // flies out on its own value and only reports the end of its exit.
+  assert.match(hook, /scheduleOnRN\(hapticLight\)\s*forceSwipe\(release, [\s\S]*?\)\s*scheduleOnRN\(commitSwipe, release\)/)
+  assert.match(hook, /if \(finished\) scheduleOnRN\(finishExit\)/)
+  assert.doesNotMatch(hook, /if \(finished\) scheduleOnRN\(commitSwipe/)
 })
 
 test("a deliberate short swipe can complete without a hard throw", () => {
@@ -111,7 +115,7 @@ test("only the active card leans with its drag, and Reduce Motion keeps it uprig
 
   assert.match(
     hook,
-    /const translateX = getDiscoverSwipeTranslateX\(ownerId\.value, cardId, x\.value\)[\s\S]*?transform: \[\s*\{ translateX \},\s*\{ rotate: `\$\{reduceMotion \? 0 : getDiscoverSwipeRotation\(translateX, screenWidth, grabbedLowerHalf\.value\)\}deg` \}/
+    /const translateX = exiting\.value \? exitX\.value : getDiscoverSwipeTranslateX\(ownerId\.value, cardId, x\.value\)[\s\S]*?transform: \[\s*\{ translateX \},\s*\{ rotate: `\$\{reduceMotion \? 0 : getDiscoverSwipeRotation\(translateX, screenWidth, grabbedLowerHalf\.value\)\}deg` \}/
   )
   // The grab half is fixed when the pan activates, so a tap never changes it.
   assert.match(hook, /\.onStart\([\s\S]*?grabbedLowerHalf\.value = isDiscoverSwipeLowerHalfGrab\(touchStartLocalY\.value, cardHeight\.value\)/)
@@ -152,7 +156,7 @@ test("the next card stays upright while it advances and only deeper cards fan ou
   // asserted in discoverySwipeModel.test.ts); only the bottom slot turns.
   assert.match(
     source,
-    /getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, dragX\)\)[\s\S]*?translateX: motion\.translateX[\s\S]*?translateY: motion\.translateY[\s\S]*?rotate: `\$\{motion\.rotateDeg\}deg`[\s\S]*?scale: motion\.scale/
+    /getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, dragX, promotedDragX\.value\)\)[\s\S]*?translateX: motion\.translateX[\s\S]*?translateY: motion\.translateY[\s\S]*?rotate: `\$\{motion\.rotateDeg\}deg`[\s\S]*?scale: motion\.scale/
   )
   assert.match(model, /if \(role === "middle"\) return getDiscoverMiddleCardMotion\(dragX\)/)
   assert.match(model, /rotateDeg: mix\(DISCOVER_BOTTOM_CARD_MOTION\.rotateDeg, 0, clamped\)/)

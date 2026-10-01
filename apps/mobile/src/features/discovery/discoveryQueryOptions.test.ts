@@ -39,7 +39,10 @@ test("Discover does not drain cursor pages while the safety list is unresolved",
   assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isSafetyListReady: false, availableCandidateCount: 0 }), false)
   assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isFetchingNextPage: true }), false)
   assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isQuotaExhausted: true }), false)
-  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, availableCandidateCount: 4 }), false)
+  // Half a page of headroom: a fast swiper (one card every ~350 ms now that
+  // the deck advances at release) must not outrun a mobile page fetch.
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, availableCandidateCount: 6 }), true)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, availableCandidateCount: 7 }), false)
 })
 
 const FILTERS = {

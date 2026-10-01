@@ -195,6 +195,17 @@ export class DiscoveryDecisionNotEligibleError extends Error {
   }
 }
 
+/** Any other refused decision, with its HTTP status (decides retrying). */
+export class DiscoveryDecisionRequestError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = "DiscoveryDecisionRequestError"
+    this.status = status
+  }
+}
+
 export async function fetchDiscoveryWatch(
   baseHttpUrl: string,
   sessionToken: string,
@@ -412,7 +423,10 @@ export async function decideDiscoverProfile(
     if (isDecisionNotEligiblePayload(payload)) {
       throw new DiscoveryDecisionNotEligibleError()
     }
-    throw new Error(getApiErrorMessage(payload, "That profile is not available anymore."))
+    throw new DiscoveryDecisionRequestError(
+      response.status,
+      getApiErrorMessage(payload, "That profile is not available anymore.")
+    )
   }
 
   return normalizeDiscoveryDecisionPayload(payload)

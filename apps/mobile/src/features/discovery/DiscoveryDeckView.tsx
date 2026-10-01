@@ -6,16 +6,16 @@ import {
   View
 } from "react-native"
 import Animated, {
-  Easing,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming
 } from "react-native-reanimated"
-import { scheduleOnRN } from "react-native-worklets"
 import { SwipeableDiscoverCard, type SwipeableDiscoverProfile } from "../demo/SwipeableDiscoverCard"
+import type { DiscoverCardExitRequest } from "../demo/useDiscoverCardSwipe"
 import { useReducedMotion } from "../../ui/animations"
+import { hapticLight } from "../../ui/haptics"
 import { ActionButtonCircle } from "../../ui/primitives"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
@@ -26,16 +26,19 @@ import { getAppLocale } from "../session/appLocale"
 import type { DiscoveryRoomShowcaseQueryInput } from "./discoveryApi"
 import { DISCOVERY_ACTION_ROW_FADE_DURATION } from "./discoveryCardFlipModel"
 import {
+  DISCOVER_DECK_ENTRANCE_MS,
+  DISCOVER_MIDDLE_CARD_TRAVEL,
   DISCOVER_PROMOTION_SPRING,
+  getDiscoverActionExitDuration,
   getDiscoverDeckDragMotion,
+  getDiscoverDeckEntrance,
   getDiscoverDeckRoleMotion,
   getDiscoverDeckRoleProgress,
+  getDiscoverMiddleCardAdvance,
   getDiscoverSwipeTranslateX,
   type DiscoverDeckRole
 } from "./discoverySwipeModel"
 import type { DiscoverSwipeValues } from "./useDiscoverSwipeValues"
-
-const ACTION_SWIPE_DURATION = 190
 
 interface DiscoveryDeckViewProps {
   profiles: readonly SwipeableDiscoverProfile[]
@@ -73,66 +76,67 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
     bottomNavVisible: true
   })
   const viewportLayout = resolveDiscoveryLayoutMetrics(screenWidth, screenHeight)
-  const actionSwipeInFlightRef = useRef(false)
-  const [actionSwipeInFlight, setActionSwipeInFlight] = useState(false)
+  const reduceMotion = useReducedMotion()
   const [isFeaturedFlipped, setIsFeaturedFlipped] = useState(false)
   const actionRowOpacity = useSharedValue(1)
   const visibleProfiles = useMemo(
     () => [profiles[2], profiles[1], featured].filter(isProfile),
     [featured, profiles]
   )
+  // A decided card leaves the deck at release (DSC-10): the next card is the
+  // top card at once, while the decided one flies out above it untouchable
+  // and is removed when its exit ends. Same key, so it is never remounted.
+  const [leavingProfiles, setLeavingProfiles] = useState<readonly SwipeableDiscoverProfile[]>([])
+  const leavingIdsRef = useRef(new Set<string>())
+  const [exitRequest, setExitRequest] = useState<(DiscoverCardExitRequest & { userId: string }) | null>(null)
+  const deckMountedRef = useRef(false)
+  useEffect(() => { deckMountedRef.current = true }, [])
+  const visibleIds = new Set(visibleProfiles.map((profile) => profile.userId))
+  const flyingProfiles = leavingProfiles.filter((profile) => !visibleIds.has(profile.userId))
 
-  const finishActionSwipe = useCallback((
-    direction: "left" | "right",
-    finished: boolean,
-    userId: string
-  ): void => {
-    actionSwipeInFlightRef.current = false
-    setActionSwipeInFlight(false)
-    if (!finished) {
-      swipeAnim.x.value = 0
-      return
-    }
+  const beginLeaving = useCallback((profile: SwipeableDiscoverProfile): boolean => {
+    if (leavingIdsRef.current.has(profile.userId)) return false
+    leavingIdsRef.current.add(profile.userId)
+    setLeavingProfiles((current) => [...current.filter((entry) => entry.userId !== profile.userId), profile])
+    return true
+  }, [])
+  const finishLeaving = useCallback((userId: string): void => {
+    leavingIdsRef.current.delete(userId)
+    setLeavingProfiles((current) => current.filter((entry) => entry.userId !== userId))
+    setExitRequest((current) => current?.userId === userId ? null : current)
+  }, [])
+  const commitTopSwipe = useCallback((direction: "left" | "right", userId: string): void => {
+    if (featured?.userId === userId) beginLeaving(featured)
     if (direction === "right") {
       onSwipeRight(userId)
     } else {
       onSwipeLeft(userId)
     }
-  }, [onSwipeLeft, onSwipeRight, swipeAnim])
+  }, [beginLeaving, featured, onSwipeLeft, onSwipeRight])
+  const handleTopSwipeRight = useCallback((userId: string) => commitTopSwipe("right", userId), [commitTopSwipe])
+  const handleTopSwipeLeft = useCallback((userId: string) => commitTopSwipe("left", userId), [commitTopSwipe])
+
   const runActionSwipe = useCallback(
     (direction: "left" | "right"): void => {
       if (
         !featured ||
-        actionSwipeInFlightRef.current ||
+        leavingIdsRef.current.has(featured.userId) ||
         actionsDisabled ||
         (direction === "right" && likeDisabled)
       ) {
         return
       }
-
-      actionSwipeInFlightRef.current = true
-      setActionSwipeInFlight(true)
-      const distance = screenWidth * 1.2
-      const userId = featured.userId
-      // The exit runs on the UI thread; JS hears once when it ends.
-      swipeAnim.ownerId.value = userId
-      swipeAnim.x.value = withTiming(direction === "right" ? distance : -distance, {
-        duration: ACTION_SWIPE_DURATION,
-        easing: Easing.out(Easing.cubic),
-        reduceMotion: ReduceMotion.Never
-      }, (finished) => {
-        "worklet"
-        scheduleOnRN(finishActionSwipe, direction, finished === true, userId)
+      // The press is the commit: haptic, decision and the next card now; the
+      // card flies out on the UI thread (instantly under Reduce Motion).
+      hapticLight()
+      setExitRequest({
+        userId: featured.userId,
+        direction,
+        durationMs: getDiscoverActionExitDuration(reduceMotion)
       })
+      commitTopSwipe(direction, featured.userId)
     },
-    [
-      actionsDisabled,
-      featured,
-      finishActionSwipe,
-      likeDisabled,
-      screenWidth,
-      swipeAnim
-    ]
+    [actionsDisabled, commitTopSwipe, featured, likeDisabled, reduceMotion]
   )
 
   useLayoutEffect(() => {
@@ -143,8 +147,6 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
       swipeAnim.x.value = 0
       swipeAnim.ownerId.value = ""
     }
-    actionSwipeInFlightRef.current = false
-    setActionSwipeInFlight(false)
     setIsFeaturedFlipped(false)
   }, [featured?.userId, swipeAnim])
 
@@ -167,23 +169,29 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
             { height: viewportLayout.deckHeight }
           ]}
         >
-          {visibleProfiles.map((profile) => {
+          {[...visibleProfiles, ...flyingProfiles].map((profile) => {
+            const leaving = !visibleIds.has(profile.userId)
             const isTop = profile.userId === featured.userId
             const isMiddle = profile.userId === profiles[1]?.userId
 
             return (
               <DeckCardContainer
                 key={profile.userId}
-                role={isTop ? "top" : isMiddle ? "middle" : "bottom"}
+                role={isTop || leaving ? "top" : isMiddle ? "middle" : "bottom"}
+                leaving={leaving}
+                entering={deckMountedRef.current}
                 featuredUserId={featured.userId}
                 swipe={swipeAnim}
               >
                 <SwipeableDiscoverCard
                   profile={profile}
-                  onSwipeRight={isTop ? onSwipeRight : noopSwipe}
-                  onSwipeLeft={isTop ? onSwipeLeft : noopSwipe}
-                  swipeAnim={isTop ? swipeAnim : undefined}
-                  disabled={!isTop || actionsDisabled || actionSwipeInFlight}
+                  onSwipeRight={isTop ? handleTopSwipeRight : noopSwipe}
+                  onSwipeLeft={isTop ? handleTopSwipeLeft : noopSwipe}
+                  swipeAnim={isTop || leaving ? swipeAnim : undefined}
+                  disabled={!isTop || actionsDisabled}
+                  leaving={leaving}
+                  exitRequest={exitRequest?.userId === profile.userId ? exitRequest : null}
+                  onExitEnd={finishLeaving}
                   canSwipeRight={!likeDisabled}
                   disableEntryAnim
                   layoutMetrics={viewportLayout.card}
@@ -217,7 +225,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                 onPress={() => runActionSwipe("left")}
                 size={viewportLayout.action.secondarySize}
                 variant="glass"
-                disabled={actionsDisabled || actionSwipeInFlight}
+                disabled={actionsDisabled}
                 style={styles.secondaryActionButton}
               >
                 <Ionicons name="close" size={26} color={styles.icon.color} />
@@ -230,7 +238,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                 onPress={() => runActionSwipe("right")}
                 size={viewportLayout.action.primarySize}
                 variant="primary"
-                disabled={actionsDisabled || likeDisabled || actionSwipeInFlight}
+                disabled={actionsDisabled || likeDisabled}
                 style={styles.primaryLikeButton}
               >
                 <Ionicons name="heart" size={27} color={uiTheme.colors.textInverted} />
@@ -261,55 +269,84 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
  * of jumping; under Reduce Motion it takes the new slot at once. The top card
  * is at rest (it moves inside SwipeableDiscoverCard), the middle card
  * advances with the featured card's drag on the UI thread, the bottom card
- * fans out, and the frosted overlay fades out as a card reaches the top.
+ * fans out, and the frosted overlay clears with that drag (DSC-11). The deck
+ * advances at release, so a promoted card continues from the drag it was
+ * promoted at. A card arriving at the back fades in (DSC-11). A leaving card
+ * stays above the deck and never takes a touch.
  */
 function DeckCardContainer(props: {
   role: DiscoverDeckRole
+  leaving: boolean
+  entering: boolean
   featuredUserId: string
   swipe: DiscoverSwipeValues
   children: ReactNode
 }) {
-  const { role, featuredUserId, swipe } = props
+  const { role, leaving, featuredUserId, swipe } = props
   const swipeX = swipe.x
   const swipeOwnerId = swipe.ownerId
   const reduceMotion = useReducedMotion()
   // A card mounts in its slot; only later role changes move it.
   const roleProgress = useSharedValue(getDiscoverDeckRoleProgress(role))
+  // A card that starts on top was carried fully forward.
+  const promotedDragX = useSharedValue(DISCOVER_MIDDLE_CARD_TRAVEL)
+  const entrance = useSharedValue(props.entering ? 0 : 1)
+  const previousRef = useRef({ role, featuredUserId })
+  // Child layout effects run before the deck's, so the drag of the card that
+  // just left is still readable here (the deck resets it for the new top).
+  useLayoutEffect(() => {
+    const previous = previousRef.current
+    previousRef.current = { role, featuredUserId }
+    if (role === "top" && previous.role === "middle") {
+      promotedDragX.value = getDiscoverSwipeTranslateX(swipeOwnerId.value, previous.featuredUserId, swipeX.value)
+    }
+  }, [featuredUserId, promotedDragX, role, swipeOwnerId, swipeX])
   useEffect(() => {
     const target = getDiscoverDeckRoleProgress(role)
     roleProgress.value = reduceMotion
       ? target
       : withSpring(target, { ...DISCOVER_PROMOTION_SPRING, reduceMotion: ReduceMotion.Never })
   }, [reduceMotion, role, roleProgress])
+  useEffect(() => {
+    entrance.value = withTiming(1, { duration: DISCOVER_DECK_ENTRANCE_MS, reduceMotion: ReduceMotion.Never })
+  }, [entrance])
   const motionStyle = useAnimatedStyle(() => {
     const dragX = role === "middle"
       ? getDiscoverSwipeTranslateX(swipeOwnerId.value, featuredUserId, swipeX.value)
       : 0
-    const motion = getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, dragX))
+    const motion = getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, dragX, promotedDragX.value))
+    const arrival = getDiscoverDeckEntrance(entrance.value, reduceMotion)
     return {
-      opacity: motion.opacity,
+      opacity: motion.opacity * arrival.opacity,
       transform: [
         { translateX: motion.translateX },
         { translateY: motion.translateY },
         { rotate: `${motion.rotateDeg}deg` },
-        { scale: motion.scale }
+        { scale: motion.scale * arrival.scale }
       ]
     }
   })
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, 0)).overlayOpacity
-  }))
+  const overlayStyle = useAnimatedStyle(() => {
+    const dragX = role === "middle"
+      ? getDiscoverSwipeTranslateX(swipeOwnerId.value, featuredUserId, swipeX.value)
+      : role === "top" ? promotedDragX.value : 0
+    return {
+      opacity: getDiscoverDeckRoleMotion(roleProgress.value, getDiscoverDeckDragMotion(role, 0), getDiscoverMiddleCardAdvance(dragX)).overlayOpacity
+    }
+  })
   return (
     <Animated.View
       style={[
-        role === "top"
-          ? styles.topCardContainer
-          : role === "middle"
-            ? styles.middleCardContainer
-            : styles.bottomCardContainer,
+        leaving
+          ? styles.leavingCardContainer
+          : role === "top"
+            ? styles.topCardContainer
+            : role === "middle"
+              ? styles.middleCardContainer
+              : styles.bottomCardContainer,
         motionStyle
       ]}
-      pointerEvents={role === "top" ? "auto" : "none"}
+      pointerEvents={role === "top" && !leaving ? "auto" : "none"}
     >
       {props.children}
       <GlassDeckOverlay style={overlayStyle} />
@@ -357,6 +394,10 @@ const styles = StyleSheet.create({
     position: "relative"
   },
   // Transforms and opacity per role live in DeckCardContainer's animated style.
+  leavingCardContainer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 4
+  },
   topCardContainer: {
     ...StyleSheet.absoluteFill,
     zIndex: 3

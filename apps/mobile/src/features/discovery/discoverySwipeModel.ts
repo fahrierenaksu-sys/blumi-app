@@ -175,7 +175,7 @@ export function getDiscoverStampOpacity(x: number, threshold: number): { like: n
 }
 
 /** px of drag after which the next card has fully taken the top card's place. */
-const DISCOVER_MIDDLE_CARD_TRAVEL = 400
+export const DISCOVER_MIDDLE_CARD_TRAVEL = 400
 
 export interface DiscoverMiddleCardMotion {
   scale: number
@@ -191,6 +191,16 @@ export function getDiscoverMiddleCardMotion(x: number): DiscoverMiddleCardMotion
     translateX: interpolateClamped(distance, 0, DISCOVER_MIDDLE_CARD_TRAVEL, -8, 0),
     translateY: interpolateClamped(distance, 0, DISCOVER_MIDDLE_CARD_TRAVEL, -12, 0)
   }
+}
+
+/**
+ * How far the next card has advanced toward the top slot (0..1). It also
+ * clears the card's frosted layer, so the frost leaves with the drag instead
+ * of after the release (DSC-11).
+ */
+export function getDiscoverMiddleCardAdvance(x: number): number {
+  "worklet"
+  return Math.min(DISCOVER_MIDDLE_CARD_TRAVEL, Math.abs(x)) / DISCOVER_MIDDLE_CARD_TRAVEL
 }
 
 export type DiscoverDeckRole = "top" | "middle" | "bottom"
@@ -223,13 +233,20 @@ export function getDiscoverDeckRoleProgress(role: DiscoverDeckRole): number {
 
 /**
  * The middle-slot pose a card blends through. Only the middle card follows
- * the featured card's drag; a card that just became the top card was carried
- * fully forward by the drag that removed its predecessor.
+ * the featured card's drag. The deck advances at release (DSC-10), so a card
+ * that just became the top card starts from the drag it was promoted at
+ * (`promotedDragX`; fully forward when unknown) and springs to rest.
  */
-export function getDiscoverDeckDragMotion(role: DiscoverDeckRole, dragX: number): DiscoverMiddleCardMotion {
+export function getDiscoverDeckDragMotion(
+  role: DiscoverDeckRole,
+  dragX: number,
+  promotedDragX?: number
+): DiscoverMiddleCardMotion {
   "worklet"
   if (role === "middle") return getDiscoverMiddleCardMotion(dragX)
-  return getDiscoverMiddleCardMotion(role === "top" ? DISCOVER_MIDDLE_CARD_TRAVEL : 0)
+  if (role !== "top") return getDiscoverMiddleCardMotion(0)
+  // Resolved here: a worklet's default parameter does not reach the UI thread.
+  return getDiscoverMiddleCardMotion(promotedDragX ?? DISCOVER_MIDDLE_CARD_TRAVEL)
 }
 
 export interface DiscoverDeckRoleMotion {
@@ -251,14 +268,18 @@ function mix(from: number, to: number, amount: number): number {
 /**
  * The pose of a deck card at a role progress: 0 is the bottom fan-out, 1 the
  * middle card at `dragMotion` (upright), 2 the top card at rest. Between two
- * slots the pose blends linearly, so a promotion is a move, not a jump.
+ * slots the pose blends linearly, so a promotion is a move, not a jump. The
+ * frosted layer clears by `overlayAdvance` at the middle slot (the drag, or
+ * the drag a promoted card left with) and fully at the top.
  */
 export function getDiscoverDeckRoleMotion(
   progress: number,
-  dragMotion: DiscoverMiddleCardMotion
+  dragMotion: DiscoverMiddleCardMotion,
+  overlayAdvance = 0
 ): DiscoverDeckRoleMotion {
   "worklet"
   const clamped = Math.min(2, Math.max(0, progress))
+  const middleOverlay = 1 - Math.min(1, Math.max(0, overlayAdvance))
   if (clamped <= 1) {
     return {
       translateX: mix(DISCOVER_BOTTOM_CARD_MOTION.translateX, dragMotion.translateX, clamped),
@@ -266,7 +287,7 @@ export function getDiscoverDeckRoleMotion(
       rotateDeg: mix(DISCOVER_BOTTOM_CARD_MOTION.rotateDeg, 0, clamped),
       scale: mix(DISCOVER_BOTTOM_CARD_MOTION.scale, dragMotion.scale, clamped),
       opacity: mix(DISCOVER_BOTTOM_CARD_MOTION.opacity, 1, clamped),
-      overlayOpacity: 1
+      overlayOpacity: mix(1, middleOverlay, clamped)
     }
   }
   const toTop = clamped - 1
@@ -276,6 +297,29 @@ export function getDiscoverDeckRoleMotion(
     rotateDeg: 0,
     scale: mix(dragMotion.scale, 1, toTop),
     opacity: 1,
-    overlayOpacity: 1 - toTop
+    overlayOpacity: middleOverlay * (1 - toTop)
   }
+}
+
+/** A card that arrives at the back of the deck fades in over this long (DSC-11). */
+export const DISCOVER_DECK_ENTRANCE_MS = 220
+
+/**
+ * The arrival of a new back card at `progress` (0..1): a fade, plus a small
+ * grow when motion is allowed. A fade is the Reduce Motion substitute itself.
+ */
+export function getDiscoverDeckEntrance(
+  progress: number,
+  reduceMotion: boolean
+): { opacity: number; scale: number } {
+  "worklet"
+  const clamped = Math.min(1, Math.max(0, progress))
+  return { opacity: clamped, scale: reduceMotion ? 1 : mix(0.94, 1, clamped) }
+}
+
+const DISCOVER_ACTION_EXIT_MS = 190
+
+/** A Like or Pass button exit; instant under Reduce Motion (DSC-10). */
+export function getDiscoverActionExitDuration(reduceMotion: boolean): number {
+  return reduceMotion ? 0 : DISCOVER_ACTION_EXIT_MS
 }
