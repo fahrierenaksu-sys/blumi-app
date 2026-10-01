@@ -89,6 +89,8 @@ export function getChatTimelineItemKey(item: ChatTimelineItem): string {
     : `room-invite:${item.inviteId}`
 }
 
+const MESSAGE_GROUP_MAX_GAP_MS = 5 * 60_000
+
 export function getChatMessageGroupPosition(
   timeline: readonly ChatTimelineItem[],
   index: number
@@ -99,6 +101,8 @@ export function getChatMessageGroupPosition(
   const belongsToSameGroup = (candidate: ChatTimelineItem | undefined): boolean => {
     if (!candidate || candidate.kind !== "message") return false
     if (candidate.message.senderUserId !== item.message.senderUserId) return false
+    // A pause of more than five minutes starts a new group (CHT-11).
+    if (Math.abs(Date.parse(candidate.createdAt) - Date.parse(item.createdAt)) > MESSAGE_GROUP_MAX_GAP_MS) return false
     return new Date(candidate.createdAt).toDateString() === new Date(item.createdAt).toDateString()
   }
 
