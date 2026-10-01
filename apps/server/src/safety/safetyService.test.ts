@@ -3,6 +3,25 @@ import test from "node:test"
 import { createInMemorySafetyRepository } from "./safetyRepository"
 import { createSafetyService, MAX_BLOCKS_PER_ACTOR, MAX_REPORTS_PER_DAY, SafetyLimitError } from "./safetyService"
 
+test("a block check sees both directions with one repository read", async () => {
+  const repository = createInMemorySafetyRepository()
+  let reads = 0
+  for (const method of ["findBlock", "listBlockedUserIdsBetween"] as const) {
+    const original = repository[method].bind(repository) as (...args: unknown[]) => Promise<unknown>
+    ;(repository as unknown as Record<string, unknown>)[method] = async (...args: unknown[]) => { reads += 1; return original(...args) }
+  }
+  const service = createSafetyService({ repository })
+  assert.equal(await service.hasBlockBetween("user_a", "user_b"), false)
+  assert.equal(reads, 1, "was one findBlock per direction")
+  await service.blockUser("user_b", "user_a")
+  for (const [first, second] of [["user_a", "user_b"], ["user_b", "user_a"]] as const) {
+    reads = 0
+    assert.equal(await service.hasBlockBetween(first, second), true)
+    assert.equal(reads, 1)
+  }
+  assert.equal(await service.hasBlockBetween("user_a", "user_c"), false)
+})
+
 test("blocks are idempotent and scoped to the actor", async () => {
   const service = createSafetyService({
     repository: createInMemorySafetyRepository()
