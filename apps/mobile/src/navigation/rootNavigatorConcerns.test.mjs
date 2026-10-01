@@ -226,20 +226,31 @@ function readyPayload(miniRoomId = "room-1", participants) {
   }
 }
 
+const { resolveReadyRoomArrival, getRoomArrivalBanner, getRoomArrivalClosedTitle, ROOM_ARRIVAL_BANNER_MS } =
+  loadModule("../features/miniRoom/roomArrivalModel.ts")
+
 function openReadyMiniRoomFor(navigationRef, currentActor = actor) {
   const handledReadyMiniRoomIdsRef = { current: new Set() }
-  const open = evaluate(findInitializer(OWNER.roomInvites, "openReadyMiniRoom"), {
+  const announcedReadyMiniRoomIdsRef = { current: new Set() }
+  const announced = []
+  const bindings = {
     latestSessionActorRef: { current: currentActor },
     navigationRef,
     handledReadyMiniRoomIdsRef,
-    createCandidateAvatarSnapshot: (input) => ({ snapshotFor: input.userId, preset: input.avatarSelection.presetId })
-  })
-  return { open, handledReadyMiniRoomIdsRef }
+    announcedReadyMiniRoomIdsRef,
+    dismissToast: () => announced.push(["dismiss"]),
+    createCandidateAvatarSnapshot: (input) => ({ snapshotFor: input.userId, preset: input.avatarSelection.presetId }),
+    resolveReadyRoomArrival,
+    announceReadyMiniRoom: (payload, partnerName) => announced.push([payload.miniRoom.miniRoomId, partnerName])
+  }
+  const enterReadyMiniRoom = evaluate(findInitializer(OWNER.roomInvites, "enterReadyMiniRoom"), bindings)
+  const open = evaluate(findInitializer(OWNER.roomInvites, "openReadyMiniRoom"), { ...bindings, enterReadyMiniRoom })
+  return { open, handledReadyMiniRoomIdsRef, announced }
 }
 
-test("a ready MiniRoom opens once with both participants and reopens only when allowed", () => {
-  const navigationRef = createNavigationRef()
-  const { open, handledReadyMiniRoomIdsRef } = openReadyMiniRoomFor(navigationRef)
+test("a ready MiniRoom opens once from its own chat and reopens only when allowed", () => {
+  const navigationRef = createNavigationRef({ routeName: "ChatThread", params: { threadId: "thread-1" } })
+  const { open, handledReadyMiniRoomIdsRef, announced } = openReadyMiniRoomFor(navigationRef)
   const payload = readyPayload()
 
   open(payload)
@@ -261,6 +272,70 @@ test("a ready MiniRoom opens once with both participants and reopens only when a
   assert.equal(navigationRef.calls.length, 1, "a duplicate ready event does not stack another MiniRoom")
   open(payload, { allowReopen: true })
   assert.equal(navigationRef.calls.length, 2)
+  assert.deepEqual(announced, [])
+})
+
+test("a ready MiniRoom away from its chat is announced, not forced open (ROOM-09)", () => {
+  for (const navigationRef of [
+    createNavigationRef({ routeName: "Shop" }),
+    createNavigationRef({ routeName: "ChatThread", params: { threadId: "another-thread" } })
+  ]) {
+    const { open, handledReadyMiniRoomIdsRef, announced } = openReadyMiniRoomFor(navigationRef)
+    open(readyPayload())
+    assert.deepEqual(navigationRef.calls, [], "the inviter stays where they are")
+    assert.deepEqual(announced, [["room-1", "Two"]])
+    assert.equal(handledReadyMiniRoomIdsRef.current.size, 0, "joining later still opens the room")
+    // An explicit join (banner, chat card or accept) opens it from anywhere.
+    open(readyPayload(), { allowReopen: true })
+    assert.equal(navigationRef.calls.length, 1)
+    assert.equal(navigationRef.calls[0][1], "MiniRoom")
+  }
+})
+
+test("the room banner joins through the server and never acts for another session", async () => {
+  const toasts = []
+  const joined = []
+  const announcedReadyMiniRoomIdsRef = { current: new Set() }
+  const latestSessionActorRef = { current: actor }
+  let joinResult = Promise.resolve(readyPayload("room-1"))
+  const announce = evaluate(findInitializer(OWNER.roomInvites, "announceReadyMiniRoom"), {
+    latestSessionActorRef,
+    announcedReadyMiniRoomIdsRef,
+    getAppLocale: () => "tr",
+    getRoomArrivalBanner,
+    getRoomArrivalClosedTitle,
+    ROOM_ARRIVAL_BANNER_MS,
+    MOBILE_HTTP_BASE_URL: "https://api.example.test",
+    showToast: (toast) => toasts.push(toast),
+    joinRoomSession: (baseUrl, token, roomId) => {
+      joined.push([baseUrl, token, roomId])
+      return joinResult
+    },
+    enterReadyMiniRoom: (payload) => joined.push(["enter", payload.miniRoom.miniRoomId])
+  })
+
+  announce(readyPayload(), "Two")
+  announce(readyPayload(), "Two")
+  assert.equal(toasts.length, 1, "one banner per room")
+  assert.equal(toasts[0].title, "Two odada")
+  assert.equal(toasts[0].body, "Katılmak için dokun")
+  assert.equal(toasts[0].durationMs, ROOM_ARRIVAL_BANNER_MS)
+
+  toasts[0].onPress()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(joined, [["https://api.example.test", "token-one", "room-1"], ["enter", "room-1"]])
+
+  joined.length = 0
+  joinResult = Promise.reject(new Error("closed"))
+  toasts[0].onPress()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(plain(toasts.at(-1)), { type: "warning", title: "Bu oda kapandı" })
+
+  joined.length = 0
+  latestSessionActorRef.current = { ...actor, session: { ...actor.session, sessionToken: "other" } }
+  toasts[0].onPress()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(joined, [], "a banner from a previous session does nothing")
 })
 
 test("a ready MiniRoom is ignored before readiness, for non-participants, and without a partner", () => {
@@ -288,12 +363,15 @@ test("a ready MiniRoom is ignored before readiness, for non-participants, and wi
 
 test("ending a session forgets opened MiniRooms and clears the invite timeline", () => {
   const handledReadyMiniRoomIdsRef = { current: new Set(["room-1"]) }
+  const announcedReadyMiniRoomIdsRef = { current: new Set(["room-2"]) }
   const inviteUpdates = []
   evaluate(findInitializer(OWNER.roomInvites, "resetRoomInviteRouting"), {
     handledReadyMiniRoomIdsRef,
+    announcedReadyMiniRoomIdsRef,
     setRoomInvites: (value) => inviteUpdates.push(value)
   })()
   assert.equal(handledReadyMiniRoomIdsRef.current.size, 0)
+  assert.equal(announcedReadyMiniRoomIdsRef.current.size, 0, "room banners are per session")
   assert.deepEqual(plain(inviteUpdates), [[]])
 })
 

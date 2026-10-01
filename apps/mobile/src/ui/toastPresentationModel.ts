@@ -14,6 +14,10 @@ export interface ToastData {
   durationMs?: number
   /** Plays the type's haptic when shown. Off by default: most callers play their own. */
   haptic?: boolean
+  /** An actionable toast (for example "Ayşe is in the room · Join"): runs after dismissing. */
+  onPress?: () => void
+  /** Spoken label of an actionable toast; a plain toast reads its dismiss label. */
+  accessibilityLabel?: string
 }
 
 export type ToastPresentationPhase = "hidden" | "visible" | "exiting"
@@ -104,6 +108,21 @@ export function getToastHapticKind(type: ToastType): ToastHapticKind | null {
   if (type === "success") return "success"
   if (type === "warning") return "error"
   return null
+}
+
+/** A press always dismisses; an actionable toast then runs its action once. */
+export function handleToastPress(toast: ToastData | null, dismiss: () => void): void {
+  dismiss()
+  toast?.onPress?.()
+}
+
+export function getToastPressLabel(
+  toast: Pick<ToastData, "title" | "accessibilityLabel" | "onPress">,
+  dismissLabel: (title: string) => string
+): string {
+  return toast.onPress && toast.accessibilityLabel
+    ? toast.accessibilityLabel
+    : dismissLabel(toast.title)
 }
 
 /** Spoken text for screen readers without live regions (iOS VoiceOver). */
