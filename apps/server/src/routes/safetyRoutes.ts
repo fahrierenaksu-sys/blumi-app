@@ -135,6 +135,12 @@ export async function registerSafetyRoutes(
         resolved.account.userId,
         blockedUserId
       )
+      // The blocker's other devices drop the chat now (as the realtime
+      // safety.block handler does); the blocked person is never told.
+      connectionManager.sendToUser(resolved.account.userId, {
+        type: "safety.user_blocked",
+        payload: { blockedUserId: block.blockedUserId }
+      })
       const endedRooms = await miniRoomService?.separateUserPair(
         resolved.account.userId,
         block.blockedUserId
@@ -218,6 +224,10 @@ export async function registerSafetyRoutes(
         reason,
         note,
         idempotencyKey
+      })
+      connectionManager.sendToUser(resolved.account.userId, {
+        type: "safety.user_blocked",
+        payload: { blockedUserId: result.block.blockedUserId }
       })
       const endedRooms = await miniRoomService?.separateUserPair(
         resolved.account.userId,

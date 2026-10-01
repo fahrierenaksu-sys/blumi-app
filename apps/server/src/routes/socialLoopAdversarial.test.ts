@@ -543,6 +543,33 @@ test("a block stops the pair on every social-loop route, including room connecti
   }
 })
 
+test("a block or report over HTTP reaches the blocker's other devices, never the blocked person", async () => {
+  const harness = createHarness()
+  try {
+    const { ada, bora, stranger } = await createMatchedPair(harness, "40012")
+    const blockedEvents = () => harness.eventsOfType("safety.user_blocked")
+      .map((entry) => ({ userIds: entry.userIds, payload: entry.event.payload }))
+
+    const blocked = await harness.app.inject({
+      method: "POST", url: "/v1/safety/blocks", headers: ada.headers, payload: { blockedUserId: bora.userId }
+    })
+    assert.equal(blocked.statusCode, 201)
+    // Same confirmation the realtime safety.block handler sends: the blocker's
+    // other phone drops the chat at once instead of on its next refresh.
+    assert.deepEqual(blockedEvents(), [{ userIds: [ada.userId], payload: { blockedUserId: bora.userId } }])
+
+    const reported = await harness.app.inject({
+      method: "POST", url: "/v1/safety/reports", headers: stranger.headers,
+      payload: { reportedUserId: bora.userId, reason: "harassment" }
+    })
+    assert.equal(reported.statusCode, 201)
+    assert.deepEqual(blockedEvents().at(-1), { userIds: [stranger.userId], payload: { blockedUserId: bora.userId } })
+    assert.ok(blockedEvents().every((entry) => !entry.userIds.includes(bora.userId)))
+  } finally {
+    await harness.app.close()
+  }
+})
+
 test("reports refuse self-reports and forged fields, and replay one report per idempotency key under concurrency", async () => {
   const harness = createHarness()
   try {
