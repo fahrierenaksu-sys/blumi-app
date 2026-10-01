@@ -110,6 +110,10 @@ const STATEMENT_CONFLICT_STATES = new Set(["40001", "40P01"])
  * whole transaction is aborted, so the error still reaches the route and maps
  * to 503 with Retry-After. Other errors, and streaming or callback queries,
  * pass through unchanged.
+ *
+ * Only safe for single autocommit statements. Never send multi-statement SQL
+ * through `pool.query` (for example "BEGIN; ...; COMMIT" in one string): a
+ * conflict after an inner COMMIT would run the committed part again.
  */
 export function retryStatementConflictOnce(pool: Pool): Pool {
   const query = pool.query.bind(pool) as (...args: unknown[]) => unknown
