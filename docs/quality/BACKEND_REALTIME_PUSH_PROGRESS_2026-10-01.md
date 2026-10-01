@@ -160,3 +160,42 @@ tamamı bitmiş, **NATIVE_VERIFIED** veya **PRODUCTION_READY** değildir.
   sayısı, davet kabul push'u (ürün kararı), uygulama içi dil değişiminin
   sunucuya taşınması (migration gerektirir), `MessageRateExceeded` receipt'i
   sonrası yeniden gönderim (receipt tablosu içeriği tutmaz).
+
+## Bildirim teslimi, rozet ve dokunma yönlendirmesi (ikinci tur) — IMPLEMENTED / TESTED
+
+Migration yok, deploy yok, gerçek push yok. Native ve fiziksel cihaz doğrulaması **OPEN**.
+
+- **P0 bağlantı havuzu:** gönderim döngüsü artık en fazla 3 sağlayıcı çağrısını
+  (ve dolayısıyla Expo HTTP çağrısı boyunca açık kalan en fazla 3 dispatch
+  transaction'ını) aynı anda çalıştırır; tur başına 30 teslim kiralanır.
+  Önceden 100 teslim aynı anda 10 bağlantılık havuzu tüketip API isteklerini
+  bekletebiliyordu. Receipt sorgusu tek toplu `getReceipts` isteğidir.
+  HTTP çağrısının transaction dışına alınması (yetki kilidi tasarımı) OPEN.
+- **Rozet:** sunucu her push'a alıcının okunmamış mesaj toplamını (`badge`,
+  iOS) ekler; sayı gönderimden hemen önce tek sorgu ile okunur (thread
+  listesindeki unread kuralının aynısı, engelli eşler hariç), 2 sn sınırlıdır,
+  hata push'u durdurmaz. Telefon, thread listesi yüklendikten sonra uygulama
+  ikonunu sohbet rozetindeki toplamla eşitler; arka plana geçerken yeniden
+  yazar; liste yüklenmeden sunucu rozetini sıfırlamaz. Çıkış/hesap değişimi 0.
+- **Expo hataları:** `InvalidCredentials`, `MismatchSenderId`, `MessageTooBig`
+  bilet aşamasında yeniden denenmez ve `console.error` ile operasyonel hata
+  olarak yazılır (yalnızca kod/tür/sayaç). `MessageRateExceeded` ve HTTP 429
+  outbox satırı dururken 30 sn'den başlayan yavaş geri çekilme ile en fazla 5
+  deneme. Receipt aşamasındaki `MessageRateExceeded` yeniden gönderilemez:
+  outbox satırı bilet kabulünde silinir, `blumi_push_receipts` içerik tutmaz.
+  Tasarım (migration gerekir, uygulanmadı): receipt satırına `notification_type`
+  ve yönlendirme verisini (`title/body/data`, metin içermez) ekleyip
+  `rejected/MessageRateExceeded` için yeni bir outbox satırı (aynı collapse id,
+  `attempt_count` devam) üretmek.
+- **Dokunma:** bilinmeyen sohbet için dokunma bir sonraki thread listesini
+  bekler (en fazla 4 sn): listede varsa sohbet, yoksa (silinmiş/engellenmiş)
+  Gelen Kutusu, liste gelmezse sohbet açılır. Oturum yokken (AuthEntry)
+  dokunulan push saklanmaz; sonraki girişte açılmaz. Başka hesabın push'u
+  `recipientUserId` ile reddedilir (mevcut).
+- **Token:** OS token'ı dönerse yeni token kaydedilir ve aynı hesabın eski
+  token'ı sunucudan silinir. Android `default` kanalı HIGH (heads-up); daha
+  önce kanalı oluşturmuş Android kurulumları Android kuralı gereği eski
+  önemde kalır (Android henüz yayında değil).
+- Testler: sunucu 1019 (892 geçti, 127 atlandı, 0 hata), legal 18; mobil
+  bildirim 74 + 5. PostgreSQL contract (`countUnreadMessagesBySender`) bu
+  ortamda koşmadı (root kısıtı) — OPEN.
