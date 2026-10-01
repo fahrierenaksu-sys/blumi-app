@@ -81,6 +81,32 @@ export function createMiniRoomMotionService(options: {
     if (!room.participantUserIds.includes(userId)) throw new Error("That room is not available.")
     return room
   }
+  /**
+   * Occupied rooms are also re-checked on a timer (2026-10-01): when both
+   * avatars stood still past MAX_STALE_MS, the next move used to wait for a
+   * forced check, seconds when the pool was busy. Empty rooms cost nothing.
+   */
+  let keepWarm: ReturnType<typeof setInterval> | undefined
+  function syncKeepWarm() {
+    const occupied = [...rooms.values()].some(room => room.connections.size > 0)
+    if (occupied && !keepWarm) {
+      keepWarm = setInterval(revalidateOccupiedRooms, REVALIDATE_AFTER_MS / 2)
+      keepWarm.unref?.()
+    } else if (!occupied && keepWarm) {
+      clearInterval(keepWarm)
+      keepWarm = undefined
+    }
+  }
+  function revalidateOccupiedRooms() {
+    for (const [id, room] of rooms) {
+      const connection = room.connections.values().next().value
+      if (!connection || now() - room.checkedAt < REVALIDATE_AFTER_MS) continue
+      void validate(id, connection.userId).catch(() => {
+        // An unavailable room was removed by the check; a failed check is retried.
+      })
+    }
+    syncKeepWarm()
+  }
   function disconnect(connectionId: string, onlyRoomId?: string) {
     for (const [id, room] of rooms) {
       if (onlyRoomId && id !== onlyRoomId) continue
@@ -93,6 +119,7 @@ export function createMiniRoomMotionService(options: {
       emitSnapshot(id, room)
       if (!room.connections.size) room.idleSince = now()
     }
+    syncKeepWarm()
   }
   return {
     invalidate(id: string) { rooms.delete(id); validations.delete(id) },
@@ -112,6 +139,7 @@ export function createMiniRoomMotionService(options: {
       disconnect(connectionId, undefined)
       room.connections.set(connectionId, { userId, sequence: 0 })
       room.idleSince = undefined
+      syncKeepWarm()
       const avatar = room.avatars.get(userId)!
       avatar.present = true
       avatar.revision++

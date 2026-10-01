@@ -98,6 +98,44 @@ test("a decision is never trusted past the stale bound without a successful chec
   await assert.rejects(service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .5, y: .7 }))
 })
 
+test("occupied rooms are re-checked on a timer, so a move after a quiet minute does not wait for the database", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] })
+  let clock = 1_000_000
+  let lookups = 0
+  let gate: Promise<void> = Promise.resolve()
+  const room: any = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const events: any[] = []
+  const service = createMiniRoomMotionService({
+    now: () => clock,
+    findRoom: async () => { lookups++; await gate; return room },
+    hasBlockBetween: async () => false,
+    emit: (_, event) => events.push(event)
+  })
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  lookups = 0
+  // Both avatars stand still for 70 s (2026-10-01: the next move used to wait
+  // for a forced check, seconds under a busy pool).
+  for (let elapsed = 0; elapsed < 70_000; elapsed += 5_000) {
+    clock += 5_000
+    t.mock.timers.tick(5_000)
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  assert.ok(lookups >= 6, "re-checked about every 10 s while occupied")
+  gate = new Promise<void>(() => undefined)
+  events.length = 0
+  void service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(events.at(-1)?.type, "mini_room.avatar_moved", "relayed without waiting for a check")
+
+  service.disconnect("ca")
+  service.disconnect("cb")
+  const checked = lookups
+  clock += 30_000
+  t.mock.timers.tick(30_000)
+  assert.equal(lookups, checked, "an empty room is not re-checked")
+})
+
 test("concurrent scene entry shares one authorization lookup and invalidation cancels an in-flight entry", async () => {
   let lookups = 0
   let release: (() => void) | undefined
