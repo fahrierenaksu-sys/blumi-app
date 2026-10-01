@@ -1,6 +1,8 @@
 import { Pressable, Text, View } from "react-native"
+import type { SharedValue } from "react-native-reanimated"
 import type { AvatarStudioTab, WardrobeCategoryId } from "../wardrobeCategoryModel"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
+import { WardrobePageDot } from "./WardrobeSlidingIndicator"
 import { wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
 /**
@@ -15,19 +17,21 @@ export function WardrobeCatalogHeader(props: {
   optionCount: number
   pageCount: number
   activePage: number
+  /** Live list position in pages (UI thread) that the dots follow. */
+  pagePosition: SharedValue<number>
   onSelectCategory: (categoryId: WardrobeCategoryId) => void
 }) {
-  const { tab, activeCategory, copy, optionCount, pageCount, activePage, onSelectCategory } = props
+  const { tab, activeCategory, copy, optionCount, pageCount, activePage, pagePosition, onSelectCategory } = props
   return (
     <View style={styles.catalogHeader}>
-      <View style={styles.filterRow}>
+      <View accessibilityRole={tab.categories.length > 1 ? "tablist" : undefined} style={styles.filterRow}>
         {tab.categories.map((categoryId) => {
           const active = categoryId === activeCategory
           return (
             <Pressable
               key={categoryId}
               testID={`wardrobe-filter-${categoryId}`}
-              accessibilityRole="button"
+              accessibilityRole={tab.categories.length > 1 ? "tab" : "header"}
               accessibilityLabel={copy[categoryId]}
               accessibilityState={{ selected: active }}
               disabled={tab.categories.length === 1}
@@ -55,10 +59,7 @@ export function WardrobeCatalogHeader(props: {
             style={styles.pageDots}
           >
             {Array.from({ length: pageCount }, (_, index) => (
-              <View
-                key={index}
-                style={[styles.pageDot, index === activePage ? styles.pageDotActive : null]}
-              />
+              <WardrobePageDot key={index} index={index} position={pagePosition} />
             ))}
           </View>
         ) : null}

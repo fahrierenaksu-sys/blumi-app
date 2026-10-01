@@ -238,6 +238,14 @@ export const wardrobeV2Styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
+  // The sliding capsule (WRD-3) takes sectionButtonActive's look.
+  sectionIndicator: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: 20,
+  },
   sectionButtonText: {
     color: wardrobeTheme.muted,
     fontFamily: "Inter_500Medium",
@@ -276,6 +284,14 @@ export const wardrobeV2Styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 1,
+  },
+  // The sliding white capsule (WRD-3) takes tabActive's look.
+  tabIndicator: {
+    position: "absolute",
+    top: 0,
+    bottom: 8,
+    left: 0,
+    borderRadius: 16,
   },
   tabLabel: {
     color: wardrobeTheme.muted,
@@ -358,10 +374,6 @@ export const wardrobeV2Styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: wardrobeTheme.hairline,
-  },
-  pageDotActive: {
-    width: 16,
-    backgroundColor: wardrobeTheme.accent,
   },
   catalogEmpty: {
     alignItems: "center",

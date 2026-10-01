@@ -2,6 +2,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useMemo, useState } from "react"
 import { getWardrobePageCount } from "../features/avatarV2/wardrobe/wardrobeStageLayout"
 import { Text, View } from "react-native"
+import { useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -99,6 +100,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     reduceMotion
   })
   const [catalogPage, setCatalogPage] = useState(0)
+  const catalogPagePosition = useSharedValue(0)
 
   const handleSelectSection = useCallback((section: AvatarStudioSectionId): void => {
     hapticLight()
@@ -169,6 +171,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
               optionCount={visibleWardrobeCards.length}
               pageCount={getWardrobePageCount(visibleWardrobeCards.length)}
               activePage={catalogPage}
+              pagePosition={catalogPagePosition}
               onSelectCategory={handleSelectCategory}
             />
           ) : null}
@@ -186,6 +189,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
             reduceMotion={reduceMotion}
             onEquip={handleEquip}
             onPageChange={setCatalogPage}
+            pagePosition={catalogPagePosition}
             onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
           />
         </WardrobeGlass>

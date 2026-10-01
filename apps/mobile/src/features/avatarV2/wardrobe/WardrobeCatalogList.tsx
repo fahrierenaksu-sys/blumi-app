@@ -1,14 +1,18 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
-  FlatList,
+  type FlatList,
   View,
   useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import Reanimated, { type AnimatedStyle } from "react-native-reanimated"
+import Reanimated, {
+  useAnimatedReaction,
+  useAnimatedScrollHandler,
+  type AnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import type { WardrobeCategoryId } from "../wardrobeCategoryModel"
 import { WardrobeCatalogCard } from "./WardrobeCatalogCard"
@@ -19,8 +23,7 @@ import {
   chunkWardrobePages,
   getWardrobeCardHeight,
   getWardrobeGridItemWidth,
-  getWardrobeGridPageHeight,
-  getWardrobePageIndex
+  getWardrobeGridPageHeight
 } from "./wardrobeStageLayout"
 import {
   WARDROBE_GRID_GAP,
@@ -48,6 +51,8 @@ export function WardrobeCatalogList(props: {
   onEquip: (item: AvatarCatalogItem) => void
   onExploreShop: () => void
   onPageChange: (pageIndex: number) => void
+  /** Written on the UI thread: the list position in pages, for the dots. */
+  pagePosition: SharedValue<number>
 }) {
   const {
     activeCategory,
@@ -57,7 +62,8 @@ export function WardrobeCatalogList(props: {
     copy,
     onEquip,
     onExploreShop,
-    onPageChange
+    onPageChange,
+    pagePosition
   } = props
   const { fontScale } = useWindowDimensions()
   const [listWidth, setListWidth] = useState(0)
@@ -96,12 +102,25 @@ export function WardrobeCatalogList(props: {
     if (shownCategoryRef.current === activeCategory) return
     shownCategoryRef.current = activeCategory
     listRef.current?.scrollToOffset({ offset: 0, animated: false })
+    pagePosition.value = 0
     onPageChange(0)
-  }, [activeCategory, onPageChange])
+  }, [activeCategory, onPageChange, pagePosition])
 
-  const handleMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    onPageChange(getWardrobePageIndex(event.nativeEvent.contentOffset.x, listWidth, pages.length))
-  }, [listWidth, onPageChange, pages.length])
+  // WRD-3: the dots follow the live offset on the UI thread; React hears
+  // only page changes (for the VoiceOver page label), never every frame.
+  const handleScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      pagePosition.value = listWidth > 0 ? event.contentOffset.x / listWidth : 0
+    }
+  }, [listWidth])
+  const pageCount = pages.length
+  useAnimatedReaction(
+    () => Math.max(0, Math.min(pageCount - 1, Math.round(pagePosition.value))),
+    (index, previous) => {
+      if (previous !== null && index !== previous) scheduleOnRN(onPageChange, index)
+    },
+    [onPageChange, pageCount]
+  )
 
   const isMeasured = itemWidth > 0
   return (
@@ -115,7 +134,7 @@ export function WardrobeCatalogList(props: {
         {isMeasured && pages.length === 0 ? (
           <WardrobeCatalogEmpty copy={copy} onExploreShop={onExploreShop} />
         ) : (
-          <FlatList
+          <Reanimated.FlatList
             ref={listRef}
             data={isMeasured ? pages : []}
             horizontal
@@ -127,7 +146,8 @@ export function WardrobeCatalogList(props: {
             windowSize={3}
             showsHorizontalScrollIndicator={false}
             scrollEnabled={pages.length > 1}
-            onMomentumScrollEnd={handleMomentumEnd}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             renderItem={renderPage}
           />
         )}

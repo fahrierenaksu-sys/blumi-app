@@ -70,6 +70,23 @@ test("a category change swaps products while they are invisible, on the UI threa
   assert.doesNotMatch(card, /thumbnailTransition/)
 })
 
+test("sections and categories are tabs with a sliding capsule and live page dots (WRD-3)", () => {
+  const switcher = readFileSync(join(wardrobeFolder, "WardrobeSectionSwitcher.tsx"), "utf8")
+  const tabs = readFileSync(join(wardrobeFolder, "WardrobeCategoryTabs.tsx"), "utf8")
+  const indicator = readFileSync(join(wardrobeFolder, "WardrobeSlidingIndicator.tsx"), "utf8")
+  const list = readFileSync(join(wardrobeFolder, "WardrobeCatalogList.tsx"), "utf8")
+  for (const source of [switcher, tabs]) {
+    assert.match(source, /accessibilityRole="tablist"/)
+    assert.match(source, /accessibilityRole="tab"/)
+    assert.match(source, /<WardrobeSlidingIndicator frame=\{frame\}/)
+  }
+  assert.match(indicator, /withSpring\(frame\.x, uiTheme\.animation\.springSnappy\)/)
+  assert.match(indicator, /if \(!placedRef\.current \|\| reduceMotion\)/)
+  assert.match(list, /pagePosition\.value = listWidth > 0 \? event\.contentOffset\.x \/ listWidth : 0/)
+  assert.match(list, /scheduleOnRN\(onPageChange, index\)/)
+  assert.doesNotMatch(list, /onMomentumScrollEnd/)
+})
+
 test("the stage sizes the canonical character from its measured area", () => {
   assert.match(screenSource, /getWardrobeStageLayout\(/)
   assert.match(screenSource, /animationState="idle_front"/)
