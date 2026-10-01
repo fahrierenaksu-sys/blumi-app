@@ -331,11 +331,23 @@ test("the room banner joins through the server and never acts for another sessio
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(plain(toasts.at(-1)), { type: "warning", title: "Bu oda kapandı" })
 
+  // A refreshed session token for the same person still joins, with the new token.
   joined.length = 0
-  latestSessionActorRef.current = { ...actor, session: { ...actor.session, sessionToken: "other" } }
+  joinResult = Promise.resolve(readyPayload("room-1"))
+  latestSessionActorRef.current = { ...actor, session: { ...actor.session, sessionToken: "token-refreshed" } }
   toasts[0].onPress()
   await new Promise((resolve) => setImmediate(resolve))
-  assert.deepEqual(joined, [], "a banner from a previous session does nothing")
+  assert.deepEqual(joined, [["https://api.example.test", "token-refreshed", "room-1"], ["enter", "room-1"]])
+
+  joined.length = 0
+  latestSessionActorRef.current = { ...actor, profile: { ...actor.profile, userId: "user-three" } }
+  toasts[0].onPress()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(joined, [], "a banner from another account does nothing")
+  latestSessionActorRef.current = null
+  toasts[0].onPress()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(joined, [], "a banner after sign-out does nothing")
 })
 
 test("a ready MiniRoom is ignored before readiness, for non-participants, and without a partner", () => {

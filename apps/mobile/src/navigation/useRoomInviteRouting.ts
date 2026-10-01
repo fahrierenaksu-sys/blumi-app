@@ -93,31 +93,34 @@ export function useRoomInviteRouting({
   /**
    * "X is in the room · Join" (UX audit ROOM-09). Joining goes through the
    * server, so a room that closed meanwhile is reported instead of opened; a
-   * banner left from another session does nothing.
+   * banner left from another account or after sign-out does nothing.
    */
   const announceReadyMiniRoom = useCallback(
     (payload: ReadyMiniRoomEvent["payload"], partnerDisplayName: string): void => {
       const roomId = payload.miniRoom.miniRoomId
-      const actor = latestSessionActorRef.current
-      if (!actor || announcedReadyMiniRoomIdsRef.current.has(roomId)) return
+      const announcedFor = latestSessionActorRef.current?.profile.userId
+      if (!announcedFor || announcedReadyMiniRoomIdsRef.current.has(roomId)) return
       announcedReadyMiniRoomIdsRef.current = new Set([...announcedReadyMiniRoomIdsRef.current, roomId])
       const locale = getAppLocale()
+      const isSamePerson = () => latestSessionActorRef.current?.profile.userId === announcedFor
       showToast({
         type: "info",
         ...getRoomArrivalBanner(locale, partnerDisplayName),
         durationMs: ROOM_ARRIVAL_BANNER_MS,
         onPress: () => {
-          if (latestSessionActorRef.current !== actor) return
+          // The latest session of the same person (a refreshed token still joins).
+          const actor = latestSessionActorRef.current
+          if (!actor || !isSamePerson()) return
           if (actor.session.mode !== "production") {
             enterReadyMiniRoom(payload)
             return
           }
           void joinRoomSession(MOBILE_HTTP_BASE_URL, actor.session.sessionToken, roomId)
             .then((ready) => {
-              if (latestSessionActorRef.current === actor) enterReadyMiniRoom(ready)
+              if (isSamePerson()) enterReadyMiniRoom(ready)
             })
             .catch(() => {
-              if (latestSessionActorRef.current !== actor) return
+              if (!isSamePerson()) return
               showToast({ type: "warning", title: getRoomArrivalClosedTitle(locale) })
             })
         }
