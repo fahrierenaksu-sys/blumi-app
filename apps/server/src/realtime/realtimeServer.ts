@@ -127,6 +127,7 @@ export function createRealtimeServer(
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const connectionEventWindows = new Map<string, EventRateWindow>()
   const userEventWindows = new Map<string, EventRateWindow>()
+  const movementEventWindows = new Map<string, EventRateWindow>()
   const upgradeAddressWindows = new Map<string, EventRateWindow>()
   const upgradeAttemptLimit = options.upgradeAttemptsPerAddressWindow ?? MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
@@ -499,7 +500,7 @@ export function createRealtimeServer(
     })
     if (!lane && (!connectionAllowed || !userAllowed ||
       (connectionInFlight.get(connection.connectionId) ?? 0) >= MAX_CONNECTION_IN_FLIGHT ||
-      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT) {
+      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT)) {
       if (connection.socket.readyState === 1) {
         connection.socket.close(RATE_LIMIT_CLOSE_CODE, RATE_LIMIT_CLOSE_REASON)
       }
