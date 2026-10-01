@@ -28,6 +28,7 @@ import { getMiniRoomCopy } from "../features/miniRoom/miniRoomCopy"
 import { useInRoomChat } from "../features/miniRoom/useInRoomChat"
 import { useMiniRoomLeaveGuard } from "../features/miniRoom/useMiniRoomLeaveGuard"
 import { useMiniRoomMedia } from "../features/miniRoom/useMiniRoomMedia"
+import { useMiniRoomNotices } from "../features/miniRoom/useMiniRoomNotices"
 import { useRoomChatHistory } from "../features/miniRoom/useRoomChatHistory"
 import {
   isDefinitivelyUnavailableRoomSession,
@@ -44,6 +45,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
+import { showToast } from "../ui/toast"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
@@ -311,6 +313,20 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     })
   }, [exitToDebrief, miniRoom.miniRoomId, sessionActor.session.mode, sessionActor.session.sessionToken])
 
+  // The same account entered this room on another device, which now drives
+  // the avatar (newest entry wins). Leave the screen without ending the room.
+  useEffect(() => {
+    if (!roomMotion.superseded || exitedRef.current) return
+    exitedRef.current = true
+    showToast({ type: "info", title: roomCopy.continuedOnOtherDevice })
+    if (navigation.canGoBack()) navigation.goBack()
+    else navigation.replace("RoomDebrief", { miniRoomId: miniRoom.miniRoomId, partner: participants.partner,
+      durationSeconds: 0, connected: everConnectedRef.current })
+  }, [miniRoom.miniRoomId, navigation, participants.partner, roomCopy, roomMotion.superseded])
+
+  const roomNotice = useMiniRoomNotices({ roomMotion, copy: roomCopy,
+    partnerFirstName: participants.partner.displayName.split(" ")[0] || participants.partner.displayName })
+
   const confirmLeave = useMiniRoomLeaveGuard({
     copy: roomCopy,
     exitedRef,
@@ -329,8 +345,9 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const notices = useMemo(() => [
     leaveError ? roomCopy.leaveNotConfirmed : null,
     reconnectError ? roomCopy.roomRefreshFailed : null,
-    sharedRoomDecor.legacyFallback ? roomCopy.legacyDecorNotice : null
-  ].filter((notice): notice is string => notice !== null), [leaveError, reconnectError, roomCopy, sharedRoomDecor.legacyFallback])
+    sharedRoomDecor.legacyFallback ? roomCopy.legacyDecorNotice : null,
+    roomNotice
+  ].filter((notice): notice is string => notice !== null), [leaveError, reconnectError, roomCopy, roomNotice, sharedRoomDecor.legacyFallback])
 
   return (
     <View style={styles.root}>

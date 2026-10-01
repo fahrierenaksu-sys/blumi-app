@@ -95,3 +95,35 @@ test("a lost scene entry is retried until the snapshot arrives, and never after 
   assert.equal(f.timers.size, 0, "leaving cancels a pending retry")
   assert.equal(entries(), 4)
 })
+
+test("a refusal of this phone's latest seat claim is surfaced once; a stale refusal after a newer tap is not", () => {
+  const f = createFixture()
+  f.session.connect()
+  f.session.receive(snapshot([avatar("a"), avatar("b")]))
+  f.session.move({ x: .5, y: .57 }, "chair:seat")
+  f.session.receive(moved(avatar("b", { x: .5, y: .57, hotspotId: "chair:seat", revision: 2 })))
+  f.session.receive(moved(avatar("a", { x: .5, y: .57, deniedHotspotId: "chair:seat", revision: 2 })))
+  assert.deepEqual(f.states.at(-1)!.seatRefusal, { revision: 2, hotspotId: "chair:seat" })
+
+  // The user tapped elsewhere before the next refusal arrived: no correction.
+  f.advance(500)
+  f.session.move({ x: .5, y: .57 }, "chair:seat")
+  f.advance(500)
+  f.session.move({ x: .4, y: .7 })
+  f.session.receive(moved(avatar("a", { x: .5, y: .57, deniedHotspotId: "chair:seat", revision: 3 })))
+  assert.deepEqual(f.states.at(-1)!.seatRefusal, { revision: 2, hotspotId: "chair:seat" })
+})
+
+test("a takeover by the same account's other device stops this phone's scene", () => {
+  const f = createFixture()
+  f.session.connect()
+  f.session.receive(snapshot([avatar("a"), avatar("b")]))
+  f.session.receive({ type: "mini_room.scene_superseded", payload: { miniRoomId: "other-room" } })
+  assert.equal(f.states.at(-1)!.superseded, undefined)
+  f.session.receive({ type: "mini_room.scene_superseded", payload: { miniRoomId: "room" } })
+  assert.equal(f.states.at(-1)!.superseded, true)
+  const sent = f.sent.length
+  assert.equal(f.session.move({ x: .5, y: .7 }), false, "the replaced device no longer sends steps")
+  assert.equal(f.sent.length, sent)
+  assert.equal(f.timers.size, 0)
+})

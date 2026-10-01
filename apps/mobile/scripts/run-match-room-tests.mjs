@@ -311,7 +311,9 @@ try {
       "src/features/miniRoom/useMiniRoomMotion.test.ts",
       "src/features/notifications/useFocusedConversation.test.ts",
       "src/features/miniRoom/scene/avatarBubblePopLifecycle.test.ts",
-      "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts"
+      "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts",
+      "src/features/miniRoom/scene/miniRoomSeatRefusalModel.test.ts",
+      "src/features/miniRoom/miniRoomNoticeModel.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

@@ -10,6 +10,13 @@ export interface MiniRoomMotionState {
   /** A new value for each join snapshot: the scene then places both avatars exactly. */
   snapKey: number
   partnerPresent: boolean
+  /**
+   * The server refused this phone's latest seat claim (the partner got there
+   * first). The scene walks the local avatar beside the seat once per revision.
+   */
+  seatRefusal?: { revision: number; hotspotId: string }
+  /** The same account entered this room on another device, which now drives the avatar. */
+  superseded?: boolean
 }
 
 const RETARGET_INTERVAL_MS = 200
@@ -34,11 +41,23 @@ export function createMiniRoomMotionSession(input: {
   let timer: ReturnType<typeof setTimeout> | undefined
   let enterTimer: ReturnType<typeof setTimeout> | undefined
   let pending: { x: number; y: number; hotspotId?: string } | undefined
+  let lastSentTarget: { x: number; y: number; hotspotId?: string } | undefined
+  let seatRefusal: MiniRoomMotionState["seatRefusal"]
+  let superseded = false
   const avatars = new Map<string, MiniRoomAvatarMotion>()
   const clearPending = () => { if (timer !== undefined) cancel(timer); timer = undefined; pending = undefined }
   const clearEnterRetry = () => { if (enterTimer !== undefined) cancel(enterTimer); enterTimer = undefined }
   const publish = () => input.update({ avatars: [...avatars.values()], snapKey,
-    partnerPresent: avatars.get(input.partnerUserId)?.present ?? false })
+    partnerPresent: avatars.get(input.partnerUserId)?.present ?? false,
+    ...(seatRefusal ? { seatRefusal } : {}), ...(superseded ? { superseded } : {}) })
+  /**
+   * A refusal corrects the local avatar only while that claim is still this
+   * phone's newest intent; a later tap (sent or coalescing) gets its own answer.
+   */
+  const isRefusalOfLatestIntent = (avatar: MiniRoomAvatarMotion) =>
+    avatar.userId === input.localUserId && !avatar.hotspotId && Boolean(avatar.deniedHotspotId) &&
+    !pending && lastSentTarget !== undefined && lastSentTarget.hotspotId === avatar.deniedHotspotId &&
+    lastSentTarget.x === avatar.x && lastSentTarget.y === avatar.y
   const enter = () => {
     input.send({ type: "mini_room.scene_enter", payload: { miniRoomId: input.miniRoomId } })
     const delay = SCENE_ENTER_RETRY_DELAYS_MS[Math.min(enterAttempts++, SCENE_ENTER_RETRY_DELAYS_MS.length - 1)]
@@ -51,13 +70,14 @@ export function createMiniRoomMotionSession(input: {
     timer = undefined
     if (!ready || !pending) return
     const target = pending; pending = undefined
-    lastSent = now()
+    lastSent = now(); lastSentTarget = target
     input.send({ type: "mini_room.move", payload: { miniRoomId: input.miniRoomId, sequence: ++sequence, ...target } })
   }
   return {
     connect() {
       clearPending(); clearEnterRetry()
       active = true; ready = false; epoch = null; avatars.clear(); sequence = 0; lastSent = -Infinity; enterAttempts = 0
+      lastSentTarget = undefined; seatRefusal = undefined; superseded = false
       enter()
     },
     disconnect() {
@@ -78,6 +98,13 @@ export function createMiniRoomMotionSession(input: {
     },
     receive(event: ServerEvent) {
       if (!active) return
+      if (event.type === "mini_room.scene_superseded") {
+        if (event.payload.miniRoomId !== input.miniRoomId) return
+        // The server already removed this socket from the scene: stop sending.
+        clearPending(); clearEnterRetry(); active = false; ready = false; superseded = true
+        publish()
+        return
+      }
       if (event.type !== "mini_room.motion_snapshot" && event.type !== "mini_room.avatar_moved") return
       const payload = event.payload
       if (payload.miniRoomId !== input.miniRoomId ||
@@ -101,6 +128,7 @@ export function createMiniRoomMotionSession(input: {
         if (!payload.participantUserIds.includes(avatar.userId) ||
           avatar.revision <= (avatars.get(avatar.userId)?.revision ?? -1)) continue
         avatars.set(avatar.userId, avatar)
+        if (isRefusalOfLatestIntent(avatar)) seatRefusal = { revision: avatar.revision, hotspotId: avatar.deniedHotspotId! }
         changed = true
       }
       if (changed) publish()

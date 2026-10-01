@@ -95,8 +95,7 @@ interface MiniRoomSceneProps {
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
 const MAX_ROOM_MESSAGE_LENGTH = 140
-const NO_HISTORY: readonly RoomChatHistoryItem[] = []
-const NO_NOTICES: readonly string[] = []
+const NO_HISTORY: readonly RoomChatHistoryItem[] = [], NO_NOTICES: readonly string[] = []
 const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer), StableRoomMapLayer = memo(RoomMapLayer)
 const StableHotspotLayer = memo(HotspotLayer), StableMiniRoomHud = memo(MiniRoomHud)
 
@@ -129,6 +128,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     partnerUser,
     participantAvatarSnapshots,
     onLocalMove: props.roomMotion?.onLocalMove,
+    onSeatTaken: props.roomMotion?.reportSeatTaken,
     roomDecorScene,
     bubbleLifetimeMs: ROOM_CHAT_BUBBLE_LIFETIME_MS
   })

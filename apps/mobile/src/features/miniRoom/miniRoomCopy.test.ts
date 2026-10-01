@@ -62,3 +62,18 @@ test("MiniRoom chat panel, menu and state copy exist in both languages", () => {
     assert.notEqual(tr[key], en[key], key)
   }
 })
+
+test("in-room presence, seat and takeover notices exist in Turkish and English", () => {
+  const tr = getMiniRoomCopy("tr")
+  const en = getMiniRoomCopy("en")
+  assert.equal(tr.partnerHere("Bora"), "Bora odada")
+  assert.equal(tr.partnerBack("Bora"), "Bora geri döndü")
+  assert.equal(tr.partnerAway("Bora"), "Bora odadan uzaklaştı")
+  assert.equal(tr.seatTaken, "Bu koltuk dolu")
+  assert.equal(tr.continuedOnOtherDevice, "Bu oda diğer cihazında devam ediyor.")
+  assert.equal(en.partnerHere("Bora"), "Bora is here")
+  assert.equal(en.partnerBack("Bora"), "Bora is back")
+  assert.equal(en.partnerAway("Bora"), "Bora stepped away")
+  assert.equal(en.seatTaken, "That seat is taken")
+  assert.equal(en.continuedOnOtherDevice, "This room continued on your other device.")
+})
