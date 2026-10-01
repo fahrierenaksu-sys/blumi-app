@@ -110,3 +110,12 @@ baseline; stage explicit reviewed paths; never include an inverse patch merely
 because it was already staged; never force-push or rewrite another agent's
 commits. Commit and push only the authorized work. Push verification must pass
 without bypassing hooks. Native and production evidence remain OPEN.
+
+The initial full `npm test` run passed. The push hook's repeated run exposed a
+fixture-ordering flaw in the restored acknowledgement flood regression:
+messages labelled "older" and "newest" could share a millisecond timestamp,
+which receipt cursors break by random message ID. Increasing the deadline did
+not resolve it, so that attempted change was discarded. The fixture now uses
+explicit increasing send times; all assertions and the original 3-second
+deadline remain. The queue implementation, cursor ordering and Claude's
+deterministic quota-window unit tests are unchanged.
