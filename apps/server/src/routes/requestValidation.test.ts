@@ -53,6 +53,7 @@ const ENFORCED_ROUTES = [
   "POST /v1/threads/:threadId/messages",
   "POST /v1/threads/:threadId/read",
   "POST /v1/threads/:threadId/room-invites",
+  "PUT /v1/chat-preferences",
   "PUT /v1/notification-preferences",
   "PUT /v1/users/me/avatar",
   "PUT /v1/users/me/room-decor",
@@ -499,6 +500,9 @@ test("request bodies exactly as the current mobile app sends them pass every enf
       payload: { body: "Hello", clientMessageId: "client-1" }
     },
     { method: "POST", url: "/v1/threads/thread_1/read", headers: auth },
+    // 2026-10-01 builds name the newest partner message they showed.
+    { method: "POST", url: "/v1/threads/thread_1/read", headers: auth, payload: { upToMessageId: "message_1" } },
+    { method: "PUT", url: "/v1/chat-preferences", headers: auth, payload: { readReceiptsEnabled: true } },
     { method: "POST", url: "/v1/safety/blocks", headers: auth, payload: { blockedUserId: "user_2" } },
     { method: "DELETE", url: "/v1/safety/blocks/user_2", headers: auth },
     {

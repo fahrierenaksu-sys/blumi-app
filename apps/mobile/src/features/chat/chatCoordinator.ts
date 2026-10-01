@@ -126,7 +126,7 @@ export interface ChatCoordinator {
   ) => Promise<void>
   handleRoomInviteAction: (action: ChatRoomInviteAction) => Promise<void>
   closeMyActiveRoom: (expectedRoomSessionId: string) => Promise<void>
-  markChatThreadRead: (threadId: string) => void
+  markChatThreadRead: (threadId: string, upToMessageId?: string) => void
   replaceThreadRoomInvites: (
     threadId: string,
     nextInvites: readonly ChatRoomInviteTimelineItem[]
@@ -509,7 +509,7 @@ export function createChatCoordinator(
     )
   }
 
-  const markChatThreadRead = (threadId: string): void => {
+  const markChatThreadRead = (threadId: string, upToMessageId?: string): void => {
     const actor = getProductionActor()
     if (actor) {
       void dependencies
@@ -517,7 +517,7 @@ export function createChatCoordinator(
           dependencies.baseHttpUrl,
           actor.session.sessionToken,
           threadId,
-          { expectedUserId: actor.session.userId }
+          { expectedUserId: actor.session.userId, ...(upToMessageId ? { upToMessageId } : {}) }
         )
         .catch(() => undefined)
     }

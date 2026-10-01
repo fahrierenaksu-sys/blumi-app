@@ -99,6 +99,7 @@ const app = createServer({
     if (!connectionManager.isFanoutReady()) throw new Error("Realtime fanout unavailable")
   },
   authService: services.authService,
+  capabilityService: services.capabilityService,
   firebaseAuthVerifier,
   chatService: services.chatService,
   economyService: services.economyService,
@@ -148,10 +149,14 @@ const realtimeServer = createRealtimeServer({
   connectionManager,
   realtimeTicketService,
   trustedProxyAddresses: config.trustedProxyAddresses,
+  capabilityService: services.capabilityService,
   httpServer: config.port === config.realtimePort ? app.server : undefined
 })
 
 async function start() {
+  // Learn whether migration 070 is applied before serving, so the first
+  // capability answers already include receipts (the probe never throws).
+  await services.chatReceiptSchema.isReady()
   await app.listen({ port: config.port, host: config.host })
   await realtimeServer.listen({
     port: config.realtimePort,

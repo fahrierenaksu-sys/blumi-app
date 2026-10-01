@@ -2,10 +2,12 @@ import type { ChatThread, ChatThreadList } from "@blumi/contracts"
 import { useEffect, useEffectEvent, useMemo } from "react"
 import { AppState } from "react-native"
 import { MOBILE_HTTP_BASE_URL, MOBILE_WS_BASE_URL } from "../config/env"
+import { createChatDeliveryAckBatcher } from "../features/chat/chatDeliveryAckBatcher"
 import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
   applyChatMessageListed,
   applyChatMessageReceived,
+  applyChatReceiptUpdated,
   applyChatThreadListed,
   applyChatThreadRead,
   getThreads,
@@ -61,6 +63,8 @@ interface GlobalRealtimeSessionInput {
   onConnectionMatched: (payload: ConnectionMatchedPayload) => void
   /** Server confirmation of a block by this user; drops the partner's chat. */
   onPartnerBlocked: (blockedUserId: string) => void
+  /** `chat_read_receipts` resolved for this session: acknowledge deliveries. */
+  receiptsEnabled: boolean
 }
 
 /**
@@ -89,7 +93,8 @@ export function useGlobalRealtimeSession({
   openReadyMiniRoom,
   getMatchDeduplicationState,
   onConnectionMatched,
-  onPartnerBlocked
+  onPartnerBlocked,
+  receiptsEnabled
 }: GlobalRealtimeSessionInput): void {
   const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity(sessionActor)
   // A new actor object with the same identity (for example a profile edit)
@@ -149,6 +154,18 @@ export function useGlobalRealtimeSession({
     sessionEntryRoute
   ])
 
+  // ── Delivery acks (2026-10-01) ──────────────────────────
+  // One batcher per signed-in account and rollout state: an account switch
+  // or a capability change disposes the old one with its pending window.
+  // Only a foreground app acknowledges.
+  const accountUserId = sessionActor?.profile.userId
+  const deliveryAcks = useMemo(() => createChatDeliveryAckBatcher({
+    // Signed out there is nothing to acknowledge for.
+    send: (ack) => accountUserId !== undefined && sendGlobal({ type: "chat.ack_delivered", payload: ack }),
+    isActive: () => receiptsEnabled && AppState.currentState === "active"
+  }), [accountUserId, receiptsEnabled])
+  useEffect(() => () => deliveryAcks.dispose(), [deliveryAcks])
+
   // ── Chat + match event routing ──────────────────────────
   const handleGlobalEvent = useMemo(
     () => createGlobalRealtimeEventHandler({
@@ -163,6 +180,8 @@ export function useGlobalRealtimeSession({
       applyChatThreadCreated: applyNewThread,
       applyChatMessageListed,
       applyChatMessageReceived,
+      acknowledgeDelivery: (message) => deliveryAcks.note(message),
+      applyChatReceiptUpdated,
       getThreads,
       openReadyMiniRoom,
       onConnectionMatched,
@@ -182,6 +201,7 @@ export function useGlobalRealtimeSession({
     [
       onConnectionMatched,
       onPartnerBlocked,
+      deliveryAcks,
       getMatchDeduplicationState,
       applyNewThread,
       applyRealtimeThreadList,

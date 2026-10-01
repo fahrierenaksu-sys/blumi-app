@@ -32,7 +32,10 @@ const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "presence.nearby",
   "reaction.received",
   // Superseded by the next step; the room snapshot (not transient) re-syncs.
-  "mini_room.avatar_moved"
+  "mini_room.avatar_moved",
+  // Receipt cursors are cumulative: the next event or list refresh covers a
+  // dropped one, so a backed-up socket sheds them first.
+  "chat.receipt_updated"
 ])
 
 export interface RealtimeConnection {

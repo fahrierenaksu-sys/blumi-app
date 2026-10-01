@@ -8,6 +8,7 @@ import {
 import {
   chatMessageListSchema,
   chatMessageReceivedSchema,
+  chatReceiptUpdatedSchema,
   chatThreadListSchema,
   chatThreadReadSchema,
   chatThreadSchema,
@@ -193,6 +194,8 @@ export const serverEventPayloadSchemas = {
     chatMessageListSchema satisfies z.ZodType<PayloadOf<"chat.message_listed">, z.ZodTypeDef, unknown>,
   "chat.message_received":
     chatMessageReceivedSchema satisfies z.ZodType<PayloadOf<"chat.message_received">, z.ZodTypeDef, unknown>,
+  "chat.receipt_updated":
+    chatReceiptUpdatedSchema satisfies z.ZodType<PayloadOf<"chat.receipt_updated">, z.ZodTypeDef, unknown>,
   "reaction.received": z.object({
     roomId: id,
     actorUserId: id,

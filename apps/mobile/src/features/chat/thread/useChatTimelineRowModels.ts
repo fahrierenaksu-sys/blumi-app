@@ -1,9 +1,10 @@
+import type { ChatPartnerReceipts } from "@blumi/contracts"
 import { useEffect, useRef } from "react"
 import type { ChatLocale, ChatTimelineItem } from "../chatRoomInviteModel"
 import {
   buildChatTimelineRowModels,
-  type ChatMessageDeliveryState,
-  type ChatTimelineRowModels
+  type ChatTimelineRowModels,
+  type LocalChatMessageDeliveryState
 } from "./chatThreadModel"
 
 /**
@@ -19,17 +20,20 @@ export function useChatTimelineRowModels({
   timeline,
   currentUserId,
   locale,
-  getMessageDeliveryState
+  getMessageDeliveryState,
+  partnerReceipts
 }: {
   timeline: readonly ChatTimelineItem[]
   currentUserId: string
   locale: ChatLocale
-  getMessageDeliveryState: (messageId: string) => ChatMessageDeliveryState
+  getMessageDeliveryState: (messageId: string) => LocalChatMessageDeliveryState
+  /** The partner's cursors; undefined while receipts are off. */
+  partnerReceipts?: ChatPartnerReceipts
 }): ChatTimelineRowModels {
   const committedRef = useRef<ChatTimelineRowModels | null>(null)
   const rowModels = buildChatTimelineRowModels(
     timeline,
-    { currentUserId, locale, getMessageDeliveryState },
+    { currentUserId, locale, getMessageDeliveryState, partnerReceipts },
     committedRef.current
   )
   useEffect(() => {

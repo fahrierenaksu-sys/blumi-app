@@ -33,6 +33,9 @@ export interface SettingsCopy {
   on: string
   off: string
   analyticsNote: string
+  readReceipts: string
+  readReceiptsNote: string
+  readReceiptsNotSaved: string
   about: string
   version: string
   philosophy: string
@@ -126,6 +129,9 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     reportClosedResponse: "We reviewed your report and closed it. Thank you for helping keep Blumi safe.",
     privacy: "PRIVACY", analytics: "Product analytics", on: "On", off: "Off",
     analyticsNote: "Optional, anonymous product events only. No messages, profile text, photos, session replay, or advertising identifiers.",
+    readReceipts: "Read receipts",
+    readReceiptsNote: "Read receipts are mutual: you see when a match has read your messages only if you both turn this on, and turning it off hides it for both of you. Delivered ticks always show.",
+    readReceiptsNotSaved: "Read receipts not saved",
     about: "ABOUT", version: "Version", philosophy: "Philosophy", philosophyValue: "Avatar-first dating",
     legal: "LEGAL", privacyPolicy: "Privacy Policy", terms: "Terms of Service", communityGuidelines: "Community Guidelines",
     account: "ACCOUNT", downloadData: "Download account data", changePhone: "Change sign-in phone", signOut: "Sign out", deleteAccount: "Delete my account",
@@ -169,6 +175,9 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     reportClosedResponse: "Bildirimin incelendi ve kapatıldı. Blumi’yi güvenli tutmaya yardımcı olduğun için teşekkürler.",
     privacy: "GİZLİLİK", analytics: "Ürün analitiği", on: "Açık", off: "Kapalı",
     analyticsNote: "Yalnızca isteğe bağlı ve anonim ürün olayları. Mesajlar, profil metni, fotoğraflar, oturum kaydı veya reklam tanımlayıcıları dahil değildir.",
+    readReceipts: "Okundu bilgisi",
+    readReceiptsNote: "Okundu bilgisi karşılıklıdır: mesajlarının görüldüğünü yalnızca ikiniz de açtığınızda görürsünüz; kapatırsan ikiniz de göremezsiniz. İletildi işareti her zaman görünür.",
+    readReceiptsNotSaved: "Okundu bilgisi kaydedilmedi",
     about: "HAKKINDA", version: "Sürüm", philosophy: "Yaklaşım", philosophyValue: "Avatar öncelikli flört",
     legal: "YASAL", privacyPolicy: "Gizlilik Politikası", terms: "Kullanım Koşulları", communityGuidelines: "Topluluk Kuralları",
     account: "HESAP", downloadData: "Hesap verilerini indir", changePhone: "Giriş telefonunu değiştir", signOut: "Çıkış yap", deleteAccount: "Hesabımı sil",

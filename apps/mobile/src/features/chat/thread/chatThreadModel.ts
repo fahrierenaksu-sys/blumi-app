@@ -1,4 +1,4 @@
-import type { ChatThread } from "@blumi/contracts"
+import type { ChatPartnerReceipts, ChatThread } from "@blumi/contracts"
 import {
   getChatMessageGroupPosition,
   getChatTimelineItemKey,
@@ -8,9 +8,12 @@ import {
   type ChatRoomInviteTimelineItem,
   type ChatTimelineItem
 } from "../chatRoomInviteModel"
+import { deriveChatMessageDeliveryState, type ChatMessageDeliveryState } from "../chatReceiptModel"
 import { CHAT_COPY, type ChatThreadCopy } from "./chatThreadCopy"
 
-export type ChatMessageDeliveryState = "sending" | "failed" | "sent"
+export type { ChatMessageDeliveryState }
+/** What the device itself knows about one of my messages. */
+export type LocalChatMessageDeliveryState = "sending" | "failed" | "sent"
 
 /**
  * Mirrors the server's message normalization (trim, then collapse every
@@ -92,6 +95,7 @@ export function getChatTimelineRowModel({
   timeline,
   currentUserId,
   getMessageDeliveryState,
+  partnerReceipts,
   locale,
   now
 }: {
@@ -99,7 +103,9 @@ export function getChatTimelineRowModel({
   index: number
   timeline: readonly ChatTimelineItem[]
   currentUserId: string
-  getMessageDeliveryState: (messageId: string) => ChatMessageDeliveryState
+  getMessageDeliveryState: (messageId: string) => LocalChatMessageDeliveryState
+  /** The partner's cursors; undefined while receipts are off. */
+  partnerReceipts?: ChatPartnerReceipts
   locale: ChatLocale
   now?: Date
 }): ChatTimelineRowModel {
@@ -109,7 +115,12 @@ export function getChatTimelineRowModel({
     ? item.senderUserId === currentUserId
     : item.message.senderUserId === currentUserId
   const deliveryState = item.kind === "message"
-    ? getMessageDeliveryState(item.message.messageId)
+    ? deriveChatMessageDeliveryState({
+        message: item.message,
+        localState: getMessageDeliveryState(item.message.messageId),
+        isMe,
+        receipts: partnerReceipts
+      })
     : "sent"
   const groupPosition = item.kind === "message"
     ? getChatMessageGroupPosition(timeline, chronologicalIndex)
@@ -146,7 +157,8 @@ export type ChatTimelineRowModels = ReadonlyMap<string, ChatTimelineRowEntry>
 
 export interface ChatTimelineRowModelContext {
   currentUserId: string
-  getMessageDeliveryState: (messageId: string) => ChatMessageDeliveryState
+  getMessageDeliveryState: (messageId: string) => LocalChatMessageDeliveryState
+  partnerReceipts?: ChatPartnerReceipts
   locale: ChatLocale
   now?: Date
 }

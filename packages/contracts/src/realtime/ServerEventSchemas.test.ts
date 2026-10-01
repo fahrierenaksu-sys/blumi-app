@@ -203,6 +203,20 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
     valid: MESSAGE,
     invalid: { ...MESSAGE, readAt: "2026-09-30T11:00:00.000Z" },
   },
+  "chat.receipt_updated": {
+    valid: {
+      threadId: "thread-1",
+      userId: "bora",
+      participantUserIds: ["ada", "bora"],
+      deliveredUpTo: { sentAt: NOW, messageId: "message-1" },
+    },
+    invalid: {
+      threadId: "thread-1",
+      userId: "bora",
+      participantUserIds: ["ada", "bora"],
+      readUpTo: { sentAt: "soon", messageId: "message-1" },
+    },
+  },
   "reaction.received": {
     valid: { roomId: "lobby", actorUserId: "ada", targetUserId: "bora", reaction: "wave", createdAt: NOW },
     invalid: { roomId: "lobby", actorUserId: "ada", reaction: "kiss", createdAt: NOW },
@@ -223,7 +237,41 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 21);
+  assert.equal(SERVER_EVENT_TYPES.length, 22);
+});
+
+test("a receipt update names one of two distinct participants and moves a cursor", () => {
+  const base = { threadId: "thread-1", userId: "bora", participantUserIds: ["ada", "bora"] };
+  const cursor = { sentAt: NOW, messageId: "message-1" };
+  assert.equal(parseServerEvent({ type: "chat.receipt_updated", payload: { ...base, readUpTo: cursor } }).kind, "valid");
+  // A cursor without a message id covers everything sent at or before sentAt.
+  assert.equal(parseServerEvent({ type: "chat.receipt_updated", payload: { ...base, readUpTo: { sentAt: NOW } } }).kind, "valid");
+  assert.equal(parseServerEvent({ type: "chat.receipt_updated", payload: base }).kind, "invalid");
+  assert.equal(parseServerEvent({
+    type: "chat.receipt_updated",
+    payload: { ...base, userId: "cem", deliveredUpTo: cursor },
+  }).kind, "invalid");
+  assert.equal(parseServerEvent({
+    type: "chat.receipt_updated",
+    payload: { ...base, userId: "ada", participantUserIds: ["ada", "ada"], deliveredUpTo: cursor },
+  }).kind, "invalid");
+  assert.equal(parseServerEvent({
+    type: "chat.receipt_updated",
+    payload: { ...base, deliveredUpTo: { sentAt: NOW, messageId: "" } },
+  }).kind, "invalid");
+});
+
+test("thread and message lists from a server without receipts stay valid", () => {
+  assert.equal(parseServerEvent({ type: "chat.thread_listed", payload: { userId: "ada", threads: [THREAD] } }).kind, "valid");
+  assert.equal(parseServerEvent({
+    type: "chat.message_listed",
+    payload: {
+      userId: "ada",
+      threadId: "thread-1",
+      messages: [MESSAGE],
+      partnerReceipts: { deliveredUpTo: { sentAt: NOW, messageId: "message-1" } },
+    },
+  }).kind, "valid");
 });
 
 for (const type of SERVER_EVENT_TYPES) {

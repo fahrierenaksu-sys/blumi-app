@@ -5,6 +5,8 @@ import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from "fas
 import { mintAdminToken, createAdminTokenService, type AdminScope, type AdminSigningKey } from "../admin/adminTokenService"
 import { createAuthService, type AuthService } from "../auth/authService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import type { CapabilityService } from "../capabilities/capabilityService"
+import type { ChatRepository } from "../chat/chatRepository"
 import { createChatService } from "../chat/chatService"
 import { createConnectionService } from "../connections/connectionService"
 import { createInMemoryMatchRepository, createInMemoryMatchStore } from "../matches/matchRepository"
@@ -58,11 +60,16 @@ function nextAddress(): string {
   return `10.${(addressCounter >> 16) & 255}.${(addressCounter >> 8) & 255}.${addressCounter & 255}`
 }
 
-export function createAdversarialServer(options: { authService?: AuthService } = {}) {
+export function createAdversarialServer(options: {
+  authService?: AuthService
+  /** Receipt suites pin the `chat_read_receipts` rollout and the chat schema state. */
+  capabilityService?: CapabilityService
+  chatRepository?: ChatRepository
+} = {}) {
   // An injected service lets a suite run the same routes on the PostgreSQL repository.
   const authService = options.authService ?? createAuthService()
-  const chatService = createChatService()
   const safetyService = createSafetyService()
+  const chatService = createChatService({ repository: options.chatRepository })
   const matchService = createMatchService({
     repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
   })
@@ -81,6 +88,7 @@ export function createAdversarialServer(options: { authService?: AuthService } =
   const adminTokenService = createAdminTokenService({ keys: [ADMIN_KEY] })
   const app = createServer({
     authService,
+    capabilityService: options.capabilityService,
     chatService,
     safetyService,
     matchService,
@@ -213,6 +221,7 @@ export function createAdversarialServer(options: { authService?: AuthService } =
     notificationService,
     miniRoomService,
     connectionService,
+    connectionManager,
     realtimeTicketService,
     createAccount,
     call,

@@ -10,6 +10,7 @@ import {
   coreApiJsonSchemas,
   createThreadRequestSchema,
   listChatMessagesQuerySchema,
+  markThreadReadRequestSchema,
   roomInviteDecisionRequestSchema,
   sendChatMessageRequestSchema,
   successResponseJsonSchema
@@ -29,9 +30,11 @@ import type { AuthService } from "../auth/authService"
 import type { CapabilityService } from "../capabilities/capabilityService"
 import {
   ChatMessageIdempotencyConflictError,
+  ChatReadCursorError,
   type ChatService,
   type CreateThreadInput
 } from "../chat/chatService"
+import type { ChatReceiptService } from "../chat/chatReceiptService"
 import {
   ChatDeliveryBlockedError,
   createChatMessageDeliveryService
@@ -67,6 +70,7 @@ export interface ThreadRouteServices {
   connectionManager: ConnectionManager
   miniRoomService?: MiniRoomService
   capabilityService: CapabilityService
+  chatReceiptService: ChatReceiptService
 }
 
 const threadIdRouteSchema = {
@@ -110,6 +114,7 @@ export async function registerThreadRoutes(
   services: ThreadRouteServices
 ): Promise<void> {
   const { authService, chatService, matchService, capabilityService } = services
+  const chatReceipts = services.chatReceiptService
   const deliveryService = createChatMessageDeliveryService({
     chatService,
     safetyService: services.safetyService,
@@ -210,10 +215,11 @@ export async function registerThreadRoutes(
     const allowV2 = resolveRequestCapabilities(
       request, userId, capabilityService
     ).capabilities.avatar_loadout_v2_read
+    const threads = await chatReceipts.projectThreads(userId, page.threads)
     return parseChatResponse(chatThreadListSchema, {
       userId,
       nextCursor: page.nextCursor,
-      threads: page.threads.map((thread) => projectChatThreadForAvatarRead(thread, allowV2))
+      threads: threads.map((thread) => projectChatThreadForAvatarRead(thread, allowV2))
     })
   })
 
@@ -242,10 +248,11 @@ export async function registerThreadRoutes(
       resolved.account.userId,
       capabilityService
     ).capabilities.avatar_loadout_v2_read
+    const threads = await chatReceipts.projectThreads(resolved.account.userId, page.threads)
     return parseChatResponse(chatThreadListSchema, {
       userId: resolved.account.userId,
       nextCursor: page.nextCursor,
-      threads: page.threads.map((thread) =>
+      threads: threads.map((thread) =>
         projectChatThreadForAvatarRead(thread, allowV2)
       )
     })
@@ -741,19 +748,28 @@ export async function registerThreadRoutes(
     try {
       const parsedQuery = listChatMessagesQuerySchema.safeParse(request.query)
       const query = parsedQuery.success ? parsedQuery.data : {}
+      const userId = resolved.account.userId
+      const beforeMessageId = typeof query.before === "string" ? query.before : undefined
       const messages = await chatService.listMessages(
-        resolved.account.userId,
+        userId,
         threadId,
         {
-          beforeMessageId:
-            typeof query.before === "string" ? query.before : undefined,
+          beforeMessageId,
           limit: readLimit(query.limit)
         }
       )
+      // The newest page reaching the device counts as delivery (owner
+      // decision 2026-10-01); older pages carry nothing new. Not awaited: the
+      // receipt never delays history, and failures are reported, not thrown.
+      if (!beforeMessageId) {
+        void chatReceipts.noteHistoryLoaded(userId, threadId, messages)
+      }
+      const partnerReceipts = await chatReceipts.getPartnerReceipts(userId, threadId)
       return parseChatResponse(chatMessageListSchema, {
-        userId: resolved.account.userId,
+        userId,
         threadId,
-        messages
+        messages,
+        ...(partnerReceipts ? { partnerReceipts } : {})
       })
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
@@ -817,21 +833,32 @@ export async function registerThreadRoutes(
   app.post("/v1/threads/:threadId/read", {
     attachValidation: true,
     config: { requestValidation: "enforced" },
-    schema: threadIdRouteSchema
+    schema: { ...threadIdRouteSchema, body: coreApiJsonSchemas.markThreadRead },
+    // Clients before 2026-10-01 send no body at all; that is the empty body
+    // (read up to now). A body that is present must match the contract.
+    preValidation: async (request) => {
+      if (request.body === undefined) request.body = {}
+    }
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
 
     const threadId = readParam(request, "threadId")
-    if (!threadId || schemaValidationFailed(request)) {
+    if (!threadId || schemaValidationFailed(request, "params")) {
       return reply.code(400).send({ error: "Choose a conversation first." })
+    }
+    const parsed = markThreadReadRequestSchema.safeParse(request.body)
+    if (!parsed.success || schemaValidationFailed(request, "body")) {
+      return reply.code(400).send({ error: "Choose a message to mark read." })
     }
 
     try {
-      const result = await chatService.markThreadRead(
+      const result = await chatReceipts.markRead(
         resolved.account.userId,
-        threadId
+        threadId,
+        parsed.data.upToMessageId ? { upToMessageId: parsed.data.upToMessageId } : {}
       )
+      // The reader's own devices update their unread counts (unchanged).
       services.connectionManager.sendToUser(resolved.account.userId, {
         type: "chat.thread_read", payload: { userId: resolved.account.userId, threadId, readAt: result.readAt }
       })
@@ -842,6 +869,9 @@ export async function registerThreadRoutes(
       })
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
+      if (error instanceof ChatReadCursorError) {
+        return reply.code(400).send({ code: error.code, error: error.message })
+      }
       return reply.code(404).send({
         error: error.message
       })

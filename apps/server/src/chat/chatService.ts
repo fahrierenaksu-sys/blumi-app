@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { ChatMessage, ChatThread } from "@blumi/contracts"
+import type { ChatMessage, ChatReceiptCursor, ChatThread } from "@blumi/contracts"
 import {
   cloneChatParticipant,
   createInMemoryChatRepository,
@@ -50,8 +50,36 @@ export interface ChatService {
     clientMessageId?: string,
     now?: Date
   ): Promise<{ message: ChatMessage; created: boolean }>
+  /**
+   * `sendMessageIdempotently` for a thread the caller already loaded (the
+   * delivery service), so the send path reads the thread once. Participants
+   * never change after creation, which makes the loaded copy authoritative.
+   */
+  sendMessageInThread(
+    thread: ChatThread,
+    userId: string,
+    body: string,
+    clientMessageId?: string,
+    now?: Date
+  ): Promise<{ message: ChatMessage; created: boolean }>
   createThread(input: CreateThreadInput, now?: Date): Promise<ChatThread>
-  markThreadRead(userId: string, threadId: string, now?: Date): Promise<{ readAt: string }>
+  /**
+   * Moves the reader's cursor forward: to `upToMessageId` (a partner message
+   * in this thread) or, without it, to `now`. `readUpTo` is the receipt
+   * cursor when receipts are stored and it moved.
+   */
+  markThreadRead(
+    userId: string,
+    threadId: string,
+    now?: Date,
+    options?: { upToMessageId?: string }
+  ): Promise<ChatMarkReadResult>
+}
+
+export interface ChatMarkReadResult {
+  readAt: string
+  readUpTo?: ChatReceiptCursor
+  participantUserIds: [string, string]
 }
 
 export interface CreateThreadInput {
@@ -67,6 +95,16 @@ export class ChatMessageIdempotencyConflictError extends PublicRequestError {
   constructor() {
     super("This message ID was already used with different content.")
     this.name = "ChatMessageIdempotencyConflictError"
+  }
+}
+
+/** A read cursor must name a message the partner sent in this thread. */
+export class ChatReadCursorError extends PublicRequestError {
+  readonly code = "CHAT_READ_CURSOR_INVALID"
+
+  constructor() {
+    super("That message is not available.")
+    this.name = "ChatReadCursorError"
   }
 }
 
@@ -158,6 +196,12 @@ export function createChatService(
     async sendMessageIdempotently(userId, threadId, body, clientMessageId, now = new Date()) {
       return sendMessageIdempotently(repository, idFactory, userId, threadId, body, clientMessageId, now)
     },
+    async sendMessageInThread(thread, userId, body, clientMessageId, now = new Date()) {
+      if (!thread.participantUserIds.includes(userId)) {
+        throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
+      }
+      return persistMessage(repository, idFactory, thread, userId, body, clientMessageId, now)
+    },
     async createThread(input, now = new Date()) {
       const existing = input.threadId
         ? await repository.findThread(input.threadId)
@@ -177,11 +221,21 @@ export function createChatService(
       await repository.saveThread(thread)
       return (await repository.findThread(thread.threadId)) ?? thread
     },
-    async markThreadRead(userId, threadId, now = new Date()) {
+    async markThreadRead(userId, threadId, now = new Date(), options = {}) {
       const thread = await getVisibleThread(userId, threadId)
-      const readAt = now.toISOString()
-      await repository.markThreadRead(thread.threadId, userId, readAt)
-      return { readAt }
+      const upToMessageId = options.upToMessageId?.trim()
+      const advanced = await repository.advanceReadCursor(upToMessageId
+        ? { threadId: thread.threadId, userId, upToMessageId }
+        : { threadId: thread.threadId, userId, readAt: now.toISOString() })
+      if (!advanced) {
+        if (upToMessageId) throw new ChatReadCursorError()
+        throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
+      }
+      return {
+        readAt: advanced.readAt,
+        ...(advanced.readUpTo ? { readUpTo: advanced.readUpTo } : {}),
+        participantUserIds: [...thread.participantUserIds] as [string, string]
+      }
     }
   }
 }
@@ -237,6 +291,18 @@ async function sendMessageIdempotently(
   now: Date
 ): Promise<{ message: ChatMessage; created: boolean }> {
   const thread = await getParticipantThread(repository, userId, threadId)
+  return persistMessage(repository, idFactory, thread, userId, body, clientMessageId, now)
+}
+
+async function persistMessage(
+  repository: ChatRepository,
+  idFactory: () => string,
+  thread: ChatThread,
+  userId: string,
+  body: string,
+  clientMessageId: string | undefined,
+  now: Date
+): Promise<{ message: ChatMessage; created: boolean }> {
   const normalizedBody = normalizeMessageBody(body)
   const normalizedClientMessageId = normalizeClientMessageId(clientMessageId)
   const message: ChatMessage = {

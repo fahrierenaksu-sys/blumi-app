@@ -433,7 +433,7 @@ test("demo room invitations open the local MiniRoom only once accepted", async (
 
 // ── Chat route bindings ────────────────────────────────────
 
-function chatThreadBindings(sessionMode) {
+function chatThreadBindings(sessionMode, receiptsEnabled = true) {
   const handlers = {
     sendChatMessageForRoute: () => "send",
     requestMessagesForRoute: () => "request",
@@ -446,7 +446,8 @@ function chatThreadBindings(sessionMode) {
     ...handlers,
     visibleRoomInvites: ["invite"],
     sessionMode,
-    chatLocale: "tr"
+    chatLocale: "tr",
+    receiptsEnabled
   })
   return { bindings, handlers }
 }
@@ -460,8 +461,13 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
     "roomInvites",
     "onRoomInviteAction",
     "onCloseActiveRoom",
-    "locale"
+    "locale",
+    "receiptsEnabled"
   ])
+  // Receipts follow the session's chat_read_receipts capability, production only.
+  assert.equal(production.bindings.receiptsEnabled, true)
+  assert.equal(chatThreadBindings("production", false).bindings.receiptsEnabled, false)
+  assert.equal(chatThreadBindings("demo", true).bindings.receiptsEnabled, false)
   assert.equal(production.bindings.sendChatMessage, production.handlers.sendChatMessageForRoute)
   assert.equal(production.bindings.requestMessages, production.handlers.requestMessagesForRoute)
   assert.equal(production.bindings.markThreadRead, production.handlers.markChatThreadRead)
@@ -885,7 +891,7 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
   // globalRealtimeSessionLifecycle.test.ts.
 
   const navigator = read(OWNER.sessionReset)
-  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock\s*\}\)/)
+  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock,\s*receiptsEnabled: resolvedCapabilities\.chat_read_receipts\s*\}\)/)
   // Local blocks and the server's confirmation share one chat cleanup.
   assert.match(navigator, /const applyConfirmedPartnerBlock = useBlockedPartnerCleanup\(sessionActor\?\.profile\.userId\)/)
   // Every block entry point (report sheet, block-only, demo report) goes through blockUser, which announces it.

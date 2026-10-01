@@ -220,9 +220,16 @@ test("pending messages stay fully visible and only show a clock until server ack
   const screenSource = declaredFunction(rowFile, "ChatTimelineRow").getText()
 
   assert.doesNotMatch(screenSource, /isOptimistic \? \{ opacity: 0\.65 \}/)
-  assert.match(screenSource, /deliveryState === "sending"[\s\S]*?name="time-outline"/)
-  assert.match(screenSource, /accessibilityLabel=\{chatCopy\.sending\}/)
-  assert.match(screenSource, /isMe && deliveryState === "sent"[\s\S]*?name="checkmark"/)
+  // Since 2026-10-01 the clock / ✓ / ✓✓ / read icons live in ChatDeliveryTicks;
+  // the state-to-icon mapping is unit-tested in chatDeliveryTickModel.test.ts and
+  // the spoken state ("sending", "iletildi", "görüldü") in chatBubbleAccessibility.test.ts.
+  assert.match(screenSource, /\{isMe \? <ChatDeliveryTicks state=\{deliveryState\} \/> : null\}/)
+  const ticks = declaredFunction(threadFile("ChatDeliveryTicks.tsx"), "ChatDeliveryTicks").getText()
+  assert.match(ticks, /accessible=\{false\}/, "the grouped bubble label speaks the state once")
+  assert.match(ticks, /const animate = !reduceMotion && state !== mountedState/)
+  const tickModel = declaredFunction(threadFile("chatDeliveryTickModel.ts"), "getChatDeliveryTickVisual").getText()
+  assert.match(tickModel, /case "sending": return \{ icon: "time-outline"/)
+  assert.match(tickModel, /case "sent": return \{ icon: "checkmark"/)
   assert.match(screenSource, /isMe && deliveryState === "failed"/)
   assert.match(screenSource, /chatCopy\.notSent/)
   assert.match(screenSource, /onPress=\{\(\) => onRetry\(item\.message\.messageId\)\}/)

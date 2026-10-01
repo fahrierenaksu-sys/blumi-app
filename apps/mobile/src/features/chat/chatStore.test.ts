@@ -30,7 +30,9 @@ import {
   setActiveThread,
   createChatThreadSnapshotReader,
   beginChatThreadListRequest,
-  removeChatThreadsWithPartner
+  removeChatThreadsWithPartner,
+  applyChatReceiptUpdated,
+  getPartnerReceipts
 } from "./chatStore"
 
 test("one realtime message is not proof that the first history page is ready", () => {
@@ -636,4 +638,64 @@ test("a thread list requested before the block cannot bring the blocked thread b
   const freshRequest = beginChatThreadListRequest()
   applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_blocked", "blocked"), blockedPartnerThread("t_other", "other")] }, { requestSequence: freshRequest })
   assert.deepEqual(getThreads().map((thread) => thread.threadId).sort(), ["t_blocked", "t_other"])
+})
+
+// ── Partner receipts (2026-10-01) ───────────────────────────
+
+test("receipt events move only the partner's cursors and re-render only that conversation", () => {
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [blockedPartnerThread("t_receipts", "partner")] })
+  const read = createChatThreadSnapshotReader("t_receipts")
+  const before = read()
+  assert.equal(before.partnerReceipts, undefined)
+  const delivered = { sentAt: "2026-09-30T10:00:00.000Z", messageId: "m1" }
+  const receipt = { threadId: "t_receipts", participantUserIds: ["me", "partner"] as [string, string] }
+
+  applyChatReceiptUpdated({ ...receipt, userId: "me", deliveredUpTo: delivered }, { localUserId: "me" })
+  applyChatReceiptUpdated({ threadId: "t_receipts", userId: "partner", participantUserIds: ["partner", "other"], deliveredUpTo: delivered }, { localUserId: "me" })
+  assert.equal(read(), before, "my own cursor and a foreign pair are ignored")
+
+  applyChatReceiptUpdated({ ...receipt, userId: "partner", deliveredUpTo: delivered }, { localUserId: "me" })
+  const after = read()
+  assert.notEqual(after, before)
+  assert.deepEqual(after.partnerReceipts, { deliveredUpTo: delivered })
+
+  let notifications = 0
+  const unsubscribe = subscribeToChatStore(() => { notifications += 1 })
+  applyChatReceiptUpdated({ ...receipt, userId: "partner", deliveredUpTo: { sentAt: "2026-09-30T09:00:00.000Z", messageId: "m0" } }, { localUserId: "me" })
+  unsubscribe()
+  assert.equal(notifications, 0, "an older cursor changes nothing")
+  assert.equal(read(), after)
+})
+
+test("thread and message lists carry the server's receipt view; an old server's lists keep it", () => {
+  resetChatStore()
+  const delivered = { sentAt: "2026-09-30T10:00:00.000Z", messageId: "m1" }
+  applyChatThreadListed({ userId: "me", threads: [{
+    ...blockedPartnerThread("t_list", "partner"),
+    partnerReceipts: { deliveredUpTo: delivered, readUpTo: delivered }
+  }] })
+  assert.deepEqual(getPartnerReceipts("t_list"), { deliveredUpTo: delivered, readUpTo: delivered })
+
+  applyChatMessageListed({ userId: "me", threadId: "t_list", messages: [] })
+  assert.deepEqual(getPartnerReceipts("t_list"), { deliveredUpTo: delivered, readUpTo: delivered }, "no field: keep")
+
+  // The partner turned read receipts off: the server's view drops readUpTo.
+  applyChatMessageListed({ userId: "me", threadId: "t_list", messages: [], partnerReceipts: { deliveredUpTo: delivered } })
+  assert.deepEqual(getPartnerReceipts("t_list"), { deliveredUpTo: delivered })
+})
+
+test("blocking the partner or switching accounts forgets their receipts", () => {
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [{
+    ...blockedPartnerThread("t_forget", "blocked"),
+    partnerReceipts: { deliveredUpTo: { sentAt: "2026-09-30T10:00:00.000Z", messageId: "m1" } }
+  }, blockedPartnerThread("t_keep", "other")] })
+  applyChatReceiptUpdated({ threadId: "t_keep", userId: "other", participantUserIds: ["me", "other"],
+    deliveredUpTo: { sentAt: "2026-09-30T10:00:00.000Z", messageId: "m2" } }, { localUserId: "me" })
+  removeChatThreadsWithPartner("blocked")
+  assert.equal(getPartnerReceipts("t_forget"), undefined)
+  assert.ok(getPartnerReceipts("t_keep"))
+  resetChatStore()
+  assert.equal(getPartnerReceipts("t_keep"), undefined)
 })

@@ -62,7 +62,7 @@ is not a reason.
 | Rule | Why | Enforced by |
 |---|---|---|
 | Applied migrations are immutable; never rename or renumber (two `032_*`, no `044`) | Checksums gate `/ready` | Migrator checksum check |
-| Migrations are additive first; the order is migrate, then deploy; each non-trivial migration gets a runbook with a compatibility matrix (see `docs/release/MIGRATION_068_RUNBOOK.md`) | New binaries refuse an old schema; old binaries must survive a new one | `/ready` schema readiness |
+| Migrations are additive first; the order is migrate, then deploy; each non-trivial migration gets a runbook with a compatibility matrix (see `docs/release/MIGRATION_068_RUNBOOK.md`). Exception: a migration listed in `OPTIONAL_READINESS_MIGRATIONS` ships with a runtime ledger probe that keeps its feature off until it is applied, so the binary may deploy first (070, `MIGRATION_070_RUNBOOK.md`) | New binaries refuse an old schema; old binaries must survive a new one | `/ready` schema readiness; `chatReceiptsPreMigration.postgres.test.ts` |
 | The migrator bounds lock waits inside each migration transaction (`BLUMI_MIGRATION_LOCK_TIMEOUT_MS`) | A queued `ALTER` blocks every request on that table | `migrateLockTimeout.postgres.test.ts` |
 | Supabase Free plan has no platform backup: take and restore-test a PostgreSQL 17 dump before any schema change | A backup that was never restored is not a backup | Runbook |
 | Railway does not reliably auto-deploy from `main`; confirm the deployment commit after every merge | A merge once produced no deploy | Runbook |

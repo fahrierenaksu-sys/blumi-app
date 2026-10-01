@@ -31,6 +31,12 @@ export interface SendThreadMessageOptions {
 
 export interface MarkThreadReadOptions {
   expectedUserId?: string
+  /**
+   * The newest partner message the reader saw (2026-10-01). Without it the
+   * request has no body and the server marks the thread read up to now, which
+   * is also what an older server does when it ignores the body.
+   */
+  upToMessageId?: string
 }
 
 export async function fetchChatThreads(
@@ -188,7 +194,12 @@ export async function markThreadRead(
     `/v1/threads/${encodeURIComponent(threadId)}/read`,
     {
       method: "POST",
-      headers: createAuthenticatedHeaders(sessionToken),
+      ...(options.upToMessageId
+        ? {
+            headers: createAuthenticatedHeaders(sessionToken, { json: true }),
+            body: JSON.stringify({ upToMessageId: options.upToMessageId })
+          }
+        : { headers: createAuthenticatedHeaders(sessionToken) }),
       signal
     },
     requestFetcher
@@ -233,7 +244,8 @@ export function normalizeMessageListPayload(payload: unknown): ChatMessageList {
     threadId: parsed.data.threadId,
     messages: parsed.data.messages.map((message) =>
       cloneMessageRecord(message as unknown as ChatMessage)
-    )
+    ),
+    ...(parsed.data.partnerReceipts ? { partnerReceipts: parsed.data.partnerReceipts } : {})
   }
 }
 

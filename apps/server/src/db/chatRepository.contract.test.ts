@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import { createInMemoryChatRepository, type ChatRepository } from "../chat/chatRepository"
+import { createChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 import { runRepositoryContract, type RepositoryContractBackend } from "./repositoryContract"
 
@@ -29,7 +30,8 @@ runRepositoryContract<ChatRepository>({
   databaseUrl: process.env.DATABASE_URL,
   factories: {
     inMemory: () => createInMemoryChatRepository(),
-    postgres: (pool) => createPostgresChatRepository(pool)
+    // The gate database has every migration, so the ledger probe finds 070.
+    postgres: (pool) => createPostgresChatRepository(pool, { receiptSchema: createChatReceiptSchemaProbe(pool) })
   },
   cases: {
     "saveThread is create-only: a repeated save never changes the thread or its participants": async (backend) => {
@@ -130,8 +132,8 @@ runRepositoryContract<ChatRepository>({
       await backend.repository.createMessage(message(threads[0]!, "in1", "2026-09-30T10:01:00.000Z", "hi", threads[0]!.participantUserIds[1]))
       await backend.repository.createMessage(message(threads[0]!, "in2", "2026-09-30T10:02:00.000Z", "hi", threads[0]!.participantUserIds[1]))
       await backend.repository.createMessage(message(threads[0]!, "out", "2026-09-30T10:03:00.000Z", "hi", viewer))
-      await backend.repository.markThreadRead(threads[0]!.threadId, viewer, "2026-09-30T10:01:30.000Z")
-      await backend.repository.markThreadRead(threads[0]!.threadId, viewer, "2026-09-30T09:00:00.000Z")
+      await backend.repository.advanceReadCursor({ threadId: threads[0]!.threadId, userId: viewer, readAt: "2026-09-30T10:01:30.000Z" })
+      await backend.repository.advanceReadCursor({ threadId: threads[0]!.threadId, userId: viewer, readAt: "2026-09-30T09:00:00.000Z" })
 
       const first = await backend.repository.listThreadsPage(viewer, { limit: 2 })
       const expectedOrder = [...threads.map((item) => item.threadId)].sort().reverse()
@@ -162,6 +164,108 @@ runRepositoryContract<ChatRepository>({
       const third = await backend.repository.listThreadsPage(viewer, { limit: 5, cursor: second.nextCursor! })
       assert.deepEqual([...first.threads, ...second.threads, ...third.threads].map((item) => item.threadId), newestFirst)
       assert.equal(third.nextCursor, null)
+    },
+
+    "the delivery cursor moves only forward and only to the partner's messages": async (backend) => {
+      const chat = thread(backend, "delivered", "2026-10-01T10:00:00.000Z")
+      const [sender, recipient] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      const own = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", recipient)
+      for (const item of [first, second, own]) await backend.repository.createMessage(item)
+      const ack = (upToMessageId: string, userId = recipient) =>
+        backend.repository.advanceDeliveredCursor({ threadId: chat.threadId, userId, upToMessageId })
+
+      assert.equal(await backend.repository.supportsReceipts(), true)
+      assert.deepEqual(await ack(second.messageId), {
+        partnerUserId: sender,
+        deliveredUpTo: { sentAt: second.sentAt, messageId: second.messageId }
+      })
+      assert.equal(await ack(first.messageId), null, "never backwards")
+      assert.equal(await ack(second.messageId), null, "a repeated ack changes nothing")
+      assert.equal(await ack(own.messageId), null, "own messages are not deliveries")
+      assert.equal(await ack("unknown_message"), null)
+      assert.equal(await ack(second.messageId, backend.id("stranger")), null, "only participants have cursors")
+
+      const rows = await backend.repository.listReceiptParticipants([chat.threadId, chat.threadId])
+      assert.deepEqual(rows.map((row) => [row.userId, row.deliveredUpTo?.messageId ?? null, row.readUpTo ?? null, row.readReceiptsEnabled]), [
+        [sender, null, null, false],
+        [recipient, second.messageId, null, false]
+      ])
+    },
+
+    "messages sent in the same instant are acknowledged in message-id order": async (backend) => {
+      const chat = thread(backend, "instant", "2026-10-01T10:00:00.000Z")
+      await backend.repository.saveThread(chat)
+      const instant = "2026-10-01T10:05:00.000Z"
+      const earlier = message(chat, "a", instant)
+      const later = message(chat, "b", instant)
+      for (const item of [later, earlier]) await backend.repository.createMessage(item)
+      const recipient = chat.participantUserIds[1]
+      const ack = (upToMessageId: string) =>
+        backend.repository.advanceDeliveredCursor({ threadId: chat.threadId, userId: recipient, upToMessageId })
+      assert.equal((await ack(earlier.messageId))?.deliveredUpTo.messageId, earlier.messageId)
+      assert.equal((await ack(later.messageId))?.deliveredUpTo.messageId, later.messageId)
+      assert.equal(await ack(earlier.messageId), null)
+    },
+
+    "the read cursor moves forward to a partner message or a whole instant and drives unread counts": async (backend) => {
+      const chat = thread(backend, "read", "2026-10-01T10:00:00.000Z")
+      const [sender, reader] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      const own = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", reader)
+      for (const item of [first, second, own]) await backend.repository.createMessage(item)
+      const read = (target: { upToMessageId: string } | { readAt: string }, userId = reader) =>
+        backend.repository.advanceReadCursor({ threadId: chat.threadId, userId, ...target })
+      const unread = async () => (await backend.repository.listThreads(reader))
+        .find((item) => item.threadId === chat.threadId)?.unreadCount
+
+      assert.deepEqual(await read({ upToMessageId: first.messageId }), {
+        readAt: first.sentAt,
+        readUpTo: { sentAt: first.sentAt, messageId: first.messageId }
+      })
+      assert.equal(await unread(), 1, "the second message is still unread")
+      assert.deepEqual(await read({ upToMessageId: second.messageId }), {
+        readAt: second.sentAt,
+        readUpTo: { sentAt: second.sentAt, messageId: second.messageId }
+      })
+      assert.deepEqual(await read({ upToMessageId: first.messageId }), { readAt: second.sentAt }, "never backwards")
+      assert.equal(await read({ upToMessageId: own.messageId }), null, "a read cursor names a partner message")
+      assert.equal(await read({ upToMessageId: "unknown_message" }), null)
+      // A read without a message covers the whole instant, even one already reached by id.
+      assert.deepEqual(await read({ readAt: second.sentAt }), {
+        readAt: second.sentAt,
+        readUpTo: { sentAt: second.sentAt }
+      })
+      assert.deepEqual(await read({ readAt: second.sentAt }), { readAt: second.sentAt })
+      assert.deepEqual(await read({ readAt: "2026-10-01T09:00:00.000Z" }), { readAt: second.sentAt })
+      assert.equal(await unread(), 0)
+      assert.equal(await read({ readAt: second.sentAt }, backend.id("stranger")), null)
+
+      const rows = await backend.repository.listReceiptParticipants([chat.threadId])
+      assert.deepEqual(rows.find((row) => row.userId === reader)?.readUpTo, { sentAt: second.sentAt })
+    },
+
+    "chat preferences default to read receipts off and are saved per account": async (backend) => {
+      const [ada, bo] = [backend.id("ada"), backend.id("bo")]
+      await backend.ensureUsers(ada, bo)
+      const chat = thread(backend, "prefs", "2026-10-01T10:00:00.000Z", [ada, bo])
+      await backend.repository.saveThread(chat)
+
+      assert.deepEqual(await backend.repository.getChatPreferences(ada), { readReceiptsEnabled: false })
+      assert.deepEqual(await backend.repository.saveChatPreferences(ada, { readReceiptsEnabled: true }, new Date()), { readReceiptsEnabled: true })
+      assert.deepEqual(await backend.repository.getChatPreferences(ada), { readReceiptsEnabled: true })
+      assert.deepEqual(await backend.repository.getChatPreferences(bo), { readReceiptsEnabled: false })
+      assert.deepEqual(
+        (await backend.repository.listReceiptParticipants([chat.threadId])).map((row) => [row.userId, row.readReceiptsEnabled]),
+        [[ada, true], [bo, false]]
+      )
+      assert.deepEqual(await backend.repository.saveChatPreferences(ada, { readReceiptsEnabled: false }, new Date()), { readReceiptsEnabled: false })
+      assert.deepEqual(await backend.repository.getChatPreferences(ada), { readReceiptsEnabled: false })
+      assert.deepEqual(await backend.repository.listReceiptParticipants([]), [])
     }
   }
 })

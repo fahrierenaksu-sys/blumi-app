@@ -62,6 +62,38 @@ test("the incoming message toast stays quiet when the conversation is on screen 
   ])
 })
 
+test("a partner's arriving message is acknowledged as delivered; my own echo is not", () => {
+  const acknowledged: string[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    acknowledgeDelivery: (value) => { acknowledged.push(value.messageId) }
+  }))
+  handler({ type: "chat.message_received", payload: message })
+  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_mine", senderUserId: "ada" } })
+  assert.deepEqual(acknowledged, ["message_1"])
+})
+
+test("receipt updates reach the chat store with the current account", () => {
+  const applied: { userId: string; localUserId?: string }[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    applyChatReceiptUpdated: (payload, options) => { applied.push({ userId: payload.userId, localUserId: options.localUserId }) }
+  }))
+  handler({
+    type: "chat.receipt_updated",
+    payload: { threadId: "thread_1", userId: "bora", participantUserIds: ["ada", "bora"], readUpTo: { sentAt: message.sentAt, messageId: "message_1" } }
+  })
+  assert.deepEqual(applied, [{ userId: "bora", localUserId: "ada" }])
+})
+
+test("delivery is acknowledged even when no alert is shown, because the conversation is open", () => {
+  const acknowledged: string[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    shouldShowIncomingMessageAlert: () => false,
+    acknowledgeDelivery: (value) => { acknowledged.push(value.messageId) }
+  }))
+  handler({ type: "chat.message_received", payload: message })
+  assert.deepEqual(acknowledged, ["message_1"])
+})
+
 test("the server's block confirmation drops the blocked partner's chat", () => {
   const blocked: string[] = []
   const handler = createGlobalRealtimeEventHandler(createDependencies({

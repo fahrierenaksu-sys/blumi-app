@@ -173,6 +173,9 @@ const BODYLESS = new Set([
   "PUT /v1/discover/watch",
   "DELETE /v1/discover/watch",
   "POST /v1/threads/sync-matches",
+  // Optional body (2026-10-01): absent or stripped of unknown keys it reads up
+  // to now, the route's normal effect. Its body contract is pinned in
+  // chatReceiptRoutes.test.ts.
   "POST /v1/threads/:threadId/read",
   "POST /v1/threads/:threadId/room-invites",
   "POST /v1/economy/rewards/daily",

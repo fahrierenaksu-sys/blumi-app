@@ -19,3 +19,12 @@ test("every notification preference row is written in both release languages", (
   assert.match(getSettingsCopy("en").notificationRows.messagesEnabled.description, /room invite/i)
   assert.match(getSettingsCopy("tr").notificationRows.messagesEnabled.description, /oda davet/i)
 })
+
+test("the read receipts setting is named and explained as mutual in both languages", () => {
+  assert.equal(getSettingsCopy("tr").readReceipts, "Okundu bilgisi")
+  assert.equal(getSettingsCopy("en").readReceipts, "Read receipts")
+  assert.match(getSettingsCopy("tr").readReceiptsNote, /karşılıklı/)
+  assert.match(getSettingsCopy("tr").readReceiptsNote, /ikiniz de/)
+  assert.match(getSettingsCopy("en").readReceiptsNote, /mutual/)
+  assert.match(getSettingsCopy("en").readReceiptsNote, /both/)
+})

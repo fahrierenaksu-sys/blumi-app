@@ -125,7 +125,7 @@ test("sends production messages, confirms optimistic state, and marks a thread r
     },
     markThreadRead: async (_baseUrl, sessionToken, threadId, options) => {
       dependencies.apiCalls.push(
-        `read:${sessionToken}:${threadId}:${options?.expectedUserId}`
+        `read:${sessionToken}:${threadId}:${options?.expectedUserId}:${options?.upToMessageId ?? "now"}`
       )
     }
   })
@@ -133,14 +133,16 @@ test("sends production messages, confirms optimistic state, and marks a thread r
 
   await coordinator.sendChatMessage("thread_1", "Hello", "client_1")
   coordinator.markChatThreadRead("thread_1")
+  coordinator.markChatThreadRead("thread_1", "message_from_partner")
   await Promise.resolve()
 
   assert.deepEqual(dependencies.apiCalls, [
     "token-ada:thread_1:Hello:client_1",
-    "read:token-ada:thread_1:ada"
+    "read:token-ada:thread_1:ada:now",
+    "read:token-ada:thread_1:ada:message_from_partner"
   ])
   assert.deepEqual(dependencies.confirmedMessages, ["message_1"])
-  assert.deepEqual(dependencies.localReadThreads, ["thread_1"])
+  assert.deepEqual(dependencies.localReadThreads, ["thread_1", "thread_1"])
 })
 
 test("serializes same-thread HTTP sends so a later tap cannot overtake an earlier ACK", async () => {

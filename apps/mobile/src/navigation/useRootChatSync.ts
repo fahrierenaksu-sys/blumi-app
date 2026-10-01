@@ -56,6 +56,8 @@ interface RootChatSyncInput {
   setRoomInvites: Dispatch<SetStateAction<ChatRoomInviteTimelineItem[]>>
   openReadyMiniRoom: RoomInviteRouting["openReadyMiniRoom"]
   handleDemoRoomInviteAction: (action: ChatRoomInviteAction) => Promise<void>
+  /** `chat_read_receipts` resolved for this session. */
+  receiptsEnabled: boolean
 }
 
 /**
@@ -72,7 +74,8 @@ export function useRootChatSync({
   visibleRoomInvites,
   setRoomInvites,
   openReadyMiniRoom,
-  handleDemoRoomInviteAction
+  handleDemoRoomInviteAction,
+  receiptsEnabled
 }: RootChatSyncInput) {
   const threadListRefreshGuardRef = useRef<ReturnType<typeof createThreadListRefreshGuard> | null>(null)
   if (!threadListRefreshGuardRef.current) threadListRefreshGuardRef.current = createThreadListRefreshGuard()
@@ -221,13 +224,15 @@ export function useRootChatSync({
     onCloseActiveRoom: sessionMode === "production"
       ? closeMyActiveRoom
       : undefined,
-    locale: chatLocale
+    locale: chatLocale,
+    receiptsEnabled: sessionMode === "production" && receiptsEnabled
   }), [
     chatLocale,
     closeMyActiveRoom,
     handleDemoRoomInviteAction,
     handleRoomInviteAction,
     markChatThreadRead,
+    receiptsEnabled,
     requestMessagesForRoute,
     sendChatMessageForRoute,
     sessionMode,

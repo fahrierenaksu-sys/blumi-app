@@ -37,6 +37,7 @@ import { useMatchingPreferences } from "../features/settings/useMatchingPreferen
 import { useMyReports } from "../features/settings/useMyReports"
 import { useNotificationSettings } from "../features/settings/useNotificationSettings"
 import { usePhoneChange } from "../features/settings/usePhoneChange"
+import { useReadReceiptsSetting } from "../features/settings/useReadReceiptsSetting"
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0"
 const BUILD_NUMBER = Platform.select({
@@ -67,6 +68,8 @@ type SettingsScreenProps = NativeStackScreenProps<
   pushPermissionStatus: "unknown" | "undetermined" | "granted" | "denied"
   isRequestingPushPermission: boolean
   onRequestPushPermission: () => Promise<void>
+  /** `chat_read_receipts` resolved for this session. */
+  readReceiptsCapability?: boolean
 }
 
 /* ── Main Screen ───────────────────────────────────────────── */
@@ -104,6 +107,11 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onRequestPushPermission
   })
   const handleUnblock = useHiddenPeople({ sessionActor, copy, locale, unblockUser })
+  const readReceipts = useReadReceiptsSetting({
+    sessionActor,
+    capabilityEnabled: props.readReceiptsCapability === true,
+    copy
+  })
   const handleGoBack = useCallback(() => {
     goBackOrFallback(navigation, () => navigation.replace("You"))
   }, [navigation])
@@ -188,7 +196,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             myReports={myReports}
           />
 
-          <SettingsPrivacySection copy={copy} analyticsConsent={analyticsConsent} />
+          <SettingsPrivacySection copy={copy} analyticsConsent={analyticsConsent} readReceipts={readReceipts} />
 
           <SettingsAboutSection copy={copy} versionLabel={VERSION_LABEL} />
 

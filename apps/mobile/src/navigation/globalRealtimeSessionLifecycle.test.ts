@@ -17,6 +17,8 @@ function mount() {
   const runtime = createFakeReactRuntime()
   const events: string[] = []
   const statusListeners = new Set<StatusListener>()
+  const sent: { type: string; payload: unknown }[] = []
+  let handlerDependencies: Record<string, (...args: unknown[]) => unknown> = {}
   let refreshFailure: ((error: Error) => void) | undefined
   const handler: { dependencies?: Record<string, unknown> } = {}
   const { useGlobalRealtimeSession } = loadSourceWithFakeReact<{
@@ -29,6 +31,7 @@ function mount() {
       "../features/chat/chatStore": {
         applyChatMessageListed: () => undefined,
         applyChatMessageReceived: () => undefined,
+        applyChatReceiptUpdated: () => undefined,
         applyChatThreadListed: () => undefined,
         applyChatThreadRead: () => undefined,
         getThreads: () => [],
@@ -39,8 +42,9 @@ function mount() {
       "../features/session/authLocale": { getNativeAppLocale: () => "en" },
       "../features/demo/demoStore": { isDemoMode: () => false, setDemoMode: () => undefined },
       "../features/realtime/globalRealtimeEventHandler": {
-        createGlobalRealtimeEventHandler: (dependencies: Record<string, unknown>) => {
+        createGlobalRealtimeEventHandler: (dependencies: Record<string, (...args: unknown[]) => unknown>) => {
           handler.dependencies = dependencies
+          handlerDependencies = dependencies
           return () => undefined
         }
       },
@@ -48,7 +52,7 @@ function mount() {
       "../features/realtime/globalRealtimeProvider": {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
-        sendGlobal: () => true,
+        sendGlobal: (event: { type: string; payload: unknown }) => { sent.push(event); return true },
         setGlobalRealtimeAppState: () => undefined,
         subscribeToStatus: (listener: StatusListener) => {
           statusListeners.add(listener)
@@ -65,7 +69,7 @@ function mount() {
         navigate: (route: string, params: { threadId?: string }) => { events.push(`navigate:${route}:${params.threadId}`) }
       } }
     },
-    real: ["../features/realtime/globalRealtimeLifecycle"]
+    real: ["../features/realtime/globalRealtimeLifecycle", "../features/chat/chatDeliveryAckBatcher"]
   })
   const resetInactiveSessionState = () => { events.push("reset") }
   const refreshProductionThreads = () => new Promise<void>((_resolve, reject) => { refreshFailure = reject })
@@ -85,7 +89,8 @@ function mount() {
     openReadyMiniRoom: () => undefined,
     getMatchDeduplicationState: () => undefined,
     onConnectionMatched: () => undefined,
-    onPartnerBlocked: () => undefined
+    onPartnerBlocked: () => undefined,
+    receiptsEnabled: false
   }
   const render = (next: Record<string, unknown> = {}) => {
     props = { ...props, ...next }
@@ -95,6 +100,10 @@ function mount() {
     runtime,
     events,
     handler,
+    sent,
+    acknowledge: (messageId: string) => handlerDependencies.acknowledgeDelivery?.({
+      messageId, threadId: "thread-1", senderUserId: "user-b", body: "hi", sentAt: "2026-10-01T10:00:00.000Z"
+    }),
     render,
     emitStatus: (status: string, meta?: { closeCode?: number }) => {
       for (const listener of [...statusListeners]) listener(status, meta)
@@ -127,6 +136,24 @@ test("leaving the main route or a restriction tears the socket down", () => {
   f.render()
   f.render({ isAccountRestricted: true })
   assert.deepEqual(f.events, ["connect:token-1", "disconnect", "reset"])
+})
+
+test("partner messages are acknowledged over the socket only while receipts are rolled out", (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const f = mount()
+  f.render()
+  f.acknowledge("m1")
+  context.mock.timers.tick(1_000)
+  assert.deepEqual(f.sent.filter((event) => event.type === "chat.ack_delivered"), [], "capability off")
+
+  f.render({ receiptsEnabled: true })
+  f.acknowledge("m2")
+  f.acknowledge("m3")
+  context.mock.timers.tick(1_000)
+  assert.deepEqual(f.sent.filter((event) => event.type === "chat.ack_delivered"), [
+    { type: "chat.ack_delivered", payload: { threadId: "thread-1", upToMessageId: "m3" } }
+  ])
+  f.runtime.unmount()
 })
 
 test("session callbacks are read at call time without reconnecting", async () => {

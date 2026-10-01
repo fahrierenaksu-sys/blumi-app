@@ -17,6 +17,7 @@ import type {
 import type {
   ChatMessageList,
   ChatMessageReceived,
+  ChatReceiptUpdated,
   ChatThread,
   ChatThreadList,
   ChatThreadRead,
@@ -56,6 +57,8 @@ export type ServerEvent =
   | { type: "chat.thread_read"; payload: ChatThreadRead }
   | { type: "chat.message_listed"; payload: ChatMessageList }
   | { type: "chat.message_received"; payload: ChatMessageReceived }
+  /** 2026-10-01; clients that predate it report it as unknown and ignore it. */
+  | { type: "chat.receipt_updated"; payload: ChatReceiptUpdated }
   | { type: "reaction.received"; payload: ReactionEvent }
   | { type: "safety.user_blocked"; payload: { blockedUserId: string } }
   | { type: "realtime.error"; payload: RealtimeErrorPayload };

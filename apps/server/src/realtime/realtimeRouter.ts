@@ -1,7 +1,9 @@
 import type { ClientEvent, ServerEvent } from "@blumi/contracts"
-import { miniRoomSceneCommandSchema } from "@blumi/contracts"
+import { chatAckDeliveredCommandSchema, miniRoomSceneCommandSchema } from "@blumi/contracts"
 import type { ChatService } from "../chat/chatService"
 import { createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
+import { createChatReceiptService } from "../chat/chatReceiptService"
+import { isCapabilityRolledOut, type CapabilityService } from "../capabilities/capabilityService"
 import type { ConnectionService } from "../connections/connectionService"
 import type { MiniRoomService } from "../miniRooms/miniRoomService"
 import type { NotificationService } from "../notifications/notificationService"
@@ -45,6 +47,8 @@ export interface CreateRealtimeRouterOptions {
    * allow rule to exercise presence mechanics.
    */
   isPresenceRoomAllowed?: RealtimePresenceRoomPolicy
+  /** Resolves the `chat_read_receipts` rollout; without it receipts stay off. */
+  capabilityService?: CapabilityService
 }
 
 export function createRealtimeRouter(
@@ -76,6 +80,15 @@ export function createRealtimeRouter(
     safetyService,
     connectionManager,
     notificationService
+  })
+  const capabilityService = options.capabilityService
+  const chatReceipts = createChatReceiptService({
+    chatService,
+    blockPolicy: safetyService,
+    isRolledOutFor: (userId) => capabilityService
+      ? isCapabilityRolledOut(capabilityService, userId, "chat_read_receipts")
+      : false,
+    emit: (userId, event) => connectionManager.sendToUser(userId, event)
   })
 
   /**
@@ -454,23 +467,37 @@ export function createRealtimeRouter(
             payload: {
               userId: connection.userId,
               ...page,
+              threads: await chatReceipts.projectThreads(connection.userId, page.threads),
               append: Boolean(event.payload.cursor)
             }
           })
           return
         }
         case "chat.list_messages": {
+          const messages = await chatService.listMessages(connection.userId, event.payload.threadId)
+          const partnerReceipts = await chatReceipts.getPartnerReceipts(connection.userId, event.payload.threadId)
           connectionManager.sendToConnection(connection.connectionId, {
             type: "chat.message_listed",
             payload: {
               userId: connection.userId,
               threadId: event.payload.threadId,
-              messages: await chatService.listMessages(
-                connection.userId,
-                event.payload.threadId
-              )
+              messages,
+              ...(partnerReceipts ? { partnerReceipts } : {})
             }
           })
+          await chatReceipts.noteHistoryLoaded(connection.userId, event.payload.threadId, messages)
+          return
+        }
+        case "chat.ack_delivered": {
+          // Cumulative and idempotent: a malformed, foreign or stale ack is
+          // dropped silently (no error frame reveals whether a thread exists).
+          const parsed = chatAckDeliveredCommandSchema.safeParse(event.payload)
+          if (!parsed.success) return
+          await chatReceipts.acknowledgeDelivered(
+            connection.userId,
+            parsed.data.threadId,
+            parsed.data.upToMessageId
+          )
           return
         }
         case "chat.send_message": {

@@ -57,8 +57,59 @@ test("chat delivery claims use leases and completion/retry are fenced", async ()
   await repository.completeDelivery(job.message.messageId, job.leaseToken, now)
   await repository.retryDelivery(job.message.messageId, job.leaseToken, now)
   for (const call of fake.calls.slice(1)) assert.match(call.text, /lease_token = \$2 AND completed_at IS NULL/)
-  await repository.markThreadRead("thread_one", "user_b", now.toISOString())
+  await repository.advanceReadCursor({ threadId: "thread_one", userId: "user_b", readAt: now.toISOString() })
   assert.deepEqual(fake.calls[3].values, ["thread_one", "user_b", now])
+})
+
+// `m.delivered_at AS last_delivered_at` is migration 042's message column under an alias.
+const MIGRATION_070_OBJECTS = /(?<!AS )\blast_delivered_at|last_delivered_message_id|last_read_message_id|blumi_chat_privacy_preferences/
+
+test("before migration 070 no chat query names a 070 column or table and receipts read as off", async () => {
+  const fake = createFakePool((text) => text.includes("RETURNING last_read_at") || text.includes("RETURNING participant.last_read_at")
+    ? [{ last_read_at: "2026-10-01T10:00:00.000Z" }]
+    : [])
+  const repository = createPostgresChatRepository(fake.pool)
+
+  assert.equal(await repository.supportsReceipts(), false)
+  assert.equal(await repository.advanceDeliveredCursor({ threadId: "thread_one", userId: "user_b", upToMessageId: "message_one" }), null)
+  assert.deepEqual(await repository.listReceiptParticipants(["thread_one"]), [])
+  assert.deepEqual(await repository.getChatPreferences("user_b"), { readReceiptsEnabled: false })
+  await assert.rejects(repository.saveChatPreferences("user_b", { readReceiptsEnabled: true }, new Date()), /070/)
+  assert.equal(fake.calls.length, 0, "receipt-only methods answer without a query")
+
+  // The read cursor keeps working on the pre-070 schema, with or without a message.
+  assert.deepEqual(
+    await repository.advanceReadCursor({ threadId: "thread_one", userId: "user_b", readAt: "2026-10-01T10:00:00.000Z" }),
+    { readAt: "2026-10-01T10:00:00.000Z" }
+  )
+  assert.deepEqual(
+    await repository.advanceReadCursor({ threadId: "thread_one", userId: "user_b", upToMessageId: "message_one" }),
+    { readAt: "2026-10-01T10:00:00.000Z" }
+  )
+  assert.match(fake.calls[0]!.text, /GREATEST\(last_read_at, \$3::timestamptz\)/)
+  assert.match(fake.calls[1]!.text, /GREATEST\(participant\.last_read_at, target\.sent_at\)/)
+  assert.match(fake.calls[1]!.text, /sender_user_id <> \$2/)
+
+  await repository.listThreadsPage("user_b")
+  await repository.findThread("thread_one")
+  await repository.listMessages("thread_one", { limit: 20 })
+  await repository.claimDeliveries({ now: new Date(), limit: 1, leaseMs: 1000 })
+  for (const call of fake.calls) assert.doesNotMatch(call.text, MIGRATION_070_OBJECTS)
+})
+
+test("after migration 070 cursor moves compare (sent_at, message_id) rows in one statement", async () => {
+  const fake = createFakePool(() => [])
+  const repository = createPostgresChatRepository(fake.pool, {
+    receiptSchema: { async isReady() { return true }, peek() { return true } }
+  })
+
+  assert.equal(await repository.advanceDeliveredCursor({ threadId: "thread_one", userId: "user_b", upToMessageId: "message_one" }), null)
+  assert.equal(await repository.advanceReadCursor({ threadId: "thread_one", userId: "user_b", upToMessageId: "message_one" }), null)
+  assert.equal(fake.calls.length, 2)
+  assert.match(fake.calls[0]!.text, /\(participant\.last_delivered_at, participant\.last_delivered_message_id\)\s+< \(target\.sent_at, target\.message_id\)/)
+  assert.match(fake.calls[0]!.text, /sender_user_id <> \$2/)
+  assert.deepEqual(fake.calls[0]!.values, ["thread_one", "user_b", "message_one"])
+  assert.match(fake.calls[1]!.text, /participant\.last_read_message_id < target\.message_id/)
 })
 
 test("postgres chat repository saves threads with ordered participants", async () => {

@@ -5,6 +5,7 @@ import type { MiniRoomLeaveCommand } from "../miniRooms/MiniRoomEnd";
 import type { MiniRoomInviteDecisionStatus } from "../miniRooms/MiniRoomInviteDecision";
 import type { ConnectionDecisionCommand } from "../connections/ConnectionDecision";
 import type {
+  ChatAckDeliveredCommand,
   ChatListMessagesCommand,
   ChatListThreadsCommand,
   ChatSendMessageCommand,
@@ -37,6 +38,8 @@ export type ClientEvent =
   | { type: "chat.list_threads"; payload: ChatListThreadsCommand }
   | { type: "chat.list_messages"; payload: ChatListMessagesCommand }
   | { type: "chat.send_message"; payload: ChatSendMessageCommand }
+  /** 2026-10-01; older servers ignore unknown client events. */
+  | { type: "chat.ack_delivered"; payload: ChatAckDeliveredCommand }
   | {
       type: "reaction.send";
       payload: {

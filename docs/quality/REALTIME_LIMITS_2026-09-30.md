@@ -15,7 +15,7 @@ send to a socket:
 | Buffered bytes | Action |
 |----------------|--------|
 | At or below 256 KiB (soft) | Send normally; reset the slow window. |
-| Above soft | Drop transient events for this socket (`presence.snapshot`, `presence.nearby`, `reaction.received`); still send everything else, including `chat.message_received`. Start a 10 s window. |
+| Above soft | Drop transient events for this socket (`presence.snapshot`, `presence.nearby`, `reaction.received`, `chat.receipt_updated`); still send everything else, including `chat.message_received`. Start a 10 s window. |
 | Above soft for 10 s | Close with 1013 (try again later), stop writing, terminate after 1 s. |
 | Above 1 MiB (hard) at any time | Same close immediately. |
 
@@ -23,7 +23,8 @@ Why this combination:
 
 - Shedding first keeps a briefly congested client (lift, tunnel) connected:
   the dropped events are superseded by the next presence snapshot or are
-  ephemeral reactions.
+  ephemeral reactions. Receipt cursors (2026-10-01) are cumulative: the next
+  receipt event or thread/message list refresh carries the dropped position.
 - Closing bounds memory: a socket holds at most the hard limit plus one
   event. `close` queues its frame behind the backlog, so the socket is
   terminated one second later rather than waiting for `ws`'s 30 s timeout.
@@ -122,3 +123,17 @@ load evidence.
   `clientMessageId`, and reports a failure there as `realtime.error`
   `CHAT_MESSAGE_NOT_SENT` with the id. Frames without the id behave as before,
   so clients that predate the field never receive either shape.
+
+## Delivery acknowledgements (2026-10-01)
+
+Evidence: `apps/server/src/realtime/realtimeServer.test.ts`,
+`connectionManager.limits.test.ts`, `realtimeFanout.test.ts`.
+
+- `chat.ack_delivered` has its own silent lane, like `mini_room.move`: 30 per
+  user per 10 s window, 2 in flight per socket, 4 per user. Over the lane the
+  frame is dropped without a reply; it never spends the shared 100-event
+  budget or closes a socket with 4429. The mobile client batches acks (one per
+  thread per 400 ms, foreground only), and cursors are cumulative, so a
+  dropped ack is repaired by the next one or by the next history load.
+- `chat.receipt_updated` is transient (shed above the soft limit) and the
+  fanout validator only lets it reach the other participant of the thread.

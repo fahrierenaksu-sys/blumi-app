@@ -47,7 +47,13 @@ const sourceFiles = [
   "src/features/chat/thread/chatTimelineEntranceModel.ts",
   "src/features/chat/thread/chatTimelineEntranceModel.test.ts",
   "src/features/chat/thread/chatBubbleAccessibility.ts",
-  "src/features/chat/thread/chatBubbleAccessibility.test.ts"
+  "src/features/chat/thread/chatBubbleAccessibility.test.ts",
+  "src/features/chat/chatReceiptModel.ts",
+  "src/features/chat/chatReceiptModel.test.ts",
+  "src/features/chat/chatDeliveryAckBatcher.ts",
+  "src/features/chat/chatDeliveryAckBatcher.test.ts",
+  "src/features/chat/thread/chatDeliveryTickModel.ts",
+  "src/features/chat/thread/chatDeliveryTickModel.test.ts"
 ]
 
 try {
@@ -103,6 +109,9 @@ try {
       join(outputDirectory, "features/chat/thread/chatThreadModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatTimelineEntranceModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatBubbleAccessibility.test.js"),
+      join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
+      join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
+      join(outputDirectory, "features/chat/thread/chatDeliveryTickModel.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],

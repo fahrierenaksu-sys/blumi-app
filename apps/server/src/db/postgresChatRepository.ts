@@ -6,6 +6,8 @@ import type {
 } from "../chat/chatRepository"
 import { normalizeStoredAvatarSelection } from "../avatar/avatarSelectionPersistence"
 import { normalizeThreadPage, encodeThreadCursor } from "../chat/chatThreadPagination"
+import { createStaticChatReceiptSchema, type ChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
+import { createPostgresChatReceipts } from "./postgresChatReceipts"
 
 interface QueryExecutor {
   query(
@@ -14,10 +16,21 @@ interface QueryExecutor {
   ): Promise<{ rows: QueryResultRow[] }>
 }
 
+/**
+ * `receiptSchema` says whether migration 070 is applied. Without one the
+ * repository assumes it is not (fail closed): receipts stay off and no query
+ * names a 070 column or table.
+ */
 export function createPostgresChatRepository(
-  pool: QueryExecutor
+  pool: QueryExecutor,
+  options: { receiptSchema?: ChatReceiptSchemaProbe } = {}
 ): ChatRepository {
+  const receipts = createPostgresChatReceipts(
+    pool,
+    options.receiptSchema ?? createStaticChatReceiptSchema(false)
+  )
   return {
+    ...receipts,
     async findTestPersona(userId) {
       const result = await pool.query(
         `SELECT user_id, greeting, replies FROM blumi_test_personas WHERE user_id = $1`,
@@ -265,14 +278,6 @@ export function createPostgresChatRepository(
       )
     },
 
-    async markThreadRead(threadId, userId, readAt) {
-      await pool.query(
-        `UPDATE blumi_chat_thread_participants
-            SET last_read_at = GREATEST(last_read_at, $3::timestamptz)
-          WHERE thread_id = $1 AND user_id = $2`,
-        [threadId, userId, new Date(readAt)]
-      )
-    },
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
       const result = await pool.query(
         `WITH due AS (

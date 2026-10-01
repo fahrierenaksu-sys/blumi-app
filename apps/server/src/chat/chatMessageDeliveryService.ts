@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@blumi/contracts"
+import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import type { ChatService } from "./chatService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { ConnectionManager } from "../realtime/connectionManager"
@@ -41,11 +41,12 @@ export function createChatMessageDeliveryService(options: {
 
   const dispatchPostPersistEffects = async (
     message: ChatMessage,
-    threadId: string,
+    thread: ChatThread,
     recipientUserIds: string[]
   ): Promise<void> => {
+    const threadId = thread.threadId
     try {
-      await dispatchDue(new Date(), message.messageId)
+      await dispatchDue(new Date(), message.messageId, thread)
     } catch (error) {
       options.reportError?.(error)
     }
@@ -55,13 +56,13 @@ export function createChatMessageDeliveryService(options: {
         const persona = await chatService.repository.findTestPersona(recipientUserId)
         if (!persona?.replies.length) continue
         const replyIndex = stableReplyIndex(message.messageId, persona.replies.length)
-        const reply = await chatService.sendMessageIdempotently(
+        const reply = await chatService.sendMessageInThread(
+          thread,
           persona.userId,
-          threadId,
           persona.replies[replyIndex]!,
           `test-persona-reply-${message.messageId}`
         )
-        try { await dispatchDue(new Date(), reply.message.messageId) }
+        try { await dispatchDue(new Date(), reply.message.messageId, thread) }
         catch (error) { options.reportError?.(error) }
       } catch (error) {
         options.reportError?.(error)
@@ -100,9 +101,13 @@ export function createChatMessageDeliveryService(options: {
         throw new ChatDeliveryBlockedError("That conversation is not available.")
       }
 
-      const delivery = await measure("persist", () => chatService.sendMessageIdempotently(
+      // The thread read above is reused for persistence and the inline
+      // dispatch (participants never change after creation), so a send reads
+      // it once instead of three times. The block check at dispatch stays: it
+      // guards a block that lands while the message is being persisted.
+      const delivery = await measure("persist", () => chatService.sendMessageInThread(
+        thread,
         input.senderUserId,
-        input.threadId,
         input.body,
         input.clientMessageId
       ))
@@ -111,22 +116,24 @@ export function createChatMessageDeliveryService(options: {
       // The periodic worker recovers the outbox if this process exits mid-dispatch.
       void dispatchPostPersistEffects(
         delivery.message,
-        input.threadId,
+        thread,
         recipientUserIds
       ).catch((error) => options.reportError?.(error))
       return delivery
     }
   }
 
-  async function dispatchDue(now: Date, messageId?: string): Promise<void> {
+  async function dispatchDue(now: Date, messageId?: string, knownThread?: ChatThread): Promise<void> {
     const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: 30_000, messageId })
-    await Promise.all(jobs.map((job) => dispatchJob(job, now)))
+    await Promise.all(jobs.map((job) => dispatchJob(job, now, knownThread)))
   }
 
-  async function dispatchJob(job: ChatDeliveryJob, now: Date): Promise<void> {
+  async function dispatchJob(job: ChatDeliveryJob, now: Date, knownThread?: ChatThread): Promise<void> {
     const { message, leaseToken } = job
     try {
-      const thread = await chatService.repository.findThread(message.threadId)
+      const thread = knownThread?.threadId === message.threadId
+        ? knownThread
+        : await chatService.repository.findThread(message.threadId)
       if (!thread || !thread.participantUserIds.includes(message.senderUserId)) {
         await chatService.repository.completeDelivery(message.messageId, leaseToken, now)
         return

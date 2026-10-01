@@ -291,6 +291,40 @@ test("createThread and markThreadRead use authenticated thread routes", async ()
   assert.equal(created.threadId, "thread_one")
 })
 
+test("a read that names the newest partner message sends it as the only body field", async () => {
+  await markThreadRead(
+    "http://localhost:4000",
+    "session_token",
+    "thread_one",
+    { expectedUserId: "user_one", upToMessageId: "message_9" },
+    (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal((init?.headers as Record<string, string>)["content-type"], "application/json")
+      assert.equal(init?.body, JSON.stringify({ upToMessageId: "message_9" }))
+      return createJsonResponse(200, { userId: "user_one", threadId: "thread_one", readAt: "2026-10-01T10:00:00.000Z" })
+    }) as typeof fetch
+  )
+  // Without a message the request stays bodyless, exactly as before.
+  await markThreadRead("http://localhost:4000", "session_token", "thread_one", {},
+    (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal(init?.body, undefined)
+      assert.equal((init?.headers as Record<string, string>)["content-type"], undefined)
+      return createJsonResponse(200, { userId: "user_one", threadId: "thread_one", readAt: "2026-10-01T10:00:00.000Z" })
+    }) as typeof fetch)
+})
+
+test("message lists keep the partner's receipt cursors and stay valid without them", async () => {
+  const messages = [{ messageId: "m1", threadId: "thread_one", senderUserId: "user_one", body: "hi", sentAt: "2026-10-01T10:00:00.000Z" }]
+  const withReceipts = await fetchThreadMessages("http://localhost:4000", "session_token", "thread_one", {},
+    (async () => createJsonResponse(200, {
+      userId: "user_one", threadId: "thread_one", messages,
+      partnerReceipts: { deliveredUpTo: { sentAt: "2026-10-01T10:00:00.000Z", messageId: "m1" } }
+    })) as typeof fetch)
+  assert.deepEqual(withReceipts.partnerReceipts, { deliveredUpTo: { sentAt: "2026-10-01T10:00:00.000Z", messageId: "m1" } })
+  const oldServer = await fetchThreadMessages("http://localhost:4000", "session_token", "thread_one", {},
+    (async () => createJsonResponse(200, { userId: "user_one", threadId: "thread_one", messages })) as typeof fetch)
+  assert.equal("partnerReceipts" in oldServer, false)
+})
+
 test("chat API rejects server errors and malformed payloads", async () => {
   await assert.rejects(
     () =>

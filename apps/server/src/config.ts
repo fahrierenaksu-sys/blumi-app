@@ -34,6 +34,16 @@ import { createAccountRecoveryService, type AccountRecoveryService } from "./acc
 import { createPostgresAccountRecoveryRepository } from "./db/postgresAccountRecoveryRepository"
 import { createPostgresChatRepository } from "./db/postgresChatRepository"
 import { applyTestPersonaPolicy } from "./chat/testPersonaPolicy"
+import {
+  createChatReceiptSchemaProbe,
+  createStaticChatReceiptSchema,
+  type ChatReceiptSchemaProbe
+} from "./chat/chatReceiptSchema"
+import {
+  createCapabilityService,
+  parseCapabilityManifest,
+  type CapabilityService
+} from "./capabilities/capabilityService"
 import { createPostgresConnectionRepository } from "./db/postgresConnectionRepository"
 import { createPostgresEconomyRepository } from "./db/postgresEconomyRepository"
 import { createPostgresMatchRepository } from "./db/postgresMatchRepository"
@@ -137,6 +147,10 @@ export interface ServerConfig {
 }
 
 export interface ConfiguredServerServices {
+  /** `chat_read_receipts` additionally waits for migration 070 (runtime gate). */
+  capabilityService: CapabilityService
+  /** Whether migration 070 is applied; warmed at startup. */
+  chatReceiptSchema: ChatReceiptSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
@@ -442,6 +456,8 @@ export function createConfiguredServerServices(
       connectionString: config.databaseUrl
     })
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
+    const chatReceiptSchema = createChatReceiptSchemaProbe(pool)
+    const capabilityService = createConfiguredCapabilityService(chatReceiptSchema)
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
       pushProvider,
@@ -463,7 +479,7 @@ export function createConfiguredServerServices(
     })
     const chatService = createChatService({
       repository: applyTestPersonaPolicy(
-        createPostgresChatRepository(pool),
+        createPostgresChatRepository(pool, { receiptSchema: chatReceiptSchema }),
         config.deployEnvironment
       ),
       blockPolicy: safetyService
@@ -516,6 +532,8 @@ export function createConfiguredServerServices(
       economyService
     })
     return {
+      capabilityService,
+      chatReceiptSchema,
       authService,
       chatService,
       economyService,
@@ -630,7 +648,11 @@ export function createConfiguredServerServices(
     getPersonalRoomDecor: (userId) => personalRoomDecorService.get(userId)
   })
 
+  // In-memory storage has no migrations: receipts depend on the manifest only.
+  const chatReceiptSchema = createStaticChatReceiptSchema(true)
   return {
+    capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
+    chatReceiptSchema,
     authService,
     chatService,
     economyService,
@@ -659,6 +681,13 @@ export function createConfiguredServerServices(
       return
     }
   }
+}
+
+function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaProbe): CapabilityService {
+  return createCapabilityService({
+    manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest,
+    runtimeGates: { chat_read_receipts: () => chatReceiptSchema.peek() }
+  })
 }
 
 function normalizeRepositoryMode(value: string): AuthRepositoryMode {

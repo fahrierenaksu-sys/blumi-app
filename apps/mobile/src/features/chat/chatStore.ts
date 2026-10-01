@@ -13,6 +13,8 @@
 import type {
   ChatMessage,
   ChatMessageList,
+  ChatPartnerReceipts,
+  ChatReceiptUpdated,
   ChatThread,
   ChatThreadList
 } from "@blumi/contracts"
@@ -21,6 +23,7 @@ import {
   getMessageListErrorMessageForDisplay,
   getThreadListErrorMessageForDisplay
 } from "./chatErrorCopy"
+import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 
 // ─── In-memory store ────────────────────────────────────────
 let threadCache: ChatThread[] = []
@@ -122,6 +125,8 @@ const LOST_ACK_RECONCILE_WINDOW_MS = 5 * 60_000
 let unreadCounts: Map<string, number> = new Map()
 let readAtByThread: Map<string, string> = new Map()
 let summaryLastMessageByThread: Map<string, ChatMessage> = new Map()
+// The partner's delivery/read cursors per thread, as the server disclosed them.
+let partnerReceiptsByThread: Map<string, ChatPartnerReceipts> = new Map()
 let activeThreadId: string | null = null // which thread is currently being viewed
 
 type Listener = () => void
@@ -185,6 +190,7 @@ export function applyChatThreadListed(
     const latestMessage = newerMessages.reduce<ChatMessage | undefined>((latest, message) =>
       !latest || compareMessageOrder(message, latest) > 0 ? message : latest, thread.lastMessage)
     merged.set(thread.threadId, cloneThread({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }))
+    setPartnerReceipts(thread.threadId, applyReceiptSnapshot(partnerReceiptsByThread.get(thread.threadId), thread.partnerReceipts))
     const currentReadAt = readAtByThread.get(thread.threadId)
     if (thread.lastReadAt && (!currentReadAt || Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt))) readAtByThread.set(thread.threadId, thread.lastReadAt)
     if (thread.unreadCount !== undefined && (!currentReadAt || (thread.lastReadAt && Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt)))) {
@@ -218,6 +224,28 @@ export function applyChatThreadRead(payload: { userId: string; threadId: string;
   unreadCounts.set(payload.threadId, count)
   threadCache = threadCache.map((thread) => thread.threadId === payload.threadId ? { ...thread, unreadCount: count, lastReadAt: payload.readAt } : thread)
   notify()
+}
+
+/** `chat.receipt_updated`: the partner's cursor moved (only theirs, never mine). */
+export function applyChatReceiptUpdated(payload: ChatReceiptUpdated, options: { localUserId?: string } = {}): void {
+  if (options.localUserId && (payload.userId === options.localUserId ||
+    !payload.participantUserIds.includes(options.localUserId))) return
+  const current = partnerReceiptsByThread.get(payload.threadId)
+  const next = applyReceiptEvent(current, payload)
+  if (next === current) return
+  setPartnerReceipts(payload.threadId, next)
+  notify()
+}
+
+export function getPartnerReceipts(threadId: string): ChatPartnerReceipts | undefined {
+  return partnerReceiptsByThread.get(threadId)
+}
+
+function setPartnerReceipts(threadId: string, receipts: ChatPartnerReceipts | undefined): void {
+  if (receipts === partnerReceiptsByThread.get(threadId)) return
+  partnerReceiptsByThread = new Map(partnerReceiptsByThread)
+  if (receipts) partnerReceiptsByThread.set(threadId, receipts)
+  else partnerReceiptsByThread.delete(threadId)
 }
 
 export function applyChatThreadListLoading(): void {
@@ -271,6 +299,7 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   unreadCounts = new Map([...unreadCounts].filter(([threadId]) => !removed.has(threadId)))
   readAtByThread = new Map([...readAtByThread].filter(([threadId]) => !removed.has(threadId)))
   summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
+  partnerReceiptsByThread = new Map([...partnerReceiptsByThread].filter(([threadId]) => !removed.has(threadId)))
   if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
   notify()
   return removedIds
@@ -287,6 +316,7 @@ export function applyChatMessageListed(payload: ChatMessageList): void {
   }
   const sorted = [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
   messageCache.set(payload.threadId, sorted)
+  setPartnerReceipts(payload.threadId, applyReceiptSnapshot(partnerReceiptsByThread.get(payload.threadId), payload.partnerReceipts))
   loadedHistoryThreads.add(payload.threadId)
   markMessageListCompleted(payload.threadId)
   setMessageListState(payload.threadId, { status: "ready" })
@@ -518,6 +548,7 @@ export function resetChatStore(): void {
   unreadCounts = new Map()
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
+  partnerReceiptsByThread = new Map()
   activeThreadId = null
   learnedSequenceByThreadId = new Map()
   removedSequenceByThreadId = new Map()
@@ -588,6 +619,7 @@ export interface ChatThreadSnapshot {
   messageListState: MessageListState
   historyReady: boolean
   deliveryKey: string
+  partnerReceipts: ChatPartnerReceipts | undefined
 }
 
 /** Only this conversation's changes invalidate the native timeline. */
@@ -602,10 +634,11 @@ export function createChatThreadSnapshotReader(threadId?: string, partnerId?: st
     const messageListState = (resolvedId && messageListStateByThreadId.get(resolvedId)) || IDLE_MESSAGE_LIST_STATE
     const historyReady = Boolean(resolvedId && loadedHistoryThreads.has(resolvedId))
     const deliveryKey = messages.map((message) => getMessageDeliveryState(message.messageId)).join("|")
+    const partnerReceipts = resolvedId ? partnerReceiptsByThread.get(resolvedId) : undefined
     if (previous && previous.thread === thread && previous.messages === messages &&
       previous.messageListState === messageListState && previous.historyReady === historyReady &&
-      previous.deliveryKey === deliveryKey) return previous
-    previous = { thread, messages, messageListState, historyReady, deliveryKey }
+      previous.deliveryKey === deliveryKey && previous.partnerReceipts === partnerReceipts) return previous
+    previous = { thread, messages, messageListState, historyReady, deliveryKey, partnerReceipts }
     return previous
   }
 }
