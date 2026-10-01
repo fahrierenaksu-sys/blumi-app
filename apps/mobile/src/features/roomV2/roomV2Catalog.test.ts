@@ -109,6 +109,9 @@ test("active Room V2 seating declares complete seatSpec routing metadata", () =>
       facing: "left",
       approachPoint: { x: -0.18, y: 0.36 },
       exitPoint: { x: -0.18, y: 0.44 },
+      localPositionCm: { x: -60, y: 20 },
+      approachPointCm: { x: -115, y: 20 },
+      exitPointCm: { x: -130, y: 20 },
       seatHeight: 0.08
     }]
   })
@@ -122,6 +125,41 @@ test("active Room V2 seating declares complete seatSpec routing metadata", () =>
       assert.ok(seat.exitPoint)
       assert.equal(typeof seat.seatHeight, "number")
     }
+  }
+})
+
+test("the starter bed's seat is reachable at its rendered size in every rotation, with unchanged art", () => {
+  // Loaded after the asset hooks above, like the catalog itself.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const { resolveRoomV2Scene } = require("./roomV2Selectors") as typeof import("./roomV2Selectors")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const projection = require("../roomWorld/roomWorldRoomV2Projection") as
+    typeof import("../roomWorld/roomWorldRoomV2Projection")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const runtime = require("../roomWorld/roomWorldRuntime") as typeof import("../roomWorld/roomWorldRuntime")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const geometryModule = require("../roomWorld/roomWorldGeometry") as typeof import("../roomWorld/roomWorldGeometry")
+  const bed = getFurnitureItem("room_v2_cozy_bed")
+  for (const rotation of ["front", "right", "back", "left"] as const) {
+    const scene = resolveRoomV2Scene({ roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
+      decor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [
+        { instanceId: "starter-room-bed", itemId: "room_v2_cozy_bed", x: 0.52, y: 0.7, rotation }] },
+      defaultRoomShellId: "room_v2_shell_blumi_world_v1" })
+    const item = scene.renderItems.find((entry) => entry.kind === "furniture")
+    // The art keeps rendering at the visual contract's size; only seat routes moved.
+    assert.equal(item?.width, bed.visualContract?.directions[rotation]?.normalizedRenderSize.width)
+    const geometry = projection.createRoomWorldGeometryFromRoomV2Scene(scene)
+    const [seat] = projection.createRoomWorldHotspotsFromRoomV2Scene(scene)
+    assert.ok(seat?.approachPoint && seat.exitPoint && seat.sourceRenderId, rotation)
+    const floor = geometry.walkableAreas[0]!.points
+    assert.ok(geometryModule.pointInRoomWorldPolygon(seat, floor), `${rotation}: seat on the floor`)
+    for (const point of [seat.approachPoint, seat.exitPoint]) {
+      assert.ok(geometryModule.isRoomWorldPointWalkable(geometry, point,
+        { clearance: runtime.ROOM_WORLD_AVATAR_COLLISION_CLEARANCE }), `${rotation}: approach and exit walkable`)
+    }
+    assert.ok(runtime.createRoomWorldSeatMovementPlan({ geometry, from: { x: 0.5, y: 0.85 }, approach: seat.approachPoint,
+      seat, seatedFurnitureRenderId: seat.sourceRenderId, clearance: runtime.ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+      timing: runtime.ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING }), `${rotation}: MiniRoom can plan sitting on the bed`)
   }
 })
 

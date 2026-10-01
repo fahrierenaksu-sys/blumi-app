@@ -293,6 +293,13 @@ const LEGACY_ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] = [
           facing: "left",
           approachPoint: { x: -0.18, y: 0.36 },
           exitPoint: { x: -0.18, y: 0.44 },
+          // The modeled bed renders at its physical size (1.42 sprite canvas),
+          // where the normalized points above land off the floor. Seat routes
+          // follow the bed's physical footprint (165 x 210 cm) instead: on the
+          // left mattress edge, approached and left from the bed's left side.
+          localPositionCm: { x: -60, y: 20 },
+          approachPointCm: { x: -115, y: 20 },
+          exitPointCm: { x: -130, y: 20 },
           seatHeight: 0.08
         }
       ]
