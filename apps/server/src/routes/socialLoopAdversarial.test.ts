@@ -417,6 +417,49 @@ test("room invite decisions are recipient-only and yield one outcome under concu
   }
 })
 
+test("accepting and joining a room read each participant's account once", async () => {
+  const harness = createHarness()
+  try {
+    const { ada, bora, threadId } = await createMatchedPair(harness, "40013")
+    const invite = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: ada.headers, payload: {}
+    })
+    assert.equal(invite.statusCode, 201)
+    const accountReads: string[] = []
+    const repository = harness.authService.repository
+    const findAccountByUserId = repository.findAccountByUserId.bind(repository)
+    repository.findAccountByUserId = async (userId) => {
+      accountReads.push(userId)
+      return findAccountByUserId(userId)
+    }
+
+    const accepted = await harness.app.inject({
+      method: "POST", url: `/v1/room-invites/${invite.json().invite.inviteId}/decision`, headers: bora.headers,
+      payload: { status: "accepted" }
+    })
+    assert.equal(accepted.statusCode, 200)
+    assert.deepEqual(accepted.json().participants.map((participant: { displayName: string }) => participant.displayName),
+      ["Ada", "Bora"])
+    // The caller's account comes with the session; the partner's is read
+    // once (with its moderation state). It used to be read six times in a row.
+    assert.ok(accountReads.length <= 2, `decision read accounts ${accountReads.length} times`)
+    assert.ok(accountReads.every((userId) => userId === ada.userId))
+
+    accountReads.length = 0
+    const roomId = accepted.json().miniRoom.miniRoomId as string
+    const joined = await harness.app.inject({
+      method: "POST", url: `/v1/room-sessions/${roomId}/join`, headers: ada.headers, payload: {}
+    })
+    assert.equal(joined.statusCode, 200)
+    assert.deepEqual(joined.json().participants.map((participant: { userId: string }) => participant.userId),
+      [ada.userId, bora.userId])
+    assert.ok(accountReads.length <= 2, `join read accounts ${accountReads.length} times`)
+    assert.ok(accountReads.every((userId) => userId === bora.userId))
+  } finally {
+    await harness.app.close()
+  }
+})
+
 test("an expired room invite cannot be accepted and never opens a room", async () => {
   const harness = createHarness()
   try {
