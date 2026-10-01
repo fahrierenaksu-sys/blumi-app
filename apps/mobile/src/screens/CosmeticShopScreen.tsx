@@ -42,6 +42,7 @@ import {
   isShopMultiItemApplyEnabled
 } from "../features/shop/shopCapabilityPolicy"
 import { ClosetBrowser } from "../features/shop/screen/ClosetBrowser"
+import { ShopCheckoutSheet } from "../features/shop/screen/ShopCheckoutSheet"
 import { ShopCoinBalance } from "../features/shop/screen/ShopCoinBalance"
 import {
   getDefaultShopCategoryId,
@@ -284,14 +285,20 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     void inventoryStore.hydrateFromServer(sessionActor.session.sessionToken)
   }, [inventoryStore, requiresServerInventory, sessionActor.session])
 
-  const { isPurchasing, handlePrimaryAction } = useShopPurchaseActions({
+  const {
+    isPurchasing,
+    handlePrimaryAction,
+    checkout,
+    confirmCheckout,
+    closeCheckout,
+    retryCheckout
+  } = useShopPurchaseActions({
     navigation,
     sessionActor,
     inventoryStore,
     avatarV2,
     avatarProducts,
     copy,
-    locale,
     combinationStateRef,
     setCombinationState,
     dispatchCombination,
@@ -483,6 +490,17 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
           )}
         </ScrollView>
       </SafeAreaView>
+      <ShopCheckoutSheet
+        checkout={checkout}
+        balance={inventoryVerified ? inventoryStore.inventory.coins : null}
+        canPerformActions={canPerformShopActions}
+        locale={locale}
+        onConfirm={() => {
+          void confirmCheckout()
+        }}
+        onClose={closeCheckout}
+        onRetry={retryCheckout}
+      />
     </View>
   )
 }

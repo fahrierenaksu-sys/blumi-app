@@ -4,17 +4,14 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
-  useRef,
   useState
 } from "react"
 import { captureProductEvent } from "../../../analytics/productAnalytics"
 import type { RootStackParamList } from "../../../navigation/RootNavigator"
 import { hapticError, hapticSuccess } from "../../../ui/haptics"
 import { showToast } from "../../../ui/toast"
-import { loadoutToUserAvatar } from "../../avatarV2/avatarSelectionModel"
 import type { useAvatarV2 } from "../../avatarV2/state/AvatarV2Provider"
 import type { InventoryStoreView } from "../../inventory/inventoryStore"
-import type { AppLocale } from "../../session/appLocale"
 import type { SessionActor } from "../../session/sessionModel"
 import {
   avatarToShopCombinationDraft,
@@ -32,9 +29,7 @@ import {
 import type { ShopCopy } from "../shopCopy"
 import type { ShopMode } from "../ShopNavigationControls"
 import { runShopPrimaryAction } from "../shopPurchaseCoordinator"
-import { resolveQueuedAvatarProduct } from "../shopQueueProductPolicy"
-import { confirmAvatarShopPurchase } from "./confirmAvatarShopPurchase"
-import { getAvatarPurchaseFailureTitle } from "./shopScreenModel"
+import { useShopLookCheckout } from "./useShopLookCheckout"
 
 /**
  * The Shop's mutation path. Every purchase goes through the inventory store
@@ -49,7 +44,6 @@ export function useShopPurchaseActions(input: {
   avatarV2: ReturnType<typeof useAvatarV2>
   avatarProducts: ShopCatalogItem[]
   copy: ShopCopy
-  locale: AppLocale
   combinationStateRef: RefObject<ShopCombinationState>
   setCombinationState: Dispatch<SetStateAction<ShopCombinationState>>
   dispatchCombination: (
@@ -70,7 +64,6 @@ export function useShopPurchaseActions(input: {
     avatarV2,
     avatarProducts,
     copy,
-    locale,
     combinationStateRef,
     setCombinationState,
     dispatchCombination,
@@ -83,163 +76,19 @@ export function useShopPurchaseActions(input: {
   } = input
   // Both are the provider's stable useCallback arrows, so calling them
   // unbound is identical to calling them through avatarV2.
-  const { saveAvatar, equipAndSaveItem } = avatarV2
+  const { equipAndSaveItem } = avatarV2
   const [isPurchasing, setIsPurchasing] = useState(false)
-  const combinationBalanceRef = useRef(inventoryStore.inventory.coins)
 
-  const executeCombinationCommands = useCallback(async function execute(
-    commands: readonly ShopCombinationCommand[]
-  ): Promise<void> {
-    const command = commands[0]
-    if (!command) return
-
-    if (command.type === "request_purchase_confirmation") {
-      const resolution = resolveQueuedAvatarProduct(command.productId, avatarProducts)
-      if (resolution.kind === "missing") {
-        dispatchCombination({ type: "cancel_apply" })
-        showToast({
-          title: copy.combination.itemUnavailable,
-          type: "warning"
-        })
-        return
-      }
-      const { product } = resolution
-      const approved = await confirmAvatarShopPurchase({
-        product,
-        balance: combinationBalanceRef.current,
-        locale
-      })
-      if (!approved) {
-        dispatchCombination({ type: "cancel_apply" })
-        return
-      }
-      await execute(dispatchCombination({
-        type: "purchase_approved",
-        productId: command.productId
-      }))
-      return
-    }
-
-    if (command.type === "purchase_product") {
-      const resolution = resolveQueuedAvatarProduct(command.productId, avatarProducts)
-      if (resolution.kind === "missing") {
-        dispatchCombination({
-          type: "purchase_failed",
-          productId: command.productId,
-          reason: "invalid_item"
-        })
-        hapticError()
-        showToast({
-          title: copy.combination.itemUnavailable,
-          type: "warning"
-        })
-        return
-      }
-      const { product } = resolution
-      if (product.priceCoins === null) {
-        dispatchCombination({
-          type: "purchase_failed",
-          productId: command.productId,
-          reason: "invalid_price"
-        })
-        showToast({
-          title: copy.combination.priceNeedsRefresh,
-          type: "warning"
-        })
-        return
-      }
-      setIsPurchasing(true)
-      const result = sessionActor.session.mode === "production"
-        ? await inventoryStore.purchaseAvatarItem(
-            sessionActor.session.sessionToken,
-            command.productId
-          )
-        : inventoryStore.unlockAvatarItem(
-            command.productId,
-            product.priceCoins
-          )
-      setIsPurchasing(false)
-      if (!result.success && result.reason !== "already_owned") {
-        captureProductEvent("purchase_failed", {
-          item_type: "avatar",
-          reason: result.reason
-        })
-        dispatchCombination({
-          type: "purchase_failed",
-          productId: command.productId,
-          reason: result.reason ?? "server_error"
-        })
-        hapticError()
-        showToast({
-          title: getAvatarPurchaseFailureTitle(result.reason, locale),
-          type: "warning"
-        })
-        return
-      }
-      if (result.success) {
-        combinationBalanceRef.current = Math.max(
-          0,
-          combinationBalanceRef.current - product.priceCoins
-        )
-        captureProductEvent("purchase_completed", {
-          item_type: "avatar",
-          price_coins: product.priceCoins
-        })
-      }
-      await execute(dispatchCombination({
-        type: "purchase_succeeded",
-        productId: command.productId
-      }))
-      return
-    }
-
-    const avatarToSave = shopCombinationDraftToAvatar(
-      command.combination,
-      avatarV2.avatar
-    )
-    const result = await saveAvatar(avatarToSave)
-    if (!result.ok) {
-      if (result.reason === "conflict" && result.currentSelection) {
-        dispatchCombination({ type: "avatar_save_revision_conflict" })
-        const currentAvatar = loadoutToUserAvatar(result.currentSelection.loadout)
-        dispatchCombination({
-          type: "refresh_after_conflict",
-          equipped: avatarToShopCombinationDraft(currentAvatar),
-          ownedProductIds: inventoryStore.inventory.ownedAvatarItemIds,
-          avatarRevision: result.currentSelection.revision
-        })
-        hapticError()
-        showToast({ title: result.errorMessage, type: "warning" })
-        return
-      }
-      dispatchCombination({
-        type: "avatar_save_failed",
-        reason: result.errorMessage
-      })
-      hapticError()
-      showToast({ title: result.errorMessage, type: "warning" })
-      return
-    }
-    dispatchCombination({
-      type: "avatar_save_confirmed",
-      avatarRevision: result.selection?.revision ?? command.avatarRevision
-    })
-    hapticSuccess()
-    showToast({
-      title: copy.combination.appliedTitle,
-      body: copy.combination.appliedBody,
-      type: "success"
-    })
-  }, [
-    avatarProducts,
-    avatarV2.avatar,
-    saveAvatar,
-    dispatchCombination,
-    copy.combination,
+  const { checkout, startCheckout, confirmCheckout, closeCheckout } = useShopLookCheckout({
+    sessionActor,
     inventoryStore,
-    locale,
-    sessionActor.session
-  ])
+    avatarV2,
+    avatarProducts,
+    copy,
+    combinationStateRef,
+    dispatchCombination,
+    setIsPurchasing
+  })
 
   const handleApplyCombination = useCallback(async (): Promise<void> => {
     if (combinationStateRef.current.phase !== "editing") return
@@ -272,7 +121,6 @@ export function useShopPurchaseActions(input: {
       })
       return
     }
-    combinationBalanceRef.current = inventoryStore.inventory.coins
     const synchronizedState: ShopCombinationState = {
       ...combinationStateRef.current,
       ownedProductIds: [
@@ -282,7 +130,7 @@ export function useShopPurchaseActions(input: {
         ])
       ]
     }
-    await executeCombinationCommands(dispatchCombination(
+    await startCheckout(dispatchCombination(
       { type: "apply" },
       synchronizedState
     ))
@@ -295,11 +143,17 @@ export function useShopPurchaseActions(input: {
     copy.loading.body,
     copy.loading.title,
     dispatchCombination,
-    executeCombinationCommands,
+    startCheckout,
     inventoryStore.inventory,
     inventoryVerified,
     isActionAvailable
   ])
+
+  /** A partial checkout retries the remaining pieces through a fresh checkout. */
+  const retryCheckout = useCallback((): void => {
+    closeCheckout()
+    void handleApplyCombination()
+  }, [closeCheckout, handleApplyCombination])
 
   const handlePrimaryAction = useCallback(async (): Promise<void> => {
     if (!canPerformShopActions) {
@@ -377,5 +231,12 @@ export function useShopPurchaseActions(input: {
     shopMode
   ])
 
-  return { isPurchasing, handlePrimaryAction }
+  return {
+    isPurchasing,
+    handlePrimaryAction,
+    checkout,
+    confirmCheckout,
+    closeCheckout,
+    retryCheckout
+  }
 }

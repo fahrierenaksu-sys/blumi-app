@@ -56,7 +56,9 @@ const sourceFiles = [
   "src/features/shop/shopAvatarCategoryModel.ts",
   "src/features/shop/shopAvatarCategoryModel.test.ts",
   "src/features/shop/shopSelectionModel.ts",
-  "src/features/shop/shopSelectionModel.test.ts"
+  "src/features/shop/shopSelectionModel.test.ts",
+  "src/features/shop/shopCheckoutModel.ts",
+  "src/features/shop/shopCheckoutModel.test.ts"
 ]
 
 const buildDomainWorkspace = () => {
@@ -181,7 +183,8 @@ try {
       join(outputDirectory, "features/shop/shopPurchaseCoordinator.test.js"),
       join(outputDirectory, "features/shop/shopPreviewPanel.test.js"),
       join(outputDirectory, "features/shop/shopAvatarCategoryModel.test.js"),
-      join(outputDirectory, "features/shop/shopSelectionModel.test.js")
+      join(outputDirectory, "features/shop/shopSelectionModel.test.js"),
+      join(outputDirectory, "features/shop/shopCheckoutModel.test.js")
     ],
     {
       cwd: workspaceRoot,

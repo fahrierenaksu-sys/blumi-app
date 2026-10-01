@@ -132,7 +132,7 @@ test("outerwear is nullable and incompatible previews are rejected explicitly", 
   assert.equal(removed.draft.outerwear, null)
 })
 
-test("apply purchases locked active products one-by-one in deterministic category order", () => {
+test("apply asks once for the whole look, then purchases one-by-one in deterministic category order", () => {
   const initial = createShopCombinationState({
     equipped: {
       hair: "hair-owned",
@@ -153,30 +153,37 @@ test("apply purchases locked active products one-by-one in deterministic categor
     { slot: "outerwear", productId: "coat-locked" },
     { slot: "shoes", productId: "shoes-locked" }
   ])
-  assert.deepEqual(started.commands, [
-    { type: "request_purchase_confirmation", slot: "dress", productId: "dress-locked" }
-  ])
+  // One checkout for the whole look instead of one system alert per item.
+  assert.deepEqual(started.commands, [{
+    type: "request_checkout_confirmation",
+    items: [
+      { slot: "dress", productId: "dress-locked" },
+      { slot: "outerwear", productId: "coat-locked" },
+      { slot: "shoes", productId: "shoes-locked" }
+    ]
+  }])
 
-  const dressApproved = reduceShopCombination(started.state, {
-    type: "purchase_approved",
-    productId: "dress-locked"
+  const approved = reduceShopCombination(started.state, {
+    type: "checkout_approved",
+    productIds: ["dress-locked", "coat-locked", "shoes-locked"]
   })
-  assert.equal(dressApproved.state.phase, "purchasing")
-  assert.deepEqual(dressApproved.commands, [
+  assert.equal(approved.state.phase, "purchasing")
+  assert.deepEqual(approved.commands, [
     { type: "purchase_product", slot: "dress", productId: "dress-locked" }
   ])
-  const dressBought = reduceShopCombination(dressApproved.state, {
+  const dressBought = reduceShopCombination(approved.state, {
     type: "purchase_succeeded",
     productId: "dress-locked"
   })
+  assert.equal(dressBought.state.phase, "purchasing", "no second confirmation")
   assert.deepEqual(dressBought.commands, [
-    { type: "request_purchase_confirmation", slot: "outerwear", productId: "coat-locked" }
+    { type: "purchase_product", slot: "outerwear", productId: "coat-locked" }
   ])
   assert.deepEqual(dressBought.state.equipped, initial.equipped)
 
   const coatBought = completePurchase(dressBought.state, "coat-locked")
   assert.deepEqual(coatBought.commands, [
-    { type: "request_purchase_confirmation", slot: "shoes", productId: "shoes-locked" }
+    { type: "purchase_product", slot: "shoes", productId: "shoes-locked" }
   ])
 
   const shoesBought = completePurchase(coatBought.state, "shoes-locked")
@@ -232,9 +239,26 @@ test("one locked product referenced by multiple slots is purchased only once", (
   assert.deepEqual(result.state.purchaseQueue, [
     { slot: "top", productId: "shared-product" }
   ])
-  assert.deepEqual(result.commands, [
-    { type: "request_purchase_confirmation", slot: "top", productId: "shared-product" }
-  ])
+  assert.deepEqual(result.commands, [{
+    type: "request_checkout_confirmation",
+    items: [{ slot: "top", productId: "shared-product" }]
+  }])
+})
+
+test("a checkout approval must name exactly the queued items", () => {
+  const initial = createShopCombinationState({
+    equipped: { top: "top-locked", shoes: "shoes-locked" },
+    ownedProductIds: [],
+    avatarRevision: 1
+  })
+  const started = reduceShopCombination(initial, { type: "apply" }).state
+  for (const productIds of [[], ["top-locked"], ["shoes-locked", "top-locked"], ["top-locked", "shoes-locked", "extra"]]) {
+    const stale = reduceShopCombination(started, { type: "checkout_approved", productIds })
+    assert.equal(stale.state, started, productIds.join(","))
+    assert.deepEqual(stale.commands, [])
+  }
+  const editing = reduceShopCombination(initial, { type: "checkout_approved", productIds: [] })
+  assert.equal(editing.state, initial, "nothing to approve while editing")
 })
 
 test("purchase error or cancellation stops apply and keeps the in-memory draft", () => {
@@ -245,8 +269,8 @@ test("purchase error or cancellation stops apply and keeps the in-memory draft",
   })
   const started = reduceShopCombination(initial, { type: "apply" }).state
   const purchasing = reduceShopCombination(started, {
-    type: "purchase_approved",
-    productId: "shoes-locked"
+    type: "checkout_approved",
+    productIds: ["shoes-locked"]
   }).state
 
   const failed = reduceShopCombination(purchasing, {
@@ -285,18 +309,19 @@ test("a later purchase failure preserves earlier ownership without partially equ
   }).state
   const started = reduceShopCombination(withTwoLockedItems, { type: "apply" }).state
 
-  const outOfOrderConfirmation = reduceShopCombination(started, {
-    type: "purchase_approved",
+  const purchasing = reduceShopCombination(started, {
+    type: "checkout_approved",
+    productIds: ["coat-locked", "shoes-locked"]
+  }).state
+  const outOfOrderSuccess = reduceShopCombination(purchasing, {
+    type: "purchase_succeeded",
     productId: "shoes-locked"
   })
-  assert.equal(outOfOrderConfirmation.state, started)
-  assert.deepEqual(outOfOrderConfirmation.commands, [])
+  assert.equal(outOfOrderSuccess.state, purchasing)
+  assert.deepEqual(outOfOrderSuccess.commands, [])
 
-  const coatBought = completePurchase(started, "coat-locked").state
-  const shoesPurchasing = reduceShopCombination(coatBought, {
-    type: "purchase_approved",
-    productId: "shoes-locked"
-  }).state
+  const shoesPurchasing = completePurchase(purchasing, "coat-locked").state
+  assert.equal(shoesPurchasing.phase, "purchasing")
   const failed = reduceShopCombination(shoesPurchasing, {
     type: "purchase_failed",
     productId: "shoes-locked",
@@ -441,17 +466,20 @@ test("five selected pieces all enter and complete the purchase queue", () => {
   assert.equal(next.commands[0]?.type, "save_avatar")
 })
 
+/** Approves the checkout when it is still waiting, then completes `productId`. */
 function completePurchase(
   state: ShopCombinationState,
   productId: string
 ): ShopCombinationTransition {
-  const approved = reduceShopCombination(state, {
-    type: "purchase_approved",
-    productId
-  })
-  assert.equal(approved.state.phase, "purchasing")
-  assert.equal(approved.commands[0]?.type, "purchase_product")
-  return reduceShopCombination(approved.state, {
+  const purchasing = state.phase === "confirming"
+    ? reduceShopCombination(state, {
+        type: "checkout_approved",
+        productIds: state.purchaseQueue.map((item) => item.productId)
+      }).state
+    : state
+  assert.equal(purchasing.phase, "purchasing")
+  assert.equal(purchasing.purchaseQueue[0]?.productId, productId)
+  return reduceShopCombination(purchasing, {
     type: "purchase_succeeded",
     productId
   })
