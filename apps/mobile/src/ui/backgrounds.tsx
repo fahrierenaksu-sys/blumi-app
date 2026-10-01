@@ -1,11 +1,47 @@
-import { useEffect, useRef } from "react"
-import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import { NavigationContext } from "@react-navigation/native"
+import { useContext, useEffect, useRef, useState } from "react"
+import { Animated, AppState, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { blumiEntryTheme, uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
 import { useReducedMotion } from "./animations"
 import { HomeLiquidBackground } from "./HomeLiquidBackground"
+import { shouldRunSoftBlobLoop, type SoftBlobVariant } from "./ambientMotionModel"
 
-type BackgroundVariant = "lobby" | "bootstrap" | "register" | "miniRoom" | "premiumMesh" | "homeLiquid"
+type BackgroundVariant = SoftBlobVariant
+
+/**
+ * True while the hosting screen is on screen and the app is in the
+ * foreground. Outside a navigator (boot surface) the screen counts as
+ * focused. Pager pages get a navigation object whose focus follows page
+ * selection, so unselected pages pause too.
+ */
+function useAmbientMotionVisible(): { screenFocused: boolean; appActive: boolean } {
+  const navigation = useContext(NavigationContext)
+  const [screenFocused, setScreenFocused] = useState(() => navigation?.isFocused() ?? true)
+  const [appActive, setAppActive] = useState(
+    () => AppState.currentState !== "background" && AppState.currentState !== "inactive"
+  )
+  useEffect(() => {
+    if (!navigation) {
+      setScreenFocused(true)
+      return undefined
+    }
+    setScreenFocused(navigation.isFocused())
+    const removeFocus = navigation.addListener("focus", () => setScreenFocused(true))
+    const removeBlur = navigation.addListener("blur", () => setScreenFocused(false))
+    return () => {
+      removeFocus()
+      removeBlur()
+    }
+  }, [navigation])
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      setAppActive(state === "active")
+    })
+    return () => subscription.remove()
+  }, [])
+  return { screenFocused, appActive }
+}
 
 const registerBackground = require("../../assets/ui/register-blush-to-white-background-v1.png")
 
@@ -88,7 +124,8 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
   const config = blobConfig[variant]
   const pulseAnim = useRef(new Animated.Value(0)).current
   const reduceMotion = useReducedMotion()
-  const motionEnabled = animated && !reduceMotion
+  const { screenFocused, appActive } = useAmbientMotionVisible()
+  const motionEnabled = shouldRunSoftBlobLoop({ variant, animated, reduceMotion, screenFocused, appActive })
 
   useEffect(() => {
     if (!motionEnabled) {

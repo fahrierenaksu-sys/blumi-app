@@ -9,6 +9,7 @@ import {
   createReducedMotionStore,
   type ReducedMotionPreference
 } from "./reducedMotionStore"
+import { getPulseRestProgress } from "./ambientMotionModel"
 import { uiTheme } from "./theme"
 
 /** Keeps product motion aligned with the OS accessibility preference. */
@@ -189,8 +190,8 @@ export function useScaleBounce(options: { delay?: number; tension?: number; fric
 
 /**
  * Continuous pulse animation — for glowing rings, attention indicators.
- * `iterations` bounds the pulse to that many beats (it then rests at
- * `minScale`); the default -1 keeps the endless loop.
+ * `iterations` bounds the pulse to that many beats (it then settles at
+ * scale 1); the default -1 keeps the endless loop.
  */
 export function usePulse(
   options: { minScale?: number; maxScale?: number; duration?: number; iterations?: number } = {}
@@ -200,9 +201,10 @@ export function usePulse(
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
+    const restProgress = getPulseRestProgress(minScale, maxScale)
     if (reduceMotion) {
       pulse.stopAnimation()
-      pulse.setValue(0)
+      pulse.setValue(restProgress)
       return
     }
     const loop = Animated.loop(
@@ -222,9 +224,23 @@ export function usePulse(
       ]),
       { iterations }
     )
-    loop.start()
-    return () => loop.stop()
-  }, [duration, iterations, pulse, reduceMotion])
+    // A bounded pulse settles at full size, never shrunk (SYS-9).
+    let settle: Animated.CompositeAnimation | null = null
+    loop.start(({ finished }) => {
+      if (!finished || iterations < 0) return
+      settle = Animated.timing(pulse, {
+        toValue: restProgress,
+        duration: duration / 2,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true
+      })
+      settle.start()
+    })
+    return () => {
+      loop.stop()
+      settle?.stop()
+    }
+  }, [duration, iterations, maxScale, minScale, pulse, reduceMotion])
 
   return {
     transform: [

@@ -190,6 +190,7 @@ try {
       "src/ui/onboardingActionSystem.test.ts",
       "src/ui/blumiLoadingScreenHandoff.test.ts",
       "src/ui/uiLocale.test.ts",
+      "src/ui/ambientMotionModel.test.ts",
       "src/features/inventory/dailyRewardCopy.test.ts"
     ],
     {

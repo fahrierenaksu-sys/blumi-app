@@ -293,7 +293,7 @@ test("critical continuous motion honors the operating system Reduce Motion prefe
     {
       relativePath: "src/ui/backgrounds.tsx",
       patterns: [
-        /const motionEnabled = animated && !reduceMotion/,
+        /const motionEnabled = shouldRunSoftBlobLoop\(\{ variant, animated, reduceMotion, screenFocused, appActive \}\)/,
         /if \(!motionEnabled\) \{[\s\S]*pulseAnim\.stopAnimation\(\)[\s\S]*pulseAnim\.setValue\(0\)/,
         /const scaleInterp = motionEnabled/
       ]
