@@ -26,6 +26,11 @@ test("two reads by id that run at the same moment never move the read receipt ba
     const newer = { messageId: `${threadId}_m6`, threadId, senderUserId: sender, body: "six", sentAt: "2026-10-01T10:06:00.000Z" }
     await repository.createMessage(older)
     await repository.createMessage(newer)
+    // A receipt is stored only while the reader shares read receipts.
+    await pool.query(
+      `INSERT INTO blumi_accounts (account_id, user_id, phone_number, created_at, updated_at)
+       VALUES ($1, $2, '+15550000706', now(), now())`, [`account_${reader}`, reader])
+    await repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
 
     // Hold the reader's participant row so both reads take their snapshot
     // first and then wait: the newer read gets the row first.

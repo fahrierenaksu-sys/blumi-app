@@ -97,6 +97,11 @@ test("before 070 chat and /ready work on PostgreSQL with receipts off; applying 
     const rows = await chatService.repository.listReceiptParticipants(["pre070_thread"])
     assert.equal(rows.find((row) => row.userId === "pre070_b")?.readUpTo, undefined)
     assert.equal((await chatService.listThreads("pre070_b"))[0]?.unreadCount, 0)
+    // A receipt is stored only while the reader shares read receipts.
+    await pool.query(
+      `INSERT INTO blumi_accounts (account_id, user_id, phone_number, created_at, updated_at)
+       VALUES ('account_pre070_b', 'pre070_b', '+15550000070', now(), now()) ON CONFLICT (user_id) DO NOTHING`)
+    await chatService.repository.saveChatPreferences("pre070_b", { readReceiptsEnabled: true }, new Date())
     await receipts.markRead("pre070_b", "pre070_thread", { upToMessageId: second.messageId })
     assert.deepEqual((await chatService.repository.listReceiptParticipants(["pre070_thread"]))
       .find((row) => row.userId === "pre070_b")?.readUpTo, { sentAt: second.sentAt, messageId: second.messageId })
