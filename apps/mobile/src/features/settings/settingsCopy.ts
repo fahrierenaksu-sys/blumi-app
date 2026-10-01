@@ -1,4 +1,5 @@
 import type { AppLocale } from "../session/appLocale"
+import type { NotificationPreferenceToggleKey } from "../notifications/notificationPreferencesModel"
 
 export interface SettingsCopy {
   title: string
@@ -105,6 +106,7 @@ export interface SettingsCopy {
   tryAgain: string
   privacyNotSaved: string
   notificationToggle: (label: string) => string
+  notificationRows: Record<NotificationPreferenceToggleKey, { label: string; description: string }>
 }
 
 const COPY: Record<AppLocale, SettingsCopy> = {
@@ -143,7 +145,13 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     signOutTitle: "Sign out of Blumi?", signOutBody: "You can sign back in with your phone number anytime.",
     showAgainTitle: "Show this person again?", showAgainBody: "They can appear in Blumi spaces again after this.", showAgain: "Show again", personVisibleAgain: "They can appear again",
     deletionCodeTitle: "Confirm with your code", deletionCodeBody: "Enter the 6-digit code sent to your sign-in phone. It expires in 5 minutes.", deletionCode: "Account deletion code", cancelDeletion: "Cancel account deletion", verifyDeletion: "Verify account deletion code",
-    notificationToggle: (label) => `${label} notifications`
+    notificationToggle: (label) => `${label} notifications`,
+    notificationRows: {
+      likesEnabled: { label: "Likes", description: "When someone likes your vibe." },
+      messagesEnabled: { label: "Messages", description: "New messages and room invites." },
+      matchesEnabled: { label: "Matches", description: "When a connection becomes mutual." },
+      discoveryWatchEnabled: { label: "Discovery Watch", description: "When a fitting new person appears." }
+    }
   },
   tr: {
     title: "Ayarlar", back: "Geri dön", matching: "EŞLEŞME", discoveryPreferences: "Keşfet tercihleri",
@@ -180,7 +188,13 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     signOutTitle: "Blumi’den çıkış yapılsın mı?", signOutBody: "Telefon numaranla dilediğin zaman yeniden giriş yapabilirsin.",
     showAgainTitle: "Bu kişi yeniden gösterilsin mi?", showAgainBody: "Bu işlemden sonra Blumi alanlarında yeniden görünebilir.", showAgain: "Yeniden göster", personVisibleAgain: "Bu kişi yeniden görünebilir",
     deletionCodeTitle: "Kodunla onayla", deletionCodeBody: "Giriş telefonuna gönderilen 6 haneli kodu gir. Kod 5 dakika içinde geçerliliğini yitirir.", deletionCode: "Hesap silme kodu", cancelDeletion: "Hesap silmeyi iptal et", verifyDeletion: "Hesap silme kodunu doğrula",
-    notificationToggle: (label) => `${label} bildirimleri`
+    notificationToggle: (label) => `${label} bildirimleri`,
+    notificationRows: {
+      likesEnabled: { label: "Beğeniler", description: "Biri vibe'ını beğendiğinde." },
+      messagesEnabled: { label: "Mesajlar", description: "Yeni mesajlar ve oda davetleri." },
+      matchesEnabled: { label: "Eşleşmeler", description: "Bir bağlantı karşılıklı olduğunda." },
+      discoveryWatchEnabled: { label: "Senin için arama", description: "Sana uyan yeni biri geldiğinde." }
+    }
   }
 }
 
