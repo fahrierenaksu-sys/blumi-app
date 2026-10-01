@@ -176,6 +176,7 @@ try {
       "src/features/session/profileCharacterReactionAssetGate.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
       "src/features/session/setupFlow/setupFlowShellModel.test.ts",
+      "src/features/session/setupFlow/setupFlowCopy.test.ts",
       "src/features/session/setupFlow/setupStaticExperience.test.ts",
       "src/features/session/youCopy.test.ts",
       "src/features/settings/settingsCopy.test.ts",

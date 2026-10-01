@@ -36,6 +36,7 @@ import type {
 } from "../features/session/sessionApi"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { captureProductEvent } from "../analytics/productAnalytics"
+import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
 import { useReducedMotionPreference } from "../ui/animations"
 import { uiTheme } from "../ui/theme"
 import { AvatarSetupScreen } from "./AvatarSetupScreen"
@@ -427,7 +428,7 @@ export function PreAuthSetupFlowScreen({
             onBackToAvatar={() => { void moveTo("avatar") }}
             onEditProfile={() => { void moveTo("profile") }}
             onSignOut={signOut}
-            completionLabel="Devam et"
+            completionLabel={getCurrentSetupFlowCopy().room.continueAction}
             motionActive={step === "room"}
             onComplete={async (room) => {
               await moveTo("phone", { ...renderedDraft, room }, "room")

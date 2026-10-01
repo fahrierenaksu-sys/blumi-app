@@ -193,8 +193,9 @@ test("onboarding explains the full account-to-room journey", () => {
     resolve(mobileRoot, "src/screens/RoomSetupScreen.tsx"),
     "utf8"
   )
+  // Step copy moved from the shell model to the TR/EN copy module (ONB-14).
   const shellModel = readFileSync(
-    resolve(mobileRoot, "src/features/session/setupFlow/setupFlowShellModel.ts"),
+    resolve(mobileRoot, "src/features/session/setupFlow/setupFlowCopy.ts"),
     "utf8"
   )
 
@@ -271,7 +272,7 @@ test("avatar setup is a no-scroll direct-manipulation stylist", () => {
     stageSource,
     /accessibilityState=\{\{ disabled, selected: active \}\}/
   )
-  assert.match(source, /Karakterim hazır/)
+  assert.match(source, /copy\.steps\.avatar\.primaryAction/)
   assert.match(source, /FEMALE_STARTER_BODY_ID/)
   assert.match(source, /MALE_STARTER_BODY_ID/)
   assert.match(stageSource, /accessibilityRole="radio"/)

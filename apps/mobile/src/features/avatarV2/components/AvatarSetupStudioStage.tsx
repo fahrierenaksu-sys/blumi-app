@@ -32,8 +32,18 @@ export interface AvatarStudioCategoryDescriptor {
   selectedIndex: number
 }
 
+/** Localized studio strings (the onboarding setup copy supplies them). */
+export interface AvatarStudioCopy {
+  accessibilityLabel: string
+  woman: string
+  man: string
+  chooseCategoryHint: (category: string) => string
+  cycleLabel: (category: string, previous: boolean) => string
+}
+
 interface AvatarSetupStudioStageProps {
   avatar: UserAvatar
+  copy: AvatarStudioCopy
   catalog: AvatarCatalogItem[]
   categories: AvatarStudioCategoryDescriptor[]
   compact: boolean
@@ -66,6 +76,7 @@ export function AvatarSetupStudioStage({
   avatar,
   catalog,
   categories,
+  copy,
   compact,
   disabled,
   isMale,
@@ -156,7 +167,7 @@ export function AvatarSetupStudioStage({
 
   return (
     <View
-      accessibilityLabel="Karakter görünüm stüdyosu"
+      accessibilityLabel={copy.accessibilityLabel}
       onLayout={onStageLayout}
       style={[styles.root, { height: metrics.stageHeight }]}
       testID="avatar-setup-studio-stage"
@@ -199,7 +210,7 @@ export function AvatarSetupStudioStage({
           active={!isMale}
           disabled={disabled}
           icon="woman-outline"
-          label="Kadın"
+          label={copy.woman}
           onPress={() => onSelectGender("woman")}
           testID="avatar-gender-woman"
         />
@@ -207,7 +218,7 @@ export function AvatarSetupStudioStage({
           active={isMale}
           disabled={disabled}
           icon="man-outline"
-          label="Erkek"
+          label={copy.man}
           onPress={() => onSelectGender("man")}
           testID="avatar-gender-man"
         />
@@ -236,6 +247,7 @@ export function AvatarSetupStudioStage({
         <OrbitPod
           active={category.type === selectedType}
           category={category}
+          copy={copy}
           disabled={disabled}
           key={`zone-${category.type}`}
           onCycle={onCycle}
@@ -287,6 +299,7 @@ function GenderButton({
 function OrbitPod({
   active,
   category,
+  copy,
   disabled,
   onCycle,
   onSelect,
@@ -295,6 +308,7 @@ function OrbitPod({
 }: {
   active: boolean
   category: AvatarStudioCategoryDescriptor
+  copy: AvatarStudioCopy
   disabled: boolean
   onCycle: (category: AvatarStudioCategory, direction: -1 | 1) => void
   onSelect: (category: AvatarStudioCategory) => void
@@ -314,6 +328,7 @@ function OrbitPod({
       <PodArrow
         active={active}
         categoryLabel={category.label}
+        copy={copy}
         direction={-1}
         disabled={disabled}
         onPress={() => {
@@ -323,7 +338,7 @@ function OrbitPod({
         testID={`avatar-style-previous-${category.type}`}
       />
       <Pressable
-        accessibilityHint={`${category.label} görünümünü seç`}
+        accessibilityHint={copy.chooseCategoryHint(category.label)}
         accessibilityRole="tab"
         accessibilityState={{ disabled, selected: active }}
         disabled={disabled}
@@ -345,6 +360,7 @@ function OrbitPod({
       <PodArrow
         active={active}
         categoryLabel={category.label}
+        copy={copy}
         direction={1}
         disabled={disabled}
         onPress={() => {
@@ -360,6 +376,7 @@ function OrbitPod({
 function PodArrow({
   active,
   categoryLabel,
+  copy,
   direction,
   disabled,
   onPress,
@@ -367,6 +384,7 @@ function PodArrow({
 }: {
   active: boolean
   categoryLabel: string
+  copy: AvatarStudioCopy
   direction: -1 | 1
   disabled: boolean
   onPress: () => void
@@ -376,7 +394,7 @@ function PodArrow({
 
   return (
     <Pressable
-      accessibilityLabel={`${categoryLabel} için ${previous ? "önceki" : "sonraki"} görünüm`}
+      accessibilityLabel={copy.cycleLabel(categoryLabel, previous)}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}

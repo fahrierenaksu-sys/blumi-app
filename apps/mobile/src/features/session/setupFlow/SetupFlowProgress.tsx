@@ -7,6 +7,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
+import { getCurrentSetupFlowCopy } from "./setupFlowLocale"
 
 interface SetupFlowProgressProps {
   current: 1 | 2 | 3 | 4
@@ -39,7 +40,7 @@ export function SetupFlowProgress({
   return (
     <View
       accessible
-      accessibilityLabel={`Kurulum adımı ${current} / 4`}
+      accessibilityLabel={getCurrentSetupFlowCopy().stepProgress(current, 4)}
       accessibilityRole="progressbar"
       accessibilityValue={{
         min: 0,

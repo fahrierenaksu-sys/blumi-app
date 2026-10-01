@@ -1,3 +1,4 @@
+import { getSetupFlowCopy } from "./setupFlowCopy"
 import {
   ONBOARDING_PRIMARY_ACTION_LAYOUT,
   getOnboardingPrimaryActionMetrics
@@ -18,37 +19,8 @@ const DENSE_SETUP_MAX_HEIGHT = 900
 // viewports keep the roomier presentation.
 const REGULAR_SETUP_MIN_HEIGHT = 920
 
-export const SETUP_FLOW_COPY = {
-  profile: {
-    title: "Seni nasıl tanıyalım?",
-    description: "İlk olarak sana nasıl sesleneceğimizi seçelim.",
-    primaryAction: "Karakterimi hazırlayalım"
-  },
-  avatar: {
-    title: "Karakterini hazırla",
-    description: "Seni yansıtan ilk görünümü birlikte seçelim.",
-    primaryAction: "Karakterim hazır"
-  },
-  room: {
-    title: "İlk köşeni birlikte kuralım",
-    description: "Yatağını yerleştir; sonra istediğin zaman değiştirebilirsin.",
-    primaryAction: "Odam hazır"
-  },
-  phone: {
-    title: "Dünyan kaybolmasın",
-    description: "Telefonunla Blumi dünyanı güvende tut.",
-    primaryAction: "Kod gönder"
-  },
-  otp: {
-    title: "Mesajlarına bak",
-    description: "Gönderdiğimiz 6 haneli kodu gir.",
-    primaryAction: "Blumi’ye katıl"
-  }
-} as const satisfies Record<PreAuthSetupStep, {
-  title: string
-  description: string
-  primaryAction: string
-}>
+/** Turkish step copy (the approved source); localized copy: setupFlowCopy. */
+export const SETUP_FLOW_COPY = getSetupFlowCopy("tr").steps
 
 export const SETUP_MOTION_TIMELINE_MS = {
   total: 440,

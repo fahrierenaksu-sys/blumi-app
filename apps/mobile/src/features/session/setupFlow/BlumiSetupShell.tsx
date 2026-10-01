@@ -35,11 +35,11 @@ import { SetupFlowProgress } from "./SetupFlowProgress"
 import { SetupFlowStage } from "./SetupFlowStage"
 import { SetupFlowTaskCard } from "./SetupFlowTaskCard"
 import {
-  SETUP_FLOW_COPY,
   getSetupLayoutMetrics,
   getSetupProgress,
   type PreAuthSetupStep
 } from "./setupFlowShellModel"
+import { getCurrentSetupFlowCopy } from "./setupFlowLocale"
 
 // When the keyboard opens or closes, the collapsible stage and heading fade
 // out/in and the rest of the column glides to its new place on the UI thread
@@ -132,7 +132,7 @@ export function BlumiSetupShell({
     [fontScale, height, width]
   )
   const progress = getSetupProgress(step)
-  const copy = SETUP_FLOW_COPY[step]
+  const copy = getCurrentSetupFlowCopy().steps[step]
 
   // Only the visible step follows the keyboard; hidden (prepared or left)
   // steps would otherwise re-layout and animate behind it (ONB-08).
