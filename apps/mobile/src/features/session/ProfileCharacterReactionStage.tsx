@@ -15,6 +15,39 @@ import { getProfileCharacterReactionGeometry } from "./profileSetupVisualModel"
 const FEMALE_TWIRL_ATLAS_V4 = require("./assets/profile-character-reaction-v4-runtime/blumi_profile_twirling_female_atlas_v4_final.png")
 const MALE_COLLAR_ATLAS_V4 = require("./assets/profile-character-reaction-v4-runtime/blumi_profile_collar_male_atlas_v4_final.png")
 
+/** Crossfade when a gender reaction (re)starts (ONB-15). */
+const REACTION_CROSSFADE_MS = 160
+
+/**
+ * Keeps both reaction atlases decoded while the profile step is on screen.
+ * Without it the first gender tap showed an empty frame while the 1024x1536
+ * atlas decoded (ONB-15). A 1-pt, near-transparent clip renders nothing
+ * visible but still makes the image views load and decode their atlas.
+ */
+function ReactionAtlasPreload({ compact }: { compact: boolean }) {
+  // Same display size as the sprite below, so the decode is reused (iOS
+  // decodes bundled images at the size they are drawn).
+  const size = (gender: "woman" | "man") => {
+    const timeline = getProfileCharacterReaction(gender).timeline
+    const cellWidth = compact ? 128 : 152
+    const cellHeight = getProfileCharacterReactionGeometry(compact).characterHeight
+    return timeline
+      ? { width: cellWidth * timeline.atlasColumns, height: cellHeight * timeline.atlasRows }
+      : { width: cellWidth, height: cellHeight }
+  }
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={styles.atlasPreload}
+    >
+      <Image resizeMode="stretch" source={FEMALE_TWIRL_ATLAS_V4} style={[styles.atlasPreloadImage, size("woman")]} />
+      <Image resizeMode="stretch" source={MALE_COLLAR_ATLAS_V4} style={[styles.atlasPreloadImage, size("man")]} />
+    </View>
+  )
+}
+
 interface ProfileCharacterReactionStageProps {
   avatar: UserAvatar
   compact: boolean
@@ -35,7 +68,26 @@ function GeneratedReactionSprite({
   const reaction = getProfileCharacterReaction(gender)
   const [frameIndex, setFrameIndex] = useState(0)
   const settleFloat = useRef(new Animated.Value(0)).current
+  const reveal = useRef(new Animated.Value(1)).current
   const timeline = reaction.timeline
+
+  useLayoutEffect(() => {
+    reveal.stopAnimation()
+    if (!gender || reduceMotion || !motionPreferenceResolved) {
+      reveal.setValue(1)
+      return undefined
+    }
+    reveal.setValue(0)
+    const fade = Animated.timing(reveal, {
+      toValue: 1,
+      duration: REACTION_CROSSFADE_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+      isInteraction: false
+    })
+    fade.start()
+    return () => fade.stop()
+  }, [gender, motionPreferenceResolved, reduceMotion, reveal])
 
   useEffect(() => {
     settleFloat.stopAnimation()
@@ -102,6 +154,7 @@ function GeneratedReactionSprite({
         styles.spriteFrame,
         {
           height: cellHeight,
+          opacity: reveal,
           transform: [
             {
               translateY: settleFloat.interpolate({
@@ -228,6 +281,9 @@ export function ProfileCharacterReactionStage({
         ]}
       />
       <View style={styles.frame} />
+      {shouldUseProfileCharacterReactionAssets(PROFILE_CHARACTER_REACTION_ASSET_MODE)
+        ? <ReactionAtlasPreload compact={compact} />
+        : null}
       <Animated.View
         style={{
           alignItems: "center",
@@ -297,6 +353,18 @@ export function ProfileCharacterReactionStage({
 }
 
 const styles = StyleSheet.create({
+  atlasPreload: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+    overflow: "hidden",
+    opacity: 0.01
+  },
+  atlasPreloadImage: {
+    position: "absolute"
+  },
   root: {
     alignItems: "center",
     height: "100%",
