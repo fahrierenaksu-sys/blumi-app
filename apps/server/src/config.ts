@@ -483,7 +483,8 @@ export function createConfiguredServerServices(
       repository: createPostgresAccountRecoveryRepository(pool)
     })
     const safetyService = createSafetyService({
-      repository: createPostgresSafetyRepository(pool)
+      repository: createPostgresSafetyRepository(pool),
+      isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
     })
     const chatService = createChatService({
       repository: applyTestPersonaPolicy(
@@ -607,7 +608,9 @@ export function createConfiguredServerServices(
     ]
   })
   const accountRecoveryService = createAccountRecoveryService({ authService })
-  const safetyService = createSafetyService()
+  const safetyService = createSafetyService({
+    isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
+  })
   const chatService = createChatService({ blockPolicy: safetyService })
   const economyService = createEconomyService()
   const commerceService = createCommerceService({ economyService })

@@ -1,4 +1,5 @@
 import type { ReportReason } from "@blumi/contracts"
+import { moderationRiskRank } from "./moderationQueue"
 
 export interface BlockRecord {
   actorUserId: string
@@ -45,6 +46,20 @@ export type SaveReportAndBlockResult =
   | { kind: "created"; report: ReportRecord; block: BlockRecord }
   | { kind: "replayed"; report: ReportRecord; block: BlockRecord }
   | { kind: "conflict" }
+  | { kind: "limited" }
+
+/** Caps how many reports one actor may create within a window. */
+export interface ReportCreationPolicy {
+  windowStartedAt: string
+  maxReportsInWindow: number
+}
+
+/** Keyset position in the pending queue: (risk rank, created at, report id). */
+export interface PendingReportCursor {
+  riskRank: number
+  createdAt: string
+  reportId: string
+}
 
 export interface SafetyRepository {
   listBlocks(actorUserId: string): Promise<BlockRecord[]>
@@ -54,14 +69,25 @@ export interface SafetyRepository {
   ): Promise<string[]>
   findBlock(actorUserId: string, blockedUserId: string): Promise<BlockRecord | null>
   saveBlock(block: BlockRecord): Promise<void>
+  countBlocks(actorUserId: string): Promise<number>
   deleteBlock(actorUserId: string, blockedUserId: string): Promise<void>
   saveReport(report: ReportRecord): Promise<void>
+  /**
+   * Creates a report and its block, or answers with the actor's existing
+   * report: the same idempotency key replays it (a changed payload is a
+   * conflict) and a pending report on the same person is returned instead
+   * of a duplicate. With a policy, a new report beyond the actor's cap in the
+   * window is refused ("limited") and records nothing.
+   */
   saveReportAndBlock(
     report: ReportRecord,
-    block: BlockRecord
+    block: BlockRecord,
+    policy?: ReportCreationPolicy
   ): Promise<SaveReportAndBlockResult>
   listReportsForActor(actorUserId: string, limit?: number): Promise<ReportRecord[]>
   listAllReports(options: { status?: string; limit: number }): Promise<ReportRecord[]>
+  /** Pending reports by risk, then oldest first, after the cursor. */
+  listPendingReportsByRisk(options: { limit: number; after?: PendingReportCursor }): Promise<ReportRecord[]>
   summarizePendingReports(
     query: PendingReportSummaryQuery
   ): Promise<PendingReportReasonSummary[]>
@@ -132,6 +158,11 @@ export function createInMemorySafetyRepository(
     async deleteBlock(actorUserId, blockedUserId) {
       store.blocks.delete(blockKey(actorUserId, blockedUserId))
     },
+    async countBlocks(actorUserId) {
+      let count = 0
+      for (const block of store.blocks.values()) if (block.actorUserId === actorUserId) count += 1
+      return count
+    },
     async saveReport(report) {
       // Mirrors the PostgreSQL primary key: a report is never overwritten.
       if (store.reports.has(report.reportId)) {
@@ -139,7 +170,7 @@ export function createInMemorySafetyRepository(
       }
       store.reports.set(report.reportId, cloneReport(report))
     },
-    async saveReportAndBlock(report, block) {
+    async saveReportAndBlock(report, block, policy) {
       if (report.idempotencyKey) {
         const existing = [...store.reports.values()].find(
           (candidate) =>
@@ -169,6 +200,25 @@ export function createInMemorySafetyRepository(
           }
         }
       }
+      const pending = [...store.reports.values()]
+        .filter((candidate) =>
+          candidate.actorUserId === report.actorUserId &&
+          candidate.reportedUserId === report.reportedUserId &&
+          candidate.status === "pending")
+        .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0]
+      if (pending) {
+        const key = blockKey(pending.actorUserId, pending.reportedUserId)
+        if (!store.blocks.has(key)) {
+          store.blocks.set(key, { actorUserId: pending.actorUserId, blockedUserId: pending.reportedUserId, createdAt: block.createdAt })
+        }
+        return { kind: "replayed", report: cloneReport(pending), block: { ...store.blocks.get(key)! } }
+      }
+      if (policy) {
+        const since = Date.parse(policy.windowStartedAt)
+        const recent = [...store.reports.values()].filter((candidate) =>
+          candidate.actorUserId === report.actorUserId && Date.parse(candidate.createdAt) >= since).length
+        if (recent >= policy.maxReportsInWindow) return { kind: "limited" }
+      }
       store.reports.set(report.reportId, cloneReport(report))
       const existingBlock = store.blocks.get(
         blockKey(block.actorUserId, block.blockedUserId)
@@ -195,6 +245,21 @@ export function createInMemorySafetyRepository(
           options.status ? report.status === options.status : true
         )
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .slice(0, options.limit)
+        .map(cloneReport)
+    },
+    async listPendingReportsByRisk(options) {
+      const position = (report: ReportRecord) =>
+        [moderationRiskRank(report.reason), Date.parse(report.createdAt), report.reportId] as const
+      const compare = (left: readonly [number, number, string], right: readonly [number, number, string]) =>
+        left[0] - right[0] || left[1] - right[1] || (left[2] < right[2] ? -1 : left[2] > right[2] ? 1 : 0)
+      const after = options.after
+        ? [options.after.riskRank, Date.parse(options.after.createdAt), options.after.reportId] as const
+        : undefined
+      return [...store.reports.values()]
+        .filter((report) => report.status === "pending")
+        .filter((report) => !after || compare(position(report), after) > 0)
+        .sort((left, right) => compare(position(left), position(right)))
         .slice(0, options.limit)
         .map(cloneReport)
     },

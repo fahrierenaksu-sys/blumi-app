@@ -6,6 +6,7 @@ import {
   resolveServerConfig
 } from "./config"
 import { CommerceProviderUnavailableError } from "./commerce/revenueCatPurchaseVerifier"
+import { createAccountRecord } from "./auth/authStore"
 import { createLivekitTokenService } from "./miniRooms/livekitTokenService"
 
 test("purchase environments default to production and reject unknown values", () => {
@@ -218,6 +219,10 @@ test("configured chat hides a blocked pair's thread from both users, including f
       threadId: "thread_config_block", miniRoomId: "room_config_block",
       participantUserIds: ["user_a", "user_b"], participants: [{ userId: "user_a" }, { userId: "user_b" }]
     })
+    // Blocks need existing accounts (2026-10-01).
+    for (const [userId, phoneNumber] of [["user_a", "+905551119901"], ["user_b", "+905551119902"]] as const) {
+      services.authService.store.accountsByPhone.set(phoneNumber, { ...createAccountRecord(phoneNumber), userId })
+    }
     await services.safetyService.blockUser("user_b", "user_a")
     for (const userId of ["user_a", "user_b"]) {
       assert.deepEqual((await services.chatService.listThreadsPage(userId)).threads, [])

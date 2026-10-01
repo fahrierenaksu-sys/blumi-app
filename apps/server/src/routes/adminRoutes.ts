@@ -23,7 +23,6 @@ import {
 import { registerAdminConsoleRoutes } from "../admin/adminConsole"
 import {
   getModerationQueueMetadata,
-  orderPendingModerationReports,
   type ModerationQueueMetadata
 } from "../safety/moderationQueue"
 
@@ -182,14 +181,23 @@ export async function registerAdminRoutes(
 
     const query = isRecord(request.query) ? request.query : {}
     try {
+      if (query.status === "pending") {
+        // Risk, then oldest first, straight from the store and paged, so a
+        // large backlog can never hide its oldest urgent reports (2026-10-01).
+        if (query.cursor !== undefined && typeof query.cursor !== "string") {
+          return reply.code(400).send({ error: "Use a valid report cursor." })
+        }
+        const page = await safetyService.listPendingReportQueue({
+          limit: readLimit(query.limit),
+          cursor: query.cursor as string | undefined
+        })
+        return { reports: page.reports.map(toAdminReportView), nextCursor: page.nextCursor }
+      }
       const reports = await safetyService.listAllReports({
         status: typeof query.status === "string" ? query.status : undefined,
         limit: readLimit(query.limit)
       })
-      const queue = query.status === "pending"
-        ? orderPendingModerationReports(reports)
-        : reports
-      return { reports: queue.map(toAdminReportView) }
+      return { reports: reports.map(toAdminReportView) }
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
       return reply.code(400).send({

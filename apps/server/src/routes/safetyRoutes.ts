@@ -11,8 +11,10 @@ import type { MiniRoomService } from "../miniRooms/miniRoomService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import {
   ReportIdempotencyConflictError,
+  SafetyLimitError,
   type SafetyService
 } from "../safety/safetyService"
+import { createFixedWindowLimiter } from "../operations/requestLimits"
 import { isPublicRequestError } from "../errors/publicRequestError"
 import { readParam, resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
 
@@ -22,6 +24,13 @@ export interface SafetyRouteServices {
   miniRoomService?: MiniRoomService
   connectionManager: ConnectionManager
 }
+
+// Per verified person, counted before any validation (2026-10-01). The
+// route-level per-IP limit is only a coarse ceiling for shared addresses.
+const REPORTS_PER_PERSON_PER_MINUTE = 20
+const BLOCKS_PER_PERSON_PER_MINUTE = 30
+const SAFETY_WRITE_IP_CEILING = { max: 300, timeWindow: "1 minute" } as const
+const TOO_MANY_SAFETY_WRITES = "Too many requests. Try again shortly."
 
 const reporterReportResponseSchema = {
   type: "object",
@@ -40,6 +49,8 @@ export async function registerSafetyRoutes(
   services: SafetyRouteServices
 ): Promise<void> {
   const { authService, safetyService, miniRoomService, connectionManager } = services
+  const reportLimiter = createFixedWindowLimiter({ max: REPORTS_PER_PERSON_PER_MINUTE })
+  const blockLimiter = createFixedWindowLimiter({ max: BLOCKS_PER_PERSON_PER_MINUTE })
 
   app.get("/v1/safety/reports", {
     config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
@@ -111,7 +122,7 @@ export async function registerSafetyRoutes(
 
   app.post("/v1/safety/blocks", {
     attachValidation: true,
-    config: { requestValidation: "enforced" },
+    config: { requestValidation: "enforced", rateLimit: SAFETY_WRITE_IP_CEILING },
     schema: {
       body: coreApiJsonSchemas.blockUser,
       response: {
@@ -122,6 +133,11 @@ export async function registerSafetyRoutes(
   }, async (request, reply) => {
     const resolved = await resolveBearerSession({ request, reply, authService })
     if (!resolved) return
+    const personLimit = blockLimiter.consume(resolved.account.userId)
+    if (!personLimit.allowed) {
+      return reply.code(429).header("Retry-After", String(personLimit.retryAfterSeconds))
+        .send({ error: TOO_MANY_SAFETY_WRITES })
+    }
 
     const parsed = blockUserRequestSchema.safeParse(request.body)
     if (!parsed.success || schemaValidationFailed(request)) {
@@ -152,6 +168,7 @@ export async function registerSafetyRoutes(
       }
       return reply.code(201).send({ block })
     } catch (error) {
+      if (error instanceof SafetyLimitError) return reply.code(429).send({ error: error.message })
       if (!isPublicRequestError(error)) throw error
       return reply.code(400).send({
         error: error.message
@@ -189,7 +206,7 @@ export async function registerSafetyRoutes(
 
   app.post("/v1/safety/reports", {
     attachValidation: true,
-    config: { requestValidation: "enforced" },
+    config: { requestValidation: "enforced", rateLimit: SAFETY_WRITE_IP_CEILING },
     schema: {
       body: coreApiJsonSchemas.reportUser,
       headers: {
@@ -206,6 +223,11 @@ export async function registerSafetyRoutes(
   }, async (request, reply) => {
     const resolved = await resolveBearerSession({ request, reply, authService })
     if (!resolved) return
+    const personLimit = reportLimiter.consume(resolved.account.userId)
+    if (!personLimit.allowed) {
+      return reply.code(429).header("Retry-After", String(personLimit.retryAfterSeconds))
+        .send({ error: TOO_MANY_SAFETY_WRITES })
+    }
 
     const parsed = reportUserRequestSchema.safeParse(request.body)
     if (!parsed.success || schemaValidationFailed(request, "body")) {
@@ -243,6 +265,7 @@ export async function registerSafetyRoutes(
       if (error instanceof ReportIdempotencyConflictError) {
         return reply.code(409).send({ error: error.message })
       }
+      if (error instanceof SafetyLimitError) return reply.code(429).send({ error: error.message })
       if (!isPublicRequestError(error)) throw error
       return reply.code(400).send({
         error: error.message

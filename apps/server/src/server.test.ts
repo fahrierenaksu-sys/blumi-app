@@ -1097,6 +1097,10 @@ test("linked Discover profiles stay visible but only grant decisions that pass t
   })
   assert.equal(self.statusCode, 404)
 
+  // Blocks need an existing account behind the Discover profile.
+  authService.store.accountsByPhone.set("+905551112246", {
+    ...createAccountRecord("+905551112246"), userId: "linked_blocked"
+  })
   const block = await app.inject({
     method: "POST",
     url: "/v1/safety/blocks",
