@@ -17,7 +17,7 @@ function mount(reduceMotion = false) {
     {
       modules: {
         "react-native": reactNative.module,
-        "../miniRoomAvatarMotion": { getMiniRoomAvatarRenderLayers: () => [] },
+        "../miniRoomAvatarMotion": { getMiniRoomAvatarRenderLayers: () => [], getMiniRoomAvatarSittingScaleY: () => 1 },
         "./miniRoomReducedMotion": { MINI_ROOM_PARTNER_ARRIVAL_MS: 900 }
       },
       inertUnknown: true
