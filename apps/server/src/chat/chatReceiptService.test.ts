@@ -145,6 +145,24 @@ test("an account outside the rollout neither moves cursors nor receives receipts
   assert.deepEqual(await receipts.getPreferences(ADA), { preferences: { readReceiptsEnabled: false }, available: false })
 })
 
+test("with mutual receipts a read without a message id clears unread but never shows the partner a read tick", async () => {
+  const { chatService, receipts, events, send } = await setup()
+  await receipts.savePreferences(ADA, { readReceiptsEnabled: true })
+  await receipts.savePreferences(BORA, { readReceiptsEnabled: true })
+  const message = await send(ADA, "hello", "2026-10-01T10:00:00.000Z")
+
+  const read = await receipts.markRead(BORA, THREAD, {}, new Date("2026-10-01T10:05:00.000Z"))
+  assert.equal(read.readAt, "2026-10-01T10:05:00.000Z")
+  assert.equal(read.readUpTo, undefined)
+  assert.equal((await chatService.listThreads(BORA))[0]!.unreadCount, 0)
+  assert.deepEqual(events.filter(({ event }) => event.type === "chat.receipt_updated" && event.payload.readUpTo), [])
+  assert.equal((await receipts.getPartnerReceipts(ADA, THREAD))?.readUpTo, undefined)
+
+  // Naming the shown message is what moves and publishes the receipt.
+  await receipts.markRead(BORA, THREAD, { upToMessageId: message.messageId })
+  assert.deepEqual((await receipts.getPartnerReceipts(ADA, THREAD))?.readUpTo, { sentAt: message.sentAt, messageId: message.messageId })
+})
+
 test("before migration 070 chat keeps working and receipts are simply absent", async () => {
   const { chatService, receipts, events, errors, send } = await setup({ receiptsSupported: false })
   const message = await send(ADA, "hello", "2026-10-01T10:00:00.000Z")

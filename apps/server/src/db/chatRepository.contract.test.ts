@@ -260,18 +260,49 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(await read({ upToMessageId: first.messageId }), { readAt: second.sentAt }, "never backwards")
       assert.equal(await read({ upToMessageId: own.messageId }), null, "a read cursor names a partner message")
       assert.equal(await read({ upToMessageId: "unknown_message" }), null)
-      // A read without a message covers the whole instant, even one already reached by id.
-      assert.deepEqual(await read({ readAt: second.sentAt }), {
-        readAt: second.sentAt,
-        readUpTo: { sentAt: second.sentAt }
-      })
-      assert.deepEqual(await read({ readAt: second.sentAt }), { readAt: second.sentAt })
       assert.deepEqual(await read({ readAt: "2026-10-01T09:00:00.000Z" }), { readAt: second.sentAt })
       assert.equal(await unread(), 0)
       assert.equal(await read({ readAt: second.sentAt }, backend.id("stranger")), null)
 
       const rows = await backend.repository.listReceiptParticipants([chat.threadId])
-      assert.deepEqual(rows.find((row) => row.userId === reader)?.readUpTo, { sentAt: second.sentAt })
+      assert.deepEqual(rows.find((row) => row.userId === reader)?.readUpTo, { sentAt: second.sentAt, messageId: second.messageId })
+    },
+
+    "a read without a message clears unread counts but never moves or publishes the read receipt": async (backend) => {
+      const chat = thread(backend, "instant", "2026-10-01T10:00:00.000Z")
+      const [sender, reader] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      const shown = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      await backend.repository.createMessage(shown)
+      const read = (target: { upToMessageId: string } | { readAt: string }) =>
+        backend.repository.advanceReadCursor({ threadId: chat.threadId, userId: reader, ...target })
+      const unread = async () => (await backend.repository.listThreads(reader))
+        .find((item) => item.threadId === chat.threadId)?.unreadCount
+      const receipt = async () => (await backend.repository.listReceiptParticipants([chat.threadId]))
+        .find((row) => row.userId === reader)?.readUpTo
+      assert.deepEqual(await read({ upToMessageId: shown.messageId }), {
+        readAt: shown.sentAt,
+        readUpTo: { sentAt: shown.sentAt, messageId: shown.messageId }
+      })
+
+      // sent_at is taken before the insert commits: this message carries a
+      // time before the instant read below but becomes visible only after it.
+      const late = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      assert.deepEqual(await read({ readAt: "2026-10-01T10:03:00.000Z" }), { readAt: "2026-10-01T10:03:00.000Z" },
+        "an instant read publishes no read receipt")
+      await backend.repository.createMessage(late)
+      assert.equal(await unread(), 0, "legacy clients still clear their unread count")
+      assert.deepEqual(await receipt(), { sentAt: shown.sentAt, messageId: shown.messageId },
+        "the partner never sees the late message as read")
+
+      // Reading the late message by id once it is shown moves the receipt,
+      // although the unread cursor is already past it.
+      assert.deepEqual(await read({ upToMessageId: late.messageId }), {
+        readAt: "2026-10-01T10:03:00.000Z",
+        readUpTo: { sentAt: late.sentAt, messageId: late.messageId }
+      })
+      assert.deepEqual(await read({ upToMessageId: late.messageId }), { readAt: "2026-10-01T10:03:00.000Z" })
+      assert.deepEqual(await receipt(), { sentAt: late.sentAt, messageId: late.messageId })
     },
 
     "chat preferences default to read receipts off and are saved per account": async (backend) => {

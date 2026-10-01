@@ -23,7 +23,11 @@ export function useChatThreadSync({
   requestMessages:
     | ((threadId: string, options?: FetchThreadMessagesOptions) => Promise<void>)
     | undefined
-  /** `upToMessageId` is the newest partner message on screen, if any. */
+  /**
+   * `upToMessageId` is the newest partner message on screen. A read is sent
+   * only once one is shown: a read without a message would cover partner
+   * messages that are still loading or not yet committed (false read).
+   */
   markThreadRead: ((threadId: string, upToMessageId?: string) => void) | undefined
   setActiveThread: (threadId: string | null) => void
 }) {
@@ -51,7 +55,7 @@ export function useChatThreadSync({
       if (timer === undefined) return
       clearTimeout(timer)
       timer = undefined
-      if (current.current.currentUserId === currentUserId) markThreadRead?.(resolvedThreadId, latestId)
+      if (current.current.currentUserId === currentUserId && latestId) markThreadRead?.(resolvedThreadId, latestId)
     }
     const sync = {
       visibility(next: boolean) {
@@ -59,7 +63,7 @@ export function useChatThreadSync({
         if (!next) flush()
         visible = next
         setActiveThread(next ? resolvedThreadId : null)
-        if (next) markThreadRead?.(resolvedThreadId, latestId)
+        if (next && latestId) markThreadRead?.(resolvedThreadId, latestId)
       },
       incoming(id: string | undefined) {
         if (id === latestId) return

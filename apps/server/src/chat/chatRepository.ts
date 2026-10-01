@@ -167,8 +167,13 @@ export interface ChatRepository {
 }
 
 interface InMemoryParticipantCursors {
+  /** Unread cursor (last_read_at): unread counts and the push badge. */
   readAt?: string
-  readMessageId?: string
+  /**
+   * Read receipt (last_read_message_id with its message's sent_at): moved
+   * only by a read that names a partner message the reader was shown.
+   */
+  readUpTo?: { sentAt: string; messageId: string }
   deliveredUpTo?: ChatReceiptCursor
 }
 
@@ -345,21 +350,18 @@ export function createInMemoryChatRepository(
       const current = cursorsOf(input.threadId, input.userId)
       const previousTime = current.readAt === undefined ? Number.NEGATIVE_INFINITY : Date.parse(current.readAt)
       const targetTime = Date.parse(target.sentAt)
-      if (!receiptsSupported) {
-        // Before 070 only the unread cursor exists: GREATEST(last_read_at, target).
-        if (targetTime > previousTime) store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt })
-        return { readAt: cursorsOf(input.threadId, input.userId).readAt! }
+      // The unread cursor: GREATEST(last_read_at, target), before and after 070.
+      const readAt = targetTime > previousTime ? target.sentAt : current.readAt!
+      if (!receiptsSupported || target.messageId === undefined) {
+        // A read without a message never moves the read receipt: it may
+        // cover a message whose sent_at precedes it but which was not shown.
+        store.cursorsByParticipant.set(key, { ...current, readAt })
+        return { readAt }
       }
-      const advances = targetTime > previousTime || (targetTime === previousTime && current.readMessageId !== undefined &&
-        (target.messageId === undefined || current.readMessageId < target.messageId))
-      if (!advances) return { readAt: current.readAt! }
-      store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt, readMessageId: target.messageId })
-      return {
-        readAt: target.sentAt,
-        readUpTo: target.messageId === undefined
-          ? { sentAt: target.sentAt }
-          : { sentAt: target.sentAt, messageId: target.messageId }
-      }
+      const receipt = { sentAt: target.sentAt, messageId: target.messageId }
+      const advances = current.readUpTo === undefined || compareChatMessagePositions(current.readUpTo, receipt) < 0
+      store.cursorsByParticipant.set(key, { ...current, readAt, ...(advances ? { readUpTo: receipt } : {}) })
+      return advances ? { readAt, readUpTo: { ...receipt } } : { readAt }
     },
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
       const jobs = [...store.deliveryJobs.values()]
@@ -415,10 +417,8 @@ export function createInMemoryChatRepository(
             threadId,
             userId,
             ...(cursors.deliveredUpTo ? { deliveredUpTo: { ...cursors.deliveredUpTo } } : {}),
-            ...(cursors.readAt
-              ? { readUpTo: cursors.readMessageId === undefined
-                  ? { sentAt: cursors.readAt }
-                  : { sentAt: cursors.readAt, messageId: cursors.readMessageId } }
+            ...(cursors.readUpTo
+              ? { readUpTo: { ...cursors.readUpTo } }
               : {}),
             readReceiptsEnabled: store.preferencesByUser.get(userId)?.readReceiptsEnabled ?? false
           }
