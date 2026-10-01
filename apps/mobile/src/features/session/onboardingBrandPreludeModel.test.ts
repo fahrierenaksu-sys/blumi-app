@@ -1,8 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  ONBOARDING_BOOT_MIN_DISSOLVE_MS,
   ONBOARDING_BRAND_PRELUDE_TIMELINE_MS,
   createOnboardingBrandPreludeState,
+  getOnboardingBootDissolvePlan,
   getOnboardingBrandPreludeBeatAtElapsed,
   getOnboardingBootGateRemainingMs,
   getOnboardingBootPreludeElapsedSnapshotMs,
@@ -113,8 +115,28 @@ test("loading owns the complete scan, then hands off at the brand reveal", () =>
 
   assert.equal(getOnboardingBootGateRemainingMs(0, false), 1_950)
   assert.equal(getOnboardingBootGateRemainingMs(1_750, false), 200)
-  assert.equal(getOnboardingBootGateRemainingMs(2_400, false), 0)
   assert.equal(getOnboardingBootGateRemainingMs(0, true), 0)
+})
+
+test("the loading surface always dissolves the scan before the prelude mounts", () => {
+  // On schedule: the dissolve runs on the shared clock from 1700 to 1950 ms.
+  assert.deepEqual(getOnboardingBootDissolvePlan(0), { delayMs: 1_700, durationMs: 250 })
+  assert.deepEqual(getOnboardingBootDissolvePlan(1_200), { delayMs: 500, durationMs: 250 })
+  assert.deepEqual(getOnboardingBootDissolvePlan(1_700), { delayMs: 0, durationMs: 250 })
+  // Mid-dissolve handoff keeps the schedule but never shortens it to a cut.
+  assert.deepEqual(getOnboardingBootDissolvePlan(1_750), { delayMs: 0, durationMs: 200 })
+  assert.deepEqual(getOnboardingBootDissolvePlan(1_940), {
+    delayMs: 0,
+    durationMs: ONBOARDING_BOOT_MIN_DISSOLVE_MS
+  })
+  // Slow hydration: the characters were still on screen, so play a full dissolve.
+  assert.deepEqual(getOnboardingBootDissolvePlan(2_400), { delayMs: 0, durationMs: 250 })
+  assert.deepEqual(getOnboardingBootDissolvePlan(-50), { delayMs: 1_700, durationMs: 250 })
+
+  // The gate opens exactly when the dissolve ends.
+  assert.equal(getOnboardingBootGateRemainingMs(1_940, false), ONBOARDING_BOOT_MIN_DISSOLVE_MS)
+  assert.equal(getOnboardingBootGateRemainingMs(2_400, false), 250)
+  assert.equal(getOnboardingBootGateRemainingMs(2_400, true), 0)
 })
 
 test("unresolved motion preference keeps the boot scan alive and the gate closed", () => {

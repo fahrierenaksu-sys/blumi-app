@@ -93,6 +93,48 @@ export function shouldReduceOnboardingBootMotion(
   return motionPreferenceResolved && reduceMotion
 }
 
+/** Shortest scan dissolve the loading surface plays before the prelude mounts. */
+export const ONBOARDING_BOOT_MIN_DISSOLVE_MS = 180
+
+export interface OnboardingBootDissolvePlan {
+  delayMs: number
+  durationMs: number
+}
+
+/**
+ * The loading surface dissolves its own scan before it hands off to the
+ * prelude. The prelude draws the scan lifted above the action rail, so a
+ * handoff while the characters are still visible would move the whole grid;
+ * dissolving on the loading surface keeps the six characters in place.
+ * A late handoff (slow hydration) still plays a full dissolve, never a cut.
+ */
+export function getOnboardingBootDissolvePlan(
+  elapsedMs: number
+): OnboardingBootDissolvePlan {
+  const { scanDissolveStart, scanDissolveComplete } =
+    ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
+  const elapsed = Math.max(0, elapsedMs)
+  if (elapsed <= scanDissolveStart) {
+    return {
+      delayMs: scanDissolveStart - elapsed,
+      durationMs: scanDissolveComplete - scanDissolveStart
+    }
+  }
+  if (elapsed < scanDissolveComplete) {
+    return {
+      delayMs: 0,
+      durationMs: Math.max(
+        ONBOARDING_BOOT_MIN_DISSOLVE_MS,
+        scanDissolveComplete - elapsed
+      )
+    }
+  }
+  return {
+    delayMs: 0,
+    durationMs: scanDissolveComplete - scanDissolveStart
+  }
+}
+
 export function getOnboardingBootGateRemainingMs(
   elapsedMs: number,
   reduceMotion: boolean,
@@ -100,11 +142,8 @@ export function getOnboardingBootGateRemainingMs(
 ): number | null {
   if (!motionPreferenceResolved) return null
   if (reduceMotion) return 0
-  return Math.max(
-    0,
-    ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete -
-      Math.max(0, elapsedMs)
-  )
+  const plan = getOnboardingBootDissolvePlan(elapsedMs)
+  return plan.delayMs + plan.durationMs
 }
 
 export function beginOnboardingBootPrelude(nowMs = Date.now()): number {

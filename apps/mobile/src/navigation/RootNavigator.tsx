@@ -598,7 +598,9 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       !isBootPreludeReady)
 
   if (shouldShowBootPrelude) {
-    return <BlumiLoadingScreen onPreludeReady={handleBootPreludeReady} />
+    // Only a waiting prelude takes the scan over; it dissolves here first.
+    const onPreludeReady = shouldGateOnboardingBootPrelude(sessionEntryRoute) ? handleBootPreludeReady : undefined
+    return <BlumiLoadingScreen onPreludeReady={onPreludeReady} />
   }
 
   const onboardingStarterBodyId =

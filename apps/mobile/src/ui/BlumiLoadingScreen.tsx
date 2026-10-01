@@ -4,6 +4,7 @@ import { OnboardingScanStage } from "../features/session/OnboardingScanStage"
 import { ONBOARDING_SCAN_FRAMES } from "../features/session/OnboardingGreetingPair"
 import {
   ONBOARDING_BRAND_PRELUDE_TIMELINE_MS,
+  getOnboardingBootDissolvePlan,
   getOnboardingBootGateRemainingMs,
   getOnboardingBootPreludeElapsedMs,
   getOnboardingBootPreludeElapsedSnapshotMs,
@@ -21,6 +22,11 @@ import { useReducedMotionPreference } from "./animations"
 const timeline = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
 
 interface BlumiLoadingScreenProps {
+  /**
+   * Given only while an onboarding prelude waits for this surface. The scan
+   * then dissolves here and the callback fires once it has, so the prelude
+   * mounts with the characters already gone (its scan sits higher on screen).
+   */
   onPreludeReady?: () => void
 }
 
@@ -46,6 +52,7 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   const bootInitializedRef = useRef(false)
   const scanRows = useRef(new Animated.Value(0)).current
   const scanSweep = useRef(new Animated.Value(0)).current
+  const scanOpacity = useRef(new Animated.Value(1)).current
   const initialElapsedMs = bootTiming.initialElapsedMs
 
   useLayoutEffect(() => {
@@ -65,8 +72,13 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   }, [scanRows, scanSweep, shouldReduceMotion])
 
   useEffect(() => {
+    if (!onPreludeReady) {
+      // No prelude takes over (splash, Discover, linking fallback): the scan
+      // stays on screen for as long as this surface does.
+      scanOpacity.setValue(1)
+      return undefined
+    }
     if (!bootTiming.initialized) return undefined
-    if (!onPreludeReady) return undefined
     if (!bootMotionPreferenceResolved) return undefined
     const gateElapsedMs = getOnboardingBootPreludeElapsedMs()
     const remainingMs = getOnboardingBootGateRemainingMs(
@@ -79,9 +91,24 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
       onPreludeReady()
       return undefined
     }
+    const dissolve = getOnboardingBootDissolvePlan(gateElapsedMs)
+    const animation = Animated.sequence([
+      Animated.delay(dissolve.delayMs),
+      Animated.timing(scanOpacity, {
+        toValue: 0,
+        duration: dissolve.durationMs,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+        isInteraction: false
+      })
+    ])
+    animation.start()
     const readyTimer = setTimeout(onPreludeReady, remainingMs)
-    return () => clearTimeout(readyTimer)
-  }, [bootMotionPreferenceResolved, bootTiming.initialized, onPreludeReady, shouldReduceMotion])
+    return () => {
+      clearTimeout(readyTimer)
+      animation.stop()
+    }
+  }, [bootMotionPreferenceResolved, bootTiming.initialized, onPreludeReady, scanOpacity, shouldReduceMotion])
 
   useEffect(() => {
     if (!bootTiming.initialized) return undefined
@@ -126,13 +153,13 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   return (
     <View style={styles.root}>
       <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
-      <View
+      <Animated.View
         accessibilityLabel="Blumi hazırlanıyor"
         accessibilityRole="progressbar"
-        style={styles.scanStage}
+        style={[styles.scanStage, { opacity: scanOpacity }]}
       >
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep} />
-      </View>
+      </Animated.View>
     </View>
   )
 }

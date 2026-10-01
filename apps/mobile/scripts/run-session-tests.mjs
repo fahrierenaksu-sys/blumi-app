@@ -184,7 +184,8 @@ try {
       "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/screens/AuthEntryScreen.test.ts",
       "src/ui/onboardingColorConsistency.test.ts",
-      "src/ui/onboardingActionSystem.test.ts"
+      "src/ui/onboardingActionSystem.test.ts",
+      "src/ui/blumiLoadingScreenHandoff.test.ts"
     ],
     {
       cwd: workspaceRoot,
