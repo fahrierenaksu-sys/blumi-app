@@ -9,6 +9,7 @@ import {
   applyChatThreadListed,
   applyChatThreadRead,
   getThreads,
+  hasMessageHistory,
   noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
@@ -23,6 +24,7 @@ import {
   disconnectGlobal,
   sendGlobal,
   setGlobalRealtimeAppState,
+  subscribeToEvents,
   subscribeToStatus,
   useGlobalRealtimeEvents
 } from "../features/realtime/globalRealtimeProvider"
@@ -37,6 +39,16 @@ import type { useRootChatSync } from "./useRootChatSync"
 import type { useRoomInviteRouting } from "./useRoomInviteRouting"
 
 type RootChatSync = ReturnType<typeof useRootChatSync>
+
+/** The conversation on screen (a chat thread, or the thread behind a MiniRoom). */
+function readActiveConversationThreadId(): string | undefined {
+  const route = navigationRef.getCurrentRoute()
+  return route?.name === "ChatThread"
+    ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
+    : route?.name === "MiniRoom"
+      ? (route.params as RootStackParamList["MiniRoom"] | undefined)?.readyMiniRoom.miniRoom.sourceThreadId
+      : undefined
+}
 
 interface GlobalRealtimeSessionInput {
   sessionActor: SessionActor | null
@@ -122,6 +134,11 @@ export function useGlobalRealtimeSession({
       return threadId ? resynchronizeLatestMessages(threadId) : Promise.resolve()
     },
     hydrateBlockedUsersFromServer,
+    // CHAT-RT-09: other cached conversations that changed while offline.
+    getActiveConversationThreadId: readActiveConversationThreadId,
+    hasMessageHistory,
+    resynchronizeThread: (threadId) => resynchronizeLatestMessages(threadId),
+    subscribeToEvents,
     connectGlobal,
     disconnectGlobal,
     sendGlobal,
