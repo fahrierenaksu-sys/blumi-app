@@ -47,6 +47,11 @@ export interface GlobalRealtimeEventHandlerDependencies {
   /** `safety.user_blocked`: the server confirmed a block by this user. */
   onPartnerBlocked?: (blockedUserId: string) => void
   showIncomingMessageToast: (toast: IncomingMessageToast) => void
+  /**
+   * False while the conversation is on screen (chat or shared room) or when
+   * the push for this message already showed a banner: one alert per message.
+   */
+  shouldShowIncomingMessageAlert?: (message: { threadId: string; messageId: string }) => boolean
 }
 
 export type GlobalRealtimeEventHandler = (event: ServerEvent) => void
@@ -110,7 +115,11 @@ export function createGlobalRealtimeEventHandler(
 
       if (
         dependencies.currentUserId &&
-        event.payload.senderUserId !== dependencies.currentUserId
+        event.payload.senderUserId !== dependencies.currentUserId &&
+        dependencies.shouldShowIncomingMessageAlert?.({
+          threadId: event.payload.threadId,
+          messageId: event.payload.messageId
+        }) !== false
       ) {
         const senderThread = dependencies.getThreads().find(
           (thread) => thread.threadId === event.payload.threadId

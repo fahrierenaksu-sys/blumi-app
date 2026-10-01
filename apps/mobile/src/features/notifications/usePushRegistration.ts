@@ -9,7 +9,8 @@ import { registerDevice, removeDevice, updateNotificationPreferences } from "./n
 import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
-import { getActiveChatThreadId } from "../chat/chatStore"
+import { resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
+import { claimForegroundAlert, isConversationFocused } from "./foregroundNotificationState"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -341,14 +342,12 @@ async function loadNotificationsModule(): Promise<NotificationsModule> {
 function ensureNotificationHandler(notifications: NotificationsModule): void {
   if (hasInstalledNotificationHandler) return
   notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      const data = notification.request.content.data
-      const activeThreadId = getActiveChatThreadId()
-      const viewingChat = AppState.currentState === "active" && activeThreadId !== null &&
-        data?.type === "chat.message" && data.threadId === activeThreadId
-      return { shouldPlaySound: false, shouldSetBadge: false,
-        shouldShowBanner: !viewingChat, shouldShowList: !viewingChat }
-    }
+    handleNotification: async (notification) => resolveForegroundNotificationPresentation({
+      data: notification.request.content.data,
+      appActive: AppState.currentState === "active",
+      isConversationFocused,
+      claimAlert: claimForegroundAlert
+    })
   })
   hasInstalledNotificationHandler = true
 }

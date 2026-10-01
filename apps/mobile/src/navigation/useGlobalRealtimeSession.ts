@@ -14,6 +14,7 @@ import {
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
 import { isDemoMode, setDemoMode } from "../features/demo/demoStore"
 import { createGlobalRealtimeEventHandler } from "../features/realtime/globalRealtimeEventHandler"
+import { shouldShowIncomingMessageAlert } from "../features/notifications/foregroundNotificationState"
 import {
   createGlobalRealtimeLifecycle,
   getGlobalRealtimeLifecycleIdentity
@@ -165,7 +166,8 @@ export function useGlobalRealtimeSession({
       onPartnerBlocked,
       showIncomingMessageToast: (toast) => {
         showToast({ ...toast, type: "info" })
-      }
+      },
+      shouldShowIncomingMessageAlert
     }),
     [
       onConnectionMatched,

@@ -9,6 +9,7 @@ import type { RootStackParamList } from "../../../navigation/RootNavigator"
 import { skipDiscoveryCandidate } from "../../connections/savedConnectionsStore"
 import { useInventoryStore } from "../../inventory/inventoryStore"
 import { reportDiscoveryMatchCreated } from "../../matches/discoveryMatchCreatedRuntime"
+import { claimForegroundAlert } from "../../notifications/foregroundNotificationState"
 import type { LobbyFeedbackCopy } from "../../lobby/lobbyFeedbackCopy"
 import type { PendingInviteMemory } from "../../lobby/pendingInvitesStore"
 import type { SessionActor } from "../../session/sessionModel"
@@ -189,6 +190,8 @@ export function useDiscoveryDecisions(input: {
         })
 
         if (match) {
+          // This phone shows the match itself; its own match push stays quiet.
+          claimForegroundAlert(`match:${match.id}`)
           // Reported here, from the server response, and never from the
           // MatchResult route, which "View match" in chat also replays.
           void reportDiscoveryMatchCreated({

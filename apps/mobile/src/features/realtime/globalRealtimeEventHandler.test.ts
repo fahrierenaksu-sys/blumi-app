@@ -42,6 +42,25 @@ test("read events stay on the current account and next chat pages are requested"
   assert.equal(refreshes, 1)
 })
 
+test("the incoming message toast stays quiet when the conversation is on screen or the push already alerted", () => {
+  const asked: { threadId: string; messageId: string }[] = []
+  let allow = false
+  const dependencies = createDependencies({
+    shouldShowIncomingMessageAlert: (incoming) => { asked.push(incoming); return allow }
+  })
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  handler({ type: "chat.message_received", payload: message })
+  assert.deepEqual(dependencies.receivedMessages, [message], "the message is still applied to the store")
+  assert.deepEqual(dependencies.toasts, [])
+  allow = true
+  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_2" } })
+  assert.equal(dependencies.toasts.length, 1)
+  assert.deepEqual(asked, [
+    { threadId: "thread_1", messageId: "message_1" },
+    { threadId: "thread_1", messageId: "message_2" }
+  ])
+})
+
 test("the server's block confirmation drops the blocked partner's chat", () => {
   const blocked: string[] = []
   const handler = createGlobalRealtimeEventHandler(createDependencies({

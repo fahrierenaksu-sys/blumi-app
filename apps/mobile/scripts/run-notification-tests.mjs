@@ -22,7 +22,9 @@ const sourceFiles = [
   "src/features/notifications/notificationRouting.ts",
   "src/features/notifications/notificationRouting.test.ts",
   "src/features/notifications/notificationPreferencesModel.ts",
-  "src/features/notifications/notificationPreferencesModel.test.ts"
+  "src/features/notifications/notificationPreferencesModel.test.ts",
+  "src/features/notifications/notificationPresentationModel.ts",
+  "src/features/notifications/notificationPresentationModel.test.ts"
 ]
 
 try {
@@ -65,6 +67,7 @@ try {
       join(outputDirectory, "features/notifications/pushRegistrationCoordinator.test.js"),
       join(outputDirectory, "features/notifications/notificationRouting.test.js"),
       join(outputDirectory, "features/notifications/notificationPreferencesModel.test.js"),
+      join(outputDirectory, "features/notifications/notificationPresentationModel.test.js"),
       resolve(workspaceRoot, "src/features/notifications/notificationResponseDelivery.test.mjs")
     ],
     {
@@ -73,7 +76,8 @@ try {
     }
   )
   execFileSync(process.execPath,
-    ["--import", "tsx", "--test", "src/features/notifications/useChatNotificationPrompt.test.ts"],
+    ["--import", "tsx", "--test", "src/features/notifications/useChatNotificationPrompt.test.ts",
+      "src/features/notifications/foregroundNotificationState.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" })
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })

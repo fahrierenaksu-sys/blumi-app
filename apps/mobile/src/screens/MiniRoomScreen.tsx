@@ -43,6 +43,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
+import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -70,6 +71,8 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     localUserId: sessionActor.profile.userId,
     partnerUserId: participants.partner.userId
   })
+  // The room shows its conversation's messages and invites itself.
+  useFocusedConversation(roomChat.threadId, isFocused)
   const roomChatHistory = useRoomChatHistory({
     threadId: roomChat.threadId,
     localUserId: sessionActor.profile.userId

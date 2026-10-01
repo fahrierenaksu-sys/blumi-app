@@ -35,6 +35,7 @@ function mount() {
       },
       "../features/demo/demoStore": { isDemoMode: () => false, setDemoMode: () => undefined },
       "../features/realtime/globalRealtimeEventHandler": { createGlobalRealtimeEventHandler: () => () => undefined },
+      "../features/notifications/foregroundNotificationState": { shouldShowIncomingMessageAlert: () => true },
       "../features/realtime/globalRealtimeProvider": {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
