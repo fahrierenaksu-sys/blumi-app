@@ -63,6 +63,21 @@ test("MiniRoom chat panel, menu and state copy exist in both languages", () => {
   }
 })
 
+test("an unconfirmed room close reads calmly: the person is already out", () => {
+  const tr = getMiniRoomCopy("tr")
+  const en = getMiniRoomCopy("en")
+  assert.equal(tr.leftRoomUnconfirmed,
+    "Odadan çıktın. Odanın kapandığı henüz onaylanmadı; bir sonraki davetinde kapatabilirsin.")
+  assert.equal(en.leftRoomUnconfirmed,
+    "You left the room. Its closing isn't confirmed yet; you can close it with your next invite.")
+  // 2026-10-01 owner report: the old banner sounded like a failure and asked
+  // for a retry inside a room the person had already chosen to leave.
+  for (const text of [tr.leftRoomUnconfirmed, en.leftRoomUnconfirmed]) {
+    assert.doesNotMatch(text, /doğrulanamadı|kontrol edip|tekrar dene|could not|check your connection|try again/i)
+  }
+  assert.equal("leaveNotConfirmed" in tr, false)
+})
+
 test("in-room presence, seat and takeover notices exist in Turkish and English", () => {
   const tr = getMiniRoomCopy("tr")
   const en = getMiniRoomCopy("en")

@@ -361,6 +361,20 @@ test("MiniRoom uses durable speech bubbles without the legacy reaction UI", () =
   assert.match(scene, /onDismissBubble/)
 })
 
+test("a confirmed MiniRoom leave never keeps the person in the room (2026-10-01)", () => {
+  const screen = read("src/screens/MiniRoomScreen.tsx")
+  const hook = read("src/features/miniRoom/useMiniRoomLeave.ts")
+
+  // The leave goes through the bounded exit-and-confirm flow, not a bare
+  // request whose failure re-enabled the arrow behind an alarming banner.
+  assert.match(screen, /useMiniRoomLeave\(\{/)
+  assert.doesNotMatch(screen, /leaveRoomSession/)
+  assert.doesNotMatch(screen, /leaveNotConfirmed|setLeaveError/)
+  assert.match(hook, /startMiniRoomLeave\(\{/)
+  assert.match(hook, /copy\.leftRoomUnconfirmed/)
+  assert.doesNotMatch(hook, /console\./)
+})
+
 test("leaving the MiniRoom always asks first, from the arrow, the menu or Android back (ROOM-08)", () => {
   const screen = read("src/screens/MiniRoomScreen.tsx")
   const guard = read("src/features/miniRoom/useMiniRoomLeaveGuard.ts")

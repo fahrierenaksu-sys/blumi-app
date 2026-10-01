@@ -45,7 +45,8 @@ export interface MiniRoomCopy {
   reconnecting: string
   connectionFailed: string
   roomRefreshFailed: string
-  leaveNotConfirmed: string
+  /** Shown after the person left when the close for both could not be confirmed. */
+  leftRoomUnconfirmed: string
   legacyDecorNotice: string
   leaveConfirmTitle: string
   leaveConfirmBody: string
@@ -108,7 +109,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     reconnecting: "Connection lost. Reconnecting…",
     connectionFailed: "Couldn't connect to the room.",
     roomRefreshFailed: "Room details could not be refreshed. Your current room is unchanged; it will retry after the next reconnection.",
-    leaveNotConfirmed: "Leaving the room could not be confirmed. Check your connection and try again.",
+    leftRoomUnconfirmed: "You left the room. Its closing isn't confirmed yet; you can close it with your next invite.",
     legacyDecorNotice: "This older session has no saved decor. A shared default room is shown.",
     leaveConfirmTitle: "Leave the room?",
     leaveConfirmBody: "The room closes for both of you.",
@@ -163,7 +164,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     reconnecting: "Bağlantı koptu. Yeniden bağlanılıyor…",
     connectionFailed: "Oda bağlantısı kurulamadı.",
     roomRefreshFailed: "Oda bilgileri yenilenemedi. Mevcut oda korunuyor; bağlantı tekrar kurulunca yeniden denenecek.",
-    leaveNotConfirmed: "Odadan çıkış sunucuda doğrulanamadı. Bağlantını kontrol edip tekrar dene.",
+    leftRoomUnconfirmed: "Odadan çıktın. Odanın kapandığı henüz onaylanmadı; bir sonraki davetinde kapatabilirsin.",
     legacyDecorNotice: "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor.",
     leaveConfirmTitle: "Odadan ayrılmak istiyor musun?",
     leaveConfirmBody: "Oda ikiniz için de kapanır.",
