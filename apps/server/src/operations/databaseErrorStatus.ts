@@ -1,3 +1,5 @@
+import { DatabaseError } from "pg"
+
 /**
  * HTTP meaning of an error that escaped a route from node-postgres. Only the
  * SQLSTATE is returned for logs: PostgreSQL messages and details can contain
@@ -28,10 +30,24 @@ const TRANSIENT_MESSAGES = [
 ]
 const TRANSIENT_SOCKET_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EAI_AGAIN"])
 
+/**
+ * A PostgreSQL server error (an ErrorResponse with a SQLSTATE). node-postgres
+ * 8.x builds these as pg-protocol's DatabaseError with `name` set to "error",
+ * so the name can never identify them. A second copy of pg-protocol in the
+ * dependency tree would defeat instanceof, so a server-supplied severity plus
+ * a 5-character SQLSTATE also qualifies.
+ */
+export function isPostgresServerError(error: unknown): error is Error & { code: string } {
+  if (!(error instanceof Error)) return false
+  const { code, severity } = error as { code?: unknown; severity?: unknown }
+  if (typeof code !== "string" || !/^[0-9A-Z]{5}$/.test(code)) return false
+  return error instanceof DatabaseError || typeof severity === "string"
+}
+
 export function classifyDatabaseError(error: unknown): DatabaseErrorStatus | null {
   if (!(error instanceof Error)) return null
   const code = (error as { code?: unknown }).code
-  if (error.name === "DatabaseError" && typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) {
+  if (isPostgresServerError(error) && typeof code === "string") {
     if (CONFLICT_STATES.has(code)) return { statusCode: 409, sqlState: code }
     if (TRANSIENT_STATES.has(code) || code.startsWith("08")) return { statusCode: 503, sqlState: code, retryAfterSeconds: 1 }
     return { statusCode: 500, sqlState: code }

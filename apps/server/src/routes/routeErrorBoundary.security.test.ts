@@ -5,6 +5,7 @@ import { createBlumiBackendStore } from "../auth/authStore"
 import { createInMemorySafetyRepository } from "../safety/safetyRepository"
 import { createSafetyService } from "../safety/safetyService"
 import { createServer } from "../server"
+import { DatabaseError } from "pg"
 
 test("route boundaries expose expected input errors but hide infrastructure details", async () => {
   const authService = createAuthService({
@@ -65,7 +66,8 @@ test("database races answer 409 and transient database failures 503 with Retry-A
     }
   })
   const app = createServer({ authService, safetyService })
-  const pgError = (code: string, message: string) => Object.assign(new Error(message), { name: "DatabaseError", code })
+  // The real node-postgres shape: pg-protocol names server errors "error".
+  const pgError = (code: string, message: string) => Object.assign(new DatabaseError(message, 0, "error"), { code, severity: "ERROR" })
 
   try {
     await authService.sendCode("+905551112233")
