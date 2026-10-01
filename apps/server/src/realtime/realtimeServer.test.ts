@@ -474,6 +474,20 @@ test("shutdown tears down a websocket that ignores the close frame within the cl
     for (let round = 0; round < 20; round += 1) await new Promise<void>((resolve) => setImmediate(resolve))
   }
 
+  // Mocked timers also stop the test's own timeout, so every wait that could
+  // hang is bounded by a real timer captured before mocking.
+  const realSetTimeout = globalThis.setTimeout
+  const realClearTimeout = globalThis.clearTimeout
+  const withinRealTime = async <T>(work: Promise<T>, label: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([work, new Promise<never>((_resolve, reject) => {
+        timer = realSetTimeout(() => reject(new Error(`Timed out: ${label}`)), 3_000)
+      })])
+    } finally {
+      realClearTimeout(timer)
+    }
+  }
   t.mock.timers.enable({ apis: ["setTimeout"] })
   try {
     let closed = false
@@ -486,9 +500,10 @@ test("shutdown tears down a websocket that ignores the close frame within the cl
     // Mocked timers also stop the test's own timeout, so wait on I/O turns.
     for (let round = 0; round < 50 && !closed; round += 1) await settleIo()
     assert.equal(closed, true, "shutdown finished once the handshake bound passed")
-    await stopping
+    await withinRealTime(stopping, "realtime shutdown")
     // The server destroyed its side; the peer sees the connection end.
-    await new Promise<void>((resolve) => { if (socket.destroyed) resolve(); else socket.once("close", () => resolve()) })
+    await withinRealTime(new Promise<void>((resolve) => { if (socket.destroyed) resolve(); else socket.once("close", () => resolve()) }),
+      "the peer socket closing")
     assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), false,
       "the batched disconnect cleanup still runs")
   } finally {
