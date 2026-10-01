@@ -378,6 +378,36 @@ test("a message queued before a block is never pushed or fanned out after it, an
   }
 })
 
+test("a send reads the thread once and keeps the post-persist block check", async () => {
+  const repository = createInMemoryChatRepository()
+  let threadReads = 0
+  const findThread = repository.findThread.bind(repository)
+  repository.findThread = async (threadId) => { threadReads += 1; return findThread(threadId) }
+  const chatService = createChatService({ repository, idFactory: () => "message_counted" })
+  await createThread(chatService)
+  threadReads = 0
+  const safetyService = createSafetyService()
+  let blockChecks = 0
+  const hasBlockBetween = safetyService.hasBlockBetween.bind(safetyService)
+  safetyService.hasBlockBetween = async (a, b) => { blockChecks += 1; return hasBlockBetween(a, b) }
+  const sentEvents: ServerEvent[] = []
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService,
+    connectionManager: {
+      async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) { sentEvents.push(event) },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+
+  await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "counted" })
+  await waitFor(() => sentEvents.length === 1)
+
+  assert.equal(threadReads, 1, "was three reads: route check, persistence and inline dispatch")
+  assert.equal(blockChecks, 2, "before persisting and again before fanout")
+})
+
 async function createThread(chatService: ReturnType<typeof createChatService>) {
   await chatService.createThread({
     threadId: "thread_one",
