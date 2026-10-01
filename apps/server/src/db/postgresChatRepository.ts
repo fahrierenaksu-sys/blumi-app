@@ -332,9 +332,23 @@ export function createPostgresChatRepository(
               thread.last_message_sent_at IS NULL OR
               (thread.last_message_sent_at, thread.last_message_id) <= (shown.sent_at, shown.message_id)
             ) RETURNING thread.thread_id
+         ), held AS (
+           -- An undelivered earlier message of the thread (leased, in retry
+           -- backoff or due) keeps this job unleased, so the inline dispatch
+           -- cannot overtake it; claims take a thread's jobs in order.
+           SELECT EXISTS (
+             SELECT 1 FROM blumi_chat_delivery_outbox AS job
+               JOIN blumi_chat_messages AS earlier USING (message_id)
+              WHERE job.completed_at IS NULL AND earlier.thread_id = $2
+                AND (earlier.sent_at, earlier.message_id) < ($5::timestamptz, $1::text)
+           ) AS held
          ), delivery AS (
            INSERT INTO blumi_chat_delivery_outbox (message_id, available_at, attempt_count, lease_token)
-           SELECT message_id, $7::timestamptz, 1, md5(random()::text || clock_timestamp()::text) FROM saved
+           SELECT message_id,
+                  CASE WHEN held.held THEN NOW() ELSE $7::timestamptz END,
+                  CASE WHEN held.held THEN 0 ELSE 1 END,
+                  CASE WHEN held.held THEN NULL ELSE md5(random()::text || clock_timestamp()::text) END
+             FROM saved CROSS JOIN held
            RETURNING lease_token, attempt_count
          ), repaired_delivery AS (
            INSERT INTO blumi_chat_delivery_outbox (message_id)
@@ -382,7 +396,7 @@ export function createPostgresChatRepository(
           outcome: "created",
           message: mapMessage(row),
           participantUserIds: members,
-          job: { leaseToken: String(row.lease_token), attempt: Number(row.attempt_count) },
+          ...(row.lease_token ? { job: { leaseToken: String(row.lease_token), attempt: Number(row.attempt_count) } } : {}),
           recipientPersonas: Array.isArray(row.recipient_personas)
             ? row.recipient_personas.map((persona: { userId: unknown; greeting: unknown; replies: unknown }) => ({
                 userId: String(persona.userId),
@@ -429,12 +443,24 @@ export function createPostgresChatRepository(
       // in the future) still exclude claimed jobs.
       const result = await pool.query(
         `WITH due AS (
-           SELECT message_id FROM blumi_chat_delivery_outbox
-            WHERE completed_at IS NULL
-              AND available_at <= CASE WHEN $4::text IS NULL THEN $1::timestamptz
-                                       ELSE GREATEST($1::timestamptz, statement_timestamp()) END
-              AND ($4::text IS NULL OR message_id = $4)
-            ORDER BY available_at, message_id FOR UPDATE SKIP LOCKED LIMIT $2
+           SELECT job.message_id FROM blumi_chat_delivery_outbox AS job
+             JOIN blumi_chat_messages AS message USING (message_id)
+            WHERE job.completed_at IS NULL
+              AND job.available_at <= CASE WHEN $4::text IS NULL THEN $1::timestamptz
+                                           ELSE GREATEST($1::timestamptz, statement_timestamp()) END
+              AND ($4::text IS NULL OR job.message_id = $4)
+              -- Only a thread's oldest undelivered job (leased, in retry
+              -- backoff or due) is claimable, so a thread is delivered in
+              -- message order. Probes the partial outbox index of
+              -- undelivered jobs, which stays small.
+              AND NOT EXISTS (
+                SELECT 1 FROM blumi_chat_delivery_outbox AS earlier_job
+                  JOIN blumi_chat_messages AS earlier USING (message_id)
+                 WHERE earlier_job.completed_at IS NULL
+                   AND earlier.thread_id = message.thread_id
+                   AND (earlier.sent_at, earlier.message_id) < (message.sent_at, message.message_id)
+              )
+            ORDER BY job.available_at, job.message_id FOR UPDATE OF job SKIP LOCKED LIMIT $2
          ), claimed AS (
            UPDATE blumi_chat_delivery_outbox AS job
               SET available_at = $3, attempt_count = job.attempt_count + 1,

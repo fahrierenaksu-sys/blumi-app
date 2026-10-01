@@ -1,5 +1,4 @@
 import type { ChatMessage } from "@blumi/contracts"
-import { compareChatMessagePositions } from "@blumi/domain"
 import type { ChatService } from "./chatService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { ConnectionManager } from "../realtime/connectionManager"
@@ -30,6 +29,8 @@ export function createChatMessageDeliveryService(options: {
   measure?: ChatPhaseMeasure
   /** A send-leased dispatch that waited longer than this renews its lease first (tests shorten it). */
   leaseRenewAfterMs?: number
+  /** The longest a recovery tick waits for its dispatches before it returns (tests shorten it). */
+  recoveryTickWaitMs?: number
 }): ChatMessageDeliveryService {
   const {
     chatService,
@@ -38,6 +39,8 @@ export function createChatMessageDeliveryService(options: {
     notificationService
   } = options
   const leaseRenewAfterMs = options.leaseRenewAfterMs ?? LEASE_RENEW_AFTER_MS
+  const recoveryTickWaitMs = options.recoveryTickWaitMs ?? RECOVERY_TICK_WAIT_MS
+  let recoveryInFlight = 0
   const measure = options.measure ?? createChatLatencyDiagnostics({
     nodeEnv: process.env.NODE_ENV ?? "unknown",
     enabled: process.env.BLUMI_CHAT_LATENCY_DIAGNOSTICS === "1"
@@ -170,19 +173,34 @@ export function createChatMessageDeliveryService(options: {
   }
 
   /**
-   * Claims due outbox jobs and dispatches them through the same per-thread
-   * chain as the inline path, in message order (sent_at, message_id), so a
-   * thread's messages reach the partner in order on recovery too (the claim
-   * orders by availability, and a retried job comes back later). Threads
-   * still run in parallel. A job that waited behind its thread renews its
-   * lease like an inline dispatch.
+   * Recovers due outbox jobs. A claim takes only each thread's oldest
+   * undelivered job, so the jobs of one round belong to different threads and
+   * run in parallel, and a thread's later messages wait until its earlier one
+   * is delivered (also while that one is in retry backoff). When a round
+   * settles, the tick claims again, so a thread's backlog drains in order
+   * within one tick. A tick lasts at most `recoveryTickWaitMs`, so one slow
+   * thread cannot stall recovery of the others: a dispatch still running
+   * keeps its lease and is not claimed again until the lease runs out.
+   * Recovered jobs never join the inline dispatch chains; the claim order
+   * already keeps a thread's order.
    */
   async function dispatchDue(now: Date): Promise<void> {
-    const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: DELIVERY_LEASE_MS })
-    const leaseUntil = now.getTime() + DELIVERY_LEASE_MS
-    const ordered = [...jobs].sort((left, right) => compareChatMessagePositions(left.message, right.message))
-    await Promise.all(ordered.map((job) => enqueueThreadDispatch(chatService, job.message.threadId,
-      () => dispatchLeased(job.message, undefined, job, leaseUntil))))
+    const tickStartedAt = Date.now()
+    const deadline = tickStartedAt + recoveryTickWaitMs
+    for (;;) {
+      const limit = Math.min(RECOVERY_BATCH_SIZE, MAX_RECOVERY_IN_FLIGHT - recoveryInFlight)
+      if (limit <= 0) return
+      // `now` may be a test clock; later rounds advance it by the time spent.
+      const claimAt = new Date(now.getTime() + (Date.now() - tickStartedAt))
+      const jobs = await chatService.repository.claimDeliveries({ now: claimAt, limit, leaseMs: DELIVERY_LEASE_MS })
+      if (jobs.length === 0) return
+      recoveryInFlight += jobs.length
+      const dispatches = jobs.map((job) => dispatchJob(job, claimAt)
+        .catch((error) => options.reportError?.(error))
+        .finally(() => { recoveryInFlight -= 1 }))
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0 || !(await settleWithin(Promise.all(dispatches), remainingMs))) return
+    }
   }
 
   /**
@@ -204,7 +222,7 @@ export function createChatMessageDeliveryService(options: {
    */
   async function dispatchLeased(
     message: ChatMessage,
-    thread: ChatThreadMembers | undefined,
+    thread: ChatThreadMembers,
     lease: { leaseToken: string; attempt: number },
     leaseUntil: number
   ): Promise<void> {
@@ -251,14 +269,34 @@ export function createChatMessageDeliveryService(options: {
 const DELIVERY_LEASE_MS = 30_000
 /** A send-leased dispatch that waited longer than this renews its lease first. */
 const LEASE_RENEW_AFTER_MS = 10_000
+/** Jobs one recovery tick claims (at most one per thread). */
+const RECOVERY_BATCH_SIZE = 50
+/** Recovered dispatches that may still run after their tick returned. */
+const MAX_RECOVERY_IN_FLIGHT = 200
+/** How long one recovery tick may claim and wait for its dispatches. */
+const RECOVERY_TICK_WAIT_MS = 2_000
+
+/** True when `work` settles within `ms`, false when the time runs out first. */
+function settleWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    // Not unref'd: a tick waiting on a dispatch must keep the process alive.
+    const timer = setTimeout(() => resolve(false), ms)
+    const settled = () => {
+      clearTimeout(timer)
+      resolve(true)
+    }
+    void work.then(settled, settled)
+  })
+}
 
 /**
- * Post-persist dispatch chains, per chat service (the HTTP route and the
- * realtime router each build their own delivery service over the same chat
- * service) and per thread. The outbox worker's recovered jobs join the same
- * chain, so recovery keeps a thread's order and never overtakes an inline
- * dispatch that is still running; a job whose lease the worker took is
- * skipped by the inline dispatch (fenced lease).
+ * Inline post-persist dispatch chains, per chat service (the HTTP route and
+ * the realtime router each build their own delivery service over the same
+ * chat service) and per thread. The outbox worker stays independent: a claim
+ * takes only a thread's oldest undelivered job and a send behind an
+ * undelivered message is not leased, so neither path overtakes the other; a
+ * job whose lease the worker took is skipped by the inline dispatch (fenced
+ * lease).
  */
 const threadDispatchChains = new WeakMap<ChatService, Map<string, Promise<void>>>()
 

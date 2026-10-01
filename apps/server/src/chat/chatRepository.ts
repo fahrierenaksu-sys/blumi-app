@@ -51,9 +51,11 @@ export interface ChatCheckedSendInput {
  * - `blocked`: a block exists between the sender and another participant;
  *   nothing was written. `retryOf` is the sender's committed message with
  *   the same client message ID, if any.
- * - `created`: the message, its thread preview and its leased outbox job
- *   were written. `recipientPersonas` are the other participants' test
- *   personas (the delivery replies for them).
+ * - `created`: the message, its thread preview and its outbox job were
+ *   written. The job is leased to the caller (`job`) unless an earlier
+ *   message of the thread is still undelivered: then it waits unleased for
+ *   a claim, which takes a thread's jobs in message order. `recipientPersonas`
+ *   are the other participants' test personas (the delivery replies for them).
  * - `retried`: the client message ID was used before; the stored message is
  *   returned (`idempotencyConflict` when its body differs). A same-body retry
  *   repairs the preview and outbox exactly like `createMessage`.
@@ -67,7 +69,7 @@ export type ChatCheckedSendResult =
       outcome: "created"
       message: ChatMessage
       participantUserIds: [string, string]
-      job: { leaseToken: string; attempt: number }
+      job?: { leaseToken: string; attempt: number }
       recipientPersonas: TestPersona[]
     }
   | { outcome: "retried"; message: ChatMessage; participantUserIds: [string, string]; idempotencyConflict?: true }
@@ -319,14 +321,20 @@ export function createInMemoryChatRepository(
           ...(prior.body !== message.body ? { idempotencyConflict: true as const } : {})
         }
       }
-      const leaseToken = randomUUID()
-      insertMessage(message, key, { availableAt: leaseUntil.getTime(), attempt: 1, leaseToken })
+      // A job behind an undelivered message of the thread is not leased, so
+      // it cannot overtake that message (claims keep the thread's order).
+      const heldBack = [...store.deliveryJobs.values()].some((job) => !job.completed &&
+        job.message.threadId === message.threadId && compareChatMessagePositions(job.message, message) < 0)
+      const leaseToken = heldBack ? undefined : randomUUID()
+      insertMessage(message, key, leaseToken
+        ? { availableAt: leaseUntil.getTime(), attempt: 1, leaseToken }
+        : { availableAt: Date.now(), attempt: 0 })
       const personas = await Promise.all(partnerUserIds.map((userId) => this.findTestPersona(userId)))
       return {
         outcome: "created",
         message: { ...message },
         participantUserIds,
-        job: { leaseToken, attempt: 1 },
+        ...(leaseToken ? { job: { leaseToken, attempt: 1 } } : {}),
         recipientPersonas: personas.filter((persona): persona is TestPersona => persona !== null)
       }
     },
@@ -364,8 +372,13 @@ export function createInMemoryChatRepository(
       return advances ? { readAt, readUpTo: { ...receipt } } : { readAt }
     },
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
-      const jobs = [...store.deliveryJobs.values()]
-        .filter((job) => !job.completed && job.availableAt <= now.getTime() && (!messageId || job.message.messageId === messageId))
+      const undelivered = [...store.deliveryJobs.values()].filter((job) => !job.completed)
+      const holdsBack = (job: (typeof undelivered)[number]) => undelivered.some((earlier) =>
+        earlier.message.threadId === job.message.threadId &&
+        compareChatMessagePositions(earlier.message, job.message) < 0)
+      const jobs = undelivered
+        .filter((job) => job.availableAt <= now.getTime() && (!messageId || job.message.messageId === messageId))
+        .filter((job) => !holdsBack(job))
         .sort((left, right) => left.availableAt - right.availableAt)
         .slice(0, limit)
       return jobs.map((job) => {

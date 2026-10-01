@@ -85,6 +85,7 @@ runRepositoryContract<ChatSendBackend>({
       if (result.outcome !== "created") return
       assert.equal(result.message.body, "hello")
       assert.deepEqual(result.participantUserIds, chat.participantUserIds)
+      assert.ok(result.job, "nothing is ahead of it, so the job is leased to the sender")
       assert.equal(result.job.attempt, 1)
       assert.deepEqual(result.recipientPersonas, [])
       assert.equal((await backend.repository.chat.findThread(chat.threadId))?.lastMessage?.messageId, result.message.messageId)
@@ -104,6 +105,33 @@ runRepositoryContract<ChatSendBackend>({
       assert.deepEqual(await claim(now.getTime() + 120_000), [])
     },
 
+    "a send behind an undelivered message of its thread is not leased, and is claimed only after it": async (backend) => {
+      const chat = thread(backend, "held")
+      await backend.repository.chat.saveThread(chat)
+      const now = new Date()
+      const first = await send(backend, message(chat, "m1", "first", undefined, now), undefined, now)
+      assert.equal(first.outcome, "created")
+      if (first.outcome !== "created") return
+      assert.ok(first.job, "nothing is ahead of the first message, so it is leased to the sender")
+      // The first dispatch fails into retry backoff.
+      await backend.repository.chat.retryDelivery(first.message.messageId, first.job.leaseToken, new Date(now.getTime() + 60_000))
+
+      const later = new Date(now.getTime() + 1)
+      const second = await send(backend, message(chat, "m2", "second", undefined, later), undefined, later)
+      assert.equal(second.outcome, "created")
+      if (second.outcome !== "created") return
+      assert.equal(second.job, undefined, "a lease would let the second message overtake the first")
+      const claim = (at: number, messageId?: string) => backend.repository.chat.claimDeliveries({
+        now: new Date(at), limit: 50, leaseMs: LEASE_MS, ...(messageId ? { messageId } : {})
+      })
+      assert.deepEqual(await claim(now.getTime() + 1_000, second.message.messageId), [])
+      const retried = (await claim(now.getTime() + 61_000)).filter((job) => job.message.threadId === chat.threadId)
+      assert.deepEqual(retried.map((job) => job.message.messageId), [first.message.messageId])
+      await backend.repository.chat.completeDelivery(first.message.messageId, retried[0]!.leaseToken, now)
+      const next = await claim(now.getTime() + 61_000, second.message.messageId)
+      assert.deepEqual(next.map((job) => job.message.messageId), [second.message.messageId])
+    },
+
     "an expired send lease is recovered by a claim, after which the sender's lease is lost": async (backend) => {
       const chat = thread(backend, "expired")
       await backend.repository.chat.saveThread(chat)
@@ -111,6 +139,7 @@ runRepositoryContract<ChatSendBackend>({
       const result = await send(backend, message(chat, "m1", "hello", undefined, now), undefined, now)
       assert.equal(result.outcome, "created")
       if (result.outcome !== "created") return
+      assert.ok(result.job)
       const [claimed] = await backend.repository.chat.claimDeliveries({
         now: new Date(now.getTime() + LEASE_MS + 1_000), limit: 10, leaseMs: LEASE_MS, messageId: result.message.messageId
       })

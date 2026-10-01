@@ -82,9 +82,15 @@ runRepositoryContract<ChatRepository>({
         [first.message.messageId, otherSender.message.messageId])
       assert.equal((await backend.repository.findThread(chat.threadId))?.lastMessage?.messageId, otherSender.message.messageId)
 
-      const jobs = await backend.repository.claimDeliveries({ now: new Date("2100-01-01T00:00:00.000Z"), limit: 10, leaseMs: 1000 })
-      assert.deepEqual(jobs.map((job) => job.message.messageId).sort(),
-        [first.message.messageId, otherSender.message.messageId].sort(), "one outbox job per created message")
+      // One outbox job per created message; a thread's jobs are claimed in message order.
+      const claimAt = new Date("2100-01-01T00:00:00.000Z")
+      const ownJobs = async () => (await backend.repository.claimDeliveries({ now: claimAt, limit: 50, leaseMs: 1000 }))
+        .filter((job) => job.message.threadId === chat.threadId)
+      const jobs = await ownJobs()
+      assert.deepEqual(jobs.map((job) => job.message.messageId), [first.message.messageId])
+      await backend.repository.completeDelivery(first.message.messageId, jobs[0]!.leaseToken, claimAt)
+      const next = await ownJobs()
+      assert.deepEqual(next.map((job) => job.message.messageId), [otherSender.message.messageId])
     },
 
     "a late message never replaces a newer thread preview": async (backend) => {
@@ -322,6 +328,45 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(await backend.repository.saveChatPreferences(ada, { readReceiptsEnabled: false }, new Date()), { readReceiptsEnabled: false })
       assert.deepEqual(await backend.repository.getChatPreferences(ada), { readReceiptsEnabled: false })
       assert.deepEqual(await backend.repository.listReceiptParticipants([]), [])
+    },
+
+    "a claim takes only the oldest undelivered job of each thread, so a retried job holds its thread back": async (backend) => {
+      const chat = thread(backend, "claim_order", "2026-09-30T10:00:00.000Z")
+      const other = thread(backend, "claim_other", "2026-09-30T10:00:00.000Z", [backend.id("user_c"), backend.id("user_d")])
+      await backend.repository.saveThread(chat)
+      await backend.repository.saveThread(other)
+      const first = message(chat, "m1", "2026-09-30T10:01:00.000Z")
+      const second = message(chat, "m2", "2026-09-30T10:02:00.000Z")
+      const third = message(chat, "m3", "2026-09-30T10:03:00.000Z")
+      const elsewhere = message(other, "n1", "2026-09-30T10:01:00.000Z")
+      // The second message's job is written first, so it is the oldest by availability.
+      for (const value of [second, first, third, elsewhere]) await backend.repository.createMessage(value)
+      const ids = new Set([first, second, third, elsewhere].map((value) => value.messageId))
+      const startedAt = Date.now()
+      const claim = async (afterMs: number, messageId?: string) =>
+        (await backend.repository.claimDeliveries({ now: new Date(startedAt + afterMs), limit: 50, leaseMs: 1000, messageId }))
+          .filter((job) => ids.has(job.message.messageId))
+      const sortedIds = (jobs: readonly { message: ChatMessage }[]) => jobs.map((job) => job.message.messageId).sort()
+
+      const firstClaim = await claim(1_000)
+      assert.deepEqual(sortedIds(firstClaim), [first.messageId, elsewhere.messageId].sort())
+      assert.deepEqual(await claim(1_000, second.messageId), [], "a targeted claim also waits for the earlier message")
+
+      // The first message's dispatch fails: in retry backoff it still holds its thread back.
+      const firstJob = firstClaim.find((job) => job.message.messageId === first.messageId)!
+      const elsewhereJob = firstClaim.find((job) => job.message.messageId === elsewhere.messageId)!
+      await backend.repository.retryDelivery(first.messageId, firstJob.leaseToken, new Date(startedAt + 60_000))
+      await backend.repository.completeDelivery(elsewhere.messageId, elsewhereJob.leaseToken, new Date())
+      assert.deepEqual(await claim(5_000), [], "later messages wait while the first is in backoff")
+      assert.deepEqual(await claim(5_000, third.messageId), [])
+
+      const retried = await claim(61_000)
+      assert.deepEqual(sortedIds(retried), [first.messageId])
+      await backend.repository.completeDelivery(first.messageId, retried[0]!.leaseToken, new Date())
+      const next = await claim(63_000)
+      assert.deepEqual(sortedIds(next), [second.messageId])
+      await backend.repository.completeDelivery(second.messageId, next[0]!.leaseToken, new Date())
+      assert.deepEqual(sortedIds(await claim(65_000, third.messageId)), [third.messageId])
     }
   }
 })
