@@ -23,6 +23,8 @@ export interface ChatTextTimelineItem {
   kind: "message"
   message: ChatMessage
   createdAt: string
+  /** The local id an acknowledged message was first shown under (stable row key). */
+  renderKey?: string
 }
 
 export type ChatTimelineItem = ChatTextTimelineItem | ChatRoomInviteTimelineItem
@@ -61,15 +63,17 @@ export function isLegacyRoomInviteSentinel(body: string): boolean {
 
 export function buildChatTimeline(
   messages: readonly ChatMessage[],
-  roomInvites: readonly ChatRoomInviteTimelineItem[]
+  roomInvites: readonly ChatRoomInviteTimelineItem[],
+  getRenderKey?: (messageId: string) => string
 ): ChatTimelineItem[] {
   const messageItems = messages
     .filter((message) => !isLegacyRoomInviteSentinel(message.body))
-    .map((message): ChatTextTimelineItem => ({
-      kind: "message",
-      message,
-      createdAt: message.sentAt
-    }))
+    .map((message): ChatTextTimelineItem => {
+      const renderKey = getRenderKey?.(message.messageId)
+      return renderKey && renderKey !== message.messageId
+        ? { kind: "message", message, createdAt: message.sentAt, renderKey }
+        : { kind: "message", message, createdAt: message.sentAt }
+    })
 
   const invitesById = new Map<string, ChatRoomInviteTimelineItem>()
   for (const invite of roomInvites) {
@@ -85,7 +89,7 @@ export function buildChatTimeline(
 
 export function getChatTimelineItemKey(item: ChatTimelineItem): string {
   return item.kind === "message"
-    ? `message:${item.message.messageId}`
+    ? `message:${item.renderKey ?? item.message.messageId}`
     : `room-invite:${item.inviteId}`
 }
 

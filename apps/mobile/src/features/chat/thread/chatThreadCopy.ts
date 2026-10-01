@@ -39,6 +39,8 @@ export type ChatThreadCopy = {
   bubbleStatusFailed: string
   bubbleStatusDelivered: string
   bubbleStatusRead: string
+  /** The "↓" pill that returns to the newest message; `count` new messages arrived meanwhile. */
+  scrollToLatestLabel: (count: number) => string
 }
 
 export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
@@ -80,7 +82,10 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     bubbleStatusSending: "sending",
     bubbleStatusFailed: "not sent",
     bubbleStatusDelivered: "delivered",
-    bubbleStatusRead: "read"
+    bubbleStatusRead: "read",
+    scrollToLatestLabel: (count) => count > 0
+      ? `Jump to the latest message, ${count} new`
+      : "Jump to the latest message"
   },
   tr: {
     chat: "Sohbet",
@@ -120,7 +125,10 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     bubbleStatusSending: "gönderiliyor",
     bubbleStatusFailed: "gönderilemedi",
     bubbleStatusDelivered: "iletildi",
-    bubbleStatusRead: "görüldü"
+    bubbleStatusRead: "görüldü",
+    scrollToLatestLabel: (count) => count > 0
+      ? `En yeni mesaja git, ${count} yeni mesaj`
+      : "En yeni mesaja git"
   }
 }
 

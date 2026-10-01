@@ -53,7 +53,9 @@ const sourceFiles = [
   "src/features/chat/chatDeliveryAckBatcher.ts",
   "src/features/chat/chatDeliveryAckBatcher.test.ts",
   "src/features/chat/thread/chatDeliveryTickModel.ts",
-  "src/features/chat/thread/chatDeliveryTickModel.test.ts"
+  "src/features/chat/thread/chatDeliveryTickModel.test.ts",
+  "src/features/chat/thread/chatScrollToLatestModel.ts",
+  "src/features/chat/thread/chatScrollToLatestModel.test.ts"
 ]
 
 try {
@@ -112,6 +114,7 @@ try {
       join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
       join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
       join(outputDirectory, "features/chat/thread/chatDeliveryTickModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatScrollToLatestModel.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],

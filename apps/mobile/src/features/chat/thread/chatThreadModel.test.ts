@@ -14,6 +14,7 @@ import {
   getChatTimelineRowModel,
   getRoomInviteActionKey,
   getRoomInviteComposerState,
+  isChatTimelineRowInviteBusy,
   normalizeOutgoingChatBody,
   selectChatPartnerSummary,
   type LocalChatMessageDeliveryState,
@@ -27,6 +28,39 @@ import {
   getMessages,
   resetChatStore
 } from "../chatStore"
+
+function messageItem(index: number): ChatTimelineItem {
+  const sentAt = new Date(Date.UTC(2026, 6, 21, 9, 0, index)).toISOString()
+  return {
+    kind: "message",
+    createdAt: sentAt,
+    message: { messageId: `m${index}`, threadId: "t", senderUserId: index % 3 === 0 ? "me" : "you", body: `b${index}`, sentAt }
+  }
+}
+
+test("loading an earlier page keeps the row models of every already shown row (CHT-12)", () => {
+  const context = { currentUserId: "me", getMessageDeliveryState: () => "sent" as const, locale: "en" as const, now: new Date("2026-07-21T12:00:00Z") }
+  const shown = Array.from({ length: 30 }, (_, index) => messageItem(index + 20))
+  const before = buildChatTimelineRowModels(shown, context)
+  const earlier = Array.from({ length: 20 }, (_, index) => messageItem(index))
+  const after = buildChatTimelineRowModels([...earlier, ...shown], context, before)
+  const reused = shown.filter((item) => after.get(getChatTimelineItemKey(item)) === before.get(getChatTimelineItemKey(item)))
+  // Only the formerly oldest row may change (it gains a neighbour and loses its day separator).
+  assert.ok(reused.length >= 29, `${reused.length} of 30 rows kept their model (was 0)`)
+})
+
+test("an invitation action marks only that invitation's row busy (CHT-13)", () => {
+  const invite: ChatTimelineItem = {
+    kind: "room_invite", inviteId: "inv1", threadId: "t", senderUserId: "you", recipientUserId: "me",
+    createdAt: "2026-07-21T09:00:00.000Z", status: "pending"
+  }
+  const rows = [messageItem(1), invite, messageItem(2)]
+  const action = getRoomInviteActionKey({ type: "accept", inviteId: "inv1" })
+  const busyBefore = rows.map((item) => isChatTimelineRowInviteBusy(item, null))
+  const busyAfter = rows.map((item) => isChatTimelineRowInviteBusy(item, action))
+  assert.deepEqual(busyBefore, [false, false, false])
+  assert.deepEqual(busyAfter, [false, true, false], "message rows keep equal props, so memoised rows skip")
+})
 
 test("outgoing chat bodies match the server's stored form so the optimistic bubble reconciles", () => {
   assert.equal(normalizeOutgoingChatBody("  hello\n\n  world\t "), "hello world")

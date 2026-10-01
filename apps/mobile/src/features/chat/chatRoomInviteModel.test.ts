@@ -9,8 +9,21 @@ import {
   getRoomInvitePresentation,
   isLegacyRoomInviteSentinel,
   getChatInitialRenderCount,
+  getChatTimelineItemKey,
   type ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
+
+test("an acknowledged message keeps the row key of its optimistic bubble (CHT-04)", () => {
+  const sent = { threadId: "t", senderUserId: "me", body: "hi", sentAt: "2026-07-21T10:00:00.000Z" }
+  const local = buildChatTimeline([{ ...sent, messageId: "__local_1" }], [])
+  const confirmed = buildChatTimeline(
+    [{ ...sent, messageId: "server-1", sentAt: "2026-07-21T10:00:01.000Z" }],
+    [],
+    (id) => (id === "server-1" ? "__local_1" : id)
+  )
+  assert.equal(getChatTimelineItemKey(confirmed[0]!), getChatTimelineItemKey(local[0]!))
+  assert.equal(getChatTimelineItemKey(buildChatTimeline([{ ...sent, messageId: "other" }], [], (id) => id)[0]!), "message:other")
+})
 
 const baseInvite: ChatRoomInviteTimelineItem = {
   kind: "room_invite",

@@ -57,7 +57,20 @@ type PendingLocalMessage = {
   senderUserId: string
 }
 const pendingMessageByLocalMessageId: Map<string, PendingLocalMessage> = new Map()
+// Server id -> the optimistic bubble's local id it replaced. The timeline keys
+// a confirmed message by its first local id, so the row is updated in place
+// (its entrance keeps playing) instead of remounting under a new key (CHT-04).
+let renderKeyByMessageId: Map<string, string> = new Map()
 let localIdCounter = 0
+
+/** Stable list key of a message: the local id it was first shown under, else its id. */
+export function getMessageRenderKey(messageId: string): string {
+  return renderKeyByMessageId.get(messageId) ?? messageId
+}
+
+function keepLocalRenderKey(serverMessageId: string, localMessageId: string): void {
+  renderKeyByMessageId.set(serverMessageId, renderKeyByMessageId.get(localMessageId) ?? localMessageId)
+}
 
 function findPendingLocalMessageId(
   clientMessageId: string,
@@ -355,6 +368,7 @@ function reconcileLostAcknowledgements(payload: ChatMessageList): ChatMessage[] 
     if (!match) continue
     claimedServerIds.add(match.messageId)
     reconciledLocalIds.add(local.messageId)
+    keepLocalRenderKey(match.messageId, local.messageId)
     removePendingLocalMessage(local.messageId)
   }
   return reconciledLocalIds.size === 0
@@ -402,6 +416,7 @@ export function applyChatMessageReceived(
 
   if (alreadyReceived && !pendingEchoId) return
   if (pendingEchoId) removePendingLocalMessage(pendingEchoId)
+  if (pendingEchoId && !alreadyReceived) keepLocalRenderKey(message.messageId, pendingEchoId)
   const cleaned = pendingEchoId ? existing.filter((entry) => entry.messageId !== pendingEchoId) : existing
   const sorted = (alreadyReceived ? cleaned : [...cleaned, message])
     .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
@@ -513,6 +528,7 @@ export function confirmOptimisticMessage(
     notify()
     return
   }
+  keepLocalRenderKey(message.messageId, localMessageId)
   applyChatMessageReceived(message, { localUserId })
 }
 
@@ -545,6 +561,7 @@ export function resetChatStore(): void {
   pendingLocalIds.clear()
   deliveryStateByLocalMessageId.clear()
   pendingMessageByLocalMessageId.clear()
+  renderKeyByMessageId = new Map()
   unreadCounts = new Map()
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
