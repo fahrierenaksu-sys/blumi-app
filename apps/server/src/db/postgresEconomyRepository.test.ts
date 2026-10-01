@@ -301,3 +301,23 @@ test("postgres coin commerce reports account and immutable pack metadata conflic
 
   assert.equal(metadataResult.conflict, "transaction")
 })
+
+test("a store webhook transaction takes its per-transaction lock in its own statement before the ledger statement", async () => {
+  const fake = createFakePool([{
+    applied: true, conflict: null, user_id: "user_a", coins: 500, coin_debt: 0,
+    owned_avatar_item_ids: [], owned_room_item_ids: [], updated_at: "2026-10-01T10:00:00.000Z"
+  }])
+  let released = 0
+  const pool = { ...fake.pool, async connect() { return { ...fake.pool, release() { released += 1 } } } }
+  await createPostgresEconomyRepository(pool).applyCoinTransaction({
+    provider: "revenuecat", eventId: "event_1", transactionId: "transaction_1", userId: "user_a",
+    productId: "com.blumi.mobile.coins.500", store: "ios", kind: "credit", coins: 500,
+    payloadHash: "a".repeat(64), occurredAt: "2026-10-01T10:00:00.000Z", updatedAt: "2026-10-01T10:00:00.000Z"
+  })
+  assert.equal(fake.calls[0]?.text, "BEGIN")
+  assert.match(fake.calls[1]!.text, /pg_advisory_xact_lock\(hashtextextended\(\$1, 0\)\)/)
+  assert.deepEqual(fake.calls[1]!.values, ["blumi:store-transaction:revenuecat:transaction_1"])
+  assert.match(fake.calls[2]!.text, /INSERT INTO blumi_store_transactions/)
+  assert.equal(fake.calls[3]?.text, "COMMIT")
+  assert.equal(released, 1)
+})

@@ -12,8 +12,12 @@ interface QueryExecutor {
   ): Promise<{ rows: QueryResultRow[] }>
 }
 
+interface TransactionalQueryExecutor extends QueryExecutor {
+  connect?: () => Promise<QueryExecutor & { release(): void }>
+}
+
 export function createPostgresEconomyRepository(
-  pool: QueryExecutor
+  pool: TransactionalQueryExecutor
 ): EconomyRepository {
   return {
     async getInventory(userId) {
@@ -179,7 +183,30 @@ export function createPostgresEconomyRepository(
     },
 
     async applyCoinTransaction(input) {
-      return applyCoinTransaction(pool, input)
+      // A credit and its refund for one store transaction must see each
+      // other's ledger row. One statement reads its snapshot when it starts,
+      // so two that run at the same moment each missed the other (the refund
+      // then moved nothing, permanently: a replay is a no-op). A per-
+      // transaction advisory lock taken in its own statement serializes them
+      // and, under READ COMMITTED, the main statement's snapshot is taken
+      // after the lock, so it sees the other side's committed rows.
+      const client = pool.connect ? await pool.connect() : null
+      if (!client) return applyCoinTransaction(pool, input)
+      try {
+        await client.query("BEGIN")
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`blumi:store-transaction:${input.provider}:${input.transactionId}`]
+        )
+        const result = await applyCoinTransaction(client, input)
+        await client.query("COMMIT")
+        return result
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined)
+        throw error
+      } finally {
+        client.release()
+      }
     }
   }
 }
