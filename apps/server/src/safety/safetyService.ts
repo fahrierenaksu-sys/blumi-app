@@ -31,8 +31,6 @@ const TARGET_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 /** Reports one person may file per rolling 24 hours (2026-10-01). */
 export const MAX_REPORTS_PER_DAY = 20
 const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000
-/** Blocks one person may hold; unblocking frees room (2026-10-01). */
-export const MAX_BLOCKS_PER_ACTOR = 1000
 const REPORT_RESOLUTION_ACTIONS = ["warn", "suspend", "ban", "dismiss"] as const
 
 export interface SafetyService {
@@ -153,11 +151,11 @@ export function createSafetyService(
 
       const existing = await repository.findBlock(actorUserId, targetUserId)
       if (existing) return existing
+      // A block is never refused by a count: refusing one would leave a user
+      // unable to shut out an abuser. Growth is bounded instead by the number
+      // of real accounts (assertKnownTarget, one row per pair) and the
+      // per-user request budget; abuse volume is capped on reports.
       await assertKnownTarget(targetUserId)
-      // Checked before the write; concurrent blocks can pass it by a few.
-      if (await repository.countBlocks(actorUserId) >= MAX_BLOCKS_PER_ACTOR) {
-        throw new SafetyLimitError("You have reached the block limit. Unblock someone to block another person.")
-      }
 
       const block: BlockRecord = {
         actorUserId,
@@ -226,6 +224,7 @@ export function createSafetyService(
       return {
         report: saved.report,
         block: saved.block,
+        // An escalation accepted the new reason, so it is not a replay.
         replayed: saved.kind === "replayed"
       }
     },

@@ -45,8 +45,27 @@ export interface PendingReportSummaryQuery {
 export type SaveReportAndBlockResult =
   | { kind: "created"; report: ReportRecord; block: BlockRecord }
   | { kind: "replayed"; report: ReportRecord; block: BlockRecord }
+  /** A more urgent reason was merged into the actor's pending report. */
+  | { kind: "escalated"; report: ReportRecord; block: BlockRecord }
   | { kind: "conflict" }
   | { kind: "limited" }
+
+/**
+ * The change a repeat report makes to the actor's pending report on the same
+ * person, or null when it collapses into it unchanged. A more urgent reason
+ * (lower moderation risk rank) replaces the pending reason so the report
+ * moves to the faster queue, and the new note is appended; an exact, equally
+ * urgent or less urgent repeat changes nothing. At most two escalations can
+ * happen (standard -> high -> urgent), so the merged note stays bounded.
+ */
+export function pendingReportEscalation(
+  pending: Pick<ReportRecord, "reason" | "note">,
+  incoming: Pick<ReportRecord, "reason" | "note">
+): { reason: ReportReason; note?: string } | null {
+  if (moderationRiskRank(incoming.reason) >= moderationRiskRank(pending.reason)) return null
+  const notes = [...new Set([pending.note, incoming.note].filter((note): note is string => Boolean(note)))]
+  return { reason: incoming.reason, ...(notes.length > 0 ? { note: notes.join(" / ") } : {}) }
+}
 
 /** Caps how many reports one actor may create within a window. */
 export interface ReportCreationPolicy {
@@ -69,7 +88,6 @@ export interface SafetyRepository {
   ): Promise<string[]>
   findBlock(actorUserId: string, blockedUserId: string): Promise<BlockRecord | null>
   saveBlock(block: BlockRecord): Promise<void>
-  countBlocks(actorUserId: string): Promise<number>
   deleteBlock(actorUserId: string, blockedUserId: string): Promise<void>
   saveReport(report: ReportRecord): Promise<void>
   /**
@@ -162,11 +180,6 @@ export function createInMemorySafetyRepository(
     async deleteBlock(actorUserId, blockedUserId) {
       store.blocks.delete(blockKey(actorUserId, blockedUserId))
     },
-    async countBlocks(actorUserId) {
-      let count = 0
-      for (const block of store.blocks.values()) if (block.actorUserId === actorUserId) count += 1
-      return count
-    },
     async saveReport(report) {
       // Mirrors the PostgreSQL primary key: a report is never overwritten.
       if (store.reports.has(report.reportId)) {
@@ -215,7 +228,12 @@ export function createInMemorySafetyRepository(
         if (!store.blocks.has(key)) {
           store.blocks.set(key, { actorUserId: pending.actorUserId, blockedUserId: pending.reportedUserId, createdAt: block.createdAt })
         }
-        return { kind: "replayed", report: cloneReport(pending), block: { ...store.blocks.get(key)! } }
+        const escalation = pendingReportEscalation(pending, report)
+        if (!escalation) return { kind: "replayed", report: cloneReport(pending), block: { ...store.blocks.get(key)! } }
+        const { note: _previousNote, ...rest } = pending
+        const escalated: ReportRecord = { ...rest, ...escalation }
+        store.reports.set(pending.reportId, cloneReport(escalated))
+        return { kind: "escalated", report: cloneReport(escalated), block: { ...store.blocks.get(key)! } }
       }
       if (policy) {
         const since = Date.parse(policy.windowStartedAt)

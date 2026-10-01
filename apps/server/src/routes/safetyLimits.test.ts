@@ -31,9 +31,14 @@ test("reports and blocks refuse people who do not exist", async () => {
       payload: { reportedUserId: target.userId, reason: "spam" } })
     assert.equal(report.statusCode, 201)
     const duplicate = await app.inject({ method: "POST", url: "/v1/safety/reports", headers: reporter.headers,
-      payload: { reportedUserId: target.userId, reason: "harassment" } })
+      payload: { reportedUserId: target.userId, reason: "spam" } })
     assert.equal(duplicate.statusCode, 200, "a pending report on the same person is answered, not duplicated")
     assert.equal(duplicate.json().report.reportId, report.json().report.reportId)
+    const escalated = await app.inject({ method: "POST", url: "/v1/safety/reports", headers: reporter.headers,
+      payload: { reportedUserId: target.userId, reason: "underage" } })
+    assert.equal(escalated.statusCode, 201, "a more urgent reason is accepted into the pending report")
+    assert.equal(escalated.json().report.reportId, report.json().report.reportId)
+    assert.equal(escalated.json().report.reason, "underage")
   } finally {
     await app.close()
   }

@@ -1,12 +1,13 @@
 import type { QueryResultRow } from "pg"
 import { REPORT_REASONS } from "@blumi/contracts"
 import { moderationRiskRank } from "../safety/moderationQueue"
-import type {
-  BlockRecord,
-  PendingReportReasonSummary,
-  ReportRecord,
-  SaveReportAndBlockResult,
-  SafetyRepository
+import {
+  pendingReportEscalation,
+  type BlockRecord,
+  type PendingReportReasonSummary,
+  type ReportRecord,
+  type SaveReportAndBlockResult,
+  type SafetyRepository
 } from "../safety/safetyRepository"
 
 interface QueryExecutor {
@@ -93,15 +94,6 @@ export function createPostgresSafetyRepository(
       )
     },
 
-    async countBlocks(actorUserId) {
-      // blumi_safety_blocks_actor_created_at_idx
-      const result = await pool.query(
-        "SELECT count(*)::int AS block_count FROM blumi_safety_blocks WHERE actor_user_id = $1",
-        [actorUserId]
-      )
-      return Number(result.rows[0]?.block_count ?? 0)
-    },
-
     async saveReport(report) {
       await pool.query(
         `INSERT INTO blumi_safety_reports (
@@ -173,9 +165,30 @@ export function createPostgresSafetyRepository(
         )
         if (pending.rows[0]) {
           const existing = mapReport(pending.rows[0])
-          const savedBlock = await ensureBlock(executor, block)
-          if (client) await executor.query("COMMIT")
-          return { kind: "replayed", report: existing, block: savedBlock } as SaveReportAndBlockResult
+          const escalation = pendingReportEscalation(existing, report)
+          if (!escalation) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "replayed", report: existing, block: savedBlock } as SaveReportAndBlockResult
+          }
+          // An admin may have resolved it since the read (the actor lock does
+          // not cover resolution): then nothing is updated and the repeat is
+          // filed as a new report below.
+          const updated = await executor.query(
+            `UPDATE blumi_safety_reports
+                SET reason = $2, note = $3
+              WHERE report_id = $1 AND status = 'pending'
+          RETURNING report_id, actor_user_id, reported_user_id, reason, note,
+                    idempotency_key, created_at, status, resolution_action,
+                    resolution_note, resolved_at, resolved_by_admin_id,
+                    resolved_by_token_id, resolution_suspended_until`,
+            [existing.reportId, escalation.reason, escalation.note ?? null]
+          )
+          if (updated.rows[0]) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "escalated", report: mapReport(updated.rows[0]), block: savedBlock } as SaveReportAndBlockResult
+          }
         }
         if (policy) {
           const recent = await executor.query(

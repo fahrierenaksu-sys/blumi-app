@@ -131,7 +131,8 @@ runRepositoryContract<SafetyRepository>({
       assert.equal(created.kind, "created")
       if (created.kind === "created") assert.equal(created.block.createdAt, AT)
       // Without a key, a repeat on the same person while the first is still
-      // pending is the same report (2026-10-01), whatever its reason.
+      // pending is the same report (2026-10-01) unless its reason is more
+      // urgent (see the escalation case); spam is less urgent than harassment.
       const second = { ...first, reportId: backend.id("report_second"), reason: "spam" as const }
       const deduped = await backend.repository.saveReportAndBlock(second, blockFor(second))
       assert.equal(deduped.kind, "replayed")
@@ -147,6 +148,42 @@ runRepositoryContract<SafetyRepository>({
       const afterResolution = { ...first, reportId: backend.id("report_after") }
       assert.equal((await backend.repository.saveReportAndBlock(afterResolution, blockFor(afterResolution))).kind, "created")
       assert.equal((await backend.repository.listReportsForActor(actor)).length, 3)
+    },
+
+    "a more urgent repeat escalates the pending report in place and keeps both notes": async (backend) => {
+      const actor = backend.id("actor")
+      const target = backend.id("target")
+      const policy = { windowStartedAt: AT, maxReportsInWindow: 20 }
+      const first = report(backend, { actorUserId: actor, reportedUserId: target, reason: "spam", note: "sends links", idempotencyKey: undefined })
+      assert.equal((await backend.repository.saveReportAndBlock(first, blockFor(first), policy)).kind, "created")
+
+      const urgent = { ...first, reportId: backend.id("report_urgent"), reason: "underage" as const, note: "says they are 15", createdAt: LATER }
+      const escalated = await backend.repository.saveReportAndBlock(urgent, blockFor(urgent), policy)
+      assert.equal(escalated.kind, "escalated")
+      if (escalated.kind === "escalated") {
+        assert.equal(escalated.report.reportId, first.reportId)
+        assert.equal(escalated.report.reason, "underage")
+        assert.equal(escalated.report.note, "sends links / says they are 15")
+        assert.equal(escalated.report.createdAt, AT, "the original time keeps it at the front of the queue")
+      }
+      const stored = await backend.repository.findReport(first.reportId)
+      assert.equal(stored?.reason, "underage")
+      assert.equal(stored?.note, "sends links / says they are 15")
+      assert.equal(await backend.repository.findReport(urgent.reportId), null, "no second row")
+      const queue = await backend.repository.listPendingReportsByRisk({ limit: 100 })
+      const position = queue.findIndex((value) => value.reportId === first.reportId)
+      assert.ok(position >= 0)
+      assert.equal(moderationRiskRank(queue[position]!.reason), 0, "the report is in the urgent queue")
+
+      // An exact repeat, an equally urgent or a less urgent repeat collapses
+      // into the pending report without changing it.
+      for (const [name, reason, note] of [["same", "underage", "says they are 15"], ["less", "spam", "more links"]] as const) {
+        const repeat = { ...first, reportId: backend.id(`report_${name}`), reason, note, createdAt: LATER }
+        const result = await backend.repository.saveReportAndBlock(repeat, blockFor(repeat), policy)
+        assert.equal(result.kind, "replayed")
+        if (result.kind === "replayed") assert.equal(result.report.note, "sends links / says they are 15")
+      }
+      assert.equal((await backend.repository.listReportsForActor(actor)).length, 1)
     },
 
     "report creation stops at the policy cap within its window": async (backend) => {
@@ -168,15 +205,6 @@ runRepositoryContract<SafetyRepository>({
       // A replay of an existing report is never refused by the cap.
       const replay = report(backend, { actorUserId: actor, reportedUserId: backend.id("target_one"), reportId: backend.id("report_replay"), idempotencyKey: undefined })
       assert.equal((await backend.repository.saveReportAndBlock(replay, blockFor(replay), policy)).kind, "replayed")
-    },
-
-    "countBlocks counts only the actor's own blocks": async (backend) => {
-      const actor = backend.id("actor")
-      assert.equal(await backend.repository.countBlocks(actor), 0)
-      await backend.repository.saveBlock({ actorUserId: actor, blockedUserId: backend.id("a"), createdAt: AT })
-      await backend.repository.saveBlock({ actorUserId: actor, blockedUserId: backend.id("b"), createdAt: AT })
-      await backend.repository.saveBlock({ actorUserId: backend.id("other"), blockedUserId: actor, createdAt: AT })
-      assert.equal(await backend.repository.countBlocks(actor), 2)
     },
 
     "the pending queue pages by risk, then oldest first, with a keyset cursor": async (backend) => {
