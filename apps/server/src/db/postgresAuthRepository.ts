@@ -1118,6 +1118,20 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       )
       return result.rows[0] ? mapSession(result.rows[0]) : null
     },
+    async getSessionWithAccountByTokenHash(sessionTokenHash) {
+      // Session token hash is unique; the account join is by primary key.
+      const result = await pool.query(
+        `SELECT session.account_id, session.session_id, session.user_id, session.session_token_hash,
+                session.expires_at, session.family_expires_at, session.rotated_at,
+                session.replaced_by_token_hash, ${JOINED_ACCOUNT_COLUMNS_SQL}
+           FROM blumi_sessions AS session
+           LEFT JOIN blumi_accounts AS account ON account.account_id = session.account_id
+          WHERE session.session_token_hash = $1`,
+        [sessionTokenHash]
+      )
+      const row = result.rows[0]
+      return row ? { session: mapSession(row), account: mapJoinedAccount(row) } : null
+    },
     async hasActiveSessionFamily(input) {
       const result = await pool.query(
         `SELECT 1 FROM blumi_sessions
@@ -1658,17 +1672,33 @@ export async function readPostgresAccountExportSnapshot(
   return result.rows[0] ? mapAccount(result.rows[0]) : null
 }
 
+const ACCOUNT_COLUMNS = [
+  "account_id", "user_id", "phone_number", "display_name", "age",
+  "avatar_preset_id", "avatar_selection", "avatar_revision",
+  "bio", "gender", "identity_gender", "discovery_genders",
+  "discovery_age_min", "discovery_age_max", "discovery_vibes",
+  "discovery_radius_km", "interests", "profile_prompts",
+  "onboarding_profile_complete",
+  "onboarding_avatar_complete", "onboarding_room_complete",
+  "onboarding_completed_at", "moderation_status",
+  "moderation_updated_at", "suspended_until", "accepted_terms", "created_at", "updated_at"
+] as const
+
 function accountSelectSql(): string {
-  return `SELECT account_id, user_id, phone_number, display_name, age,
-                 avatar_preset_id, avatar_selection, avatar_revision,
-                 bio, gender, identity_gender, discovery_genders,
-                 discovery_age_min, discovery_age_max, discovery_vibes,
-                 discovery_radius_km, interests, profile_prompts,
-                 onboarding_profile_complete,
-                 onboarding_avatar_complete, onboarding_room_complete,
-                 onboarding_completed_at, moderation_status,
-                 moderation_updated_at, suspended_until, accepted_terms, created_at, updated_at
+  return `SELECT ${ACCOUNT_COLUMNS.join(", ")}
             FROM blumi_accounts`
+}
+
+/** Account columns of a joined row, prefixed so they cannot collide with the session's. */
+const JOINED_ACCOUNT_PREFIX = "account__"
+const JOINED_ACCOUNT_COLUMNS_SQL = ACCOUNT_COLUMNS
+  .map((column) => `account.${column} AS ${JOINED_ACCOUNT_PREFIX}${column}`).join(", ")
+
+function mapJoinedAccount(row: QueryResultRow): AccountRecord | null {
+  if (row[`${JOINED_ACCOUNT_PREFIX}account_id`] === null || row[`${JOINED_ACCOUNT_PREFIX}account_id`] === undefined) return null
+  const accountRow: QueryResultRow = {}
+  for (const column of ACCOUNT_COLUMNS) accountRow[column] = row[`${JOINED_ACCOUNT_PREFIX}${column}`]
+  return mapAccount(accountRow)
 }
 
 function assertSessionMatchesAccount(

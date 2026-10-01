@@ -106,6 +106,14 @@ export interface AuthRepository {
     now: Date
   }): Promise<AccountRecord | null>
   getSessionByTokenHash(sessionTokenHash: string): Promise<SessionRecord | null>
+  /**
+   * The session and its account (null when the account is gone) in one read:
+   * every authenticated request needs both, and two sequential lookups cost
+   * two database round trips.
+   */
+  getSessionWithAccountByTokenHash(
+    sessionTokenHash: string
+  ): Promise<{ session: SessionRecord; account: AccountRecord | null } | null>
   hasActiveSessionFamily(input: { userId: string; sessionFamilyId: string; now: Date }): Promise<boolean>
   /**
    * The subset of `identities` whose session family still has an unexpired
@@ -890,6 +898,10 @@ export function createInMemoryAuthRepository(
     async getSessionByTokenHash(sessionTokenHash) {
       const session = store.sessionsByTokenHash.get(sessionTokenHash)
       return session ? { ...session } : null
+    },
+    async getSessionWithAccountByTokenHash(sessionTokenHash) {
+      const session = await this.getSessionByTokenHash(sessionTokenHash)
+      return session ? { session, account: await this.findAccountById(session.accountId) } : null
     },
     async hasActiveSessionFamily(input) {
       return [...store.sessionsByTokenHash.values()].some((session) =>
