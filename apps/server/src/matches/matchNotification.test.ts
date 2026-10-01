@@ -10,13 +10,17 @@ test("a first like notifies only its recipient and a new mutual match notifies b
     profile("user_a", "A"),
     profile("user_b", "B")
   ]))
-  const sent: Array<{ userId: string; type?: string }> = []
+  const sent: Array<{ userId: string; type?: string; partnerUserId?: string }> = []
   const service = createMatchService({
     repository,
     idFactory: () => "match_notification",
     notificationService: {
       sendPushToUser: async (userId, notification) => {
-        sent.push({ userId, type: notification.data?.type })
+        sent.push({
+          userId,
+          type: notification.data?.type,
+          ...(notification.data?.partnerUserId ? { partnerUserId: notification.data.partnerUserId } : {})
+        })
         return { outcome: "queued", deliveryCount: 1 }
       }
     }
@@ -26,9 +30,11 @@ test("a first like notifies only its recipient and a new mutual match notifies b
   assert.deepEqual(sent, [{ userId: "user_b", type: "discovery.like" }])
 
   await service.decide("user_b", "user_a", "like")
+  // The partner id stays server-side: it lets a later block cancel a queued
+  // push and is removed from the device payload.
   assert.deepEqual(sent.slice(1).sort((left, right) => left.userId.localeCompare(right.userId)), [
-    { userId: "user_a", type: "discovery.match" },
-    { userId: "user_b", type: "discovery.match" }
+    { userId: "user_a", type: "discovery.match", partnerUserId: "user_b" },
+    { userId: "user_b", type: "discovery.match", partnerUserId: "user_a" }
   ])
 
   await service.decide("user_b", "user_a", "like")

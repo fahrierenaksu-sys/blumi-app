@@ -359,7 +359,12 @@ async function notifyMatch(
     notificationService.sendPushToUser(userId, {
       title: "It’s a match!",
       body: "Your vibes connected. Say hi when you’re ready.",
-      data: { type: "discovery.match", matchId: match.matchId }
+      data: {
+        type: "discovery.match",
+        matchId: match.matchId,
+        // Server-side only (never sent to the device): a later block cancels the push.
+        partnerUserId: match.participantUserIds.find((id) => id !== userId) ?? ""
+      }
     })
   ))
 }
