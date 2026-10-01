@@ -248,7 +248,7 @@ export function ProfileSetupScreen({
             ]}
           >
             <Text style={styles.genderLabel}>{copy.gender}</Text>
-            <Text numberOfLines={1} style={styles.genderHint}>
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.genderHint}>
               {copy.genderChangeHint}
             </Text>
           </View>
@@ -297,6 +297,7 @@ export function ProfileSetupScreen({
                       color={selected ? uiTheme.colors.actionDark : uiTheme.colors.textSecondary}
                     />
                   <Text
+                    maxFontSizeMultiplier={1.3}
                     numberOfLines={1}
                     style={[
                       styles.genderOptionText,

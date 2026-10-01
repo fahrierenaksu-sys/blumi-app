@@ -454,7 +454,7 @@ export function RoomSetupScreen({
               : copy.bedPendingSummary}
           </Text>
           <View style={styles.giftChip}>
-            <Text style={styles.giftChipText}>{copy.giftBadge}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.giftChipText}>{copy.giftBadge}</Text>
           </View>
         </View>
         <View style={styles.roomFirstStatus}>
@@ -469,7 +469,7 @@ export function RoomSetupScreen({
               <View style={styles.placementCompleteIcon}>
                 <Ionicons color="#FFFFFF" name="checkmark" size={14} />
               </View>
-              <Text style={styles.placementCompleteText}>{copy.bedPlacedCard}</Text>
+              <Text maxFontSizeMultiplier={1.4} style={styles.placementCompleteText}>{copy.bedPlacedCard}</Text>
             </Animated.View>
           ) : starterBed ? (
             <GestureDetector gesture={bedDrag.cardGesture}>
@@ -505,8 +505,8 @@ export function RoomSetupScreen({
                   />
                 </LinearGradient>
                 <View style={styles.starterItemCopy}>
-                  <Text style={styles.starterItemTitle}>{copy.starterItemTitle}</Text>
-                  <Text style={styles.starterItemHint}>{copy.starterItemHint}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.starterItemTitle}>{copy.starterItemTitle}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.starterItemHint}>{copy.starterItemHint}</Text>
                 </View>
                 <View style={styles.starterItemAction}>
                   <Ionicons color="#FFFFFF" name="add" size={20} />

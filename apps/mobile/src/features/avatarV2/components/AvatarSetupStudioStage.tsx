@@ -295,7 +295,7 @@ function GenderButton({
         name={icon}
         size={21}
       />
-      <Text style={[styles.genderButtonText, active ? styles.genderButtonTextActive : null]}>
+      <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.genderButtonText, active ? styles.genderButtonTextActive : null]}>
         {label}
       </Text>
     </Pressable>
@@ -359,7 +359,7 @@ function OrbitPod({
             size={14}
           />
         </View>
-        <Text numberOfLines={1} style={[styles.podText, active ? styles.podTextActive : null]}>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.podText, active ? styles.podTextActive : null]}>
           {category.label}
         </Text>
       </Pressable>

@@ -43,7 +43,7 @@ export function SetupFlowHeader({
           />
         </Pressable>
       </View>
-      <Text accessibilityLabel={title} style={styles.brand}>
+      <Text accessibilityLabel={title} maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.brand}>
         {title}
       </Text>
       <View style={[styles.sideSlot, styles.rightSlot]}>
@@ -62,6 +62,7 @@ export function SetupFlowHeader({
           </View>
         ) : (
           <Text
+            maxFontSizeMultiplier={1.2}
             accessibilityLabel={copy.stepProgress(current, 4)}
             style={styles.step}
           >

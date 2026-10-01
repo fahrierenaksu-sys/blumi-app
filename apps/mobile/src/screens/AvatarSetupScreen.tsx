@@ -273,7 +273,7 @@ export function AvatarSetupScreen({
                     size={17}
                   />
                 </View>
-                <Text style={styles.avatarFreedomText}>{copy.avatar.changeAnyTime}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.avatarFreedomText}>{copy.avatar.changeAnyTime}</Text>
               </View>
               <View pointerEvents="none" style={styles.avatarFreedomDivider} />
               <View style={styles.avatarFreedomItem}>
@@ -285,7 +285,7 @@ export function AvatarSetupScreen({
                     size={17}
                   />
                 </View>
-                <Text style={styles.avatarFreedomText}>{copy.avatar.discoverInShop}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.avatarFreedomText}>{copy.avatar.discoverInShop}</Text>
               </View>
             </View>
           </View>
