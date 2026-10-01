@@ -255,3 +255,32 @@ test("concurrent scene entry shares one authorization lookup and invalidation ca
   service.invalidate("room")
   await assert.rejects(invalidating)
 })
+
+test("a room just verified by its acceptance is entered without another lookup; ending it or time removes that shortcut", async () => {
+  let clock = 0
+  let lookups = 0
+  const record = { miniRoomId: "room", participantUserIds: ["a", "b"] } as any
+  const events: any[] = []
+  const service = createMiniRoomMotionService({ now: () => clock,
+    findRoom: async () => { lookups++; return record }, hasBlockBetween: async () => false,
+    emit: (_, event) => events.push(event) })
+  service.prime(record)
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  assert.equal(lookups, 0, "both phones join on the acceptance's own verification")
+  assert.ok(events.at(-1).payload.avatars.every((avatar: any) => avatar.present))
+  await assert.rejects(service.enter("cx", "x", "room"), "membership is still checked")
+
+  service.prime(record)
+  service.invalidate("room")
+  await service.enter("ca", "a", "room")
+  assert.equal(lookups, 1, "an ended or blocked room is looked up again")
+
+  service.prime(record)
+  clock += 10_000
+  await service.enter("ca", "a", "room")
+  assert.equal(lookups, 2, "a stale verification is not reused")
+  service.prime({ ...record, endedAt: new Date(0).toISOString() })
+  await service.enter("ca", "a", "room")
+  assert.equal(lookups, 3, "an ended record is never primed")
+})

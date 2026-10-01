@@ -50,6 +50,13 @@ export interface MiniRoomCopy {
   leaveConfirmTitle: string
   leaveConfirmBody: string
   leaveConfirmStay: string
+  /** Short in-room notices; each is also announced to screen readers. */
+  partnerHere: (partnerFirstName: string) => string
+  partnerBack: (partnerFirstName: string) => string
+  partnerAway: (partnerFirstName: string) => string
+  seatTaken: string
+  /** Shown after this device leaves a room the same account continued elsewhere. */
+  continuedOnOtherDevice: string
 }
 
 export function getMiniRoomCopy(locale: AccountRecoveryLocale): MiniRoomCopy {
@@ -105,7 +112,12 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     legacyDecorNotice: "This older session has no saved decor. A shared default room is shown.",
     leaveConfirmTitle: "Leave the room?",
     leaveConfirmBody: "The room closes for both of you.",
-    leaveConfirmStay: "Stay"
+    leaveConfirmStay: "Stay",
+    partnerHere: (partnerFirstName) => `${partnerFirstName} is here`,
+    partnerBack: (partnerFirstName) => `${partnerFirstName} is back`,
+    partnerAway: (partnerFirstName) => `${partnerFirstName} stepped away`,
+    seatTaken: "That seat is taken",
+    continuedOnOtherDevice: "This room continued on your other device."
   },
   tr: {
     roomTitle: "Eşleşme odası",
@@ -155,7 +167,12 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     legacyDecorNotice: "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor.",
     leaveConfirmTitle: "Odadan ayrılmak istiyor musun?",
     leaveConfirmBody: "Oda ikiniz için de kapanır.",
-    leaveConfirmStay: "Kal"
+    leaveConfirmStay: "Kal",
+    partnerHere: (partnerFirstName) => `${partnerFirstName} odada`,
+    partnerBack: (partnerFirstName) => `${partnerFirstName} geri döndü`,
+    partnerAway: (partnerFirstName) => `${partnerFirstName} odadan uzaklaştı`,
+    seatTaken: "Bu koltuk dolu",
+    continuedOnOtherDevice: "Bu oda diğer cihazında devam ediyor."
   }
 }
 

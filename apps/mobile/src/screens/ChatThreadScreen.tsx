@@ -22,7 +22,9 @@ import { uiTheme } from "../ui/theme"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { ChatThread } from "@blumi/contracts"
 import { createMatchFromPersistedThread } from "../features/matches/matchRoomModel"
+import { useRoomInviteExpiryClock } from "../features/chat/useRoomInviteExpiryClock"
 import {
+  applyRoomInviteExpiry,
   buildChatTimeline,
   getChatTimelineItemKey,
   getChatInitialRenderCount,
@@ -91,12 +93,18 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const closeActiveRoomHandler = bindings.onCloseActiveRoom
   const chatLocale = resolveChatThreadLocale(bindings.locale)
   const chatCopy = CHAT_COPY[chatLocale]
-  const threadRoomInvites = useMemo(
+  const storedThreadRoomInvites = useMemo(
     () =>
       resolvedThreadId
         ? roomInvites.filter((invite) => invite.threadId === resolvedThreadId)
         : EMPTY_ROOM_INVITES,
     [resolvedThreadId, roomInvites]
+  )
+  // Expiry has no server event: both phones flip the card at its expiresAt.
+  const inviteClockMs = useRoomInviteExpiryClock(storedThreadRoomInvites)
+  const threadRoomInvites = useMemo(
+    () => applyRoomInviteExpiry(storedThreadRoomInvites, inviteClockMs),
+    [inviteClockMs, storedThreadRoomInvites]
   )
   const timeline = useMemo(
     () => buildChatTimeline(messages, threadRoomInvites),

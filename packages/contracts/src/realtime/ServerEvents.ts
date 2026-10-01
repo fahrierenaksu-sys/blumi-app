@@ -27,6 +27,8 @@ import type { ReactionEvent } from "../reactions/ReactionEvent";
 export type ServerEvent =
   | { type: "mini_room.motion_snapshot"; payload: import("../miniRooms/MiniRoomMotion").MiniRoomMotionSnapshot }
   | { type: "mini_room.avatar_moved"; payload: { miniRoomId: string; epoch: string; participantUserIds: [string, string]; avatar: import("../miniRooms/MiniRoomMotion").MiniRoomAvatarMotion } }
+  /** 2026-10-01; sent only to the replaced socket. Clients that predate it ignore it as unknown. */
+  | { type: "mini_room.scene_superseded"; payload: import("../miniRooms/MiniRoomMotion").MiniRoomSceneSuperseded }
   | { type: "room.joined"; payload: JoinRoomResponse }
   | { type: "room.left"; payload: { roomId: string } }
   | { type: "presence.snapshot"; payload: RoomPresenceSnapshot }

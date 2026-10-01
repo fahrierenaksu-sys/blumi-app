@@ -88,6 +88,10 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
     invalid: { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"],
       avatar: { userId: "a", x: 2, y: .7, present: true, revision: 2 } }
   },
+  "mini_room.scene_superseded": {
+    valid: { miniRoomId: "room" },
+    invalid: { miniRoomId: "" }
+  },
   "room.joined": {
     valid: {
       roomId: "lobby",
@@ -263,6 +267,17 @@ test("a receipt update names one of two distinct participants and moves a cursor
     type: "chat.receipt_updated",
     payload: { ...base, deliveredUpTo: { sentAt: NOW, messageId: "" } },
   }).kind, "invalid");
+});
+
+test("a motion record may name a refused seat; older records without it stay valid", () => {
+  const base = { miniRoomId: "room", epoch: "e", participantUserIds: ["a", "b"] };
+  const refused = { userId: "b", x: .5, y: .57, present: true, revision: 3, deniedHotspotId: "chair:seat" };
+  const moved = parseServerEvent({ type: "mini_room.avatar_moved", payload: { ...base, avatar: refused } });
+  assert.equal(moved.kind, "valid");
+  assert.equal(moved.kind === "valid" && moved.event.type === "mini_room.avatar_moved"
+    ? moved.event.payload.avatar.deniedHotspotId : undefined, "chair:seat");
+  assert.equal(parseServerEvent({ type: "mini_room.avatar_moved",
+    payload: { ...base, avatar: { ...refused, deniedHotspotId: "" } } }).kind, "invalid");
 });
 
 test("thread and message lists from a server without receipts stay valid", () => {

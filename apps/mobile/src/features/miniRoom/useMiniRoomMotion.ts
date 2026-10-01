@@ -7,6 +7,8 @@ export function useMiniRoomMotion(input: {
   miniRoomId: string; localUserId: string; partnerUserId: string; enabled: boolean; isFocused: boolean
 }) {
   const [state, setState] = useState<MiniRoomMotionState>({ avatars: [], snapKey: 0, partnerPresent: false })
+  // Taps on a seat this phone already shows as the partner's (no server trip).
+  const [localSeatTakenCount, setLocalSeatTakenCount] = useState(0)
   const sessionRef = useRef<ReturnType<typeof createMiniRoomMotionSession> | null>(null)
   const { miniRoomId, localUserId, partnerUserId, enabled, isFocused } = input
   useEffect(() => {
@@ -34,5 +36,6 @@ export function useMiniRoomMotion(input: {
   }, [enabled, isFocused, localUserId, miniRoomId, partnerUserId])
   const onLocalMove = useCallback((point: { x: number; y: number }, hotspotId?: string) =>
     !enabled || (sessionRef.current?.move(point, hotspotId) ?? false), [enabled])
-  return { ...state, onLocalMove, enabled }
+  const reportSeatTaken = useCallback(() => setLocalSeatTakenCount(count => count + 1), [])
+  return { ...state, onLocalMove, reportSeatTaken, localSeatTakenCount, enabled }
 }
