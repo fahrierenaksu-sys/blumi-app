@@ -12,14 +12,8 @@ import {
   View,
   useWindowDimensions
 } from "react-native"
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Reanimated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
@@ -57,8 +51,10 @@ import {
   type MiniRoomPanelMode
 } from "./miniRoomLayout"
 import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
+import { useMiniRoomCameraTransform } from "./useMiniRoomCameraTransform"
 import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
 
+const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable)
 interface MiniRoomSceneProps {
   roomMotion?: ReturnType<typeof import("../useMiniRoomMotion").useMiniRoomMotion>
   copy: MiniRoomCopy
@@ -148,8 +144,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
-  const layout = useMemo(
-    () => resolveMiniRoomLayout({
+  const layoutInput = useMemo(
+    () => ({
       windowWidth: viewport.width,
       windowHeight: viewport.height,
       safeTop: safeAreaInsets.top,
@@ -163,19 +159,18 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         ? roomShell.canvasSize.width / roomShell.canvasSize.height
         : 1
     }),
-    [
-      chatExpanded,
-      composerLines,
-      keyboard.inset,
-      keyboard.visible,
-      roomShell,
-      safeAreaInsets.bottom,
-      safeAreaInsets.top,
-      viewport.fontScale,
-      viewport.height,
-      viewport.width
-    ]
+    [chatExpanded, composerLines, keyboard.inset, keyboard.visible, roomShell,
+      safeAreaInsets.bottom, safeAreaInsets.top, viewport.fontScale, viewport.height, viewport.width]
   )
+  const layout = useMemo(() => resolveMiniRoomLayout(layoutInput), [layoutInput])
+  // ROOM-15: the room keeps its resting frame; the keyboard framing is a UI-thread transform.
+  const restCamera = useMemo(
+    () => resolveMiniRoomLayout({ ...layoutInput, keyboardVisible: false, keyboardInset: 0 }).camera,
+    [layoutInput]
+  )
+  const cameraStyle = useMiniRoomCameraTransform({
+    rest: restCamera, target: layout.camera, durationMs: keyboard.durationMs, reduceMotion
+  })
   const {
     dismissSpeechBubble,
     moveLocalAvatar,
@@ -414,11 +409,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         ]}
       >
         {roomDecorScene?.shell ? (
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={copy.moveAvatar}
             accessibilityHint={copy.moveAvatarHint}
-            style={[styles.roomWorldCamera, layout.camera]}
+            style={[styles.roomWorldCamera, restCamera, cameraStyle]}
             onLayout={handleStageLayout}
             onPress={handleRoomPress}
           >
@@ -437,20 +432,20 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
                 {copy.welcome(partnerFirstName)}
               </Text>
             </Animated.View>
-          </Pressable>
+          </AnimatedPressable>
         ) : (
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={copy.moveAvatar}
             accessibilityHint={copy.moveAvatarHint}
-            style={[styles.legacyRoomStage, { top: layout.camera.top }]}
+            style={[styles.legacyRoomStage, { top: restCamera.top }, cameraStyle]}
             onLayout={handleStageLayout}
             onPress={handleRoomPress}
           >
             <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
             {hotspotLayer}
             {avatarLayer}
-          </Pressable>
+          </AnimatedPressable>
         )}
       </Animated.View>
 

@@ -1,12 +1,23 @@
-import { memo, useEffect, useMemo, useRef } from "react"
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native"
-import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
+import Reanimated, {
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import {
   getMiniRoomAvatarRenderLayers,
   getMiniRoomAvatarSittingScaleY
 } from "../miniRoomAvatarMotion"
 import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
+import {
+  getMiniRoomAvatarZIndex,
+  resolveMiniRoomAvatarAnchorOffset,
+  resolveMiniRoomAvatarDepthOrder
+} from "./miniRoomAvatarStageModel"
 import {
   MINI_ROOM_PARTNER_ARRIVAL_MS,
   type MiniRoomMotionPolicy
@@ -56,8 +67,31 @@ export function AvatarLayer(props: AvatarLayerProps) {
     ? [...avatarsWithBubbles].sort((a, b) => a.x - b.x)[0]?.userId
     : undefined
 
+  // ROOM-06: avatars move by transform in room pixels (no per-frame layout).
+  const stageWidth = useSharedValue(0)
+  const stageHeight = useSharedValue(0)
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    stageWidth.value = event.nativeEvent.layout.width
+    stageHeight.value = event.nativeEvent.layout.height
+  }, [stageHeight, stageWidth])
+
+  // Draw order follows the live depth, but React hears only when one avatar
+  // passes another (not every frame).
+  const userIds = sortedAvatars.map((avatar) => avatar.userId).join("|")
+  const [depthOrder, setDepthOrder] = useState(userIds)
+  useAnimatedReaction(
+    () => resolveMiniRoomAvatarDepthOrder(Object.keys(avatarPositions).map((id) => ({
+      id,
+      y: avatarPositions[id]!.y.value
+    }))),
+    (order, previous) => {
+      if (order !== previous) scheduleOnRN(setDepthOrder, order)
+    },
+    [avatarPositions]
+  )
+
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={handleLayout}>
       {sortedAvatars.map((avatar) => {
         const bubble = bubbles.find((entry) => entry.speakerUserId === avatar.userId)
         const isLocal = avatar.userId === localUserId
@@ -80,6 +114,9 @@ export function AvatarLayer(props: AvatarLayerProps) {
             key={avatar.userId}
             avatar={avatar}
             position={position}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            zIndex={getMiniRoomAvatarZIndex(depthOrder, avatar.userId)}
             bubble={bubble}
             bubblePlacement={bubblePlacement}
             bubbleRaised={bubbleRaised}
@@ -99,6 +136,10 @@ export function AvatarLayer(props: AvatarLayerProps) {
 interface AvatarFigureProps {
   avatar: AvatarState
   position: MiniRoomAvatarPosition
+  stageWidth: SharedValue<number>
+  stageHeight: SharedValue<number>
+  /** Changes only when the depth order flips. */
+  zIndex: number
   bubble: SpeechBubble | undefined
   bubblePlacement: BubblePlacement
   bubbleRaised: boolean
@@ -114,6 +155,9 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   const {
     avatar,
     position,
+    stageWidth,
+    stageHeight,
+    zIndex,
     bubble,
     bubblePlacement,
     bubbleRaised,
@@ -346,19 +390,26 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     inputRange: [0, 0.7, 1],
     outputRange: [0.55, 0.1, 0]
   })
-  // Walking moves these on the UI thread; React renders only on pose changes.
-  const anchorStyle = useAnimatedStyle(() => ({
-    left: `${position.x.value * 100}%`,
-    top: `${position.y.value * 100}%`,
-    // Nearer avatars (larger y) draw on top, also mid-walk.
-    zIndex: Math.round(position.y.value * 1000)
-  }))
+  // Walking moves these on the UI thread as a transform (no layout per
+  // frame); React renders only on pose changes and depth-order flips.
+  const presentOpacity = avatar.present === false ? 0.35 : 1
+  const anchorStyle = useAnimatedStyle(() => {
+    const offset = resolveMiniRoomAvatarAnchorOffset(
+      { x: position.x.value, y: position.y.value },
+      { width: stageWidth.value, height: stageHeight.value }
+    )
+    return {
+      // Hidden until the room is measured, so no frame shows it at the corner.
+      opacity: stageWidth.value > 0 ? presentOpacity : 0,
+      transform: [{ translateX: offset.translateX }, { translateY: offset.translateY }]
+    }
+  })
   const depthScaleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.9 + position.y.value * 0.2 }]
   }))
 
   return (
-    <Reanimated.View style={[styles.avatarAnchor, anchorStyle, { opacity: avatar.present === false ? 0.35 : 1 }]}>
+    <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
       {showJoinPulse ? (
         <Animated.View
           style={[
@@ -473,6 +524,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
 const styles = StyleSheet.create({
   avatarAnchor: {
     position: "absolute",
+    left: 0,
+    top: 0,
     width: 86,
     height: 142,
     marginLeft: -43,
