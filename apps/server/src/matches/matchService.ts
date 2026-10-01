@@ -290,7 +290,7 @@ export function createMatchService(
       const reciprocal = await repository.findDecision(targetUserId, currentUserId)
       if (reciprocal?.decision !== "like") {
         if (persisted.created) {
-          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId, currentUserId))
+          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId))
         }
         return {
           decision: canonicalDecision,
@@ -348,14 +348,15 @@ export function createMatchService(
 
 async function notifyLike(
   notificationService: Pick<NotificationService, "sendPushToUser"> | undefined,
-  userId: string,
-  sourceUserId: string
+  userId: string
 ): Promise<void> {
   if (!notificationService) return
   await notificationService.sendPushToUser(userId, {
     title: "Someone likes your vibe",
     body: "Open Blumi to see where this could go.",
-    data: { type: "discovery.like", sourceUserId }
+    // The like is anonymous: the device payload carries an opaque id for the
+    // push policy's dedupe, never the liker's user id.
+    data: { type: "discovery.like", likeId: `like_${randomUUID()}` }
   })
 }
 
