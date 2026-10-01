@@ -23,6 +23,7 @@ import {
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
 import { cozyPinkBedroomScene } from "./roomMaps"
+import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
 import {
   createMiniRoomAvatarPosition,
   createMiniRoomSegmentAnimator,
@@ -69,6 +70,8 @@ interface UseMiniRoomSceneStoreInput {
   scene?: RoomScene
   roomDecorScene?: ResolvedRoomV2Scene
   onLocalMove?: (point: RoomPoint, hotspotId?: string) => boolean
+  /** A seat this phone already knows the partner holds was tapped. */
+  onSeatTaken?: (hotspotId: string) => void
   bubbleLifetimeMs?: number
 }
 
@@ -87,6 +90,15 @@ interface MoveOptions {
   roomWorldHotspot?: ReturnType<typeof createRoomWorldHotspotsFromRoomV2Scene>[number]
   /** Plan without the other avatar: a partner step this phone could not route. */
   ignoreOccupants?: boolean
+  /**
+   * A server record: never re-sent, and it ends exactly at its target (only
+   * the path may route around this phone's view of the other avatar).
+   */
+  authoritative?: boolean
+  /** Arrival facing for a standing target (a refused seat faces the seat). */
+  arrivalFacing?: AvatarFacing
+  /** Leave through this seat's exit when the avatar is already on its way in. */
+  departFromHotspotId?: string
 }
 
 export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRoomStore {
@@ -98,6 +110,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const participantAvatarSnapshots = input.participantAvatarSnapshots
   const bubbleLifetimeMs = input.bubbleLifetimeMs
   const onLocalMove = input.onLocalMove
+  const onSeatTaken = input.onSeatTaken
   const usesRoomV2Scene = Boolean(input.roomDecorScene?.shell)
   const geometry = useMemo(
     () => usesRoomV2Scene && input.roomDecorScene
@@ -238,8 +251,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const seatHotspot = options?.roomWorldHotspot?.kind === "seat"
         ? options.roomWorldHotspot
         : undefined
-      const currentSeatHotspot = localAvatar.seatedHotspotId
-        ? roomWorldHotspots.find((hotspot) => hotspot.id === localAvatar.seatedHotspotId)
+      const departingHotspotId = localAvatar.seatedHotspotId ?? options?.departFromHotspotId
+      const currentSeatHotspot = departingHotspotId
+        ? roomWorldHotspots.find((hotspot) => hotspot.id === departingHotspotId)
         : undefined
       const currentSeatExit = currentSeatHotspot?.exitPoint && currentSeatHotspot.sourceRenderId
         ? {
@@ -293,10 +307,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         })
         : null
       if (seatHotspot?.approachPoint && !seatPlan) return false
+      // An authoritative target is resolved without occupants, exactly as the
+      // sender's phone accepted it, so both phones end at the same point.
       const target = seatPlan?.target ?? resolveRoomWorldInteractiveTarget({
         geometry: currentSeatGeometry,
         target: point,
-        occupants,
+        occupants: options?.authoritative ? [] : occupants,
         movingOccupantId: userId,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
       })
@@ -331,7 +347,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       if (!plan) return false
 
       const activeMovementRef = movementRefFor(userId)
-      if (userId === localUserId && onLocalMove &&
+      const sendsLocalMove = userId === localUserId && !options?.authoritative
+      if (sendsLocalMove && onLocalMove &&
         !onLocalMove(target, options?.hotspot?.id)) return false
       cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
       if (userId === localUserId) cancelPendingMiniRoomMovementCompletion(
@@ -343,7 +360,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const finalSegment = plan.segments[plan.segments.length - 1]
       if (!finalSegment) return false
       const arrivalFacing =
-        options?.hotspot?.facingOnArrival ?? finalSegment.facing
+        options?.hotspot?.facingOnArrival ?? options?.arrivalFacing ?? finalSegment.facing
       const arrivalMotion =
         options?.hotspot?.kind === "seat" &&
         canMiniRoomAvatarUseMotion({
@@ -354,7 +371,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           ? "sitting"
           : "idle"
 
-      if (userId === localUserId) setPressedPoint(target)
+      if (sendsLocalMove) setPressedPoint(target)
 
       const arrivalSeatedHotspotId =
         options?.hotspot?.kind === "seat"
@@ -448,6 +465,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const hotspot = hotspots.find((entry) => entry.id === hotspotId)
       if (!hotspot) return false
       const roomWorldHotspot = roomWorldHotspots.find((entry) => entry.id === hotspotId)
+      const partnerHolds = Object.values(avatarsRef.current).some((avatar) =>
+        avatar.userId !== localUserId && avatar.present !== false && avatar.seatedHotspotId === hotspotId)
+      if (hotspot.kind === "seat" && partnerHolds) {
+        onSeatTaken?.(hotspotId)
+        return false
+      }
       const target = roomWorldHotspot
         ? roomWorldHotspot.approachPoint ?? {
           x: roomWorldHotspot.x,
@@ -457,22 +480,39 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       setSelectedHotspotId(hotspotId)
       return runMovement(localUserId, target, { hotspot, roomWorldHotspot })
     },
-    [hotspots, localUserId, roomWorldHotspots, runMovement]
+    [hotspots, localUserId, onSeatTaken, roomWorldHotspots, runMovement]
   )
+
+  const resolveRefusedSeatStand = useCallback((hotspotId: string) => {
+    const roomWorldHotspot = roomWorldHotspots.find(h => h.id === hotspotId)
+    const hotspot = hotspots.find(h => h.id === hotspotId)
+    if (!roomWorldHotspot && !hotspot) return undefined
+    // Room V2 seats carry their rig (seat + approach); legacy map seats keep
+    // the approach on the map hotspot.
+    return resolveMiniRoomRefusedSeatStand(roomWorldHotspot?.approachPoint
+      ? { geometry, seat: roomWorldHotspot, approach: roomWorldHotspot.approachPoint }
+      : { geometry, seat: hotspot ?? roomWorldHotspot!, approach: hotspot?.approachPoint })
+  }, [geometry, hotspots, roomWorldHotspots])
 
   const applyRemoteAvatar = useCallback((next: import("@blumi/contracts").MiniRoomAvatarMotion, snap = false) => {
     const avatar = avatarsRef.current[next.userId]
     if (!avatar) return
     const hotspot = next.hotspotId ? hotspots.find(h => h.id === next.hotspotId) : undefined
     const roomWorldHotspot = next.hotspotId ? roomWorldHotspots.find(h => h.id === next.hotspotId) : undefined
+    // A refused seat claim stands beside that seat, as on every phone.
+    const refused = !next.hotspotId && next.deniedHotspotId
+      ? resolveRefusedSeatStand(next.deniedHotspotId) : undefined
+    const target = refused?.point ?? next
+    if (refused && next.userId === localUserId) setSelectedHotspotId(undefined)
     if (!snap && next.present) {
       setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId], present: true } }))
-      const options = hotspot ? { hotspot, roomWorldHotspot } : undefined
+      const options: MoveOptions = hotspot ? { hotspot, roomWorldHotspot, authoritative: true }
+        : { authoritative: true, ...(refused ? { arrivalFacing: refused.facing, departFromHotspotId: next.deniedHotspotId } : {}) }
       // This phone plans around its own view of the other avatar, which can
       // differ from the sender's for a moment. Never leave the partner behind:
       // route without that occupant, and failing that, place it at the target.
-      if (runMovement(next.userId, next, options) ||
-        runMovement(next.userId, next, { ...options, ignoreOccupants: true })) return
+      if (runMovement(next.userId, target, options) ||
+        runMovement(next.userId, target, { ...options, ignoreOccupants: true })) return
     }
     cancelActiveMiniRoomMovement(movementRefFor(next.userId), cancelMiniRoomMovementRun)
     const driver = getMotionDriver(avatar)
@@ -487,17 +527,17 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     }
     // Place exactly: seated on its seat when the record carries one, as the
     // sender's phone shows it, otherwise at the nearest walkable point.
-    const facing = hotspot?.facingOnArrival ?? avatar.facing
+    const facing = hotspot?.facingOnArrival ?? refused?.facing ?? avatar.facing
     const seated = hotspot?.kind === "seat" &&
       canMiniRoomAvatarUseMotion({ appearance: avatar.appearance, motion: "sitting", facing })
     const position = seated ? { x: hotspot.x, y: hotspot.y }
-      : resolveRoomWorldInteractiveTarget({ geometry, target: next }) ?? next
+      : resolveRoomWorldInteractiveTarget({ geometry, target }) ?? target
     snapMiniRoomAvatarPosition(driver.position, position)
     setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
       x: position.x, y: position.y, targetX: undefined, targetY: undefined,
-      motion: seated ? "sitting" : "idle", ...(seated ? { facing } : {}),
+      motion: seated ? "sitting" : "idle", ...(seated || refused ? { facing } : {}),
       seatedHotspotId: seated ? hotspot.id : undefined, present: next.present } }))
-  }, [geometry, getMotionDriver, hotspots, movementRefFor, roomWorldHotspots, runMovement])
+  }, [geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand, roomWorldHotspots, runMovement])
 
   const setRemotePresence = useCallback((userId: string, present: boolean) => {
     if (!present) cancelActiveMiniRoomMovement(movementRefFor(userId), cancelMiniRoomMovementRun)

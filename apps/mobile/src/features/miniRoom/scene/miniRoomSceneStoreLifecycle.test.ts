@@ -45,7 +45,8 @@ function mount() {
         "../../roomWorld/roomWorldRuntime",
         "./miniRoomMovementLifecycle",
         "./miniRoomMovementRun",
-        "./miniRoomSpeechQueue"
+        "./miniRoomSpeechQueue",
+        "./miniRoomSeatRefusalModel"
       ],
       globals: {
         setTimeout: (run: () => void, delay: number) => {
@@ -114,6 +115,59 @@ test("a partner step this phone cannot plan around its own avatar still moves th
   const partner = f.store().avatars.partner
   const moved = partner.motion === "walking" || partner.x !== before.x || partner.y !== before.y
   assert.ok(moved, "the partner walks or is placed at its authoritative target")
+  f.runtime.unmount()
+})
+
+test("a partner step ends exactly at its authoritative target, even inside this phone's avatar's personal space", () => {
+  const f = mount()
+  f.render()
+  // This phone's avatar stands at .40/.70. The partner's phone accepted a
+  // target right beside it; re-resolving that target against this phone's
+  // occupants would leave the two phones showing the partner in different places.
+  assert.equal(f.store().moveLocalAvatar({ x: .40, y: .70 }), true)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .44, y: .71, present: true, revision: 1 })
+  const partner = f.store().avatars.partner
+  assert.deepEqual({ x: partner.targetX, y: partner.targetY }, { x: .44, y: .71 })
+  f.runtime.unmount()
+})
+
+test("a partner step never calls the local move sender, and an own-avatar correction is not re-sent", () => {
+  const sent: unknown[] = []
+  const f = mount()
+  f.render({ onLocalMove: (point: unknown, hotspotId?: string) => { sent.push([point, hotspotId]); return true } } as Partial<StoreInput>)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .6, y: .72, present: true, revision: 1 })
+  f.store().applyRemoteAvatar({ userId: "local", x: .45, y: .72, present: true, revision: 2 })
+  assert.deepEqual(sent, [])
+  assert.equal(f.store().avatars.local.motion, "walking")
+  f.runtime.unmount()
+})
+
+test("a refused seat claim walks the avatar beside the seat, standing and facing it, on both phones", () => {
+  const f = mount()
+  f.render()
+  // The partner's claim on the sofa was refused by the server.
+  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, deniedHotspotId: "sofa_corner" })
+  const walking = f.store().avatars.partner
+  assert.equal(walking.motion, "walking")
+  assert.notEqual(walking.seatedHotspotId, "sofa_corner")
+  // Beside the seat's approach point (.24/.62), out of the sitter's lane.
+  assert.ok(Math.abs(Math.hypot(walking.targetX! - .24, walking.targetY! - .62) - .128) < .001)
+  // A rejoin snapshot places it at the same stand point, never on the seat.
+  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, deniedHotspotId: "sofa_corner" }, true)
+  const placed = f.store().avatars.partner
+  assert.equal(placed.motion, "idle")
+  assert.equal(placed.seatedHotspotId, undefined)
+  assert.deepEqual({ x: placed.x, y: placed.y }, { x: walking.targetX, y: walking.targetY })
+  f.runtime.unmount()
+})
+
+test("tapping a seat the partner already holds is refused locally and reported as taken", () => {
+  const taken: string[] = []
+  const f = mount()
+  f.render({ onSeatTaken: (hotspotId: string) => { taken.push(hotspotId) } } as Partial<StoreInput>)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .24, y: .62, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), false)
+  assert.deepEqual(taken, ["sofa_corner"])
   f.runtime.unmount()
 })
 
