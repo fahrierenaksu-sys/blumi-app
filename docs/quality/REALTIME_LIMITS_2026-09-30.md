@@ -35,6 +35,10 @@ Why this combination:
   would stop the client from reconnecting.
 - 1013 is distinct from the existing 1012 (fanout gap resynchronization) and
   4429 (authorization backlog), so logs can tell the causes apart.
+- Update 2026-10-01: 1012 is also the graceful-restart close (reason "Server
+  restarting"), and the client spreads its first retry after 1001, 1012 and
+  1013 over 0-5 s. Chat is no longer closed with 4429 at a human rate; see
+  `docs/quality/REALTIME_CAPACITY_2026-10-01.md`.
 
 The window is only evaluated on a send. A socket that receives nothing more
 does not grow; liveness pings handle dead peers.
