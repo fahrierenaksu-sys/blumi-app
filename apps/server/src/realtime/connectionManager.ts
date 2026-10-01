@@ -51,6 +51,8 @@ export interface RealtimeConnection {
   joinedRoomIds: Set<string>
   isAlive: boolean
   sessionFamilyId?: string
+  /** Increases with each socket this instance accepts: a reconnect is newer than the socket it replaces. */
+  openedOrder?: number
 }
 
 export interface ConnectionManager {
@@ -123,6 +125,7 @@ export function createConnectionManager(
   const gapTerminationTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const slowSince = new Map<string, number>()
   const transientDropListeners = new Set<(connectionId: string, event: ServerEvent) => void>()
+  let openedConnections = 0
   const softLimitBytes = options.outboundBuffer?.softLimitBytes ?? REALTIME_OUTBOUND_SOFT_LIMIT_BYTES
   const hardLimitBytes = options.outboundBuffer?.hardLimitBytes ?? REALTIME_OUTBOUND_HARD_LIMIT_BYTES
   const sustainedMs = options.outboundBuffer?.sustainedMs ?? REALTIME_OUTBOUND_SUSTAINED_MS
@@ -154,7 +157,8 @@ export function createConnectionManager(
         },
         socket,
         joinedRoomIds: new Set(),
-        isAlive: true
+        isAlive: true,
+        openedOrder: ++openedConnections
       }
       if (connections.has(connection.connectionId)) {
         throw new Error("Realtime connection ID is already active.")
