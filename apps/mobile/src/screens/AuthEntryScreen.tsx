@@ -1,7 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
@@ -12,8 +11,14 @@ import {
 } from "react-native"
 import {
   useEntranceAnimation,
+  useReducedMotion,
   useReducedMotionPreference
 } from "../ui/animations"
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring
+} from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { SoftBlobBackground } from "../ui/backgrounds"
@@ -61,42 +66,54 @@ function waitForHandoff(durationMs: number): Promise<void> {
 }
 
 interface CinematicActionButtonProps {
-  busy?: boolean
   compact: boolean
   disabled?: boolean
+  /** Ignores presses while a handoff runs, without a spinner or dimming. */
+  locked?: boolean
   label: string
   onPress: () => void
   testID: string
 }
 
+const CTA_PRESSED_SCALE = 0.97
+
 function CinematicActionButton({
-  busy = false,
   compact,
   disabled = false,
+  locked = false,
   label,
   onPress,
   testID
 }: CinematicActionButtonProps) {
   const entrance = useEntranceAnimation({ delay: 0, duration: 240, translateY: 10 })
+  const reduceMotion = useReducedMotion()
+  // The press spring runs on the UI thread; under Reduce Motion the pressed
+  // colour alone carries the feedback.
+  const pressScale = useSharedValue(1)
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: pressScale.value }] }))
+  const pressTo = (value: number) => {
+    if (reduceMotion) return
+    pressScale.value = withSpring(value, uiTheme.animation.springSnappy)
+  }
   return (
     <Animated.View style={[styles.cinematicActionContainer, entrance]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        disabled={busy || disabled}
-        onPress={onPress}
-        testID={testID}
-        style={({ pressed }) => [
-          styles.cinematicAction,
-          compact ? styles.controlCompact : null,
-          pressed ? styles.cinematicActionPressed : null,
-          busy ? styles.cinematicActionBusy : null,
-          disabled ? styles.cinematicActionDisabled : null
-        ]}
-      >
-        {busy ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
+      <Reanimated.View style={pressStyle}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ disabled: disabled || locked }}
+          disabled={disabled || locked}
+          onPress={onPress}
+          onPressIn={() => pressTo(CTA_PRESSED_SCALE)}
+          onPressOut={() => pressTo(1)}
+          testID={testID}
+          style={({ pressed }) => [
+            styles.cinematicAction,
+            compact ? styles.controlCompact : null,
+            pressed ? styles.cinematicActionPressed : null,
+            disabled ? styles.cinematicActionDisabled : null
+          ]}
+        >
           <Text
             adjustsFontSizeToFit
             maxFontSizeMultiplier={1.25}
@@ -106,8 +123,8 @@ function CinematicActionButton({
           >
             {label}
           </Text>
-        )}
-      </Pressable>
+        </Pressable>
+      </Reanimated.View>
     </Animated.View>
   )
 }
@@ -224,10 +241,12 @@ export function AuthEntryScreen({
   }, [isPreludeActionsExiting, onClearError, preludeActionsExit, reduceMotion])
   const openCharacterGreeting = useCallback(() => {
     if (!isPreludeInteractive || isPreludeActionsExiting) return
+    hapticLight()
     dispatchIntro({ type: "open-greeting" })
   }, [isPreludeActionsExiting, isPreludeInteractive])
   const openDemo = useCallback(async (): Promise<void> => {
     if (!IS_BLUMI_DEMO_ENABLED || isCompletingIntro || isSubmitting) return
+    hapticLight()
     onClearError()
     setIsCompletingIntro(true)
     try {
@@ -238,6 +257,7 @@ export function AuthEntryScreen({
   }, [isCompletingIntro, isSubmitting, onClearError, onStartDemo])
   const openRegister = useCallback(async (intent: "create" | "sign-in"): Promise<void> => {
     if (isCompletingIntro) return
+    hapticLight()
     const startsWorldHandoff =
       !reduceMotion &&
       intent === "create" &&
@@ -416,9 +436,9 @@ export function AuthEntryScreen({
                 </Animated.View>
               ) : shouldRenderWhoaAction ? (
                 <CinematicActionButton
-                  busy={isCompletingIntro || isSubmitting}
                   compact={viewportLayout.compact}
                   label={copy.whoa}
+                  locked={isCompletingIntro || isSubmitting}
                   onPress={() => { void openRegister("create") }}
                   testID="onboarding-whoa"
                 />
@@ -510,11 +530,7 @@ const styles = StyleSheet.create({
   },
   cinematicActionPressed: {
     backgroundColor: uiTheme.colors.actionDarkPressed,
-    opacity: 0.94,
-    transform: [{ scale: 0.988 }]
-  },
-  cinematicActionBusy: {
-    opacity: 0.72
+    opacity: 0.94
   },
   cinematicActionDisabled: { opacity: 0.78 },
   controlCompact: {
