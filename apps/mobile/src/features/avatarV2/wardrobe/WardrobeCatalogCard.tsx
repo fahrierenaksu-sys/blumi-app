@@ -25,11 +25,10 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   width: number
   onEquip: (item: AvatarCatalogItem) => void
   previewSource?: ImageSourcePropType
-  thumbnailTransition: number
 }) {
   const {
     item, equipped, itemStateLabel, wearingLabel, locked, width, onEquip,
-    previewSource, thumbnailTransition
+    previewSource
   } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
     ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
@@ -59,7 +58,8 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       source={previewSource}
       contentFit="contain"
       cachePolicy="memory-disk"
-      transition={thumbnailTransition}
+      // WRD-2: static thumbnails never fade in after decoding (as in the Shop).
+      transition={0}
       style={[
         thumbnailPresentation.frame === "rig"
           ? styles.itemPreviewRigLayer

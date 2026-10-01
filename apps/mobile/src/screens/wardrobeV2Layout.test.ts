@@ -58,6 +58,18 @@ test("glass falls back to a solid surface for Reduce Transparency or a missing n
   assert.doesNotMatch(screenSource, /from "expo-blur"/)
 })
 
+test("a category change swaps products while they are invisible, on the UI thread (WRD-1/WRD-2)", () => {
+  const motion = readFileSync(join(wardrobeFolder, "useWardrobeCategoryMotion.ts"), "utf8")
+  const card = readFileSync(join(wardrobeFolder, "WardrobeCatalogCard.tsx"), "utf8")
+  assert.match(motion, /withTiming\(0, \{ duration: WARDROBE_CATALOG_FADE_OUT_MS \}, \(finished\) => \{\s*if \(finished\) scheduleOnRN\(setShownCategory, target\)/)
+  assert.match(motion, /useLayoutEffect\(\(\) => \{[\s\S]*?withTiming\(1, \{ duration: WARDROBE_CATALOG_FADE_IN_MS \}\)/)
+  assert.doesNotMatch(motion, /from "react-native"|Animated\.timing|requestAnimationFrame/)
+  assert.match(screenSource, /catalogStyle=\{catalogTransition\.style\}/)
+  assert.match(screenSource, /pointerEvents=\{switching \? "none" : "auto"\}/)
+  assert.match(card, /transition=\{0\}/)
+  assert.doesNotMatch(card, /thumbnailTransition/)
+})
+
 test("the stage sizes the canonical character from its measured area", () => {
   assert.match(screenSource, /getWardrobeStageLayout\(/)
   assert.match(screenSource, /animationState="idle_front"/)

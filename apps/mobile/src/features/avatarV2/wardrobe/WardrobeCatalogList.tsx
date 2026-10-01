@@ -1,12 +1,14 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   FlatList,
   View,
   useWindowDimensions,
   type NativeScrollEvent,
-  type NativeSyntheticEvent
+  type NativeSyntheticEvent,
+  type StyleProp,
+  type ViewStyle
 } from "react-native"
+import Reanimated, { type AnimatedStyle } from "react-native-reanimated"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import type { WardrobeCategoryId } from "../wardrobeCategoryModel"
 import { WardrobeCatalogCard } from "./WardrobeCatalogCard"
@@ -37,7 +39,10 @@ type WardrobePage = readonly WardrobeCatalogCardModel[]
 export function WardrobeCatalogList(props: {
   activeCategory: WardrobeCategoryId
   cards: readonly WardrobeCatalogCardModel[]
-  catalogOpacity: Animated.Value
+  /** UI-thread opacity of the category swap (useWardrobeCatalogTransition). */
+  catalogStyle: StyleProp<AnimatedStyle<ViewStyle>>
+  /** True while the previous category fades out; its cards take no taps. */
+  switching: boolean
   copy: WardrobeStudioCopy
   reduceMotion: boolean
   onEquip: (item: AvatarCatalogItem) => void
@@ -47,9 +52,9 @@ export function WardrobeCatalogList(props: {
   const {
     activeCategory,
     cards,
-    catalogOpacity,
+    catalogStyle,
+    switching,
     copy,
-    reduceMotion,
     onEquip,
     onExploreShop,
     onPageChange
@@ -75,14 +80,13 @@ export function WardrobeCatalogList(props: {
               locked={card.locked}
               width={itemWidth}
               previewSource={card.previewSource}
-              thumbnailTransition={reduceMotion ? 0 : 120}
               onEquip={onEquip}
             />
           ))}
         </View>
       ))}
     </View>
-  ), [cardHeight, copy.wearing, itemWidth, listWidth, onEquip, pageHeight, reduceMotion])
+  ), [cardHeight, copy.wearing, itemWidth, listWidth, onEquip, pageHeight])
 
   // One list for every category: a category change swaps the data and jumps
   // back to the first page without animation, instead of remounting the list.
@@ -101,9 +105,10 @@ export function WardrobeCatalogList(props: {
 
   const isMeasured = itemWidth > 0
   return (
-    // The category fade stays on the native-driver opacity around the list.
-    <Animated.View
-      style={[styles.catalogArea, { opacity: catalogOpacity }]}
+    // The category swap fades this wrapper on the UI thread (WRD-1).
+    <Reanimated.View
+      pointerEvents={switching ? "none" : "auto"}
+      style={[styles.catalogArea, catalogStyle]}
       onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
     >
       <View style={{ height: pageHeight }}>
@@ -127,6 +132,6 @@ export function WardrobeCatalogList(props: {
           />
         )}
       </View>
-    </Animated.View>
+    </Reanimated.View>
   )
 }

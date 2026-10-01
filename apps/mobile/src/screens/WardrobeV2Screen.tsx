@@ -25,7 +25,7 @@ import {
 import { getAvatarItemPreviewSource } from "../features/avatarV2/wardrobe/wardrobePreviewSources"
 import { useWardrobeTryOn } from "../features/avatarV2/wardrobe/useWardrobeTryOn"
 import { useWardrobeDone } from "../features/avatarV2/wardrobe/useWardrobeDone"
-import { useWardrobeCatalogFade } from "../features/avatarV2/wardrobe/useWardrobeCategoryMotion"
+import { useWardrobeCatalogTransition } from "../features/avatarV2/wardrobe/useWardrobeCategoryMotion"
 import { WardrobeTopBar } from "../features/avatarV2/wardrobe/WardrobeTopBar"
 import { WardrobeSectionSwitcher } from "../features/avatarV2/wardrobe/WardrobeSectionSwitcher"
 import { WardrobePreviewStage } from "../features/avatarV2/wardrobe/WardrobePreviewStage"
@@ -70,7 +70,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   )
   const activeCategory = resolveAvatarStudioCategory(studioTabs, selectedCategory)
   const activeTab = findAvatarStudioTab(studioTabs, activeCategory)
-  const catalogOpacity = useWardrobeCatalogFade({ activeCategory, reduceMotion })
 
   const activeItems = useMemo(
     () => getWardrobeActiveItems({
@@ -94,6 +93,11 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     [avatar, canEquipItem, displayedAvatar, inventory, studioCopy, activeItems]
   )
 
+  const catalogTransition = useWardrobeCatalogTransition({
+    activeCategory,
+    cards: visibleWardrobeCards,
+    reduceMotion
+  })
   const [catalogPage, setCatalogPage] = useState(0)
 
   const handleSelectSection = useCallback((section: AvatarStudioSectionId): void => {
@@ -174,9 +178,10 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
             </Text>
           ) : null}
           <WardrobeCatalogList
-            activeCategory={activeCategory}
-            cards={visibleWardrobeCards}
-            catalogOpacity={catalogOpacity}
+            activeCategory={catalogTransition.shownCategory}
+            cards={catalogTransition.cards}
+            catalogStyle={catalogTransition.style}
+            switching={catalogTransition.switching}
             copy={studioCopy}
             reduceMotion={reduceMotion}
             onEquip={handleEquip}
