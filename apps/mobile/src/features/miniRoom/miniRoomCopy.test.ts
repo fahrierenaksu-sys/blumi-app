@@ -18,7 +18,6 @@ test("MiniRoom copy keeps the Turkish text chat and optional live-audio journey 
   assert.equal(copy.roomMessagePlaceholder, "Bir şey yaz…")
   assert.equal(copy.sendRoomMessage, "Oda mesajını gönder")
   assert.equal(copy.dismissRoomMessage, "Oda mesajını kapat")
-  assert.equal(copy.sendReaction("wave"), "El sallama tepkisi gönder")
 })
 
 test("MiniRoom copy retains the English text chat and optional live-audio journey", () => {
@@ -36,7 +35,6 @@ test("MiniRoom copy retains the English text chat and optional live-audio journe
   // 2026-09-30 user-approved rename: match room / write something
   assert.equal(copy.roomMessagePlaceholder, "Write something…")
   assert.equal(copy.dismissRoomMessage, "Dismiss room message")
-  assert.equal(copy.sendReaction("heart"), "Send heart reaction")
 })
 
 test("MiniRoom chat panel, menu and state copy exist in both languages", () => {
@@ -60,6 +58,15 @@ test("MiniRoom chat panel, menu and state copy exist in both languages", () => {
   }
   for (const key of ["connecting", "reconnecting", "connectionFailed", "sendFailedNotice", "historyFailed"] as const) {
     assert.notEqual(tr[key], en[key], key)
+  }
+})
+
+test("MiniRoom copy carries no text for retired room controls", () => {
+  // The room has no reaction buttons and no separate "text room" mode label;
+  // their strings were unused leftovers of the retired lobby-era HUD.
+  for (const copy of [getMiniRoomCopy("tr"), getMiniRoomCopy("en")]) {
+    assert.equal("sendReaction" in copy, false)
+    assert.equal("textRoom" in copy, false)
   }
 })
 
