@@ -259,6 +259,35 @@ test("foreground banners are hidden only for messages in the actively viewed con
   runtime.dispose()
 })
 
+test("iOS inactive transitions do not turn a visible conversation into a push banner", async () => {
+  const runtime = createRuntime()
+  await settle()
+  const state = runtime.modules.get("./foregroundNotificationState")
+  const release = state.registerFocusedConversation("thread-visible")
+  runtime.setActiveThread(null)
+  runtime.appState("inactive")
+  const visible = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-visible", messageId: "inactive-visible" })
+  assert.equal(visible.shouldShowBanner, false)
+  assert.equal(visible.shouldShowList, false)
+  release()
+  runtime.appState("background")
+  const unseen = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-visible", messageId: "new-background" })
+  assert.equal(unseen.shouldShowBanner, true)
+  runtime.dispose()
+})
+
+test("room message banners stay hidden before thread resolution and recover after room exit", async () => {
+  const runtime = createRuntime()
+  await settle()
+  const release = runtime.modules.get("./foregroundNotificationState").registerRoomMessageAlertSuppression()
+  const received = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "unresolved-room-thread", messageId: "room-push" })
+  assert.equal(received.shouldShowBanner, false)
+  assert.equal(received.shouldShowList, false)
+  release()
+  assert.equal((await runtime.handleForegroundNotification({ type: "chat.message", threadId: "other-thread", messageId: "after-room" })).shouldShowBanner, true)
+  runtime.dispose()
+})
+
 test("foreground registers permission granted in iOS Settings without prompting, and cleans up on logout", async () => {
   const runtime = createRuntime({ physicalDevice: true })
   await settle()

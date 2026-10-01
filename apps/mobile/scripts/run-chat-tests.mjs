@@ -32,10 +32,6 @@ const sourceFiles = [
   "src/features/chat/matchChatOpening.ts",
   "src/features/chat/matchChatOpening.test.ts",
   "src/features/chat/chatStore.ts",
-  "src/features/chat/chatParticipantUpdates.ts",
-  "src/features/chat/chatParticipantUpdates.test.ts",
-  "src/features/chat/liveParticipantIdentityModel.ts",
-  "src/features/chat/liveParticipantIdentityModel.test.ts",
   "src/features/chat/chatMessageRenderKeys.ts",
   "src/features/chat/chatReadHere.ts",
   "src/features/chat/chatPartnerReceiptsState.ts",
@@ -117,8 +113,6 @@ try {
       join(outputDirectory, "features/inbox/inboxRowModel.test.js"),
       join(outputDirectory, "features/chat/matchChatOpening.test.js"),
       join(outputDirectory, "features/chat/chatStore.test.js"),
-      join(outputDirectory, "features/chat/chatParticipantUpdates.test.js"),
-      join(outputDirectory, "features/chat/liveParticipantIdentityModel.test.js"),
       join(outputDirectory, "features/chat/chatStore.adversarial.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteApi.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteModel.test.js"),
@@ -161,7 +155,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/useLiveParticipantIdentity.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

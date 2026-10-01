@@ -9,6 +9,18 @@ import { createForegroundAlertLedger, shouldShowInAppMessageAlert } from "./noti
  */
 const alertLedger = createForegroundAlertLedger()
 const focusedConversationCounts = new Map<string, number>()
+const roomMessageAlertSuppressions = new Set<symbol>()
+
+/** A room protects its composer even while its canonical thread is loading. */
+export function registerRoomMessageAlertSuppression(): () => void {
+  const owner = Symbol()
+  roomMessageAlertSuppressions.add(owner)
+  return () => { roomMessageAlertSuppressions.delete(owner) }
+}
+
+export function areRoomMessageAlertsSuppressed(): boolean {
+  return roomMessageAlertSuppressions.size > 0
+}
 
 export function registerFocusedConversation(threadId: string): () => void {
   focusedConversationCounts.set(threadId, (focusedConversationCounts.get(threadId) ?? 0) + 1)
@@ -33,6 +45,10 @@ export function claimForegroundAlert(key: string): boolean {
 
 /** Gate for the in-app toast of a message received over the socket. */
 export function shouldShowIncomingMessageAlert(message: { threadId: string; messageId: string }): boolean {
+  if (areRoomMessageAlertsSuppressed()) {
+    claimForegroundAlert(`message:${message.messageId}`)
+    return false
+  }
   return shouldShowInAppMessageAlert(message, isConversationFocused, claimForegroundAlert)
 }
 

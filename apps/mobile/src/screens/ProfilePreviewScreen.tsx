@@ -35,7 +35,6 @@ import {
 import { uiTheme } from "../ui/theme"
 import { springPressScale, useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
-import { useLiveParticipantIdentity } from "../features/chat/useLiveParticipantIdentity"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import {
@@ -72,7 +71,6 @@ export interface ProfileCue {
 export interface ProfilePreviewData {
   userId: string
   displayName: string
-  profileUpdatedAt?: string
   age?: number
   avatarSnapshot?: CandidateAvatarSnapshot
   headline: string
@@ -105,7 +103,7 @@ const CUE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const { navigation, route } = props
   const copy = getProfilePreviewCopy(getAppLocale())
-  const profile = useLiveParticipantIdentity(props.profileOverride ?? ("profile" in route.params ? route.params.profile : undefined))
+  const profile = props.profileOverride ?? ("profile" in route.params ? route.params.profile : undefined)
   const likeScaleAnim = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
   const contentAnim = useRef(new Animated.Value(0)).current

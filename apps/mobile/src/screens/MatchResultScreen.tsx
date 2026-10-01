@@ -51,7 +51,6 @@ import { useEntranceAnimation, useReducedMotion, usePulse } from "../ui/animatio
 import { hapticSuccess } from "../ui/haptics"
 import { AvatarFrame, type AvatarFrameVariant } from "../ui/AvatarFrame"
 import { ReportModal } from "../components/ReportModal"
-import { useLiveMatchParticipant } from "../features/matches/useLiveMatchParticipant"
 
 type MatchResultScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -63,8 +62,7 @@ type MatchResultScreenProps = NativeStackScreenProps<
 export function MatchResultScreen(props: MatchResultScreenProps) {
   const { navigation, route, sessionActor } = props
   const { avatar } = useAvatarV2()
-  const matchedUser = useLiveMatchParticipant(route.params.match.matchedUser) ?? route.params.match.matchedUser
-  const match = { ...route.params.match, matchedUser }
+  const match = route.params.match
   const currentAvatar = useMemo(
     () => resolveLatestMatchRoomAvatar(avatar),
     [avatar]

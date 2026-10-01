@@ -3,8 +3,6 @@ import type { CompleteAvatarSelection } from "../avatar/AvatarSelection";
 export interface ChatParticipantSummary {
   userId: string;
   displayName?: string;
-  /** Persisted account version, so delayed replies cannot restore old identity. */
-  profileUpdatedAt?: string;
   /** Available only to the two members of an authorized mutual chat. */
   avatar?: CompleteAvatarSelection;
 }

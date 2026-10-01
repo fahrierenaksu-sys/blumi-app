@@ -228,7 +228,6 @@ test("fetchDiscoverProfiles loads authenticated production profiles", async () =
           {
             userId: "discover_defne",
             displayName: "Defne Yildiz",
-            updatedAt: "2026-10-01T12:00:00.000Z",
             age: 24,
             bio: "Coffee, ceramics, and slow Sundays.",
             prompts: [
@@ -260,19 +259,11 @@ test("fetchDiscoverProfiles loads authenticated production profiles", async () =
     /discovery_room_showcase/
   )
   assert.equal(profiles[0]?.displayName, "Defne Yildiz")
-  assert.equal(profiles[0]?.updatedAt, "2026-10-01T12:00:00.000Z")
   assert.equal(profiles[0]?.bio, "Coffee, ceramics, and slow Sundays.")
   assert.deepEqual(profiles[0]?.prompts, [
     { promptId: "small_joy", answer: "Fresh coffee." }
   ])
   assert.deepEqual(profiles[0]?.vibeTags, ["coffee dates"])
-})
-
-test("Discover rejects malformed profile versions at the HTTP boundary", async () => {
-  await assert.rejects(fetchDiscoverProfiles("https://api.blumi.test", "token", {
-    ageMin: 18, ageMax: 99, genders: [], vibes: []
-  }, (async () => createJsonResponse(200, { profiles: [{ userId: "partner", displayName: "Irmak", age: 24,
-    distanceLabel: "Nearby", vibeTags: [], avatarPresetId: "sunset", updatedAt: "not-a-date" }] })) as typeof fetch), /Discover profile/)
 })
 
 test("fetchDiscoverPage omits legacy radius controls and returns global supply metadata", async () => {

@@ -37,10 +37,6 @@ import { isAuthError } from "../auth/authErrors"
 import { readProfileUpdateBody } from "./profileUpdateBody"
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
-import type { ChatService } from "../chat/chatService"
-import type { ConnectionManager } from "../realtime/connectionManager"
-import type { AfterResponseTasks } from "../operations/afterResponseTasks"
-import { announceChatParticipantUpdate } from "../chat/chatParticipantUpdates"
 
 export interface UserRouteServices {
   authService: AuthService
@@ -48,9 +44,6 @@ export interface UserRouteServices {
   capabilityService: CapabilityService
   accountRecoveryService?: AccountRecoveryService
   firebaseAuthVerifier?: FirebaseAuthVerifier
-  chatService: ChatService
-  connectionManager: ConnectionManager
-  afterResponseTasks: AfterResponseTasks
 }
 
 const accountChallengeRouteSchema = {
@@ -287,9 +280,6 @@ export async function registerUserRoutes(
         return reply.code(401).send({ error: "Sign in again to continue." })
       }
 
-      if (typeof update.displayName === "string") {
-        services.afterResponseTasks.run("chat_participant_profile_update", () => announceChatParticipantUpdate(services, profile.userId))
-      }
       return { profile }
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
@@ -359,7 +349,6 @@ export async function registerUserRoutes(
         )
       })
     }
-    services.afterResponseTasks.run("chat_participant_avatar_update", () => announceChatParticipantUpdate(services, resolvedSession.account.userId))
     return {
       avatar: projectAvatarSelectionForRead(
         result.selection,

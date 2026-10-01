@@ -11,12 +11,14 @@ function presentation(data: unknown, options: {
   appActive?: boolean
   focused?: string[]
   presented?: string[]
+  suppressMessageAlerts?: boolean
 } = {}) {
   const ledger = createForegroundAlertLedger()
   for (const key of options.presented ?? []) ledger.claim(key)
   const result = resolveForegroundNotificationPresentation({
     data,
     appActive: options.appActive ?? true,
+    suppressMessageAlerts: options.suppressMessageAlerts,
     isConversationFocused: (threadId) => (options.focused ?? []).includes(threadId),
     claimAlert: ledger.claim
   })
@@ -34,6 +36,21 @@ test("a message or room invite for the open conversation is not shown as a banne
     assert.equal(presentation(data, { focused: ["thread_b"] }).shouldShowBanner, true)
     assert.equal(presentation(data, { focused: ["thread_a"], appActive: false }).shouldShowBanner, true)
   }
+})
+
+test("room focus suppresses foreground message banners without disabling background notifications", () => {
+  const message = { type: "chat.message", threadId: "other_thread", messageId: "room_message" }
+  assert.equal(presentation(message, { suppressMessageAlerts: true }).shouldShowBanner, false)
+  assert.equal(presentation(message, { suppressMessageAlerts: true, appActive: false }).shouldShowBanner, true)
+  assert.equal(presentation({ type: "discovery.like" }, { suppressMessageAlerts: true }).shouldShowBanner, true)
+})
+
+test("a delayed message push is hidden after the message was already displayed", () => {
+  const data = { type: "chat.message", threadId: "thread_a", messageId: "already-read" }
+  const presented = ["message:already-read"]
+  assert.equal(presentation(data, { presented }).shouldShowBanner, false)
+  assert.equal(presentation(data, { presented, appActive: false }).shouldShowBanner, false)
+  assert.equal(presentation(data, { appActive: false }).shouldShowBanner, true)
 })
 
 test("a message already shown by the in-app toast is not shown again by the push", () => {

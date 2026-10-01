@@ -280,9 +280,7 @@ export function createChatCoordinator(
           dependencies.markOptimisticMessageFailed(clientMessageId)
           dependencies.showWarningToast({
             title: "Message not sent",
-            body: getMessageSendErrorMessageForDisplay(
-              error instanceof Error ? error.message : ""
-            )
+            body: getMessageSendErrorMessageForDisplay(error)
           })
         }
         throw error

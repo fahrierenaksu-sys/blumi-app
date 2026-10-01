@@ -152,27 +152,6 @@ test("match sync checks existing chat IDs in one parameterized query", async () 
   assert.deepEqual(fake.calls[0]?.values, [["thread_match_one", "thread_match_two"]])
 })
 
-test("chat list and single-thread reads use the current profile name and saved outfit", async () => {
-  const fake = createFakePool((text) => text.includes("FROM blumi_chat_thread_participants")
-    ? ["user_a", "user_b"].map((userId) => ({
-        thread_id: "thread_one", user_id: userId,
-        display_name: text.includes("COALESCE(account.display_name, participant.display_name)") ? "Irmak" : "Eren",
-        avatar_preset_id: DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId,
-        avatar_selection: DEFAULT_FEMALE_AVATAR_LOADOUT, avatar_revision: 7,
-        profile_updated_at: text.includes("account.updated_at AS profile_updated_at") ? "2026-10-01T12:00:00Z" : null
-      }))
-    : [{ thread_id: "thread_one", mini_room_id: "room", created_at: "2026-10-01T10:00:00Z" }])
-  const repository = createPostgresChatRepository(fake.pool)
-  const listed = (await repository.listThreads("user_a"))[0]
-  const opened = await repository.findThread("thread_one")
-  for (const thread of [listed, opened]) {
-    assert.equal(thread?.participants[1].displayName, "Irmak")
-    assert.equal(thread?.participants[1].avatar?.revision, 7)
-    assert.equal(thread?.participants[1].profileUpdatedAt, "2026-10-01T12:00:00.000Z")
-    assert.deepEqual(thread?.participants[1].avatar?.loadout, DEFAULT_FEMALE_AVATAR_LOADOUT)
-  }
-})
-
 test("postgres chat repository maps listed threads with latest message", async () => {
   const fake = createFakePool((text) => {
     if (text.includes("FROM blumi_chat_thread_participants")) {

@@ -8,6 +8,21 @@ import {
   sendThreadMessage
 } from "./chatApi"
 
+test("message rate limits and server failures display their cause instead of a connection warning", async () => {
+  const { getMessageSendErrorMessageForDisplay } = await import("./chatErrorCopy")
+  for (const [status, expected] of [
+    [429, "Mesaj gönderme sınırına ulaştın. Biraz bekleyip tekrar dene."],
+    [503, "Sunucu şu anda mesajını gönderemiyor. Biraz sonra tekrar dene."],
+    [401, "Oturumun doğrulanamadı. Tekrar giriş yapıp mesajını yeniden gönder."]
+  ] as const) {
+    const error = await sendThreadMessage("https://example.test", "token", "thread", "hello", {},
+      (async () => createJsonResponse(status, { error: "opaque server diagnostics" })) as typeof fetch).catch((error: Error) => error)
+    assert.ok(error instanceof Error)
+    assert.equal(getMessageSendErrorMessageForDisplay(error, "tr"), expected)
+    assert.doesNotMatch(getMessageSendErrorMessageForDisplay(error, "en"), /opaque|connection/i)
+  }
+})
+
 test("chat refresh consumes cursor pages and rejects nonadvancing or cross-account pages", async () => {
   const urls: string[] = []
   const result = await fetchChatThreads("http://localhost:4000", "token", (async (url) => {

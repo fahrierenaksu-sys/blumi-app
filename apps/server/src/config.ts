@@ -639,8 +639,7 @@ export function createConfiguredServerServices(
   const safetyService = createSafetyService({
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
   })
-  const chatService = createChatService({ blockPolicy: safetyService,
-    profileSource: async (ids) => (await authService.repository.findAccountsByUserIds(ids)).map((account) => ({ ...account.profile, profileUpdatedAt: account.updatedAt })) })
+  const chatService = createChatService({ blockPolicy: safetyService })
   const economyService = createEconomyService()
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({

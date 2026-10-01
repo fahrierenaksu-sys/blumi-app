@@ -1,3 +1,5 @@
+import { ChatMessageSendError } from "./chatApi"
+
 const SAFE_THREAD_LIST_ERROR_MESSAGES = new Set([
   "Chats need a connection.",
   "We could not refresh your chats yet."
@@ -111,11 +113,23 @@ export function getMatchChatOpenErrorMessageForDisplay(
 }
 
 export function getMessageSendErrorMessageForDisplay(
-  errorMessage: string,
+  error: unknown,
   locale?: ChatErrorLocale
 ): string {
+  const resolvedLocale = resolveChatErrorLocale(locale)
+  if (error instanceof ChatMessageSendError) {
+    if (error.status === 429) return resolvedLocale === "tr"
+      ? "Mesaj gönderme sınırına ulaştın. Biraz bekleyip tekrar dene."
+      : "You're sending messages too quickly. Wait a moment and try again."
+    if (error.status >= 500) return resolvedLocale === "tr"
+      ? "Sunucu şu anda mesajını gönderemiyor. Biraz sonra tekrar dene."
+      : "The server couldn't send your message right now. Try again shortly."
+    if (error.status === 401) return resolvedLocale === "tr"
+      ? "Oturumun doğrulanamadı. Tekrar giriş yapıp mesajını yeniden gönder."
+      : "Your session couldn't be verified. Sign in again and retry your message."
+  }
   return getKnownOrFallback(
-    errorMessage,
+    typeof error === "string" ? error : error instanceof Error ? error.message : "",
     SAFE_MESSAGE_SEND_ERROR_MESSAGES,
     FALLBACK_COPY.messageSend,
     locale

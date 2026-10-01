@@ -148,7 +148,7 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
         issuedAt: NOW,
       },
       participants: [
-        { userId: "ada", displayName: "Ada", avatar: AVATAR, profileUpdatedAt: NOW },
+        { userId: "ada", displayName: "Ada", avatar: AVATAR },
         { userId: "bora", displayName: "Bora", avatar: { presetId: "dusk" } },
       ],
     },
@@ -190,10 +190,6 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
   "chat.thread_created": {
     valid: THREAD,
     invalid: { ...THREAD, participantUserIds: ["ada"] },
-  },
-  "chat.participant_updated": {
-    valid: { participant: { userId: "bora", displayName: "Irmak" }, updatedAt: NOW },
-    invalid: { participant: { userId: "" }, updatedAt: NOW },
   },
   "chat.thread_listed": {
     valid: { userId: "ada", threads: [THREAD], nextCursor: null },
@@ -253,7 +249,7 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 26);
+  assert.equal(SERVER_EVENT_TYPES.length, 25);
 });
 
 test("a typing update names the typist, a known state and a bounded lifetime, never text", () => {

@@ -1,8 +1,7 @@
 import type {
   DiscoveryDecisionQuota,
   MediaSessionToken,
-  MiniRoom,
-  MiniRoomParticipant
+  MiniRoom
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
@@ -31,7 +30,6 @@ import { resetChatStore } from "../features/chat/chatStore"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
-import { RoomDebriefScreen } from "../screens/RoomDebriefScreen"
 import { ChatThreadScreen } from "../screens/ChatThreadScreen"
 import { YouScreen } from "../screens/YouScreen"
 import { ProfileEditScreen } from "../screens/ProfileEditScreen"
@@ -132,7 +130,9 @@ export interface ReadyMiniRoomRouteParam {
 
 export interface MiniRoomParticipantsRouteParam {
   you: { userId: string; displayName: string }
-  partner: Pick<MiniRoomParticipant, "userId" | "displayName" | "profileUpdatedAt"> & {
+  partner: {
+    userId: string
+    displayName: string
     avatarSnapshot?: CandidateAvatarSnapshot
   }
 }
@@ -181,9 +181,14 @@ export type RootStackParamList = {
     participants: MiniRoomParticipantsRouteParam
   }
   MiniRoomRigPreview: undefined
+  /** Legacy source contract only; the debrief screen is not registered. */
   RoomDebrief: {
     miniRoomId: string
-    partner: MiniRoomParticipantsRouteParam["partner"]
+    partner: {
+      userId: string
+      displayName: string
+      avatarSnapshot?: CandidateAvatarSnapshot
+    }
     durationSeconds: number
     connected: boolean
   }
@@ -767,18 +772,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     sessionToken={sessionActor.session.sessionToken}
                     demoMode={sessionActor.session.mode === "demo"}
                     sessionActor={sessionActor}
-                  />
-                )}
-              </Stack.Screen>
-              <Stack.Screen
-                name="RoomDebrief"
-                options={{ headerShown: false, gestureEnabled: false }}
-              >
-                {(screenProps) => (
-                  <RoomDebriefScreen
-                    {...screenProps}
-                    sessionActor={sessionActor}
-                    onDecisionDelivered={reconcileConnectionDecisionDelivery}
                   />
                 )}
               </Stack.Screen>

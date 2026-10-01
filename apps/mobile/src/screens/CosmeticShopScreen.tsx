@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons"
 import { publishSelectedShopPreviewWarmup } from "../features/performance/sceneAssetWarmupModel"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -62,6 +63,8 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { hapticSelection } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
+import { ActionButtonCircle } from "../ui/primitives"
+import { uiTheme } from "../ui/theme"
 import { useAppViewportMetrics } from "../ui/layout/useAppViewportMetrics"
 
 type CosmeticShopScreenProps = NativeStackScreenProps<
@@ -172,6 +175,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     setCombinationState,
     combinationStateRef,
     dispatchCombination,
+    shopExitLocked,
+    handleCloseShop
   } = useShopCombinationSession({
     navigation,
     avatar: avatarV2.avatar,
@@ -346,6 +351,15 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         >
         <View style={[styles.header, shopLayoutMetrics.catalog.accessibilityLayout && styles.headerAccessibility]}>
           <View style={styles.headerLeft}>
+            <ActionButtonCircle
+              accessibilityLabel={copy.back}
+              accessibilityState={{ disabled: shopExitLocked }}
+              disabled={shopExitLocked}
+              onPress={handleCloseShop}
+              size={44}
+            >
+              <Ionicons name="chevron-back" size={20} color={uiTheme.colors.textPrimary} />
+            </ActionButtonCircle>
             <View style={styles.headerCopy}>
               <Text
                 accessibilityRole="header"
@@ -405,7 +419,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
           ) : null}
 
           {showShopContent ? (
-            <View style={{ gap: shopLayoutMetrics.sectionGap }}>
+            <Reanimated.View entering={contentEntering} style={{ gap: shopLayoutMetrics.sectionGap }}>
               <Animated.View
                 testID="shop-preview-motion"
                 style={[
@@ -469,23 +483,21 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 />
               ) : null}
 
-              <Reanimated.View entering={contentEntering}>
-                <ClosetBrowser
-                  categories={categoryOptions}
-                  activeCategoryId={activeCategoryId}
-                  products={filteredProducts}
-                  inventoryVerified={inventoryVerified}
-                  pendingInventoryLabel={inventoryGateLabel}
-                  selectedId={selectedProduct?.id}
-                  mode={shopMode}
-                  locale={locale}
-                  layoutMetrics={shopLayoutMetrics}
-                  onSelectCategory={handleSelectCategory}
-                  onSelectProduct={handleSelectProduct}
-                  revealRequest={shelfRevealRequest}
-                />
-              </Reanimated.View>
-            </View>
+              <ClosetBrowser
+                categories={categoryOptions}
+                activeCategoryId={activeCategoryId}
+                products={filteredProducts}
+                inventoryVerified={inventoryVerified}
+                pendingInventoryLabel={inventoryGateLabel}
+                selectedId={selectedProduct?.id}
+                mode={shopMode}
+                locale={locale}
+                layoutMetrics={shopLayoutMetrics}
+                onSelectCategory={handleSelectCategory}
+                onSelectProduct={handleSelectProduct}
+                revealRequest={shelfRevealRequest}
+              />
+            </Reanimated.View>
           ) : showSkeleton ? (
             <ShopShelfSkeleton layoutMetrics={shopLayoutMetrics} locale={locale} />
           ) : (

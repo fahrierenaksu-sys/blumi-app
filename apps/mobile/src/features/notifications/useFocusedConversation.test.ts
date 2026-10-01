@@ -3,6 +3,27 @@ import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import type * as Hook from "./useFocusedConversation"
 
+test("room message alert suppression follows focus and unmount without waiting for a thread id", () => {
+  const runtime = createFakeReactRuntime()
+  let suppressed = false
+  const hook = loadSourceWithFakeReact<typeof Hook>("features/notifications/useFocusedConversation.ts", runtime, {
+    modules: { "./foregroundNotificationState": {
+      registerRoomMessageAlertSuppression: () => {
+        suppressed = true
+        return () => { suppressed = false }
+      }
+    } }
+  })
+  const render = (focused: boolean) => runtime.render(() => hook.useRoomMessageAlertSuppression(focused))
+  render(true)
+  assert.equal(suppressed, true)
+  render(false)
+  assert.equal(suppressed, false)
+  render(true)
+  runtime.unmount()
+  assert.equal(suppressed, false)
+})
+
 test("a focused chat or MiniRoom marks its conversation on screen only while focused and mounted", () => {
   const runtime = createFakeReactRuntime()
   let onScreen: string | null = null

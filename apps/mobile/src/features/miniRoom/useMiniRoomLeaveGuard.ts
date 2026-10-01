@@ -35,8 +35,8 @@ export function useMiniRoomLeaveGuard({
     )
   }, [copy, requestLeave])
 
-  // The room's own exit (Debrief after leaving, the partner leaving, a block)
-  // sets exitedRef before replacing the screen, so that removal passes once.
+  // The room's own exit sets exitedRef before returning to chat or Inbox,
+  // so that removal passes once without another confirmation.
   usePreventRemove(true, ({ data }) => {
     if (resolveMiniRoomRemoval({ exited: exitedRef.current }) === "allow") {
       navigation.dispatch(data.action)

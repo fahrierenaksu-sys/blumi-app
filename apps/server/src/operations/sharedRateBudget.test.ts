@@ -1,9 +1,75 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createInMemoryRateBudget } from "./sharedRateBudget"
+import { createInMemoryRateBudget, createPostgresRateBudget, USER_RATE_BUDGET_LIMITS, userBudgetKey } from "./sharedRateBudget"
 import { createAuthService } from "../auth/authService"
 import { createServer } from "../server"
 import { AUTHENTICATED_IP_REQUESTS_PER_MINUTE } from "./requestLimits"
+import { createChatService } from "../chat/chatService"
+
+test("chat and leave budgets are independent, bounded per user, and renew with the window", async () => {
+  let now = 1_800_000_000_000
+  const budget = createInMemoryRateBudget(() => now)
+  for (const scope of ["chatSend", "roomLeave"] as const) {
+    for (let i = 0; i < USER_RATE_BUDGET_LIMITS[scope]; i++) assert.equal((await budget.consumeUser("sender", scope)).allowed, true)
+    assert.equal((await budget.consumeUser("sender", scope)).allowed, false)
+    assert.equal((await budget.consumeUser("another", scope)).allowed, true)
+  }
+  assert.equal((await budget.consumeUser("sender")).allowed, true)
+  now += 60_000
+  assert.equal((await budget.consumeUser("sender", "chatSend")).allowed, true)
+  assert.equal((await budget.consumeUser("sender", "roomLeave")).allowed, true)
+})
+
+test("PostgreSQL uses separate scoped rows and the same bounded limits without a schema change", async () => {
+  const parameters: unknown[][] = []
+  const budget = createPostgresRateBudget({ async query(_sql, values) {
+    parameters.push(values ?? [])
+    return { rows: [{ allowed: true, retry_after_seconds: 12 }] }
+  } })
+  for (const scope of ["general", "chatSend", "roomLeave"] as const) {
+    assert.deepEqual(await budget.consumeUser("sender", scope), { allowed: true, retryAfterSeconds: 12 })
+  }
+  assert.equal(new Set(parameters.map(values => values[0])).size, 3)
+  assert.deepEqual(parameters.map(values => values[2]), [100, 180, 20])
+  assert.equal(parameters[0]![0], userBudgetKey("sender"), "old callers keep the general row")
+})
+
+test("background requests cannot starve sequential chat sends across HTTP instances", async () => {
+  const auth = createAuthService({ codeFactory: () => "123456" })
+  await auth.sendCode("+905551234559")
+  const session = await auth.verifyCode("+905551234559", "123456")
+  await auth.updateProfile(session.sessionToken, { displayName: "Sender", age: 24, gender: "woman", avatarPresetId: "avatar_v2_body_default" })
+  for (const step of ["profile", "avatar", "room"] as const) await auth.completeOnboardingStep(session.sessionToken, step)
+  const resolved = await auth.getSession(session.sessionToken)
+  assert.ok(resolved)
+  const userId = resolved.account.userId
+  const chatService = createChatService()
+  await chatService.repository.saveThread({
+    threadId: "burst_thread", miniRoomId: "burst_room", participantUserIds: [userId, "partner"],
+    participants: [{ userId, displayName: "Sender" }, { userId: "partner", displayName: "Partner" }],
+    createdAt: new Date().toISOString()
+  })
+  const sharedRateLimiter = createInMemoryRateBudget(() => 1_800_000_000_000)
+  const apps = [0, 1].map(() => createServer({ authService: auth, chatService, sharedRateLimiter }))
+  const headers = { authorization: `Bearer ${session.sessionToken}` }
+  try {
+    for (let i = 0; i < 100; i++) {
+      assert.equal((await apps[i % 2]!.inject({ method: "GET", url: "/v1/users/me", headers })).statusCode, 200)
+    }
+    assert.equal((await apps[0]!.inject({ method: "GET", url: "/v1/users/me", headers })).statusCode, 429)
+    for (let i = 0; i < 180; i++) {
+      const sent = await apps[i % 2]!.inject({ method: "POST", url: "/v1/threads/burst_thread/messages", headers,
+        payload: { body: `message ${i}`, clientMessageId: `burst_client_${i}` } })
+      assert.equal(sent.statusCode, 201, `send ${i}: ${sent.body}`)
+    }
+    const refused = await apps[0]!.inject({ method: "POST", url: "/v1/threads/burst_thread/messages", headers,
+      payload: { body: "over budget", clientMessageId: "burst_over_budget" } })
+    assert.equal(refused.statusCode, 429)
+    assert.equal(refused.json().code, "CHAT_SEND_RATE_LIMITED")
+    assert.ok(Number(refused.headers["retry-after"]) > 0)
+    assert.equal((await chatService.repository.listMessages("burst_thread")).length, 180)
+  } finally { await Promise.all(apps.map(app => app.close())) }
+})
 
 test("an older clock window cannot reset an already consumed newer budget", async () => {
   let now = 120_000

@@ -8,6 +8,18 @@ import {
   resetForegroundNotificationAlerts,
   shouldShowIncomingMessageAlert
 } from "./foregroundNotificationState"
+import * as foreground from "./foregroundNotificationState"
+
+test("a focused room suppresses message toasts even before its thread resolves, and releases suppression on exit", () => {
+  resetForegroundNotificationAlerts()
+  const release = foreground.registerRoomMessageAlertSuppression()
+  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_room", messageId: "room_early" }), false)
+  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_other", messageId: "room_other" }), false)
+  release()
+  release()
+  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_other", messageId: "after_exit" }), true)
+  assert.equal(claimForegroundAlert("message:room_early"), false, "a delayed push does not repeat the suppressed alert")
+})
 
 test("a conversation stays focused until every surface showing it releases it", () => {
   const first = registerFocusedConversation("thread_room")

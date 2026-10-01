@@ -17,9 +17,9 @@ export function useMiniRoomLeave(input: {
   sessionToken: string
   copy: MiniRoomCopy
   exitedRef: RefObject<boolean>
-  exitToDebrief: () => void
+  exitRoom: () => void
 }): { leaveRequested: boolean; requestLeave: () => void } {
-  const { miniRoomId, sessionMode, copy, exitedRef, exitToDebrief } = input
+  const { miniRoomId, sessionMode, copy, exitedRef, exitRoom } = input
   const [leaveRequested, setLeaveRequested] = useState(false)
   const requestedRef = useRef(false)
   const mountedRef = useRef(true)
@@ -37,17 +37,17 @@ export function useMiniRoomLeave(input: {
     requestedRef.current = true
     setLeaveRequested(true)
     if (sessionMode !== "production") {
-      exitToDebrief()
+      exitRoom()
       return
     }
     void startMiniRoomLeave({
       attempt: () => leaveRoomSession(MOBILE_HTTP_BASE_URL, sessionTokenRef.current, miniRoomId),
       readFailureStatus: (error) => error instanceof RoomSessionLeaveError ? error.status : null,
       // A screen already removed some other way (sign-out, a reset) stays removed.
-      exit: () => { if (mountedRef.current) exitToDebrief() },
+      exit: () => { if (mountedRef.current) exitRoom() },
       onUnconfirmed: () => showToast({ type: "info", title: copy.leftRoomUnconfirmed })
     })
-  }, [copy, exitToDebrief, exitedRef, miniRoomId, sessionMode])
+  }, [copy, exitRoom, exitedRef, miniRoomId, sessionMode])
 
   return { leaveRequested, requestLeave }
 }

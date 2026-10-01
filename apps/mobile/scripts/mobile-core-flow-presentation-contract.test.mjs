@@ -319,21 +319,15 @@ test("legacy avatar fallback stays honest and monogram-based", () => {
   assert.doesNotMatch(avatar, /deriveFaceParts/)
 })
 
-test("room debrief preserves the mini-room partner avatar snapshot", () => {
+test("room exit returns to chat without a debrief or a repeated match decision", () => {
   const navigator = read("src/navigation/RootNavigator.tsx")
-  const debrief = read("src/screens/RoomDebriefScreen.tsx")
   const miniRoom = read("src/screens/MiniRoomScreen.tsx")
-
-  assert.match(
-    navigator,
-    /RoomDebrief:\s*\{[\s\S]*partner:\s*MiniRoomParticipantsRouteParam\["partner"\]/
-  )
-  assert.match(navigator, /partner: Pick<MiniRoomParticipant, "userId" \| "displayName" \| "profileUpdatedAt"> & \{\s*avatarSnapshot\?: CandidateAvatarSnapshot/)
-  assert.match(miniRoom, /navigation\.replace\("RoomDebrief", \{[\s\S]*partner:\s*participants\.partner/)
-  assert.match(debrief, /partner\.avatarSnapshot \? \(/)
-  assert.match(debrief, /<CandidateAvatarPreview/)
-  assert.match(debrief, /<Avatar[\s\S]*name=\{partner\.displayName\}[\s\S]*seed=\{partner\.userId\}/)
-  assert.doesNotMatch(debrief, /createCandidateAvatarSnapshot/)
+  assert.doesNotMatch(navigator, /import\s+\{\s*RoomDebriefScreen|name="RoomDebrief"/)
+  assert.doesNotMatch(miniRoom, /RoomDebrief|saveConnection|passConnection/)
+  assert.match(miniRoom, /getMiniRoomExitDestination\(miniRoom\.sourceThreadId, blockedPartner\)/)
+  assert.match(miniRoom, /navigation\.popTo\("ChatThread", \{ threadId: destination\.threadId \}\)/)
+  assert.match(miniRoom, /navigation\.popTo\("Inbox"\)/)
+  assert.match(miniRoom, /handleSafetyActionComplete[\s\S]*exitRoom\(true\)/)
 })
 
 test("chat surfaces render a canonical participant avatar and keep monograms for missing legacy data", () => {

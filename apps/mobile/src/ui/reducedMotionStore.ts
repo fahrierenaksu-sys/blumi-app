@@ -50,7 +50,6 @@ export function createReducedMotionStore(
   const start = () => {
     const generation = ++queryGeneration
     osSubscription = source.addEventListener("reduceMotionChanged", (enabled) => {
-      queryGeneration += 1 // A live OS change is newer than the initial query.
       publish({ reduceMotion: enabled, isResolved: true })
     })
     void source.isReduceMotionEnabled().then((enabled) => {

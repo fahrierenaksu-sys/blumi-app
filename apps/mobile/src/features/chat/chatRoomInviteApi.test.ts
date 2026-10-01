@@ -258,7 +258,7 @@ test("room invite API joins an accepted session only with a server-issued room p
         },
         participants: [
           { userId: "user_one", displayName: "Mina", avatar: {} },
-          { userId: "user_two", displayName: "Defne", avatar: {}, profileUpdatedAt: "2026-10-01T12:00:00.000Z" }
+          { userId: "user_two", displayName: "Defne", avatar: {} }
         ]
       })
     }) as typeof fetch
@@ -266,7 +266,6 @@ test("room invite API joins an accepted session only with a server-issued room p
 
   assert.equal(ready.miniRoom.miniRoomId, "mini room")
   assert.equal(ready.participants[1]?.displayName, "Defne")
-  assert.equal(ready.participants[1]?.profileUpdatedAt, "2026-10-01T12:00:00.000Z")
   assert.equal(ready.miniRoom.sharedDecor?.revision, 2)
 })
 

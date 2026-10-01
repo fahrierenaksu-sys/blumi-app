@@ -28,16 +28,6 @@ const message: ChatMessage = {
   sentAt: "2026-07-22T00:00:00.000Z"
 }
 
-test("participant identity updates reach chat state without a new-chat or message alert", () => {
-  const applied: unknown[] = []
-  const dependencies = createDependencies({ applyChatParticipantUpdated: (payload) => applied.push(payload) })
-  const payload = { participant: { userId: "bora", displayName: "Irmak" }, updatedAt: message.sentAt }
-  createGlobalRealtimeEventHandler(dependencies)({ type: "chat.participant_updated", payload })
-  assert.deepEqual(applied, [payload])
-  assert.deepEqual(dependencies.createdThreadEvents, [])
-  assert.deepEqual(dependencies.toasts, [])
-})
-
 test("read events stay on the current account and next chat pages are requested", () => {
   const reads: string[] = []
   const cursors: string[] = []

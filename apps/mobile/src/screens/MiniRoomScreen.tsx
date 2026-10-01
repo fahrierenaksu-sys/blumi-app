@@ -35,6 +35,7 @@ import {
   joinRoomSession
 } from "../features/chat/chatRoomInviteApi"
 import { useMiniRoomLeave } from "../features/miniRoom/useMiniRoomLeave"
+import { getMiniRoomExitDestination } from "../features/miniRoom/miniRoomLeaveModel"
 import { mergeMiniRoomReconnectSnapshot } from "../features/miniRoom/reconnectRoomSnapshot"
 import { createMiniRoomPartnerAvatarSnapshot } from "../features/miniRoom/partnerAvatarSnapshot"
 import { createCurrentUserAvatarSnapshot } from "../features/miniRoom/currentUserAvatarSnapshot"
@@ -46,11 +47,10 @@ import { resolveAccountRecoveryLocale } from "../features/session/accountRecover
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
 import { showToast } from "../ui/toast"
-import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
+import { useFocusedConversation, useRoomMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
 import { getChatTypingCopy } from "../features/chat/typing/chatTypingCopy"
 import { useChatDraftTyping } from "../features/chat/typing/useChatDraftTyping"
 import { usePartnerTyping } from "../features/chat/typing/usePartnerTyping"
-import { useLiveParticipantIdentity } from "../features/chat/useLiveParticipantIdentity"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -58,12 +58,10 @@ type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"
 
 export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor } = props
-  const { readyMiniRoom } = route.params
-  const livePartner = useLiveParticipantIdentity(route.params.participants.partner)
-  const participants = { you: { ...route.params.participants.you, displayName: sessionActor.profile.displayName },
-    partner: livePartner ?? route.params.participants.partner }
+  const { readyMiniRoom, participants } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
   const isFocused = useIsFocused()
+  useRoomMessageAlertSuppression(isFocused)
   const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,
     localUserId: sessionActor.profile.userId, partnerUserId: participants.partner.userId,
     enabled: sessionActor.session.mode === "production", isFocused })
@@ -101,9 +99,6 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       : lifecycleConnectionStatus === "unreachable"
         ? "disconnected"
         : lifecycleConnectionStatus
-  const connectedAtRef = useRef<number | null>(null)
-  const accumulatedConnectedMsRef = useRef<number>(0)
-  const everConnectedRef = useRef<boolean>(false)
   const exitedRef = useRef<boolean>(false)
   const [safetyVisible, setSafetyVisible] = useState(false)
   const [reconnectError, setReconnectError] = useState(false)
@@ -156,34 +151,16 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     participants.you.userId
   ])
 
-  useEffect(() => {
-    if (status === "connected") {
-      everConnectedRef.current = true
-      if (connectedAtRef.current === null) {
-        connectedAtRef.current = Date.now()
-      }
-    } else if (connectedAtRef.current !== null) {
-      accumulatedConnectedMsRef.current +=
-        Date.now() - connectedAtRef.current
-      connectedAtRef.current = null
-    }
-  }, [status])
-
-  const exitToDebrief = useCallback((): void => {
+  const exitRoom = useCallback((blockedPartner = false): void => {
     if (exitedRef.current) return
     exitedRef.current = true
-    let totalMs = accumulatedConnectedMsRef.current
-    if (connectedAtRef.current !== null) {
-      totalMs += Date.now() - connectedAtRef.current
-      connectedAtRef.current = null
+    const destination = getMiniRoomExitDestination(miniRoom.sourceThreadId, blockedPartner)
+    if (destination.name === "ChatThread") {
+      navigation.popTo("ChatThread", { threadId: destination.threadId })
+    } else {
+      navigation.popTo("Inbox")
     }
-    navigation.replace("RoomDebrief", {
-      miniRoomId: miniRoom.miniRoomId,
-      partner: participants.partner,
-      durationSeconds: Math.round(totalMs / 1000),
-      connected: everConnectedRef.current
-    })
-  }, [miniRoom.miniRoomId, navigation, participants.partner])
+  }, [miniRoom.sourceThreadId, navigation])
 
   const handleLifecycleEvent = useCallback(
     (event: ServerEvent): void => {
@@ -193,9 +170,9 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       ) {
         return
       }
-      exitToDebrief()
+      exitRoom()
     },
-    [exitToDebrief, miniRoom.miniRoomId]
+    [exitRoom, miniRoom.miniRoomId]
   )
 
   useGlobalRealtimeEvents(handleLifecycleEvent)
@@ -260,7 +237,6 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
           partner: {
             ...currentParams.participants.partner,
             displayName: refreshedPartner.displayName,
-            profileUpdatedAt: refreshedPartner.profileUpdatedAt,
             avatarSnapshot: createCandidateAvatarSnapshot({
               userId: refreshedPartner.userId,
               displayName: refreshedPartner.displayName,
@@ -280,7 +256,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       }).catch((error: unknown) => {
         if (!isCurrent(generation) || controller.signal.aborted) return
         if (isDefinitivelyUnavailableRoomSession(error)) {
-          exitToDebrief()
+          exitRoom()
           return
         }
         setReconnectError(true)
@@ -296,7 +272,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
       requestController = null
       unsubscribe()
     }
-  }, [exitToDebrief, miniRoom.miniRoomId, navigation, reconnectScopeKey, sessionActor.profile.userId, sessionActor.session.mode, sessionActor.session.sessionToken])
+  }, [exitRoom, miniRoom.miniRoomId, navigation, reconnectScopeKey, sessionActor.profile.userId, sessionActor.session.mode, sessionActor.session.sessionToken])
 
   const { leaveRequested, requestLeave } = useMiniRoomLeave({
     miniRoomId: miniRoom.miniRoomId,
@@ -304,19 +280,16 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     sessionToken: sessionActor.session.sessionToken,
     copy: roomCopy,
     exitedRef,
-    exitToDebrief
+    exitRoom
   })
 
   // The same account entered this room on another device, which now drives
   // the avatar (newest entry wins). Leave the screen without ending the room.
   useEffect(() => {
     if (!roomMotion.superseded || exitedRef.current) return
-    exitedRef.current = true
     showToast({ type: "info", title: roomCopy.continuedOnOtherDevice })
-    if (navigation.canGoBack()) navigation.goBack()
-    else navigation.replace("RoomDebrief", { miniRoomId: miniRoom.miniRoomId, partner: participants.partner,
-      durationSeconds: 0, connected: everConnectedRef.current })
-  }, [miniRoom.miniRoomId, navigation, participants.partner, roomCopy, roomMotion.superseded])
+    exitRoom()
+  }, [exitRoom, roomCopy, roomMotion.superseded])
 
   const roomNotice = useMiniRoomNotices({ roomMotion, copy: roomCopy,
     partnerFirstName: participants.partner.displayName.split(" ")[0] || participants.partner.displayName })
@@ -331,9 +304,9 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const handleSafetyActionComplete = useCallback((): void => {
     setSafetyVisible(false)
     if (!exitedRef.current) {
-      exitToDebrief()
+      exitRoom(true)
     }
-  }, [exitToDebrief])
+  }, [exitRoom])
 
   const notices = useMemo(() => [
     reconnectError ? roomCopy.roomRefreshFailed : null,
