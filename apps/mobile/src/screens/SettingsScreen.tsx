@@ -1,5 +1,4 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import Ionicons from "@expo/vector-icons/Ionicons"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import { useCallback } from "react"
@@ -11,8 +10,8 @@ import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { SoftBlobBackground } from "../ui/backgrounds"
-import { ActionButtonCircle, TopBar } from "../ui/primitives"
-import { uiTheme } from "../ui/theme"
+import { TopBar } from "../ui/primitives"
+import { BackButton } from "../ui/backButton"
 import { useAnalyticsConsent } from "../analytics/analyticsConsent"
 import { DiscoverFiltersBottomSheet } from "../components/DiscoverFiltersBottomSheet"
 import { getSettingsCopy } from "../features/settings/settingsCopy"
@@ -160,9 +159,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={handleGoBack} size={40}>
-              <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={copy.back} onPress={handleGoBack} />
           }
         />
 

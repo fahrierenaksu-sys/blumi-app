@@ -151,6 +151,9 @@ export const settingsStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: uiTheme.colors.divider
   },
+  rowPressed: {
+    backgroundColor: uiTheme.colors.surfaceMuted
+  },
   rowBody: {
     flex: 1
   },

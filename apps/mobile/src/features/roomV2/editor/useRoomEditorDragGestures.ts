@@ -6,11 +6,12 @@ import {
   ReduceMotion,
   useSharedValue,
   withSpring,
+  withTiming,
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets"
 import { useReducedMotion } from "../../../ui/animations"
-import { hapticError, hapticLight } from "../../../ui/haptics"
+import { hapticError, hapticLight, hapticSelection } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import { resolvePlacedFurnitureRenderItem } from "../roomV2Selectors"
 import type {
@@ -23,6 +24,8 @@ import { ACTIVE_ROOM_FURNITURE_CATALOG } from "./roomEditorCatalog"
 import {
   ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS,
   ROOM_EDITOR_DRAG_GHOST_OPACITY,
+  ROOM_EDITOR_DRAG_SETTLE_FADE_MS,
+  shouldTickRoomEditorDragValidity,
   ROOM_EDITOR_DRAG_LIFT_SCALE,
   ROOM_EDITOR_DRAG_OUTSIDE_CELL,
   ROOM_EDITOR_DRAG_RETURN_SPRING,
@@ -115,6 +118,7 @@ export function useRoomEditorDragGestures(input: {
   const reduceMotion = useReducedMotion()
   const [ghost, setGhost] = useState<RoomEditorDragGhostContent | undefined>()
   const activeDragRef = useRef<ActiveDrag | null>(null)
+  const lastDragPreviewRef = useRef<PlacementPreview | undefined>(undefined)
 
   const hitRects = useSharedValue<RoomEditorDragHitRect[]>([])
   const stageSize = useSharedValue({ width: 0, height: 0 })
@@ -184,6 +188,23 @@ export function useRoomEditorDragGestures(input: {
       scheduleOnRN(clearGhost, session)
     })
   }, [clearGhost, ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostX, ghostY, reduceMotion])
+
+  // A valid drop: the piece is already placed under the ghost, so the ghost
+  // settles from its lift scale and fades into it (ROOM-10).
+  const settleGhost = useCallback((session: number) => {
+    "worklet"
+    if (reduceMotion) {
+      ghostOpacity.value = 0
+      ghostScale.value = 1
+      scheduleOnRN(clearGhost, session)
+      return
+    }
+    ghostScale.value = withSpring(1, { ...ROOM_EDITOR_DRAG_RETURN_SPRING, reduceMotion: ReduceMotion.Never })
+    ghostOpacity.value = withTiming(0, { duration: ROOM_EDITOR_DRAG_SETTLE_FADE_MS, reduceMotion: ReduceMotion.Never }, (finished) => {
+      "worklet"
+      if (finished) scheduleOnRN(clearGhost, session)
+    })
+  }, [clearGhost, ghostOpacity, ghostScale, reduceMotion])
 
   const hideGhost = useCallback((session: number) => {
     ghostOpacity.value = 0
@@ -272,6 +293,8 @@ export function useRoomEditorDragGestures(input: {
       const drag = activeDragRef.current
       if (!drag || drag.session !== session) return
       const preview = handlers.computePreview(drag, column, row)
+      if (shouldTickRoomEditorDragValidity(lastDragPreviewRef.current, preview)) hapticSelection()
+      lastDragPreviewRef.current = preview
       input.selection.updatePlacementPreview(preview)
       input.selection.updatePlacementFeedback(
         drag.source === "tray" && column === ROOM_EDITOR_DRAG_OUTSIDE_CELL
@@ -289,9 +312,10 @@ export function useRoomEditorDragGestures(input: {
         ? handlers.computePreview(drag, column, row)
         : undefined
       const release = resolveRoomEditorDragRelease({ source: drag.source, moved, inside, preview })
+      lastDragPreviewRef.current = undefined
       if (release === "commit" && preview) {
-        hideGhost(session)
         input.commitTrayPlacementPreview(preview)
+        scheduleOnUI(settleGhost, session)
         return
       }
       input.selection.updatePlacementPreview(undefined)

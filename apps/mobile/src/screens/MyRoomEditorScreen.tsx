@@ -378,6 +378,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                   canPlaceAnotherRoomItem={canPlaceAnotherRoomItem}
                   createInventoryItemDragGesture={drag.createTrayDragGesture}
                   onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
+                  onTrayFeedback={selection.setPlacementFeedback}
                 />
               </WardrobeGlass>
             </Animated.View>

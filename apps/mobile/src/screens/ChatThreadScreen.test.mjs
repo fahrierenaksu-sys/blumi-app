@@ -181,7 +181,9 @@ test("only newest-edge rows enter, on the UI thread, and a bubble reads as one e
 })
 
 test("inbox warms a bounded set of conversations and starts selected history before navigation", () => {
-  const inbox = readFileSync(new URL("./InboxScreen.tsx", import.meta.url), "utf8")
+  // The press-in warm-up lives in the conversation row (features/inbox).
+  const inbox = readFileSync(new URL("./InboxScreen.tsx", import.meta.url), "utf8") +
+    readFileSync(new URL("../features/inbox/InboxConversationRow.tsx", import.meta.url), "utf8")
   const root = readFileSync(new URL("../navigation/RootNavigator.tsx", import.meta.url), "utf8")
   const rootChatSync = readFileSync(new URL("../navigation/useRootChatSync.ts", import.meta.url), "utf8")
   assert.match(inbox, /\.slice\(0, 6\)/)

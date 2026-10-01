@@ -10,11 +10,6 @@ export interface YouScreenCopy {
   editProfileDescription: string
   settings: string
   settingsDescription: string
-  signOut: string
-  signOutAccessibility: string
-  signOutTitle: string
-  signOutBody: string
-  cancel: string
 }
 
 const COPY: Record<AppLocale, YouScreenCopy> = {
@@ -27,12 +22,7 @@ const COPY: Record<AppLocale, YouScreenCopy> = {
     editProfile: "Edit profile",
     editProfileDescription: "Update your details",
     settings: "Settings",
-    settingsDescription: "App preferences",
-    signOut: "Sign out",
-    signOutAccessibility: "Sign out of Blumi",
-    signOutTitle: "Sign out of Blumi?",
-    signOutBody: "You can sign in again with your phone number.",
-    cancel: "Cancel"
+    settingsDescription: "App preferences"
   },
   tr: {
     title: "Profilim",
@@ -43,12 +33,7 @@ const COPY: Record<AppLocale, YouScreenCopy> = {
     editProfile: "Profili düzenle",
     editProfileDescription: "Bilgilerini güncelle",
     settings: "Ayarlar",
-    settingsDescription: "Uygulama tercihleri",
-    signOut: "Çıkış yap",
-    signOutAccessibility: "Blumi’den çıkış yap",
-    signOutTitle: "Blumi’den çıkış yapılsın mı?",
-    signOutBody: "Telefon numaranla yeniden giriş yapabilirsin.",
-    cancel: "Vazgeç"
+    settingsDescription: "Uygulama tercihleri"
   }
 }
 

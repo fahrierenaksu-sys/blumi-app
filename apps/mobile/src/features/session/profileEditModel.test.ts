@@ -4,7 +4,10 @@ import {
   analyzeProfileEditDraft,
   analyzeProfileInterests,
   analyzeProfilePrompts,
+  addProfileInterests,
   createMemoizedProfileEditDraftAnalyzer,
+  removeProfileInterest,
+  shouldConfirmProfileEditExit
 } from "./profileEditModel"
 
 const current = {
@@ -361,4 +364,23 @@ test("identity and discovery preferences save independently from the avatar body
     radiusKm: 50
   })
   assert.equal("avatarPresetId" in result.update, false)
+})
+
+test("DSC-9: interest chips add typed entries (comma or return) and remove one at a time", () => {
+  assert.equal(addProfileInterests("coffee", "films"), "coffee\nfilms")
+  assert.equal(addProfileInterests("", " live music , hiking,"), "live music\nhiking")
+  assert.equal(addProfileInterests("coffee", "coffee"), "coffee", "an exact duplicate is not added twice")
+  assert.equal(addProfileInterests("coffee", "   "), "coffee")
+  assert.equal(removeProfileInterest("coffee\nfilms\nhiking", "films"), "coffee\nhiking")
+  assert.equal(removeProfileInterest("coffee", "missing"), "coffee")
+  // Over-limit entries are kept so the field's validation explains them.
+  const eleven = Array.from({ length: 11 }, (_, index) => `i${index}`).join(",")
+  assert.equal(analyzeProfileInterests(addProfileInterests("", eleven)).error, "too-many")
+})
+
+test("DSC-9: leaving with unsaved edits asks first, never while saving or after a save", () => {
+  assert.equal(shouldConfirmProfileEditExit({ hasChanges: true, isSaving: false, saved: false }), true)
+  assert.equal(shouldConfirmProfileEditExit({ hasChanges: false, isSaving: false, saved: false }), false)
+  assert.equal(shouldConfirmProfileEditExit({ hasChanges: true, isSaving: true, saved: false }), false)
+  assert.equal(shouldConfirmProfileEditExit({ hasChanges: true, isSaving: false, saved: true }), false)
 })

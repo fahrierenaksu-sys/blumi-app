@@ -6,15 +6,18 @@ import ts from "typescript"
 
 const source = readFileSync(new URL("./InboxScreen.tsx", import.meta.url), "utf8")
 const file = ts.createSourceFile("InboxScreen.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-function initializer(name) {
+// The conversation row moved to features/inbox with its presentation model.
+const rowSource = readFileSync(new URL("../features/inbox/InboxConversationRow.tsx", import.meta.url), "utf8")
+const rowFile = ts.createSourceFile("InboxConversationRow.tsx", rowSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+function initializer(name, sourceFile = name === "ConversationCard" ? rowFile : file) {
   let result
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && node.name.getText(file) === name) result = node.initializer
+    if (ts.isVariableDeclaration(node) && node.name.getText(sourceFile) === name) result = node.initializer
     ts.forEachChild(node, visit)
   }
-  visit(file)
+  visit(sourceFile)
   assert.ok(result, name)
-  return result.getText(file)
+  return result.getText(sourceFile)
 }
 function evaluate(expression, context) {
   const code = ts.transpileModule(`const result = ${expression}`, {
@@ -59,9 +62,9 @@ function cardHarness() {
 }
 function props(overrides = {}) {
   return {
-    threadId: "thread-a", copy: { openChatWith: () => "Open", startWithSpark: "Start" },
-    partnerName: "Partner", partnerUserId: "partner", lastBody: "Hello", lastTime: "1m",
-    hasUnread: false, reduceMotion: false, unreadPulseAnim: {}, onPress: () => {}, onWarm: () => {}, ...overrides
+    threadId: "thread-a", copy: { openChatHint: "Opens", startWithSpark: "Start" },
+    partnerName: "Partner", partnerUserId: "partner", previewPrefix: undefined, lastBody: "Hello", lastTime: "1m",
+    unreadBadge: null, accessibilityLabel: "Partner, Hello, 1m", reduceMotion: false, unreadPulseAnim: {}, onPress: () => {}, onWarm: () => {}, ...overrides
   }
 }
 
@@ -86,7 +89,9 @@ test("unaffected row renders keep shared callbacks and memo equality", () => {
   assert.equal(first.onWarm, next.onWarm)
   const { equal } = cardHarness()
   assert.equal(equal(first, next), true)
-  assert.equal(equal(first, { ...next, hasUnread: true }), false)
+  assert.equal(equal(first, { ...next, unreadBadge: "2" }), false)
+  assert.equal(equal(first, { ...next, accessibilityLabel: "Partner, 2 unread messages" }), false)
+  assert.equal(equal(first, { ...next, previewPrefix: "You: " }), false)
   assert.equal(equal(first, { ...next, lastBody: "Changed" }), false)
 })
 
@@ -197,7 +202,7 @@ test("prefetch selects only the first six eligible conversations and warms at mo
 
 test("re-tapping the Chats tab scrolls the list to the top, without animation under Reduce Motion", () => {
   assert.match(source, /useMainTabReselect\("chats", scrollToTop\)/)
-  assert.match(source, /<FlatList[\s\S]*?ref=\{listRef\}/)
+  assert.match(source, /<Reanimated\.FlatList[\s\S]*?ref=\{listRef\}/)
   for (const reduceMotion of [false, true]) {
     const calls = []
     const scrollToTop = evaluate(initializer("scrollToTop"), {
@@ -218,4 +223,18 @@ test("unread glow pulses a bounded number of times and the list supports pull-to
   assert.match(source, /<RefreshControl[\s\S]*?refreshing=\{refreshing\}[\s\S]*?onRefresh=\{onRefresh\}[\s\S]*?tintColor=\{uiTheme\.colors\.primary\}/)
   assert.match(source, /copy\.unknownPartner/)
   assert.doesNotMatch(source, /"Someone"/)
+})
+
+test("CHT-08/CHT-10: rows are measured, and a thread moving to the top slides without a jump", () => {
+  assert.doesNotMatch(source, /getItemLayout/)
+  assert.match(source, /itemLayoutAnimation=\{reduceMotion \? undefined : INBOX_ROW_LAYOUT\}/)
+  const motion = readFileSync(new URL("../features/inbox/inboxMotion.ts", import.meta.url), "utf8")
+  assert.match(motion, /LinearTransition[\s\S]*\.dampingRatio\(1\)[\s\S]*ReduceMotion\.Never/)
+})
+
+test("CHT-09: rows read their unread count, preview and live time", () => {
+  assert.match(source, /const now = useInboxClock\(navigation\)/)
+  assert.match(source, /formatInboxTimestamp\(thread\.lastMessage\?\.sentAt, now, copy, timeFormatter\)/)
+  assert.match(rowSource, /accessibilityHint=\{props\.copy\.openChatHint\}/)
+  assert.match(rowSource, /hasUnread \? cardStyles\.nameUnread : null/)
 })

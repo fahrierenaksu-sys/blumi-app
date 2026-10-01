@@ -98,7 +98,10 @@ test("the unsaved-exit guard can stop the iOS swipe and cancels a drag in progre
 test("taps keep their Pressables and drag is announced where it is available", () => {
   assert.match(stageSource, /onPress=\{onPress\}/)
   assert.match(stageSource, /accessibilityHint=\{`\$\{copy\.stageHint\} \$\{copy\.stageDragHint\}`\}/)
-  assert.match(cardSource, /onPress=\{\(\) => onPreviewItem\(item\.id\)\}/)
+  // A placeable card previews; a locked or placed one says why with a shake (ROOM-14).
+  assert.match(cardSource, /onPress=\{handlePress\}/)
+  assert.match(cardSource, /if \(canDrag\) \{\s*onPreviewItem\(item\.id\)/)
+  assert.match(cardSource, /onUnavailableItem\(owned \? "placed" : "locked"\)/)
   assert.match(cardSource, /accessibilityHint=\{canDrag \? trayDragHint : undefined\}/)
   assert.match(placementHookSource, /const handleItemTap = useCallback/)
   assert.match(placementHookSource, /const handleFloorTap = useCallback/)

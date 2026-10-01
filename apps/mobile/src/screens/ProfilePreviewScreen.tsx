@@ -1,7 +1,10 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect, useRef, useState } from "react"
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import Reanimated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
+import { getProfileHeroStretch } from "../features/discovery/profilePreviewHeroModel"
+import { hapticLight } from "../ui/haptics"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import {
   CandidateAvatarPreview,
@@ -127,6 +130,14 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     }).start()
   }, [contentAnim])
 
+  // DSC-15: the page bounces, and pulling past the top stretches the hero glow.
+  const scrollY = useSharedValue(0)
+  const handleScroll = useAnimatedScrollHandler((event) => { scrollY.value = event.contentOffset.y })
+  const heroStretchStyle = useAnimatedStyle(() => {
+    const stretch = getProfileHeroStretch(scrollY.value, reduceMotion)
+    return { transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }] }
+  })
+
   if (!profile) return null
   const isProductionDiscovery = props.sessionActor.session.mode === "production"
   const avatarSnapshot = createCandidateAvatarSnapshot({
@@ -218,6 +229,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
 
   const sendInviteAndReturn = (): void => {
     if (decisionDisabled) return
+    hapticLight()
     if (isProductionDiscovery) {
       void submitProductionDecision("like")
       return
@@ -230,6 +242,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
       goBackToDiscovery()
       return
     }
+    hapticLight()
     if (isProductionDiscovery) {
       void submitProductionDecision("pass")
       return
@@ -243,10 +256,11 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
-      <ScrollView
+      <Reanimated.ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        bounces={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <Animated.View
           style={{
@@ -265,10 +279,10 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
           {/* Full-bleed Hero Section */}
           <View style={styles.heroBlock}>
             {/* Background Glows */}
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Reanimated.View style={[StyleSheet.absoluteFill, heroStretchStyle]} pointerEvents="none">
               <View style={[styles.heroGlow, { backgroundColor: uiTheme.colors.avatarAccent }]} />
               <View style={styles.heroGlowSecondary} />
-            </View>
+            </Reanimated.View>
 
             {/* Top Navigation Overlays */}
             <SafeAreaView contentGutter={false} edges={["top"]} style={styles.heroNav}>
@@ -278,7 +292,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                 size={42}
                 style={styles.navButton}
               >
-                <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
+                <Ionicons name="chevron-back" size={22} color={uiTheme.colors.textPrimary} />
               </ActionButtonCircle>
               {!profile.isSelf ? (
                 <ActionButtonCircle
@@ -315,7 +329,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
             {/* Info Overlay (Gradient at bottom of hero) */}
             <View style={styles.heroInfoOverlay} pointerEvents="none">
               <LinearGradient
-                colors={["transparent", "rgba(10, 5, 15, 0.4)", "rgba(10, 5, 15, 0.95)"]}
+                colors={["transparent", "rgba(10, 5, 15, 0.26)", "rgba(10, 5, 15, 0.72)"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
                 style={StyleSheet.absoluteFill}
@@ -462,7 +476,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
             </SafeAreaView>
           </View>
         </Animated.View>
-      </ScrollView>
+      </Reanimated.ScrollView>
       {!profile.isSelf ? (
         <ReportModal
           visible={reportVisible}

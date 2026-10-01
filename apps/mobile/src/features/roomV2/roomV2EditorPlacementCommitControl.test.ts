@@ -142,7 +142,8 @@ test("room editor catalog supports selecting, rotating, and explicitly placing a
   assert.doesNotMatch(editorSurfaceSource, /<TextInput/)
   assert.doesNotMatch(editorSource, /KeyboardAvoidingView/)
   assert.match(editorInventoryListSource, /onPreviewItem=\{setSelectedInventoryItemId\}/)
-  assert.match(editorInventoryCardSource, /accessibilityLabel={`Preview \${item\.name}`}/)
+  assert.match(editorInventoryCardSource, /accessibilityLabel=\{previewLabel\}/)
+  assert.match(editorInventoryListSource, /previewLabel=\{copy\.previewItem\(entry\.item\.name\)\}/)
   assert.match(editorSelectedActionsSource, /accessibilityLabel=\{copy\.chooseRotation\(copy\.rotationLabels\[nextTrayRotation\], itemName\)\}/)
   assert.match(editorSelectedActionsSource, /accessibilityLabel=\{copy\.placeItem\(itemName\)\}/)
   assert.match(editorSource, /handlePlaceTrayItem=\{itemActions\.handleAddSelectedInventoryItem\}/)
@@ -263,8 +264,19 @@ test("editor waits for persisted decor and syncs the inspector when a staged ite
 test("stage furniture is announced as an editor selection rather than an in-room interaction", () => {
   assert.match(editorStageSource, /<Pressable\s+accessible=\{Boolean\(selectedInstanceId\)\}\s+accessibilityRole="button"\s+accessibilityLabel=\{copy\.stageLabel\}/)
   assert.match(editorStageSource, /itemInteractionMode="edit"/)
-  assert.match(rendererSource, /itemInteractionMode === "edit"/)
-  assert.match(rendererSource, /Select \$\{item\.name\} to move, rotate, or remove/)
+  // Labels are localized in roomV2Accessibility (ROOM-14); the renderer passes the mode.
+  assert.match(rendererSource, /mode: itemInteractionMode/)
+  const accessibilitySource = readFileSync(resolve(process.cwd(), "src/features/roomV2/roomV2Accessibility.ts"), "utf8")
+  assert.match(accessibilitySource, /input\.mode === "edit"/)
+  assert.match(accessibilitySource, /Select \$\{name\} to move, rotate, or remove/)
+})
+
+test("ROOM-01: the in-room avatar is tappable without leaving its UI-thread walk frame", () => {
+  assert.match(rendererSource, /onItemTap=\{shouldRoomV2ItemReceiveTap\(\{ kind: item\.kind, mode: itemInteractionMode \}\) \? onItemTap : undefined\}/)
+  // The live frame always wraps a walking avatar; the tap target sits inside it.
+  assert.match(rendererSource, /const Wrapper = liveAvatarPosition \? RoomRendererLiveAvatarFrame : isTouchInteractive \? Pressable : View/)
+  assert.match(rendererSource, /\{tapsInsideLiveFrame \? \(\s*<Pressable[\s\S]*?onPress=\{\(event\) => \{ event\.stopPropagation\(\); onItemTap\?\.\(item\) \}\}/)
+  assert.match(rendererSource, /pointerEvents=\{tapsInsideLiveFrame \? "box-none" : pointerEvents\}/)
 })
 
 test("editor catalog contains only room furniture the current user owns", () => {

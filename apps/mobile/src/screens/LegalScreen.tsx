@@ -6,8 +6,9 @@ import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
-import { ActionButtonCircle, TopBar } from "../ui/primitives"
+import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { BackButton } from "../ui/backButton"
 import { getAppLocale } from "../features/session/appLocale"
 import { getLegalContent, type LegalContentType } from "../features/legal/legalCopy"
 import { buildLegalDocumentLines } from "../features/legal/legalDocumentModel"
@@ -78,9 +79,7 @@ export function LegalScreen(props: LegalScreenProps) {
           title={content.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={getAppLocale() === "tr" ? "Geri dön" : "Go back"} onPress={handleGoBack} size={40}>
-              <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={getAppLocale() === "tr" ? "Geri dön" : "Go back"} onPress={handleGoBack} />
           }
         />
         <ScrollView

@@ -2,7 +2,6 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,15 +16,19 @@ import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { MyAvatar } from "../ui/myAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
-import { ActionButtonCircle, TopBar } from "../ui/primitives"
+import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { springPressScale, useReducedMotion } from "../ui/animations"
-import { hapticMedium } from "../ui/haptics"
+import { BackButton } from "../ui/backButton"
+import { hapticSuccess } from "../ui/haptics"
+import { ProfileEditSaveButton } from "../features/session/ProfileEditSaveButton"
+import { ProfileInterestsField } from "../features/session/ProfileInterestsField"
+import { useProfileEditExitGuard } from "../features/session/useProfileEditExitGuard"
 import { getAppLocale } from "../features/session/appLocale"
 import { getProfileEditCopy } from "../features/session/profileEditCopy"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import {
-  createMemoizedProfileEditDraftAnalyzer
+  createMemoizedProfileEditDraftAnalyzer,
+  shouldConfirmProfileEditExit
 } from "../features/session/profileEditModel"
 import {
   USER_PROFILE_MAX_INTEREST_LENGTH,
@@ -101,8 +104,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   const [saved, setSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const saveScaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -187,6 +188,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   )
   const canSave = valid && !saved && !isSaving
   const copy = getProfileEditCopy(getAppLocale())
+  useProfileEditExitGuard({ enabled: shouldConfirmProfileEditExit({ hasChanges, isSaving, saved }), navigation, copy })
   const discoveryCopy = copy
   const avatarPreview = useMemo(
     () => (
@@ -212,7 +214,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     setSaveError(null)
     try {
       await onSave(update)
-      hapticMedium()
+      hapticSuccess()
       setSaved(true)
       setTimeout(() => {
         if (isMountedRef.current) {
@@ -233,9 +235,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     update
   ])
 
-  const handleSavePressIn = () => springPressScale(saveScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handleSavePressOut = () => springPressScale(saveScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
-
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
@@ -248,9 +247,10 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("You"))} size={40}>
-              <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("You"))} />
+          }
+          rightSlot={
+            <ProfileEditSaveButton enabled={canSave && hasChanges} isSaving={isSaving} saved={saved} onPress={handleSave} copy={copy} />
           }
         />
 
@@ -451,25 +451,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
 
           <View style={styles.fieldCard}>
             <Text style={styles.fieldLabel}>{copy.interests}</Text>
-            <TextInput
-              accessibilityLabel={copy.interestsAccessibility}
-              style={[styles.input, styles.interestsInput]}
-              value={interestsText}
-              onChangeText={setInterestsText}
-              placeholder={"coffee\nfilms\nlive music"}
-              placeholderTextColor={uiTheme.colors.textMuted}
-              autoCapitalize="none"
-              multiline
-            />
-            {interests.length > 0 ? (
-              <View style={styles.interestRow}>
-                {interests.map((interest) => (
-                  <View key={interest} style={styles.interestChip}>
-                    <Text style={styles.interestChipText}>{interest}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
+            <ProfileInterestsField interestsText={interestsText} interests={interests} onChangeInterestsText={setInterestsText} copy={copy} />
             {interestError ? (
               <ValidationError
                 message={
@@ -551,46 +533,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
             </Text>
           ) : null}
 
-          {/* Save */}
-          <Animated.View style={[styles.saveWrap, { transform: [{ scale: saveScaleAnim }] }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                saved
-                  ? copy.savedStatus
-                  : isSaving
-                    ? copy.savingAccessibility
-                    : copy.save
-              }
-              accessibilityState={{ disabled: !canSave || !hasChanges }}
-              onPress={handleSave}
-              onPressIn={handleSavePressIn}
-              onPressOut={handleSavePressOut}
-              disabled={!canSave || !hasChanges}
-              style={[
-                styles.saveButton,
-                (!canSave || !hasChanges) ? styles.saveButtonDisabled : null,
-              ]}
-            >
-              <LinearGradient
-                colors={
-                  canSave && hasChanges
-                    ? uiTheme.gradients.primary as [string, string]
-                    : [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.saveButtonGradient}
-              >
-                <Text style={styles.saveButtonText}>
-                  {saved ? copy.saved : isSaving ? copy.saving : copy.save}
-                </Text>
-                {saved ? (
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                ) : null}
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
           {saved ? (
             <Text
               accessibilityLiveRegion="polite"
@@ -727,10 +669,6 @@ const styles = StyleSheet.create({
     minHeight: 82,
     textAlignVertical: "top",
   },
-  interestsInput: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
   promptOptionList: {
     gap: uiTheme.spacing.sm,
   },
@@ -790,21 +728,6 @@ const styles = StyleSheet.create({
   segmentTextSelected: {
     color: uiTheme.colors.primary,
   },
-  interestRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: uiTheme.spacing.xs,
-  },
-  interestChip: {
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 5,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: uiTheme.colors.secondary,
-  },
-  interestChipText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textSecondary,
-  },
   errorRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -831,31 +754,5 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.successInk,
     fontWeight: "700",
     textAlign: "center",
-  },
-  saveWrap: {
-    alignSelf: "center",
-    marginTop: uiTheme.spacing.sm,
-  },
-  saveButton: {
-    borderRadius: uiTheme.radius.full,
-    overflow: "hidden",
-    ...uiTheme.shadow.glow,
-  },
-  saveButtonGradient: {
-    paddingHorizontal: uiTheme.spacing.xxl,
-    paddingVertical: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.full,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: uiTheme.spacing.xs,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-    shadowOpacity: 0,
-  },
-  saveButtonText: {
-    ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
-  },
+  }
 })

@@ -224,3 +224,19 @@ test("a pending invite turns expired on both phones at its expiry, without a ser
   assert.equal(getNextRoomInviteExpiry(expired, at), null)
   assert.equal(getNextRoomInviteExpiry([{ ...pending, expiresAt: "not a date" }], before), null)
 })
+
+test("CHT-11: a pause longer than five minutes starts a new message group", () => {
+  const message = (messageId: string, sentAt: string): ChatMessage => ({
+    messageId, threadId: "thread_one", senderUserId: "user_one", body: messageId, sentAt
+  })
+  const timeline = buildChatTimeline([
+    message("morning", "2026-07-21T09:00:00.000Z"),
+    message("soon_after", "2026-07-21T09:05:00.000Z"),
+    message("hours_later", "2026-07-21T13:00:00.000Z"),
+    message("six_minutes_later", "2026-07-21T13:06:00.000Z")
+  ], [])
+  assert.equal(getChatMessageGroupPosition(timeline, 0), "first")
+  assert.equal(getChatMessageGroupPosition(timeline, 1), "last", "exactly five minutes still groups")
+  assert.equal(getChatMessageGroupPosition(timeline, 2), "single")
+  assert.equal(getChatMessageGroupPosition(timeline, 3), "single")
+})

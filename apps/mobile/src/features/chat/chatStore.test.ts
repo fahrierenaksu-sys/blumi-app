@@ -123,6 +123,38 @@ test("another device read clears unread and a stale list cannot resurrect it", (
   assert.equal(getThreadUnreadCount(thread.threadId), 1)
 })
 
+test("CHT-06: a list served before this device's read cannot bring read messages back as unread", () => {
+  resetChatStore()
+  const seen = { messageId: "seen", threadId: "read-here", senderUserId: "a", body: "seen", sentAt: "2026-09-05T10:00:00Z" }
+  const thread = { threadId: "read-here", miniRoomId: "room", participantUserIds: ["a", "b"] as [string, string],
+    participants: [{ userId: "a" }, { userId: "b" }] as [{ userId: string }, { userId: string }], createdAt: "2026-09-05T00:00:00Z",
+    unreadCount: 2, lastReadAt: "2026-09-05T09:00:00Z", lastMessage: seen }
+  applyChatThreadListed({ userId: "b", threads: [thread] })
+  assert.equal(getThreadUnreadCount("read-here"), 2)
+  // The chat opens on screen and is marked read on this device.
+  setActiveThread("read-here")
+  markThreadRead("read-here")
+  // A partner message arrives while the conversation is on screen.
+  const whileOpen = { ...seen, messageId: "while-open", sentAt: "2026-09-05T10:01:00Z" }
+  applyChatMessageReceived(whileOpen, { localUserId: "b" })
+  // Back in the inbox; the refresh was served before the server stored the read.
+  setActiveThread(null)
+  applyChatThreadListed({ userId: "b", threads: [{ ...thread, unreadCount: 3, lastMessage: whileOpen }] })
+  assert.equal(getThreadUnreadCount("read-here"), 0, "messages already shown here stay read")
+  // A message that arrives after leaving is unread, and a later list stays authoritative for it.
+  const afterLeaving = { ...seen, messageId: "after-leaving", sentAt: "2026-09-05T10:02:00Z" }
+  applyChatMessageReceived(afterLeaving, { localUserId: "b" })
+  assert.equal(getThreadUnreadCount("read-here"), 1)
+  applyChatThreadListed({ userId: "b", threads: [{ ...thread, unreadCount: 3, lastMessage: whileOpen }] })
+  assert.equal(getThreadUnreadCount("read-here"), 1, "a stale list keeps counting the message this device has not shown")
+  applyChatThreadListed({ userId: "b", threads: [{ ...thread, unreadCount: 1, lastReadAt: whileOpen.sentAt, lastMessage: afterLeaving }] })
+  assert.equal(getThreadUnreadCount("read-here"), 1)
+  // An account switch forgets what this device read.
+  resetChatStore()
+  applyChatThreadListed({ userId: "b", threads: [thread] })
+  assert.equal(getThreadUnreadCount("read-here"), 2)
+})
+
 test("summary-covered delayed realtime delivery does not double count unread", () => {
   resetChatStore()
   const message = { messageId: "covered", threadId: "summary", senderUserId: "a", body: "offline", sentAt: "2026-09-05T10:02:00Z" }

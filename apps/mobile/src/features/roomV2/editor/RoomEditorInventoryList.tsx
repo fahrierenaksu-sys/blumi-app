@@ -8,6 +8,7 @@ import {
   type NativeSyntheticEvent
 } from "react-native"
 import type { PanGesture } from "react-native-gesture-handler"
+import { hapticError } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
 import { InventoryCatalogCard } from "./InventoryCatalogCard"
@@ -55,6 +56,8 @@ export function RoomEditorInventoryList(props: {
     rotation: PlacedRoomItem["rotation"]
   ) => PanGesture
   onBrowseShop: () => void
+  /** Shows why a locked or already-placed card cannot be placed. */
+  onTrayFeedback: (message: string) => void
 }) {
   const {
     copy,
@@ -69,8 +72,13 @@ export function RoomEditorInventoryList(props: {
     setSelectedInventoryItemId,
     canPlaceAnotherRoomItem,
     createInventoryItemDragGesture,
-    onBrowseShop
+    onBrowseShop,
+    onTrayFeedback
   } = props
+  const handleUnavailableItem = useCallback((reason: "locked" | "placed") => {
+    hapticError()
+    onTrayFeedback(reason === "placed" ? copy.feedback.alreadyPlaced : copy.feedback.lockedInShop)
+  }, [copy.feedback.alreadyPlaced, copy.feedback.lockedInShop, onTrayFeedback])
   const [listWidth, setListWidth] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
   const cardWidth = getRoomEditorDockCardWidth(listWidth, ROOM_EDITOR_DOCK_GRID_GAP)
@@ -101,7 +109,9 @@ export function RoomEditorInventoryList(props: {
             ? selectedInventoryRotation
             : getDefaultRoomV2FurnitureRotation(entry.item)}
           trayDragHint={copy.trayDragHint}
+          previewLabel={copy.previewItem(entry.item.name)}
           onPreviewItem={setSelectedInventoryItemId}
+          onUnavailableItem={handleUnavailableItem}
           createDragGesture={createInventoryItemDragGesture}
         />
       ))}
@@ -109,7 +119,8 @@ export function RoomEditorInventoryList(props: {
   ), [
     canPlaceAnotherRoomItem,
     cardWidth,
-    copy.trayDragHint,
+    copy,
+    handleUnavailableItem,
     createInventoryItemDragGesture,
     highlightedItemId,
     selectedInventoryEntry?.item.id,
