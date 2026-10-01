@@ -128,12 +128,14 @@ export function createRealtimeServer(
 ): RealtimeServer {
   const ownsHttpServer = !options.httpServer
   const httpServer = options.httpServer ?? createServer()
-  const wsServer = new WebSocketServer({
+  // closeTimeout is a ws 8.22 option that @types/ws does not declare yet.
+  const wsServerOptions = {
     noServer: true,
     maxPayload: MAX_REALTIME_MESSAGE_BYTES,
     perMessageDeflate: false,
     closeTimeout: REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS
-  })
+  }
+  const wsServer = new WebSocketServer(wsServerOptions)
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const eventBudget = createRealtimeEventBudget()
   // Delivery acks: newest per thread, in order, never dropped for being busy.
