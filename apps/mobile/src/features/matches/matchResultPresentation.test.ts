@@ -58,6 +58,53 @@ test("the discovery route keeps its shipped copy, safety entry, and onboarding g
   ])
 })
 
+test("a Turkish device gets the match moment in Turkish on both surfaces (DSC-1)", () => {
+  const modal = getMatchResultPresentation({
+    entry: "connection_modal",
+    matchedUserName: "Ada",
+    canStartConversation: true,
+    locale: "tr"
+  })
+  assert.equal(modal.headline, "Enerjiniz tuttu.")
+  assert.equal(modal.body, "Sen ve Ada aynı şeyi hissettiniz. Hazır olduğunda bir mesajla başla.")
+  assert.equal(modal.badgeLabel, "Karşılıklı eşleşme")
+  assert.equal(modal.closeLabel, "Eşleşme ekranını kapat")
+  assert.deepEqual(modal.actions, [
+    { id: "send_message", label: "Sohbete başla", enabled: true },
+    { id: "keep_discovering", label: "Keşfetmeye devam et", enabled: true }
+  ])
+
+  const route = getMatchResultPresentation({
+    entry: "discovery_route",
+    matchedUserName: "Ada",
+    canStartConversation: true,
+    locale: "tr"
+  })
+  assert.equal(route.headline, "Enerjiniz tuttu.")
+  assert.equal(route.eyebrow, "Yeni eşleşme")
+  assert.equal(route.title, "Az önce eşleştiniz.")
+  assert.equal(route.body, "Bir mesajla başlayın, birbirinizi kendi hızınızda tanıyın.")
+  assert.equal(route.nextStepTitle, "İlk adım doğal olsun.")
+  assert.equal(route.nextStepBody, "Düşünceli bir selam sohbeti başlatmaya yeter.")
+  assert.equal(route.backLabel, "Keşfet'e dön")
+  assert.equal(route.safetyLabel, "Ada için güvenlik seçenekleri")
+  assert.deepEqual(route.actions, [
+    { id: "send_message", label: "Selam ver", enabled: true },
+    { id: "keep_discovering", label: "Keşfetmeye devam et", enabled: true }
+  ])
+
+  // Every user-visible string differs from English: nothing falls back.
+  for (const entry of MATCH_RESULT_ENTRY_POINTS) {
+    const en = getMatchResultPresentation({ entry, matchedUserName: "Ada", canStartConversation: true, locale: "en" })
+    const tr = getMatchResultPresentation({ entry, matchedUserName: "Ada", canStartConversation: true, locale: "tr" })
+    for (const key of Object.keys(en) as (keyof typeof en)[]) {
+      if (key === "entry" || key === "actions") continue
+      assert.notEqual(tr[key], en[key], `${entry}.${String(key)}`)
+    }
+    en.actions.forEach((action, index) => assert.notEqual(tr.actions[index]!.label, action.label))
+  }
+})
+
 test("match_created is attributed once, to the realtime connection presentation only", () => {
   assert.deepEqual(getMatchCreatedProperties("connection_modal", "production"), {
     source: "mini_room_mutual_save",

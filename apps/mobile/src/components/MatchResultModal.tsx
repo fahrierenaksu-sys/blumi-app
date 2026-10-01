@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useRef, type ComponentProps } from "react"
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react"
 import {
   Animated,
   Easing,
@@ -23,6 +23,7 @@ import {
   getMatchResultPresentation,
   shouldPlayMatchHaptic
 } from "../features/matches/matchResultPresentation"
+import { getAppLocale } from "../features/session/appLocale"
 import { uiTheme } from "../ui/theme"
 
 interface MatchResultModalProps {
@@ -196,10 +197,12 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const heartPulse = useRef(new Animated.Value(1)).current
   const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
   const previousVisibleRef = useRef(false)
+  const [locale] = useState(getAppLocale)
   const presentation = getMatchResultPresentation({
     entry: "connection_modal",
     matchedUserName,
-    canStartConversation: true
+    canStartConversation: true,
+    locale
   })
   const [sendMessageAction, keepDiscoveringAction] = presentation.actions
   const resolvedMatchedAvatarSnapshot = createCandidateAvatarSnapshot({

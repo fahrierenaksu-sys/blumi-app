@@ -2,7 +2,6 @@ export interface ConnectionMatchPresentationDependencies {
   hasPresented: (miniRoomId: string) => boolean
   markPresented: (miniRoomId: string) => void
   captureMatchCreated: () => void
-  showMatchToast: (toast: { title: string; body: string }) => void
   showMatchModal: (match: {
     miniRoomId: string
     matchedUserName: string
@@ -17,6 +16,11 @@ export interface ConnectionMatchPresentationInput {
   mode: "demo" | "production"
 }
 
+/**
+ * Presents a mutual match once. The modal is the whole celebration: the
+ * English-only toast that used to sit on top of it was removed (UX audit
+ * DSC-1, 2026-10-01).
+ */
 export function presentConnectionMatch(
   dependencies: ConnectionMatchPresentationDependencies,
   input: ConnectionMatchPresentationInput
@@ -25,10 +29,6 @@ export function presentConnectionMatch(
 
   dependencies.markPresented(input.miniRoomId)
   dependencies.captureMatchCreated()
-  dependencies.showMatchToast({
-    title: "It's a match! ✨",
-    body: `You and ${input.matchedUserName} both saved the moment`
-  })
   dependencies.showMatchModal({
     miniRoomId: input.miniRoomId,
     matchedUserName: input.matchedUserName,

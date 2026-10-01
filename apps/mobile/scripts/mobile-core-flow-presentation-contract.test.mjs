@@ -49,17 +49,19 @@ function readChatThreadSurface() {
 test("production match flow leads from Discover to chat without a room promise", () => {
   const matchResult = read("src/screens/MatchResultScreen.tsx")
   const matchModal = read("src/components/MatchResultModal.tsx")
-  const matchPresentation = read("src/features/matches/matchResultPresentation.ts")
+  // Copy for both match surfaces lives in the shared presentation model and
+  // its TR/EN copy module (DSC-1, 2026-10-01).
+  const matchPresentation = read("src/features/matches/matchResultPresentation.ts") +
+    read("src/features/matches/matchResultCopy.ts")
   const lobby = read("src/screens/LobbyScreen.tsx")
   const lobbyCopy = read("src/features/lobby/lobbyFeedbackCopy.ts")
 
-  // Copy for both match surfaces lives in the shared presentation model.
   assert.match(matchPresentation, /You two just matched\./)
   assert.match(matchPresentation, /Start with a message and get to know each other at your pace\./)
-  assert.match(matchPresentation, /label: "Start chatting"/)
-  assert.match(matchPresentation, /label: "Keep exploring"/)
+  assert.match(matchPresentation, /sendMessage: "Start chatting"/)
+  assert.match(matchPresentation, /keepDiscovering: "Keep exploring"/)
   assert.match(matchPresentation, /Safety options for \$\{name\}/)
-  assert.doesNotMatch(matchPresentation, /Go to Room|head into the room|open a room/)
+  assert.doesNotMatch(matchPresentation, /Go to Room|head into the room|open a room|odaya geç|oda aç/i)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|SharedMatchRoom|Go to Room/)
   assert.match(lobby, /showDiscoverFeedback\(lobbyCopy\.liked, "warm"\)/)
   assert.match(lobbyCopy, /liked: "Like sent\."/)

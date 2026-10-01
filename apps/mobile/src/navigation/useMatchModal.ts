@@ -19,7 +19,6 @@ import {
   updateSavedConnectionStatus
 } from "../features/connections/savedConnectionsStore"
 import type { SessionActor } from "../features/session/sessionModel"
-import { showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
 
 export interface GlobalMatchState {
@@ -67,9 +66,6 @@ export function useMatchModal({
       captureMatchCreated: () => {
         const properties = getMatchCreatedProperties("connection_modal", match.mode)
         if (properties) captureProductEvent("match_created", properties)
-      },
-      showMatchToast: (toast) => {
-        showToast({ ...toast, type: "success" })
       },
       showMatchModal: setGlobalMatch
     }, match)
