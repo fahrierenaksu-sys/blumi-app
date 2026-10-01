@@ -51,7 +51,6 @@ test("press feedback and entrances have a non-moving Reduce Motion path from the
   assert.match(helper, /export function springPressScale\([\s\S]*?if \(reduceMotion\) \{\s*value\.stopAnimation\(\)\s*value\.setValue\(toValue\)/)
   for (const path of [
     "src/components/IncomingInviteCallout.tsx",
-    "src/features/settings/SettingsRow.tsx",
     "src/ui/vibeTilePicker.tsx",
     "src/screens/RoomDebriefScreen.tsx",
     "src/screens/ProfilePreviewScreen.tsx",
@@ -62,6 +61,10 @@ test("press feedback and entrances have a non-moving Reduce Motion path from the
     assert.match(source, /springPressScale\(\w+, [^)]*, reduceMotion\)/, path)
     assert.doesNotMatch(source, /Animated\.spring\(\w*[sS]caleAnim/, path)
   }
+  // Settings rows do not move at all: a pressed row tints like an iOS list (DSC-16).
+  const settingsRow = read("src/features/settings/SettingsRow.tsx")
+  assert.doesNotMatch(settingsRow, /scale/i)
+  assert.match(settingsRow, /pressed && styles\.rowPressed/)
   // Entrances and the feedback pill fade in place (opacity only).
   assert.match(read("src/screens/RoomDebriefScreen.tsx"), /opacity: heroAnim,[\s\S]{0,120}transform: reduceMotion \? \[\] :/)
   assert.match(read("src/screens/ProfilePreviewScreen.tsx"), /opacity: contentAnim,[\s\S]{0,120}transform: reduceMotion \? \[\] :/)

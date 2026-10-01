@@ -11,8 +11,9 @@ async function readSource(relativePath) {
 test("core navigation and status surfaces use Ionicons instead of text glyph icons", async () => {
   const files = [
     "screens/ProfileEditScreen.tsx",
-    "screens/InboxScreen.tsx",
+    // The inbox's icons live in its row and the shared back button.
     "features/inbox/InboxConversationRow.tsx",
+    "ui/backButton.tsx",
     // Discover's only icon (legacy lobby pending invites) lives here.
     "features/lobby/PendingInviteStrip.tsx",
     "features/miniRoom/scene/MiniRoomHud.tsx"

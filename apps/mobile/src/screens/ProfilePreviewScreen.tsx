@@ -278,7 +278,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                 size={42}
                 style={styles.navButton}
               >
-                <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
+                <Ionicons name="chevron-back" size={22} color={uiTheme.colors.textPrimary} />
               </ActionButtonCircle>
               {!profile.isSelf ? (
                 <ActionButtonCircle

@@ -1,12 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef } from "react"
-import { Animated, Pressable, Text, View } from "react-native"
-import { springPressScale, useReducedMotion } from "../../ui/animations"
+import { Pressable, Text, View } from "react-native"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
 import { settingsStyles as styles } from "./settingsStyles"
 
-/* ── Animated Row ──────────────────────────────────────────── */
+/* ── Row ───────────────────────────────────────────────────── */
+
+/** iOS list feel: a pressed row tints its background instead of shrinking (DSC-16). */
 
 export function SettingsRow(props: {
   icon: keyof typeof Ionicons.glyphMap
@@ -20,12 +20,6 @@ export function SettingsRow(props: {
   children?: React.ReactNode
 }) {
   const { icon, iconColors, label, description, value, chevron, onPress, isLast, children } = props
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  const handlePressIn = () => springPressScale(scaleAnim, 0.98, uiTheme.animation.spring, reduceMotion)
-  const handlePressOut = () => springPressScale(scaleAnim, 1, uiTheme.animation.spring, reduceMotion)
-
   const content = (
     <>
       <View style={styles.iconCircle}>
@@ -50,22 +44,16 @@ export function SettingsRow(props: {
     </>
   )
 
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      {onPress ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${label}${value ? `, ${value}` : ""}`}
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={[styles.row, !isLast && styles.rowDivider]}
-        >
-          {content}
-        </Pressable>
-      ) : (
-        <View style={[styles.row, !isLast && styles.rowDivider]}>{content}</View>
-      )}
-    </Animated.View>
+  return onPress ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}${value ? `, ${value}` : ""}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, !isLast && styles.rowDivider, pressed && styles.rowPressed]}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View style={[styles.row, !isLast && styles.rowDivider]}>{content}</View>
   )
 }

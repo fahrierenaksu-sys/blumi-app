@@ -16,10 +16,8 @@ test("profile copy keeps every visible label in the selected language", () => {
   assert.equal(turkish.vibe("Rose"), "Rose havası")
   assert.equal(english.editProfile, "Edit profile")
   assert.equal(turkish.editProfile, "Profili düzenle")
-  assert.equal(english.signOut, "Sign out")
-  assert.equal(turkish.signOut, "Çıkış yap")
-  assert.equal(turkish.signOutTitle, "Blumi’den çıkış yapılsın mı?")
-  assert.equal(english.cancel, "Cancel")
+  assert.equal(english.settings, "Settings")
+  assert.equal(turkish.settings, "Ayarlar")
 })
 
 test("profile screen renders the centralized copy contract", () => {
@@ -28,5 +26,8 @@ test("profile screen renders the centralized copy contract", () => {
   assert.match(source, /getYouScreenCopy\(getAppLocale\(\)\)/)
   assert.doesNotMatch(source, />Edit Profile</)
   assert.doesNotMatch(source, />Sign out</)
+  // Sign-out lives only in Settings (DSC-16).
+  assert.doesNotMatch(source, /signOut|session-sign-out/)
+  assert.match(source, /<BackButton /)
   assert.doesNotMatch(source, /years old/)
 })

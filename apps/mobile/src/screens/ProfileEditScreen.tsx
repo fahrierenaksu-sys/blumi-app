@@ -17,8 +17,9 @@ import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { MyAvatar } from "../ui/myAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
-import { ActionButtonCircle, TopBar } from "../ui/primitives"
+import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { BackButton } from "../ui/backButton"
 import { springPressScale, useReducedMotion } from "../ui/animations"
 import { hapticMedium } from "../ui/haptics"
 import { getAppLocale } from "../features/session/appLocale"
@@ -248,9 +249,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("You"))} size={40}>
-              <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("You"))} />
           }
         />
 

@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { SessionActor } from "../features/session/sessionApi"
 import { getAppLocale } from "../features/session/authLocale"
@@ -10,30 +10,25 @@ import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { MyAvatar } from "../ui/myAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
-import { TopBar, ActionButtonCircle } from "../ui/primitives"
+import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { BackButton } from "../ui/backButton"
 import { VIBE_PRESETS } from "../ui/vibeTilePicker"
 
 type YouScreenProps = NativeStackScreenProps<RootStackParamList, "You"> & {
   sessionActor: SessionActor
+  /** Unused since sign-out lives only in Settings (DSC-16); kept for the navigator's props. */
   onResetSession: () => void
 }
 
 export function YouScreen(props: YouScreenProps) {
-  const { navigation, sessionActor, onResetSession } = props
+  const { navigation, sessionActor } = props
   const { profile } = sessionActor
   const copy = getYouScreenCopy(getAppLocale())
 
   const vibePreset = VIBE_PRESETS.find((p) => p.id === profile.avatar.presetId)
   const vibeLabel = vibePreset?.label ?? copy.customVibe
   const vibeColor = vibePreset?.swatch ?? uiTheme.colors.primary
-  const confirmSignOut = () => {
-    Alert.alert(copy.signOutTitle, copy.signOutBody, [
-      { text: copy.cancel, style: "cancel" },
-      { text: copy.signOut, style: "destructive", onPress: onResetSession }
-    ])
-  }
-
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
@@ -42,9 +37,7 @@ export function YouScreen(props: YouScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("Lobby"))} size={40}>
-              <Ionicons name="chevron-back" size={22} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("Lobby"))} />
           }
           rightSlot={<View style={styles.topRightSpacer} />}
         />
@@ -120,18 +113,6 @@ export function YouScreen(props: YouScreenProps) {
             </Pressable>
           </View>
 
-          <Pressable
-            accessibilityLabel={copy.signOutAccessibility}
-            accessibilityRole="button"
-            onPress={confirmSignOut}
-            style={({ pressed }) => [
-              styles.signOutGlassButton,
-              pressed ? styles.signOutGlassButtonPressed : null
-            ]}
-            testID="session-sign-out"
-          >
-            <Text style={styles.signOutGlassText}>{copy.signOut}</Text>
-          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -280,24 +261,4 @@ const styles = StyleSheet.create({
     ...uiTheme.font.caption,
     color: uiTheme.colors.textSecondary,
   },
-  signOutGlassButton: {
-    alignSelf: "center",
-    marginTop: uiTheme.spacing.lg,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 30,
-    backgroundColor: "rgba(255, 230, 235, 0.7)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 180, 200, 0.8)",
-    ...uiTheme.shadow.soft,
-  },
-  signOutGlassButtonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.97 }],
-  },
-  signOutGlassText: {
-    ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.dangerInk,
-    fontWeight: "800",
-  }
 })

@@ -1,5 +1,4 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import {
   Animated,
@@ -32,8 +31,9 @@ import { goBackFromInbox } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
-import { ActionButtonCircle, TopBar } from "../ui/primitives"
+import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import { BackButton } from "../ui/backButton"
 import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
 import { InboxLoadingSkeleton } from "../features/inbox/InboxLoadingSkeleton"
 import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
@@ -240,9 +240,7 @@ export function InboxScreen(props: InboxScreenProps) {
           title={copy.title}
           titleAlign="start"
           leftSlot={
-            <ActionButtonCircle accessibilityLabel={copy.back} onPress={handleGoBack} size={40}>
-              <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            <BackButton accessibilityLabel={copy.back} onPress={handleGoBack} />
           }
           rightSlot={<View style={styles.topRightSpacer} />}
         />
