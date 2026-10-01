@@ -647,7 +647,10 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
 
     async getSessionByTokenHash(sessionTokenHash, now = new Date()) {
-      const session = await repository.getSessionByTokenHash(sessionTokenHash)
+      // One read for the session and its account (was two round trips on
+      // every authenticated request).
+      const found = await repository.getSessionWithAccountByTokenHash(sessionTokenHash)
+      const session = found?.session
       // A rotated token only survives for the refresh grace window, never for
       // requests: its expiry is the rotating request's clock, which can be
       // later than a concurrent request's `now`.
@@ -655,7 +658,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         return null
       }
 
-      const account = await repository.findAccountById(session.accountId)
+      const account = found.account
       if (
         account?.moderation?.status === "suspended" &&
         account.moderation.suspendedUntil &&

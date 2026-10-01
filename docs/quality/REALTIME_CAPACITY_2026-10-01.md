@@ -272,6 +272,41 @@ Measured with `pg_stat_statements` in the harness; see section 3.
    push-device lookup when no push is due would bring it to about 5. This is
    the largest remaining load and, with the transaction pooler, what the
    5,000-user target needs (section 2).
+
+   **Update (later on 2026-10-01): implemented and tested locally.** A send
+   is now one statement (`ChatRepository.sendMessageChecked`: thread,
+   participants, blocks in both directions, idempotent insert, preview, the
+   outbox job leased to the sender's inline dispatch, recipients' test
+   personas); the session and its account are one read; a block check is one
+   read; the push locale is read only for a recipient with a device. No
+   schema or wire change; invalid input and a concurrent first send of the
+   same `clientMessageId` take the previous stepwise path. Statements per
+   message, counted by `chatSendRoundTrips.postgres.test.ts` (recipient with a
+   push device, no peer NOTIFY):
+
+   | | Up to the persisting statement | Whole send and inline delivery |
+   |---|---|---|
+   | HTTP before | 8 (7 sequential) | 16 |
+   | HTTP after | 3 | 8 (6 without a push device) |
+   | Realtime before | 5 (4 sequential) | 13 |
+   | Realtime after | 1 | 6 (4 without a push device) |
+
+   Harness at +20 ms and pool 10, 400 users, 100 rooms, 100 HTTP pairs, no
+   push devices (p50 / p95 in ms; before = `1ae2923`):
+
+   | Offered chat | Before | After |
+   |---|---|---|
+   | One pair, 4 msgs/s | room ack 89, room delivery 133, HTTP 159, HTTP delivery 202 | 26, 48, 72, 93 |
+   | 30 msgs/s | room ack 211 / 401, HTTP 363 / 671, 377 round trips/s | not run |
+   | 60 msgs/s | saturated: room ack 6,339 / 9,519, HTTP 10,090 / 14,828, 36 HTTP errors, 1,108 of 1,800 not delivered in the window | room ack 24 / 40, delivery 46 / 74; HTTP 69 / 103, delivery 91 / 139; all delivered; 269 round trips/s |
+   | 80 msgs/s | not run | room ack 30 / 75, delivery 59 / 144; HTTP 91 / 219, delivery 119 / 287; all delivered; 354 round trips/s |
+   | 150 msgs/s | 1,231 of 4,500 persisted (37/s), 1,824 room sends refused, 790 HTTP errors | all 4,500 persisted (136/s), ack about 1.3 s; delivery backlogged (pool saturated) |
+
+   Sustained on pool 10 at 20 ms: about 30-37 messages per second before,
+   about 80-100 after (about 65 when every recipient has a push device). A
+   dispatch that waited more than 10 s renews its lease first (one extra
+   statement, only under saturation). Not measured on Railway, Supabase or a
+   device.
 3. **Fail-closed checks under saturation (server).** When the pool is
    saturated, background checks time out after the 10 s pool wait: MiniRoom
    access past its 60 s bound then holds a move, and a socket's authorization

@@ -175,11 +175,9 @@ export function createSafetyService(
       return normalizedCandidateUserIds.filter((userId) => blockedSet.has(userId))
     },
     async hasBlockBetween(userAId, userBId) {
-      const [first, second] = await Promise.all([
-        repository.findBlock(userAId, userBId),
-        repository.findBlock(userBId, userAId)
-      ])
-      return Boolean(first || second)
+      // Both directions in one indexed query (was two findBlock round trips;
+      // this check runs on every chat send, delivery and private push).
+      return (await repository.listBlockedUserIdsBetween(userAId, [userBId])).length > 0
     },
     async reportUser(actorUserId, input, now = new Date()) {
       const reportedUserId = normalizeTargetUserId(input.reportedUserId)

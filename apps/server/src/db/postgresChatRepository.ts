@@ -277,6 +277,133 @@ export function createPostgresChatRepository(
       }
     },
 
+    async sendMessageChecked({ message, clientMessageId, leaseUntil }) {
+      // One statement, one snapshot: the gate (thread, participants, blocks in
+      // both directions by primary key), the idempotent insert, the preview,
+      // the leased outbox job and the recipients' test personas. A committed
+      // retry is found in the snapshot (`prior`) and gets createMessage's
+      // preview and outbox repair; a concurrent first insert of the same
+      // client message ID only shows up as a conflict (`raced`).
+      const result = await pool.query(
+        `WITH members AS (
+           SELECT participant.user_id, participant.participant_order
+             FROM blumi_chat_thread_participants AS participant
+            WHERE participant.thread_id = $2
+         ), gate AS (
+           SELECT EXISTS (SELECT 1 FROM blumi_chat_threads WHERE thread_id = $2) AS thread_exists,
+                  (SELECT count(*)::int FROM members) AS member_count,
+                  EXISTS (SELECT 1 FROM members WHERE user_id = $3) AS is_member,
+                  EXISTS (
+                    SELECT 1 FROM members AS partner
+                     WHERE partner.user_id <> $3 AND (
+                       EXISTS (SELECT 1 FROM blumi_safety_blocks AS block
+                                WHERE block.actor_user_id = $3 AND block.blocked_user_id = partner.user_id)
+                       OR EXISTS (SELECT 1 FROM blumi_safety_blocks AS block
+                                   WHERE block.actor_user_id = partner.user_id AND block.blocked_user_id = $3))
+                  ) AS blocked
+         ), allowed AS (
+           SELECT 1 AS allowed FROM gate
+            WHERE gate.thread_exists AND gate.member_count = 2 AND gate.is_member AND NOT gate.blocked
+         ), prior AS (
+           SELECT message_id, thread_id, sender_user_id, body, sent_at, delivered_at, read_at, edited_at
+             FROM blumi_chat_messages
+            WHERE $6::text IS NOT NULL AND thread_id = $2 AND sender_user_id = $3 AND client_message_id = $6::text
+         ), saved AS (
+           INSERT INTO blumi_chat_messages (
+             message_id, thread_id, sender_user_id, body, sent_at, client_message_id
+           )
+           SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz, $6::text FROM allowed
+            WHERE NOT EXISTS (SELECT 1 FROM prior)
+           ON CONFLICT (thread_id, sender_user_id, client_message_id)
+             WHERE client_message_id IS NOT NULL DO NOTHING
+           RETURNING message_id, thread_id, sender_user_id, body, sent_at,
+                     delivered_at, read_at, edited_at
+         ), repaired AS (
+           SELECT prior.* FROM prior JOIN allowed ON true WHERE prior.body = $4
+         ), shown AS (
+           SELECT message_id, thread_id, sent_at FROM saved
+           UNION ALL
+           SELECT message_id, thread_id, sent_at FROM repaired
+         ), preview AS (
+           UPDATE blumi_chat_threads AS thread
+              SET last_message_id = shown.message_id, last_message_sent_at = shown.sent_at
+             FROM shown
+            WHERE thread.thread_id = shown.thread_id AND (
+              thread.last_message_sent_at IS NULL OR
+              (thread.last_message_sent_at, thread.last_message_id) <= (shown.sent_at, shown.message_id)
+            ) RETURNING thread.thread_id
+         ), delivery AS (
+           INSERT INTO blumi_chat_delivery_outbox (message_id, available_at, attempt_count, lease_token)
+           SELECT message_id, $7::timestamptz, 1, md5(random()::text || clock_timestamp()::text) FROM saved
+           RETURNING lease_token, attempt_count
+         ), repaired_delivery AS (
+           INSERT INTO blumi_chat_delivery_outbox (message_id)
+           SELECT message_id FROM repaired ON CONFLICT (message_id) DO NOTHING
+           RETURNING message_id
+         )
+         SELECT gate.thread_exists, gate.member_count, gate.is_member, gate.blocked,
+                (SELECT array_agg(user_id ORDER BY participant_order) FROM members) AS participant_user_ids,
+                saved.message_id, saved.thread_id, saved.sender_user_id, saved.body, saved.sent_at,
+                saved.delivered_at, saved.read_at, saved.edited_at,
+                delivery.lease_token, delivery.attempt_count,
+                prior.message_id AS prior_message_id, prior.thread_id AS prior_thread_id,
+                prior.sender_user_id AS prior_sender_user_id, prior.body AS prior_body,
+                prior.sent_at AS prior_sent_at, prior.delivered_at AS prior_delivered_at,
+                prior.read_at AS prior_read_at, prior.edited_at AS prior_edited_at,
+                (SELECT json_agg(json_build_object('userId', persona.user_id, 'greeting', persona.greeting,
+                                                   'replies', persona.replies) ORDER BY members.participant_order)
+                   FROM blumi_test_personas AS persona
+                   JOIN members ON members.user_id = persona.user_id
+                  WHERE persona.user_id <> $3 AND EXISTS (SELECT 1 FROM saved)) AS recipient_personas
+           FROM gate
+           LEFT JOIN saved ON true
+           LEFT JOIN delivery ON true
+           LEFT JOIN prior ON true`,
+        [
+          message.messageId,
+          message.threadId,
+          message.senderUserId,
+          message.body,
+          new Date(message.sentAt),
+          clientMessageId ?? null,
+          leaseUntil
+        ]
+      )
+      const row = result.rows[0]
+      if (!row?.thread_exists) return { outcome: "unavailable" }
+      const participantUserIds = Array.isArray(row.participant_user_ids) ? row.participant_user_ids.map(String) : []
+      if (participantUserIds.length !== 2) throw new Error("Chat thread is missing participants.")
+      if (!row.is_member) return { outcome: "unavailable" }
+      const members = [participantUserIds[0]!, participantUserIds[1]!] as [string, string]
+      const prior = row.prior_message_id ? mapMessage(withoutPrefix(row, "prior_")) : null
+      if (row.blocked) return prior ? { outcome: "blocked", retryOf: prior } : { outcome: "blocked" }
+      if (row.message_id) {
+        return {
+          outcome: "created",
+          message: mapMessage(row),
+          participantUserIds: members,
+          job: { leaseToken: String(row.lease_token), attempt: Number(row.attempt_count) },
+          recipientPersonas: Array.isArray(row.recipient_personas)
+            ? row.recipient_personas.map((persona: { userId: unknown; greeting: unknown; replies: unknown }) => ({
+                userId: String(persona.userId),
+                greeting: String(persona.greeting),
+                replies: Array.isArray(persona.replies) ? persona.replies.map(String) : []
+              }))
+            : []
+        }
+      }
+      if (prior) {
+        return {
+          outcome: "retried",
+          message: prior,
+          participantUserIds: members,
+          ...(prior.body !== message.body ? { idempotencyConflict: true as const } : {})
+        }
+      }
+      if (!clientMessageId) throw new Error("Chat message persistence did not return a created message.")
+      return { outcome: "raced" }
+    },
+
     async updateThreadLastMessage(threadId, message) {
       await pool.query(
         `UPDATE blumi_chat_threads AS thread
@@ -323,6 +450,12 @@ export function createPostgresChatRepository(
     async completeDelivery(messageId, leaseToken, now) {
       await pool.query(`UPDATE blumi_chat_delivery_outbox SET completed_at = $3
         WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`, [messageId, leaseToken, now])
+    },
+    async renewDeliveryLease(messageId, leaseToken, leaseUntil) {
+      const result = await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3
+        WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL RETURNING message_id`,
+      [messageId, leaseToken, leaseUntil])
+      return result.rows.length > 0
     },
     async retryDelivery(messageId, leaseToken, availableAt) {
       await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3, lease_token = NULL
@@ -475,6 +608,14 @@ function readOptionalParticipantAvatar(
     // Display metadata is optional: malformed legacy data must not block chat.
     return undefined
   }
+}
+
+function withoutPrefix(row: QueryResultRow, prefix: string): QueryResultRow {
+  const stripped: QueryResultRow = {}
+  for (const [key, value] of Object.entries(row)) {
+    if (key.startsWith(prefix)) stripped[key.slice(prefix.length)] = value
+  }
+  return stripped
 }
 
 function mapMessage(row: QueryResultRow): ChatMessage {

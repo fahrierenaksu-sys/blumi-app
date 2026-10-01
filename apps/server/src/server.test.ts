@@ -1526,13 +1526,16 @@ test("thread endpoints require session access and send messages", async () => {
     codeFactory: () => "482931"
   })
   let messageId = 0
+  const safetyService = createSafetyService()
+  // Production wiring (config.ts): the chat service's block policy is the
+  // safety service, which the one-statement send checks.
   const chatService = createChatService({
-    idFactory: () => `message_${++messageId}`
+    idFactory: () => `message_${++messageId}`,
+    blockPolicy: safetyService
   })
   const matchService = createMatchService({
     repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
   })
-  const safetyService = createSafetyService()
   const connectionManager = createConnectionManager()
   const createdThreadEvents: string[] = []
   const sendToUsers = connectionManager.sendToUsers
@@ -1753,7 +1756,7 @@ test("thread endpoints require session access and send messages", async () => {
   assert.equal(blockedSend.statusCode, 404)
   assert.equal(blockedSend.json().error, "That conversation is not available.")
   assert.deepEqual(
-    (await chatService.listMessages(userId, "thread_server")).map(
+    (await chatService.repository.listMessages("thread_server")).map(
       (message) => message.messageId
     ),
     ["message_1"]
@@ -1783,10 +1786,13 @@ test("thread endpoints require session access and send messages", async () => {
   })
   assert.equal(messages.statusCode, 200)
   assert.equal(messages.json().messages.length, 3)
+  // The refused send above drew an id before its statement refused it, so
+  // ids are not consecutive; page by the listed ones.
+  const listedIds = messages.json().messages.map((message: { messageId: string }) => message.messageId)
 
   const paged = await app.inject({
     method: "GET",
-    url: "/v1/threads/thread_server/messages?before=message_3&limit=1",
+    url: `/v1/threads/thread_server/messages?before=${listedIds[2]}&limit=1`,
     headers: {
       authorization: `Bearer ${token}`
     }
@@ -1794,7 +1800,7 @@ test("thread endpoints require session access and send messages", async () => {
   assert.equal(paged.statusCode, 200)
   assert.deepEqual(
     paged.json().messages.map((message: { messageId: string }) => message.messageId),
-    ["message_2"]
+    [listedIds[1]]
   )
 
   const idempotentSend = await app.inject({

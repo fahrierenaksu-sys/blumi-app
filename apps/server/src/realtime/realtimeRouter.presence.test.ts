@@ -141,10 +141,11 @@ test("six-user presence publication uses six block SQL reads and removes bidirec
   assert.equal(expected.get("user_0")?.find(user => user.userId === "user_2")?.blocked, true)
   assert.equal(expected.get("user_2")?.find(user => user.userId === "user_0")?.blocked, true)
   assert.equal(expected.get("user_0")?.find(user => user.userId === "user_3")?.blocked, false)
-  assert.equal(harness.queries.length, 60, "old ordered-pair algorithm performs two SQL reads per pair")
+  // hasBlockBetween reads both directions at once since 2026-10-01 (it was two reads per pair).
+  assert.equal(harness.queries.length, 30, "the ordered-pair algorithm performs one SQL read per pair")
   harness.queries.length = 0
   await harness.publish()
-  context.diagnostic(`block SQL reads: old algorithm 60; router ${harness.queries.length}`)
+  context.diagnostic(`block SQL reads: ordered pairs 30; router ${harness.queries.length}`)
   for (const user of snapshot.users) {
     const events = harness.deliveries.get(user.userId)!
     assert.equal(events.length, 2)

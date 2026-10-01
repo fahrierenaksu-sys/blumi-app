@@ -99,6 +99,31 @@ runRepositoryContract<AuthRepository>({
         assert.equal(Math.abs(Date.parse(family.expiresAt) - (now.getTime() + 60_000)) < 1_000, true)
       }
     },
+    "the joined session read answers exactly what the separate session and account reads answer": async ({ repository, id }) => {
+      // Every authenticated request reads both; one join saves a round trip.
+      const now = new Date()
+      const account = await createAccount(repository, id, "joined")
+      await repository.saveAccount({
+        ...account,
+        profile: { ...account.profile, displayName: "Joined", age: 27, bio: "hi", interests: ["coffee"] },
+        moderation: { status: "suspended", updatedAt: now.toISOString(), suspendedUntil: new Date(now.getTime() + 60_000).toISOString() }
+      })
+      const session: SessionRecord = {
+        accountId: account.accountId,
+        userId: account.userId,
+        sessionId: id("joined_family"),
+        sessionTokenHash: randomBytes(32).toString("hex"),
+        expiresAt: new Date(now.getTime() + 60_000).toISOString()
+      }
+      await repository.saveSession(session)
+      const joined = await repository.getSessionWithAccountByTokenHash(session.sessionTokenHash)
+      assert.deepEqual(joined, {
+        session: await repository.getSessionByTokenHash(session.sessionTokenHash),
+        account: await repository.findAccountById(account.accountId)
+      })
+      assert.equal(joined?.account?.moderation?.status, "suspended")
+      assert.equal(await repository.getSessionWithAccountByTokenHash(randomBytes(32).toString("hex")), null)
+    },
     "an empty request answers without a query result": async ({ repository }) => {
       assert.deepEqual(await repository.listActiveSessionFamilies({ identities: [], now: new Date() }), [])
     },

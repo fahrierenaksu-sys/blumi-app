@@ -652,6 +652,9 @@ export async function backgroundedPhoneGetsPrivatePushes(context: ScenarioContex
   await (await bora.connect()).close()
 
   const { threadId, matchId } = await harness.matchPair(ada, bora)
+  // The match opens its chat after the like is answered; the app sends only
+  // once it has the thread (before, the send's extra round trips hid this race).
+  await sa.waitFor("chat.thread_created", (event) => event.payload.threadId === threadId)
   const secret = "Meet me at the ferry, code 4821"
   const message = await sendOverHttp(ada, threadId, secret, "e2e-push-message-01")
   const invite = await ada.http("POST", `/v1/threads/${threadId}/room-invites`, {})

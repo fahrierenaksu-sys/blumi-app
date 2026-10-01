@@ -166,16 +166,20 @@ export function createNotificationService(
     },
     async sendPushToUser(userId, notification, discoveryWatch) {
       const normalizedUserId = normalizeUserId(userId)
+      // Validated before any read; the locale only picks the copy, so it is
+      // read only for a recipient with a device (one round trip less per
+      // chat message to a phone without push).
+      const validated = normalizeNotification(notification, "en")
+      if (discoveryWatch && (discoveryWatch.userId !== normalizedUserId || validated.data?.type !== "discovery.watch_match")) {
+        throw new Error("Discovery Watch authorization does not match notification recipient or type.")
+      }
+      const devices = await repository.listDevices(normalizedUserId)
+      if (devices.length === 0) return { outcome: "no_device", deliveryCount: 0 }
       const normalizedNotification = normalizeNotification(
         notification,
         await resolveLocale(normalizedUserId, notification.data?.type)
       )
-      if (discoveryWatch && (discoveryWatch.userId !== normalizedUserId || normalizedNotification.data?.type !== "discovery.watch_match")) {
-        throw new Error("Discovery Watch authorization does not match notification recipient or type.")
-      }
       const queuedAt = now()
-      const devices = await repository.listDevices(normalizedUserId)
-      if (devices.length === 0) return { outcome: "no_device", deliveryCount: 0 }
       const deliveries = devices.map((device) => ({
         deliveryId: normalizeDeliveryId(deliveryIdFactory()),
         userId: normalizedUserId,
