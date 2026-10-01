@@ -157,6 +157,7 @@ export function useRoomInviteRouting({
         currentRouteParams: currentRoute?.params,
         sourceThreadId: payload.miniRoom.sourceThreadId
       })
+      if (arrival === "stay") return
       if (arrival === "announce") {
         announceReadyMiniRoom(payload, partner.displayName)
         return
@@ -183,7 +184,7 @@ export function useRoomInviteRouting({
       }
 
       if (
-        (action.type === "accept" || action.type === "open_room") &&
+        action.type === "open_room" &&
         invite.status === "accepted" &&
         invite.roomSessionId
       ) {

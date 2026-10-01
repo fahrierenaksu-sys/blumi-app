@@ -263,7 +263,7 @@ test("hydrates and immutably updates room invites through the chat coordinator",
     roomSessionId: "room-session-1"
   })
 
-  assert.deepEqual(dependencies.openedRooms, [roomReady, roomReady])
+  assert.deepEqual(dependencies.openedRooms, [roomReady])
   assert.deepEqual(dependencies.analyticsEvents, [
     "room_invite_sent",
     "room_invite_accepted",
@@ -272,7 +272,7 @@ test("hydrates and immutably updates room invites through the chat coordinator",
   ])
 })
 
-test("an accepted invite opens the room from the decision answer without a second join request", async () => {
+test("acceptance updates the card without entering; a separate entry joins with fresh server authority", async () => {
   let joins = 0
   const decided = { ...invite, status: "accepted" as const, roomSessionId: "room_1" }
   const dependencies = createDependencies({
@@ -286,12 +286,13 @@ test("an accepted invite opens the room from the decision answer without a secon
 
   await coordinator.handleRoomInviteAction({ type: "accept", inviteId: "invite_1" })
 
-  // The decision already carries the room, participants and media session;
-  // a second join round trip only delayed the room (latency audit 2026-10-01).
   assert.equal(joins, 0)
-  assert.deepEqual(dependencies.openedRooms, [roomReady])
+  assert.deepEqual(dependencies.openedRooms, [])
   assert.deepEqual(dependencies.roomInvites, [decided], "the stored invite carries no room payload")
   assert.deepEqual(dependencies.analyticsEvents, ["room_invite_accepted"])
+  await coordinator.handleRoomInviteAction({ type: "open_room", inviteId: "invite_1", roomSessionId: "room_1" })
+  assert.equal(joins, 1)
+  assert.deepEqual(dependencies.openedRooms, [roomReady])
 })
 
 test("loads invitations before slow message history and shares in-flight history and invite requests", async () => {
@@ -706,15 +707,27 @@ test("does not open or report a room after an invite response becomes stale", as
   let current = true
   const dependencies = createDependencies({
     isCurrentSession: () => current,
-    joinRoomSession: async () => {
+    decideThreadRoomInvite: async () => {
       current = false
-      return roomReady
+      return { ...invite, status: "accepted", roomSessionId: "room_1" }
     }
   })
   const coordinator = createChatCoordinator(dependencies)
 
   await coordinator.handleRoomInviteAction({ type: "accept", inviteId: "invite_1" })
 
+  assert.deepEqual(dependencies.openedRooms, [])
+  assert.deepEqual(dependencies.analyticsEvents, [])
+})
+
+test("does not enter a room when the explicit join response belongs to a stale session", async () => {
+  let current = true
+  const dependencies = createDependencies({
+    isCurrentSession: () => current,
+    joinRoomSession: async () => { current = false; return roomReady }
+  })
+  const coordinator = createChatCoordinator(dependencies)
+  await coordinator.handleRoomInviteAction({ type: "open_room", inviteId: "invite_1", roomSessionId: "room_1" })
   assert.deepEqual(dependencies.openedRooms, [])
   assert.deepEqual(dependencies.analyticsEvents, [])
 })

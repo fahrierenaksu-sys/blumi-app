@@ -9,6 +9,7 @@ import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteMode
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { styles } from "./chatThreadStyles"
+import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 
 /**
  * Owns the draft text so typing never re-renders the timeline owner.
@@ -19,6 +20,7 @@ export function ChatComposer({
   chatLocale,
   isPendingThread,
   canCreateRoomInvite,
+  roomInviteReady = false,
   isCreatingRoomInvite,
   roomInviteDisabledReason,
   onRoomInvitePress,
@@ -30,6 +32,7 @@ export function ChatComposer({
   chatLocale: ChatLocale
   isPendingThread: boolean
   canCreateRoomInvite: boolean
+  roomInviteReady?: boolean
   isCreatingRoomInvite: boolean
   roomInviteDisabledReason: string | null
   onRoomInvitePress: () => void
@@ -95,7 +98,7 @@ export function ChatComposer({
               : null
           ]}
         >
-          <Ionicons name="home-outline" size={20} color={uiTheme.colors.primaryDeep} />
+          <RoomInviteComposerIcon ready={roomInviteReady} />
         </Pressable>
         <View style={styles.inputWrap}>
           <TextInput

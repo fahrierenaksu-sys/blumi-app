@@ -150,6 +150,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const partnerName = partnerSummary?.displayName ?? pendingPartnerName ?? chatCopy.unknownPartner
   const partnerUserId = partnerSummary?.userId ?? pendingPartnerId ?? ""
   const partnerAvatar = partnerSummary?.avatar
+  const inviteYou = useMemo(() => ({
+    userId: currentUserId, name: sessionActor.profile.displayName, avatar: sessionActor.profile.avatar
+  }), [currentUserId, sessionActor.profile.displayName, sessionActor.profile.avatar])
+  const invitePartner = useMemo(() => ({
+    userId: partnerUserId, name: partnerName, avatar: partnerAvatar
+  }), [partnerUserId, partnerName, partnerAvatar])
   const persistedMatch = useMemo(
     () => thread && sessionActor.session.mode === "production"
       ? createMatchFromPersistedThread(thread, currentUserId)
@@ -163,6 +169,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     isFocused,
     latestIncomingMessageId: messages.filter((message) => message.senderUserId !== currentUserId).at(-1)?.messageId,
     requestMessages: bindings.requestMessages,
+    refreshParticipants: bindings.refreshParticipants,
     markThreadRead: bindings.markThreadRead,
     setActiveThread
   })
@@ -237,6 +244,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           chatLocale={chatLocale}
           currentUserId={currentUserId}
           partnerName={partnerName}
+          you={inviteYou}
+          partner={invitePartner}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
           isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
           onRoomInviteAction={handleRoomInviteAction}
@@ -250,6 +259,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       chatLocale,
       currentUserId,
       partnerName,
+      inviteYou,
+      invitePartner,
       enteringRowKeys,
       activeRoomInviteAction,
       handleRoomInviteAction,
@@ -377,6 +388,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             chatLocale={chatLocale}
             isPendingThread={isPendingThread}
             canCreateRoomInvite={canCreateRoomInvite}
+            roomInviteReady={threadRoomInvites.some(invite => invite.status === "accepted" && Boolean(invite.roomSessionId))}
             isCreatingRoomInvite={isCreatingRoomInvite}
             roomInviteDisabledReason={roomInviteDisabledReason}
             onRoomInvitePress={handleRoomInvitePress}

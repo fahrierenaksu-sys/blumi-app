@@ -17,6 +17,8 @@ export interface ChatThreadBindings {
     clientMessageId: string
   ) => Promise<void>
   requestMessages: (threadId: string, options?: FetchThreadMessagesOptions) => Promise<void>
+  /** Refresh saved participant loadouts through the existing authenticated thread API. */
+  refreshParticipants?: () => Promise<void>
   /** `upToMessageId`: the newest partner message the reader saw (read receipts). */
   markThreadRead: (threadId: string, upToMessageId?: string) => void
   roomInvites: readonly ChatRoomInviteTimelineItem[]

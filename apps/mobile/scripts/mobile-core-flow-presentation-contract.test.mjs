@@ -128,7 +128,7 @@ test("chat composer places the guarded room button before the text input", () =>
   assert.match(composer, /<View style=\{styles\.composer\}>[\s\S]*?getRoomInviteCreateLabel[\s\S]*?<View style=\{styles\.inputWrap\}>/)
 })
 
-test("chat header keeps the canonical avatar and bubbles use the muted WhatsApp-style palette", () => {
+test("chat preserves its canonical header and muted bubbles while invitations use the shared theme", () => {
   const header = read("src/features/chat/thread/ChatThreadHeader.tsx")
   const chat = read("src/features/chat/thread/chatThreadStyles.ts")
   const inviteCard = read("src/features/chat/ChatRoomInviteCard.tsx")
@@ -138,8 +138,10 @@ test("chat header keeps the canonical avatar and bubbles use the muted WhatsApp-
   assert.match(chat, /bubbleMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
   assert.match(chat, /bubbleThem: \{[\s\S]*?backgroundColor: "#FFFDFC"[\s\S]*?borderColor: "#EEE5E8"/)
   assert.match(chat, /tailMe: \{[\s\S]*?backgroundColor: "#F6E7EB"[\s\S]*?borderColor: "#E8D7DD"/)
-  assert.match(inviteCard, /colors=\{\["#FFF9FB", "#FFFDFC"\]\}/)
-  assert.match(inviteCard, /backgroundColor: "#F8EEF2"/)
+  assert.match(inviteCard, /backgroundColor: uiTheme\.colors\.surfaceRaised/)
+  assert.match(inviteCard, /borderColor: uiTheme\.colors\.borderStrong/)
+  assert.match(inviteCard, /\.\.\.uiTheme\.font\.subheading/)
+  assert.match(inviteCard, /<ChatRoomInviteScene[\s\S]*?sender=\{card\.isSender \? you : partner\} recipient=\{card\.isSender \? partner : you\}/)
 })
 
 test("chat localizes core empty, history, composer, and accessibility copy for Turkish", () => {
