@@ -5,6 +5,7 @@ import {
   createOnboardingIntroTelemetry,
   getOnboardingIntroBeatEvent,
   getOnboardingIntroPerformanceEvent,
+  recordOnboardingFrameGaps,
   recordOnboardingFrameSample
 } from "./onboardingIntroTelemetry"
 
@@ -74,4 +75,17 @@ test("frame samples produce a bounded performance payload for intro completion",
       }
     }
   )
+})
+
+test("UI-thread frame gaps feed the same bounded performance payload", () => {
+  const telemetry = createOnboardingIntroTelemetry(1_000, 1_180)
+  recordOnboardingFrameGaps(telemetry, [17, 53, 0, -4, Number.NaN, 4_000])
+  const event = getOnboardingIntroPerformanceEvent(telemetry, {
+    nowMs: 1_900,
+    reduceMotion: false,
+    resumed: false,
+    coldStartMs: 900
+  })
+  assert.equal(event.properties.intro_frame_samples, 2)
+  assert.equal(event.properties.intro_worst_frame_ms, 53)
 })

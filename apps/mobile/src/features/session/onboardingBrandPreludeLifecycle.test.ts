@@ -10,7 +10,9 @@ type Element = { props: { onLayout?: () => void } }
 function mount() {
   const runtime = createFakeReactRuntime()
   const beats: { beat: string; reduceMotion: boolean }[] = []
-  const frames: (() => void)[] = []
+  const samplerStates: boolean[] = []
+  // Stable like the real hook's useCallback result.
+  const readFrameGaps = () => undefined
   const { OnboardingBrandPrelude } = loadSourceWithFakeReact<{ OnboardingBrandPrelude: (props: unknown) => Element }>(
     "features/session/OnboardingBrandPrelude.tsx",
     runtime,
@@ -26,13 +28,20 @@ function mount() {
             return null
           },
           getOnboardingIntroPerformanceEvent: () => ({ name: "performance", properties: {} }),
-          recordOnboardingFrameSample: () => undefined
+          recordOnboardingFrameGaps: () => undefined
+        },
+        "./onboardingIntroFrameSampler": {
+          useOnboardingIntroFrameSampler: (active: boolean) => {
+            samplerStates.push(active)
+            return readFrameGaps
+          }
         }
       },
       real: ["./onboardingBrandPreludeModel"],
       inertUnknown: true,
+      // No frame loop may run on the JS thread: a frame API call would throw.
       globals: {
-        requestAnimationFrame: (run: () => void) => { frames.push(run); return frames.length },
+        requestAnimationFrame: () => { throw new Error("JS frame loop") },
         cancelAnimationFrame: () => undefined
       }
     }
@@ -53,7 +62,7 @@ function mount() {
     props = { ...props, ...next }
     return runtime.render(() => OnboardingBrandPrelude(props))
   }
-  return { runtime, beats, frames, render }
+  return { runtime, beats, samplerStates, render }
 }
 
 const scanBeats = (beats: { beat: string; reduceMotion: boolean }[]) => beats.filter(({ beat }) => beat === "scan")
@@ -61,9 +70,10 @@ const scanBeats = (beats: { beat: string; reduceMotion: boolean }[]) => beats.fi
 test("the prelude timeline starts once and re-renders do not restart it", () => {
   const f = mount()
   const root = f.render()
-  assert.equal(scanBeats(f.beats).length, 0, "waits for layout and the first frame")
+  assert.equal(scanBeats(f.beats).length, 0, "waits for the native layout")
+  assert.equal(f.samplerStates.at(-1), false, "no frame sampling before layout")
   root.props.onLayout?.()
-  f.frames.shift()?.()
+  assert.equal(f.samplerStates.at(-1), true, "frame pacing is sampled on the UI thread")
   assert.deepEqual(scanBeats(f.beats), [{ beat: "scan", reduceMotion: false }])
   f.render()
   f.render({ greetingText: "Hello", showGreetingBubble: true })
@@ -74,7 +84,6 @@ test("the prelude timeline starts once and re-renders do not restart it", () => 
 test("turning on Reduce Motion finishes the prelude with reduced-motion telemetry", () => {
   const f = mount()
   f.render().props.onLayout?.()
-  f.frames.shift()?.()
   f.render({ reduceMotion: true })
   const beats = scanBeats(f.beats)
   assert.deepEqual(beats[0], { beat: "scan", reduceMotion: false })

@@ -50,8 +50,7 @@ test("injected fetchers run only inside requestJson", () => {
 // Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
-  "features/roomV2/editor/useRoomEditorStageLayout.ts",
-  "features/session/OnboardingBrandPrelude.tsx"
+  "features/roomV2/editor/useRoomEditorStageLayout.ts"
 ])
 
 test("no new requestAnimationFrame or setInterval loops in production code", () => {
@@ -102,7 +101,7 @@ const OVERSIZED_DEBT = {
   "screens/ProfileEditScreen.tsx": 861,
   "features/session/sessionApi.ts": 847,
   "features/avatarV2/room/avatarRoomSelectors.ts": 825,
-  "features/session/OnboardingWorldScene.tsx": 823,
+  "features/session/OnboardingWorldScene.tsx": 817,
   "ui/primitives.tsx": 812
 }
 

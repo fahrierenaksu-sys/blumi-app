@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native"
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming
+} from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { captureProductEvent } from "../../analytics/productAnalytics"
 import { OnboardingGreetingPair } from "./OnboardingGreetingPair"
@@ -20,8 +27,13 @@ import {
   createOnboardingIntroTelemetry,
   getOnboardingIntroBeatEvent,
   getOnboardingIntroPerformanceEvent,
-  recordOnboardingFrameSample
+  recordOnboardingFrameGaps
 } from "./onboardingIntroTelemetry"
+import { useOnboardingIntroFrameSampler } from "./onboardingIntroFrameSampler"
+
+/** Typing cadence of the greeting reveal (one clip on the UI thread). */
+const GREETING_TYPE_DELAY_MS = 360
+const GREETING_TYPE_MS_PER_CHARACTER = 38
 
 const BLUMI_MARK = require("../../../assets/brand/blumi-splash-mark.png")
 interface OnboardingBrandPreludeProps {
@@ -78,20 +90,23 @@ export function OnboardingBrandPrelude({
   const greetingReveal = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
   const homeExit = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
   const greetingPairReveal = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
-  const typingNudge = useRef(new Animated.Value(0)).current
-  const typingGlyphReveal = useRef(new Animated.Value(1)).current
   const elapsedMsRef = useRef(initialElapsedMs)
-  const progressRef = useRef({ ...initialProgress })
   const didShowActions = useRef(false)
   const didShowSecondaryAction = useRef(false)
   const didFinish = useRef(false)
-  const [hasLaidOut, setHasLaidOut] = useState(shouldReduceMotion)
+  // The timeline starts once the prelude has a native layout.
   const [sceneReady, setSceneReady] = useState(shouldReduceMotion)
-  const [visibleGreetingText, setVisibleGreetingText] = useState(
-    shouldReduceMotion && showGreetingBubble ? greetingText : ""
-  )
   const [charactersStarted, setCharactersStarted] = useState(
     shouldReduceMotion || initialElapsedMs >= timeline.characterEntranceStart
+  )
+  const charactersStartedRef = useRef(charactersStarted)
+  const greetingReveal01 = useSharedValue(shouldReduceMotion && showGreetingBubble ? 1 : 0)
+  const [greetingWidth, setGreetingWidth] = useState(0)
+  const greetingClipStyle = useAnimatedStyle(() => ({
+    width: greetingReveal01.value * greetingWidth
+  }))
+  const readFrameGaps = useOnboardingIntroFrameSampler(
+    sceneReady && !shouldReduceMotion && motionEnabled
   )
   const [greetingPairActive, setGreetingPairActive] = useState(
     shouldReduceMotion && showGreetingBubble
@@ -113,17 +128,21 @@ export function OnboardingBrandPrelude({
 
   const capturePerformance = useCallback((resumed: boolean) => {
     const nowMs = Date.now()
-    const event = getOnboardingIntroPerformanceEvent(telemetry, {
-      nowMs,
-      reduceMotion: shouldReduceMotion,
-      resumed,
-      coldStartMs: nowMs - telemetry.startedAtMs
+    // Frame gaps arrive from the UI thread once; the timing is read now.
+    readFrameGaps((gaps) => {
+      recordOnboardingFrameGaps(telemetry, gaps)
+      const event = getOnboardingIntroPerformanceEvent(telemetry, {
+        nowMs,
+        reduceMotion: shouldReduceMotion,
+        resumed,
+        coldStartMs: nowMs - telemetry.startedAtMs
+      })
+      captureProductEvent(event.name, event.properties)
     })
-    captureProductEvent(event.name, event.properties)
-  }, [shouldReduceMotion, telemetry])
+  }, [readFrameGaps, shouldReduceMotion, telemetry])
 
   const handleLayout = () => {
-    setHasLaidOut(true)
+    setSceneReady(true)
     markOnboardingContentReady()
   }
 
@@ -205,114 +224,27 @@ export function OnboardingBrandPrelude({
     }
   }, [greetingPairReveal, greetingReveal, homeExit, shouldReduceMotion, showGreetingBubble])
 
-  // Keep the greeting legible while giving the pair a small, human-feeling
-  // introduction. This is deliberately a short, deterministic cue rather
-  // than a layout animation: the bubble keeps its width and never reflows the
-  // action area while letters arrive.
+  // The greeting is laid out once at full width and revealed by one clip
+  // that grows on the UI thread: no per-letter React render and no bubble
+  // jitter while letters arrive (ONB-03).
   useEffect(() => {
     if (!showGreetingBubble) {
-      setVisibleGreetingText("")
-      typingNudge.stopAnimation()
-      typingNudge.setValue(0)
-      typingGlyphReveal.stopAnimation()
-      typingGlyphReveal.setValue(1)
-      return undefined
+      greetingReveal01.value = 0
+      return
     }
     if (shouldReduceMotion) {
-      setVisibleGreetingText(greetingText)
-      typingNudge.setValue(0)
-      typingGlyphReveal.setValue(1)
-      return undefined
+      greetingReveal01.value = 1
+      return
     }
-
-    let index = 0
-    let timer: ReturnType<typeof setTimeout> | undefined
-    setVisibleGreetingText("")
-    typingGlyphReveal.setValue(1)
-    const typeNext = () => {
-      index += 1
-      setVisibleGreetingText(greetingText.slice(0, index))
-      typingNudge.stopAnimation()
-      typingNudge.setValue(0)
-      typingGlyphReveal.setValue(0.78)
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(typingNudge, {
-            toValue: 1,
-            duration: 34,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-            isInteraction: false
-          }),
-          Animated.timing(typingNudge, {
-            toValue: -1,
-            duration: 46,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-            isInteraction: false
-          }),
-          Animated.timing(typingNudge, {
-            toValue: 0,
-            duration: 64,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-            isInteraction: false
-          })
-        ]),
-        Animated.timing(typingGlyphReveal, {
-          toValue: 1,
-          duration: 120,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-          isInteraction: false
-        })
-      ]).start()
-      if (index < greetingText.length) {
-        timer = setTimeout(typeNext, 38)
-      }
-    }
-    timer = setTimeout(typeNext, 360)
-    return () => {
-      if (timer) clearTimeout(timer)
-      typingNudge.stopAnimation()
-      typingGlyphReveal.stopAnimation()
-    }
-  }, [greetingText, shouldReduceMotion, showGreetingBubble, typingGlyphReveal, typingNudge])
-
-  useEffect(() => {
-    if (sceneReady || !hasLaidOut) return undefined
-    const readyId = requestAnimationFrame(() => setSceneReady(true))
-    return () => cancelAnimationFrame(readyId)
-  }, [hasLaidOut, sceneReady])
-
-  useEffect(() => {
-    if (!sceneReady || shouldReduceMotion || !motionEnabled) return undefined
-    let frameId = 0
-    const sample = () => {
-      if (didFinish.current) return
-      recordOnboardingFrameSample(telemetry, Date.now())
-      frameId = requestAnimationFrame(sample)
-    }
-    frameId = requestAnimationFrame(sample)
-    return () => cancelAnimationFrame(frameId)
-  }, [motionEnabled, sceneReady, shouldReduceMotion, telemetry])
-
-  useEffect(() => {
-    const subscriptions = [
-      scanRows.addListener(({ value }) => { progressRef.current.scanRows = value }),
-      scanSweep.addListener(({ value }) => { progressRef.current.scanSweep = value }),
-      scanOpacity.addListener(({ value }) => { progressRef.current.scanOpacity = value }),
-      brandReveal.addListener(({ value }) => { progressRef.current.brand = value }),
-      characterReveal.addListener(({ value }) => { progressRef.current.characters = value })
-    ]
-    return () => {
-      scanRows.removeListener(subscriptions[0])
-      scanSweep.removeListener(subscriptions[1])
-      scanOpacity.removeListener(subscriptions[2])
-      brandReveal.removeListener(subscriptions[3])
-      characterReveal.removeListener(subscriptions[4])
-    }
-  }, [brandReveal, characterReveal, scanOpacity, scanRows, scanSweep])
+    greetingReveal01.value = 0
+    greetingReveal01.value = withDelay(
+      GREETING_TYPE_DELAY_MS,
+      withTiming(1, {
+        duration: Math.max(1, greetingText.length * GREETING_TYPE_MS_PER_CHARACTER),
+        easing: ReanimatedEasing.linear
+      })
+    )
+  }, [greetingReveal01, greetingText, shouldReduceMotion, showGreetingBubble])
 
   useEffect(() => {
     if (!motionPreferenceResolved) return undefined
@@ -322,6 +254,7 @@ export function OnboardingBrandPrelude({
       scanOpacity.setValue(0)
       brandReveal.setValue(1)
       characterReveal.setValue(1)
+      charactersStartedRef.current = true
       setCharactersStarted(true)
       captureBeat("scan", false)
       captureBeat("brand", false)
@@ -345,6 +278,9 @@ export function OnboardingBrandPrelude({
     if (!motionEnabled || !sceneReady) return undefined
 
     const elapsed = elapsedMsRef.current
+    // Progress comes from the shared clock, not from per-frame value
+    // listeners that copied every native frame back to JS (ONB-03).
+    const progress = getOnboardingBrandPreludeProgressAtElapsed(elapsed)
     const startedAt = Date.now()
     const timers: ReturnType<typeof setTimeout>[] = []
     const resumed = elapsed > initialElapsedMs + 20
@@ -367,16 +303,19 @@ export function OnboardingBrandPrelude({
     ])
 
     const animation = Animated.parallel([
-      delayedTiming(scanRows, 0, timeline.scanRowsComplete, progressRef.current.scanRows, 1, Easing.out(Easing.cubic)),
-      delayedTiming(scanSweep, timeline.scanSweepStart, timeline.scanSweepComplete, progressRef.current.scanSweep, 1, Easing.inOut(Easing.cubic)),
-      delayedTiming(scanOpacity, timeline.scanDissolveStart, timeline.scanDissolveComplete, 1 - progressRef.current.scanOpacity, 0, Easing.out(Easing.cubic)),
-      delayedTiming(brandReveal, timeline.brandRevealStart, timeline.brandRevealComplete, progressRef.current.brand, 1, Easing.out(Easing.back(1.04))),
-      delayedTiming(characterReveal, timeline.characterEntranceStart, timeline.characterEntranceComplete, progressRef.current.characters, 1, Easing.out(Easing.back(0.82)))
+      delayedTiming(scanRows, 0, timeline.scanRowsComplete, progress.scanRows, 1, Easing.out(Easing.cubic)),
+      delayedTiming(scanSweep, timeline.scanSweepStart, timeline.scanSweepComplete, progress.scanSweep, 1, Easing.inOut(Easing.cubic)),
+      delayedTiming(scanOpacity, timeline.scanDissolveStart, timeline.scanDissolveComplete, 1 - progress.scanOpacity, 0, Easing.out(Easing.cubic)),
+      delayedTiming(brandReveal, timeline.brandRevealStart, timeline.brandRevealComplete, progress.brand, 1, Easing.out(Easing.back(1.04))),
+      delayedTiming(characterReveal, timeline.characterEntranceStart, timeline.characterEntranceComplete, progress.characters, 1, Easing.out(Easing.back(0.82)))
     ])
 
-    if (!charactersStarted) {
+    if (!charactersStartedRef.current) {
       timers.push(setTimeout(
-        () => setCharactersStarted(true),
+        () => {
+          charactersStartedRef.current = true
+          setCharactersStarted(true)
+        },
         Math.max(0, timeline.characterEntranceStart - elapsed)
       ))
     }
@@ -416,7 +355,7 @@ export function OnboardingBrandPrelude({
       animation.stop()
       timers.forEach(clearTimeout)
     }
-  }, [brandReveal, captureBeat, capturePerformance, characterReveal, charactersStarted, initialElapsedMs, motionEnabled, motionPreferenceResolved, onActionsVisible, onFinished, onSecondaryActionVisible, reduceMotion, scanOpacity, scanRows, scanSweep, sceneReady])
+  }, [brandReveal, captureBeat, capturePerformance, characterReveal, initialElapsedMs, motionEnabled, motionPreferenceResolved, onActionsVisible, onFinished, onSecondaryActionVisible, reduceMotion, scanOpacity, scanRows, scanSweep, sceneReady])
 
   const pairLift = characterReveal.interpolate({
     inputRange: [0, 0.62, 0.82, 1],
@@ -446,15 +385,31 @@ export function OnboardingBrandPrelude({
               opacity: greetingReveal,
               transform: [
                 { translateY: greetingReveal.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-                { scale: greetingReveal.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
-                { translateX: typingNudge.interpolate({ inputRange: [-1, 0, 1], outputRange: [-0.7, 0, 0.7] }) },
-                { rotate: typingNudge.interpolate({ inputRange: [-1, 0, 1], outputRange: ["-0.25deg", "0deg", "0.25deg"] }) }
+                { scale: greetingReveal.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }
               ]
             }
           ]}
           testID="onboarding-character-greeting"
         >
-          <Animated.Text maxFontSizeMultiplier={1.2} style={[styles.greetingText, { opacity: typingGlyphReveal }]}>{visibleGreetingText}</Animated.Text>
+          <View>
+            <Text
+              maxFontSizeMultiplier={1.2}
+              numberOfLines={1}
+              onLayout={(event) => setGreetingWidth(Math.ceil(event.nativeEvent.layout.width))}
+              style={[styles.greetingText, styles.greetingTextSpacer]}
+            >
+              {greetingText}
+            </Text>
+            <Reanimated.View style={[styles.greetingClip, greetingClipStyle]}>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                numberOfLines={1}
+                style={[styles.greetingText, { width: greetingWidth }]}
+              >
+                {greetingText}
+              </Text>
+            </Reanimated.View>
+          </View>
           <View style={styles.greetingTail} />
         </Animated.View>
       ) : null}
@@ -572,6 +527,8 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.textPrimary,
     textAlign: "center"
   },
+  greetingTextSpacer: { opacity: 0 },
+  greetingClip: { position: "absolute", top: 0, bottom: 0, left: 0, overflow: "hidden" },
   greetingTail: {
     position: "absolute",
     bottom: -8,
