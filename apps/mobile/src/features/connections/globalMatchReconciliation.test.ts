@@ -179,6 +179,34 @@ test("still presents the match, without a remote avatar, when the chat cannot be
   }])
 })
 
+test("a slow chat never holds the match back: it presents after a short wait and still saves the chat", async () => {
+  const presented: unknown[] = []
+  let finishThread: ((thread: Awaited<ReturnType<GlobalMatchReconciliationDependencies["createThread"]>>) => void) | undefined
+  const dependencies = createDependencies(() => actor, {
+    createThread: () => new Promise((resolve) => { finishThread = resolve }),
+    presentMatch: (match) => { presented.push(match) },
+    threadWaitMs: 5
+  })
+
+  await reconcileRealtimeConnectionMatch(payload, actor, dependencies)
+  assert.deepEqual(presented, [{
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    mode: "production"
+  }])
+
+  finishThread?.({
+    threadId: "thread_match",
+    miniRoomId: "room_match",
+    participantUserIds: ["ada", "bora"],
+    participants: [{ userId: "ada" }, { userId: "bora" }],
+    createdAt: "2026-07-22T00:00:00.000Z"
+  })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(dependencies.createdThreads, ["thread_match"], "the late chat is still applied")
+})
+
 test("contains a failed account hydration request inside the match flow", async () => {
   const dependencies = createDependencies(
     () => actor,

@@ -29,7 +29,12 @@ export interface GlobalMatchReconciliationDependencies {
     mode: SessionActor["session"]["mode"]
   }) => void
   httpBaseUrl: string
+  /** How long the modal waits for the chat's partner avatar; tests shorten it. */
+  threadWaitMs?: number
 }
+
+/** Long enough for a normal chat open, short enough not to delay the moment. */
+const MATCH_THREAD_WAIT_MS = 1_500
 
 export function isSameAuthenticatedSession(
   expected: SessionActor,
@@ -69,18 +74,30 @@ export async function reconcileRealtimeConnectionMatch(
     const participantUserIds = [...payload.participantUserIds] as [string, string]
     // The opened chat carries the partner's server name and real avatar, so
     // the modal shows the partner's chibi instead of a hash-derived outfit
-    // (UX audit DSC-3). A failed open still presents the match.
-    const thread = await dependencies
+    // (UX audit DSC-3). A failed or slow open still presents the match; a
+    // late chat is applied when it arrives.
+    const threadRequest = dependencies
       .createThread(
         dependencies.httpBaseUrl,
         expectedActor.session.sessionToken,
         { participantUserIds }
       )
+      .then((thread) => {
+        if (isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
+          dependencies.applyChatThreadCreated(thread)
+        }
+        return thread
+      })
       .catch(() => null)
-    if (thread && isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
-      dependencies.applyChatThreadCreated(thread)
-      partner = findThreadPartner(thread, expectedActor.profile.userId)
-    }
+    let waitTimer: ReturnType<typeof setTimeout> | undefined
+    const thread = await Promise.race([
+      threadRequest,
+      new Promise<null>((resolve) => {
+        waitTimer = setTimeout(() => resolve(null), dependencies.threadWaitMs ?? MATCH_THREAD_WAIT_MS)
+      })
+    ])
+    clearTimeout(waitTimer)
+    if (thread) partner = findThreadPartner(thread, expectedActor.profile.userId)
   }
 
   if (!isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
