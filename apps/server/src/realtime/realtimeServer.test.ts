@@ -1047,6 +1047,54 @@ test("a delivery ack over the socket reaches only the sender, and ack bursts nev
   } finally { await harness.close() }
 })
 
+test("a burst of delivery acks for many threads reaches every partner, and the last ack of a thread survives a flood", async () => {
+  const harness = await createRealtimeHarness({
+    capabilityService: createCapabilityService({
+      manifest: parseCapabilityManifest(JSON.stringify({
+        rollouts: { db_chat_metadata_ready: 100, chat_read_receipts: 100 }
+      })).manifest
+    })
+  })
+  try {
+    const a = await harness.createSession("+905551110133", "Burst A")
+    const b = await harness.createSession("+905551110134", "Burst B")
+    const threadIds = Array.from({ length: 6 }, (_, index) => `burst-thread-${index}`)
+    const newest = new Map<string, string>()
+    for (const threadId of threadIds) {
+      await harness.chatService.createThread({ threadId, miniRoomId: `${threadId}-room`,
+        participantUserIds: [a.userId, b.userId], participants: [{ userId: a.userId }, { userId: b.userId }] })
+      newest.set(threadId, (await harness.chatService.sendMessage(a.userId, threadId, "hello")).messageId)
+    }
+    const first = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "older")
+    const last = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "newest")
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const ea = collectEvents(sa)
+    const ack = (threadId: string, upToMessageId: string) =>
+      sb.send(JSON.stringify({ type: "chat.ack_delivered", payload: { threadId, upToMessageId } }))
+
+    // One client flush: an ack per thread, back to back (the old budget kept
+    // two in flight per socket and silently dropped the rest).
+    for (const threadId of threadIds) ack(threadId, newest.get(threadId)!)
+    await waitUntil(() => new Set(receiptThreads(ea.all())).size === threadIds.length, 3_000)
+    assert.deepEqual(new Set(receiptThreads(ea.all())), new Set(threadIds))
+
+    // A flood of repeated acks for one thread, then the newest: the newest
+    // is coalesced and processed, never dropped behind the repeats.
+    for (let index = 0; index < 60; index++) ack(threadIds[0]!, first.messageId)
+    ack(threadIds[0]!, last.messageId)
+    await waitUntil(() => ea.all().some((event) =>
+      event.type === "chat.receipt_updated" &&
+      (event.payload as { deliveredUpTo?: { messageId: string } }).deliveredUpTo?.messageId === last.messageId), 3_000)
+    assert.equal(sb.readyState, WebSocket.OPEN)
+  } finally { await harness.close() }
+})
+
+function receiptThreads(events: readonly { type: string; payload: unknown }[]): string[] {
+  return events
+    .filter((event) => event.type === "chat.receipt_updated")
+    .map((event) => (event.payload as { threadId: string }).threadId)
+}
+
 test("a closing socket leaves the MiniRoom at once and many disconnects share one lease cleanup", async () => {
   const harness = await createRealtimeHarness()
   // 2026-10-01: a cleanup transaction per socket (six round trips) made a
