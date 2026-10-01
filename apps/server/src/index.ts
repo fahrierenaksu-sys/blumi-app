@@ -15,6 +15,7 @@ import { startNotificationOutboxWorker } from "./notifications/notificationOutbo
 import { startDiscoveryWatchWorker } from "./matches/discoveryWatchWorker"
 import { createAdminTokenService } from "./admin/adminTokenService"
 import { createGracefulShutdown } from "./operations/serviceLifecycle"
+import { installProcessLifecycle } from "./operations/processLifecycle"
 import { startPeriodicWorker } from "./operations/periodicWorker"
 import { createChatMessageDeliveryService } from "./chat/chatMessageDeliveryService"
 import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
@@ -199,18 +200,11 @@ const shutdown = createGracefulShutdown({
   closeData: () => services.close()
 })
 
-function handleShutdown() {
-  void shutdown().then(() => process.exit(0), (error) => {
-    console.error("Blumi shutdown failed", safeOperationalErrorKind(error))
-    process.exit(1)
-  })
-}
-
-process.once("SIGTERM", handleShutdown)
-process.once("SIGINT", handleShutdown)
-
-start().catch((error) => {
-  app.log.error({ errorKind: safeOperationalErrorKind(error) }, "Blumi startup failed")
-  void shutdown().catch((shutdownError) => console.error("Startup cleanup failed", safeOperationalErrorKind(shutdownError)))
-    .finally(() => process.exit(1))
+const lifecycle = installProcessLifecycle({
+  process,
+  shutdown,
+  exit: (code) => process.exit(code),
+  reportError: (message, errorKind) => console.error(message, errorKind)
 })
+
+start().catch((error) => lifecycle.fail("startup", error))
