@@ -2,6 +2,7 @@ import cors from "@fastify/cors"
 import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
+import { PrivateRequestLogController, privateLogSerializers } from "./operations/privateRequestLog"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
 import Fastify, {
@@ -113,6 +114,8 @@ interface CreateServerOptions {
   notificationService?: NotificationService
   miniRoomService?: MiniRoomService
   logger?: boolean
+  /** Test seam: where JSON log lines go instead of stdout. */
+  logDestination?: { write(line: string): void }
   nodeEnv?: string
   corsOrigins?: string[]
   trustedProxyAddresses?: string[]
@@ -187,7 +190,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     })
   const trustedProxyAddresses = options.trustedProxyAddresses ?? []
   const app = Fastify({
-    logger: createLoggerOptions(options.logger ?? false, nodeEnv),
+    logger: createLoggerOptions(options.logger ?? false, nodeEnv, options.logDestination),
+    logController: new PrivateRequestLogController(),
     genReqId: () => randomUUID(),
     trustProxy:
       trustedProxyAddresses.length > 0 ? trustedProxyAddresses : false
@@ -338,11 +342,16 @@ function registerErrorHandler(app: FastifyInstance) {
 
 function createLoggerOptions(
   enabled: boolean,
-  nodeEnv: string
+  nodeEnv: string,
+  destination?: { write(line: string): void }
 ): FastifyServerOptions["logger"] {
   if (!enabled) return false
-  if (nodeEnv === "production") return true
+  // Raw URLs, hosts and client IPs never reach the logs (privacy rules).
+  if (nodeEnv === "production" || destination) {
+    return { serializers: privateLogSerializers, ...(destination ? { stream: destination } : {}) }
+  }
   return {
+    serializers: privateLogSerializers,
     transport: {
       target: "pino-pretty",
       options: {
