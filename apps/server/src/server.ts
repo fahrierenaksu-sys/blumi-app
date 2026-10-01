@@ -15,6 +15,7 @@ import Fastify, {
 import { randomUUID } from "node:crypto"
 import { createAuthService, type AuthService } from "./auth/authService"
 import type { FirebaseAuthVerifier } from "./auth/firebaseAuth"
+import { createFirebaseSessionRevocationHook } from "./auth/firebaseSessionRevocation"
 import { createAvatarService, type AvatarService } from "./avatar/avatarService"
 import { createChatService, type ChatService } from "./chat/chatService"
 import type { ConnectionService } from "./connections/connectionService"
@@ -283,6 +284,15 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   }
   // A closing app finishes the side effects its answered requests started.
   app.addHook("onClose", () => afterResponseTasks.drain())
+  const revokeFirebaseSessions = createFirebaseSessionRevocationHook(
+    authService,
+    options.firebaseAuthVerifier,
+    afterResponseTasks
+  )
+  const stopSessionReuseRevocation = revokeFirebaseSessions
+    ? authService.subscribeSessionReuse?.((userId) => revokeFirebaseSessions(userId, "session_reuse"))
+    : undefined
+  app.addHook("onClose", async () => { stopSessionReuseRevocation?.() })
   void app.register(async (instance) => {
     registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget())
     await registerAuthRoutes(instance, routeServices)
@@ -298,7 +308,10 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       accountRecoveryService,
       adminUsersService: options.adminUsersService,
       adminAnalyticsService: options.adminAnalyticsService,
-      connectionManager
+      connectionManager,
+      ...(revokeFirebaseSessions
+        ? { onUserBanned: (userId: string) => revokeFirebaseSessions(userId, "moderation_ban") }
+        : {})
     })
     await registerUserRoutes(instance, routeServices)
     await registerDiscoverRoutes(instance, routeServices)

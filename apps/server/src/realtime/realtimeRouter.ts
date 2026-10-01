@@ -79,6 +79,10 @@ export function createRealtimeRouter(
     }
   })
   miniRoomService.onRoomInvalidated?.(id => motion.invalidate(id))
+  // A step shed under backpressure is repaired by a delayed snapshot to that socket.
+  connectionManager.onTransientEventDropped((connectionId, event) => {
+    if (event.type === "mini_room.avatar_moved") motion.resyncAfterDrop(connectionId, event.payload.miniRoomId)
+  })
   // Prefetch: both phones' first scene entry reuses the accept/join check.
   miniRoomService.onRoomReady?.(room => motion.prime(room))
   const chatMessageDeliveryService = createChatMessageDeliveryService({

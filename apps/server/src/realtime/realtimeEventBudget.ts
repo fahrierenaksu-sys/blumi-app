@@ -8,7 +8,7 @@
  * |-----------|------------------------------------------|-------------|
  * | motion    | mini_room.move                           | dropped     |
  * | transient | reaction.send, presence.move_to_spot     | dropped     |
- * | receipt   | chat.ack_delivered                       | dropped     |
+ * | receipt   | chat.ack_delivered                       | dropped above an abusive arrival rate; otherwise queued (newest per thread) |
  * | typing    | chat.typing                              | dropped     |
  * | chat      | chat.send_message                        | refused with CHAT_MESSAGE_NOT_SENT (retryable); closed only far above a human rate |
  * | control   | everything else (lists, invites, scene, safety) | socket closed with 4429 |
@@ -21,8 +21,10 @@
  *
  * Motion admission only counts the window: the server's handleMovement keeps
  * one step in flight per socket and replaces a pending step with the latest,
- * so a step is never dropped for being busy. Delivery acks are cumulative, so
- * the next one covers a dropped one.
+ * so a step is never dropped for being busy. Delivery acks likewise only count
+ * the arrival window: deliveryAckQueue keeps the newest ack of each thread and
+ * processes them one at a time per socket, paced per user, so a burst of acks
+ * for many threads is never cut after the second (2026-10-01).
  */
 export const REALTIME_EVENT_WINDOW_MS = 10_000
 
@@ -46,7 +48,10 @@ interface ClassLimits {
 export const REALTIME_EVENT_LIMITS: Readonly<Record<RealtimeEventClass, ClassLimits>> = Object.freeze({
   motion: { userWindow: 60, connectionInFlight: 2, userInFlight: 4 },
   transient: { userWindow: 30, connectionInFlight: 2, userInFlight: 4 },
-  receipt: { userWindow: 30, connectionInFlight: 2, userInFlight: 4 },
+  // Arrival guard only; processing is paced by deliveryAckQueue (30 per user
+  // window, newest ack per thread kept). A phone sends at most one ack per
+  // thread per flush, far below this.
+  receipt: { userWindow: 300, connectionInFlight: 2, userInFlight: 4 },
   // A dropped typing hint lapses on the phone within 6 s.
   typing: { userWindow: 20, connectionInFlight: 2, userInFlight: 4 },
   // 3 messages per second sustained is far above typing speed; a burst of

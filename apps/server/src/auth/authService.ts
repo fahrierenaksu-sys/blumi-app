@@ -166,6 +166,12 @@ export interface AuthService {
    * refresh-token reuse (family revocation) has committed.
    */
   subscribeRealtimeAccessRevocations(listener: RealtimeAccessRevocationListener): () => void
+  /**
+   * Fires after refresh-token reuse revoked a session family (committed), with
+   * the affected user id. The server revokes the bound Firebase user's refresh
+   * tokens on it (firebaseSessionRevocation.ts).
+   */
+  subscribeSessionReuse(listener: (userId: string) => void): () => void
 }
 
 export interface AccountDataExport {
@@ -209,6 +215,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
   const accountDeletionHandlers = options.accountDeletionHandlers ?? []
   const accountDataExporter = options.accountDataExporter ?? createEmptyAccountDataExporter()
   const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
+  const sessionReuseListeners = new Set<(userId: string) => void>()
 
   async function requestAccountActionChallenge(input: {
     account: AccountRecord
@@ -858,6 +865,13 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       if (rotation.kind === "reuse_detected") {
         // The family was deleted in the same transaction; drop live sockets.
         realtimeAccessRevocations.publish({ kind: "user", userId: rotation.userId })
+        for (const listener of [...sessionReuseListeners]) {
+          try {
+            listener(rotation.userId)
+          } catch {
+            // A listener failure must not undo the committed family revocation.
+          }
+        }
         return null
       }
       if (rotation.kind !== "rotated") return null
@@ -886,6 +900,10 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
     subscribeRealtimeAccessRevocations(listener) {
       return realtimeAccessRevocations.subscribeRealtimeAccessRevocations(listener)
+    },
+    subscribeSessionReuse(listener) {
+      sessionReuseListeners.add(listener)
+      return () => { sessionReuseListeners.delete(listener) }
     },
 
     async requestAccountDeletionChallenge(sessionToken, now = new Date()) {

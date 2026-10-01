@@ -21,11 +21,9 @@ test("reduced motion makes decorative room motion instant or static", () => {
   assert.deepEqual(resolveMiniRoomMotionPolicy(true), {
     animateBreathe: false,
     animateJoin: false,
-    animateHeart: false,
     animateSpeaking: false,
     animateBubble: false,
-    animateWalking: true,
-    transitionDuration: 0
+    animateWalking: true
   })
 })
 
@@ -33,10 +31,8 @@ test("the default room policy retains tasteful motion", () => {
   assert.deepEqual(resolveMiniRoomMotionPolicy(false), {
     animateBreathe: true,
     animateJoin: true,
-    animateHeart: true,
     animateSpeaking: true,
     animateBubble: true,
-    animateWalking: true,
-    transitionDuration: 420
+    animateWalking: true
   })
 })

@@ -102,7 +102,11 @@ export interface SafetyRepository {
       resolvedByTokenId: string
       suspendedUntil?: string
     }
-  ): Promise<"resolved" | "not_found" | "conflict">
+  ): Promise<"resolved" | "not_found" | "conflict" | "reported_account_missing">
+  // "reported_account_missing": a suspend/ban of a report whose account was
+  // deleted (PostgreSQL, where accounts live in the same database). The
+  // report stays pending. The in-memory store has no accounts; the service
+  // checks `isKnownUser` first.
 }
 
 export interface InMemorySafetyStore {
