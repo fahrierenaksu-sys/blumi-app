@@ -85,6 +85,8 @@ interface MiniRoomAvatarMotionDriver {
 interface MoveOptions {
   hotspot?: RoomHotspot
   roomWorldHotspot?: ReturnType<typeof createRoomWorldHotspotsFromRoomV2Scene>[number]
+  /** Plan without the other avatar: a partner step this phone could not route. */
+  ignoreOccupants?: boolean
 }
 
 export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRoomStore {
@@ -140,6 +142,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     motionDrivers.set(avatar.userId, driver)
     return driver
   }, [motionDrivers])
+  const [sceneEpoch, setSceneEpoch] = useState(0)
   const [bubbles, setBubbles] = useState<SpeechBubble[]>([])
   const [pressedPoint, setPressedPoint] = useState<RoomPoint | undefined>()
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | undefined>()
@@ -174,6 +177,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     for (const avatar of Object.values(nextAvatars)) {
       snapMiniRoomAvatarPosition(getMotionDriver(avatar).position, avatar)
     }
+    // Fresh avatars stand at spawn; room motion re-places them from the latest
+    // authoritative records when this changes.
+    setSceneEpoch((epoch) => epoch + 1)
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     bubbleTimerRef.current = null
     speechQueueRef.current = createMiniRoomSpeechQueue()
@@ -228,7 +234,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         ...committedLocalAvatar,
         ...readMiniRoomAvatarPosition(motionDriver.position)
       }
-      const occupants = createMiniRoomOccupants(currentAvatars)
+      const occupants = options?.ignoreOccupants ? [] : createMiniRoomOccupants(currentAvatars)
       const seatHotspot = options?.roomWorldHotspot?.kind === "seat"
         ? options.roomWorldHotspot
         : undefined
@@ -457,21 +463,40 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const applyRemoteAvatar = useCallback((next: import("@blumi/contracts").MiniRoomAvatarMotion, snap = false) => {
     const avatar = avatarsRef.current[next.userId]
     if (!avatar) return
-    if (snap || !next.present) {
-      cancelActiveMiniRoomMovement(movementRefFor(next.userId), cancelMiniRoomMovementRun)
-      const driver = getMotionDriver(avatar)
-      const position = snap ? resolveRoomWorldInteractiveTarget({ geometry, target: next }) ?? next
-        : readMiniRoomAvatarPosition(driver.position)
+    const hotspot = next.hotspotId ? hotspots.find(h => h.id === next.hotspotId) : undefined
+    const roomWorldHotspot = next.hotspotId ? roomWorldHotspots.find(h => h.id === next.hotspotId) : undefined
+    if (!snap && next.present) {
+      setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId], present: true } }))
+      const options = hotspot ? { hotspot, roomWorldHotspot } : undefined
+      // This phone plans around its own view of the other avatar, which can
+      // differ from the sender's for a moment. Never leave the partner behind:
+      // route without that occupant, and failing that, place it at the target.
+      if (runMovement(next.userId, next, options) ||
+        runMovement(next.userId, next, { ...options, ignoreOccupants: true })) return
+    }
+    cancelActiveMiniRoomMovement(movementRefFor(next.userId), cancelMiniRoomMovementRun)
+    const driver = getMotionDriver(avatar)
+    if (!snap && !next.present) {
+      // Absent: freeze where it is on screen, dimmed, until it returns.
+      const position = readMiniRoomAvatarPosition(driver.position)
       snapMiniRoomAvatarPosition(driver.position, position)
       setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
         x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
-        seatedHotspotId: undefined, present: next.present } }))
+        seatedHotspotId: undefined, present: false } }))
       return
     }
-    setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId], present: true } }))
-    const hotspot = hotspots.find(h => h.id === next.hotspotId)
-    const roomWorldHotspot = roomWorldHotspots.find(h => h.id === next.hotspotId)
-    runMovement(next.userId, next, hotspot ? { hotspot, roomWorldHotspot } : undefined)
+    // Place exactly: seated on its seat when the record carries one, as the
+    // sender's phone shows it, otherwise at the nearest walkable point.
+    const facing = hotspot?.facingOnArrival ?? avatar.facing
+    const seated = hotspot?.kind === "seat" &&
+      canMiniRoomAvatarUseMotion({ appearance: avatar.appearance, motion: "sitting", facing })
+    const position = seated ? { x: hotspot.x, y: hotspot.y }
+      : resolveRoomWorldInteractiveTarget({ geometry, target: next }) ?? next
+    snapMiniRoomAvatarPosition(driver.position, position)
+    setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
+      x: position.x, y: position.y, targetX: undefined, targetY: undefined,
+      motion: seated ? "sitting" : "idle", ...(seated ? { facing } : {}),
+      seatedHotspotId: seated ? hotspot.id : undefined, present: next.present } }))
   }, [geometry, getMotionDriver, hotspots, movementRefFor, roomWorldHotspots, runMovement])
 
   const setRemotePresence = useCallback((userId: string, present: boolean) => {
@@ -662,6 +687,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     hotspots,
     avatars,
     avatarPositions,
+    sceneEpoch,
     bubbles,
     interaction,
     moveLocalAvatar,

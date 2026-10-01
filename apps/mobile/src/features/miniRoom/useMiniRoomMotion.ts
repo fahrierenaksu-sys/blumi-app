@@ -6,18 +6,20 @@ import { createMiniRoomMotionSession, type MiniRoomMotionState } from "./miniRoo
 export function useMiniRoomMotion(input: {
   miniRoomId: string; localUserId: string; partnerUserId: string; enabled: boolean; isFocused: boolean
 }) {
-  const [state, setState] = useState<MiniRoomMotionState>({ avatars: [], snap: false, partnerPresent: false })
+  const [state, setState] = useState<MiniRoomMotionState>({ avatars: [], snapKey: 0, partnerPresent: false })
   const sessionRef = useRef<ReturnType<typeof createMiniRoomMotionSession> | null>(null)
   const { miniRoomId, localUserId, partnerUserId, enabled, isFocused } = input
   useEffect(() => {
-    setState({ avatars: [], snap: false, partnerPresent: false })
+    setState({ avatars: [], snapKey: 0, partnerPresent: false })
     if (!enabled || !isFocused) return
     const session = createMiniRoomMotionSession({ miniRoomId, localUserId, partnerUserId,
       send: sendGlobal, update: setState })
     sessionRef.current = session
     let joined = false
     const sync = () => {
-      const visible = getGlobalStatus() === "connected" && AppState.currentState === "active"
+      // "inactive" (Control Centre, notification shade, a system prompt) keeps the
+      // socket open, so it keeps the scene too; only the background leaves it.
+      const visible = getGlobalStatus() === "connected" && AppState.currentState !== "background"
       if (visible && !joined) { joined = true; session.connect() }
       else if (!visible && joined) { joined = false; session.leave() }
     }

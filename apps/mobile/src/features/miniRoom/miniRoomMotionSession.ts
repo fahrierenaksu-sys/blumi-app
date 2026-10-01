@@ -1,10 +1,21 @@
 import type { ClientEvent, MiniRoomAvatarMotion, ServerEvent } from "@blumi/contracts"
 
 export interface MiniRoomMotionState {
+  /**
+   * Latest authoritative record of every participant (empty until the scene is
+   * joined). Always complete, so React rendering only the last of several
+   * updates in a burst can never lose a step.
+   */
   avatars: MiniRoomAvatarMotion[]
-  snap: boolean
+  /** A new value for each join snapshot: the scene then places both avatars exactly. */
+  snapKey: number
   partnerPresent: boolean
 }
+
+const RETARGET_INTERVAL_MS = 200
+/** An unanswered scene entry is sent again; without its snapshot the avatar cannot walk. */
+const SCENE_ENTER_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 15_000] as const
+let lastSnapKey = 0
 
 /** Target changes only, never animation frames. First target has no debounce. */
 export function createMiniRoomMotionSession(input: {
@@ -18,11 +29,24 @@ export function createMiniRoomMotionSession(input: {
   const now = input.now ?? Date.now
   const schedule = input.schedule ?? setTimeout
   const cancel = input.cancel ?? clearTimeout
-  let ready = false, sequence = 0, epoch: string | null = null, lastSent = -Infinity
+  let active = false, ready = false, sequence = 0, epoch: string | null = null, lastSent = -Infinity
+  let snapKey = 0, enterAttempts = 0
   let timer: ReturnType<typeof setTimeout> | undefined
+  let enterTimer: ReturnType<typeof setTimeout> | undefined
   let pending: { x: number; y: number; hotspotId?: string } | undefined
   const avatars = new Map<string, MiniRoomAvatarMotion>()
   const clearPending = () => { if (timer !== undefined) cancel(timer); timer = undefined; pending = undefined }
+  const clearEnterRetry = () => { if (enterTimer !== undefined) cancel(enterTimer); enterTimer = undefined }
+  const publish = () => input.update({ avatars: [...avatars.values()], snapKey,
+    partnerPresent: avatars.get(input.partnerUserId)?.present ?? false })
+  const enter = () => {
+    input.send({ type: "mini_room.scene_enter", payload: { miniRoomId: input.miniRoomId } })
+    const delay = SCENE_ENTER_RETRY_DELAYS_MS[Math.min(enterAttempts++, SCENE_ENTER_RETRY_DELAYS_MS.length - 1)]
+    enterTimer = schedule(() => {
+      enterTimer = undefined
+      if (active && !ready) enter()
+    }, delay)
+  }
   const flush = () => {
     timer = undefined
     if (!ready || !pending) return
@@ -32,12 +56,13 @@ export function createMiniRoomMotionSession(input: {
   }
   return {
     connect() {
-      clearPending(); ready = false; epoch = null; avatars.clear(); sequence = 0; lastSent = -Infinity
-      input.send({ type: "mini_room.scene_enter", payload: { miniRoomId: input.miniRoomId } })
+      clearPending(); clearEnterRetry()
+      active = true; ready = false; epoch = null; avatars.clear(); sequence = 0; lastSent = -Infinity; enterAttempts = 0
+      enter()
     },
     disconnect() {
-      clearPending(); ready = false
-      input.update({ avatars: [], snap: false, partnerPresent: false })
+      clearPending(); clearEnterRetry(); active = false; ready = false
+      input.update({ avatars: [], snapKey, partnerPresent: false })
     },
     leave() {
       this.disconnect()
@@ -46,28 +71,39 @@ export function createMiniRoomMotionSession(input: {
     move(point: { x: number; y: number }, hotspotId?: string) {
       if (!ready) return false
       pending = { ...point, ...(hotspotId ? { hotspotId } : {}) }
-      const delay = Math.max(0, 200 - (now() - lastSent))
+      const delay = Math.max(0, RETARGET_INTERVAL_MS - (now() - lastSent))
       if (delay === 0) { if (timer !== undefined) cancel(timer); flush() }
       else if (timer === undefined) timer = schedule(flush, delay)
       return true
     },
     receive(event: ServerEvent) {
+      if (!active) return
       if (event.type !== "mini_room.motion_snapshot" && event.type !== "mini_room.avatar_moved") return
       const payload = event.payload
       if (payload.miniRoomId !== input.miniRoomId ||
         !payload.participantUserIds.includes(input.localUserId) ||
         !payload.participantUserIds.includes(input.partnerUserId)) return
-      const initial = event.type === "mini_room.motion_snapshot" && epoch === null
-      if (!initial && payload.epoch !== epoch) return
-      if (initial) { epoch = payload.epoch; ready = true }
       const incoming = event.type === "mini_room.motion_snapshot" ? event.payload.avatars : [event.payload.avatar]
-      const changed = incoming.filter(avatar =>
-        payload.participantUserIds.includes(avatar.userId) &&
-        avatar.revision > (avatars.get(avatar.userId)?.revision ?? -1))
-      if (!changed.length) return
-      for (const avatar of changed) avatars.set(avatar.userId, avatar)
-      input.update({ avatars: changed, snap: initial,
-        partnerPresent: avatars.get(input.partnerUserId)?.present ?? false })
+      if (epoch === null) {
+        // Join on the snapshot that answers this socket's entry. An earlier one,
+        // caused by the partner, would start steps the server still ignores.
+        if (event.type !== "mini_room.motion_snapshot" ||
+          !incoming.some(avatar => avatar.userId === input.localUserId && avatar.present)) return
+        epoch = payload.epoch; ready = true; snapKey = ++lastSnapKey
+        clearEnterRetry()
+        for (const avatar of incoming) avatars.set(avatar.userId, avatar)
+        publish()
+        return
+      }
+      if (payload.epoch !== epoch) return
+      let changed = false
+      for (const avatar of incoming) {
+        if (!payload.participantUserIds.includes(avatar.userId) ||
+          avatar.revision <= (avatars.get(avatar.userId)?.revision ?? -1)) continue
+        avatars.set(avatar.userId, avatar)
+        changed = true
+      }
+      if (changed) publish()
     }
   }
 }
