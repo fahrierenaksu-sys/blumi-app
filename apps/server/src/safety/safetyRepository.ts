@@ -45,8 +45,126 @@ export interface PendingReportSummaryQuery {
 export type SaveReportAndBlockResult =
   | { kind: "created"; report: ReportRecord; block: BlockRecord }
   | { kind: "replayed"; report: ReportRecord; block: BlockRecord }
+  /** A more urgent reason was merged into the actor's pending report. */
+  | { kind: "escalated"; report: ReportRecord; block: BlockRecord }
   | { kind: "conflict" }
   | { kind: "limited" }
+
+/** The longest report note the service accepts; a merged note keeps to it. */
+export const REPORT_NOTE_MAX_LENGTH = 1000
+/**
+ * How long after a report was resolved a retry of the request that escalated
+ * it is still recognised as that request (mobile retries within seconds).
+ */
+export const ESCALATION_REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000
+/**
+ * Characters of a request note that must appear in the stored note for the
+ * stored row to answer that request. A merged note may truncate a long note,
+ * but always keeps far more than this of each part.
+ */
+const NOTE_MATCH_PREFIX_LENGTH = 200
+const PREVIOUS_REASON_PREFIX = "[Önceki sebep / previous reason: "
+const PREVIOUS_REASON_PATTERN = /^\[Önceki sebep \/ previous reason: ([a-z_]+)\] ?/
+
+/**
+ * The change a repeat report makes to the actor's pending report on the same
+ * person, or null when it collapses into it unchanged. A more urgent reason
+ * (lower moderation risk rank) replaces the pending reason so the report
+ * moves to the faster queue. The note keeps the replaced reason visible to
+ * moderators as a "[Önceki sebep / previous reason: …]" prefix, then the
+ * pending note, then the new note, bounded to REPORT_NOTE_MAX_LENGTH. An
+ * exact, equally urgent or less urgent repeat changes nothing. The schema has
+ * no escalation trail yet (docs/quality/SAFETY_REPORT_ESCALATION_TRAIL_DESIGN_2026-10-01.md).
+ */
+export function pendingReportEscalation(
+  pending: Pick<ReportRecord, "reason" | "note">,
+  incoming: Pick<ReportRecord, "reason" | "note">
+): { reason: ReportReason; note: string } | null {
+  if (moderationRiskRank(incoming.reason) >= moderationRiskRank(pending.reason)) return null
+  const marker = `${PREVIOUS_REASON_PREFIX}${pending.reason}]`
+  const previous = pending.note ?? ""
+  const added = incoming.note && !previous.includes(incoming.note) ? incoming.note : ""
+  const separator = previous && added ? " / " : ""
+  const budget = REPORT_NOTE_MAX_LENGTH - marker.length - 1 - separator.length
+  let previousLength = previous.length
+  let addedLength = added.length
+  if (previousLength + addedLength > budget) {
+    const half = Math.floor(budget / 2)
+    if (previousLength <= half) addedLength = budget - previousLength
+    else if (addedLength <= half) previousLength = budget - addedLength
+    else {
+      previousLength = half
+      addedLength = budget - half
+    }
+  }
+  const body = `${truncateNote(previous, previousLength)}${separator}${truncateNote(added, addedLength)}`
+  return { reason: incoming.reason, note: body ? `${marker} ${body}` : marker }
+}
+
+/**
+ * The reasons a report has carried, newest first: its current reason, then
+ * each reason an escalation replaced. The last one is the original reason.
+ */
+function reportReasonTrail(report: Pick<ReportRecord, "reason" | "note">): ReportReason[] {
+  const trail: ReportReason[] = [report.reason]
+  let rest = report.note ?? ""
+  for (let match = PREVIOUS_REASON_PATTERN.exec(rest); match; match = PREVIOUS_REASON_PATTERN.exec(rest)) {
+    trail.push(match[1] as ReportReason)
+    rest = rest.slice(match[0].length)
+  }
+  return trail
+}
+
+function noteHolds(stored: string | undefined, note: string | undefined): boolean {
+  if (!note) return true
+  return (stored ?? "").includes(note.slice(0, NOTE_MATCH_PREFIX_LENGTH))
+}
+
+/**
+ * Whether the stored report found by a request's idempotency key still
+ * answers that request. An escalation may have made its reason more urgent
+ * and merged notes into it, so the request's reason must be the report's
+ * original reason and its note must still be held in the merged note.
+ */
+export function storedReportAnswersKeyedRequest(
+  stored: Pick<ReportRecord, "reportedUserId" | "reason" | "note">,
+  request: Pick<ReportRecord, "reportedUserId" | "reason" | "note">
+): boolean {
+  if (stored.reportedUserId !== request.reportedUserId) return false
+  if (moderationRiskRank(stored.reason) > moderationRiskRank(request.reason)) return false
+  const trail = reportReasonTrail(stored)
+  if (trail[trail.length - 1] !== request.reason) return false
+  return trail.length === 1 ? (stored.note ?? undefined) === (request.note ?? undefined) : noteHolds(stored.note, request.note)
+}
+
+/**
+ * Whether a keyed request whose key is not stored is a retry of the request
+ * that escalated this report: the schema keeps only the first request's key,
+ * so the escalating request is recognised by its target, by its reason being
+ * one the report was escalated to and by its note held in the merged note.
+ * A report resolved longer than ESCALATION_REPLAY_WINDOW_MS before the
+ * request is not matched, so a later report is filed as new.
+ */
+export function isEscalatingRequestRetry(
+  stored: ReportRecord,
+  request: Pick<ReportRecord, "actorUserId" | "reportedUserId" | "reason" | "note" | "idempotencyKey" | "createdAt">
+): boolean {
+  if (!request.idempotencyKey || stored.idempotencyKey === request.idempotencyKey) return false
+  if (stored.actorUserId !== request.actorUserId || stored.reportedUserId !== request.reportedUserId) return false
+  if (stored.status !== "pending") {
+    const resolvedAt = Date.parse(stored.resolution?.resolvedAt ?? "")
+    if (!Number.isFinite(resolvedAt) || Date.parse(request.createdAt) - resolvedAt > ESCALATION_REPLAY_WINDOW_MS) return false
+  }
+  const trail = reportReasonTrail(stored)
+  // Every reason but the original one was set by an escalating request.
+  if (!trail.slice(0, -1).includes(request.reason)) return false
+  return noteHolds(stored.note, request.note)
+}
+
+function truncateNote(note: string, length: number): string {
+  if (note.length <= length) return note
+  return length <= 0 ? "" : `${note.slice(0, length - 1)}…`
+}
 
 /** Caps how many reports one actor may create within a window. */
 export interface ReportCreationPolicy {
@@ -69,7 +187,6 @@ export interface SafetyRepository {
   ): Promise<string[]>
   findBlock(actorUserId: string, blockedUserId: string): Promise<BlockRecord | null>
   saveBlock(block: BlockRecord): Promise<void>
-  countBlocks(actorUserId: string): Promise<number>
   deleteBlock(actorUserId: string, blockedUserId: string): Promise<void>
   saveReport(report: ReportRecord): Promise<void>
   /**
@@ -162,11 +279,6 @@ export function createInMemorySafetyRepository(
     async deleteBlock(actorUserId, blockedUserId) {
       store.blocks.delete(blockKey(actorUserId, blockedUserId))
     },
-    async countBlocks(actorUserId) {
-      let count = 0
-      for (const block of store.blocks.values()) if (block.actorUserId === actorUserId) count += 1
-      return count
-    },
     async saveReport(report) {
       // Mirrors the PostgreSQL primary key: a report is never overwritten.
       if (store.reports.has(report.reportId)) {
@@ -182,7 +294,7 @@ export function createInMemorySafetyRepository(
             candidate.idempotencyKey === report.idempotencyKey
         )
         if (existing) {
-          if (!sameReportPayload(existing, report)) return { kind: "conflict" }
+          if (!storedReportAnswersKeyedRequest(existing, report)) return { kind: "conflict" }
           const existingBlock = store.blocks.get(
             blockKey(existing.actorUserId, existing.reportedUserId)
           )
@@ -204,6 +316,19 @@ export function createInMemorySafetyRepository(
           }
         }
       }
+      if (report.idempotencyKey) {
+        const escalated = [...store.reports.values()]
+          .filter((candidate) => candidate.actorUserId === report.actorUserId && candidate.reportedUserId === report.reportedUserId)
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+          .find((candidate) => isEscalatingRequestRetry(candidate, report))
+        if (escalated) {
+          const key = blockKey(escalated.actorUserId, escalated.reportedUserId)
+          if (!store.blocks.has(key)) {
+            store.blocks.set(key, { actorUserId: escalated.actorUserId, blockedUserId: escalated.reportedUserId, createdAt: block.createdAt })
+          }
+          return { kind: "escalated", report: cloneReport(escalated), block: { ...store.blocks.get(key)! } }
+        }
+      }
       const pending = [...store.reports.values()]
         .filter((candidate) =>
           candidate.actorUserId === report.actorUserId &&
@@ -215,7 +340,12 @@ export function createInMemorySafetyRepository(
         if (!store.blocks.has(key)) {
           store.blocks.set(key, { actorUserId: pending.actorUserId, blockedUserId: pending.reportedUserId, createdAt: block.createdAt })
         }
-        return { kind: "replayed", report: cloneReport(pending), block: { ...store.blocks.get(key)! } }
+        const escalation = pendingReportEscalation(pending, report)
+        if (!escalation) return { kind: "replayed", report: cloneReport(pending), block: { ...store.blocks.get(key)! } }
+        const { note: _previousNote, ...rest } = pending
+        const escalated: ReportRecord = { ...rest, ...escalation }
+        store.reports.set(pending.reportId, cloneReport(escalated))
+        return { kind: "escalated", report: cloneReport(escalated), block: { ...store.blocks.get(key)! } }
       }
       if (policy) {
         const since = Date.parse(policy.windowStartedAt)
@@ -327,12 +457,4 @@ function cloneReport(report: ReportRecord): ReportRecord {
     ...report,
     resolution: report.resolution ? { ...report.resolution } : undefined
   }
-}
-
-function sameReportPayload(left: ReportRecord, right: ReportRecord): boolean {
-  return (
-    left.reportedUserId === right.reportedUserId &&
-    left.reason === right.reason &&
-    (left.note ?? undefined) === (right.note ?? undefined)
-  )
 }

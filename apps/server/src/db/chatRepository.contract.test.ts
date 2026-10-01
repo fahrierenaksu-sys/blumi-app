@@ -82,9 +82,15 @@ runRepositoryContract<ChatRepository>({
         [first.message.messageId, otherSender.message.messageId])
       assert.equal((await backend.repository.findThread(chat.threadId))?.lastMessage?.messageId, otherSender.message.messageId)
 
-      const jobs = await backend.repository.claimDeliveries({ now: new Date("2100-01-01T00:00:00.000Z"), limit: 10, leaseMs: 1000 })
-      assert.deepEqual(jobs.map((job) => job.message.messageId).sort(),
-        [first.message.messageId, otherSender.message.messageId].sort(), "one outbox job per created message")
+      // One outbox job per created message; a thread's jobs are claimed in message order.
+      const claimAt = new Date("2100-01-01T00:00:00.000Z")
+      const ownJobs = async () => (await backend.repository.claimDeliveries({ now: claimAt, limit: 50, leaseMs: 1000 }))
+        .filter((job) => job.message.threadId === chat.threadId)
+      const jobs = await ownJobs()
+      assert.deepEqual(jobs.map((job) => job.message.messageId), [first.message.messageId])
+      await backend.repository.completeDelivery(first.message.messageId, jobs[0]!.leaseToken, claimAt)
+      const next = await ownJobs()
+      assert.deepEqual(next.map((job) => job.message.messageId), [otherSender.message.messageId])
     },
 
     "a late message never replaces a newer thread preview": async (backend) => {
@@ -239,6 +245,9 @@ runRepositoryContract<ChatRepository>({
       const chat = thread(backend, "read", "2026-10-01T10:00:00.000Z")
       const [sender, reader] = chat.participantUserIds
       await backend.repository.saveThread(chat)
+      // The reader shares read receipts, so reads by id store the receipt.
+      await backend.ensureUsers(sender, reader)
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
       const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
       const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
       const own = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", reader)
@@ -260,18 +269,92 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(await read({ upToMessageId: first.messageId }), { readAt: second.sentAt }, "never backwards")
       assert.equal(await read({ upToMessageId: own.messageId }), null, "a read cursor names a partner message")
       assert.equal(await read({ upToMessageId: "unknown_message" }), null)
-      // A read without a message covers the whole instant, even one already reached by id.
-      assert.deepEqual(await read({ readAt: second.sentAt }), {
-        readAt: second.sentAt,
-        readUpTo: { sentAt: second.sentAt }
-      })
-      assert.deepEqual(await read({ readAt: second.sentAt }), { readAt: second.sentAt })
       assert.deepEqual(await read({ readAt: "2026-10-01T09:00:00.000Z" }), { readAt: second.sentAt })
       assert.equal(await unread(), 0)
       assert.equal(await read({ readAt: second.sentAt }, backend.id("stranger")), null)
 
       const rows = await backend.repository.listReceiptParticipants([chat.threadId])
-      assert.deepEqual(rows.find((row) => row.userId === reader)?.readUpTo, { sentAt: second.sentAt })
+      assert.deepEqual(rows.find((row) => row.userId === reader)?.readUpTo, { sentAt: second.sentAt, messageId: second.messageId })
+    },
+
+    "a read without a message clears unread counts but never moves or publishes the read receipt": async (backend) => {
+      const chat = thread(backend, "instant", "2026-10-01T10:00:00.000Z")
+      const [sender, reader] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      // The reader shares read receipts, so reads by id store the receipt.
+      await backend.ensureUsers(sender, reader)
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
+      const shown = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      await backend.repository.createMessage(shown)
+      const read = (target: { upToMessageId: string } | { readAt: string }) =>
+        backend.repository.advanceReadCursor({ threadId: chat.threadId, userId: reader, ...target })
+      const unread = async () => (await backend.repository.listThreads(reader))
+        .find((item) => item.threadId === chat.threadId)?.unreadCount
+      const receipt = async () => (await backend.repository.listReceiptParticipants([chat.threadId]))
+        .find((row) => row.userId === reader)?.readUpTo
+      assert.deepEqual(await read({ upToMessageId: shown.messageId }), {
+        readAt: shown.sentAt,
+        readUpTo: { sentAt: shown.sentAt, messageId: shown.messageId }
+      })
+
+      // sent_at is taken before the insert commits: this message carries a
+      // time before the instant read below but becomes visible only after it.
+      const late = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      assert.deepEqual(await read({ readAt: "2026-10-01T10:03:00.000Z" }), { readAt: "2026-10-01T10:03:00.000Z" },
+        "an instant read publishes no read receipt")
+      await backend.repository.createMessage(late)
+      assert.equal(await unread(), 0, "legacy clients still clear their unread count")
+      assert.deepEqual(await receipt(), { sentAt: shown.sentAt, messageId: shown.messageId },
+        "the partner never sees the late message as read")
+
+      // Reading the late message by id once it is shown moves the receipt,
+      // although the unread cursor is already past it.
+      assert.deepEqual(await read({ upToMessageId: late.messageId }), {
+        readAt: "2026-10-01T10:03:00.000Z",
+        readUpTo: { sentAt: late.sentAt, messageId: late.messageId }
+      })
+      assert.deepEqual(await read({ upToMessageId: late.messageId }), { readAt: "2026-10-01T10:03:00.000Z" })
+      assert.deepEqual(await receipt(), { sentAt: late.sentAt, messageId: late.messageId })
+    },
+
+    "a read while the reader has read receipts off clears unread counts but stores no read receipt": async (backend) => {
+      // Owner decision 2026-10-01 (RECEIPTS_PRIVACY_DESIGN option A): reads
+      // made while receipts are off are never stored, so turning receipts on
+      // later can never reveal them.
+      const [sender, reader] = [backend.id("sender"), backend.id("reader")]
+      await backend.ensureUsers(sender, reader)
+      const chat = thread(backend, "private_read", "2026-10-01T10:00:00.000Z", [sender, reader])
+      await backend.repository.saveThread(chat)
+      const first = message(chat, "m1", "2026-10-01T10:01:00.000Z", "one", sender)
+      const second = message(chat, "m2", "2026-10-01T10:02:00.000Z", "two", sender)
+      for (const item of [first, second]) await backend.repository.createMessage(item)
+      const read = (upToMessageId: string) =>
+        backend.repository.advanceReadCursor({ threadId: chat.threadId, userId: reader, upToMessageId })
+      const unread = async () => (await backend.repository.listThreads(reader))
+        .find((item) => item.threadId === chat.threadId)?.unreadCount
+      const receipt = async () => (await backend.repository.listReceiptParticipants([chat.threadId]))
+        .find((row) => row.userId === reader)?.readUpTo
+
+      assert.deepEqual(await read(first.messageId), { readAt: first.sentAt })
+      assert.equal(await unread(), 1)
+      assert.deepEqual(await read(second.messageId), { readAt: second.sentAt })
+      assert.equal(await unread(), 0)
+      assert.equal(await receipt(), undefined, "nothing is stored while receipts are off")
+
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: true }, new Date())
+      assert.equal(await receipt(), undefined, "turning receipts on reveals no earlier read")
+      assert.deepEqual(await read(second.messageId), {
+        readAt: second.sentAt,
+        readUpTo: { sentAt: second.sentAt, messageId: second.messageId }
+      }, "the next read of a shown message stores the receipt")
+
+      await backend.repository.saveChatPreferences(reader, { readReceiptsEnabled: false }, new Date())
+      const third = message(chat, "m3", "2026-10-01T10:03:00.000Z", "three", sender)
+      await backend.repository.createMessage(third)
+      assert.deepEqual(await read(third.messageId), { readAt: third.sentAt })
+      assert.equal(await unread(), 0)
+      assert.deepEqual(await receipt(), { sentAt: second.sentAt, messageId: second.messageId },
+        "a read while off again does not move the receipt")
     },
 
     "chat preferences default to read receipts off and are saved per account": async (backend) => {
@@ -291,6 +374,45 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(await backend.repository.saveChatPreferences(ada, { readReceiptsEnabled: false }, new Date()), { readReceiptsEnabled: false })
       assert.deepEqual(await backend.repository.getChatPreferences(ada), { readReceiptsEnabled: false })
       assert.deepEqual(await backend.repository.listReceiptParticipants([]), [])
+    },
+
+    "a claim takes only the oldest undelivered job of each thread, so a retried job holds its thread back": async (backend) => {
+      const chat = thread(backend, "claim_order", "2026-09-30T10:00:00.000Z")
+      const other = thread(backend, "claim_other", "2026-09-30T10:00:00.000Z", [backend.id("user_c"), backend.id("user_d")])
+      await backend.repository.saveThread(chat)
+      await backend.repository.saveThread(other)
+      const first = message(chat, "m1", "2026-09-30T10:01:00.000Z")
+      const second = message(chat, "m2", "2026-09-30T10:02:00.000Z")
+      const third = message(chat, "m3", "2026-09-30T10:03:00.000Z")
+      const elsewhere = message(other, "n1", "2026-09-30T10:01:00.000Z")
+      // The second message's job is written first, so it is the oldest by availability.
+      for (const value of [second, first, third, elsewhere]) await backend.repository.createMessage(value)
+      const ids = new Set([first, second, third, elsewhere].map((value) => value.messageId))
+      const startedAt = Date.now()
+      const claim = async (afterMs: number, messageId?: string) =>
+        (await backend.repository.claimDeliveries({ now: new Date(startedAt + afterMs), limit: 50, leaseMs: 1000, messageId }))
+          .filter((job) => ids.has(job.message.messageId))
+      const sortedIds = (jobs: readonly { message: ChatMessage }[]) => jobs.map((job) => job.message.messageId).sort()
+
+      const firstClaim = await claim(1_000)
+      assert.deepEqual(sortedIds(firstClaim), [first.messageId, elsewhere.messageId].sort())
+      assert.deepEqual(await claim(1_000, second.messageId), [], "a targeted claim also waits for the earlier message")
+
+      // The first message's dispatch fails: in retry backoff it still holds its thread back.
+      const firstJob = firstClaim.find((job) => job.message.messageId === first.messageId)!
+      const elsewhereJob = firstClaim.find((job) => job.message.messageId === elsewhere.messageId)!
+      await backend.repository.retryDelivery(first.messageId, firstJob.leaseToken, new Date(startedAt + 60_000))
+      await backend.repository.completeDelivery(elsewhere.messageId, elsewhereJob.leaseToken, new Date())
+      assert.deepEqual(await claim(5_000), [], "later messages wait while the first is in backoff")
+      assert.deepEqual(await claim(5_000, third.messageId), [])
+
+      const retried = await claim(61_000)
+      assert.deepEqual(sortedIds(retried), [first.messageId])
+      await backend.repository.completeDelivery(first.messageId, retried[0]!.leaseToken, new Date())
+      const next = await claim(63_000)
+      assert.deepEqual(sortedIds(next), [second.messageId])
+      await backend.repository.completeDelivery(second.messageId, next[0]!.leaseToken, new Date())
+      assert.deepEqual(sortedIds(await claim(65_000, third.messageId)), [third.messageId])
     }
   }
 })

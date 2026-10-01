@@ -1,10 +1,31 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { DatabaseError } from "pg"
 import { classifyDatabaseError } from "./databaseErrorStatus"
+import { safeOperationalErrorKind } from "./safeErrorLog"
 
+// The shape node-postgres 8.23 really throws: pg-protocol constructs
+// DatabaseError(message, length, "error"), so error.name is "error".
 function pgError(code: string): Error {
-  return Object.assign(new Error("duplicate key value violates unique constraint \"x\" (phone)"), { name: "DatabaseError", code })
+  const error = new DatabaseError("duplicate key value violates unique constraint \"x\" (phone)", 0, "error")
+  error.code = code
+  error.severity = "ERROR"
+  return error
 }
+
+test("a real node-postgres error is recognised by class, not by its name", () => {
+  const error = pgError("23505")
+  assert.equal(error.name, "error")
+  assert.deepEqual(classifyDatabaseError(error), { statusCode: 409, sqlState: "23505" })
+  assert.equal(safeOperationalErrorKind(error), "DatabaseError")
+})
+
+test("a server error from another copy of the driver is recognised by severity and SQLSTATE", () => {
+  const duplicate = Object.assign(new Error("x"), { name: "error", severity: "ERROR", code: "40P01" })
+  assert.deepEqual(classifyDatabaseError(duplicate), { statusCode: 503, sqlState: "40P01", retryAfterSeconds: 1 })
+  // No severity: an application error that happens to carry a 5-char code.
+  assert.equal(classifyDatabaseError(Object.assign(new Error("x"), { code: "23505" })), null)
+})
 
 test("constraint races map to 409 and transient database states to 503 with a retry hint", () => {
   assert.deepEqual(classifyDatabaseError(pgError("23505")), { statusCode: 409, sqlState: "23505" })

@@ -267,7 +267,7 @@ export function createChatService(
         case "created":
           return { kind: "sent", message: result.message, created: true,
             members: { threadId, participantUserIds: result.participantUserIds },
-            job: result.job, recipientPersonas: result.recipientPersonas }
+            ...(result.job ? { job: result.job } : {}), recipientPersonas: result.recipientPersonas }
       }
     },
     async createThread(input, now = new Date()) {

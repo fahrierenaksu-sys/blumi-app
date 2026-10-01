@@ -1,12 +1,16 @@
 import type { QueryResultRow } from "pg"
 import { REPORT_REASONS } from "@blumi/contracts"
 import { moderationRiskRank } from "../safety/moderationQueue"
-import type {
-  BlockRecord,
-  PendingReportReasonSummary,
-  ReportRecord,
-  SaveReportAndBlockResult,
-  SafetyRepository
+import {
+  ESCALATION_REPLAY_WINDOW_MS,
+  isEscalatingRequestRetry,
+  pendingReportEscalation,
+  storedReportAnswersKeyedRequest,
+  type BlockRecord,
+  type PendingReportReasonSummary,
+  type ReportRecord,
+  type SaveReportAndBlockResult,
+  type SafetyRepository
 } from "../safety/safetyRepository"
 
 interface QueryExecutor {
@@ -93,15 +97,6 @@ export function createPostgresSafetyRepository(
       )
     },
 
-    async countBlocks(actorUserId) {
-      // blumi_safety_blocks_actor_created_at_idx
-      const result = await pool.query(
-        "SELECT count(*)::int AS block_count FROM blumi_safety_blocks WHERE actor_user_id = $1",
-        [actorUserId]
-      )
-      return Number(result.rows[0]?.block_count ?? 0)
-    },
-
     async saveReport(report) {
       await pool.query(
         `INSERT INTO blumi_safety_reports (
@@ -142,7 +137,7 @@ export function createPostgresSafetyRepository(
           )
           if (existing.rows[0]) {
             const replay = mapReport(existing.rows[0])
-            if (!sameReportPayload(replay, report)) {
+            if (!storedReportAnswersKeyedRequest(replay, report)) {
               if (client) await executor.query("COMMIT")
               return { kind: "conflict" } as SaveReportAndBlockResult
             }
@@ -159,6 +154,34 @@ export function createPostgresSafetyRepository(
             } as SaveReportAndBlockResult
           }
         }
+        if (report.idempotencyKey) {
+          // The schema keeps only the first request's key, so a retry of a
+          // request that escalated a report is recognised by its content.
+          // Only reports still pending or resolved within the replay window
+          // can match; blumi_safety_reports_actor_created_at_idx serves it.
+          const candidates = await executor.query(
+            `SELECT report_id, actor_user_id, reported_user_id, reason, note,
+                    idempotency_key, created_at, status, resolution_action,
+                    resolution_note, resolved_at, resolved_by_admin_id,
+                    resolved_by_token_id, resolution_suspended_until
+               FROM blumi_safety_reports
+              WHERE actor_user_id = $1 AND reported_user_id = $2
+                AND (status = 'pending' OR resolved_at >= $3)
+              ORDER BY created_at DESC, report_id DESC
+              LIMIT 20`,
+            [
+              report.actorUserId,
+              report.reportedUserId,
+              new Date(Date.parse(report.createdAt) - ESCALATION_REPLAY_WINDOW_MS)
+            ]
+          )
+          const escalated = candidates.rows.map(mapReport).find((candidate) => isEscalatingRequestRetry(candidate, report))
+          if (escalated) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "escalated", report: escalated, block: savedBlock } as SaveReportAndBlockResult
+          }
+        }
         // blumi_safety_reports_actor_created_at_idx serves both reads.
         const pending = await executor.query(
           `SELECT report_id, actor_user_id, reported_user_id, reason, note,
@@ -173,9 +196,30 @@ export function createPostgresSafetyRepository(
         )
         if (pending.rows[0]) {
           const existing = mapReport(pending.rows[0])
-          const savedBlock = await ensureBlock(executor, block)
-          if (client) await executor.query("COMMIT")
-          return { kind: "replayed", report: existing, block: savedBlock } as SaveReportAndBlockResult
+          const escalation = pendingReportEscalation(existing, report)
+          if (!escalation) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "replayed", report: existing, block: savedBlock } as SaveReportAndBlockResult
+          }
+          // An admin may have resolved it since the read (the actor lock does
+          // not cover resolution): then nothing is updated and the repeat is
+          // filed as a new report below.
+          const updated = await executor.query(
+            `UPDATE blumi_safety_reports
+                SET reason = $2, note = $3
+              WHERE report_id = $1 AND status = 'pending'
+          RETURNING report_id, actor_user_id, reported_user_id, reason, note,
+                    idempotency_key, created_at, status, resolution_action,
+                    resolution_note, resolved_at, resolved_by_admin_id,
+                    resolved_by_token_id, resolution_suspended_until`,
+            [existing.reportId, escalation.reason, escalation.note ?? null]
+          )
+          if (updated.rows[0]) {
+            const savedBlock = await ensureBlock(executor, block)
+            if (client) await executor.query("COMMIT")
+            return { kind: "escalated", report: mapReport(updated.rows[0]), block: savedBlock } as SaveReportAndBlockResult
+          }
         }
         if (policy) {
           const recent = await executor.query(
@@ -493,12 +537,4 @@ async function ensureBlock(
     blocked_user_id: block.blockedUserId,
     created_at: block.createdAt
   })
-}
-
-function sameReportPayload(left: ReportRecord, right: ReportRecord): boolean {
-  return (
-    left.reportedUserId === right.reportedUserId &&
-    left.reason === right.reason &&
-    (left.note ?? undefined) === (right.note ?? undefined)
-  )
 }

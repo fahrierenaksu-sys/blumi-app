@@ -43,6 +43,22 @@ test("each read names the newest partner message the screen showed (the read rec
   f.runtime.unmount()
 })
 
+test("no read is sent until a partner message is on screen, so the server never marks unseen messages read", () => {
+  const g = mount()
+  const before = g.readCursors.length
+  g.render({ resolvedThreadId: "thread-b", latestIncomingMessageId: undefined })
+  g.state("background")
+  g.state("active")
+  g.flush()
+  assert.equal(g.readCursors.length, before, "entering or resuming an empty or loading chat sends no read")
+  assert.equal(g.active.at(-1), "thread-b", "focus still flags the thread active, which clears its local badge")
+  assert.ok(g.readCursors.every((cursor) => cursor !== undefined), "every read names a message")
+  g.render({ latestIncomingMessageId: "first-shown" })
+  g.flush()
+  assert.equal(g.readCursors.at(-1), "first-shown")
+  g.runtime.unmount()
+})
+
 test("partner message bursts debounce server read updates while the chat is visible", () => {
   const f = mount()
   assert.deepEqual(f.reads, ["thread-a"])

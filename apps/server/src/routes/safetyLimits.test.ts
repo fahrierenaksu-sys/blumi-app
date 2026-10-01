@@ -31,9 +31,43 @@ test("reports and blocks refuse people who do not exist", async () => {
       payload: { reportedUserId: target.userId, reason: "spam" } })
     assert.equal(report.statusCode, 201)
     const duplicate = await app.inject({ method: "POST", url: "/v1/safety/reports", headers: reporter.headers,
-      payload: { reportedUserId: target.userId, reason: "harassment" } })
+      payload: { reportedUserId: target.userId, reason: "spam" } })
     assert.equal(duplicate.statusCode, 200, "a pending report on the same person is answered, not duplicated")
     assert.equal(duplicate.json().report.reportId, report.json().report.reportId)
+    const escalated = await app.inject({ method: "POST", url: "/v1/safety/reports", headers: reporter.headers,
+      payload: { reportedUserId: target.userId, reason: "underage" } })
+    assert.equal(escalated.statusCode, 201, "a more urgent reason is accepted into the pending report")
+    assert.equal(escalated.json().report.reportId, report.json().report.reportId)
+    assert.equal(escalated.json().report.reason, "underage")
+  } finally {
+    await app.close()
+  }
+})
+
+test("keyed retries after an escalation get their original answers, not a 409", async () => {
+  const authService = createAuthService({ codeFactory: () => "123456" })
+  const app = createServer({ authService })
+  try {
+    const reporter = await signedIn(authService, "+905551118011")
+    const target = await signedIn(authService, "+905551118012")
+    const send = (key: string, reason: string, note: string) => app.inject({
+      method: "POST", url: "/v1/safety/reports",
+      headers: { ...reporter.headers, "idempotency-key": key },
+      payload: { reportedUserId: target.userId, reason, note }
+    })
+    const first = await send("report-key-0001", "spam", "sends links")
+    assert.equal(first.statusCode, 201)
+    const escalation = await send("report-key-0002", "underage", "says 15")
+    assert.equal(escalation.statusCode, 201)
+    const firstRetry = await send("report-key-0001", "spam", "sends links")
+    assert.equal(firstRetry.statusCode, 200, "the original request replays")
+    const escalationRetry = await send("report-key-0002", "underage", "says 15")
+    assert.equal(escalationRetry.statusCode, 201, "the escalating request replays its own result")
+    for (const response of [firstRetry, escalationRetry]) {
+      assert.equal(response.json().report.reportId, first.json().report.reportId)
+      assert.equal(response.json().report.reason, "underage")
+    }
+    assert.equal((await send("report-key-0001", "spam", "changed")).statusCode, 409)
   } finally {
     await app.close()
   }

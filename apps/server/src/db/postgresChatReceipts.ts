@@ -1,4 +1,4 @@
-import type { ChatPreferences, ChatReceiptCursor } from "@blumi/contracts"
+import type { ChatPreferences } from "@blumi/contracts"
 import type { QueryResultRow } from "pg"
 import {
   DEFAULT_CHAT_PREFERENCES,
@@ -26,13 +26,9 @@ export function createPostgresChatReceipts(pool: QueryExecutor, schema: ChatRece
     supportsReceipts: () => schema.isReady(),
 
     async advanceReadCursor(input: { threadId: string; userId: string } & ChatReadTarget): Promise<ChatReadAdvance | null> {
-      const ready = await schema.isReady()
-      if (input.upToMessageId === undefined) {
-        return ready
-          ? readAtInstant(pool, input.threadId, input.userId, input.readAt)
-          : legacyReadAtInstant(pool, input.threadId, input.userId, input.readAt)
-      }
-      return ready
+      // Same SQL before and after 070: only the unread cursor moves.
+      if (input.upToMessageId === undefined) return readAtInstant(pool, input.threadId, input.userId, input.readAt)
+      return await schema.isReady()
         ? readUpToMessage(pool, input.threadId, input.userId, input.upToMessageId)
         : legacyReadUpToMessage(pool, input.threadId, input.userId, input.upToMessageId)
     },
@@ -77,9 +73,12 @@ export function createPostgresChatReceipts(pool: QueryExecutor, schema: ChatRece
       const result = await pool.query(
         `SELECT participant.thread_id, participant.user_id,
                 participant.last_delivered_at, participant.last_delivered_message_id,
-                participant.last_read_at, participant.last_read_message_id,
+                receipt.sent_at AS read_receipt_sent_at, receipt.message_id AS read_receipt_message_id,
                 COALESCE(preference.read_receipts_enabled, false) AS read_receipts_enabled
            FROM blumi_chat_thread_participants AS participant
+           LEFT JOIN blumi_chat_messages AS receipt
+             ON receipt.thread_id = participant.thread_id
+            AND receipt.message_id = participant.last_read_message_id
            LEFT JOIN blumi_chat_privacy_preferences AS preference
              ON preference.user_id = participant.user_id
           WHERE participant.thread_id = ANY($1::text[])
@@ -92,7 +91,11 @@ export function createPostgresChatReceipts(pool: QueryExecutor, schema: ChatRece
         ...(row.last_delivered_at && row.last_delivered_message_id
           ? { deliveredUpTo: { sentAt: toIso(row.last_delivered_at), messageId: String(row.last_delivered_message_id) } }
           : {}),
-        ...(row.last_read_at ? { readUpTo: readCursor(row.last_read_at, row.last_read_message_id) } : {}),
+        // The read receipt is the named message's own position, never
+        // last_read_at (which an instant read can move past unshown messages).
+        ...(row.read_receipt_message_id
+          ? { readUpTo: { sentAt: toIso(row.read_receipt_sent_at), messageId: String(row.read_receipt_message_id) } }
+          : {}),
         readReceiptsEnabled: row.read_receipts_enabled === true
       }))
     },
@@ -122,8 +125,15 @@ export function createPostgresChatReceipts(pool: QueryExecutor, schema: ChatRece
   }
 }
 
-/** Pre-070 read (unchanged semantics): the unread cursor only moves forward. */
-async function legacyReadAtInstant(pool: QueryExecutor, threadId: string, userId: string, readAt: string) {
+/**
+ * A read without a message (older app builds, or no partner message on
+ * screen) moves only the unread cursor, last_read_at. It never moves or
+ * publishes the read receipt: sent_at is assigned before a send commits, so
+ * an instant can cover a partner message that was not yet visible, let alone
+ * shown, and the partner would see a false read tick.
+ * Same SQL before and after 070.
+ */
+async function readAtInstant(pool: QueryExecutor, threadId: string, userId: string, readAt: string): Promise<ChatReadAdvance | null> {
   const result = await pool.query(
     `UPDATE blumi_chat_thread_participants
         SET last_read_at = GREATEST(last_read_at, $3::timestamptz)
@@ -154,72 +164,64 @@ async function legacyReadUpToMessage(pool: QueryExecutor, threadId: string, user
   return result.rows[0] ? { readAt: toIso(result.rows[0].last_read_at) } : null
 }
 
-/** A read without a message covers the whole instant: the message id is cleared. */
-async function readAtInstant(pool: QueryExecutor, threadId: string, userId: string, readAt: string): Promise<ChatReadAdvance | null> {
-  const result = await pool.query(
-    `WITH current AS (
-       SELECT last_read_at FROM blumi_chat_thread_participants
-        WHERE thread_id = $1 AND user_id = $2
-     ), advanced AS (
-       UPDATE blumi_chat_thread_participants AS participant
-          SET last_read_at = $3::timestamptz, last_read_message_id = NULL
-        WHERE participant.thread_id = $1 AND participant.user_id = $2
-          AND (participant.last_read_at IS NULL OR participant.last_read_at < $3::timestamptz OR
-               (participant.last_read_at = $3::timestamptz AND participant.last_read_message_id IS NOT NULL))
-       RETURNING participant.last_read_at
-     )
-     SELECT EXISTS (SELECT 1 FROM current) AS participant,
-            (SELECT last_read_at FROM advanced) AS advanced_at,
-            (SELECT last_read_at FROM current) AS current_at`,
-    [threadId, userId, new Date(readAt)]
-  )
-  const row = result.rows[0]
-  if (!row?.participant) return null
-  if (row.advanced_at) {
-    const sentAt = toIso(row.advanced_at)
-    return { readAt: sentAt, readUpTo: { sentAt } }
-  }
-  return { readAt: toIso(row.current_at) }
-}
-
+/**
+ * A read up to a shown partner message. The unread cursor moves to
+ * GREATEST(last_read_at, message time); the read receipt is the message named
+ * by last_read_message_id and moves only forward in (sent_at, message_id)
+ * order, compared with that message's own position. An instant read may have
+ * put last_read_at past a message that is read by id later; the receipt still
+ * advances to it. Both comparisons read the participant row being updated, so
+ * a concurrent read that committed first is re-checked (never moved back).
+ * While the reader has read receipts off, only the unread cursor moves: no
+ * receipt is stored, so turning receipts on later never reveals reads made
+ * while they were off (RECEIPTS_PRIVACY_DESIGN option A, owner decision
+ * 2026-10-01). A read racing a preference toggle uses the value its
+ * statement sees.
+ */
 async function readUpToMessage(pool: QueryExecutor, threadId: string, userId: string, messageId: string): Promise<ChatReadAdvance | null> {
+  const receiptMovesForward = `((SELECT shares FROM reader) AND (participant.last_read_message_id IS NULL OR NOT EXISTS (
+         SELECT 1 FROM blumi_chat_messages AS receipt
+          WHERE receipt.thread_id = participant.thread_id
+            AND receipt.message_id = participant.last_read_message_id
+            AND (receipt.sent_at, receipt.message_id) >= (target.sent_at, target.message_id))))`
   const result = await pool.query(
     `WITH target AS (
        SELECT sent_at, message_id FROM blumi_chat_messages
         WHERE thread_id = $1 AND message_id = $3 AND sender_user_id <> $2
+     ), reader AS (
+       SELECT COALESCE((SELECT read_receipts_enabled FROM blumi_chat_privacy_preferences
+                         WHERE user_id = $2), false) AS shares
      ), current AS (
-       SELECT last_read_at FROM blumi_chat_thread_participants
+       SELECT last_read_at, last_read_message_id FROM blumi_chat_thread_participants
         WHERE thread_id = $1 AND user_id = $2
      ), advanced AS (
        UPDATE blumi_chat_thread_participants AS participant
-          SET last_read_at = target.sent_at, last_read_message_id = target.message_id
+          SET last_read_at = GREATEST(participant.last_read_at, target.sent_at),
+              last_read_message_id = CASE WHEN ${receiptMovesForward}
+                                          THEN target.message_id
+                                          ELSE participant.last_read_message_id END
          FROM target
         WHERE participant.thread_id = $1 AND participant.user_id = $2
           AND (participant.last_read_at IS NULL OR participant.last_read_at < target.sent_at OR
-               (participant.last_read_at = target.sent_at AND participant.last_read_message_id IS NOT NULL AND
-                participant.last_read_message_id < target.message_id))
+               ${receiptMovesForward})
        RETURNING participant.last_read_at, participant.last_read_message_id
      )
      SELECT EXISTS (SELECT 1 FROM target) AS found,
             EXISTS (SELECT 1 FROM current) AS participant,
             (SELECT last_read_at FROM advanced) AS advanced_at,
-            (SELECT last_read_message_id FROM advanced) AS advanced_message_id,
-            (SELECT last_read_at FROM current) AS current_at`,
+            (SELECT last_read_at FROM current) AS current_at,
+            ((SELECT last_read_message_id FROM advanced) = (SELECT message_id FROM target) AND
+             (SELECT last_read_message_id FROM current) IS DISTINCT FROM (SELECT message_id FROM target)) AS receipt_advances,
+            (SELECT sent_at FROM target) AS target_sent_at,
+            (SELECT message_id FROM target) AS target_message_id`,
     [threadId, userId, messageId]
   )
   const row = result.rows[0]
   if (!row?.found || !row.participant) return null
-  if (row.advanced_at) {
-    const sentAt = toIso(row.advanced_at)
-    return { readAt: sentAt, readUpTo: { sentAt, messageId: String(row.advanced_message_id) } }
-  }
-  return { readAt: toIso(row.current_at) }
-}
-
-function readCursor(readAt: unknown, messageId: unknown): ChatReceiptCursor {
-  return messageId
-    ? { sentAt: toIso(readAt), messageId: String(messageId) }
-    : { sentAt: toIso(readAt) }
+  const readAt = toIso(row.advanced_at ?? row.current_at)
+  return row.receipt_advances === true
+    ? { readAt, readUpTo: { sentAt: toIso(row.target_sent_at), messageId: String(row.target_message_id) } }
+    : { readAt }
 }
 
 function toIso(value: unknown): string {

@@ -53,7 +53,7 @@ test("chat delivery claims use leases and completion/retry are fenced", async ()
   const [job] = await repository.claimDeliveries({ now, limit: 50, leaseMs: 30000 })
   assert.equal(job.leaseToken, "lease")
   assert.equal(job.attempt, 2)
-  assert.match(fake.calls[0].text, /FOR UPDATE SKIP LOCKED/)
+  assert.match(fake.calls[0].text, /FOR UPDATE OF job SKIP LOCKED/)
   await repository.completeDelivery(job.message.messageId, job.leaseToken, now)
   await repository.retryDelivery(job.message.messageId, job.leaseToken, now)
   for (const call of fake.calls.slice(1)) assert.match(call.text, /lease_token = \$2 AND completed_at IS NULL/)
@@ -109,7 +109,7 @@ test("after migration 070 cursor moves compare (sent_at, message_id) rows in one
   assert.match(fake.calls[0]!.text, /\(participant\.last_delivered_at, participant\.last_delivered_message_id\)\s+< \(target\.sent_at, target\.message_id\)/)
   assert.match(fake.calls[0]!.text, /sender_user_id <> \$2/)
   assert.deepEqual(fake.calls[0]!.values, ["thread_one", "user_b", "message_one"])
-  assert.match(fake.calls[1]!.text, /participant\.last_read_message_id < target\.message_id/)
+  assert.match(fake.calls[1]!.text, /\(receipt\.sent_at, receipt\.message_id\) >= \(target\.sent_at, target\.message_id\)/)
 })
 
 test("postgres chat repository saves threads with ordered participants", async () => {

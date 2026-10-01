@@ -63,7 +63,7 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | BE-09 | Outbox, push receipt and audit tables never pruned | audit:db#4, workers#1, privacy#0, DB-05 | DONE 13a39a5 (follow-up: no index on completed_at/occurred_at; never-completed outbox rows never pruned) | P1 |
 | BE-10 | OTP send claim deletes expired rows before advisory lock (deadlock) | audit:db#5 | NOT STARTED (verifiers could not reproduce; intent-only) | P3 |
 | BE-11 | No statement/lock/idle-in-transaction timeout; pool waited forever | audit:db#6, DB-08 | PARTIAL f863ffa (pool wait 10 s, keepalive). Missing: statement_timeout opt-in only (unset by default), idle_in_transaction/lock_timeout need role-level ALTER ROLE (owner) | P2 |
-| BE-12 | DB error mapping 409/503 | DB-06, method:4 F1 | PARTIAL 4c24fbc is broken in production: databaseErrorStatus.ts:34 checks error.name === "DatabaseError" but pg sets name "error", so real SQLSTATEs fall to 500; tests use fake errors | P1 |
+| BE-12 | DB error mapping 409/503 | DB-06, method:4 F1 | FIXED ce37509 (branch worktree-wf_b472540e-453-1, not merged): instanceof DatabaseError or severity+SQLSTATE; pool.query retries 40001/40P01 once; real-PostgreSQL gate test | P1 |
 | BE-13 | pg Pool had no 'error' listener (idle disconnect crashes the only replica) | ops#0, DB-07 | DONE f863ffa (databasePoolConfig.ts:87,92) | P0 |
 | BE-14 | Push dispatch held up to 100 pooled transactions across Expo HTTP | workers#0, notifications#0, scale#0, method:2 §4 | PARTIAL 12e73d4 (concurrency 3, 30 leased). Missing: transaction + device row lock still open across the Expo call (postgresNotificationRepository.ts:32); COMMIT failure re-sends the push | P1 |
 | BE-15 | Railway draining 0 s, graceful shutdown never ran | runtime#0, workers#3, ops#1 | DONE d270ae4 (drainingSeconds 35) + c1e5961 | P1 |
@@ -76,12 +76,12 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | BE-22 | Live Railway service drifted from .railway/railway.ts (name, CI gate, restarts) | ops#4, REL-7 | NEEDS OWNER DECISION | P2 |
 | BE-23 | No production runtime metrics (event-loop lag, pool saturation, backlog) | ops#6, REL-14 | NOT STARTED | P2 |
 | BE-24 | Production build ships whole monorepo (~1.1 GB node_modules) | runtime#3 | NOT STARTED | P2 |
-| BE-25 | Refund reversal debited coins without a recorded credit | economy#0, method:4 F3 | PARTIAL f5a0c64. Missing: concurrent credit+reversal race (per-transaction advisory lock) | P2 |
+| BE-25 | Refund reversal debited coins without a recorded credit | economy#0, method:4 F3 | FIXED f5a0c64 + c127b3c (branch worktree-wf_b472540e-453-1, not merged): per-transaction pg_advisory_xact_lock; deterministic PostgreSQL race test | P2 |
 | BE-26 | Unappliable signed RevenueCat events acked 200 and discarded | economy#1, SEC-R10 | NOT STARTED (needs migration; payments off) | P2 |
 | BE-27 | Moderation queue showed only newest 50-100 reports | safety#0 | DONE 6615739 (keyset, risk order) | P1 |
 | BE-28 | Reports/blocks unbounded per user | safety#1, SEC-R9 | DONE 6615739 | P1 |
-| BE-29 | Report dedupe drops escalations (spam then underage stays standard priority) | method:4 F2 | NOT STARTED (verified postgresSafetyRepository.ts:174-178 returns "replayed") | P1 |
-| BE-30 | Block refused at 1000 blocks (user cannot block an abuser) | method:4 F2 | NOT STARTED (safetyService.ts:158) | P2 |
+| BE-29 | Report dedupe drops escalations (spam then underage stays standard priority) | method:4 F2 | FIXED 933072e (branch worktree-wf_b472540e-453-1, not merged): a more urgent reason escalates the pending report in place, note appended | P1 |
+| BE-30 | Block refused at 1000 blocks (user cannot block an abuser) | method:4 F2 | FIXED 933072e (branch worktree-wf_b472540e-453-1, not merged): block cap removed; reports stay capped | P2 |
 | BE-31 | Second suspension shortened a longer one | safety#3 | DONE (postgresSafetyRepository.ts:376-381; 6615739/05ff8a9) | P2 |
 | BE-32 | No admin path to lift ban/suspension or phone ban | safety#4, PRD-6 | NEEDS OWNER DECISION | P2 |
 | BE-33 | Room showcase URL = unsalted sha256(userId, revision), served unauthenticated (bypasses mutual-like gate/blocks) | privacy#3 | NOT STARTED (verified roomSnapshotRenderer.ts:150) | P2 |
@@ -97,7 +97,7 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | BE-43 | Push sign-out cleanup depends on in-memory token; foreground ignores recipientUserId | notifications#2 | DONE 3e9773d, 06d9a6b (not re-verified) | P2 |
 | RT-01 | Silent-socket reconnect has 0 ms jitter (herd after a server stall) | method:1 §2 | NOT STARTED | P2 |
 | RT-02 | 1011 and ticket 503 not treated as server_wide; Retry-After ignored | method:1 §2 | NOT STARTED (realtimeClient.ts:47) | P2 |
-| RT-03 | ws closeTimeout 30 s equals shutdown deadline (flush/fanout skipped, exit 1) | method:1 §3 | NOT STARTED (no closeTimeout set) | P2 |
+| RT-03 | ws closeTimeout 30 s equals shutdown deadline (flush/fanout skipped, exit 1) | method:1 §3 | FIXED 848bf3e + 30b4fad (branch worktree-wf_b472540e-453-1, not merged): closeTimeout 3 s plus straggler terminate; fake-timer test | P2 |
 | RT-04 | DB outage >60 s: auth cache expiry closes all sockets 1011 (herd) | method:1 §4 | NOT STARTED | P2 |
 | RT-05 | chat.send_message handled 4 in flight per socket (can commit out of order) | method:1 §5 | NOT STARTED | P2 |
 | RT-06 | Reconnect resync has no resume cursor (only last message, max 5 threads) | method:1 §9 | NOT STARTED | P2 |
@@ -105,10 +105,10 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | RT-08 | LISTEN drop during deploy overlap loses a new peer's events without onGap | method:1 §7 | NOT STARTED | P3 |
 | RT-09 | Transaction pooler + BLUMI_DB_LISTEN_URL for more pool headroom | method:1 §6, REALTIME_CAPACITY §5/§6.7 | NEEDS OWNER DECISION (staging test) | P2 |
 | RT-10 | Fixed-window event budget (2x burst at boundary) -> GCRA | method:1 §5 | NOT STARTED | P3 |
-| CH-01 | Read without upToMessageId publishes readUpTo at server time: message can be "read" before it is shown | method:2 §2 | NOT STARTED (postgresChatReceipts.ts:180) | P1 |
-| CH-02 | Reads made with receipts off revealed retroactively when both enable | method:2 §2 | NEEDS OWNER DECISION | P2 |
+| CH-01 | Read without upToMessageId publishes readUpTo at server time: message can be "read" before it is shown | method:2 §2 | FIXED 2fe0853 (branch worktree-wf_b472540e-453-1, not merged): instant reads move only the unread cursor; receipt is the named message; app reads only a shown message | P1 |
+| CH-02 | Reads made with receipts off revealed retroactively when both enable | method:2 §2 | NEEDS OWNER DECISION (design: docs/quality/RECEIPTS_PRIVACY_DESIGN_2026-10-01.md) | P2 |
 | CH-03 | Push sent for every message even when recipient is in the thread (delay 2-3 s, skip if delivered) | method:2 §4 | NOT STARTED | P2 |
-| CH-04 | Worker dispatchDue sends a thread's jobs in parallel (order after restart) | method:2 §5 | NOT STARTED (chatMessageDeliveryService.ts:173) | P2 |
+| CH-04 | Worker dispatchDue sends a thread's jobs in parallel (order after restart) | method:2 §5 | FIXED ddef9be (branch worktree-wf_b472540e-453-1, not merged): recovered jobs go through the per-thread chain in message order | P2 |
 | CH-05 | Preview tie-break (sent_at vs sent_at,message_id); md5 lease token | method:2 §1 | NOT STARTED | P3 |
 | CH-06 | Typing: block query per signal; ref written during render | method:2 §3 | NOT STARTED | P3 |
 | CH-07 | Receipt-stage MessageRateExceeded cannot be re-sent (needs migration) | PUSH_PROGRESS | NEEDS OWNER DECISION | P3 |

@@ -52,9 +52,11 @@ export interface ChatCheckedSendInput {
  * - `blocked`: a block exists between the sender and another participant;
  *   nothing was written. `retryOf` is the sender's committed message with
  *   the same client message ID, if any.
- * - `created`: the message, its thread preview and its leased outbox job
- *   were written. `recipientPersonas` are the other participants' test
- *   personas (the delivery replies for them).
+ * - `created`: the message, its thread preview and its outbox job were
+ *   written. The job is leased to the caller (`job`) unless an earlier
+ *   message of the thread is still undelivered: then it waits unleased for
+ *   a claim, which takes a thread's jobs in message order. `recipientPersonas`
+ *   are the other participants' test personas (the delivery replies for them).
  * - `retried`: the client message ID was used before; the stored message is
  *   returned (`idempotencyConflict` when its body differs). A same-body retry
  *   repairs the preview and outbox exactly like `createMessage`.
@@ -68,7 +70,7 @@ export type ChatCheckedSendResult =
       outcome: "created"
       message: ChatMessage
       participantUserIds: [string, string]
-      job: { leaseToken: string; attempt: number }
+      job?: { leaseToken: string; attempt: number }
       recipientPersonas: TestPersona[]
     }
   | { outcome: "retried"; message: ChatMessage; participantUserIds: [string, string]; idempotencyConflict?: true }
@@ -168,8 +170,13 @@ export interface ChatRepository {
 }
 
 interface InMemoryParticipantCursors {
+  /** Unread cursor (last_read_at): unread counts and the push badge. */
   readAt?: string
-  readMessageId?: string
+  /**
+   * Read receipt (last_read_message_id with its message's sent_at): moved
+   * only by a read that names a partner message the reader was shown.
+   */
+  readUpTo?: { sentAt: string; messageId: string }
   deliveredUpTo?: ChatReceiptCursor
 }
 
@@ -325,14 +332,20 @@ export function createInMemoryChatRepository(
           ...(prior.body !== message.body ? { idempotencyConflict: true as const } : {})
         }
       }
-      const leaseToken = randomUUID()
-      insertMessage(message, key, { availableAt: leaseUntil.getTime(), attempt: 1, leaseToken })
+      // A job behind an undelivered message of the thread is not leased, so
+      // it cannot overtake that message (claims keep the thread's order).
+      const heldBack = [...store.deliveryJobs.values()].some((job) => !job.completed &&
+        job.message.threadId === message.threadId && compareChatMessagePositions(job.message, message) < 0)
+      const leaseToken = heldBack ? undefined : randomUUID()
+      insertMessage(message, key, leaseToken
+        ? { availableAt: leaseUntil.getTime(), attempt: 1, leaseToken }
+        : { availableAt: Date.now(), attempt: 0 })
       const personas = await Promise.all(partnerUserIds.map((userId) => this.findTestPersona(userId)))
       return {
         outcome: "created",
         message: { ...message },
         participantUserIds,
-        job: { leaseToken, attempt: 1 },
+        ...(leaseToken ? { job: { leaseToken, attempt: 1 } } : {}),
         recipientPersonas: personas.filter((persona): persona is TestPersona => persona !== null)
       }
     },
@@ -356,25 +369,30 @@ export function createInMemoryChatRepository(
       const current = cursorsOf(input.threadId, input.userId)
       const previousTime = current.readAt === undefined ? Number.NEGATIVE_INFINITY : Date.parse(current.readAt)
       const targetTime = Date.parse(target.sentAt)
-      if (!receiptsSupported) {
-        // Before 070 only the unread cursor exists: GREATEST(last_read_at, target).
-        if (targetTime > previousTime) store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt })
-        return { readAt: cursorsOf(input.threadId, input.userId).readAt! }
+      // The unread cursor: GREATEST(last_read_at, target), before and after 070.
+      const readAt = targetTime > previousTime ? target.sentAt : current.readAt!
+      // A read without a message never moves the read receipt: it may cover
+      // a message whose sent_at precedes it but which was not shown. A read
+      // while the reader has receipts off stores no receipt, so turning them
+      // on later never reveals it (RECEIPTS_PRIVACY_DESIGN option A).
+      const readerSharesReceipts = store.preferencesByUser.get(input.userId)?.readReceiptsEnabled === true
+      if (!receiptsSupported || target.messageId === undefined || !readerSharesReceipts) {
+        store.cursorsByParticipant.set(key, { ...current, readAt })
+        return { readAt }
       }
-      const advances = targetTime > previousTime || (targetTime === previousTime && current.readMessageId !== undefined &&
-        (target.messageId === undefined || current.readMessageId < target.messageId))
-      if (!advances) return { readAt: current.readAt! }
-      store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt, readMessageId: target.messageId })
-      return {
-        readAt: target.sentAt,
-        readUpTo: target.messageId === undefined
-          ? { sentAt: target.sentAt }
-          : { sentAt: target.sentAt, messageId: target.messageId }
-      }
+      const receipt = { sentAt: target.sentAt, messageId: target.messageId }
+      const advances = current.readUpTo === undefined || compareChatMessagePositions(current.readUpTo, receipt) < 0
+      store.cursorsByParticipant.set(key, { ...current, readAt, ...(advances ? { readUpTo: receipt } : {}) })
+      return advances ? { readAt, readUpTo: { ...receipt } } : { readAt }
     },
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
-      const jobs = [...store.deliveryJobs.values()]
-        .filter((job) => !job.completed && job.availableAt <= now.getTime() && (!messageId || job.message.messageId === messageId))
+      const undelivered = [...store.deliveryJobs.values()].filter((job) => !job.completed)
+      const holdsBack = (job: (typeof undelivered)[number]) => undelivered.some((earlier) =>
+        earlier.message.threadId === job.message.threadId &&
+        compareChatMessagePositions(earlier.message, job.message) < 0)
+      const jobs = undelivered
+        .filter((job) => job.availableAt <= now.getTime() && (!messageId || job.message.messageId === messageId))
+        .filter((job) => !holdsBack(job))
         .sort((left, right) => left.availableAt - right.availableAt)
         .slice(0, limit)
       return jobs.map((job) => {
@@ -426,10 +444,8 @@ export function createInMemoryChatRepository(
             threadId,
             userId,
             ...(cursors.deliveredUpTo ? { deliveredUpTo: { ...cursors.deliveredUpTo } } : {}),
-            ...(cursors.readAt
-              ? { readUpTo: cursors.readMessageId === undefined
-                  ? { sentAt: cursors.readAt }
-                  : { sentAt: cursors.readAt, messageId: cursors.readMessageId } }
+            ...(cursors.readUpTo
+              ? { readUpTo: { ...cursors.readUpTo } }
               : {}),
             readReceiptsEnabled: store.preferencesByUser.get(userId)?.readReceiptsEnabled ?? false
           }

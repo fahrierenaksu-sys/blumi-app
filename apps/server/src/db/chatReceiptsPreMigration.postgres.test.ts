@@ -92,9 +92,19 @@ test("before 070 chat and /ready work on PostgreSQL with receipts off; applying 
     assert.deepEqual(await receipts.getPartnerReceipts("pre070_a", "pre070_thread"), {
       deliveredUpTo: { sentAt: second.sentAt, messageId: second.messageId }
     })
-    // The pre-070 unread cursor carries over as an id-less read position.
+    // The pre-070 unread cursor keeps counting unread messages but is never
+    // published as a read receipt: only a read that names a shown message is.
     const rows = await chatService.repository.listReceiptParticipants(["pre070_thread"])
-    assert.deepEqual(rows.find((row) => row.userId === "pre070_b")?.readUpTo, { sentAt: "2026-10-01T10:05:00.000Z" })
+    assert.equal(rows.find((row) => row.userId === "pre070_b")?.readUpTo, undefined)
+    assert.equal((await chatService.listThreads("pre070_b"))[0]?.unreadCount, 0)
+    // A receipt is stored only while the reader shares read receipts.
+    await pool.query(
+      `INSERT INTO blumi_accounts (account_id, user_id, phone_number, created_at, updated_at)
+       VALUES ('account_pre070_b', 'pre070_b', '+15550000070', now(), now()) ON CONFLICT (user_id) DO NOTHING`)
+    await chatService.repository.saveChatPreferences("pre070_b", { readReceiptsEnabled: true }, new Date())
+    await receipts.markRead("pre070_b", "pre070_thread", { upToMessageId: second.messageId })
+    assert.deepEqual((await chatService.repository.listReceiptParticipants(["pre070_thread"]))
+      .find((row) => row.userId === "pre070_b")?.readUpTo, { sentAt: second.sentAt, messageId: second.messageId })
     assert.deepEqual(errors, [])
   } finally {
     await pool.end()

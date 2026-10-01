@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { DatabaseError, Pool } from "pg"
 import { resolveServerConfig } from "../config"
 import {
   createDatabasePools,
@@ -7,6 +8,7 @@ import {
   LISTEN_POOL_MAX,
   resolveDatabaseListenUrl,
   resolveDatabasePoolSettings,
+  retryStatementConflictOnce,
   toPoolConfig
 } from "./databasePoolConfig"
 
@@ -87,4 +89,36 @@ test("server configuration carries the resolved pool settings", () => {
   const config = resolveServerConfig({ NODE_ENV: "test", BLUMI_DB_POOL_MAX: "12" })
   assert.equal(config.databasePool.max, 12)
   assert.throws(() => resolveServerConfig({ NODE_ENV: "test", BLUMI_DB_POOL_MAX: "0" }), /BLUMI_DB_POOL_MAX/)
+})
+
+function conflict(code: string): DatabaseError {
+  return Object.assign(new DatabaseError("could not serialize access", 0, "error"), { code, severity: "ERROR" })
+}
+
+test("pool statements aborted by a deadlock or serialization failure are retried exactly once", async () => {
+  const outcomes: Array<Error | string> = [conflict("40P01"), "ok", conflict("40001"), conflict("40001"), conflict("23505")]
+  let calls = 0
+  const fake = {
+    query: async (_sql: string) => {
+      calls += 1
+      const next = outcomes.shift()
+      if (next instanceof Error) throw next
+      return { rows: [next] }
+    }
+  } as unknown as Pool
+  const pool = retryStatementConflictOnce(fake)
+  assert.deepEqual(await pool.query("SELECT 1"), { rows: ["ok"] })
+  assert.equal(calls, 2)
+  // A second conflict in a row is not retried again.
+  await assert.rejects(pool.query("SELECT 1"), { code: "40001" })
+  assert.equal(calls, 4)
+  // Constraint violations are answers, not transient failures.
+  await assert.rejects(pool.query("SELECT 1"), { code: "23505" })
+  assert.equal(calls, 5)
+})
+
+test("the shared server pool retries statement conflicts", async () => {
+  const { pool } = createDatabasePools({ databaseUrl: "postgresql://example.invalid/db", databasePool: DEFAULT_DATABASE_POOL_SETTINGS })
+  assert.notEqual(pool.query, Pool.prototype.query)
+  await pool.end()
 })

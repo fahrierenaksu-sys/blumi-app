@@ -103,6 +103,8 @@ test("read receipts are off by default and mutual: both must turn them on", asyn
 test("projections show delivery to both, and read state only while both share it", async () => {
   const { chatService, receipts, send } = await setup()
   const message = await send(ADA, "hello", "2026-10-01T10:00:00.000Z")
+  // Bora shares read receipts when reading; Ada does not yet.
+  await receipts.savePreferences(BORA, { readReceiptsEnabled: true })
   await receipts.acknowledgeDelivered(BORA, THREAD, message.messageId)
   await receipts.markRead(BORA, THREAD, { upToMessageId: message.messageId })
   const delivered = { sentAt: message.sentAt, messageId: message.messageId }
@@ -112,13 +114,24 @@ test("projections show delivery to both, and read state only while both share it
   assert.deepEqual(await receipts.getPartnerReceipts(ADA, THREAD), { deliveredUpTo: delivered })
 
   await receipts.savePreferences(ADA, { readReceiptsEnabled: true })
-  await receipts.savePreferences(BORA, { readReceiptsEnabled: true })
   assert.deepEqual(await adaView(), { deliveredUpTo: delivered, readUpTo: delivered })
 
   // Turning it off hides it both ways, including for the person who turned it off.
   await receipts.savePreferences(BORA, { readReceiptsEnabled: false })
   assert.deepEqual(await adaView(), { deliveredUpTo: delivered })
   assert.deepEqual(await receipts.getPartnerReceipts(BORA, THREAD), {})
+})
+
+test("a read made while the reader has receipts off is never shown after both turn them on", async () => {
+  const { chatService, receipts, send } = await setup()
+  const message = await send(ADA, "hello", "2026-10-01T10:00:00.000Z")
+  await receipts.markRead(BORA, THREAD, { upToMessageId: message.messageId })
+  await receipts.savePreferences(ADA, { readReceiptsEnabled: true })
+  await receipts.savePreferences(BORA, { readReceiptsEnabled: true })
+  const adaView = async () => (await receipts.projectThreads(ADA, await chatService.listThreads(ADA)))[0]!.partnerReceipts
+  assert.equal((await adaView())?.readUpTo, undefined)
+  await receipts.markRead(BORA, THREAD, { upToMessageId: message.messageId })
+  assert.deepEqual((await adaView())?.readUpTo, { sentAt: message.sentAt, messageId: message.messageId })
 })
 
 test("a blocked pair receives no receipt events in either direction", async () => {
@@ -143,6 +156,24 @@ test("an account outside the rollout neither moves cursors nor receives receipts
   assert.equal(await receipts.getPartnerReceipts(ADA, THREAD), undefined)
   await assert.rejects(receipts.savePreferences(ADA, { readReceiptsEnabled: true }), ChatReceiptsUnavailableError)
   assert.deepEqual(await receipts.getPreferences(ADA), { preferences: { readReceiptsEnabled: false }, available: false })
+})
+
+test("with mutual receipts a read without a message id clears unread but never shows the partner a read tick", async () => {
+  const { chatService, receipts, events, send } = await setup()
+  await receipts.savePreferences(ADA, { readReceiptsEnabled: true })
+  await receipts.savePreferences(BORA, { readReceiptsEnabled: true })
+  const message = await send(ADA, "hello", "2026-10-01T10:00:00.000Z")
+
+  const read = await receipts.markRead(BORA, THREAD, {}, new Date("2026-10-01T10:05:00.000Z"))
+  assert.equal(read.readAt, "2026-10-01T10:05:00.000Z")
+  assert.equal(read.readUpTo, undefined)
+  assert.equal((await chatService.listThreads(BORA))[0]!.unreadCount, 0)
+  assert.deepEqual(events.filter(({ event }) => event.type === "chat.receipt_updated" && event.payload.readUpTo), [])
+  assert.equal((await receipts.getPartnerReceipts(ADA, THREAD))?.readUpTo, undefined)
+
+  // Naming the shown message is what moves and publishes the receipt.
+  await receipts.markRead(BORA, THREAD, { upToMessageId: message.messageId })
+  assert.deepEqual((await receipts.getPartnerReceipts(ADA, THREAD))?.readUpTo, { sentAt: message.sentAt, messageId: message.messageId })
 })
 
 test("before migration 070 chat keeps working and receipts are simply absent", async () => {

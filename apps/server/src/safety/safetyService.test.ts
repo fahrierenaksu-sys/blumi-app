@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createInMemorySafetyRepository } from "./safetyRepository"
-import { createSafetyService, MAX_BLOCKS_PER_ACTOR, MAX_REPORTS_PER_DAY, SafetyLimitError } from "./safetyService"
+import { createSafetyService, MAX_REPORTS_PER_DAY, SafetyLimitError } from "./safetyService"
 
 test("a block check sees both directions with one repository read", async () => {
   const repository = createInMemorySafetyRepository()
@@ -198,14 +198,32 @@ test("block and report targets must be existing people; unblocking a missing per
   assert.equal((await service.blockUser("user_a", "user_b")).blockedUserId, "user_b")
 })
 
-test("a pending report on the same person is returned instead of a duplicate", async () => {
+test("a pending report on the same person is returned instead of a duplicate unless the new reason is more urgent", async () => {
   let id = 0
   const service = createSafetyService({ idFactory: () => `report_${++id}` })
-  const first = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "spam" })
-  const repeat = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "harassment", note: "again" })
+  const first = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "harassment", note: "rude" })
+  const repeat = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "spam", note: "again" })
   assert.equal(first.replayed, false)
   assert.equal(repeat.replayed, true)
   assert.equal(repeat.report.reportId, first.report.reportId)
+  assert.equal(repeat.report.reason, "harassment")
+  assert.equal(repeat.report.note, "rude")
+  assert.equal((await service.listReportsForActor("user_a")).length, 1)
+})
+
+test("spam then underage on the same person escalates the pending report into the urgent queue", async () => {
+  let id = 0
+  const service = createSafetyService({ idFactory: () => `report_${++id}` })
+  const first = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "spam" })
+  const urgent = await service.reportUser("user_a", { reportedUserId: "user_b", reason: "underage", note: "says 15" })
+  assert.equal(urgent.replayed, false, "the new reason was accepted")
+  assert.equal(urgent.report.reportId, first.report.reportId)
+  assert.equal(urgent.report.reason, "underage")
+  assert.equal(urgent.report.note, "[Önceki sebep / previous reason: spam] says 15", "moderators still see the first reason")
+  const queue = await service.listPendingReportQueue({})
+  assert.equal(queue.reports[0]?.reportId, first.report.reportId)
+  assert.equal(queue.reports[0]?.reason, "underage")
+  assert.equal((await service.getPendingReportQueueSummary()).countsByPriority.urgent, 1)
   assert.equal((await service.listReportsForActor("user_a")).length, 1)
 })
 
@@ -230,14 +248,12 @@ test("one person can file at most 20 reports in 24 hours", async () => {
   assert.equal(nextDay.replayed, false)
 })
 
-test("one person can hold at most 1000 blocks; an existing block is still answered", async () => {
+test("blocking is never refused by a count: a user who already blocked many people can still block an abuser", async () => {
   const service = createSafetyService()
-  assert.equal(MAX_BLOCKS_PER_ACTOR, 1000)
-  for (let index = 0; index < MAX_BLOCKS_PER_ACTOR; index += 1) {
+  for (let index = 0; index < 1000; index += 1) {
     await service.blockUser("user_a", `blocked_${index}`)
   }
-  await assert.rejects(() => service.blockUser("user_a", "one_too_many"), (error) => error instanceof SafetyLimitError)
+  assert.equal((await service.blockUser("user_a", "abuser")).blockedUserId, "abuser")
+  assert.equal(await service.hasBlockBetween("user_a", "abuser"), true)
   assert.equal((await service.blockUser("user_a", "blocked_7")).blockedUserId, "blocked_7")
-  await service.unblockUser("user_a", "blocked_7")
-  assert.equal((await service.blockUser("user_a", "one_too_many")).blockedUserId, "one_too_many")
 })

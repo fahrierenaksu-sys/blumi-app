@@ -1,4 +1,5 @@
 import { Pool, type PoolConfig } from "pg"
+import { isPostgresServerError } from "../operations/databaseErrorStatus"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
 /**
@@ -83,7 +84,7 @@ export function createDatabasePools(config: {
   databaseListenUrl?: string
   databasePool: DatabasePoolSettings
 }): { pool: Pool; listenPool?: Pool } {
-  const pool = new Pool(toPoolConfig(config.databaseUrl, config.databasePool))
+  const pool = retryStatementConflictOnce(new Pool(toPoolConfig(config.databaseUrl, config.databasePool)))
   pool.on("error", (error) => {
     console.error("PostgreSQL idle connection failed", safeOperationalErrorKind(error))
   })
@@ -93,6 +94,40 @@ export function createDatabasePools(config: {
     console.error("PostgreSQL listen connection failed", safeOperationalErrorKind(error))
   })
   return { pool, listenPool }
+}
+
+// serialization_failure and deadlock_detected: PostgreSQL rolled the
+// statement back because of a concurrent transaction, not because of its input.
+const STATEMENT_CONFLICT_STATES = new Set(["40001", "40P01"])
+
+/**
+ * Retries a `pool.query` statement once when PostgreSQL aborted it with a
+ * serialization failure or a deadlock. A `pool.query` call is one autocommit
+ * statement (the server keeps no transaction open across pool calls), and an
+ * aborted statement left nothing behind, so running it again is the same as
+ * running it once: the retry is idempotent by construction. Statements inside
+ * an explicit transaction (`pool.connect()` clients) are not retried: the
+ * whole transaction is aborted, so the error still reaches the route and maps
+ * to 503 with Retry-After. Other errors, and streaming or callback queries,
+ * pass through unchanged.
+ *
+ * Only safe for single autocommit statements. Never send multi-statement SQL
+ * through `pool.query` (for example "BEGIN; ...; COMMIT" in one string): a
+ * conflict after an inner COMMIT would run the committed part again.
+ */
+export function retryStatementConflictOnce(pool: Pool): Pool {
+  const query = pool.query.bind(pool) as (...args: unknown[]) => unknown
+  const retrying = (...args: unknown[]): unknown => {
+    if (args.some((arg) => typeof arg === "function")) return query(...args)
+    const result = query(...args)
+    if (!(result instanceof Promise)) return result
+    return result.catch((error: unknown) => {
+      if (!isPostgresServerError(error) || !STATEMENT_CONFLICT_STATES.has(error.code)) throw error
+      return query(...args)
+    })
+  }
+  pool.query = retrying as Pool["query"]
+  return pool
 }
 
 export function toPoolConfig(connectionString: string | undefined, settings: DatabasePoolSettings): PoolConfig {
