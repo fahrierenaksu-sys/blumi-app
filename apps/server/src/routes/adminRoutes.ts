@@ -7,7 +7,7 @@ import type {
 } from "../admin/adminTokenService"
 import type { ReportRecord } from "../safety/safetyRepository"
 import type { SafetyService } from "../safety/safetyService"
-import { ReportResolutionConflictError } from "../safety/safetyService"
+import { ReportResolutionConflictError, ReportedAccountDeletedError } from "../safety/safetyService"
 import { isPublicRequestError } from "../errors/publicRequestError"
 import { isRecord, readLimit, readParam } from "./routeHelpers"
 import type { AccountRecoveryService, AccountRecoveryStatus } from "../account/accountRecoveryService"
@@ -54,6 +54,8 @@ export interface AdminRouteServices {
   adminUsersService?: AdminUsersService
   adminAnalyticsService?: AdminAnalyticsService
   connectionManager?: ConnectionManager
+  /** Runs after a committed `ban` resolution (Firebase refresh-token revocation). */
+  onUserBanned?: (userId: string) => void
 }
 
 function safeCompare(a: string, b: string): boolean {
@@ -249,9 +251,10 @@ export async function registerAdminRoutes(
       if (!report) {
         return reply.code(404).send({ error: "That report is not available." })
       }
+      if (report.resolution?.action === "ban") services.onUserBanned?.(report.reportedUserId)
       return { report: toAdminReportView(report) }
     } catch (error) {
-      if (error instanceof ReportResolutionConflictError) {
+      if (error instanceof ReportResolutionConflictError || error instanceof ReportedAccountDeletedError) {
         return reply.code(409).send({ error: error.message })
       }
       if (!isPublicRequestError(error)) throw error

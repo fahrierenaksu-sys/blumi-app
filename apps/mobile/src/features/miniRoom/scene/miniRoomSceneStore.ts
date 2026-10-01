@@ -75,7 +75,6 @@ interface UseMiniRoomSceneStoreInput {
   bubbleLifetimeMs?: number
 }
 
-const PROXIMITY_CLOSE_DISTANCE = 0.18
 function cancelMiniRoomMovementRun(run: MiniRoomMovementRun): void {
   run.cancel()
 }
@@ -682,13 +681,6 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     [finishActiveSpeechBubble]
   )
 
-  const proximityClose = useMemo(() => {
-    const list = Object.values(avatars).filter(avatar => avatar.present !== false)
-    if (list.length < 2) return false
-    const [a, b] = list
-    return Math.hypot(a.x - b.x, a.y - b.y) <= PROXIMITY_CLOSE_DISTANCE
-  }, [avatars])
-
   useEffect(() => {
     const list = Object.values(avatars).filter(avatar => avatar.present !== false)
     if (list.length < 2) return
@@ -719,10 +711,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const interaction = useMemo(
     () => ({
       pressedPoint,
-      selectedHotspotId,
-      proximityClose
+      selectedHotspotId
     }),
-    [pressedPoint, proximityClose, selectedHotspotId]
+    [pressedPoint, selectedHotspotId]
   )
 
   const avatarIdsKey = Object.keys(avatars).join("\u0000")

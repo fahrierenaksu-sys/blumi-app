@@ -60,6 +60,13 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       )
       return Boolean(result.rowCount)
     },
+    async findFirebaseUidByUserId(userId) {
+      const result = await pool.query(
+        "SELECT firebase_uid FROM blumi_accounts WHERE user_id = $1", [userId]
+      )
+      const uid = result.rows[0]?.firebase_uid
+      return typeof uid === "string" && uid.length > 0 ? uid : null
+    },
     async saveFirebaseActionChallenge(challenge) {
       await pool.query(
         `INSERT INTO blumi_firebase_action_challenges (
@@ -1401,14 +1408,20 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
             await client.query("ROLLBACK")
             return false
           }
-          const firebaseUid = consumed.rows[0]?.firebase_uid
-          if (typeof firebaseUid === "string" && firebaseUid.length > 0) {
-            await client.query(
-              `INSERT INTO blumi_firebase_user_deletion_outbox (firebase_uid, account_id)
-               VALUES ($1, $2) ON CONFLICT (firebase_uid) DO NOTHING`,
-              [firebaseUid, account.accountId]
-            )
-          }
+          // The uid that confirmed the deletion, else the bound uid (an
+          // OTP-confirmed deletion): deleting the Firebase user also kills its
+          // refresh tokens, so the device cannot mint a sign-in silently.
+          await client.query(
+            `INSERT INTO blumi_firebase_user_deletion_outbox (firebase_uid, account_id)
+             SELECT uid, $2
+               FROM (SELECT COALESCE(
+                       NULLIF($1::text, ''),
+                       (SELECT firebase_uid FROM blumi_accounts WHERE account_id = $2)
+                     ) AS uid) AS chosen
+              WHERE uid IS NOT NULL
+             ON CONFLICT (firebase_uid) DO NOTHING`,
+            [consumed.rows[0]?.firebase_uid ?? null, account.accountId]
+          )
         }
         // Match dispatch/enqueue lock order: user authority -> watch -> device -> outbox.
         // Acquire only after confirmation is consumed in this same transaction.
@@ -1548,8 +1561,14 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "DELETE FROM blumi_safety_blocks WHERE actor_user_id = $1 OR blocked_user_id = $1",
           [account.userId]
         )
+        // Open reports AGAINST this account are safety evidence and stay in the
+        // moderation queue (no FK to accounts); the account's own reports and
+        // closed reports about it go. Retention period and phone linkage:
+        // docs/quality/ACCOUNT_DELETION_SAFETY_DESIGN_2026-10-01.md.
         await client.query(
-          "DELETE FROM blumi_safety_reports WHERE actor_user_id = $1 OR reported_user_id = $1",
+          `DELETE FROM blumi_safety_reports
+            WHERE actor_user_id = $1
+               OR (reported_user_id = $1 AND status <> 'pending')`,
           [account.userId]
         )
         await client.query(

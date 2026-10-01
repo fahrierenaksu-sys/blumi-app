@@ -10,7 +10,8 @@ import {
   leaveActiveRoom,
   leaveRoomSession,
   RoomInviteApiError,
-  RoomSessionJoinError
+  RoomSessionJoinError,
+  RoomSessionLeaveError
 } from "./chatRoomInviteApi"
 
 const invite = {
@@ -145,7 +146,15 @@ test("room leave APIs require authenticated server acknowledgement", async () =>
   await assert.rejects(
     leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
       createJsonResponse(503, { error: "Rooms are temporarily unavailable." })
-    ) as typeof fetch)
+    ) as typeof fetch),
+    (error: unknown) => error instanceof RoomSessionLeaveError && error.status === 503
+  )
+  // The leave flow decides from the status: 404 means nothing is left to close.
+  await assert.rejects(
+    leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>
+      createJsonResponse(404, { error: "That room is not available." })
+    ) as typeof fetch),
+    (error: unknown) => error instanceof RoomSessionLeaveError && error.status === 404
   )
   await assert.rejects(
     leaveRoomSession("https://example.test", "session_token", "room_one", (async () =>

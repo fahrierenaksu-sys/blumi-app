@@ -87,3 +87,26 @@ promoted. Code changes remain reversible through their reviewed diff.
 
 **Production ready: not claimed.** Native evidence and deployment remain separate
 from implementation and automated test evidence.
+
+## Preservation correction — 2026-10-02
+
+Commit `6b1ac89` accidentally included a previously staged inverse patch of
+Claude's work. It is superseded by an additive restoration commit, not rewritten
+or removed from history. The exact pre-commit patch was reversed to recover
+Claude's changes while retaining the live profile/avatar and UI changes above.
+The restoration covers 86 paths: 76 match baseline `1627800` exactly; the other
+10 retain both sets of changes and were inspected as integration points.
+
+Recovered behavior includes Firebase refresh-token revocation, account-deletion
+safety evidence, delivery acknowledgement retries, graceful server shutdown,
+safe MiniRoom exit, scene-entry/socket ordering, backpressure resynchronization,
+and the two-phone motion regression. The previous removal of unused room props
+and the retired sparkle UI is also restored exactly to Claude's baseline.
+No character artwork was authored or promoted.
+
+Preservation checks for subsequent deliveries: inspect both staged and unstaged
+changes before editing; compare overlapping files against their committed
+baseline; stage explicit reviewed paths; never include an inverse patch merely
+because it was already staged; never force-push or rewrite another agent's
+commits. Commit and push only the authorized work. Push verification must pass
+without bypassing hooks. Native and production evidence remain OPEN.

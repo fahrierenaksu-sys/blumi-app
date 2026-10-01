@@ -3,10 +3,26 @@ import { miniRoomMoveSchema, type MiniRoomAvatarMotion, type MiniRoomMove, type 
 import { MINI_ROOM_FLOOR, pointInRoomWorldPolygon } from "@blumi/domain"
 import type { MiniRoomRecord } from "./miniRoomRepository"
 
+/**
+ * The device behind a socket: its sign-in session (one per app install) and
+ * the order in which the server accepted the socket. Two sockets of one
+ * session are one phone reconnecting; different sessions are different devices.
+ */
+export interface MiniRoomSceneDevice {
+  key: string
+  order: number
+}
+
+interface MotionConnection {
+  userId: string
+  sequence: number
+  device?: MiniRoomSceneDevice
+}
+
 interface MotionRoom {
   participantUserIds: [string, string]
   avatars: Map<string, MiniRoomAvatarMotion>
-  connections: Map<string, { userId: string; sequence: number }>
+  connections: Map<string, MotionConnection>
   checkedAt: number
   /** Set when an accept or join just verified the room (active, unblocked). */
   verifiedAt?: number
@@ -17,6 +33,13 @@ const REVALIDATE_AFTER_MS = 10_000
 const MAX_STALE_MS = 60_000
 const IDLE_ROOM_RETENTION_MS = 60_000
 const MAX_IDLE_ROOMS = 128
+/**
+ * A socket that shed an avatar step under backpressure is re-sent the room
+ * snapshot after this delay (one per socket however many steps it shed), so
+ * the buffer can drain first and a partner who stopped walking is not left
+ * frozen at an older target until the next enter or exit.
+ */
+export const MINI_ROOM_MOTION_RESYNC_DELAY_MS = 250
 
 /**
  * Ephemeral scene state, never persisted room ownership or durable chat.
@@ -41,10 +64,19 @@ export function createMiniRoomMotionService(options: {
   const emitToRoom = (room: MotionRoom, event: ServerEvent) => {
     if (room.connections.size) options.emit([...room.connections.keys()], event)
   }
-  const emitSnapshot = (id: string, room: MotionRoom) => emitToRoom(room, {
+  const snapshotEvent = (id: string, room: MotionRoom): ServerEvent => ({
     type: "mini_room.motion_snapshot", payload: { miniRoomId: id, epoch,
       participantUserIds: room.participantUserIds, avatars: [...room.avatars.values()].map(a => ({ ...a })) }
   })
+  const emitSnapshot = (id: string, room: MotionRoom) => emitToRoom(room, snapshotEvent(id, room))
+  const pendingResyncs = new Set<string>()
+  /**
+   * The entry each socket is waiting to complete. A scene exit, a closed
+   * socket or a newer entry on the same socket cancels it, so an entry that
+   * finishes its access check late can never put back an avatar that left.
+   */
+  const pendingEntries = new Map<string, { roomId: string; token: number }>()
+  let entryToken = 0
   function createMotionRoom(stored: MiniRoomRecord): MotionRoom {
     return {
       participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
@@ -169,26 +201,67 @@ export function createMiniRoomMotionService(options: {
       room.verifiedAt = now()
       rooms.set(stored.miniRoomId, room)
     },
-    disconnect(connectionId: string, onlyRoomId?: string) { disconnect(connectionId, onlyRoomId) },
-    async enter(connectionId: string, userId: string, id: string) {
+    /** A scene exit (one room) or a closed socket (every room). */
+    disconnect(connectionId: string, onlyRoomId?: string) {
+      const pending = pendingEntries.get(connectionId)
+      if (pending && (!onlyRoomId || pending.roomId === onlyRoomId)) pendingEntries.delete(connectionId)
+      disconnect(connectionId, onlyRoomId)
+    },
+    /**
+     * The connection manager shed an avatar_moved for this socket. Re-send it
+     * the current snapshot, once, after a short delay. State and revisions are
+     * untouched, so latest-wins and seat claims hold; a socket that left the
+     * scene or was superseded meanwhile gets nothing. Local delivery only.
+     */
+    resyncAfterDrop(connectionId: string, id: string) {
+      const key = `${id}\u0000${connectionId}`
+      if (pendingResyncs.has(key) || !rooms.get(id)?.connections.has(connectionId)) return
+      pendingResyncs.add(key)
+      const timer = setTimeout(() => {
+        pendingResyncs.delete(key)
+        const room = rooms.get(id)
+        if (room?.connections.has(connectionId)) options.emit([connectionId], snapshotEvent(id, room))
+      }, MINI_ROOM_MOTION_RESYNC_DELAY_MS)
+      timer.unref?.()
+    },
+    async enter(connectionId: string, userId: string, id: string, device?: MiniRoomSceneDevice) {
       if (typeof id !== "string" || !id || id.length > 128) return
       evictIdleRooms()
+      const token = ++entryToken
+      pendingEntries.set(connectionId, { roomId: id, token })
       const verifiedAt = rooms.get(id)?.verifiedAt
       const verified = verifiedAt !== undefined && now() - verifiedAt < REVALIDATE_AFTER_MS
-      const room = await authorize(id, userId, !verified)
+      let room: MotionRoom
+      let current: boolean
+      try {
+        room = await authorize(id, userId, !verified)
+      } finally {
+        current = pendingEntries.get(connectionId)?.token === token
+        if (current) pendingEntries.delete(connectionId)
+      }
       if (rooms.get(id) !== room) throw new Error("That room is not available.")
+      // The socket left this scene, closed, or entered again while the check ran.
+      if (!current) return
+      const others = [...room.connections.entries()]
+        .filter(([otherId, other]) => otherId !== connectionId && other.userId === userId)
+      const samePhone = (other: MotionConnection) =>
+        device !== undefined && other.device !== undefined && other.device.key === device.key
+      // One phone reconnecting: the socket it opened last drives the avatar,
+      // whatever order the entries' checks finished in (2026-10-01: a late
+      // entry from the abandoned socket told the live one "continued on
+      // another device" and closed the room screen).
+      if (others.some(([, other]) => samePhone(other) && other.device!.order > device!.order)) return
       // One scene per socket. A repeated entry for the same room (a client retry)
       // keeps the avatar present instead of flashing it absent to the partner.
       disconnect(connectionId, undefined, id)
-      // One device drives an avatar: the newest scene entry of an account takes
-      // over, and the older device is told so it can leave without ending the
-      // room. Presence stays on, so the partner sees no flicker.
-      const superseded = [...room.connections.entries()]
-        .filter(([otherId, other]) => otherId !== connectionId && other.userId === userId)
-        .map(([otherId]) => otherId)
-      for (const otherId of superseded) room.connections.delete(otherId)
+      // One device drives an avatar: the newest scene entry of another device
+      // of the account takes over, and that device is told so it can leave
+      // without ending the room. This phone's own older socket is dropped
+      // silently. Presence stays on, so the partner sees no flicker.
+      for (const [otherId] of others) room.connections.delete(otherId)
+      const superseded = others.filter(([, other]) => !samePhone(other)).map(([otherId]) => otherId)
       const avatar = room.avatars.get(userId)!
-      room.connections.set(connectionId, { userId, sequence: 0 })
+      room.connections.set(connectionId, { userId, sequence: 0, ...(device ? { device } : {}) })
       room.idleSince = undefined
       syncKeepWarm()
       if (!avatar.present) room.avatars.set(userId, { ...avatar, present: true, revision: avatar.revision + 1 })

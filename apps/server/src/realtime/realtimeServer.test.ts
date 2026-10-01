@@ -28,7 +28,7 @@ import {
   REALTIME_HEARTBEAT_INTERVAL_MS,
   REALTIME_RESTART_CLOSE_CODE
 } from "./realtimeServer"
-import { createConnectionManager } from "./connectionManager"
+import { createConnectionManager, REALTIME_OUTBOUND_SOFT_LIMIT_BYTES } from "./connectionManager"
 import type { RealtimeFanout } from "./realtimeFanout"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
@@ -965,6 +965,31 @@ async function createMotionRoomPair(harness: Awaited<ReturnType<typeof createRea
   return { a, b, sa, sb, ea, eb, miniRoomId }
 }
 
+test("a partner socket that shed an avatar step under backpressure is re-sent the current snapshot", async () => {
+  const harness = await createRealtimeHarness()
+  try {
+    const { a, b, sa, ea, eb, miniRoomId } = await createMotionRoomPair(harness, "32")
+    const serverSocketB = harness.connectionManager.getUserConnections(b.userId)[0]!.socket
+    let backedUp = true
+    Object.defineProperty(serverSocketB, "bufferedAmount", { configurable: true,
+      get: () => backedUp ? REALTIME_OUTBOUND_SOFT_LIMIT_BYTES + 1 : 0 })
+    const before = eb.all().length
+    sa.send(JSON.stringify({ type: "mini_room.move", payload: { miniRoomId, sequence: 1, x: .52, y: .7 } }))
+    // The mover's own socket is not backed up and gets the step itself.
+    await ea.waitForMatching("mini_room.avatar_moved", event => event.payload.avatar.x === .52)
+    backedUp = false
+    const snapshot = await eb.waitForMatching("mini_room.motion_snapshot", event =>
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && avatar.x === .52))
+    assert.ok(snapshot.payload.avatars.every(avatar => avatar.present))
+    assert.equal(eb.all().slice(before).filter(event => event.type === "mini_room.avatar_moved").length, 0,
+      "the step itself was shed; only the snapshot repaired the partner's view")
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(ea.all().filter(event => event.type === "mini_room.motion_snapshot" &&
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && avatar.x === .52)).length, 0,
+      "the socket that received the step is not re-sent a snapshot")
+  } finally { await harness.close() }
+})
+
 test("a burst of targets during a slow authorization check still delivers the final target, in order", async () => {
   let clock = Date.now()
   const harness = await createRealtimeHarness({ authorizationClock: () => clock })
@@ -1046,6 +1071,54 @@ test("a delivery ack over the socket reaches only the sender, and ack bursts nev
     assert.equal(ea.all().filter((event) => event.type === "chat.receipt_updated").length, 1, "repeated acks are no-ops")
   } finally { await harness.close() }
 })
+
+test("a burst of delivery acks for many threads reaches every partner, and the last ack of a thread survives a flood", async () => {
+  const harness = await createRealtimeHarness({
+    capabilityService: createCapabilityService({
+      manifest: parseCapabilityManifest(JSON.stringify({
+        rollouts: { db_chat_metadata_ready: 100, chat_read_receipts: 100 }
+      })).manifest
+    })
+  })
+  try {
+    const a = await harness.createSession("+905551110133", "Burst A")
+    const b = await harness.createSession("+905551110134", "Burst B")
+    const threadIds = Array.from({ length: 6 }, (_, index) => `burst-thread-${index}`)
+    const newest = new Map<string, string>()
+    for (const threadId of threadIds) {
+      await harness.chatService.createThread({ threadId, miniRoomId: `${threadId}-room`,
+        participantUserIds: [a.userId, b.userId], participants: [{ userId: a.userId }, { userId: b.userId }] })
+      newest.set(threadId, (await harness.chatService.sendMessage(a.userId, threadId, "hello")).messageId)
+    }
+    const first = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "older")
+    const last = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "newest")
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const ea = collectEvents(sa)
+    const ack = (threadId: string, upToMessageId: string) =>
+      sb.send(JSON.stringify({ type: "chat.ack_delivered", payload: { threadId, upToMessageId } }))
+
+    // One client flush: an ack per thread, back to back (the old budget kept
+    // two in flight per socket and silently dropped the rest).
+    for (const threadId of threadIds) ack(threadId, newest.get(threadId)!)
+    await waitUntil(() => new Set(receiptThreads(ea.all())).size === threadIds.length, 3_000)
+    assert.deepEqual(new Set(receiptThreads(ea.all())), new Set(threadIds))
+
+    // A flood of repeated acks for one thread, then the newest: the newest
+    // is coalesced and processed, never dropped behind the repeats.
+    for (let index = 0; index < 60; index++) ack(threadIds[0]!, first.messageId)
+    ack(threadIds[0]!, last.messageId)
+    await waitUntil(() => ea.all().some((event) =>
+      event.type === "chat.receipt_updated" &&
+      (event.payload as { deliveredUpTo?: { messageId: string } }).deliveredUpTo?.messageId === last.messageId), 3_000)
+    assert.equal(sb.readyState, WebSocket.OPEN)
+  } finally { await harness.close() }
+})
+
+function receiptThreads(events: readonly { type: string; payload: unknown }[]): string[] {
+  return events
+    .filter((event) => event.type === "chat.receipt_updated")
+    .map((event) => (event.payload as { threadId: string }).threadId)
+}
 
 test("a closing socket leaves the MiniRoom at once and many disconnects share one lease cleanup", async () => {
   const harness = await createRealtimeHarness()

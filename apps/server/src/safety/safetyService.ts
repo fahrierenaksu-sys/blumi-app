@@ -94,6 +94,17 @@ export class ReportIdempotencyConflictError extends PublicRequestError {
   }
 }
 
+/**
+ * A suspend/ban of a report whose account was deleted (open reports outlive
+ * the account as evidence). The report stays pending; dismiss or warn it.
+ */
+export class ReportedAccountDeletedError extends PublicRequestError {
+  constructor() {
+    super("The reported account was deleted, so it cannot be suspended or banned. Dismiss or warn instead.")
+    this.name = "ReportedAccountDeletedError"
+  }
+}
+
 /** A per-person safety cap was reached (answered with 429). */
 export class SafetyLimitError extends PublicRequestError {
   constructor(message: string) {
@@ -269,6 +280,12 @@ export function createSafetyService(
         resolution.suspendedUntil,
         now
       )
+      if ((action === "suspend" || action === "ban") && options.isKnownUser) {
+        const pending = await repository.findReport(normalizedReportId)
+        if (pending?.status === "pending" && !(await options.isKnownUser(pending.reportedUserId))) {
+          throw new ReportedAccountDeletedError()
+        }
+      }
       const result = await repository.resolveReport(normalizedReportId, {
         action,
         ...(note ? { note } : {}),
@@ -279,6 +296,7 @@ export function createSafetyService(
       })
       if (result === "not_found") return null
       if (result === "conflict") throw new ReportResolutionConflictError()
+      if (result === "reported_account_missing") throw new ReportedAccountDeletedError()
       let report: ReportRecord | null = null
       try {
         report = await repository.findReport(normalizedReportId)
