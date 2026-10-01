@@ -95,7 +95,7 @@ const OVERSIZED_DEBT = {
   "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
   "features/demo/SwipeableDiscoverCard.tsx": 1153,
   "features/roomV2/state/RoomV2Provider.tsx": 1210,
-  "features/roomV2/components/RoomRenderer2D.tsx": 996,
+  "features/roomV2/components/RoomRenderer2D.tsx": 967,
   "navigation/RootNavigator.tsx": 1123,
   "features/session/useSessionState.ts": 1117,
   "screens/MyRoomScreen.tsx": 1082,

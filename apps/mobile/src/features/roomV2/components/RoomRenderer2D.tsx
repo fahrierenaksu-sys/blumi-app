@@ -34,7 +34,14 @@ import {
   useRoomRendererMarkerPulse,
   useRoomRendererScreenFocused
 } from "./useRoomRendererLoops"
-import { getRoomV2AvatarAccessibilityValue } from "../roomV2Accessibility"
+import { getAppLocale } from "../../session/appLocale"
+import { getPlacementGuideSpan } from "./roomRendererPlacementGuideModel"
+import {
+  getRoomV2AvatarAccessibilityValue,
+  getRoomV2ItemAccessibility,
+  getRoomV2StageAccessibilityLabel,
+  shouldRoomV2ItemReceiveTap
+} from "../roomV2Accessibility"
 import {
   getRoomV2DepthPerspectiveScale,
   getRoomV2FurnitureImageResizeMode,
@@ -164,7 +171,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
       {onStagePress ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel ?? "Walk in room"}
+          accessibilityLabel={accessibilityLabel ?? getRoomV2StageAccessibilityLabel(getAppLocale())}
           accessibilityValue={accessibilityValue}
           onPress={handleStagePress}
           style={StyleSheet.absoluteFill}
@@ -193,7 +200,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             item={item}
             isSelected={selectedInstanceId === item.renderId}
             placementState={placementStateByRenderId?.[item.renderId]}
-            onItemTap={item.kind === "furniture" ? onItemTap : undefined}
+            onItemTap={shouldRoomV2ItemReceiveTap({ kind: item.kind, mode: itemInteractionMode }) ? onItemTap : undefined}
             onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
             onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
             onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}
@@ -499,7 +506,21 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   const isTouchInteractive = Boolean(onItemTap || onItemLongPress || onItemLongPressMove)
   const pointerEvents = isTouchInteractive ? "auto" : "none"
 
-  const Wrapper = isTouchInteractive ? Pressable : liveAvatarPosition ? RoomRendererLiveAvatarFrame : View
+  // A walking avatar keeps its UI-thread frame; its tap target sits inside the
+  // frame (ROOM-01), so wrapping it in a Pressable never breaks the live walk.
+  const Wrapper = liveAvatarPosition ? RoomRendererLiveAvatarFrame : isTouchInteractive ? Pressable : View
+  const tapsInsideLiveFrame = Boolean(liveAvatarPosition && onItemTap)
+  const itemAccessibility = getRoomV2ItemAccessibility({
+    kind: item.kind,
+    name: item.name,
+    interactionType: item.kind === "furniture" ? item.interactionType : undefined,
+    mode: itemInteractionMode,
+    locale: getAppLocale(),
+    tappable: isTouchInteractive
+  })
+  const avatarAccessibilityValue = item.kind === "avatar"
+    ? { text: getRoomV2AvatarAccessibilityValue({ state: item.state, direction: item.direction, seatedFurnitureName }, getAppLocale()) }
+    : undefined
   const liveAvatarLayout = liveAvatarPosition && {
     live: liveAvatarPosition,
     baseX: item.x,
@@ -520,30 +541,11 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   return (
     <RoomRendererLiveAvatarLayoutContext.Provider value={liveAvatarLayout}>
       <Wrapper
-        accessible={isTouchInteractive || item.kind === "avatar" ? true : undefined}
-        accessibilityRole={isTouchInteractive ? "button" : undefined}
-        accessibilityLabel={
-          isTouchInteractive && item.kind === "furniture"
-            ? itemInteractionMode === "edit"
-              ? `Select ${item.name} to move, rotate, or remove`
-              : item.interactionType === "seat"
-                ? `Sit on ${item.name}`
-                : `Interact with ${item.name}`
-            : item.kind === "avatar"
-              ? item.name ?? "Room avatar"
-              : undefined
-        }
-        accessibilityValue={
-          item.kind === "avatar"
-            ? {
-                text: getRoomV2AvatarAccessibilityValue({
-                  state: item.state,
-                  direction: item.direction,
-                  seatedFurnitureName
-                })
-              }
-            : undefined
-        }
+        accessible={tapsInsideLiveFrame ? false : isTouchInteractive || item.kind === "avatar" ? true : undefined}
+        accessibilityRole={isTouchInteractive && !tapsInsideLiveFrame ? "button" : undefined}
+        accessibilityLabel={tapsInsideLiveFrame || (!isTouchInteractive && item.kind !== "avatar") ? undefined : itemAccessibility.label}
+        accessibilityHint={tapsInsideLiveFrame ? undefined : itemAccessibility.hint}
+        accessibilityValue={tapsInsideLiveFrame ? undefined : avatarAccessibilityValue}
         delayLongPress={onItemLongPressMove ? 0 : 360}
         onLongPress={() => {
           longPressActiveRef.current = true
@@ -577,7 +579,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
         onMoveShouldSetResponder={() => Boolean(onItemLongPressMove)}
         onResponderTerminationRequest={() => !onItemLongPressMove}
         testID={testID}
-        pointerEvents={pointerEvents}
+        pointerEvents={tapsInsideLiveFrame ? "box-none" : pointerEvents}
         style={[
           styles.item,
           {
@@ -619,6 +621,9 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
                 footprintStyle
               ]}
             />
+          ) : null}
+          {item.kind === "avatar" && !item.seatRig ? (
+            <View pointerEvents="none" style={[styles.avatarGroundShadow, { top: `${item.anchor.y * 100}%` }, avatarMotion.state === "walking" ? styles.avatarGroundShadowWalking : null]} />
           ) : null}
           {item.kind === "avatar" ? (
             <Animated.View
@@ -675,6 +680,16 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
                 {item.name || item.renderId}
               </Text>
             </>
+          ) : null}
+          {tapsInsideLiveFrame ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={itemAccessibility.label}
+              accessibilityHint={itemAccessibility.hint}
+              accessibilityValue={avatarAccessibilityValue}
+              onPress={(event) => { event.stopPropagation(); onItemTap?.(item) }}
+              style={StyleSheet.absoluteFill}
+            />
           ) : null}
         </View>
       </Wrapper>
@@ -733,52 +748,6 @@ function getPlacementGuideStyle(
     left: `${minX * 100}%`,
     top: `${lane.y * 100}%`,
     width: `${Math.max(0, maxX - minX) * 100}%`
-  }
-}
-
-function getPlacementGuideSpan(
-  lane: RoomPlacementLane,
-  shell: RoomShell
-): { minX: number; maxX: number } {
-  const fallbackMinX = lane.minX ?? shell.placeableArea?.minX ?? 0
-  const fallbackMaxX = lane.maxX ?? shell.placeableArea?.maxX ?? 1
-  const polygonSpan = getPolygonHorizontalSpanAtY(shell.walkablePolygon, lane.y)
-  if (!polygonSpan) {
-    return {
-      minX: fallbackMinX,
-      maxX: fallbackMaxX
-    }
-  }
-
-  return {
-    minX: Math.max(fallbackMinX, polygonSpan.minX),
-    maxX: Math.min(fallbackMaxX, polygonSpan.maxX)
-  }
-}
-
-function getPolygonHorizontalSpanAtY(
-  polygon: RoomShell["walkablePolygon"],
-  y: number
-): { minX: number; maxX: number } | null {
-  if (!polygon || polygon.length < 3) return null
-  const intersections: number[] = []
-  for (let index = 0; index < polygon.length; index += 1) {
-    const start = polygon[index]
-    const end = polygon[(index + 1) % polygon.length]
-    const crosses =
-      (start.y <= y && end.y > y) ||
-      (end.y <= y && start.y > y)
-    if (!crosses) continue
-    const dy = end.y - start.y
-    if (Math.abs(dy) <= 0.0001) continue
-    const t = (y - start.y) / dy
-    intersections.push(start.x + (end.x - start.x) * t)
-  }
-  if (intersections.length < 2) return null
-  intersections.sort((a, b) => a - b)
-  return {
-    minX: intersections[0],
-    maxX: intersections[intersections.length - 1]
   }
 }
 
@@ -908,20 +877,22 @@ const styles = StyleSheet.create({
     height: "100%",
     zIndex: 2
   },
+  // ROOM-11: a soft contact shadow at the feet (the item's anchor), the same
+  // tone as MiniRoom's; narrower while walking, none when seated.
   avatarGroundShadow: {
     position: "absolute",
-    left: "10%",
-    right: "10%",
-    bottom: "2%",
-    height: "9%",
+    left: "30%",
+    width: "40%",
+    height: "5%",
+    marginTop: "-2.5%",
     borderRadius: 999,
-    backgroundColor: "rgba(38, 17, 42, 0.62)",
-    shadowColor: "#5D2339",
-    shadowOpacity: 0.26,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 0 },
-    transform: [{ rotate: "-3deg" }],
+    backgroundColor: "rgba(52, 31, 17, 0.2)",
     zIndex: 1
+  },
+  avatarGroundShadowWalking: {
+    left: "36%",
+    width: "28%",
+    opacity: 0.7
   },
   interactionAura: {
     position: "absolute",
