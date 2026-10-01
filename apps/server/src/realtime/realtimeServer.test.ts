@@ -1096,8 +1096,11 @@ test("a burst of delivery acks for many threads reaches every partner, and the l
         participantUserIds: [a.userId, b.userId], participants: [{ userId: a.userId }, { userId: b.userId }] })
       newest.set(threadId, (await harness.chatService.sendMessage(a.userId, threadId, "hello")).messageId)
     }
-    const first = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "older")
-    const last = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "newest")
+    // Explicit, increasing times: sends in the same millisecond order by their
+    // random message ids, which made "newest" sort first about half the time.
+    const base = Date.now()
+    const first = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "older", new Date(base + 1_000))
+    const last = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "newest", new Date(base + 2_000))
     const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
     const ea = collectEvents(sa)
     const ack = (threadId: string, upToMessageId: string) =>
