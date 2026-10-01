@@ -86,6 +86,29 @@ deploy veya fiziksel cihaz push denemesi yapılmadı.
   **NATIVE_VERIFIED / PRODUCTION_READY** iddiası yok. Sanat dosyası veya
   avatar asset'i değiştirilmedi; mevcut Reanimated sürücüleri kullanıldı.
 
+## Bağımsız inceleme ve düzeltmeler — IMPLEMENTED / TESTED
+
+911e075, 1a8f273 ve 08d6a18 ayrı bir oturumda adversarial olarak incelendi.
+Bulunan hatalar önce başarısız test, sonra dar düzeltme ile kapatıldı:
+
+- Sunucu (`a981aa2`): yetki kontrolü beklerken gelen hareket adımları sessizce
+  düşüyordu (son hedef kaybı); artık soket başına sıralı ve "en yeni kazanır".
+  Zemin dışına taşan koltuk hedefleri reddediliyordu; `hotspotId` taşıyan
+  hareket artık iletilir. Aynı soketin tekrar girişi partnere "ayrıldı" titremesi
+  yaratmıyor. Hareket artık yalnızca sahneye girmiş yerel soketlere gider;
+  üretimde adım başına PostgreSQL NOTIFY sorgusu kalktı.
+- Mobil (`0c83437`): aynı anda gelen partner adımı ile kendi yankımız tek
+  render'da birleşince partner adımı kayboluyordu; durum artık tam kayıt ve
+  snap anahtarı taşır. Sahne yeniden kurulunca konum/presence yeniden uygulanır.
+  Planlanamayan partner adımı artık yürür ya da hedefe yerleşir. Kayıp
+  `scene_enter` yeniden denenir. iOS "inactive" artık sahneden çıkarmaz.
+- Bildirim (`cd74344`): ön planda aynı mesaj için toast + push banner çift
+  uyarısı kaldırıldı; açık sohbet veya o sohbetin MiniRoom'u ekrandayken toast
+  gösterilmez (CHT-01), toast sohbeti açar, bilinmeyen gönderen yerelleştirildi.
+
+PostgreSQL kapısı bu inceleme ortamında root dışı kullanıcıyla çalıştırılamadı;
+PostgreSQL kodu değişmedi. Native doğrulama hâlâ **OPEN**.
+
 ## Kalan görevler — OPEN
 
 - Kullanıcının native oda hareketi/presence kontrolü ve iki fiziksel telefon
@@ -97,6 +120,13 @@ deploy veya fiziksel cihaz push denemesi yapılmadı.
   ancak bu ölçümden sonra değerlendirilmelidir.
 - P03 oda daveti kararı, native kart/erişilebilirlik doğrulaması ve fiziksel
   cihaz push testi.
+- Sunucuda koltuk sahipliği yok: iki kullanıcı aynı koltuğu aynı anda seçerse
+  iki telefon da ikisini aynı koltukta gösterir (tutarlı ama üst üste).
+- Başlangıç yatağının (`room_v2_cozy_bed`) koltuk noktası Room V2 render
+  boyutuyla (1.42) zemin dışına düşüyor; MiniRoom'da yatağa oturma planı
+  kurulamıyor. Senkron hatası değil, geometri işi; native kontrol gerekir.
+- Aynı hesabın iki cihazı aynı odadaysa ikinci cihaz kendi avatarının diğer
+  cihazdan gelen adımlarını uygulamaz (yalnızca katılım snapshot'ında).
 
 Bu kayıt ilk paketin **IMPLEMENTED / TESTED** durumudur. Görev dosyasının
 tamamı bitmiş, **NATIVE_VERIFIED** veya **PRODUCTION_READY** değildir.

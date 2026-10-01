@@ -30,7 +30,9 @@ export const REALTIME_SLOW_CONSUMER_CLOSE_CODE = 1013
 const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "presence.snapshot",
   "presence.nearby",
-  "reaction.received"
+  "reaction.received",
+  // Superseded by the next step; the room snapshot (not transient) re-syncs.
+  "mini_room.avatar_moved"
 ])
 
 export interface RealtimeConnection {

@@ -103,6 +103,43 @@ test("participant reset cancels both walking drivers before creating the new sce
   f.runtime.unmount()
 })
 
+test("a partner step this phone cannot plan around its own avatar still moves the partner", () => {
+  const f = mount()
+  f.render()
+  // This phone's avatar takes the sofa first; the partner's phone sent its own
+  // step to the same seat before it saw that. The partner must not stay behind.
+  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), true)
+  const before = { x: f.store().avatars.partner.x, y: f.store().avatars.partner.y }
+  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, hotspotId: "sofa_corner" })
+  const partner = f.store().avatars.partner
+  const moved = partner.motion === "walking" || partner.x !== before.x || partner.y !== before.y
+  assert.ok(moved, "the partner walks or is placed at its authoritative target")
+  f.runtime.unmount()
+})
+
+test("snapping onto a seat shows the avatar seated there, as on the sender's phone", () => {
+  const f = mount()
+  f.render()
+  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+  const partner = f.store().avatars.partner
+  assert.equal(partner.motion, "sitting")
+  assert.equal(partner.seatedHotspotId, "sofa_corner")
+  assert.deepEqual({ x: partner.x, y: partner.y }, { x: .2, y: .58 })
+  assert.deepEqual(f.store().avatarPositions.partner, { x: { value: .2 }, y: { value: .58 } })
+  f.runtime.unmount()
+})
+
+test("the scene epoch advances when the scene is rebuilt, never on a plain re-render", () => {
+  const f = mount()
+  f.render()
+  const first = f.store().sceneEpoch
+  f.render()
+  assert.equal(f.store().sceneEpoch, first)
+  f.render({ partnerUser: { userId: "partner-2", displayName: "Other" } })
+  assert.notEqual(f.store().sceneEpoch, first)
+  f.runtime.unmount()
+})
+
 test("re-renders with the same participants keep the scene, speech and callbacks", () => {
   const f = mount()
   const first = f.render()

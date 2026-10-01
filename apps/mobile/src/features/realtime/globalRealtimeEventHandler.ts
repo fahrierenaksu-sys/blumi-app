@@ -22,6 +22,8 @@ export interface IncomingMessageToast {
   title: string
   body: string
   durationMs: number
+  /** Opens the message's conversation. */
+  onPress?: () => void
 }
 
 export interface GlobalRealtimeEventHandlerDependencies {
@@ -47,6 +49,13 @@ export interface GlobalRealtimeEventHandlerDependencies {
   /** `safety.user_blocked`: the server confirmed a block by this user. */
   onPartnerBlocked?: (blockedUserId: string) => void
   showIncomingMessageToast: (toast: IncomingMessageToast) => void
+  /** True while the user looks at this conversation: its chat or its MiniRoom. */
+  isConversationOnScreen?: (threadId: string) => boolean
+  /** Records an incoming message already surfaced in-app (toast or open conversation). */
+  noteMessageShownInApp?: (messageId: string) => void
+  openConversation?: (threadId: string) => void
+  /** Localized title for a sender whose name is not known yet. */
+  unknownSenderName?: string
 }
 
 export type GlobalRealtimeEventHandler = (event: ServerEvent) => void
@@ -112,18 +121,26 @@ export function createGlobalRealtimeEventHandler(
         dependencies.currentUserId &&
         event.payload.senderUserId !== dependencies.currentUserId
       ) {
+        const { threadId, messageId } = event.payload
+        // Either way the message is surfaced in-app, so a foreground push
+        // banner for it would repeat the alert.
+        dependencies.noteMessageShownInApp?.(messageId)
+        // The open conversation (or its MiniRoom bubble) already shows it.
+        if (dependencies.isConversationOnScreen?.(threadId)) return
         const senderThread = dependencies.getThreads().find(
-          (thread) => thread.threadId === event.payload.threadId
+          (thread) => thread.threadId === threadId
         )
         const senderName = senderThread?.participants.find(
           (participant) => participant.userId === event.payload.senderUserId
-        )?.displayName ?? "Someone"
+        )?.displayName ?? dependencies.unknownSenderName ?? "Someone"
+        const openConversation = dependencies.openConversation
         dependencies.showIncomingMessageToast({
           title: senderName,
           body: event.payload.body.length > 60
             ? `${event.payload.body.slice(0, 57)}…`
             : event.payload.body,
-          durationMs: 2500
+          durationMs: 2500,
+          ...(openConversation ? { onPress: () => openConversation(threadId) } : {})
         })
       }
       return

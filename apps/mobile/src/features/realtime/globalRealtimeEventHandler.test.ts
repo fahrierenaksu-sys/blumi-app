@@ -3,7 +3,8 @@ import test from "node:test"
 import type { ChatMessage, ChatThreadList } from "@blumi/contracts"
 import {
   createGlobalRealtimeEventHandler,
-  type GlobalRealtimeEventHandlerDependencies
+  type GlobalRealtimeEventHandlerDependencies,
+  type IncomingMessageToast
 } from "./globalRealtimeEventHandler"
 
 type TestDependencies = GlobalRealtimeEventHandlerDependencies & {
@@ -16,7 +17,7 @@ type TestDependencies = GlobalRealtimeEventHandlerDependencies & {
   readyRooms: unknown[]
   roomInvites: unknown[]
   matchedEvents: unknown[]
-  toasts: { title: string; body: string; durationMs: number }[]
+  toasts: IncomingMessageToast[]
 }
 
 const message: ChatMessage = {
@@ -81,7 +82,7 @@ function createDependencies(
     getThreads: () => [],
     openReadyMiniRoom: (payload: unknown) => dependencies.readyRooms.push(payload),
     onConnectionMatched: (payload: unknown) => dependencies.matchedEvents.push(payload),
-    showIncomingMessageToast: (toast: { title: string; body: string; durationMs: number }) => {
+    showIncomingMessageToast: (toast: IncomingMessageToast) => {
       dependencies.toasts.push(toast)
     },
     ...overrides
@@ -145,11 +146,43 @@ test("applies incoming messages and shortens only other-user notification copy",
   })
 
   assert.equal(dependencies.receivedMessages.length, 2)
-  assert.deepEqual(dependencies.toasts, [{
+  assert.deepEqual(dependencies.toasts.map(({ title, body, durationMs }) => ({ title, body, durationMs })), [{
     title: "Bora",
     body: `${message.body.slice(0, 57)}…`,
     durationMs: 2500
   }])
+})
+
+test("no toast for a message whose conversation is on screen, in its chat or its MiniRoom (CHT-01)", () => {
+  const onScreen = new Set(["thread_1"])
+  const shown: string[] = []
+  const dependencies = createDependencies({
+    isConversationOnScreen: (threadId) => onScreen.has(threadId),
+    noteMessageShownInApp: (messageId) => { shown.push(messageId) }
+  })
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  handler({ type: "chat.message_received", payload: message })
+  assert.deepEqual(dependencies.toasts, [])
+  assert.deepEqual(shown, ["message_1"], "a visible message needs no foreground push banner either")
+  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_2", threadId: "thread_2" } })
+  assert.equal(dependencies.toasts.length, 1)
+  assert.deepEqual(shown, ["message_1", "message_2"], "the toast already alerted; the push banner must not repeat it")
+  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_3", senderUserId: "ada" } })
+  assert.deepEqual(shown, ["message_1", "message_2"], "own messages are not alerts")
+})
+
+test("the message toast opens its conversation and names an unknown sender in the user's language", () => {
+  const opened: string[] = []
+  const dependencies = createDependencies({
+    openConversation: (threadId) => { opened.push(threadId) },
+    unknownSenderName: "Biri"
+  })
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  handler({ type: "chat.message_received", payload: message })
+  const [toast] = dependencies.toasts
+  assert.equal(toast?.title, "Biri")
+  toast?.onPress?.()
+  assert.deepEqual(opened, ["thread_1"])
 })
 
 test("the sender's in-room acknowledgement is stored without its client id", () => {

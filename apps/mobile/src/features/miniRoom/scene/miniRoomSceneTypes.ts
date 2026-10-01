@@ -152,6 +152,8 @@ export interface MiniRoomStore {
   interaction: InteractionState
   moveLocalAvatar: (point: RoomPoint) => boolean
   moveLocalAvatarToHotspot: (hotspotId: string) => boolean
+  /** Changes whenever the scene is rebuilt with fresh avatars (new participant, scene or appearance). */
+  sceneEpoch: number
   applyRemoteAvatar: (avatar: import("@blumi/contracts").MiniRoomAvatarMotion, snap?: boolean) => void
   setRemotePresence: (userId: string, present: boolean) => void
   addSpeechBubble: (bubble: Omit<SpeechBubble, "id" | "createdAt" | "expiresAt">) => void

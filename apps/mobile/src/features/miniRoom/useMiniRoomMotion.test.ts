@@ -23,20 +23,30 @@ test("room motion lifecycle leaves on background/blur and detaches the old accou
   const render = (patch: Partial<typeof input> = {}) => {
     input = { ...input, ...patch }; return runtime.render(() => hook.useMiniRoomMotion(input))
   }
-  render()
-  assert.equal(sent.at(-1).type, "mini_room.scene_enter")
-  app.currentState = "background"; for (const fn of appListeners) fn()
-  assert.equal(sent.at(-1).type, "mini_room.scene_exit")
-  assert.equal((runtime.output as ReturnType<typeof Hook.useMiniRoomMotion>).onLocalMove({ x: .5, y: .7 }), false)
-  app.currentState = "active"; for (const fn of appListeners) fn()
-  assert.equal(sent.at(-1).type, "mini_room.scene_enter")
-  const oldListener = [...events][0]!
-  render({ localUserId: "c", partnerUserId: "d", miniRoomId: "room-b" })
-  assert.equal(events.has(oldListener), false)
-  assert.equal(sent.at(-1).payload.miniRoomId, "room-b")
-  status = "reconnecting"; for (const fn of statuses) fn()
-  assert.equal((runtime.output as ReturnType<typeof Hook.useMiniRoomMotion>).partnerPresent, false)
-  render({ isFocused: false })
-  assert.equal(events.size + statuses.size + appListeners.size, 0)
-  runtime.unmount()
+  // Unmount even when an assertion fails, so no scene-entry retry timer is left.
+  try {
+    render()
+    assert.equal(sent.at(-1).type, "mini_room.scene_enter")
+    // Control Centre, the notification shade or a system prompt make iOS briefly
+    // "inactive" while the socket stays open: the partner must not see us leave.
+    const beforeInactive = sent.length
+    app.currentState = "inactive"; for (const fn of appListeners) fn()
+    app.currentState = "active"; for (const fn of appListeners) fn()
+    assert.equal(sent.length, beforeInactive)
+    app.currentState = "background"; for (const fn of appListeners) fn()
+    assert.equal(sent.at(-1).type, "mini_room.scene_exit")
+    assert.equal((runtime.output as ReturnType<typeof Hook.useMiniRoomMotion>).onLocalMove({ x: .5, y: .7 }), false)
+    app.currentState = "active"; for (const fn of appListeners) fn()
+    assert.equal(sent.at(-1).type, "mini_room.scene_enter")
+    const oldListener = [...events][0]!
+    render({ localUserId: "c", partnerUserId: "d", miniRoomId: "room-b" })
+    assert.equal(events.has(oldListener), false)
+    assert.equal(sent.at(-1).payload.miniRoomId, "room-b")
+    status = "reconnecting"; for (const fn of statuses) fn()
+    assert.equal((runtime.output as ReturnType<typeof Hook.useMiniRoomMotion>).partnerPresent, false)
+    render({ isFocused: false })
+    assert.equal(events.size + statuses.size + appListeners.size, 0)
+  } finally {
+    runtime.unmount()
+  }
 })

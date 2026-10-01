@@ -65,7 +65,10 @@ export function createRealtimeRouter(
   const motion = createMiniRoomMotionService({
     findRoom: id => miniRoomService.findMiniRoom(id),
     hasBlockBetween: (a, b) => safetyService.hasBlockBetween(a, b),
-    emit: (users, event) => connectionManager.sendToUsers(users, event)
+    // Local sockets only: no cross-instance publish (a NOTIFY query) per step.
+    emit: (connectionIds, event) => {
+      for (const connectionId of connectionIds) connectionManager.sendToConnection(connectionId, event)
+    }
   })
   miniRoomService.onRoomInvalidated?.(id => motion.invalidate(id))
   const chatMessageDeliveryService = createChatMessageDeliveryService({

@@ -291,9 +291,13 @@ export function ToastContainer() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={copy.dismissLabel(toast.title)}
+          accessibilityLabel={toast.onPress ? copy.openLabel(toast.title) : copy.dismissLabel(toast.title)}
           style={styles.content}
-          onPress={dismissToast}
+          onPress={() => {
+            const open = toast.onPress
+            dismissToast()
+            open?.()
+          }}
         >
           <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
             <Ionicons
