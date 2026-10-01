@@ -75,6 +75,8 @@ export function createRealtimeRouter(
     }
   })
   miniRoomService.onRoomInvalidated?.(id => motion.invalidate(id))
+  // Prefetch: both phones' first scene entry reuses the accept/join check.
+  miniRoomService.onRoomReady?.(room => motion.prime(room))
   const chatMessageDeliveryService = createChatMessageDeliveryService({
     chatService,
     safetyService,

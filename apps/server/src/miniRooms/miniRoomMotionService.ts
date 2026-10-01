@@ -8,6 +8,8 @@ interface MotionRoom {
   avatars: Map<string, MiniRoomAvatarMotion>
   connections: Map<string, { userId: string; sequence: number }>
   checkedAt: number
+  /** Set when an accept or join just verified the room (active, unblocked). */
+  verifiedAt?: number
   idleSince?: number
 }
 
@@ -42,6 +44,16 @@ export function createMiniRoomMotionService(options: {
     type: "mini_room.motion_snapshot", payload: { miniRoomId: id, epoch,
       participantUserIds: room.participantUserIds, avatars: [...room.avatars.values()].map(a => ({ ...a })) }
   })
+  function createMotionRoom(stored: MiniRoomRecord): MotionRoom {
+    return {
+      participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
+      // Until a socket enters, the room is idle and may be evicted.
+      idleSince: now(),
+      avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
+        userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
+      }]))
+    }
+  }
   async function authorize(id: string, userId: string, force = false) {
     let room = rooms.get(id)
     if (!room || force || now() - room.checkedAt >= ROOM_CHECK_TTL_MS) {
@@ -56,14 +68,7 @@ export function createMiniRoomMotionService(options: {
             throw new Error("That room is not available.")
           }
           if (validations.get(id) !== validation) throw new Error("That room is not available.")
-          const current = rooms.get(id) ?? {
-            participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
-            // Until a socket enters, the room is idle and may be evicted.
-            idleSince: now(),
-            avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
-              userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
-            }]))
-          }
+          const current = rooms.get(id) ?? createMotionRoom(stored)
           current.checkedAt = now()
           rooms.set(id, current)
           return current
@@ -104,11 +109,26 @@ export function createMiniRoomMotionService(options: {
   }
   return {
     invalidate(id: string) { rooms.delete(id); validations.delete(id) },
+    /**
+     * Prefetch: an accept or join has just verified this room, so the first
+     * scene entries of both phones reuse that verification instead of two
+     * more database reads. Ending or blocking invalidates it as before.
+     */
+    prime(stored: MiniRoomRecord) {
+      if (stored.endedAt) return
+      evictIdleRooms()
+      const room = rooms.get(stored.miniRoomId) ?? createMotionRoom(stored)
+      room.checkedAt = now()
+      room.verifiedAt = now()
+      rooms.set(stored.miniRoomId, room)
+    },
     disconnect(connectionId: string, onlyRoomId?: string) { disconnect(connectionId, onlyRoomId) },
     async enter(connectionId: string, userId: string, id: string) {
       if (typeof id !== "string" || !id || id.length > 128) return
       evictIdleRooms()
-      const room = await authorize(id, userId, true)
+      const verifiedAt = rooms.get(id)?.verifiedAt
+      const verified = verifiedAt !== undefined && now() - verifiedAt < ROOM_CHECK_TTL_MS
+      const room = await authorize(id, userId, !verified)
       if (rooms.get(id) !== room) throw new Error("That room is not available.")
       // One scene per socket. A repeated entry for the same room (a client retry)
       // keeps the avatar present instead of flashing it absent to the partner.

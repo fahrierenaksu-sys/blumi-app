@@ -159,6 +159,78 @@ test("chat room invites expire durably and blocked pairs fail closed", async () 
   )
 })
 
+test("accepting a chat room invite runs its independent reads together instead of one after another", async () => {
+  const harness = await createHarness()
+  const now = new Date("2026-07-21T10:00:00.000Z")
+  const created = await harness.service.createChatInvite({ threadId: harness.threadId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
+  const inFlight = new Set<string>()
+  const overlaps = new Set<string>()
+  const slow = <A extends unknown[], R>(name: string, call: (...args: A) => Promise<R>) => async (...args: A) => {
+    for (const other of inFlight) if (other !== name) overlaps.add([other, name].sort().join("+"))
+    inFlight.add(name)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 5))
+      return await call(...args)
+    } finally { inFlight.delete(name) }
+  }
+  const repository = harness.service.repository
+  repository.findMiniRoom = slow("findMiniRoom", repository.findMiniRoom.bind(repository))
+  repository.findInvite = slow("findInvite", repository.findInvite.bind(repository))
+  harness.safetyService.hasBlockBetween = slow("hasBlockBetween", harness.safetyService.hasBlockBetween.bind(harness.safetyService))
+  const threads = harness.chatService.repository
+  threads.findThread = slow("findThread", threads.findThread.bind(threads))
+
+  const accepted = await harness.service.decideChatInvite({ inviteId: created.invite.inviteId,
+    actorUserId: harness.recipient.userId, senderProfile: harness.sender, recipientProfile: harness.recipient,
+    status: "accepted" }, now)
+  assert.ok(accepted.miniRoom)
+  assert.ok(overlaps.has("findThread+hasBlockBetween"), "the thread and block checks run together before the claim")
+  assert.ok(overlaps.has("findMiniRoom+hasBlockBetween") && overlaps.has("findInvite+hasBlockBetween") &&
+    overlaps.has("findInvite+findMiniRoom"), "the post-claim block re-check and reads run together")
+})
+
+test("an accepted or joined room is announced ready for prefetch; a declined or blocked one is not", async () => {
+  const harness = await createHarness()
+  const ready: string[] = []
+  harness.service.onRoomReady?.((room) => { ready.push(room.miniRoomId) })
+  harness.service.onRoomReady?.(() => { throw new Error("a prefetch listener failed") })
+  const now = new Date("2026-07-21T10:00:00.000Z")
+  const declined = await harness.service.createChatInvite({ threadId: harness.threadId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
+  await harness.service.decideChatInvite({ inviteId: declined.invite.inviteId, actorUserId: harness.recipient.userId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient, status: "declined" }, now)
+  assert.deepEqual(ready, [])
+  const created = await harness.service.createChatInvite({ threadId: harness.threadId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
+  const accepted = await harness.service.decideChatInvite({ inviteId: created.invite.inviteId,
+    actorUserId: harness.recipient.userId, senderProfile: harness.sender, recipientProfile: harness.recipient,
+    status: "accepted" }, now)
+  assert.deepEqual(ready, [accepted.miniRoom!.miniRoomId], "a failing listener never fails the accept")
+  await harness.service.joinChatRoom({ miniRoomId: accepted.miniRoom!.miniRoomId, actorUserId: harness.sender.userId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
+  assert.equal(ready.length, 2)
+  await harness.safetyService.blockUser(harness.sender.userId, harness.recipient.userId)
+  await assert.rejects(harness.service.joinChatRoom({ miniRoomId: accepted.miniRoom!.miniRoomId,
+    actorUserId: harness.sender.userId, senderProfile: harness.sender, recipientProfile: harness.recipient }, now))
+  assert.equal(ready.length, 2)
+})
+
+test("a block found by the parallel post-claim check still closes the accepted room", async () => {
+  const harness = await createHarness()
+  const now = new Date("2026-07-21T10:00:00.000Z")
+  const created = await harness.service.createChatInvite({ threadId: harness.threadId,
+    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
+  let checks = 0
+  const original = harness.safetyService.hasBlockBetween.bind(harness.safetyService)
+  // Unblocked before the claim, blocked right after it (a block committing mid-accept).
+  harness.safetyService.hasBlockBetween = async (a, b) => ++checks > 1 ? true : original(a, b)
+  await assert.rejects(harness.service.decideChatInvite({ inviteId: created.invite.inviteId,
+    actorUserId: harness.recipient.userId, senderProfile: harness.sender, recipientProfile: harness.recipient,
+    status: "accepted" }, now), /not available/)
+  assert.equal(await harness.service.findActiveMiniRoomForUser(harness.recipient.userId), null)
+})
+
 async function createHarness(getPersonalRoomDecor?: Parameters<typeof createMiniRoomService>[0]["getPersonalRoomDecor"]) {
   const chatService = createChatService()
   const safetyService = createSafetyService()
@@ -186,7 +258,7 @@ async function createHarness(getPersonalRoomDecor?: Parameters<typeof createMini
       { userId: recipient.userId, displayName: recipient.displayName }
     ]
   })
-  return { service, safetyService, sender, recipient, threadId }
+  return { service, safetyService, chatService, sender, recipient, threadId }
 }
 
 function profile(userId: string, displayName: string): UserProfile {

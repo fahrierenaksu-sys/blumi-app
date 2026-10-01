@@ -43,6 +43,8 @@ export class ChatRoomInviteError extends Error {
 
 export interface MiniRoomService {
   onRoomInvalidated?(listener: (miniRoomId: string) => void): void
+  /** A chat room was just verified active and unblocked by an accept or join. */
+  onRoomReady?(listener: (miniRoom: MiniRoomRecord) => void): void
   repository: MiniRoomRepository
   createInvite(input: CreateInviteInput, now?: Date): Promise<MiniRoomInviteRecord>
   decideInvite(
@@ -166,10 +168,18 @@ export function createMiniRoomService(
 ): MiniRoomService {
   const repository = options.repository ?? createInMemoryMiniRoomRepository(undefined, options.getPersonalRoomDecor)
   const roomInvalidationListeners = new Set<(id: string) => void>()
+  const roomReadyListeners = new Set<(room: MiniRoomRecord) => void>()
+  const announceReady = (room: MiniRoomRecord): void => {
+    // A listener only prefetches; it can never fail the accept or join.
+    for (const listener of roomReadyListeners) {
+      try { listener(room) } catch { /* best effort */ }
+    }
+  }
   const idFactory = options.idFactory ?? (() => randomUUID())
 
   return {
     onRoomInvalidated(listener) { roomInvalidationListeners.add(listener) },
+    onRoomReady(listener) { roomReadyListeners.add(listener) },
     repository,
     async createChatInvite(input, now = new Date()) {
       assertDistinctChatProfiles(input.senderProfile, input.recipientProfile)
@@ -237,6 +247,13 @@ export function createMiniRoomService(
       }
       assertDistinctChatProfiles(input.senderProfile, input.recipientProfile)
       assertProfilesMatchInvite(invite, input.senderProfile, input.recipientProfile)
+      // Independent reads run together: the block lookup does not wait for
+      // the thread check (a rejection is observed only where it is awaited).
+      const blockedBefore = options.safetyService.hasBlockBetween(
+        invite.senderUserId,
+        invite.recipientUserId
+      )
+      blockedBefore.catch(() => undefined)
       await assertChatThreadParticipants(
         options.chatService,
         invite.sourceThreadId,
@@ -257,17 +274,13 @@ export function createMiniRoomService(
             "That room invite is not available."
           )
         }
-        if (
-          await options.safetyService.hasBlockBetween(
-            invite.senderUserId,
-            invite.recipientUserId
-          )
-        ) {
+        if (await blockedBefore) {
           throw new ChatRoomInviteError(
             "PAIR_BLOCKED",
             "That room invite is not available."
           )
         }
+        announceReady(miniRoom)
         return buildChatInviteResult({
           invite,
           miniRoom,
@@ -291,12 +304,7 @@ export function createMiniRoomService(
         })
         throw new ChatRoomInviteError("INVITE_EXPIRED", "That room invite expired.")
       }
-      if (
-        await options.safetyService.hasBlockBetween(
-          invite.senderUserId,
-          invite.recipientUserId
-        )
-      ) {
+      if (await blockedBefore) {
         await repository.transitionPendingInvite({
           inviteId: invite.inviteId,
           status: "cancelled",
@@ -353,28 +361,28 @@ export function createMiniRoomService(
       if (accepted === "accepted") {
         // A block can commit while the accept statement is in flight. The
         // block's pair separation then runs on a snapshot without this room and
-        // cannot end it, so re-check after the commit and close it here.
-        if (
-          await options.safetyService.hasBlockBetween(
-            invite.senderUserId,
-            invite.recipientUserId
-          )
-        ) {
+        // cannot end it, so re-check after the commit and close it here. The
+        // re-check and the two reads of the result are independent: one wave.
+        const [blockedAfter, persistedRoom, acceptedInvite] = await Promise.all([
+          options.safetyService.hasBlockBetween(invite.senderUserId, invite.recipientUserId),
+          repository.findMiniRoom(miniRoom.miniRoomId),
+          repository.findInvite(invite.inviteId)
+        ])
+        if (blockedAfter) {
           await separatePair(invite.recipientUserId, invite.senderUserId, now)
           throw new ChatRoomInviteError(
             "PAIR_BLOCKED",
             "That room invite is not available."
           )
         }
-        const persistedRoom = await repository.findMiniRoom(miniRoom.miniRoomId)
         if (!persistedRoom) throw new Error("Accepted room did not persist.")
-        const acceptedInvite = await repository.findInvite(invite.inviteId)
         if (!acceptedInvite) {
           throw new ChatRoomInviteError(
             "INVITE_NOT_AVAILABLE",
             "That room invite is not available."
           )
         }
+        announceReady(persistedRoom)
         return buildChatInviteResult({
           invite: acceptedInvite,
           miniRoom: persistedRoom,
@@ -406,6 +414,7 @@ export function createMiniRoomService(
             "That room invite is not available."
           )
         }
+        announceReady(currentRoom)
         return buildChatInviteResult({
           invite: currentInvite,
           miniRoom: currentRoom,
@@ -508,6 +517,7 @@ export function createMiniRoomService(
           "That room is not available."
         )
       }
+      announceReady(miniRoom)
       return {
         miniRoom,
         mediaSession: options.livekitTokenService.createMediaSession({
