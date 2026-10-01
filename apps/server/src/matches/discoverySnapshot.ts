@@ -17,6 +17,13 @@ export class DiscoveryCursorError extends Error {
   }
 }
 export const DISCOVERY_ACTIVE_SNAPSHOT_LIMIT = 30
+/**
+ * Ranked candidates stored per snapshot. Each refresh used to copy every
+ * eligible account (30 live snapshots per user), which grows the candidate
+ * table with users x accounts. The daily decision quota is 10, so a person
+ * never reaches the end of 1000 ranked profiles within one 30-minute snapshot.
+ */
+export const DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT = 1000
 export class DiscoveryRefreshLimitError extends Error {
   readonly code = "DISCOVERY_REFRESH_LIMIT"
   constructor(readonly retryAfterSeconds: number) {
@@ -82,7 +89,7 @@ export function createInMemoryDiscoverySnapshots(list: (userId: string, filters:
   const snapshots = new Map<string, { meta: DiscoverySnapshotMeta; ids: string[] }>()
   return {
     async create(input) {
-      const ids = (await list(input.userId, input.filters)).map(p => p.userId)
+      const ids = (await list(input.userId, input.filters)).slice(0, DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT).map(p => p.userId)
       const active = [...snapshots.values()].filter(value => value.meta.userId === input.userId && Date.parse(value.meta.expiresAt) > input.now.getTime())
       if (active.length >= DISCOVERY_ACTIVE_SNAPSHOT_LIMIT) throw new DiscoveryRefreshLimitError(
         Math.max(1, Math.ceil((Math.min(...active.map(value => Date.parse(value.meta.expiresAt))) - input.now.getTime()) / 1000)))

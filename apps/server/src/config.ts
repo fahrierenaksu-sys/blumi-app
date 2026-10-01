@@ -6,6 +6,7 @@ import {
   type DatabasePoolSettings
 } from "./db/databasePoolConfig"
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
+import { createPostgresRetentionService } from "./db/postgresRetention"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
 import { createSchemaReadinessCheck } from "./operations/schemaReadiness"
 import { createAuthService, type AuthService } from "./auth/authService"
@@ -163,6 +164,8 @@ export interface ConfiguredServerServices {
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
+  /** Bounded deletes of finished work and audit rows past their window (db/postgresRetention.ts). */
+  retentionService: { purgeExpired(): Promise<unknown> }
   authService: AuthService
   chatService: ChatService
   economyService: EconomyService
@@ -572,6 +575,7 @@ export function createConfiguredServerServices(
             livekitUrl: config.livekitUrl, apiKey: config.livekitApiKey, apiSecret: config.livekitApiSecret
           }))
         : { async dispatchDue() {} },
+      retentionService: createPostgresRetentionService(pool),
       realtimeTicketStore: createPostgresRealtimeTicketStore(pool),
       // LISTEN needs a session connection; publishes and purges use the
       // shared pool (NOTIFY works through a transaction pooler).
@@ -690,6 +694,7 @@ export function createConfiguredServerServices(
     personalRoomDecorService,
     roomSnapshotService,
     mediaRevocationService: { async dispatchDue() {} },
+    retentionService: { async purgeExpired() {} },
     async checkReadiness() {},
     sharedRateLimiter: createInMemoryRateBudget(),
     discoverySnapshots: createDiscoverySnapshotService(createInMemoryDiscoverySnapshots((userId, filters) => matchService.listDiscovery(userId, filters))),

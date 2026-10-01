@@ -1501,12 +1501,21 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           "DELETE FROM blumi_room_presence WHERE user_id = $1",
           [account.userId]
         )
+        // Rooms before invites: blumi_mini_rooms.invite_id references the
+        // accepted invite (NO ACTION), so deleting the invite first fails.
         await client.query(
-          "DELETE FROM blumi_mini_room_invites WHERE sender_user_id = $1 OR recipient_user_id = $1",
+          `DELETE FROM blumi_mini_rooms
+            WHERE participant_a_user_id = $1
+               OR participant_b_user_id = $1
+               OR invite_id IN (
+                 SELECT invite_id
+                   FROM blumi_mini_room_invites
+                  WHERE sender_user_id = $1 OR recipient_user_id = $1
+               )`,
           [account.userId]
         )
         await client.query(
-          "DELETE FROM blumi_mini_rooms WHERE participant_a_user_id = $1 OR participant_b_user_id = $1",
+          "DELETE FROM blumi_mini_room_invites WHERE sender_user_id = $1 OR recipient_user_id = $1",
           [account.userId]
         )
         await client.query(

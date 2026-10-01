@@ -139,21 +139,25 @@ export function createPostgresPresenceRepository(
     },
     async heartbeatConnectionLease(connectionId, userId, leaseMs) {
       const duration = validateConnectionLeaseMs(leaseMs)
-      return withRealtimeConnectionLeaseTransaction(pool, userId, async (client) => {
-        const result = await client.query(
-          `WITH connection_clock AS MATERIALIZED (
-             SELECT clock_timestamp() AS checked_at
-           )
-           UPDATE blumi_realtime_connection_leases AS lease
-              SET expires_at = connection_clock.checked_at + ($3::double precision * INTERVAL '1 millisecond'),
-                  updated_at = connection_clock.checked_at
-             FROM connection_clock
-            WHERE lease.connection_id = $1 AND lease.user_id = $2
-           RETURNING lease.connection_id`,
-          [connectionId, userId, duration]
-        )
-        return result.rows.length > 0
-      })
+      // One autocommit statement instead of BEGIN + lock + UPDATE + COMMIT: the
+      // clock CTE reads the lock CTE, so the per-user advisory lock is held
+      // before the row is written and released when the statement commits.
+      // A lease a concurrent disconnect deleted is re-checked and not updated.
+      const result = await pool.query(
+        `WITH lease_lock AS MATERIALIZED (
+           SELECT pg_advisory_xact_lock(hashtextextended($4, 0)) AS locked
+         ), connection_clock AS MATERIALIZED (
+           SELECT clock_timestamp() AS checked_at FROM lease_lock
+         )
+         UPDATE blumi_realtime_connection_leases AS lease
+            SET expires_at = connection_clock.checked_at + ($3::double precision * INTERVAL '1 millisecond'),
+                updated_at = connection_clock.checked_at
+           FROM connection_clock
+          WHERE lease.connection_id = $1 AND lease.user_id = $2
+         RETURNING lease.connection_id`,
+        [connectionId, userId, duration, realtimeConnectionLeaseLockKey(userId)]
+      )
+      return result.rows.length > 0
     },
     async heartbeatConnectionLeases(leases, leaseMs) {
       const duration = validateConnectionLeaseMs(leaseMs)

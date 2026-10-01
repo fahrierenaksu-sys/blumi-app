@@ -87,6 +87,10 @@ const discoverySnapshotCleanupWorker = startPeriodicWorker({
   run: () => services.discoverySnapshots.purgeExpired(), intervalMs: 60_000,
   reportError: (error) => console.error("Discovery snapshot cleanup failed", safeOperationalErrorKind(error))
 })
+const retentionWorker = startPeriodicWorker({
+  run: () => services.retentionService.purgeExpired(), intervalMs: 600_000,
+  reportError: (error) => console.error("Retention cleanup failed", safeOperationalErrorKind(error))
+})
 const discoveryWatchWorker = startDiscoveryWatchWorker({
   matchService: services.matchService,
   safetyService: services.safetyService,
@@ -187,7 +191,8 @@ const shutdown = createGracefulShutdown({
     () => mediaRevocationWorker?.stop() ?? Promise.resolve(),
     () => ticketCleanupWorker.stop(),
     () => rateBudgetCleanupWorker.stop(),
-    () => discoverySnapshotCleanupWorker.stop()
+    () => discoverySnapshotCleanupWorker.stop(),
+    () => retentionWorker.stop()
   ],
   drainOutgoing: () => connectionManager.closeFanout(),
   closeData: () => services.close()
