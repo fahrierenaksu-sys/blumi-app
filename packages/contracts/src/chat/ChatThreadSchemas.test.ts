@@ -1,9 +1,17 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  chatAckDeliveredCommandSchema,
+  chatMessageListSchema,
   chatMessageSchema,
-  chatParticipantSummarySchema
+  chatParticipantSummarySchema,
+  chatPreferencesEnvelopeSchema,
+  chatThreadSchema
 } from "./ChatThreadSchemas"
+import {
+  chatPreferencesUpdateRequestSchema,
+  markThreadReadRequestSchema
+} from "../api/CoreApiSchemas"
 
 const COMMON_LOADOUT = {
   bodyId: "avatar_v2_body_default",
@@ -118,6 +126,74 @@ test("chat message schema rejects impossible metadata chronology", () => {
     ...base,
     editedAt: "2026-08-13T09:05:00.000Z"
   }).success, false)
+})
+
+const RECEIPT_THREAD = {
+  threadId: "thread-1",
+  miniRoomId: "room-1",
+  participantUserIds: ["user-1", "user-2"],
+  participants: [{ userId: "user-1" }, { userId: "user-2" }],
+  createdAt: "2026-10-01T09:00:00.000Z"
+}
+
+test("thread and message lists round-trip the viewer's partner receipt cursors", () => {
+  const partnerReceipts = {
+    deliveredUpTo: { sentAt: "2026-10-01T09:02:00.000Z", messageId: "message-9" },
+    readUpTo: { sentAt: "2026-10-01T09:01:00.000Z" }
+  }
+  assert.deepEqual(chatThreadSchema.parse({ ...RECEIPT_THREAD, partnerReceipts }).partnerReceipts, partnerReceipts)
+  assert.deepEqual(chatMessageListSchema.parse({
+    userId: "user-1",
+    threadId: "thread-1",
+    messages: [],
+    partnerReceipts
+  }).partnerReceipts, partnerReceipts)
+})
+
+test("an old server's thread and message list without receipts stays valid", () => {
+  assert.equal(chatThreadSchema.parse(RECEIPT_THREAD).partnerReceipts, undefined)
+  assert.equal(chatMessageListSchema.parse({ userId: "user-1", threadId: "thread-1", messages: [] }).partnerReceipts, undefined)
+})
+
+test("receipt cursors reject malformed dates and empty or oversized message ids", () => {
+  for (const cursor of [
+    { sentAt: "soon" },
+    { sentAt: "2026-10-01T09:00:00.000Z", messageId: "" },
+    { sentAt: "2026-10-01T09:00:00.000Z", messageId: "m".repeat(257) }
+  ]) {
+    assert.equal(chatThreadSchema.safeParse({
+      ...RECEIPT_THREAD,
+      partnerReceipts: { deliveredUpTo: cursor }
+    }).success, false, JSON.stringify(cursor))
+  }
+})
+
+test("receipts never ride on the strict message shape older clients parse", () => {
+  const message = {
+    messageId: "message-1",
+    threadId: "thread-1",
+    senderUserId: "user-1",
+    body: "Hello",
+    sentAt: "2026-10-01T09:00:00.000Z"
+  }
+  assert.equal(chatMessageSchema.safeParse({ ...message, deliveredUpTo: { sentAt: message.sentAt } }).success, false)
+})
+
+test("delivery acks, read bodies and chat preferences are strict", () => {
+  assert.equal(chatAckDeliveredCommandSchema.safeParse({ threadId: "thread-1", upToMessageId: "message-1" }).success, true)
+  assert.equal(chatAckDeliveredCommandSchema.safeParse({ threadId: "thread-1" }).success, false)
+  assert.equal(chatAckDeliveredCommandSchema.safeParse({ threadId: "thread-1", upToMessageId: "m", userId: "x" }).success, false)
+  assert.deepEqual(markThreadReadRequestSchema.parse({}), {})
+  assert.deepEqual(markThreadReadRequestSchema.parse({ upToMessageId: " message-1 " }), { upToMessageId: "message-1" })
+  assert.equal(markThreadReadRequestSchema.safeParse({ upToMessageId: " " }).success, false)
+  assert.equal(markThreadReadRequestSchema.safeParse({ readAt: "2026-10-01T09:00:00.000Z" }).success, false)
+  assert.equal(chatPreferencesUpdateRequestSchema.safeParse({ readReceiptsEnabled: true }).success, true)
+  assert.equal(chatPreferencesUpdateRequestSchema.safeParse({ readReceiptsEnabled: "yes" }).success, false)
+  assert.equal(chatPreferencesUpdateRequestSchema.safeParse({}).success, false)
+  assert.deepEqual(
+    chatPreferencesEnvelopeSchema.parse({ preferences: { readReceiptsEnabled: false } }),
+    { preferences: { readReceiptsEnabled: false } }
+  )
 })
 
 function parseAvatar(loadout: unknown): Record<string, unknown> {

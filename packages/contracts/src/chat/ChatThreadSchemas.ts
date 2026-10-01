@@ -117,6 +117,19 @@ export const chatMessageReceivedSchema = z.object({
   clientMessageId: z.string().min(1).max(128).optional()
 }).strict().superRefine(refineChatMessageTimes)
 
+/** Message ids are server generated; the bound keeps hostile input small. */
+const chatMessageIdSchema = z.string().min(1).max(256)
+
+export const chatReceiptCursorSchema = z.object({
+  sentAt: isoDateSchema,
+  messageId: chatMessageIdSchema.optional()
+})
+
+export const chatPartnerReceiptsSchema = z.object({
+  deliveredUpTo: chatReceiptCursorSchema.optional(),
+  readUpTo: chatReceiptCursorSchema.optional()
+})
+
 export const chatThreadSchema = z.object({
   threadId: z.string().min(1),
   miniRoomId: z.string().min(1),
@@ -128,7 +141,8 @@ export const chatThreadSchema = z.object({
   createdAt: isoDateSchema,
   lastMessage: chatMessageSchema.optional(),
   unreadCount: z.number().int().nonnegative().optional(),
-  lastReadAt: isoDateSchema.optional()
+  lastReadAt: isoDateSchema.optional(),
+  partnerReceipts: chatPartnerReceiptsSchema.optional()
 })
 
 export const chatThreadListSchema = z.object({
@@ -141,7 +155,47 @@ export const chatThreadListSchema = z.object({
 export const chatMessageListSchema = z.object({
   userId: z.string().min(1),
   threadId: z.string().min(1),
-  messages: z.array(chatMessageSchema)
+  messages: z.array(chatMessageSchema),
+  partnerReceipts: chatPartnerReceiptsSchema.optional()
+})
+
+/** `chat.receipt_updated`: only the other participant may receive it. */
+export const chatReceiptUpdatedSchema = z.object({
+  threadId: z.string().min(1),
+  userId: z.string().min(1),
+  participantUserIds: z.tuple([z.string().min(1), z.string().min(1)]),
+  deliveredUpTo: chatReceiptCursorSchema.optional(),
+  readUpTo: chatReceiptCursorSchema.optional()
+}).superRefine((payload, context) => {
+  if (!payload.deliveredUpTo && !payload.readUpTo) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["deliveredUpTo"],
+      message: "A receipt update moves at least one cursor."
+    })
+  }
+  if (!payload.participantUserIds.includes(payload.userId) ||
+      payload.participantUserIds[0] === payload.participantUserIds[1]) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["userId"],
+      message: "The receipt belongs to one of two distinct participants."
+    })
+  }
+})
+
+/** Client `chat.ack_delivered` payload, validated by the server. */
+export const chatAckDeliveredCommandSchema = z.object({
+  threadId: z.string().min(1).max(256),
+  upToMessageId: chatMessageIdSchema
+}).strict()
+
+export const chatPreferencesSchema = z.object({
+  readReceiptsEnabled: z.boolean()
+})
+
+export const chatPreferencesEnvelopeSchema = z.object({
+  preferences: chatPreferencesSchema
 })
 
 export const chatThreadReadSchema = z.object({

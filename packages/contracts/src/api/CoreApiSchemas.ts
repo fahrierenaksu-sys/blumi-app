@@ -72,6 +72,18 @@ export const listChatMessagesQuerySchema = z.object({
   limit: z.union([z.string(), z.number()]).optional()
 })
 
+/**
+ * Optional body of `POST /v1/threads/:threadId/read` (2026-10-01). Older
+ * clients send no body; the server then marks the thread read up to now.
+ */
+export const markThreadReadRequestSchema = z.object({
+  upToMessageId: nonEmptyString.max(256).optional()
+}).strict()
+
+export const chatPreferencesUpdateRequestSchema = z.object({
+  readReceiptsEnabled: z.boolean()
+}).strict()
+
 export const roomInviteDecisionRequestSchema = z.object({
   status: z.enum(["accepted", "declined"])
 })
@@ -284,6 +296,19 @@ export const coreApiJsonSchemas = {
     },
     additionalProperties: false
   },
+  markThreadRead: {
+    type: "object",
+    properties: {
+      upToMessageId: { ...trimmedStringJsonSchema, maxLength: 256 }
+    },
+    additionalProperties: false
+  },
+  chatPreferences: {
+    type: "object",
+    required: ["readReceiptsEnabled"],
+    properties: { readReceiptsEnabled: { type: "boolean" } },
+    additionalProperties: false
+  },
   roomInviteDecision: {
     type: "object",
     required: ["status"],
@@ -450,6 +475,8 @@ export type DeviceRegistrationRequest = z.infer<typeof deviceRegistrationRequest
 export type PersonalRoomDecorSaveRequest = z.infer<typeof personalRoomDecorSaveRequestSchema>
 export type CreateThreadRequest = z.infer<typeof createThreadRequestSchema>
 export type SendChatMessageRequest = z.infer<typeof sendChatMessageRequestSchema>
+export type MarkThreadReadRequest = z.infer<typeof markThreadReadRequestSchema>
+export type ChatPreferencesUpdateRequest = z.infer<typeof chatPreferencesUpdateRequestSchema>
 export type RoomInviteDecisionRequest = z.infer<typeof roomInviteDecisionRequestSchema>
 export type OnboardingStepRequest = z.infer<typeof onboardingStepRequestSchema>
 export type PhoneNumberRequest = z.infer<typeof phoneNumberRequestSchema>

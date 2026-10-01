@@ -12,3 +12,4 @@ export * from "./avatar/avatarLoadoutRules";
 export * from "./avatar/retiredAvatarItems";
 export * from "./roomWorld/roomWorldGeometry";
 export * from "./roomWorld/miniRoomFloor";
+export * from "./chat/chatReceiptCursor";
