@@ -20,6 +20,7 @@ import {
   shouldPrefetchDiscoveryPage,
   shouldStartDiscoveryWatch
 } from "../discoveryQueryOptions"
+import { mergeDiscoveryQuota } from "../discoveryDeckModel"
 import { getDiscoveryErrorMessageForDisplay } from "../discoveryErrorCopy"
 import type { SessionActor } from "../../session/sessionModel"
 
@@ -96,8 +97,10 @@ export function useProductionDiscoveryQuery(input: {
         const lastPageIndex = current.pages.length - 1
         return {
           ...current,
+          // Answers of quick swipes can arrive out of order; never let a
+          // late one raise the remaining count again.
           pages: current.pages.map((page, index) =>
-            index === lastPageIndex ? { ...page, quota } : page
+            index === lastPageIndex ? { ...page, quota: mergeDiscoveryQuota(page.quota, quota) } : page
           )
         }
       }

@@ -93,3 +93,22 @@ export function applyProductionDetailDecision(
     }
   }
 }
+
+/**
+ * Decision answers can arrive out of order when cards are swiped quickly, so
+ * a late answer must not raise the remaining count again. Within one quota
+ * period (same `resetsAt`) the answer with the most used decisions wins, the
+ * newest on a tie; a later period always replaces an earlier one.
+ */
+export function mergeDiscoveryQuota(
+  current: DiscoveryDecisionQuota | undefined,
+  next: DiscoveryDecisionQuota
+): DiscoveryDecisionQuota {
+  if (!current) return next
+  const currentResetsAt = Date.parse(current.resetsAt)
+  const nextResetsAt = Date.parse(next.resetsAt)
+  if (Number.isFinite(currentResetsAt) && Number.isFinite(nextResetsAt) && nextResetsAt !== currentResetsAt) {
+    return nextResetsAt > currentResetsAt ? next : current
+  }
+  return next.used < current.used ? current : next
+}
