@@ -212,6 +212,32 @@ test("presence metadata writes ignore malformed cached avatars", async () => {
   assert.ok(fake.calls.some((call) => /INSERT INTO blumi_room_presence/i.test(call.text)))
 })
 
+test("a connection lease heartbeat is one autocommit statement that still takes the per-user lease lock", async () => {
+  // At a 30 s heartbeat and 5000 sockets, BEGIN + lock + UPDATE + COMMIT held a
+  // pooled connection for four round trips (~80 ms to Supabase) per pong.
+  const calls: QueryCall[] = []
+  let connects = 0
+  const pool = {
+    async query(text: string, values?: readonly unknown[]) {
+      calls.push({ text, values })
+      return { rows: [{ connection_id: "connection_1" }] }
+    },
+    async connect() {
+      connects += 1
+      throw new Error("a heartbeat must not check out a transaction client")
+    }
+  }
+  const repository = createPostgresPresenceRepository(pool as never)
+
+  assert.equal(await repository.heartbeatConnectionLease("connection_1", "user_1", 90_000), true)
+
+  assert.equal(connects, 0)
+  assert.equal(calls.length, 1)
+  assert.match(calls[0]!.text, /pg_advisory_xact_lock\(hashtextextended\(\$4, 0\)\)/)
+  assert.match(calls[0]!.text, /UPDATE blumi_realtime_connection_leases/)
+  assert.deepEqual(calls[0]!.values, ["connection_1", "user_1", 90_000, "blumi:realtime-connection-leases:user_1"])
+})
+
 test("postgres serializes concurrent spot reservations across independent pools", {
   skip: !process.env.DATABASE_URL
 }, async () => {
