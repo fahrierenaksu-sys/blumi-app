@@ -444,6 +444,25 @@ test("an exhausted quota keeps the server quota and says so", async () => {
   assert.equal(view.seen.size, 0)
 })
 
+test("a decision the server refuses as not eligible drops the card instead of springing it back", async () => {
+  const view = mount()
+  const { DiscoveryDecisionNotEligibleError } = await import("../discoveryApi")
+  view.harness.decide = async () => { throw new DiscoveryDecisionNotEligibleError() }
+
+  view.hook.handlePrimaryLike()
+  await view.settle()
+
+  // Retrying can never succeed (banned, matched elsewhere, filtered out or a
+  // recent pass), so the card must not return to the deck to fail again.
+  assert.deepEqual([...view.seen], ["user-a"])
+  assert.deepEqual(view.harness.swipeReturns, [])
+  assert.deepEqual(view.harness.haptics, ["light"], "no error haptic for a card that simply left")
+  assert.deepEqual(view.harness.toasts, [])
+  assert.deepEqual(view.feedback, [{ text: copy.unavailable, tone: "soft" }])
+  assert.deepEqual(view.harness.events, [], "nothing was decided")
+  assert.equal(view.hook.inFlightDecisionUserIds.size, 0)
+})
+
 test("ProfilePreview bounces decide through the production API or report an unavailable profile", async () => {
   const known = mount({ params: { pendingPassUserId: "user-a" } })
   await known.settle()

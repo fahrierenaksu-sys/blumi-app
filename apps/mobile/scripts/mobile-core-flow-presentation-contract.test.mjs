@@ -49,17 +49,19 @@ function readChatThreadSurface() {
 test("production match flow leads from Discover to chat without a room promise", () => {
   const matchResult = read("src/screens/MatchResultScreen.tsx")
   const matchModal = read("src/components/MatchResultModal.tsx")
-  const matchPresentation = read("src/features/matches/matchResultPresentation.ts")
+  // Copy for both match surfaces lives in the shared presentation model and
+  // its TR/EN copy module (DSC-1, 2026-10-01).
+  const matchPresentation = read("src/features/matches/matchResultPresentation.ts") +
+    read("src/features/matches/matchResultCopy.ts")
   const lobby = read("src/screens/LobbyScreen.tsx")
   const lobbyCopy = read("src/features/lobby/lobbyFeedbackCopy.ts")
 
-  // Copy for both match surfaces lives in the shared presentation model.
   assert.match(matchPresentation, /You two just matched\./)
   assert.match(matchPresentation, /Start with a message and get to know each other at your pace\./)
-  assert.match(matchPresentation, /label: "Start chatting"/)
-  assert.match(matchPresentation, /label: "Keep exploring"/)
+  assert.match(matchPresentation, /sendMessage: "Start chatting"/)
+  assert.match(matchPresentation, /keepDiscovering: "Keep exploring"/)
   assert.match(matchPresentation, /Safety options for \$\{name\}/)
-  assert.doesNotMatch(matchPresentation, /Go to Room|head into the room|open a room/)
+  assert.doesNotMatch(matchPresentation, /Go to Room|head into the room|open a room|odaya geç|oda aç/i)
   assert.doesNotMatch(matchResult, /canEnterSharedRoom|SharedMatchRoom|Go to Room/)
   assert.match(lobby, /showDiscoverFeedback\(lobbyCopy\.liked, "warm"\)/)
   assert.match(lobbyCopy, /liked: "Like sent\."/)
@@ -356,6 +358,22 @@ test("MiniRoom uses durable speech bubbles without the legacy reaction UI", () =
   assert.doesNotMatch(avatarLayer, /RoomEmote|REACTION_ICON|emoteWrap/)
   assert.match(scene, /ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000/)
   assert.match(scene, /onDismissBubble/)
+})
+
+test("leaving the MiniRoom always asks first, from the arrow, the menu or Android back (ROOM-08)", () => {
+  const screen = read("src/screens/MiniRoomScreen.tsx")
+  const guard = read("src/features/miniRoom/useMiniRoomLeaveGuard.ts")
+
+  // The HUD arrow and menu both call onLeave; it now opens the confirmation.
+  assert.match(screen, /useMiniRoomLeaveGuard\(\{/)
+  assert.match(screen, /onLeave=\{confirmLeave\}/)
+  assert.doesNotMatch(screen, /onLeave=\{requestEndMiniRoom\}/)
+  // Any other removal (Android back, a gesture, a reset) is guarded the same
+  // way until the room has ended; native-stack honours only usePreventRemove.
+  assert.match(guard, /usePreventRemove\(/)
+  assert.match(guard, /resolveMiniRoomRemoval\(\{ exited: exitedRef\.current \}\) === "allow"/)
+  assert.match(guard, /navigation\.dispatch\(data\.action\)/)
+  assert.match(guard, /Alert\.alert\(/)
 })
 
 test("the MiniRoom composer keeps refused text and restores a failed message for retry", () => {

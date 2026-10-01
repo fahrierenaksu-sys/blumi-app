@@ -31,6 +31,22 @@ test("HTTP goes through the shared request client, never a raw fetch", () => {
   assert.deepEqual(offenders, [], "use requestJson (deadline, abort, error mapping) instead of fetch()")
 })
 
+// An injected `fetcher` called directly skips requestJson's deadline and
+// cancellation: room invite send/accept/cancel could stay busy forever
+// (2026-10-01). Listed files call their fetcher inside a requestJson wrapper.
+const FETCHER_INSIDE_REQUEST_JSON = new Set([
+  "features/network/apiClient.ts",
+  "features/inventory/economyApi.ts"
+])
+
+test("injected fetchers run only inside requestJson", () => {
+  const offenders = sources
+    .filter(({ text }) => /await fetcher\(/.test(text))
+    .map(({ path }) => path)
+    .filter((path) => !FETCHER_INSIDE_REQUEST_JSON.has(path))
+  assert.deepEqual(offenders, [], "pass the fetcher to requestJson instead of calling it directly")
+})
+
 // Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([

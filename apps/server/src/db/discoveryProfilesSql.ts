@@ -1,5 +1,12 @@
-/** Shared eligibility/ranking query. Snapshot storage returns only IDs to SQL. */
-export function discoveryProfilesSql(): string {
+/**
+ * Shared eligibility/ranking query. Snapshot storage returns only IDs to SQL.
+ * `candidateSource` names an outer CTE with a `user_id` column; eligibility is
+ * then evaluated for those accounts only (a page read), never the whole pool.
+ */
+export function discoveryProfilesSql(candidateSource?: "page_candidates"): string {
+  const candidateFilter = candidateSource
+    ? `AND blumi_accounts.user_id IN (SELECT ${candidateSource}.user_id FROM ${candidateSource})`
+    : ""
   return `WITH viewer AS (
            SELECT COALESCE(identity_gender, gender) AS viewer_gender,
                   interests AS viewer_vibes
@@ -47,6 +54,7 @@ export function discoveryProfilesSql(): string {
              FROM blumi_accounts
              CROSS JOIN viewer
             WHERE user_id <> $1
+            ${candidateFilter}
             AND moderation_status NOT IN ('suspended', 'banned')
             AND display_name <> ''
             AND age IS NOT NULL

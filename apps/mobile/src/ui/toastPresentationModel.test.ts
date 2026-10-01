@@ -8,6 +8,8 @@ import {
   getToastAnnouncement,
   getToastBottomOffset,
   getToastHapticKind,
+  getToastPressLabel,
+  handleToastPress,
   reduceToastPresentation,
   resolveToastKeyboardInset,
   type ToastData
@@ -133,6 +135,33 @@ test("the dismiss label is localised", () => {
 test("a toast that opens its subject says so to VoiceOver, in both languages", () => {
   assert.equal(getToastCopy("tr").openLabel("Bora"), "Aç: Bora")
   assert.equal(getToastCopy("en").openLabel("Bora"), "Open: Bora")
+})
+
+test("pressing an actionable toast dismisses it, then runs its action once", () => {
+  const calls: string[] = []
+  const actionable: ToastData = {
+    id: "toast_3",
+    title: "Ayşe odada",
+    body: "Katılmak için dokun",
+    type: "info",
+    accessibilityLabel: "Ayşe odada. Katılmak için dokun",
+    onPress: () => { calls.push("join") }
+  }
+  handleToastPress(actionable, () => { calls.push("dismiss") })
+  assert.deepEqual(calls, ["dismiss", "join"])
+
+  calls.length = 0
+  handleToastPress(first, () => { calls.push("dismiss") })
+  assert.deepEqual(calls, ["dismiss"], "a plain toast only dismisses")
+
+  const labels = getToastCopy("tr")
+  assert.equal(getToastPressLabel(actionable, labels), "Ayşe odada. Katılmak için dokun")
+  assert.equal(getToastPressLabel(first, labels), "Bildirimi kapat: Saved")
+  assert.equal(
+    getToastPressLabel({ title: "Bora", onPress: () => undefined }, labels),
+    "Aç: Bora",
+    "an actionable toast without its own label says it opens"
+  )
 })
 
 test("the toast locale is Turkish only for Turkish locales", () => {

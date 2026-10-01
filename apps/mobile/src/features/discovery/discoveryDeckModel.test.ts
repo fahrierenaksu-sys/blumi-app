@@ -8,6 +8,7 @@ import {
   beginInFlightDiscoveryDecision,
   buildDiscoveryDeck,
   finishInFlightDiscoveryDecision,
+  mergeDiscoveryQuota,
   rollbackOptimisticDiscoveryDecision
 } from "./discoveryDeckModel"
 
@@ -87,4 +88,30 @@ test("a completed production detail decision removes the candidate and synchroni
   assert.deepEqual([...synchronized.seenUserIds], ["older", "candidate-a"])
   assert.deepEqual(synchronized.quota, quota)
   assert.deepEqual([...seen], ["older"])
+})
+
+test("an older decision answer arriving late never raises the remaining quota again", () => {
+  const quotaAt = (used: number, resetsAt = "2026-07-31T00:00:00.000Z"): DiscoveryDecisionQuota => ({
+    limit: 10,
+    extensionDecisions: 0,
+    used,
+    remaining: 10 - used,
+    resetsAt,
+    rewardedAd: { available: false, extensionDecisions: 10 }
+  })
+
+  // Two quick swipes: the second answer (used 10) arrives before the first (used 9).
+  const afterSecond = mergeDiscoveryQuota(quotaAt(8), quotaAt(10))
+  assert.equal(afterSecond.remaining, 0)
+  assert.equal(mergeDiscoveryQuota(afterSecond, quotaAt(9)).remaining, 0, "the late answer is stale")
+
+  // Same count: the newest answer wins (for example a raised limit).
+  const raised = { ...quotaAt(10), limit: 20, remaining: 10 }
+  assert.deepEqual(mergeDiscoveryQuota(quotaAt(10), raised), raised)
+  // A new UTC day replaces the old period even with a smaller count.
+  const nextDay = quotaAt(1, "2026-08-01T00:00:00.000Z")
+  assert.deepEqual(mergeDiscoveryQuota(afterSecond, nextDay), nextDay)
+  // A late answer from the previous day never replaces the new one.
+  assert.deepEqual(mergeDiscoveryQuota(nextDay, quotaAt(10)), nextDay)
+  assert.deepEqual(mergeDiscoveryQuota(undefined, nextDay), nextDay)
 })

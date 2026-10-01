@@ -24,6 +24,7 @@ import {
   createStableMatchedUserAvatar,
   resolveLatestMatchRoomAvatar
 } from "../features/matches/matchRoomResolvers"
+import { getAppLocale } from "../features/session/appLocale"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { createPostMatchChatNavigationState, getLobbyReturnStrategy } from "../navigation/rootNavigationModel"
@@ -62,10 +63,12 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     [match.matchedUser]
   )
   const canStartConversation = canOpenMatchExperience(sessionActor)
+  const [locale] = useState(getAppLocale)
   const presentation = getMatchResultPresentation({
     entry: "discovery_route",
     matchedUserName: match.matchedUser.displayName,
-    canStartConversation
+    canStartConversation,
+    locale
   })
   const [sendMessageAction, keepDiscoveringAction] = presentation.actions
   const [reportVisible, setReportVisible] = useState(false)

@@ -214,26 +214,32 @@ export function createMatchService(
       if (currentUserId === targetUserId) {
         throw new DiscoveryDecisionNotEligibleError()
       }
-      const target = await repository.findEligibleDiscoverProfile(
-        currentUserId,
-        targetUserId,
-        filters,
-        currentUserGender
-      )
-      if (!target) {
-        const previousDecision = await repository.findDecision(
+      // Both are reads; running them together saves one database round trip
+      // on every like and pass. The quota write still re-checks under its lock.
+      const [target, previousDecision] = await Promise.all([
+        repository.findEligibleDiscoverProfile(
           currentUserId,
-          targetUserId
-        )
-        if (previousDecision?.decision === decision) {
+          targetUserId,
+          filters,
+          currentUserGender
+        ),
+        repository.findDecision(currentUserId, targetUserId)
+      ])
+      if (!target) {
+        // The parallel read may predate a concurrent twin's commit that the
+        // eligibility read already saw; re-read before refusing a retry.
+        const confirmedDecision = previousDecision?.decision === decision
+          ? previousDecision
+          : await repository.findDecision(currentUserId, targetUserId)
+        if (confirmedDecision?.decision === decision) {
           const retryTarget = await repository.findDiscoverProfile(targetUserId)
           if (retryTarget) {
-            return decideForTarget(currentUserId, retryTarget, decision, now)
+            return decideForTarget(currentUserId, retryTarget, decision, now, confirmedDecision)
           }
         }
         throw new DiscoveryDecisionNotEligibleError()
       }
-      return decideForTarget(currentUserId, target, decision, now)
+      return decideForTarget(currentUserId, target, decision, now, previousDecision)
     }
   }
 
@@ -241,7 +247,8 @@ export function createMatchService(
     currentUserId: string,
     target: DiscoverProfileRecord,
     decision: DiscoveryDecision,
-    now: Date
+    now: Date,
+    knownPreviousDecision?: DiscoveryDecisionRecord | null
   ): Promise<DiscoveryDecisionResult> {
       const targetUserId = target.userId
 
@@ -251,7 +258,9 @@ export function createMatchService(
         decision,
         decidedAt: now.toISOString()
       }
-      const previousDecision = await repository.findDecision(currentUserId, targetUserId)
+      const previousDecision = knownPreviousDecision !== undefined
+        ? knownPreviousDecision
+        : await repository.findDecision(currentUserId, targetUserId)
       const reconsiderationOf = canReconsiderExpiredPass(
         previousDecision,
         target,
@@ -281,7 +290,7 @@ export function createMatchService(
       const reciprocal = await repository.findDecision(targetUserId, currentUserId)
       if (reciprocal?.decision !== "like") {
         if (persisted.created) {
-          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId, currentUserId))
+          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId))
         }
         return {
           decision: canonicalDecision,
@@ -339,14 +348,15 @@ export function createMatchService(
 
 async function notifyLike(
   notificationService: Pick<NotificationService, "sendPushToUser"> | undefined,
-  userId: string,
-  sourceUserId: string
+  userId: string
 ): Promise<void> {
   if (!notificationService) return
   await notificationService.sendPushToUser(userId, {
     title: "Someone likes your vibe",
     body: "Open Blumi to see where this could go.",
-    data: { type: "discovery.like", sourceUserId }
+    // The like is anonymous: the device payload carries an opaque id for the
+    // push policy's dedupe, never the liker's user id.
+    data: { type: "discovery.like", likeId: `like_${randomUUID()}` }
   })
 }
 

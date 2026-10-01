@@ -417,6 +417,49 @@ test("room invite decisions are recipient-only and yield one outcome under concu
   }
 })
 
+test("accepting and joining a room read each participant's account once", async () => {
+  const harness = createHarness()
+  try {
+    const { ada, bora, threadId } = await createMatchedPair(harness, "40013")
+    const invite = await harness.app.inject({
+      method: "POST", url: `/v1/threads/${threadId}/room-invites`, headers: ada.headers, payload: {}
+    })
+    assert.equal(invite.statusCode, 201)
+    const accountReads: string[] = []
+    const repository = harness.authService.repository
+    const findAccountByUserId = repository.findAccountByUserId.bind(repository)
+    repository.findAccountByUserId = async (userId) => {
+      accountReads.push(userId)
+      return findAccountByUserId(userId)
+    }
+
+    const accepted = await harness.app.inject({
+      method: "POST", url: `/v1/room-invites/${invite.json().invite.inviteId}/decision`, headers: bora.headers,
+      payload: { status: "accepted" }
+    })
+    assert.equal(accepted.statusCode, 200)
+    assert.deepEqual(accepted.json().participants.map((participant: { displayName: string }) => participant.displayName),
+      ["Ada", "Bora"])
+    // The caller's account comes with the session; the partner's is read
+    // once (with its moderation state). It used to be read six times in a row.
+    assert.ok(accountReads.length <= 2, `decision read accounts ${accountReads.length} times`)
+    assert.ok(accountReads.every((userId) => userId === ada.userId))
+
+    accountReads.length = 0
+    const roomId = accepted.json().miniRoom.miniRoomId as string
+    const joined = await harness.app.inject({
+      method: "POST", url: `/v1/room-sessions/${roomId}/join`, headers: ada.headers, payload: {}
+    })
+    assert.equal(joined.statusCode, 200)
+    assert.deepEqual(joined.json().participants.map((participant: { userId: string }) => participant.userId),
+      [ada.userId, bora.userId])
+    assert.ok(accountReads.length <= 2, `join read accounts ${accountReads.length} times`)
+    assert.ok(accountReads.every((userId) => userId === bora.userId))
+  } finally {
+    await harness.app.close()
+  }
+})
+
 test("an expired room invite cannot be accepted and never opens a room", async () => {
   const harness = createHarness()
   try {
@@ -538,6 +581,33 @@ test("a block stops the pair on every social-loop route, including room connecti
       .filter((entry) => entry.userIds.includes(ada.userId) && entry.event.type !== "chat.room_invite_updated").length, 0)
     // Read from storage: the service now hides the blocked pair's thread.
     assert.equal((await harness.chatService.repository.listMessages(threadId)).length, 0)
+  } finally {
+    await harness.app.close()
+  }
+})
+
+test("a block or report over HTTP reaches the blocker's other devices, never the blocked person", async () => {
+  const harness = createHarness()
+  try {
+    const { ada, bora, stranger } = await createMatchedPair(harness, "40012")
+    const blockedEvents = () => harness.eventsOfType("safety.user_blocked")
+      .map((entry) => ({ userIds: entry.userIds, payload: entry.event.payload }))
+
+    const blocked = await harness.app.inject({
+      method: "POST", url: "/v1/safety/blocks", headers: ada.headers, payload: { blockedUserId: bora.userId }
+    })
+    assert.equal(blocked.statusCode, 201)
+    // Same confirmation the realtime safety.block handler sends: the blocker's
+    // other phone drops the chat at once instead of on its next refresh.
+    assert.deepEqual(blockedEvents(), [{ userIds: [ada.userId], payload: { blockedUserId: bora.userId } }])
+
+    const reported = await harness.app.inject({
+      method: "POST", url: "/v1/safety/reports", headers: stranger.headers,
+      payload: { reportedUserId: bora.userId, reason: "harassment" }
+    })
+    assert.equal(reported.statusCode, 201)
+    assert.deepEqual(blockedEvents().at(-1), { userIds: [stranger.userId], payload: { blockedUserId: bora.userId } })
+    assert.ok(blockedEvents().every((entry) => !entry.userIds.includes(bora.userId)))
   } finally {
     await harness.app.close()
   }

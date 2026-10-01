@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useRef, type ComponentProps } from "react"
+import type { AvatarSelection } from "@blumi/contracts"
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react"
 import {
   Animated,
   Easing,
@@ -23,6 +24,7 @@ import {
   getMatchResultPresentation,
   shouldPlayMatchHaptic
 } from "../features/matches/matchResultPresentation"
+import { getAppLocale } from "../features/session/appLocale"
 import { uiTheme } from "../ui/theme"
 
 interface MatchResultModalProps {
@@ -31,6 +33,8 @@ interface MatchResultModalProps {
   matchedUserName: string
   matchedUserId?: string
   matchedAvatarSnapshot?: CandidateAvatarSnapshot
+  /** The partner's real avatar; without it a preview outfit is shown (DSC-3). */
+  matchedAvatarSelection?: AvatarSelection
   onClose: () => void
   onKeepDiscovering: () => void
   onSendMessage: () => void
@@ -183,6 +187,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
     matchedUserName,
     matchedUserId,
     matchedAvatarSnapshot,
+    matchedAvatarSelection,
     onClose,
     onKeepDiscovering,
     onSendMessage
@@ -196,16 +201,19 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const heartPulse = useRef(new Animated.Value(1)).current
   const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
   const previousVisibleRef = useRef(false)
+  const [locale] = useState(getAppLocale)
   const presentation = getMatchResultPresentation({
     entry: "connection_modal",
     matchedUserName,
-    canStartConversation: true
+    canStartConversation: true,
+    locale
   })
   const [sendMessageAction, keepDiscoveringAction] = presentation.actions
   const resolvedMatchedAvatarSnapshot = createCandidateAvatarSnapshot({
     userId: matchedUserId ?? matchedUserName,
     displayName: matchedUserName,
-    avatarSnapshot: matchedAvatarSnapshot
+    avatarSnapshot: matchedAvatarSnapshot,
+    avatarSelection: matchedAvatarSelection
   })
 
   const stopEntrance = useCallback(() => {
@@ -377,9 +385,6 @@ export function MatchResultModal(props: MatchResultModalProps) {
                 size={96}
                 stage="match"
               />
-              <Text style={styles.avatarSourceText}>
-                {resolvedMatchedAvatarSnapshot.label}
-              </Text>
               <Text style={styles.avatarName}>{matchedUserName}</Text>
             </View>
           </Animated.View>
@@ -488,11 +493,6 @@ const styles = StyleSheet.create({
     ...uiTheme.font.bodySmall,
     color: uiTheme.colors.textSecondary,
     fontWeight: "600",
-    textAlign: "center",
-  },
-  avatarSourceText: {
-    ...uiTheme.font.micro,
-    color: uiTheme.colors.textMuted,
     textAlign: "center",
   },
   heartConnector: {

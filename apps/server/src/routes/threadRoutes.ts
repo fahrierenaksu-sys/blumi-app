@@ -17,7 +17,8 @@ import {
 import type {
   AvatarSelection,
   ChatThread,
-  CompleteAvatarSelection
+  CompleteAvatarSelection,
+  UserProfile
 } from "@blumi/contracts"
 import { cloneCompleteAvatarSelection } from "../avatar/avatarSelectionPersistence"
 import {
@@ -526,26 +527,16 @@ export async function registerThreadRoutes(
     if (!context || context === "hidden") {
       return sendUnavailableInviteContext(context, reply, "That room is not available.")
     }
-    const senderAccount = await authService.repository.findAccountByUserId(
-      miniRoom.participantUserIds[0]
-    )
-    const recipientAccount = await authService.repository.findAccountByUserId(
-      miniRoom.participantUserIds[1]
-    )
-    if (
-      !senderAccount ||
-      !recipientAccount ||
-      !(await authService.isRealtimeUserAllowed(senderAccount.userId)) ||
-      !(await authService.isRealtimeUserAllowed(recipientAccount.userId))
-    ) {
+    const roomProfiles = resolvePairProfiles(miniRoom.participantUserIds, resolved.account, context.partnerAccount)
+    if (!roomProfiles) {
       return reply.code(403).send({ error: "That room is not available." })
     }
     try {
       return await miniRoomService.joinChatRoom({
         miniRoomId: roomSessionId,
         actorUserId: resolved.account.userId,
-        senderProfile: senderAccount.profile,
-        recipientProfile: recipientAccount.profile
+        senderProfile: roomProfiles[0],
+        recipientProfile: roomProfiles[1]
       })
     } catch (error) {
       return sendChatRoomInviteError(error, reply)
@@ -651,26 +642,20 @@ export async function registerThreadRoutes(
     if (!context || context === "hidden") {
       return sendUnavailableInviteContext(context, reply, "That room invite is not available.")
     }
-    const senderAccount = await authService.repository.findAccountByUserId(
-      invite.senderUserId
+    const inviteProfiles = resolvePairProfiles(
+      [invite.senderUserId, invite.recipientUserId],
+      resolved.account,
+      context.partnerAccount
     )
-    const recipientAccount = await authService.repository.findAccountByUserId(
-      invite.recipientUserId
-    )
-    if (
-      !senderAccount ||
-      !recipientAccount ||
-      !(await authService.isRealtimeUserAllowed(invite.senderUserId)) ||
-      !(await authService.isRealtimeUserAllowed(invite.recipientUserId))
-    ) {
+    if (!inviteProfiles) {
       return reply.code(403).send({ error: "That room invite is not available." })
     }
     try {
       const result = await miniRoomService.decideChatInvite({
         inviteId,
         actorUserId: resolved.account.userId,
-        senderProfile: senderAccount.profile,
-        recipientProfile: recipientAccount.profile,
+        senderProfile: inviteProfiles[0],
+        recipientProfile: inviteProfiles[1],
         status: parsed.data.status
       })
       services.connectionManager.sendToUsers(
@@ -938,13 +923,36 @@ async function resolveMutualChatInviteContext(input: {
     thread.threadId === createAuthorizedThreadId(source) &&
     thread.miniRoomId === source.miniRoomId
   )) return null
-  const partnerAccount = await input.services.authService.repository.findAccountByUserId(
-    partnerUserId
-  )
-  if (!partnerAccount || !(await input.services.authService.isRealtimeUserAllowed(partnerUserId))) {
+  // One round trip: the partner's profile and moderation state together.
+  const [partnerAccount, partnerAllowed] = await Promise.all([
+    input.services.authService.repository.findAccountByUserId(partnerUserId),
+    input.services.authService.isRealtimeUserAllowed(partnerUserId)
+  ])
+  if (!partnerAccount || !partnerAllowed) {
     return null
   }
   return { thread, partnerAccount }
+}
+
+/**
+ * The [sender, recipient] profiles of an invite or room from the caller's
+ * session account and the partner the invite context already read and
+ * checked; the caller's moderation was checked with the session. Null when
+ * the pair is not exactly the caller and that partner (answered 403).
+ */
+function resolvePairProfiles(
+  pairUserIds: readonly [string, string],
+  callerAccount: { userId: string; profile: UserProfile },
+  partnerAccount: { userId: string; profile: UserProfile }
+): [UserProfile, UserProfile] | null {
+  if (pairUserIds[0] === pairUserIds[1]) return null
+  const profiles = new Map([
+    [callerAccount.userId, callerAccount.profile],
+    [partnerAccount.userId, partnerAccount.profile]
+  ])
+  const sender = profiles.get(pairUserIds[0])
+  const recipient = profiles.get(pairUserIds[1])
+  return sender && recipient ? [sender, recipient] : null
 }
 
 function sendUnavailableInviteContext(

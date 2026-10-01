@@ -36,6 +36,8 @@ import {
   getToastAnnouncement,
   getToastBottomOffset,
   getToastHapticKind,
+  getToastPressLabel,
+  handleToastPress,
   reduceToastPresentation,
   resolveToastKeyboardInset,
   type ToastData,
@@ -291,13 +293,9 @@ export function ToastContainer() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={toast.onPress ? copy.openLabel(toast.title) : copy.dismissLabel(toast.title)}
+          accessibilityLabel={getToastPressLabel(toast, copy)}
           style={styles.content}
-          onPress={() => {
-            const open = toast.onPress
-            dismissToast()
-            open?.()
-          }}
+          onPress={() => handleToastPress(toast, dismissToast)}
         >
           <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
             <Ionicons

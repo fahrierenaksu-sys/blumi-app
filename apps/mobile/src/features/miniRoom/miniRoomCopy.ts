@@ -47,6 +47,9 @@ export interface MiniRoomCopy {
   roomRefreshFailed: string
   leaveNotConfirmed: string
   legacyDecorNotice: string
+  leaveConfirmTitle: string
+  leaveConfirmBody: string
+  leaveConfirmStay: string
 }
 
 export function getMiniRoomCopy(locale: AccountRecoveryLocale): MiniRoomCopy {
@@ -99,7 +102,10 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     connectionFailed: "Couldn't connect to the room.",
     roomRefreshFailed: "Room details could not be refreshed. Your current room is unchanged; it will retry after the next reconnection.",
     leaveNotConfirmed: "Leaving the room could not be confirmed. Check your connection and try again.",
-    legacyDecorNotice: "This older session has no saved decor. A shared default room is shown."
+    legacyDecorNotice: "This older session has no saved decor. A shared default room is shown.",
+    leaveConfirmTitle: "Leave the room?",
+    leaveConfirmBody: "The room closes for both of you.",
+    leaveConfirmStay: "Stay"
   },
   tr: {
     roomTitle: "Eşleşme odası",
@@ -146,7 +152,10 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     connectionFailed: "Oda bağlantısı kurulamadı.",
     roomRefreshFailed: "Oda bilgileri yenilenemedi. Mevcut oda korunuyor; bağlantı tekrar kurulunca yeniden denenecek.",
     leaveNotConfirmed: "Odadan çıkış sunucuda doğrulanamadı. Bağlantını kontrol edip tekrar dene.",
-    legacyDecorNotice: "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor."
+    legacyDecorNotice: "Bu eski oturumda dekor kaydı yok. Ortak varsayılan oda gösteriliyor.",
+    leaveConfirmTitle: "Odadan ayrılmak istiyor musun?",
+    leaveConfirmBody: "Oda ikiniz için de kapanır.",
+    leaveConfirmStay: "Kal"
   }
 }
 

@@ -12,9 +12,9 @@ function params(userId: string, filters: DiscoveryFilters): unknown[] {
   const f = normalizeFilters(filters)
   return [userId, f.ageMin, f.ageMax, f.genders, f.vibes]
 }
-function eligibleSql(projection: "profile" | "candidate" = "profile"): string {
+function eligibleSql(projection: "profile" | "candidate" = "profile", candidateSource?: "page_candidates"): string {
   const columns = projection === "candidate" ? "ranked.user_id, ranked.rank_score" : "ranked.*"
-  return `SELECT ${columns} FROM (${discoveryProfilesSql()}) ranked
+  return `SELECT ${columns} FROM (${discoveryProfilesSql(candidateSource)}) ranked
     JOIN blumi_accounts account ON account.user_id = ranked.user_id
     WHERE account.moderation_status NOT IN ('suspended', 'banned')
       AND NOT EXISTS (SELECT 1 FROM blumi_safety_blocks b WHERE
@@ -64,14 +64,18 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
       return result.rows[0] ? map(result.rows[0]) : null
     },
     async read(input) {
-      const result = await pool.query(`WITH current_eligible AS (${eligibleSql()}), positions AS (
+      // Current eligibility is re-checked for this page's candidates only.
+      // Ranking the whole pool per page row cost O(page x accounts): about 3 s
+      // per page with 20k accounts (discoverySnapshotReadCost.postgres.test.ts).
+      const result = await pool.query(`WITH page_candidates AS MATERIALIZED (
         SELECT c.position,c.user_id FROM blumi_discovery_snapshot_candidates c
         JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id
         WHERE c.snapshot_id=$6 AND c.position >= $7 AND s.expires_at > NOW()
           AND s.user_id=$1 AND s.filter_hash=$9
-        ORDER BY c.position LIMIT $8)
-        SELECT positions.position,current_eligible.* FROM positions
-        LEFT JOIN current_eligible ON current_eligible.user_id=positions.user_id ORDER BY positions.position`,
+        ORDER BY c.position LIMIT $8),
+        current_eligible AS MATERIALIZED (${eligibleSql("profile", "page_candidates")})
+        SELECT page_candidates.position,current_eligible.* FROM page_candidates
+        LEFT JOIN current_eligible ON current_eligible.user_id=page_candidates.user_id ORDER BY page_candidates.position`,
         [...params(input.meta.userId,input.filters),input.meta.snapshotId,input.position,input.limit,input.meta.filterHash])
       return result.rows.map(row => ({position:Number(row.position),profile:row.user_id ? mapAccountProfileSafely(row)[0] ?? null : null}))
     },

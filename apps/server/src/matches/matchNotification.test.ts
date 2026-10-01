@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createInMemoryMatchRepository, createInMemoryMatchStore, createSeedDiscoverProfiles } from "./matchRepository"
 import { createMatchService } from "./matchService"
+import { createNotificationService } from "../notifications/notificationService"
 
 const TEST_AVATAR = createSeedDiscoverProfiles()[0]!.avatar
 
@@ -33,6 +34,48 @@ test("a first like notifies only its recipient and a new mutual match notifies b
 
   await service.decide("user_b", "user_a", "like")
   assert.equal(sent.length, 3)
+})
+
+test("a like push stays anonymous: its payload never names the person who liked", async () => {
+  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([
+    profile("user_a", "A"), profile("user_b", "B"), profile("user_c", "C")
+  ]))
+  const payloads: Array<Record<string, string> | undefined> = []
+  const service = createMatchService({
+    repository,
+    notificationService: {
+      sendPushToUser: async (_userId, notification) => {
+        payloads.push(notification.data)
+        return { outcome: "queued", deliveryCount: 1 }
+      }
+    }
+  })
+
+  await service.decide("user_a", "user_b", "like")
+  await service.decide("user_c", "user_b", "like")
+
+  // The copy says "Someone likes your vibe"; the device payload must not
+  // reveal who (it reached the recipient's phone as sourceUserId).
+  assert.equal(payloads.length, 2)
+  for (const data of payloads) {
+    assert.equal(data?.type, "discovery.like")
+    assert.equal(data?.sourceUserId, undefined)
+    assert.ok(!Object.values(data ?? {}).some((value) => /user_[ac]/.test(value)), JSON.stringify(data))
+    assert.match(data?.likeId ?? "", /^like_[0-9a-f-]{36}$/)
+  }
+  // Each like keeps its own delivery identity (one push per like, as before).
+  assert.notEqual(payloads[0]?.likeId, payloads[1]?.likeId)
+
+  // The push policy dedupes on that identity: two people's likes both queue,
+  // a replay of one like does not.
+  const notifications = createNotificationService({ now: () => new Date("2026-09-30T10:00:00.000Z") })
+  await notifications.registerDevice("user_b", { platform: "ios", pushToken: "token_b" })
+  const like = (data: Record<string, string> | undefined) => notifications.sendPushToUser("user_b", {
+    title: "Someone likes your vibe", body: "Open Blumi to see where this could go.", data
+  })
+  assert.equal((await like(payloads[0])).outcome, "queued")
+  assert.equal((await like(payloads[1])).outcome, "queued")
+  assert.notEqual((await like(payloads[0])).outcome, "queued")
 })
 
 test("notification failure never changes a persisted like or match response", async () => {

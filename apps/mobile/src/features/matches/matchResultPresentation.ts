@@ -9,6 +9,8 @@
  * model is the single place that states them so both renderers read the same
  * contract for actions, analytics attribution, and Reduce Motion.
  */
+import type { AppLocale } from "../session/appLocale"
+import { getMatchResultCopy } from "./matchResultCopy"
 
 export const MATCH_RESULT_ENTRY_POINTS = ["connection_modal", "discovery_route"] as const
 export type MatchResultEntryPoint = typeof MATCH_RESULT_ENTRY_POINTS[number]
@@ -51,6 +53,8 @@ export interface MatchResultPresentationInput<Entry extends MatchResultEntryPoin
   matchedUserName: string
   /** Onboarding gate for opening chat; only the route surface can be reached before it passes. */
   canStartConversation: boolean
+  /** Resolved once at the surface (`getAppLocale()`); English when omitted. */
+  locale?: AppLocale
 }
 
 export function getMatchResultPresentation(
@@ -66,32 +70,35 @@ export function getMatchResultPresentation(
   input: MatchResultPresentationInput
 ): MatchResultPresentation {
   const name = input.matchedUserName
+  const copy = getMatchResultCopy(input.locale ?? "en")
   if (input.entry === "connection_modal") {
+    const modal = copy.connectionModal
     return {
       entry: "connection_modal",
-      headline: "It's a vibe.",
-      body: `You and ${name} both felt it. Start with a message when you are ready.`,
-      badgeLabel: "Mutual match",
-      closeLabel: "Close match result",
+      headline: modal.headline,
+      body: modal.body(name),
+      badgeLabel: modal.badgeLabel,
+      closeLabel: modal.closeLabel,
       actions: [
-        { id: "send_message", label: "Start chatting", enabled: true },
-        { id: "keep_discovering", label: "Keep exploring", enabled: true }
+        { id: "send_message", label: modal.sendMessage, enabled: true },
+        { id: "keep_discovering", label: modal.keepDiscovering, enabled: true }
       ]
     }
   }
+  const route = copy.discoveryRoute
   return {
     entry: "discovery_route",
-    headline: "It’s a vibe.",
-    eyebrow: "New match",
-    title: "You two just matched.",
-    body: "Start with a message and get to know each other at your pace.",
-    nextStepTitle: "Make the first move feel natural.",
-    nextStepBody: "A thoughtful hello is enough to get the conversation going.",
-    backLabel: "Return to Discover",
-    safetyLabel: `Safety options for ${name}`,
+    headline: route.headline,
+    eyebrow: route.eyebrow,
+    title: route.title,
+    body: route.body,
+    nextStepTitle: route.nextStepTitle,
+    nextStepBody: route.nextStepBody,
+    backLabel: route.backLabel,
+    safetyLabel: route.safetyLabel(name),
     actions: [
-      { id: "send_message", label: "Say Hi", enabled: input.canStartConversation },
-      { id: "keep_discovering", label: "Keep Exploring", enabled: true }
+      { id: "send_message", label: route.sendMessage, enabled: input.canStartConversation },
+      { id: "keep_discovering", label: route.keepDiscovering, enabled: true }
     ]
   }
 }

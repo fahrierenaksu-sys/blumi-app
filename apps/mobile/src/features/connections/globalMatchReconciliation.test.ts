@@ -109,6 +109,104 @@ test("creates the authorized chat thread and presents a current-session match", 
   assert.deepEqual(dependencies.presentedMatches, ["room_match"])
 })
 
+const boraAvatar = {
+  presetId: "avatar_v2_body_default",
+  revision: 4,
+  loadout: {
+    schemaVersion: 1,
+    bodyId: "avatar_v2_body_default",
+    faceId: "avatar_v2_face_default",
+    eyesId: "avatar_v2_eyes_mocha_doe",
+    noseId: "avatar_v2_nose_soft_button",
+    mouthId: "avatar_v2_mouth_peach_whisper_smile",
+    hairId: "avatar_v2_hair_mocha_ribbon_blowout",
+    topId: "avatar_v2_top_default",
+    bottomId: "avatar_v2_bottom_default",
+    shoesId: "avatar_v2_shoes_milk_tea_court_sneakers",
+    accessoryIds: []
+  }
+} as const
+
+test("presents the partner's real avatar and name from the opened chat (DSC-3)", async () => {
+  const presented: unknown[] = []
+  const dependencies = createDependencies(() => actor, {
+    // A partner first seen on this device is saved under the raw id.
+    recordMutualConnection: async () => ({
+      userId: "bora",
+      displayName: "bora",
+      savedAt: "2026-07-22T00:00:00.000Z",
+      status: "mutual" as const
+    }),
+    createThread: async () => ({
+      threadId: "thread_match",
+      miniRoomId: "room_match",
+      participantUserIds: ["ada", "bora"] as [string, string],
+      participants: [
+        { userId: "ada", displayName: "Ada" },
+        { userId: "bora", displayName: "Bora", avatar: boraAvatar as never }
+      ],
+      createdAt: "2026-07-22T00:00:00.000Z"
+    }),
+    presentMatch: (match) => { presented.push(match) }
+  })
+
+  await reconcileRealtimeConnectionMatch(payload, actor, dependencies)
+
+  assert.deepEqual(presented, [{
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    matchedAvatarSelection: boraAvatar,
+    mode: "production"
+  }])
+})
+
+test("still presents the match, without a remote avatar, when the chat cannot be opened", async () => {
+  const presented: unknown[] = []
+  const dependencies = createDependencies(() => actor, {
+    createThread: async () => { throw new Error("offline") },
+    presentMatch: (match) => { presented.push(match) }
+  })
+
+  await reconcileRealtimeConnectionMatch(payload, actor, dependencies)
+
+  assert.deepEqual(dependencies.createdThreads, [])
+  assert.deepEqual(presented, [{
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    mode: "production"
+  }])
+})
+
+test("a slow chat never holds the match back: it presents after a short wait and still saves the chat", async () => {
+  const presented: unknown[] = []
+  let finishThread: ((thread: Awaited<ReturnType<GlobalMatchReconciliationDependencies["createThread"]>>) => void) | undefined
+  const dependencies = createDependencies(() => actor, {
+    createThread: () => new Promise((resolve) => { finishThread = resolve }),
+    presentMatch: (match) => { presented.push(match) },
+    threadWaitMs: 5
+  })
+
+  await reconcileRealtimeConnectionMatch(payload, actor, dependencies)
+  assert.deepEqual(presented, [{
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    mode: "production"
+  }])
+
+  finishThread?.({
+    threadId: "thread_match",
+    miniRoomId: "room_match",
+    participantUserIds: ["ada", "bora"],
+    participants: [{ userId: "ada" }, { userId: "bora" }],
+    createdAt: "2026-07-22T00:00:00.000Z"
+  })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(dependencies.createdThreads, ["thread_match"], "the late chat is still applied")
+})
+
 test("contains a failed account hydration request inside the match flow", async () => {
   const dependencies = createDependencies(
     () => actor,

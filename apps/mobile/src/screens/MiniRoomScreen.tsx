@@ -27,6 +27,7 @@ import type { SessionActor } from "../features/session/sessionApi"
 import { MiniRoomScene } from "../features/miniRoom/scene/MiniRoomScene"
 import { getMiniRoomCopy } from "../features/miniRoom/miniRoomCopy"
 import { useInRoomChat } from "../features/miniRoom/useInRoomChat"
+import { useMiniRoomLeaveGuard } from "../features/miniRoom/useMiniRoomLeaveGuard"
 import { useMiniRoomMedia } from "../features/miniRoom/useMiniRoomMedia"
 import { useRoomChatHistory } from "../features/miniRoom/useRoomChatHistory"
 import {
@@ -309,6 +310,13 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     })
   }, [exitToDebrief, miniRoom.miniRoomId, sessionActor.session.mode, sessionActor.session.sessionToken])
 
+  const confirmLeave = useMiniRoomLeaveGuard({
+    copy: roomCopy,
+    exitedRef,
+    requestLeave: requestEndMiniRoom,
+    navigation
+  })
+
   const handleSafetyActionComplete = useCallback((): void => {
     setSafetyVisible(false)
     if (!exitedRef.current) {
@@ -344,7 +352,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         localMedia={mediaState.localMedia}
         roomDecorScene={hostRoomSnapshot}
         leaveDisabled={leaveDisabled}
-        onLeave={requestEndMiniRoom}
+        onLeave={confirmLeave}
         onOpenSafety={() => setSafetyVisible(true)}
         onRetryConnect={() => {
           void retryConnect()

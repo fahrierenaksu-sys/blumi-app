@@ -342,7 +342,8 @@ function resolveNotificationPolicy(
   const type = notification.data?.type
   switch (type) {
     case "discovery.like":
-      return policyFor("like", notification.data?.sourceUserId, queuedAt)
+      // likeId: anonymous per-like id; sourceUserId: payloads queued before 2026-10-01.
+      return policyFor("like", notification.data?.likeId ?? notification.data?.sourceUserId, queuedAt)
     case "chat.message":
       return policyFor("message", notification.data?.messageId, queuedAt)
     case "discovery.match":

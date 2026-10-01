@@ -12,7 +12,11 @@ import type {
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
-import { RoomInviteApiError, type RoomSessionJoinResult } from "./chatRoomInviteApi"
+import {
+  RoomInviteApiError,
+  type RoomInviteDecisionResult,
+  type RoomSessionJoinResult
+} from "./chatRoomInviteApi"
 import {
   getMessageListErrorMessageForDisplay,
   getMessageSendErrorMessageForDisplay,
@@ -70,7 +74,7 @@ export interface ChatCoordinatorDependencies {
     sessionToken: string,
     inviteId: string,
     status: "accepted" | "declined"
-  ) => Promise<ChatRoomInviteTimelineItem>
+  ) => Promise<RoomInviteDecisionResult>
   cancelThreadRoomInvite: (
     baseHttpUrl: string,
     sessionToken: string,
@@ -432,7 +436,7 @@ export function createChatCoordinator(
       }
 
       if (action.type === "accept" || action.type === "decline") {
-        const invite = await dependencies.decideThreadRoomInvite(
+        const { readyRoom, ...invite } = await dependencies.decideThreadRoomInvite(
           dependencies.baseHttpUrl,
           actor.session.sessionToken,
           action.inviteId,
@@ -441,7 +445,9 @@ export function createChatCoordinator(
         if (!dependencies.isCurrentSession(actor)) return
         upsertRoomInvite(invite)
         if (action.type === "accept" && invite.roomSessionId) {
-          const roomReady = await dependencies.joinRoomSession(
+          // The acceptance answer carries the ready room; join only for an
+          // older server answer without it.
+          const roomReady = readyRoom ?? await dependencies.joinRoomSession(
             dependencies.baseHttpUrl,
             actor.session.sessionToken,
             invite.roomSessionId
