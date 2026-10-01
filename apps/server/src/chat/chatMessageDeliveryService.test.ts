@@ -408,6 +408,41 @@ test("a send reads the thread once and keeps the post-persist block check", asyn
   assert.equal(blockChecks, 2, "before persisting and again before fanout")
 })
 
+test("a slow dispatch of one message never lets the sender's next message overtake it, across HTTP and socket senders", async () => {
+  // Found by the PostgreSQL social-loop E2E: sequential sends reached the
+  // partner out of order when an earlier message's dispatch queries were slower.
+  const chatService = createChatService()
+  await createThread(chatService)
+  const claimDeliveries = chatService.repository.claimDeliveries.bind(chatService.repository)
+  let releaseFirst!: () => void
+  const firstClaimGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+  let claims = 0
+  chatService.repository.claimDeliveries = async (input) => {
+    claims += 1
+    if (claims === 1) await firstClaimGate
+    return claimDeliveries(input)
+  }
+  const delivered: string[] = []
+  const connectionManager = {
+    async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+      if (event.type === "chat.message_received") delivered.push(event.payload.body)
+    },
+    hasUserConnections: () => true
+  } as unknown as ConnectionManager
+  const notificationService = { async sendPushToUser() {} } as unknown as NotificationService
+  // The HTTP route and the realtime router each create their own service.
+  const http = createChatMessageDeliveryService({ chatService, safetyService: createSafetyService(), connectionManager, notificationService })
+  const socket = createChatMessageDeliveryService({ chatService, safetyService: createSafetyService(), connectionManager, notificationService })
+
+  await http.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "first" })
+  await socket.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "second" })
+  await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  assert.deepEqual(delivered, [], "the second message waits for the first one's dispatch")
+  releaseFirst()
+  await waitFor(() => delivered.length === 2)
+  assert.deepEqual(delivered, ["first", "second"])
+})
+
 async function createThread(chatService: ReturnType<typeof createChatService>) {
   await chatService.createThread({
     threadId: "thread_one",

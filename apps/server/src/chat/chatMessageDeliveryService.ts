@@ -114,11 +114,13 @@ export function createChatMessageDeliveryService(options: {
       // The persisted message plus durable outbox row is the send ACK. Push/realtime
       // fanout and synthetic test-persona replies must not delay that confirmation.
       // The periodic worker recovers the outbox if this process exits mid-dispatch.
-      void dispatchPostPersistEffects(
+      // Serialized per thread, in persist order, so a slower dispatch of an
+      // earlier message is never overtaken by the next one (live order).
+      void enqueueThreadDispatch(chatService, thread.threadId, () => dispatchPostPersistEffects(
         delivery.message,
         thread,
         recipientUserIds
-      ).catch((error) => options.reportError?.(error))
+      )).catch((error) => options.reportError?.(error))
       return delivery
     }
   }
@@ -156,6 +158,30 @@ export function createChatMessageDeliveryService(options: {
       await chatService.repository.retryDelivery(message.messageId, leaseToken, new Date(now.getTime() + backoffMs))
     }
   }
+}
+
+/**
+ * Inline post-persist dispatch chains, per chat service (the HTTP route and the
+ * realtime router each build their own delivery service over the same chat
+ * service) and per thread. The outbox worker stays independent: it only
+ * recovers jobs this chain did not claim.
+ */
+const threadDispatchChains = new WeakMap<ChatService, Map<string, Promise<void>>>()
+
+function enqueueThreadDispatch(chatService: ChatService, threadId: string, dispatch: () => Promise<void>): Promise<void> {
+  let chains = threadDispatchChains.get(chatService)
+  if (!chains) {
+    chains = new Map()
+    threadDispatchChains.set(chatService, chains)
+  }
+  const threadChains = chains
+  const current = (threadChains.get(threadId) ?? Promise.resolve()).then(dispatch)
+  const tail = current.catch(() => undefined)
+  threadChains.set(threadId, tail)
+  void tail.then(() => {
+    if (threadChains.get(threadId) === tail) threadChains.delete(threadId)
+  })
+  return current
 }
 
 function stableReplyIndex(messageId: string, count: number): number {

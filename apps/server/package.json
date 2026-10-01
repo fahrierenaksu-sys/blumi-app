@@ -12,6 +12,7 @@
     "build": "tsc && node --import tsx scripts/build-legal-pages.mjs",
     "test:e2e:api": "npm run build && node --test dist/e2e/criticalAuthFlow.test.js",
     "test:e2e:api:postgres": "npm run build && node --test dist/e2e/criticalPostgresAuthFlow.test.js",
+    "test:e2e:social": "node --import tsx --test src/e2e/socialLoop.e2e.test.ts src/e2e/socialLoopLoad.e2e.test.ts",
     "start": "node dist/index.js",
     "test": "node scripts/run-server-tests.mjs",
     "typecheck": "tsc --noEmit"
