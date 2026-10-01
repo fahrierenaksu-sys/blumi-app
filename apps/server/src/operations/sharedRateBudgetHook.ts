@@ -1,15 +1,17 @@
 import type { FastifyInstance } from "fastify"
 import type { AuthService } from "../auth/authService"
-import { readBearerToken } from "../routes/routeHelpers"
+import { preResolveBearerSession } from "../routes/routeHelpers"
 import type { SharedRateBudget } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
 
-/** preHandler runs after the existing cheap onRequest/IP limiter. */
+/**
+ * preHandler runs after the existing cheap onRequest/IP limiter. The session
+ * it reads is handed to the route's own resolution, so an authenticated
+ * request reads its session once.
+ */
 export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService, budget: SharedRateBudget): void {
   app.addHook("preHandler", async (request, reply) => {
-    const token = readBearerToken(request)
-    if (!token) return
-    const resolved = await auth.getSession(token)
+    const resolved = await preResolveBearerSession(request, auth)
     if (!resolved) return
     try {
       const result = await budget.consumeUser(resolved.account.userId)

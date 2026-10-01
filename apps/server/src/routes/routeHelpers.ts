@@ -7,6 +7,44 @@ import {
 } from "../auth/authStore"
 import { normalizePhoneNumber, normalizeVerificationCode } from "../auth/phone"
 
+type ResolvedSession = Awaited<ReturnType<AuthService["getSession"]>>
+
+/**
+ * A session the request-wide budget hook already read, handed to the route's
+ * own resolution once: the same token on the same request is not read from
+ * the database twice. A later resolution in the same handler reads again.
+ */
+const preResolvedSessions = new WeakMap<FastifyRequest, {
+  authService: AuthService
+  sessionToken: string
+  resolved: ResolvedSession
+}>()
+
+/** Reads the bearer session for a pre-handler and keeps it for the route. */
+export async function preResolveBearerSession(
+  request: FastifyRequest,
+  authService: AuthService
+): Promise<ResolvedSession> {
+  const sessionToken = readBearerToken(request)
+  if (!sessionToken) return null
+  const resolved = await authService.getSession(sessionToken)
+  preResolvedSessions.set(request, { authService, sessionToken, resolved })
+  return resolved
+}
+
+function takePreResolvedSession(
+  request: FastifyRequest,
+  authService: AuthService,
+  sessionToken: string
+): { resolved: ResolvedSession } | null {
+  const entry = preResolvedSessions.get(request)
+  if (!entry) return null
+  preResolvedSessions.delete(request)
+  return entry.authService === authService && entry.sessionToken === sessionToken
+    ? { resolved: entry.resolved }
+    : null
+}
+
 export async function resolveBearerSession({
   request,
   reply,
@@ -22,7 +60,10 @@ export async function resolveBearerSession({
     return null
   }
 
-  const resolved = await authService.getSession(sessionToken)
+  const preResolved = takePreResolvedSession(request, authService, sessionToken)
+  const resolved = preResolved
+    ? preResolved.resolved
+    : await authService.getSession(sessionToken)
   if (!resolved) {
     reply.code(401).send({ error: "Sign in again to continue." })
     return null
