@@ -183,6 +183,35 @@ test("missing client declaration is legacy and fails closed", () => {
   assert.equal(Object.values(resolution.capabilities).every((value) => !value), true)
 })
 
+test("a default rollout turns a capability on until the manifest stages it or its gate closes", () => {
+  const declared = ["chat_typing", "chat_presence"] as const
+  const defaults = { chat_typing: 100 } as const
+  const unstaged = createCapabilityService({ manifest: parseCapabilityManifest(undefined).manifest, defaultRollouts: defaults })
+  assert.equal(unstaged.resolve("user-1", declared).capabilities.chat_typing, true)
+  assert.equal(unstaged.resolve("user-1", declared).capabilities.chat_presence, false)
+  // Clients that do not declare it (older builds) never get it.
+  assert.equal(unstaged.resolve("user-1", ["chat_presence"]).capabilities.chat_typing, false)
+  assert.equal(unstaged.resolve("user-1", undefined).capabilities.chat_typing, false)
+
+  const staged = createCapabilityService({
+    manifest: parseCapabilityManifest(JSON.stringify({ rollouts: { chat_typing: "internal" }, internalUserIds: ["owner"] })).manifest,
+    defaultRollouts: defaults
+  })
+  assert.equal(staged.resolve("owner", declared).capabilities.chat_typing, true)
+  assert.equal(staged.resolve("user-1", declared).capabilities.chat_typing, false)
+
+  const killed = createCapabilityService({
+    manifest: parseCapabilityManifest(undefined).manifest,
+    defaultRollouts: defaults,
+    runtimeGates: { chat_typing: () => false }
+  })
+  assert.equal(killed.resolve("user-1", declared).capabilities.chat_typing, false)
+
+  // Without defaults the service stays manifest-only, as before.
+  const manifestOnly = createCapabilityService({ manifest: parseCapabilityManifest(undefined).manifest })
+  assert.equal(manifestOnly.resolve("user-1", declared).capabilities.chat_typing, false)
+})
+
 function findUserInBucketRange(minimum: number, maximum: number): string {
   for (let index = 0; index < 10_000; index += 1) {
     const userId = `cohort-user-${index}`

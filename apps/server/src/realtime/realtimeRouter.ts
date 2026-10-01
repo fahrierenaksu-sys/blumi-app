@@ -3,6 +3,7 @@ import { chatAckDeliveredCommandSchema, miniRoomSceneCommandSchema } from "@blum
 import type { ChatService } from "../chat/chatService"
 import { createChatMessageDeliveryService } from "../chat/chatMessageDeliveryService"
 import { createChatReceiptService } from "../chat/chatReceiptService"
+import { createChatTypingService } from "../chat/chatTypingService"
 import { isCapabilityRolledOut, type CapabilityService } from "../capabilities/capabilityService"
 import type { ConnectionService } from "../connections/connectionService"
 import type { MiniRoomService } from "../miniRooms/miniRoomService"
@@ -89,6 +90,20 @@ export function createRealtimeRouter(
       ? isCapabilityRolledOut(capabilityService, userId, "chat_read_receipts")
       : false,
     emit: (userId, event) => connectionManager.sendToUser(userId, event)
+  })
+  const chatTyping = createChatTypingService({
+    threads: chatService.repository,
+    blockPolicy: safetyService,
+    isRolledOutFor: (userId) => capabilityService
+      ? isCapabilityRolledOut(capabilityService, userId, "chat_typing")
+      : false,
+    // In-process only: the partner's sockets on this instance. Never the
+    // cross-instance NOTIFY fanout, push, outbox or database.
+    emit: (userId, event) => {
+      for (const partner of connectionManager.getUserConnections(userId)) {
+        connectionManager.sendToConnection(partner.connectionId, event)
+      }
+    }
   })
 
   /**
@@ -500,6 +515,14 @@ export function createRealtimeRouter(
           )
           return
         }
+        case "chat.typing":
+          // Transient and silent: see chatTypingService.
+          await chatTyping.relay({
+            connectionId: connection.connectionId,
+            userId: connection.userId,
+            payload: event.payload
+          })
+          return
         case "chat.send_message": {
           // Optional retry id (2026-09-30): the same idempotent send as the
           // HTTP route, acknowledged only to this socket with the id so the

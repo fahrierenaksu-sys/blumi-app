@@ -34,6 +34,7 @@ import { createAccountRecoveryService, type AccountRecoveryService } from "./acc
 import { createPostgresAccountRecoveryRepository } from "./db/postgresAccountRecoveryRepository"
 import { createPostgresChatRepository } from "./db/postgresChatRepository"
 import { applyTestPersonaPolicy } from "./chat/testPersonaPolicy"
+import { isChatTypingSwitchedOn } from "./chat/chatTypingService"
 import {
   createChatReceiptSchemaProbe,
   createStaticChatReceiptSchema,
@@ -684,9 +685,16 @@ export function createConfiguredServerServices(
 }
 
 function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaProbe): CapabilityService {
+  // Typing stores nothing, so it is on unless the manifest stages it or the
+  // BLUMI_CHAT_TYPING_ENABLED kill switch turns it off for everyone.
+  const chatTypingOn = isChatTypingSwitchedOn(process.env.BLUMI_CHAT_TYPING_ENABLED)
   return createCapabilityService({
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest,
-    runtimeGates: { chat_read_receipts: () => chatReceiptSchema.peek() }
+    defaultRollouts: { chat_typing: 100 },
+    runtimeGates: {
+      chat_read_receipts: () => chatReceiptSchema.peek(),
+      chat_typing: () => chatTypingOn
+    }
   })
 }
 

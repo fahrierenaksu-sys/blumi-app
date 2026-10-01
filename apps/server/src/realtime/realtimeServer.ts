@@ -68,6 +68,7 @@ const MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW = 40
  * the latest pending step replaces the older one instead.
  */
 const SILENT_LANE_LIMITS = {
+  "chat.typing": { perUserPerWindow: 20, inFlightPerConnection: 2, inFlightPerUser: 4 }, // a dropped hint lapses on the phone in 6 s
   "chat.ack_delivered": { perUserPerWindow: 30, inFlightPerConnection: 2, inFlightPerUser: 4 }
 } as const
 type SilentLaneType = keyof typeof SILENT_LANE_LIMITS
