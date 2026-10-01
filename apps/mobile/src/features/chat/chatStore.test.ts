@@ -155,6 +155,25 @@ test("CHT-06: a list served before this device's read cannot bring read messages
   assert.equal(getThreadUnreadCount("read-here"), 2)
 })
 
+test("focusing a thread clears its local badge with no server read, also offline before history loads", () => {
+  // The thread screen sends a server read only once a partner message is on
+  // screen; focusing alone is local-only and must still clear the badge.
+  resetChatStore()
+  const last = { messageId: "cached-last", threadId: "offline", senderUserId: "a", body: "hi", sentAt: "2026-09-05T10:00:00Z" }
+  const thread = { threadId: "offline", miniRoomId: "room", participantUserIds: ["a", "b"] as [string, string],
+    participants: [{ userId: "a" }, { userId: "b" }] as [{ userId: string }, { userId: string }], createdAt: "2026-09-05T00:00:00Z",
+    unreadCount: 4, lastMessage: last }
+  applyChatThreadListed({ userId: "b", threads: [thread] })
+  assert.equal(getTotalUnreadCount(), 4)
+  setActiveThread("offline")
+  assert.equal(getThreadUnreadCount("offline"), 0, "the badge clears on focus")
+  setActiveThread(null)
+  assert.equal(getTotalUnreadCount(), 0, "and stays cleared after leaving")
+  // The server never stored a read; a list served later still says 4.
+  applyChatThreadListed({ userId: "b", threads: [thread] })
+  assert.equal(getThreadUnreadCount("offline"), 0, "a list without the read does not bring the shown messages back")
+})
+
 test("summary-covered delayed realtime delivery does not double count unread", () => {
   resetChatStore()
   const message = { messageId: "covered", threadId: "summary", senderUserId: "a", body: "offline", sentAt: "2026-09-05T10:02:00Z" }

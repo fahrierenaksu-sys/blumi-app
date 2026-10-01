@@ -51,6 +51,7 @@ test("no read is sent until a partner message is on screen, so the server never 
   g.state("active")
   g.flush()
   assert.equal(g.readCursors.length, before, "entering or resuming an empty or loading chat sends no read")
+  assert.equal(g.active.at(-1), "thread-b", "focus still flags the thread active, which clears its local badge")
   assert.ok(g.readCursors.every((cursor) => cursor !== undefined), "every read names a message")
   g.render({ latestIncomingMessageId: "first-shown" })
   g.flush()
