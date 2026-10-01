@@ -49,6 +49,55 @@ test("foreign actors, invalid points, ended rooms and blocked pairs never relay 
   assert.equal(events.length, 0)
 })
 
+test("a due access re-check runs in the background while moves keep relaying, and an ended room stops them", async () => {
+  let clock = 1_000_000
+  let lookups = 0
+  let release: (() => void) | undefined
+  let gate: Promise<void> = Promise.resolve()
+  const room: any = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const events: any[] = []
+  const service = createMiniRoomMotionService({
+    now: () => clock,
+    findRoom: async () => { lookups++; await gate; return room },
+    hasBlockBetween: async () => false,
+    emit: (_, event) => events.push(event)
+  })
+  await service.enter("ca", "a", "room")
+  events.length = 0
+  lookups = 0
+  gate = new Promise<void>(resolve => { release = resolve })
+  clock += 10_000
+  // The re-check is due but slow: the move is relayed without waiting for it.
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
+  assert.equal(events.length, 1)
+  assert.equal(lookups, 1)
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .52, y: .7 })
+  assert.equal(lookups, 1, "one background check at a time")
+  room.endedAt = new Date().toISOString()
+  release!()
+  await new Promise(resolve => setImmediate(resolve))
+  await assert.rejects(service.move("ca", "a", { miniRoomId: "room", sequence: 3, x: .5, y: .7 }))
+  assert.equal(events.length, 2)
+})
+
+test("a decision is never trusted past the stale bound without a successful check", async () => {
+  let clock = 1_000_000
+  let failing = false
+  const room: any = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const service = createMiniRoomMotionService({
+    now: () => clock,
+    findRoom: async () => { if (failing) throw new Error("database unavailable"); return room },
+    hasBlockBetween: async () => false,
+    emit: () => undefined
+  })
+  await service.enter("ca", "a", "room")
+  failing = true
+  clock += 59_999
+  await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
+  clock += 1
+  await assert.rejects(service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .5, y: .7 }))
+})
+
 test("concurrent scene entry shares one authorization lookup and invalidation cancels an in-flight entry", async () => {
   let lookups = 0
   let release: (() => void) | undefined

@@ -11,6 +11,9 @@ interface MotionRoom {
   idleSince?: number
 }
 
+const REVALIDATE_AFTER_MS = 10_000
+const MAX_STALE_MS = 60_000
+
 /** Ephemeral scene state, never persisted room ownership or durable chat. */
 export function createMiniRoomMotionService(options: {
   findRoom(id: string): Promise<MiniRoomRecord | null>
@@ -26,34 +29,54 @@ export function createMiniRoomMotionService(options: {
     type: "mini_room.motion_snapshot", payload: { miniRoomId: id, epoch,
       participantUserIds: room.participantUserIds, avatars: [...room.avatars.values()].map(a => ({ ...a })) }
   })
+  function validate(id: string, userId: string): Promise<MotionRoom> {
+    let validation = validations.get(id)
+    if (!validation) {
+      // Read only after the first await, by which time it is assigned.
+      let current: Promise<MotionRoom> | undefined = undefined
+      current = (async (): Promise<MotionRoom> => {
+        const stored = await options.findRoom(id)
+        if (!stored || stored.endedAt || await options.hasBlockBetween(...stored.participantUserIds)) {
+          rooms.delete(id)
+          throw new Error("That room is not available.")
+        }
+        if (!stored.participantUserIds.includes(userId) || validations.get(id) !== current) {
+          throw new Error("That room is not available.")
+        }
+        const room = rooms.get(id) ?? {
+          participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
+          avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
+            userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
+          }]))
+        }
+        room.checkedAt = now()
+        rooms.set(id, room)
+        return room
+      })()
+      validation = current
+      validations.set(id, current)
+      const clear = () => { if (validations.get(id) === current) validations.delete(id) }
+      void current.then(clear, clear)
+    }
+    return validation
+  }
+  /**
+   * Room access for scene entry and moves. Ending a room or separating the
+   * pair invalidates it at once (`invalidate`). Otherwise a decision is
+   * re-checked every REVALIDATE_AFTER_MS in the background while moves keep
+   * flowing on it (2026-10-01: the check used to hold the move that found it
+   * due, so a busy database delayed movement), and is never trusted for
+   * longer than MAX_STALE_MS without a check succeeding.
+   */
   async function authorize(id: string, userId: string, force = false) {
     let room = rooms.get(id)
-    if (!room || force || now() - room.checkedAt >= 10_000) {
-      let validation = validations.get(id)
-      if (!validation) {
-        validation = (async () => {
-          const stored = await options.findRoom(id)
-          if (!stored || stored.endedAt || await options.hasBlockBetween(...stored.participantUserIds)) {
-            rooms.delete(id)
-            throw new Error("That room is not available.")
-          }
-          if (!stored.participantUserIds.includes(userId) || validations.get(id) !== validation) {
-            throw new Error("That room is not available.")
-          }
-          const current = rooms.get(id) ?? {
-            participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
-            avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
-              userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
-            }]))
-          }
-          current.checkedAt = now()
-          rooms.set(id, current)
-          return current
-        })()
-        validations.set(id, validation)
-      }
-      try { room = await validation }
-      finally { if (validations.get(id) === validation) validations.delete(id) }
+    const age = room ? now() - room.checkedAt : Number.POSITIVE_INFINITY
+    if (!room || force || age >= MAX_STALE_MS) {
+      room = await validate(id, userId)
+    } else if (age >= REVALIDATE_AFTER_MS) {
+      void validate(id, userId).catch(() => {
+        // An unavailable room was removed by the check; a failed check is retried.
+      })
     }
     if (!room.participantUserIds.includes(userId)) throw new Error("That room is not available.")
     return room
