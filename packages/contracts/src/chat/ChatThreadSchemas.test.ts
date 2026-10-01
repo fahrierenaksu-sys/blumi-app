@@ -6,7 +6,8 @@ import {
   chatMessageSchema,
   chatParticipantSummarySchema,
   chatPreferencesEnvelopeSchema,
-  chatThreadSchema
+  chatThreadSchema,
+  chatTypingCommandSchema
 } from "./ChatThreadSchemas"
 import {
   chatPreferencesUpdateRequestSchema,
@@ -194,6 +195,16 @@ test("delivery acks, read bodies and chat preferences are strict", () => {
     chatPreferencesEnvelopeSchema.parse({ preferences: { readReceiptsEnabled: false } }),
     { preferences: { readReceiptsEnabled: false } }
   )
+})
+
+test("typing commands are strict and can never carry draft text", () => {
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "thread-1", state: "start" }).success, true)
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "thread-1", state: "stop" }).success, true)
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "thread-1", state: "start", body: "hel" }).success, false)
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "thread-1", state: "typing" }).success, false)
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "", state: "start" }).success, false)
+  assert.equal(chatTypingCommandSchema.safeParse({ threadId: "t".repeat(257), state: "start" }).success, false)
+  assert.equal(chatTypingCommandSchema.safeParse({ state: "start" }).success, false)
 })
 
 function parseAvatar(loadout: unknown): Record<string, unknown> {

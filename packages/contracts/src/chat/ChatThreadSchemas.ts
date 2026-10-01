@@ -190,6 +190,32 @@ export const chatAckDeliveredCommandSchema = z.object({
   upToMessageId: chatMessageIdSchema
 }).strict()
 
+export const CHAT_TYPING_STATES = ["start", "stop"] as const
+/** Upper bound for a `start`'s lifetime; the server sends 6 s today. */
+export const CHAT_TYPING_MAX_EXPIRES_MS = 15_000
+
+/** Client `chat.typing` payload, validated by the server. Never carries text. */
+export const chatTypingCommandSchema = z.object({
+  threadId: z.string().min(1).max(256),
+  state: z.enum(CHAT_TYPING_STATES)
+}).strict()
+
+/** `chat.typing_updated`: only the other participant may receive it. */
+export const chatTypingUpdatedSchema = z.object({
+  threadId: z.string().min(1),
+  userId: z.string().min(1),
+  state: z.enum(CHAT_TYPING_STATES),
+  expiresInMs: z.number().int().min(0).max(CHAT_TYPING_MAX_EXPIRES_MS)
+}).superRefine((payload, context) => {
+  if (payload.state === "start" && payload.expiresInMs === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["expiresInMs"],
+      message: "A typing start must lapse after a positive time."
+    })
+  }
+})
+
 export const chatPreferencesSchema = z.object({
   readReceiptsEnabled: z.boolean()
 })

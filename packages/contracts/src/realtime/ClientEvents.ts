@@ -9,6 +9,7 @@ import type {
   ChatListMessagesCommand,
   ChatListThreadsCommand,
   ChatSendMessageCommand,
+  ChatTypingCommand,
 } from "../chat/ChatThread";
 import type { ReactionType } from "../reactions/ReactionEvent";
 import type { ReportReason } from "../safety/ReportReason";
@@ -40,6 +41,11 @@ export type ClientEvent =
   | { type: "chat.send_message"; payload: ChatSendMessageCommand }
   /** 2026-10-01; older servers ignore unknown client events. */
   | { type: "chat.ack_delivered"; payload: ChatAckDeliveredCommand }
+  /**
+   * 2026-10-01; sent only while the server resolves `chat_typing`, so an
+   * older server never receives it (it would ignore it anyway).
+   */
+  | { type: "chat.typing"; payload: ChatTypingCommand }
   | {
       type: "reaction.send";
       payload: {
