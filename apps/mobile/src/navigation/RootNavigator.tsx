@@ -1076,6 +1076,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
             currentUserName={sessionActor.profile.displayName}
             matchedUserName={globalMatch?.matchedUserName ?? ""}
             matchedUserId={globalMatch?.matchedUserId}
+            matchedAvatarSelection={globalMatch?.matchedAvatarSelection}
             onClose={dismissGlobalMatch}
             onKeepDiscovering={goLobby}
             onSendMessage={handleMatchSendMessage}

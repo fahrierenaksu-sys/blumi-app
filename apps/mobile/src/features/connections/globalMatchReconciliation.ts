@@ -1,4 +1,4 @@
-import type { ChatThread, ServerEvent } from "@blumi/contracts"
+import type { AvatarSelection, ChatParticipantSummary, ChatThread, ServerEvent } from "@blumi/contracts"
 import type { SessionActor } from "../session/sessionModel"
 import type { SavedConnection } from "./savedConnectionsStore"
 
@@ -25,6 +25,7 @@ export interface GlobalMatchReconciliationDependencies {
     miniRoomId: string
     matchedUserId: string
     matchedUserName: string
+    matchedAvatarSelection?: AvatarSelection
     mode: SessionActor["session"]["mode"]
   }) => void
   httpBaseUrl: string
@@ -60,23 +61,26 @@ export async function reconcileRealtimeConnectionMatch(
     return
   }
 
+  let partner: ChatParticipantSummary | undefined
   if (expectedActor.session.mode === "production") {
     void dependencies
       .hydrateFromServer(expectedActor.session.sessionToken)
       .catch(() => undefined)
     const participantUserIds = [...payload.participantUserIds] as [string, string]
-    void dependencies
+    // The opened chat carries the partner's server name and real avatar, so
+    // the modal shows the partner's chibi instead of a hash-derived outfit
+    // (UX audit DSC-3). A failed open still presents the match.
+    const thread = await dependencies
       .createThread(
         dependencies.httpBaseUrl,
         expectedActor.session.sessionToken,
         { participantUserIds }
       )
-      .then((thread) => {
-        if (isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
-          dependencies.applyChatThreadCreated(thread)
-        }
-      })
-      .catch(() => undefined)
+      .catch(() => null)
+    if (thread && isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
+      dependencies.applyChatThreadCreated(thread)
+      partner = findThreadPartner(thread, expectedActor.profile.userId)
+    }
   }
 
   if (!isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
@@ -86,7 +90,16 @@ export async function reconcileRealtimeConnectionMatch(
   dependencies.presentMatch({
     miniRoomId: payload.miniRoomId,
     matchedUserId: connection.userId,
-    matchedUserName: connection.displayName,
+    matchedUserName: partner?.displayName || connection.displayName,
+    ...(partner?.avatar ? { matchedAvatarSelection: partner.avatar } : {}),
     mode: expectedActor.session.mode
   })
+}
+
+/** The other participant of a chat, with the server's name and avatar. */
+export function findThreadPartner(
+  thread: ChatThread,
+  currentUserId: string
+): ChatParticipantSummary | undefined {
+  return thread.participants.find((participant) => participant.userId !== currentUserId)
 }

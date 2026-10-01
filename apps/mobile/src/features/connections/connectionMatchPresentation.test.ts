@@ -8,7 +8,7 @@ import {
 function createDependencies(): ConnectionMatchPresentationDependencies & {
   presented: Set<string>
   analyticsEvents: string[]
-  matches: { miniRoomId: string; matchedUserName: string; matchedUserId: string }[]
+  matches: Parameters<ConnectionMatchPresentationDependencies["showMatchModal"]>[0][]
 } {
   const presented = new Set<string>()
   return {
@@ -63,6 +63,26 @@ test("the modal is the only celebration: no toast is shown on top of it (DSC-1)"
     mode: "production"
   })
   assert.deepEqual(toasts, [])
+})
+
+test("the modal receives the partner's real avatar when the chat provided one (DSC-3)", () => {
+  const dependencies = createDependencies()
+  const avatar = { presetId: "avatar_v2_body_default", revision: 2 }
+
+  presentConnectionMatch(dependencies, {
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    matchedAvatarSelection: avatar,
+    mode: "production"
+  })
+
+  assert.deepEqual(dependencies.matches, [{
+    miniRoomId: "room_match",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    matchedAvatarSelection: avatar
+  }])
 })
 
 test("does not duplicate the reveal when realtime later reports the same match", () => {

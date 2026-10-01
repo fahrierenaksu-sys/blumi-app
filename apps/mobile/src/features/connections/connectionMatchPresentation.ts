@@ -1,3 +1,5 @@
+import type { AvatarSelection } from "@blumi/contracts"
+
 export interface ConnectionMatchPresentationDependencies {
   hasPresented: (miniRoomId: string) => boolean
   markPresented: (miniRoomId: string) => void
@@ -6,6 +8,8 @@ export interface ConnectionMatchPresentationDependencies {
     miniRoomId: string
     matchedUserName: string
     matchedUserId: string
+    /** The partner's real avatar from the opened chat (UX audit DSC-3). */
+    matchedAvatarSelection?: AvatarSelection
   }) => void
 }
 
@@ -13,6 +17,7 @@ export interface ConnectionMatchPresentationInput {
   miniRoomId: string
   matchedUserId: string
   matchedUserName: string
+  matchedAvatarSelection?: AvatarSelection
   mode: "demo" | "production"
 }
 
@@ -32,7 +37,8 @@ export function presentConnectionMatch(
   dependencies.showMatchModal({
     miniRoomId: input.miniRoomId,
     matchedUserName: input.matchedUserName,
-    matchedUserId: input.matchedUserId
+    matchedUserId: input.matchedUserId,
+    ...(input.matchedAvatarSelection ? { matchedAvatarSelection: input.matchedAvatarSelection } : {})
   })
   return true
 }

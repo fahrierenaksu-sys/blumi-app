@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import type { AvatarSelection } from "@blumi/contracts"
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react"
 import {
   Animated,
@@ -32,6 +33,8 @@ interface MatchResultModalProps {
   matchedUserName: string
   matchedUserId?: string
   matchedAvatarSnapshot?: CandidateAvatarSnapshot
+  /** The partner's real avatar; without it a preview outfit is shown (DSC-3). */
+  matchedAvatarSelection?: AvatarSelection
   onClose: () => void
   onKeepDiscovering: () => void
   onSendMessage: () => void
@@ -184,6 +187,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
     matchedUserName,
     matchedUserId,
     matchedAvatarSnapshot,
+    matchedAvatarSelection,
     onClose,
     onKeepDiscovering,
     onSendMessage
@@ -208,7 +212,8 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const resolvedMatchedAvatarSnapshot = createCandidateAvatarSnapshot({
     userId: matchedUserId ?? matchedUserName,
     displayName: matchedUserName,
-    avatarSnapshot: matchedAvatarSnapshot
+    avatarSnapshot: matchedAvatarSnapshot,
+    avatarSelection: matchedAvatarSelection
   })
 
   const stopEntrance = useCallback(() => {
@@ -380,9 +385,6 @@ export function MatchResultModal(props: MatchResultModalProps) {
                 size={96}
                 stage="match"
               />
-              <Text style={styles.avatarSourceText}>
-                {resolvedMatchedAvatarSnapshot.label}
-              </Text>
               <Text style={styles.avatarName}>{matchedUserName}</Text>
             </View>
           </Animated.View>
@@ -491,11 +493,6 @@ const styles = StyleSheet.create({
     ...uiTheme.font.bodySmall,
     color: uiTheme.colors.textSecondary,
     fontWeight: "600",
-    textAlign: "center",
-  },
-  avatarSourceText: {
-    ...uiTheme.font.micro,
-    color: uiTheme.colors.textMuted,
     textAlign: "center",
   },
   heartConnector: {

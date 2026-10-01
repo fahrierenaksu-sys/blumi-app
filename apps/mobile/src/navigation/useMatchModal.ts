@@ -1,4 +1,4 @@
-import type { ChatThread } from "@blumi/contracts"
+import type { AvatarSelection, ChatThread } from "@blumi/contracts"
 import { useCallback, useRef, useState, type RefObject } from "react"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
@@ -10,6 +10,7 @@ import {
   type ConnectionMatchPresentationInput
 } from "../features/connections/connectionMatchPresentation"
 import {
+  findThreadPartner,
   reconcileRealtimeConnectionMatch,
   type ConnectionMatchedPayload
 } from "../features/connections/globalMatchReconciliation"
@@ -25,6 +26,8 @@ export interface GlobalMatchState {
   miniRoomId: string
   matchedUserName: string
   matchedUserId?: string
+  /** The partner's real avatar from the opened chat (UX audit DSC-3). */
+  matchedAvatarSelection?: AvatarSelection
 }
 
 type HydrateInventory = Parameters<typeof reconcileRealtimeConnectionMatch>[2]["hydrateFromServer"]
@@ -92,10 +95,12 @@ export function useMatchModal({
       )
       if (!isCurrentSession(actor)) return
       applyNewThread(thread)
+      const partner = findThreadPartner(thread, actor.profile.userId)
       presentMatch({
         miniRoomId: response.match.miniRoomId,
         matchedUserId: connection.userId,
-        matchedUserName: connection.displayName,
+        matchedUserName: partner?.displayName || connection.displayName,
+        ...(partner?.avatar ? { matchedAvatarSelection: partner.avatar } : {}),
         mode: actor.session.mode
       })
       return

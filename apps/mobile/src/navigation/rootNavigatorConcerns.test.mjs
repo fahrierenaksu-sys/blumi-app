@@ -696,6 +696,19 @@ test("the match modal opens the synced thread, a pending partner chat, or Discov
   )
 })
 
+test("the match modal shows the partner's real avatar from the opened chat (DSC-3)", () => {
+  assert.equal(
+    findJsxAttribute("./RootNavigator.tsx", "MatchResultModal", "matchedAvatarSelection"),
+    "globalMatch?.matchedAvatarSelection"
+  )
+  // The delivered-decision path reads the partner from the chat it opened.
+  assert.match(read(OWNER.matchModal), /findThreadPartner\(thread, actor\.profile\.userId\)/)
+  const modal = read("../components/MatchResultModal.tsx")
+  assert.match(modal, /avatarSelection: matchedAvatarSelection/)
+  // The English-only "Blumi avatar" caption under the partner is gone.
+  assert.doesNotMatch(modal, /resolvedMatchedAvatarSnapshot\.label/)
+})
+
 test("the match modal presents each match once and reports match_created through the shared model", () => {
   const { presentConnectionMatch } = loadModule("../features/connections/connectionMatchPresentation.ts")
   const { getMatchCreatedProperties } = loadModule("../features/matches/matchResultPresentation.ts")
