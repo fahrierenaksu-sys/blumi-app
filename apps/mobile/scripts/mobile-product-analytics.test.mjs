@@ -29,7 +29,7 @@ test("product analytics is explicit-consent, minimal, and replay-free", () => {
   assert.match(consent, /reset\(\)/)
   assert.match(consent, /hydrationPromise/)
   assert.match(settings, /const analyticsConsent = useAnalyticsConsent\(\)/)
-  assert.match(settings, /<SettingsPrivacySection copy=\{copy\} analyticsConsent=\{analyticsConsent\} \/>/)
+  assert.match(settings, /<SettingsPrivacySection copy=\{copy\} analyticsConsent=\{analyticsConsent\} readReceipts=\{readReceipts\} \/>/)
   assert.match(settingsPrivacy, /label=\{copy\.analytics\}/)
   assert.match(settingsCopy, /analytics:\s*"Product analytics"/)
   assert.match(settingsPrivacy, /accessibilityRole="switch"/)
