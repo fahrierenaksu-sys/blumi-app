@@ -39,6 +39,8 @@ export interface ShopCopy {
   roomCatalogHint: string
   previousPage: string
   nextPage: string
+  shelfPage: (page: number, total: number) => string
+  ownedCompact: string
   itemCount: (count: number) => string
   categories: Record<string, string>
   readyToPlace: string
@@ -120,6 +122,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     avatarCatalogHint: "Swipe to explore styles",
     previousPage: "Previous items",
     nextPage: "Next items",
+    shelfPage: (page, total) => `Page ${page} of ${total}`,
+    ownedCompact: "Owned",
     roomCatalogHint: "Tap a piece to preview it in your room.",
     itemCount: (count) => `${count} items`,
     categories: {
@@ -204,6 +208,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     avatarCatalogHint: "Kaydır, tarzını keşfet",
     previousPage: "Önceki ürünler",
     nextPage: "Sonraki ürünler",
+    shelfPage: (page, total) => `Sayfa ${page} / ${total}`,
+    ownedCompact: "Sende",
     roomCatalogHint: "Odanda önizlemek için bir parçaya dokun.",
     itemCount: (count) => `${count} öğe`,
     categories: {

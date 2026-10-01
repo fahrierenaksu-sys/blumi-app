@@ -296,6 +296,18 @@ test("re-tapping the Shop tab scrolls to the top, without motion under Reduce Mo
   assert.match(scrollHook, /scrollTo\(\{ y: 0, animated: !reduceMotion \}\)/)
   assert.match(source, /const shopScrollRef = useShopScrollToTop\(\)/)
   assert.match(source, /<ScrollView\s+ref=\{shopScrollRef\}/)
+  // The outer page rarely scrolls; the product shelf also returns to page 1.
+  const closet = readScreenModule("ClosetBrowser.tsx")
+  assert.match(closet, /useMainTabReselect\("shop", scrollShelfToStart\)/)
+  assert.match(closet, /scrollShelfToPage\(0, !reduceMotion\)/)
+})
+
+test("the shelf counter follows the live scroll offset on the UI thread", () => {
+  const closet = readScreenModule("ClosetBrowser.tsx")
+  assert.match(closet, /useAnimatedReaction\(\s*\(\) => getShopShelfPageIndex\(shelfScrollOffset\.value, productShelfWidth, pageCount\)/)
+  assert.match(closet, /if \(index !== previous\) scheduleOnRN\(setPageIndex, index\)/)
+  assert.doesNotMatch(closet, /onMomentumScrollEnd/)
+  assert.doesNotMatch(cardFile.getText(), /"Sende"/, "compact owned label comes from shopCopy")
 })
 
 test("the coin balance counts on the UI thread and announces only the confirmed value", () => {

@@ -40,7 +40,8 @@ test("shop remains body-compatible through the catalog source of truth", () => {
 test("compact shop shows two readable product columns per page", () => {
   assert.match(closetBrowser, /SHOP_PRODUCT_COLUMNS_PER_PAGE\s*=\s*2/)
   assert.match(closetBrowser, /productCardWidth[\s\S]*SHOP_PRODUCT_COLUMNS_PER_PAGE/)
-  assert.match(closetBrowser, /index \+= catalog.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  // Paging lives in the tested shelf model (buildShopShelfPages).
+  assert.match(closetBrowser, /buildShopShelfPages\(props\.products, catalog\.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE\)/)
 })
 
 test("full-canvas rig layers get a type-aware contained presentation", () => {

@@ -74,7 +74,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
         : selectedCompact && product.previewType === "room" && product.owned
           ? copy.readyToPlace
           : selectedCompact && product.owned && product.previewType === "avatar"
-            ? locale === "tr" ? "Sende" : copy.owned
+            ? copy.ownedCompact
             : presentation.stateLabel)
   const avatarPreviewSource = product.avatarItem
     ? getShopProductThumbnailSource(product.sourceItemId)
