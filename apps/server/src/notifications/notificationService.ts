@@ -16,6 +16,12 @@ import {
 } from "./pushProvider"
 import { randomUUID } from "node:crypto"
 import { PublicRequestError } from "../errors/publicRequestError"
+import {
+  isPushExpired,
+  resolvePushCopy,
+  toOutgoingPushNotification,
+  type PushLocale
+} from "./pushMessagePolicy"
 
 const MAX_PUSH_TOKEN_LENGTH = 4096
 const MAX_PUSH_TITLE_LENGTH = 120
@@ -43,6 +49,8 @@ export interface NotificationService {
   updatePreferences(userId: string, preferences: NotificationPreferences, fields?: (keyof NotificationPreferences)[]): Promise<NotificationPreferences>
   sendPushToUser(userId: string, notification: PushNotification, discoveryWatch?: import("../matches/matchRepository").DiscoveryWatchClaim): Promise<PushQueueResult>
   dispatchDue(now?: Date): Promise<void>
+  /** Called after new deliveries are durably queued, so a worker can dispatch them at once. */
+  onDeliveriesQueued?(listener: () => void): () => void
 }
 
 export interface CreateNotificationServiceOptions {
@@ -52,6 +60,16 @@ export interface CreateNotificationServiceOptions {
   deliveryIdFactory?: () => string
   providerTimeoutMs?: number
   reportPushFailure?: (failure: SafePushFailure) => void
+  /** The recipient's app language when the server knows it; English otherwise. */
+  resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
+  /**
+   * Re-checked right before each provider call: a block, ban, deleted account
+   * or answered invite since enqueue must stop a queued or retried push.
+   */
+  isDeliveryCurrent?: (
+    delivery: { userId: string; notification: PushNotification },
+    now: Date
+  ) => Promise<boolean>
 }
 
 export interface SafePushFailure {
@@ -82,6 +100,20 @@ export function createNotificationService(
   }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
+  }
+  const queuedListeners = new Set<() => void>()
+  const announceQueued = () => {
+    for (const listener of queuedListeners) {
+      try { listener() } catch { /* A wake-up hint must not fail a durable enqueue. */ }
+    }
+  }
+  const resolveLocale = async (userId: string, type: string | undefined): Promise<PushLocale> => {
+    if (!options.resolveRecipientLocale || !resolvePushCopy(type, "en")) return "en"
+    try {
+      return (await options.resolveRecipientLocale(userId)) === "tr" ? "tr" : "en"
+    } catch {
+      return "en"
+    }
   }
 
   return {
@@ -116,7 +148,10 @@ export function createNotificationService(
     },
     async sendPushToUser(userId, notification, discoveryWatch) {
       const normalizedUserId = normalizeUserId(userId)
-      const normalizedNotification = normalizeNotification(notification)
+      const normalizedNotification = normalizeNotification(
+        notification,
+        await resolveLocale(normalizedUserId, notification.data?.type)
+      )
       if (discoveryWatch && (discoveryWatch.userId !== normalizedUserId || normalizedNotification.data?.type !== "discovery.watch_match")) {
         throw new Error("Discovery Watch authorization does not match notification recipient or type.")
       }
@@ -145,10 +180,16 @@ export function createNotificationService(
           discoveryWatch
         })
         if (!decision.allowed) return { outcome: decision.reason, deliveryCount: 0 }
+        if (decision.deliveryCount > 0) announceQueued()
         return { outcome: "queued", deliveryCount: decision.deliveryCount }
       }
       await Promise.all(deliveries.map((delivery) => repository.enqueueDelivery(delivery)))
+      announceQueued()
       return { outcome: "queued", deliveryCount: deliveries.length }
+    },
+    onDeliveriesQueued(listener) {
+      queuedListeners.add(listener)
+      return () => { queuedListeners.delete(listener) }
     },
     async dispatchDue(dispatchAt = now()) {
       await dispatchDue(dispatchAt)
@@ -186,12 +227,36 @@ export function createNotificationService(
         })
         return
       }
+      if (isPushExpired(delivery.notification, dispatchAt)) {
+        if (delivery.leaseToken) await repository.markDeliveryFailed({
+          deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
+          now: dispatchAt, errorCode: "expired"
+        })
+        return
+      }
+      if (options.isDeliveryCurrent) {
+        let current: boolean
+        try {
+          current = await options.isDeliveryCurrent({ userId: delivery.userId, notification: delivery.notification }, dispatchAt)
+        } catch {
+          await scheduleRetryOrFail(delivery, attempt, dispatchAt, "relevance_check_failed")
+          return
+        }
+        if (!current) {
+          if (delivery.leaseToken) await repository.markDeliveryFailed({
+            deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
+            now: dispatchAt, errorCode: "no_longer_relevant"
+          })
+          return
+        }
+      }
+      const outgoing = toOutgoingPushNotification({ userId: delivery.userId, notification: delivery.notification })
       const controller = new AbortController()
       let timer: ReturnType<typeof setTimeout> | undefined
       let ticket: void | { ticketId: string }
       try {
         const admitted = await repository.withAuthorizedDelivery(delivery, dispatchAt, () => Promise.race([
-          pushProvider.sendPush(delivery.pushToken, delivery.notification, { signal: controller.signal }),
+          pushProvider.sendPush(delivery.pushToken, outgoing, { signal: controller.signal }),
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => {
               controller.abort()
@@ -219,21 +284,24 @@ export function createNotificationService(
         await repository.removeDeviceRegistration({ ...delivery, registrationId: delivery.registrationId })
         return
       }
-      const errorCode = toSafeErrorCode(error)
-      if (attempt >= MAX_DELIVERY_ATTEMPTS) {
-        if (!delivery.leaseToken) return
-        await repository.markDeliveryFailed({ deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt, now: dispatchAt, errorCode })
-        return
-      }
-      await repository.markDeliveryRetry({
-        deliveryId: delivery.deliveryId,
-        leaseToken: delivery.leaseToken ?? "",
-        attempt,
-        availableAt: new Date(dispatchAt.getTime() + retryDelayMs(attempt)),
-        now: dispatchAt,
-        errorCode
-      })
+      await scheduleRetryOrFail(delivery, attempt, dispatchAt, toSafeErrorCode(error))
     }
+  }
+
+  async function scheduleRetryOrFail(delivery: PushDelivery, attempt: number, dispatchAt: Date, errorCode: string): Promise<void> {
+    if (attempt >= MAX_DELIVERY_ATTEMPTS) {
+      if (!delivery.leaseToken) return
+      await repository.markDeliveryFailed({ deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt, now: dispatchAt, errorCode })
+      return
+    }
+    await repository.markDeliveryRetry({
+      deliveryId: delivery.deliveryId,
+      leaseToken: delivery.leaseToken ?? "",
+      attempt,
+      availableAt: new Date(dispatchAt.getTime() + retryDelayMs(attempt)),
+      now: dispatchAt,
+      errorCode
+    })
   }
 
   async function dispatchReceipt(receipt: PendingPushReceipt, dispatchAt: Date): Promise<void> {
@@ -349,9 +417,22 @@ function resolveNotificationPolicy(
       return policyFor("match", notification.data?.matchId, queuedAt)
     case "discovery.watch_match":
       return policyFor("discovery_watch", notification.data?.profileId, queuedAt)
+    // Chat-initiated room invites belong to the conversation: the Messages
+    // preference and quiet hours apply, the hourly budget does not.
+    case "chat.room_invite":
+      return policyFor("message", eventKey("room-invite", notification.data?.inviteId), queuedAt)
+    case "mini_room.invite":
+      return policyFor("message", eventKey("lobby-invite", notification.data?.inviteId), queuedAt)
+    case "connection.matched":
+      return policyFor("match", eventKey("connection", notification.data?.miniRoomId), queuedAt)
     default:
       return null
   }
+}
+
+function eventKey(prefix: string, id: string | undefined): string | undefined {
+  const normalized = id?.trim()
+  return normalized ? `${prefix}:${normalized}` : undefined
 }
 
 function policyFor(
@@ -388,15 +469,18 @@ function normalizePushToken(pushToken: string): string {
   return trimmed
 }
 
-function normalizeNotification(notification: PushNotification): PushNotification {
+function normalizeNotification(notification: PushNotification, locale: PushLocale): PushNotification {
+  const copy = resolvePushCopy(notification.data?.type, locale)
   if (notification.data?.type === "chat.message") {
     return {
-      title: "Blumi",
-      body: "You have a new message.",
+      ...copy!,
       data: Object.fromEntries(Object.entries(normalizeData(notification.data))
         .filter(([key]) => ["type", "messageId", "threadId"].includes(key)))
     }
   }
+  // Known types always use the server's neutral copy, so no caller can put a
+  // name or message text on a lock screen.
+  if (copy) return { ...copy, data: normalizeData(notification.data!) }
   const title = normalizeText(notification.title, MAX_PUSH_TITLE_LENGTH)
   const body = normalizeText(notification.body, MAX_PUSH_BODY_LENGTH)
   return {

@@ -35,6 +35,37 @@ runRepositoryContract<NotificationRepository>({
         await service.updatePreferences(userId, { ...DEFAULT_NOTIFICATION_PREFERENCES, messagesEnabled: false })
         assert.equal(await claim("message", "disabled"), "disabled")
       }
+    },
+    "room invites use the Messages preference, dedupe per invite and reach the device with routing ids only": async (backend) => {
+      const userId = backend.id("invitee")
+      await backend.ensureUsers(userId)
+      const now = new Date("2026-10-01T10:00:00Z")
+      const sent: Array<Record<string, string> | undefined> = []
+      const pushToken = backend.id("invitee-token")
+      // The PostgreSQL backend shares one outbox across cases: count this device only.
+      const service = createNotificationService({ repository: backend.repository, now: () => now,
+        pushProvider: { async sendPush(token, notification) { if (token === pushToken) sent.push(notification.data) } } })
+      await service.registerDevice(userId, { platform: "ios", pushToken })
+      await service.updatePreferences(userId, { ...DEFAULT_NOTIFICATION_PREFERENCES, maxPushesPerHour: 1 })
+      const invite = (inviteId: string) => service.sendPushToUser(userId, { title: "Blumi", body: "Invite", data: {
+        type: "chat.room_invite", threadId: "thread_contract", inviteId,
+        expiresAt: "2026-10-01T10:10:00.000Z", senderDisplayName: "never sent"
+      } })
+      assert.equal((await service.sendPushToUser(userId, { title: "Blumi", body: "Update",
+        data: { type: "discovery.match", matchId: backend.id("budget"), partnerUserId: "partner" } })).outcome, "queued")
+      assert.equal((await invite(backend.id("invite"))).outcome, "queued", "invites do not use the hourly budget")
+      assert.equal((await invite(backend.id("invite"))).outcome, "duplicate")
+      await service.dispatchDue(now)
+      assert.deepEqual(sent.map((data) => data?.type).sort(), ["chat.room_invite", "discovery.match"])
+      assert.deepEqual(sent.find((data) => data?.type === "chat.room_invite"), {
+        type: "chat.room_invite", threadId: "thread_contract", inviteId: backend.id("invite"),
+        expiresAt: "2026-10-01T10:10:00.000Z", recipientUserId: userId
+      })
+      assert.deepEqual(sent.find((data) => data?.type === "discovery.match"), {
+        type: "discovery.match", matchId: backend.id("budget"), recipientUserId: userId
+      })
+      await service.updatePreferences(userId, { ...DEFAULT_NOTIFICATION_PREFERENCES, messagesEnabled: false })
+      assert.equal((await invite(backend.id("muted"))).outcome, "disabled")
     }
   }
 })

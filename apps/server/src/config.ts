@@ -73,6 +73,7 @@ import {
   createNotificationService,
   type NotificationService
 } from "./notifications/notificationService"
+import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
 import { createReactionService, type ReactionService } from "./reactions/reactionService"
 import { createRoomService, type RoomService } from "./rooms/roomService"
 import {
@@ -443,7 +444,8 @@ export function createConfiguredServerServices(
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
-      pushProvider
+      pushProvider,
+      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }))
     })
     const authService = createAuthService({
       repository: createPostgresAuthRepository(pool),
@@ -566,7 +568,10 @@ export function createConfiguredServerServices(
     }
   }
 
-  const notificationService = createNotificationService({ pushProvider })
+  const notificationService = createNotificationService({
+    pushProvider,
+    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }))
+  })
   const authService = createAuthService({
     smsProvider,
     codeFactory,

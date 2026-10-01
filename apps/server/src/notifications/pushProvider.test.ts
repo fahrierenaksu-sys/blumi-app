@@ -37,6 +37,39 @@ test("expo push provider sends an authenticated Expo push request", async () => 
   })
 })
 
+test("expo push provider maps delivery options onto the Expo message fields", async () => {
+  const bodies: unknown[] = []
+  const provider = createExpoPushProvider({
+    fetcher: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return new Response(JSON.stringify({ data: { status: "ok", id: "ticket_1" } }), { status: 200 })
+    }
+  })
+  await provider.sendPush("ExponentPushToken[device]", {
+    title: "Blumi",
+    body: "You have a new room invitation.",
+    data: { type: "chat.room_invite", threadId: "t", inviteId: "i", recipientUserId: "u" },
+    delivery: { priority: "high", collapseId: "invite.abc", threadId: "thread.abc", channelId: "default", expiration: 1790000000 }
+  })
+  await provider.sendPush("ExponentPushToken[device]", {
+    title: "Blumi", body: "Update", delivery: { ttlSeconds: 86400 }
+  })
+  assert.deepEqual(bodies[0], {
+    to: "ExponentPushToken[device]",
+    sound: "default",
+    title: "Blumi",
+    body: "You have a new room invitation.",
+    data: { type: "chat.room_invite", threadId: "t", inviteId: "i", recipientUserId: "u" },
+    priority: "high",
+    collapseId: "invite.abc",
+    tag: "invite.abc",
+    threadId: "thread.abc",
+    channelId: "default",
+    expiration: 1790000000
+  })
+  assert.deepEqual(bodies[1], { to: "ExponentPushToken[device]", sound: "default", title: "Blumi", body: "Update", ttl: 86400 })
+})
+
 test("receipt lookup forwards cancellation and reads only requested ticket", async () => {
   const controller = new AbortController()
   const provider = createExpoPushProvider({ fetcher: async (url, init) => {
