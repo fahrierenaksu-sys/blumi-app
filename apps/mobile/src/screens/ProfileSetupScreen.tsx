@@ -1,9 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import {
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions
 } from "react-native"
@@ -22,13 +24,18 @@ import { getNativeAppLocale } from "../features/session/authLocale"
 import { getProfileSetupCopy } from "../features/session/profileSetupCopy"
 import { getProfileSetupLayoutMetrics } from "../features/session/profileSetupLayout"
 import {
+  PROFILE_AGE_DIGITS,
+  getProfileSetupFieldError,
+  shouldDismissAgeKeyboard
+} from "../features/session/profileSetupValidation"
+import {
   getProfileSetupInitialGender,
   PROFILE_SETUP_VISUAL
 } from "../features/session/profileSetupVisualModel"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import type { SessionActor } from "../features/session/sessionModel"
 import { FieldInput } from "../ui/fieldInput"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
 import {
   useOnboardingHardwareBack,
@@ -78,6 +85,9 @@ export function ProfileSetupScreen({
   const [ageText, setAgeText] = useState(
     initialProfile.age ? String(initialProfile.age) : ""
   )
+  const [nameTouched, setNameTouched] = useState(false)
+  const [ageTouched, setAgeTouched] = useState(false)
+  const ageInputRef = useRef<TextInput | null>(null)
   const [gender, setGender] = useState(
     getProfileSetupInitialGender(initialProfile.gender)
   )
@@ -106,10 +116,11 @@ export function ProfileSetupScreen({
     ),
     [gender, initialProfile.avatar.loadout]
   )
+  const fieldError = getProfileSetupFieldError({ displayName, ageText, nameTouched, ageTouched })
   const validationMessage = errorMessage ?? (
-    displayName.length > 0 && !nameValid
+    fieldError === "name"
       ? copy.useTwoToThirtyCharacters
-      : ageText.length > 0 && !ageValid
+      : fieldError === "age"
         ? copy.ageRangeError
         : null
   )
@@ -182,6 +193,10 @@ export function ProfileSetupScreen({
               label={copy.displayName}
               value={displayName}
               onChangeText={setDisplayName}
+              onBlur={() => setNameTouched(true)}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => ageInputRef.current?.focus()}
               placeholder={copy.displayNamePlaceholder}
               autoCapitalize="words"
               autoCorrect={false}
@@ -198,9 +213,14 @@ export function ProfileSetupScreen({
               accessibilityLabel={copy.age}
               label={copy.age}
               value={ageText}
-              onChangeText={(value) =>
-                setAgeText(value.replace(/[^0-9]/g, "").slice(0, 2))
-              }
+              inputRef={ageInputRef}
+              onChangeText={(value) => {
+                const nextAge = value.replace(/[^0-9]/g, "").slice(0, PROFILE_AGE_DIGITS)
+                setAgeText(nextAge)
+                if (shouldDismissAgeKeyboard(nextAge)) Keyboard.dismiss()
+              }}
+              onBlur={() => setAgeTouched(true)}
+              returnKeyType="done"
               placeholder="18+"
               keyboardType="number-pad"
               icon="calendar-outline"
@@ -251,7 +271,7 @@ export function ProfileSetupScreen({
                   disabled={busy}
                   onPress={() => {
                     if (gender === option.value) return
-                    hapticLight()
+                    hapticSelection()
                     setGender(option.value)
                   }}
                   style={({ pressed }) => [

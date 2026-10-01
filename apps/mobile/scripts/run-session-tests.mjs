@@ -171,6 +171,7 @@ try {
       "src/features/session/onboardingWelcomeHomeAssetGate.test.ts",
       "src/features/session/onboardingWelcomeHomeModel.test.ts",
       "src/features/session/onboardingWorldClockModel.test.ts",
+      "src/features/session/profileSetupValidation.test.ts",
       "src/features/session/onboardingWorldCompositionModel.test.ts",
       "src/features/session/profileCharacterReactionAssetGate.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
