@@ -65,6 +65,19 @@ export function canMiniRoomAvatarUseMotion(
   }).isProductionReady
 }
 
+/** Squash that suggests sitting when only the standing idle art can be shown. */
+export const MINI_ROOM_IDLE_FALLBACK_SIT_SCALE_Y = 0.86
+
+/**
+ * Vertical scale of a seated avatar (ROOM-04). Real sitting layers are drawn
+ * seated, so squashing them distorted the locked chibi proportions; only the
+ * standing idle fallback gets the squash.
+ */
+export function getMiniRoomAvatarSittingScaleY(input: MiniRoomAvatarMotionInput): number {
+  if (input.motion !== "sitting") return 1
+  return canMiniRoomAvatarUseMotion(input) ? 1 : MINI_ROOM_IDLE_FALLBACK_SIT_SCALE_Y
+}
+
 function toRoomAvatarMotionState(
   motion: AvatarState["motion"]
 ): RoomV2AvatarMotionState {

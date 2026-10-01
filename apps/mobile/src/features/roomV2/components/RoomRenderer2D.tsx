@@ -625,7 +625,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
               style={[
                 styles.avatarImage,
                 {
-                  opacity: item.direction === "back" ? 0.84 : 1,
+                  // ROOM-03: walking toward the back wall only shrinks slightly; no ghost opacity.
                   transform: [
                     { translateX: getAvatarMotionTranslateX(avatarMotion, gestureRef) },
                     { translateY: getAvatarMotionTranslateY(avatarMotion, breatheRef, walkRef, gestureRef, usesIdleBreathe, item.kind === "avatar" ? item.seatRig : undefined, stageHeightPx) },

@@ -34,12 +34,16 @@ export function createFailClosedCapabilityResolution(): CapabilityResolution {
   })
 }
 
+// One frozen fail-closed map: every render without resolved capabilities sees
+// the same object, so memoised consumers (main-tab pages) do not re-render.
+const FAIL_CLOSED_CAPABILITIES = createFailClosedCapabilityResolution().capabilities
+
 export function getSessionScopedCapabilities(
   sessionToken: string | null,
   resolved: SessionScopedCapabilities
 ): CapabilityMap {
   if (!sessionToken || resolved.sessionToken !== sessionToken) {
-    return createFailClosedCapabilityResolution().capabilities
+    return FAIL_CLOSED_CAPABILITIES
   }
   return resolved.capabilities
 }

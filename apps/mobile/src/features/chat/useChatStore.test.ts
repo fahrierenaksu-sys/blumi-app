@@ -8,7 +8,7 @@ import type * as ChatStore from "./chatStore"
 function mount() {
   const runtime = createFakeReactRuntime()
   const store = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys"]
   })
   return { runtime, store }
 }

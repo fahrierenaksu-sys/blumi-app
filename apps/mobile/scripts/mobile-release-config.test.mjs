@@ -1043,7 +1043,10 @@ test("navigation links and offline status remain wired to native runtime", () =>
   }
   assert.match(navigator, /import \{ linking \} from "\.\/rootLinking"/)
   assert.match(navigator, /linking=\{linking\}/)
-  assert.match(navigator, /<ConnectionBanner status=\{rootConnectionStatus\}/)
+  // SYS-3: the banner subscribes to the connection state itself, so a
+  // reconnect re-renders only the banner, not the navigator.
+  assert.match(navigator, /<RootConnectionBanner \/>/)
+  assert.match(read("src/navigation/RootConnectionBanner.tsx"), /const \{ connectionStatus \} = useGlobalRealtime\(\)\s*return <ConnectionBanner status=\{connectionStatus\} \/>/)
   assert.match(networkStore, /NetInfo\.addEventListener/)
   assert.doesNotMatch(networkStore, /\bany\b|console\.warn|try\s*\{\s*require/)
   // Updated 2026-09-30 (owner feedback): the banner moved to

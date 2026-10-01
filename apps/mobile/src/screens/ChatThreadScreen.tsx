@@ -3,7 +3,6 @@ import { useIsFocused } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useState } from "react"
 import {
-  FlatList,
   KeyboardAvoidingView,
   type ListRenderItem,
   Platform,
@@ -11,8 +10,9 @@ import {
   useWindowDimensions,
   View
 } from "react-native"
+import Animated from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { useChatThreadStore } from "../features/chat/chatStore"
+import { getMessageRenderKey, useChatThreadStore } from "../features/chat/chatStore"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
@@ -35,7 +35,12 @@ import {
   CHAT_COPY,
   resolveChatThreadLocale
 } from "../features/chat/thread/chatThreadCopy"
-import { selectChatPartnerSummary } from "../features/chat/thread/chatThreadModel"
+import {
+  isChatTimelineRowInviteBusy,
+  selectChatPartnerSummary
+} from "../features/chat/thread/chatThreadModel"
+import { ChatScrollToLatestPill } from "../features/chat/thread/ChatScrollToLatestPill"
+import { useChatScrollToLatest } from "../features/chat/thread/useChatScrollToLatest"
 import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindings"
 import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
@@ -109,7 +114,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     [inviteClockMs, storedThreadRoomInvites]
   )
   const timeline = useMemo(
-    () => buildChatTimeline(messages, threadRoomInvites),
+    // Acknowledged messages keep their optimistic bubble's key (CHT-04).
+    () => buildChatTimeline(messages, threadRoomInvites, getMessageRenderKey),
     [messages, threadRoomInvites]
   )
   // Inverted FlatList starts at offset zero with the newest message visible.
@@ -162,7 +168,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   })
 
   const {
-    handleSend,
+    handleSend: sendMessage,
     handleRetry,
     handleLoadEarlier,
     isLoadingEarlier
@@ -197,6 +203,15 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     activeUserIdRef
   })
 
+  const scrollToLatestState = useChatScrollToLatest({ newestFirstTimeline, currentUserId })
+  const { scrollToLatest } = scrollToLatestState
+  // CHT-05: my own message is always shown, even when I had scrolled up.
+  const handleSend = useCallback((draft: string): boolean => {
+    const accepted = sendMessage(draft)
+    if (accepted) scrollToLatest()
+    return accepted
+  }, [scrollToLatest, sendMessage])
+
   const rowModels = useChatTimelineRowModels({
     timeline,
     currentUserId,
@@ -223,7 +238,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           currentUserId={currentUserId}
           partnerName={partnerName}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
-          activeRoomInviteAction={activeRoomInviteAction}
+          isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
           onRoomInviteAction={handleRoomInviteAction}
           onRetry={handleRetry}
         />
@@ -319,9 +334,13 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               partnerAvatar={partnerAvatar}
             />
           ) : (
-            <FlatList
+            <View style={styles.flex}>
+            <Animated.FlatList
+              ref={scrollToLatestState.listRef}
               data={newestFirstTimeline}
               inverted
+              onScroll={scrollToLatestState.scrollHandler}
+              scrollEventThrottle={16}
               initialNumToRender={initialMessageRenderCount}
               keyExtractor={getChatTimelineItemKey}
               style={styles.messageListContainer}
@@ -341,6 +360,13 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               }
               renderItem={renderTimelineRow}
             />
+            <ChatScrollToLatestPill
+              visible={scrollToLatestState.isAway}
+              count={scrollToLatestState.unseenCount}
+              chatCopy={chatCopy}
+              onPress={scrollToLatest}
+            />
+            </View>
           )}
 
           <ChatTypingBubble threadId={resolvedThreadId} partnerUserId={partnerUserId} partnerName={partnerName} locale={chatLocale} />

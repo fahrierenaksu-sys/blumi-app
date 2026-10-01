@@ -24,6 +24,8 @@ import {
   getThreadListErrorMessageForDisplay
 } from "./chatErrorCopy"
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
+import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
+export { getMessageRenderKey } from "./chatMessageRenderKeys"
 
 // ─── In-memory store ────────────────────────────────────────
 let threadCache: ChatThread[] = []
@@ -358,6 +360,7 @@ function reconcileLostAcknowledgements(payload: ChatMessageList): ChatMessage[] 
     if (!match) continue
     claimedServerIds.add(match.messageId)
     reconciledLocalIds.add(local.messageId)
+    keepLocalRenderKey(match.messageId, local.messageId)
     removePendingLocalMessage(local.messageId)
   }
   return reconciledLocalIds.size === 0
@@ -405,6 +408,7 @@ export function applyChatMessageReceived(
 
   if (alreadyReceived && !pendingEchoId) return
   if (pendingEchoId) removePendingLocalMessage(pendingEchoId)
+  if (pendingEchoId && !alreadyReceived) keepLocalRenderKey(message.messageId, pendingEchoId)
   const cleaned = pendingEchoId ? existing.filter((entry) => entry.messageId !== pendingEchoId) : existing
   const sorted = (alreadyReceived ? cleaned : [...cleaned, message])
     .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
@@ -516,6 +520,7 @@ export function confirmOptimisticMessage(
     notify()
     return
   }
+  keepLocalRenderKey(message.messageId, localMessageId)
   applyChatMessageReceived(message, { localUserId })
 }
 
@@ -548,6 +553,7 @@ export function resetChatStore(): void {
   pendingLocalIds.clear()
   deliveryStateByLocalMessageId.clear()
   pendingMessageByLocalMessageId.clear()
+  resetMessageRenderKeys()
   unreadCounts = new Map()
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()

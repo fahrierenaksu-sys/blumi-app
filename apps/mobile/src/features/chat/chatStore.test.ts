@@ -32,8 +32,45 @@ import {
   beginChatThreadListRequest,
   removeChatThreadsWithPartner,
   applyChatReceiptUpdated,
-  getPartnerReceipts
+  getPartnerReceipts,
+  getMessageRenderKey
 } from "./chatStore"
+
+test("an acknowledged bubble keeps its first local render key so the row never remounts (CHT-04)", () => {
+  resetChatStore()
+  try {
+    const acked = addOptimisticMessage({ threadId: "thread_key", senderUserId: "user_one", body: "hi", clientMessageId: "client-key-001" })
+    confirmOptimisticMessage(acked.clientMessageId, {
+      messageId: "server-key-001", threadId: "thread_key", senderUserId: "user_one", body: "hi", sentAt: "2026-09-29T10:00:00Z"
+    }, "user_one")
+    assert.equal(getMessageRenderKey("server-key-001"), acked.localMessageId)
+
+    const echoed = addOptimisticMessage({ threadId: "thread_key", senderUserId: "user_one", body: "again", clientMessageId: "client-key-002" })
+    applyChatMessageReceived({
+      messageId: "server-key-002", threadId: "thread_key", senderUserId: "user_one", body: "again", sentAt: "2026-09-29T10:00:01Z"
+    }, { localUserId: "user_one" })
+    assert.equal(getMessageRenderKey("server-key-002"), echoed.localMessageId, "a realtime echo keeps the key too")
+
+    assert.equal(getMessageRenderKey("server-from-partner"), "server-from-partner", "other messages key by their id")
+    resetChatStore()
+    assert.equal(getMessageRenderKey("server-key-001"), "server-key-001", "keys are dropped on account reset")
+  } finally {
+    resetChatStore()
+  }
+})
+
+test("a server message that was already on screen keeps its own key", () => {
+  resetChatStore()
+  try {
+    const pending = addOptimisticMessage({ threadId: "thread_key2", senderUserId: "user_one", body: "x", clientMessageId: "client-key-003" })
+    const canonical = { messageId: "server-key-003", threadId: "thread_key2", senderUserId: "user_one", body: "x", sentAt: "2026-09-29T10:00:00Z" }
+    applyChatMessageListed({ threadId: "thread_key2", messages: [canonical] } as never)
+    confirmOptimisticMessage(pending.clientMessageId, canonical, "user_one")
+    assert.equal(getMessageRenderKey("server-key-003"), "server-key-003")
+  } finally {
+    resetChatStore()
+  }
+})
 
 test("one realtime message is not proof that the first history page is ready", () => {
   resetChatStore()

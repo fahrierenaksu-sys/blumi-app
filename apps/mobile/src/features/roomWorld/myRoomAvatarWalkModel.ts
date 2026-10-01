@@ -1,24 +1,26 @@
 import { ROOM_LAYER_ORDER, type RoomLayer, type RoomV2RenderItem } from "../roomV2/roomV2.types"
-import { easeOutRoomWorldMovement, type RoomWorldMovementPlan } from "./roomWorldRuntime"
+import type { RoomWorldMovementPlan } from "./roomWorldRuntime"
 
-/** One UI-thread timing step: animate to `x`/`y` over `durationMs`. */
+/**
+ * One UI-thread timing step: animate to `x`/`y` over `durationMs` with the
+ * RoomWorld walk curve (`easeRoomWorldMovement`): linear at cruise speed,
+ * ramped only at the start of the first and the end of the last step.
+ */
 export interface MyRoomWalkStep {
   x: number
   y: number
   durationMs: number
+  rampIn: number
+  rampOut: number
 }
-
-/**
- * The per-segment ease the JS movement frame used (`getRoomWorldMovementFrame`).
- * It is a worklet, so the UI-thread timing runs the exact same curve.
- */
-export const MY_ROOM_WALK_EASING = easeOutRoomWorldMovement
 
 export function createMyRoomWalkTimeline(plan: RoomWorldMovementPlan): MyRoomWalkStep[] {
   return plan.segments.map((segment) => ({
     x: segment.to.x,
     y: segment.to.y,
-    durationMs: segment.durationMs
+    durationMs: segment.durationMs,
+    rampIn: segment.rampIn ?? 0,
+    rampOut: segment.rampOut ?? 0
   }))
 }
 

@@ -334,7 +334,7 @@ test("production rooms keep production persistence and sync wiring", () => {
 test("production rooms retain live-room reconnection chrome", () => {
   assert.match(
     navigatorSource,
-    /!isAccountRestricted\s*\? <ConnectionBanner/
+    /!isAccountRestricted\s*\? <RootConnectionBanner/
   )
 })
 

@@ -5,7 +5,7 @@ import type {
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
@@ -26,15 +26,8 @@ import {
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
 import { useBlockStore } from "../features/safety/blockStore"
-import {
-  resetChatStore,
-  useTotalUnreadCount
-} from "../features/chat/chatStore"
-import { flushAuthenticatedConnectionDecisionOutbox } from "../features/connections/connectionDecisionRuntime"
-import {
-  disconnectGlobal,
-  useGlobalRealtime
-} from "../features/realtime/globalRealtimeProvider"
+import { resetChatStore } from "../features/chat/chatStore"
+import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
 import { RoomDebriefScreen } from "../screens/RoomDebriefScreen"
@@ -85,8 +78,9 @@ import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
-import { ConnectionBanner } from "../features/realtime/connectionBanner/ConnectionBanner"
 import { LinkedProfileScreen } from "./LinkedProfileScreen"
+import { RootConnectionBanner } from "./RootConnectionBanner"
+import { useConnectionDecisionOutboxFlush } from "./useConnectionDecisionOutboxFlush"
 import { linking } from "./rootLinking"
 import { navigationRef } from "./rootNavigationRef"
 import { MainTabBottomBar, RootNavigationChrome } from "./RootNavigationChrome"
@@ -309,8 +303,9 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
   const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
   const [navigationReadyGeneration, setNavigationReadyGeneration] = useState(0)
-  const totalUnreadCount = useTotalUnreadCount()
-  const { connectionStatus: rootConnectionStatus } = useGlobalRealtime()
+  // The unread badge (MainTabBottomBar) and the connection pill
+  // (RootConnectionBanner) subscribe themselves: neither change re-renders
+  // this navigator, its pages or pushed screens.
   const demoStore = useDemoStore()
   const {
     visibleRoomInvites,
@@ -331,7 +326,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     sessionActor?.profile.userId,
     sessionActor?.session.mode === "production"
   )
-  const chatBadgeCount = totalUnreadCount + (isDemoMode() ? demoStore.matchedProfiles.length : 0)
   const sessionEntryRoute = selectSessionEntryRoute({
     isHydrating,
     hasSeenIntro,
@@ -466,16 +460,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }
   }, [claimDailyRewardFromServer, hydrateFromServer, inventoryHydrationSessionToken, inventoryRewardBody])
 
-  useEffect(() => {
-    if (sessionActor?.session.mode !== "production") return
-    void flushAuthenticatedConnectionDecisionOutbox({
-      actorUserId: sessionActor.profile.userId,
-      sessionToken: sessionActor.session.sessionToken,
-      onDelivered: reconcileConnectionDecisionDelivery
-    }).catch((error: unknown) => {
-      console.warn("Connection decision outbox could not be refreshed.", error)
-    })
-  }, [reconcileConnectionDecisionDelivery, rootConnectionStatus, sessionActor])
+  useConnectionDecisionOutboxFlush(sessionActor, reconcileConnectionDecisionDelivery)
 
   useEffect(() => {
     if (sessionEntryRoute === "AuthEntry") {
@@ -573,23 +558,41 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     typingEnabled: resolvedCapabilities.chat_typing
   })
 
-  const mainTabPageDependencies: MainTabPageDependencies = {
+  // Main-tab pages are memoised (renderMainTabPage.tsx); everything they
+  // receive keeps its identity until its real inputs change, so a root render
+  // or a tab change does not re-render them (SYS-2 / PERF-1).
+  const sessionDisplayName = sessionActor?.profile.displayName ?? ""
+  const updateDiscoveryPreferences = useCallback<MainTabPageDependencies["onUpdateDiscoveryPreferences"]>(
+    (discoveryPreferences) => updateSessionProfile({
+      displayName: sessionDisplayName,
+      discoveryPreferences
+    }),
+    [sessionDisplayName, updateSessionProfile]
+  )
+  const mainTabPageDependencies = useMemo<MainTabPageDependencies>(() => ({
     onResetSession: clearSessionActor,
-    onUpdateDiscoveryPreferences: (actor) => (discoveryPreferences) =>
-      updateSessionProfile({
-        displayName: actor.profile.displayName,
-        discoveryPreferences
-      }),
+    onUpdateDiscoveryPreferences: updateDiscoveryPreferences,
     onRetryThreads: refreshProductionThreads,
     onWarmThread: warmThreadMessagesForInbox,
     resolvedCapabilities,
     isFullShopCatalogQaPreview: IS_FULL_SHOP_CATALOG_QA_PREVIEW
-  }
-  const renderMainTabPage = (
+  }), [
+    clearSessionActor,
+    refreshProductionThreads,
+    resolvedCapabilities,
+    updateDiscoveryPreferences,
+    warmThreadMessagesForInbox
+  ])
+  const renderMainTabPage = useCallback((
     actor: SessionActor,
     routeName: MainTabRouteName,
     pageProps: MainTabPageProps
-  ) => renderMainTabPageWith(mainTabPageDependencies, actor, routeName, pageProps)
+  ) => renderMainTabPageWith(mainTabPageDependencies, actor, routeName, pageProps), [mainTabPageDependencies])
+  const renderPagerPage = useCallback(
+    (pageRouteName: MainTabRouteName, pageProps: MainTabPageProps) =>
+      sessionActor ? renderMainTabPage(sessionActor, pageRouteName, pageProps) : null,
+    [renderMainTabPage, sessionActor]
+  )
 
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||
@@ -638,7 +641,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     <DiscoveryStartupBoundary key={sessionNavigatorKey} active={sessionEntryRoute === "Main" && sessionActor?.session.mode === "production" && !isAccountRestricted}>
     <View style={styles.navigatorShell}>
       {!isAccountRestricted
-        ? <ConnectionBanner status={rootConnectionStatus} />
+        ? <RootConnectionBanner />
         : null}
       <NavigationContainer
         ref={navigationRef}
@@ -710,13 +713,10 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     <MainTabPager
                       navigation={screenProps.navigation}
                       route={screenProps.route}
-                      renderPage={(pageRouteName, pageProps) =>
-                        renderMainTabPage(sessionActor, pageRouteName, pageProps)
-                      }
+                      renderPage={renderPagerPage}
                       bottomBar={
                         <MainTabBottomBar
                           routeName={screenProps.route.name}
-                          chatCount={chatBadgeCount}
                           onPress={handleBottomNavPress}
                         />
                       }
@@ -1092,7 +1092,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         sessionActor={sessionActor}
         sessionEntryRoute={sessionEntryRoute}
         isAccountRestricted={isAccountRestricted}
-        chatCount={chatBadgeCount}
         isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
         onBottomNavPress={handleBottomNavPress}
       />

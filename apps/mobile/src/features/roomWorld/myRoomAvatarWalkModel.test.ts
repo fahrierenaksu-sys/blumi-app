@@ -5,11 +5,10 @@ import { insertRoomV2RenderItemSorted } from "../roomV2/roomV2Selectors"
 import {
   createMyRoomAvatarDepthNeighbours,
   createMyRoomWalkTimeline,
-  getMyRoomAvatarDepthIndex,
-  MY_ROOM_WALK_EASING
+  getMyRoomAvatarDepthIndex
 } from "./myRoomAvatarWalkModel"
 import {
-  easeOutRoomWorldMovement,
+  easeRoomWorldMovement,
   getRoomWorldMovementFrame,
   type RoomWorldMovementPlan
 } from "./roomWorldRuntime"
@@ -22,24 +21,24 @@ const plan: RoomWorldMovementPlan = {
   target: { x: 0.6, y: 0.7 },
   path: [],
   segments: [
-    { from: { x: 0.4, y: 0.5 }, to: { x: 0.5, y: 0.6 }, facing: "right", distance: 0.14, durationMs: 420, isFinal: false },
-    { from: { x: 0.5, y: 0.6 }, to: { x: 0.6, y: 0.7 }, facing: "front", distance: 0.14, durationMs: 380, isFinal: true }
+    { from: { x: 0.4, y: 0.5 }, to: { x: 0.5, y: 0.6 }, facing: "right", distance: 0.14, durationMs: 324, isFinal: false, rampIn: 0.444, rampOut: 0 },
+    { from: { x: 0.5, y: 0.6 }, to: { x: 0.6, y: 0.7 }, facing: "front", distance: 0.14, durationMs: 324, isFinal: true, rampIn: 0, rampOut: 0.444 }
   ]
 }
 
-test("the UI-thread walk timeline keeps every segment's target and duration", () => {
+test("the UI-thread walk timeline keeps every segment's target, duration and ramps", () => {
   assert.deepEqual(createMyRoomWalkTimeline(plan), [
-    { x: 0.5, y: 0.6, durationMs: 420 },
-    { x: 0.6, y: 0.7, durationMs: 380 }
+    { x: 0.5, y: 0.6, durationMs: 324, rampIn: 0.444, rampOut: 0 },
+    { x: 0.6, y: 0.7, durationMs: 324, rampIn: 0, rampOut: 0.444 }
   ])
 })
 
-test("the UI-thread walk uses the same ease-out curve as the JS movement frame", () => {
-  assert.equal(MY_ROOM_WALK_EASING, easeOutRoomWorldMovement)
+test("the UI-thread walk uses the same constant-speed curve as the JS movement frame", () => {
+  const [step] = createMyRoomWalkTimeline(plan)
   const segment = plan.segments[0]!
-  for (const elapsed of [0, 60, 210, 333, 420]) {
+  for (const elapsed of [0, 60, 210, 333, 324]) {
     const frame = getRoomWorldMovementFrame({ segment, startedAt: 0, now: elapsed })
-    const progress = MY_ROOM_WALK_EASING(elapsed / segment.durationMs)
+    const progress = easeRoomWorldMovement(Math.min(1, elapsed / step!.durationMs), step!.rampIn, step!.rampOut)
     assert.ok(Math.abs(frame.x - (segment.from.x + (segment.to.x - segment.from.x) * progress)) < 1e-12)
     assert.ok(Math.abs(frame.y - (segment.from.y + (segment.to.y - segment.from.y) * progress)) < 1e-12)
   }

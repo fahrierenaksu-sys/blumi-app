@@ -1,12 +1,15 @@
 import {
   cancelAnimation,
-  Easing,
   makeMutable,
   ReduceMotion,
   withTiming,
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
+import {
+  easeRoomWorldMovement,
+  type RoomWorldMovementSegment
+} from "../../roomWorld/roomWorldRuntime"
 import type { MiniRoomSegmentAnimator } from "./miniRoomMovementRun"
 import type { RoomPoint } from "./miniRoomSceneTypes"
 
@@ -17,9 +20,19 @@ export interface MiniRoomAvatarPosition {
 }
 
 /**
- * Same curve as roomWorldRuntime's easeOutRoomWorldMovement: 1 - (1 - t)^3.
+ * The RoomWorld walk curve for one segment (ROOM-02): linear at the walk's
+ * one speed, ramped only at the start of the first and the end of the last
+ * segment. Same function as the JS movement frame, so both phones and both
+ * threads agree.
  */
-export const MINI_ROOM_MOVEMENT_EASING = Easing.out(Easing.cubic)
+export function createMiniRoomMovementEasing(segment: RoomWorldMovementSegment): (progress: number) => number {
+  const rampIn = segment.rampIn ?? 0
+  const rampOut = segment.rampOut ?? 0
+  return (progress: number) => {
+    "worklet"
+    return easeRoomWorldMovement(progress, rampIn, rampOut)
+  }
+}
 
 export function createMiniRoomAvatarPosition(point: RoomPoint): MiniRoomAvatarPosition {
   return { x: makeMutable(point.x), y: makeMutable(point.y) }
@@ -54,7 +67,7 @@ export function createMiniRoomSegmentAnimator(position: MiniRoomAvatarPosition):
       }
       const config = {
         duration: segment.durationMs,
-        easing: MINI_ROOM_MOVEMENT_EASING,
+        easing: createMiniRoomMovementEasing(segment),
         reduceMotion: ReduceMotion.Never
       }
       position.x.value = segment.from.x

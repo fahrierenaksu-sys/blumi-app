@@ -14,22 +14,33 @@ import {
 export const ROOM_WORLD_AVATAR_COLLISION_CLEARANCE = 0.012
 export const ROOM_WORLD_AVATAR_PERSONAL_SPACE_RADIUS = 0.058
 
+/**
+ * One constant walking speed for a whole path (ROOM-02). Every segment takes
+ * distance x durationPerDistanceMs, corners do not stop the avatar, and only
+ * the first and last `rampDistance` of the path accelerate from and
+ * decelerate to rest. A path longer than `maxWalkDurationMs` is walked faster
+ * as a whole (one cap), never per segment. Plans are pure, so both phones of
+ * a shared room time the same walk identically.
+ */
 export interface RoomWorldMovementTiming {
-  minDurationMs: number
-  maxDurationMs: number
+  /** Cruise pace: milliseconds per room unit. */
   durationPerDistanceMs: number
+  /** The longest a whole walk may take. */
+  maxWalkDurationMs: number
+  /** Room units spent accelerating at the start and decelerating at the end. */
+  rampDistance: number
 }
 
 export const ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING: RoomWorldMovementTiming = {
-  minDurationMs: 240,
-  maxDurationMs: 760,
-  durationPerDistanceMs: 1_800
+  durationPerDistanceMs: 1_800,
+  maxWalkDurationMs: 1_800,
+  rampDistance: 0.04
 }
 
 export const ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING: RoomWorldMovementTiming = {
-  minDurationMs: 260,
-  maxDurationMs: 820,
-  durationPerDistanceMs: 1_900
+  durationPerDistanceMs: 1_900,
+  maxWalkDurationMs: 1_800,
+  rampDistance: 0.04
 }
 
 /**
@@ -144,12 +155,18 @@ export interface RoomWorldMovementSegment {
   distance: number
   durationMs: number
   isFinal: boolean
+  /** Share of this segment's time spent accelerating from rest (first segment only); 0 = linear. */
+  rampIn?: number
+  /** Share of this segment's time spent decelerating to rest (last segment only); 0 = linear. */
+  rampOut?: number
 }
 
 export interface RoomWorldMovementPlan {
   target: RoomWorldPoint
   path: RoomWorldPath
   segments: RoomWorldMovementSegment[]
+  /** The timing the segments were timed with; combining plans re-times the whole walk. */
+  timing?: RoomWorldMovementTiming
 }
 
 export interface RoomWorldMovementFrame {
@@ -211,7 +228,7 @@ export function createRoomWorldMovementPlan(input: {
       to: segmentTarget,
       facing: deriveRoomWorldFacing(segmentStart, segmentTarget),
       distance,
-      durationMs: getRoomWorldMovementDuration(distance, input.timing),
+      durationMs: 0,
       isFinal: index === path.length - 1
     }
     segmentStart = segmentTarget
@@ -221,8 +238,58 @@ export function createRoomWorldMovementPlan(input: {
   return {
     target: input.to,
     path,
-    segments
+    segments: timeRoomWorldMovementSegments(segments, input.timing),
+    timing: input.timing
   }
+}
+
+/**
+ * Times a whole walk at one speed: duration = distance x pace for every
+ * segment, plus a short acceleration on the first segment and deceleration
+ * on the last (velocity is continuous at every corner). One cap scales the
+ * whole walk when it would take longer than `maxWalkDurationMs`.
+ */
+export function timeRoomWorldMovementSegments(
+  segments: readonly RoomWorldMovementSegment[],
+  timing: RoomWorldMovementTiming
+): RoomWorldMovementSegment[] {
+  const count = segments.length
+  if (count === 0) return []
+  const first = segments[0]!
+  const last = segments[count - 1]!
+  const rampIn = Math.min(timing.rampDistance, count === 1 ? first.distance / 2 : first.distance)
+  const rampOut = Math.min(timing.rampDistance, count === 1 ? last.distance / 2 : last.distance)
+  const totalDistance = segments.reduce((sum, segment) => sum + segment.distance, 0)
+  const uncappedMs = (totalDistance + rampIn + rampOut) * timing.durationPerDistanceMs
+  const pace = uncappedMs > timing.maxWalkDurationMs
+    ? timing.durationPerDistanceMs * (timing.maxWalkDurationMs / uncappedMs)
+    : timing.durationPerDistanceMs
+  return segments.map((segment, index) => {
+    const segmentRampIn = index === 0 ? rampIn : 0
+    const segmentRampOut = index === count - 1 ? rampOut : 0
+    const durationMs = (segment.distance + segmentRampIn + segmentRampOut) * pace
+    return {
+      ...segment,
+      durationMs,
+      rampIn: durationMs > 0 ? (2 * segmentRampIn * pace) / durationMs : 0,
+      rampOut: durationMs > 0 ? (2 * segmentRampOut * pace) / durationMs : 0
+    }
+  })
+}
+
+/**
+ * Share of a segment's distance covered at time share `progress`: constant
+ * acceleration over `rampIn`, constant speed, constant deceleration over
+ * `rampOut`. With no ramps it is linear. Runs on the UI thread as the
+ * withTiming easing and on JS for movement frames, so both agree exactly.
+ */
+export function easeRoomWorldMovement(progress: number, rampIn: number, rampOut: number): number {
+  "worklet"
+  const p = Math.min(1, Math.max(0, progress))
+  const cruise = 1 / (1 - (rampIn + rampOut) / 2)
+  if (rampIn > 0 && p < rampIn) return (cruise * p * p) / (2 * rampIn)
+  if (rampOut > 0 && p > 1 - rampOut) return 1 - (cruise * (1 - p) * (1 - p)) / (2 * rampOut)
+  return cruise * (p - rampIn / 2)
 }
 
 export function createRoomWorldSeatMovementPlan(input: {
@@ -266,7 +333,8 @@ export function createRoomWorldSeatMovementPlan(input: {
   return {
     target: seatPlan.target,
     path: [...approachPlan.path, ...seatPlan.path],
-    segments: [...approachSegments, ...seatPlan.segments]
+    segments: timeRoomWorldMovementSegments([...approachSegments, ...seatPlan.segments], input.timing),
+    timing: input.timing
   }
 }
 
@@ -287,7 +355,7 @@ export function createRoomWorldSeatExitMovementPlan(input: {
   )
 
   return [input.exit, ...getRoomWorldSeatExitFallbacks(input)]
-    .map((exit) => {
+    .map((exit): RoomWorldMovementPlan | null => {
       const exitPlan = createRoomWorldMovementPlan({
         geometry: unobstructedGeometry,
         from: input.from,
@@ -313,10 +381,11 @@ export function createRoomWorldSeatExitMovementPlan(input: {
       return {
         target: targetPlan.target,
         path: [...exitPlan.path, ...targetPlan.path],
-        segments: [
+        segments: timeRoomWorldMovementSegments([
           ...exitPlan.segments.map((segment) => ({ ...segment, isFinal: false })),
           ...targetPlan.segments
-        ]
+        ], input.timing),
+        timing: input.timing
       }
     })
     .find((plan): plan is RoomWorldMovementPlan => Boolean(plan)) ?? null
@@ -363,14 +432,17 @@ export function combineRoomWorldMovementPlans(
   const finalPlan = plans.at(-1)
   if (!finalPlan || plans.some((plan) => plan.segments.length === 0)) return null
 
+  const segments = plans.flatMap((plan, index) =>
+    index === plans.length - 1
+      ? plan.segments
+      : plan.segments.map((segment) => ({ ...segment, isFinal: false }))
+  )
   return {
     target: finalPlan.target,
     path: plans.flatMap((plan) => plan.path),
-    segments: plans.flatMap((plan, index) =>
-      index === plans.length - 1
-        ? plan.segments
-        : plan.segments.map((segment) => ({ ...segment, isFinal: false }))
-    )
+    // One walk: one speed, one start ramp and one stop ramp across the plans.
+    segments: finalPlan.timing ? timeRoomWorldMovementSegments(segments, finalPlan.timing) : segments,
+    timing: finalPlan.timing
   }
 }
 
@@ -464,11 +536,10 @@ export function getRoomWorldMovementFrame(input: {
   startedAt: number
   now: number
 }): RoomWorldMovementFrame {
-  const progress = Math.min(
-    1,
-    Math.max(0, (input.now - input.startedAt) / input.segment.durationMs)
-  )
-  const eased = easeOutRoomWorldMovement(progress)
+  const progress = input.segment.durationMs > 0
+    ? Math.min(1, Math.max(0, (input.now - input.startedAt) / input.segment.durationMs))
+    : 1
+  const eased = easeRoomWorldMovement(progress, input.segment.rampIn ?? 0, input.segment.rampOut ?? 0)
   return {
     x: input.segment.from.x + (input.segment.to.x - input.segment.from.x) * eased,
     y: input.segment.from.y + (input.segment.to.y - input.segment.from.y) * eased,
@@ -513,11 +584,6 @@ export function getRoomWorldMovementFramePose(input: {
   }
 }
 
-export function easeOutRoomWorldMovement(value: number): number {
-  "worklet"
-  return 1 - Math.pow(1 - value, 3)
-}
-
 function resolveRoomWorldNearestWalkableTarget(input: {
   geometry: RoomWorldGeometry
   target: RoomWorldPoint
@@ -552,16 +618,6 @@ function resolveRoomWorldNearestWalkableTarget(input: {
     )
 
   return validCandidates[0] ?? null
-}
-
-function getRoomWorldMovementDuration(
-  distance: number,
-  timing: RoomWorldMovementTiming
-): number {
-  return Math.min(
-    timing.maxDurationMs,
-    Math.max(timing.minDurationMs, distance * timing.durationPerDistanceMs)
-  )
 }
 
 function getRoomWorldDistance(

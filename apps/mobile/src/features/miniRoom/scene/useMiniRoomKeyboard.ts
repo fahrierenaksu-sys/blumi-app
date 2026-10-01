@@ -12,14 +12,18 @@ export interface MiniRoomKeyboardState {
   visible: boolean
   /** Real overlap of the keyboard with the window bottom, in points. */
   inset: number
+  /** The keyboard animation's duration for this change (0 when unknown). */
+  durationMs: number
 }
 
-const HIDDEN: MiniRoomKeyboardState = { visible: false, inset: 0 }
+const HIDDEN: MiniRoomKeyboardState = { visible: false, inset: 0, durationMs: 0 }
 
 /**
  * The system keyboard's measured frame, updated once per keyboard event (show,
- * hide, suggestion bar or layout change) — never per frame. The layout change
- * rides the keyboard's own native animation curve unless Reduce Motion is on.
+ * hide, suggestion bar or layout change) — never per frame. The chat panel's
+ * small layout change rides the keyboard's own native animation curve unless
+ * Reduce Motion is on; the room camera does not re-lay out at all (it moves
+ * by UI-thread transform, useMiniRoomCameraTransform).
  *
  * iOS reports the end frame, so the overlap is exact for every keyboard size.
  * Android keeps its window-resize behaviour: the flag changes, no inset is added.
@@ -30,9 +34,10 @@ export function useMiniRoomKeyboard(reduceMotion: boolean): MiniRoomKeyboardStat
   const lastRef = useRef<MiniRoomKeyboardState>(HIDDEN)
 
   useEffect(() => {
-    const apply = (next: MiniRoomKeyboardState, event?: KeyboardEvent): void => {
+    const apply = (frame: Omit<MiniRoomKeyboardState, "durationMs">, event?: KeyboardEvent): void => {
       const last = lastRef.current
-      if (last.visible === next.visible && last.inset === next.inset) return
+      if (last.visible === frame.visible && last.inset === frame.inset) return
+      const next = { ...frame, durationMs: event && event.duration > 0 ? event.duration : 0 }
       lastRef.current = next
       if (!reduceMotion && event && event.duration > 0) {
         LayoutAnimation.configureNext({

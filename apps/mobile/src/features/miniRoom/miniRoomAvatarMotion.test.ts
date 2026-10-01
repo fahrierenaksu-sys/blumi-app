@@ -13,6 +13,7 @@ const { createMiniRoomPartnerAvatarSnapshot } = require("./partnerAvatarSnapshot
 const { createCurrentUserAvatarSnapshot } = require("./currentUserAvatarSnapshot") as typeof import("./currentUserAvatarSnapshot")
 const {
   canMiniRoomAvatarUseMotion,
+  getMiniRoomAvatarSittingScaleY,
   getMiniRoomAvatarRenderLayers
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./miniRoomAvatarMotion") as typeof import("./miniRoomAvatarMotion")
@@ -25,6 +26,24 @@ const {
 const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { resolveInitialAvatarV2 } = require("../avatarV2/avatarV2Persistence") as typeof import("../avatarV2/avatarV2Persistence")
+
+test("real sitting layers keep the chibi proportions; only the idle fallback is squashed (ROOM-04)", () => {
+  const snapshot = createCurrentUserAvatarSnapshot({
+    userId: "sitter",
+    displayName: "Ada",
+    avatar: resolveInitialAvatarV2("avatar_v2_body_male_light"),
+    avatarCatalog: AVATAR_V2_CATALOG
+  })
+  assert.equal(getMiniRoomAvatarSittingScaleY({ appearance: snapshot.appearance, motion: "sitting", facing: "front" }), 1)
+  assert.equal(getMiniRoomAvatarSittingScaleY({ appearance: snapshot.appearance, motion: "idle", facing: "front" }), 1)
+  const catalogWithoutSitting = ROOM_AVATAR_CATALOG.map((item) => ({ ...item, assetsByMotion: undefined }))
+  assert.equal(getMiniRoomAvatarSittingScaleY({
+    appearance: snapshot.appearance,
+    motion: "sitting",
+    facing: "front",
+    catalog: catalogWithoutSitting
+  }), 0.86)
+})
 
 test("authenticated male preview uses the production MiniRoom snapshot path", () => {
   const snapshot = createCurrentUserAvatarSnapshot({

@@ -171,9 +171,11 @@ function isSameTimelineSource(left: ChatTimelineItem, right: ChatTimelineItem): 
     left.message === right.message && left.createdAt === right.createdAt
 }
 
+// `chronologicalIndex` is left out on purpose: an earlier page shifts every
+// index, and no row renders it, so comparing it re-rendered every row on
+// "load earlier" (CHT-12). A reused entry may carry an older index.
 function isSameRowModel(left: ChatTimelineRowModel, right: ChatTimelineRowModel): boolean {
-  return left.chronologicalIndex === right.chronologicalIndex &&
-    left.isRoomInvite === right.isRoomInvite &&
+  return left.isRoomInvite === right.isRoomInvite &&
     left.isMe === right.isMe &&
     left.deliveryState === right.deliveryState &&
     left.groupPosition === right.groupPosition &&
@@ -213,6 +215,20 @@ export function buildChatTimelineRowModels(
   })
 
   return reusedAll && previous ? previous : models
+}
+
+/**
+ * Whether a row's invitation action is running. Rows get this boolean instead
+ * of the active action key, so starting an action re-renders only the
+ * invitation it belongs to (CHT-13).
+ */
+export function isChatTimelineRowInviteBusy(
+  item: ChatTimelineItem,
+  activeRoomInviteAction: string | null
+): boolean {
+  return item.kind === "room_invite" &&
+    activeRoomInviteAction !== null &&
+    activeRoomInviteAction.includes(item.inviteId)
 }
 
 export interface RoomInviteComposerState {

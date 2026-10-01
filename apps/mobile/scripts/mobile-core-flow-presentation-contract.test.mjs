@@ -108,7 +108,8 @@ test("loading earlier messages preserves the current chat scroll position", () =
 
   // The list is inverted (newest first), so earlier history is appended at the
   // far end in the footer and the visible messages keep their position.
-  assert.match(chat, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
+  // CHT-05: a Reanimated FlatList (UI-thread scroll offset) with the same props.
+  assert.match(chat, /<Animated\.FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
   assert.match(chat, /maintainVisibleContentPosition=\{\{ minIndexForVisible: 0,/)
   assert.match(chat, /ListFooterComponent=\{[\s\S]*?<ChatLoadEarlierButton[\s\S]*?isLoadingEarlier=\{isLoadingEarlier\}/)
   assert.match(

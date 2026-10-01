@@ -8,6 +8,21 @@ export interface MainTabPagerIndicatorValues {
   progress: { value: number }
   /** True while a finger drag or a settle animation moves the pages. */
   tracking: { value: boolean }
+  /**
+   * Page the pager shows on the UI thread (a tap snaps it before navigation
+   * answers), or -1 while no pager is mounted. The bar animates its pill to
+   * it in a UI-thread reaction, so a tap never waits for a JS render.
+   */
+  selection: { value: number }
+}
+
+/**
+ * Whether the bar's own JS-driven selection motion should run for a newly
+ * committed `activeIndex`: not when the pager already moved the pill there
+ * on the UI thread.
+ */
+export function shouldAnimateBottomNavSelectionFromJs(pagerSelection: number, activeIndex: number): boolean {
+  return pagerSelection !== activeIndex
 }
 
 export interface MainTabPagerIndicatorSample {

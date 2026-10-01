@@ -30,6 +30,7 @@ const sourceFiles = [
   "src/features/chat/matchChatOpening.ts",
   "src/features/chat/matchChatOpening.test.ts",
   "src/features/chat/chatStore.ts",
+  "src/features/chat/chatMessageRenderKeys.ts",
   "src/features/chat/chatStore.test.ts",
   "src/features/chat/chatStore.adversarial.test.ts",
   "src/features/chat/chatRoomInviteApi.ts",
@@ -58,7 +59,9 @@ const sourceFiles = [
   "src/features/chat/typing/chatTypingModel.test.ts",
   "src/features/chat/typing/chatTypingStore.ts",
   "src/features/chat/typing/chatTypingStore.test.ts",
-  "src/features/chat/typing/chatTypingCopy.ts"
+  "src/features/chat/typing/chatTypingCopy.ts",
+  "src/features/chat/thread/chatScrollToLatestModel.ts",
+  "src/features/chat/thread/chatScrollToLatestModel.test.ts"
 ]
 
 try {
@@ -119,6 +122,7 @@ try {
       join(outputDirectory, "features/chat/thread/chatDeliveryTickModel.test.js"),
       join(outputDirectory, "features/chat/typing/chatTypingModel.test.js"),
       join(outputDirectory, "features/chat/typing/chatTypingStore.test.js"),
+      join(outputDirectory, "features/chat/thread/chatScrollToLatestModel.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
       resolve(workspaceRoot, "src/features/chat/typing/chatTypingSurfaces.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")

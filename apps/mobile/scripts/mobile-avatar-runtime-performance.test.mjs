@@ -67,7 +67,16 @@ test("MiniRoom walking runs on the UI thread and commits React state only on pos
   assert.doesNotMatch(miniRoomStoreSource, /requestAnimationFrame|setInterval\(/)
   assert.match(miniRoomStoreSource, /onSegmentStart:[\s\S]*?onSegmentEnd:[\s\S]*?onArrival:/)
   // Every avatar is positioned from its live shared values, not from React state.
-  assert.match(avatarLayerSource, /const anchorStyle = useAnimatedStyle\(\(\) => \(\{\s*left: `\$\{position\.x\.value \* 100\}%`,\s*top: `\$\{position\.y\.value \* 100\}%`/)
+  // ROOM-06: by transform in room pixels, never left/top/zIndex per frame.
+  assert.match(avatarLayerSource, /const anchorStyle = useAnimatedStyle\(\(\) => \{\s*const offset = resolveMiniRoomAvatarAnchorOffset\(\s*\{ x: position\.x\.value, y: position\.y\.value \}/)
+  assert.match(avatarLayerSource, /transform: \[\{ translateX: offset\.translateX \}, \{ translateY: offset\.translateY \}\]/)
+  assert.doesNotMatch(avatarLayerSource, /left: `\$\{position\.x\.value|zIndex: Math\.round\(position/)
+  // ROOM-15: the keyboard frames the room by UI-thread transform; its layout stays put.
+  const scene = readFileSync(new URL("../src/features/miniRoom/scene/MiniRoomScene.tsx", import.meta.url), "utf8")
+  assert.match(scene, /style=\{\[styles\.roomWorldCamera, restCamera, cameraStyle\]\}/)
+  assert.doesNotMatch(scene, /styles\.roomWorldCamera, layout\.camera/)
+  // The draw order reaches React only when the depth order flips.
+  assert.match(avatarLayerSource, /\(order, previous\) => \{\s*if \(order !== previous\) scheduleOnRN\(setDepthOrder, order\)/)
   assert.match(avatarLayerSource, /transform: \[\{ scale: 0\.9 \+ position\.y\.value \* 0\.2 \}\]/)
   assert.doesNotMatch(avatarLayerSource, /left: `\$\{avatar\.x \* 100\}%`/)
   assert.doesNotMatch(avatarLayerSource, /const depthScale = 0\.9 \+ avatar\.y/)

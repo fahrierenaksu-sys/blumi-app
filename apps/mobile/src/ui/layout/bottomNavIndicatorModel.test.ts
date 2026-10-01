@@ -6,14 +6,21 @@ import {
   readMainTabPagerIndicatorProgress,
   resolveBottomNavIndicatorIndex,
   resolveMainTabPagerIndicatorSample,
+  shouldAnimateBottomNavSelectionFromJs,
   type MainTabPagerIndicatorValues
 } from "./bottomNavIndicatorModel"
 
 const W = 390
 
 function createIndicator(): MainTabPagerIndicatorValues {
-  return { progress: { value: 0 }, tracking: { value: false } }
+  return { progress: { value: 0 }, tracking: { value: false }, selection: { value: -1 } }
 }
+
+test("a selection the pager already showed on the UI thread is not animated again from JS", () => {
+  assert.equal(shouldAnimateBottomNavSelectionFromJs(2, 2), false, "a pager tap moved the pill already")
+  assert.equal(shouldAnimateBottomNavSelectionFromJs(-1, 2), true, "no pager (rollback path): JS animates")
+  assert.equal(shouldAnimateBottomNavSelectionFromJs(1, 2), true, "the pager shows another page: JS follows the route")
+})
 
 test("the pager publishes its fractional page only while a drag or settle moves it", () => {
   assert.deepEqual(

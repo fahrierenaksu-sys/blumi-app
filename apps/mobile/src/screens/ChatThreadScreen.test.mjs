@@ -48,7 +48,7 @@ test("typing state stays inside the composer, outside the timeline owner", () =>
   assert.match(composer.getText(composerFile), /onChangeText=\{setInputText\}/)
   assert.match(file.getText(), /import \{ ChatComposer \} from "\.\.\/features\/chat\/thread\/ChatComposer"/)
   assert.match(screen.getText(file), /<ChatComposer\b/)
-  assert.match(screen.getText(file), /<FlatList\b/)
+  assert.match(screen.getText(file), /<Animated\.FlatList\b/)
 })
 
 test("cached messages, room invitations, and the header paint without entrance delays", () => {
@@ -69,14 +69,14 @@ test("cached messages, room invitations, and the header paint without entrance d
   )
   assert.match(screenSource, /<ChatTimelineRow\b/)
   assert.match(declaredFunction(rowFile, "ChatTimelineRow").getText(), /<ChatRoomInviteCard\b/)
-  assert.match(screenSource, /<FlatList\b/)
+  assert.match(screenSource, /<Animated\.FlatList\b/)
 })
 
 test("conversation opens at the newest item without a delayed animated jump", () => {
   const screenSource = component("ChatThreadScreen").getText(file)
 
   assert.match(screenSource, /const newestFirstTimeline = useMemo\([\s\S]*?\[\.\.\.timeline\]\.reverse\(\)/)
-  assert.match(screenSource, /<FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
+  assert.match(screenSource, /<Animated\.FlatList[\s\S]*?data=\{newestFirstTimeline\}[\s\S]*?inverted/)
   assert.match(screenSource, /ListFooterComponent=/)
   assert.match(screenSource, /autoscrollToTopThreshold: 80/)
   // Rows get prebuilt models from the chronological timeline (node-tested in
@@ -115,8 +115,27 @@ test("conversation opens at the newest item without a delayed animated jump", ()
 
 test("the timeline dismisses the keyboard by drag and keeps row taps working while it is open", () => {
   const screenSource = component("ChatThreadScreen").getText(file)
-  assert.match(screenSource, /<FlatList[\s\S]*?keyboardDismissMode="interactive"/)
-  assert.match(screenSource, /<FlatList[\s\S]*?keyboardShouldPersistTaps="handled"/)
+  assert.match(screenSource, /<Animated\.FlatList[\s\S]*?keyboardDismissMode="interactive"/)
+  assert.match(screenSource, /<Animated\.FlatList[\s\S]*?keyboardShouldPersistTaps="handled"/)
+})
+
+test("the scroll position stays on the UI thread and a send always shows the new message (CHT-05)", () => {
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(screenSource, /onScroll=\{scrollToLatestState\.scrollHandler\}/)
+  assert.match(screenSource, /if \(accepted\) scrollToLatest\(\)/)
+  assert.match(screenSource, /<ChatScrollToLatestPill\b/)
+  const hook = declaredFunction(threadFile("useChatScrollToLatest.ts"), "useChatScrollToLatest").getText()
+  assert.match(hook, /useAnimatedScrollHandler\(/)
+  // JS hears only threshold crossings, never a scroll frame.
+  assert.match(hook, /if \(away !== previous\) scheduleOnRN\(setIsAway, away\)/)
+  assert.doesNotMatch(hook, /onScroll: \(event\) => \{[^}]*set[A-Z]/)
+})
+
+test("rows get only their own invitation busy state and a stable message key (CHT-04, CHT-13)", () => {
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(screenSource, /isInviteBusy=\{isChatTimelineRowInviteBusy\(entry\.item, activeRoomInviteAction\)\}/)
+  assert.doesNotMatch(screenSource, /activeRoomInviteAction=\{/)
+  assert.match(screenSource, /buildChatTimeline\(messages, threadRoomInvites, getMessageRenderKey\)/)
 })
 
 test("re-opening the match from the chat header does not replay the celebration", () => {

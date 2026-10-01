@@ -31,7 +31,7 @@ function ChatTimelineRow({
   currentUserId,
   partnerName,
   isEntering,
-  activeRoomInviteAction,
+  isInviteBusy,
   onRoomInviteAction,
   onRetry
 }: {
@@ -42,7 +42,8 @@ function ChatTimelineRow({
   currentUserId: string
   partnerName: string
   isEntering: boolean
-  activeRoomInviteAction: string | null
+  /** Only an invitation row whose action is running is busy; other rows keep equal props. */
+  isInviteBusy: boolean
   onRoomInviteAction:
     | ((action: ChatRoomInviteAction, onError?: (error: unknown) => void) => void)
     | undefined
@@ -85,10 +86,7 @@ function ChatTimelineRow({
           invite={item}
           currentUserId={currentUserId}
           locale={chatLocale}
-          isBusy={
-            activeRoomInviteAction !== null &&
-            activeRoomInviteAction.includes(item.inviteId)
-          }
+          isBusy={isInviteBusy}
           onAction={onRoomInviteAction}
         />
       ) : (
@@ -157,8 +155,8 @@ function ChatTimelineRow({
 }
 
 /**
- * Rows re-render only when their item/row models, the active invitation
- * action, or a callback changes; `buildChatTimelineRowModels` keeps unchanged
+ * Rows re-render only when their item/row models, their own invitation busy
+ * state, or a callback changes; `buildChatTimelineRowModels` keeps unchanged
  * models referentially stable so the shallow comparison holds.
  */
 const MemoizedChatTimelineRow = memo(ChatTimelineRow)
