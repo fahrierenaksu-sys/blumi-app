@@ -7,6 +7,26 @@ import {
 } from "../auth/authStore"
 import { normalizePhoneNumber, normalizeVerificationCode } from "../auth/phone"
 
+type ResolvedBearerSession = Awaited<ReturnType<AuthService["getSession"]>>
+const requestSessions = new WeakMap<FastifyRequest, { token: string; resolved: Promise<ResolvedBearerSession> }>()
+
+/**
+ * Resolves a bearer token at most once per request. The shared rate budget
+ * preHandler and the route both need the session; each resolution is two
+ * database round trips (session row, account row).
+ */
+export function resolveRequestSession(
+  request: FastifyRequest,
+  authService: AuthService,
+  sessionToken: string
+): Promise<ResolvedBearerSession> {
+  const cached = requestSessions.get(request)
+  if (cached?.token === sessionToken) return cached.resolved
+  const resolved = authService.getSession(sessionToken)
+  requestSessions.set(request, { token: sessionToken, resolved })
+  return resolved
+}
+
 export async function resolveBearerSession({
   request,
   reply,
@@ -22,7 +42,7 @@ export async function resolveBearerSession({
     return null
   }
 
-  const resolved = await authService.getSession(sessionToken)
+  const resolved = await resolveRequestSession(request, authService, sessionToken)
   if (!resolved) {
     reply.code(401).send({ error: "Sign in again to continue." })
     return null
