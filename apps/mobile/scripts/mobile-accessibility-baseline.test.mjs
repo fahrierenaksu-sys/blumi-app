@@ -58,6 +58,8 @@ const criticalFiles = [
   "src/screens/MyRoomScreen.tsx",
   "src/screens/ProfilePreviewScreen.tsx",
   "src/screens/ProfileEditScreen.tsx",
+  "src/features/session/ProfileEditSaveButton.tsx",
+  "src/features/session/ProfileInterestsField.tsx",
   "src/screens/RoomDebriefScreen.tsx",
   "src/screens/RegisterScreen.tsx",
   "src/features/session/register/RegisterCreateView.tsx",
@@ -409,13 +411,13 @@ test("profile editing exposes radio semantics and announces validation and save 
   assert.match(source, /\{copy\.savedStatus\}/)
   assert.match(copy, /savedStatus: "Profile saved"/)
   assert.match(source, /\{copy\.interestHint\}/)
-  assert.match(copy, /interestHint: "One interest per line"/)
   assert.match(source, /\(currentInterests \?\? \[\]\)\.join\("\\n"\)/)
-  assert.match(
-    source,
-    /accessibilityLabel=\{copy\.interestsAccessibility\}[\s\S]*?multiline/
-  )
-  assert.match(copy, /interestsAccessibility: "Interests, one interest per line"/)
+  // Interests are chips (DSC-9): a labelled entry field and a remove button per chip.
+  const interests = readFileSync(resolve(mobileRoot, "src/features/session/ProfileInterestsField.tsx"), "utf8")
+  assert.match(interests, /accessibilityLabel=\{copy\.interestsAccessibility\}/)
+  assert.match(interests, /accessibilityLabel=\{copy\.removeInterest\(interest\)\}/)
+  assert.match(copy, /interestsAccessibility: "Add an interest"/)
+  assert.match(copy, /interestsAccessibility: "İlgi alanı ekle"/)
 })
 
 test("settings phone change reuses the country-aware phone contract", () => {

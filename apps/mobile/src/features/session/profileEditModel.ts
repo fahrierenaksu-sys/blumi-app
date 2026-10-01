@@ -290,6 +290,21 @@ export function parseProfileInterests(value: string): string[] {
   ]
 }
 
+/** Adds one typed entry (several when separated by commas) to the chip list. */
+export function addProfileInterests(value: string, entry: string): string {
+  const added = entry.split(/[,\r\n]/).map((item) => item.trim()).filter((item) => item.length > 0)
+  return parseProfileInterests([value, ...added].join("\n")).join("\n")
+}
+
+export function removeProfileInterest(value: string, interest: string): string {
+  return parseProfileInterests(value).filter((item) => item !== interest).join("\n")
+}
+
+/** Back, swipe-back or replace asks before unsaved edits are thrown away (DSC-9). */
+export function shouldConfirmProfileEditExit(input: { hasChanges: boolean; isSaving: boolean; saved: boolean }): boolean {
+  return input.hasChanges && !input.isSaving && !input.saved
+}
+
 export function analyzeProfileInterests(value: string): ProfileInterestAnalysis {
   const interests = parseProfileInterests(value)
   const error = getProfileInterestError(interests)

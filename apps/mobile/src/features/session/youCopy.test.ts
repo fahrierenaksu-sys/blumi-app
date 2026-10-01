@@ -20,6 +20,18 @@ test("profile copy keeps every visible label in the selected language", () => {
   assert.equal(turkish.settings, "Ayarlar")
 })
 
+test("DSC-9: profile edit guards unsaved edits, saves from the top bar and edits interests as chips", () => {
+  const source = readFileSync(join(process.cwd(), "src/screens/ProfileEditScreen.tsx"), "utf8")
+  assert.match(source, /useProfileEditExitGuard\(\{ enabled: shouldConfirmProfileEditExit\(\{ hasChanges, isSaving, saved \}\)/)
+  assert.match(source, /rightSlot=\{\s*<ProfileEditSaveButton enabled=\{canSave && hasChanges\}/)
+  assert.match(source, /<ProfileInterestsField /)
+  assert.match(source, /hapticSuccess\(\)/)
+  assert.doesNotMatch(source, /coffee\\nfilms/)
+  const guard = readFileSync(join(process.cwd(), "src/features/session/useProfileEditExitGuard.ts"), "utf8")
+  assert.match(guard, /usePreventRemove\(enabled,/)
+  assert.match(guard, /navigation\.dispatch\(data\.action\)/)
+})
+
 test("profile screen renders the centralized copy contract", () => {
   const source = readFileSync(join(process.cwd(), "src/screens/YouScreen.tsx"), "utf8")
 

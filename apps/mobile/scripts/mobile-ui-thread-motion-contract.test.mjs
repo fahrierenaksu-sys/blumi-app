@@ -54,7 +54,8 @@ test("press feedback and entrances have a non-moving Reduce Motion path from the
     "src/ui/vibeTilePicker.tsx",
     "src/screens/RoomDebriefScreen.tsx",
     "src/screens/ProfilePreviewScreen.tsx",
-    "src/screens/ProfileEditScreen.tsx"
+    // The profile save action moved to the top bar (DSC-9).
+    "src/features/session/ProfileEditSaveButton.tsx"
   ]) {
     const source = read(path)
     assert.match(source, /const reduceMotion = useReducedMotion\(\)/, path)
