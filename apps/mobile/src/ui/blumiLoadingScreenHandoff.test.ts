@@ -56,7 +56,7 @@ function mountLoadingScreen(options: { reduceMotion?: boolean; resolved?: boolea
       "./backgrounds": { SoftBlobBackground: "Background" },
       "./animations": { useReducedMotionPreference: () => motion }
     },
-    real: ["../features/session/onboardingBrandPreludeModel"]
+    real: ["../features/session/onboardingBrandPreludeModel", "./loadingScreenCopy", "./uiLocale"]
   })
   return { runtime, started, setValues, BlumiLoadingScreen }
 }

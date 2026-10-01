@@ -26,6 +26,7 @@ function harness(resume = { startElapsedMs: 0, resumesBootScan: false }) {
     timeline: { scanRowsComplete: 800, scanSweepStart: 250, scanSweepComplete: 1750, scanDissolveComplete: 1950 },
     useReducedMotionPreference: () => motion, getNativeOnboardingBootReduceMotion: () => null,
     getOnboardingLoadingScanResume: () => resume,
+    getLoadingScreenCopy: () => ({ preparing: "Blumi hazırlanıyor" }), resolveUiLocale: () => "tr",
     readOnboardingBootSurfaceHandoff: () => ({ bootSurfaceVisible: false, bootSurfaceVisibleUntilMs: null }),
     getOnboardingBootPreludeElapsedSnapshotMs: () => resume.startElapsedMs,
     getOnboardingBrandPreludeProgressAtElapsed: (ms) => ({

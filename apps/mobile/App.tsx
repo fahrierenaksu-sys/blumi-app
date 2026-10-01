@@ -24,10 +24,15 @@ import { hydrateAnalyticsConsent } from "./src/analytics/analyticsConsent"
 import { BLUMI_BUILD_PROFILE } from "./src/config/env"
 import { getAllLegalContent } from "./src/features/legal/legalCopy"
 import { assertLegalReleaseReady } from "./src/features/legal/legalPolicyMetadata"
+import { getAppLocale } from "./src/features/session/appLocale"
+import { setUiLocaleSource } from "./src/ui/uiLocale"
 
 // Start crash reporting first so a failed release legal check is reported
 // instead of terminating before Sentry is installed.
 initializeCrashReporting()
+
+// Shared UI (toasts, loading surface) speaks the app language.
+setUiLocaleSource(getAppLocale)
 
 assertLegalReleaseReady({
   buildProfile: BLUMI_BUILD_PROFILE,

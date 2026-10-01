@@ -21,6 +21,8 @@ import {
 } from "../features/session/nativeOnboardingBootBridge"
 import { SoftBlobBackground } from "./backgrounds"
 import { useReducedMotionPreference } from "./animations"
+import { getLoadingScreenCopy } from "./loadingScreenCopy"
+import { resolveUiLocale } from "./uiLocale"
 
 const timeline = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
 
@@ -159,7 +161,7 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
     <View style={styles.root}>
       <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
       <Animated.View
-        accessibilityLabel="Blumi hazırlanıyor"
+        accessibilityLabel={getLoadingScreenCopy(resolveUiLocale()).preparing}
         accessibilityRole="progressbar"
         style={[styles.scanStage, { opacity: scanOpacity }]}
       >
@@ -241,7 +243,7 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   return (
     <View style={styles.root}>
       <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
-      <View accessibilityLabel="Blumi hazırlanıyor" accessibilityRole="progressbar"
+      <View accessibilityLabel={getLoadingScreenCopy(resolveUiLocale()).preparing} accessibilityRole="progressbar"
         style={[styles.scanStage, { opacity: assetsReady && motionResolved ? 1 : 0 }]}>
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep}
           onAssetLoad={onAssetLoad} onAssetError={onError} />

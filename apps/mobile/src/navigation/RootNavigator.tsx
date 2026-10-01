@@ -77,6 +77,8 @@ import {
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
 import { ToastContainer, showToast } from "../ui/toast"
+import { getDailyRewardToastCopy } from "../features/inventory/dailyRewardCopy"
+import { getAppLocale } from "../features/session/appLocale"
 import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
@@ -442,9 +444,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     )
     ? sessionActor.session.sessionToken
     : null
-  const inventoryRewardBody = sessionActor?.session.onboarding.completedAt
-    ? "A little something for your next vibe."
-    : "Your first vibe starts with a little extra."
+  const inventoryRewardOnboarded = Boolean(sessionActor?.session.onboarding.completedAt)
 
   useEffect(() => {
     if (!inventoryHydrationSessionToken) return
@@ -454,8 +454,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
       return claimDailyRewardFromServer(inventoryHydrationSessionToken).then((rewardCoins) => {
         if (!active || !rewardCoins) return
         showToast({
-          title: `Daily reward: +${rewardCoins} coins`,
-          body: inventoryRewardBody,
+          ...getDailyRewardToastCopy(getAppLocale(), rewardCoins, inventoryRewardOnboarded),
           type: "success",
           durationMs: 4000
         })
@@ -464,7 +463,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     return () => {
       active = false
     }
-  }, [claimDailyRewardFromServer, hydrateFromServer, inventoryHydrationSessionToken, inventoryRewardBody])
+  }, [claimDailyRewardFromServer, hydrateFromServer, inventoryHydrationSessionToken, inventoryRewardOnboarded])
 
   useEffect(() => {
     if (sessionActor?.session.mode !== "production") return
