@@ -127,7 +127,23 @@ let readAtByThread: Map<string, string> = new Map()
 let summaryLastMessageByThread: Map<string, ChatMessage> = new Map()
 // The partner's delivery/read cursors per thread, as the server disclosed them.
 let partnerReceiptsByThread: Map<string, ChatPartnerReceipts> = new Map()
+// Newest message this device has shown read per thread (open chat or explicit
+// mark-read). The read reaches the server asynchronously, so a thread list
+// served before it was stored still counts these messages unread (CHT-06).
+let readHereThroughByThread: Map<string, ChatMessage> = new Map()
 let activeThreadId: string | null = null // which thread is currently being viewed
+
+function noteReadOnThisDevice(threadId: string, message?: ChatMessage): void {
+  const candidates = message
+    ? [message]
+    : [threadCache.find((thread) => thread.threadId === threadId)?.lastMessage, ...(messageCache.get(threadId) ?? [])]
+  let newest = readHereThroughByThread.get(threadId)
+  for (const candidate of candidates) {
+    if (!candidate || candidate.messageId.startsWith("__local_")) continue
+    if (!newest || compareMessageOrder(candidate, newest) > 0) newest = candidate
+  }
+  if (newest) readHereThroughByThread.set(threadId, newest)
+}
 
 type Listener = () => void
 const listeners: Set<Listener> = new Set()
@@ -194,9 +210,16 @@ export function applyChatThreadListed(
     const currentReadAt = readAtByThread.get(thread.threadId)
     if (thread.lastReadAt && (!currentReadAt || Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt))) readAtByThread.set(thread.threadId, thread.lastReadAt)
     if (thread.unreadCount !== undefined && (!currentReadAt || (thread.lastReadAt && Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt)))) {
+      const readHereThrough = readHereThroughByThread.get(thread.threadId)
+      // Every message this list knows of was already shown read on this device.
+      const listReadHere = readHereThrough !== undefined && thread.lastMessage !== undefined &&
+        compareMessageOrder(thread.lastMessage, readHereThrough) <= 0
       const newlyReceivedUnread = newerMessages.filter((message) => message.senderUserId !== payload.userId &&
-        (!thread.lastReadAt || Date.parse(message.sentAt) > Date.parse(thread.lastReadAt))).length
-      unreadCounts.set(thread.threadId, activeThreadId === thread.threadId ? 0 : thread.unreadCount + newlyReceivedUnread)
+        (!thread.lastReadAt || Date.parse(message.sentAt) > Date.parse(thread.lastReadAt)) &&
+        (!readHereThrough || compareMessageOrder(message, readHereThrough) > 0)).length
+      unreadCounts.set(thread.threadId, activeThreadId === thread.threadId
+        ? 0
+        : (listReadHere ? 0 : thread.unreadCount) + newlyReceivedUnread)
     }
   }
   if (!payload.append) unreadCounts = new Map([...unreadCounts].filter(([threadId]) => merged.has(threadId)))
@@ -300,6 +323,7 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   readAtByThread = new Map([...readAtByThread].filter(([threadId]) => !removed.has(threadId)))
   summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
   partnerReceiptsByThread = new Map([...partnerReceiptsByThread].filter(([threadId]) => !removed.has(threadId)))
+  readHereThroughByThread = new Map([...readHereThroughByThread].filter(([threadId]) => !removed.has(threadId)))
   if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
   notify()
   return removedIds
@@ -419,6 +443,9 @@ export function applyChatMessageReceived(
     (a, b) => (b.lastMessage?.sentAt ? Date.parse(b.lastMessage.sentAt) : 0) -
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
+
+  // A message that arrives while its conversation is on screen is read here.
+  if (message.threadId === activeThreadId && !alreadyReceived) noteReadOnThisDevice(message.threadId, message)
 
   // Increment unread count if this thread isn't currently active
   // and the message isn't from local optimistic echo
@@ -549,6 +576,7 @@ export function resetChatStore(): void {
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
   partnerReceiptsByThread = new Map()
+  readHereThroughByThread = new Map()
   activeThreadId = null
   learnedSequenceByThreadId = new Map()
   removedSequenceByThreadId = new Map()
@@ -565,6 +593,7 @@ function createClientMessageId(): string {
 export function setActiveThread(threadId: string | null): void {
   activeThreadId = threadId
   if (threadId) {
+    noteReadOnThisDevice(threadId)
     unreadCounts.set(threadId, 0)
     notify()
   }
@@ -575,6 +604,7 @@ export function getActiveChatThreadId(): string | null { return activeThreadId }
 
 /** Clear unread count for a specific thread. */
 export function markThreadRead(threadId: string): void {
+  noteReadOnThisDevice(threadId)
   if (unreadCounts.get(threadId)) {
     unreadCounts.set(threadId, 0)
     notify()
