@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import test from "node:test"
 import { Pool } from "pg"
 import { createPostgresDiscoverySnapshots } from "../db/postgresDiscoverySnapshots"
-import { createDiscoverySnapshotService } from "./discoverySnapshot"
+import { DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT, createDiscoverySnapshotService } from "./discoverySnapshot"
 
 const filters = {ageMin:18,ageMax:99,genders:[],vibes:[]}
 const avatar = {schemaVersion:1,bodyId:"avatar_v2_body_default",faceId:"avatar_v2_face_default",
@@ -148,9 +148,11 @@ test("PostgreSQL snapshot survives decisions, current eligibility changes, anoth
     const budget = await pool.query(`SELECT COUNT(*) AS snapshots,MAX(candidate_count) AS max_candidates
       FROM blumi_discovery_snapshots WHERE user_id=$1`,[viewerUserId])
     assert.equal(Number(budget.rows[0].snapshots),30)
-    assert.equal(Number(budget.rows[0].max_candidates),1117)
+    // 1117 eligible accounts, but one snapshot stores at most the ranked cap.
+    assert.equal(DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT,1000)
+    assert.equal(Number(budget.rows[0].max_candidates),DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT)
     assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshot_candidates c
-      JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=$1`,[viewerUserId])).rows[0].count),30*1117)
+      JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=$1`,[viewerUserId])).rows[0].count),30*DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT)
     const beforeFailure=await pool.query(`SELECT snapshot_id FROM blumi_discovery_snapshots WHERE user_id=ANY($1::text[]) ORDER BY snapshot_id`,[fixtureUserIds])
     // Use an owner below the active-snapshot cap so this exercises the SQL
     // failure/rollback path rather than the earlier refresh-budget guard.
@@ -164,12 +166,13 @@ test("PostgreSQL snapshot survives decisions, current eligibility changes, anoth
       JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=ANY($1::text[])`,[fixtureUserIds])).rows[0].count)
     assert.ok(beforeCleanup>5000)
     await pool.query(`UPDATE blumi_discovery_snapshots SET expires_at=NOW()-INTERVAL '1 minute' WHERE user_id=ANY($1::text[])`,[fixtureUserIds])
+    // One purge tick drains the whole expired backlog in bounded batches; a
+    // single 5000-row batch per minute fell behind snapshot creation.
     await repository.purgeExpired()
     assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshot_candidates c
-      JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=ANY($1::text[])`,[fixtureUserIds])).rows[0].count),beforeCleanup-5000)
-    for (let i=0;i<10;i++) await repository.purgeExpired()
-    assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshot_candidates c
       JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=ANY($1::text[])`,[fixtureUserIds])).rows[0].count),0)
+    assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshots
+      WHERE user_id=ANY($1::text[])`,[fixtureUserIds])).rows[0].count),0)
     await pool.query(`INSERT INTO blumi_accounts(account_id,user_id,phone_number,display_name,age,gender,
       avatar_preset_id,avatar_selection,onboarding_profile_complete,onboarding_avatar_complete,onboarding_room_complete,created_at,updated_at)
       SELECT $3||n,$3||n,'test+'||$3||n,'Race profile',25,'woman',$1,$2,TRUE,TRUE,TRUE,NOW(),NOW()
@@ -179,8 +182,8 @@ test("PostgreSQL snapshot survives decisions, current eligibility changes, anoth
       const validMeta=await repository.get(...args)
       await otherPool.query(`UPDATE blumi_discovery_snapshots SET expires_at=NOW()-INTERVAL '1 second' WHERE user_id=ANY($1::text[])`,[fixtureUserIds])
       await createPostgresDiscoverySnapshots(otherPool).purgeExpired()
-      assert.ok(Number((await pool.query(`SELECT MIN(c.position) AS first FROM blumi_discovery_snapshot_candidates c
-        JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=$1`,[viewerUserId])).rows[0].first)>=5000)
+      assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshot_candidates c
+        JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=$1`,[viewerUserId])).rows[0].count),0)
       return validMeta
     }})
     await assert.rejects(racingService.page({userId:viewerUserId,filters,limit:12,cursor:racePage.page.nextCursor!}),

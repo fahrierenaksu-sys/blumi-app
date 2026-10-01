@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto"
 import type { QueryResultRow } from "pg"
 import type { DiscoveryFilters } from "@blumi/contracts"
 import type { DiscoverySnapshotMeta, DiscoverySnapshotRepository } from "../matches/discoverySnapshot"
-import { DISCOVERY_ACTIVE_SNAPSHOT_LIMIT, DiscoveryRefreshLimitError } from "../matches/discoverySnapshot"
+import { DISCOVERY_ACTIVE_SNAPSHOT_LIMIT, DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT, DiscoveryRefreshLimitError } from "../matches/discoverySnapshot"
 import { discoveryProfilesSql } from "./discoveryProfilesSql"
 import { mapAccountProfileSafely, normalizeFilters } from "./postgresMatchRepository"
 
-interface Executor { query(sql: string, values?: readonly unknown[]): Promise<{ rows: QueryResultRow[] }> }
+interface Executor { query(sql: string, values?: readonly unknown[]): Promise<{ rows: QueryResultRow[]; rowCount?: number | null }> }
+const PURGE_CANDIDATE_BATCH = 5000
+const PURGE_SNAPSHOT_BATCH = 500
+const PURGE_MAX_BATCHES = 40
+function deletedCount(result: { rowCount?: number | null }): number { return result.rowCount ?? 0 }
 interface SnapshotPool extends Executor { connect(): Promise<Executor & {release():void}> }
 function params(userId: string, filters: DiscoveryFilters): unknown[] {
   const f = normalizeFilters(filters)
@@ -42,7 +46,8 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
           throw new DiscoveryRefreshLimitError(Math.max(1,Number(budget.rows[0]!.retry_after)))
         }
         await client.query(`DELETE FROM blumi_discovery_snapshots WHERE user_id=$1 AND expires_at<=NOW()`,[input.userId])
-        const result = await client.query(`WITH candidates AS MATERIALIZED (${eligibleSql("candidate")}),
+        const result = await client.query(`WITH candidates AS MATERIALIZED (${eligibleSql("candidate")}
+          ORDER BY ranked.rank_score DESC, ranked.user_id ASC LIMIT ${DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT}),
         meta AS (INSERT INTO blumi_discovery_snapshots
           (snapshot_id,user_id,filter_hash,created_at,expires_at,candidate_count)
           SELECT $6::uuid,$1,$7,$8::timestamptz,$8::timestamptz + INTERVAL '30 minutes',COUNT(*) FROM candidates RETURNING *),
@@ -80,18 +85,23 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
       return result.rows.map(row => ({position:Number(row.position),profile:row.user_id ? mapAccountProfileSafely(row)[0] ?? null : null}))
     },
     async purgeExpired() {
-      // Bound actual candidate deletion, not merely parent count: a snapshot can
-      // contain every eligible account. Separate autocommit batches release locks.
-      await pool.query(`DELETE FROM blumi_discovery_snapshot_candidates WHERE (snapshot_id,position) IN (
-        SELECT c.snapshot_id,c.position FROM blumi_discovery_snapshots s
-        JOIN blumi_discovery_snapshot_candidates c ON c.snapshot_id=s.snapshot_id
-        WHERE s.expires_at <= NOW() ORDER BY s.expires_at,c.snapshot_id,c.position
-        LIMIT 5000 FOR UPDATE OF c SKIP LOCKED)`)
-      await pool.query(`DELETE FROM blumi_discovery_snapshots WHERE snapshot_id IN (
-        SELECT snapshot_id FROM blumi_discovery_snapshots WHERE expires_at <= NOW()
-        AND NOT EXISTS (SELECT 1 FROM blumi_discovery_snapshot_candidates c
-          WHERE c.snapshot_id=blumi_discovery_snapshots.snapshot_id)
-        ORDER BY expires_at LIMIT 100 FOR UPDATE SKIP LOCKED)`)
+      // Bound each statement, not the tick: a snapshot can hold up to
+      // DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT rows and one 5000-row batch per
+      // minute fell behind creation. Separate autocommit batches release locks;
+      // the batch cap keeps one tick from monopolising a pool connection.
+      for (let batch = 0; batch < PURGE_MAX_BATCHES; batch++) {
+        const candidates = await pool.query(`DELETE FROM blumi_discovery_snapshot_candidates WHERE (snapshot_id,position) IN (
+          SELECT c.snapshot_id,c.position FROM blumi_discovery_snapshots s
+          JOIN blumi_discovery_snapshot_candidates c ON c.snapshot_id=s.snapshot_id
+          WHERE s.expires_at <= NOW() ORDER BY s.expires_at,c.snapshot_id,c.position
+          LIMIT ${PURGE_CANDIDATE_BATCH} FOR UPDATE OF c SKIP LOCKED)`)
+        const snapshots = await pool.query(`DELETE FROM blumi_discovery_snapshots WHERE snapshot_id IN (
+          SELECT snapshot_id FROM blumi_discovery_snapshots WHERE expires_at <= NOW()
+          AND NOT EXISTS (SELECT 1 FROM blumi_discovery_snapshot_candidates c
+            WHERE c.snapshot_id=blumi_discovery_snapshots.snapshot_id)
+          ORDER BY expires_at LIMIT ${PURGE_SNAPSHOT_BATCH} FOR UPDATE SKIP LOCKED)`)
+        if (deletedCount(candidates) < PURGE_CANDIDATE_BATCH && deletedCount(snapshots) < PURGE_SNAPSHOT_BATCH) return
+      }
     }
   }
 }

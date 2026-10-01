@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Pool, type QueryResultRow } from "pg"
+import { DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT } from "../matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./postgresDiscoverySnapshots"
 
 // A Discover page read re-checks only the page's snapshot candidates. It used
@@ -57,7 +58,8 @@ test("a Discover page read checks only the page's candidates, not the whole acco
     }
     const repository = createPostgresDiscoverySnapshots(recordingPool)
     const meta = await repository.create({ userId: viewer, filters, filterHash: "read-cost", now: new Date() })
-    assert.equal(meta.count, POOL_SIZE)
+    // All accounts are ranked; the snapshot keeps the top capped slice.
+    assert.equal(meta.count, Math.min(POOL_SIZE, DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT))
 
     const rows = await repository.read({ meta, filters, position: 0, limit: PAGE_ROWS })
     assert.equal(rows.length, PAGE_ROWS)
