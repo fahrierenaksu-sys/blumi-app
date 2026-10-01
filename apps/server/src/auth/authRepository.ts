@@ -107,6 +107,15 @@ export interface AuthRepository {
   }): Promise<AccountRecord | null>
   getSessionByTokenHash(sessionTokenHash: string): Promise<SessionRecord | null>
   hasActiveSessionFamily(input: { userId: string; sessionFamilyId: string; now: Date }): Promise<boolean>
+  /**
+   * The subset of `identities` whose session family still has an unexpired
+   * token, with the family's latest token expiry, answered in one query for
+   * the realtime authorization sweep.
+   */
+  listActiveSessionFamilies(input: {
+    identities: readonly { userId: string; sessionFamilyId: string }[]
+    now: Date
+  }): Promise<{ userId: string; sessionFamilyId: string; expiresAt: string }[]>
   saveSession(session: SessionRecord): Promise<void>
   deleteSession(sessionTokenHash: string): Promise<void>
   acknowledgeModeration(input: {
@@ -887,6 +896,26 @@ export function createInMemoryAuthRepository(
         session.userId === input.userId && session.sessionId === input.sessionFamilyId &&
         Date.parse(session.expiresAt) > input.now.getTime())
     },
+    async listActiveSessionFamilies(input) {
+      const wanted = new Set(input.identities.map((identity) =>
+        sessionFamilyKey(identity.userId, identity.sessionFamilyId)))
+      const active = new Map<string, { userId: string; sessionFamilyId: string; expiresAt: string }>()
+      if (wanted.size === 0) return []
+      for (const session of store.sessionsByTokenHash.values()) {
+        const key = sessionFamilyKey(session.userId, session.sessionId)
+        const expiresAt = Date.parse(session.expiresAt)
+        if (!wanted.has(key) || expiresAt <= input.now.getTime()) continue
+        const current = active.get(key)
+        if (!current || Date.parse(current.expiresAt) < expiresAt) {
+          active.set(key, {
+            userId: session.userId,
+            sessionFamilyId: session.sessionId,
+            expiresAt: new Date(expiresAt).toISOString()
+          })
+        }
+      }
+      return [...active.values()]
+    },
     async saveSession(session) {
       store.sessionsByTokenHash.set(session.sessionTokenHash, { ...session })
     },
@@ -1043,6 +1072,10 @@ function recordPhoneBan(
   if (!store.moderationPhoneBans.has(phoneHash)) {
     store.moderationPhoneBans.set(phoneHash, { source, createdAt: now.toISOString() })
   }
+}
+
+function sessionFamilyKey(userId: string, sessionFamilyId: string): string {
+  return `${userId}\u0000${sessionFamilyId}`
 }
 
 function accountActionKey(accountId: string, purpose: AccountActionPurpose): string {

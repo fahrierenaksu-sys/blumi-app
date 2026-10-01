@@ -18,6 +18,11 @@ import {
   type RealtimeAccessRevocationListener
 } from "./realtimeAccessRevocation"
 import {
+  checkRealtimeSessions,
+  type RealtimeSessionDecision,
+  type RealtimeSessionIdentity
+} from "./realtimeSessionBatch"
+import {
   createInMemoryAuthRepository,
   type AccountProfileUpdate,
   type AuthRepository
@@ -126,6 +131,11 @@ export interface AuthService {
   getSessionByTokenHash(sessionTokenHash: string, now?: Date): Promise<{ account: AccountRecord; session: SessionRecord } | null>
   isRealtimeUserAllowed(userId: string, now?: Date): Promise<boolean>
   isRealtimeSessionAllowed(input: { userId: string; sessionFamilyId: string }, now?: Date): Promise<boolean>
+  /** `isRealtimeSessionAllowed` for many sessions in two queries (realtimeSessionBatch). */
+  areRealtimeSessionsAllowed(
+    identities: readonly RealtimeSessionIdentity[],
+    now?: Date
+  ): Promise<RealtimeSessionDecision[]>
   acknowledgeModeration(
     sessionToken: string,
     now?: Date
@@ -679,6 +689,12 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     async isRealtimeSessionAllowed(input, now = new Date()) {
       if (!await repository.hasActiveSessionFamily({ ...input, now })) return false
       return this.isRealtimeUserAllowed(input.userId, now)
+    },
+    async areRealtimeSessionsAllowed(identities, now = new Date()) {
+      return checkRealtimeSessions({
+        repository, identities, now,
+        isRealtimeUserAllowed: (userId) => this.isRealtimeUserAllowed(userId, now)
+      })
     },
     async acknowledgeModeration(sessionToken, now = new Date()) {
       const resolved = await this.getSession(sessionToken, now)
