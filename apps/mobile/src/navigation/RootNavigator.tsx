@@ -569,7 +569,8 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     getMatchDeduplicationState,
     onConnectionMatched: handleRealtimeConnectionMatch,
     onPartnerBlocked: applyConfirmedPartnerBlock,
-    receiptsEnabled: resolvedCapabilities.chat_read_receipts
+    receiptsEnabled: resolvedCapabilities.chat_read_receipts,
+    typingEnabled: resolvedCapabilities.chat_typing
   })
 
   const mainTabPageDependencies: MainTabPageDependencies = {

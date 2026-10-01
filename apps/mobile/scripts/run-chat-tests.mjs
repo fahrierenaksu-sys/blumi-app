@@ -53,7 +53,12 @@ const sourceFiles = [
   "src/features/chat/chatDeliveryAckBatcher.ts",
   "src/features/chat/chatDeliveryAckBatcher.test.ts",
   "src/features/chat/thread/chatDeliveryTickModel.ts",
-  "src/features/chat/thread/chatDeliveryTickModel.test.ts"
+  "src/features/chat/thread/chatDeliveryTickModel.test.ts",
+  "src/features/chat/typing/chatTypingModel.ts",
+  "src/features/chat/typing/chatTypingModel.test.ts",
+  "src/features/chat/typing/chatTypingStore.ts",
+  "src/features/chat/typing/chatTypingStore.test.ts",
+  "src/features/chat/typing/chatTypingCopy.ts"
 ]
 
 try {
@@ -112,7 +117,10 @@ try {
       join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
       join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
       join(outputDirectory, "features/chat/thread/chatDeliveryTickModel.test.js"),
+      join(outputDirectory, "features/chat/typing/chatTypingModel.test.js"),
+      join(outputDirectory, "features/chat/typing/chatTypingStore.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
+      resolve(workspaceRoot, "src/features/chat/typing/chatTypingSurfaces.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],
     {
@@ -138,7 +146,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

@@ -12,6 +12,7 @@ import {
   chatThreadListSchema,
   chatThreadReadSchema,
   chatThreadSchema,
+  chatTypingUpdatedSchema,
 } from "../chat/ChatThreadSchemas";
 import { CONNECTION_DECISION_STATUSES } from "../connections/ConnectionDecision";
 import { sharedRoomDecorSnapshotSchema } from "../miniRooms/MiniRoom";
@@ -197,6 +198,8 @@ export const serverEventPayloadSchemas = {
     chatMessageReceivedSchema satisfies z.ZodType<PayloadOf<"chat.message_received">, z.ZodTypeDef, unknown>,
   "chat.receipt_updated":
     chatReceiptUpdatedSchema satisfies z.ZodType<PayloadOf<"chat.receipt_updated">, z.ZodTypeDef, unknown>,
+  "chat.typing_updated":
+    chatTypingUpdatedSchema satisfies z.ZodType<PayloadOf<"chat.typing_updated">, z.ZodTypeDef, unknown>,
   "reaction.received": z.object({
     roomId: id,
     actorUserId: id,

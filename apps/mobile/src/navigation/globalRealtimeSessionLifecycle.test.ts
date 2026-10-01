@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { chatTypingStore } from "../features/chat/typing/chatTypingStore"
 import type { SessionActor } from "../features/session/sessionModel"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../testing/hookHarness"
 
@@ -69,7 +70,7 @@ function mount() {
         navigate: (route: string, params: { threadId?: string }) => { events.push(`navigate:${route}:${params.threadId}`) }
       } }
     },
-    real: ["../features/realtime/globalRealtimeLifecycle", "../features/chat/chatDeliveryAckBatcher"]
+    real: ["../features/realtime/globalRealtimeLifecycle", "../features/chat/chatDeliveryAckBatcher", "../features/chat/typing/chatTypingStore"]
   })
   const resetInactiveSessionState = () => { events.push("reset") }
   const refreshProductionThreads = () => new Promise<void>((_resolve, reject) => { refreshFailure = reject })
@@ -90,7 +91,8 @@ function mount() {
     getMatchDeduplicationState: () => undefined,
     onConnectionMatched: () => undefined,
     onPartnerBlocked: () => undefined,
-    receiptsEnabled: false
+    receiptsEnabled: false,
+    typingEnabled: false
   }
   const render = (next: Record<string, unknown> = {}) => {
     props = { ...props, ...next }
@@ -154,6 +156,19 @@ test("partner messages are acknowledged over the socket only while receipts are 
     { type: "chat.ack_delivered", payload: { threadId: "thread-1", upToMessageId: "m3" } }
   ])
   f.runtime.unmount()
+})
+
+test("typing signals go out over the socket only while chat_typing is rolled out, per account", () => {
+  const f = mount()
+  f.render()
+  const command = { threadId: "thread-1", state: "start" as const }
+  assert.equal(chatTypingStore.send(command), false, "capability off")
+  f.render({ typingEnabled: true })
+  assert.equal(chatTypingStore.send(command), true)
+  assert.deepEqual(f.sent.filter((event) => event.type === "chat.typing"), [{ type: "chat.typing", payload: command }])
+  f.runtime.unmount()
+  assert.equal(chatTypingStore.getSnapshot().ownerUserId, undefined, "signing out resets typing")
+  assert.equal(chatTypingStore.send(command), false)
 })
 
 test("session callbacks are read at call time without reconnecting", async () => {

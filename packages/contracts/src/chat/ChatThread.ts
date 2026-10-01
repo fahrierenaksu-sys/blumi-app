@@ -94,6 +94,31 @@ export interface ChatAckDeliveredCommand {
   upToMessageId: string;
 }
 
+/**
+ * Typing indicator (2026-10-01). Transient: it carries no text and is never
+ * stored, logged or pushed. `start` while the draft changes, `stop` on send,
+ * clear, blur, background or leaving the conversation.
+ */
+export type ChatTypingState = "start" | "stop"
+
+/** `chat.typing` client command, sent only while `chat_typing` is on. */
+export interface ChatTypingCommand {
+  threadId: string
+  state: ChatTypingState
+}
+
+/**
+ * `chat.typing_updated`: `userId` started or stopped typing in the thread.
+ * Sent only to the other participant. A `start` lapses after `expiresInMs`
+ * unless renewed; `stop` carries 0. Clients that predate it ignore it.
+ */
+export interface ChatTypingUpdated {
+  threadId: string
+  userId: string
+  state: ChatTypingState
+  expiresInMs: number
+}
+
 /** Per-account chat privacy settings. Read receipts are off by default. */
 export interface ChatPreferences {
   readReceiptsEnabled: boolean;

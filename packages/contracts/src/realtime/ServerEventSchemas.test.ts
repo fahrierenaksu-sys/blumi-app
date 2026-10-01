@@ -221,6 +221,10 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
       readUpTo: { sentAt: "soon", messageId: "message-1" },
     },
   },
+  "chat.typing_updated": {
+    valid: { threadId: "thread-1", userId: "bora", state: "start", expiresInMs: 6000 },
+    invalid: { threadId: "thread-1", userId: "bora", state: "typing", expiresInMs: 6000 },
+  },
   "reaction.received": {
     valid: { roomId: "lobby", actorUserId: "ada", targetUserId: "bora", reaction: "wave", createdAt: NOW },
     invalid: { roomId: "lobby", actorUserId: "ada", reaction: "kiss", createdAt: NOW },
@@ -245,7 +249,21 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 23);
+  assert.equal(SERVER_EVENT_TYPES.length, 25);
+});
+
+test("a typing update names the typist, a known state and a bounded lifetime, never text", () => {
+  const base = { threadId: "thread-1", userId: "bora" };
+  const parse = (payload: unknown) => parseServerEvent({ type: "chat.typing_updated", payload }).kind;
+  assert.equal(parse({ ...base, state: "start", expiresInMs: 6000 }), "valid");
+  assert.equal(parse({ ...base, state: "stop", expiresInMs: 0 }), "valid");
+  // A start must lapse on its own; a stuck indicator is worse than none.
+  assert.equal(parse({ ...base, state: "start", expiresInMs: 0 }), "invalid");
+  assert.equal(parse({ ...base, state: "start", expiresInMs: 15_001 }), "invalid");
+  assert.equal(parse({ ...base, state: "start", expiresInMs: 1.5 }), "invalid");
+  assert.equal(parse({ ...base, state: "start" }), "invalid");
+  assert.equal(parse({ threadId: "thread-1", state: "stop", expiresInMs: 0 }), "invalid");
+  assert.equal(parse({ ...base, userId: "", state: "stop", expiresInMs: 0 }), "invalid");
 });
 
 test("a receipt update names one of two distinct participants and moves a cursor", () => {

@@ -9,6 +9,7 @@
  * | motion    | mini_room.move                           | dropped     |
  * | transient | reaction.send, presence.move_to_spot     | dropped     |
  * | receipt   | chat.ack_delivered                       | dropped     |
+ * | typing    | chat.typing                              | dropped     |
  * | chat      | chat.send_message                        | refused with CHAT_MESSAGE_NOT_SENT (retryable); closed only far above a human rate |
  * | control   | everything else (lists, invites, scene, safety) | socket closed with 4429 |
  *
@@ -25,7 +26,7 @@
  */
 export const REALTIME_EVENT_WINDOW_MS = 10_000
 
-export type RealtimeEventClass = "motion" | "transient" | "receipt" | "chat" | "control"
+export type RealtimeEventClass = "motion" | "transient" | "receipt" | "typing" | "chat" | "control"
 
 export type RealtimeAdmission =
   | { kind: "admit"; release(): void }
@@ -46,6 +47,8 @@ export const REALTIME_EVENT_LIMITS: Readonly<Record<RealtimeEventClass, ClassLim
   motion: { userWindow: 60, connectionInFlight: 2, userInFlight: 4 },
   transient: { userWindow: 30, connectionInFlight: 2, userInFlight: 4 },
   receipt: { userWindow: 30, connectionInFlight: 2, userInFlight: 4 },
+  // A dropped typing hint lapses on the phone within 6 s.
+  typing: { userWindow: 20, connectionInFlight: 2, userInFlight: 4 },
   // 3 messages per second sustained is far above typing speed; a burst of
   // queued retries after a reconnect still fits.
   chat: { userWindow: 30, connectionInFlight: 4, userInFlight: 8, abuseWindow: 90 },
@@ -56,6 +59,7 @@ const OVER_BUDGET: Readonly<Record<RealtimeEventClass, RealtimeAdmission["kind"]
   motion: "drop",
   transient: "drop",
   receipt: "drop",
+  typing: "drop",
   chat: "refuse_chat",
   control: "close"
 })
@@ -69,6 +73,8 @@ export function classifyRealtimeEvent(type: string): RealtimeEventClass {
       return "transient"
     case "chat.ack_delivered":
       return "receipt"
+    case "chat.typing":
+      return "typing"
     case "chat.send_message":
       return "chat"
     default:

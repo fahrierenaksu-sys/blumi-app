@@ -51,6 +51,8 @@ import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelin
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
 import { ChatNotificationPermissionCard, type ChatPushRegistration } from "../features/notifications/ChatNotificationPermissionCard"
+import { ChatTypingBubble } from "../features/chat/typing/ChatTypingBubble"
+import { useChatDraftTyping } from "../features/chat/typing/useChatDraftTyping"
 
 type ChatThreadScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -240,6 +242,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     ]
   )
 
+  const draftTyping = useChatDraftTyping(isPendingThread ? undefined : resolvedThreadId, isFocused)
+
   const handleGoBack = (): void => {
     goBackOrFallback(navigation, () => navigation.replace("Inbox"))
   }
@@ -339,7 +343,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             />
           )}
 
+          <ChatTypingBubble threadId={resolvedThreadId} partnerUserId={partnerUserId} partnerName={partnerName} locale={chatLocale} />
           <ChatComposer
+            draftTyping={draftTyping}
             chatCopy={chatCopy}
             partnerName={partnerName}
             chatLocale={chatLocale}

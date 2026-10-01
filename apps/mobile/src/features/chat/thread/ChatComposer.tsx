@@ -6,6 +6,7 @@ import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
 import { useReducedMotion } from "../../../ui/animations"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
+import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { styles } from "./chatThreadStyles"
 
@@ -21,7 +22,8 @@ export function ChatComposer({
   isCreatingRoomInvite,
   roomInviteDisabledReason,
   onRoomInvitePress,
-  onSend
+  onSend,
+  draftTyping
 }: {
   chatCopy: ChatThreadCopy
   partnerName: string
@@ -32,6 +34,8 @@ export function ChatComposer({
   roomInviteDisabledReason: string | null
   onRoomInvitePress: () => void
   onSend: (body: string) => boolean
+  /** Typing signal for the partner (chat_typing); never sees programmatic text. */
+  draftTyping?: ChatDraftTyping
 }) {
   const [inputText, setInputText] = useState("")
   const sendScaleAnim = useRef(new Animated.Value(1)).current
@@ -99,6 +103,8 @@ export function ChatComposer({
             style={styles.input}
             value={inputText}
             onChangeText={setInputText}
+            onChange={draftTyping ? (event) => draftTyping.noteDraft(event.nativeEvent.text) : undefined}
+            onBlur={draftTyping?.endDraft}
             placeholder={chatCopy.messagePlaceholder}
             placeholderTextColor={uiTheme.colors.textMuted}
             multiline
@@ -110,7 +116,10 @@ export function ChatComposer({
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
-            onPress={handleSend}
+            onPress={() => {
+              handleSend()
+              draftTyping?.endDraft()
+            }}
             onPressIn={handleSendPressIn}
             onPressOut={handleSendPressOut}
             disabled={isSendDisabled}

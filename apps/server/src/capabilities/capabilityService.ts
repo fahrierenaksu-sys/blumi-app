@@ -120,25 +120,39 @@ export function stableCapabilityBucket(userId: string): number {
  */
 export type CapabilityRuntimeGates = Readonly<Partial<Record<CapabilityKey, () => boolean>>>
 
+/**
+ * Stage a capability has when the manifest does not name it. Empty by
+ * default, so every capability stays manifest-only unless production wiring
+ * opts one in (`chat_typing`, 2026-10-01: on by default, stores nothing, and
+ * its runtime gate is the kill switch). A manifest entry always wins.
+ */
+export type CapabilityDefaultRollouts = Readonly<Partial<Record<CapabilityKey, CapabilityRolloutStage>>>
+
 export function createCapabilityService({
   manifest,
-  runtimeGates = {}
+  runtimeGates = {},
+  defaultRollouts = {}
 }: {
   manifest: CapabilityManifest
   runtimeGates?: CapabilityRuntimeGates
+  defaultRollouts?: CapabilityDefaultRollouts
 }): CapabilityService {
+  const effectiveManifest: CapabilityManifest = Object.freeze({
+    rollouts: Object.freeze({ ...defaultRollouts, ...manifest.rollouts }),
+    internalUserIds: manifest.internalUserIds
+  })
   return Object.freeze({
     resolve(
       userId: string,
       declaredCapabilities: readonly CapabilityKey[] | undefined
     ) {
       if (declaredCapabilities === undefined) {
-        return createResolution(true, new Set<CapabilityKey>(), manifest, userId, runtimeGates)
+        return createResolution(true, new Set<CapabilityKey>(), effectiveManifest, userId, runtimeGates)
       }
       return createResolution(
         false,
         new Set(declaredCapabilities),
-        manifest,
+        effectiveManifest,
         userId,
         runtimeGates
       )

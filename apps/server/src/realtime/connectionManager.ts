@@ -35,6 +35,7 @@ const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "reaction.received",
   // Superseded by the next step; the room snapshot (not transient) re-syncs.
   "mini_room.avatar_moved",
+  "chat.typing_updated", // A hint that lapses on the phone; the next start renews it.
   // Receipt cursors are cumulative: the next event or list refresh covers a
   // dropped one, so a backed-up socket sheds them first.
   "chat.receipt_updated"

@@ -71,6 +71,7 @@ const criticalFiles = [
   "src/screens/ProfileSetupScreen.tsx",
   "src/features/miniRoom/scene/MiniRoomHud.tsx",
   "src/features/miniRoom/scene/MiniRoomScene.tsx",
+  "src/features/miniRoom/scene/RoomChatComposer.tsx",
   "src/features/miniRoom/scene/HotspotLayer.tsx",
   "src/ui/errorBoundary.tsx",
   "src/ui/primitives.tsx",

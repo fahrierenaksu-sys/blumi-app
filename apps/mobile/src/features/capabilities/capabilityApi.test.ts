@@ -48,7 +48,7 @@ test("capability reads never share across sessions or clear a newer flight", asy
   await current
 })
 
-test("mobile declares the complete avatar, Shop and chat receipt rollout surface", () => {
+test("mobile declares the complete avatar, Shop, chat receipt and typing rollout surface", () => {
   assert.deepEqual(SUPPORTED_MOBILE_CAPABILITIES, [
     "avatar_loadout_v2_read",
     "avatar_loadout_v2_write",
@@ -56,7 +56,8 @@ test("mobile declares the complete avatar, Shop and chat receipt rollout surface
     "discovery_public_profile",
     "discovery_badges",
     "discovery_room_showcase",
-    "chat_read_receipts"
+    "chat_read_receipts",
+    "chat_typing"
   ])
 })
 

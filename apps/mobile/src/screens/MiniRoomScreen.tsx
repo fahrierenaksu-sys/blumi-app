@@ -47,6 +47,9 @@ import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
 import { showToast } from "../ui/toast"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
+import { getChatTypingCopy } from "../features/chat/typing/chatTypingCopy"
+import { useChatDraftTyping } from "../features/chat/typing/useChatDraftTyping"
+import { usePartnerTyping } from "../features/chat/typing/usePartnerTyping"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -76,6 +79,11 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   })
   // The room shows its conversation's messages and invites itself.
   useFocusedConversation(roomChat.threadId, isFocused)
+  // Typing (chat_typing): dots over the partner's chibi, spoken once per session.
+  const draftTyping = useChatDraftTyping(roomChat.threadId, isFocused)
+  const partnerTyping = usePartnerTyping(roomChat.threadId, participants.partner.userId,
+    getChatTypingCopy(locale).partnerTyping(participants.partner.displayName))
+  const roomTyping = useMemo(() => ({ partnerTyping, draft: draftTyping }), [draftTyping, partnerTyping])
   const roomChatHistory = useRoomChatHistory({
     threadId: roomChat.threadId,
     localUserId: sessionActor.profile.userId
@@ -387,6 +395,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         chatHistory={roomChatHistory.items}
         chatHistoryStatus={roomChatHistory.status}
         notices={notices}
+        typing={roomTyping}
       />
     </View>
   )

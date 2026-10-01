@@ -103,9 +103,11 @@ test("MiniRoom movement rerenders only the live avatar layer", () => {
       new RegExp(`(?:const |, )${componentName} = memo\\(`)
     )
   }
+  // The composer lives in its own view (2026-10-01); the scene mounts it.
   assert.match(
-    miniRoomSceneSource,
-    /const RoomChatComposer = memo\(function RoomChatComposer/
+    read("src/features/miniRoom/scene/RoomChatComposer.tsx"),
+    /export const RoomChatComposer = memo\(function RoomChatComposer/
   )
+  assert.match(miniRoomSceneSource, /<RoomChatComposer\b/)
   assert.match(miniRoomSceneSource, /const handleRoomPress = useCallback\(/)
 })

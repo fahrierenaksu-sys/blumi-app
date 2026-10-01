@@ -895,7 +895,7 @@ test("the global realtime lifecycle restarts only on its protected identity inpu
   // globalRealtimeSessionLifecycle.test.ts.
 
   const navigator = read(OWNER.sessionReset)
-  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock,\s*receiptsEnabled: resolvedCapabilities\.chat_read_receipts\s*\}\)/)
+  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock,\s*receiptsEnabled: resolvedCapabilities\.chat_read_receipts,\s*typingEnabled: resolvedCapabilities\.chat_typing\s*\}\)/)
   // Local blocks and the server's confirmation share one chat cleanup.
   assert.match(navigator, /const applyConfirmedPartnerBlock = useBlockedPartnerCleanup\(sessionActor\?\.profile\.userId\)/)
   // Every block entry point (report sheet, block-only, demo report) goes through blockUser, which announces it.
