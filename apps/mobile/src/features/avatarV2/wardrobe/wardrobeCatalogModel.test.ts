@@ -19,6 +19,7 @@ const {
 } = require("../avatarV2Selectors") as typeof import("../avatarV2Selectors")
 const {
   buildWardrobeCards,
+  buildWardrobeShopLink,
   getAvatarItemPreviewImageStyle,
   getStarterLayerThumbnail,
   getWardrobeActiveItems,
@@ -189,4 +190,87 @@ test("starter garments previewed from their room layer are fitted by measured bo
     assert.ok(fit.box.width <= 100 && fit.box.height <= 68, "fits the card art box")
   }
   assert.equal(getStarterLayerThumbnail("avatar_v2_hair_mocha_ribbon_blowout"), undefined)
+})
+
+test("locked items the Shop sells stay visible after the owned ones (owner decision, MICRO-3)", () => {
+  const owned = new Set(
+    AVATAR_V2_CATALOG.filter((item) => item.ownedByDefault === true).map((item) => item.id)
+  )
+  const canEquipItem = (item: (typeof AVATAR_V2_CATALOG)[number]) =>
+    canEquipAvatarV2Item({ ownedItemIds: [...owned] }, item, DEFAULT_AVATAR_V2.bodyId)
+  const soldInShop = (item: (typeof AVATAR_V2_CATALOG)[number]) => !owned.has(item.id)
+  for (const category of ["hair", "top", "shoes"] as const) {
+    const items = getWardrobeActiveItems({
+      catalog: AVATAR_V2_CATALOG,
+      category,
+      bodyId: DEFAULT_AVATAR_V2.bodyId,
+      canEquipItem,
+      isAvailableInShop: soldInShop
+    })
+    const ownedOnly = getWardrobeActiveItems({
+      catalog: AVATAR_V2_CATALOG,
+      category,
+      bodyId: DEFAULT_AVATAR_V2.bodyId,
+      canEquipItem
+    })
+    assert.ok(items.length > ownedOnly.length, `${category} shows locked Shop items`)
+    const firstLocked = items.findIndex((item) => !canEquipItem(item))
+    assert.ok(firstLocked >= ownedOnly.length, "owned items come first")
+    assert.ok(items.slice(firstLocked).every((item) => !canEquipItem(item)))
+    for (const item of items) {
+      assert.equal(isAvatarItemRoomPreviewSupported(item), true, item.id)
+    }
+  }
+  const nothingListed = getWardrobeActiveItems({
+    catalog: AVATAR_V2_CATALOG,
+    category: "hair",
+    bodyId: DEFAULT_AVATAR_V2.bodyId,
+    canEquipItem,
+    isAvailableInShop: () => false
+  })
+  assert.ok(nothingListed.every((item) => canEquipItem(item)), "unlisted, unowned items stay hidden")
+})
+
+test("See in Shop links carry the item's canonical id and a fresh request", () => {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.type === "hair")!
+  assert.deepEqual(buildWardrobeShopLink(item, 7), {
+    initialShopMode: "avatar",
+    focusProductId: item.id,
+    focusRequestId: 7
+  })
+})
+
+test("locked cards read as Shop items in the app language and mark the one being previewed", () => {
+  const hair = getWardrobeActiveItems({
+    catalog: AVATAR_V2_CATALOG,
+    category: "hair",
+    bodyId: DEFAULT_AVATAR_V2.bodyId,
+    canEquipItem: () => true
+  })
+  for (const locale of ["en", "tr"] as const) {
+    const cards = buildWardrobeCards({
+      items: hair,
+      avatar: DEFAULT_AVATAR_V2,
+      displayedAvatar: DEFAULT_AVATAR_V2,
+      inventory: ownNothing,
+      canEquipItem: () => false,
+      copy: AVATAR_STUDIO_COPY[locale],
+      getPreviewSource: () => undefined,
+      previewingItemId: hair[0].id
+    })
+    assert.ok(cards.every((card) => card.locked && card.itemStateLabel === AVATAR_STUDIO_COPY[locale].lockedInShop))
+    assert.equal(cards[0].previewing, true)
+    assert.ok(cards.slice(1).every((card) => !card.previewing))
+  }
+  const ownedCards = buildWardrobeCards({
+    items: hair,
+    avatar: DEFAULT_AVATAR_V2,
+    displayedAvatar: DEFAULT_AVATAR_V2,
+    inventory: ownAll,
+    canEquipItem: () => true,
+    copy,
+    getPreviewSource: () => undefined,
+    previewingItemId: hair[0].id
+  })
+  assert.equal(ownedCards[0].previewing, false, "only locked items are previewed without saving")
 })

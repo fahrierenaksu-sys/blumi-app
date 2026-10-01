@@ -7,7 +7,7 @@ import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { useReducedMotion } from "../ui/animations"
 import { getAppLocale } from "../features/session/authLocale"
 import {
@@ -35,6 +35,8 @@ import { WardrobeCategoryTabs } from "../features/avatarV2/wardrobe/WardrobeCate
 import { WardrobeCatalogHeader } from "../features/avatarV2/wardrobe/WardrobeCatalogHeader"
 import { WardrobeCatalogList } from "../features/avatarV2/wardrobe/WardrobeCatalogList"
 import { WardrobeGlass } from "../features/avatarV2/wardrobe/WardrobeGlass"
+import { WardrobeLockedPreviewBar } from "../features/avatarV2/wardrobe/WardrobeLockedPreviewBar"
+import { useWardrobeLockedPreview } from "../features/avatarV2/wardrobe/useWardrobeLockedPreview"
 import { wardrobeV2Styles as styles } from "../features/avatarV2/wardrobe/wardrobeV2Styles"
 
 type WardrobeV2ScreenProps = NativeStackScreenProps<RootStackParamList, "WardrobeV2">
@@ -65,6 +67,15 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     handleEquip
   } = useWardrobeTryOn({ navigation, avatar, isSaving, canEquipItem, saveAvatar })
 
+  const {
+    lockedItem,
+    stageAvatar,
+    isAvailableInShop,
+    previewLockedItem,
+    clearLockedPreview,
+    openLockedItemInShop
+  } = useWardrobeLockedPreview({ navigation, displayedAvatar, copy: studioCopy })
+
   const studioTabs = useMemo(
     () => getAvatarStudioTabs(activeSection, catalog, avatar),
     [activeSection, avatar, catalog]
@@ -77,9 +88,10 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       catalog,
       category: activeCategory,
       bodyId: avatar.bodyId,
-      canEquipItem
+      canEquipItem,
+      isAvailableInShop
     }),
-    [activeCategory, avatar.bodyId, canEquipItem, catalog]
+    [activeCategory, avatar.bodyId, canEquipItem, catalog, isAvailableInShop]
   )
   const visibleWardrobeCards = useMemo(
     () => buildWardrobeCards({
@@ -89,9 +101,10 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       inventory,
       canEquipItem,
       copy: studioCopy,
-      getPreviewSource: getAvatarItemPreviewSource
+      getPreviewSource: getAvatarItemPreviewSource,
+      previewingItemId: lockedItem?.id ?? null
     }),
-    [avatar, canEquipItem, displayedAvatar, inventory, studioCopy, activeItems]
+    [avatar, canEquipItem, displayedAvatar, inventory, studioCopy, activeItems, lockedItem]
   )
 
   const catalogTransition = useWardrobeCatalogTransition({
@@ -103,17 +116,24 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   const catalogPagePosition = useSharedValue(0)
 
   const handleSelectSection = useCallback((section: AvatarStudioSectionId): void => {
-    hapticLight()
+    hapticSelection()
     dismissTryOnPreview()
+    clearLockedPreview()
     setActiveSection(section)
     setSelectedCategory(getAvatarStudioDefaultCategory(section))
-  }, [dismissTryOnPreview])
+  }, [clearLockedPreview, dismissTryOnPreview])
+
+  const handleEquipOwned = useCallback((item: Parameters<typeof handleEquip>[0]): void => {
+    clearLockedPreview()
+    handleEquip(item)
+  }, [clearLockedPreview, handleEquip])
 
   const handleSelectCategory = useCallback((categoryId: WardrobeCategoryId): void => {
-    hapticLight()
+    hapticSelection()
     dismissTryOnPreview()
+    clearLockedPreview()
     setSelectedCategory(categoryId)
-  }, [dismissTryOnPreview])
+  }, [clearLockedPreview, dismissTryOnPreview])
 
   const handleClose = useCallback((): void => {
     goBackOrFallback(navigation, () => navigation.replace("MyRoom"))
@@ -138,12 +158,21 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
 
         <View style={styles.heroRegion}>
           <WardrobePreviewStage
-            avatar={displayedAvatar}
+            avatar={stageAvatar}
             catalog={catalog}
             copy={studioCopy}
             reduceMotion={reduceMotion}
             showSavingStatus={isSaving || Boolean(pendingTryOn)}
           />
+          {lockedItem ? (
+            <WardrobeLockedPreviewBar
+              itemName={lockedItem.name}
+              copy={studioCopy}
+              reduceMotion={reduceMotion}
+              onSeeInShop={openLockedItemInShop}
+              onClose={clearLockedPreview}
+            />
+          ) : null}
           {saveIssue ? (
             <View style={styles.saveErrorSlot}>
               <WardrobeSaveError message={saveIssue} />
@@ -187,7 +216,8 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
             switching={catalogTransition.switching}
             copy={studioCopy}
             reduceMotion={reduceMotion}
-            onEquip={handleEquip}
+            onEquip={handleEquipOwned}
+            onPreviewLocked={previewLockedItem}
             onPageChange={setCatalogPage}
             pagePosition={catalogPagePosition}
             onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}

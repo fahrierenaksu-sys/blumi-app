@@ -39,7 +39,14 @@ export const AVATAR_STUDIO_COPY = {
     fullLook: "Full look",
     emptyTitle: "Nothing here yet",
     emptyBody: "Find a new favorite in the Shop.",
-    exploreShop: "Explore Shop"
+    exploreShop: "Explore Shop",
+    lockedInShop: "In the Shop",
+    lockedHint: "Previews it on your character",
+    lockedPreviewTitle: (name: string) => `Previewing ${name}`,
+    lockedPreviewBody: "Not in your closet yet",
+    seeInShop: "See in Shop",
+    seeInShopAccessibility: (name: string) => `See ${name} in the Shop`,
+    closePreview: "Close preview"
   },
   tr: {
     title: "Gardırop",
@@ -77,7 +84,14 @@ export const AVATAR_STUDIO_COPY = {
     fullLook: "Tam kombin",
     emptyTitle: "Bu bölüm şimdilik boş",
     emptyBody: "Yeni bir favori bulmak için Mağaza'ya göz at.",
-    exploreShop: "Mağazayı keşfet"
+    exploreShop: "Mağazayı keşfet",
+    lockedInShop: "Mağazada",
+    lockedHint: "Karakterinde önizler",
+    lockedPreviewTitle: (name: string) => `${name} önizleniyor`,
+    lockedPreviewBody: "Henüz dolabında değil",
+    seeInShop: "Mağazada gör",
+    seeInShopAccessibility: (name: string) => `${name} ürününü Mağazada gör`,
+    closePreview: "Önizlemeyi kapat"
   }
 } as const
 

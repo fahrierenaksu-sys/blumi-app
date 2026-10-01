@@ -87,6 +87,22 @@ test("sections and categories are tabs with a sliding capsule and live page dots
   assert.doesNotMatch(list, /onMomentumScrollEnd/)
 })
 
+test("locked cards preview and link to the Shop instead of a dead tap (MICRO-3, WRD-5)", () => {
+  const card = readFileSync(join(wardrobeFolder, "WardrobeCatalogCard.tsx"), "utf8")
+  const preview = readFileSync(join(wardrobeFolder, "useWardrobeLockedPreview.ts"), "utf8")
+  const topBar = readFileSync(join(wardrobeFolder, "WardrobeTopBar.tsx"), "utf8")
+  assert.doesNotMatch(card, /disabled=\{locked\}/)
+  assert.match(card, /onPress=\{\(\) => \(locked \? onPreviewLocked\(item\) : onEquip\(item\)\)\}/)
+  assert.match(card, /accessibilityHint=\{locked \? lockedHint : undefined\}/)
+  // Preview only: never saved, and the Shop link carries the canonical id.
+  assert.doesNotMatch(preview, /saveAvatar|equipAndSaveItem|purchase/)
+  assert.match(preview, /navigation\.navigate\("CosmeticShop", buildWardrobeShopLink\(lockedItem, Date\.now\(\)\)\)/)
+  assert.match(preview, /isAvatarItemSoldInShop\(item, listing\)/)
+  assert.match(screenSource, /isAvailableInShop\s*\}\),/)
+  assert.match(topBar, /name="chevron-back"/)
+  assert.doesNotMatch(topBar, /arrow-back/)
+})
+
 test("the stage sizes the canonical character from its measured area", () => {
   assert.match(screenSource, /getWardrobeStageLayout\(/)
   assert.match(screenSource, /animationState="idle_front"/)

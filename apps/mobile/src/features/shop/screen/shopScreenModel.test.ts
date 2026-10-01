@@ -9,6 +9,7 @@ import {
   findShopShelfPageIndex,
   formatShopShelfCounter,
   getShopShelfPageIndex,
+  resolveShopProductFocus,
   createRoomPreviewDecor,
   filterProductsByCategory,
   getAvatarIcon,
@@ -340,6 +341,16 @@ test("the page holding a product is found for deep links and re-selection", () =
   assert.equal(findShopShelfPageIndex(buildShopShelfPages(items, 1), "p6"), 3)
   assert.equal(findShopShelfPageIndex(pages, "missing"), -1)
   assert.equal(findShopShelfPageIndex(pages, undefined), -1)
+})
+
+test("a See-in-Shop link focuses the product on its own category shelf by canonical id", () => {
+  const hair = avatarProduct("hair-mocha", "hair")
+  const top = avatarProduct("top-blossom", "top")
+  const focus = resolveShopProductFocus([top, hair], "hair-mocha")
+  assert.equal(focus?.product, hair)
+  assert.equal(focus?.categoryId, getPrimaryProductCategoryId(hair, "avatar"))
+  assert.equal(resolveShopProductFocus([top, hair], "unlisted"), null)
+  assert.equal(resolveShopProductFocus([top, hair], undefined), null)
 })
 
 test("T-2: every shelf size hands drags past its ends to the main pager, from the real page model", () => {

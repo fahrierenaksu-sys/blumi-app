@@ -252,6 +252,23 @@ export function getShopShelfMaxScrollOffset(pageCount: number, shelfWidth: numbe
   return (Math.floor(pageCount) - 1) * shelfWidth
 }
 
+/**
+ * MICRO-3: a "See in Shop" link names a product by its canonical source item
+ * id. Returns the avatar product and the category whose shelf shows it, or
+ * null when the Shop does not list it (the link then just opens the Shop).
+ */
+export function resolveShopProductFocus(
+  avatarProducts: readonly ShopCatalogItem[],
+  sourceItemId: string | undefined
+): { product: ShopCatalogItem; categoryId: string } | null {
+  if (!sourceItemId) return null
+  const product = avatarProducts.find((candidate) =>
+    candidate.sourceItemId === sourceItemId && candidate.previewType === "avatar"
+  )
+  if (!product) return null
+  return { product, categoryId: getPrimaryProductCategoryId(product, "avatar") }
+}
+
 const SHOP_SHELF_CARDS_PER_COLUMN = 2
 
 /**

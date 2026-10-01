@@ -167,6 +167,58 @@ export const wardrobeV2Styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  lockedPreviewSlot: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 8,
+    zIndex: 4,
+  },
+  lockedPreview: {
+    minHeight: 52,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingLeft: 14,
+    paddingRight: 8,
+  },
+  lockedPreviewCopy: {
+    flex: 1,
+    minWidth: 120,
+  },
+  lockedPreviewTitle: {
+    color: wardrobeTheme.ink,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  lockedPreviewBody: {
+    color: wardrobeTheme.muted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  lockedPreviewAction: {
+    minHeight: 40,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: uiTheme.colors.primary,
+  },
+  lockedPreviewActionText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  lockedPreviewClose: {
+    width: 32,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   saveErrorSlot: {
     position: "absolute",
     top: 0,
@@ -442,6 +494,12 @@ export const wardrobeV2Styles = StyleSheet.create({
   },
   itemArtLocked: {
     opacity: 0.6,
+  },
+  // A locked item being tried on lights up with a soft rose ring (MICRO-3).
+  itemArtPreviewing: {
+    opacity: 1,
+    borderColor: "rgba(246, 92, 157, 0.55)",
+    borderStyle: "dashed",
   },
   itemThumbBox: {
     width: 100,

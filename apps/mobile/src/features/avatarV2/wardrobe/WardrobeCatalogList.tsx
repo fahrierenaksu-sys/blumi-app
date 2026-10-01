@@ -49,6 +49,7 @@ export function WardrobeCatalogList(props: {
   copy: WardrobeStudioCopy
   reduceMotion: boolean
   onEquip: (item: AvatarCatalogItem) => void
+  onPreviewLocked: (item: AvatarCatalogItem) => void
   onExploreShop: () => void
   onPageChange: (pageIndex: number) => void
   /** Written on the UI thread: the list position in pages, for the dots. */
@@ -61,6 +62,7 @@ export function WardrobeCatalogList(props: {
     switching,
     copy,
     onEquip,
+    onPreviewLocked,
     onExploreShop,
     onPageChange,
     pagePosition
@@ -84,15 +86,18 @@ export function WardrobeCatalogList(props: {
               itemStateLabel={card.itemStateLabel}
               wearingLabel={copy.wearing}
               locked={card.locked}
+              previewing={card.previewing}
+              lockedHint={copy.lockedHint}
               width={itemWidth}
               previewSource={card.previewSource}
               onEquip={onEquip}
+              onPreviewLocked={onPreviewLocked}
             />
           ))}
         </View>
       ))}
     </View>
-  ), [cardHeight, copy.wearing, itemWidth, listWidth, onEquip, pageHeight])
+  ), [cardHeight, copy.lockedHint, copy.wearing, itemWidth, listWidth, onEquip, onPreviewLocked, pageHeight])
 
   // One list for every category: a category change swaps the data and jumps
   // back to the first page without animation, instead of remounting the list.

@@ -56,6 +56,7 @@ import { useShopCatalogProducts } from "../features/shop/screen/useShopCatalogPr
 import { useShopCombinationSession } from "../features/shop/screen/useShopCombinationSession"
 import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel"
 import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewSelection"
+import { useShopProductFocus } from "../features/shop/screen/useShopProductFocus"
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
 import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -273,6 +274,15 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     setSelectedId
   })
 
+  const shelfRevealRequest = useShopProductFocus({
+    focusProductId: props.route.params?.focusProductId,
+    focusRequestId: props.route.params?.focusRequestId,
+    avatarProducts,
+    setShopMode,
+    setSelectedCategoryId,
+    selectProduct: handleSelectProduct
+  })
+
   const handleSelectMode = useCallback((nextMode: ShopMode): void => {
     hapticSelection()
     publishSelectedShopPreviewWarmup([])
@@ -485,6 +495,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 layoutMetrics={shopLayoutMetrics}
                 onSelectCategory={handleSelectCategory}
                 onSelectProduct={handleSelectProduct}
+                revealRequest={shelfRevealRequest}
               />
             </Reanimated.View>
           ) : showSkeleton ? (
