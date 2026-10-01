@@ -1,6 +1,7 @@
 import cors from "@fastify/cors"
 import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
+import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
@@ -128,6 +129,8 @@ interface CreateServerOptions {
   personalRoomDecorService?: PersonalRoomDecorService
   roomSnapshotService?: RoomSnapshotService
   capabilityService?: CapabilityService
+  /** Side effects that responses do not wait for; drained when the app closes. */
+  afterResponseTasks?: AfterResponseTasks
 }
 
 export function createServer(options: CreateServerOptions = {}): FastifyInstance {
@@ -152,8 +155,13 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   })
   const notificationService =
     options.notificationService ?? createNotificationService()
+  const afterResponseTasks = options.afterResponseTasks ?? createAfterResponseTasks()
   const matchService =
-    options.matchService ?? createMatchService({ economyService, notificationService })
+    options.matchService ?? createMatchService({
+      economyService,
+      notificationService,
+      deferSideEffects: (work) => afterResponseTasks.run("match-side-effects", work)
+    })
   const referralService = options.referralService ?? createReferralService()
   const roomSnapshotService = options.roomSnapshotService ?? createRoomSnapshotService({
     isPublicByDefault: false,
@@ -262,8 +270,11 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     accountRecoveryService,
     connectionManager,
     connectionService: options.connectionService,
-    miniRoomService: options.miniRoomService
+    miniRoomService: options.miniRoomService,
+    afterResponseTasks
   }
+  // A closing app finishes the side effects its answered requests started.
+  app.addHook("onClose", () => afterResponseTasks.drain())
   void app.register(async (instance) => {
     registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget())
     await registerAuthRoutes(instance, routeServices)

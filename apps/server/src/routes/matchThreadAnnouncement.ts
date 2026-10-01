@@ -17,15 +17,17 @@ export interface MatchThreadAnnouncementServices {
 }
 
 /**
- * Opens the chat of a new Discover match and announces it to both people with
- * `chat.thread_created`, so the partner learns about the match while online
- * (before, the chat appeared only when one of them opened it or restarted).
+ * Opens the chat of a new Discover match and announces the match to both
+ * people: `chat.thread_created` (only when this call created the chat) and
+ * then `connection.matched` keyed `match_<matchId>`, so the partner sees the
+ * match moment on any screen with the chat's names and avatars already on the
+ * phone. Before, the partner only found a new chat.
  *
- * Idempotent: an existing chat for the pair (this match's or a room-saved
- * connection's) is left alone and nothing is announced. A block in either
- * direction, before or right after creation, keeps the chat unannounced, the
- * same rule `POST /v1/threads/sync-matches` applies. Returns the announced
- * thread, or null.
+ * Called once per match, by the decision that created it. An existing chat
+ * for the pair (this match's or a room-saved connection's) is reused. A block
+ * in either direction, before or right after creation, keeps everything
+ * unannounced, the same rule `POST /v1/threads/sync-matches` applies. Returns
+ * the pair's thread when the match was announced, or null.
  */
 export async function announceNewMatchThread(
   services: MatchThreadAnnouncementServices,
@@ -42,11 +44,39 @@ export async function announceNewMatchThread(
     services.connectionRepository?.findMatchBetween(firstUserId, secondUserId) ?? Promise.resolve(null),
     services.safetyService.hasBlockBetween(firstUserId, secondUserId)
   ])
-  if (existing || blocked) return null
-  if (connection && await services.chatService.repository.findThread(
-    createAuthorizedThreadId({ source: "connection", sourceId: connection.miniRoomId, miniRoomId: connection.miniRoomId })
-  )) return null
+  if (blocked) return null
+  const reused = existing ?? (connection
+    ? await services.chatService.repository.findThread(
+      createAuthorizedThreadId({ source: "connection", sourceId: connection.miniRoomId, miniRoomId: connection.miniRoomId })
+    )
+    : null)
+  const thread = reused ?? await createMatchThread(services, match, threadId, firstUserId, secondUserId)
+  if (!thread) return null
+  if (await services.safetyService.hasBlockBetween(firstUserId, secondUserId)) return null
+  if (!reused) {
+    services.connectionManager.sendToUsers(thread.participantUserIds, {
+      type: "chat.thread_created",
+      payload: thread
+    })
+  }
+  services.connectionManager.sendToUsers([firstUserId, secondUserId], {
+    type: "connection.matched",
+    payload: {
+      miniRoomId: `match_${match.matchId}`,
+      participantUserIds: [firstUserId, secondUserId],
+      matchedAt: match.matchedAt
+    }
+  })
+  return thread
+}
 
+async function createMatchThread(
+  services: MatchThreadAnnouncementServices,
+  match: MatchRecord,
+  threadId: string,
+  firstUserId: string,
+  secondUserId: string
+): Promise<ChatThread | null> {
   const accounts = new Map((await services.authRepository.findAccountsByUserIds([firstUserId, secondUserId]))
     .map((account) => [account.userId, account]))
   const participants = [firstUserId, secondUserId].map((userId) => {
@@ -58,18 +88,12 @@ export async function announceNewMatchThread(
   // A partner without a name cannot be shown; sync-matches retries later.
   if (!participants[0] || !participants[1]) return null
 
-  const thread = await services.chatService.createThread({
+  return services.chatService.createThread({
     threadId,
     miniRoomId: `match_${match.matchId}`,
     participantUserIds: [firstUserId, secondUserId],
     participants: participants as CreateThreadInput["participants"]
   })
-  if (await services.safetyService.hasBlockBetween(firstUserId, secondUserId)) return null
-  services.connectionManager.sendToUsers(thread.participantUserIds, {
-    type: "chat.thread_created",
-    payload: thread
-  })
-  return thread
 }
 
 function completeAvatarForChat(avatar: AvatarSelection): CompleteAvatarSelection | undefined {
