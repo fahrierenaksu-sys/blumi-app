@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@blumi/contracts"
+import { compareChatMessagePositions } from "@blumi/domain"
 import type { ChatService } from "./chatService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { ConnectionManager } from "../realtime/connectionManager"
@@ -50,7 +51,7 @@ export function createChatMessageDeliveryService(options: {
   ): Promise<void> => {
     try {
       if (leased) await dispatchLeased(message, thread, leased.job, leased.leaseUntil)
-      else await dispatchDue(new Date(), message.messageId, thread)
+      else await dispatchClaimedInChain(new Date(), message.messageId, thread)
     } catch (error) {
       options.reportError?.(error)
     }
@@ -68,7 +69,7 @@ export function createChatMessageDeliveryService(options: {
           persona.replies[replyIndex]!,
           `test-persona-reply-${message.messageId}`
         )
-        try { await dispatchDue(new Date(), reply.message.messageId, thread) }
+        try { await dispatchClaimedInChain(new Date(), reply.message.messageId, thread) }
         catch (error) { options.reportError?.(error) }
       } catch (error) {
         options.reportError?.(error)
@@ -168,9 +169,30 @@ export function createChatMessageDeliveryService(options: {
     return delivery
   }
 
-  async function dispatchDue(now: Date, messageId?: string, knownThread?: ChatThreadMembers): Promise<void> {
+  /**
+   * Claims due outbox jobs and dispatches them through the same per-thread
+   * chain as the inline path, in message order (sent_at, message_id), so a
+   * thread's messages reach the partner in order on recovery too (the claim
+   * orders by availability, and a retried job comes back later). Threads
+   * still run in parallel. A job that waited behind its thread renews its
+   * lease like an inline dispatch.
+   */
+  async function dispatchDue(now: Date): Promise<void> {
+    const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: DELIVERY_LEASE_MS })
+    const leaseUntil = now.getTime() + DELIVERY_LEASE_MS
+    const ordered = [...jobs].sort((left, right) => compareChatMessagePositions(left.message, right.message))
+    await Promise.all(ordered.map((job) => enqueueThreadDispatch(chatService, job.message.threadId,
+      () => dispatchLeased(job.message, undefined, job, leaseUntil))))
+  }
+
+  /**
+   * Claims and dispatches one message from inside its thread's dispatch
+   * chain (the inline path already holds the chain, so it must not queue
+   * behind itself).
+   */
+  async function dispatchClaimedInChain(now: Date, messageId: string, thread: ChatThreadMembers): Promise<void> {
     const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: DELIVERY_LEASE_MS, messageId })
-    await Promise.all(jobs.map((job) => dispatchJob(job, now, knownThread)))
+    for (const job of jobs) await dispatchJob(job, now, thread)
   }
 
   /**
@@ -182,7 +204,7 @@ export function createChatMessageDeliveryService(options: {
    */
   async function dispatchLeased(
     message: ChatMessage,
-    thread: ChatThreadMembers,
+    thread: ChatThreadMembers | undefined,
     lease: { leaseToken: string; attempt: number },
     leaseUntil: number
   ): Promise<void> {
@@ -231,10 +253,12 @@ const DELIVERY_LEASE_MS = 30_000
 const LEASE_RENEW_AFTER_MS = 10_000
 
 /**
- * Inline post-persist dispatch chains, per chat service (the HTTP route and the
+ * Post-persist dispatch chains, per chat service (the HTTP route and the
  * realtime router each build their own delivery service over the same chat
- * service) and per thread. The outbox worker stays independent: it only
- * recovers jobs this chain did not claim.
+ * service) and per thread. The outbox worker's recovered jobs join the same
+ * chain, so recovery keeps a thread's order and never overtakes an inline
+ * dispatch that is still running; a job whose lease the worker took is
+ * skipped by the inline dispatch (fenced lease).
  */
 const threadDispatchChains = new WeakMap<ChatService, Map<string, Promise<void>>>()
 

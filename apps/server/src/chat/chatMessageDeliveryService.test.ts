@@ -449,6 +449,52 @@ test("a slow dispatch of one message never lets the sender's next message overta
   assert.deepEqual(delivered, ["first", "second"])
 })
 
+test("the recovery worker delivers a thread's messages in message order, one at a time", async () => {
+  // After a restart or a lost lease the worker claims a batch of jobs; a
+  // thread's messages must still reach the partner in order.
+  const store = createInMemoryChatStore()
+  let nextId = 0
+  const chatService = createChatService({
+    repository: createInMemoryChatRepository(store),
+    idFactory: () => ["message_z", "message_a", "message_other"][nextId++]!
+  })
+  await createThread(chatService)
+  await chatService.createThread({
+    threadId: "thread_two", miniRoomId: "room_two", participantUserIds: ["user_a", "user_c"],
+    participants: [{ userId: "user_a", displayName: "Ada" }, { userId: "user_c", displayName: "Cem" }]
+  })
+  const first = await chatService.sendMessage("user_a", "thread_one", "first", new Date("2026-10-01T10:00:00.000Z"))
+  await chatService.sendMessage("user_a", "thread_one", "second", new Date("2026-10-01T10:00:01.000Z"))
+  await chatService.sendMessage("user_a", "thread_two", "elsewhere", new Date("2026-10-01T10:00:02.000Z"))
+  // The first message's job was retried, so the claim returns it last.
+  const firstJob = store.deliveryJobs.get(first.messageId)!
+  store.deliveryJobs.set(first.messageId, { ...firstJob, availableAt: firstJob.availableAt + 5_000 })
+
+  let releaseFirst!: () => void
+  const firstFanoutGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+  const delivered: string[] = []
+  const connectionManager = {
+    async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+      if (event.type !== "chat.message_received") return
+      if (event.payload.body === "first") await firstFanoutGate
+      delivered.push(event.payload.body)
+    },
+    hasUserConnections: () => true
+  } as unknown as ConnectionManager
+  const worker = createChatMessageDeliveryService({
+    chatService, safetyService: createSafetyService(), connectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+
+  const recovering = worker.dispatchDue(new Date(Date.now() + 60_000))
+  await waitFor(() => delivered.includes("elsewhere"))
+  await new Promise<void>((resolve) => setTimeout(resolve, 20))
+  assert.deepEqual(delivered, ["elsewhere"], "another thread is not held up; the second message waits for the first")
+  releaseFirst()
+  await recovering
+  assert.deepEqual(delivered, ["elsewhere", "first", "second"])
+})
+
 test("input the one-statement send refuses keeps its answers behind the conversation and block checks", async () => {
   const safetyService = createSafetyService()
   const chatService = createChatService({ blockPolicy: safetyService })
@@ -505,8 +551,8 @@ test("a leased dispatch that waited renews its lease, and one whose lease the wo
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "second" })
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "third" })
   // The second job's lease runs out while it waits: the worker of another
-  // process claims and delivers it.
-  const worker = createChatMessageDeliveryService({ ...options, connectionManager: {
+  // process (its own chat service and dispatch chains) claims and delivers it.
+  const worker = createChatMessageDeliveryService({ ...options, chatService: createChatService({ repository }), connectionManager: {
     async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
       if (event.type === "chat.message_received") delivered.push(`worker:${event.payload.messageId}`)
     },
