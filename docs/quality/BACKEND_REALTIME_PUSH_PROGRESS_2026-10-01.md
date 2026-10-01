@@ -90,9 +90,11 @@ deploy veya fiziksel cihaz push denemesi yapılmadı.
 
 - Kullanıcının native oda hareketi/presence kontrolü ve iki fiziksel telefon
   arasında gerçek ağ gecikmesi. Çoklu replika doğrulaması yapılmadı.
-- Çift tik/görüldü: 070 migration dosyası, capability kapısı, atomik tuple
-  imleçleri, teslim ACK'i, karşılıklı tercih, API/realtime/store/UI zinciri.
-  070 henüz yazılmadı; migration uygulanmadı.
+- Çift tik/görüldü: **IMPLEMENTED / TESTED** (worktree dalı, birleştirilmedi).
+  070 **yazıldı, uygulanmadı**; binary 070 olmadan çalışır ve alındı bilgisi
+  kapalı kalır. Adımlar ve uyumluluk matrisi:
+  [`MIGRATION_070_RUNBOOK.md`](../release/MIGRATION_070_RUNBOOK.md). Native ve
+  iki telefon doğrulaması, gizlilik metni güncellemesi OPEN.
 - RT10: yerel/staging ve iki cihaz gecikme ölçümü. RT06 sorgu optimizasyonu
   ancak bu ölçümden sonra değerlendirilmelidir.
 - P03 oda daveti kararı, native kart/erişilebilirlik doğrulaması ve fiziksel

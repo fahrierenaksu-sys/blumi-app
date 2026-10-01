@@ -53,6 +53,17 @@ applied at the owner's request without a separate dump and restore test. The
 binary that ships 069 can now pass `/ready`. See
 [`MIGRATION_069_NOTE.md`](./MIGRATION_069_NOTE.md).
 
+## Migration 070 (2026-10-01) — WRITTEN, NOT APPLIED
+
+Migration `070_chat_delivery_receipts.sql` adds nullable receipt cursors to
+`blumi_chat_thread_participants` and the `blumi_chat_privacy_preferences`
+table. Unlike 068, the binary ships first: `/ready` treats 070 as optional
+(`OPTIONAL_READINESS_MIGRATIONS`) and the server probes the ledger before
+using it, so receipts stay off until it is applied. While 070 is pending, the
+release audit reports one missing migration; that is expected. Steps,
+compatibility matrix, verification and rollback order:
+[`MIGRATION_070_RUNBOOK.md`](./MIGRATION_070_RUNBOOK.md).
+
 ## Safe inspection
 
 From the repository root, with the exact target project ref:
