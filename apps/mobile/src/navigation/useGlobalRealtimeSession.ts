@@ -9,14 +9,13 @@ import {
   applyChatThreadListed,
   applyChatThreadRead,
   getThreads,
-  isConversationOnScreen,
-  noteMessageShownInApp,
   noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
 import { getInboxCopy } from "../features/chat/inboxCopy"
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
 import { isDemoMode, setDemoMode } from "../features/demo/demoStore"
 import { createGlobalRealtimeEventHandler } from "../features/realtime/globalRealtimeEventHandler"
+import { shouldShowIncomingMessageAlert } from "../features/notifications/foregroundNotificationState"
 import {
   createGlobalRealtimeLifecycle,
   getGlobalRealtimeLifecycleIdentity
@@ -171,8 +170,7 @@ export function useGlobalRealtimeSession({
       showIncomingMessageToast: (toast) => {
         showToast({ ...toast, type: "info" })
       },
-      isConversationOnScreen,
-      noteMessageShownInApp,
+      shouldShowIncomingMessageAlert,
       openConversation: (threadId) => {
         if (navigationRef.isReady()) navigationRef.navigate("ChatThread", { threadId })
       },

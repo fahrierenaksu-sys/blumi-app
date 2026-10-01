@@ -43,6 +43,25 @@ test("read events stay on the current account and next chat pages are requested"
   assert.equal(refreshes, 1)
 })
 
+test("the incoming message toast stays quiet when the conversation is on screen or the push already alerted", () => {
+  const asked: { threadId: string; messageId: string }[] = []
+  let allow = false
+  const dependencies = createDependencies({
+    shouldShowIncomingMessageAlert: (incoming) => { asked.push(incoming); return allow }
+  })
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  handler({ type: "chat.message_received", payload: message })
+  assert.deepEqual(dependencies.receivedMessages, [message], "the message is still applied to the store")
+  assert.deepEqual(dependencies.toasts, [])
+  allow = true
+  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_2" } })
+  assert.equal(dependencies.toasts.length, 1)
+  assert.deepEqual(asked, [
+    { threadId: "thread_1", messageId: "message_1" },
+    { threadId: "thread_1", messageId: "message_2" }
+  ])
+})
+
 test("the server's block confirmation drops the blocked partner's chat", () => {
   const blocked: string[] = []
   const handler = createGlobalRealtimeEventHandler(createDependencies({
@@ -155,20 +174,20 @@ test("applies incoming messages and shortens only other-user notification copy",
 
 test("no toast for a message whose conversation is on screen, in its chat or its MiniRoom (CHT-01)", () => {
   const onScreen = new Set(["thread_1"])
-  const shown: string[] = []
+  const asked: string[] = []
   const dependencies = createDependencies({
-    isConversationOnScreen: (threadId) => onScreen.has(threadId),
-    noteMessageShownInApp: (messageId) => { shown.push(messageId) }
+    shouldShowIncomingMessageAlert: ({ threadId, messageId }) => {
+      asked.push(messageId)
+      return !onScreen.has(threadId)
+    }
   })
   const handler = createGlobalRealtimeEventHandler(dependencies)
   handler({ type: "chat.message_received", payload: message })
   assert.deepEqual(dependencies.toasts, [])
-  assert.deepEqual(shown, ["message_1"], "a visible message needs no foreground push banner either")
   handler({ type: "chat.message_received", payload: { ...message, messageId: "message_2", threadId: "thread_2" } })
   assert.equal(dependencies.toasts.length, 1)
-  assert.deepEqual(shown, ["message_1", "message_2"], "the toast already alerted; the push banner must not repeat it")
   handler({ type: "chat.message_received", payload: { ...message, messageId: "message_3", senderUserId: "ada" } })
-  assert.deepEqual(shown, ["message_1", "message_2"], "own messages are not alerts")
+  assert.deepEqual(asked, ["message_1", "message_2"], "own messages are never alerts")
 })
 
 test("the message toast opens its conversation and names an unknown sender in the user's language", () => {

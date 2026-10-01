@@ -9,7 +9,13 @@ import { registerDevice, removeDevice, updateNotificationPreferences } from "./n
 import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
-import { isConversationOnScreen, wasMessageShownInApp } from "../chat/chatStore"
+import { resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
+import {
+  claimForegroundAlert,
+  isConversationFocused,
+  resetForegroundNotificationAlerts
+} from "./foregroundNotificationState"
+import { rememberRegisteredPushDevice, removeRegisteredPushDevice } from "./pushDeviceRegistry"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -94,7 +100,6 @@ export function usePushRegistration(
 
     const abortController = new AbortController()
     let active = true
-    let registeredPushToken: string | null = null
     let syncQueue = Promise.resolve()
     let pushTokenSubscription: { remove(): void } | null = null
     let responseSubscription: { remove(): void } | null = null
@@ -220,7 +225,7 @@ export function usePushRegistration(
         })
         if (!active) return
         if (result.status === "registered") {
-          registeredPushToken = result.pushToken
+          if (userId) rememberRegisteredPushDevice(userId, result.pushToken)
           setPermissionStatus("granted")
         } else if (result.reason === "permission-denied") {
           setPermissionStatus("denied")
@@ -277,14 +282,18 @@ export function usePushRegistration(
       responseSubscription?.remove()
       // Credential rotation is not logout: its old effect must not remove the
       // same account's newly refreshed registration and queued notifications.
-      if (registeredPushToken && shouldRemovePushRegistration(userId, currentUserIdRef.current)) {
-        void removeDevice(
+      // Sign-out waits for this same removal before revoking the session.
+      if (userId && shouldRemovePushRegistration(userId, currentUserIdRef.current)) {
+        void removeRegisteredPushDevice(userId, (pushToken) => removeDevice(
           MOBILE_HTTP_BASE_URL,
           sessionToken,
-          registeredPushToken
-        ).catch((error) => {
+          pushToken
+        )).catch((error) => {
           captureAppException(error, { feature: "push_device_cleanup" })
         })
+        // The next person on this phone must not see this account's alerts.
+        resetForegroundNotificationAlerts()
+        if (notificationsForDelivery) clearPresentedNotifications(notificationsForDelivery)
       }
     }
   }, [mode, sessionId, sessionToken, userId])
@@ -319,6 +328,15 @@ async function createAndroidNotificationChannel(): Promise<void> {
   })
 }
 
+function clearPresentedNotifications(notifications: NotificationsModule): void {
+  void Promise.all([
+    notifications.dismissAllNotificationsAsync(),
+    notifications.setBadgeCountAsync(0)
+  ]).catch((error) => {
+    captureAppException(error, { feature: "push_presented_cleanup" })
+  })
+}
+
 function normalizePermissionStatus(
   status: NotificationsPermissionStatus
 ): "granted" | "denied" | "undetermined" {
@@ -341,17 +359,12 @@ async function loadNotificationsModule(): Promise<NotificationsModule> {
 function ensureNotificationHandler(notifications: NotificationsModule): void {
   if (hasInstalledNotificationHandler) return
   notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      const data = notification.request.content.data
-      // Chat pushes are queued even while the socket is open. In the foreground
-      // hide the banner when the conversation (chat or its MiniRoom) is on
-      // screen, or when the socket already surfaced the message as a toast.
-      const alreadySeen = AppState.currentState === "active" && data?.type === "chat.message" && (
-        (typeof data.threadId === "string" && isConversationOnScreen(data.threadId)) ||
-        (typeof data.messageId === "string" && wasMessageShownInApp(data.messageId)))
-      return { shouldPlaySound: false, shouldSetBadge: false,
-        shouldShowBanner: !alreadySeen, shouldShowList: !alreadySeen }
-    }
+    handleNotification: async (notification) => resolveForegroundNotificationPresentation({
+      data: notification.request.content.data,
+      appActive: AppState.currentState === "active",
+      isConversationFocused,
+      claimAlert: claimForegroundAlert
+    })
   })
   hasInstalledNotificationHandler = true
 }

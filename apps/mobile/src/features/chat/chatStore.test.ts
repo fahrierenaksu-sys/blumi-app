@@ -30,43 +30,8 @@ import {
   setActiveThread,
   createChatThreadSnapshotReader,
   beginChatThreadListRequest,
-  removeChatThreadsWithPartner,
-  isConversationOnScreen,
-  noteMessageShownInApp,
-  showConversationInRoom,
-  wasMessageShownInApp
+  removeChatThreadsWithPartner
 } from "./chatStore"
-
-test("a conversation is on screen in its focused chat or its focused MiniRoom, never after logout", () => {
-  resetChatStore()
-  assert.equal(isConversationOnScreen("thread-a"), false)
-  setActiveThread("thread-a")
-  assert.equal(isConversationOnScreen("thread-a"), true)
-  setActiveThread(null)
-  const release = showConversationInRoom("thread-b")
-  assert.equal(isConversationOnScreen("thread-b"), true)
-  assert.equal(isConversationOnScreen("thread-a"), false)
-  const next = showConversationInRoom("thread-c")
-  release()
-  assert.equal(isConversationOnScreen("thread-c"), true, "a stale release cannot hide a newer room")
-  next()
-  assert.equal(isConversationOnScreen("thread-c"), false)
-  showConversationInRoom("thread-d")
-  resetChatStore()
-  assert.equal(isConversationOnScreen("thread-d"), false)
-})
-
-test("messages shown in-app are remembered per session and bounded", () => {
-  resetChatStore()
-  noteMessageShownInApp("message-1")
-  assert.equal(wasMessageShownInApp("message-1"), true)
-  assert.equal(wasMessageShownInApp("message-2"), false)
-  for (let index = 0; index < 500; index++) noteMessageShownInApp(`burst-${index}`)
-  assert.equal(wasMessageShownInApp("message-1"), false, "the oldest ids are forgotten first")
-  assert.equal(wasMessageShownInApp("burst-499"), true)
-  resetChatStore()
-  assert.equal(wasMessageShownInApp("burst-499"), false, "another account never inherits them")
-})
 
 test("one realtime message is not proof that the first history page is ready", () => {
   resetChatStore()

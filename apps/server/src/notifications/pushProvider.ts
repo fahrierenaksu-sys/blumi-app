@@ -5,6 +5,21 @@ export interface PushNotification {
   title: string
   body: string
   data?: Record<string, string>
+  /** Derived at dispatch from the notification type; never persisted. */
+  delivery?: PushDeliveryOptions
+}
+
+/** Expo push message fields Blumi sets (docs.expo.dev push message format). */
+export interface PushDeliveryOptions {
+  priority?: "default" | "normal" | "high"
+  /** iOS `apns-collapse-id` (replaces a shown notification); Android in-transit collapse. */
+  collapseId?: string
+  /** iOS `thread-id`: visual grouping in Notification Center. */
+  threadId?: string
+  channelId?: string
+  /** Unix seconds after which the provider drops an undelivered message. */
+  expiration?: number
+  ttlSeconds?: number
 }
 
 export interface PushProvider {
@@ -72,7 +87,8 @@ export function createExpoPushProvider({
           sound: "default",
           title: notification.title,
           body: notification.body,
-          ...(notification.data ? { data: notification.data } : {})
+          ...(notification.data ? { data: notification.data } : {}),
+          ...toExpoDeliveryFields(notification.delivery)
         })
       })
       const payload = await readJsonPayload(response)
@@ -89,6 +105,19 @@ export function createExpoPushProvider({
       if (!ticket.id) throw new Error("Expo push returned an invalid ticket ID.")
       return { ticketId: ticket.id }
     }
+  }
+}
+
+function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record<string, string | number> {
+  if (!delivery) return {}
+  return {
+    ...(delivery.priority ? { priority: delivery.priority } : {}),
+    // Android shows `tag` replacements; iOS uses collapseId for both.
+    ...(delivery.collapseId ? { collapseId: delivery.collapseId, tag: delivery.collapseId } : {}),
+    ...(delivery.threadId ? { threadId: delivery.threadId } : {}),
+    ...(delivery.channelId ? { channelId: delivery.channelId } : {}),
+    ...(delivery.ttlSeconds !== undefined ? { ttl: delivery.ttlSeconds } : {}),
+    ...(delivery.expiration !== undefined ? { expiration: delivery.expiration } : {})
   }
 }
 

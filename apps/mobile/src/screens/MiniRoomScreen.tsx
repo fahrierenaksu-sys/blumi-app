@@ -2,7 +2,6 @@ import type { ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocused } from "@react-navigation/native"
 import { useMiniRoomMotion } from "../features/miniRoom/useMiniRoomMotion"
-import { useRoomConversationOnScreen } from "../features/miniRoom/useRoomConversationOnScreen"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
@@ -45,6 +44,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
+import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -72,7 +72,8 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     localUserId: sessionActor.profile.userId,
     partnerUserId: participants.partner.userId
   })
-  useRoomConversationOnScreen(roomChat.threadId, isFocused)
+  // The room shows its conversation's messages and invites itself.
+  useFocusedConversation(roomChat.threadId, isFocused)
   const roomChatHistory = useRoomChatHistory({
     threadId: roomChat.threadId,
     localUserId: sessionActor.profile.userId

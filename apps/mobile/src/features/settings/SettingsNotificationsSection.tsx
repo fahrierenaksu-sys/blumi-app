@@ -73,19 +73,20 @@ export function SettingsNotificationsSection(props: {
         ) : notificationPreferences ? (
           NOTIFICATION_PREFERENCE_ROWS.map((row, index) => {
             const visual = getNotificationPreferenceRowVisual(row.key)
+            const rowCopy = copy.notificationRows[row.key]
             return (
               <SettingsRow
                 key={row.key}
                 icon={visual.icon}
                 iconColors={uiTheme.gradients[visual.gradient]}
-                label={row.label}
-                description={row.description}
+                label={rowCopy.label}
+                description={rowCopy.description}
                 isLast={index === NOTIFICATION_PREFERENCE_ROWS.length - 1}
               >
                 <Switch
                   accessibilityRole="switch"
-                  accessibilityLabel={copy.notificationToggle(row.label)}
-                  accessibilityHint={row.description}
+                  accessibilityLabel={copy.notificationToggle(rowCopy.label)}
+                  accessibilityHint={rowCopy.description}
                   accessibilityState={{
                     checked: notificationPreferences[row.key],
                     disabled: isSavingNotificationPreferences

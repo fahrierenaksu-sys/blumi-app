@@ -13,6 +13,7 @@ import { createMatchService } from "../matches/matchService"
 import { createMiniRoomService } from "../miniRooms/miniRoomService"
 import { createLivekitTokenService } from "../miniRooms/livekitTokenService"
 import { createNotificationService } from "../notifications/notificationService"
+import { createRecipientLocaleResolver } from "../notifications/notificationDeliveryContext"
 import { createPresenceService } from "../presence/presenceService"
 import { createConnectionManager } from "../realtime/connectionManager"
 import { createRoomService } from "../rooms/roomService"
@@ -112,7 +113,13 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     assert.deepEqual(listed.json().invites.map((invite: { inviteId: string }) => invite.inviteId), [inviteId])
     await notificationService.dispatchDue()
     assert.deepEqual(sentPushes, [{
-      data: { type: "chat.room_invite", threadId, inviteId }
+      data: {
+        type: "chat.room_invite",
+        threadId,
+        inviteId,
+        expiresAt: created.json().invite.expiresAt,
+        recipientUserId: recipient.userId
+      }
     }])
 
     const accepted = await app.inject({
@@ -264,6 +271,75 @@ test("mutual-match chat room invite endpoints persist state, notify safely, and 
     assert.equal(block.statusCode, 201)
     assert.equal(await miniRoomService.findActiveMiniRoomForUser(sender.userId), null)
     assert.equal(roomEndEvents.filter((event) => event.payload.miniRoomId === safetyRoomId).length, 1)
+  } finally {
+    await app.close()
+  }
+})
+
+test("a room invite push is queued even while the recipient holds a socket, and expires with the invite", async () => {
+  const authService = createAuthService({ codeFactory: () => "482931" })
+  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const matchService = createMatchService({
+    repository: createInMemoryMatchRepository(createInMemoryMatchStore([]))
+  })
+  const sentPushes: Array<{ body: string; data?: Record<string, string> }> = []
+  const notificationService = createNotificationService({
+    pushProvider: { async sendPush(_token, notification) { sentPushes.push({ body: notification.body, data: notification.data }) } },
+    resolveRecipientLocale: createRecipientLocaleResolver(authService.repository)
+  })
+  const miniRoomService = createMiniRoomService({
+    presenceService: createPresenceService({ roomService: createRoomService() }),
+    safetyService,
+    chatService,
+    livekitTokenService: createLivekitTokenService()
+  })
+  const connectionManager = createConnectionManager()
+  // A socket the server still counts can belong to a phone that has already
+  // gone to the background; only the phone knows whether the thread is open.
+  connectionManager.hasUserConnections = () => true
+  const app = createServer({
+    authService, chatService, safetyService, matchService, miniRoomService, notificationService, connectionManager
+  })
+  try {
+    const sender = await createEligibleAccount(app, authService, "+905551110020", "Ada")
+    const recipient = await createEligibleAccount(app, authService, "+905551110021", "Bora")
+    await notificationService.registerDevice(recipient.userId, { platform: "ios", pushToken: "recipient-device" })
+    await matchService.repository.createMatch({
+      matchId: "socket_invite",
+      participantUserIds: [sender.userId, recipient.userId],
+      matchedAt: "2026-07-21T10:00:00.000Z"
+    })
+    const threadId = "thread_match_socket_invite"
+    await chatService.createThread({
+      threadId,
+      miniRoomId: "match_socket_invite",
+      participantUserIds: [sender.userId, recipient.userId],
+      participants: [
+        { userId: sender.userId, displayName: "Ada" },
+        { userId: recipient.userId, displayName: "Bora" }
+      ]
+    })
+    const created = await app.inject({
+      method: "POST",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${sender.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(created.statusCode, 201)
+    const invite = created.json().invite as { inviteId: string; expiresAt: string }
+    await notificationService.dispatchDue()
+    assert.deepEqual(sentPushes, [{
+      // The recipient registered with the Turkish app language.
+      body: "Yeni bir oda davetin var.",
+      data: {
+        type: "chat.room_invite",
+        threadId,
+        inviteId: invite.inviteId,
+        expiresAt: invite.expiresAt,
+        recipientUserId: recipient.userId
+      }
+    }])
   } finally {
     await app.close()
   }

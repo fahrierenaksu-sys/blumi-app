@@ -32,8 +32,6 @@ function mount() {
         applyChatThreadListed: () => undefined,
         applyChatThreadRead: () => undefined,
         getThreads: () => [],
-        isConversationOnScreen: () => false,
-        noteMessageShownInApp: () => undefined,
         noteRealtimeThreadListRequested: () => undefined
       },
       "../features/chat/inboxCopy": { getInboxCopy: () => ({ unknownPartner: "Someone" }) },
@@ -46,6 +44,7 @@ function mount() {
           return () => undefined
         }
       },
+      "../features/notifications/foregroundNotificationState": { shouldShowIncomingMessageAlert: () => true },
       "../features/realtime/globalRealtimeProvider": {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
@@ -144,12 +143,11 @@ test("session callbacks are read at call time without reconnecting", async () =>
   assert.deepEqual(f.events, ["connect:token-1", "disconnect", "clear:latest"])
 })
 
-test("incoming message alerts know the conversation on screen, record in-app alerts and open the chat", () => {
+test("incoming message alerts go through the one foreground alert gate and open the chat", () => {
   const f = mount()
   f.render()
   const dependencies = f.handler.dependencies!
-  assert.equal(typeof dependencies.isConversationOnScreen, "function")
-  assert.equal(typeof dependencies.noteMessageShownInApp, "function")
+  assert.equal(typeof dependencies.shouldShowIncomingMessageAlert, "function")
   assert.equal(dependencies.unknownSenderName, "Someone")
   ;(dependencies.openConversation as (threadId: string) => void)("thread-1")
   assert.deepEqual(f.events.slice(-1), ["navigate:ChatThread:thread-1"])

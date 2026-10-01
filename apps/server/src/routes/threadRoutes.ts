@@ -473,10 +473,10 @@ export async function registerThreadRoutes(
           { type: "chat.room_invite_updated", payload: result.invite }
         )
       }
-      if (
-        result.created &&
-        !services.connectionManager.hasUserConnections(result.invite.recipientUserId)
-      ) {
+      // Queued regardless of sockets: a socket the server still counts may
+      // belong to a phone already in the background. The phone hides the
+      // banner itself while this conversation is open in the foreground.
+      if (result.created) {
         try {
           await services.notificationService.sendPushToUser(
             result.invite.recipientUserId,
@@ -486,7 +486,8 @@ export async function registerThreadRoutes(
               data: {
                 type: "chat.room_invite",
                 threadId,
-                inviteId: result.invite.inviteId
+                inviteId: result.invite.inviteId,
+                ...(result.invite.expiresAt ? { expiresAt: result.invite.expiresAt } : {})
               }
             }
           )

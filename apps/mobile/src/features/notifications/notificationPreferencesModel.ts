@@ -6,31 +6,12 @@ export type NotificationPreferenceToggleKey =
   | "matchesEnabled"
   | "discoveryWatchEnabled"
 
-export const NOTIFICATION_PREFERENCE_ROWS: readonly {
-  key: NotificationPreferenceToggleKey
-  label: string
-  description: string
-}[] = [
-  {
-    key: "likesEnabled",
-    label: "Likes",
-    description: "When someone likes your vibe."
-  },
-  {
-    key: "messagesEnabled",
-    label: "Messages",
-    description: "When a new message is waiting."
-  },
-  {
-    key: "matchesEnabled",
-    label: "Matches",
-    description: "When a connection becomes mutual."
-  },
-  {
-    key: "discoveryWatchEnabled",
-    label: "Discovery Watch",
-    description: "When a fitting new person appears."
-  }
+/** Row order in Settings; the labels live in the bilingual settings copy. */
+export const NOTIFICATION_PREFERENCE_ROWS: readonly { key: NotificationPreferenceToggleKey }[] = [
+  { key: "likesEnabled" },
+  { key: "messagesEnabled" },
+  { key: "matchesEnabled" },
+  { key: "discoveryWatchEnabled" }
 ]
 
 export function updateNotificationPreferenceToggle(

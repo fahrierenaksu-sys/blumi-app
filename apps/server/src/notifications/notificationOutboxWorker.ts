@@ -10,6 +10,8 @@ export interface NotificationOutboxWorker {
  * A deliberately small process worker: PostgreSQL owns the queue and leasing,
  * so several HTTP/realtime instances may run this safely.  Failures remain in
  * the durable outbox for the next interval rather than being silently lost.
+ * A newly queued push wakes it at once; the interval is the fallback that
+ * picks up retries and work queued by another instance.
  */
 export function startNotificationOutboxWorker(options: {
   notificationService: NotificationService
@@ -22,18 +24,32 @@ export function startNotificationOutboxWorker(options: {
   }
   let stopped = false
   let running: Promise<void> | null = null
+  // A wake-up during a cycle may arrive after that cycle claimed its batch,
+  // so it owes exactly one follow-up cycle.
+  let wakePending = false
   const run = () => {
     if (stopped || running) return
+    wakePending = false
     running = options.notificationService.dispatchDue()
       .catch((error) => { options.reportError?.(error) })
-      .finally(() => { running = null })
+      .finally(() => {
+        running = null
+        if (wakePending) run()
+      })
   }
+  const wake = () => {
+    if (stopped) return
+    if (running) wakePending = true
+    else run()
+  }
+  const unsubscribe = options.notificationService.onDeliveriesQueued?.(wake)
   const timer = setInterval(() => { void run() }, intervalMs)
   timer.unref()
   void run()
   return {
     async stop() {
       stopped = true
+      unsubscribe?.()
       clearInterval(timer)
       await running
     }

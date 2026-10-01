@@ -39,13 +39,13 @@ import {
   completeFirebaseAccount,
   AccountAccessError,
   fetchProductionAccountSnapshot,
-  revokeProductionSession,
   type RegisterAccountInput,
   type SendVerificationCodeInput,
   type UpdateSessionProfileInput,
   updateProductionProfile,
   updateSessionActorProfile
 } from "./sessionApi"
+import { revokeProductionSessionAfterPushCleanup } from "./sessionPushCleanup"
 import {
   confirmFirebasePhoneCode,
   getVerifiedFirebasePhoneIdToken,
@@ -771,9 +771,9 @@ export function useSessionState(): UseSessionStateResult {
       await logoutCurrentSession({
         revoke:
           actorToRevoke?.session.mode === "production"
-            ? () => revokeProductionSession(
+            ? () => revokeProductionSessionAfterPushCleanup(
                 MOBILE_HTTP_BASE_URL,
-                actorToRevoke.session.sessionToken
+                actorToRevoke.session
               )
             : undefined,
         clear: () => clearing

@@ -50,8 +50,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   let currentAppState = "active"
   let notificationHandler
   let activeThreadId = null
-  let roomThreadId = null
-  const shownInApp = new Set()
+  const removals = []
+  const presentedClears = []
   const notifications = {
     getPermissionsAsync: async () => ({ status: permission }),
     requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
@@ -64,7 +64,9 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       return { remove: () => { responseUnsubscriptionCount += 1; listener = undefined } }
     },
     getLastNotificationResponseAsync: async () => lastResponse,
-    clearLastNotificationResponseAsync: async () => { clearCount += 1; lastResponse = null }
+    clearLastNotificationResponseAsync: async () => { clearCount += 1; lastResponse = null },
+    dismissAllNotificationsAsync: async () => { presentedClears.push("dismiss") },
+    setBadgeCountAsync: async (count) => { presentedClears.push(`badge:${count}`); return true }
   }
   const actor = {
     session: { mode: "production", userId: "user-one", sessionId: "session-one", sessionToken: "token-one" },
@@ -107,19 +109,17 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     "./notificationApi": {
       updateNotificationPreferences: async () => {},
       registerDevice: async (_base, token, input) => { registrations.push({ token, ...input }) },
-      removeDevice: async () => { throw new Error("Unexpected device removal") }
+      removeDevice: async (_base, token, pushToken) => { removals.push({ token, pushToken }) }
     },
-    "../chat/chatStore": {
-      isConversationOnScreen: (threadId) => threadId === activeThreadId || threadId === roomThreadId,
-      wasMessageShownInApp: (messageId) => shownInApp.has(messageId)
-    }
+    "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId }
   }
   const modules = new Map()
   function load(name) {
     if (Object.hasOwn(mocks, name)) return mocks[name]
     assert.ok([
       "./usePushRegistration", "./notificationTimeZoneSync",
-      "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting"
+      "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting",
+      "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry"
     ].includes(name), `Unexpected dependency: ${name}`)
     if (modules.has(name)) return modules.get(name)
     const module = { exports: {} }
@@ -181,10 +181,9 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   renderHook(actor)
   return {
     navigations, errors,
-    registrations,
+    registrations, removals, presentedClears,
+    modules,
     setActiveThread: (id) => { activeThreadId = id },
-    setRoomThread: (id) => { roomThreadId = id },
-    noteShownInApp: (id) => { shownInApp.add(id) },
     handleForegroundNotification: (data) => notificationHandler.handleNotification({ request: { content: { data } } }),
     get permissionRequests() { return permissionRequests },
     get foregroundListenerCount() { return foregroundListeners.size },
@@ -247,26 +246,6 @@ test("foreground banners are hidden only for messages in the actively viewed con
   runtime.appState("active")
   runtime.setActiveThread(null)
   assert.equal((await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-one" })).shouldShowBanner, true)
-  runtime.dispose()
-})
-
-test("a foreground chat push never repeats an in-app alert or the open MiniRoom's speech bubble", async () => {
-  // Chat pushes are now queued even for connected recipients, so a message
-  // already toasted in-app must not also drop an OS banner on top of it.
-  const runtime = createRuntime()
-  await settle()
-  runtime.noteShownInApp("message-toasted")
-  const toasted = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-toasted" })
-  assert.equal(toasted.shouldShowBanner, false)
-  assert.equal(toasted.shouldShowList, false)
-  const missed = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-missed" })
-  assert.equal(missed.shouldShowBanner, true, "a message the socket never delivered still alerts")
-  runtime.setRoomThread("thread-room")
-  const inRoom = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-room", messageId: "message-room" })
-  assert.equal(inRoom.shouldShowBanner, false)
-  runtime.appState("background")
-  const backgrounded = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-toasted" })
-  assert.equal(backgrounded.shouldShowBanner, true)
   runtime.dispose()
 })
 
@@ -450,4 +429,56 @@ test("changing the response callback keeps its subscription and retries pending 
   await settle()
   assert.equal(runtime.navigations.length, 1, "the pending response survives callback changes")
   assert.equal(runtime.navigations[0][1].threadId, "thread-one")
+})
+
+test("a room invite for the open conversation and a message the toast already showed do not banner", async () => {
+  const runtime = createRuntime()
+  await settle()
+  runtime.setActiveThread("thread-one")
+  const invite = await runtime.handleForegroundNotification({ type: "chat.room_invite", threadId: "thread-one", inviteId: "invite-one" })
+  assert.equal(invite.shouldShowBanner, false)
+  runtime.setActiveThread(null)
+  const otherInvite = await runtime.handleForegroundNotification({ type: "chat.room_invite", threadId: "thread-one", inviteId: "invite-two" })
+  assert.equal(otherInvite.shouldShowBanner, true)
+  const state = runtime.modules.get("./foregroundNotificationState")
+  assert.equal(state.claimForegroundAlert("message:toast-shown"), true, "the in-app toast claims first")
+  const toastShown = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "toast-shown" })
+  assert.equal(toastShown.shouldShowBanner, false)
+  const release = state.registerFocusedConversation("thread-room")
+  const inRoom = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-room", messageId: "room-message" })
+  assert.equal(inRoom.shouldShowBanner, false, "the shared room shows its conversation's messages itself")
+  release()
+  runtime.dispose()
+})
+
+test("logout removes this device's registration with the still-valid session and clears its notifications", async () => {
+  const runtime = createRuntime({ physicalDevice: true })
+  await settle()
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  runtime.startSession(null)
+  await settle()
+  assert.deepEqual(runtime.removals, [{ token: "token-one", pushToken: "ExponentPushToken[test]" }])
+  assert.deepEqual([...runtime.presentedClears].sort(), ["badge:0", "dismiss"])
+  const registry = runtime.modules.get("./pushDeviceRegistry")
+  await registry.removeRegisteredPushDevice("user-one", async () => { throw new Error("must not remove twice") })
+  assert.equal(runtime.removals.length, 1)
+  runtime.dispose()
+})
+
+test("a tapped push addressed to another account is ignored", async (t) => {
+  const runtime = createRuntime({ response: {
+    notification: { request: { identifier: "other-account", content: {
+      data: { type: "chat.message", threadId: "thread-one", recipientUserId: "user-two" }
+    } } }
+  } })
+  t.after(runtime.dispose)
+  await settle()
+  assert.equal(runtime.navigations.length, 0)
+  runtime.emit({ notification: { request: { identifier: "own-account", content: {
+    data: { type: "chat.message", threadId: "thread-one", recipientUserId: "user-one" }
+  } } } })
+  assert.equal(runtime.navigations.length, 1)
 })

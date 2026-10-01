@@ -276,9 +276,9 @@ export function createRealtimeRouter(
             type: "mini_room.invite_received",
             payload: invite
           })
-          await notifyOfflineUser(invite.recipientUserId, {
+          await queuePush(invite.recipientUserId, {
             title: "Blumi",
-            body: `${displayNameForPush(connection.profile.displayName)} wants to meet you`,
+            body: "Someone wants to meet you.",
             data: {
               type: "mini_room.invite",
               inviteId: invite.inviteId,
@@ -367,7 +367,7 @@ export function createRealtimeRouter(
             })
             await Promise.all(
               result.match.participantUserIds.map((userId) =>
-                notifyOfflineUser(userId, {
+                queuePush(userId, {
                   title: "Blumi",
                   body: "You have a new match! 🎉",
                   data: {
@@ -532,7 +532,7 @@ export function createRealtimeRouter(
     }
   }
 
-  async function notifyOfflineUser(
+  async function queuePush(
     userId: string,
     notification: {
       title: string
@@ -540,7 +540,9 @@ export function createRealtimeRouter(
       data?: Record<string, string>
     }
   ): Promise<void> {
-    if (connectionManager.hasUserConnections(userId)) return
+    // Queued regardless of sockets (P-03): a counted socket may belong to a
+    // phone already in the background. The phone suppresses the banner while
+    // the in-app surface is showing; the server copy never carries names.
     try {
       await notificationService.sendPushToUser(userId, notification)
     } catch {
@@ -557,9 +559,4 @@ export function readRealtimeClientMessageId(payload: unknown): string | undefine
   if (typeof payload !== "object" || payload === null) return undefined
   const value = (payload as Record<string, unknown>).clientMessageId
   return typeof value === "string" && value.length > 0 && value.length <= 128 ? value : undefined
-}
-
-function displayNameForPush(displayName: string | undefined): string {
-  const normalized = displayName?.trim()
-  return normalized || "Someone"
 }
