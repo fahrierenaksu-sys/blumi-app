@@ -596,7 +596,9 @@ test("Blumi Room keeps text chat and declares no live audio or camera permission
   assert.doesNotMatch(mediaHook, /createLivekitClient|setMicrophoneEnabled/)
   assert.doesNotMatch(mediaHook, /toggleCamera|cameraEnabled/)
   assert.match(miniRoomScreen, /useInRoomChat/)
-  assert.match(miniRoomScene, /<TextInput/)
+  // The room's text composer is its own view since 2026-10-01; the scene mounts it.
+  assert.match(miniRoomScene, /<RoomChatComposer\b/)
+  assert.match(read("src/features/miniRoom/scene/RoomChatComposer.tsx"), /<TextInput/)
 })
 
 test("privacy copy accurately describes first-release text rooms and deferred audio", () => {
