@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { useEffect, type RefObject } from "react"
 import {
   Pressable,
   Text,
@@ -7,6 +8,13 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
+import { useReducedMotion } from "../../../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import type { AuthEntryCopy } from "../authEntryCopy"
 import {
@@ -37,7 +45,9 @@ export function RegisterOtpEntry({
   onOtpFocus,
   onOtpBlur,
   onSubmit,
-  onResend
+  onResend,
+  inputRef,
+  rejectedCodeCount = 0
 }: {
   authCopy: AuthEntryCopy
   busy: boolean
@@ -55,8 +65,24 @@ export function RegisterOtpEntry({
   onOtpBlur: () => void
   onSubmit: () => void
   onResend: () => void
+  inputRef?: RefObject<TextInput | null>
+  /** Grows with every rejected code; each increase shakes the cells once. */
+  rejectedCodeCount?: number
 }) {
   const resend = resolveResendControl(resendCooldownSeconds, busy, authCopy)
+  const reduceMotion = useReducedMotion()
+  const shakeX = useSharedValue(0)
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }))
+  useEffect(() => {
+    if (rejectedCodeCount === 0 || reduceMotion) return
+    shakeX.value = withSequence(
+      withTiming(-9, { duration: 45 }),
+      withTiming(8, { duration: 70 }),
+      withTiming(-5, { duration: 60 }),
+      withTiming(3, { duration: 50 }),
+      withTiming(0, { duration: 45 })
+    )
+  }, [reduceMotion, rejectedCodeCount, shakeX])
   return (
     <View testID="register-code-step" style={containerStyle}>
       <View style={styles.sentCard}>
@@ -96,8 +122,9 @@ export function RegisterOtpEntry({
         <Text maxFontSizeMultiplier={1.5} style={styles.otpLabel}>
           {authCopy.sixDigitCode}
         </Text>
-        <View style={styles.otpInputShell}>
+        <Animated.View style={[styles.otpInputShell, shakeStyle]}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel={authCopy.sixDigitCodeAccessibilityLabel}
             value={verificationCode}
             onChangeText={onCodeChange}
@@ -135,7 +162,7 @@ export function RegisterOtpEntry({
               </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
         {showOtpError ? (
           <Text
             accessibilityRole="alert"

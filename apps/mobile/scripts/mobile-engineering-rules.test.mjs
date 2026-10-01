@@ -51,8 +51,7 @@ test("injected fetchers run only inside requestJson", () => {
 // values). Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
   "features/roomV2/editor/useRoomEditorStageLayout.ts",
-  "features/session/OnboardingBrandPrelude.tsx",
-  "features/session/register/useRegisterFlowController.ts"
+  "features/session/OnboardingBrandPrelude.tsx"
 ])
 
 test("no new requestAnimationFrame or setInterval loops in production code", () => {

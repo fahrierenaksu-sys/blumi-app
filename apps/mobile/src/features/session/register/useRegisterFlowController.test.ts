@@ -103,13 +103,23 @@ type FirebaseStub = {
   unsubscribed: number
 }
 
-function loadController(runtime: ReturnType<typeof createHookRuntime>, firebase: FirebaseStub) {
+function loadController(
+  runtime: ReturnType<typeof createHookRuntime>,
+  firebase: FirebaseStub,
+  haptics: string[]
+) {
   const loader = Module as unknown as {
     _load: (request: string, parent: unknown, isMain: boolean) => unknown
   }
   const originalLoad = loader._load
   loader._load = function load(request, parent, isMain) {
     if (request === "react") return runtime.react
+    if (request === "../../../ui/haptics") {
+      return {
+        hapticSuccess: () => { haptics.push("success") },
+        hapticError: () => { haptics.push("error") }
+      }
+    }
     if (request === "../firebasePhoneAuth") {
       return {
         getFirebaseCurrentPhoneNumber: () => firebase.currentPhoneNumber,
@@ -147,7 +157,8 @@ function mountController(
     listener: null,
     unsubscribed: 0
   }
-  const useRegisterFlowController = loadController(runtime, firebase)
+  const haptics: string[] = []
+  const useRegisterFlowController = loadController(runtime, firebase, haptics)
   const events: string[] = []
   const codeRequests: { phoneNumber: string }[] = []
   const registrations: RegisterAccountInput[] = []
@@ -156,6 +167,7 @@ function mountController(
     request: { resolve: () => void; reject: (error: Error) => void } | null
   } = { request: null }
   let requestOutcome: "resolve" | "reject" | "defer" = "resolve"
+  let registerOutcome: "resolve" | "reject" = "resolve"
   const focusCalls: number[] = []
   const input: RegisterFlowControllerInput = {
     authIntent: "create",
@@ -176,6 +188,7 @@ function mountController(
     onRegister: async (registration) => {
       events.push("register")
       registrations.push(registration)
+      if (registerOutcome === "reject") throw new Error("invalid code")
     },
     onClearError: () => { events.push("clear-error") },
     onCreateFlowStageChange: (stage) => { stageChanges.push(stage) },
@@ -185,6 +198,10 @@ function mountController(
   controller.phoneInputRef.current = {
     focus: () => { focusCalls.push(1) }
   } as unknown as NonNullable<typeof controller.phoneInputRef.current>
+  const otpFocusCalls: number[] = []
+  controller.otpInputRef.current = {
+    focus: () => { otpFocusCalls.push(1) }
+  } as unknown as NonNullable<typeof controller.otpInputRef.current>
 
   const rerender = (next: Partial<RegisterFlowControllerInput> = {}) => {
     Object.assign(input, next)
@@ -210,18 +227,17 @@ function mountController(
     registrations,
     stageChanges,
     focusCalls,
+    otpFocusCalls,
+    haptics,
     firebase,
     pending,
-    setRequestOutcome(outcome: "resolve" | "reject" | "defer") { requestOutcome = outcome }
+    setRequestOutcome(outcome: "resolve" | "reject" | "defer") { requestOutcome = outcome },
+    setRegisterOutcome(outcome: "resolve" | "reject") { registerOutcome = outcome }
   }
 }
 
 test.beforeEach(() => {
   mock.timers.enable({ apis: ["setTimeout"] })
-  globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
-    setImmediate(() => callback(0))
-    return 0
-  }) as typeof requestAnimationFrame
 })
 
 test.afterEach(() => {
@@ -359,13 +375,13 @@ test("verification waits for a complete code and submits the create registration
   assert.equal(harness.registrations.length, 0)
   assert.equal(harness.controller.showOtpError, true)
 
+  harness.events.length = 0
   await harness.act((controller) => controller.handleCodeChange("123456"))
   assert.equal(harness.controller.showOtpError, false)
-  assert.equal(harness.controller.primaryDisabled, false)
-  harness.events.length = 0
-  await harness.act((controller) => controller.runPrimaryAction())
 
+  // The sixth digit verifies the code without another tap (ONB-12).
   assert.deepEqual(harness.events, ["clear-error", "register"])
+  assert.deepEqual(harness.haptics, ["success"])
   assert.deepEqual(harness.registrations, [{
     phoneNumber: VALID_TR_E164,
     verificationCode: "123456",
@@ -487,7 +503,6 @@ test("sign-in needs no legal acceptance, reports no create-flow stage, and submi
   await harness.act((controller) => controller.runPrimaryAction())
   assert.equal(harness.controller.progressCurrent, 2)
   await harness.act((controller) => controller.handleCodeChange("654321"))
-  await harness.act((controller) => controller.runPrimaryAction())
 
   assert.deepEqual(harness.stageChanges, [])
   assert.deepEqual(harness.registrations, [{
@@ -502,4 +517,41 @@ test("an external submit keeps the primary action busy", () => {
   const harness = mountController({ authIntent: "sign-in", isSubmitting: true })
   assert.equal(harness.controller.busy, true)
   assert.equal(harness.controller.primaryDisabled, true)
+})
+
+test("the code request waits for the OTP step to commit, then the code field takes focus", async () => {
+  const harness = mountController()
+  await enterValidPhone(harness)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  harness.events.length = 0
+  harness.controller.runPrimaryAction()
+  await new Promise((resolveTurn) => setImmediate(resolveTurn))
+  assert.deepEqual(harness.events, ["clear-error"], "no provider request before the OTP step renders")
+  assert.equal(harness.otpFocusCalls.length, 0)
+  await harness.act(() => undefined)
+  assert.deepEqual(harness.events, ["clear-error", "request-code"])
+  assert.equal(harness.otpFocusCalls.length, 1)
+})
+
+test("a rejected code buzzes, clears the cells, refocuses and is not resubmitted by itself", async () => {
+  const harness = mountController()
+  await enterValidPhone(harness)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  await harness.act((controller) => controller.runPrimaryAction())
+  const focusBefore = harness.otpFocusCalls.length
+  harness.setRegisterOutcome("reject")
+
+  await harness.act((controller) => controller.handleCodeChange("111111"))
+  assert.equal(harness.registrations.length, 1)
+  assert.deepEqual(harness.haptics, ["error"])
+  assert.equal(harness.controller.flow.verificationCode, "")
+  assert.equal(harness.controller.otpErrorCount, 1)
+  assert.equal(harness.controller.showOtpError, false, "the session error speaks, not the empty-code hint")
+  assert.equal(harness.otpFocusCalls.length, focusBefore + 1)
+
+  // Retyping the same code is a deliberate attempt and verifies again once.
+  await harness.act((controller) => controller.handleCodeChange("111111"))
+  assert.equal(harness.registrations.length, 1, "the identical failed code is not auto-resubmitted")
+  await harness.act((controller) => controller.handleCodeChange("111112"))
+  assert.equal(harness.registrations.length, 2)
 })

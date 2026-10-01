@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { TextInput } from "react-native"
+import { hapticError, hapticSuccess } from "../../../ui/haptics"
 import { LEGAL_DOCUMENT_VERSION } from "../../legal/legalPolicyMetadata"
 import type { AccountRecoveryLocale } from "../accountRecoveryCopy"
 import type { AuthEntryCopy } from "../authEntryCopy"
@@ -32,6 +33,7 @@ import {
   resolveRegisterFieldErrors,
   resolveRegisterPrimaryAction,
   resolveRegisterProgress,
+  shouldAutoSubmitRegisterCode,
   shouldRunResendCooldown,
   tickResendCooldown,
   type RegisterAuthIntent,
@@ -83,6 +85,12 @@ export function useRegisterFlowController({
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0)
   const actionInFlightRef = useRef(false)
   const phoneInputRef = useRef<TextInput | null>(null)
+  const otpInputRef = useRef<TextInput | null>(null)
+  const lastAutoSubmittedCodeRef = useRef<string | null>(null)
+  const codeStepCommitWaitersRef = useRef<(() => void)[]>([])
+  const otpFocusPendingRef = useRef(false)
+  // Bumped on every rejected code so the code cells can shake once.
+  const [otpErrorCount, setOtpErrorCount] = useState(0)
   const busy = isSubmitting || localBusy
   const phoneAnalysis = useMemo(
     () => analyzeFormattedLocalPhoneNumber(flow.phoneNumber, flow.selectedCountry),
@@ -140,6 +148,27 @@ export function useRegisterFlowController({
     }, 1000)
     return () => clearTimeout(timer)
   }, [isCodeStep, resendCooldownSeconds])
+
+  // The OTP step has committed: release a pending code request and put the
+  // caret in the code field so the SMS code can be typed or autofilled at once.
+  useEffect(() => {
+    otpFocusPendingRef.current = isCodeStep
+    if (!isCodeStep) return
+    for (const resolve of codeStepCommitWaitersRef.current.splice(0)) resolve()
+  }, [isCodeStep])
+
+  // The code field is read-only while busy, so focus lands once it is not.
+  useEffect(() => {
+    if (!isCodeStep || busy || !otpFocusPendingRef.current) return
+    otpFocusPendingRef.current = false
+    otpInputRef.current?.focus()
+  }, [busy, isCodeStep, otpErrorCount])
+
+  const waitForCodeStepCommit = (): Promise<void> => new Promise((resolve) => {
+    codeStepCommitWaitersRef.current.push(resolve)
+    // Never hold the request if the step could not advance (phone edited).
+    setTimeout(resolve, 250)
+  })
 
   useLayoutEffect(() => {
     if (authIntent === "create") {
@@ -206,14 +235,15 @@ export function useRegisterFlowController({
             ? advanceRegisterFlowToCode(current)
             : current
         )
-        // Let the OTP screen render before the native verification request can open UI.
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        // Let the OTP step commit before the native verification request can open UI.
+        await waitForCodeStepCommit()
       }
       await onRequestVerificationCode({
         phoneNumber: availability.normalizedPhoneNumber
       })
       const success = resolveCodeRequestSuccess(isCodeStep, authCopy)
       setCodeRequestStatus(success.codeRequestStatus)
+      lastAutoSubmittedCodeRef.current = null
       setAttemptedPrimaryAction(false)
       setOtpTouched(false)
       setResendCooldownSeconds(RESEND_COOLDOWN_SECONDS)
@@ -251,13 +281,36 @@ export function useRegisterFlowController({
           locale
         }
       })
+      hapticSuccess()
     } catch {
-      // Session state owns the user-facing verification error.
+      // Session state owns the user-facing verification error; the field
+      // clears, shakes and takes focus again for the next attempt.
+      hapticError()
+      setFlow((current) => updateRegisterCode(current, ""))
+      setAttemptedPrimaryAction(false)
+      setOtpErrorCount((count) => count + 1)
+      otpFocusPendingRef.current = true
     } finally {
       actionInFlightRef.current = false
       setLocalBusy(false)
     }
   }
+
+  const verifyCodeRef = useRef(verifyCode)
+  verifyCodeRef.current = verifyCode
+  const autoSubmitCode = shouldAutoSubmitRegisterCode({
+    isCodeStep,
+    verificationCode: flow.verificationCode,
+    lastAutoSubmittedCode: lastAutoSubmittedCodeRef.current,
+    canVerify: availability.canVerify,
+    actionInFlight: actionInFlightRef.current,
+    codeRequestStatus
+  })
+  useEffect(() => {
+    if (!autoSubmitCode) return
+    lastAutoSubmittedCodeRef.current = flow.verificationCode
+    void verifyCodeRef.current()
+  }, [autoSubmitCode, flow.verificationCode])
 
   const runPrimaryAction = (): void => {
     if (isCodeStep) {
@@ -323,6 +376,8 @@ export function useRegisterFlowController({
     showPhoneError,
     showOtpError,
     phoneInputRef,
+    otpInputRef,
+    otpErrorCount,
     returnToPhoneStep,
     runPrimaryAction,
     resendCode,

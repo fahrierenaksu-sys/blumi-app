@@ -251,6 +251,8 @@ export function RegisterSignInView({
                   onOtpBlur={register.handleOtpBlur}
                   onSubmit={register.runPrimaryAction}
                   onResend={register.resendCode}
+                  inputRef={register.otpInputRef}
+                  rejectedCodeCount={register.otpErrorCount}
                 />
               ) : (
                 <RegisterPhoneEntry
