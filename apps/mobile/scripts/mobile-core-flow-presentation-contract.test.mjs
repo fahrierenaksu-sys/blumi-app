@@ -360,6 +360,22 @@ test("MiniRoom uses durable speech bubbles without the legacy reaction UI", () =
   assert.match(scene, /onDismissBubble/)
 })
 
+test("leaving the MiniRoom always asks first, from the arrow, the menu or Android back (ROOM-08)", () => {
+  const screen = read("src/screens/MiniRoomScreen.tsx")
+  const guard = read("src/features/miniRoom/useMiniRoomLeaveGuard.ts")
+
+  // The HUD arrow and menu both call onLeave; it now opens the confirmation.
+  assert.match(screen, /useMiniRoomLeaveGuard\(\{/)
+  assert.match(screen, /onLeave=\{confirmLeave\}/)
+  assert.doesNotMatch(screen, /onLeave=\{requestEndMiniRoom\}/)
+  // Any other removal (Android back, a gesture, a reset) is guarded the same
+  // way until the room has ended; native-stack honours only usePreventRemove.
+  assert.match(guard, /usePreventRemove\(/)
+  assert.match(guard, /resolveMiniRoomRemoval\(\{ exited: exitedRef\.current \}\) === "allow"/)
+  assert.match(guard, /navigation\.dispatch\(data\.action\)/)
+  assert.match(guard, /Alert\.alert\(/)
+})
+
 test("the MiniRoom composer keeps refused text and restores a failed message for retry", () => {
   const screen = read("src/screens/MiniRoomScreen.tsx")
   const scene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
