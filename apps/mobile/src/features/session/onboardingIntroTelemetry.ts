@@ -67,6 +67,18 @@ export function recordOnboardingFrameSample(
   telemetry.lastFrameAtMs = nowMs
 }
 
+/** Adds frame gaps measured elsewhere (the UI-thread sampler), same bounds. */
+export function recordOnboardingFrameGaps(
+  telemetry: IntroTelemetryState,
+  gapsMs: readonly number[]
+): void {
+  for (const gap of gapsMs) {
+    if (Number.isFinite(gap) && gap > 0 && gap < 1_000) {
+      telemetry.frameGapsMs.push(gap)
+    }
+  }
+}
+
 export function getOnboardingIntroPerformanceEvent(
   telemetry: IntroTelemetryState,
   input: {

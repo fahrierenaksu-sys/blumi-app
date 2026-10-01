@@ -14,6 +14,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSpring,
   withTiming
 } from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
@@ -32,8 +33,18 @@ export interface AvatarStudioCategoryDescriptor {
   selectedIndex: number
 }
 
+/** Localized studio strings (the onboarding setup copy supplies them). */
+export interface AvatarStudioCopy {
+  accessibilityLabel: string
+  woman: string
+  man: string
+  chooseCategoryHint: (category: string) => string
+  cycleLabel: (category: string, previous: boolean) => string
+}
+
 interface AvatarSetupStudioStageProps {
   avatar: UserAvatar
+  copy: AvatarStudioCopy
   catalog: AvatarCatalogItem[]
   categories: AvatarStudioCategoryDescriptor[]
   compact: boolean
@@ -50,6 +61,8 @@ interface AvatarSetupStudioStageProps {
 }
 
 const MOTION_MS = 220
+const SELECTION_MIN_OPACITY = 0.85
+const SELECTION_HOP_FROM_SCALE = 0.97
 const POD_ARROW_VISUAL_SIZE = 26
 const POD_ARROW_HIT_SLOP = 9
 
@@ -66,6 +79,7 @@ export function AvatarSetupStudioStage({
   avatar,
   catalog,
   categories,
+  copy,
   compact,
   disabled,
   isMale,
@@ -88,12 +102,14 @@ export function AvatarSetupStudioStage({
     veryCompact
   )
   const selectionProgress = useSharedValue(1)
+  const selectionHop = useSharedValue(1)
   const ambientPulse = useSharedValue(0)
   const previousSelectionKeyRef = useRef(selectionKey)
 
   useLayoutEffect(() => {
     if (reduceMotion || !motionActive) {
       selectionProgress.value = 1
+      selectionHop.value = 1
       previousSelectionKeyRef.current = selectionKey
       return
     }
@@ -102,9 +118,13 @@ export function AvatarSetupStudioStage({
       return
     }
     previousSelectionKeyRef.current = selectionKey
+    // The character never disappears while a layer changes (ONB-10): it dips
+    // to 85 % and does a small, springy hop instead of blinking out.
     selectionProgress.value = 0
     selectionProgress.value = withTiming(1, { duration: MOTION_MS })
-  }, [motionActive, reduceMotion, selectionKey, selectionProgress])
+    selectionHop.value = SELECTION_HOP_FROM_SCALE
+    selectionHop.value = withSpring(1, { dampingRatio: 0.6, duration: 420 })
+  }, [motionActive, reduceMotion, selectionHop, selectionKey, selectionProgress])
 
   useEffect(() => {
     ambientPulse.value = 0
@@ -128,11 +148,8 @@ export function AvatarSetupStudioStage({
   }, [ambientPulse, motionActive, reduceMotion])
 
   const avatarArrivalStyle = useAnimatedStyle(() => ({
-    opacity: selectionProgress.value,
-    transform: [
-      { translateY: interpolate(selectionProgress.value, [0, 1], [10, 0]) },
-      { scale: interpolate(selectionProgress.value, [0, 1], [0.982, 1]) }
-    ]
+    opacity: interpolate(selectionProgress.value, [0, 1], [SELECTION_MIN_OPACITY, 1]),
+    transform: [{ scale: selectionHop.value }]
   }))
   const backdropVeilStyle = useAnimatedStyle(() => ({
     opacity: interpolate(ambientPulse.value, [0, 1], [0.56, 0.74])
@@ -156,7 +173,7 @@ export function AvatarSetupStudioStage({
 
   return (
     <View
-      accessibilityLabel="Karakter görünüm stüdyosu"
+      accessibilityLabel={copy.accessibilityLabel}
       onLayout={onStageLayout}
       style={[styles.root, { height: metrics.stageHeight }]}
       testID="avatar-setup-studio-stage"
@@ -199,7 +216,7 @@ export function AvatarSetupStudioStage({
           active={!isMale}
           disabled={disabled}
           icon="woman-outline"
-          label="Kadın"
+          label={copy.woman}
           onPress={() => onSelectGender("woman")}
           testID="avatar-gender-woman"
         />
@@ -207,7 +224,7 @@ export function AvatarSetupStudioStage({
           active={isMale}
           disabled={disabled}
           icon="man-outline"
-          label="Erkek"
+          label={copy.man}
           onPress={() => onSelectGender("man")}
           testID="avatar-gender-man"
         />
@@ -236,6 +253,7 @@ export function AvatarSetupStudioStage({
         <OrbitPod
           active={category.type === selectedType}
           category={category}
+          copy={copy}
           disabled={disabled}
           key={`zone-${category.type}`}
           onCycle={onCycle}
@@ -277,7 +295,7 @@ function GenderButton({
         name={icon}
         size={21}
       />
-      <Text style={[styles.genderButtonText, active ? styles.genderButtonTextActive : null]}>
+      <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.genderButtonText, active ? styles.genderButtonTextActive : null]}>
         {label}
       </Text>
     </Pressable>
@@ -287,6 +305,7 @@ function GenderButton({
 function OrbitPod({
   active,
   category,
+  copy,
   disabled,
   onCycle,
   onSelect,
@@ -295,6 +314,7 @@ function OrbitPod({
 }: {
   active: boolean
   category: AvatarStudioCategoryDescriptor
+  copy: AvatarStudioCopy
   disabled: boolean
   onCycle: (category: AvatarStudioCategory, direction: -1 | 1) => void
   onSelect: (category: AvatarStudioCategory) => void
@@ -314,6 +334,7 @@ function OrbitPod({
       <PodArrow
         active={active}
         categoryLabel={category.label}
+        copy={copy}
         direction={-1}
         disabled={disabled}
         onPress={() => {
@@ -323,7 +344,7 @@ function OrbitPod({
         testID={`avatar-style-previous-${category.type}`}
       />
       <Pressable
-        accessibilityHint={`${category.label} görünümünü seç`}
+        accessibilityHint={copy.chooseCategoryHint(category.label)}
         accessibilityRole="tab"
         accessibilityState={{ disabled, selected: active }}
         disabled={disabled}
@@ -338,13 +359,14 @@ function OrbitPod({
             size={14}
           />
         </View>
-        <Text numberOfLines={1} style={[styles.podText, active ? styles.podTextActive : null]}>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.podText, active ? styles.podTextActive : null]}>
           {category.label}
         </Text>
       </Pressable>
       <PodArrow
         active={active}
         categoryLabel={category.label}
+        copy={copy}
         direction={1}
         disabled={disabled}
         onPress={() => {
@@ -360,6 +382,7 @@ function OrbitPod({
 function PodArrow({
   active,
   categoryLabel,
+  copy,
   direction,
   disabled,
   onPress,
@@ -367,6 +390,7 @@ function PodArrow({
 }: {
   active: boolean
   categoryLabel: string
+  copy: AvatarStudioCopy
   direction: -1 | 1
   disabled: boolean
   onPress: () => void
@@ -376,7 +400,7 @@ function PodArrow({
 
   return (
     <Pressable
-      accessibilityLabel={`${categoryLabel} için ${previous ? "önceki" : "sonraki"} görünüm`}
+      accessibilityLabel={copy.cycleLabel(categoryLabel, previous)}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}

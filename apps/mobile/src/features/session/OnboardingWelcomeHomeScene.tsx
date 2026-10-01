@@ -6,6 +6,7 @@ import {
   ONBOARDING_WELCOME_HOME_TIMELINE_MS as timeline,
   getOnboardingWelcomeHomeProgressAtElapsed
 } from "./onboardingWelcomeHomeModel"
+import { getCurrentSetupFlowCopy } from "./setupFlow/setupFlowLocale"
 
 const WELCOME_COTTAGE = require("./assets/onboarding-welcome-home-v1-runtime/blumi_welcome_cottage_v1.png")
 
@@ -126,7 +127,7 @@ export function OnboardingWelcomeHomeScene({
 
   return (
     <View
-      accessibilityLabel="Sıcak Blumi evinin önünde canlı karakterler"
+      accessibilityLabel={getCurrentSetupFlowCopy().welcomeHomeAccessibilityLabel}
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       style={[styles.root, compact ? styles.rootCompact : null]}

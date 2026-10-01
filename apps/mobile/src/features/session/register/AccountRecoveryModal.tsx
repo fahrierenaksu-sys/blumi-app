@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import {
   KeyboardAvoidingView,
   Modal,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View
 } from "react-native"
+import { hapticError } from "../../../ui/haptics"
 import type { AccountRecoveryCopy } from "../accountRecoveryCopy"
 import {
   resolveRecoveryPrimaryControl,
@@ -49,6 +51,10 @@ export function AccountRecoveryModal({
     recoveryCode,
     recoveryCopy
   })
+  // A rejected step answers physically, not only in red text (ONB-18).
+  useEffect(() => {
+    if (recoveryError) hapticError()
+  }, [recoveryError])
   return (
     <Modal visible={recoveryVisible} transparent animationType="fade" onRequestClose={closeRecovery}>
       <View style={styles.recoveryBackdrop}>
@@ -70,13 +76,13 @@ export function AccountRecoveryModal({
                   : recoveryCopy.codeBody}
               </Text>
               {recoveryStage === "details" ? <>
-                <TextInput accessibilityLabel={recoveryCopy.oldPhoneLabel} autoComplete="tel" keyboardType="phone-pad" placeholder={recoveryCopy.oldPhonePlaceholder} value={recoveryOldPhone} onChangeText={setRecoveryOldPhone} style={styles.recoveryInput} />
+                <TextInput accessibilityLabel={recoveryCopy.oldPhoneLabel} autoComplete="tel" autoFocus keyboardType="phone-pad" placeholder={recoveryCopy.oldPhonePlaceholder} value={recoveryOldPhone} onChangeText={setRecoveryOldPhone} style={styles.recoveryInput} />
                 <TextInput accessibilityLabel={recoveryCopy.newPhoneLabel} autoComplete="tel" keyboardType="phone-pad" placeholder={recoveryCopy.newPhonePlaceholder} value={recoveryNewPhone} onChangeText={setRecoveryNewPhone} style={styles.recoveryInput} />
-              </> : <TextInput accessibilityLabel={recoveryCopy.codeLabel} autoComplete="one-time-code" keyboardType="number-pad" maxLength={6} placeholder={recoveryCopy.codePlaceholder} value={recoveryCode} onChangeText={(value) => setRecoveryCode(sanitizeRecoveryCode(value))} style={styles.recoveryInput} />}
+              </> : <TextInput accessibilityLabel={recoveryCopy.codeLabel} autoComplete="one-time-code" autoFocus textContentType="oneTimeCode" keyboardType="number-pad" maxLength={6} placeholder={recoveryCopy.codePlaceholder} value={recoveryCode} onChangeText={(value) => setRecoveryCode(sanitizeRecoveryCode(value))} style={styles.recoveryInput} />}
               {recoveryError ? <Text accessibilityRole="alert" style={styles.recoveryError}>{recoveryError}</Text> : null}
               <View style={[styles.recoveryActions, stackRecoveryActions ? styles.recoveryActionsStacked : null]}>
-                <Pressable accessibilityRole="button" accessibilityLabel={recoveryCopy.cancel} disabled={recoveryBusy} onPress={closeRecovery} style={[styles.recoverySecondary, stackRecoveryActions ? styles.recoveryActionStacked : null]}><Text style={styles.recoverySecondaryText}>{recoveryCopy.cancel}</Text></Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel={recoveryPrimary.label} disabled={recoveryPrimary.disabled} onPress={() => void (recoveryStage === "details" ? requestRecoveryCode() : submitRecovery())} style={[styles.recoveryPrimary, stackRecoveryActions ? styles.recoveryActionStacked : null]}><Text style={styles.recoveryPrimaryText}>{recoveryPrimary.label}</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={recoveryCopy.cancel} disabled={recoveryBusy} onPress={closeRecovery} style={({ pressed }) => [styles.recoverySecondary, stackRecoveryActions ? styles.recoveryActionStacked : null, pressed ? styles.controlPressed : null]}><Text style={styles.recoverySecondaryText}>{recoveryCopy.cancel}</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={recoveryPrimary.label} disabled={recoveryPrimary.disabled} onPress={() => void (recoveryStage === "details" ? requestRecoveryCode() : submitRecovery())} style={({ pressed }) => [styles.recoveryPrimary, stackRecoveryActions ? styles.recoveryActionStacked : null, pressed && !recoveryPrimary.disabled ? styles.controlPressed : null]}><Text style={styles.recoveryPrimaryText}>{recoveryPrimary.label}</Text></Pressable>
               </View>
             </View>
           </ScrollView>

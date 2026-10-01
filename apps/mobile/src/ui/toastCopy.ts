@@ -1,7 +1,8 @@
+import { readUiLocaleTag } from "./uiLocale"
+
 /**
- * Toast accessibility copy. The shared UI layer cannot import the session
- * locale resolver (`features/session`), so the toast resolves its language
- * from the JavaScript runtime locale, which follows the device language.
+ * Toast accessibility copy, in the app language registered at the app root
+ * (ui/uiLocale), falling back to the runtime locale.
  */
 
 export type ToastLocale = "tr" | "en"
@@ -16,18 +17,10 @@ const TOAST_COPY: Readonly<Record<ToastLocale, ToastCopy>> = {
   en: { dismissLabel: (title) => `Dismiss notification: ${title}`, openLabel: (title) => `Open: ${title}` }
 }
 
-export function resolveToastLocale(locale: string | undefined = readIntlLocale()): ToastLocale {
+export function resolveToastLocale(locale: string | undefined = readUiLocaleTag()): ToastLocale {
   return (locale ?? "en").toLowerCase().startsWith("tr") ? "tr" : "en"
 }
 
 export function getToastCopy(locale: ToastLocale): ToastCopy {
   return TOAST_COPY[locale]
-}
-
-function readIntlLocale(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().locale
-  } catch {
-    return undefined
-  }
 }

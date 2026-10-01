@@ -9,10 +9,10 @@ import {
   type TextStyle,
   type ViewStyle
 } from "react-native"
+import { getGlassSurfaceColors, type GlassTone } from "./glassSurfaceModel"
 import { LinearGradient } from "./linearGradient"
+import { useReduceTransparency } from "./reduceTransparency"
 import { uiTheme } from "./theme"
-
-type GlassTone = "light" | "dark" | "accent"
 
 interface GlassSurfaceProps {
   children: ReactNode
@@ -33,9 +33,11 @@ interface GlassActionProps {
 
 export function GlassSurface(props: GlassSurfaceProps) {
   const { children, tone = "light", style } = props
+  // Under Reduce Transparency every glass surface is a solid card (SYS-7).
+  const reduceTransparency = useReduceTransparency()
   return (
-    <View style={[styles.surface, getToneStyle(tone), style]}>
-      <View pointerEvents="none" style={styles.edgeHighlight} />
+    <View style={[styles.surface, getGlassSurfaceColors(tone, reduceTransparency), style]}>
+      {reduceTransparency ? null : <View pointerEvents="none" style={styles.edgeHighlight} />}
       {children}
     </View>
   )
@@ -108,6 +110,7 @@ export function GlassCTA(props: GlassActionProps) {
     textStyle
   } = props
   const isPrimary = variant === "primary"
+  const reduceTransparency = useReduceTransparency()
   return (
     <Pressable
       accessibilityRole="button"
@@ -117,6 +120,7 @@ export function GlassCTA(props: GlassActionProps) {
       style={({ pressed }) => [
         styles.cta,
         isPrimary ? styles.primaryCta : styles.secondaryCta,
+        !isPrimary && reduceTransparency ? styles.secondaryCtaOpaque : null,
         pressed && !disabled ? styles.ctaPressed : null,
         disabled ? styles.ctaDisabled : null,
         style
@@ -153,30 +157,12 @@ export function GlassCTA(props: GlassActionProps) {
   )
 }
 
-function getToneStyle(tone: GlassTone): ViewStyle {
-  if (tone === "dark") return styles.surfaceDark
-  if (tone === "accent") return styles.surfaceAccent
-  return styles.surfaceLight
-}
-
 const styles = StyleSheet.create({
   surface: {
     overflow: "hidden",
     borderWidth: 1,
     position: "relative",
     ...uiTheme.shadow.float
-  },
-  surfaceLight: {
-    backgroundColor: "rgba(255, 255, 255, 0.76)",
-    borderColor: "rgba(255, 255, 255, 0.68)"
-  },
-  surfaceDark: {
-    backgroundColor: "rgba(32, 22, 42, 0.72)",
-    borderColor: "rgba(255, 255, 255, 0.18)"
-  },
-  surfaceAccent: {
-    backgroundColor: "rgba(255, 226, 238, 0.76)",
-    borderColor: "rgba(255, 255, 255, 0.72)"
   },
   edgeHighlight: {
     position: "absolute",
@@ -242,6 +228,9 @@ const styles = StyleSheet.create({
   secondaryCta: {
     backgroundColor: "rgba(255, 255, 255, 0.78)",
     borderColor: uiTheme.colors.borderStrong
+  },
+  secondaryCtaOpaque: {
+    backgroundColor: "#FFFFFF"
   },
   ctaPressed: {
     transform: [{ scale: 0.98 }],

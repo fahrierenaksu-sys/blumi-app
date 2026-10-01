@@ -59,8 +59,10 @@ test("avatar onboarding has one progress surface and keeps identity editing sepa
 
 test("character setup and Discover share Blumi's avatar-first low-pressure promise", () => {
   const avatar = read("src/screens/AvatarSetupScreen.tsx")
+  const setupCopy = read("src/features/session/setupFlow/setupFlowCopy.ts")
   const discoveryCopy = read("src/features/discovery/discoverySurfaceCopy.ts")
-  assert.match(avatar, /Bu sadece başlangıç\. Tarzını sonra da değiştirebilirsin\./)
+  assert.match(avatar, /copy\.avatar\.description/)
+  assert.match(setupCopy, /Bu sadece başlangıç\. Tarzını sonra da değiştirebilirsin\./)
   assert.match(discoveryCopy, /loadingTitle: "Finding people who match your vibe…"/)
 })
 

@@ -146,7 +146,8 @@ test("room onboarding uses one pictured quest surface that places on tap and dra
   )
 
   assert.match(source, /starterBed\.asset\.source/)
-  assert.match(source, /PanResponder\.create/)
+  // The card drags through a Gesture Handler pan on the UI thread (ROOMSETUP-1).
+  assert.match(source, /<GestureDetector gesture=\{bedDrag\.cardGesture\}>/)
   assert.match(source, /placeBedAtPoint\(STARTER_ROOM_BED_DEFAULT_POINT\)/)
   assert.match(source, /starterItemLiquidFrame/)
   // Room setup text lives in roomSetupCopy.ts (Turkish and English).

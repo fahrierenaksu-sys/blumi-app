@@ -129,6 +129,29 @@ export function getPreviousPreAuthSetupStep(
   return previousPreAuthSetupSteps[step]
 }
 
+/** Idle time on a step before its successor is mounted off-screen. */
+export const PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS = 600
+
+const nextPreAuthSetupSteps: Readonly<
+  Record<PreAuthSetupStep, PreAuthOnboardingResumeStep | null>
+> = Object.freeze({
+  profile: "avatar",
+  avatar: "room",
+  room: "phone",
+  phone: null,
+  otp: null
+})
+
+/**
+ * The step to mount (hidden) while the user is on `step`, so its images
+ * decode and its tree mounts before the transition instead of during it.
+ */
+export function getPreAuthSetupStepToPrepare(
+  step: PreAuthSetupStep
+): PreAuthOnboardingResumeStep | null {
+  return nextPreAuthSetupSteps[step]
+}
+
 export function normalizePreAuthResumeStep(
   step: PreAuthSetupStep
 ): PreAuthOnboardingResumeStep {

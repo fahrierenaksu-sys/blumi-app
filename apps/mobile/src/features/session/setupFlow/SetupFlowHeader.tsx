@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
+import { getCurrentSetupFlowCopy } from "./setupFlowLocale"
 
 interface SetupFlowHeaderProps {
   current: 1 | 2 | 3 | 4
@@ -17,11 +18,12 @@ export function SetupFlowHeader({
   title = "Blumi",
   progressStyle = "fraction"
 }: SetupFlowHeaderProps) {
+  const copy = getCurrentSetupFlowCopy()
   return (
     <View style={styles.root} testID="setup-flow-header">
       <View style={styles.sideSlot}>
         <Pressable
-          accessibilityLabel="Geri"
+          accessibilityLabel={copy.back}
           accessibilityRole="button"
           accessibilityState={{ disabled: backDisabled }}
           disabled={backDisabled}
@@ -41,14 +43,14 @@ export function SetupFlowHeader({
           />
         </Pressable>
       </View>
-      <Text accessibilityLabel={title} style={styles.brand}>
+      <Text accessibilityLabel={title} maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.brand}>
         {title}
       </Text>
       <View style={[styles.sideSlot, styles.rightSlot]}>
         {progressStyle === "dots" ? (
           <View
             accessible
-            accessibilityLabel={`Kurulum adımı ${current} / 4`}
+            accessibilityLabel={copy.stepProgress(current, 4)}
             style={styles.dots}
           >
             {[1, 2, 3, 4].map((step) => (
@@ -60,7 +62,8 @@ export function SetupFlowHeader({
           </View>
         ) : (
           <Text
-            accessibilityLabel={`Kurulum adımı ${current} / 4`}
+            maxFontSizeMultiplier={1.2}
+            accessibilityLabel={copy.stepProgress(current, 4)}
             style={styles.step}
           >
             {current} / 4

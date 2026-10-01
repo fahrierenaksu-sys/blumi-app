@@ -8,27 +8,27 @@ import {
   type MutableRefObject,
   type ReactNode
 } from "react"
-import { Pressable, StyleSheet } from "react-native"
+import { Pressable, StyleSheet, View } from "react-native"
 import type { LayoutChangeEvent, ScrollViewProps, StyleProp, ViewStyle } from "react-native"
 import { Gesture, GestureDetector, State, type GestureType } from "react-native-gesture-handler"
 import Reanimated, {
   cancelAnimation,
-  Easing,
   ReduceMotion,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { useReducedMotion } from "./animations"
 import {
-  SHEET_DISMISS,
+  SHEET_ENTER_SPRING,
+  SHEET_EXIT_SPRING,
   SHEET_RETURN_SPRING,
   getSheetBackdropOpacity,
   getSheetExitOffset,
+  getSheetExitVelocity,
   resolveSheetDismissClaim,
   resolveSheetDismissRelease,
   resolveSheetDragOffset
@@ -41,6 +41,16 @@ interface SheetScrollOwnership {
 }
 
 const SheetScrollContext = createContext<SheetScrollOwnership | null>(null)
+const SheetCloseContext = createContext<(() => void) | null>(null)
+
+/**
+ * Inside a SwipeDismissSheet: closes it with the same exit as a swipe (the
+ * sheet leaves with its backdrop, then `onDismiss` runs). Use it for a
+ * visible close button so every way out moves alike (SYS-4). Null outside.
+ */
+export function useSwipeDismissSheetClose(): (() => void) | null {
+  return useContext(SheetCloseContext)
+}
 
 /** The dimming layer behind the sheet, drawn and faded by the sheet itself. */
 export interface SwipeDismissSheetBackdrop {
@@ -65,6 +75,15 @@ export interface SwipeDismissSheetProps {
   style?: StyleProp<ViewStyle>
   accessibilityViewIsModal?: boolean
   testID?: string
+  /**
+   * "self": the sheet rises from below with a spring and its backdrop fades
+   * in with it; pair it with `<Modal animationType="none">` so the backdrop
+   * never slides up like a curtain (SYS-4). Default "modal": the Modal's own
+   * animation presents the sheet.
+   */
+  presentation?: "modal" | "self"
+  /** Draws the iOS-style grabber at the top of the sheet. */
+  grabber?: boolean
   children: ReactNode
 }
 
@@ -88,6 +107,8 @@ export function SwipeDismissSheet({
   style,
   accessibilityViewIsModal,
   testID,
+  presentation = "modal",
+  grabber = false,
   children
 }: SwipeDismissSheetProps) {
   const reduceMotion = useReducedMotion()
@@ -158,9 +179,14 @@ export function SwipeDismissSheet({
           scheduleOnRN(dismiss)
           return
         }
-        offset.value = withTiming(
+        // The exit carries the flick's speed and never overshoots (SYS-5).
+        offset.value = withSpring(
           getSheetExitOffset(sheetHeight.value),
-          { duration: SHEET_DISMISS.exitDurationMs, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never },
+          {
+            ...SHEET_EXIT_SPRING,
+            velocity: getSheetExitVelocity(event.velocityY),
+            reduceMotion: ReduceMotion.Never
+          },
           (finished) => {
             "worklet"
             if (finished) scheduleOnRN(dismiss)
@@ -196,12 +222,57 @@ export function SwipeDismissSheet({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: getSheetBackdropOpacity(offset.value, sheetHeight.value)
   }))
+  const presentedRef = useRef(presentation !== "self")
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    sheetHeight.value = event.nativeEvent.layout.height
-  }, [sheetHeight])
-  const backdropPress = backdrop?.onPress
+    const height = event.nativeEvent.layout.height
+    sheetHeight.value = height
+    if (presentedRef.current) return
+    presentedRef.current = true
+    // Rises from below once measured; the backdrop follows the offset.
+    if (reduceMotionValue.value) {
+      offset.value = 0
+      return
+    }
+    offset.value = getSheetExitOffset(height)
+    offset.value = withSpring(0, { ...SHEET_ENTER_SPRING, reduceMotion: ReduceMotion.Never })
+  }, [offset, reduceMotionValue, sheetHeight])
+
+  // Programmatic close (backdrop tap, close button): the same exit as a swipe.
+  const closingRef = useRef(false)
+  const closeWith = useCallback((callback: () => void) => {
+    if (closingRef.current) return
+    closingRef.current = true
+    const finish = () => {
+      closingRef.current = false
+      callback()
+    }
+    if (reduceMotionValue.value) {
+      offset.value = getSheetExitOffset(sheetHeight.value)
+      finish()
+      return
+    }
+    cancelAnimation(offset)
+    offset.value = withSpring(
+      getSheetExitOffset(sheetHeight.value),
+      { ...SHEET_EXIT_SPRING, reduceMotion: ReduceMotion.Never },
+      (finished) => {
+        "worklet"
+        if (finished) scheduleOnRN(finish)
+      }
+    )
+  }, [offset, reduceMotionValue, sheetHeight])
+  const close = useCallback(() => {
+    if (!enabled) return
+    closeWith(dismiss)
+  }, [closeWith, dismiss, enabled])
+  const onBackdropPress = backdrop?.onPress
+  const backdropPress = useMemo(
+    () => onBackdropPress ? () => closeWith(onBackdropPress) : undefined,
+    [closeWith, onBackdropPress]
+  )
 
   return (
+    <SheetCloseContext.Provider value={close}>
     <SheetScrollContext.Provider value={ownership}>
       {backdrop ? (
         <Reanimated.View
@@ -226,10 +297,12 @@ export function SwipeDismissSheet({
           style={[styles.sheetShape, style, sheetStyle]}
           testID={testID}
         >
+          {grabber ? <View pointerEvents="none" style={styles.grabber} /> : null}
           {children}
         </Reanimated.View>
       </GestureDetector>
     </SheetScrollContext.Provider>
+    </SheetCloseContext.Provider>
   )
 }
 
@@ -271,5 +344,14 @@ const styles = StyleSheet.create({
   // Android ignores it.
   sheetShape: {
     borderCurve: "continuous"
+  },
+  grabber: {
+    alignSelf: "center",
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 6,
+    marginBottom: 2,
+    backgroundColor: "rgba(60, 40, 52, 0.22)"
   }
 })

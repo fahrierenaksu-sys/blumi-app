@@ -21,7 +21,8 @@ import {
   resolveSignInPrimaryActionLabel,
   sanitizeRecoveryCode,
   shouldRunResendCooldown,
-  tickResendCooldown
+  tickResendCooldown,
+  shouldAutoSubmitRegisterCode
 } from "./registerScreenModel"
 
 const en = getAuthEntryCopy("en")
@@ -457,4 +458,23 @@ test("account recovery keeps digits only and gates its primary action per stage"
     }),
     { label: "checking", disabled: true }
   )
+})
+
+test("a complete code verifies itself once and a failed code is not retried automatically", () => {
+  const base = {
+    isCodeStep: true,
+    verificationCode: "123456",
+    lastAutoSubmittedCode: null,
+    canVerify: true,
+    actionInFlight: false,
+    codeRequestStatus: "sent" as const
+  }
+  assert.equal(shouldAutoSubmitRegisterCode(base), true)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, verificationCode: "12345" }), false)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, lastAutoSubmittedCode: "123456" }), false)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, lastAutoSubmittedCode: "123450" }), true)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, actionInFlight: true }), false)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, codeRequestStatus: "sending" }), false)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, isCodeStep: false }), false)
+  assert.equal(shouldAutoSubmitRegisterCode({ ...base, canVerify: false }), false)
 })

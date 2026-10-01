@@ -1,6 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Alert, BackHandler } from "react-native"
+import { getCurrentSetupFlowCopy } from "../../features/session/setupFlow/setupFlowLocale"
 
 export function useOnboardingSignOut(
   onSignOut: () => Promise<void>,
@@ -33,13 +34,14 @@ export function useOnboardingSignOut(
 
   const requestSignOut = useCallback((): void => {
     if (busyRef.current) return
+    const copy = getCurrentSetupFlowCopy().signOut
     Alert.alert(
-      "Sign out of Blumi?",
-      "Your saved setup progress stays safe. You can continue after signing in again.",
+      copy.title,
+      copy.body,
       [
-        { text: "Keep setting up", style: "cancel" },
+        { text: copy.keepGoing, style: "cancel" },
         {
-          text: "Sign out",
+          text: copy.confirm,
           style: "destructive",
           onPress: () => void signOut()
         }

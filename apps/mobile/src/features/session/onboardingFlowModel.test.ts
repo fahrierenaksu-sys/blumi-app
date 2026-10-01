@@ -16,7 +16,9 @@ import {
   reducePreAuthSetupStep,
   shouldGateOnboardingBootPrelude,
   shouldWaitForPreAuthDraftHydration,
-  shouldAcceptRegisterStageChange
+  shouldAcceptRegisterStageChange,
+  getPreAuthSetupStepToPrepare,
+  PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS
 } from "./onboardingFlowModel"
 
 test("setup layers preserve navigation direction without a full page slide", () => {
@@ -195,4 +197,13 @@ test("navigator identity stays stable while moving between onboarding screens", 
   assert.equal(getSessionNavigatorKey("RoomSetup", "user_one"), "onboarding:user_one")
   assert.equal(getSessionNavigatorKey("Main", "user_one"), "main:user_one")
   assert.equal(getSessionNavigatorKey("AuthEntry", undefined), "auth")
+})
+
+test("each setup step prepares only its direct successor", () => {
+  assert.equal(getPreAuthSetupStepToPrepare("profile"), "avatar")
+  assert.equal(getPreAuthSetupStepToPrepare("avatar"), "room")
+  assert.equal(getPreAuthSetupStepToPrepare("room"), "phone")
+  assert.equal(getPreAuthSetupStepToPrepare("phone"), null)
+  assert.equal(getPreAuthSetupStepToPrepare("otp"), null)
+  assert.ok(PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS >= 400, "after the 360 ms step entrance settles")
 })

@@ -170,10 +170,13 @@ try {
       "src/features/session/onboardingScanStageContract.test.ts",
       "src/features/session/onboardingWelcomeHomeAssetGate.test.ts",
       "src/features/session/onboardingWelcomeHomeModel.test.ts",
+      "src/features/session/onboardingWorldClockModel.test.ts",
+      "src/features/session/profileSetupValidation.test.ts",
       "src/features/session/onboardingWorldCompositionModel.test.ts",
       "src/features/session/profileCharacterReactionAssetGate.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
       "src/features/session/setupFlow/setupFlowShellModel.test.ts",
+      "src/features/session/setupFlow/setupFlowCopy.test.ts",
       "src/features/session/setupFlow/setupStaticExperience.test.ts",
       "src/features/session/youCopy.test.ts",
       "src/features/settings/settingsCopy.test.ts",
@@ -184,7 +187,12 @@ try {
       "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/screens/AuthEntryScreen.test.ts",
       "src/ui/onboardingColorConsistency.test.ts",
-      "src/ui/onboardingActionSystem.test.ts"
+      "src/ui/onboardingActionSystem.test.ts",
+      "src/ui/blumiLoadingScreenHandoff.test.ts",
+      "src/ui/uiLocale.test.ts",
+      "src/ui/ambientMotionModel.test.ts",
+      "src/ui/glassSurfaceModel.test.ts",
+      "src/features/inventory/dailyRewardCopy.test.ts"
     ],
     {
       cwd: workspaceRoot,

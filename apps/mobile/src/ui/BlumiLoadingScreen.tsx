@@ -4,11 +4,15 @@ import { OnboardingScanStage } from "../features/session/OnboardingScanStage"
 import { ONBOARDING_SCAN_FRAMES } from "../features/session/OnboardingGreetingPair"
 import {
   ONBOARDING_BRAND_PRELUDE_TIMELINE_MS,
+  getOnboardingBootDissolvePlan,
   getOnboardingBootGateRemainingMs,
   getOnboardingBootPreludeElapsedMs,
   getOnboardingBootPreludeElapsedSnapshotMs,
   getOnboardingBrandPreludeProgressAtElapsed,
+  getOnboardingLoadingScanResume,
   hydrateOnboardingBootPreludeStart,
+  markOnboardingBootSurfaceVisible,
+  readOnboardingBootSurfaceHandoff,
   shouldReduceOnboardingBootMotion
 } from "../features/session/onboardingBrandPreludeModel"
 import {
@@ -17,10 +21,17 @@ import {
 } from "../features/session/nativeOnboardingBootBridge"
 import { SoftBlobBackground } from "./backgrounds"
 import { useReducedMotionPreference } from "./animations"
+import { getLoadingScreenCopy } from "./loadingScreenCopy"
+import { resolveUiLocale } from "./uiLocale"
 
 const timeline = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
 
 interface BlumiLoadingScreenProps {
+  /**
+   * Given only while an onboarding prelude waits for this surface. The scan
+   * then dissolves here and the callback fires once it has, so the prelude
+   * mounts with the characters already gone (its scan sits higher on screen).
+   */
   onPreludeReady?: () => void
 }
 
@@ -46,7 +57,10 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   const bootInitializedRef = useRef(false)
   const scanRows = useRef(new Animated.Value(0)).current
   const scanSweep = useRef(new Animated.Value(0)).current
+  const scanOpacity = useRef(new Animated.Value(1)).current
   const initialElapsedMs = bootTiming.initialElapsedMs
+
+  useLayoutEffect(() => markOnboardingBootSurfaceVisible(), [])
 
   useLayoutEffect(() => {
     if (bootInitializedRef.current) return
@@ -65,8 +79,13 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   }, [scanRows, scanSweep, shouldReduceMotion])
 
   useEffect(() => {
+    if (!onPreludeReady) {
+      // No prelude takes over (splash, Discover, linking fallback): the scan
+      // stays on screen for as long as this surface does.
+      scanOpacity.setValue(1)
+      return undefined
+    }
     if (!bootTiming.initialized) return undefined
-    if (!onPreludeReady) return undefined
     if (!bootMotionPreferenceResolved) return undefined
     const gateElapsedMs = getOnboardingBootPreludeElapsedMs()
     const remainingMs = getOnboardingBootGateRemainingMs(
@@ -79,9 +98,24 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
       onPreludeReady()
       return undefined
     }
+    const dissolve = getOnboardingBootDissolvePlan(gateElapsedMs)
+    const animation = Animated.sequence([
+      Animated.delay(dissolve.delayMs),
+      Animated.timing(scanOpacity, {
+        toValue: 0,
+        duration: dissolve.durationMs,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+        isInteraction: false
+      })
+    ])
+    animation.start()
     const readyTimer = setTimeout(onPreludeReady, remainingMs)
-    return () => clearTimeout(readyTimer)
-  }, [bootMotionPreferenceResolved, bootTiming.initialized, onPreludeReady, shouldReduceMotion])
+    return () => {
+      clearTimeout(readyTimer)
+      animation.stop()
+    }
+  }, [bootMotionPreferenceResolved, bootTiming.initialized, onPreludeReady, scanOpacity, shouldReduceMotion])
 
   useEffect(() => {
     if (!bootTiming.initialized) return undefined
@@ -126,18 +160,22 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
   return (
     <View style={styles.root}>
       <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
-      <View
-        accessibilityLabel="Blumi hazırlanıyor"
+      <Animated.View
+        accessibilityLabel={getLoadingScreenCopy(resolveUiLocale()).preparing}
         accessibilityRole="progressbar"
-        style={styles.scanStage}
+        style={[styles.scanStage, { opacity: scanOpacity }]}
       >
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep} />
-      </View>
+      </Animated.View>
     </View>
   )
 }
 
-/** Discover has a local clock: the native onboarding clock may already be over. */
+/**
+ * Covers Discover until it is ready. Straight after the boot surface (cold
+ * start) it continues the boot scan on the shared clock with the images
+ * already on screen; later (sign-in) it plays its own scan once loaded.
+ */
 export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   onFinished: () => void
   onError: () => void
@@ -146,11 +184,18 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   const nativeReduceMotion = getNativeOnboardingBootReduceMotion()
   const motionResolved = isResolved || nativeReduceMotion !== null
   const reduced = isResolved ? reduceMotion : nativeReduceMotion ?? false
+  const [resume] = useState(() => getOnboardingLoadingScanResume({
+    nowMs: Date.now(),
+    ...readOnboardingBootSurfaceHandoff(),
+    bootElapsedMs: getOnboardingBootPreludeElapsedSnapshotMs()
+  }))
+  const startMs = resume.startElapsedMs
   const [loadedAssets, setLoadedAssets] = useState<readonly number[]>([])
   const requiredAssetCount = ONBOARDING_SCAN_FRAMES.length + 1
-  const assetsReady = loadedAssets.length === requiredAssetCount
-  const scanRows = useRef(new Animated.Value(0)).current
-  const scanSweep = useRef(new Animated.Value(0)).current
+  const assetsReady = resume.resumesBootScan || loadedAssets.length === requiredAssetCount
+  const startProgress = getOnboardingBrandPreludeProgressAtElapsed(startMs)
+  const scanRows = useRef(new Animated.Value(startProgress.scanRows)).current
+  const scanSweep = useRef(new Animated.Value(startProgress.scanSweep)).current
   const completed = useRef(false)
   const onAssetLoad = useCallback((id: number) => {
     if (!Number.isInteger(id) || id < 0 || id >= requiredAssetCount) return
@@ -159,7 +204,7 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
 
   useEffect(() => {
     if (!assetsReady || !motionResolved || completed.current) return
-    if (reduced) {
+    if (reduced || startMs >= timeline.scanDissolveComplete) {
       scanRows.setValue(1)
       scanSweep.setValue(1)
       completed.current = true
@@ -170,18 +215,19 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
     const animation = Animated.sequence([
       Animated.parallel([
         Animated.timing(scanRows, {
-          toValue: 1, duration: timeline.scanRowsComplete,
+          toValue: 1, duration: Math.max(1, timeline.scanRowsComplete - startMs),
           easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false
         }),
         Animated.sequence([
-          Animated.delay(timeline.scanSweepStart),
+          Animated.delay(Math.max(0, timeline.scanSweepStart - startMs)),
           Animated.timing(scanSweep, {
-            toValue: 1, duration: timeline.scanSweepComplete - timeline.scanSweepStart,
+            toValue: 1,
+            duration: Math.max(1, timeline.scanSweepComplete - Math.max(timeline.scanSweepStart, startMs)),
             easing: Easing.inOut(Easing.cubic), useNativeDriver: true, isInteraction: false
           })
         ])
       ]),
-      Animated.delay(timeline.scanDissolveComplete - timeline.scanSweepComplete)
+      Animated.delay(Math.max(0, timeline.scanDissolveComplete - Math.max(timeline.scanSweepComplete, startMs)))
     ])
     animation.start(({ finished }) => {
       if (!active || !finished || completed.current) return
@@ -192,12 +238,12 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
       active = false
       animation.stop()
     }
-  }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep])
+  }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep, startMs])
 
   return (
     <View style={styles.root}>
       <SoftBlobBackground animated={false} style={styles.backdrop} variant="register" />
-      <View accessibilityLabel="Blumi hazırlanıyor" accessibilityRole="progressbar"
+      <View accessibilityLabel={getLoadingScreenCopy(resolveUiLocale()).preparing} accessibilityRole="progressbar"
         style={[styles.scanStage, { opacity: assetsReady && motionResolved ? 1 : 0 }]}>
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep}
           onAssetLoad={onAssetLoad} onAssetError={onError} />

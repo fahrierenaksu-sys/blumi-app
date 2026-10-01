@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useState, type ComponentProps } from "react"
+import { useEffect, useState, type ComponentProps, type Ref } from "react"
 import {
   StyleSheet,
   Text,
@@ -30,6 +30,8 @@ interface FieldInputProps extends Omit<TextInputProps, "style"> {
   error?: string
   containerStyle?: StyleProp<ViewStyle>
   icon?: ComponentProps<typeof Ionicons>["name"]
+  /** Lets a form move focus to this field (return key "next"). */
+  inputRef?: Ref<TextInput>
 }
 
 export function FieldInput(props: FieldInputProps) {
@@ -40,6 +42,7 @@ export function FieldInput(props: FieldInputProps) {
     error,
     containerStyle,
     icon,
+    inputRef,
     onFocus,
     onBlur,
     ...inputProps
@@ -98,6 +101,7 @@ export function FieldInput(props: FieldInputProps) {
         ) : null}
         <TextInput
           {...inputProps}
+          ref={inputRef}
           accessibilityLabel={inputProps.accessibilityLabel ?? label}
           placeholderTextColor={uiTheme.colors.textMuted}
           onFocus={handleFocus}

@@ -63,7 +63,19 @@ test("the drag runs on the UI thread and Reduce Motion comes from the shared sto
   const onUpdate = sheet.slice(sheet.indexOf(".onUpdate("), sheet.indexOf(".onEnd("))
   assert.match(onUpdate, /"worklet"/)
   assert.doesNotMatch(onUpdate, /scheduleOnRN|runOnJS|set[A-Z]\w*\(/, "no JS work per frame")
-  // JS hears once, when the sheet closes.
-  assert.deepEqual((sheet.match(/scheduleOnRN\((\w+)/g) ?? []).sort(), ["scheduleOnRN(dismiss", "scheduleOnRN(dismiss"])
+  // JS hears once, when the sheet closes (a swipe, or a backdrop/close button
+  // that plays the same exit first: SYS-4).
+  assert.deepEqual((sheet.match(/scheduleOnRN\((\w+)/g) ?? []).sort(), ["scheduleOnRN(dismiss", "scheduleOnRN(dismiss", "scheduleOnRN(finish"])
   assert.match(sheet, /if \(reduceMotionValue\.value\) \{\s*offset\.value = getSheetExitOffset\(sheetHeight\.value\)\s*scheduleOnRN\(dismiss\)/)
+})
+
+test("every way out leaves like a swipe, with the release speed and no bounce (SYS-4, SYS-5)", () => {
+  assert.match(sheet, /\.\.\.SHEET_EXIT_SPRING,\s*velocity: getSheetExitVelocity\(event\.velocityY\)/)
+  assert.doesNotMatch(sheet, /withTiming\(/, "no fixed-duration exit")
+  // Backdrop tap and close buttons run the same exit before their callback.
+  assert.match(sheet, /onBackdropPress \? \(\) => closeWith\(onBackdropPress\)/)
+  assert.match(sheet, /export function useSwipeDismissSheetClose\(\)/)
+  // Opt-in self presentation: rises with a spring, backdrop fades with it.
+  assert.match(sheet, /presentation\?: "modal" \| "self"/)
+  assert.match(sheet, /offset\.value = withSpring\(0, \{ \.\.\.SHEET_ENTER_SPRING/)
 })

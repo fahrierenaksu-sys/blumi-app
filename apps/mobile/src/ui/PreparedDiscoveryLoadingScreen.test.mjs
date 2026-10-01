@@ -4,7 +4,7 @@ import test from "node:test"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 
-function harness() {
+function harness(resume = { startElapsedMs: 0, resumesBootScan: false }) {
   const source = readFileSync(new URL("./BlumiLoadingScreen.tsx", import.meta.url), "utf8")
   const file = ts.createSourceFile("BlumiLoadingScreen.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const component = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "PreparedDiscoveryLoadingScreen")
@@ -25,9 +25,16 @@ function harness() {
     ONBOARDING_SCAN_FRAMES: Array(6).fill("asset"),
     timeline: { scanRowsComplete: 800, scanSweepStart: 250, scanSweepComplete: 1750, scanDissolveComplete: 1950 },
     useReducedMotionPreference: () => motion, getNativeOnboardingBootReduceMotion: () => null,
+    getOnboardingLoadingScanResume: () => resume,
+    getLoadingScreenCopy: () => ({ preparing: "Blumi hazırlanıyor" }), resolveUiLocale: () => "tr",
+    readOnboardingBootSurfaceHandoff: () => ({ bootSurfaceVisible: false, bootSurfaceVisibleUntilMs: null }),
+    getOnboardingBootPreludeElapsedSnapshotMs: () => resume.startElapsedMs,
+    getOnboardingBrandPreludeProgressAtElapsed: (ms) => ({
+      scanRows: Math.min(1, ms / 800), scanSweep: Math.max(0, Math.min(1, (ms - 250) / 1500))
+    }),
     useState(initial) {
       const index = cursor++
-      if (!(index in slots)) slots[index] = initial
+      if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial
       return [slots[index], (update) => { slots[index] = typeof update === "function" ? update(slots[index]) : update }]
     },
     useRef(initial) { const index = cursor++; return slots[index] ??= { current: initial } },
@@ -44,7 +51,7 @@ function harness() {
       })
     },
     Animated: {
-      Value: class { constructor(value) { this.value = value } setValue(value) { this.value = value } },
+      Value: class { constructor(value) { this.value = value; this.initial = value } setValue(value) { this.value = value } },
       timing: (_, options) => animation("timing", options),
       delay: (duration) => animation("delay", { duration }),
       parallel: (children) => animation("parallel", children),
@@ -61,7 +68,7 @@ function harness() {
       scheduled.splice(0).forEach((effect) => effect())
       return tree.props.children[1]
     },
-    motion, starts,
+    motion, starts, slots,
     get completions() { return completions }, get failures() { return failures }, get stops() { return stops },
     dispose() { effects.forEach((effect) => effect.cleanup?.()) }
   }
@@ -140,4 +147,23 @@ test("image failure is forwarded to bounded recovery without revealing a partial
   assert.equal(h.failures, 1)
   assert.equal(h.render().props.style[1].opacity, 0)
   assert.equal(h.starts.length, 0)
+})
+
+test("straight after the boot surface the scan continues the shared clock without an image gate", () => {
+  const h = harness({ startElapsedMs: 1_000, resumesBootScan: true })
+  const stage = h.render()
+  assert.equal(stage.props.style[1].opacity, 1, "the boot surface already showed these images")
+  const sequence = h.starts[0].animation
+  const [parallel, hold] = sequence.input
+  assert.equal(parallel.input[0].input.duration, 1, "rows already complete")
+  assert.equal(parallel.input[1].input[0].input.duration, 0, "the sweep is already moving")
+  assert.equal(parallel.input[1].input[1].input.duration, 750)
+  assert.equal(hold.input.duration, 200)
+})
+
+test("a boot scan that already finished rests complete and releases at once", () => {
+  const h = harness({ startElapsedMs: 1_950, resumesBootScan: true })
+  h.render()
+  assert.equal(h.starts.length, 0, "no replay of a finished scan")
+  assert.equal(h.completions, 1)
 })

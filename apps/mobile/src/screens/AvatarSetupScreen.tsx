@@ -34,23 +34,24 @@ import type {
   AvatarCatalogItem,
   UserAvatar
 } from "../features/avatarV2/avatarV2.types"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { useReducedMotionPreference } from "../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
+import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
+import type { AvatarStudioCategoryKey } from "../features/session/setupFlow/setupFlowCopy"
 import {
   useOnboardingHardwareBack,
   useOnboardingSignOut
 } from "./components/onboardingScreenActions"
 
 const STARTER_CATEGORIES: {
-  type: AvatarStudioCategory
-  label: string
+  type: AvatarStudioCategory & AvatarStudioCategoryKey
   icon: keyof typeof Ionicons.glyphMap
 }[] = [
-  { type: "hair", label: "Saç", icon: "cut-outline" },
-  { type: "top", label: "Üst", icon: "shirt-outline" },
-  { type: "bottom", label: "Alt", icon: "layers-outline" },
-  { type: "shoes", label: "Ayakkabı", icon: "footsteps-outline" }
+  { type: "hair", icon: "cut-outline" },
+  { type: "top", icon: "shirt-outline" },
+  { type: "bottom", icon: "layers-outline" },
+  { type: "shoes", icon: "footsteps-outline" }
 ]
 
 export interface AvatarSetupScreenProps {
@@ -76,6 +77,7 @@ export function AvatarSetupScreen({
   motionActive = true
 }: AvatarSetupScreenProps) {
   const { fontScale, height, width } = useWindowDimensions()
+  const copy = getCurrentSetupFlowCopy()
   const { avatar, catalog, canEquipItem, equipItem } = useAvatarV2()
   const [selectedType, setSelectedType] = useState<AvatarStudioCategory>("hair")
   const { reduceMotion } = useReducedMotionPreference()
@@ -169,18 +171,18 @@ export function AvatarSetupScreen({
       direction
     )
     equipWithMotion(items[nextIndex])
-    hapticLight()
+    hapticSelection()
   }
 
   function equipBody(bodyId: string): void {
     equipWithMotion(bodyItems.find((item) => item.id === bodyId))
-    hapticLight()
+    hapticSelection()
   }
 
   function selectCategory(type: AvatarStudioCategory): void {
     if (type === selectedType) return
     setSelectedType(type)
-    hapticLight()
+    hapticSelection()
   }
 
   const isMale = starterAvatar.bodyId === MALE_STARTER_BODY_ID
@@ -194,7 +196,7 @@ export function AvatarSetupScreen({
       )
       return {
         type,
-        label: metadata?.label ?? type,
+        label: metadata ? copy.avatar.categories[metadata.type] : type,
         icon: metadata?.icon ?? "ellipse-outline",
         itemCount: items.length,
         selectedIndex: equippedIndex
@@ -208,10 +210,10 @@ export function AvatarSetupScreen({
       onPrimaryAction={() => void onComplete(starterAvatar).catch(() => undefined)}
       primaryActionBusy={isSubmitting}
       primaryActionDisabled={busy}
-      primaryActionLabel="Karakterim hazır"
+      primaryActionLabel={copy.steps.avatar.primaryAction}
       primaryActionTestID="avatar-setup-submit"
       reduceMotion={reduceMotion}
-      headerTitle="İlk görünümün"
+      headerTitle={copy.avatar.headerTitle}
       headerProgressStyle="fraction"
       hideHeading
       hideProgressRail
@@ -231,6 +233,7 @@ export function AvatarSetupScreen({
           avatar={starterAvatar}
           catalog={catalog}
           categories={studioCategories}
+          copy={copy.studio}
           compact={compact}
           disabled={busy}
           isMale={isMale}
@@ -250,15 +253,15 @@ export function AvatarSetupScreen({
       <View style={styles.avatarFirstSheet}>
             <View style={styles.avatarFirstSummary}>
               <Text accessibilityRole="header" style={styles.avatarFirstTitle}>
-                Karakterini hazırla
+                {copy.avatar.title}
               </Text>
               <Text style={styles.avatarFirstDescription}>
-                Bu sadece başlangıç. Tarzını sonra da değiştirebilirsin.
+                {copy.avatar.description}
               </Text>
             </View>
             <View
               accessible
-              accessibilityLabel="Görünümünü istediğin zaman değiştirebilir ve Mağaza’dan yeni parçalar keşfedebilirsin."
+              accessibilityLabel={copy.avatar.freedomAccessibilityLabel}
               style={styles.avatarFreedomNote}
             >
               <View style={styles.avatarFreedomItem}>
@@ -270,7 +273,7 @@ export function AvatarSetupScreen({
                     size={17}
                   />
                 </View>
-                <Text style={styles.avatarFreedomText}>İstediğin zaman değiştir</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.avatarFreedomText}>{copy.avatar.changeAnyTime}</Text>
               </View>
               <View pointerEvents="none" style={styles.avatarFreedomDivider} />
               <View style={styles.avatarFreedomItem}>
@@ -282,7 +285,7 @@ export function AvatarSetupScreen({
                     size={17}
                   />
                 </View>
-                <Text style={styles.avatarFreedomText}>Mağaza’da yeni parçalar keşfet</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.avatarFreedomText}>{copy.avatar.discoverInShop}</Text>
               </View>
             </View>
           </View>

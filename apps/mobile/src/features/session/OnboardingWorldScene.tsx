@@ -35,6 +35,11 @@ import {
 } from "./onboardingWorldCompositionModel"
 import { ONBOARDING_ARRIVAL_PREROLL_MS } from "./onboardingArrivalMotionModel"
 import {
+  getClampedClockProgress,
+  getLoopingClockProgress,
+  getRewindClockProgress
+} from "./onboardingWorldClockModel"
+import {
   ONBOARDING_POPULATION_COUNTER_TIMING_MS
 } from "./onboardingPopulationCounterModel"
 import { hapticLight, hapticMedium } from "../../ui/haptics"
@@ -211,15 +216,14 @@ export function OnboardingWorldScene({
   const handoff = useRef(new Animated.Value(0)).current
   const rotation = useRef(new Animated.Value(0)).current
   const runnerOrbit = useRef(new Animated.Value(0)).current
+  // Where each resumable clock stopped, read from wall time (no listeners).
   const progressRefs = useRef({
     impactTimeline: shouldReduceMotion ? ONBOARDING_INTRO_TIMELINE_MS.landingComplete : 0,
-    populationReveal: shouldReduceMotion ? 1 : 0,
-    chase: shouldReduceMotion ? 1 : 0,
-    catchReaction: shouldReduceMotion ? 1 : 0,
     handoff: 0,
     rotation: 0,
     runnerOrbit: 0
   })
+  const clocks = progressRefs.current
   const impactHapticPlayedRef = useRef(false)
   const landingHapticPlayedRef = useRef(false)
   const phaseClockRef = useRef<{
@@ -236,35 +240,6 @@ export function OnboardingWorldScene({
     const subscription = AppState.addEventListener("change", setAppState)
     return () => subscription.remove()
   }, [])
-
-  useEffect(() => {
-    const subscriptions = [
-      impactTimeline.addListener(({ value }) => { progressRefs.current.impactTimeline = value }),
-      populationReveal.addListener(({ value }) => { progressRefs.current.populationReveal = value }),
-      chase.addListener(({ value }) => { progressRefs.current.chase = value }),
-      catchReaction.addListener(({ value }) => { progressRefs.current.catchReaction = value }),
-      handoff.addListener(({ value }) => { progressRefs.current.handoff = value }),
-      rotation.addListener(({ value }) => { progressRefs.current.rotation = value }),
-      runnerOrbit.addListener(({ value }) => { progressRefs.current.runnerOrbit = value })
-    ]
-    return () => {
-      impactTimeline.removeListener(subscriptions[0])
-      populationReveal.removeListener(subscriptions[1])
-      chase.removeListener(subscriptions[2])
-      catchReaction.removeListener(subscriptions[3])
-      handoff.removeListener(subscriptions[4])
-      rotation.removeListener(subscriptions[5])
-      runnerOrbit.removeListener(subscriptions[6])
-    }
-  }, [
-    catchReaction,
-    chase,
-    handoff,
-    impactTimeline,
-    populationReveal,
-    rotation,
-    runnerOrbit
-  ])
 
   const canAnimate =
     motionPreferenceResolved && !reduceMotion && !introState.isPaused &&
@@ -438,6 +413,7 @@ export function OnboardingWorldScene({
     if (shouldReduceMotion) return
     if (handoffActive) {
       handoff.stopAnimation()
+      const run = { startProgress: progressRefs.current.handoff, startedAtMs: Date.now(), durationMs: HANDOFF_DURATION_MS }
       const fadeOut = Animated.timing(handoff, {
         toValue: 1,
         duration: getRemainingDuration(
@@ -449,9 +425,13 @@ export function OnboardingWorldScene({
         isInteraction: false
       })
       fadeOut.start()
-      return () => fadeOut.stop()
+      return () => {
+        fadeOut.stop()
+        clocks.handoff = getClampedClockProgress(run, Date.now())
+      }
     }
     if (progressRefs.current.handoff <= 0) return
+    const rewind = { startProgress: progressRefs.current.handoff, startedAtMs: Date.now(), durationMs: HANDOFF_ROLLBACK_DURATION_MS }
     const rollback = Animated.timing(handoff, {
       toValue: 0,
       duration: Math.max(
@@ -463,8 +443,11 @@ export function OnboardingWorldScene({
       isInteraction: false
     })
     rollback.start()
-    return () => rollback.stop()
-  }, [handoff, handoffActive, shouldReduceMotion])
+    return () => {
+      rollback.stop()
+      clocks.handoff = getRewindClockProgress(rewind, Date.now())
+    }
+  }, [clocks, handoff, handoffActive, shouldReduceMotion])
 
   useEffect(() => {
     if (shouldReduceMotion) return
@@ -491,10 +474,20 @@ export function OnboardingWorldScene({
       useNativeDriver: true,
       isInteraction: false
     })
+    const run = {
+      startProgress: elapsedMs / ONBOARDING_INTRO_TIMELINE_MS.landingComplete,
+      startedAtMs: Date.now(),
+      durationMs: ONBOARDING_INTRO_TIMELINE_MS.landingComplete
+    }
     animation.start()
-    return () => animation.stop()
+    return () => {
+      animation.stop()
+      clocks.impactTimeline =
+        getClampedClockProgress(run, Date.now()) * ONBOARDING_INTRO_TIMELINE_MS.landingComplete
+    }
   }, [
     canAnimate,
+    clocks,
     impactSequenceActive,
     impactSequenceSettled,
     impactTimeline,
@@ -634,6 +627,7 @@ export function OnboardingWorldScene({
     }
 
     rotation.setValue(progressRefs.current.rotation)
+    const turn = { startProgress: progressRefs.current.rotation, startedAtMs: Date.now(), durationMs: ONBOARDING_GLOBE_LOOP_DURATION_MS }
     const firstTurn = Animated.timing(rotation, {
       toValue: 1,
       duration: getRemainingDuration(
@@ -658,7 +652,6 @@ export function OnboardingWorldScene({
     firstTurn.start(({ finished }) => {
       if (!finished) return
       rotation.setValue(0)
-      progressRefs.current.rotation = 0
       loop.start()
     })
 
@@ -666,8 +659,9 @@ export function OnboardingWorldScene({
       firstTurn.stop()
       loop.stop()
       rotation.stopAnimation()
+      clocks.rotation = getLoopingClockProgress(turn, Date.now())
     }
-  }, [rotation, shouldRunContinuousMotion])
+  }, [clocks, rotation, shouldRunContinuousMotion])
 
   useEffect(() => {
     if (!shouldRunRunnerOrbit) {

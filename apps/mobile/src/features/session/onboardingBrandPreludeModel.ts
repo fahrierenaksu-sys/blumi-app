@@ -93,6 +93,48 @@ export function shouldReduceOnboardingBootMotion(
   return motionPreferenceResolved && reduceMotion
 }
 
+/** Shortest scan dissolve the loading surface plays before the prelude mounts. */
+export const ONBOARDING_BOOT_MIN_DISSOLVE_MS = 180
+
+export interface OnboardingBootDissolvePlan {
+  delayMs: number
+  durationMs: number
+}
+
+/**
+ * The loading surface dissolves its own scan before it hands off to the
+ * prelude. The prelude draws the scan lifted above the action rail, so a
+ * handoff while the characters are still visible would move the whole grid;
+ * dissolving on the loading surface keeps the six characters in place.
+ * A late handoff (slow hydration) still plays a full dissolve, never a cut.
+ */
+export function getOnboardingBootDissolvePlan(
+  elapsedMs: number
+): OnboardingBootDissolvePlan {
+  const { scanDissolveStart, scanDissolveComplete } =
+    ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
+  const elapsed = Math.max(0, elapsedMs)
+  if (elapsed <= scanDissolveStart) {
+    return {
+      delayMs: scanDissolveStart - elapsed,
+      durationMs: scanDissolveComplete - scanDissolveStart
+    }
+  }
+  if (elapsed < scanDissolveComplete) {
+    return {
+      delayMs: 0,
+      durationMs: Math.max(
+        ONBOARDING_BOOT_MIN_DISSOLVE_MS,
+        scanDissolveComplete - elapsed
+      )
+    }
+  }
+  return {
+    delayMs: 0,
+    durationMs: scanDissolveComplete - scanDissolveStart
+  }
+}
+
 export function getOnboardingBootGateRemainingMs(
   elapsedMs: number,
   reduceMotion: boolean,
@@ -100,11 +142,61 @@ export function getOnboardingBootGateRemainingMs(
 ): number | null {
   if (!motionPreferenceResolved) return null
   if (reduceMotion) return 0
-  return Math.max(
-    0,
-    ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete -
-      Math.max(0, elapsedMs)
+  const plan = getOnboardingBootDissolvePlan(elapsedMs)
+  return plan.delayMs + plan.durationMs
+}
+
+/** How long after the boot surface leaves a loading scan may still resume it. */
+export const ONBOARDING_BOOT_RESUME_WINDOW_MS = 1_000
+
+let mountedBootSurfaces = 0
+let bootSurfaceVisibleUntilMs: number | null = null
+
+/** Called by the boot loading surface while it is on screen; returns its release. */
+export function markOnboardingBootSurfaceVisible(): () => void {
+  mountedBootSurfaces += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    mountedBootSurfaces = Math.max(0, mountedBootSurfaces - 1)
+    bootSurfaceVisibleUntilMs = Date.now()
+  }
+}
+
+export function readOnboardingBootSurfaceHandoff(): {
+  bootSurfaceVisible: boolean
+  bootSurfaceVisibleUntilMs: number | null
+} {
+  return {
+    bootSurfaceVisible: mountedBootSurfaces > 0,
+    bootSurfaceVisibleUntilMs
+  }
+}
+
+/**
+ * A loading scan that takes over directly from the boot surface (cold start
+ * into Discover) continues the same clock and skips its image gate, because
+ * the same images are on screen. Later scans (sign-in) start fresh.
+ */
+export function getOnboardingLoadingScanResume(input: {
+  nowMs: number
+  bootSurfaceVisible: boolean
+  bootSurfaceVisibleUntilMs: number | null
+  bootElapsedMs: number
+}): { startElapsedMs: number; resumesBootScan: boolean } {
+  const handsOver = input.bootSurfaceVisible || (
+    input.bootSurfaceVisibleUntilMs !== null &&
+    input.nowMs - input.bootSurfaceVisibleUntilMs <= ONBOARDING_BOOT_RESUME_WINDOW_MS
   )
+  if (!handsOver) return { startElapsedMs: 0, resumesBootScan: false }
+  return {
+    startElapsedMs: Math.min(
+      Math.max(0, input.bootElapsedMs),
+      ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete
+    ),
+    resumesBootScan: true
+  }
 }
 
 export function beginOnboardingBootPrelude(nowMs = Date.now()): number {

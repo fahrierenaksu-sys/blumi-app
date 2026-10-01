@@ -139,6 +139,31 @@ export function canSubmitRegisterVerification(input: {
   return true
 }
 
+export const REGISTER_CODE_LENGTH = 6
+
+/**
+ * A complete six-digit code verifies itself once (ONB-12). The same code is
+ * never resubmitted automatically after a failure; editing it re-arms.
+ */
+export function shouldAutoSubmitRegisterCode(input: {
+  isCodeStep: boolean
+  verificationCode: string
+  lastAutoSubmittedCode: string | null
+  canVerify: boolean
+  actionInFlight: boolean
+  codeRequestStatus: RegisterCodeRequestStatus
+}): boolean {
+  if (!input.isCodeStep) return false
+  if (input.verificationCode.length !== REGISTER_CODE_LENGTH) return false
+  if (input.verificationCode === input.lastAutoSubmittedCode) return false
+  return canSubmitRegisterVerification({
+    canVerify: input.canVerify,
+    verifiedFirebasePhone: false,
+    actionInFlight: input.actionInFlight,
+    codeRequestStatus: input.codeRequestStatus
+  })
+}
+
 type CodeRequestNoticeCopy = Pick<
   AuthEntryCopy,
   "freshCodeSent" | "codeExpiresSoon" | "resendFailed" | "codeNotSent"

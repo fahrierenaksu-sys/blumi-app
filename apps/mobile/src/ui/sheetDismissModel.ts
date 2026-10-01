@@ -21,7 +21,27 @@ export const SHEET_DISMISS = Object.freeze({
   /** Seconds of release velocity added to the offset before deciding. */
   projectionSeconds: 0.12,
   /** Exit animation duration (ms) after a dismissing release. */
-  exitDurationMs: 180
+  exitDurationMs: 180,
+  /** Furthest (px) an upward drag can stretch the sheet above rest. */
+  rubberBandLimit: 32
+})
+
+/**
+ * Exit after a dismissing release or a backdrop tap: carries the release
+ * velocity, never overshoots back into view (SYS-5).
+ */
+export const SHEET_EXIT_SPRING = Object.freeze({
+  stiffness: 260,
+  mass: 1,
+  damping: 2 * Math.sqrt(260),
+  overshootClamping: true
+})
+
+/** Opening from below when the sheet owns its presentation (SYS-4). */
+export const SHEET_ENTER_SPRING = Object.freeze({
+  stiffness: 320,
+  mass: 1,
+  damping: 0.92 * 2 * Math.sqrt(320)
 })
 
 /** Spring back to rest: critically damped, no bounce. */
@@ -48,11 +68,23 @@ export function resolveSheetDismissClaim(input: { dx: number; dy: number; atTop:
   return "wait"
 }
 
-/** Sheet offset (px, downward) for a drag: 1:1 down, never above rest. */
+/**
+ * Sheet offset (px, downward) for a drag: 1:1 down; an upward pull stretches
+ * with resistance up to the rubber-band limit instead of stopping dead.
+ */
 export function resolveSheetDragOffset(translationY: number): number {
   "worklet"
   if (!Number.isFinite(translationY)) return 0
-  return Math.max(0, translationY)
+  if (translationY >= 0) return translationY
+  const pull = -translationY
+  const limit = SHEET_DISMISS.rubberBandLimit
+  return -(limit * pull) / (pull + limit * 2)
+}
+
+/** Initial release velocity (px/s) for the exit spring: downward only. */
+export function getSheetExitVelocity(velocityY: number): number {
+  "worklet"
+  return Number.isFinite(velocityY) ? Math.max(0, velocityY) : 0
 }
 
 /** Distance (px) a slow drag must travel to close a sheet of this height. */

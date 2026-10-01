@@ -40,15 +40,34 @@ test("returning users navigate without rewriting intro persistence", async () =>
   assert.equal(navigated, true)
 })
 
-test("optional handoff work completes after persistence and before navigation", async () => {
+test("the handoff starts together with persistence and navigation waits for both", async () => {
   const order: string[] = []
-
-  await continueFromOnboardingIntro({
+  let persist!: () => void
+  const action = continueFromOnboardingIntro({
     requiresCompletion: true,
-    completeIntro: async () => { order.push("persist") },
+    completeIntro: () => new Promise<void>((resolve) => {
+      order.push("persist-start")
+      persist = () => { order.push("persist-done"); resolve() }
+    }),
     beforeNavigate: async () => { order.push("handoff") },
     navigate: () => { order.push("navigate") }
   })
+  await Promise.resolve()
+  assert.deepEqual(order, ["persist-start", "handoff"], "the world fades while the local write runs")
+  persist()
+  await action
+  assert.deepEqual(order, ["persist-start", "handoff", "persist-done", "navigate"])
+})
 
-  assert.deepEqual(order, ["persist", "handoff", "navigate"])
+test("a failed persistence after the handoff started still never navigates", async () => {
+  let navigated = false
+  let handoff = false
+  await assert.rejects(() => continueFromOnboardingIntro({
+    requiresCompletion: true,
+    completeIntro: async () => { throw new Error("storage unavailable") },
+    beforeNavigate: async () => { handoff = true },
+    navigate: () => { navigated = true }
+  }))
+  assert.equal(handoff, true)
+  assert.equal(navigated, false)
 })

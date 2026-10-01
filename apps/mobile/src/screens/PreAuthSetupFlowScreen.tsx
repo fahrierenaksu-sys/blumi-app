@@ -1,3 +1,4 @@
+import { usePreventRemove } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import {
   useCallback,
@@ -13,6 +14,7 @@ import Animated, {
   Easing,
   useSharedValue,
   useAnimatedStyle,
+  withSpring,
   withTiming
 } from "react-native-reanimated"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
@@ -22,6 +24,8 @@ import type { PreAuthOnboardingResumeStep } from "../features/session/preAuthOnb
 import {
   createOnboardingFunnelEvent,
   getPreAuthSetupLayerDirection,
+  getPreAuthSetupStepToPrepare,
+  PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS,
   getPreviousPreAuthSetupStep,
   shouldAcceptRegisterStageChange,
   type PreAuthSetupStep
@@ -32,7 +36,9 @@ import type {
 } from "../features/session/sessionApi"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { captureProductEvent } from "../analytics/productAnalytics"
+import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
 import { useReducedMotionPreference } from "../ui/animations"
+import { uiTheme } from "../ui/theme"
 import { AvatarSetupScreen } from "./AvatarSetupScreen"
 import { ProfileSetupScreen } from "./ProfileSetupScreen"
 import { RegisterScreen } from "./RegisterScreen"
@@ -99,15 +105,23 @@ function PersistentStepLayer({
       }
       return
     }
-    const duration = reduceMotion ? 120 : active ? 360 : 180
+    const duration = reduceMotion ? 120 : active ? 260 : 180
     opacity.value = withTiming(active ? 1 : 0, {
       duration,
       easing: active ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic)
     })
-    translateY.value = withTiming(reduceMotion ? 0 : direction * 8, {
-      duration,
-      easing: Easing.out(Easing.cubic)
-    })
+    // Steps travel vertically only (mismatched sheet widths must not shift
+    // sideways); the arriving step settles with the snappy press spring.
+    if (reduceMotion) {
+      translateY.value = 0
+    } else if (active) {
+      translateY.value = withSpring(0, uiTheme.animation.springSnappy)
+    } else {
+      translateY.value = withTiming(direction * 8, {
+        duration,
+        easing: Easing.in(Easing.cubic)
+      })
+    }
   }, [active, animateOnMount, direction, opacity, reduceMotion, translateY])
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -216,6 +230,22 @@ export function PreAuthSetupFlowScreen({
     )
   }, [step])
 
+  // Once the visible step has settled, mount the next one hidden so its tree
+  // and images are ready before the user moves on (no mount during the move).
+  const stepToPrepare = getPreAuthSetupStepToPrepare(step)
+  const isNextStepPrepared = stepToPrepare === null || mountedSteps.has(stepToPrepare)
+  useEffect(() => {
+    if (stepToPrepare === null || isNextStepPrepared) return
+    const timer = setTimeout(() => {
+      setMountedSteps((currentSteps) =>
+        currentSteps.has(stepToPrepare)
+          ? currentSteps
+          : new Set([...currentSteps, stepToPrepare])
+      )
+    }, PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [isNextStepPrepared, stepToPrepare])
+
   const persistDraftInOrder = useCallback((
     nextDraft: PreAuthSetupDraft,
     nextStep: PreAuthOnboardingResumeStep
@@ -309,10 +339,23 @@ export function PreAuthSetupFlowScreen({
     void moveTo(resumableStep)
   }, [leaveSetup, moveTo, step])
 
+  const allowLeaveRef = useRef(false)
   const signOut = useCallback(async () => {
     await onClearDraft()
+    allowLeaveRef.current = true
     navigation.navigate("AuthEntry")
   }, [navigation, onClearDraft])
+
+  // An edge swipe or hardware back past the first step goes one step back
+  // instead of throwing the whole setup away (ONB-06). Starting over is the
+  // one explicit way out.
+  usePreventRemove(step !== "profile", ({ data }) => {
+    if (allowLeaveRef.current) {
+      navigation.dispatch(data.action)
+      return
+    }
+    goBack()
+  })
 
   const registerNavigation = useMemo(() => ({
     ...navigation,
@@ -385,7 +428,7 @@ export function PreAuthSetupFlowScreen({
             onBackToAvatar={() => { void moveTo("avatar") }}
             onEditProfile={() => { void moveTo("profile") }}
             onSignOut={signOut}
-            completionLabel="Devam et"
+            completionLabel={getCurrentSetupFlowCopy().room.continueAction}
             motionActive={step === "room"}
             onComplete={async (room) => {
               await moveTo("phone", { ...renderedDraft, room }, "room")

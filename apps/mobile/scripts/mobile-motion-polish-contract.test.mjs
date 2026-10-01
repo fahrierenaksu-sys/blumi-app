@@ -43,7 +43,9 @@ test("continuous pulse animation is suppressed for reduced motion", () => {
 
   assert.match(pulseSource, /useReducedMotion\(\)/)
   assert.match(pulseSource, /if \(reduceMotion\)/)
-  assert.match(pulseSource, /pulse\.setValue\(0\)/)
+  // Reduced motion and a finished bounded pulse rest at scale 1 (SYS-9).
+  assert.match(pulseSource, /pulse\.setValue\(restProgress\)/)
+  assert.match(pulseSource, /getPulseRestProgress\(minScale, maxScale\)/)
   // Opt-in bound; the default (-1, RN's own) keeps existing callers endless.
   assert.match(pulseSource, /iterations = -1 \} = options/)
   assert.match(pulseSource, /\{ iterations \}/)
