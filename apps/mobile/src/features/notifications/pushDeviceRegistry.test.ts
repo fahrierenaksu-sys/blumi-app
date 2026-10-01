@@ -56,3 +56,13 @@ test("a new registration during a pending removal is kept", async () => {
   assert.deepEqual(removed, ["ExponentPushToken[d]"])
   forgetRegisteredPushDevice()
 })
+
+test("a rotated token for the same account reports the stale token once; another account's token is never reported", () => {
+  forgetRegisteredPushDevice()
+  assert.equal(rememberRegisteredPushDevice("user_a", "ExponentPushToken[old]"), null)
+  assert.equal(rememberRegisteredPushDevice("user_a", "ExponentPushToken[old]"), null)
+  assert.equal(rememberRegisteredPushDevice("user_a", "ExponentPushToken[new]"), "ExponentPushToken[old]")
+  assert.equal(rememberRegisteredPushDevice("user_a", "ExponentPushToken[new]"), null)
+  assert.equal(rememberRegisteredPushDevice("user_b", "ExponentPushToken[b]"), null, "an account switch is sign-out's job")
+  forgetRegisteredPushDevice()
+})

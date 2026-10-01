@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createExpoPushProvider } from "./pushProvider"
+import { createExpoPushProvider, PushProviderHttpError } from "./pushProvider"
 
 test("expo push provider sends an authenticated Expo push request", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = []
@@ -79,6 +79,56 @@ test("receipt lookup forwards cancellation and reads only requested ticket", asy
     return new Response(JSON.stringify({ data: { ticket: { status: "error", details: { error: "DeviceNotRegistered" } } } }))
   } })
   assert.deepEqual(await provider.getReceipt?.("ticket", { signal: controller.signal }), { status: "error", errorCode: "DeviceNotRegistered" })
+})
+
+test("the recipient's unread total travels as the Expo badge; an invalid count is left out", async () => {
+  const bodies: Array<Record<string, unknown>> = []
+  const provider = createExpoPushProvider({
+    fetcher: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return new Response(JSON.stringify({ data: { status: "ok", id: "ticket" } }), { status: 200 })
+    }
+  })
+  await provider.sendPush("ExponentPushToken[device]", { title: "Blumi", body: "Update", delivery: { badge: 3 } })
+  await provider.sendPush("ExponentPushToken[device]", { title: "Blumi", body: "Update", delivery: { badge: 0 } })
+  await provider.sendPush("ExponentPushToken[device]", { title: "Blumi", body: "Update", delivery: { badge: -1 } })
+  await provider.sendPush("ExponentPushToken[device]", { title: "Blumi", body: "Update", delivery: { badge: 1.5 } })
+  assert.deepEqual(bodies.map((body) => body.badge), [3, 0, undefined, undefined])
+})
+
+test("receipts for many tickets are read in one request per 1000 ids", async () => {
+  const requests: string[][] = []
+  const provider = createExpoPushProvider({
+    accessToken: "expo-access-token",
+    fetcher: async (url, init) => {
+      assert.match(String(url), /getReceipts$/)
+      assert.equal((init?.headers as Record<string, string>).authorization, "Bearer expo-access-token")
+      const ids = (JSON.parse(String(init?.body)) as { ids: string[] }).ids
+      requests.push(ids)
+      return new Response(JSON.stringify({ data: Object.fromEntries(ids
+        .filter((id) => id !== "pending")
+        .map((id) => [id, id === "gone"
+          ? { status: "error", message: "private text", details: { error: "DeviceNotRegistered" } }
+          : { status: "ok" }])) }))
+    }
+  })
+  const ids = ["ok", "gone", "pending", ...Array.from({ length: 1000 }, (_value, index) => `t${index}`)]
+  const receipts = await provider.getReceipts!(ids)
+  assert.deepEqual(requests.map((batch) => batch.length), [1000, 3])
+  assert.deepEqual(receipts.get("ok"), { status: "ok" })
+  assert.deepEqual(receipts.get("gone"), { status: "error", errorCode: "DeviceNotRegistered" })
+  assert.equal(receipts.has("pending"), false, "a receipt Expo does not have yet stays unknown")
+  assert.equal(receipts.size, ids.length - 1)
+})
+
+test("an Expo rate limit response is reported as such so the outbox can back off", async () => {
+  const provider = createExpoPushProvider({
+    fetcher: async () => new Response(JSON.stringify({ errors: [{ code: "TOO_MANY_REQUESTS" }] }), { status: 429 })
+  })
+  await assert.rejects(
+    () => provider.sendPush("ExponentPushToken[device]", { title: "Blumi", body: "Update" }),
+    (error: unknown) => error instanceof PushProviderHttpError && error.status === 429
+  )
 })
 
 test("expo push provider rejects non-Expo tokens without making a request", async () => {

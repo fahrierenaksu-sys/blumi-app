@@ -37,15 +37,20 @@ export function createNotificationDeliveryHooks(services: () => {
     repository: Parameters<typeof createRecipientLocaleResolver>[0]
     isRealtimeUserAllowed(userId: string, now?: Date): Promise<boolean>
   }
-  chatService: { repository: Pick<NotificationRelevanceDependencies, "findThread"> }
+  chatService: {
+    repository: Pick<NotificationRelevanceDependencies, "findThread">
+    countUnreadMessages(userId: string): Promise<number>
+  }
   safetyService: Pick<NotificationRelevanceDependencies, "hasBlockBetween">
   miniRoomService: { repository: { findInvite: NotificationRelevanceDependencies["findRoomInvite"] } }
 }): {
   resolveRecipientLocale: (userId: string) => Promise<PushLocale | undefined>
+  resolveRecipientBadge: (userId: string) => Promise<number>
   isDeliveryCurrent: ReturnType<typeof createNotificationRelevanceCheck>
 } {
   return {
     resolveRecipientLocale: (userId) => createRecipientLocaleResolver(services().authService.repository)(userId),
+    resolveRecipientBadge: (userId) => services().chatService.countUnreadMessages(userId),
     isDeliveryCurrent: createNotificationRelevanceCheck({
       isUserAllowed: (userId, now) => services().authService.isRealtimeUserAllowed(userId, now),
       hasBlockBetween: (userAId, userBId) => services().safetyService.hasBlockBetween(userAId, userBId),

@@ -225,7 +225,14 @@ export function usePushRegistration(
         })
         if (!active) return
         if (result.status === "registered") {
-          if (userId) rememberRegisteredPushDevice(userId, result.pushToken)
+          // A rotated OS token leaves the old Expo token registered to this
+          // account until Expo reports it; remove it now (best effort).
+          const staleToken = userId ? rememberRegisteredPushDevice(userId, result.pushToken) : null
+          if (staleToken) {
+            void removeDevice(MOBILE_HTTP_BASE_URL, sessionToken, staleToken).catch((error) => {
+              captureAppException(error, { feature: "push_stale_token_cleanup" })
+            })
+          }
           setPermissionStatus("granted")
         } else if (result.reason === "permission-denied") {
           setPermissionStatus("denied")
@@ -320,9 +327,13 @@ async function createAndroidNotificationChannel(): Promise<void> {
   if (Platform.OS !== "android") return
   const notifications = await loadNotificationsModule()
   ensureNotificationHandler(notifications)
+  // The server sends every push on channel "default". HIGH makes Android show
+  // messages, invites and matches as heads-up banners (DEFAULT is silent in
+  // the shade). Android never raises an existing channel's importance, so a
+  // phone that already created it keeps its old level until reinstall.
   await notifications.setNotificationChannelAsync("default", {
     name: "Blumi",
-    importance: notifications.AndroidImportance.DEFAULT,
+    importance: notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 180],
     lightColor: "#F26779"
   })

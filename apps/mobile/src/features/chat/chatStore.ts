@@ -38,6 +38,7 @@ export type ThreadListState =
   | { status: "failed"; errorMessage: string }
 
 let threadListState: ThreadListState = { status: "idle" }
+let threadListVersion = 0 // bumps per applied list reply or failure (push tap routing)
 export type MessageListState =
   | { status: "idle" }
   | { status: "loading" }
@@ -205,6 +206,7 @@ export function applyChatThreadListed(
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
   threadListState = { status: "ready" }
+  threadListVersion += 1
   notify()
 }
 
@@ -258,6 +260,7 @@ export function applyChatThreadListFailed(errorMessage: string): void {
     status: "failed",
     errorMessage: getThreadListErrorMessageForDisplay(errorMessage)
   }
+  threadListVersion += 1
   notify()
 }
 
@@ -676,6 +679,14 @@ export function hasThreadsFetched(): boolean {
 export function getThreadListState(): ThreadListState {
   return { ...threadListState }
 }
+
+export function getThreadListStatus(): ThreadListState["status"] { return threadListState.status }
+export function getThreadListVersion(): number { return threadListVersion }
+/** Re-renders only when a thread list reply or failure is applied. */
+export function useThreadListVersion(): number {
+  return useSyncExternalStore(subscribeToChatStore, getThreadListVersion, getThreadListVersion)
+}
+export function hasChatThread(threadId: string): boolean { return threadCache.some((thread) => thread.threadId === threadId) }
 
 function cloneThread(thread: ChatThread): ChatThread {
   return {

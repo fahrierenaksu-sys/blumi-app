@@ -1,5 +1,8 @@
 const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send"
+const EXPO_RECEIPTS_ENDPOINT = "https://exp.host/--/api/v2/push/getReceipts"
 const EXPO_PUSH_TOKEN_PATTERN = /^(?:ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/
+/** Expo accepts at most 1000 receipt ids per getReceipts request. */
+const MAX_RECEIPT_IDS_PER_REQUEST = 1000
 
 export interface PushNotification {
   title: string
@@ -20,17 +23,26 @@ export interface PushDeliveryOptions {
   /** Unix seconds after which the provider drops an undelivered message. */
   expiration?: number
   ttlSeconds?: number
+  /** iOS app icon badge: the recipient's unread message total at dispatch. */
+  badge?: number
 }
 
 export interface PushProvider {
   sendPush(pushToken: string, notification: PushNotification, options?: { signal?: AbortSignal }): Promise<void | { ticketId: string }>
   getReceipt?(ticketId: string, options?: { signal?: AbortSignal }): Promise<PushReceipt | null>
+  /** Batched receipts; a ticket missing from the map has no receipt yet. */
+  getReceipts?(ticketIds: readonly string[], options?: { signal?: AbortSignal }): Promise<Map<string, PushReceipt>>
 }
 
 export interface PushReceipt { status: "ok" | "error"; errorCode?: string }
 
 export class PushProviderRejection extends Error {
   constructor(readonly code: string) { super(`Expo push ticket was rejected: ${code}.`) }
+}
+
+/** The push service answered with a non-2xx status (429: project rate limit). */
+export class PushProviderHttpError extends Error {
+  constructor(readonly status: number) { super(`Expo push request failed with status ${status}.`) }
 }
 
 export function createDevelopmentPushProvider(): PushProvider {
@@ -50,19 +62,33 @@ export function createExpoPushProvider({
 }): PushProvider {
   const normalizedAccessToken = accessToken?.trim()
 
+  const getReceiptBatch = async (ticketIds: readonly string[], signal?: AbortSignal): Promise<Map<string, PushReceipt>> => {
+    const response = await fetcher(EXPO_RECEIPTS_ENDPOINT, {
+      method: "POST", signal,
+      headers: { "content-type": "application/json", ...(normalizedAccessToken ? { authorization: `Bearer ${normalizedAccessToken}` } : {}) },
+      body: JSON.stringify({ ids: ticketIds })
+    })
+    if (!response.ok) throw new Error("Receipt provider unavailable")
+    const payload = await readJsonPayload(response) as { data?: Record<string, unknown> } | null
+    const receipts = new Map<string, PushReceipt>()
+    for (const ticketId of ticketIds) {
+      const receipt = readExpoPushReceipt(payload?.data?.[ticketId])
+      if (receipt) receipts.set(ticketId, receipt)
+    }
+    return receipts
+  }
+
   return {
     async getReceipt(ticketId, options) {
-      const response = await fetcher("https://exp.host/--/api/v2/push/getReceipts", {
-        method: "POST", signal: options?.signal,
-        headers: { "content-type": "application/json", ...(normalizedAccessToken ? { authorization: `Bearer ${normalizedAccessToken}` } : {}) },
-        body: JSON.stringify({ ids: [ticketId] })
-      })
-      if (!response.ok) throw new Error("Receipt provider unavailable")
-      const payload = await readJsonPayload(response) as { data?: Record<string, unknown> } | null
-      const receipt = payload?.data?.[ticketId] as { status?: unknown; details?: { error?: unknown } } | undefined
-      if (!receipt) return null
-      if (receipt.status !== "ok" && receipt.status !== "error") throw new Error("Invalid push receipt")
-      return { status: receipt.status, ...(typeof receipt.details?.error === "string" ? { errorCode: receipt.details.error } : {}) }
+      return (await getReceiptBatch([ticketId], options?.signal)).get(ticketId) ?? null
+    },
+    async getReceipts(ticketIds, options) {
+      const receipts = new Map<string, PushReceipt>()
+      for (let start = 0; start < ticketIds.length; start += MAX_RECEIPT_IDS_PER_REQUEST) {
+        const batch = await getReceiptBatch(ticketIds.slice(start, start + MAX_RECEIPT_IDS_PER_REQUEST), options?.signal)
+        for (const [ticketId, receipt] of batch) receipts.set(ticketId, receipt)
+      }
+      return receipts
     },
     async sendPush(pushToken, notification, options) {
       const normalizedPushToken = pushToken.trim()
@@ -94,7 +120,7 @@ export function createExpoPushProvider({
       const payload = await readJsonPayload(response)
 
       if (!response.ok) {
-        throw new Error(`Expo push request failed with status ${response.status}.`)
+        throw new PushProviderHttpError(response.status)
       }
 
       const ticket = readExpoPushTicket(payload)
@@ -117,8 +143,16 @@ function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record
     ...(delivery.threadId ? { threadId: delivery.threadId } : {}),
     ...(delivery.channelId ? { channelId: delivery.channelId } : {}),
     ...(delivery.ttlSeconds !== undefined ? { ttl: delivery.ttlSeconds } : {}),
-    ...(delivery.expiration !== undefined ? { expiration: delivery.expiration } : {})
+    ...(delivery.expiration !== undefined ? { expiration: delivery.expiration } : {}),
+    ...(Number.isSafeInteger(delivery.badge) && delivery.badge! >= 0 ? { badge: delivery.badge! } : {})
   }
+}
+
+function readExpoPushReceipt(value: unknown): PushReceipt | null {
+  if (!value || typeof value !== "object") return null
+  const receipt = value as { status?: unknown; details?: { error?: unknown } }
+  if (receipt.status !== "ok" && receipt.status !== "error") throw new Error("Invalid push receipt")
+  return { status: receipt.status, ...(typeof receipt.details?.error === "string" ? { errorCode: receipt.details.error } : {}) }
 }
 
 interface ExpoPushTicket {

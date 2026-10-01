@@ -123,6 +123,31 @@ runRepositoryContract<ChatRepository>({
         expected.slice(3), "an unknown cursor falls back to the newest page")
     },
 
+    "unread totals per sender follow the same read cursor as the thread list (push badge)": async (backend) => {
+      const viewer = backend.id("viewer")
+      const ada = backend.id("ada")
+      const bo = backend.id("bo")
+      const withAda = thread(backend, "ada", "2026-09-30T10:00:00.000Z", [viewer, ada])
+      const withBo = thread(backend, "bo", "2026-09-30T10:00:00.000Z", [viewer, bo])
+      const others = thread(backend, "others", "2026-09-30T10:00:00.000Z", [ada, bo])
+      for (const item of [withAda, withBo, others]) await backend.repository.saveThread(item)
+      assert.deepEqual(await backend.repository.countUnreadMessagesBySender(viewer), [])
+      await backend.repository.createMessage(message(withAda, "a1", "2026-09-30T10:01:00.000Z", "hi", ada))
+      await backend.repository.createMessage(message(withAda, "a2", "2026-09-30T10:02:00.000Z", "hi", ada))
+      await backend.repository.createMessage(message(withAda, "mine", "2026-09-30T10:03:00.000Z", "hi", viewer))
+      await backend.repository.createMessage(message(withBo, "b1", "2026-09-30T10:01:00.000Z", "hi", bo))
+      await backend.repository.createMessage(message(others, "x", "2026-09-30T10:01:00.000Z", "hi", ada))
+      await backend.repository.advanceReadCursor({ threadId: withAda.threadId, userId: viewer, readAt: "2026-09-30T10:01:30.000Z" })
+      const counts = await backend.repository.countUnreadMessagesBySender(viewer)
+      assert.deepEqual(counts.sort((left, right) => left.senderUserId.localeCompare(right.senderUserId)),
+        [{ senderUserId: ada, unreadCount: 1 }, { senderUserId: bo, unreadCount: 1 }].sort((left, right) => left.senderUserId.localeCompare(right.senderUserId)))
+      const listed = await backend.repository.listThreads(viewer)
+      assert.equal(listed.reduce((total, item) => total + (item.unreadCount ?? 0), 0), 2, "the badge equals the app's unread total")
+      await backend.repository.advanceReadCursor({ threadId: withBo.threadId, userId: viewer, readAt: "2026-09-30T10:05:00.000Z" })
+      await backend.repository.advanceReadCursor({ threadId: withAda.threadId, userId: viewer, readAt: "2026-09-30T10:05:00.000Z" })
+      assert.deepEqual(await backend.repository.countUnreadMessagesBySender(viewer), [])
+    },
+
     "thread pages are newest first with a stable createdAt/threadId cursor and per-viewer unread counts": async (backend) => {
       const viewer = backend.id("viewer")
       const createdAt = "2026-09-30T10:00:00.000Z"

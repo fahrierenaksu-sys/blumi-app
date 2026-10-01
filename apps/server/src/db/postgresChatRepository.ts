@@ -102,6 +102,23 @@ export function createPostgresChatRepository(
       return { threads, nextCursor: result.rows.length > limit ? encodeThreadCursor({ userId, threadId: last.threadId, createdAt: String(rows.at(-1)?.cursor_created_at ?? last.createdAt) }) : null }
     },
 
+    async countUnreadMessagesBySender(userId) {
+      // Same predicate as listThreadsPage's unread_count; per thread it is an
+      // index range scan on blumi_chat_messages(thread_id, sent_at).
+      const result = await pool.query(
+        `SELECT message.sender_user_id, count(*)::int AS unread_count
+           FROM blumi_chat_thread_participants AS viewer
+           JOIN blumi_chat_messages AS message
+             ON message.thread_id = viewer.thread_id
+            AND message.sender_user_id <> viewer.user_id
+            AND message.sent_at > COALESCE(viewer.last_read_at, '-infinity'::timestamptz)
+          WHERE viewer.user_id = $1
+          GROUP BY message.sender_user_id`,
+        [userId]
+      )
+      return result.rows.map((row) => ({ senderUserId: String(row.sender_user_id), unreadCount: Number(row.unread_count) }))
+    },
+
     async findThread(threadId) {
       const result = await pool.query(
         `SELECT

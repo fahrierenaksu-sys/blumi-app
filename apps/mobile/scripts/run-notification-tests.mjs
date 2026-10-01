@@ -26,7 +26,13 @@ const sourceFiles = [
   "src/features/notifications/notificationPresentationModel.ts",
   "src/features/notifications/notificationPresentationModel.test.ts",
   "src/features/notifications/pushDeviceRegistry.ts",
-  "src/features/notifications/pushDeviceRegistry.test.ts"
+  "src/features/notifications/pushDeviceRegistry.test.ts",
+  "src/features/notifications/notificationTapRouting.ts",
+  "src/features/notifications/notificationTapRouting.test.ts",
+  "src/features/notifications/appIconBadgeModel.ts",
+  "src/features/notifications/appIconBadgeModel.test.ts",
+  "src/features/notifications/signedOutNotificationTaps.ts",
+  "src/features/notifications/signedOutNotificationTaps.test.ts"
 ]
 
 try {
@@ -71,6 +77,9 @@ try {
       join(outputDirectory, "features/notifications/notificationPreferencesModel.test.js"),
       join(outputDirectory, "features/notifications/notificationPresentationModel.test.js"),
       join(outputDirectory, "features/notifications/pushDeviceRegistry.test.js"),
+      join(outputDirectory, "features/notifications/notificationTapRouting.test.js"),
+      join(outputDirectory, "features/notifications/appIconBadgeModel.test.js"),
+      join(outputDirectory, "features/notifications/signedOutNotificationTaps.test.js"),
       resolve(workspaceRoot, "src/features/notifications/notificationResponseDelivery.test.mjs")
     ],
     {
