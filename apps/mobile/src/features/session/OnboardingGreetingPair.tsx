@@ -313,6 +313,14 @@ export function OnboardingGreetingPair({
       pointerEvents="none"
       style={styles.pair}
     >
+      {/* Every wave frame decodes up front at its drawn size (a 1-pt, near-
+          transparent clip), so a frame swap never shows an empty frame on
+          the first wave (ONB-04). */}
+      <View style={styles.framePreload}>
+        {[...FEMALE_WAVE_FRAMES, ...MALE_WAVE_FRAMES].map((source, index) => (
+          <Image key={index} fadeDuration={0} resizeMode="contain" source={source} style={styles.framePreloadImage} />
+        ))}
+      </View>
       <Animated.View style={{ opacity: maleEntrance, transform: [
         {
           translateX: maleEntrance.interpolate({
@@ -398,6 +406,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   character: { width: 108, height: 178 },
+  framePreload: { position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "hidden", opacity: 0.01 },
+  framePreloadImage: { position: "absolute", width: 108, height: 178 },
   male: { marginRight: -8 },
   female: { marginLeft: -8 }
 })
