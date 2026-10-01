@@ -9,6 +9,10 @@ import type {
 import { randomUUID } from "node:crypto"
 import { createInMemoryWatchAuthority, type DiscoveryWatchAuthorization } from "./discoveryWatchAuthority"
 
+export interface DiscoveryWatchRestoreOptions {
+  coolDownUntil?: Date
+}
+
 export interface DiscoveryWatchClaim extends DiscoveryWatchRecord {
   claimToken: string
   generation: string
@@ -89,7 +93,11 @@ export interface MatchRepository {
   createMatch(match: MatchRecord): Promise<MatchRecord>
   findDiscoveryWatch(userId: string): Promise<DiscoveryWatchRecord | null>
   claimNextDiscoveryWatch(now: Date): Promise<DiscoveryWatchClaim | null>
-  restoreDiscoveryWatch(watch: DiscoveryWatchClaim): Promise<DiscoveryWatchRecord>
+  /**
+   * Releases a claim. With `coolDownUntil` the watch stays unclaimable until
+   * then (a watch with no candidate is not rescanned every cycle).
+   */
+  restoreDiscoveryWatch(watch: DiscoveryWatchClaim, options?: DiscoveryWatchRestoreOptions): Promise<DiscoveryWatchRecord>
   completeDiscoveryWatch(watch: DiscoveryWatchClaim): Promise<boolean>
   isDiscoveryWatchClaimCurrent(watch: DiscoveryWatchClaim, now: Date): Promise<boolean>
   upsertDiscoveryWatch(watch: DiscoveryWatchRecord): Promise<DiscoveryWatchRecord>
@@ -277,10 +285,16 @@ export function createInMemoryMatchRepository(
           () => { store.watchClaims.delete(next.userId); store.discoveryWatches.delete(next.userId) }) }
       })
     },
-    async restoreDiscoveryWatch(watch) {
+    async restoreDiscoveryWatch(watch, options) {
       return store.watchAuthority.exclusive(watch.userId, async () => {
       if (store.watchClaims.get(watch.userId)?.token === watch.claimToken && store.discoveryWatches.has(watch.userId)) {
-        store.watchClaims.delete(watch.userId)
+        if (options?.coolDownUntil) {
+          // A claim nobody holds: blocks claiming until it lapses, and a
+          // preference change (upsert) clears it at once.
+          store.watchClaims.set(watch.userId, { token: `cooldown:${randomUUID()}`, expiresAt: options.coolDownUntil.getTime() })
+        } else {
+          store.watchClaims.delete(watch.userId)
+        }
         const current = store.discoveryWatches.get(watch.userId)!
         store.discoveryWatches.set(watch.userId, { ...current, updatedAt: watch.updatedAt })
       }
