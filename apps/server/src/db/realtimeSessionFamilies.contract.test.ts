@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { randomBytes, randomInt } from "node:crypto"
+import type { Pool } from "pg"
 import { createInMemoryAuthRepository, type AuthRepository } from "../auth/authRepository"
 import { createAuthService } from "../auth/authService"
 import { createAccountRecord, createBlumiBackendStore, type AccountRecord, type SessionRecord } from "../auth/authStore"
@@ -35,12 +36,33 @@ async function saveSession(
   await auth.saveSession(session)
 }
 
+/**
+ * The PostgreSQL repository leaves moderation to the moderation service, so
+ * `saveAccount` ignores it there; the test writes it to the same columns.
+ */
+function withModerationWrites(repository: AuthRepository, pool: Pool): AuthRepository {
+  return {
+    ...repository,
+    async saveAccount(account) {
+      await repository.saveAccount(account)
+      if (!account.moderation) return
+      await pool.query(
+        `UPDATE blumi_accounts
+            SET moderation_status = $2, moderation_updated_at = $3, suspended_until = $4
+          WHERE user_id = $1`,
+        [account.userId, account.moderation.status, account.moderation.updatedAt,
+          account.moderation.suspendedUntil ?? null]
+      )
+    }
+  }
+}
+
 runRepositoryContract<AuthRepository>({
   name: "realtime session families",
   databaseUrl: process.env.DATABASE_URL,
   factories: {
     inMemory: () => createInMemoryAuthRepository(createBlumiBackendStore()),
-    postgres: (pool) => createPostgresAuthRepository(pool)
+    postgres: (pool) => withModerationWrites(createPostgresAuthRepository(pool), pool)
   },
   cases: {
     "returns exactly the requested families that still have an unexpired token": async ({ repository, id }) => {
