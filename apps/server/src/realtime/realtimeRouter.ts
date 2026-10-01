@@ -27,6 +27,8 @@ export interface RealtimeRouter {
     event: ClientEvent
   ): Promise<void>
   handleDisconnect(connection: RealtimeConnection): Promise<void>
+  /** Shutdown: the same cleanup for every socket at once, in batched transactions. */
+  handleDisconnects(connections: readonly RealtimeConnection[]): Promise<void>
 }
 
 export interface CreateRealtimeRouterOptions {
@@ -524,6 +526,13 @@ export function createRealtimeRouter(
       const clearedRoomIds = await presenceService.disconnectConnection(
         connection.connectionId,
         connection.userId
+      )
+      await Promise.all(clearedRoomIds.map(publishRoomPresence))
+    },
+    async handleDisconnects(connections) {
+      for (const connection of connections) motion.disconnect(connection.connectionId)
+      const clearedRoomIds = await presenceService.disconnectConnections(
+        connections.map((connection) => ({ connectionId: connection.connectionId, userId: connection.userId }))
       )
       await Promise.all(clearedRoomIds.map(publishRoomPresence))
     }

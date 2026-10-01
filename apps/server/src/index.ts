@@ -6,6 +6,11 @@ import {
 import { createRealtimeServer } from "./realtime/realtimeServer"
 import { createConnectionManager } from "./realtime/connectionManager"
 import { createRealtimeTicketService } from "./realtime/realtimeTicketService"
+import {
+  connectionSetupLimitForPool,
+  createConnectionSetupGate,
+  DEFAULT_CONNECTION_SETUP_LIMIT
+} from "./realtime/connectionSetupGate"
 import { startNotificationOutboxWorker } from "./notifications/notificationOutboxWorker"
 import { startDiscoveryWatchWorker } from "./matches/discoveryWatchWorker"
 import { createAdminTokenService } from "./admin/adminTokenService"
@@ -49,7 +54,12 @@ const connectionManager = createConnectionManager({
 const realtimeTicketService = createRealtimeTicketService({
   authService: services.authService,
   store: services.realtimeTicketStore,
-  requireSharedStore: config.nodeEnv === "production"
+  requireSharedStore: config.nodeEnv === "production",
+  // Ticket requests and socket upgrades share half the database pool, so a
+  // reconnect storm cannot starve chat and room traffic.
+  setupGate: createConnectionSetupGate(config.authRepositoryMode === "postgres"
+    ? connectionSetupLimitForPool(config.databasePool.max)
+    : DEFAULT_CONNECTION_SETUP_LIMIT)
 })
 const notificationOutboxWorker = startNotificationOutboxWorker({
   notificationService: services.notificationService,
