@@ -50,6 +50,16 @@ test("MiniRoom UI-thread walking keeps the RoomWorld speed, curve and Reduce Mot
   assert.doesNotMatch(positions + walk, /Easing\.out\(Easing\.cubic\)/)
 })
 
+test("back-facing avatars are never ghosted and real sitting art is not squashed (ROOM-03, ROOM-04)", () => {
+  const avatarLayer = read("src/features/miniRoom/scene/AvatarLayer.tsx")
+  const renderer = read("src/features/roomV2/components/RoomRenderer2D.tsx")
+  assert.doesNotMatch(avatarLayer, /facing === "back" \? 0\.8/)
+  assert.doesNotMatch(renderer, /opacity: item\.direction === "back"/)
+  assert.match(renderer, /\{ scale: item\.direction === "back" \? 0\.96 : 1 \}/)
+  assert.match(avatarLayer, /scaleY: Animated\.multiply\(breatheScaleY, sittingScaleY\)/)
+  assert.doesNotMatch(avatarLayer, /isSitting \? 0\.86/)
+})
+
 test("MiniRoom partner arrival highlight is a finite one-shot sequence", () => {
   const avatarLayer = read("src/features/miniRoom/scene/AvatarLayer.tsx")
   const effectStart = avatarLayer.indexOf("if (!showJoinPulse || !motionPolicy.animateJoin)")

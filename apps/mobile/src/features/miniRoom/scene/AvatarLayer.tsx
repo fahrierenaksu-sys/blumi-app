@@ -2,7 +2,10 @@ import { memo, useEffect, useMemo, useRef } from "react"
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native"
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
-import { getMiniRoomAvatarRenderLayers } from "../miniRoomAvatarMotion"
+import {
+  getMiniRoomAvatarRenderLayers,
+  getMiniRoomAvatarSittingScaleY
+} from "../miniRoomAvatarMotion"
 import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
 import {
   MINI_ROOM_PARTNER_ARRIVAL_MS,
@@ -137,6 +140,14 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       avatar.facing,
       avatar.motion
     ]
+  )
+  const sittingScaleY = useMemo(
+    () => getMiniRoomAvatarSittingScaleY({
+      appearance: avatar.appearance,
+      motion: avatar.motion,
+      facing: avatar.facing
+    }),
+    [avatar.appearance, avatar.facing, avatar.motion]
   )
   const usesAnimatedAvatarFrames = roomAvatarLayers.some(
     (layer) => (layer.animation?.frames.length ?? 0) > 1
@@ -300,7 +311,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
 
   const facingSignX = avatar.facing === "left" ? -1 : 1
   const facingLean = avatar.facing === "left" || avatar.facing === "right" ? 1 : 0
-  const facingBackDim = avatar.facing === "back" ? 0.82 : 1
   const isSitting = avatar.motion === "sitting"
 
   const breatheScaleY = breatheRef.interpolate({
@@ -428,11 +438,12 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
           style={[
             styles.avatarImageFill,
             {
-              opacity: facingBackDim,
+              // ROOM-03: a back-facing avatar stays fully opaque (no ghost).
               transform: [
                 { translateY: Animated.add(walkTranslateY, breatheTranslateY) },
                 { scaleX: facingSignX },
-                { scaleY: Animated.multiply(breatheScaleY, isSitting ? 0.86 : 1) },
+                // ROOM-04: squash only the standing idle fallback, never real sitting art.
+                { scaleY: Animated.multiply(breatheScaleY, sittingScaleY) },
                 { rotate: leanRotate },
                 { rotate: speakingRotate }
               ]
