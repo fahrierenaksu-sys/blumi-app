@@ -215,7 +215,10 @@ export function createRealtimeRouter(
         case "mini_room.scene_enter": {
           const parsed = miniRoomSceneCommandSchema.safeParse(event.payload)
           if (!parsed.success) return
-          await motion.enter(connection.connectionId, connection.userId, parsed.data.miniRoomId)
+          // The sign-in session tells one phone's reconnect from another device.
+          await motion.enter(connection.connectionId, connection.userId, parsed.data.miniRoomId,
+            connection.sessionFamilyId && connection.openedOrder !== undefined
+              ? { key: connection.sessionFamilyId, order: connection.openedOrder } : undefined)
           return
         }
         case "mini_room.scene_exit": {

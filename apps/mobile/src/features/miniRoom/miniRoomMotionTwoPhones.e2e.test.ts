@@ -50,6 +50,7 @@ interface ServerHarness {
 }
 interface SimSocket {
   received(type: string, since?: number): { event: { type: string } }[]
+  send(type: string, payload: unknown): number
   barrier(): Promise<void>
   close(): Promise<number>
 }
@@ -464,6 +465,31 @@ test("a partner on an app without motion sync (TestFlight build 14) never enters
   await oldPhone.barrier()
   assert.deepEqual(oldPhone.received("mini_room.avatar_moved"), [], "the server sends motion only to sockets in the scene")
   assert.deepEqual(oldPhone.received("mini_room.motion_snapshot"), [])
+})
+
+test("a late scene entry from the phone's own abandoned socket never takes the room away from it", async (t) => {
+  const { harness, ada, bora, miniRoomId } = await startServer()
+  const roomDecorScene = loadSharedRoomScene()
+  // Ada's phone had a socket before this one (same sign-in session); its
+  // entry, held up by a slow check, reaches the server after the reconnect.
+  const abandoned = await ada.connect()
+  const phoneA = createPhone({ harness, me: ada, partner: bora, miniRoomId, roomDecorScene })
+  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene })
+  t.after(async () => {
+    phoneA.close()
+    phoneB.close()
+    await abandoned.close()
+    await harness.close()
+  })
+  phoneA.open()
+  phoneB.open()
+  await bothInScene(phoneA, phoneB)
+  abandoned.send("mini_room.scene_enter", { miniRoomId })
+  await abandoned.barrier()
+  await new Promise((done) => setTimeout(done, 50))
+  assert.notEqual(phoneA.view().motion.superseded, true, "Ada's phone is not told another device took over")
+  await assertPartnerSeesWalk(phoneA, phoneB, { x: 0.6, y: 0.8 })
+  await assertPartnerSeesWalk(phoneB, phoneA, { x: 0.45, y: 0.75 })
 })
 
 function loadSeatHotspotId(scene: ResolvedRoomV2Scene): string {
