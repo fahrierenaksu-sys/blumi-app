@@ -2,6 +2,7 @@ import cors from "@fastify/cors"
 import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
+import { classifyDatabaseError } from "./operations/databaseErrorStatus"
 import helmet from "@fastify/helmet"
 import rateLimit from "@fastify/rate-limit"
 import Fastify, {
@@ -316,8 +317,25 @@ function registerProductionMiddleware(
   })
 }
 
+const DATABASE_ERROR_MESSAGES = {
+  409: "That changed at the same moment. Refresh and try again.",
+  500: "Something went wrong.",
+  503: "Service temporarily unavailable. Try again shortly."
+} as const
+
 function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request, reply) => {
+    const database = classifyDatabaseError(error)
+    if (database) {
+      // Only the SQLSTATE is logged; PostgreSQL text can contain row values.
+      request.log.error({ errorKind: safeOperationalErrorKind(error), sqlState: database.sqlState }, "Database request error")
+      if (database.retryAfterSeconds) reply.header("Retry-After", String(database.retryAfterSeconds))
+      return reply.code(database.statusCode).send({
+        error: DATABASE_ERROR_MESSAGES[database.statusCode],
+        statusCode: database.statusCode,
+        requestId: request.id
+      })
+    }
     const statusCode = getErrorStatusCode(error)
     if (statusCode >= 500) {
       request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Unhandled request error")
