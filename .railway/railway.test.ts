@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 import { createRailwayContext, type ServiceNode } from "railway/iac"
 import { GRACEFUL_SHUTDOWN_TIMEOUT_MS } from "../apps/server/src/operations/serviceLifecycle"
@@ -29,5 +30,25 @@ for (const environment of ["staging", "production"] as const) {
     })
     assert.deepEqual(api.variables.BLUMI_TRUST_PROXY, { type: "literal", value: "100.64.0.0/10" })
     assert.equal(api.variables.DATABASE_URL, undefined)
+    // Railpack reads RAILPACK_NODE_VERSION before engines and .nvmrc; an
+    // exact pin keeps the deployed runtime equal to the verified one.
+    assert.deepEqual(api.variables.RAILPACK_NODE_VERSION, { type: "literal", value: pinnedNodeVersion })
   })
 }
+
+const repositoryFile = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8")
+const pinnedNodeVersion = repositoryFile(".nvmrc").trim()
+
+test("one Node version is pinned for local, CI, OTA publish and Railway", () => {
+  assert.match(pinnedNodeVersion, /^22\.\d+\.\d+$/)
+  // Node 22.23.2 (2026-07-28) is the newest 22.x security release; never pin below it.
+  const [, minor, patch] = pinnedNodeVersion.split(".").map(Number)
+  assert.ok(minor > 23 || (minor === 23 && patch >= 2), `Node ${pinnedNodeVersion} predates the 22.23.2 security release`)
+  const engines = JSON.parse(repositoryFile("package.json")).engines.node
+  assert.equal(engines, `>=${pinnedNodeVersion} <23`)
+  for (const workflow of [".github/workflows/verify.yml", ".github/workflows/develop-ota-publish.yml"]) {
+    const source = repositoryFile(workflow)
+    assert.match(source, /node-version-file: \.nvmrc/, workflow)
+    assert.doesNotMatch(source, /node-version: /, workflow)
+  }
+})
