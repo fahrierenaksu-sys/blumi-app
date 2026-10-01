@@ -14,21 +14,35 @@ export interface FirebasePhoneIdentity {
 }
 
 export interface FirebaseAuthVerifier {
+  /** Rejects revoked, disabled or deleted Firebase users (`checkRevoked`). */
   verifyIdToken(idToken: string): Promise<FirebasePhoneIdentity>
+  /**
+   * Invalidates every Firebase refresh token of the user, so the client SDK
+   * can no longer mint ID tokens silently; ID tokens already minted fail the
+   * revocation check in `verifyIdToken`. A new SMS verification is required.
+   */
+  revokeRefreshTokens?(uid: string): Promise<void>
 }
+
+/** The firebase-admin calls Blumi uses; injectable for tests. */
+export type FirebaseAdminAuthClient = Pick<Auth, "verifyIdToken" | "revokeRefreshTokens" | "deleteUser">
 
 export interface FirebaseAuthVerifierOptions {
   projectId?: string
   serviceAccountJson?: string
   serviceAccountJsonBase64?: string
+  authClient?: FirebaseAdminAuthClient
 }
 
 export function createFirebaseAuthVerifier(
   options: FirebaseAuthVerifierOptions = {}
-): FirebaseAuthVerifier & { deleteUser(uid: string): Promise<void> } {
-  let authClient: Auth | undefined
+): FirebaseAuthVerifier & {
+  deleteUser(uid: string): Promise<void>
+  revokeRefreshTokens(uid: string): Promise<void>
+} {
+  let authClient: FirebaseAdminAuthClient | undefined = options.authClient
 
-  function getAuthClient(): Auth {
+  function getAuthClient(): FirebaseAdminAuthClient {
     if (authClient) return authClient
     const app = getFirebaseApp(options)
     authClient = getAuth(app)
@@ -39,7 +53,12 @@ export function createFirebaseAuthVerifier(
     async deleteUser(uid) {
       await getAuthClient().deleteUser(uid)
     },
+    async revokeRefreshTokens(uid) {
+      await getAuthClient().revokeRefreshTokens(uid)
+    },
     async verifyIdToken(idToken) {
+      // checkRevoked: tokens minted before revokeRefreshTokens (auth_time
+      // older than tokensValidAfterTime) and disabled users are rejected.
       const decoded = await getAuthClient().verifyIdToken(idToken, true)
       if (
         typeof decoded.uid !== "string" ||
