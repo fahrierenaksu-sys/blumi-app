@@ -4,6 +4,8 @@ import {
   RealtimeClient,
   REALTIME_CONNECT_TIMEOUT_MS,
   REALTIME_FAST_RECONNECT_ATTEMPTS,
+  REALTIME_LIVENESS_CLOSE_CODE,
+  REALTIME_LIVENESS_GRACE_MS,
   type RealtimeConnectionStatus,
   type RealtimeSocket
 } from "./realtimeClient"
@@ -25,10 +27,16 @@ class FakeSocket implements RealtimeSocket {
 
   public constructor(public readonly protocols: string[]) {}
 
+  public closeCode: number | undefined
   public send(): void {}
-  public close(): void {
+  public close(code?: number): void {
     this.closed = true
+    this.closeCode = code
     this.readyState = 3
+  }
+
+  public message(data: string): void {
+    this.onmessage?.({ data })
   }
 
   public open(): void {
@@ -53,6 +61,7 @@ function createHarness(
   options: {
     random?: () => number
     ticketProvider?: () => Promise<string>
+    now?: () => number
   } = {}
 ): Harness {
   const sockets: FakeSocket[] = []
@@ -63,6 +72,7 @@ function createHarness(
     options.ticketProvider ?? (async () => `lifecycle-ticket-${++requests}`),
     {
       random: options.random ?? (() => 1 - Number.EPSILON),
+      ...(options.now ? { now: options.now } : {}),
       createSocket: (_url, protocols) => {
         const socket = new FakeSocket(protocols)
         sockets.push(socket)
@@ -149,9 +159,9 @@ test("foreground cancels a pending backoff and starts the fast attempts over", a
   assert.equal(harness.sockets.length, socketsBeforeResume + 1, "retried at once, not after 16 s")
 
   // The backoff was reset: the next failure retries within the first
-  // attempt's one-second ceiling.
+  // attempt's one-second window (the harness picks its latest point).
   harness.sockets.at(-1)?.drop()
-  context.mock.timers.tick(999)
+  context.mock.timers.tick(998)
   await flushTicketRequest()
   assert.equal(harness.sockets.length, socketsBeforeResume + 1)
   context.mock.timers.tick(1)
@@ -297,4 +307,103 @@ test("a socket that never opens is abandoned after the connect timeout", async (
   context.mock.timers.tick(REALTIME_CONNECT_TIMEOUT_MS * 2)
   assert.equal(harness.sockets[1]?.closed, false, "an open socket is never timed out")
   harness.client.disconnect()
+})
+
+// ── Liveness (2026-10-01) ──────────────────────────────────────────────────
+// Mobile WebSocket APIs never surface ping frames, so a half-open socket (a
+// Wi-Fi to cellular handover, a NAT timeout) used to look connected until the
+// platform gave up minutes later. The server now sends a heartbeat event every
+// intervalMs; a client that has seen one treats silence as a dead socket.
+
+function useFakeClock(context: TestContext): () => number {
+  context.mock.timers.enable({ apis: ["setTimeout", "Date"] })
+  return () => Date.now()
+}
+
+const HEARTBEAT = JSON.stringify({ type: "realtime.heartbeat", payload: { intervalMs: 15_000 } })
+
+test("a socket silent past the heartbeat interval plus grace is replaced at once", async (context) => {
+  const now = useFakeClock(context)
+  const harness = createHarness({ now })
+  const events: unknown[] = []
+  harness.client.onServerEvent((event) => { events.push(event) })
+  harness.client.connect("token-liveness")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  harness.sockets[0]?.message(HEARTBEAT)
+  assert.deepEqual(events, [], "heartbeats are a transport signal, not an app event")
+
+  context.mock.timers.tick(15_000 + REALTIME_LIVENESS_GRACE_MS - 1)
+  assert.equal(harness.sockets[0]?.closed, false)
+  context.mock.timers.tick(1)
+  assert.equal(harness.sockets[0]?.closed, true)
+  assert.equal(harness.sockets[0]?.closeCode, REALTIME_LIVENESS_CLOSE_CODE)
+  context.mock.timers.tick(0)
+  await flushTicketRequest()
+  assert.equal(harness.sockets.length, 2, "reconnected without waiting for a backoff")
+  assert.deepEqual(harness.sockets[1]?.protocols, ["ticket-lifecycle-ticket-2"])
+  harness.client.disconnect()
+})
+
+test("any inbound frame keeps a socket alive and heartbeats keep re-arming it", async (context) => {
+  const now = useFakeClock(context)
+  const harness = createHarness({ now })
+  harness.client.connect("token-liveness-traffic")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  harness.sockets[0]?.message(HEARTBEAT)
+  for (let second = 0; second < 120; second += 5) {
+    context.mock.timers.tick(5_000)
+    // Even a frame this build cannot parse proves the socket is alive.
+    harness.sockets[0]?.message(second % 15 === 0 ? HEARTBEAT : "{not json")
+  }
+  assert.equal(harness.sockets[0]?.closed, false)
+  assert.equal(harness.sockets.length, 1)
+  harness.client.disconnect()
+})
+
+test("liveness is never enforced against a server that sends no heartbeats", async (context) => {
+  const now = useFakeClock(context)
+  const harness = createHarness({ now })
+  harness.client.connect("token-old-server")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  context.mock.timers.tick(10 * 60_000)
+  assert.equal(harness.sockets[0]?.closed, false)
+  assert.equal(harness.sockets.length, 1)
+  harness.client.disconnect()
+})
+
+test("returning to the foreground replaces an open socket that went silent while suspended", async (context) => {
+  let clock = 1_000_000
+  const harness = createHarness({ now: () => clock })
+  useFakeTimers(context)
+  harness.client.connect("token-silent-resume")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  harness.sockets[0]?.message(HEARTBEAT)
+  // An inactive app keeps its socket; timers stall while iOS freezes it.
+  harness.client.setAppActive(false)
+  clock += 15_000 + REALTIME_LIVENESS_GRACE_MS
+  harness.client.setAppActive(true)
+  await flushTicketRequest()
+  assert.equal(harness.sockets[0]?.closed, true)
+  assert.equal(harness.sockets[0]?.closeCode, REALTIME_LIVENESS_CLOSE_CODE)
+  assert.equal(harness.sockets.length, 2)
+  harness.client.disconnect()
+})
+
+test("background and sign-out send a normal close frame so the server releases the socket at once", async (context) => {
+  useFakeTimers(context)
+  const harness = createHarness()
+  harness.client.connect("token-close-codes")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  harness.client.suspend()
+  assert.equal(harness.sockets[0]?.closeCode, 1000)
+  harness.client.setAppActive(true)
+  await flushTicketRequest()
+  harness.sockets[1]?.open()
+  harness.client.disconnect()
+  assert.equal(harness.sockets[1]?.closeCode, 1000)
 })

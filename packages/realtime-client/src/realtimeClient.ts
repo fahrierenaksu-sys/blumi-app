@@ -25,9 +25,35 @@ export interface RealtimeConnectionMeta {
 export const REALTIME_AUTH_INVALID_CLOSE_CODE = 4401
 /** Attempts before the status changes from "reconnecting" to "unreachable". */
 export const REALTIME_FAST_RECONNECT_ATTEMPTS = 10
-const FAST_RECONNECT_CEILING_MS = 30_000
+/**
+ * Ceiling of the fast attempts. With a 1 s base the retries after the first
+ * wait 1-2, 2-4, 4-8 and then 7.5-15 s, so a phone that lost the server for a
+ * minute is back within seconds of its return instead of up to 30 s later.
+ */
+export const REALTIME_FAST_RECONNECT_CEILING_MS = 15_000
 /** Slow retries continue indefinitely, never more than this far apart. */
-export const REALTIME_SLOW_RECONNECT_CEILING_MS = 60_000
+export const REALTIME_SLOW_RECONNECT_CEILING_MS = 30_000
+/**
+ * The first retry after an ordinary drop waits a uniformly random 0-1 s
+ * (full jitter): immediate for the user, spread for the server.
+ */
+export const REALTIME_FIRST_RECONNECT_WINDOW_MS = 1_000
+/**
+ * The first retry after a server-wide close (restart or deploy 1012, going
+ * away 1001, overload 1013) is spread uniformly over 0-5 s, so 5,000 clients
+ * reconnect at about 1,000 per second instead of in the same instant.
+ */
+export const REALTIME_RESTART_RECONNECT_WINDOW_MS = 5_000
+const SERVER_WIDE_CLOSE_CODES: ReadonlySet<number> = new Set([1001, 1012, 1013])
+/**
+ * Silence tolerated after the server's announced heartbeat interval before the
+ * socket is declared dead. A half-open socket (Wi-Fi to cellular handover, NAT
+ * timeout) otherwise looks connected until the platform gives up minutes later.
+ */
+export const REALTIME_LIVENESS_GRACE_MS = 10_000
+/** Close code this client sends when it abandons a silent socket. */
+export const REALTIME_LIVENESS_CLOSE_CODE = 4000
+const CLIENT_NORMAL_CLOSE_CODE = 1000
 /**
  * A socket must stay open this long (or deliver an authenticated server
  * event) before the backoff resets, so an accept-then-close loop keeps
@@ -61,7 +87,8 @@ export interface RealtimeSocket {
   onclose: ((event: { code: number }) => void) | null
   onerror: (() => void) | null
   send(data: string): void
-  close(): void
+  /** Code 1000 or 3000-4999 and a short reason, as the WebSocket API allows. */
+  close(code?: number, reason?: string): void
 }
 
 export type RealtimeSocketFactory = (url: string, protocols: string[]) => RealtimeSocket
@@ -85,7 +112,11 @@ export interface RealtimeClientOptions {
   onDroppedEvent?: (drop: RealtimeEventDrop) => void
   /** Socket constructor; defaults to the platform's global WebSocket. */
   createSocket?: RealtimeSocketFactory
+  /** Millisecond clock for liveness; injectable for deterministic tests. */
+  now?: () => number
 }
+
+type ReconnectKind = "default" | "server_wide" | "immediate"
 
 export class RealtimeTicketRequestError extends Error {
   public constructor(public readonly statusCode: number) {
@@ -131,6 +162,10 @@ export class RealtimeClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
   private connectTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+  private livenessTimer: ReturnType<typeof setTimeout> | null = null
+  /** Set once the current socket's server announced heartbeats; null otherwise. */
+  private livenessTimeoutMs: number | null = null
+  private lastInboundAt = 0
   private ticketRequestInFlight = false
   /** The server refused this session (401/403 ticket, 1008/4401 close); only connect() retries. */
   private sessionRefused = false
@@ -150,9 +185,11 @@ export class RealtimeClient {
     this.random = options.random ?? Math.random
     this.onDroppedEvent = options.onDroppedEvent ?? reportDroppedEventInDevelopment
     this.createSocket = options.createSocket ?? createGlobalWebSocket
+    this.now = options.now ?? Date.now
   }
 
   private readonly random: () => number
+  private readonly now: () => number
   private readonly createSocket: RealtimeSocketFactory
   private readonly onDroppedEvent: (drop: RealtimeEventDrop) => void
   private readonly droppedEventCounts: RealtimeEventDropCounts = {
@@ -178,6 +215,12 @@ export class RealtimeClient {
     if (result.kind === "valid" && result.event.type !== "realtime.error") {
       // The server only sends product events on an authorized socket.
       this.markConnectionHealthy()
+    }
+    if (result.kind === "valid" && result.event.type === "realtime.heartbeat") {
+      // Transport signal only: it arms liveness and never reaches listeners.
+      this.livenessTimeoutMs = result.event.payload.intervalMs + REALTIME_LIVENESS_GRACE_MS
+      this.armLivenessTimer()
+      return
     }
     if (result.kind === "unknown") {
       this.recordDrop({ reason: "unknown_type", type: result.type })
@@ -218,7 +261,7 @@ export class RealtimeClient {
     this.sessionToken = sessionToken
     this.connectionGeneration += 1
     this.clearReconnectTimer()
-    this.closeCurrentSocket()
+    this.closeCurrentSocket(CLIENT_NORMAL_CLOSE_CODE, "Client reconnecting")
     this.emitStatus("connecting")
 
     if (!this.networkConnected) {
@@ -276,6 +319,7 @@ export class RealtimeClient {
       [`ticket-${ticket}`]
     )
     this.socket = socket
+    this.livenessTimeoutMs = null
     this.clearConnectTimeoutTimer()
     this.connectTimeoutTimer = setTimeout(() => {
       this.connectTimeoutTimer = null
@@ -298,6 +342,8 @@ export class RealtimeClient {
 
     socket.onmessage = (messageEvent) => {
       if (this.socket !== socket) return
+      // Any frame proves the socket is alive, even one this build drops.
+      this.lastInboundAt = this.now()
       if (typeof messageEvent.data !== "string") {
         return
       }
@@ -309,6 +355,7 @@ export class RealtimeClient {
       this.socket = null
       this.clearStableConnectionTimer()
       this.clearConnectTimeoutTimer()
+      this.clearLivenessTimer()
       this.emitStatus("disconnected", { closeCode: closeEvent.code })
       if (
         closeEvent.code === 1008 ||
@@ -319,7 +366,9 @@ export class RealtimeClient {
         return
       }
       if (!this.intentionalDisconnect && this.networkConnected) {
-        this.scheduleReconnect()
+        this.scheduleReconnect(
+          SERVER_WIDE_CLOSE_CODES.has(closeEvent.code) ? "server_wide" : "default"
+        )
       }
     }
 
@@ -329,6 +378,11 @@ export class RealtimeClient {
     }
   }
 
+  /**
+   * Sign-out or session change. The socket is closed with a normal close
+   * frame, so the server releases the connection (and a MiniRoom partner sees
+   * the user leave) at once instead of after the heartbeat timeout.
+   */
   public disconnect(): void {
     this.intentionalDisconnect = true
     this.sessionToken = null
@@ -336,7 +390,7 @@ export class RealtimeClient {
     this.reconnectAttempts = 0
     this.ticketRequestInFlight = false
     this.clearReconnectTimer()
-    this.closeCurrentSocket()
+    this.closeCurrentSocket(CLIENT_NORMAL_CLOSE_CODE, "Client disconnected")
     this.emitStatus("disconnected")
   }
 
@@ -344,7 +398,8 @@ export class RealtimeClient {
    * App foreground signal. While inactive no retry is scheduled. Returning to
    * the foreground cancels any pending backoff and reconnects at once when no
    * socket is live or opening, including a socket the OS closed without
-   * delivering its close event. The fast backoff starts over because the
+   * delivering its close event and an open socket that stayed silent past its
+   * liveness window (timers do not run while iOS suspends the app). The fast backoff starts over because the
    * outage began while the app could not retry; a server already classified
    * unreachable keeps that level, so the status stays honest if this attempt
    * fails too.
@@ -366,8 +421,9 @@ export class RealtimeClient {
     ) return
     if (this.socket) {
       const { readyState } = this.socket
-      if (readyState === SOCKET_OPEN || readyState === SOCKET_CONNECTING) return
-      this.closeCurrentSocket()
+      if (readyState === SOCKET_CONNECTING) return
+      if (readyState === SOCKET_OPEN && !this.isSocketSilent()) return
+      this.closeCurrentSocket(REALTIME_LIVENESS_CLOSE_CODE, "Realtime liveness timeout")
     }
     this.clearReconnectTimer()
     if (this.reconnectAttempts < REALTIME_FAST_RECONNECT_ATTEMPTS) {
@@ -382,7 +438,8 @@ export class RealtimeClient {
    * The app went to the background. A suspended iOS app cannot answer the
    * server's pings, so an open socket would keep the user "connected", and
    * chat push notifications suppressed, until the heartbeat terminates it
-   * 30-60 s later. Close it now and stay closed until setAppActive(true).
+   * 15-30 s later. Close it now with a normal close frame and stay closed
+   * until setAppActive(true).
    */
   public suspend(): void {
     this.appActive = false
@@ -392,7 +449,7 @@ export class RealtimeClient {
     const hadConnection = this.socket !== null || this.ticketRequestInFlight
     this.connectionGeneration += 1
     this.ticketRequestInFlight = false
-    this.closeCurrentSocket()
+    this.closeCurrentSocket(CLIENT_NORMAL_CLOSE_CODE, "Client suspended")
     if (hadConnection) this.emitStatus("disconnected")
   }
 
@@ -460,21 +517,11 @@ export class RealtimeClient {
     }
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(kind: ReconnectKind = "default"): void {
     if (this.intentionalDisconnect || !this.sessionToken || !this.networkConnected) return
 
-    // A fanout gap or server restart closes every socket on an instance at
-    // once. Equal jitter keeps each attempt within its exponential ceiling
-    // while spreading clients across the upper half of the window. After the
-    // fast attempts the client never gives up: it keeps retrying at most
-    // REALTIME_SLOW_RECONNECT_CEILING_MS apart and says so honestly.
     const fast = this.reconnectAttempts < REALTIME_FAST_RECONNECT_ATTEMPTS
-    const exponent = Math.min(this.reconnectAttempts, 16)
-    const ceiling = Math.min(
-      1_000 * 2 ** exponent,
-      fast ? FAST_RECONNECT_CEILING_MS : REALTIME_SLOW_RECONNECT_CEILING_MS
-    )
-    const delay = Math.round(ceiling / 2 + this.random() * (ceiling / 2))
+    const delay = this.reconnectDelay(kind, fast)
     this.reconnectAttempts += 1
     this.emitStatus(fast ? "reconnecting" : "unreachable")
     this.clearReconnectTimer()
@@ -486,6 +533,68 @@ export class RealtimeClient {
       this.connectionGeneration += 1
       void this.openSocket(this.sessionToken, this.connectionGeneration)
     }, delay)
+  }
+
+  /**
+   * The first retry uses full jitter over a short window (a wider one after a
+   * server-wide close, none after a liveness failure, whose cause is this
+   * device's network). Later retries use equal jitter below an exponential
+   * ceiling, so an accept-then-close loop keeps growing its delay while
+   * clients dropped together stay spread. After the fast attempts the client
+   * never gives up: it keeps retrying at most
+   * REALTIME_SLOW_RECONNECT_CEILING_MS apart and says so honestly.
+   */
+  private reconnectDelay(kind: ReconnectKind, fast: boolean): number {
+    if (this.reconnectAttempts === 0) {
+      const window = kind === "immediate"
+        ? 0
+        : kind === "server_wide"
+          ? REALTIME_RESTART_RECONNECT_WINDOW_MS
+          : REALTIME_FIRST_RECONNECT_WINDOW_MS
+      return Math.floor(this.random() * window)
+    }
+    const exponent = Math.min(this.reconnectAttempts, 16)
+    const ceiling = Math.min(
+      1_000 * 2 ** exponent,
+      fast ? REALTIME_FAST_RECONNECT_CEILING_MS : REALTIME_SLOW_RECONNECT_CEILING_MS
+    )
+    return Math.round(ceiling / 2 + this.random() * (ceiling / 2))
+  }
+
+  private isSocketSilent(): boolean {
+    return this.livenessTimeoutMs !== null &&
+      this.now() - this.lastInboundAt >= this.livenessTimeoutMs
+  }
+
+  private armLivenessTimer(): void {
+    const socket = this.socket
+    const timeoutMs = this.livenessTimeoutMs
+    if (!socket || timeoutMs === null || this.livenessTimer) return
+    const remaining = Math.max(1, this.lastInboundAt + timeoutMs - this.now())
+    this.livenessTimer = setTimeout(() => {
+      this.livenessTimer = null
+      if (this.socket !== socket) return
+      if (!this.isSocketSilent()) {
+        // Traffic arrived since arming: check again when it would expire.
+        this.armLivenessTimer()
+        return
+      }
+      this.handleSilentSocket()
+    }, remaining)
+  }
+
+  /** The socket stopped delivering anything, heartbeats included. */
+  private handleSilentSocket(): void {
+    this.closeCurrentSocket(REALTIME_LIVENESS_CLOSE_CODE, "Realtime liveness timeout")
+    this.emitStatus("disconnected", { closeCode: REALTIME_LIVENESS_CLOSE_CODE })
+    this.connectionGeneration += 1
+    this.scheduleReconnect("immediate")
+  }
+
+  private clearLivenessTimer(): void {
+    if (!this.livenessTimer) return
+    clearTimeout(this.livenessTimer)
+    this.livenessTimer = null
   }
 
   private markConnectionHealthy(): void {
@@ -511,12 +620,20 @@ export class RealtimeClient {
     this.reconnectTimer = null
   }
 
-  private closeCurrentSocket(): void {
+  private closeCurrentSocket(code?: number, reason?: string): void {
     const socket = this.socket
     this.socket = null
+    this.livenessTimeoutMs = null
     this.clearStableConnectionTimer()
     this.clearConnectTimeoutTimer()
-    socket?.close()
+    this.clearLivenessTimer()
+    if (!socket) return
+    try {
+      if (code === undefined) socket.close()
+      else socket.close(code, reason)
+    } catch {
+      // A socket that cannot send a close frame is already gone.
+    }
   }
 
   private isCurrentConnectionAttempt(

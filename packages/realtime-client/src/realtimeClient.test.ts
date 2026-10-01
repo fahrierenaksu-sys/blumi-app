@@ -5,6 +5,8 @@ import {
   REALTIME_AUTH_INVALID_CLOSE_CODE,
   isRealtimeAuthInvalidClose,
   RealtimeTicketRequestError,
+  REALTIME_FIRST_RECONNECT_WINDOW_MS,
+  REALTIME_RESTART_RECONNECT_WINDOW_MS,
   REALTIME_STABLE_CONNECTION_MS,
   type RealtimeConnectionStatus,
   type RealtimeEventDrop
@@ -129,7 +131,7 @@ test("unexpected close reconnects with a fresh opaque ticket", async (context) =
   context.after(restore)
   context.mock.timers.enable({ apis: ["setTimeout"] })
   const statuses: RealtimeConnectionStatus[] = []
-  const client = new RealtimeClient("wss://realtime.example", createTicketProvider())
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), { random: () => 0.5 })
   client.onConnectionStatus((status) => { statuses.push(status) })
 
   client.connect("token-1")
@@ -139,7 +141,8 @@ test("unexpected close reconnects with a fresh opaque ticket", async (context) =
   MockWebSocket.instances[0]?.drop()
 
   assert.equal(statuses.at(-1), "reconnecting")
-  context.mock.timers.tick(999)
+  context.mock.timers.tick(REALTIME_FIRST_RECONNECT_WINDOW_MS / 2 - 1)
+  await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 1)
   context.mock.timers.tick(1)
   await flushTicketRequest()
@@ -176,7 +179,8 @@ test("fanout gap close 1012 reconnects without invalidating authentication", asy
   MockWebSocket.instances[0]?.drop(1012)
   assert.equal(isRealtimeAuthInvalidClose(1012), false)
   assert.equal(statuses.at(-1), "reconnecting")
-  context.mock.timers.tick(1_000)
+  // A server-wide close spreads the first retry over the restart window.
+  context.mock.timers.tick(REALTIME_RESTART_RECONNECT_WINDOW_MS)
   await flushTicketRequest()
   MockWebSocket.instances[1]?.open()
   assert.equal(statuses.at(-1), "connected")
@@ -495,7 +499,7 @@ test("a transient ticket request failure retries with a newly issued ticket", as
   ])
 })
 
-test("reconnect delay is jittered below the exponential ceiling", async (context) => {
+test("the first retry uses full jitter and later retries stay below the exponential ceiling", async (context) => {
   const restore = installWebSocketMock()
   context.after(restore)
   context.mock.timers.enable({ apis: ["setTimeout"] })
@@ -507,16 +511,42 @@ test("reconnect delay is jittered below the exponential ceiling", async (context
 
   client.connect("token-jitter-floor")
   await flushTicketRequest()
+  // An ordinary drop: the first retry may start at once.
   MockWebSocket.instances[0]?.drop()
-  context.mock.timers.tick(499)
+  context.mock.timers.tick(0)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2)
+  // The second consecutive failure waits at least half its 2 s ceiling.
+  MockWebSocket.instances[1]?.drop()
+  context.mock.timers.tick(999)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 2)
+  context.mock.timers.tick(1)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 3)
+  client.disconnect()
+})
+
+test("an ordinary drop retries within one second even at the latest jitter point", async (context) => {
+  context.after(installWebSocketMock())
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const client = new RealtimeClient("wss://realtime.example", createTicketProvider(), {
+    random: () => 1 - Number.EPSILON
+  })
+  client.connect("token-jitter-ceiling")
+  await flushTicketRequest()
+  MockWebSocket.instances[0]?.open()
+  MockWebSocket.instances[0]?.drop(1006)
+  context.mock.timers.tick(REALTIME_FIRST_RECONNECT_WINDOW_MS - 2)
   await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 1)
   context.mock.timers.tick(1)
   await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 2)
+  client.disconnect()
 })
 
-test("clients disconnected together spread their reconnect attempts", async (context) => {
+test("clients closed together by a server restart spread their first retry over five seconds", async (context) => {
   const restore = installWebSocketMock()
   context.after(restore)
   context.mock.timers.enable({ apis: ["setTimeout"] })
@@ -528,12 +558,17 @@ test("clients disconnected together spread their reconnect attempts", async (con
   await flushTicketRequest()
   MockWebSocket.instances[0]?.drop(1012)
   MockWebSocket.instances[1]?.drop(1012)
-  context.mock.timers.tick(500)
+  context.mock.timers.tick(0)
   await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 3)
-  context.mock.timers.tick(495)
+  context.mock.timers.tick(REALTIME_RESTART_RECONNECT_WINDOW_MS * 0.99 - 1)
+  await flushTicketRequest()
+  assert.equal(MockWebSocket.instances.length, 3)
+  context.mock.timers.tick(1)
   await flushTicketRequest()
   assert.equal(MockWebSocket.instances.length, 4)
+  early.disconnect()
+  late.disconnect()
 })
 
 test("valid server events are delivered unchanged", async (context) => {
