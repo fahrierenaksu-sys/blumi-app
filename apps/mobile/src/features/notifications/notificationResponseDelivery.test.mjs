@@ -29,7 +29,10 @@ function rootCallback(name, bindings, sourceFile = rootFile) {
 
 // Execute production event logic with injected native APIs. This does not model
 // React scheduling, notification OS persistence, or native navigation rendering.
-function createRuntime({ ready = true, response = null, onResponse, physicalDevice = false } = {}) {
+function createRuntime({ ready = true, response = null, onResponse, physicalDevice = false, platform = "ios" } = {}) {
+  let expoToken = "ExponentPushToken[test]"
+  let pushTokenListener
+  const channels = []
   let hookIndex = 0
   let scheduledEffects = []
   const hookValues = []
@@ -55,9 +58,11 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const notifications = {
     getPermissionsAsync: async () => ({ status: permission }),
     requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
-    getExpoPushTokenAsync: async () => ({ data: "ExponentPushToken[test]" }),
+    getExpoPushTokenAsync: async () => ({ data: expoToken }),
+    AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+    setNotificationChannelAsync: async (id, channel) => { channels.push({ id, ...channel }) },
     setNotificationHandler: (handler) => { notificationHandler = handler },
-    addPushTokenListener: () => ({ remove: () => {} }),
+    addPushTokenListener: (callback) => { pushTokenListener = callback; return { remove: () => { pushTokenListener = undefined } } },
     addNotificationResponseReceivedListener: (callback) => {
       responseSubscriptionCount += 1
       listener = callback
@@ -97,7 +102,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   }
   const mocks = {
     react,
-    "react-native": { Platform: { OS: "ios" }, AppState: { get currentState() { return currentAppState }, addEventListener: (_event, callback) => {
+    "react-native": { Platform: { OS: platform }, AppState: { get currentState() { return currentAppState }, addEventListener: (_event, callback) => {
       foregroundListeners.add(callback)
       return { remove: () => foregroundListeners.delete(callback) }
     } } },
@@ -143,7 +148,10 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     runInNewContext(executable, context)
     return module.exports
   }
+  const chatTaps = { decision: { kind: "open" }, decided: [] }
   const sessionBindings = {
+    decideChatTap: (threadId) => { chatTaps.decided.push(threadId); return chatTaps.decision },
+    chatListVersion: 0,
     sessionEntryRoute: "Main",
     isAccountRestricted: false,
     isCurrentSession: (expected) => expected.profile.userId === currentActor?.profile.userId &&
@@ -180,6 +188,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   })
   renderHook(actor)
   return {
+    chatTaps, channels,
+    rotatePushToken: (token) => { expoToken = token; pushTokenListener?.({ type: platform, data: "device-token" }) },
     navigations, errors,
     registrations, removals, presentedClears,
     modules,
@@ -481,4 +491,58 @@ test("a tapped push addressed to another account is ignored", async (t) => {
     data: { type: "chat.message", threadId: "thread-one", recipientUserId: "user-one" }
   } } } })
   assert.equal(runtime.navigations.length, 1)
+})
+
+test("a cold-start tap for a removed conversation waits for the thread list, then opens the Inbox once", async (t) => {
+  const runtime = createRuntime({ response })
+  t.after(runtime.dispose)
+  runtime.chatTaps.decision = { kind: "wait", retryInMs: 4000 }
+  await settle()
+  assert.equal(runtime.navigations.length, 0, "the list has not arrived yet")
+  assert.equal(runtime.clearCount, 0, "a waiting tap stays cached")
+  runtime.chatTaps.decision = { kind: "inbox" }
+  runtime.rerenderWithEquivalentCallback()
+  await settle()
+  assert.deepEqual(runtime.navigations, [["Inbox"]])
+  assert.equal(runtime.clearCount, 1)
+  runtime.rerenderWithEquivalentCallback()
+  await settle()
+  assert.equal(runtime.navigations.length, 1, "exactly once")
+  assert.deepEqual(runtime.chatTaps.decided, ["thread-one", "thread-one"])
+})
+
+test("room invite taps open their conversation through the same gate", async (t) => {
+  const runtime = createRuntime()
+  t.after(runtime.dispose)
+  await settle()
+  runtime.emit({ notification: { request: { identifier: "invite", content: {
+    data: { type: "chat.room_invite", threadId: "thread-invite", inviteId: "expired-invite" }
+  } } } })
+  assert.equal(JSON.stringify(runtime.navigations), JSON.stringify([["ChatThread", { threadId: "thread-invite" }]]))
+})
+
+test("a rotated push token re-registers and removes the stale token from the same account", async (t) => {
+  const runtime = createRuntime({ physicalDevice: true })
+  t.after(runtime.dispose)
+  await settle()
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  runtime.rotatePushToken("ExponentPushToken[rotated]")
+  await settle()
+  assert.deepEqual(runtime.registrations.map((entry) => entry.pushToken), ["ExponentPushToken[test]", "ExponentPushToken[rotated]"])
+  assert.deepEqual(runtime.removals, [{ token: "token-one", pushToken: "ExponentPushToken[test]" }])
+  assert.equal(runtime.permissionRequests, 0, "token rotation never prompts")
+})
+
+test("the Android channel every push uses is created with HIGH importance for heads-up banners", async (t) => {
+  const runtime = createRuntime({ physicalDevice: true, platform: "android" })
+  t.after(runtime.dispose)
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.channels.length > 0, true)
+  assert.deepEqual(runtime.channels.map((channel) => [channel.id, channel.importance]).at(-1), ["default", 4])
+  assert.equal(runtime.registrations.at(-1)?.platform, "android")
 })

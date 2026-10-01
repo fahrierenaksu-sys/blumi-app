@@ -858,10 +858,14 @@ test("an inactive session resets demo mode, matches, invites, chat, and the sock
 
 test("push registration is scoped to the unrestricted main session and replays on readiness", () => {
   const routing = read("./useNotificationResponseRouting.ts")
+  assert.match(routing, /const isMainSession = sessionEntryRoute === "Main" && !isAccountRestricted/)
+  // The wait bound for an unknown conversation also replays pending taps.
   assert.match(
     routing,
-    /usePushRegistration\(\s*sessionEntryRoute === "Main" && !isAccountRestricted \? sessionActor : null,\s*handleNotificationResponseData,\s*navigationReadyGeneration\s*\)/
+    /usePushRegistration\(\s*isMainSession \? sessionActor : null,\s*handleNotificationResponseData,[\s\S]*?navigationReadyGeneration \+ tapRetryTick\s*\)/
   )
+  assert.match(routing, /useSignedOutNotificationTapDiscard\(sessionEntryRoute === "AuthEntry"\)/)
+  assert.match(routing, /useAppIconBadge\(isMainSession && sessionActor\?\.session\.mode === "production"\)/)
   const navigator = read("./RootNavigator.tsx")
   assert.match(navigator, /const pushRegistration = useNotificationResponseRouting\(\{[\s\S]*?navigationReadyGeneration\s*\}\)/)
   assert.match(navigator, /setNavigationReadyGeneration\(\(generation\) => generation \+ 1\)/)

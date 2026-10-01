@@ -15,9 +15,17 @@ interface RegisteredPushDevice {
 
 let registered: RegisteredPushDevice | null = null
 
-export function rememberRegisteredPushDevice(userId: string, pushToken: string): void {
-  if (registered?.userId === userId && registered.pushToken === pushToken && !registered.removal) return
+/**
+ * Returns the same account's previous token when this one replaces it (the
+ * OS rotated the push token), so the caller can unregister the stale one.
+ */
+export function rememberRegisteredPushDevice(userId: string, pushToken: string): string | null {
+  if (registered?.userId === userId && registered.pushToken === pushToken && !registered.removal) return null
+  const replaced = registered?.userId === userId && registered.pushToken !== pushToken && !registered.removal
+    ? registered.pushToken
+    : null
   registered = { userId, pushToken }
+  return replaced
 }
 
 export function removeRegisteredPushDevice(
