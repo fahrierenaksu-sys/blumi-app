@@ -3,7 +3,7 @@ import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import type * as Hook from "./useChatThreadSync"
 
-function mount() {
+function mount(refreshParticipants?: () => Promise<void>) {
   const runtime = createFakeReactRuntime()
   const timers = new Map<number, () => void>()
   const listeners = new Set<(state: string) => void>()
@@ -20,6 +20,7 @@ function mount() {
       clearTimeout: (id: number) => timers.delete(id) }
   })
   let input = { resolvedThreadId: "thread-a", currentUserId: "a", isFocused: true,
+    refreshParticipants,
     latestIncomingMessageId: "one", requestMessages: undefined,
     markThreadRead: (id: string, upToMessageId?: string) => { reads.push(id); readCursors.push(upToMessageId) },
     setActiveThread: (id: string | null) => { active.push(id) } }
@@ -31,6 +32,23 @@ function mount() {
   render()
   return { render, runtime, reads, readCursors, active, timers, listeners, flush, state }
 }
+
+test("saved participant outfits refresh on chat entry and foreground, but not while covered", () => {
+  let refreshes = 0
+  const f = mount(async () => { refreshes += 1 })
+  assert.equal(refreshes, 1)
+  f.state("background")
+  assert.equal(refreshes, 1)
+  f.state("active")
+  assert.equal(refreshes, 2)
+  f.render({ isFocused: false })
+  f.state("active")
+  assert.equal(refreshes, 2)
+  f.render({ isFocused: true })
+  assert.equal(refreshes, 3)
+  f.runtime.unmount()
+  assert.equal(f.listeners.size, 0)
+})
 
 test("each read names the newest partner message the screen showed (the read receipt cursor)", () => {
   const f = mount()

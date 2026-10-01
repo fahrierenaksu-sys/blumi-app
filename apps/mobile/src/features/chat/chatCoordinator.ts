@@ -442,17 +442,9 @@ export function createChatCoordinator(
         )
         if (!dependencies.isCurrentSession(actor)) return
         upsertRoomInvite(invite)
-        if (action.type === "accept" && invite.roomSessionId) {
-          // The acceptance answer carries the ready room; join only for an
-          // older server answer without it.
-          const roomReady = readyRoom ?? await dependencies.joinRoomSession(
-            dependencies.baseHttpUrl,
-            actor.session.sessionToken,
-            invite.roomSessionId
-          )
-          if (!dependencies.isCurrentSession(actor)) return
-          dependencies.openReadyMiniRoom(roomReady, { allowReopen: true })
-        }
+        // Acceptance unlocks the card. Revalidate entry with an explicit join;
+        // do not retain the decision's media token for a later, stale entry.
+        void readyRoom
         dependencies.captureProductEvent(
           action.type === "accept" ? "room_invite_accepted" : "room_invite_declined",
           { mode: actor.session.mode }

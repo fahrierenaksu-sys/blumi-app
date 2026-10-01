@@ -3,14 +3,13 @@ import type { AppLocale } from "../session/appLocale"
 /**
  * What happens when the server reports a ready shared room (`mini_room.ready`).
  * UX audit ROOM-09: the inviter used to be pulled into the room from any
- * screen with a plain fade. The room now opens directly only from the invite's
- * own chat or when the user asked for it (accept, join, demo); anywhere else a
- * "X is in the room · Join" banner is shown.
+ * screen with a plain fade. Only an explicit Enter room action opens it now.
+ * The invitation chat stays on its card; other screens show a ready-room banner.
  */
-export type ReadyRoomArrival = "enter" | "announce"
+export type ReadyRoomArrival = "enter" | "announce" | "stay"
 
 export function resolveReadyRoomArrival(input: {
-  /** The user accepted or tapped join; never second-guess an explicit action. */
+  /** The user tapped Enter room; accepting alone never enters. */
   requestedByUser: boolean
   currentRouteName: string | undefined
   currentRouteParams: unknown
@@ -22,7 +21,7 @@ export function resolveReadyRoomArrival(input: {
   const threadId = params && typeof params === "object"
     ? (params as { threadId?: unknown }).threadId
     : undefined
-  return threadId === input.sourceThreadId ? "enter" : "announce"
+  return threadId === input.sourceThreadId ? "stay" : "announce"
 }
 
 /** Long enough to notice and tap; the chat's invite card still offers Join. */

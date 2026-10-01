@@ -2,6 +2,7 @@ import { memo } from "react"
 import { Pressable, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { ChatRoomInviteCard } from "../ChatRoomInviteCard"
+import type { RoomInviteSceneParticipant } from "../ChatRoomInviteScene"
 import { ChatDeliveryTicks } from "./ChatDeliveryTicks"
 import type {
   ChatLocale,
@@ -30,6 +31,8 @@ function ChatTimelineRow({
   chatLocale,
   currentUserId,
   partnerName,
+  you,
+  partner,
   isEntering,
   isInviteBusy,
   onRoomInviteAction,
@@ -41,6 +44,8 @@ function ChatTimelineRow({
   chatLocale: ChatLocale
   currentUserId: string
   partnerName: string
+  you: RoomInviteSceneParticipant
+  partner: RoomInviteSceneParticipant
   isEntering: boolean
   /** Only an invitation row whose action is running is busy; other rows keep equal props. */
   isInviteBusy: boolean
@@ -86,6 +91,8 @@ function ChatTimelineRow({
           invite={item}
           currentUserId={currentUserId}
           locale={chatLocale}
+          you={you}
+          partner={partner}
           isBusy={isInviteBusy}
           onAction={onRoomInviteAction}
         />

@@ -216,6 +216,7 @@ export function useRootChatSync({
   const chatThreadBindings = useMemo((): ChatThreadBindings => ({
     sendChatMessage: sendChatMessageForRoute,
     requestMessages: requestMessagesForRoute,
+    refreshParticipants: refreshProductionThreads,
     markThreadRead: markChatThreadRead,
     roomInvites: visibleRoomInvites,
     onRoomInviteAction: sessionMode === "demo"
@@ -227,6 +228,7 @@ export function useRootChatSync({
     locale: chatLocale,
     receiptsEnabled: sessionMode === "production" && receiptsEnabled
   }), [
+    refreshProductionThreads,
     chatLocale,
     closeMyActiveRoom,
     handleDemoRoomInviteAction,

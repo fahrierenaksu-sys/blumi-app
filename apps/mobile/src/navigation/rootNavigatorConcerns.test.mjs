@@ -248,12 +248,15 @@ function openReadyMiniRoomFor(navigationRef, currentActor = actor) {
   return { open, handledReadyMiniRoomIdsRef, announced }
 }
 
-test("a ready MiniRoom opens once from its own chat and reopens only when allowed", () => {
+test("a ready MiniRoom stays in its chat, then enters only through explicit entry", () => {
   const navigationRef = createNavigationRef({ routeName: "ChatThread", params: { threadId: "thread-1" } })
   const { open, handledReadyMiniRoomIdsRef, announced } = openReadyMiniRoomFor(navigationRef)
   const payload = readyPayload()
 
   open(payload)
+  assert.equal(navigationRef.calls.length, 0)
+  assert.equal(handledReadyMiniRoomIdsRef.current.size, 0)
+  open(payload, { allowReopen: true })
   assert.equal(navigationRef.calls.length, 1)
   const [kind, route, params] = navigationRef.calls[0]
   assert.equal(kind, "navigate")
@@ -397,7 +400,7 @@ function demoInviteHandler(currentActor, invite, opened) {
   })
 }
 
-test("demo room invitations open the local MiniRoom only once accepted", async () => {
+test("demo acceptance stays in chat; explicit entry opens an accepted room", async () => {
   const demoActor = { ...actor, session: { mode: "demo" } }
   await assert.rejects(
     demoInviteHandler(actor, null, [])({ type: "accept", inviteId: "invite-1" }),
@@ -413,6 +416,10 @@ test("demo room invitations open the local MiniRoom only once accepted", async (
   assert.deepEqual(pending, [])
 
   const opened = []
+  await demoInviteHandler(demoActor, {
+    status: "accepted", roomSessionId: "demo-room"
+  }, opened)({ type: "accept", inviteId: "invite-1" })
+  assert.deepEqual(opened, [])
   await demoInviteHandler(demoActor, {
     status: "accepted",
     roomSessionId: "demo-room",
@@ -437,6 +444,7 @@ function chatThreadBindings(sessionMode, receiptsEnabled = true) {
   const handlers = {
     sendChatMessageForRoute: () => "send",
     requestMessagesForRoute: () => "request",
+    refreshProductionThreads: () => "refresh-participants",
     markChatThreadRead: () => "read",
     handleDemoRoomInviteAction: () => "demo-invite",
     handleRoomInviteAction: () => "production-invite",
@@ -457,6 +465,7 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
   assert.deepEqual(Object.keys(production.bindings), [
     "sendChatMessage",
     "requestMessages",
+    "refreshParticipants",
     "markThreadRead",
     "roomInvites",
     "onRoomInviteAction",

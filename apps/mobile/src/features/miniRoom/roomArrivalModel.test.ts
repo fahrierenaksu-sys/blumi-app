@@ -11,13 +11,13 @@ import {
 // room from anywhere (Shop, mid-sentence). Only the invite's own chat enters
 // directly; anywhere else a "X is in the room · Join" banner is shown.
 
-test("the invite's own chat enters the room directly", () => {
+test("a ready event stays in the invitation chat until the user presses enter", () => {
   assert.equal(resolveReadyRoomArrival({
     requestedByUser: false,
     currentRouteName: "ChatThread",
     currentRouteParams: { threadId: "thread-1" },
     sourceThreadId: "thread-1"
-  }), "enter")
+  }), "stay")
 })
 
 test("anywhere else the room is announced instead of taking over the screen", () => {

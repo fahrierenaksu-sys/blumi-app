@@ -13,6 +13,7 @@ export function useChatThreadSync({
   isFocused,
   latestIncomingMessageId,
   requestMessages,
+  refreshParticipants,
   markThreadRead,
   setActiveThread
 }: {
@@ -20,6 +21,7 @@ export function useChatThreadSync({
   currentUserId: string
   isFocused: boolean
   latestIncomingMessageId: string | undefined
+  refreshParticipants?: () => Promise<void>
   requestMessages:
     | ((threadId: string, options?: FetchThreadMessagesOptions) => Promise<void>)
     | undefined
@@ -34,6 +36,14 @@ export function useChatThreadSync({
   const current = useRef({ currentUserId, isFocused, latestIncomingMessageId })
   current.current = { currentUserId, isFocused, latestIncomingMessageId }
   const readSync = useRef<{ visibility(visible: boolean): void; incoming(id: string | undefined): void } | null>(null)
+  useEffect(() => {
+    if (!isFocused || !resolvedThreadId || !refreshParticipants) return
+    void refreshParticipants().catch(() => undefined)
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") void refreshParticipants().catch(() => undefined)
+    })
+    return () => subscription.remove()
+  }, [isFocused, refreshParticipants, resolvedThreadId])
   // Request messages from server when entering thread
   useEffect(() => {
     if (requestMessages && resolvedThreadId) {
