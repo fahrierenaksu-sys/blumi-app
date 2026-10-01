@@ -232,7 +232,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
   const disconnectFinished = deferred<void>()
   const order: string[] = []
   const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
-  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnections.bind(harness.presenceService)
   harness.presenceService.joinRoom = async (...args) => {
     order.push("join:start")
     joinStarted.resolve()
@@ -245,7 +245,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
       joinFinished.resolve()
     }
   }
-  harness.presenceService.disconnectConnection = async (...args) => {
+  harness.presenceService.disconnectConnections = async (...args) => {
     order.push("disconnect:start")
     try {
       return await originalDisconnect(...args)
@@ -287,7 +287,7 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
   const disconnectFinished = deferred<void>()
   let joinCalls = 0
   const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
-  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnections.bind(harness.presenceService)
   harness.presenceService.joinRoom = async (...args) => {
     joinCalls += 1
     if (joinCalls === 1) {
@@ -296,7 +296,7 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
     }
     return originalJoin(...args)
   }
-  harness.presenceService.disconnectConnection = async (...args) => {
+  harness.presenceService.disconnectConnections = async (...args) => {
     try {
       return await originalDisconnect(...args)
     } finally {
@@ -940,6 +940,70 @@ test("two room sockets share motion immediately, reconnect at the accepted targe
     await new Promise(resolve => setTimeout(resolve, 30))
     assert.equal(eb.all().filter(event => event.type === "mini_room.avatar_moved").length, count)
   } finally { await harness.close() }
+})
+
+test("a closing socket leaves the MiniRoom at once and many disconnects share one lease cleanup", async () => {
+  const harness = await createRealtimeHarness()
+  // 2026-10-01: a cleanup transaction per socket (six round trips) made a
+  // mass network drop queue 30,000 round trips behind the reconnects.
+  const batches: number[] = []
+  let finishedBatches = 0
+  const releaseFirstCleanup = deferred<void>()
+  const originalDisconnects = harness.presenceService.disconnectConnections.bind(harness.presenceService)
+  harness.presenceService.disconnectConnection = async () => assert.fail("socket closes are cleaned up in batches")
+  harness.presenceService.disconnectConnections = async (connections) => {
+    batches.push(connections.length)
+    if (batches.length === 1) await releaseFirstCleanup.promise
+    try {
+      return await originalDisconnects(connections)
+    } finally {
+      finishedBatches += 1
+    }
+  }
+  try {
+    const a = await harness.createSession("+905551110131", "Leaving A")
+    const b = await harness.createSession("+905551110132", "Staying B")
+    const startedAt = new Date().toISOString()
+    await harness.miniRoomService.repository.saveInvite({ inviteId: "leave-invite", senderUserId: a.userId,
+      recipientUserId: b.userId, status: "pending", createdAt: startedAt })
+    await harness.miniRoomService.repository.acceptPendingInvite({ inviteId: "leave-invite",
+      decidedAt: startedAt, miniRoom: { miniRoomId: "leave-room", lobbyRoomId: "retired",
+        livekitRoomName: "leave-test", participantUserIds: [a.userId, b.userId], startedAt } })
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const eb = collectEvents(sb)
+    for (const socket of [sa, sb]) {
+      socket.send(JSON.stringify({ type: "mini_room.scene_enter", payload: { miniRoomId: "leave-room" } }))
+    }
+    await eb.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+
+    sa.close()
+    await eb.waitForMatching("mini_room.motion_snapshot", event =>
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && !avatar.present))
+    await waitUntil(() => batches.length === 1)
+    // The partner saw the avatar leave while the database cleanup is still held.
+
+    const idle = await Promise.all([3, 4, 5].map(async (index) => {
+      const session = await harness.createSession(`+90555111013${index}`, `Idle ${index}`)
+      return { session, socket: await harness.connect(session.sessionToken) }
+    }))
+    const idleConnections = idle.map(({ session }) =>
+      harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)!)
+    for (const { socket } of idle) socket.close()
+    await waitUntil(() => idleConnections.every((connection) =>
+      !harness.connectionManager.listConnections().includes(connection)))
+    assert.deepEqual(batches, [1], "closes arriving during a cleanup wait for the next batch")
+
+    releaseFirstCleanup.resolve()
+    await waitUntil(() => finishedBatches === 2)
+    assert.deepEqual(batches, [1, 3])
+    for (const connection of idleConnections) {
+      assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, connection.userId), false,
+        "the batched cleanup removed the closed socket's lease")
+    }
+  } finally {
+    releaseFirstCleanup.resolve()
+    await harness.close()
+  }
 })
 
 async function createRealtimeHarness(options: {

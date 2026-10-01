@@ -26,8 +26,9 @@ export interface RealtimeRouter {
     connection: RealtimeConnection,
     event: ClientEvent
   ): Promise<void>
-  handleDisconnect(connection: RealtimeConnection): Promise<void>
-  /** Shutdown: the same cleanup for every socket at once, in batched transactions. */
+  /** In-memory state of a closed socket (MiniRoom motion), released at once. */
+  releaseConnection(connection: RealtimeConnection): void
+  /** Lease and presence cleanup for closed sockets, in batched transactions. */
   handleDisconnects(connections: readonly RealtimeConnection[]): Promise<void>
 }
 
@@ -521,13 +522,9 @@ export function createRealtimeRouter(
           return
       }
     },
-    async handleDisconnect(connection) {
+    releaseConnection(connection) {
+      // The partner sees the avatar leave without waiting for the database.
       motion.disconnect(connection.connectionId)
-      const clearedRoomIds = await presenceService.disconnectConnection(
-        connection.connectionId,
-        connection.userId
-      )
-      await Promise.all(clearedRoomIds.map(publishRoomPresence))
     },
     async handleDisconnects(connections) {
       for (const connection of connections) motion.disconnect(connection.connectionId)

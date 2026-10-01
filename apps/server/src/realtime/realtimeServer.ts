@@ -54,6 +54,12 @@ export const REALTIME_HEARTBEAT_INTERVAL_MS = 15_000
  * in one batched statement per tick, instead of one transaction per pong.
  */
 export const REALTIME_CONNECTION_LEASE_RENEW_MS = 30_000
+/**
+ * Closed sockets' leases are removed together after this window (one
+ * statement per 100). In-memory state, MiniRoom motion included, is released
+ * at once; the lease only gates room presence and expires on its own.
+ */
+const REALTIME_DISCONNECT_BATCH_WINDOW_MS = 50
 /** Graceful shutdown close: clients spread their first retry (1012 = restart). */
 export const REALTIME_RESTART_CLOSE_CODE = 1012
 const RESTART_CLOSE_REASON = "Server restarting"
@@ -125,7 +131,7 @@ export function createRealtimeServer(
   })
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const leaseRenewedAt = new Map<string, number>()
-  const shutdownDisconnects: RealtimeConnection[] = []
+  const pendingDisconnects: RealtimeConnection[] = []
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
   const connectionLifecycleOperations = new Map<string, Promise<void>>()
@@ -398,21 +404,30 @@ export function createRealtimeServer(
       // The user's windows outlive the socket: a reconnect inside a window
       // must not reset the per-user budget. The heartbeat purges them.
       eventBudget.forgetConnection(connection.connectionId)
-      if (removed && closing) {
-        // A shutdown closes every socket at once: clean up in one batch
-        // (close() flushes it) instead of a transaction per socket, which on
-        // a deploy competed with the reconnect storm on the same database.
-        shutdownDisconnects.push(removed)
-      } else if (removed) {
-        void track(enqueueConnectionLifecycleOperation(removed.connectionId, async () => {
-          // A room.join is the only client operation that can create room presence.
-          // Let those already dispatched finish before removing this connection's
-          // lease, so a late join cannot recreate presence after disconnect cleanup.
-          await waitForConnectionRoomJoins(removed.connectionId)
-          await router.handleDisconnect(removed)
-        })).catch((error) => console.error("Realtime disconnect cleanup failed", safeOperationalErrorKind(error)))
-      }
+      if (!removed) return
+      router.releaseConnection(removed)
+      // Lease cleanup is batched (2026-10-01): a transaction per socket made a
+      // deploy or a mass network drop queue thousands of transactions in
+      // front of the reconnects. A shutdown flushes the batch in close().
+      pendingDisconnects.push(removed)
+      if (!closing) scheduleDisconnectFlush()
     })
+  }
+
+  let disconnectFlushTimer: ReturnType<typeof setTimeout> | undefined
+  let disconnectFlushRunning = false
+  function scheduleDisconnectFlush(): void {
+    if (disconnectFlushTimer || disconnectFlushRunning) return
+    disconnectFlushTimer = setTimeout(() => {
+      disconnectFlushTimer = undefined
+      disconnectFlushRunning = true
+      void track(flushDisconnects()).finally(() => {
+        disconnectFlushRunning = false
+        // Closes that arrived during the flush form the next batch.
+        if (pendingDisconnects.length > 0 && !closing) scheduleDisconnectFlush()
+      })
+    }, REALTIME_DISCONNECT_BATCH_WINDOW_MS)
+    disconnectFlushTimer.unref?.()
   }
 
   let leaseRenewalPending = false
@@ -460,17 +475,18 @@ export function createRealtimeServer(
   }, CONNECTION_LEASE_CLEANUP_INTERVAL_MS)
   connectionLeaseCleanup.unref()
 
-  async function flushShutdownDisconnects(): Promise<void> {
-    const batch = shutdownDisconnects.splice(0)
+  async function flushDisconnects(): Promise<void> {
+    const batch = pendingDisconnects.splice(0)
     if (batch.length === 0) return
-    // As for a single socket: joins already dispatched finish first, so a
-    // late join cannot recreate presence after the cleanup.
+    // A room.join is the only client operation that can create room presence.
+    // Joins already dispatched finish first, so a late join cannot recreate
+    // presence after the cleanup.
     await Promise.all(batch.map((connection) => waitForConnectionRoomJoins(connection.connectionId)))
     try {
       await router.handleDisconnects(batch)
     } catch (error) {
       // Leases expire on their own (90 s) and are purged by any instance.
-      console.error("Realtime shutdown cleanup failed", safeOperationalErrorKind(error))
+      console.error("Realtime disconnect cleanup failed", safeOperationalErrorKind(error))
     }
   }
 
@@ -674,7 +690,9 @@ export function createRealtimeServer(
         }
       })
       await socketsClosed
-      await track(flushShutdownDisconnects())
+      clearTimeout(disconnectFlushTimer)
+      disconnectFlushTimer = undefined
+      await track(flushDisconnects())
       await Promise.allSettled([...activeOperations])
       if (!closeOptions.preserveFanout) await connectionManager.closeFanout()
       httpServer.off("upgrade", handleUpgradeRequest)
