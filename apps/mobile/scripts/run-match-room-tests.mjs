@@ -309,6 +309,7 @@ try {
       "src/features/miniRoom/miniRoomMotionSession.test.ts",
       "src/features/miniRoom/useMiniRoomMotion.test.ts",
       "src/features/miniRoom/scene/avatarBubblePopLifecycle.test.ts",
+      "src/features/miniRoom/scene/RoomTapFeedback.test.ts",
       "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }

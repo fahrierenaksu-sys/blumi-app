@@ -401,20 +401,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
         </Animated.View>
       ) : null}
 
-      <View
-        style={[
-          styles.avatarShadowOuter,
-          avatar.motion === "walking" ? styles.avatarShadowOuterWalking : null,
-          isSitting ? styles.avatarShadowOuterSitting : null
-        ]}
-      />
-      <View
-        style={[
-          styles.avatarShadow,
-          avatar.motion === "walking" ? styles.avatarShadowWalking : null,
-          isSitting ? styles.avatarShadowSitting : null
-        ]}
-      />
       {/* Depth scale (from the live y) wraps the same box so it scales about the same centre. */}
       <Reanimated.View
         style={[
@@ -491,39 +477,6 @@ const styles = StyleSheet.create({
   },
   avatarWalking: {
     bottom: 24
-  },
-  avatarShadowOuter: {
-    position: "absolute",
-    bottom: 14,
-    width: 76,
-    height: 21,
-    borderRadius: 999,
-    backgroundColor: "rgba(52, 31, 17, 0.09)"
-  },
-  avatarShadowOuterWalking: {
-    width: 54,
-    opacity: 0.55
-  },
-  avatarShadowOuterSitting: {
-    width: 64,
-    height: 16
-  },
-  avatarShadow: {
-    position: "absolute",
-    bottom: 18,
-    width: 54,
-    height: 15,
-    borderRadius: 999,
-    backgroundColor: "rgba(52, 31, 17, 0.25)"
-  },
-  avatarShadowWalking: {
-    width: 36,
-    opacity: 0.7
-  },
-  avatarShadowSitting: {
-    width: 46,
-    height: 11,
-    backgroundColor: "rgba(52, 31, 17, 0.28)"
   },
   avatarSitting: {
     bottom: 4
