@@ -28,7 +28,7 @@ import {
   REALTIME_HEARTBEAT_INTERVAL_MS,
   REALTIME_RESTART_CLOSE_CODE
 } from "./realtimeServer"
-import { createConnectionManager } from "./connectionManager"
+import { createConnectionManager, REALTIME_OUTBOUND_SOFT_LIMIT_BYTES } from "./connectionManager"
 import type { RealtimeFanout } from "./realtimeFanout"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
@@ -964,6 +964,31 @@ async function createMotionRoomPair(harness: Awaited<ReturnType<typeof createRea
   await ea.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
   return { a, b, sa, sb, ea, eb, miniRoomId }
 }
+
+test("a partner socket that shed an avatar step under backpressure is re-sent the current snapshot", async () => {
+  const harness = await createRealtimeHarness()
+  try {
+    const { a, b, sa, ea, eb, miniRoomId } = await createMotionRoomPair(harness, "32")
+    const serverSocketB = harness.connectionManager.getUserConnections(b.userId)[0]!.socket
+    let backedUp = true
+    Object.defineProperty(serverSocketB, "bufferedAmount", { configurable: true,
+      get: () => backedUp ? REALTIME_OUTBOUND_SOFT_LIMIT_BYTES + 1 : 0 })
+    const before = eb.all().length
+    sa.send(JSON.stringify({ type: "mini_room.move", payload: { miniRoomId, sequence: 1, x: .52, y: .7 } }))
+    // The mover's own socket is not backed up and gets the step itself.
+    await ea.waitForMatching("mini_room.avatar_moved", event => event.payload.avatar.x === .52)
+    backedUp = false
+    const snapshot = await eb.waitForMatching("mini_room.motion_snapshot", event =>
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && avatar.x === .52))
+    assert.ok(snapshot.payload.avatars.every(avatar => avatar.present))
+    assert.equal(eb.all().slice(before).filter(event => event.type === "mini_room.avatar_moved").length, 0,
+      "the step itself was shed; only the snapshot repaired the partner's view")
+    await new Promise(resolve => setTimeout(resolve, 30))
+    assert.equal(ea.all().filter(event => event.type === "mini_room.motion_snapshot" &&
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && avatar.x === .52)).length, 0,
+      "the socket that received the step is not re-sent a snapshot")
+  } finally { await harness.close() }
+})
 
 test("a burst of targets during a slow authorization check still delivers the final target, in order", async () => {
   let clock = Date.now()
