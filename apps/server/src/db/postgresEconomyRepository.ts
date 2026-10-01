@@ -13,7 +13,7 @@ interface QueryExecutor {
 }
 
 interface TransactionalQueryExecutor extends QueryExecutor {
-  connect?: () => Promise<QueryExecutor & { release(): void }>
+  connect?: () => Promise<QueryExecutor & { release(error?: Error | boolean): void }>
 }
 
 export function createPostgresEconomyRepository(
@@ -192,6 +192,10 @@ export function createPostgresEconomyRepository(
       // after the lock, so it sees the other side's committed rows.
       const client = pool.connect ? await pool.connect() : null
       if (!client) return applyCoinTransaction(pool, input)
+      // A connection whose ROLLBACK failed may still hold the transaction
+      // and its advisory lock: release(error) makes node-postgres destroy it
+      // instead of handing it to the next caller.
+      let broken: Error | undefined
       try {
         await client.query("BEGIN")
         await client.query(
@@ -202,10 +206,12 @@ export function createPostgresEconomyRepository(
         await client.query("COMMIT")
         return result
       } catch (error) {
-        await client.query("ROLLBACK").catch(() => undefined)
+        await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+          broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
+        })
         throw error
       } finally {
-        client.release()
+        client.release(broken)
       }
     }
   }
