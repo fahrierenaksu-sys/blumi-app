@@ -68,10 +68,13 @@ import { registerReferralRoutes } from "./routes/referralRoutes"
 import { registerPersonalRoomDecorRoutes } from "./routes/personalRoomDecorRoutes"
 import {
   createCapabilityService,
+  isCapabilityRolledOut,
   parseCapabilityManifest,
   type CapabilityService
 } from "./capabilities/capabilityService"
 import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
+import { createChatReceiptService } from "./chat/chatReceiptService"
+import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
 import {
   createPersonalRoomDecorService,
   type PersonalRoomDecorService
@@ -171,6 +174,12 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest
   })
   const connectionManager = options.connectionManager ?? createConnectionManager()
+  const chatReceiptService = createChatReceiptService({
+    chatService,
+    blockPolicy: safetyService,
+    isRolledOutFor: (userId) => isCapabilityRolledOut(capabilityService, userId, "chat_read_receipts"),
+    emit: (userId, event) => connectionManager.sendToUser(userId, event)
+  })
   const realtimeTicketService = options.realtimeTicketService ??
     createRealtimeTicketService({
       authService,
@@ -249,6 +258,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     personalRoomDecorService,
     roomSnapshotService,
     capabilityService,
+    chatReceiptService,
     accountRecoveryService,
     connectionManager,
     connectionService: options.connectionService,
@@ -279,6 +289,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerEconomyRoutes(instance, routeServices)
     await registerCommerceRoutes(instance, routeServices)
     await registerNotificationRoutes(instance, routeServices)
+    await registerChatPreferencesRoutes(instance, routeServices)
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
     await registerRoomSnapshotRoutes(instance, routeServices)

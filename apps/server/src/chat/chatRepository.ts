@@ -1,4 +1,5 @@
-import type { ChatMessage, ChatThread } from "@blumi/contracts"
+import type { ChatMessage, ChatPreferences, ChatReceiptCursor, ChatThread } from "@blumi/contracts"
+import { compareChatMessagePositions } from "@blumi/domain"
 import { randomUUID } from "node:crypto"
 import { encodeThreadCursor, normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
 
@@ -27,6 +28,35 @@ export interface TestPersona {
   replies: string[]
 }
 
+/** One participant's receipt cursors and privacy setting in one thread. */
+export interface ChatReceiptParticipant {
+  threadId: string
+  userId: string
+  deliveredUpTo?: ChatReceiptCursor
+  readUpTo?: ChatReceiptCursor
+  readReceiptsEnabled: boolean
+}
+
+export interface ChatDeliveredAdvance {
+  partnerUserId: string
+  deliveredUpTo: ChatReceiptCursor
+}
+
+export type ChatReadTarget =
+  | { readAt: string; upToMessageId?: undefined }
+  | { upToMessageId: string; readAt?: undefined }
+
+export interface ChatReadAdvance {
+  /** The stored unread cursor afterwards (what `chat.thread_read` reports). */
+  readAt: string
+  /** The receipt read cursor, only when receipts are supported and it moved. */
+  readUpTo?: ChatReceiptCursor
+}
+
+export const DEFAULT_CHAT_PREFERENCES: Readonly<ChatPreferences> = Object.freeze({
+  readReceiptsEnabled: false
+})
+
 export interface ChatRepository {
   findTestPersona(userId: string): Promise<TestPersona | null>
   listThreads(userId: string): Promise<ChatThread[]>
@@ -48,10 +78,37 @@ export interface ChatRepository {
     clientMessageId?: string
   ): Promise<ChatMessageCreateResult>
   updateThreadLastMessage(threadId: string, message: ChatMessage): Promise<void>
-  markThreadRead(threadId: string, userId: string, readAt: string): Promise<void>
+  /**
+   * Moves the reader's unread cursor forward, never back. With
+   * `upToMessageId` the cursor is that partner message's position; null
+   * means the message is not the partner's in this thread (or the user is
+   * not a participant). Works before migration 070; `readUpTo` is reported
+   * only after it.
+   */
+  advanceReadCursor(input: { threadId: string; userId: string } & ChatReadTarget): Promise<ChatReadAdvance | null>
   claimDeliveries(input: { now: Date; limit: number; leaseMs: number; messageId?: string }): Promise<ChatDeliveryJob[]>
   completeDelivery(messageId: string, leaseToken: string, now: Date): Promise<void>
   retryDelivery(messageId: string, leaseToken: string, availableAt: Date): Promise<void>
+  /**
+   * False until migration 070 is applied. Before that the receipt methods
+   * below touch no 070 object and answer null, [] or the defaults.
+   */
+  supportsReceipts(): Promise<boolean>
+  /**
+   * Moves `userId`'s delivery cursor to the partner message `upToMessageId`
+   * when that is later (atomic, monotonic). Null when nothing moved.
+   */
+  advanceDeliveredCursor(input: { threadId: string; userId: string; upToMessageId: string }): Promise<ChatDeliveredAdvance | null>
+  /** Both participants of each thread with their cursors and read-receipt setting. */
+  listReceiptParticipants(threadIds: readonly string[]): Promise<ChatReceiptParticipant[]>
+  getChatPreferences(userId: string): Promise<ChatPreferences>
+  saveChatPreferences(userId: string, preferences: ChatPreferences, now: Date): Promise<ChatPreferences>
+}
+
+interface InMemoryParticipantCursors {
+  readAt?: string
+  readMessageId?: string
+  deliveredUpTo?: ChatReceiptCursor
 }
 
 export interface InMemoryChatStore {
@@ -59,7 +116,8 @@ export interface InMemoryChatStore {
   messagesByThread: Map<string, ChatMessage[]>
   messagesByClientMessageId: Map<string, ChatMessage>
   deliveryJobs: Map<string, { message: ChatMessage; availableAt: number; attempt: number; leaseToken?: string; completed?: boolean }>
-  readAtByParticipant: Map<string, string>
+  cursorsByParticipant: Map<string, InMemoryParticipantCursors>
+  preferencesByUser: Map<string, ChatPreferences>
 }
 
 export function createInMemoryChatStore(): InMemoryChatStore {
@@ -68,13 +126,24 @@ export function createInMemoryChatStore(): InMemoryChatStore {
     messagesByThread: new Map(),
     messagesByClientMessageId: new Map(),
     deliveryJobs: new Map(),
-    readAtByParticipant: new Map()
+    cursorsByParticipant: new Map(),
+    preferencesByUser: new Map()
   }
 }
 
 export function createInMemoryChatRepository(
-  store: InMemoryChatStore = createInMemoryChatStore()
+  store: InMemoryChatStore = createInMemoryChatStore(),
+  options: { receiptsSupported?: boolean } = {}
 ): ChatRepository {
+  const receiptsSupported = options.receiptsSupported ?? true
+  const cursorKey = (threadId: string, userId: string) => `${threadId}\0${userId}`
+  const cursorsOf = (threadId: string, userId: string): InMemoryParticipantCursors =>
+    store.cursorsByParticipant.get(cursorKey(threadId, userId)) ?? {}
+  const isParticipant = (threadId: string, userId: string) =>
+    store.threads.get(threadId)?.participantUserIds.includes(userId) === true
+  const findPartnerMessage = (threadId: string, userId: string, messageId: string) =>
+    (store.messagesByThread.get(threadId) ?? []).find((message) =>
+      message.messageId === messageId && message.senderUserId !== userId)
   return {
     async findTestPersona() { return null },
     async listThreads(userId) {
@@ -89,7 +158,7 @@ export function createInMemoryChatRepository(
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
       const threads = candidates.slice(0, limit).map((thread) => {
-          const lastReadAt = store.readAtByParticipant.get(`${thread.threadId}\0${userId}`)
+          const lastReadAt = cursorsOf(thread.threadId, userId).readAt
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
             .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
           return { ...cloneThread(thread), unreadCount, ...(lastReadAt ? { lastReadAt } : {}) }
@@ -165,10 +234,31 @@ export function createInMemoryChatRepository(
         lastMessage: { ...message }
       })
     },
-    async markThreadRead(threadId, userId, readAt) {
-      const key = `${threadId}\0${userId}`
-      const previous = store.readAtByParticipant.get(key)
-      if (!previous || Date.parse(previous) < Date.parse(readAt)) store.readAtByParticipant.set(key, readAt)
+    async advanceReadCursor(input) {
+      if (!isParticipant(input.threadId, input.userId)) return null
+      const target = input.upToMessageId === undefined
+        ? { sentAt: input.readAt, messageId: undefined }
+        : findPartnerMessage(input.threadId, input.userId, input.upToMessageId)
+      if (!target) return null
+      const key = cursorKey(input.threadId, input.userId)
+      const current = cursorsOf(input.threadId, input.userId)
+      const previousTime = current.readAt === undefined ? Number.NEGATIVE_INFINITY : Date.parse(current.readAt)
+      const targetTime = Date.parse(target.sentAt)
+      if (!receiptsSupported) {
+        // Before 070 only the unread cursor exists: GREATEST(last_read_at, target).
+        if (targetTime > previousTime) store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt })
+        return { readAt: cursorsOf(input.threadId, input.userId).readAt! }
+      }
+      const advances = targetTime > previousTime || (targetTime === previousTime && current.readMessageId !== undefined &&
+        (target.messageId === undefined || current.readMessageId < target.messageId))
+      if (!advances) return { readAt: current.readAt! }
+      store.cursorsByParticipant.set(key, { ...current, readAt: target.sentAt, readMessageId: target.messageId })
+      return {
+        readAt: target.sentAt,
+        readUpTo: target.messageId === undefined
+          ? { sentAt: target.sentAt }
+          : { sentAt: target.sentAt, messageId: target.messageId }
+      }
     },
     async claimDeliveries({ now, limit, leaseMs, messageId }) {
       const jobs = [...store.deliveryJobs.values()]
@@ -188,6 +278,55 @@ export function createInMemoryChatRepository(
     async retryDelivery(messageId, leaseToken, availableAt) {
       const job = store.deliveryJobs.get(messageId)
       if (job?.leaseToken === leaseToken) store.deliveryJobs.set(messageId, { ...job, availableAt: availableAt.getTime(), leaseToken: undefined })
+    },
+    async supportsReceipts() {
+      return receiptsSupported
+    },
+    async advanceDeliveredCursor({ threadId, userId, upToMessageId }) {
+      if (!receiptsSupported || !isParticipant(threadId, userId)) return null
+      const target = findPartnerMessage(threadId, userId, upToMessageId)
+      if (!target) return null
+      const current = cursorsOf(threadId, userId)
+      const previous = current.deliveredUpTo
+      if (previous?.messageId !== undefined && compareChatMessagePositions(
+        { sentAt: previous.sentAt, messageId: previous.messageId }, target) >= 0) return null
+      const deliveredUpTo = { sentAt: target.sentAt, messageId: target.messageId }
+      store.cursorsByParticipant.set(cursorKey(threadId, userId), { ...current, deliveredUpTo })
+      return {
+        partnerUserId: target.senderUserId,
+        deliveredUpTo: { ...deliveredUpTo }
+      }
+    },
+    async listReceiptParticipants(threadIds) {
+      if (!receiptsSupported) return []
+      return [...new Set(threadIds)].flatMap((threadId) => {
+        const thread = store.threads.get(threadId)
+        if (!thread) return []
+        return thread.participantUserIds.map((userId): ChatReceiptParticipant => {
+          const cursors = cursorsOf(threadId, userId)
+          return {
+            threadId,
+            userId,
+            ...(cursors.deliveredUpTo ? { deliveredUpTo: { ...cursors.deliveredUpTo } } : {}),
+            ...(cursors.readAt
+              ? { readUpTo: cursors.readMessageId === undefined
+                  ? { sentAt: cursors.readAt }
+                  : { sentAt: cursors.readAt, messageId: cursors.readMessageId } }
+              : {}),
+            readReceiptsEnabled: store.preferencesByUser.get(userId)?.readReceiptsEnabled ?? false
+          }
+        })
+      })
+    },
+    async getChatPreferences(userId) {
+      if (!receiptsSupported) return { ...DEFAULT_CHAT_PREFERENCES }
+      return { ...(store.preferencesByUser.get(userId) ?? DEFAULT_CHAT_PREFERENCES) }
+    },
+    async saveChatPreferences(userId, preferences) {
+      if (!receiptsSupported) throw new Error("Chat preferences need migration 070.")
+      const saved = { readReceiptsEnabled: preferences.readReceiptsEnabled }
+      store.preferencesByUser.set(userId, saved)
+      return { ...saved }
     }
   }
 }

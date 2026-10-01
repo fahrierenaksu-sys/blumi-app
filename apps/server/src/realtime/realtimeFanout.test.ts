@@ -277,6 +277,37 @@ test("read cursor fanout cannot target a different user or a public room", () =>
   assert.equal(validateRealtimeFanoutMessage({ origin: "one", target: { kind: "room", roomId: "public" }, event }), false)
 })
 
+test("receipt fanout reaches only the other participant of the thread", () => {
+  const event = {
+    type: "chat.receipt_updated",
+    payload: {
+      threadId: "thread",
+      userId: "reader",
+      participantUserIds: ["reader", "sender"],
+      readUpTo: { sentAt: "2026-10-01T10:00:00.000Z", messageId: "message_1" }
+    }
+  }
+  const message = (target: unknown, payload: unknown = event.payload) =>
+    validateRealtimeFanoutMessage({ origin: "one", target, event: { type: event.type, payload } })
+
+  assert.equal(message({ kind: "user", userId: "sender" }), true)
+  assert.equal(message({ kind: "user", userId: "reader" }), false, "never the cursor owner")
+  assert.equal(message({ kind: "user", userId: "stranger" }), false, "never a non-participant")
+  assert.equal(message({ kind: "users", userIds: ["sender"] }), false)
+  assert.equal(message({ kind: "room", roomId: "thread" }), false)
+  // The payload itself must satisfy the shared receipt schema.
+  assert.equal(message({ kind: "user", userId: "sender" }, { ...event.payload, readUpTo: undefined }), false)
+  assert.equal(message({ kind: "user", userId: "sender" }, {
+    ...event.payload,
+    userId: "stranger",
+    participantUserIds: ["reader", "sender"]
+  }), false)
+  assert.equal(message({ kind: "user", userId: "sender" }, {
+    ...event.payload,
+    readUpTo: { sentAt: "not a date" }
+  }), false)
+})
+
 test("realtime fanout validation rejects unknown or incomplete server events", () => {
   const validMessage: RealtimeFanoutMessage = {
     origin: "instance_1",

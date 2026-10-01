@@ -7,6 +7,7 @@ import WebSocket from "ws"
 import { createInMemoryAuthRepository } from "../auth/authRepository"
 import { createAuthService } from "../auth/authService"
 import { createBlumiBackendStore } from "../auth/authStore"
+import { createCapabilityService, parseCapabilityManifest, type CapabilityService } from "../capabilities/capabilityService"
 import { createChatService } from "../chat/chatService"
 import { createConnectionService } from "../connections/connectionService"
 import { createMiniRoomService } from "../miniRooms/miniRoomService"
@@ -863,6 +864,44 @@ test("two room sockets share motion immediately, reconnect at the accepted targe
   } finally { await harness.close() }
 })
 
+test("a delivery ack over the socket reaches only the sender, and ack bursts never close the socket", async () => {
+  const harness = await createRealtimeHarness({
+    capabilityService: createCapabilityService({
+      manifest: parseCapabilityManifest(JSON.stringify({
+        rollouts: { db_chat_metadata_ready: 100, chat_read_receipts: 100 }
+      })).manifest
+    })
+  })
+  try {
+    const a = await harness.createSession("+905551110131", "Receipt A")
+    const b = await harness.createSession("+905551110132", "Receipt B")
+    await harness.chatService.createThread({ threadId: "receipt-thread", miniRoomId: "receipt-room",
+      participantUserIds: [a.userId, b.userId], participants: [{ userId: a.userId }, { userId: b.userId }] })
+    const message = await harness.chatService.sendMessage(a.userId, "receipt-thread", "hello")
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const ea = collectEvents(sa), eb = collectEvents(sb)
+    const ack = (payload: unknown) => sb.send(JSON.stringify({ type: "chat.ack_delivered", payload }))
+
+    ack({ threadId: "receipt-thread", upToMessageId: message.messageId })
+    const receipt = await ea.waitFor("chat.receipt_updated")
+    assert.deepEqual(receipt.payload, {
+      threadId: "receipt-thread",
+      userId: b.userId,
+      participantUserIds: [a.userId, b.userId].sort(),
+      deliveredUpTo: { sentAt: message.sentAt, messageId: message.messageId }
+    })
+
+    ack({ threadId: "receipt-thread" })
+    ack({ threadId: "someone-elses-thread", upToMessageId: message.messageId })
+    for (let index = 0; index < 100; index++) ack({ threadId: "receipt-thread", upToMessageId: message.messageId })
+    sb.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+    await eb.waitFor("chat.thread_listed")
+    assert.equal(sb.readyState, WebSocket.OPEN, "acks have their own silent budget")
+    assert.equal(eb.all().some((event) => event.type === "chat.receipt_updated"), false)
+    assert.equal(ea.all().filter((event) => event.type === "chat.receipt_updated").length, 1, "repeated acks are no-ops")
+  } finally { await harness.close() }
+})
+
 async function createRealtimeHarness(options: {
   pauseTicketConsumption?: boolean
   rejectTicketConsumption?: boolean
@@ -872,6 +911,7 @@ async function createRealtimeHarness(options: {
   allowAuthorizedTestRoom?: boolean
   captureIntervalCallbacks?: { callback: () => void; ms: number }[]
   authorizationClock?: () => number
+  capabilityService?: CapabilityService
 } = {}) {
   // Each realtime authorization check costs these two queries in PostgreSQL.
   const authorizationQueries = { count: 0 }
@@ -974,7 +1014,8 @@ async function createRealtimeHarness(options: {
     ...(options.allowAuthorizedTestRoom
       ? { isPresenceRoomAllowed: (_actor: unknown, roomId: string) => roomId === AUTHORIZED_TEST_ROOM_ID }
       : {}),
-    ...(options.authorizationClock ? { authorizationClock: options.authorizationClock } : {})
+    ...(options.authorizationClock ? { authorizationClock: options.authorizationClock } : {}),
+    ...(options.capabilityService ? { capabilityService: options.capabilityService } : {})
   })
   let realtimeServer: ReturnType<typeof createRealtimeServer>
   if (options.captureIntervals || options.captureIntervalCallbacks) {
@@ -1003,6 +1044,7 @@ async function createRealtimeHarness(options: {
 
   return {
     authService,
+    chatService,
     miniRoomService,
     safetyService,
     authorizationQueries,

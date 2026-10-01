@@ -30,7 +30,10 @@ export const REALTIME_SLOW_CONSUMER_CLOSE_CODE = 1013
 const TRANSIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "presence.snapshot",
   "presence.nearby",
-  "reaction.received"
+  "reaction.received",
+  // Receipt cursors are cumulative: the next event or list refresh covers a
+  // dropped one, so a backed-up socket sheds them first.
+  "chat.receipt_updated"
 ])
 
 export interface RealtimeConnection {

@@ -112,10 +112,20 @@ export function stableCapabilityBucket(userId: string): number {
   return digest.readUInt32BE(0) % 100
 }
 
+/**
+ * Server-detected readiness a capability needs besides its manifest entry,
+ * read synchronously from a cached probe. `chat_read_receipts` requires
+ * migration 070 (`chatReceiptSchema.ts`), so a manifest that enables it early
+ * cannot switch it on before the schema exists.
+ */
+export type CapabilityRuntimeGates = Readonly<Partial<Record<CapabilityKey, () => boolean>>>
+
 export function createCapabilityService({
-  manifest
+  manifest,
+  runtimeGates = {}
 }: {
   manifest: CapabilityManifest
+  runtimeGates?: CapabilityRuntimeGates
 }): CapabilityService {
   return Object.freeze({
     resolve(
@@ -123,23 +133,38 @@ export function createCapabilityService({
       declaredCapabilities: readonly CapabilityKey[] | undefined
     ) {
       if (declaredCapabilities === undefined) {
-        return createResolution(true, new Set<CapabilityKey>(), manifest, userId)
+        return createResolution(true, new Set<CapabilityKey>(), manifest, userId, runtimeGates)
       }
       return createResolution(
         false,
         new Set(declaredCapabilities),
         manifest,
-        userId
+        userId,
+        runtimeGates
       )
     }
   })
+}
+
+/**
+ * Whether the server rolled `key` out to `userId`, independent of what the
+ * requesting client declared. For server behaviour that also reaches other
+ * people (receipt events); clients that predate it ignore what it produces.
+ */
+export function isCapabilityRolledOut(
+  capabilityService: CapabilityService,
+  userId: string,
+  key: CapabilityKey
+): boolean {
+  return capabilityService.resolve(userId, [key]).capabilities[key]
 }
 
 function createResolution(
   legacy: boolean,
   declared: ReadonlySet<CapabilityKey>,
   manifest: CapabilityManifest,
-  userId: string
+  userId: string,
+  runtimeGates: CapabilityRuntimeGates
 ): CapabilityResolution {
   const bucket = stableCapabilityBucket(userId)
   const base = Object.fromEntries(CAPABILITY_KEYS.map((key) => [
@@ -148,7 +173,7 @@ function createResolution(
       manifest.rollouts[key],
       bucket,
       manifest.internalUserIds.includes(userId)
-    )
+    ) && (runtimeGates[key]?.() ?? true)
   ])) as Record<CapabilityKey, boolean>
 
   const resolved = Object.fromEntries(CAPABILITY_KEYS.map((key) => [

@@ -35,6 +35,7 @@ import { isPublicRequestError } from "../errors/publicRequestError"
 import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
+import type { CapabilityService } from "../capabilities/capabilityService"
 
 const HEARTBEAT_INTERVAL_MS = 30_000
 const CONNECTION_LEASE_CLEANUP_INTERVAL_MS = 60_000
@@ -57,6 +58,16 @@ const AUTHORIZATION_FAILURE_CLOSE_REASON = "Realtime authorization unavailable"
  * for a carrier NAT reconnecting after an instance restart.
  */
 const MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW = 40
+/**
+ * Events with their own budget that never count toward the shared one and
+ * are dropped silently when over it (the socket stays open): avatar movement
+ * and delivery acks, which are cumulative, so the next one covers a drop.
+ */
+const SILENT_LANE_LIMITS = {
+  "mini_room.move": { perUserPerWindow: 60, inFlightPerConnection: 2, inFlightPerUser: 4 },
+  "chat.ack_delivered": { perUserPerWindow: 30, inFlightPerConnection: 2, inFlightPerUser: 4 }
+} as const
+type SilentLaneType = keyof typeof SILENT_LANE_LIMITS
 /** Memory bound for tracked addresses; the oldest window is evicted first. */
 const MAX_TRACKED_UPGRADE_ADDRESSES = 10_000
 const CHAT_MESSAGE_NOT_SENT_MESSAGE = "Your message was not sent. Try again."
@@ -96,6 +107,8 @@ export interface CreateRealtimeServerOptions {
   trustedProxyAddresses?: string[]
   /** Test seam; production uses MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW. */
   upgradeAttemptsPerAddressWindow?: number
+  /** Resolves the `chat_read_receipts` rollout; without it receipts stay off. */
+  capabilityService?: CapabilityService
 }
 
 export function createRealtimeServer(
@@ -111,14 +124,19 @@ export function createRealtimeServer(
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const connectionEventWindows = new Map<string, EventRateWindow>()
   const userEventWindows = new Map<string, EventRateWindow>()
-  const movementEventWindows = new Map<string, EventRateWindow>()
   const upgradeAddressWindows = new Map<string, EventRateWindow>()
   const upgradeAttemptLimit = options.upgradeAttemptsPerAddressWindow ?? MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const connectionInFlight = new Map<string, number>()
   const userInFlight = new Map<string, number>()
-  const connectionMovementInFlight = new Map<string, number>()
-  const userMovementInFlight = new Map<string, number>()
+  const silentLanes = new Map(
+    (Object.keys(SILENT_LANE_LIMITS) as SilentLaneType[]).map((type) => [type, {
+      ...SILENT_LANE_LIMITS[type],
+      windows: new Map<string, EventRateWindow>(),
+      connectionInFlight: new Map<string, number>(),
+      userInFlight: new Map<string, number>()
+    }])
+  )
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
   const connectionLifecycleOperations = new Map<string, Promise<void>>()
@@ -202,7 +220,8 @@ export function createRealtimeServer(
     chatService: options.chatService,
     safetyService: options.safetyService,
     notificationService,
-    isPresenceRoomAllowed: options.isPresenceRoomAllowed
+    isPresenceRoomAllowed: options.isPresenceRoomAllowed,
+    capabilityService: options.capabilityService
   })
 
   const handleUpgradeRequest = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -444,26 +463,26 @@ export function createRealtimeServer(
     const now = Date.now()
     let frame: unknown
     try { frame = JSON.parse(data.toString()) } catch { frame = undefined }
-    const movement = isClientEvent(frame) && frame.type === "mini_room.move"
-    if (movement) {
-      purgeExpiredEventWindows(movementEventWindows, now)
-      if (!consumeEventAllowance({ windows: movementEventWindows, key: connection.userId, now, limit: 60 }) ||
-        (connectionMovementInFlight.get(connection.connectionId) ?? 0) >= 2 ||
-        (userMovementInFlight.get(connection.userId) ?? 0) >= 4) return
+    const lane = isClientEvent(frame) ? silentLanes.get(frame.type as SilentLaneType) : undefined
+    if (lane) {
+      purgeExpiredEventWindows(lane.windows, now)
+      if (!consumeEventAllowance({ windows: lane.windows, key: connection.userId, now, limit: lane.perUserPerWindow }) ||
+        (lane.connectionInFlight.get(connection.connectionId) ?? 0) >= lane.inFlightPerConnection ||
+        (lane.userInFlight.get(connection.userId) ?? 0) >= lane.inFlightPerUser) return
     }
-    const connectionAllowed = movement || consumeEventAllowance({
+    const connectionAllowed = Boolean(lane) || consumeEventAllowance({
       windows: connectionEventWindows,
       key: connection.connectionId,
       now,
       limit: MAX_CONNECTION_EVENTS_PER_WINDOW
     })
-    const userAllowed = movement || consumeEventAllowance({
+    const userAllowed = Boolean(lane) || consumeEventAllowance({
       windows: userEventWindows,
       key: connection.userId,
       now,
       limit: MAX_USER_EVENTS_PER_WINDOW
     })
-    if (!movement && (!connectionAllowed || !userAllowed ||
+    if (!lane && (!connectionAllowed || !userAllowed ||
       (connectionInFlight.get(connection.connectionId) ?? 0) >= MAX_CONNECTION_IN_FLIGHT ||
       (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT)) {
       if (connection.socket.readyState === 1) {
@@ -471,8 +490,8 @@ export function createRealtimeServer(
       }
       return
     }
-    const connectionSlots = movement ? connectionMovementInFlight : connectionInFlight
-    const userSlots = movement ? userMovementInFlight : userInFlight
+    const connectionSlots = lane ? lane.connectionInFlight : connectionInFlight
+    const userSlots = lane ? lane.userInFlight : userInFlight
     connectionSlots.set(connection.connectionId, (connectionSlots.get(connection.connectionId) ?? 0) + 1)
     userSlots.set(connection.userId, (userSlots.get(connection.userId) ?? 0) + 1)
     let received: ClientEvent | undefined

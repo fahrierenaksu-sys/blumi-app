@@ -28,6 +28,7 @@ const SERVER_EVENT_TYPES = new Set([
   "chat.thread_read",
   "chat.message_listed",
   "chat.message_received",
+  "chat.receipt_updated",
   "reaction.received",
   "safety.user_blocked"
 ])
@@ -109,6 +110,14 @@ export function validateRealtimeFanoutMessage(
   if (record.event.type === "chat.thread_read") {
     return record.target.kind === "user" && record.target.userId === record.event.payload.userId
   }
+  if (record.event.type === "chat.receipt_updated") {
+    // A receipt describes one participant's cursor and may only reach the
+    // other participant of that thread: never the owner, a room or a list.
+    const { participantUserIds, userId } = record.event.payload
+    return record.target.kind === "user" &&
+      record.target.userId !== userId &&
+      participantUserIds.includes(record.target.userId)
+  }
   return true
 }
 
@@ -160,6 +169,7 @@ function isServerEventPayload(type: string, value: unknown): boolean {
   switch (type) {
     case "mini_room.avatar_moved":
     case "mini_room.motion_snapshot":
+    case "chat.receipt_updated":
       return parseServerEvent({ type, payload: value }).kind === "valid"
     case "room.joined":
       return hasStrings(payload, ["roomId", "currentUserId", "assignedSpotId"]) &&
