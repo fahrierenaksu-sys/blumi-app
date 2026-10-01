@@ -170,43 +170,40 @@ async function legacyReadUpToMessage(pool: QueryExecutor, threadId: string, user
  * by last_read_message_id and moves only forward in (sent_at, message_id)
  * order, compared with that message's own position. An instant read may have
  * put last_read_at past a message that is read by id later; the receipt still
- * advances to it.
+ * advances to it. Both comparisons read the participant row being updated, so
+ * a concurrent read that committed first is re-checked (never moved back).
  */
 async function readUpToMessage(pool: QueryExecutor, threadId: string, userId: string, messageId: string): Promise<ChatReadAdvance | null> {
+  const receiptMovesForward = `(participant.last_read_message_id IS NULL OR NOT EXISTS (
+         SELECT 1 FROM blumi_chat_messages AS receipt
+          WHERE receipt.thread_id = participant.thread_id
+            AND receipt.message_id = participant.last_read_message_id
+            AND (receipt.sent_at, receipt.message_id) >= (target.sent_at, target.message_id)))`
   const result = await pool.query(
     `WITH target AS (
        SELECT sent_at, message_id FROM blumi_chat_messages
         WHERE thread_id = $1 AND message_id = $3 AND sender_user_id <> $2
      ), current AS (
-       SELECT participant.last_read_at, receipt.sent_at AS receipt_sent_at,
-              receipt.message_id AS receipt_message_id
-         FROM blumi_chat_thread_participants AS participant
-         LEFT JOIN blumi_chat_messages AS receipt
-           ON receipt.thread_id = participant.thread_id
-          AND receipt.message_id = participant.last_read_message_id
-        WHERE participant.thread_id = $1 AND participant.user_id = $2
-     ), decision AS (
-       SELECT target.sent_at, target.message_id,
-              (current.receipt_message_id IS NULL OR
-               (current.receipt_sent_at, current.receipt_message_id) < (target.sent_at, target.message_id)) AS receipt_advances,
-              (current.last_read_at IS NULL OR current.last_read_at < target.sent_at) AS unread_advances
-         FROM target CROSS JOIN current
+       SELECT last_read_at, last_read_message_id FROM blumi_chat_thread_participants
+        WHERE thread_id = $1 AND user_id = $2
      ), advanced AS (
        UPDATE blumi_chat_thread_participants AS participant
-          SET last_read_at = GREATEST(participant.last_read_at, decision.sent_at),
-              last_read_message_id = CASE WHEN decision.receipt_advances
-                                          THEN decision.message_id
+          SET last_read_at = GREATEST(participant.last_read_at, target.sent_at),
+              last_read_message_id = CASE WHEN ${receiptMovesForward}
+                                          THEN target.message_id
                                           ELSE participant.last_read_message_id END
-         FROM decision
+         FROM target
         WHERE participant.thread_id = $1 AND participant.user_id = $2
-          AND (decision.receipt_advances OR decision.unread_advances)
-       RETURNING participant.last_read_at
+          AND (participant.last_read_at IS NULL OR participant.last_read_at < target.sent_at OR
+               ${receiptMovesForward})
+       RETURNING participant.last_read_at, participant.last_read_message_id
      )
      SELECT EXISTS (SELECT 1 FROM target) AS found,
             EXISTS (SELECT 1 FROM current) AS participant,
             (SELECT last_read_at FROM advanced) AS advanced_at,
             (SELECT last_read_at FROM current) AS current_at,
-            (SELECT receipt_advances FROM decision) AS receipt_advances,
+            ((SELECT last_read_message_id FROM advanced) = (SELECT message_id FROM target) AND
+             (SELECT last_read_message_id FROM current) IS DISTINCT FROM (SELECT message_id FROM target)) AS receipt_advances,
             (SELECT sent_at FROM target) AS target_sent_at,
             (SELECT message_id FROM target) AS target_message_id`,
     [threadId, userId, messageId]
