@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View
 } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
@@ -73,8 +72,6 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
   const { visible, initialFilters, onClose, onApply } = props
   const [draftFilters, setDraftFilters] = useState<DiscoverFilters>(initialFilters)
   const insets = useSafeAreaInsets()
-  const { width, fontScale } = useWindowDimensions()
-  const expandedLayout = width < 360 || fontScale >= 1.3
   const copy = getDiscoveryHomeCopy(getAppLocale()).filters
 
   useEffect(() => {
@@ -115,12 +112,10 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
   }
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.overlay}>
         <SwipeDismissSheet
           onDismiss={onClose}
-          presentation="self"
-          accessibilityViewIsModal
           backdrop={{
             style: styles.backdrop,
             onPress: onClose,
@@ -129,10 +124,12 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
         >
           <View style={styles.grabber} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no" />
+          <View style={styles.sheetGlowTop} pointerEvents="none" />
+          <View style={styles.sheetGlowBottom} pointerEvents="none" />
           <View style={styles.headerRow}>
             <View style={styles.headerCopy}>
               <Text style={styles.headerEyebrow}>{copy.eyebrow}</Text>
-              <Text accessibilityRole="header" style={styles.headerTitle}>{copy.title}</Text>
+              <Text style={styles.headerTitle}>{copy.title}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -151,14 +148,13 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           >
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{copy.showMe}</Text>
-              <View style={[styles.segmentRow, expandedLayout && styles.stackedRow]}>
+              <View style={styles.segmentRow}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={copy.showEveryoneAccessibilityLabel}
                   accessibilityState={{ selected: draftFilters.genders.length === 0 }}
                   style={[
                     styles.segment,
-                    expandedLayout && styles.stackedItem,
                     draftFilters.genders.length === 0 ? styles.segmentActive : null
                   ]}
                   onPress={() => {
@@ -185,7 +181,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                       accessibilityRole="button"
                       accessibilityLabel={genderCopy.accessibilityLabel}
                       accessibilityState={{ selected: active }}
-                      style={[styles.segment, expandedLayout && styles.stackedItem, active ? styles.segmentActive : null]}
+                      style={[styles.segment, active ? styles.segmentActive : null]}
                       onPress={() => {
                         setDraftFilters((previous) => ({
                           ...previous,
@@ -211,8 +207,8 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
               <Text style={styles.sectionTitle}>{copy.ageWindow}</Text>
               <View style={styles.ageCard}>
                 <Text style={styles.ageValue}>{ageSummary}</Text>
-                <View style={[styles.ageControls, expandedLayout && styles.stackedRow]}>
-                  <View style={[styles.ageControlGroup, expandedLayout && styles.stackedItem]}>
+                <View style={styles.ageControls}>
+                  <View style={styles.ageControlGroup}>
                     <Text style={styles.ageLabel}>{copy.minimum}</Text>
                     <View
                       style={styles.ageStepper}
@@ -247,7 +243,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                     </View>
                   </View>
 
-                  <View style={[styles.ageControlGroup, expandedLayout && styles.stackedItem]}>
+                  <View style={styles.ageControlGroup}>
                     <Text style={styles.ageLabel}>{copy.maximum}</Text>
                     <View
                       style={styles.ageStepper}
@@ -321,8 +317,8 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
 
           </SwipeDismissSheetScrollView>
 
-          <View style={[styles.footer, expandedLayout && styles.stackedRow]}>
-            <View style={[styles.footerButton, expandedLayout && styles.stackedItem]}>
+          <View style={styles.footer}>
+            <View style={styles.footerButton}>
               <SecondaryButton
                 label={copy.reset}
                 onPress={() => {
@@ -330,7 +326,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                 }}
               />
             </View>
-            <View style={[styles.footerButton, styles.applyButton, expandedLayout && styles.stackedItem]}>
+            <View style={styles.footerButton}>
               <PrimaryButton
                 label={copy.apply}
                 onPress={() => {
@@ -368,15 +364,42 @@ const styles = StyleSheet.create({
     maxHeight: "86%",
     borderTopLeftRadius: uiTheme.radius.xxl,
     borderTopRightRadius: uiTheme.radius.xxl,
-    borderCurve: "continuous",
-    backgroundColor: "#FFF8FC",
+    backgroundColor: "rgba(255, 250, 253, 0.76)",
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.88)",
-    paddingTop: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.lg,
     overflow: "hidden",
     ...uiTheme.shadow.deep,
+  },
+  sheetSheen: {
+    position: "absolute",
+    left: -40,
+    right: -40,
+    top: 72,
+    height: 104,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.26)",
+    transform: [{ rotate: "-7deg" }],
+  },
+  sheetGlowTop: {
+    position: "absolute",
+    top: -132,
+    left: -96,
+    width: 390,
+    height: 276,
+    borderRadius: 180,
+    backgroundColor: "rgba(255, 124, 183, 0.18)",
+  },
+  sheetGlowBottom: {
+    position: "absolute",
+    right: -120,
+    bottom: -130,
+    width: 420,
+    height: 320,
+    borderRadius: 210,
+    backgroundColor: "rgba(191, 166, 255, 0.20)",
   },
   headerRow: {
     flexDirection: "row",
@@ -384,11 +407,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: uiTheme.spacing.lg,
     paddingBottom: uiTheme.spacing.md,
-    gap: uiTheme.spacing.md,
   },
   headerCopy: {
-    flex: 1,
-    minWidth: 0,
     gap: 3,
   },
   headerEyebrow: {
@@ -399,27 +419,24 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...uiTheme.font.heading,
     color: uiTheme.colors.textPrimary,
-    fontSize: 24,
-    lineHeight: 30,
   },
   closeButton: {
-    flexShrink: 0,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.52)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
   },
   content: {
-    flexShrink: 1,
+    maxHeight: 520,
   },
   contentContainer: {
     paddingHorizontal: uiTheme.spacing.lg,
     paddingBottom: uiTheme.spacing.md,
-    gap: uiTheme.spacing.lg,
+    gap: uiTheme.spacing.md,
   },
   section: {
     gap: uiTheme.spacing.xs,
@@ -437,16 +454,14 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: uiTheme.radius.full,
     borderWidth: 1,
-    borderColor: "#EDE1EB",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    borderColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "rgba(255, 255, 255, 0.34)",
     alignItems: "center",
     justifyContent: "center",
   },
   segmentActive: {
-    borderColor: uiTheme.colors.primary,
-    backgroundColor: "#FFE8F3",
+    borderColor: "rgba(255, 79, 152, 0.72)",
+    backgroundColor: "rgba(255, 229, 244, 0.62)",
     ...uiTheme.shadow.soft,
   },
   segmentText: {
@@ -463,7 +478,7 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.30)",
     padding: uiTheme.spacing.md,
     gap: uiTheme.spacing.md,
     ...uiTheme.shadow.soft,
@@ -490,15 +505,15 @@ const styles = StyleSheet.create({
     borderRadius: uiTheme.radius.full,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.82)",
-    backgroundColor: "#FFF4FA",
+    backgroundColor: "rgba(255, 255, 255, 0.38)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: uiTheme.spacing.xs,
   },
   stepperButton: {
-    width: 44,
-    height: 44,
+    width: 32,
+    height: 32,
     borderRadius: 13,
     borderCurve: "continuous",
     alignItems: "center",
@@ -522,15 +537,14 @@ const styles = StyleSheet.create({
   vibeChip: {
     borderRadius: uiTheme.radius.full,
     borderWidth: 1,
-    borderColor: "#EDE1EB",
-    backgroundColor: "#FFFFFF",
-    minHeight: 44,
+    borderColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "rgba(255, 255, 255, 0.36)",
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
   vibeChipSelected: {
-    borderColor: uiTheme.colors.primary,
-    backgroundColor: "#FFE8F3",
+    borderColor: "rgba(255, 79, 152, 0.82)",
+    backgroundColor: "rgba(255, 229, 244, 0.64)",
     ...uiTheme.shadow.soft,
   },
   vibeChipText: {
@@ -545,15 +559,17 @@ const styles = StyleSheet.create({
   footer: {
     marginHorizontal: uiTheme.spacing.lg,
     marginBottom: uiTheme.spacing.md,
-    paddingTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.82)",
+    borderRadius: 28,
+    borderCurve: "continuous",
+    padding: 8,
     flexDirection: "row",
     gap: uiTheme.spacing.sm,
+    backgroundColor: "rgba(255, 255, 255, 0.34)",
+    ...uiTheme.shadow.soft,
   },
   footerButton: {
-    flexGrow: 1,
-    flexBasis: 0,
+    flex: 1,
   },
-  applyButton: { flexGrow: 2 },
-  stackedRow: { flexDirection: "column" },
-  stackedItem: { flexGrow: 0, flexShrink: 0, flexBasis: "auto" },
 })

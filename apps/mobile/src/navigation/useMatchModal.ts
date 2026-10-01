@@ -1,5 +1,5 @@
 import type { AvatarSelection, ChatThread } from "@blumi/contracts"
-import { useCallback, useMemo, useRef, useState, type RefObject } from "react"
+import { useCallback, useRef, useState, type RefObject } from "react"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { createThread } from "../features/chat/chatApi"
@@ -24,7 +24,6 @@ import {
 } from "../features/connections/savedConnectionsStore"
 import type { SessionActor } from "../features/session/sessionModel"
 import { navigationRef } from "./rootNavigationRef"
-import { useLiveMatchParticipant } from "../features/matches/useLiveMatchParticipant"
 
 export interface GlobalMatchState {
   miniRoomId: string
@@ -58,14 +57,6 @@ export function useMatchModal({
   hydrateFromServer
 }: MatchModalInput) {
   const [globalMatch, setGlobalMatch] = useState<GlobalMatchState | null>(null)
-  const matchParticipant = useMemo(() => globalMatch?.matchedUserId ? {
-    userId: globalMatch.matchedUserId, displayName: globalMatch.matchedUserName,
-    avatarSelection: globalMatch.matchedAvatarSelection
-  } : undefined, [globalMatch])
-  const liveParticipant = useLiveMatchParticipant(matchParticipant)
-  const liveGlobalMatch = useMemo(() => globalMatch && liveParticipant ? {
-    ...globalMatch, matchedUserName: liveParticipant.displayName, matchedAvatarSelection: liveParticipant.avatarSelection
-  } : globalMatch, [globalMatch, liveParticipant])
   const handledMatchIdsRef = useRef(new Set<string>())
   const reconcilingMatchIdsRef = useRef(new Set<string>())
 
@@ -224,10 +215,10 @@ export function useMatchModal({
       // Thread not synced yet, navigate with partner intent
       goChat({
         partnerId: globalMatch.matchedUserId,
-        partnerName: liveGlobalMatch?.matchedUserName ?? globalMatch.matchedUserName
+        partnerName: globalMatch.matchedUserName
       })
     }
-  }, [globalMatch, goChat, goLobby, liveGlobalMatch])
+  }, [globalMatch, goChat, goLobby])
 
   /** Forget presented matches and close the modal when the session ends. */
   const resetMatchModal = useCallback((): void => {
@@ -238,7 +229,7 @@ export function useMatchModal({
   }, [])
 
   return {
-    globalMatch: liveGlobalMatch,
+    globalMatch,
     reconcileConnectionDecisionDelivery,
     handleRealtimeConnectionMatch,
     getMatchDeduplicationState,

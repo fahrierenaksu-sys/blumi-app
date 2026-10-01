@@ -390,7 +390,6 @@ function isMiniRoomParticipant(value: unknown): value is MiniRoomParticipant {
   return (
     typeof record.userId === "string" &&
     typeof record.displayName === "string" &&
-    (record.profileUpdatedAt === undefined || (typeof record.profileUpdatedAt === "string" && Number.isFinite(Date.parse(record.profileUpdatedAt)))) &&
     Boolean(record.avatar) &&
     typeof record.avatar === "object"
   )

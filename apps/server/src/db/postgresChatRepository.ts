@@ -78,10 +78,8 @@ export function createPostgresChatRepository(
       const rows = result.rows.slice(0, limit)
       if (rows.length === 0) return { threads: [], nextCursor: null }
       const participantRows = await pool.query(
-        `SELECT participant.thread_id, participant.user_id,
-                COALESCE(account.display_name, participant.display_name) AS display_name,
-                account.avatar_preset_id, account.avatar_selection, account.avatar_revision,
-                account.updated_at AS profile_updated_at
+        `SELECT participant.thread_id, participant.user_id, participant.display_name,
+                account.avatar_preset_id, account.avatar_selection, account.avatar_revision
            FROM blumi_chat_thread_participants AS participant
            LEFT JOIN blumi_accounts AS account ON account.user_id = participant.user_id
           WHERE participant.thread_id = ANY($1::text[])
@@ -561,10 +559,8 @@ async function loadParticipants(
   threadId: string
 ): Promise<ChatThread["participants"]> {
   const result = await pool.query(
-    `SELECT participant.user_id,
-            COALESCE(account.display_name, participant.display_name) AS display_name,
-            account.avatar_preset_id, account.avatar_selection, account.avatar_revision,
-            account.updated_at AS profile_updated_at
+    `SELECT participant.user_id, participant.display_name,
+            account.avatar_preset_id, account.avatar_selection, account.avatar_revision
        FROM blumi_chat_thread_participants AS participant
        LEFT JOIN blumi_accounts AS account
          ON account.user_id = participant.user_id
@@ -588,7 +584,6 @@ function mapParticipant(
   return {
     userId: String(row.user_id),
     ...(row.display_name ? { displayName: String(row.display_name) } : {}),
-    ...(row.profile_updated_at ? { profileUpdatedAt: new Date(row.profile_updated_at).toISOString() } : {}),
     ...(avatar ? { avatar } : {})
   }
 }

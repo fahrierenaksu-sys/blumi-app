@@ -149,8 +149,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const safetyService = options.safetyService ?? createSafetyService({
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
   })
-  const chatService = options.chatService ?? createChatService({ blockPolicy: safetyService,
-    profileSource: async (ids) => (await authService.repository.findAccountsByUserIds(ids)).map((account) => ({ ...account.profile, profileUpdatedAt: account.updatedAt })) })
+  const chatService = options.chatService ?? createChatService({ blockPolicy: safetyService })
   const economyService = options.economyService ?? createEconomyService()
   const commerceService = options.commerceService ?? createCommerceService({
     economyService

@@ -50,7 +50,6 @@ export function createReduceTransparencyStore(
   const start = () => {
     const current = ++generation
     osSubscription = source.addEventListener("reduceTransparencyChanged", (enabled) => {
-      generation += 1 // A live OS change is newer than the initial query.
       publish({ reduceTransparency: enabled, isResolved: true })
     })
     source.isReduceTransparencyEnabled().then((enabled) => {

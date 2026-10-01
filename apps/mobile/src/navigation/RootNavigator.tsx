@@ -1,8 +1,7 @@
 import type {
   DiscoveryDecisionQuota,
   MediaSessionToken,
-  MiniRoom,
-  MiniRoomParticipant
+  MiniRoom
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
@@ -132,7 +131,9 @@ export interface ReadyMiniRoomRouteParam {
 
 export interface MiniRoomParticipantsRouteParam {
   you: { userId: string; displayName: string }
-  partner: Pick<MiniRoomParticipant, "userId" | "displayName" | "profileUpdatedAt"> & {
+  partner: {
+    userId: string
+    displayName: string
     avatarSnapshot?: CandidateAvatarSnapshot
   }
 }
@@ -183,7 +184,11 @@ export type RootStackParamList = {
   MiniRoomRigPreview: undefined
   RoomDebrief: {
     miniRoomId: string
-    partner: MiniRoomParticipantsRouteParam["partner"]
+    partner: {
+      userId: string
+      displayName: string
+      avatarSnapshot?: CandidateAvatarSnapshot
+    }
     durationSeconds: number
     connected: boolean
   }

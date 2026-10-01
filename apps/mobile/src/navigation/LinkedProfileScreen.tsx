@@ -44,7 +44,6 @@ function createDeepLinkedProfile(
   return {
     userId: profile.userId,
     displayName: profile.displayName,
-    profileUpdatedAt: profile.updatedAt,
     age: profile.age,
     avatarSnapshot: createCandidateAvatarSnapshot({
       userId: profile.userId,
@@ -161,16 +160,14 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
   const copy = getProfilePreviewCopy(getAppLocale())
   const directProfile = "profile" in route.params ? route.params.profile : undefined
   const deepLinkedUserId = "userId" in route.params ? route.params.userId : undefined
-  // A production card is a snapshot, not authority for the opened profile.
-  const requestUserId = deepLinkedUserId ?? (!demoMode && directProfile && !directProfile.isSelf ? directProfile.userId : undefined)
-  const target: LinkedProfileTarget<ProfilePreviewData> | null = requestUserId
-    ? { kind: "remote", userId: requestUserId }
-    : directProfile
+  const target: LinkedProfileTarget<ProfilePreviewData> | null = directProfile
     ? { kind: "direct", profile: directProfile }
-    : null
+    : deepLinkedUserId
+      ? { kind: "remote", userId: deepLinkedUserId }
+      : null
   const [loadState, setLoadState] = useState(
     createLinkedProfileLoadState<ProfilePreviewData>(
-      requestUserId ?? null
+      directProfile ? null : deepLinkedUserId ?? null
     )
   )
   const [retryNonce, setRetryNonce] = useState(0)
@@ -195,11 +192,11 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
   }))
 
   useEffect(() => {
-    if (!requestUserId) {
+    if (directProfile || !deepLinkedUserId) {
       setLoadState(createLinkedProfileLoadState(null))
       return
     }
-    const userId = requestUserId
+    const userId = deepLinkedUserId
     const controller = new AbortController()
     let isActive = true
 
@@ -254,7 +251,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
       isActive = false
       controller.abort()
     }
-  }, [requestUserId, demoMode, retryNonce, sessionToken])
+  }, [deepLinkedUserId, demoMode, directProfile, retryNonce, sessionToken])
 
   const viewState = target
     ? getLinkedProfileViewState(target, loadState)
@@ -298,7 +295,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
             accessibilityLabel={copy.tryAgain}
             onPress={() => {
               setLoadState(
-                createLinkedProfileLoadState(requestUserId ?? null)
+                createLinkedProfileLoadState(deepLinkedUserId ?? null)
               )
               setRetryNonce((value) => value + 1)
             }}

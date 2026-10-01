@@ -764,11 +764,10 @@ test("the root navigator wires pending deep link replay to readiness and state c
 
 // ── Match modal ────────────────────────────────────────────
 
-function matchSendMessage(globalMatch, thread, liveGlobalMatch = globalMatch) {
+function matchSendMessage(globalMatch, thread) {
   const calls = []
   const handler = evaluate(findInitializer(OWNER.matchModal, "handleMatchSendMessage"), {
     globalMatch,
-    liveGlobalMatch,
     goLobby: () => calls.push(["lobby"]),
     goChat: (params) => calls.push(["chat", params]),
     findThreadForPartner: () => thread
@@ -787,9 +786,6 @@ test("the match modal opens the synced thread, a pending partner chat, or Discov
     [["chat", { partnerId: "user-two", partnerName: "Two" }]]
   )
   assert.deepEqual(matchSendMessage({ miniRoomId: "m", matchedUserName: "Two" }, undefined), [["lobby"]])
-  assert.deepEqual(matchSendMessage({ miniRoomId: "m", matchedUserName: "Eren", matchedUserId: "partner" }, undefined,
-    { miniRoomId: "m", matchedUserName: "Irmak", matchedUserId: "partner" }),
-    [["chat", { partnerId: "partner", partnerName: "Irmak" }]])
   assert.equal(
     findJsxAttribute("./RootNavigator.tsx", "MatchResultModal", "onSendMessage"),
     "handleMatchSendMessage"

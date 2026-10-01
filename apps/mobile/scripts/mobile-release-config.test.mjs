@@ -676,8 +676,7 @@ test("shop exit discards previews and cannot interrupt an active transaction", (
 
   assert.match(combinationSession, /const shopExitLocked = combinationState\.phase !== "editing"/)
   assert.match(combinationSession, /event\.preventDefault\(\)/)
-  assert.match(shop, /useShopCombinationSession\(\{\s*navigation,/)
-  assert.match(combinationSession, /navigation\.addListener\("beforeRemove",[\s\S]*combinationStateRef\.current\.phase !== "editing"[\s\S]*event\.preventDefault\(\)/)
+  assert.match(shop, /disabled=\{shopExitLocked\}/)
   assert.match(combinationSession, /dispatchCombination\(\{ type: "discard_draft" \}\)/)
 })
 

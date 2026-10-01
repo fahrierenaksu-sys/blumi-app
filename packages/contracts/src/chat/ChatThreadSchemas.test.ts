@@ -27,13 +27,6 @@ const COMMON_LOADOUT = {
   accessoryIds: []
 }
 
-test("participant profile versions are optional for old servers and validated when present", () => {
-  assert.equal(chatParticipantSummarySchema.safeParse({ userId: "partner" }).success, true)
-  const timestamp = "2026-10-01T12:00:00.000Z"
-  assert.equal(chatParticipantSummarySchema.parse({ userId: "partner", profileUpdatedAt: timestamp }).profileUpdatedAt, timestamp)
-  assert.equal(chatParticipantSummarySchema.safeParse({ userId: "partner", profileUpdatedAt: "not-a-date" }).success, false)
-})
-
 test("chat participant schema accepts exact avatar loadout V1 and V2", () => {
   const v1 = { schemaVersion: 1 as const, ...COMMON_LOADOUT }
   const v2 = {

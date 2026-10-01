@@ -326,9 +326,8 @@ test("room debrief preserves the mini-room partner avatar snapshot", () => {
 
   assert.match(
     navigator,
-    /RoomDebrief:\s*\{[\s\S]*partner:\s*MiniRoomParticipantsRouteParam\["partner"\]/
+    /RoomDebrief:\s*\{[\s\S]*partner:\s*\{[\s\S]*userId:\s*string[\s\S]*displayName:\s*string[\s\S]*avatarSnapshot\?:\s*CandidateAvatarSnapshot[\s\S]*\}/
   )
-  assert.match(navigator, /partner: Pick<MiniRoomParticipant, "userId" \| "displayName" \| "profileUpdatedAt"> & \{\s*avatarSnapshot\?: CandidateAvatarSnapshot/)
   assert.match(miniRoom, /navigation\.replace\("RoomDebrief", \{[\s\S]*partner:\s*participants\.partner/)
   assert.match(debrief, /partner\.avatarSnapshot \? \(/)
   assert.match(debrief, /<CandidateAvatarPreview/)

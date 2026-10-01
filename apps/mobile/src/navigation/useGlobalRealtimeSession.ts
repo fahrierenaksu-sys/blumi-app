@@ -8,7 +8,6 @@ import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
   applyChatMessageListed,
   applyChatMessageReceived,
-  applyChatParticipantUpdated,
   applyChatReceiptUpdated,
   applyChatThreadListed,
   applyChatThreadRead,
@@ -209,7 +208,6 @@ export function useGlobalRealtimeSession({
       upsertRoomInvite,
       applyChatThreadListed: applyRealtimeThreadList,
       applyChatThreadRead,
-      applyChatParticipantUpdated,
       requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
       requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
       applyChatThreadCreated: applyNewThread,

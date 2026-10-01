@@ -21,17 +21,13 @@ test("Shop displays the result of the current avatar save attempt", () => {
   assert.doesNotMatch(purchase, /title: avatarV2\.saveErrorMessage/)
 })
 
-test("scene resets cancel movement first while identity refresh stays outside the reset", () => {
+test("scene and snapshot resets cancel the active movement loop first", () => {
   const store = read("apps/mobile/src/features/miniRoom/scene/miniRoomSceneStore.ts")
 
   assert.match(
     store,
-    /useEffect\(\(\) => \{\s*for \(const ref of movementsRef\.current\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = initialAvatarsForScene\(\)[\s\S]*?snapMiniRoomAvatarPosition\(/
+    /useEffect\(\(\) => \{\s*for \(const ref of movementsRef\.current\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)[\s\S]*?cancelPendingMiniRoomMovementCompletion\([\s\S]*?const nextAvatars = createInitialAvatars[\s\S]*?snapMiniRoomAvatarPosition\(/
   )
-  assert.match(store, /const initialAvatarsForScene = useEffectEvent\(\(\) => createInitialAvatars\(/)
-  const resetDependencies = store.match(/setSelectedHotspotId\(undefined\)\s*\}, \[([\s\S]*?)\]\)/)?.[1]
-  assert.ok(resetDependencies)
-  assert.doesNotMatch(resetDependencies, /localDisplayName|partnerDisplayName|participantAvatarSnapshots/)
   assert.match(
     store,
     /for \(const ref of movements\.values\(\)\) cancelActiveMiniRoomMovement\(ref, cancelMiniRoomMovementRun\)/

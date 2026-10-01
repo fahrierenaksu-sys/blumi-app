@@ -50,7 +50,6 @@ import { useFocusedConversation } from "../features/notifications/useFocusedConv
 import { getChatTypingCopy } from "../features/chat/typing/chatTypingCopy"
 import { useChatDraftTyping } from "../features/chat/typing/useChatDraftTyping"
 import { usePartnerTyping } from "../features/chat/typing/usePartnerTyping"
-import { useLiveParticipantIdentity } from "../features/chat/useLiveParticipantIdentity"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
@@ -58,10 +57,7 @@ type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"
 
 export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor } = props
-  const { readyMiniRoom } = route.params
-  const livePartner = useLiveParticipantIdentity(route.params.participants.partner)
-  const participants = { you: { ...route.params.participants.you, displayName: sessionActor.profile.displayName },
-    partner: livePartner ?? route.params.participants.partner }
+  const { readyMiniRoom, participants } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
   const isFocused = useIsFocused()
   const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,
@@ -260,7 +256,6 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
           partner: {
             ...currentParams.participants.partner,
             displayName: refreshedPartner.displayName,
-            profileUpdatedAt: refreshedPartner.profileUpdatedAt,
             avatarSnapshot: createCandidateAvatarSnapshot({
               userId: refreshedPartner.userId,
               displayName: refreshedPartner.displayName,
