@@ -233,11 +233,15 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
     },
     invalid: { code: "PRESENCE_ROOM_UNAVAILABLE", message: "missing request type" },
   },
+  "realtime.heartbeat": {
+    valid: { intervalMs: 15_000 },
+    invalid: { intervalMs: 5 },
+  },
 };
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 22);
+  assert.equal(SERVER_EVENT_TYPES.length, 23);
 });
 
 test("a receipt update names one of two distinct participants and moves a cursor", () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import type { ChatThreadList } from "@blumi/contracts"
+import type { ChatThread, ChatThreadList, ServerEvent } from "@blumi/contracts"
 import type { SessionActor } from "../session/sessionModel"
 import {
   createGlobalRealtimeLifecycle,
@@ -203,6 +203,65 @@ test("reconnect refreshes safety and active history once without initial or dupl
   listener("connected")
   assert.equal(resyncs, 1)
 })
+
+// CHAT-RT-09 (2026-10-01): messages missed while the socket was down used to
+// stay invisible in every cached conversation except the open one.
+test("after a reconnect, cached conversations whose latest message changed are refetched", async () => {
+  const eventListeners: ((event: ServerEvent) => void)[] = []
+  const resynced: string[] = []
+  let threads = [listedThread("open", "m1"), listedThread("changed", "m2"), listedThread("same", "m3"), listedThread("never_opened", "m4")]
+  const dependencies = createDependencies({
+    getThreads: () => threads,
+    hasMessageHistory: (threadId) => threadId !== "never_opened",
+    getActiveConversationThreadId: () => "open",
+    resynchronizeThread: async (threadId) => { resynced.push(threadId) },
+    resynchronizeActiveConversation: async () => undefined,
+    subscribeToEvents: (listener) => {
+      eventListeners.push(listener)
+      return () => { eventListeners.splice(eventListeners.indexOf(listener), 1) }
+    }
+  })
+  const cleanup = createGlobalRealtimeLifecycle(dependencies)()
+  const status = dependencies.statusListeners[0]!
+  const listed = (list: ChatThread[], append = false) => {
+    for (const listener of [...eventListeners]) {
+      listener({ type: "chat.thread_listed", payload: { userId: "ada", threads: list, append } })
+    }
+  }
+  status("connected")
+  listed(threads)
+  assert.deepEqual(resynced, [], "the first connection has nothing to compare")
+
+  status("reconnecting", { closeCode: 1012 })
+  // Messages arrive while offline; the store is not touched until the list.
+  status("connected")
+  listed([listedThread("x", "m9")], true)
+  assert.deepEqual(resynced, [], "an appended page is not the post-reconnect list")
+  listed([
+    listedThread("changed", "m2b"),
+    listedThread("open", "m1b"),
+    listedThread("never_opened", "m4b"),
+    listedThread("same", "m3")
+  ])
+  await Promise.resolve()
+  assert.deepEqual(resynced, ["changed"])
+  threads = []
+  listed([listedThread("changed", "m2c")])
+  assert.deepEqual(resynced, ["changed"], "only the first list after a reconnect is compared")
+  cleanup()
+  assert.equal(eventListeners.length, 0)
+})
+
+function listedThread(threadId: string, lastMessageId: string): ChatThread {
+  return {
+    threadId,
+    miniRoomId: `room_${threadId}`,
+    participantUserIds: ["ada", "bora"],
+    participants: [{ userId: "ada" }, { userId: "bora" }],
+    createdAt: "2026-10-01T09:00:00.000Z",
+    lastMessage: { messageId: lastMessageId, threadId, senderUserId: "bora", body: "hi", sentAt: "2026-10-01T09:05:00.000Z" }
+  }
+}
 
 test("a superseded account does not resynchronize on reconnect", () => {
   let current = true

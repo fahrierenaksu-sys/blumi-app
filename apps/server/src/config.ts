@@ -1,5 +1,10 @@
-import { Pool } from "pg"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
+import {
+  createDatabasePools,
+  resolveDatabaseListenUrl,
+  resolveDatabasePoolSettings,
+  type DatabasePoolSettings
+} from "./db/databasePoolConfig"
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
 import { createSchemaReadinessCheck } from "./operations/schemaReadiness"
@@ -123,6 +128,10 @@ export interface ServerConfig {
   smsProviderMode: SmsProviderMode
   pushProviderMode: PushProviderMode
   databaseUrl?: string
+  /** node-postgres pool settings (BLUMI_DB_*), see db/databasePoolConfig.ts. */
+  databasePool: DatabasePoolSettings
+  /** Optional session-capable URL for realtime LISTEN (BLUMI_DB_LISTEN_URL). */
+  databaseListenUrl?: string
   otpHmacSecret?: string
   livekitUrl?: string
   livekitApiKey?: string
@@ -221,6 +230,8 @@ export function resolveServerConfig(
     requestedPushProvider ?? "development"
   )
   const databaseUrl = env.DATABASE_URL?.trim()
+  const databasePool = resolveDatabasePoolSettings(env)
+  const databaseListenUrl = resolveDatabaseListenUrl(env)
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
   const voiceFlag = env.BLUMI_VOICE_ENABLED?.trim()
   if (voiceFlag !== undefined && voiceFlag !== "0" && voiceFlag !== "1") {
@@ -394,6 +405,8 @@ export function resolveServerConfig(
     smsProviderMode,
     pushProviderMode,
     databaseUrl,
+    databasePool,
+    databaseListenUrl,
     otpHmacSecret,
     livekitUrl,
     livekitApiKey,
@@ -452,9 +465,7 @@ export function createConfiguredServerServices(
   })
   const revenueCatPurchaseVerifier = createConfiguredRevenueCatPurchaseVerifier(config)
   if (config.authRepositoryMode === "postgres") {
-    const pool = new Pool({
-      connectionString: config.databaseUrl
-    })
+    const { pool, listenPool } = createDatabasePools(config)
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
     const chatReceiptSchema = createChatReceiptSchemaProbe(pool)
     const capabilityService = createConfiguredCapabilityService(chatReceiptSchema)
@@ -562,7 +573,12 @@ export function createConfiguredServerServices(
           }))
         : { async dispatchDue() {} },
       realtimeTicketStore: createPostgresRealtimeTicketStore(pool),
-      realtimeFanout: createPostgresRealtimeFanout(pool, {
+      // LISTEN needs a session connection; publishes and purges use the
+      // shared pool (NOTIFY works through a transaction pooler).
+      realtimeFanout: createPostgresRealtimeFanout(listenPool ? {
+        query: (text: string, values: readonly unknown[]) => pool.query(text, [...values]),
+        connect: () => listenPool.connect()
+      } : pool, {
         reportError: (error) => {
           console.error("Realtime fanout subscription failed", safeOperationalErrorKind(error))
         }
@@ -581,7 +597,7 @@ export function createConfiguredServerServices(
       sharedRateLimiter: createPostgresRateBudget(pool),
       discoverySnapshots: createDiscoverySnapshotService(createPostgresDiscoverySnapshots(pool)),
       async close() {
-        await pool.end()
+        await Promise.all([pool.end(), listenPool?.end()])
       }
     }
   }

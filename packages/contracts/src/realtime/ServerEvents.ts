@@ -61,7 +61,19 @@ export type ServerEvent =
   | { type: "chat.receipt_updated"; payload: ChatReceiptUpdated }
   | { type: "reaction.received"; payload: ReactionEvent }
   | { type: "safety.user_blocked"; payload: { blockedUserId: string } }
-  | { type: "realtime.error"; payload: RealtimeErrorPayload };
+  | { type: "realtime.error"; payload: RealtimeErrorPayload }
+  | { type: "realtime.heartbeat"; payload: RealtimeHeartbeatPayload };
+
+/**
+ * Application-level liveness beacon (2026-10-01). The server sends one to
+ * every socket each `intervalMs`, next to its WebSocket ping, because mobile
+ * WebSocket APIs never surface ping frames to JavaScript. A client that has
+ * seen one and then receives nothing for `intervalMs` plus a grace period
+ * treats the socket as dead and reconnects. Carries no user data.
+ */
+export interface RealtimeHeartbeatPayload {
+  intervalMs: number;
+}
 
 /**
  * Sent only to the requesting connection when the server rejects a client

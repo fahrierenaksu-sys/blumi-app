@@ -1127,6 +1127,30 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       return result.rows.length > 0
     },
 
+    async listActiveSessionFamilies(input) {
+      if (input.identities.length === 0) return []
+      // One indexed probe per identity (blumi_sessions_session_id_idx).
+      const result = await pool.query(
+        `SELECT session.user_id, session.session_id, max(session.expires_at) AS expires_at
+           FROM unnest($1::text[], $2::text[]) AS wanted(user_id, session_id)
+           JOIN blumi_sessions AS session
+             ON session.session_id = wanted.session_id
+            AND session.user_id = wanted.user_id
+          WHERE session.expires_at > $3
+          GROUP BY session.user_id, session.session_id`,
+        [
+          input.identities.map((identity) => identity.userId),
+          input.identities.map((identity) => identity.sessionFamilyId),
+          input.now
+        ]
+      )
+      return result.rows.map((row) => ({
+        userId: String(row.user_id),
+        sessionFamilyId: String(row.session_id),
+        expiresAt: new Date(row.expires_at as string | Date).toISOString()
+      }))
+    },
+
     async saveSession(session) {
       await pool.query(
         `INSERT INTO blumi_sessions (

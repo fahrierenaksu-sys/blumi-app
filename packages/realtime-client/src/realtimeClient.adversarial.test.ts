@@ -3,7 +3,11 @@
 // Node mock timers, so nothing touches the network.
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RealtimeClient, type RealtimeConnectionStatus } from "./realtimeClient"
+import {
+  RealtimeClient,
+  REALTIME_SLOW_RECONNECT_CEILING_MS,
+  type RealtimeConnectionStatus
+} from "./realtimeClient"
 
 class MockWebSocket {
   public static readonly OPEN = 1
@@ -83,19 +87,23 @@ test("a reconnect storm from an instance restart is spread over the window and b
   await flush()
   const firstSockets = [...MockWebSocket.instances]
   for (const socket of firstSockets) socket.open()
-  // A fanout gap closes every socket on the instance at the same instant.
+  // A restart or fanout gap closes every socket on the instance at the same
+  // instant (1012). The first retry is spread uniformly over five seconds.
   for (const socket of firstSockets) socket.drop(1012)
   const perBucket: number[] = []
   let seen = MockWebSocket.instances.length
-  for (let bucket = 0; bucket < 10; bucket += 1) {
-    context.mock.timers.tick(100)
-    await flush()
+  context.mock.timers.tick(0)
+  await flush()
+  for (let bucket = 0; bucket < 50; bucket += 1) {
     perBucket.push(MockWebSocket.instances.length - seen)
     seen = MockWebSocket.instances.length
+    context.mock.timers.tick(100)
+    await flush()
   }
-  assert.deepEqual(perBucket.slice(0, 4), [0, 0, 0, 0], "no attempt before half the first ceiling")
-  assert.equal(perBucket.reduce((sum, count) => sum + count, 0), 40, "every client retried within one second")
-  assert.ok(Math.max(...perBucket) <= 10, `attempts per 100 ms: ${perBucket.join(",")}`)
+  perBucket.push(MockWebSocket.instances.length - seen)
+  assert.equal(perBucket.reduce((sum, count) => sum + count, 0), 40, "every client retried within five seconds")
+  assert.ok(Math.max(...perBucket) <= 2, `attempts per 100 ms: ${perBucket.join(",")}`)
+  assert.ok(perBucket.slice(45).some((count) => count > 0), "the window really spans five seconds")
 
   // The restarted instance is still down: the second attempt waits 1-2 s.
   const secondSockets = MockWebSocket.instances.slice(40)
@@ -129,13 +137,13 @@ test("after the fast reconnect attempts are exhausted the client still recovers 
   }
   assert.equal(statuses.at(-1), "unreachable")
   // The app banner maps "unreachable" to its own copy (connectionBannerModel.test.ts).
-  // Slow attempts continue, never more than 60 s apart.
+  // Slow attempts continue, never more than 30 s apart (2026-10-01; was 60 s).
   for (let slow = 0; slow < 10; slow += 1) {
     const before = MockWebSocket.instances.length
     MockWebSocket.instances.at(-1)?.drop()
-    context.mock.timers.tick(60_000)
+    context.mock.timers.tick(REALTIME_SLOW_RECONNECT_CEILING_MS)
     await flush()
-    assert.equal(MockWebSocket.instances.length, before + 1, `slow attempt ${slow} happened within 60 s`)
+    assert.equal(MockWebSocket.instances.length, before + 1, `slow attempt ${slow} happened within 30 s`)
     assert.equal(statuses.at(-1), "unreachable")
   }
   // The server is back.

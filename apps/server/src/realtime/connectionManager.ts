@@ -1,18 +1,20 @@
 import { randomUUID } from "node:crypto"
 import type { ServerEvent, UserProfile } from "@blumi/contracts"
 import type { WebSocket } from "ws"
+import type { RealtimeAccessRevocation } from "../auth/realtimeAccessRevocation"
 import {
   splitRealtimeFanoutTarget,
   type RealtimeFanout,
   type RealtimeFanoutMessage
 } from "./realtimeFanout"
+import type { RealtimeFanoutControl } from "./realtimeFanoutControl"
 
 /**
  * Slow-consumer policy for each socket's outbound buffer (`bufferedAmount`,
  * bytes accepted by `ws` but not yet flushed to the kernel):
  *
  * - Above the soft limit, transient events that the next event or snapshot
- *   supersedes (presence, reactions) are dropped for that socket; every other
+ *   supersedes (presence, reactions, MiniRoom moves) are dropped for that socket; every other
  *   event, including chat delivery, is still sent.
  * - Staying above the soft limit for the sustained window, or crossing the
  *   hard limit at any time, closes the socket with 1013 (try again later) and
@@ -71,10 +73,19 @@ export interface ConnectionManager {
   startFanout(): Promise<void>
   isFanoutReady(): boolean
   closeFanout(): Promise<void>
+  /** Forwards a local revocation to other instances; failures are reported, not thrown. */
+  publishAccessRevocation(revocation: RealtimeAccessRevocation): Promise<void>
+  /** Revocations announced by other instances. */
+  subscribeAccessRevocations(listener: (revocation: RealtimeAccessRevocation) => void): () => void
 }
 
 export interface CreateConnectionManagerOptions {
-  fanout?: RealtimeFanout
+  /**
+   * Cross-instance delivery. With the optional control capabilities it skips
+   * the NOTIFY round trip while no other instance listens, and carries
+   * access revocations between instances.
+   */
+  fanout?: RealtimeFanout & Partial<RealtimeFanoutControl>
   instanceId?: string
   reportFanoutError?: (error: unknown) => void
   shutdownDrainTimeoutMs?: number
@@ -90,6 +101,11 @@ export function createConnectionManager(
   options: CreateConnectionManagerOptions = {}
 ): ConnectionManager {
   const connections = new Map<string, RealtimeConnection>()
+  // Per-user index: a send touches only the recipient's sockets instead of
+  // scanning every connection on the instance (5,000 per MiniRoom move).
+  const userConnections = new Map<string, Set<RealtimeConnection>>()
+  // One JSON encoding per event, however many sockets receive it.
+  const encodedEvents = new WeakMap<ServerEvent, string>()
   const instanceId = options.instanceId ?? `realtime_${randomUUID()}`
   let unsubscribe: (() => Promise<void>) | undefined
   let startingFanout: Promise<void> | undefined
@@ -135,11 +151,19 @@ export function createConnectionManager(
         throw new Error("Realtime connection ID is already active.")
       }
       connections.set(connection.connectionId, connection)
+      let owned = userConnections.get(connection.userId)
+      if (!owned) userConnections.set(connection.userId, owned = new Set())
+      owned.add(connection)
       return connection
     },
     removeConnection(connectionId) {
       const connection = connections.get(connectionId) ?? null
       connections.delete(connectionId)
+      if (connection) {
+        const owned = userConnections.get(connection.userId)
+        owned?.delete(connection)
+        if (owned?.size === 0) userConnections.delete(connection.userId)
+      }
       clearTimeout(gapTerminationTimers.get(connectionId))
       gapTerminationTimers.delete(connectionId)
       deliveryQueues.delete(connectionId)
@@ -153,14 +177,10 @@ export function createConnectionManager(
       return [...connections.values()]
     },
     hasUserConnections(userId) {
-      return [...connections.values()].some(
-        (connection) => connection.userId === userId
-      )
+      return (userConnections.get(userId)?.size ?? 0) > 0
     },
     getUserConnections(userId) {
-      return [...connections.values()].filter(
-        (connection) => connection.userId === userId
-      )
+      return [...(userConnections.get(userId) ?? [])]
     },
     joinRoom(connectionId, roomId) {
       connections.get(connectionId)?.joinedRoomIds.add(roomId)
@@ -189,8 +209,9 @@ export function createConnectionManager(
       sendToUsersLocally(userIdList, event)
       // Durable callers must observe transport rejection before acknowledging
       // their database job. Recipients deduplicate retries by event/message ID.
+      // With no other instance listening, local delivery is the whole delivery.
       const fanout = options.fanout
-      if (fanout && userIdList.length > 0) {
+      if (fanout && userIdList.length > 0 && hasRemoteListeners()) {
         const targets = splitRealtimeFanoutTarget({ kind: "users", userIds: userIdList })
         await track(Promise.all(targets.map((target) =>
           fanout.publish({ origin: instanceId, target, event }))))
@@ -238,6 +259,19 @@ export function createConnectionManager(
     isFanoutReady() {
       return !closingFanout && (!options.fanout || Boolean(unsubscribe) && (options.fanout.isHealthy?.() ?? true))
     },
+    async publishAccessRevocation(revocation) {
+      const publish = options.fanout?.publishAccessRevocation
+      if (!publish || closingFanout) return
+      try {
+        await track(publish.call(options.fanout, revocation))
+      } catch (error) {
+        // Other instances still enforce it within the cache TTL.
+        reportFanoutError(error)
+      }
+    },
+    subscribeAccessRevocations(listener) {
+      return options.fanout?.subscribeAccessRevocations?.(listener) ?? (() => undefined)
+    },
     closeFanout() {
       if (closedFanout) return closedFanout
       closingFanout = true
@@ -279,19 +313,21 @@ export function createConnectionManager(
   }
 
   function sendToUserLocally(userId: string, event: ServerEvent): void {
-    for (const connection of connections.values()) {
-      if (connection.userId === userId) deliver(connection, event)
-    }
+    const owned = userConnections.get(userId)
+    if (!owned) return
+    for (const connection of [...owned]) deliver(connection, event)
   }
 
   function sendToUsersLocally(
     userIds: readonly string[],
     event: ServerEvent
   ): void {
-    const userIdSet = new Set(userIds)
-    for (const connection of connections.values()) {
-      if (userIdSet.has(connection.userId)) deliver(connection, event)
-    }
+    for (const userId of new Set(userIds)) sendToUserLocally(userId, event)
+  }
+
+  /** False only while the fanout knows no other instance is listening. */
+  function hasRemoteListeners(): boolean {
+    return options.fanout?.hasRemotePeers?.() ?? true
   }
 
   function broadcastRoomLocally(roomId: string, event: ServerEvent): void {
@@ -339,7 +375,7 @@ export function createConnectionManager(
     event: ServerEvent
   ): void {
     const fanout = options.fanout
-    if (!fanout || closingFanout) return
+    if (!fanout || closingFanout || !hasRemoteListeners()) return
     for (const chunk of splitRealtimeFanoutTarget(target)) {
       void track(fanout.publish({
         origin: instanceId,
@@ -371,7 +407,12 @@ export function createConnectionManager(
     } else {
       slowSince.delete(connection.connectionId)
     }
-    socket.send(JSON.stringify(event))
+    let encoded = encodedEvents.get(event)
+    if (encoded === undefined) {
+      encoded = JSON.stringify(event)
+      encodedEvents.set(event, encoded)
+    }
+    socket.send(encoded)
   }
 
   function closeSlowConsumer(connection: RealtimeConnection): void {

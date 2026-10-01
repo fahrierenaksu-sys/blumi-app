@@ -23,6 +23,11 @@ import {
 
 const PRESENCE_LEASE_MS = 1000 * 60
 const REALTIME_CONNECTION_LEASE_MS = 1000 * 90
+/**
+ * Leases renewed per transaction. Each takes one advisory lock per user; 100
+ * keeps a batch well inside PostgreSQL's shared lock table on a small plan.
+ */
+export const REALTIME_CONNECTION_LEASE_BATCH = 100
 
 export interface PresenceService {
   repository: PresenceRepository
@@ -31,7 +36,15 @@ export interface PresenceService {
   leaveAllRooms(userId: string): Promise<void>
   registerConnection(connectionId: string, userId: string): Promise<void>
   heartbeatConnection(connectionId: string, userId: string): Promise<boolean>
+  /** Renews many leases in transactions of REALTIME_CONNECTION_LEASE_BATCH; returns the renewed ids. */
+  heartbeatConnections(
+    connections: readonly { connectionId: string; userId: string }[]
+  ): Promise<Set<string>>
   disconnectConnection(connectionId: string, userId: string): Promise<string[]>
+  /** Shutdown cleanup for many connections in batched transactions; returns cleared rooms. */
+  disconnectConnections(
+    connections: readonly { connectionId: string; userId: string }[]
+  ): Promise<string[]>
   purgeExpiredConnectionLeases(): Promise<number>
   purgeExpiredPresence(): Promise<number>
   moveToSpot(
@@ -173,8 +186,29 @@ export function createPresenceService(
         REALTIME_CONNECTION_LEASE_MS
       )
     },
+    async heartbeatConnections(connections) {
+      const renewed = new Set<string>()
+      for (let start = 0; start < connections.length; start += REALTIME_CONNECTION_LEASE_BATCH) {
+        const ids = await repository.heartbeatConnectionLeases(
+          connections.slice(start, start + REALTIME_CONNECTION_LEASE_BATCH),
+          REALTIME_CONNECTION_LEASE_MS
+        )
+        for (const id of ids) renewed.add(id)
+      }
+      return renewed
+    },
     async disconnectConnection(connectionId, userId) {
       return repository.disconnectConnectionLease(connectionId, userId)
+    },
+    async disconnectConnections(connections) {
+      const roomIds = new Set<string>()
+      for (let start = 0; start < connections.length; start += REALTIME_CONNECTION_LEASE_BATCH) {
+        const cleared = await repository.disconnectConnectionLeases(
+          connections.slice(start, start + REALTIME_CONNECTION_LEASE_BATCH)
+        )
+        for (const roomId of cleared) roomIds.add(roomId)
+      }
+      return [...roomIds]
     },
     async purgeExpiredConnectionLeases() {
       return repository.purgeExpiredConnectionLeases(500)

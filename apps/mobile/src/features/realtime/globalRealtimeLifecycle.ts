@@ -2,13 +2,19 @@ import type { ChatThread, ChatThreadList } from "@blumi/contracts"
 import type {
   ClientEvent,
   RealtimeConnectionMeta,
-  RealtimeConnectionStatus
+  RealtimeConnectionStatus,
+  ServerEvent
 } from "@blumi/realtime-client"
 import type { SessionActor } from "../session/sessionModel"
 import {
   createLoadedDemoThreadList,
   shouldConnectGlobalRealtime
 } from "./realtimeMode"
+import {
+  selectThreadsToResynchronize,
+  snapshotThreadLastMessages,
+  type ThreadLastMessageSnapshot
+} from "./reconnectThreadResyncModel"
 
 export interface GlobalRealtimeWarningToast {
   title: string
@@ -25,6 +31,14 @@ export interface GlobalRealtimeLifecycleDependencies {
   resetInactiveSessionState: () => void
   refreshProductionThreads: () => Promise<void>
   resynchronizeActiveConversation?: () => Promise<void>
+  /**
+   * CHAT-RT-09: after a reconnect, cached conversations whose latest message
+   * changed while the socket was down are refetched too (bounded).
+   */
+  getActiveConversationThreadId?: () => string | undefined
+  hasMessageHistory?: (threadId: string) => boolean
+  resynchronizeThread?: (threadId: string) => Promise<void>
+  subscribeToEvents?: (listener: (event: ServerEvent) => void) => () => void
   hydrateBlockedUsersFromServer: (
     ownerUserId: string,
     sessionToken: string
@@ -132,10 +146,36 @@ export function createGlobalRealtimeLifecycle(
     let hasConnected = false
     let connected = false
     let connectionGeneration = 0
+    // Latest message per thread when the socket dropped, awaiting the thread
+    // list that follows the reconnect.
+    let threadsBeforeDrop: ThreadLastMessageSnapshot | null = null
+    let pendingThreadComparison: ThreadLastMessageSnapshot | null = null
+    const unsubscribeThreadList = dependencies.subscribeToEvents?.((event) => {
+      if (!active || event.type !== "chat.thread_listed" || !pendingThreadComparison) return
+      if (event.payload.userId !== actor.profile.userId || event.payload.append) return
+      const before = pendingThreadComparison
+      pendingThreadComparison = null
+      const resynchronizeThread = dependencies.resynchronizeThread
+      const hasMessageHistory = dependencies.hasMessageHistory
+      if (!resynchronizeThread || !hasMessageHistory || !dependencies.isCurrentSession(actor)) return
+      for (const threadId of selectThreadsToResynchronize({
+        before,
+        listed: event.payload.threads,
+        hasMessageHistory,
+        activeThreadId: dependencies.getActiveConversationThreadId?.()
+      })) {
+        void resynchronizeThread(threadId).catch(() => {
+          // A stale cached conversation still refreshes when it is opened.
+        })
+      }
+    })
     const unsubscribeConnected = dependencies.subscribeToStatus((status) => {
       if (!active || !dependencies.isCurrentSession(actor)) return
       if (status !== "connected") {
-        if (connected) connectionGeneration += 1
+        if (connected) {
+          connectionGeneration += 1
+          threadsBeforeDrop = snapshotThreadLastMessages(dependencies.getThreads())
+        }
         connected = false
         return
       }
@@ -144,6 +184,8 @@ export function createGlobalRealtimeLifecycle(
       const generation = ++connectionGeneration
       const reconnect = hasConnected
       hasConnected = true
+      pendingThreadComparison = reconnect ? threadsBeforeDrop : null
+      threadsBeforeDrop = null
       if (dependencies.sendGlobal({ type: "chat.list_threads", payload: {} }) !== false) {
         dependencies.noteThreadListRequested?.()
       }
@@ -164,6 +206,7 @@ export function createGlobalRealtimeLifecycle(
       if (dependencies.isRealtimeAuthInvalidClose(meta?.closeCode)) {
         active = false
         unsubscribeConnected()
+        unsubscribeThreadList?.()
         unsubscribeInvalidSession()
         dependencies.disconnectGlobal()
         void dependencies.clearSessionActor()
@@ -177,6 +220,7 @@ export function createGlobalRealtimeLifecycle(
       if (!active) return
       active = false
       unsubscribeConnected()
+      unsubscribeThreadList?.()
       unsubscribeInvalidSession()
       dependencies.disconnectGlobal()
     }

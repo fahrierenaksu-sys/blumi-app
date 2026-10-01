@@ -42,7 +42,24 @@ export interface PresenceRepository {
   deleteUserPresence(userId: string): Promise<void>
   registerConnectionLease(connectionId: string, userId: string, leaseMs: number): Promise<void>
   heartbeatConnectionLease(connectionId: string, userId: string, leaseMs: number): Promise<boolean>
+  /**
+   * `heartbeatConnectionLease` for many connections in one transaction.
+   * Returns the connection ids whose lease existed and was extended; a lease
+   * that was removed is never recreated.
+   */
+  heartbeatConnectionLeases(
+    leases: readonly { connectionId: string; userId: string }[],
+    leaseMs: number
+  ): Promise<string[]>
   disconnectConnectionLease(connectionId: string, userId: string): Promise<string[]>
+  /**
+   * `disconnectConnectionLease` for many connections in one transaction (a
+   * shutdown closes every socket at once). Returns the rooms whose presence
+   * was cleared because a user's last live connection left.
+   */
+  disconnectConnectionLeases(
+    leases: readonly { connectionId: string; userId: string }[]
+  ): Promise<string[]>
   purgeExpiredConnectionLeases(limit: number): Promise<number>
   /**
    * Deletes up to `limit` expired presence rows. Reads never return expired
@@ -154,6 +171,18 @@ export function createInMemoryPresenceRepository(
       })
       return true
     },
+    async heartbeatConnectionLeases(leases, leaseMs) {
+      const duration = validateConnectionLeaseMs(leaseMs)
+      const expiresAt = Date.now() + duration
+      const renewed: string[] = []
+      for (const { connectionId, userId } of leases) {
+        const current = store.connectionLeases.get(connectionId)
+        if (!current || current.userId !== userId) continue
+        store.connectionLeases.set(connectionId, { ...current, expiresAt })
+        renewed.push(connectionId)
+      }
+      return renewed
+    },
     async disconnectConnectionLease(connectionId, userId) {
       const current = store.connectionLeases.get(connectionId)
       if (!current || current.userId !== userId) return []
@@ -171,6 +200,13 @@ export function createInMemoryPresenceRepository(
           roomIds.add(record.roomId)
           store.records.delete(key)
         }
+      }
+      return [...roomIds]
+    },
+    async disconnectConnectionLeases(leases) {
+      const roomIds = new Set<string>()
+      for (const { connectionId, userId } of leases) {
+        for (const roomId of await this.disconnectConnectionLease(connectionId, userId)) roomIds.add(roomId)
       }
       return [...roomIds]
     },

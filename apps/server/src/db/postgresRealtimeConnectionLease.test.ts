@@ -172,6 +172,104 @@ test("concurrent heartbeat and disconnect cannot resurrect a removed connection 
   }
 })
 
+test("a batched renewal extends live leases only and never resurrects one removed concurrently", {
+  skip: !databaseUrl
+}, async () => {
+  const replicaA = createPool("realtime-batch-a")
+  const replicaB = createPool("realtime-batch-b")
+  const users = Array.from({ length: 4 }, () => `lease-user-${randomUUID()}`)
+  const roomId = `lease-room-${randomUUID()}`
+  const connections = users.map(() => `connection_${randomUUID()}`)
+  const repositoryA = asLeaseRepository(replicaA)
+  const repositoryB = asLeaseRepository(replicaB)
+
+  try {
+    for (const userId of users) await seedAccountAndPresence(replicaA, userId, roomId)
+    for (const [index, userId] of users.entries()) {
+      await repositoryA.registerConnectionLease(connections[index]!, userId, 1_000)
+    }
+    const before = await replicaA.query(
+      "SELECT connection_id, expires_at FROM blumi_realtime_connection_leases WHERE connection_id = ANY($1::text[])",
+      [connections]
+    )
+    assert.equal(before.rowCount, 4)
+
+    const leases = users.map((userId, index) => ({ connectionId: connections[index]!, userId }))
+    // Two overlapping batches in opposite input order plus a disconnect race:
+    // locks are taken in one sorted order, so none of them can deadlock.
+    const [renewedA, renewedB, removedRooms] = await Promise.all([
+      repositoryA.heartbeatConnectionLeases(leases, 90_000),
+      repositoryB.heartbeatConnectionLeases([...leases].reverse(), 90_000),
+      repositoryB.disconnectConnectionLease(connections[0]!, users[0]!)
+    ])
+    for (const renewed of [renewedA, renewedB]) {
+      assert.deepEqual(
+        renewed.filter((id) => id !== connections[0]).sort(),
+        connections.slice(1).sort()
+      )
+    }
+    assert.deepEqual(removedRooms, [roomId], "the user's last connection clears its presence")
+    assert.equal(
+      (await replicaA.query("SELECT 1 FROM blumi_realtime_connection_leases WHERE connection_id = $1", [connections[0]])).rowCount,
+      0,
+      "a renewal that loses the disconnect race must not recreate the lease"
+    )
+    const after = await replicaA.query(
+      `SELECT count(*)::int AS live FROM blumi_realtime_connection_leases
+        WHERE connection_id = ANY($1::text[]) AND expires_at > clock_timestamp() + INTERVAL '60 seconds'`,
+      [connections.slice(1)]
+    )
+    assert.equal(after.rows[0]?.live, 3, "the other leases were extended to the full duration")
+    // A lease presented with another user's id is not renewed.
+    assert.deepEqual(
+      await repositoryA.heartbeatConnectionLeases([{ connectionId: connections[1]!, userId: users[2]! }], 90_000),
+      []
+    )
+  } finally {
+    await replicaA.query("DELETE FROM blumi_accounts WHERE user_id = ANY($1::text[])", [users]).catch(() => undefined)
+    await Promise.all([replicaA.end(), replicaB.end()])
+  }
+})
+
+test("a batched shutdown disconnect keeps presence of users with another live connection", {
+  skip: !databaseUrl
+}, async () => {
+  const pool = createPool("realtime-batch-disconnect")
+  const repository = asLeaseRepository(pool)
+  const stays = `lease-user-${randomUUID()}`
+  const leaves = `lease-user-${randomUUID()}`
+  const roomStays = `lease-room-${randomUUID()}`
+  const roomLeaves = `lease-room-${randomUUID()}`
+  const closing = [`connection_${randomUUID()}`, `connection_${randomUUID()}`]
+  const otherReplica = `connection_${randomUUID()}`
+  try {
+    await seedAccountAndPresence(pool, stays, roomStays)
+    await seedAccountAndPresence(pool, leaves, roomLeaves)
+    await repository.registerConnectionLease(closing[0]!, stays, 90_000)
+    await repository.registerConnectionLease(otherReplica, stays, 90_000)
+    await repository.registerConnectionLease(closing[1]!, leaves, 90_000)
+
+    const cleared = await repository.disconnectConnectionLeases([
+      { connectionId: closing[0]!, userId: stays },
+      { connectionId: closing[1]!, userId: leaves },
+      // A lease presented with another user's id is left alone.
+      { connectionId: otherReplica, userId: leaves }
+    ])
+    assert.deepEqual(cleared, [roomLeaves])
+    const leases = await pool.query(
+      "SELECT connection_id FROM blumi_realtime_connection_leases WHERE user_id = ANY($1::text[])",
+      [[stays, leaves]]
+    )
+    assert.deepEqual(leases.rows.map((row) => row.connection_id), [otherReplica])
+    assert.equal((await pool.query("SELECT 1 FROM blumi_room_presence WHERE user_id = $1", [stays])).rowCount, 1)
+    assert.equal((await pool.query("SELECT 1 FROM blumi_room_presence WHERE user_id = $1", [leaves])).rowCount, 0)
+    assert.deepEqual(await repository.disconnectConnectionLeases([]), [])
+  } finally {
+    await pool.query("DELETE FROM blumi_accounts WHERE user_id = ANY($1::text[])", [[stays, leaves]]).catch(() => undefined)
+    await pool.end()
+  }
+})
+
 test("account deletion and last websocket disconnect use one lock order", {
   skip: !databaseUrl,
   timeout: 20_000

@@ -109,26 +109,33 @@ export function createPostgresPresenceRepository(
     },
     async registerConnectionLease(connectionId, userId, leaseMs) {
       const duration = validateConnectionLeaseMs(leaseMs)
-      await withRealtimeConnectionLeaseTransaction(pool, userId, async (client) => {
-        const result = await client.query(
-          `INSERT INTO blumi_realtime_connection_leases (
-             connection_id, user_id, expires_at, updated_at
-           )
-           SELECT $1, $2,
-                  connection_clock.checked_at + ($3::double precision * INTERVAL '1 millisecond'),
-                  connection_clock.checked_at
-             FROM (SELECT clock_timestamp() AS checked_at) AS connection_clock
-           ON CONFLICT (connection_id) DO UPDATE SET
-             expires_at = EXCLUDED.expires_at,
-             updated_at = EXCLUDED.updated_at
-           WHERE blumi_realtime_connection_leases.user_id = EXCLUDED.user_id
-           RETURNING connection_id`,
-          [connectionId, userId, duration]
-        )
-        if (result.rows.length === 0) {
-          throw new Error("Realtime connection ID is already assigned.")
-        }
-      })
+      // One round trip instead of four (every socket upgrade, so every
+      // reconnect of a storm): the statement is its own transaction and takes
+      // the user's lease lock before inserting, like the explicit transaction
+      // did. ON CONFLICT checks the latest committed row, not the snapshot.
+      const result = await pool.query(
+        `WITH lease_lock AS MATERIALIZED (
+           SELECT pg_advisory_xact_lock(hashtextextended($4, 0)) AS acquired
+         ), connection_clock AS MATERIALIZED (
+           SELECT clock_timestamp() AS checked_at FROM lease_lock
+         )
+         INSERT INTO blumi_realtime_connection_leases (
+           connection_id, user_id, expires_at, updated_at
+         )
+         SELECT $1, $2,
+                connection_clock.checked_at + ($3::double precision * INTERVAL '1 millisecond'),
+                connection_clock.checked_at
+           FROM connection_clock
+         ON CONFLICT (connection_id) DO UPDATE SET
+           expires_at = EXCLUDED.expires_at,
+           updated_at = EXCLUDED.updated_at
+         WHERE blumi_realtime_connection_leases.user_id = EXCLUDED.user_id
+         RETURNING connection_id`,
+        [connectionId, userId, duration, realtimeConnectionLeaseLockKey(userId)]
+      )
+      if (result.rows.length === 0) {
+        throw new Error("Realtime connection ID is already assigned.")
+      }
     },
     async heartbeatConnectionLease(connectionId, userId, leaseMs) {
       const duration = validateConnectionLeaseMs(leaseMs)
@@ -146,6 +153,58 @@ export function createPostgresPresenceRepository(
           [connectionId, userId, duration]
         )
         return result.rows.length > 0
+      })
+    },
+    async heartbeatConnectionLeases(leases, leaseMs) {
+      const duration = validateConnectionLeaseMs(leaseMs)
+      if (leases.length === 0) return []
+      // The same per-user locks as a single heartbeat, taken in one sorted
+      // order so two batches can never deadlock; a single-user transaction
+      // holds only its own lock and never waits on a batch's rows.
+      const lockKeys = [...new Set(leases.map((lease) => realtimeConnectionLeaseLockKey(lease.userId)))].sort()
+      return withRealtimeConnectionLeaseLocks(pool, lockKeys, async (client) => {
+        const result = await client.query(
+          `WITH connection_clock AS MATERIALIZED (
+             SELECT clock_timestamp() AS checked_at
+           )
+           UPDATE blumi_realtime_connection_leases AS lease
+              SET expires_at = connection_clock.checked_at + ($3::double precision * INTERVAL '1 millisecond'),
+                  updated_at = connection_clock.checked_at
+             FROM unnest($1::text[], $2::text[]) AS renewed(connection_id, user_id), connection_clock
+            WHERE lease.connection_id = renewed.connection_id AND lease.user_id = renewed.user_id
+           RETURNING lease.connection_id`,
+          [leases.map((lease) => lease.connectionId), leases.map((lease) => lease.userId), duration]
+        )
+        return result.rows.map((row) => String(row.connection_id))
+      })
+    },
+    async disconnectConnectionLeases(leases) {
+      if (leases.length === 0) return []
+      const lockKeys = [...new Set(leases.map((lease) => realtimeConnectionLeaseLockKey(lease.userId)))].sort()
+      // The single-connection semantics for a whole batch, under the same
+      // sorted per-user locks as batched renewal.
+      return withRealtimeConnectionLeaseLocks(pool, lockKeys, async (client) => {
+        const removed = await client.query(
+          `DELETE FROM blumi_realtime_connection_leases AS lease
+            USING unnest($1::text[], $2::text[]) AS gone(connection_id, user_id)
+            WHERE lease.connection_id = gone.connection_id AND lease.user_id = gone.user_id
+            RETURNING lease.user_id`,
+          [leases.map((lease) => lease.connectionId), leases.map((lease) => lease.userId)]
+        )
+        const userIds = [...new Set(removed.rows.map((row) => String(row.user_id)))]
+        if (userIds.length === 0) return []
+        const cleared = await client.query(
+          `DELETE FROM blumi_room_presence AS presence
+            WHERE presence.user_id = ANY($1::text[])
+              AND NOT EXISTS (
+                SELECT 1 FROM blumi_realtime_connection_leases AS live
+                 WHERE live.user_id = presence.user_id
+                   AND live.expires_at > clock_timestamp()
+              )
+            RETURNING presence.room_id`,
+          [userIds]
+        )
+        return [...new Set(cleared.rows.map((row) => String(row.room_id)))]
       })
     },
     async disconnectConnectionLease(connectionId, userId) {
@@ -392,11 +451,31 @@ async function withRealtimeConnectionLeaseTransaction<T>(
   userId: string,
   operation: (client: TransactionClient) => Promise<T>
 ): Promise<T> {
+  return withRealtimeConnectionLeaseLocks(pool, [realtimeConnectionLeaseLockKey(userId)], operation)
+}
+
+/** Takes the given lease locks, in the given (sorted) order, in one round trip. */
+async function withRealtimeConnectionLeaseLocks<T>(
+  pool: TransactionalQueryExecutor,
+  lockKeys: readonly string[],
+  operation: (client: TransactionClient) => Promise<T>
+): Promise<T> {
   const client = await pool.connect()
   let destroyClient = false
   try {
     await client.query("BEGIN")
-    await client.query(REALTIME_CONNECTION_LEASE_LOCK_SQL, [realtimeConnectionLeaseLockKey(userId)])
+    if (lockKeys.length === 1) {
+      await client.query(REALTIME_CONNECTION_LEASE_LOCK_SQL, [lockKeys[0]])
+    } else {
+      // unnest yields the keys in array order, so the locks follow it.
+      await client.query(
+        `SELECT count(*) FROM (
+           SELECT pg_advisory_xact_lock(hashtextextended(lock_key, 0))
+             FROM unnest($1::text[]) AS keys(lock_key)
+         ) AS acquired`,
+        [lockKeys]
+      )
+    }
     const result = await operation(client)
     await client.query("COMMIT")
     return result

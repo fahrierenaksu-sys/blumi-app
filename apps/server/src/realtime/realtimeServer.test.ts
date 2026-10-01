@@ -19,9 +19,15 @@ import { createSafetyService } from "../safety/safetyService"
 import { createGracefulShutdown } from "../operations/serviceLifecycle"
 import {
   REALTIME_AUTHORIZATION_CACHE_TTL_MS,
-  REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
+  REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
+  REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS
 } from "./realtimeAuthorizationCache"
-import { createRealtimeServer } from "./realtimeServer"
+import {
+  createRealtimeServer,
+  REALTIME_CONNECTION_LEASE_RENEW_MS,
+  REALTIME_HEARTBEAT_INTERVAL_MS,
+  REALTIME_RESTART_CLOSE_CODE
+} from "./realtimeServer"
 import { createConnectionManager } from "./connectionManager"
 import type { RealtimeFanout } from "./realtimeFanout"
 import { createRealtimeTicketService } from "./realtimeTicketService"
@@ -116,11 +122,10 @@ test("realtime does not complete the websocket upgrade before ticket authenticat
   }
 })
 
-test("realtime persists a connection before upgrade and serializes its heartbeat before disconnect", async () => {
+test("realtime persists a connection before upgrade", async () => {
   const harness = await createRealtimeHarness()
   let signalRegistrationStarted!: () => void
   let releaseRegistration!: () => void
-  let releaseHeartbeat: () => void = () => {}
   const registrationStarted = new Promise<void>((resolve) => { signalRegistrationStarted = resolve })
   const registrationGate = new Promise<void>((resolve) => { releaseRegistration = resolve })
   const originalRegister = harness.presenceService.registerConnection.bind(harness.presenceService)
@@ -143,55 +148,81 @@ test("realtime persists a connection before upgrade and serializes its heartbeat
     const connection = harness.connectionManager.listConnections()[0]
     assert.ok(connection)
     assert.match(connection.connectionId, /^connection_[0-9a-f-]{36}$/i)
-    const order: string[] = []
-    let signalHeartbeatStarted!: () => void
-    let signalDisconnectStarted!: () => void
-    const heartbeatStarted = new Promise<void>((resolve) => { signalHeartbeatStarted = resolve })
-    const heartbeatGate = new Promise<void>((resolve) => { releaseHeartbeat = resolve })
-    const disconnectStarted = new Promise<void>((resolve) => { signalDisconnectStarted = resolve })
-    const originalHeartbeat = harness.presenceService.heartbeatConnection.bind(harness.presenceService)
-    const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
-    harness.presenceService.heartbeatConnection = async (connectionId, userId) => {
-      order.push(`heartbeat:start:${connectionId}`)
-      signalHeartbeatStarted()
-      await heartbeatGate
-      const renewed = await originalHeartbeat(connectionId, userId)
-      order.push(`heartbeat:end:${connectionId}`)
-      return renewed
-    }
-    harness.presenceService.disconnectConnection = async (connectionId, userId) => {
-      order.push(`disconnect:${connectionId}`)
-      signalDisconnectStarted()
-      return originalDisconnect(connectionId, userId)
-    }
-
-    connection.socket.emit("pong")
-    await heartbeatStarted
-    const closed = waitForClose(socket)
-    socket.close()
-    await closed
-    assert.deepEqual(order, [`heartbeat:start:${connection.connectionId}`])
-
-    releaseHeartbeat()
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    try {
-      await Promise.race([
-        disconnectStarted,
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(() => reject(new Error("Disconnect did not follow the queued heartbeat")), 1000)
-        })
-      ])
-    } finally {
-      if (timeout) clearTimeout(timeout)
-    }
-    assert.deepEqual(order, [
-      `heartbeat:start:${connection.connectionId}`,
-      `heartbeat:end:${connection.connectionId}`,
-      `disconnect:${connection.connectionId}`
-    ])
   } finally {
     releaseRegistration()
-    releaseHeartbeat()
+    await harness.close()
+  }
+})
+
+// Lease renewal (2026-10-01): a pong only marks the socket alive. Due leases
+// are renewed in one batch per heartbeat tick, which replaced a database
+// transaction per pong (four round trips per socket every interval).
+test("leases renew in batches on the heartbeat tick and a renewal racing a disconnect never resurrects a lease", async () => {
+  const callbacks: { callback: () => void; ms: number }[] = []
+  const harness = await createRealtimeHarness({ captureIntervalCallbacks: callbacks })
+  const originalNow = Date.now
+  let releaseRenewal: () => void = () => {}
+  try {
+    const a = await harness.createSession("+905551110097", "Lease Batch A")
+    const b = await harness.createSession("+905551110098", "Lease Batch B")
+    const socketA = await harness.connect(a.sessionToken)
+    const socketB = await harness.connect(b.sessionToken)
+    const [connectionA, connectionB] = [a.userId, b.userId].map((userId) =>
+      harness.connectionManager.getUserConnections(userId)[0]!)
+    const batches: string[][] = []
+    let singleHeartbeats = 0
+    const renewalGate = new Promise<void>((resolve) => { releaseRenewal = resolve })
+    let signalRenewalStarted!: () => void
+    const renewalStarted = new Promise<void>((resolve) => { signalRenewalStarted = resolve })
+    const originalBatch = harness.presenceService.heartbeatConnections.bind(harness.presenceService)
+    harness.presenceService.heartbeatConnection = async () => { singleHeartbeats += 1; return true }
+    harness.presenceService.heartbeatConnections = async (connections) => {
+      batches.push(connections.map((connection) => connection.connectionId).sort())
+      signalRenewalStarted()
+      await renewalGate
+      return originalBatch(connections)
+    }
+
+    connectionA.socket.emit("pong")
+    connectionB.socket.emit("pong")
+    assert.equal(singleHeartbeats, 0, "a pong never touches the database")
+    const heartbeat = callbacks.find((entry) => entry.ms === REALTIME_HEARTBEAT_INTERVAL_MS)
+    assert.ok(heartbeat)
+    Date.now = () => originalNow() + REALTIME_CONNECTION_LEASE_RENEW_MS
+    heartbeat.callback()
+    Date.now = originalNow
+    await renewalStarted
+    assert.deepEqual(batches, [[connectionA.connectionId, connectionB.connectionId].sort()])
+
+    // A disconnects while the batch is in flight; its cleanup is not queued
+    // behind the renewal, and the renewal cannot bring its lease back.
+    const closedA = waitForClose(socketA)
+    socketA.close()
+    await closedA
+    await waitUntil(() => harness.connectionManager.getConnection(connectionA.connectionId) === null)
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (!await harness.presenceService.repository
+        .heartbeatConnectionLease(connectionA.connectionId, a.userId, 90_000)) break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    releaseRenewal()
+    await waitUntil(() => batches.length === 1)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    assert.equal(await harness.presenceService.repository
+      .heartbeatConnectionLease(connectionA.connectionId, a.userId, 90_000), false)
+    assert.equal(socketB.readyState, WebSocket.OPEN)
+
+    // A live socket whose lease vanished (purged elsewhere) must re-register.
+    await harness.presenceService.repository.disconnectConnectionLease(connectionB.connectionId, b.userId)
+    const closedB = waitForClose(socketB, 1_000)
+    Date.now = () => originalNow() + 2 * REALTIME_CONNECTION_LEASE_RENEW_MS
+    connectionB.socket.emit("pong")
+    heartbeat.callback()
+    Date.now = originalNow
+    assert.equal(await closedB, 1011)
+  } finally {
+    Date.now = originalNow
+    releaseRenewal()
     await harness.close()
   }
 })
@@ -204,7 +235,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
   const disconnectFinished = deferred<void>()
   const order: string[] = []
   const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
-  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnections.bind(harness.presenceService)
   harness.presenceService.joinRoom = async (...args) => {
     order.push("join:start")
     joinStarted.resolve()
@@ -217,7 +248,7 @@ test("realtime waits for an in-flight room join before disconnect cleanup", asyn
       joinFinished.resolve()
     }
   }
-  harness.presenceService.disconnectConnection = async (...args) => {
+  harness.presenceService.disconnectConnections = async (...args) => {
     order.push("disconnect:start")
     try {
       return await originalDisconnect(...args)
@@ -259,7 +290,7 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
   const disconnectFinished = deferred<void>()
   let joinCalls = 0
   const originalJoin = harness.presenceService.joinRoom.bind(harness.presenceService)
-  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
+  const originalDisconnect = harness.presenceService.disconnectConnections.bind(harness.presenceService)
   harness.presenceService.joinRoom = async (...args) => {
     joinCalls += 1
     if (joinCalls === 1) {
@@ -268,7 +299,7 @@ test("a delayed join from a closed socket does not remove presence rejoined on a
     }
     return originalJoin(...args)
   }
-  harness.presenceService.disconnectConnection = async (...args) => {
+  harness.presenceService.disconnectConnections = async (...args) => {
     try {
       return await originalDisconnect(...args)
     } finally {
@@ -327,12 +358,16 @@ test("realtime close waits for websocket lease cleanup before data close and cle
   assert.ok(connection)
   assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, session.userId), true)
 
-  const originalDisconnect = harness.presenceService.disconnectConnection.bind(harness.presenceService)
-  harness.presenceService.disconnectConnection = async (connectionId, userId) => {
+  // A shutdown cleans every socket up in one batch (2026-10-01), not one
+  // transaction per socket; the drain ordering is unchanged.
+  const originalDisconnects = harness.presenceService.disconnectConnections.bind(harness.presenceService)
+  harness.presenceService.disconnectConnection = async () => assert.fail("shutdown uses the batched cleanup")
+  harness.presenceService.disconnectConnections = async (connections) => {
     order.push("lease:disconnect-start")
+    assert.deepEqual(connections, [{ connectionId: connection.connectionId, userId: session.userId }])
     disconnectStarted.resolve()
     await releaseDisconnect.promise
-    const rooms = await originalDisconnect(connectionId, userId)
+    const rooms = await originalDisconnects(connections)
     order.push("lease:disconnect-finished")
     return rooms
   }
@@ -356,12 +391,16 @@ test("realtime close waits for websocket lease cleanup before data close and cle
     })
     const stopping = shutdown()
 
-    assert.equal(await waitForClose(socket), 1005, "server close completes without an abnormal 1006 termination")
+    // 1012 (service restart): clients spread their first retry over a few
+    // seconds instead of reconnecting in the same instant (2026-10-01).
+    assert.equal(await waitForClose(socket), REALTIME_RESTART_CLOSE_CODE,
+      "server close completes with a restart code, not an abnormal 1006 termination")
     await disconnectStarted.promise
     await new Promise<void>((resolve) => setImmediate(resolve))
     assert.equal(dataClosed, false, "database closure must wait for realtime disconnect cleanup")
     assert.deepEqual(order, ["lease:disconnect-start"])
-    assert.equal(intervalHandles.length, 2, "both realtime maintenance timers were installed")
+    assert.equal(intervalHandles.length, 3,
+      "the heartbeat, authorization sweep and lease cleanup timers were installed")
     for (const interval of intervalHandles) {
       assert.ok(clearedIntervals.has(interval), "close must clear each realtime maintenance timer")
     }
@@ -547,7 +586,8 @@ test("token rotation preserves a socket until its session family is revoked", as
 })
 
 test("an expired session family cannot receive a private event", async () => {
-  const harness = await createRealtimeHarness()
+  const clock = { now: Date.now() }
+  const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
   try {
     const session = await harness.createSession("+905551110085", "Expired")
     const socket = await harness.connect(session.sessionToken)
@@ -555,6 +595,9 @@ test("an expired session family cannot receive a private event", async () => {
     assert.ok(resolved)
     const check = harness.authService.isRealtimeSessionAllowed.bind(harness.authService)
     harness.authService.isRealtimeSessionAllowed = (identity) => check(identity, new Date(resolved.session.expiresAt))
+    // The decision primed at upgrade never outlives the token's own expiry,
+    // even though that is far sooner than the cache TTL here.
+    clock.now = Date.parse(resolved.session.expiresAt)
     const received: unknown[] = []
     socket.on("message", (data) => received.push(data))
     const closed = waitForClose(socket, 500)
@@ -586,10 +629,14 @@ test("revocation leaves another session family for the same user authorized", as
 })
 
 test("realtime closes the socket when authorization becomes unavailable", async () => {
-  const harness = await createRealtimeHarness({ rejectRealtimeAuthorization: true })
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ rejectRealtimeAuthorization: true, authorizationClock: () => clock.now })
   try {
     const session = await harness.createSession("+905551110091", "Auth Failure")
     const socket = await harness.connect(session.sessionToken)
+    // The upgrade primed the decision; once it expires, the first event needs
+    // a check, and a check that cannot run fails closed.
+    clock.now += REALTIME_AUTHORIZATION_CACHE_TTL_MS
     socket.send(JSON.stringify({ type: "unknown", payload: {} }))
 
     assert.equal(await waitForClose(socket, 1000), 1011)
@@ -682,7 +729,7 @@ async function primeAuthorization(harness: Awaited<ReturnType<typeof createRealt
   return events
 }
 
-test("realtime authorization costs one check per session family per TTL window, not per event", async () => {
+test("realtime authorization costs no check inside the window primed at upgrade, then one per TTL window", async () => {
   const clock = { now: 1_000_000 }
   const harness = await createRealtimeHarness({ authorizationClock: () => clock.now })
   try {
@@ -702,13 +749,14 @@ test("realtime authorization costs one check per session family per TTL window, 
     }
     await waitUntil(() => received === inbound + outbound)
     // Before the cache: 2 queries per inbound event, per inbound reply and per
-    // outbound event (2 x (10 + 10 + 10) = 60). After: one shared check.
-    assert.equal(harness.authorizationQueries.count, 2,
+    // outbound event (2 x (10 + 10 + 10) = 60). With the 2 s cache: one shared
+    // check. Since 2026-10-01 the upgrade's own ticket check primes it: none.
+    assert.equal(harness.authorizationQueries.count, 0,
       `${inbound} inbound + ${outbound} outbound events cost ${harness.authorizationQueries.count} authorization queries`)
     clock.now += REALTIME_AUTHORIZATION_CACHE_TTL_MS
     harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
     await waitUntil(() => received === inbound + outbound + 1)
-    assert.equal(harness.authorizationQueries.count, 4, "an expired window re-checks the database")
+    assert.equal(harness.authorizationQueries.count, 2, "an expired window re-checks the database")
   } finally {
     await harness.close()
   }
@@ -787,7 +835,9 @@ test("a revocation without a local signal is enforced once the bounded TTL windo
   }
 })
 
-test("the periodic authorization sweep has bounded concurrency and fails closed per connection", async () => {
+// Batched sweep (2026-10-01): one session query and one account query per 500
+// sockets replaced two queries per socket every 30 s (333 queries/s at 5,000).
+test("the periodic authorization sweep checks every socket in one batch and closes the denied ones", async () => {
   const callbacks: { callback: () => void; ms: number }[] = []
   const harness = await createRealtimeHarness({ captureIntervalCallbacks: callbacks })
   try {
@@ -796,28 +846,57 @@ test("the periodic authorization sweep has bounded concurrency and fails closed 
       const session = await harness.createSession(`+9055522200${String(index).padStart(2, "0")}`, `Sweep ${index}`)
       sockets.push({ userId: session.userId, socket: await harness.connect(session.sessionToken) })
     }
-    const failing = sockets[0]!
-    let active = 0
-    let maxActive = 0
-    let calls = 0
-    harness.authService.isRealtimeSessionAllowed = async (identity) => {
-      calls += 1
-      active += 1
-      maxActive = Math.max(maxActive, active)
-      await new Promise<void>((resolve) => setTimeout(resolve, 5))
-      active -= 1
-      if (identity.userId === failing.userId) throw new Error("authorization store unavailable")
-      return true
+    const denied = sockets[0]!
+    const batches: number[] = []
+    let singleChecks = 0
+    harness.authService.isRealtimeSessionAllowed = async () => { singleChecks += 1; return true }
+    harness.authService.areRealtimeSessionsAllowed = async (identities) => {
+      batches.push(identities.length)
+      return identities.map((identity) => ({
+        allowed: identity.userId !== denied.userId,
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString()
+      }))
     }
-    const closed = waitForClose(failing.socket, 1000)
-    const heartbeat = callbacks.find((entry) => entry.ms === 30_000)
-    assert.ok(heartbeat)
-    heartbeat.callback()
-    await waitUntil(() => calls === sockets.length && active === 0)
-    assert.ok(maxActive <= REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
-      `sweep ran ${maxActive} concurrent checks`)
-    assert.equal(await closed, 1011)
+    const closed = waitForClose(denied.socket, 1000)
+    const sweep = callbacks.find((entry) => entry.ms === REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS)
+    assert.ok(sweep)
+    sweep.callback()
+    assert.equal(await closed, 4403)
+    assert.deepEqual(batches, [sockets.length])
+    assert.equal(singleChecks, 0)
     for (const entry of sockets.slice(1)) assert.equal(entry.socket.readyState, WebSocket.OPEN)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("a failed sweep closes nothing at once, and the next check after the TTL fails closed", async () => {
+  const callbacks: { callback: () => void; ms: number }[] = []
+  const clock = { now: 1_000_000 }
+  const harness = await createRealtimeHarness({ captureIntervalCallbacks: callbacks, authorizationClock: () => clock.now })
+  try {
+    const session = await harness.createSession("+905552220099", "Sweep Outage")
+    const socket = await harness.connect(session.sessionToken)
+    let sweeps = 0
+    harness.authService.areRealtimeSessionsAllowed = async () => {
+      sweeps += 1
+      throw new Error("authorization store unavailable")
+    }
+    harness.authService.isRealtimeSessionAllowed = async () => {
+      throw new Error("authorization store unavailable")
+    }
+    const sweep = callbacks.find((entry) => entry.ms === REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS)
+    assert.ok(sweep)
+    sweep.callback()
+    await waitUntil(() => sweeps === 1)
+    // A database blip must not disconnect every user at once (a reconnect storm).
+    const events = await primeAuthorization(harness, socket)
+    assert.equal(socket.readyState, WebSocket.OPEN)
+    clock.now += REALTIME_AUTHORIZATION_CACHE_TTL_MS
+    const closed = waitForClose(socket, 1000)
+    harness.connectionManager.sendToUser(session.userId, THREAD_LISTED(session.userId))
+    assert.equal(await closed, 1011)
+    assert.equal(events.all().length, 1, "nothing is delivered once the decision cannot be renewed")
   } finally {
     await harness.close()
   }
@@ -966,6 +1045,70 @@ test("a delivery ack over the socket reaches only the sender, and ack bursts nev
     assert.equal(eb.all().some((event) => event.type === "chat.receipt_updated"), false)
     assert.equal(ea.all().filter((event) => event.type === "chat.receipt_updated").length, 1, "repeated acks are no-ops")
   } finally { await harness.close() }
+})
+
+test("a closing socket leaves the MiniRoom at once and many disconnects share one lease cleanup", async () => {
+  const harness = await createRealtimeHarness()
+  // 2026-10-01: a cleanup transaction per socket (six round trips) made a
+  // mass network drop queue 30,000 round trips behind the reconnects.
+  const batches: number[] = []
+  let finishedBatches = 0
+  const releaseFirstCleanup = deferred<void>()
+  const originalDisconnects = harness.presenceService.disconnectConnections.bind(harness.presenceService)
+  harness.presenceService.disconnectConnection = async () => assert.fail("socket closes are cleaned up in batches")
+  harness.presenceService.disconnectConnections = async (connections) => {
+    batches.push(connections.length)
+    if (batches.length === 1) await releaseFirstCleanup.promise
+    try {
+      return await originalDisconnects(connections)
+    } finally {
+      finishedBatches += 1
+    }
+  }
+  try {
+    const a = await harness.createSession("+905551110131", "Leaving A")
+    const b = await harness.createSession("+905551110132", "Staying B")
+    const startedAt = new Date().toISOString()
+    await harness.miniRoomService.repository.saveInvite({ inviteId: "leave-invite", senderUserId: a.userId,
+      recipientUserId: b.userId, status: "pending", createdAt: startedAt })
+    await harness.miniRoomService.repository.acceptPendingInvite({ inviteId: "leave-invite",
+      decidedAt: startedAt, miniRoom: { miniRoomId: "leave-room", lobbyRoomId: "retired",
+        livekitRoomName: "leave-test", participantUserIds: [a.userId, b.userId], startedAt } })
+    const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
+    const eb = collectEvents(sb)
+    for (const socket of [sa, sb]) {
+      socket.send(JSON.stringify({ type: "mini_room.scene_enter", payload: { miniRoomId: "leave-room" } }))
+    }
+    await eb.waitForMatching("mini_room.motion_snapshot", event => event.payload.avatars.every(avatar => avatar.present))
+
+    sa.close()
+    await eb.waitForMatching("mini_room.motion_snapshot", event =>
+      event.payload.avatars.some(avatar => avatar.userId === a.userId && !avatar.present))
+    await waitUntil(() => batches.length === 1)
+    // The partner saw the avatar leave while the database cleanup is still held.
+
+    const idle = await Promise.all([3, 4, 5].map(async (index) => {
+      const session = await harness.createSession(`+90555111013${index}`, `Idle ${index}`)
+      return { session, socket: await harness.connect(session.sessionToken) }
+    }))
+    const idleConnections = idle.map(({ session }) =>
+      harness.connectionManager.listConnections().find((entry) => entry.userId === session.userId)!)
+    for (const { socket } of idle) socket.close()
+    await waitUntil(() => idleConnections.every((connection) =>
+      !harness.connectionManager.listConnections().includes(connection)))
+    assert.deepEqual(batches, [1], "closes arriving during a cleanup wait for the next batch")
+
+    releaseFirstCleanup.resolve()
+    await waitUntil(() => finishedBatches === 2)
+    assert.deepEqual(batches, [1, 3])
+    for (const connection of idleConnections) {
+      assert.equal(await harness.presenceService.heartbeatConnection(connection.connectionId, connection.userId), false,
+        "the batched cleanup removed the closed socket's lease")
+    }
+  } finally {
+    releaseFirstCleanup.resolve()
+    await harness.close()
+  }
 })
 
 async function createRealtimeHarness(options: {

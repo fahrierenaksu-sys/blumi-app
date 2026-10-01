@@ -52,6 +52,42 @@ test("in-memory presence keeps rejoined users until their last local connection 
   assert.equal(await repository.findUserPresence("room_one", "user_one"), null)
 })
 
+test("in-memory batched renewal and shutdown disconnect keep the single-connection semantics", async () => {
+  const repository = createInMemoryPresenceRepository()
+  const now = new Date()
+  for (const userId of ["user_stays", "user_leaves"]) {
+    await repository.savePresence({
+      roomId: `room_${userId}`,
+      userId,
+      displayName: "User",
+      avatar,
+      spotId: "spot_one",
+      inMiniRoom: false,
+      joinedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 60_000).toISOString()
+    })
+  }
+  await repository.registerConnectionLease("closing_a", "user_stays", 90_000)
+  await repository.registerConnectionLease("other_replica", "user_stays", 90_000)
+  await repository.registerConnectionLease("closing_b", "user_leaves", 90_000)
+  assert.deepEqual(
+    (await repository.heartbeatConnectionLeases([
+      { connectionId: "closing_a", userId: "user_stays" },
+      { connectionId: "closing_b", userId: "someone_else" },
+      { connectionId: "missing", userId: "user_stays" }
+    ], 90_000)).sort(),
+    ["closing_a"]
+  )
+  assert.deepEqual(await repository.disconnectConnectionLeases([
+    { connectionId: "closing_a", userId: "user_stays" },
+    { connectionId: "closing_b", userId: "user_leaves" }
+  ]), ["room_user_leaves"])
+  assert.ok(await repository.findUserPresence("room_user_stays", "user_stays"))
+  assert.equal(await repository.findUserPresence("room_user_leaves", "user_leaves"), null)
+  assert.deepEqual(await repository.heartbeatConnectionLeases([{ connectionId: "closing_a", userId: "user_stays" }], 90_000), [])
+})
+
 test("in-memory connection lease purge removes only expired rows", async () => {
   const store = createInMemoryPresenceStore()
   const repository = createInMemoryPresenceRepository(store)

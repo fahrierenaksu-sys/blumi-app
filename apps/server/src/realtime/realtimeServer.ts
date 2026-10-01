@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type RawData, type WebSocket } from "ws"
 import proxyAddr from "@fastify/proxy-addr"
-import type { ClientEvent } from "@blumi/contracts"
+import type { ClientEvent, ServerEvent } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
 import type { ChatService } from "../chat/chatService"
 import type { ConnectionService } from "../connections/connectionService"
@@ -17,6 +17,7 @@ import type { ReactionService } from "../reactions/reactionService"
 import type { SafetyService } from "../safety/safetyService"
 import {
   createConnectionManager,
+  REALTIME_OUTBOUND_HARD_LIMIT_BYTES,
   type ConnectionManager,
   type RealtimeConnection
 } from "./connectionManager"
@@ -26,8 +27,8 @@ import {
 } from "./realtimeAuth"
 import {
   createRealtimeAuthorizationCache,
-  forEachWithConcurrency,
-  REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY
+  REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS,
+  type RealtimeAuthorizationIdentity
 } from "./realtimeAuthorizationCache"
 import type { RealtimeAccessRevocation } from "../auth/realtimeAccessRevocation"
 import { createRealtimeRouter, readRealtimeClientMessageId } from "./realtimeRouter"
@@ -36,49 +37,47 @@ import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import type { RealtimeTicketService } from "./realtimeTicketService"
 import type { CapabilityService } from "../capabilities/capabilityService"
+import { classifyRealtimeEvent, createRealtimeEventBudget } from "./realtimeEventBudget"
+import { createRealtimeUpgradeLimiter } from "./realtimeUpgradeLimiter"
 
-const HEARTBEAT_INTERVAL_MS = 30_000
+/**
+ * Liveness (2026-10-01). Each interval the server pings every socket and sends
+ * it a `realtime.heartbeat` event (mobile WebSocket APIs never surface pings,
+ * so the beacon is what lets a phone detect a dead socket). A socket that
+ * neither answered the previous ping nor sent anything since is terminated,
+ * so a dead or half-open socket is released within 15-30 s (was 30-60 s).
+ * The ping (2 bytes) and the beacon (about 60 bytes) leave in the same tick,
+ * so a foreground phone's radio wakes at most once per interval for them.
+ */
+export const REALTIME_HEARTBEAT_INTERVAL_MS = 15_000
+/**
+ * Connection leases last 90 s. Live sockets renew theirs at most this often,
+ * in one batched statement per tick, instead of one transaction per pong.
+ */
+export const REALTIME_CONNECTION_LEASE_RENEW_MS = 30_000
+/**
+ * Closed sockets' leases are removed together after this window (one
+ * statement per 100). In-memory state, MiniRoom motion included, is released
+ * at once; the lease only gates room presence and expires on its own.
+ */
+const REALTIME_DISCONNECT_BATCH_WINDOW_MS = 50
+/** Graceful shutdown close: clients spread their first retry (1012 = restart). */
+export const REALTIME_RESTART_CLOSE_CODE = 1012
+const RESTART_CLOSE_REASON = "Server restarting"
 const CONNECTION_LEASE_CLEANUP_INTERVAL_MS = 60_000
 const MAX_REALTIME_MESSAGE_BYTES = 64 * 1024
-const REALTIME_EVENT_WINDOW_MS = 10_000
-const MAX_CONNECTION_EVENTS_PER_WINDOW = 60
-const MAX_USER_EVENTS_PER_WINDOW = 100
-const MAX_CONNECTION_IN_FLIGHT = 8
-const MAX_USER_IN_FLIGHT = 16
-/** Room movement steps per user per window; the client sends at most 5/s per device. */
-const MAX_USER_MOVEMENTS_PER_WINDOW = 60
 const RATE_LIMIT_CLOSE_CODE = 4429
 const RATE_LIMIT_CLOSE_REASON = "Too many realtime actions"
 const MODERATION_CLOSE_CODE = 4403
 const MODERATION_CLOSE_REASON = "Account restricted"
 const AUTHORIZATION_FAILURE_CLOSE_CODE = 1011
 const AUTHORIZATION_FAILURE_CLOSE_REASON = "Realtime authorization unavailable"
-/**
- * Upgrade attempts per client address per event window, counted before the
- * ticket is consumed: a well-formed fake ticket costs a store lookup and
- * delete, so unauthenticated attempts need their own bound. Generous enough
- * for a carrier NAT reconnecting after an instance restart.
- */
-const MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW = 40
-/**
- * Events with their own budget that never count toward the shared one and
- * are dropped silently when over it (the socket stays open): delivery acks,
- * which are cumulative, so the next one covers a drop. Avatar movement has
- * its own lane in handleMovement: a step is never dropped for being busy,
- * the latest pending step replaces the older one instead.
- */
-const SILENT_LANE_LIMITS = {
-  "chat.ack_delivered": { perUserPerWindow: 30, inFlightPerConnection: 2, inFlightPerUser: 4 }
-} as const
-type SilentLaneType = keyof typeof SILENT_LANE_LIMITS
-/** Memory bound for tracked addresses; the oldest window is evicted first. */
-const MAX_TRACKED_UPGRADE_ADDRESSES = 10_000
 const CHAT_MESSAGE_NOT_SENT_MESSAGE = "Your message was not sent. Try again."
-
-interface EventRateWindow {
-  startedAt: number
-  count: number
-}
+const CHAT_RATE_LIMITED_MESSAGE = "You're sending messages too quickly. Try again in a moment."
+const HEARTBEAT_FRAME = JSON.stringify({
+  type: "realtime.heartbeat",
+  payload: { intervalMs: REALTIME_HEARTBEAT_INTERVAL_MS }
+} satisfies ServerEvent)
 
 export interface RealtimeServer {
   connectionManager: ConnectionManager
@@ -108,10 +107,12 @@ export interface CreateRealtimeServerOptions {
    * upgrade limit keys on the address Fastify reports as `request.ip`.
    */
   trustedProxyAddresses?: string[]
-  /** Test seam; production uses MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW. */
+  /** Test seams; production uses the realtimeUpgradeLimiter defaults. */
   upgradeAttemptsPerAddressWindow?: number
   /** Resolves the `chat_read_receipts` rollout; without it receipts stay off. */
   capabilityService?: CapabilityService
+  failedUpgradesPerAddressWindow?: number
+  upgradesPerUserWindow?: number
 }
 
 export function createRealtimeServer(
@@ -125,24 +126,17 @@ export function createRealtimeServer(
     perMessageDeflate: false
   })
   const connectionManager = options.connectionManager ?? createConnectionManager()
-  const connectionEventWindows = new Map<string, EventRateWindow>()
-  const userEventWindows = new Map<string, EventRateWindow>()
-  const movementEventWindows = new Map<string, EventRateWindow>()
-  const upgradeAddressWindows = new Map<string, EventRateWindow>()
-  const upgradeAttemptLimit = options.upgradeAttemptsPerAddressWindow ?? MAX_UPGRADE_ATTEMPTS_PER_ADDRESS_PER_WINDOW
+  const eventBudget = createRealtimeEventBudget()
+  const upgradeLimiter = createRealtimeUpgradeLimiter({
+    attemptsPerAddress: options.upgradeAttemptsPerAddressWindow,
+    failuresPerAddress: options.failedUpgradesPerAddressWindow,
+    upgradesPerUser: options.upgradesPerUserWindow
+  })
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
-  const connectionInFlight = new Map<string, number>()
-  const userInFlight = new Map<string, number>()
+  const leaseRenewedAt = new Map<string, number>()
+  const pendingDisconnects: RealtimeConnection[] = []
   const movementInFlight = new Set<string>()
   const deferredMovements = new Map<string, ClientEvent>()
-  const silentLanes = new Map(
-    (Object.keys(SILENT_LANE_LIMITS) as SilentLaneType[]).map((type) => [type, {
-      ...SILENT_LANE_LIMITS[type],
-      windows: new Map<string, EventRateWindow>(),
-      connectionInFlight: new Map<string, number>(),
-      userInFlight: new Map<string, number>()
-    }])
-  )
   let closing = false
   const activeOperations = new Set<Promise<unknown>>()
   const connectionLifecycleOperations = new Map<string, Promise<void>>()
@@ -195,14 +189,22 @@ export function createRealtimeServer(
       await Promise.allSettled([...pending])
     }
   }
-  // Positive decisions are reused for at most REALTIME_AUTHORIZATION_CACHE_TTL_MS
-  // per session family; concurrent checks for one family share one query.
+  // Event-driven authorization: decisions are primed at upgrade, refreshed in
+  // batches by the sweep, dropped at once on revocation, and otherwise reused
+  // for at most REALTIME_AUTHORIZATION_CACHE_TTL_MS.
   const authorizationCache = createRealtimeAuthorizationCache({
     check: (identity) => options.authService.isRealtimeSessionAllowed(identity),
+    checkMany: async (identities) => (await options.authService.areRealtimeSessionsAllowed(identities))
+      .map((decision) => ({
+        allowed: decision.allowed,
+        ...(decision.expiresAt ? { notAfter: Date.parse(decision.expiresAt) } : {})
+      })),
     ...(options.authorizationClock ? { now: options.authorizationClock } : {})
   })
-  const handleAccessRevocation = (revocation: RealtimeAccessRevocation) => {
+  const handleAccessRevocation = (revocation: RealtimeAccessRevocation, origin: "local" | "remote") => {
     authorizationCache.invalidate(revocation)
+    // Other instances drop their cached decision too (fanout control channel).
+    if (origin === "local") void connectionManager.publishAccessRevocation(revocation)
     if (closing || revocation.kind !== "user") return
     // Close the affected sockets now rather than on their next event or sweep.
     for (const connection of connectionManager.getUserConnections(revocation.userId)) {
@@ -211,8 +213,9 @@ export function createRealtimeServer(
   }
   // Fakes in tests may omit the subscription; the TTL bound still applies.
   const unsubscribeAccessRevocations = [
-    options.authService.subscribeRealtimeAccessRevocations?.(handleAccessRevocation),
-    options.safetyService.subscribeRealtimeAccessRevocations?.(handleAccessRevocation)
+    options.authService.subscribeRealtimeAccessRevocations?.((revocation) => handleAccessRevocation(revocation, "local")),
+    options.safetyService.subscribeRealtimeAccessRevocations?.((revocation) => handleAccessRevocation(revocation, "local")),
+    connectionManager.subscribeAccessRevocations((revocation) => handleAccessRevocation(revocation, "remote"))
   ]
   connectionManager.setDeliveryAuthorization(authorizeConnection)
   const notificationService =
@@ -248,31 +251,49 @@ export function createRealtimeServer(
       socket.destroy()
       return
     }
-    const now = Date.now()
-    if (upgradeAddressWindows.size >= MAX_TRACKED_UPGRADE_ADDRESSES) {
-      purgeExpiredEventWindows(upgradeAddressWindows, now)
-      const oldest = upgradeAddressWindows.keys().next()
-      if (!oldest.done && upgradeAddressWindows.size >= MAX_TRACKED_UPGRADE_ADDRESSES) {
-        upgradeAddressWindows.delete(oldest.value)
-      }
-    }
-    if (!consumeEventAllowance({
-      windows: upgradeAddressWindows,
-      key: resolveClientAddress(request),
-      now,
-      limit: upgradeAttemptLimit
-    })) {
+    const address = resolveClientAddress(request)
+    if (!upgradeLimiter.admitAddress(address, Date.now())) {
       rejectUpgrade(socket, "429 Too Many Requests")
       return
     }
+    // Load shedding: the database work of setting up this socket (ticket,
+    // session, lease) runs inside a bounded number of slots; the client
+    // retries with jittered backoff when none is free.
+    const setupGate = options.realtimeTicketService.setupGate
+    const releaseSetupSlot = setupGate ? setupGate.tryAcquire() : () => undefined
+    if (!releaseSetupSlot) {
+      rejectUpgrade(socket, "503 Service Unavailable")
+      return
+    }
+    try {
+      await upgradeWithSetupSlot(request, socket, head, address)
+    } finally {
+      releaseSetupSlot()
+    }
+  }
 
+  async function upgradeWithSetupSlot(
+    request: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+    address: string
+  ): Promise<void> {
+    // The ticket check below proves an unexpired, unrotated session token of
+    // an eligible, unrestricted account: stricter than the cached decision,
+    // so a success primes the cache and the first event costs no query.
+    const observation = authorizationCache.observe()
     const actor = await authenticateRealtimeRequest({
       request,
       authService: options.authService,
       realtimeTicketService: options.realtimeTicketService
     })
     if (!actor) {
+      upgradeLimiter.recordFailure(address, Date.now())
       rejectUpgrade(socket, "401 Unauthorized")
+      return
+    }
+    if (!upgradeLimiter.admitUser(actor.userId, Date.now())) {
+      rejectUpgrade(socket, "429 Too Many Requests")
       return
     }
     if (closing) { rejectUpgrade(socket, "503 Service Unavailable"); return }
@@ -328,6 +349,11 @@ export function createRealtimeServer(
         socket.off("close", onRawSocketClose)
         try {
           establishConnection(webSocket, actor, connectionId)
+          authorizationCache.recordAllowed(
+            { userId: actor.userId, sessionFamilyId: actor.sessionFamilyId },
+            observation,
+            Date.parse(actor.sessionExpiresAt)
+          )
         } catch (error) {
           void track(disconnectBeforeUpgrade()).catch((cleanupError) => {
             console.error("Realtime failed-upgrade lease cleanup failed", safeOperationalErrorKind(cleanupError))
@@ -359,25 +385,15 @@ export function createRealtimeServer(
       sessionFamilyId: actor.sessionFamilyId,
       connectionId
     })
+    // The lease was registered just before the upgrade.
+    leaseRenewedAt.set(connection.connectionId, Date.now())
 
     socket.on("pong", () => {
-      const current = connectionManager.getConnection(connection.connectionId)
-      if (!current) return
-      current.isAlive = true
-      void track(enqueueConnectionLifecycleOperation(connection.connectionId, async () => {
-        const renewed = await options.presenceService.heartbeatConnection(
-          connection.connectionId,
-          connection.userId
-        )
-        if (!renewed) throw new Error("Realtime connection lease is no longer registered.")
-      })).catch((error) => {
-        console.error("Realtime connection lease heartbeat failed", safeOperationalErrorKind(error))
-        if (current.socket.readyState === 1) {
-          current.socket.close(AUTHORIZATION_FAILURE_CLOSE_CODE, AUTHORIZATION_FAILURE_CLOSE_REASON)
-        }
-      })
+      connection.isAlive = true
     })
     socket.on("message", (data) => {
+      // Any frame proves the peer is alive, even one the budget drops.
+      connection.isAlive = true
       if (closing) return
       void track(handleMessage(connection, data)).catch(() => {
         if (connection.socket.readyState === 1) {
@@ -390,41 +406,70 @@ export function createRealtimeServer(
     })
     socket.on("close", () => {
       const removed = connectionManager.removeConnection(connection.connectionId)
-      connectionEventWindows.delete(connection.connectionId)
+      leaseRenewedAt.delete(connection.connectionId)
       deferredMovements.delete(connection.connectionId)
-      // The user's window outlives the socket: a reconnect inside the window must
-      // not reset the per-user budget. The heartbeat purges expired windows.
-      if (removed) {
-        void track(enqueueConnectionLifecycleOperation(removed.connectionId, async () => {
-          // A room.join is the only client operation that can create room presence.
-          // Let those already dispatched finish before removing this connection's
-          // lease, so a late join cannot recreate presence after disconnect cleanup.
-          await waitForConnectionRoomJoins(removed.connectionId)
-          await router.handleDisconnect(removed)
-        })).catch((error) => console.error("Realtime disconnect cleanup failed", safeOperationalErrorKind(error)))
-      }
+      // The user's windows outlive the socket: a reconnect inside a window
+      // must not reset the per-user budget. The heartbeat purges them.
+      eventBudget.forgetConnection(connection.connectionId)
+      if (!removed) return
+      router.releaseConnection(removed)
+      // Lease cleanup is batched (2026-10-01): a transaction per socket made a
+      // deploy or a mass network drop queue thousands of transactions in
+      // front of the reconnects. A shutdown flushes the batch in close().
+      pendingDisconnects.push(removed)
+      if (!closing) scheduleDisconnectFlush()
     })
   }
 
-  let heartbeatAuthorizationPending = false
+  let disconnectFlushTimer: ReturnType<typeof setTimeout> | undefined
+  let disconnectFlushRunning = false
+  function scheduleDisconnectFlush(): void {
+    if (disconnectFlushTimer || disconnectFlushRunning) return
+    disconnectFlushTimer = setTimeout(() => {
+      disconnectFlushTimer = undefined
+      disconnectFlushRunning = true
+      void track(flushDisconnects()).finally(() => {
+        disconnectFlushRunning = false
+        // Closes that arrived during the flush form the next batch.
+        if (pendingDisconnects.length > 0 && !closing) scheduleDisconnectFlush()
+      })
+    }, REALTIME_DISCONNECT_BATCH_WINDOW_MS)
+    disconnectFlushTimer.unref?.()
+  }
+
+  let leaseRenewalPending = false
   const heartbeat = setInterval(() => {
-    purgeExpiredEventWindows(userEventWindows, Date.now())
-    purgeExpiredEventWindows(movementEventWindows, Date.now())
-    purgeExpiredEventWindows(upgradeAddressWindows, Date.now())
-    if (!heartbeatAuthorizationPending) {
-      heartbeatAuthorizationPending = true
-      void track(closeRestrictedConnections()).finally(() => { heartbeatAuthorizationPending = false })
-    }
-    for (const connection of collectConnections(connectionManager)) {
+    const now = Date.now()
+    eventBudget.purgeExpired(now)
+    upgradeLimiter.purgeExpired(now)
+    const dueForRenewal: RealtimeConnection[] = []
+    for (const connection of connectionManager.listConnections()) {
+      const socket = connection.socket
       if (!connection.isAlive) {
-        connection.socket.terminate()
+        socket.terminate()
         continue
       }
       connection.isAlive = false
-      connection.socket.ping()
+      if (socket.readyState !== 1) continue
+      socket.ping()
+      if ((socket.bufferedAmount ?? 0) <= REALTIME_OUTBOUND_HARD_LIMIT_BYTES) socket.send(HEARTBEAT_FRAME)
+      if (now - (leaseRenewedAt.get(connection.connectionId) ?? 0) >= REALTIME_CONNECTION_LEASE_RENEW_MS) {
+        dueForRenewal.push(connection)
+      }
     }
-  }, HEARTBEAT_INTERVAL_MS)
+    if (dueForRenewal.length > 0 && !leaseRenewalPending) {
+      leaseRenewalPending = true
+      void track(renewConnectionLeases(dueForRenewal)).finally(() => { leaseRenewalPending = false })
+    }
+  }, REALTIME_HEARTBEAT_INTERVAL_MS)
   heartbeat.unref()
+  let authorizationSweepPending = false
+  const authorizationSweep = setInterval(() => {
+    if (authorizationSweepPending) return
+    authorizationSweepPending = true
+    void track(closeRestrictedConnections()).finally(() => { authorizationSweepPending = false })
+  }, REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS)
+  authorizationSweep.unref()
   const connectionLeaseCleanup = setInterval(() => {
     void track(options.presenceService.purgeExpiredConnectionLeases()).catch((error) => {
       console.error("Realtime connection lease cleanup failed", safeOperationalErrorKind(error))
@@ -437,25 +482,76 @@ export function createRealtimeServer(
   }, CONNECTION_LEASE_CLEANUP_INTERVAL_MS)
   connectionLeaseCleanup.unref()
 
+  async function flushDisconnects(): Promise<void> {
+    const batch = pendingDisconnects.splice(0)
+    if (batch.length === 0) return
+    // A room.join is the only client operation that can create room presence.
+    // Joins already dispatched finish first, so a late join cannot recreate
+    // presence after the cleanup.
+    await Promise.all(batch.map((connection) => waitForConnectionRoomJoins(connection.connectionId)))
+    try {
+      await router.handleDisconnects(batch)
+    } catch (error) {
+      // Leases expire on their own (90 s) and are purged by any instance.
+      console.error("Realtime disconnect cleanup failed", safeOperationalErrorKind(error))
+    }
+  }
+
+  /**
+   * Renews the leases of live sockets in batches. A failed round is retried on
+   * the next tick (the 90 s lease outlives several); a lease that no longer
+   * exists closes its socket so the client reconnects and registers anew. An
+   * UPDATE never recreates a lease, so a renewal cannot outlive a disconnect.
+   */
+  async function renewConnectionLeases(connections: readonly RealtimeConnection[]): Promise<void> {
+    const startedAt = Date.now()
+    let renewed: ReadonlySet<string>
+    try {
+      renewed = await options.presenceService.heartbeatConnections(
+        connections.map((connection) => ({ connectionId: connection.connectionId, userId: connection.userId }))
+      )
+    } catch (error) {
+      console.error("Realtime connection lease renewal failed", safeOperationalErrorKind(error))
+      return
+    }
+    for (const connection of connections) {
+      if (connectionManager.getConnection(connection.connectionId) !== connection) continue
+      if (renewed.has(connection.connectionId)) {
+        leaseRenewedAt.set(connection.connectionId, startedAt)
+      } else if (connection.socket.readyState === 1) {
+        connection.socket.close(AUTHORIZATION_FAILURE_CLOSE_CODE, AUTHORIZATION_FAILURE_CLOSE_REASON)
+      }
+    }
+  }
+
+  /**
+   * Re-checks every live socket in batches (one session and one account query
+   * per 500 sockets) and refreshes their cached decisions. A batch failure
+   * closes nothing: decisions then expire within the TTL and the next event or
+   * delivery fails closed on its own check.
+   */
   async function closeRestrictedConnections(): Promise<void> {
     authorizationCache.purgeExpired()
-    // Bounded so a large instance does not burst every check at the pool at once.
-    await forEachWithConcurrency(
-      collectConnections(connectionManager),
-      REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY,
-      async (connection) => {
-        try {
-          await authorizeConnection(connection)
-        } catch {
-          if (connection.socket.readyState === 1) {
-            connection.socket.close(
-              AUTHORIZATION_FAILURE_CLOSE_CODE,
-              AUTHORIZATION_FAILURE_CLOSE_REASON
-            )
-          }
-        }
-      }
-    )
+    const identified: RealtimeConnection[] = []
+    for (const connection of connectionManager.listConnections()) {
+      if (connection.sessionFamilyId) identified.push(connection)
+      else if (connection.socket.readyState === 1) connection.socket.close(MODERATION_CLOSE_CODE, MODERATION_CLOSE_REASON)
+    }
+    let denied: RealtimeAuthorizationIdentity[]
+    try {
+      denied = await authorizationCache.refresh(identified.map((connection) => ({
+        userId: connection.userId,
+        sessionFamilyId: connection.sessionFamilyId!
+      })))
+    } catch (error) {
+      console.error("Realtime authorization sweep failed", safeOperationalErrorKind(error))
+      return
+    }
+    const deniedFamilies = new Set(denied.map((identity) => `${identity.userId}\u0000${identity.sessionFamilyId}`))
+    for (const connection of identified) {
+      if (!deniedFamilies.has(`${connection.userId}\u0000${connection.sessionFamilyId}`)) continue
+      if (connection.socket.readyState === 1) connection.socket.close(MODERATION_CLOSE_CODE, MODERATION_CLOSE_REASON)
+    }
   }
 
   async function handleMessage(
@@ -468,68 +564,57 @@ export function createRealtimeServer(
       connection.socket.close(1009, "Realtime message too large")
       return
     }
-    const now = Date.now()
     let frame: unknown
     try { frame = JSON.parse(data.toString()) } catch { frame = undefined }
-    if (isClientEvent(frame) && frame.type === "mini_room.move") {
-      // Movement has its own budget: it never consumes the chat allowance or
-      // closes the socket. Over budget, a step is dropped (abusive rate only).
-      if (!consumeEventAllowance({ windows: movementEventWindows, key: connection.userId, now,
-        limit: MAX_USER_MOVEMENTS_PER_WINDOW })) return
-      await handleMovement(connection, frame)
+    const event = isClientEvent(frame) ? frame : undefined
+    const eventClass = classifyRealtimeEvent(event?.type ?? "")
+    const admission = eventBudget.admit({
+      connectionId: connection.connectionId,
+      userId: connection.userId,
+      eventClass,
+      now: Date.now()
+    })
+    if (admission.kind === "drop") return
+    if (eventClass === "motion" && event && admission.kind === "admit") {
+      // Movement counts against its own window only: a step is never dropped
+      // for being busy. handleMovement keeps one step in flight per socket and
+      // replaces a pending one with the latest, so the slot is not held here.
+      admission.release()
+      await handleMovement(connection, event)
       return
     }
-    const lane = isClientEvent(frame) ? silentLanes.get(frame.type as SilentLaneType) : undefined
-    if (lane) {
-      purgeExpiredEventWindows(lane.windows, now)
-      if (!consumeEventAllowance({ windows: lane.windows, key: connection.userId, now, limit: lane.perUserPerWindow }) ||
-        (lane.connectionInFlight.get(connection.connectionId) ?? 0) >= lane.inFlightPerConnection ||
-        (lane.userInFlight.get(connection.userId) ?? 0) >= lane.inFlightPerUser) return
+    if (admission.kind === "refuse_chat") {
+      // Over the chat budget: the sender retries the bubble; other traffic and
+      // the socket are unaffected. Older clients without a retry id keep the
+      // previous close, as they cannot mark a bubble failed.
+      const clientMessageId = readRealtimeClientMessageId(event?.payload)
+      if (clientMessageId) {
+        reportChatNotSent(connection, clientMessageId, CHAT_RATE_LIMITED_MESSAGE)
+        return
+      }
     }
-    const connectionAllowed = Boolean(lane) || consumeEventAllowance({
-      windows: connectionEventWindows,
-      key: connection.connectionId,
-      now,
-      limit: MAX_CONNECTION_EVENTS_PER_WINDOW
-    })
-    const userAllowed = Boolean(lane) || consumeEventAllowance({
-      windows: userEventWindows,
-      key: connection.userId,
-      now,
-      limit: MAX_USER_EVENTS_PER_WINDOW
-    })
-    if (!lane && (!connectionAllowed || !userAllowed ||
-      (connectionInFlight.get(connection.connectionId) ?? 0) >= MAX_CONNECTION_IN_FLIGHT ||
-      (userInFlight.get(connection.userId) ?? 0) >= MAX_USER_IN_FLIGHT)) {
+    if (admission.kind !== "admit") {
       if (connection.socket.readyState === 1) {
         connection.socket.close(RATE_LIMIT_CLOSE_CODE, RATE_LIMIT_CLOSE_REASON)
       }
       return
     }
-    const connectionSlots = lane ? lane.connectionInFlight : connectionInFlight
-    const userSlots = lane ? lane.userInFlight : userInFlight
-    connectionSlots.set(connection.connectionId, (connectionSlots.get(connection.connectionId) ?? 0) + 1)
-    userSlots.set(connection.userId, (userSlots.get(connection.userId) ?? 0) + 1)
-    let received: ClientEvent | undefined
     try {
-      const parsed = frame
-      if (!isClientEvent(parsed)) return
-      received = parsed
+      if (!event) return
       if (!await authorizeConnection(connection) || connection.socket.readyState !== 1) return
-      if (parsed.type === "room.join" || parsed.type === "mini_room.scene_enter") {
+      if (event.type === "room.join" || event.type === "mini_room.scene_enter") {
         await trackConnectionRoomJoin(connection.connectionId, () => {
           if (!connectionManager.getConnection(connection.connectionId)) return Promise.resolve()
-          return router.handleClientEvent(connection, parsed)
+          return router.handleClientEvent(connection, event)
         })
       } else {
-        await router.handleClientEvent(connection, parsed)
+        await router.handleClientEvent(connection, event)
       }
     } catch (error) {
-      reportRefusedChatSend(connection, received, error)
+      reportRefusedChatSend(connection, event, error)
       return
     } finally {
-      releaseInFlight(connectionSlots, connection.connectionId)
-      releaseInFlight(userSlots, connection.userId)
+      admission.release()
     }
   }
 
@@ -576,13 +661,22 @@ export function createRealtimeServer(
   ): void {
     if (event?.type !== "chat.send_message") return
     const clientMessageId = readRealtimeClientMessageId(event.payload)
-    if (!clientMessageId || connection.socket.readyState !== 1) return
+    if (!clientMessageId) return
+    reportChatNotSent(
+      connection,
+      clientMessageId,
+      isPublicRequestError(error) ? error.message : CHAT_MESSAGE_NOT_SENT_MESSAGE
+    )
+  }
+
+  function reportChatNotSent(connection: RealtimeConnection, clientMessageId: string, message: string): void {
+    if (connection.socket.readyState !== 1) return
     connectionManager.sendToConnection(connection.connectionId, {
       type: "realtime.error",
       payload: {
         code: "CHAT_MESSAGE_NOT_SENT",
         requestType: "chat.send_message",
-        message: isPublicRequestError(error) ? error.message : CHAT_MESSAGE_NOT_SENT_MESSAGE,
+        message,
         clientMessageId
       }
     })
@@ -630,14 +724,20 @@ export function createRealtimeServer(
       closing = true
       for (const unsubscribe of unsubscribeAccessRevocations) unsubscribe?.()
       clearInterval(heartbeat)
+      clearInterval(authorizationSweep)
       clearInterval(connectionLeaseCleanup)
       const socketsClosed = new Promise<void>((resolve) => {
         wsServer.close(() => resolve())
+        // 1012: the clients reconnect, spreading their first retry over a few
+        // seconds, instead of all at the instant the next instance is ready.
         for (const client of wsServer.clients) {
-          client.close()
+          client.close(REALTIME_RESTART_CLOSE_CODE, RESTART_CLOSE_REASON)
         }
       })
       await socketsClosed
+      clearTimeout(disconnectFlushTimer)
+      disconnectFlushTimer = undefined
+      await track(flushDisconnects())
       await Promise.allSettled([...activeOperations])
       if (!closeOptions.preserveFanout) await connectionManager.closeFanout()
       httpServer.off("upgrade", handleUpgradeRequest)
@@ -656,12 +756,6 @@ export function createRealtimeServer(
   }
 }
 
-function releaseInFlight(counts: Map<string, number>, key: string): void {
-  const remaining = (counts.get(key) ?? 1) - 1
-  if (remaining <= 0) counts.delete(key)
-  else counts.set(key, remaining)
-}
-
 function rejectUpgrade(socket: Duplex, status: string): void {
   if (socket.destroyed) return
   socket.write(
@@ -670,37 +764,6 @@ function rejectUpgrade(socket: Duplex, status: string): void {
     "Content-Length: 0\r\n\r\n"
   )
   socket.destroy()
-}
-
-function consumeEventAllowance(input: {
-  windows: Map<string, EventRateWindow>
-  key: string
-  now: number
-  limit: number
-}): boolean {
-  const current = input.windows.get(input.key)
-  if (!current || current.startedAt + REALTIME_EVENT_WINDOW_MS <= input.now) {
-    input.windows.set(input.key, { startedAt: input.now, count: 1 })
-    return true
-  }
-  if (current.count >= input.limit) return false
-  input.windows.set(input.key, {
-    startedAt: current.startedAt,
-    count: current.count + 1
-  })
-  return true
-}
-
-function purgeExpiredEventWindows(windows: Map<string, EventRateWindow>, now: number): void {
-  for (const [key, window] of windows) {
-    if (window.startedAt + REALTIME_EVENT_WINDOW_MS <= now) windows.delete(key)
-  }
-}
-
-function collectConnections(
-  connectionManager: ConnectionManager
-): RealtimeConnection[] {
-  return connectionManager.listConnections()
 }
 
 /**

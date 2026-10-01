@@ -11,7 +11,8 @@ interface MotionRoom {
   idleSince?: number
 }
 
-const ROOM_CHECK_TTL_MS = 10_000
+const REVALIDATE_AFTER_MS = 10_000
+const MAX_STALE_MS = 60_000
 const IDLE_ROOM_RETENTION_MS = 60_000
 const MAX_IDLE_ROOMS = 128
 
@@ -37,39 +38,84 @@ export function createMiniRoomMotionService(options: {
     type: "mini_room.motion_snapshot", payload: { miniRoomId: id, epoch,
       participantUserIds: room.participantUserIds, avatars: [...room.avatars.values()].map(a => ({ ...a })) }
   })
+  function validate(id: string): Promise<MotionRoom> {
+    let validation = validations.get(id)
+    if (!validation) {
+      // Shared by concurrent callers, so it checks only the room itself; each
+      // caller's membership is checked in authorize against the shared result.
+      // Read only after the first await, by which time it is assigned.
+      let current: Promise<MotionRoom> | undefined = undefined
+      current = (async (): Promise<MotionRoom> => {
+        const stored = await options.findRoom(id)
+        if (!stored || stored.endedAt || await options.hasBlockBetween(...stored.participantUserIds)) {
+          rooms.delete(id)
+          throw new Error("That room is not available.")
+        }
+        if (validations.get(id) !== current) throw new Error("That room is not available.")
+        const room = rooms.get(id) ?? {
+          participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
+          // Until a socket enters, the room is idle and may be evicted.
+          idleSince: now(),
+          avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
+            userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
+          }]))
+        }
+        room.checkedAt = now()
+        rooms.set(id, room)
+        return room
+      })()
+      validation = current
+      validations.set(id, current)
+      const clear = () => { if (validations.get(id) === current) validations.delete(id) }
+      void current.then(clear, clear)
+    }
+    return validation
+  }
+  /**
+   * Room access for scene entry and moves. Ending a room or separating the
+   * pair invalidates it at once (`invalidate`). Otherwise a decision is
+   * re-checked every REVALIDATE_AFTER_MS in the background while moves keep
+   * flowing on it (2026-10-01: the check used to hold the move that found it
+   * due, so a busy database delayed movement), and is never trusted for
+   * longer than MAX_STALE_MS without a check succeeding.
+   */
   async function authorize(id: string, userId: string, force = false) {
     let room = rooms.get(id)
-    if (!room || force || now() - room.checkedAt >= ROOM_CHECK_TTL_MS) {
-      let validation = validations.get(id)
-      if (!validation) {
-        // Shared by concurrent callers, so it checks only the room itself; each
-        // caller's membership is checked below against the shared result.
-        validation = (async () => {
-          const stored = await options.findRoom(id)
-          if (!stored || stored.endedAt || await options.hasBlockBetween(...stored.participantUserIds)) {
-            rooms.delete(id)
-            throw new Error("That room is not available.")
-          }
-          if (validations.get(id) !== validation) throw new Error("That room is not available.")
-          const current = rooms.get(id) ?? {
-            participantUserIds: stored.participantUserIds, checkedAt: now(), connections: new Map(),
-            // Until a socket enters, the room is idle and may be evicted.
-            idleSince: now(),
-            avatars: new Map(stored.participantUserIds.map((id, index) => [id, {
-              userId: id, x: index === 0 ? .38 : .62, y: .76, present: false, revision: 0
-            }]))
-          }
-          current.checkedAt = now()
-          rooms.set(id, current)
-          return current
-        })()
-        validations.set(id, validation)
-      }
-      try { room = await validation }
-      finally { if (validations.get(id) === validation) validations.delete(id) }
+    const age = room ? now() - room.checkedAt : Number.POSITIVE_INFINITY
+    if (!room || force || age >= MAX_STALE_MS) {
+      room = await validate(id)
+    } else if (age >= REVALIDATE_AFTER_MS) {
+      void validate(id).catch(() => {
+        // An unavailable room was removed by the check; a failed check is retried.
+      })
     }
     if (!room.participantUserIds.includes(userId)) throw new Error("That room is not available.")
     return room
+  }
+  /**
+   * Occupied rooms are also re-checked on a timer (2026-10-01): when both
+   * avatars stood still past MAX_STALE_MS, the next move used to wait for a
+   * forced check, seconds when the pool was busy. Empty rooms cost nothing.
+   */
+  let keepWarm: ReturnType<typeof setInterval> | undefined
+  function syncKeepWarm() {
+    const occupied = [...rooms.values()].some(room => room.connections.size > 0)
+    if (occupied && !keepWarm) {
+      keepWarm = setInterval(revalidateOccupiedRooms, REVALIDATE_AFTER_MS / 2)
+      keepWarm.unref?.()
+    } else if (!occupied && keepWarm) {
+      clearInterval(keepWarm)
+      keepWarm = undefined
+    }
+  }
+  function revalidateOccupiedRooms() {
+    for (const [id, room] of rooms) {
+      if (!room.connections.size || now() - room.checkedAt < REVALIDATE_AFTER_MS) continue
+      void validate(id).catch(() => {
+        // An unavailable room was removed by the check; a failed check is retried.
+      })
+    }
+    syncKeepWarm()
   }
   function disconnect(connectionId: string, onlyRoomId?: string, exceptRoomId?: string) {
     for (const [id, room] of rooms) {
@@ -84,6 +130,7 @@ export function createMiniRoomMotionService(options: {
       emitSnapshot(id, room)
       if (!room.connections.size) room.idleSince = now()
     }
+    syncKeepWarm()
   }
   function evictIdleRooms() {
     const idle = [...rooms.entries()].filter(([, room]) => room.idleSince !== undefined)
@@ -110,6 +157,7 @@ export function createMiniRoomMotionService(options: {
       const wasPresent = avatar.present
       room.connections.set(connectionId, { userId, sequence: 0 })
       room.idleSince = undefined
+      syncKeepWarm()
       if (!wasPresent) {
         avatar.present = true
         avatar.revision++

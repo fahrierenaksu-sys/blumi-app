@@ -7,6 +7,27 @@ import {
 } from "../auth/authStore"
 import { normalizePhoneNumber, normalizeVerificationCode } from "../auth/phone"
 
+type ResolvedRequestSession = Awaited<ReturnType<AuthService["getSession"]>>
+const requestSessions = new WeakMap<FastifyRequest, { sessionToken: string; resolved: Promise<ResolvedRequestSession> }>()
+
+/**
+ * Resolves a request's bearer session once (2026-10-01). The shared request
+ * budget hook and the route handler each looked it up, two queries every
+ * time, on every authenticated request. Both now share one lookup made
+ * moments apart within the same request; nothing outlives the request.
+ */
+export function resolveRequestSession(
+  request: FastifyRequest,
+  authService: AuthService,
+  sessionToken: string
+): Promise<ResolvedRequestSession> {
+  const memo = requestSessions.get(request)
+  if (memo?.sessionToken === sessionToken) return memo.resolved
+  const resolved = authService.getSession(sessionToken)
+  requestSessions.set(request, { sessionToken, resolved })
+  return resolved
+}
+
 export async function resolveBearerSession({
   request,
   reply,
@@ -22,7 +43,7 @@ export async function resolveBearerSession({
     return null
   }
 
-  const resolved = await authService.getSession(sessionToken)
+  const resolved = await resolveRequestSession(request, authService, sessionToken)
   if (!resolved) {
     reply.code(401).send({ error: "Sign in again to continue." })
     return null

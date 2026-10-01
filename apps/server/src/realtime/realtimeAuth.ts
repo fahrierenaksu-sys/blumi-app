@@ -8,6 +8,8 @@ export interface RealtimeSessionActor {
   accountId: string
   userId: string
   sessionFamilyId: string
+  /** Expiry of the token that opened the socket; caps its cached authorization. */
+  sessionExpiresAt: string
   profile: UserProfile
 }
 
@@ -26,6 +28,7 @@ export async function authenticateRealtimeRequest(input: {
     accountId: resolved.account.accountId,
     userId: resolved.account.userId,
     sessionFamilyId: resolved.session.sessionId,
+    sessionExpiresAt: resolved.session.expiresAt,
     profile: {
       ...resolved.account.profile,
       avatar: { ...resolved.account.profile.avatar }

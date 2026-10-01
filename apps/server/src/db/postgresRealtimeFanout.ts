@@ -1,5 +1,6 @@
 import type { Pool } from "pg"
 import { randomUUID } from "node:crypto"
+import type { RealtimeAccessRevocation } from "../auth/realtimeAccessRevocation"
 import {
   MAX_REALTIME_FANOUT_BYTES,
   MAX_REALTIME_FANOUT_USER_TARGETS,
@@ -7,8 +8,27 @@ import {
   type RealtimeFanoutGapReason,
   validateRealtimeFanoutMessage
 } from "../realtime/realtimeFanout"
+import {
+  parseRemoteAccessRevocation,
+  type RealtimeFanoutControl
+} from "../realtime/realtimeFanoutControl"
 
 export const REALTIME_FANOUT_CHANNEL = "blumi_realtime"
+/**
+ * Instance-to-instance control messages (2026-10-01): peer hellos and access
+ * revocations. Small, never user content, and sent on the LISTEN connection
+ * (hellos) or the pool (revocations, which are rare).
+ */
+export const REALTIME_CONTROL_CHANNEL = "blumi_realtime_control"
+/** Each listening instance announces itself this often. */
+export const REALTIME_PEER_HELLO_INTERVAL_MS = 10_000
+/**
+ * A peer unheard for this long is gone. The same window applies after this
+ * instance (re)starts listening: until then it assumes peers exist, so a
+ * peer that started first is always discovered before publishing stops.
+ */
+export const REALTIME_PEER_TTL_MS = 30_000
+const MAX_CONTROL_PAYLOAD_BYTES = 1_024
 const MAX_REFERENCE_PAYLOAD_BYTES = 2_000_000
 // jsonb::text may add separators absent from the publisher's compact JSON.
 const MAX_REFERENCE_QUERY_BYTES = 4_000_000
@@ -43,15 +63,42 @@ export interface PostgresRealtimeFanoutOptions {
   watchdogMs?: number
   setupTimeoutMs?: number
   onMetrics?: (counters: { pending: number; pendingBytes: number; gaps: number }) => void
+  /** Test seam for peer discovery; production uses Date.now. */
+  now?: () => number
 }
 
 export function createPostgresRealtimeFanout(
   pool: Pool | FanoutPool,
   options: PostgresRealtimeFanoutOptions = {}
-): RealtimeFanout {
+): RealtimeFanout & RealtimeFanoutControl {
   let healthySubscriptions = 0
+  const now = options.now ?? Date.now
+  const controlId = randomUUID()
+  const peers = new Map<string, number>()
+  /** When the current LISTEN became healthy; undefined while not listening. */
+  let listeningSince: number | undefined
+  const revocationListeners = new Set<(revocation: RealtimeAccessRevocation) => void>()
+  const knowsRemotePeers = (): boolean => {
+    const current = now()
+    if (listeningSince === undefined || current - listeningSince < REALTIME_PEER_TTL_MS) return true
+    for (const [peer, lastSeen] of peers) {
+      if (current - lastSeen >= REALTIME_PEER_TTL_MS) peers.delete(peer)
+    }
+    return peers.size > 0
+  }
   return {
     isHealthy: () => healthySubscriptions > 0,
+    hasRemotePeers: knowsRemotePeers,
+    async publishAccessRevocation(revocation) {
+      await pool.query("SELECT pg_notify($1, $2)", [
+        REALTIME_CONTROL_CHANNEL,
+        JSON.stringify({ v: 1, kind: "revoke", origin: controlId, revocation })
+      ])
+    },
+    subscribeAccessRevocations(listener) {
+      revocationListeners.add(listener)
+      return () => { revocationListeners.delete(listener) }
+    },
     async publish(message) {
       if (
         message.target.kind === "users" &&
@@ -98,6 +145,44 @@ export function createPostgresRealtimeFanout(
           .finally(() => { purging = undefined })
       }, 60_000)
       cleanupTimer.unref()
+      let healthyClient: NotificationClient | undefined
+      let lastHelloReplyAt = 0
+      // Hellos travel on the LISTEN connection, so discovery costs the shared
+      // pool nothing.
+      const sendHello = (): void => {
+        const client = healthyClient
+        if (!client || stopped) return
+        void client.query("SELECT pg_notify($1, $2)", [
+          REALTIME_CONTROL_CHANNEL,
+          JSON.stringify({ v: 1, kind: "hello", origin: controlId })
+        ]).catch(reportError)
+      }
+      const helloTimer = setInterval(sendHello, REALTIME_PEER_HELLO_INTERVAL_MS)
+      helloTimer.unref()
+      const handleControl = (payload: string | undefined): void => {
+        if (!payload || Buffer.byteLength(payload, "utf8") > MAX_CONTROL_PAYLOAD_BYTES) return
+        let value: unknown
+        try { value = JSON.parse(payload) } catch { return }
+        const message = value as { v?: unknown; kind?: unknown; origin?: unknown; revocation?: unknown } | null
+        if (!message || message.v !== 1 || typeof message.origin !== "string" ||
+          message.origin.length === 0 || message.origin.length > 64 || message.origin === controlId) return
+        if (message.kind === "hello") {
+          const known = peers.has(message.origin)
+          peers.set(message.origin, now())
+          // Answer a newcomer at once so it learns about this instance too.
+          if (!known && now() - lastHelloReplyAt >= 1_000) {
+            lastHelloReplyAt = now()
+            sendHello()
+          }
+          return
+        }
+        if (message.kind !== "revoke") return
+        const revocation = parseRemoteAccessRevocation(message.revocation)
+        if (!revocation) return
+        for (const listener of [...revocationListeners]) {
+          try { listener(revocation) } catch { /* One listener cannot block the rest. */ }
+        }
+      }
 
       const establishClient = async (generation: number): Promise<void> => {
         const client = await pool.connect()
@@ -115,12 +200,16 @@ export function createPostgresRealtimeFanout(
         }
         const fail = (reason: RealtimeFanoutGapReason): void => {
           if (detached || stopped) return
+          // Only another instance's events can be missed. With no peer heard
+          // from (and past the startup window) the gap lost nothing, so live
+          // sockets are kept instead of forcing every client to reconnect.
+          const mayHaveMissedEvents = knowsRemotePeers()
           if (activeClient === client) { activeClient = undefined; activeCleanup = undefined }
           detach(true)
           gaps += 1
           metrics()
           reportError(new Error(`Realtime fanout gap: ${reason}`))
-          try { onGap?.(reason) }
+          try { if (mayHaveMissedEvents) onGap?.(reason) }
           catch { reportError(new Error("Realtime gap callback failed.")) }
           finally { scheduleReconnect() }
         }
@@ -171,6 +260,10 @@ export function createPostgresRealtimeFanout(
           channel: string
           payload?: string
         }) => {
+          if (!detached && !stopped && notification.channel === REALTIME_CONTROL_CHANNEL) {
+            handleControl(notification.payload)
+            return
+          }
           if (detached || stopped ||
             notification.channel !== REALTIME_FANOUT_CHANNEL ||
             !notification.payload
@@ -207,7 +300,13 @@ export function createPostgresRealtimeFanout(
           queue.length = 0
           pending = 0
           pendingBytes = 0
-          if (healthy) { healthy = false; healthySubscriptions -= 1 }
+          if (healthy) {
+            healthy = false
+            healthySubscriptions -= 1
+            if (healthyClient === client) healthyClient = undefined
+            // Peers announced while this connection was down are unknown.
+            if (healthySubscriptions === 0) listeningSince = undefined
+          }
           client.off("notification", listener)
           client.off("error", onError)
           client.off("end", onEnd)
@@ -236,8 +335,16 @@ export function createPostgresRealtimeFanout(
             detach(true)
             return
           }
+          await client.query(`LISTEN ${REALTIME_CONTROL_CHANNEL}`)
+          if (stopped || detached || generation !== connectGeneration) {
+            detach(true)
+            return
+          }
           healthy = true
           healthySubscriptions += 1
+          healthyClient = client
+          listeningSince ??= now()
+          sendHello()
         } catch (error) {
           if (activeClient === client) { activeClient = undefined; activeCleanup = undefined }
           detach(true)
@@ -289,6 +396,7 @@ export function createPostgresRealtimeFanout(
       try { await connect() } catch (error) {
         stopped = true
         clearInterval(cleanupTimer)
+        clearInterval(helloTimer)
         clearTimeout(reconnectTimer)
         throw error
       }
@@ -297,6 +405,7 @@ export function createPostgresRealtimeFanout(
         stopped = true
         connectGeneration += 1
         clearInterval(cleanupTimer)
+        clearInterval(helloTimer)
         if (reconnectTimer) {
           clearTimeout(reconnectTimer)
           reconnectTimer = undefined

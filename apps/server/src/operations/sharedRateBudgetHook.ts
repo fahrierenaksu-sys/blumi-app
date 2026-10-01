@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify"
 import type { AuthService } from "../auth/authService"
-import { readBearerToken } from "../routes/routeHelpers"
+import { readBearerToken, resolveRequestSession } from "../routes/routeHelpers"
 import type { SharedRateBudget } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
 
@@ -9,7 +9,8 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
   app.addHook("preHandler", async (request, reply) => {
     const token = readBearerToken(request)
     if (!token) return
-    const resolved = await auth.getSession(token)
+    // The route handler reuses this lookup (resolveBearerSession).
+    const resolved = await resolveRequestSession(request, auth, token)
     if (!resolved) return
     try {
       const result = await budget.consumeUser(resolved.account.userId)

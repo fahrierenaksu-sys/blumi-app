@@ -5,6 +5,7 @@ import {
   createInMemoryRealtimeTicketStore,
   type RealtimeTicketStore
 } from "./realtimeTicketStore"
+import { createConnectionSetupGate, type ConnectionSetupGate } from "./connectionSetupGate"
 
 const DEFAULT_TICKET_TTL_MS = 30_000
 
@@ -14,9 +15,20 @@ export interface IssuedRealtimeTicket {
 }
 
 export interface RealtimeTicketService {
+  /**
+   * Shared with the realtime server's upgrades: ticket requests and socket
+   * upgrades together never take more than the gate's share of the pool.
+   * Test doubles may omit it; nothing is shed then.
+   */
+  readonly setupGate?: ConnectionSetupGate
+  /**
+   * `resolved` is the session the caller already resolved for this exact
+   * token in the same request; it saves a second session lookup.
+   */
   issue(
     sessionToken: string,
-    now?: Date
+    now?: Date,
+    resolved?: Awaited<ReturnType<AuthService["getSession"]>>
   ): Promise<IssuedRealtimeTicket | null>
   consume(ticket: string, now?: Date): Promise<string | null>
 }
@@ -27,6 +39,7 @@ export function createRealtimeTicketService(options: {
   ticketFactory?: () => string
   store?: RealtimeTicketStore
   requireSharedStore?: boolean
+  setupGate?: ConnectionSetupGate
 }): RealtimeTicketService {
   const ttlMs = options.ttlMs ?? DEFAULT_TICKET_TTL_MS
   if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0 || ttlMs > 60_000) {
@@ -39,8 +52,9 @@ export function createRealtimeTicketService(options: {
   const store = options.store ?? createInMemoryRealtimeTicketStore()
 
   return {
-    async issue(sessionToken, now = new Date()) {
-      const resolved = await options.authService.getSession(sessionToken, now)
+    setupGate: options.setupGate ?? createConnectionSetupGate(),
+    async issue(sessionToken, now = new Date(), alreadyResolved) {
+      const resolved = alreadyResolved ?? await options.authService.getSession(sessionToken, now)
       if (!resolved || !isProductEligibleAccount(resolved.account)) return null
       const ticket = ticketFactory()
       if (!isValidTicket(ticket)) {

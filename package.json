@@ -39,7 +39,7 @@
     "expo-doctor": "^1.18.2",
     "patch-package": "8.0.1",
     "railway": "3.11.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "overrides": {
