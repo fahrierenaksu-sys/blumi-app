@@ -46,7 +46,8 @@ test("room invite history cancellation settles even when the transport ignores a
 test("sending, answering and cancelling a room invite settle even when the transport stalls", async () => {
   // A stalled request must not keep the invite button or the accept button
   // busy forever: these calls share requestJson's deadline and cancellation.
-  const actions: Array<[string, (fetcher: typeof fetch, signal: AbortSignal) => Promise<unknown>]> = [
+  type InviteCall = (fetcher: typeof fetch, signal: AbortSignal) => Promise<unknown>
+  const actions: [string, InviteCall][] = [
     ["create", (fetcher, signal) =>
       createThreadRoomInvite("https://example.test", "session_token", "thread_one", fetcher, signal)],
     ["decide", (fetcher, signal) =>
