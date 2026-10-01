@@ -191,6 +191,7 @@ try {
       "src/ui/blumiLoadingScreenHandoff.test.ts",
       "src/ui/uiLocale.test.ts",
       "src/ui/ambientMotionModel.test.ts",
+      "src/ui/glassSurfaceModel.test.ts",
       "src/features/inventory/dailyRewardCopy.test.ts"
     ],
     {

@@ -19,6 +19,15 @@ const reducedMotionStore = createReducedMotionStore({
     AccessibilityInfo.addEventListener(event, listener)
 })
 
+let reducedMotionPrimed = false
+
+/** Called once at the app root so later mounts read a resolved preference. */
+export function primeReducedMotionPreference(): void {
+  if (reducedMotionPrimed) return
+  reducedMotionPrimed = true
+  reducedMotionStore.subscribe(() => undefined)
+}
+
 export function useReducedMotionPreference(): ReducedMotionPreference {
   // One shared OS subscription; resolved values are available synchronously
   // to later mounts, and the unresolved default remains fail closed.
