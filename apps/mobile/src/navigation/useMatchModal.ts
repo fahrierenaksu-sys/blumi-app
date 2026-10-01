@@ -12,9 +12,12 @@ import {
 import {
   findThreadPartner,
   reconcileRealtimeConnectionMatch,
+  reconcileRealtimeDiscoveryMatch,
   type ConnectionMatchedPayload
 } from "../features/connections/globalMatchReconciliation"
+import { discoveryMatchDelivery, parseDiscoveryMatchId } from "../features/matches/discoveryMatchDelivery"
 import { getMatchCreatedProperties } from "../features/matches/matchResultPresentation"
+import { claimForegroundAlert } from "../features/notifications/foregroundNotificationState"
 import {
   recordMutualConnection,
   updateSavedConnectionStatus
@@ -119,11 +122,47 @@ export function useMatchModal({
       const actor = sessionActor
       if (!actor) return
 
-      reconcilingMatchIdsRef.current = new Set([
-        ...reconcilingMatchIdsRef.current,
-        payload.miniRoomId
-      ])
-      void reconcileRealtimeConnectionMatch(payload, actor, {
+      const reconcile = (run: () => Promise<void>): void => {
+        reconcilingMatchIdsRef.current = new Set([
+          ...reconcilingMatchIdsRef.current,
+          payload.miniRoomId
+        ])
+        void run()
+          .catch(() => undefined)
+          .finally(() => {
+            reconcilingMatchIdsRef.current = new Set(
+              [...reconcilingMatchIdsRef.current].filter(
+                (miniRoomId) => miniRoomId !== payload.miniRoomId
+              )
+            )
+          })
+      }
+
+      // A Discover match (`match_<matchId>`): the swiper's own decision may
+      // still be answering, so the delivery registry decides whether this
+      // phone shows it here, after that answer, or not at all (the route did).
+      if (parseDiscoveryMatchId(payload.miniRoomId)) {
+        const partnerUserId = payload.participantUserIds.find((userId) => userId !== actor.profile.userId)
+        if (!partnerUserId) return
+        const presentDiscoveryMatch = (): void => reconcile(() => reconcileRealtimeDiscoveryMatch(payload, actor, {
+          getCurrentSessionActor: () => latestSessionActorRef.current,
+          findThreadForPartner,
+          createThread,
+          applyChatThreadCreated: applyNewThread,
+          claimMatchAlert: claimForegroundAlert,
+          presentMatch,
+          httpBaseUrl: MOBILE_HTTP_BASE_URL
+        }))
+        const route = discoveryMatchDelivery.routeRealtimeMatch(
+          actor.profile.userId,
+          { miniRoomId: payload.miniRoomId, partnerUserId },
+          presentDiscoveryMatch
+        )
+        if (route === "present") presentDiscoveryMatch()
+        return
+      }
+
+      reconcile(() => reconcileRealtimeConnectionMatch(payload, actor, {
         getCurrentSessionActor: () => latestSessionActorRef.current,
         recordMutualConnection,
         hydrateFromServer,
@@ -131,15 +170,7 @@ export function useMatchModal({
         applyChatThreadCreated: applyNewThread,
         presentMatch,
         httpBaseUrl: MOBILE_HTTP_BASE_URL
-      })
-        .catch(() => undefined)
-        .finally(() => {
-          reconcilingMatchIdsRef.current = new Set(
-            [...reconcilingMatchIdsRef.current].filter(
-              (miniRoomId) => miniRoomId !== payload.miniRoomId
-            )
-          )
-        })
+      }))
     },
     [applyNewThread, hydrateFromServer, latestSessionActorRef, presentMatch, sessionActor]
   )
@@ -193,6 +224,7 @@ export function useMatchModal({
   const resetMatchModal = useCallback((): void => {
     handledMatchIdsRef.current = new Set()
     reconcilingMatchIdsRef.current = new Set()
+    discoveryMatchDelivery.reset()
     setGlobalMatch(null)
   }, [])
 

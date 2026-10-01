@@ -3,6 +3,8 @@ import test from "node:test"
 import type { SessionActor } from "../session/sessionModel"
 import {
   reconcileRealtimeConnectionMatch,
+  reconcileRealtimeDiscoveryMatch,
+  type DiscoveryMatchReconciliationDependencies,
   type GlobalMatchReconciliationDependencies
 } from "./globalMatchReconciliation"
 
@@ -220,4 +222,72 @@ test("contains a failed account hydration request inside the match flow", async 
   await reconcileRealtimeConnectionMatch(payload, actor, dependencies)
 
   assert.deepEqual(dependencies.presentedMatches, ["room_match"])
+})
+
+const discoveryPayload = {
+  miniRoomId: "match_match_42",
+  participantUserIds: ["ada", "bora"] as [string, string],
+  matchedAt: "2026-10-01T00:00:00.000Z"
+}
+
+function discoveryThread(): import("@blumi/contracts").ChatThread {
+  return {
+    threadId: "thread_match_match_42",
+    miniRoomId: "match_match_42",
+    participantUserIds: ["ada", "bora"] as [string, string],
+    participants: [
+      { userId: "ada", displayName: "Ada" },
+      { userId: "bora", displayName: "Bora", avatar: boraAvatar as never }
+    ],
+    createdAt: "2026-10-01T00:00:00.000Z"
+  }
+}
+
+function createDiscoveryDependencies(overrides: Partial<DiscoveryMatchReconciliationDependencies> = {}) {
+  const calls = { presented: [] as Array<Record<string, unknown>>, claimed: [] as string[], created: 0 }
+  const dependencies: DiscoveryMatchReconciliationDependencies = {
+    getCurrentSessionActor: () => actor,
+    findThreadForPartner: () => discoveryThread(),
+    createThread: async () => { calls.created += 1; return discoveryThread() },
+    applyChatThreadCreated: () => undefined,
+    claimMatchAlert: (key) => { calls.claimed.push(key) },
+    presentMatch: (match) => { calls.presented.push({ ...match }) },
+    httpBaseUrl: "https://api.example.test",
+    threadWaitMs: 20,
+    ...overrides
+  }
+  return { dependencies, calls }
+}
+
+test("a Discover match reaching the partner presents the chat's name and chibi without a saved connection or a request", async () => {
+  const { dependencies, calls } = createDiscoveryDependencies()
+  await reconcileRealtimeDiscoveryMatch(discoveryPayload, actor, dependencies)
+  assert.equal(calls.created, 0, "the chat announced just before is already on the phone")
+  assert.deepEqual(calls.claimed, ["match:match_42"], "its own match push banner stays quiet")
+  assert.deepEqual(calls.presented, [{
+    miniRoomId: "match_match_42",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    matchedAvatarSelection: boraAvatar,
+    mode: "production",
+    source: "discovery"
+  }])
+})
+
+test("a Discover match whose chat is not on the phone yet opens it, and never shows an id as the name", async () => {
+  const opened = createDiscoveryDependencies({ findThreadForPartner: () => undefined })
+  await reconcileRealtimeDiscoveryMatch(discoveryPayload, actor, opened.dependencies)
+  assert.equal(opened.calls.created, 1)
+  assert.equal(opened.calls.presented[0]?.matchedUserName, "Bora")
+
+  const nameless = createDiscoveryDependencies({
+    findThreadForPartner: () => undefined,
+    createThread: async () => { throw new Error("offline") }
+  })
+  await reconcileRealtimeDiscoveryMatch(discoveryPayload, actor, nameless.dependencies)
+  assert.deepEqual(nameless.calls.presented, [])
+
+  const switched = createDiscoveryDependencies({ getCurrentSessionActor: () => staleActor })
+  await reconcileRealtimeDiscoveryMatch(discoveryPayload, actor, switched.dependencies)
+  assert.deepEqual(switched.calls.presented, [])
 })

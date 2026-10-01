@@ -19,6 +19,11 @@ export interface ConnectionMatchPresentationInput {
   matchedUserName: string
   matchedAvatarSelection?: AvatarSelection
   mode: "demo" | "production"
+  /**
+   * `discovery`: the partner's side of a Discover match. Its `match_created`
+   * is emitted once, from the swiper's decision (DSC-04), not here.
+   */
+  source?: "room" | "discovery"
 }
 
 /**
@@ -33,7 +38,7 @@ export function presentConnectionMatch(
   if (dependencies.hasPresented(input.miniRoomId)) return false
 
   dependencies.markPresented(input.miniRoomId)
-  dependencies.captureMatchCreated()
+  if (input.source !== "discovery") dependencies.captureMatchCreated()
   dependencies.showMatchModal({
     miniRoomId: input.miniRoomId,
     matchedUserName: input.matchedUserName,

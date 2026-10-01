@@ -28,7 +28,9 @@ const sourceFiles = [
   "src/features/connections/connectionMatchRuntime.ts",
   "src/features/connections/connectionMatchRuntime.test.ts",
   "src/features/connections/globalMatchReconciliation.ts",
-  "src/features/connections/globalMatchReconciliation.test.ts"
+  "src/features/connections/globalMatchReconciliation.test.ts",
+  "src/features/matches/discoveryMatchDelivery.ts",
+  "src/features/matches/discoveryMatchDelivery.test.ts"
 ]
 
 try {
@@ -64,7 +66,8 @@ try {
       join(outputDirectory, "features/connections/connectionDecisionFlushGate.test.js"),
       join(outputDirectory, "features/connections/connectionMatchPresentation.test.js"),
       join(outputDirectory, "features/connections/connectionMatchRuntime.test.js"),
-      join(outputDirectory, "features/connections/globalMatchReconciliation.test.js")
+      join(outputDirectory, "features/connections/globalMatchReconciliation.test.js"),
+      join(outputDirectory, "features/matches/discoveryMatchDelivery.test.js")
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

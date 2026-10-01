@@ -101,3 +101,19 @@ test("does not duplicate the reveal when realtime later reports the same match",
   assert.equal(dependencies.analyticsEvents.length, 1)
   assert.equal(dependencies.matches.length, 1)
 })
+
+test("a Discover match reaching the partner shows once and leaves match_created to the swiper's decision", () => {
+  const dependencies = createDependencies()
+  const input = {
+    miniRoomId: "match_match_42",
+    matchedUserId: "bora",
+    matchedUserName: "Bora",
+    mode: "production" as const,
+    source: "discovery" as const
+  }
+
+  assert.equal(presentConnectionMatch(dependencies, input), true)
+  assert.equal(presentConnectionMatch(dependencies, input), false)
+  assert.equal(dependencies.matches.length, 1)
+  assert.equal(dependencies.analyticsEvents.length, 0)
+})
