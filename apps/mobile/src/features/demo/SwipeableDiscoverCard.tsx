@@ -49,7 +49,7 @@ import type { DiscoveryCardLayoutMetrics } from "../discovery/discoveryLayoutMet
 import { getDiscoverySurfaceCopy } from "../discovery/discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
 import type { DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
-import { useDiscoverCardSwipe } from "./useDiscoverCardSwipe"
+import { useDiscoverCardSwipe, type DiscoverCardExitRequest } from "./useDiscoverCardSwipe"
 
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
 const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
@@ -102,6 +102,8 @@ interface SwipeableDiscoverCardProps {
   onFrontImageError?: () => void
   deferFrontAvatar?: boolean
   deferBackAvatar?: boolean
+  /** Flying out after its decision (`leaving`); the deck removes it on `onExitEnd`. */
+  leaving?: boolean; exitRequest?: DiscoverCardExitRequest | null; onExitEnd?: (userId: string) => void
 }
 
 export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
@@ -137,14 +139,8 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const queryClient = useQueryClient()
   const { width: screenWidth } = useWindowDimensions()
   const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle, onCardLayout } = useDiscoverCardSwipe({
-    swipe: swipeAnim,
-    cardId: profile.userId,
-    disabled,
-    canSwipeRight,
-    reduceMotion,
-    screenWidth,
-    onSwipeRight,
-    onSwipeLeft
+    swipe: swipeAnim, cardId: profile.userId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight, onSwipeLeft,
+    leaving: props.leaving, exitRequest: props.exitRequest, onExitEnd: props.onExitEnd
   })
   const copy = getDiscoverySurfaceCopy(getAppLocale())
   const cardBack = useMemo(

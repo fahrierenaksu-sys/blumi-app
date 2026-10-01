@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import type { LayoutChangeEvent } from "react-native"
 import { Gesture, State } from "react-native-gesture-handler"
 import {
@@ -12,7 +12,7 @@ import {
   withTiming
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
-import { hapticSelection } from "../../ui/haptics"
+import { hapticLight, hapticSelection } from "../../ui/haptics"
 import { useMainTabPagerGestureRef } from "../../ui/MainTabPagerGestureOwnership"
 import { uiTheme } from "../../ui/theme"
 import {
@@ -54,13 +54,21 @@ const STAMP_POP_SETTLE = { ...uiTheme.animation.springSnappy, reduceMotion: Redu
  *
  * Crossing the commit threshold ticks once (selection haptic) and pops the
  * stamp; the side is tracked in a shared value, so JS hears only when it
- * changes. The like/pass commit haptic belongs to the decision
- * (useDiscoveryDecisions), which the action buttons share.
+ * changes. A release past the threshold plays the commit haptic and commits
+ * the like or pass at once (DSC-10): the card then leaves on its own exit
+ * value, so the deck advances and the next card can be grabbed while this
+ * one is still flying out. The deck keeps it mounted (`leaving`) until
+ * `onExitEnd`. A button exit arrives as `exitRequest` and leaves the same way.
  *
  * The owning card leans with its drag (the other way when held by its lower
  * half, fixed when the pan activates) and leaves at its release speed. Reduce
  * Motion keeps it upright, skips the stamp pop and exits instantly.
  */
+export interface DiscoverCardExitRequest {
+  direction: DiscoverSwipeDirection
+  durationMs: number
+}
+
 export function useDiscoverCardSwipe(input: {
   swipe?: DiscoverSwipeValues
   cardId: string
@@ -70,8 +78,13 @@ export function useDiscoverCardSwipe(input: {
   screenWidth: number
   onSwipeRight: (userId: string) => void
   onSwipeLeft: (userId: string) => void
+  /** The deck keeps this card mounted while it flies out. */
+  leaving?: boolean
+  exitRequest?: DiscoverCardExitRequest | null
+  onExitEnd?: (userId: string) => void
 }) {
   const { cardId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight, onSwipeLeft } = input
+  const { leaving = false, exitRequest = null, onExitEnd } = input
   const localSwipe = useDiscoverSwipeValues()
   const { x, ownerId } = input.swipe ?? localSwipe
   const touchStartX = useSharedValue(0)
@@ -81,6 +94,9 @@ export function useDiscoverCardSwipe(input: {
   const grabbedLowerHalf = useSharedValue(false)
   const stampScale = useSharedValue(1)
   const thresholdSide = useSharedValue<DiscoverSwipeThresholdSide>(0)
+  // The leaving card's own position, so the shared drag is free at release.
+  const exitX = useSharedValue(0)
+  const exiting = useSharedValue(false)
   const pagerGestureRef = useMainTabPagerGestureRef()
   const swipeThreshold = getDiscoverSwipeThreshold(screenWidth)
 
@@ -92,19 +108,35 @@ export function useDiscoverCardSwipe(input: {
     }
   }, [cardId, onSwipeLeft, onSwipeRight])
 
+  const finishExit = useCallback((): void => {
+    onExitEnd?.(cardId)
+  }, [cardId, onExitEnd])
+
   const forceSwipe = useCallback((direction: DiscoverSwipeDirection, durationMs: number): void => {
     "worklet"
-    ownerId.value = cardId
-    x.value = withTiming(getDiscoverSwipeOutX(direction, screenWidth), {
+    // Leaves from where it is on its own value; the shared drag keeps its
+    // release value until the deck hands it to the next card.
+    exitX.value = getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
+    exiting.value = true
+    exitX.value = withTiming(getDiscoverSwipeOutX(direction, screenWidth), {
       duration: durationMs,
       easing: Easing.out(Easing.quad),
       reduceMotion: ReduceMotion.Never
     }, (finished) => {
       "worklet"
-      // An interrupted exit never submits a like or pass.
-      if (finished) scheduleOnRN(commitSwipe, direction)
+      if (finished) scheduleOnRN(finishExit)
     })
-  }, [cardId, commitSwipe, ownerId, screenWidth, x])
+  }, [cardId, exitX, exiting, finishExit, ownerId, screenWidth, x])
+
+  // A button exit (Like/Pass): the deck already committed the decision.
+  useEffect(() => {
+    if (exitRequest) forceSwipe(exitRequest.direction, exitRequest.durationMs)
+  }, [exitRequest, forceSwipe])
+
+  // A card that comes back (a refused decision) follows the shared drag again.
+  useEffect(() => {
+    if (!leaving) exiting.value = false
+  }, [exiting, leaving])
 
   const resetPosition = useCallback((): void => {
     "worklet"
@@ -191,11 +223,16 @@ export function useDiscoverCardSwipe(input: {
       }
       const remaining = getDiscoverSwipeOutX(release, screenWidth) - x.value
       const velocityTowardExit = release === "right" ? event.velocityX : -event.velocityX
+      // The commit haptic and the decision belong to the release, not to the
+      // end of the exit animation (DSC-10).
+      scheduleOnRN(hapticLight)
       forceSwipe(release, reduceMotion ? 0 : getDiscoverSwipeOutDuration(remaining, velocityTowardExit))
+      scheduleOnRN(commitSwipe, release)
     }), [
     canSwipeRight,
     cardHeight,
     cardId,
+    commitSwipe,
     disabled,
     forceSwipe,
     grabbedLowerHalf,
@@ -214,7 +251,7 @@ export function useDiscoverCardSwipe(input: {
   ])
 
   const cardSwipeStyle = useAnimatedStyle(() => {
-    const translateX = getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
+    const translateX = exiting.value ? exitX.value : getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
     return {
       transform: [
         { translateX },
@@ -223,11 +260,11 @@ export function useDiscoverCardSwipe(input: {
     }
   })
   const likeStampStyle = useAnimatedStyle(() => ({
-    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).like,
+    opacity: getDiscoverStampOpacity(exiting.value ? exitX.value : getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).like,
     transform: [{ scale: stampScale.value }]
   }))
   const nopeStampStyle = useAnimatedStyle(() => ({
-    opacity: getDiscoverStampOpacity(getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).nope,
+    opacity: getDiscoverStampOpacity(exiting.value ? exitX.value : getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value), swipeThreshold).nope,
     transform: [{ scale: stampScale.value }]
   }))
 

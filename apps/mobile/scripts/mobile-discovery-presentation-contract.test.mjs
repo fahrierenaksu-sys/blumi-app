@@ -173,7 +173,8 @@ test("production decisions advance optimistically without locking the next profi
   const surfaceSource = read(`${discoverScreen}/DiscoverDeckSurface.tsx`)
 
   assert.match(decisionsSource, /inFlightDecisionUserIdsRef/)
-  assert.match(decisionsSource, /markCandidateSeen\(candidate\.userId\)[\s\S]*?await decideDiscoverProfile/)
+  // The decision is sent after the card left, in the background with retry.
+  assert.match(decisionsSource, /markCandidateSeen\(candidate\.userId\)[\s\S]*?await runDiscoveryDecisionWithRetry\(\s*\(\) => decideDiscoverProfile\(/)
   assert.match(surfaceSource, /actionsDisabled=\{discoveryQuotaExhausted \|\| \(featuredCandidate \? inFlightDecisionUserIds\.has\(featuredCandidate\.userId\) : false\)\}/)
   assert.doesNotMatch(lobbySource, /actionsDisabled=\{decidingUserId !== null\}/)
   // A refused decision springs the card back from its exit side; it claims
@@ -199,9 +200,10 @@ test("quota exhaustion is separate from candidate supply and never promises an u
 test("discovery action buttons use the same animated swipe path as gestures", () => {
   const sharedDeckSource = read("src/features/discovery/DiscoveryDeckView.tsx")
 
-  assert.match(sharedDeckSource, /actionSwipeInFlightRef = useRef\(false\)/)
-  // Same shared drag value the card gesture writes, animated on the UI thread.
-  assert.match(sharedDeckSource, /swipeAnim\.ownerId\.value = userId\s*swipeAnim\.x\.value = withTiming\(/)
+  // A press commits at once (haptic, decision, next card) and asks the card
+  // for the same UI-thread exit a release plays; Reduce Motion makes it instant.
+  assert.match(sharedDeckSource, /hapticLight\(\)\s*setExitRequest\(\{\s*userId: featured\.userId,\s*direction,\s*durationMs: getDiscoverActionExitDuration\(reduceMotion\)\s*\}\)\s*commitTopSwipe\(direction, featured\.userId\)/)
+  assert.match(sharedDeckSource, /leavingIdsRef\.current\.has\(featured\.userId\)/)
   assert.match(sharedDeckSource, /runActionSwipe\("left"\)/)
   assert.match(sharedDeckSource, /runActionSwipe\("right"\)/)
   assert.doesNotMatch(sharedDeckSource, /zIndex:\s*-/)
@@ -299,18 +301,21 @@ test("the active discovery card rests straight and only back cards form the stac
   // discoverySwipeModel.test.ts; the deck applies them from one role progress.
   assert.match(
     sharedDeckSource,
-    /const motion = getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, dragX\)\)\s*return \{\s*opacity: motion\.opacity,\s*transform: \[\s*\{ translateX: motion\.translateX \},\s*\{ translateY: motion\.translateY \},\s*\{ rotate: `\$\{motion\.rotateDeg\}deg` \},\s*\{ scale: motion\.scale \}/
+    /const motion = getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, dragX, promotedDragX\.value\)\)\s*const arrival = getDiscoverDeckEntrance\(entrance\.value, reduceMotion\)\s*return \{\s*opacity: motion\.opacity \* arrival\.opacity,\s*transform: \[\s*\{ translateX: motion\.translateX \},\s*\{ translateY: motion\.translateY \},\s*\{ rotate: `\$\{motion\.rotateDeg\}deg` \},\s*\{ scale: motion\.scale \* arrival\.scale \}/
   )
   assert.match(sharedDeckSource, /role === "middle"\s*\?\s*getDiscoverSwipeTranslateX\(swipeOwnerId\.value, featuredUserId, swipeX\.value\)/)
   assert.match(
     swipeModelSource,
     /DISCOVER_BOTTOM_CARD_MOTION = \{\s*translateX:\s*-?\d+,\s*translateY:\s*-?\d+,\s*rotateDeg:\s*-?\d+,\s*scale:\s*0\.\d+/
   )
-  assert.match(sharedDeckSource, /role=\{isTop \? "top" : isMiddle \? "middle" : "bottom"\}/)
-  assert.match(sharedDeckSource, /pointerEvents=\{role === "top" \? "auto" : "none"\}/)
+  assert.match(sharedDeckSource, /role=\{isTop \|\| leaving \? "top" : isMiddle \? "middle" : "bottom"\}/)
+  // A decided card flies out above the deck (DSC-10) and never takes a touch.
+  assert.match(sharedDeckSource, /pointerEvents=\{role === "top" && !leaving \? "auto" : "none"\}/)
+  assert.match(sharedDeckSource, /leavingCardContainer:\s*\{[\s\S]*?zIndex:\s*4/)
   // The frosted overlay is always there, fades with the role progress and never takes a touch.
   assert.match(sharedDeckSource, /\{props\.children\}\s*<GlassDeckOverlay style=\{overlayStyle\} \/>/)
-  assert.match(sharedDeckSource, /getDiscoverDeckRoleMotion\(roleProgress\.value, [^)]*\)\)\.overlayOpacity/)
+  // The frost clears with the drag, not after the release (DSC-11).
+  assert.match(sharedDeckSource, /getDiscoverDeckRoleMotion\(roleProgress\.value, getDiscoverDeckDragMotion\(role, 0\), getDiscoverMiddleCardAdvance\(dragX\)\)\.overlayOpacity/)
   assert.match(sharedDeckSource, /<Animated\.View pointerEvents="none" style=\{\[styles\.glassOverlay, props\.style\]\}>/)
   // Promotion springs to the new slot; Reduce Motion takes it at once.
   assert.match(

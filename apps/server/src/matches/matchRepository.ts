@@ -58,6 +58,24 @@ export interface PersistedDiscoveryDecision {
   quota: DiscoveryDecisionQuota
 }
 
+/**
+ * One Discover decision as `recordDecision` stored it. A like whose reciprocal
+ * like is committed also carries the pair's match; `matchCreated` is true for
+ * the single call that inserted it, so match side effects run exactly once.
+ */
+export interface RecordedDiscoveryDecision extends PersistedDiscoveryDecision {
+  match: MatchRecord | null
+  matchCreated: boolean
+}
+
+export interface RecordDiscoveryDecisionInput {
+  decision: DiscoveryDecisionRecord
+  now: Date
+  reconsiderationOf?: string
+  /** The id a new match gets; an existing match for the pair keeps its id. */
+  proposedMatchId: string
+}
+
 export interface MatchRecord {
   matchId: string
   participantUserIds: [string, string]
@@ -83,6 +101,12 @@ export interface MatchRepository {
     now: Date,
     reconsiderationOf?: string
   ): Promise<PersistedDiscoveryDecision>
+  /**
+   * Spends quota once for a decision and, for a like that completes a mutual
+   * like, creates the pair's match atomically. Two simultaneous reciprocal
+   * likes always end with exactly one match; retries replay it.
+   */
+  recordDecision(input: RecordDiscoveryDecisionInput): Promise<RecordedDiscoveryDecision>
   getDecisionQuota(userId: string, now: Date): Promise<DiscoveryDecisionQuota>
   findDecision(
     fromUserId: string,
@@ -204,28 +228,25 @@ export function createInMemoryMatchRepository(
       })
     },
     async consumeDecisionQuota(decision, now, reconsiderationOf) {
-      const existing = store.decisions.get(decisionKey(decision.fromUserId, decision.toUserId))
-      const quota = getInMemoryDecisionQuota(store, decision.fromUserId, now)
-      if (existing && existing.decidedAt !== reconsiderationOf) {
-        return { decision: { ...existing }, created: false, quota }
+      return consumeInMemoryDecisionQuota(store, decision, now, reconsiderationOf)
+    },
+    async recordDecision({ decision, now, reconsiderationOf, proposedMatchId }) {
+      // No await until the end: the read-check-write below is atomic in memory.
+      const persisted = consumeInMemoryDecisionQuota(store, decision, now, reconsiderationOf)
+      const reciprocal = store.decisions.get(decisionKey(decision.toUserId, decision.fromUserId))
+      if (persisted.decision?.decision !== "like" || reciprocal?.decision !== "like") {
+        return { ...persisted, match: null, matchCreated: false }
       }
-      if (quota.remaining <= 0) {
-        return { decision: null, created: false, quota }
+      const key = matchKey(decision.fromUserId, decision.toUserId)
+      const existing = store.matches.get(key)
+      if (existing) return { ...persisted, match: cloneMatch(existing), matchCreated: false }
+      const created: MatchRecord = {
+        matchId: proposedMatchId,
+        participantUserIds: [decision.fromUserId, decision.toUserId],
+        matchedAt: now.toISOString()
       }
-      store.decisions.set(decisionKey(decision.fromUserId, decision.toUserId), {
-        ...decision
-      })
-      const quotaKey = discoveryQuotaKey(decision.fromUserId, now)
-      const current = store.discoveryQuotas.get(quotaKey) ?? {
-        used: 0,
-        extensionDecisions: 0
-      }
-      store.discoveryQuotas.set(quotaKey, { ...current, used: current.used + 1 })
-      return {
-        decision: { ...decision },
-        created: true,
-        quota: getInMemoryDecisionQuota(store, decision.fromUserId, now)
-      }
+      store.matches.set(key, created)
+      return { ...persisted, match: cloneMatch(created), matchCreated: true }
     },
     async getDecisionQuota(userId, now) {
       return getInMemoryDecisionQuota(store, userId, now)
@@ -330,6 +351,36 @@ export function createInMemoryMatchRepository(
 }
 
 const DISCOVERY_DAILY_DECISION_LIMIT = 10
+
+function consumeInMemoryDecisionQuota(
+  store: InMemoryMatchStore,
+  decision: DiscoveryDecisionRecord,
+  now: Date,
+  reconsiderationOf: string | undefined
+): PersistedDiscoveryDecision {
+  const existing = store.decisions.get(decisionKey(decision.fromUserId, decision.toUserId))
+  const quota = getInMemoryDecisionQuota(store, decision.fromUserId, now)
+  if (existing && existing.decidedAt !== reconsiderationOf) {
+    return { decision: { ...existing }, created: false, quota }
+  }
+  if (quota.remaining <= 0) {
+    return { decision: null, created: false, quota }
+  }
+  store.decisions.set(decisionKey(decision.fromUserId, decision.toUserId), {
+    ...decision
+  })
+  const quotaKey = discoveryQuotaKey(decision.fromUserId, now)
+  const current = store.discoveryQuotas.get(quotaKey) ?? {
+    used: 0,
+    extensionDecisions: 0
+  }
+  store.discoveryQuotas.set(quotaKey, { ...current, used: current.used + 1 })
+  return {
+    decision: { ...decision },
+    created: true,
+    quota: getInMemoryDecisionQuota(store, decision.fromUserId, now)
+  }
+}
 
 function getInMemoryDecisionQuota(
   store: InMemoryMatchStore,

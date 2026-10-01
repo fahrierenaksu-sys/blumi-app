@@ -93,7 +93,7 @@ const MAX_LINES = 800
 const OVERSIZED_DEBT = {
   "features/avatarV2/room/avatarRoomCatalog.ts": 1304,
   "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
-  "features/demo/SwipeableDiscoverCard.tsx": 1153,
+  "features/demo/SwipeableDiscoverCard.tsx": 1148,
   "features/roomV2/state/RoomV2Provider.tsx": 1210,
   "features/roomV2/components/RoomRenderer2D.tsx": 996,
   "navigation/RootNavigator.tsx": 1123,

@@ -14,6 +14,7 @@ import { DiscoveryRefreshLimitError } from "../matches/discoverySnapshot"
 import type { CapabilityService } from "../capabilities/capabilityService"
 import { resolveRequestCapabilities } from "../avatar/avatarReadProjection"
 import { isPublicRequestError } from "../errors/publicRequestError"
+import { createAfterResponseTasks, type AfterResponseTasks } from "../operations/afterResponseTasks"
 import {
   DiscoveryDecisionNotEligibleError,
   DiscoveryDecisionQuotaExceededError,
@@ -43,6 +44,7 @@ export interface DiscoverRouteServices {
   chatService?: ChatService
   connectionService?: ConnectionService
   connectionManager?: ConnectionManager
+  afterResponseTasks?: AfterResponseTasks
 }
 
 // Per verified person. The per-IP limit before authentication is only a
@@ -264,15 +266,19 @@ export async function registerDiscoverRoutes(
   })
 
   const { chatService, connectionService, connectionManager } = services
+  const afterResponseTasks = services.afterResponseTasks ?? createAfterResponseTasks()
+  if (!services.afterResponseTasks) app.addHook("onClose", () => afterResponseTasks.drain())
+  // The response does not wait for the chat and the partner's match moment:
+  // the match is durable, and sync-matches heals a failed announcement.
   const announceMatch = chatService && connectionManager
-    ? (match: MatchRecord) =>
+    ? (match: MatchRecord) => afterResponseTasks.run("match-announcement", () =>
         announceNewMatchThread({
           chatService,
           authRepository: authService.repository,
           safetyService,
           connectionManager,
           connectionRepository: connectionService?.repository
-        }, match)
+        }, match))
     : undefined
 
   app.post("/v1/discover/:userId/like", {
@@ -483,7 +489,7 @@ async function decideOnDiscoverProfile({
   matchService: MatchService
   safetyService: SafetyService
   decision: "like" | "pass"
-  announceMatch?: (match: MatchRecord) => Promise<unknown>
+  announceMatch?: (match: MatchRecord) => void
 }) {
   const resolved = await resolveProductSession({ request, reply, authService })
   if (!resolved) return
@@ -493,29 +499,29 @@ async function decideOnDiscoverProfile({
   if (!targetUserId || schemaValidationFailed(request)) {
     return reply.code(400).send({ error: "Choose a profile first." })
   }
-  if (await safetyService.hasBlockBetween(resolved.account.userId, targetUserId)) {
-    return reply.code(400).send({ error: "That profile is not available anymore." })
-  }
 
   try {
+    const userId = resolved.account.userId
     const result = await matchService.decideEligible(
-      resolved.account.userId,
+      userId,
       targetUserId,
       decision,
       resolvePersistedDiscoveryFilters(resolved.account.profile.discoveryPreferences),
       resolveCurrentUserDiscoveryGender(
         resolved.account.profile.identityGender ?? resolved.account.profile.gender
-      )
+      ),
+      undefined,
+      // Checked alongside the eligibility reads, still before any write.
+      { isPairBlocked: () => safetyService.hasBlockBetween(userId, targetUserId) }
     )
-    if (result.matched && result.match && announceMatch) {
-      try {
-        await announceMatch(result.match)
-      } catch (error) {
-        // The match is durable; sync-matches opens the chat on the next visit.
-        request.log.warn({ errorKind: safeOperationalErrorKind(error) }, "Match chat announcement failed")
-      }
+    // Only the decision that created the match announces it (exactly once).
+    if (result.matchCreated && result.match) announceMatch?.(result.match)
+    return {
+      decision: result.decision,
+      matched: result.matched,
+      match: result.match,
+      quota: result.quota
     }
-    return result
   } catch (error) {
     if (error instanceof DiscoveryDecisionNotEligibleError) {
       return reply.code(409).send({

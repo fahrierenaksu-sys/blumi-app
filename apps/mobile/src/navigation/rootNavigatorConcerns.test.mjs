@@ -830,13 +830,17 @@ test("ending a session forgets presented and reconciling matches and closes the 
   const handledMatchIdsRef = { current: new Set(["match-1"]) }
   const reconcilingMatchIdsRef = { current: new Set(["match-2"]) }
   const modalUpdates = []
+  let discoveryDeliveryResets = 0
   evaluate(findInitializer(OWNER.matchModal, "resetMatchModal"), {
     handledMatchIdsRef,
     reconcilingMatchIdsRef,
+    // Parked and route-shown Discover matches belong to the ended account too.
+    discoveryMatchDelivery: { reset: () => { discoveryDeliveryResets += 1 } },
     setGlobalMatch: (value) => modalUpdates.push(value)
   })()
   assert.equal(handledMatchIdsRef.current.size, 0)
   assert.equal(reconcilingMatchIdsRef.current.size, 0)
+  assert.equal(discoveryDeliveryResets, 1)
   assert.deepEqual(modalUpdates, [null])
 })
 

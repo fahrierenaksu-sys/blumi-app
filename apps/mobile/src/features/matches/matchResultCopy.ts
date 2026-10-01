@@ -10,6 +10,8 @@ export interface MatchResultCopy {
     body: (matchedUserName: string) => string
     badgeLabel: string
     closeLabel: string
+    /** VoiceOver label of the partner's chibi, after the name. */
+    avatarLabel: string
     sendMessage: string
     keepDiscovering: string
   }
@@ -34,6 +36,7 @@ const MATCH_RESULT_COPY: Record<AppLocale, MatchResultCopy> = {
       body: (name) => `You and ${name} both felt it. Start with a message when you are ready.`,
       badgeLabel: "Mutual match",
       closeLabel: "Close match result",
+      avatarLabel: "Blumi avatar",
       sendMessage: "Start chatting",
       keepDiscovering: "Keep exploring"
     },
@@ -56,6 +59,7 @@ const MATCH_RESULT_COPY: Record<AppLocale, MatchResultCopy> = {
       body: (name) => `Sen ve ${name} aynı şeyi hissettiniz. Hazır olduğunda bir mesajla başla.`,
       badgeLabel: "Karşılıklı eşleşme",
       closeLabel: "Eşleşme ekranını kapat",
+      avatarLabel: "Blumi avatarı",
       sendMessage: "Sohbete başla",
       keepDiscovering: "Keşfetmeye devam et"
     },

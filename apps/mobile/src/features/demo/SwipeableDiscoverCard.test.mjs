@@ -66,38 +66,41 @@ function hookCallback(name, bindings) {
   return runInNewContext(executable, bindings)
 }
 
-test("an interrupted swipe never submits a like or pass", () => {
+// DSC-10: the release (or button press) commits the decision; the exit then
+// runs on the card's own value, leaving the shared drag to the next card, and
+// only reports its end so the deck can drop the flying card.
+test("a card exit flies from where it is on its own value and reports only a finished exit", () => {
   let onAnimationEnd
-  const delivered = []
-  const commitSwipe = hookCallback("commitSwipe", {
-    cardId: "candidate",
-    onSwipeRight: (id) => delivered.push(`like:${id}`),
-    onSwipeLeft: (id) => delivered.push(`pass:${id}`)
-  })
-  const x = { value: 0 }
-  const ownerId = { value: "" }
+  const ended = []
+  const finishExit = () => ended.push("exit-end")
+  const x = { value: 130 }
+  const ownerId = { value: "candidate" }
+  const exitX = { value: 0 }
+  const exiting = { value: false }
   const forceSwipe = hookCallback("forceSwipe", {
     x,
     ownerId,
+    exitX,
+    exiting,
     cardId: "candidate",
-    reduceMotion: false,
     screenWidth: 400,
-    SWIPE_OUT_DURATION: 190,
     ReduceMotion: { Never: "never" },
-    Easing: { out: () => undefined, cubic: undefined },
+    Easing: { out: () => undefined, quad: undefined },
     getDiscoverSwipeOutX: (direction, width) => direction === "right" ? width * 1.2 : -width * 1.2,
+    getDiscoverSwipeTranslateX: (owner, card, value) => owner === card ? value : 0,
     withTiming: (toValue, _config, callback) => { onAnimationEnd = callback; return toValue },
     scheduleOnRN: (fn, ...args) => fn(...args),
-    commitSwipe
+    finishExit
   })
-  forceSwipe("right")
+  forceSwipe("right", 180)
+  assert.equal(exiting.value, true)
+  assert.equal(exitX.value, 480)
+  assert.equal(x.value, 130, "the shared drag is untouched: the next card follows it until the deck hands it over")
   assert.equal(ownerId.value, "candidate")
-  assert.equal(x.value, 480)
   onAnimationEnd(false)
-  assert.deepEqual(delivered, [])
-  forceSwipe("left")
+  assert.deepEqual(ended, [])
   onAnimationEnd(true)
-  assert.deepEqual(delivered, ["pass:candidate"])
+  assert.deepEqual(ended, ["exit-end"])
 })
 
 test("unrelated card renders reuse the snapshot but a new appearance invalidates it", () => {

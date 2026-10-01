@@ -69,6 +69,32 @@ test("shared budget failure denies the authenticated request", async () => {
   } finally { await app.close() }
 })
 
+test("an authenticated request reads its bearer session once for the budget and the route", async () => {
+  const auth = createAuthService({ codeFactory: () => "123456" })
+  await auth.sendCode("+905551234558")
+  const session = await auth.verifyCode("+905551234558", "123456")
+  let sessionReads = 0
+  const readSession = auth.repository.getSessionByTokenHash.bind(auth.repository)
+  auth.repository.getSessionByTokenHash = async (...args) => {
+    sessionReads += 1
+    return readSession(...args)
+  }
+  const app = createServer({ authService: auth })
+  try {
+    const headers = { authorization: `Bearer ${session.sessionToken}` }
+    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers })).statusCode, 200)
+    // Before: the budget hook and the route each read the session (two
+    // sequential database round trips per authenticated request).
+    assert.equal(sessionReads, 1)
+    sessionReads = 0
+    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers })).statusCode, 200)
+    assert.equal(sessionReads, 1, "the reuse never outlives its request")
+    sessionReads = 0
+    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers: { authorization: "Bearer revoked" } })).statusCode, 401)
+    assert.equal(sessionReads, 1)
+  } finally { await app.close() }
+})
+
 test("cheap local limit stops excess requests before shared budget access", async () => {
   const auth = createAuthService({ codeFactory: () => "123456" })
   await auth.sendCode("+905551234557")

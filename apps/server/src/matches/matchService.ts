@@ -52,7 +52,8 @@ export interface MatchService {
     decision: DiscoveryDecision,
     filters: DiscoveryFilters,
     currentUserGender?: DiscoveryGender,
-    now?: Date
+    now?: Date,
+    guards?: DiscoveryDecisionGuards
   ): Promise<DiscoveryDecisionResult>
   getDiscoveryWatch(userId: string, now?: Date): Promise<DiscoveryWatchRecord | null>
   claimNextDiscoveryWatch(now?: Date): Promise<DiscoveryWatchClaim | null>
@@ -71,7 +72,25 @@ export interface DiscoveryDecisionResult {
   decision: DiscoveryDecisionRecord
   matched: boolean
   match: MatchRecord | null
+  /** True only for the one decision that created the match (server-side). */
+  matchCreated: boolean
   quota: DiscoveryDecisionQuota
+}
+
+export interface DiscoveryDecisionGuards {
+  /**
+   * Runs alongside the eligibility reads, before anything is written; true
+   * refuses the decision with DiscoveryDecisionBlockedError.
+   */
+  isPairBlocked?: () => Promise<boolean>
+}
+
+/** A block in either direction; answered like an unavailable profile. */
+export class DiscoveryDecisionBlockedError extends PublicRequestError {
+  constructor() {
+    super("That profile is not available anymore.")
+    this.name = "DiscoveryDecisionBlockedError"
+  }
 }
 
 export type DiscoverDecisionCapability = "mutual-like" | "view-only"
@@ -104,6 +123,11 @@ export interface CreateMatchServiceOptions {
   economyService?: EconomyService
   notificationService?: Pick<NotificationService, "sendPushToUser">
   reportSideEffectFailure?: (kind: "reward" | "notification", error: unknown) => void
+  /**
+   * Runs reward and push side effects after the decision is answered (they
+   * still run once and report failures). Without it they are awaited inline.
+   */
+  deferSideEffects?: (work: () => Promise<void>) => void
 }
 
 export function createMatchService(
@@ -209,22 +233,26 @@ export function createMatchService(
       decision,
       filters,
       currentUserGender,
-      now = new Date()
+      now = new Date(),
+      guards = {}
     ) {
       if (currentUserId === targetUserId) {
         throw new DiscoveryDecisionNotEligibleError()
       }
-      // Both are reads; running them together saves one database round trip
-      // on every like and pass. The quota write still re-checks under its lock.
-      const [target, previousDecision] = await Promise.all([
+      // All reads; running them together saves round trips on every like and
+      // pass (the caller's block check included). The quota write still
+      // re-checks under its lock.
+      const [target, previousDecision, blocked] = await Promise.all([
         repository.findEligibleDiscoverProfile(
           currentUserId,
           targetUserId,
           filters,
           currentUserGender
         ),
-        repository.findDecision(currentUserId, targetUserId)
+        repository.findDecision(currentUserId, targetUserId),
+        guards.isPairBlocked?.() ?? Promise.resolve(false)
       ])
+      if (blocked) throw new DiscoveryDecisionBlockedError()
       if (!target) {
         // The parallel read may predate a concurrent twin's commit that the
         // eligibility read already saw; re-read before refusing a retry.
@@ -268,66 +296,60 @@ export function createMatchService(
       )
         ? previousDecision?.decidedAt
         : undefined
-      const persisted = await repository.consumeDecisionQuota(
-        decisionRecord,
+      const recorded = await repository.recordDecision({
+        decision: decisionRecord,
         now,
-        reconsiderationOf
-      )
-      if (!persisted.decision) {
-        throw new DiscoveryDecisionQuotaExceededError(persisted.quota)
+        reconsiderationOf,
+        proposedMatchId: idFactory()
+      })
+      if (!recorded.decision) {
+        throw new DiscoveryDecisionQuotaExceededError(recorded.quota)
       }
-      const canonicalDecision = persisted.decision
+      const canonicalDecision = recorded.decision
+      const match = recorded.match
 
-      if (canonicalDecision.decision !== "like") {
-        return {
-          decision: canonicalDecision,
-          matched: false,
-          match: null,
-          quota: persisted.quota
-        }
-      }
-
-      const reciprocal = await repository.findDecision(targetUserId, currentUserId)
-      if (reciprocal?.decision !== "like") {
-        if (persisted.created) {
-          await runSideEffect("notification", () => notifyLike(options.notificationService, targetUserId))
+      if (!match) {
+        if (canonicalDecision.decision === "like" && recorded.created) {
+          await runSideEffects([["notification", () => notifyLike(options.notificationService, targetUserId)]])
         }
         return {
           decision: canonicalDecision,
           matched: false,
           match: null,
-          quota: persisted.quota
+          matchCreated: false,
+          quota: recorded.quota
         }
       }
 
-      const existing = await repository.findMatchBetween(currentUserId, targetUserId)
-      if (existing) {
-        await runSideEffect("reward", () => rewardMatchParticipants(options.economyService, existing, now))
-        return {
-          decision: canonicalDecision,
-          matched: true,
-          match: existing,
-          quota: persisted.quota
-        }
-      }
-
-      const match: MatchRecord = {
-        matchId: idFactory(),
-        participantUserIds: [currentUserId, targetUserId],
-        matchedAt: now.toISOString()
-      }
-      const canonicalMatch = await repository.createMatch(match)
-      await Promise.all([
-        runSideEffect("reward", () => rewardMatchParticipants(options.economyService, canonicalMatch, now)),
-        runSideEffect("notification", () => notifyMatch(options.notificationService, canonicalMatch))
-      ])
+      // Only the one decision that created the match notifies; a retry or the
+      // losing twin of a simultaneous like re-grants the idempotent reward only.
+      await runSideEffects(recorded.matchCreated
+        ? [
+            ["reward", () => rewardMatchParticipants(options.economyService, match, now)],
+            ["notification", () => notifyMatch(options.notificationService, match)]
+          ]
+        : [["reward", () => rewardMatchParticipants(options.economyService, match, now)]])
 
       return {
         decision: canonicalDecision,
         matched: true,
-        match: canonicalMatch,
-        quota: persisted.quota
+        match,
+        matchCreated: recorded.matchCreated,
+        quota: recorded.quota
       }
+  }
+
+  async function runSideEffects(
+    effects: ReadonlyArray<readonly ["reward" | "notification", () => Promise<void>]>
+  ): Promise<void> {
+    const work = async () => {
+      await Promise.all(effects.map(([kind, action]) => runSideEffect(kind, action)))
+    }
+    if (options.deferSideEffects) {
+      options.deferSideEffects(work)
+      return
+    }
+    await work()
   }
 
   async function runSideEffect(

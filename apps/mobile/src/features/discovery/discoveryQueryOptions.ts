@@ -35,8 +35,11 @@ export function shouldPrefetchDiscoveryPage(input: {
     !input.isFetchingNextPage &&
     input.hasNextPage &&
     !input.isQuotaExhausted &&
-    input.availableCandidateCount <= 3
+    input.availableCandidateCount <= DISCOVERY_PREFETCH_REMAINING_CARDS
 }
+
+/** Fetch the next page while half a page (of 12) is still in the deck. */
+export const DISCOVERY_PREFETCH_REMAINING_CARDS = 6
 
 interface DiscoveryQueryScope {
   baseHttpUrl: string

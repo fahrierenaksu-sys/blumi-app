@@ -449,13 +449,16 @@ test("concurrent reciprocal likes return the same persisted match id", async () 
     )
   ])
 
-  assert.equal(fromA.matched, true)
-  assert.equal(fromB.matched, true)
-  assert.equal(fromA.match?.matchId, fromB.match?.matchId)
-  assert.equal(
-    (await repository.findMatchBetween("user_a", "user_b"))?.matchId,
-    fromA.match?.matchId
-  )
+  // The decision and the match are one atomic write: the like that lands
+  // second completes the match (the first hears of it over realtime), and
+  // exactly one of the two creates it.
+  const persisted = await repository.findMatchBetween("user_a", "user_b")
+  assert.ok(persisted)
+  assert.ok(fromA.matched || fromB.matched)
+  for (const result of [fromA, fromB]) {
+    if (result.matched) assert.equal(result.match?.matchId, persisted.matchId)
+  }
+  assert.equal([fromA, fromB].filter((result) => result.matchCreated).length, 1)
 })
 
 test("a persisted mutual match is returned even when its reward cannot be granted", async () => {

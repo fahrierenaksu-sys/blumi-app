@@ -14,7 +14,8 @@ import type {
   DiscoveryDecisionRecord,
   MatchRecord,
   MatchRepository,
-  PersistedDiscoveryDecision
+  PersistedDiscoveryDecision,
+  RecordedDiscoveryDecision
 } from "../matches/matchRepository"
 
 interface QueryExecutor {
@@ -185,22 +186,91 @@ export function createPostgresMatchRepository(
           reconsiderationOf ? new Date(reconsiderationOf) : null
         ]
       )
+      return mapPersistedDecision(decision, result.rows[0])
+    },
+
+    async recordDecision({ decision, now, reconsiderationOf, proposedMatchId }) {
+      // Statement 1 (one round trip, one implicit transaction): spend quota and
+      // store the decision; if the reciprocal like was already committed when
+      // the statement began, create the pair's match in the same transaction.
+      // ON CONFLICT DO UPDATE returns the pair's row even when a concurrent
+      // twin inserted it, so exactly one caller sees its own proposed id.
+      const result = await pool.query(
+        `WITH consumed AS (
+           SELECT outcome, decision, decided_at, created,
+                  decision_limit, extension_decisions, used, remaining, resets_at
+             FROM blumi_consume_discovery_decision($1, $2, $3, $4, $5)
+         ), mutual AS (
+           INSERT INTO blumi_matches (
+             match_id, participant_a_user_id, participant_b_user_id, matched_at
+           )
+           SELECT $6, $1, $2, $4
+             FROM consumed
+            WHERE consumed.outcome <> 'quota_exhausted'
+              AND consumed.decision = 'like'
+              AND EXISTS (
+                SELECT 1 FROM blumi_discovery_decisions reciprocal
+                 WHERE reciprocal.from_user_id = $2
+                   AND reciprocal.to_user_id = $1
+                   AND reciprocal.decision = 'like'
+              )
+           ON CONFLICT (participant_key) DO UPDATE SET
+             matched_at = blumi_matches.matched_at
+           RETURNING match_id, participant_a_user_id, participant_b_user_id, matched_at
+         )
+         SELECT consumed.outcome, consumed.decision, consumed.decided_at, consumed.created,
+                consumed.decision_limit AS limit, consumed.extension_decisions,
+                consumed.used, consumed.remaining, consumed.resets_at,
+                mutual.match_id, mutual.participant_a_user_id,
+                mutual.participant_b_user_id, mutual.matched_at
+           FROM consumed
+           LEFT JOIN mutual ON TRUE`,
+        [
+          decision.fromUserId,
+          decision.toUserId,
+          decision.decision,
+          now,
+          reconsiderationOf ? new Date(reconsiderationOf) : null,
+          proposedMatchId
+        ]
+      )
       const row = result.rows[0]
-      if (!row) throw new Error("Discovery quota persistence did not return a result.")
-      const quota = mapDecisionQuota(row)
-      if (row.outcome === "quota_exhausted") {
-        return { decision: null, created: false, quota }
+      const persisted = mapPersistedDecision(decision, row)
+      if (row?.match_id) {
+        const match = mapMatch(row)
+        return { ...persisted, match, matchCreated: match.matchId === proposedMatchId }
       }
-      return {
-        decision: {
-          fromUserId: decision.fromUserId,
-          toUserId: decision.toUserId,
-          decision: row.decision === "pass" ? "pass" : "like",
-          decidedAt: new Date(row.decided_at as string | number | Date).toISOString()
-        },
-        created: row.created === true,
-        quota
-      } satisfies PersistedDiscoveryDecision
+      if (persisted.decision?.decision !== "like") {
+        return { ...persisted, match: null, matchCreated: false } satisfies RecordedDiscoveryDecision
+      }
+      // Statement 2, after statement 1 committed: under READ COMMITTED a
+      // statement only sees likes committed before it began, so two reciprocal
+      // likes racing through statement 1 can both miss each other. Re-checking
+      // in a new statement closes that gap: of two racing likes, the later
+      // commit always sees the earlier one here. (A single statement cannot do
+      // this, and an explicit transaction with a pair lock costs more trips.)
+      const recheck = await pool.query(
+        `INSERT INTO blumi_matches (
+           match_id, participant_a_user_id, participant_b_user_id, matched_at
+         )
+         SELECT $3, $1, $2, $4
+          WHERE EXISTS (
+                  SELECT 1 FROM blumi_discovery_decisions
+                   WHERE from_user_id = $1 AND to_user_id = $2 AND decision = 'like'
+                )
+            AND EXISTS (
+                  SELECT 1 FROM blumi_discovery_decisions
+                   WHERE from_user_id = $2 AND to_user_id = $1 AND decision = 'like'
+                )
+         ON CONFLICT (participant_key) DO UPDATE SET
+           matched_at = blumi_matches.matched_at
+         RETURNING match_id, participant_a_user_id, participant_b_user_id, matched_at`,
+        [decision.fromUserId, decision.toUserId, proposedMatchId, now]
+      )
+      const matchRow = recheck.rows[0]
+      if (!matchRow) return { ...persisted, match: null, matchCreated: false }
+      const match = mapMatch(matchRow)
+      return { ...persisted, match, matchCreated: match.matchId === proposedMatchId }
     },
 
     async getDecisionQuota(userId, now) {
@@ -432,6 +502,27 @@ export function normalizeFilters(filters: DiscoveryFilters): DiscoveryFilters {
     ageMax: filters.ageMax,
     genders: [...filters.genders],
     vibes: filters.vibes.map((vibe) => vibe.trim().toLowerCase())
+  }
+}
+
+function mapPersistedDecision(
+  decision: DiscoveryDecisionRecord,
+  row: QueryResultRow | undefined
+): PersistedDiscoveryDecision {
+  if (!row) throw new Error("Discovery quota persistence did not return a result.")
+  const quota = mapDecisionQuota(row)
+  if (row.outcome === "quota_exhausted") {
+    return { decision: null, created: false, quota }
+  }
+  return {
+    decision: {
+      fromUserId: decision.fromUserId,
+      toUserId: decision.toUserId,
+      decision: row.decision === "pass" ? "pass" : "like",
+      decidedAt: new Date(row.decided_at as string | number | Date).toISOString()
+    },
+    created: row.created === true,
+    quota
   }
 }
 

@@ -33,6 +33,7 @@ import {
   type RevenueCatPurchaseVerifier
 } from "./commerce/revenueCatPurchaseVerifier"
 import { createMatchService, type MatchService } from "./matches/matchService"
+import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { createDiscoverySnapshotService, createInMemoryDiscoverySnapshots, type DiscoverySnapshotService } from "./matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./db/postgresDiscoverySnapshots"
 import { createPostgresAuthRepository } from "./db/postgresAuthRepository"
@@ -168,6 +169,8 @@ export interface ConfiguredServerServices {
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
   /** Bounded deletes of finished work and audit rows past their window (db/postgresRetention.ts). */
   retentionService: { purgeExpired(): Promise<unknown> }
+  /** Match side effects run after the decision is answered; drained on close. */
+  afterResponseTasks: AfterResponseTasks
   authService: AuthService
   chatService: ChatService
   economyService: EconomyService
@@ -467,6 +470,8 @@ export function parseAdminSigningKeys(value: string | undefined): readonly Admin
 export function createConfiguredServerServices(
   config = resolveServerConfig()
 ): ConfiguredServerServices {
+  const afterResponseTasks = createAfterResponseTasks()
+  const deferSideEffects = (work: () => Promise<void>) => afterResponseTasks.run("match-side-effects", work)
   const smsProvider = createConfiguredSmsProvider(config)
   const codeFactory = createConfiguredCodeFactory(config)
   const pushProvider = createConfiguredPushProvider(config)
@@ -535,7 +540,8 @@ export function createConfiguredServerServices(
     const matchService = createMatchService({
       repository: createPostgresMatchRepository(pool),
       economyService,
-      notificationService
+      notificationService,
+      deferSideEffects
     })
     const referralService = createReferralService({
       repository: createPostgresReferralRepository(pool)
@@ -556,6 +562,7 @@ export function createConfiguredServerServices(
       economyService
     })
     return {
+      afterResponseTasks,
       capabilityService,
       chatReceiptSchema,
       authService,
@@ -664,7 +671,7 @@ export function createConfiguredServerServices(
     authService,
     economyService
   })
-  const matchService = createMatchService({ economyService, notificationService })
+  const matchService = createMatchService({ economyService, notificationService, deferSideEffects })
   const referralService = createReferralService()
   const roomService = createRoomService()
   const presenceService = createPresenceService({
@@ -683,6 +690,7 @@ export function createConfiguredServerServices(
   // In-memory storage has no migrations: receipts depend on the manifest only.
   const chatReceiptSchema = createStaticChatReceiptSchema(true)
   return {
+    afterResponseTasks,
     capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
     chatReceiptSchema,
     authService,

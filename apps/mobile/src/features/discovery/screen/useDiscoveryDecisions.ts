@@ -9,6 +9,7 @@ import type { RootStackParamList } from "../../../navigation/RootNavigator"
 import { skipDiscoveryCandidate } from "../../connections/savedConnectionsStore"
 import { useInventoryStore } from "../../inventory/inventoryStore"
 import { reportDiscoveryMatchCreated } from "../../matches/discoveryMatchCreatedRuntime"
+import { discoveryMatchDelivery } from "../../matches/discoveryMatchDelivery"
 import { claimForegroundAlert } from "../../notifications/foregroundNotificationState"
 import type { LobbyFeedbackCopy } from "../../lobby/lobbyFeedbackCopy"
 import type { PendingInviteMemory } from "../../lobby/pendingInvitesStore"
@@ -32,14 +33,21 @@ import {
   isLiveInviteAvailable,
   type DiscoveryCandidate
 } from "../discoveryCandidateModel"
+import {
+  DISCOVERY_DECISION_RETRY_DELAYS_MS,
+  runDiscoveryDecisionWithRetry
+} from "../discoveryDecisionRetry"
 import { getDiscoveryErrorMessageForDisplay } from "../discoveryErrorCopy"
 import { scheduleMatchResultNavigation } from "../matchResultNavigation"
 import type { ShowDiscoverFeedback } from "./DiscoveryFeedbackPill"
 import type { SetSeenCandidateIds } from "./useDiscoveryDeck"
 
 // Card and ProfilePreview decisions. Production decisions advance the deck
-// optimistically, call the Discover API, and open MatchResult on a mutual
-// like; outside production they fall back to legacy lobby room invites.
+// optimistically (the card already left on release), send the decision in
+// the background with retry, and open MatchResult on a mutual like; a
+// definitive failure brings the card back with an error (DSC-03). The deck
+// plays the commit haptic at release (DSC-10). Outside production they fall
+// back to legacy lobby room invites.
 export function useDiscoveryDecisions(input: {
   sessionActor: SessionActor
   isProductionDiscovery: boolean
@@ -152,12 +160,19 @@ export function useDiscoveryDecisions(input: {
       inFlightDecisionUserIdsRef.current = started.nextUserIds
       setInFlightDecisionUserIds(started.nextUserIds)
       markCandidateSeen(candidate.userId)
+      // A realtime match for this partner waits for this answer (one moment).
+      const tracksMatch = decision === "like"
+      if (tracksMatch) discoveryMatchDelivery.beginLike(myUserId, candidate.userId)
+      let settledMatchId: string | null = null
       try {
-        const result = await decideDiscoverProfile(
-          MOBILE_HTTP_BASE_URL,
-          sessionActor.session.sessionToken,
-          candidate.userId,
-          decision
+        const result = await runDiscoveryDecisionWithRetry(
+          () => decideDiscoverProfile(
+            MOBILE_HTTP_BASE_URL,
+            sessionActor.session.sessionToken,
+            candidate.userId,
+            decision
+          ),
+          { delaysMs: DISCOVERY_DECISION_RETRY_DELAYS_MS }
         )
         updateProductionQuota(result.quota)
         captureProductEvent("discovery_decision", {
@@ -191,6 +206,7 @@ export function useDiscoveryDecisions(input: {
         })
 
         if (match) {
+          settledMatchId = match.id
           // This phone shows the match itself; its own match push stays quiet.
           claimForegroundAlert(`match:${match.id}`)
           // Reported here, from the server response, and never from the
@@ -233,6 +249,13 @@ export function useDiscoveryDecisions(input: {
         restoreCandidateAfterDecisionFailure(candidate.userId, decision)
         return false
       } finally {
+        if (tracksMatch) {
+          discoveryMatchDelivery.settleLike(
+            myUserId,
+            candidate.userId,
+            settledMatchId ? { matchId: settledMatchId } : null
+          )
+        }
         const finishedUserIds = finishInFlightDiscoveryDecision(
           inFlightDecisionUserIdsRef.current,
           candidate.userId
@@ -264,8 +287,7 @@ export function useDiscoveryDecisions(input: {
       (!isProductionDiscovery && !isLiveInviteAvailable(featuredCandidate))
     ) return
     if (isProductionDiscovery) {
-      // A repeat while the decision is in flight is dropped, so it stays silent.
-      if (!inFlightDecisionUserIdsRef.current.has(featuredCandidate.userId)) hapticLight()
+      // The deck already played the commit haptic at release (DSC-10).
       void decideProductionCandidate(featuredCandidate, "like")
       return
     }
@@ -309,11 +331,12 @@ export function useDiscoveryDecisions(input: {
   const handleSkipFeatured = useCallback(() => {
     if (!featuredCandidate) return
     if (inFlightDecisionUserIdsRef.current.has(featuredCandidate.userId)) return
-    hapticLight()
     if (isProductionDiscovery) {
+      // The deck already played the commit haptic at release (DSC-10).
       void decideProductionCandidate(featuredCandidate, "pass")
       return
     }
+    hapticLight()
     showDiscoverFeedback(lobbyCopy.skipped, "soft")
     markCandidateSeen(featuredCandidate.userId)
     void skipDiscoveryCandidate({

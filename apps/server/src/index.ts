@@ -107,6 +107,7 @@ const app = createServer({
   legalPagesEnabled: process.env.BLUMI_LEGAL_PAGES_ENABLED === "1",
   discoverySnapshots: services.discoverySnapshots,
   sharedRateLimiter: services.sharedRateLimiter,
+  afterResponseTasks: services.afterResponseTasks,
   isAccepting: () => accepting,
   checkReadiness: async () => {
     await services.checkReadiness()
