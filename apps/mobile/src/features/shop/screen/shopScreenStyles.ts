@@ -254,13 +254,20 @@ export const shopScreenStyles = StyleSheet.create({
     minHeight: 122,
     padding: 5,
   },
+  // The rose border is drawn by productSelectionRing so it can fade (SHOP-3).
   productCardSelected: {
-    borderColor: uiTheme.colors.primary,
     backgroundColor: "rgba(255, 242, 249, 0.94)",
   },
-  productCardPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.97 }],
+  productSelectionRing: {
+    position: "absolute",
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: uiTheme.colors.primary,
   },
   productThumb: {
     position: "relative",

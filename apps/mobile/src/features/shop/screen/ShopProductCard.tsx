@@ -3,7 +3,6 @@ import { Image as ExpoImage } from "expo-image"
 import { memo, useCallback } from "react"
 import {
   type ImageSourcePropType,
-  Pressable,
   StyleSheet,
   Text,
   View
@@ -11,6 +10,7 @@ import {
 import { getMaleRigLayerThumbnailPresentation } from "../../avatarV2/maleRigThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../../avatarV2/qa/avatarQaInventory"
 import type { AppLocale } from "../../session/appLocale"
+import { PressableScale } from "../../../ui/PressableScale"
 import { uiTheme } from "../../../ui/theme"
 import {
   getAvatarItemPreviewSource,
@@ -24,6 +24,7 @@ import { getShopCopy } from "../shopCopy"
 import { formatCoins } from "../shopFormatters"
 import { getShopProductPresentation } from "../shopProductPresentation"
 import { getShopThumbnailLayout } from "../shopThumbnailLayout"
+import { ShopCardSelectionRing, ShopCardViewingBadge } from "./ShopCardSelection"
 import { getAvatarIcon } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 
@@ -74,7 +75,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
         : selectedCompact && product.previewType === "room" && product.owned
           ? copy.readyToPlace
           : selectedCompact && product.owned && product.previewType === "avatar"
-            ? locale === "tr" ? "Sende" : copy.owned
+            ? copy.ownedCompact
             : presentation.stateLabel)
   const avatarPreviewSource = product.avatarItem
     ? getShopProductThumbnailSource(product.sourceItemId)
@@ -93,18 +94,18 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     onSelectProduct(product)
   }, [onSelectProduct, product])
   return (
-    <Pressable
+    <PressableScale
       testID={`shop-item-${automationSlug}`}
       accessibilityRole="button"
       accessibilityLabel={`${product.title}, ${visibleMetaLabel}`}
       accessibilityState={{ selected }}
       onPress={handlePress}
-      style={({ pressed }) => [
+      pressedScale={0.97}
+      style={[
         styles.productCard,
         selectedCompact ? styles.productCardCompact : null,
         compactCardSizeStyle,
-        selected ? styles.productCardSelected : null,
-        pressed ? styles.productCardPressed : null
+        selected ? styles.productCardSelected : null
       ]}
     >
       <View style={[styles.productThumb, { height: thumbHeight }]}>
@@ -126,15 +127,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
             style={styles.productImage}
           />
         ) : null}
-        {selected ? (
-          <View style={[styles.productDropBadge, selected ? styles.productViewingBadge : null]}>
-            <Ionicons
-              name={selected ? "eye" : "sparkles"}
-              size={10}
-              color={selected ? "#FFFFFF" : uiTheme.colors.primary}
-            />
-          </View>
-        ) : null}
+        <ShopCardViewingBadge visible={selected} />
       </View>
       <Text style={styles.productTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.88}>
         {product.title}
@@ -155,7 +148,8 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
           {visibleMetaLabel}
         </Text>
       </View>
-    </Pressable>
+      <ShopCardSelectionRing selected={selected} />
+    </PressableScale>
   )
 })
 

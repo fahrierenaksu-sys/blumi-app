@@ -196,6 +196,9 @@ export type RootStackParamList = {
   You: undefined
   CosmeticShop: {
     initialShopMode?: "avatar" | "home"
+    /** Canonical item id to focus (wardrobe "See in Shop"); a new request id refocuses. */
+    focusProductId?: string
+    focusRequestId?: number
   } | undefined
   ProfileEdit: undefined
   WardrobeV2: undefined

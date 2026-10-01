@@ -66,7 +66,8 @@ export interface ShopCombinationState {
 }
 
 export type ShopCombinationCommand =
-  | ({ type: "request_purchase_confirmation" } & ShopCombinationQueueItem)
+  /** One checkout for every item the look still needs (SHOP-1). */
+  | { type: "request_checkout_confirmation"; items: readonly ShopCombinationQueueItem[] }
   | ({ type: "purchase_product" } & ShopCombinationQueueItem)
   | {
     type: "save_avatar"
@@ -92,7 +93,8 @@ export type ShopCombinationAction =
   | { type: "discard_draft" }
   | { type: "change_category"; slot: ShopCombinationSlot }
   | { type: "apply" }
-  | { type: "purchase_approved"; productId: string }
+  /** The user approved the checkout that listed exactly `productIds`. */
+  | { type: "checkout_approved"; productIds: readonly string[] }
   | { type: "purchase_succeeded"; productId: string }
   | { type: "purchase_failed"; productId: string; reason: string }
   | { type: "cancel_apply" }
@@ -201,14 +203,17 @@ export function reduceShopCombination(
         requiresRefresh: false,
         issue: null
       },
-      [{ type: "request_purchase_confirmation", ...purchaseQueue[0] }]
+      [{ type: "request_checkout_confirmation", items: purchaseQueue }]
     )
   }
 
-  if (action.type === "purchase_approved") {
+  if (action.type === "checkout_approved") {
     if (state.phase !== "confirming") return unchanged(state)
     const current = state.purchaseQueue[0]
-    if (!current || current.productId !== action.productId) return unchanged(state)
+    // A stale sheet must not approve a different list than the one queued.
+    if (!current || !sameProductIds(state.purchaseQueue, action.productIds)) {
+      return unchanged(state)
+    }
     return transition(
       { ...state, phase: "purchasing" },
       [{ type: "purchase_product", ...current }]
@@ -231,9 +236,10 @@ export function reduceShopCombination(
       purchasedProductIds
     }
     if (purchaseQueue.length === 0) return beginSave(purchasedState, purchasedProductIds)
+    // The checkout already approved the whole list: continue without asking.
     return transition(
-      { ...purchasedState, phase: "confirming" },
-      [{ type: "request_purchase_confirmation", ...purchaseQueue[0] }]
+      { ...purchasedState, phase: "purchasing" },
+      [{ type: "purchase_product", ...purchaseQueue[0] }]
     )
   }
 
@@ -382,6 +388,14 @@ function transition(
 
 function unchanged(state: ShopCombinationState): ShopCombinationTransition {
   return transition(state)
+}
+
+function sameProductIds(
+  queue: readonly ShopCombinationQueueItem[],
+  productIds: readonly string[]
+): boolean {
+  return queue.length === productIds.length &&
+    queue.every((item, index) => item.productId === productIds[index])
 }
 
 function unique(values: readonly string[]): string[] {

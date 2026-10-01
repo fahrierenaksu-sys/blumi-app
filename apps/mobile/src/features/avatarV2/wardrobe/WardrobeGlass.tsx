@@ -1,19 +1,16 @@
 import type { ReactNode } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { useReduceTransparency } from "../../../ui/reduceTransparency"
-import { getOptionalBlurView } from "./optionalBlurView"
 import { wardrobeTheme } from "./wardrobeV2Styles"
 
 type WardrobeGlassTone = "panel" | "control"
 
-// Resolved once at load: null when this binary lacks the native blur module.
-const OptionalBlurView = getOptionalBlurView()
-
 /**
- * A light glass surface: thin bright edge, soft shadow, faint sheen and, where
- * the native blur exists, a gentle backdrop blur. Content stays on top of a
- * near-opaque tint so text and products remain sharp. Reduce Transparency or a
- * missing blur module gives the same shape as a solid surface.
+ * A light glass surface: thin bright edge, soft shadow and faint sheen over an
+ * opaque tint, so text and products stay sharp. Reduce Transparency drops the
+ * gradient and sheen. WRD-4: there is no backdrop blur: the opaque tint always
+ * covered it (it was paid for and never visible), and the binary-missing guard
+ * could not detect a missing native module anyway.
  */
 export function WardrobeGlass(props: {
   tone: WardrobeGlassTone
@@ -45,9 +42,6 @@ export function WardrobeGlass(props: {
       ]}
     >
       <View style={[styles.clip, { borderRadius: radius }]}>
-        {!reduceTransparency && OptionalBlurView && isPanel ? (
-          <OptionalBlurView intensity={26} tint="light" style={StyleSheet.absoluteFill} />
-        ) : null}
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, tint]} />
         {reduceTransparency ? null : (
           <View pointerEvents="none" style={[styles.sheen, { height: isPanel ? 64 : 20 }]} />

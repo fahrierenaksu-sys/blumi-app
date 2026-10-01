@@ -56,7 +56,9 @@ const sourceFiles = [
   "src/features/shop/shopAvatarCategoryModel.ts",
   "src/features/shop/shopAvatarCategoryModel.test.ts",
   "src/features/shop/shopSelectionModel.ts",
-  "src/features/shop/shopSelectionModel.test.ts"
+  "src/features/shop/shopSelectionModel.test.ts",
+  "src/features/shop/shopCheckoutModel.ts",
+  "src/features/shop/shopCheckoutModel.test.ts"
 ]
 
 const buildDomainWorkspace = () => {
@@ -133,6 +135,9 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/maleHairV2SurfaceIntegration.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/myRoomAvatarSource.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/retiredWardrobe.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeCatalogTransitionModel.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeIndicatorModel.test.ts"),
+      resolve(workspaceRoot, "src/features/shop/shopListingModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
       resolve(workspaceRoot, "scripts/room-avatar-renderer-subscription.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-avatar-runtime-performance.test.mjs"),
@@ -181,7 +186,8 @@ try {
       join(outputDirectory, "features/shop/shopPurchaseCoordinator.test.js"),
       join(outputDirectory, "features/shop/shopPreviewPanel.test.js"),
       join(outputDirectory, "features/shop/shopAvatarCategoryModel.test.js"),
-      join(outputDirectory, "features/shop/shopSelectionModel.test.js")
+      join(outputDirectory, "features/shop/shopSelectionModel.test.js"),
+      join(outputDirectory, "features/shop/shopCheckoutModel.test.js")
     ],
     {
       cwd: workspaceRoot,

@@ -9,7 +9,9 @@ import {
   Text,
   View
 } from "react-native"
+import Reanimated from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { useReducedMotion } from "../ui/animations"
 import { IS_BLUMI_PAID_COINS_ENABLED } from "../config/env"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { CoinPackWalletPanel } from "../features/commerce/CoinPackWalletPanel"
@@ -42,7 +44,9 @@ import {
   isShopMultiItemApplyEnabled
 } from "../features/shop/shopCapabilityPolicy"
 import { ClosetBrowser } from "../features/shop/screen/ClosetBrowser"
+import { ShopCheckoutSheet } from "../features/shop/screen/ShopCheckoutSheet"
 import { ShopCoinBalance } from "../features/shop/screen/ShopCoinBalance"
+import { ShopShelfSkeleton, useShopContentEntrance } from "../features/shop/screen/ShopShelfSkeleton"
 import {
   getDefaultShopCategoryId,
   getShopSurfacePolicy
@@ -52,10 +56,11 @@ import { useShopCatalogProducts } from "../features/shop/screen/useShopCatalogPr
 import { useShopCombinationSession } from "../features/shop/screen/useShopCombinationSession"
 import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel"
 import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewSelection"
+import { useShopProductFocus } from "../features/shop/screen/useShopProductFocus"
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
 import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle } from "../ui/primitives"
@@ -88,6 +93,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const copy = getShopCopy(locale)
   const coinPackCopy = getCoinPackCopy(locale)
   const viewportMetrics = useAppViewportMetrics({ bottomNavVisible: true })
+  const reduceMotion = useReducedMotion()
   const { isConnected } = useNetworkStatus()
   const avatarV2 = useAvatarV2()
   const shopCatalogRuntime = resolveShopCatalogRuntime({
@@ -219,6 +225,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   } = shopSurfacePolicy
   const shopStatusState: Exclude<ShopPresentationState, "ready"> =
     shopPresentationState === "ready" ? "loading" : shopPresentationState
+  // SHOP-5: the first load draws the shelf's shape, then crossfades into it.
+  const showSkeleton = !showShopContent && shopStatusState === "loading"
+  const contentEntering = useShopContentEntrance({ showSkeleton, reduceMotion })
   const isActionAvailable = !requiresServerInventory || isConnected
   const inventoryGateLabel = shopPresentationState === "error"
     ? copy.error.title
@@ -265,8 +274,17 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     setSelectedId
   })
 
+  const shelfRevealRequest = useShopProductFocus({
+    focusProductId: props.route.params?.focusProductId,
+    focusRequestId: props.route.params?.focusRequestId,
+    avatarProducts,
+    setShopMode,
+    setSelectedCategoryId,
+    selectProduct: handleSelectProduct
+  })
+
   const handleSelectMode = useCallback((nextMode: ShopMode): void => {
-    hapticLight()
+    hapticSelection()
     publishSelectedShopPreviewWarmup([])
     setShopMode(nextMode)
     setSelectedCategoryId(getDefaultShopCategoryId(nextMode))
@@ -274,7 +292,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   }, [])
 
   const handleSelectCategory = useCallback((categoryId: string): void => {
-    hapticLight()
+    hapticSelection()
     setSelectedCategoryId(categoryId)
   }, [])
 
@@ -284,14 +302,20 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     void inventoryStore.hydrateFromServer(sessionActor.session.sessionToken)
   }, [inventoryStore, requiresServerInventory, sessionActor.session])
 
-  const { isPurchasing, handlePrimaryAction } = useShopPurchaseActions({
+  const {
+    isPurchasing,
+    handlePrimaryAction,
+    checkout,
+    confirmCheckout,
+    closeCheckout,
+    retryCheckout
+  } = useShopPurchaseActions({
     navigation,
     sessionActor,
     inventoryStore,
     avatarV2,
     avatarProducts,
     copy,
-    locale,
     combinationStateRef,
     setCombinationState,
     dispatchCombination,
@@ -395,7 +419,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
           ) : null}
 
           {showShopContent ? (
-            <>
+            <Reanimated.View entering={contentEntering} style={{ gap: shopLayoutMetrics.sectionGap }}>
               <Animated.View
                 testID="shop-preview-motion"
                 style={[
@@ -471,8 +495,11 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 layoutMetrics={shopLayoutMetrics}
                 onSelectCategory={handleSelectCategory}
                 onSelectProduct={handleSelectProduct}
+                revealRequest={shelfRevealRequest}
               />
-            </>
+            </Reanimated.View>
+          ) : showSkeleton ? (
+            <ShopShelfSkeleton layoutMetrics={shopLayoutMetrics} locale={locale} />
           ) : (
             <ShopStatusCard
               state={shopStatusState}
@@ -483,6 +510,17 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
           )}
         </ScrollView>
       </SafeAreaView>
+      <ShopCheckoutSheet
+        checkout={checkout}
+        balance={inventoryVerified ? inventoryStore.inventory.coins : null}
+        canPerformActions={canPerformShopActions}
+        locale={locale}
+        onConfirm={() => {
+          void confirmCheckout()
+        }}
+        onClose={closeCheckout}
+        onRetry={retryCheckout}
+      />
     </View>
   )
 }

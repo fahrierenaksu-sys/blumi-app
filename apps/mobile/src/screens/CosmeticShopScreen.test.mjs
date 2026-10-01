@@ -76,7 +76,7 @@ test("card passes its inner content dimensions to the thumbnail including paddin
       getShopCopy: () => ({}), getShopProductPresentation: () => ({}),
       getShopProductThumbnailSource: () => 1, RIG_LAYER_THUMBNAIL_ITEM_IDS: new Set(),
       getAvatarAutomationSlug: (id) => id, styles: {},
-      Pressable: "Pressable", View: "View", Text: "Text", AvatarProductThumbnail: "AvatarProductThumbnail"
+      PressableScale: "PressableScale", ShopCardSelectionRing: "Ring", ShopCardViewingBadge: "Badge", View: "View", Text: "Text", AvatarProductThumbnail: "AvatarProductThumbnail"
     })
     const thumbnail = tree.props.children[0].props.children[0]
     assert.equal(thumbnail.props.width, cardWidth - cardPadding * 2 - 2)
@@ -104,12 +104,28 @@ test("selecting a Shop card hands the product to the live preview without specul
       getAvatarAutomationSlug: (id) => id, styles: {},
       Ionicons: "Ionicons", uiTheme: { colors: { primary: "pink" } },
       ExpoImage: { prefetch: () => { speculativeRequests += 1 } },
-      Pressable: "Pressable", View: "View", Text: "Text", AvatarProductThumbnail: "AvatarProductThumbnail"
+      PressableScale: "PressableScale", ShopCardSelectionRing: "Ring", ShopCardViewingBadge: "Badge", View: "View", Text: "Text", AvatarProductThumbnail: "AvatarProductThumbnail"
     })
     tree.props.onPress()
   }
   assert.deepEqual(selected, [product, product])
   assert.equal(speculativeRequests, 0)
+})
+
+test("Shop cards press and select with UI-thread motion and a Reduce Motion path (SHOP-3)", () => {
+  const card = cardFile.getText()
+  const selection = readScreenModule("ShopCardSelection.tsx")
+  const pressable = readFileSync(new URL("../ui/PressableScale.tsx", import.meta.url), "utf8")
+  assert.match(card, /<PressableScale[\s\S]*?onPress=\{handlePress\}/)
+  assert.match(card, /<ShopCardViewingBadge visible=\{selected\} \/>/)
+  assert.match(card, /<ShopCardSelectionRing selected=\{selected\} \/>/)
+  assert.doesNotMatch(card, /\(\{ pressed \}\)/, "no JS-driven pressed style")
+  assert.match(selection, /withTiming\(target, \{ duration: uiTheme\.animation\.durationFast \}\)/)
+  assert.match(selection, /withSpring\(target, uiTheme\.animation\.springSnappy\)/)
+  assert.match(selection, /reduceMotion\s*\?\s*target/)
+  assert.match(pressable, /useReducedMotion\(\)/)
+  assert.match(pressable, /withSpring\(1, uiTheme\.animation\.springSnappy\)/)
+  assert.doesNotMatch(pressable, /Animated\.spring|requestAnimationFrame/)
 })
 
 test("selected Shop previews request only added avatar layers or the furniture render source", () => {
@@ -279,7 +295,7 @@ test("unverified catalog cards show neutral pending status, not ownership or pri
     getShopProductPresentation: () => ({ stateLabel: "Owned" }),
     getAvatarAutomationSlug: () => "top",
     styles: { productCard: "card", productCardCompact: "compact", productMetaPill: "meta", productMetaPillOwned: { ownership: "owned" } },
-    Pressable: "Pressable", View: "View", Text: "Text", Ionicons: "Icon"
+    PressableScale: "PressableScale", ShopCardSelectionRing: "Ring", ShopCardViewingBadge: "Badge", View: "View", Text: "Text", Ionicons: "Icon"
   })
 
   assert.equal(tree.props.accessibilityLabel, "Top, Mağazan hazırlanıyor")
@@ -296,6 +312,18 @@ test("re-tapping the Shop tab scrolls to the top, without motion under Reduce Mo
   assert.match(scrollHook, /scrollTo\(\{ y: 0, animated: !reduceMotion \}\)/)
   assert.match(source, /const shopScrollRef = useShopScrollToTop\(\)/)
   assert.match(source, /<ScrollView\s+ref=\{shopScrollRef\}/)
+  // The outer page rarely scrolls; the product shelf also returns to page 1.
+  const closet = readScreenModule("ClosetBrowser.tsx")
+  assert.match(closet, /useMainTabReselect\("shop", scrollShelfToStart\)/)
+  assert.match(closet, /scrollShelfToPage\(0, !reduceMotion\)/)
+})
+
+test("the shelf counter follows the live scroll offset on the UI thread", () => {
+  const closet = readScreenModule("ClosetBrowser.tsx")
+  assert.match(closet, /useAnimatedReaction\(\s*\(\) => getShopShelfPageIndex\(shelfScrollOffset\.value, productShelfWidth, pageCount\)/)
+  assert.match(closet, /if \(index !== previous\) scheduleOnRN\(setPageIndex, index\)/)
+  assert.doesNotMatch(closet, /onMomentumScrollEnd/)
+  assert.doesNotMatch(cardFile.getText(), /"Sende"/, "compact owned label comes from shopCopy")
 })
 
 test("the coin balance counts on the UI thread and announces only the confirmed value", () => {

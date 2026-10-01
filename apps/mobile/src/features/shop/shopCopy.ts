@@ -39,6 +39,8 @@ export interface ShopCopy {
   roomCatalogHint: string
   previousPage: string
   nextPage: string
+  shelfPage: (page: number, total: number) => string
+  ownedCompact: string
   itemCount: (count: number) => string
   categories: Record<string, string>
   readyToPlace: string
@@ -69,11 +71,38 @@ export interface ShopCopy {
     appliedTitle: string
     appliedBody: string
     alreadyApplied: string
-    purchaseTitle: string
     cancel: string
-    buy: string
-    purchaseSummary: (title: string, price: string, remaining: string) => string
     purchaseFailure: (reason: string | undefined) => string
+  }
+  checkout: {
+    title: string
+    itemCount: (count: number) => string
+    total: string
+    balance: string
+    balanceAfter: string
+    shortfall: (coins: string) => string
+    priceUnknown: string
+    confirm: (total: string) => string
+    confirmAccessibility: (total: string) => string
+    buying: string
+    applying: string
+    applied: string
+    partial: (purchased: number, total: number) => string
+    noneCharged: string
+    applyFailed: string
+    cancel: string
+    close: string
+    done: string
+    retry: string
+    closeAccessibility: string
+    lineStatus: {
+      pending: string
+      purchasing: string
+      purchased: string
+      notCharged: string
+    }
+    lineAccessibility: (title: string, price: string, status: string) => string
+    unknownItem: string
   }
 }
 
@@ -120,6 +149,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     avatarCatalogHint: "Swipe to explore styles",
     previousPage: "Previous items",
     nextPage: "Next items",
+    shelfPage: (page, total) => `Page ${page} of ${total}`,
+    ownedCompact: "Owned",
     roomCatalogHint: "Tap a piece to preview it in your room.",
     itemCount: (count) => `${count} items`,
     categories: {
@@ -149,10 +180,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
       appliedTitle: "Your look is applied",
       appliedBody: "Your avatar is updated across Blumi.",
       alreadyApplied: "This look is already on",
-      purchaseTitle: "Buy this item",
       cancel: "Cancel",
-      buy: "Buy",
-      purchaseSummary: (title, price, remaining) => `${title}\n${price} coins · ${remaining} coins remaining`,
       purchaseFailure: (reason) => reason === "not_enough_coins"
         ? "Not enough coins"
         : reason === "invalid_item"
@@ -160,6 +188,36 @@ const COPY: Record<AppLocale, ShopCopy> = {
           : reason === "invalid_price"
             ? "This item price needs a refresh"
             : "The purchase could not be completed"
+    },
+    checkout: {
+      title: "Buy the look",
+      itemCount: (count) => (count === 1 ? "1 piece" : `${count} pieces`),
+      total: "Total",
+      balance: "Your coins",
+      balanceAfter: "After purchase",
+      shortfall: (coins) => `You need ${coins} more coins`,
+      priceUnknown: "A price needs a refresh. Try again in a moment.",
+      confirm: (total) => `Buy · ${total}`,
+      confirmAccessibility: (total) => `Buy the look for ${total} coins`,
+      buying: "Buying…",
+      applying: "Putting on your look…",
+      applied: "Your look is applied",
+      partial: (purchased, total) => `${purchased} of ${total} pieces are yours. Nothing else was charged.`,
+      noneCharged: "Nothing was charged.",
+      applyFailed: "Your new pieces are yours, but the look could not be put on yet. Try again.",
+      cancel: "Cancel",
+      close: "Close",
+      done: "Done",
+      retry: "Try again",
+      closeAccessibility: "Close checkout",
+      lineStatus: {
+        pending: "Ready to buy",
+        purchasing: "Buying",
+        purchased: "Yours",
+        notCharged: "Not charged"
+      },
+      lineAccessibility: (title, price, status) => `${title}, ${price} coins, ${status}`,
+      unknownItem: "Unavailable piece"
     }
   },
   tr: {
@@ -204,6 +262,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     avatarCatalogHint: "Kaydır, tarzını keşfet",
     previousPage: "Önceki ürünler",
     nextPage: "Sonraki ürünler",
+    shelfPage: (page, total) => `Sayfa ${page} / ${total}`,
+    ownedCompact: "Sende",
     roomCatalogHint: "Odanda önizlemek için bir parçaya dokun.",
     itemCount: (count) => `${count} öğe`,
     categories: {
@@ -233,10 +293,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
       appliedTitle: "Kombinin uygulandı",
       appliedBody: "Avatarın Blumi genelinde güncellendi.",
       alreadyApplied: "Kombin zaten üzerinde",
-      purchaseTitle: "Ürünü satın al",
       cancel: "Vazgeç",
-      buy: "Satın al",
-      purchaseSummary: (title, price, remaining) => `${title}\n${price} jeton · Kalan ${remaining} jeton`,
       purchaseFailure: (reason) => reason === "not_enough_coins"
         ? "Yeterli jetonun yok"
         : reason === "invalid_item"
@@ -244,6 +301,36 @@ const COPY: Record<AppLocale, ShopCopy> = {
           : reason === "invalid_price"
             ? "Ürün fiyatı yenilenmeli"
             : "Satın alma tamamlanamadı"
+    },
+    checkout: {
+      title: "Kombini al",
+      itemCount: (count) => `${count} parça`,
+      total: "Toplam",
+      balance: "Jetonun",
+      balanceAfter: "Satın alma sonrası",
+      shortfall: (coins) => `${coins} jeton daha gerekiyor`,
+      priceUnknown: "Bir fiyatın yenilenmesi gerekiyor. Birazdan tekrar dene.",
+      confirm: (total) => `Satın al · ${total}`,
+      confirmAccessibility: (total) => `Kombini ${total} jetona satın al`,
+      buying: "Satın alınıyor…",
+      applying: "Kombinin giydiriliyor…",
+      applied: "Kombinin uygulandı",
+      partial: (purchased, total) => `${total} parçadan ${purchased} tanesi artık senin. Diğerleri için ücret alınmadı.`,
+      noneCharged: "Hiç ücret alınmadı.",
+      applyFailed: "Yeni parçaların artık senin ama kombin henüz giydirilemedi. Tekrar dene.",
+      cancel: "Vazgeç",
+      close: "Kapat",
+      done: "Tamam",
+      retry: "Tekrar dene",
+      closeAccessibility: "Ödemeyi kapat",
+      lineStatus: {
+        pending: "Alınmaya hazır",
+        purchasing: "Alınıyor",
+        purchased: "Senin",
+        notCharged: "Ücret alınmadı"
+      },
+      lineAccessibility: (title, price, status) => `${title}, ${price} jeton, ${status}`,
+      unknownItem: "Kullanılamayan parça"
     }
   }
 }

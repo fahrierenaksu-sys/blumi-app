@@ -29,7 +29,8 @@ export function WardrobeTopBar(props: {
           style={styles.backButton}
           contentStyle={styles.glassControl}
         >
-          <Ionicons name="arrow-back" size={19} color={wardrobeTheme.ink} />
+          {/* WRD-5: the same back chevron as every other detail screen. */}
+          <Ionicons name="chevron-back" size={20} color={wardrobeTheme.ink} />
         </WardrobeGlass>
       </Pressable>
       <View style={styles.topBarSpacer} />

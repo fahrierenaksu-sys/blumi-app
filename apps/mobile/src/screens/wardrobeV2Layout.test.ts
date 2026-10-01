@@ -51,11 +51,56 @@ test("the product list pages three-column rows sideways with names under the car
   assert.match(screenSource, /\{item\.name\}/)
 })
 
-test("glass falls back to a solid surface for Reduce Transparency or a missing native blur", () => {
+test("glass is an opaque tinted surface without a hidden backdrop blur (WRD-4)", () => {
   assert.match(screenSource, /useReduceTransparency\(\)/)
-  assert.match(screenSource, /!reduceTransparency && OptionalBlurView/)
-  assert.match(screenSource, /panelSolid/)
-  assert.doesNotMatch(screenSource, /from "expo-blur"/)
+  assert.match(screenSource, /backgroundColor: isPanel \? wardrobeTheme\.panelSolid : wardrobeTheme\.controlSolid/)
+  // The opaque tint covered any blur; a hidden blur only cost GPU time.
+  assert.doesNotMatch(screenSource, /BlurView|expo-blur|getOptionalBlurView/)
+})
+
+test("a category change swaps products while they are invisible, on the UI thread (WRD-1/WRD-2)", () => {
+  const motion = readFileSync(join(wardrobeFolder, "useWardrobeCategoryMotion.ts"), "utf8")
+  const card = readFileSync(join(wardrobeFolder, "WardrobeCatalogCard.tsx"), "utf8")
+  assert.match(motion, /withTiming\(0, \{ duration: WARDROBE_CATALOG_FADE_OUT_MS \}, \(finished\) => \{\s*if \(finished\) scheduleOnRN\(setShownCategory, target\)/)
+  assert.match(motion, /useLayoutEffect\(\(\) => \{[\s\S]*?withTiming\(1, \{ duration: WARDROBE_CATALOG_FADE_IN_MS \}\)/)
+  assert.doesNotMatch(motion, /from "react-native"|Animated\.timing|requestAnimationFrame/)
+  assert.match(screenSource, /catalogStyle=\{catalogTransition\.style\}/)
+  assert.match(screenSource, /pointerEvents=\{switching \? "none" : "auto"\}/)
+  assert.match(card, /transition=\{0\}/)
+  assert.doesNotMatch(card, /thumbnailTransition/)
+})
+
+test("sections and categories are tabs with a sliding capsule and live page dots (WRD-3)", () => {
+  const switcher = readFileSync(join(wardrobeFolder, "WardrobeSectionSwitcher.tsx"), "utf8")
+  const tabs = readFileSync(join(wardrobeFolder, "WardrobeCategoryTabs.tsx"), "utf8")
+  const indicator = readFileSync(join(wardrobeFolder, "WardrobeSlidingIndicator.tsx"), "utf8")
+  const list = readFileSync(join(wardrobeFolder, "WardrobeCatalogList.tsx"), "utf8")
+  for (const source of [switcher, tabs]) {
+    assert.match(source, /accessibilityRole="tablist"/)
+    assert.match(source, /accessibilityRole="tab"/)
+    assert.match(source, /<WardrobeSlidingIndicator frame=\{frame\}/)
+  }
+  assert.match(indicator, /withSpring\(frame\.x, uiTheme\.animation\.springSnappy\)/)
+  assert.match(indicator, /if \(!placedRef\.current \|\| reduceMotion\)/)
+  assert.match(list, /pagePosition\.value = listWidth > 0 \? event\.contentOffset\.x \/ listWidth : 0/)
+  assert.match(list, /scheduleOnRN\(onPageChange, index\)/)
+  assert.doesNotMatch(list, /onMomentumScrollEnd/)
+})
+
+test("locked cards preview and link to the Shop instead of a dead tap (MICRO-3, WRD-5)", () => {
+  const card = readFileSync(join(wardrobeFolder, "WardrobeCatalogCard.tsx"), "utf8")
+  const preview = readFileSync(join(wardrobeFolder, "useWardrobeLockedPreview.ts"), "utf8")
+  const topBar = readFileSync(join(wardrobeFolder, "WardrobeTopBar.tsx"), "utf8")
+  assert.doesNotMatch(card, /disabled=\{locked\}/)
+  assert.match(card, /onPress=\{\(\) => \(locked \? onPreviewLocked\(item\) : onEquip\(item\)\)\}/)
+  assert.match(card, /accessibilityHint=\{locked \? lockedHint : undefined\}/)
+  // Preview only: never saved, and the Shop link carries the canonical id.
+  assert.doesNotMatch(preview, /saveAvatar|equipAndSaveItem|purchase/)
+  assert.match(preview, /navigation\.navigate\("CosmeticShop", buildWardrobeShopLink\(lockedItem, Date\.now\(\)\)\)/)
+  assert.match(preview, /isAvatarItemSoldInShop\(item, listing\)/)
+  assert.match(screenSource, /isAvailableInShop\s*\}\),/)
+  assert.match(topBar, /name="chevron-back"/)
+  assert.doesNotMatch(topBar, /arrow-back/)
 })
 
 test("the stage sizes the canonical character from its measured area", () => {

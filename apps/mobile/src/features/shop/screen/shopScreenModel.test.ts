@@ -5,6 +5,11 @@ import type { ShopCatalogItem } from "../shopCatalog"
 import { resolveHorizontalScrollerDragOwner } from "../../../ui/mainTabPagerEdgeHandoffModel"
 import {
   buildShopCategoryOptions,
+  buildShopShelfPages,
+  findShopShelfPageIndex,
+  formatShopShelfCounter,
+  getShopShelfPageIndex,
+  resolveShopProductFocus,
   createRoomPreviewDecor,
   filterProductsByCategory,
   getAvatarIcon,
@@ -299,4 +304,84 @@ test("the product shelf hands a drag past its first or last page to the main pag
   // rubber-bands because Shop is the last main page.
   assert.equal(drag(-20, 2), "release")
   assert.equal(drag(20, 2), "scroller")
+})
+
+test("shelf pages hold columns of two cards, two columns per page or one under Large Text", () => {
+  const items = Array.from({ length: 9 }, (_, index) => ({ id: `p${index}` }))
+  const pages = buildShopShelfPages(items, 2)
+  assert.equal(pages.length, 3)
+  assert.deepEqual(pages[0].map((column) => column.map((item) => item.id)), [["p0", "p1"], ["p2", "p3"]])
+  assert.deepEqual(pages[2].map((column) => column.map((item) => item.id)), [["p8"]])
+  assert.equal(buildShopShelfPages(items, 1).length, 5, "Large Text: one column per page")
+  assert.deepEqual(buildShopShelfPages([], 2), [])
+  assert.equal(buildShopShelfPages(items, 0).length, 5, "never fewer than one column per page")
+})
+
+test("the shelf counter follows the live offset and clamps to existing pages", () => {
+  const width = 212
+  assert.equal(getShopShelfPageIndex(0, width, 3), 0)
+  assert.equal(getShopShelfPageIndex(width * 0.49, width, 3), 0, "still closer to the first page")
+  assert.equal(getShopShelfPageIndex(width * 0.51, width, 3), 1, "past the middle the counter moves")
+  assert.equal(getShopShelfPageIndex(width * 2, width, 3), 2)
+  assert.equal(getShopShelfPageIndex(width * 5, width, 3), 2, "overscroll stays on the last page")
+  assert.equal(getShopShelfPageIndex(-40, width, 3), 0)
+  assert.equal(getShopShelfPageIndex(width, width, 1), 0, "1/1")
+  assert.equal(getShopShelfPageIndex(Number.NaN, width, 3), 0)
+  assert.equal(getShopShelfPageIndex(width, 0, 3), 0)
+  assert.equal(formatShopShelfCounter(1, 3), "2/3")
+  assert.equal(formatShopShelfCounter(0, 0), "1/1", "an empty shelf still reads 1/1")
+})
+
+test("the page holding a product is found for deep links and re-selection", () => {
+  const items = Array.from({ length: 7 }, (_, index) => ({ id: `p${index}` }))
+  const pages = buildShopShelfPages(items, 2)
+  assert.equal(findShopShelfPageIndex(pages, "p0"), 0)
+  assert.equal(findShopShelfPageIndex(pages, "p5"), 1)
+  assert.equal(findShopShelfPageIndex(pages, "p6"), 1)
+  assert.equal(findShopShelfPageIndex(buildShopShelfPages(items, 1), "p6"), 3)
+  assert.equal(findShopShelfPageIndex(pages, "missing"), -1)
+  assert.equal(findShopShelfPageIndex(pages, undefined), -1)
+})
+
+test("a See-in-Shop link focuses the product on its own category shelf by canonical id", () => {
+  const hair = avatarProduct("hair-mocha", "hair")
+  const top = avatarProduct("top-blossom", "top")
+  const focus = resolveShopProductFocus([top, hair], "hair-mocha")
+  assert.equal(focus?.product, hair)
+  assert.equal(focus?.categoryId, getPrimaryProductCategoryId(hair, "avatar"))
+  assert.equal(resolveShopProductFocus([top, hair], "unlisted"), null)
+  assert.equal(resolveShopProductFocus([top, hair], undefined), null)
+})
+
+test("T-2: every shelf size hands drags past its ends to the main pager, from the real page model", () => {
+  const width = 212
+  const drag = (pageCount: number, page: number, dx: number) => resolveHorizontalScrollerDragOwner({
+    dx,
+    dy: 0,
+    scrollOffset: page * width,
+    maxScrollOffset: getShopShelfMaxScrollOffset(pageCount, width)
+  })
+  for (const productCount of [0, 1, 3, 4, 5, 8, 9, 16, 17]) {
+    for (const columnsPerPage of [1, 2]) {
+      const products = Array.from({ length: productCount }, (_, id) => ({ id: `${id}` }))
+      const pageCount = buildShopShelfPages(products, columnsPerPage).length
+      const owns = shouldShopShelfOwnHorizontalDrags(pageCount)
+      assert.equal(owns, pageCount > 1, `${productCount} products / ${columnsPerPage} columns`)
+      if (!owns) {
+        // 1/1 (or empty): the gestures are off and the model releases both directions.
+        assert.equal(drag(pageCount, 0, 20), "release")
+        assert.equal(drag(pageCount, 0, -20), "release")
+        continue
+      }
+      const last = pageCount - 1
+      assert.equal(drag(pageCount, 0, 20), "release", "first page, towards the previous tab")
+      assert.equal(drag(pageCount, 0, -20), "scroller")
+      assert.equal(drag(pageCount, last, -20), "release", "last page, towards the next tab")
+      assert.equal(drag(pageCount, last, 20), "scroller")
+      for (let page = 1; page < last; page += 1) {
+        assert.equal(drag(pageCount, page, 20), "scroller")
+        assert.equal(drag(pageCount, page, -20), "scroller")
+      }
+    }
+  }
 })

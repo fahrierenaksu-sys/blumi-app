@@ -22,14 +22,18 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   itemStateLabel: string
   wearingLabel: string
   locked: boolean
+  /** A locked item currently tried on the stage (MICRO-3). */
+  previewing: boolean
+  lockedHint: string
   width: number
   onEquip: (item: AvatarCatalogItem) => void
+  /** A locked card previews instead of equipping; ownership is never assumed. */
+  onPreviewLocked: (item: AvatarCatalogItem) => void
   previewSource?: ImageSourcePropType
-  thumbnailTransition: number
 }) {
   const {
-    item, equipped, itemStateLabel, wearingLabel, locked, width, onEquip,
-    previewSource, thumbnailTransition
+    item, equipped, itemStateLabel, wearingLabel, locked, previewing, lockedHint, width,
+    onEquip, onPreviewLocked, previewSource
   } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
     ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
@@ -59,7 +63,8 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       source={previewSource}
       contentFit="contain"
       cachePolicy="memory-disk"
-      transition={thumbnailTransition}
+      // WRD-2: static thumbnails never fade in after decoding (as in the Shop).
+      transition={0}
       style={[
         thumbnailPresentation.frame === "rig"
           ? styles.itemPreviewRigLayer
@@ -86,12 +91,9 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       testID={`wardrobe-item-${getAvatarAutomationSlug(item.id)}`}
       accessibilityRole="button"
       accessibilityLabel={`${item.name}, ${equipped ? wearingLabel : itemStateLabel}`}
-      accessibilityState={{
-        disabled: locked,
-        selected: equipped
-      }}
-      disabled={locked}
-      onPress={() => onEquip(item)}
+      accessibilityHint={locked ? lockedHint : undefined}
+      accessibilityState={{ selected: equipped || previewing }}
+      onPress={() => (locked ? onPreviewLocked(item) : onEquip(item))}
       style={({ pressed }) => [
         styles.itemCard,
         { width },
@@ -103,7 +105,8 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
           styles.itemArt,
           { height: Math.round(width * WARDROBE_ART_ASPECT) },
           equipped ? styles.itemArtSelected : null,
-          locked ? styles.itemArtLocked : null
+          locked ? styles.itemArtLocked : null,
+          previewing ? styles.itemArtPreviewing : null
         ]}
       >
         {previewSource ? (
@@ -147,6 +150,9 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   previous.itemStateLabel === next.itemStateLabel &&
   previous.wearingLabel === next.wearingLabel &&
   previous.locked === next.locked &&
+  previous.previewing === next.previewing &&
+  previous.lockedHint === next.lockedHint &&
+  previous.onPreviewLocked === next.onPreviewLocked &&
   previous.width === next.width &&
   previous.onEquip === next.onEquip &&
   previous.previewSource === next.previewSource

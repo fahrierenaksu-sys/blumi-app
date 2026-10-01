@@ -1,5 +1,4 @@
 import type { ImageSourcePropType } from "react-native"
-import { buildAvatarShopCatalogItem } from "../../shop/shopCatalog"
 import { isAvatarV2ItemCompatibleWithBody } from "../avatarBodyCompatibility"
 import type { AvatarCatalogItem, AvatarInventory, UserAvatar } from "../avatarV2.types"
 import { isAvatarV2ItemEquipped } from "../avatarV2Selectors"
@@ -14,6 +13,8 @@ export interface WardrobeCatalogCardModel {
   equipped: boolean
   itemStateLabel: string
   locked: boolean
+  /** A locked item currently tried on the stage without saving (MICRO-3). */
+  previewing: boolean
   previewSource?: ImageSourcePropType
 }
 
@@ -24,6 +25,7 @@ export interface WardrobeCatalogCopy {
   switchBase: string
   fullLook: string
   tryOn: string
+  lockedInShop: string
 }
 
 export function isAvatarItemRoomPreviewSupported(item: AvatarCatalogItem): boolean {
@@ -31,21 +33,41 @@ export function isAvatarItemRoomPreviewSupported(item: AvatarCatalogItem): boole
 }
 
 /**
- * Items shown for a category: body-compatible, room-preview supported, and
- * equippable (ownership is decided by the caller's `canEquipItem`).
+ * Items shown for a category: body-compatible and room-preview supported;
+ * equippable ones first (ownership is decided by the caller's
+ * `canEquipItem`, i.e. the server inventory), then, by owner decision, the
+ * unowned ones the Shop sells (`isAvailableInShop`) as locked cards. Catalog
+ * order is kept within each group.
  */
 export function getWardrobeActiveItems(input: {
   catalog: AvatarCatalogItem[]
   category: WardrobeCategoryId
   bodyId: string
   canEquipItem: (item: AvatarCatalogItem) => boolean
+  isAvailableInShop?: (item: AvatarCatalogItem) => boolean
 }): AvatarCatalogItem[] {
-  return getWardrobeCategoryItems(input.catalog, input.category).filter(
+  const fitting = getWardrobeCategoryItems(input.catalog, input.category).filter(
     (item) =>
       isAvatarV2ItemCompatibleWithBody(item, input.bodyId) &&
-      isAvatarItemRoomPreviewSupported(item) &&
-      input.canEquipItem(item)
+      isAvatarItemRoomPreviewSupported(item)
   )
+  const owned = fitting.filter((item) => input.canEquipItem(item))
+  const isAvailableInShop = input.isAvailableInShop
+  if (!isAvailableInShop) return owned
+  const locked = fitting.filter((item) => !input.canEquipItem(item) && isAvailableInShop(item))
+  return [...owned, ...locked]
+}
+
+/**
+ * Route params for a locked card's "See in Shop": the item's own canonical
+ * id (never a derived id) and a fresh request id so a repeat link refocuses.
+ */
+export function buildWardrobeShopLink(item: AvatarCatalogItem, requestId: number): {
+  initialShopMode: "avatar"
+  focusProductId: string
+  focusRequestId: number
+} {
+  return { initialShopMode: "avatar", focusProductId: item.id, focusRequestId: requestId }
 }
 
 export function resolveWardrobeEquippedLabel(input: {
@@ -72,14 +94,13 @@ export function buildWardrobeCards(input: {
   canEquipItem: (item: AvatarCatalogItem) => boolean
   copy: WardrobeCatalogCopy
   getPreviewSource: (item: AvatarCatalogItem) => ImageSourcePropType | undefined
+  /** The locked item being previewed on the stage, if any. */
+  previewingItemId?: string | null
 }): WardrobeCatalogCardModel[] {
-  const { avatar, displayedAvatar, inventory, canEquipItem, copy } = input
+  // `avatar` and `inventory` stay in the input for callers; a locked label no
+  // longer comes from the (English) Shop catalog presentation.
+  const { displayedAvatar, canEquipItem, copy } = input
   return input.items.map((item) => {
-    const catalogItem = buildAvatarShopCatalogItem({
-      item,
-      avatar,
-      inventory
-    })
     const canEquip = canEquipItem(item)
     const roomPreviewSupported = isAvatarItemRoomPreviewSupported(item)
     const locked = !canEquip || !roomPreviewSupported
@@ -88,7 +109,7 @@ export function buildWardrobeCards(input: {
     const itemStateLabel = !roomPreviewSupported
       ? copy.roomFitPending
       : locked
-        ? catalogItem.stateLabel
+        ? copy.lockedInShop
         : item.type === "body"
           ? copy.switchBase
           : item.outfitKey
@@ -100,6 +121,7 @@ export function buildWardrobeCards(input: {
       equipped,
       itemStateLabel,
       locked,
+      previewing: locked && item.id === input.previewingItemId,
       previewSource
     }
   })

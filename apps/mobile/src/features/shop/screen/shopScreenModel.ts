@@ -251,3 +251,65 @@ export function getShopShelfMaxScrollOffset(pageCount: number, shelfWidth: numbe
   if (!Number.isFinite(pageCount) || !Number.isFinite(shelfWidth) || pageCount <= 1 || shelfWidth <= 0) return 0
   return (Math.floor(pageCount) - 1) * shelfWidth
 }
+
+/**
+ * MICRO-3: a "See in Shop" link names a product by its canonical source item
+ * id. Returns the avatar product and the category whose shelf shows it, or
+ * null when the Shop does not list it (the link then just opens the Shop).
+ */
+export function resolveShopProductFocus(
+  avatarProducts: readonly ShopCatalogItem[],
+  sourceItemId: string | undefined
+): { product: ShopCatalogItem; categoryId: string } | null {
+  if (!sourceItemId) return null
+  const product = avatarProducts.find((candidate) =>
+    candidate.sourceItemId === sourceItemId && candidate.previewType === "avatar"
+  )
+  if (!product) return null
+  return { product, categoryId: getPrimaryProductCategoryId(product, "avatar") }
+}
+
+const SHOP_SHELF_CARDS_PER_COLUMN = 2
+
+/**
+ * The product shelf's pages: columns of two cards, `columnsPerPage` columns
+ * per page (two, or one in the Large Text layout). Catalog order is kept.
+ */
+export function buildShopShelfPages<T>(products: readonly T[], columnsPerPage: number): T[][][] {
+  const perPage = Math.max(1, Math.floor(Number.isFinite(columnsPerPage) ? columnsPerPage : 1))
+  const columns: T[][] = []
+  for (let index = 0; index < products.length; index += SHOP_SHELF_CARDS_PER_COLUMN) {
+    columns.push(products.slice(index, index + SHOP_SHELF_CARDS_PER_COLUMN))
+  }
+  const pages: T[][][] = []
+  for (let index = 0; index < columns.length; index += perPage) {
+    pages.push(columns.slice(index, index + perPage))
+  }
+  return pages
+}
+
+/**
+ * The page the shelf shows at a horizontal offset: the nearest page, clamped
+ * to the existing ones. Runs on the UI thread while the shelf scrolls, so the
+ * counter moves with the finger instead of after the momentum ends.
+ */
+export function getShopShelfPageIndex(scrollOffset: number, shelfWidth: number, pageCount: number): number {
+  "worklet"
+  if (!(shelfWidth > 0) || !(pageCount > 1) || !Number.isFinite(scrollOffset)) return 0
+  const index = Math.round(scrollOffset / shelfWidth)
+  return Math.max(0, Math.min(Math.floor(pageCount) - 1, index))
+}
+
+/** "2/3"; an empty shelf reads "1/1". */
+export function formatShopShelfCounter(pageIndex: number, pageCount: number): string {
+  return `${pageIndex + 1}/${Math.max(1, pageCount)}`
+}
+
+/** The page that holds `productId`, or -1. */
+export function findShopShelfPageIndex<T extends { id: string }>(
+  pages: readonly (readonly (readonly T[])[])[],
+  productId: string | undefined
+): number {
+  if (!productId) return -1
+  return pages.findIndex((page) => page.some((column) => column.some((product) => product.id === productId)))
+}

@@ -40,7 +40,8 @@ test("shop remains body-compatible through the catalog source of truth", () => {
 test("compact shop shows two readable product columns per page", () => {
   assert.match(closetBrowser, /SHOP_PRODUCT_COLUMNS_PER_PAGE\s*=\s*2/)
   assert.match(closetBrowser, /productCardWidth[\s\S]*SHOP_PRODUCT_COLUMNS_PER_PAGE/)
-  assert.match(closetBrowser, /index \+= catalog.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE/)
+  // Paging lives in the tested shelf model (buildShopShelfPages).
+  assert.match(closetBrowser, /buildShopShelfPages\(props\.products, catalog\.accessibilityLayout \? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE\)/)
 })
 
 test("full-canvas rig layers get a type-aware contained presentation", () => {
@@ -105,6 +106,19 @@ test("shop makes loading, empty, offline, and retry states explicit and accessib
   assert.match(shopNavigationControls, /accessibilityRole=\{props\.state === "loading" \? "progressbar" : "alert"\}/)
   assert.match(shopNavigationControls, /accessibilityLiveRegion="polite"/)
   assert.match(shopScreen, /onRetry=\{handleRetryShop\}/)
+})
+
+test("the first load shows the shelf's shape and crossfades into it (SHOP-5)", () => {
+  const skeleton = readShopScreenModule("ShopShelfSkeleton.tsx")
+  assert.match(shopScreen, /const showSkeleton = !showShopContent && shopStatusState === "loading"/)
+  assert.match(shopScreen, /showSkeleton \? \(\s*<ShopShelfSkeleton/)
+  assert.match(shopScreen, /<Reanimated\.View entering=\{contentEntering\}/)
+  assert.match(skeleton, /testID="shop-status-loading"/)
+  assert.match(skeleton, /accessibilityRole="progressbar"/)
+  assert.match(skeleton, /SHOP_CONTENT_CROSSFADE_MS = 160/)
+  // Only after a skeleton the user saw, and never under Reduce Motion.
+  assert.match(skeleton, /if \(!skeletonShown \|\| input\.reduceMotion\) return undefined/)
+  assert.doesNotMatch(skeleton, /withRepeat|ActivityIndicator/)
 })
 
 test("coin packs stay hidden until the balance pill is pressed", () => {
