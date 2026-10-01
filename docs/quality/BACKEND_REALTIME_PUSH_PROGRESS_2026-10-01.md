@@ -100,3 +100,31 @@ deploy veya fiziksel cihaz push denemesi yapılmadı.
 
 Bu kayıt ilk paketin **IMPLEMENTED / TESTED** durumudur. Görev dosyasının
 tamamı bitmiş, **NATIVE_VERIFIED** veya **PRODUCTION_READY** değildir.
+
+## Bildirim sistemi denetimi (sohbet push çekirdeği dışı) — IMPLEMENTED / TESTED
+
+`develop` @ `08d6a18` üzerine ayrı bir worktree dalında; sohbet push çekirdeği
+(`911e075`) yeniden yazılmadı. Migration yok, deploy yok, gerçek push yok.
+
+- Oda daveti (P03 açık maddesi kapandı) ve eski realtime push yolları soket
+  açık görünse de kuyruğa alınır; telefon ilgili sohbet/oda ekrandayken banner
+  göstermez. Davet push'u davetle birlikte sona erer (Expo `expiration`), geç
+  yeniden deneme düşer.
+- Sunucu her tür için TR/EN metni kendisi seçer (dil: kayıttaki şartları kabul
+  dili; bilinmiyorsa İngilizce). Cihaza yalnızca yönlendirme kimlikleri ve
+  alıcı kimliği gider; beğenen kişi, eşleşme partneri, Discovery Watch adayı
+  sunucuda kalır. Mesaj/davet/eşleşme `high` öncelik, sohbet başına
+  collapse/thread-id gruplama, Android `default` kanalı.
+- Oda daveti Mesajlar tercihine, sessiz saatlere ve davet başına tekrar
+  engellemeye uyar; saatlik bütçeden muaftır (mevcut `message` türü).
+- Gönderimden hemen önce yeniden kontrol: ban/askı/silinmiş hesap, iki yönlü
+  engel, kaldırılmış sohbet, yanıtlanmış/iptal/süresi dolmuş davet push'u düşürür.
+- Kuyruğa giren push worker'ı hemen uyandırır; 1 sn döngü yedek kalır.
+- Telefon: her olay tek uyarı (uygulama içi toast, push banner'ı, eşleşme
+  ekranı aynı olayı bir kez gösterir); odadaki konuşmanın mesajları banner
+  göstermez. Çıkışta cihaz kaydı oturum iptalinden önce silinir; hesap
+  değişiminde bildirimler ve rozet temizlenir. Bildirim tercihleri TR/EN.
+- OPEN: fiziksel iki telefon testi, APNs anahtarı (P-02), sunucu tarafı rozet
+  sayısı, davet kabul push'u (ürün kararı), uygulama içi dil değişiminin
+  sunucuya taşınması (migration gerektirir), `MessageRateExceeded` receipt'i
+  sonrası yeniden gönderim (receipt tablosu içeriği tutmaz).
