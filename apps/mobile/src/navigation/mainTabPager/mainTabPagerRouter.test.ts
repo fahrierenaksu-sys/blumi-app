@@ -17,7 +17,7 @@ import {
   withMainTabPagerRouter
 } from "./mainTabPagerRouter"
 
-const DETAIL_ROUTES = ["ChatThread", "ProfilePreview", "MatchResult", "MyRoomEditor", "WardrobeV2"] as const
+const DETAIL_ROUTES = ["ChatThread", "MiniRoom", "ProfilePreview", "MatchResult", "MyRoomEditor", "WardrobeV2"] as const
 const ROUTE_NAMES = [...MAIN_TAB_ROUTE_NAMES, ...DETAIL_ROUTES]
 type State = StackNavigationState<ParamListBase>
 
@@ -43,6 +43,29 @@ function names(state: State): string[] {
 function tabRoutes(state: State) {
   return state.routes.filter((route) => (MAIN_TAB_ROUTE_NAMES as readonly string[]).includes(route.name))
 }
+
+test("room exit pops to the existing chat without duplicating it or showing a debrief", () => {
+  let state = router.getInitialState(options)
+  state = apply(state, CommonActions.navigate("ChatThread", { threadId: "room_thread" }))
+  const chatKey = state.routes[1]!.key
+  state = apply(state, CommonActions.navigate("MiniRoom", { readyMiniRoom: { miniRoom: { sourceThreadId: "room_thread" } } }))
+  state = apply(state, StackActions.popTo("ChatThread", { threadId: "room_thread" }))
+  assert.deepEqual(names(state), ["Lobby", "ChatThread"])
+  assert.equal(state.routes[1]!.key, chatKey)
+  assert.deepEqual(state.routes[1]!.params, { threadId: "room_thread" })
+})
+
+test("a directly opened room exits to chat; a room with no chat returns to Inbox in the stable main slot", () => {
+  let state = router.getInitialState(options)
+  const slotKey = getMainTabSlotKey(state)
+  state = apply(state, CommonActions.navigate("MiniRoom"))
+  state = apply(state, StackActions.popTo("ChatThread", { threadId: "room_thread" }))
+  assert.deepEqual(names(state), ["Lobby", "ChatThread"])
+  state = apply(state, CommonActions.navigate("MiniRoom"))
+  state = apply(state, StackActions.popTo("Inbox"))
+  assert.deepEqual(names(state), ["Inbox"])
+  assert.equal(state.routes[0]!.key, slotKey)
+})
 
 test("the pager select action renames the slot in place with a stable key", () => {
   let state = router.getInitialState(options)

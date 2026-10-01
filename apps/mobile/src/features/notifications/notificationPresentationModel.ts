@@ -26,6 +26,7 @@ export function foregroundAlertKey(data: unknown): string | null {
 export function resolveForegroundNotificationPresentation(input: {
   data: unknown
   appActive: boolean
+  suppressMessageAlerts?: boolean
   isConversationFocused: (threadId: string) => boolean
   claimAlert: (key: string) => boolean
 }): ForegroundNotificationPresentation {
@@ -35,8 +36,12 @@ export function resolveForegroundNotificationPresentation(input: {
     shouldShowBanner: visible, shouldShowList: visible, shouldPlaySound: false, shouldSetBadge: false
   })
   if (!input.appActive) {
+    const firstPresentation = key ? input.claimAlert(key) : true
+    return show(record?.type === "chat.message" ? firstPresentation : true)
+  }
+  if (record?.type === "chat.message" && input.suppressMessageAlerts) {
     if (key) input.claimAlert(key)
-    return show(true)
+    return show(false)
   }
   const threadId = identifier(record?.threadId)
   if ((record?.type === "chat.message" || record?.type === "chat.room_invite") &&

@@ -1,27 +1,39 @@
 import { createHash } from "node:crypto"
 
 export interface RateBudgetResult { allowed: boolean; retryAfterSeconds: number }
+export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave"
 export interface SharedRateBudget {
-  consumeUser(userId: string): Promise<RateBudgetResult>
+  consumeUser(userId: string, scope?: UserRateBudgetScope): Promise<RateBudgetResult>
   purgeExpired(): Promise<void>
 }
 export const USER_REQUESTS_PER_MINUTE = 100
+// Match realtime's sustained chat allowance (30 per 10 seconds). Reads and
+// background refreshes must never exhaust the sender's allowance or prevent
+// a person from closing a room. All scopes remain bounded across instances.
+export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, number>> = {
+  general: USER_REQUESTS_PER_MINUTE,
+  chatSend: 180,
+  roomLeave: 20
+}
 const WINDOW_MS = 60_000
 
-export function userBudgetKey(userId: string): string {
-  return createHash("sha256").update(`http-user:${userId}`).digest("hex")
+export function userBudgetKey(userId: string, scope: UserRateBudgetScope = "general"): string {
+  // Preserve the existing general key during rolling upgrades.
+  const prefix = scope === "general" ? "http-user" : `http-user-${scope}`
+  return createHash("sha256").update(`${prefix}:${userId}`).digest("hex")
 }
 
 export function createInMemoryRateBudget(now: () => number = Date.now): SharedRateBudget {
   const budgets = new Map<string, { window: number; count: number }>()
   return {
-    async consumeUser(userId) {
-      const time = now(), observedWindow = Math.floor(time / WINDOW_MS) * WINDOW_MS, key = userBudgetKey(userId)
+    async consumeUser(userId, scope = "general") {
+      const max = USER_RATE_BUDGET_LIMITS[scope]
+      const time = now(), observedWindow = Math.floor(time / WINDOW_MS) * WINDOW_MS, key = userBudgetKey(userId, scope)
       const current = budgets.get(key)
       const window = Math.max(current?.window ?? observedWindow, observedWindow)
-      const count = current?.window === window ? Math.min(current.count + 1, USER_REQUESTS_PER_MINUTE + 1) : 1
+      const count = current?.window === window ? Math.min(current.count + 1, max + 1) : 1
       budgets.set(key, { window, count })
-      return { allowed: count <= USER_REQUESTS_PER_MINUTE, retryAfterSeconds: Math.min(60, Math.max(1, Math.ceil((window + WINDOW_MS - time) / 1000))) }
+      return { allowed: count <= max, retryAfterSeconds: Math.min(60, Math.max(1, Math.ceil((window + WINDOW_MS - time) / 1000))) }
     },
     async purgeExpired() {
       const time = now()
@@ -34,7 +46,7 @@ interface BudgetExecutor { query(sql: string, values?: unknown[]): Promise<{ row
 
 export function createPostgresRateBudget(pool: BudgetExecutor): SharedRateBudget {
   return {
-    async consumeUser(userId) {
+    async consumeUser(userId, scope = "general") {
       const result = await pool.query(
         `WITH clock AS (SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS now_ms),
          bucket AS (SELECT (now_ms / $2::bigint) * $2::bigint AS started, now_ms FROM clock)
@@ -46,7 +58,7 @@ export function createPostgresRateBudget(pool: BudgetExecutor): SharedRateBudget
              THEN LEAST(blumi_shared_rate_budgets.request_count + 1, $3::int + 1) ELSE 1 END
          RETURNING request_count <= $3 AS allowed,
            LEAST(60, GREATEST(1, ceil((window_started_ms + $2 - (SELECT now_ms FROM bucket)) / 1000.0)))::int AS retry_after_seconds`,
-        [userBudgetKey(userId), WINDOW_MS, USER_REQUESTS_PER_MINUTE]
+        [userBudgetKey(userId, scope), WINDOW_MS, USER_RATE_BUDGET_LIMITS[scope]]
       )
       const row = result.rows[0]
       if (!row || typeof row.allowed !== "boolean") throw new Error("Shared request budget unavailable")

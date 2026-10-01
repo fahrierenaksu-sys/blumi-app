@@ -30,7 +30,6 @@ import { resetChatStore } from "../features/chat/chatStore"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
-import { RoomDebriefScreen } from "../screens/RoomDebriefScreen"
 import { ChatThreadScreen } from "../screens/ChatThreadScreen"
 import { YouScreen } from "../screens/YouScreen"
 import { ProfileEditScreen } from "../screens/ProfileEditScreen"
@@ -182,6 +181,7 @@ export type RootStackParamList = {
     participants: MiniRoomParticipantsRouteParam
   }
   MiniRoomRigPreview: undefined
+  /** Legacy source contract only; the debrief screen is not registered. */
   RoomDebrief: {
     miniRoomId: string
     partner: {
@@ -772,18 +772,6 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                     sessionToken={sessionActor.session.sessionToken}
                     demoMode={sessionActor.session.mode === "demo"}
                     sessionActor={sessionActor}
-                  />
-                )}
-              </Stack.Screen>
-              <Stack.Screen
-                name="RoomDebrief"
-                options={{ headerShown: false, gestureEnabled: false }}
-              >
-                {(screenProps) => (
-                  <RoomDebriefScreen
-                    {...screenProps}
-                    sessionActor={sessionActor}
-                    onDecisionDelivered={reconcileConnectionDecisionDelivery}
                   />
                 )}
               </Stack.Screen>

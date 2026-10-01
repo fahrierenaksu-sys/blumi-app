@@ -3,11 +3,18 @@ import test from "node:test"
 import { getMiniRoomCopy } from "./miniRoomCopy"
 import {
   classifyMiniRoomLeaveFailure,
+  getMiniRoomExitDestination,
   getMiniRoomLeaveConfirmation,
   MINI_ROOM_LEAVE_EXIT_WAIT_MS,
   MINI_ROOM_LEAVE_RETRY_DELAYS_MS,
   resolveMiniRoomRemoval
 } from "./miniRoomLeaveModel"
+
+test("room exit returns to the existing conversation without another match decision", () => {
+  assert.deepEqual(getMiniRoomExitDestination("existing_thread"), { name: "ChatThread", threadId: "existing_thread" })
+  assert.deepEqual(getMiniRoomExitDestination(undefined), { name: "Inbox" })
+  assert.deepEqual(getMiniRoomExitDestination("existing_thread", true), { name: "Inbox" }, "a blocked partner's chat must not reopen")
+})
 
 // UX audit ROOM-08: the top-left arrow looks like a plain back button but
 // ended the room for both people at once. Leaving now asks first, and the

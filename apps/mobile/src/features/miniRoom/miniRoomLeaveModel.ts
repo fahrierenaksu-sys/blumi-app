@@ -1,5 +1,13 @@
 import type { MiniRoomCopy } from "./miniRoomCopy"
 
+/** The match and durable conversation already exist before room entry. */
+export function getMiniRoomExitDestination(sourceThreadId: string | undefined, blockedPartner = false):
+  { name: "ChatThread"; threadId: string } | { name: "Inbox" } {
+  return sourceThreadId && !blockedPartner
+    ? { name: "ChatThread", threadId: sourceThreadId }
+    : { name: "Inbox" }
+}
+
 /**
  * Leaving the shared room ends it for both people (UX audit ROOM-08), so every
  * way out (the top-left arrow, the menu, Android back, a gesture) asks first.

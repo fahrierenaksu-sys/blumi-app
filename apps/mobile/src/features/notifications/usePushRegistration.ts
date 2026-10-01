@@ -11,6 +11,7 @@ import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
 import { resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
 import {
+  areRoomMessageAlertsSuppressed,
   claimForegroundAlert,
   isConversationFocused,
   resetForegroundNotificationAlerts
@@ -372,7 +373,10 @@ function ensureNotificationHandler(notifications: NotificationsModule): void {
   notifications.setNotificationHandler({
     handleNotification: async (notification) => resolveForegroundNotificationPresentation({
       data: notification.request.content.data,
-      appActive: AppState.currentState === "active",
+      // iOS inactive is a foreground transition (including Notification
+      // Center); it must not bypass the open-conversation presentation gate.
+      appActive: AppState.currentState === "active" || AppState.currentState === "inactive",
+      suppressMessageAlerts: areRoomMessageAlertsSuppressed(),
       isConversationFocused,
       claimAlert: claimForegroundAlert
     })

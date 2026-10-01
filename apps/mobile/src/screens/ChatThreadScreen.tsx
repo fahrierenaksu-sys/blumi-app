@@ -52,6 +52,7 @@ import { useChatMessageSending } from "../features/chat/thread/useChatMessageSen
 import { useChatRoomInviteActions } from "../features/chat/thread/useChatRoomInviteActions"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
+import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
@@ -94,6 +95,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { screenMountedRef, activeUserIdRef } = useChatThreadLifecycle(currentUserId)
 
   const resolvedThreadId = thread?.threadId ?? threadId
+  // Keep notification focus separate from read-receipt AppState transitions.
+  useFocusedConversation(resolvedThreadId, isFocused)
   const isPendingThread = !thread && !!pendingPartnerId
   const roomInvites = bindings.roomInvites
   const roomInviteActionHandler = bindings.onRoomInviteAction

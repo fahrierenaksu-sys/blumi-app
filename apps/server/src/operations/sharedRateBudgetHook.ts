@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify"
 import type { AuthService } from "../auth/authService"
 import { readBearerToken, resolveRequestSession } from "../routes/routeHelpers"
-import type { SharedRateBudget } from "./sharedRateBudget"
+import type { SharedRateBudget, UserRateBudgetScope } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
 
 /** preHandler runs after the existing cheap onRequest/IP limiter. */
@@ -13,12 +13,22 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
     const resolved = await resolveRequestSession(request, auth, token)
     if (!resolved) return
     try {
-      const result = await budget.consumeUser(resolved.account.userId)
+      const scope = requestBudgetScope(request.method, request.routeOptions.url)
+      const result = await budget.consumeUser(resolved.account.userId, scope)
       if (!result.allowed) return reply.header("Retry-After", String(result.retryAfterSeconds)).code(429)
-        .send({ error: "Too many requests. Try again shortly." })
+        .send(scope === "chatSend"
+          ? { code: "CHAT_SEND_RATE_LIMITED", error: "You're sending messages too quickly. Try again in a moment." }
+          : { error: "Too many requests. Try again shortly." })
     } catch (error) {
       request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Shared request budget unavailable")
       return reply.code(503).send({ error: "Service temporarily unavailable." })
     }
   })
+}
+
+function requestBudgetScope(method: string, route: string | undefined): UserRateBudgetScope {
+  if (method !== "POST") return "general"
+  if (route === "/v1/threads/:threadId/messages") return "chatSend"
+  if (route === "/v1/room-sessions/:roomSessionId/leave" || route === "/v1/users/me/active-room/leave") return "roomLeave"
+  return "general"
 }

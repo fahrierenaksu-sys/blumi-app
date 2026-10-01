@@ -128,17 +128,28 @@ test("a token replaced by a session refresh is refused and the room stays open f
   }
 })
 
-test("request limits answer 429 with Retry-After and change nothing", async () => {
+test("the general request budget cannot prevent leaving a room", async () => {
   const harness = await startSocialLoop()
   try {
-    const { ada, bora, sa, sb, miniRoomId } = await openConnectedRoom(harness, ["Jale", "Kaan"])
+    const { ada, sa, sb, miniRoomId } = await openConnectedRoom(harness, ["Jale", "Kaan"])
 
     // A person over the per-minute budget (shared across instances).
     for (let index = 0; index < USER_REQUESTS_PER_MINUTE; index += 1) await ada.http("GET", "/v1/threads")
     const overBudget = await phoneLeave(harness, ada, miniRoomId)
-    assert.equal(overBudget.status, 429)
-    assert.ok(Number(overBudget.retryAfter) >= 1)
-    assert.ok(await harness.services.miniRoomService.findActiveMiniRoomForUser(ada.userId), "the refused leave changed nothing")
+    assert.equal(overBudget.status, 200)
+    assert.deepEqual(overBudget.body, { ended: true })
+    assert.equal(await harness.services.miniRoomService.findActiveMiniRoomForUser(ada.userId), null)
+
+    await Promise.all([sa.close(), sb.close()])
+  } finally {
+    await harness.close()
+  }
+})
+
+test("failed-auth address limits still refuse room leave requests", async () => {
+  const harness = await startSocialLoop()
+  try {
+    const { bora, sa, sb, miniRoomId } = await openConnectedRoom(harness, ["Jale", "Kaan"])
 
     // Another phone on the same network address sent unverifiable tokens:
     // the address is refused before any session lookup, even with a valid one.

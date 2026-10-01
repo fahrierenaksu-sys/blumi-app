@@ -29,6 +29,13 @@ export interface SendThreadMessageOptions {
   clientMessageId?: string
 }
 
+export class ChatMessageSendError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = "ChatMessageSendError"
+  }
+}
+
 export interface MarkThreadReadOptions {
   expectedUserId?: string
   /**
@@ -171,7 +178,7 @@ export async function sendThreadMessage(
   )
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(payload, "That message could not be sent."))
+    throw new ChatMessageSendError(getApiErrorMessage(payload, "That message could not be sent."), response.status)
   }
 
   return normalizeMessagePayload(payload)
