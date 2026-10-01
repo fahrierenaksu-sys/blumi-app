@@ -51,11 +51,11 @@ test("the product list pages three-column rows sideways with names under the car
   assert.match(screenSource, /\{item\.name\}/)
 })
 
-test("glass falls back to a solid surface for Reduce Transparency or a missing native blur", () => {
+test("glass is an opaque tinted surface without a hidden backdrop blur (WRD-4)", () => {
   assert.match(screenSource, /useReduceTransparency\(\)/)
-  assert.match(screenSource, /!reduceTransparency && OptionalBlurView/)
-  assert.match(screenSource, /panelSolid/)
-  assert.doesNotMatch(screenSource, /from "expo-blur"/)
+  assert.match(screenSource, /backgroundColor: isPanel \? wardrobeTheme\.panelSolid : wardrobeTheme\.controlSolid/)
+  // The opaque tint covered any blur; a hidden blur only cost GPU time.
+  assert.doesNotMatch(screenSource, /BlurView|expo-blur|getOptionalBlurView/)
 })
 
 test("a category change swaps products while they are invisible, on the UI thread (WRD-1/WRD-2)", () => {
