@@ -14,6 +14,8 @@ export interface ToastData {
   durationMs?: number
   /** Plays the type's haptic when shown. Off by default: most callers play their own. */
   haptic?: boolean
+  /** Tapping opens what the toast is about (and dismisses it); without it, a tap only dismisses. */
+  onPress?: () => void
 }
 
 export type ToastPresentationPhase = "hidden" | "visible" | "exiting"

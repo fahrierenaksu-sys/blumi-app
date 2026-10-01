@@ -8,11 +8,12 @@ export type ToastLocale = "tr" | "en"
 
 export interface ToastCopy {
   dismissLabel: (title: string) => string
+  openLabel: (title: string) => string
 }
 
 const TOAST_COPY: Readonly<Record<ToastLocale, ToastCopy>> = {
-  tr: { dismissLabel: (title) => `Bildirimi kapat: ${title}` },
-  en: { dismissLabel: (title) => `Dismiss notification: ${title}` }
+  tr: { dismissLabel: (title) => `Bildirimi kapat: ${title}`, openLabel: (title) => `Aç: ${title}` },
+  en: { dismissLabel: (title) => `Dismiss notification: ${title}`, openLabel: (title) => `Open: ${title}` }
 }
 
 export function resolveToastLocale(locale: string | undefined = readIntlLocale()): ToastLocale {

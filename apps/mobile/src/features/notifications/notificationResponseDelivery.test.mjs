@@ -50,6 +50,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   let currentAppState = "active"
   let notificationHandler
   let activeThreadId = null
+  let roomThreadId = null
+  const shownInApp = new Set()
   const notifications = {
     getPermissionsAsync: async () => ({ status: permission }),
     requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
@@ -107,7 +109,10 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       registerDevice: async (_base, token, input) => { registrations.push({ token, ...input }) },
       removeDevice: async () => { throw new Error("Unexpected device removal") }
     },
-    "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId }
+    "../chat/chatStore": {
+      isConversationOnScreen: (threadId) => threadId === activeThreadId || threadId === roomThreadId,
+      wasMessageShownInApp: (messageId) => shownInApp.has(messageId)
+    }
   }
   const modules = new Map()
   function load(name) {
@@ -178,6 +183,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     navigations, errors,
     registrations,
     setActiveThread: (id) => { activeThreadId = id },
+    setRoomThread: (id) => { roomThreadId = id },
+    noteShownInApp: (id) => { shownInApp.add(id) },
     handleForegroundNotification: (data) => notificationHandler.handleNotification({ request: { content: { data } } }),
     get permissionRequests() { return permissionRequests },
     get foregroundListenerCount() { return foregroundListeners.size },
@@ -240,6 +247,26 @@ test("foreground banners are hidden only for messages in the actively viewed con
   runtime.appState("active")
   runtime.setActiveThread(null)
   assert.equal((await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-one" })).shouldShowBanner, true)
+  runtime.dispose()
+})
+
+test("a foreground chat push never repeats an in-app alert or the open MiniRoom's speech bubble", async () => {
+  // Chat pushes are now queued even for connected recipients, so a message
+  // already toasted in-app must not also drop an OS banner on top of it.
+  const runtime = createRuntime()
+  await settle()
+  runtime.noteShownInApp("message-toasted")
+  const toasted = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-toasted" })
+  assert.equal(toasted.shouldShowBanner, false)
+  assert.equal(toasted.shouldShowList, false)
+  const missed = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-missed" })
+  assert.equal(missed.shouldShowBanner, true, "a message the socket never delivered still alerts")
+  runtime.setRoomThread("thread-room")
+  const inRoom = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-room", messageId: "message-room" })
+  assert.equal(inRoom.shouldShowBanner, false)
+  runtime.appState("background")
+  const backgrounded = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "message-toasted" })
+  assert.equal(backgrounded.shouldShowBanner, true)
   runtime.dispose()
 })
 

@@ -130,6 +130,11 @@ test("the dismiss label is localised", () => {
   assert.equal(getToastCopy("en").dismissLabel("Saved"), "Dismiss notification: Saved")
 })
 
+test("a toast that opens its subject says so to VoiceOver, in both languages", () => {
+  assert.equal(getToastCopy("tr").openLabel("Bora"), "Aç: Bora")
+  assert.equal(getToastCopy("en").openLabel("Bora"), "Open: Bora")
+})
+
 test("the toast locale is Turkish only for Turkish locales", () => {
   assert.equal(resolveToastLocale("tr-TR"), "tr")
   assert.equal(resolveToastLocale("TR"), "tr")

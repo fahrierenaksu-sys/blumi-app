@@ -123,6 +123,9 @@ let unreadCounts: Map<string, number> = new Map()
 let readAtByThread: Map<string, string> = new Map()
 let summaryLastMessageByThread: Map<string, ChatMessage> = new Map()
 let activeThreadId: string | null = null // which thread is currently being viewed
+let roomConversation: { threadId: string; token: symbol } | null = null
+const MAX_SHOWN_IN_APP_MESSAGE_IDS = 200
+const shownInAppMessageIds = new Set<string>()
 
 type Listener = () => void
 const listeners: Set<Listener> = new Set()
@@ -519,6 +522,8 @@ export function resetChatStore(): void {
   readAtByThread = new Map()
   summaryLastMessageByThread = new Map()
   activeThreadId = null
+  roomConversation = null
+  shownInAppMessageIds.clear()
   learnedSequenceByThreadId = new Map()
   removedSequenceByThreadId = new Map()
   pendingRealtimeListRequestSequence = null
@@ -539,8 +544,33 @@ export function setActiveThread(threadId: string | null): void {
   }
 }
 
-/** Only a focused, foreground ChatThread screen registers itself as active. */
-export function getActiveChatThreadId(): string | null { return activeThreadId }
+/** A focused MiniRoom shows its conversation as speech bubbles. Returns the release. */
+export function showConversationInRoom(threadId: string): () => void {
+  const token = Symbol(threadId)
+  roomConversation = { threadId, token }
+  return () => { if (roomConversation?.token === token) roomConversation = null }
+}
+
+/**
+ * The user is looking at this conversation: its focused chat (only a focused,
+ * foreground ChatThread registers itself as active) or its focused MiniRoom.
+ */
+export function isConversationOnScreen(threadId: string): boolean {
+  return activeThreadId === threadId || roomConversation?.threadId === threadId
+}
+
+/** Incoming messages already surfaced in-app, so a foreground push does not repeat them. */
+export function noteMessageShownInApp(messageId: string): void {
+  shownInAppMessageIds.delete(messageId)
+  shownInAppMessageIds.add(messageId)
+  if (shownInAppMessageIds.size > MAX_SHOWN_IN_APP_MESSAGE_IDS) {
+    shownInAppMessageIds.delete(shownInAppMessageIds.values().next().value!)
+  }
+}
+
+export function wasMessageShownInApp(messageId: string): boolean {
+  return shownInAppMessageIds.has(messageId)
+}
 
 /** Clear unread count for a specific thread. */
 export function markThreadRead(threadId: string): void {

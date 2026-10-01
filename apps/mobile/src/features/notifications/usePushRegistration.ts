@@ -9,7 +9,7 @@ import { registerDevice, removeDevice, updateNotificationPreferences } from "./n
 import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
-import { getActiveChatThreadId } from "../chat/chatStore"
+import { isConversationOnScreen, wasMessageShownInApp } from "../chat/chatStore"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -343,11 +343,14 @@ function ensureNotificationHandler(notifications: NotificationsModule): void {
   notifications.setNotificationHandler({
     handleNotification: async (notification) => {
       const data = notification.request.content.data
-      const activeThreadId = getActiveChatThreadId()
-      const viewingChat = AppState.currentState === "active" && activeThreadId !== null &&
-        data?.type === "chat.message" && data.threadId === activeThreadId
+      // Chat pushes are queued even while the socket is open. In the foreground
+      // hide the banner when the conversation (chat or its MiniRoom) is on
+      // screen, or when the socket already surfaced the message as a toast.
+      const alreadySeen = AppState.currentState === "active" && data?.type === "chat.message" && (
+        (typeof data.threadId === "string" && isConversationOnScreen(data.threadId)) ||
+        (typeof data.messageId === "string" && wasMessageShownInApp(data.messageId)))
       return { shouldPlaySound: false, shouldSetBadge: false,
-        shouldShowBanner: !viewingChat, shouldShowList: !viewingChat }
+        shouldShowBanner: !alreadySeen, shouldShowList: !alreadySeen }
     }
   })
   hasInstalledNotificationHandler = true

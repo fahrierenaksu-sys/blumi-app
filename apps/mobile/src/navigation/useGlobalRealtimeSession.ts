@@ -9,8 +9,11 @@ import {
   applyChatThreadListed,
   applyChatThreadRead,
   getThreads,
+  isConversationOnScreen,
+  noteMessageShownInApp,
   noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
+import { getInboxCopy } from "../features/chat/inboxCopy"
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
 import { isDemoMode, setDemoMode } from "../features/demo/demoStore"
 import { createGlobalRealtimeEventHandler } from "../features/realtime/globalRealtimeEventHandler"
@@ -28,6 +31,8 @@ import {
 } from "../features/realtime/globalRealtimeProvider"
 import { isRealtimeAuthInvalidClose } from "@blumi/realtime-client"
 import { hydrateBlockedUsersFromServer } from "../features/safety/blockStore"
+import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
+import { getNativeAppLocale } from "../features/session/authLocale"
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
@@ -165,7 +170,16 @@ export function useGlobalRealtimeSession({
       onPartnerBlocked,
       showIncomingMessageToast: (toast) => {
         showToast({ ...toast, type: "info" })
-      }
+      },
+      isConversationOnScreen,
+      noteMessageShownInApp,
+      openConversation: (threadId) => {
+        if (navigationRef.isReady()) navigationRef.navigate("ChatThread", { threadId })
+      },
+      unknownSenderName: getInboxCopy(resolveAccountRecoveryLocale(
+        getNativeAppLocale(),
+        Intl.DateTimeFormat().resolvedOptions().locale
+      )).unknownPartner
     }),
     [
       onConnectionMatched,

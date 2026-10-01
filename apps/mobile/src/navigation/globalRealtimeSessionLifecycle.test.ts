@@ -18,6 +18,7 @@ function mount() {
   const events: string[] = []
   const statusListeners = new Set<StatusListener>()
   let refreshFailure: ((error: Error) => void) | undefined
+  const handler: { dependencies?: Record<string, unknown> } = {}
   const { useGlobalRealtimeSession } = loadSourceWithFakeReact<{
     useGlobalRealtimeSession: (input: Record<string, unknown>) => void
   }>("navigation/useGlobalRealtimeSession.ts", runtime, {
@@ -31,10 +32,20 @@ function mount() {
         applyChatThreadListed: () => undefined,
         applyChatThreadRead: () => undefined,
         getThreads: () => [],
+        isConversationOnScreen: () => false,
+        noteMessageShownInApp: () => undefined,
         noteRealtimeThreadListRequested: () => undefined
       },
+      "../features/chat/inboxCopy": { getInboxCopy: () => ({ unknownPartner: "Someone" }) },
+      "../features/session/accountRecoveryCopy": { resolveAccountRecoveryLocale: () => "en" },
+      "../features/session/authLocale": { getNativeAppLocale: () => "en" },
       "../features/demo/demoStore": { isDemoMode: () => false, setDemoMode: () => undefined },
-      "../features/realtime/globalRealtimeEventHandler": { createGlobalRealtimeEventHandler: () => () => undefined },
+      "../features/realtime/globalRealtimeEventHandler": {
+        createGlobalRealtimeEventHandler: (dependencies: Record<string, unknown>) => {
+          handler.dependencies = dependencies
+          return () => undefined
+        }
+      },
       "../features/realtime/globalRealtimeProvider": {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
@@ -49,7 +60,11 @@ function mount() {
       "@blumi/realtime-client": { isRealtimeAuthInvalidClose: (code?: number) => code === 4401 },
       "../features/safety/blockStore": { hydrateBlockedUsersFromServer: async () => undefined },
       "../ui/toast": { showToast: (toast: { title: string }) => { events.push(`toast:${toast.title}`) } },
-      "./rootNavigationRef": { navigationRef: { getCurrentRoute: () => undefined } }
+      "./rootNavigationRef": { navigationRef: {
+        getCurrentRoute: () => undefined,
+        isReady: () => true,
+        navigate: (route: string, params: { threadId?: string }) => { events.push(`navigate:${route}:${params.threadId}`) }
+      } }
     },
     real: ["../features/realtime/globalRealtimeLifecycle"]
   })
@@ -80,6 +95,7 @@ function mount() {
   return {
     runtime,
     events,
+    handler,
     render,
     emitStatus: (status: string, meta?: { closeCode?: number }) => {
       for (const listener of [...statusListeners]) listener(status, meta)
@@ -126,4 +142,15 @@ test("session callbacks are read at call time without reconnecting", async () =>
   await settle()
   f.emitStatus("disconnected", { closeCode: 4401 })
   assert.deepEqual(f.events, ["connect:token-1", "disconnect", "clear:latest"])
+})
+
+test("incoming message alerts know the conversation on screen, record in-app alerts and open the chat", () => {
+  const f = mount()
+  f.render()
+  const dependencies = f.handler.dependencies!
+  assert.equal(typeof dependencies.isConversationOnScreen, "function")
+  assert.equal(typeof dependencies.noteMessageShownInApp, "function")
+  assert.equal(dependencies.unknownSenderName, "Someone")
+  ;(dependencies.openConversation as (threadId: string) => void)("thread-1")
+  assert.deepEqual(f.events.slice(-1), ["navigate:ChatThread:thread-1"])
 })
