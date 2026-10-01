@@ -39,6 +39,7 @@ const VALID_PRODUCTION_ENV = {
   ...ADMIN_SIGNING_ENV,
   BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
   BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+  BLUMI_TRUST_PROXY: "100.64.0.0/10",
   ...REVENUECAT_ENV
 }
 
@@ -274,6 +275,37 @@ test("trusted proxies are explicit addresses instead of blanket trust", () => {
   assert.deepEqual(config.trustedProxyAddresses, ["127.0.0.1", "10.0.0.0/8"])
 })
 
+test("production fails fast without an explicit trusted proxy list", () => {
+  // Without it request.ip is the edge peer, so every per-IP limit would key
+  // all clients together.
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_TRUST_PROXY: undefined }),
+    /BLUMI_TRUST_PROXY is required in production/
+  )
+  assert.throws(
+    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_TRUST_PROXY: " , " }),
+    /BLUMI_TRUST_PROXY is required in production/
+  )
+  assert.deepEqual(
+    resolveServerConfig(VALID_PRODUCTION_ENV).trustedProxyAddresses,
+    ["100.64.0.0/10"]
+  )
+})
+
+test("trusted proxies must be IP addresses or CIDR ranges and never trust everyone", () => {
+  for (const value of ["true", "*", "0.0.0.0/0", "::/0", "10.0.0.0/33", "10.0.0/8", "proxy.internal", "fe80::/129", "10.0.0.0/"]) {
+    assert.throws(
+      () => resolveServerConfig({ NODE_ENV: "development", BLUMI_TRUST_PROXY: value }),
+      /BLUMI_TRUST_PROXY/,
+      value
+    )
+  }
+  assert.deepEqual(
+    resolveServerConfig({ NODE_ENV: "development", BLUMI_TRUST_PROXY: "::1, fd00::/8, 192.168.1.1/32" }).trustedProxyAddresses,
+    ["::1", "fd00::/8", "192.168.1.1/32"]
+  )
+})
+
 test("local QA auth requires a complete loopback-only development setup", async () => {
   const config = resolveServerConfig({
     NODE_ENV: "development",
@@ -324,6 +356,7 @@ test("an explicit disabled QA flag is safe in production", () => {
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
     BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    BLUMI_TRUST_PROXY: "100.64.0.0/10",
     ...REVENUECAT_ENV,
     BLUMI_QA_AUTH_ENABLED: "0"
   })
@@ -410,6 +443,7 @@ test("production requires a postgres repository and database url", () => {
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
     BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    BLUMI_TRUST_PROXY: "100.64.0.0/10",
     ...REVENUECAT_ENV
   })
   assert.equal(config.authRepositoryMode, "postgres")
@@ -431,6 +465,7 @@ test("production requires a postgres repository and database url", () => {
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
     BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    BLUMI_TRUST_PROXY: "100.64.0.0/10",
     ...REVENUECAT_ENV
   })
   assert.equal(legacySplitPorts.realtimePort, 4100)
@@ -469,6 +504,7 @@ test("Firebase Phone Auth is the only production verification provider", () => {
     ...ADMIN_SIGNING_ENV,
     BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
     BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    BLUMI_TRUST_PROXY: "100.64.0.0/10",
     ...REVENUECAT_ENV
   })
   assert.equal(config.smsProviderMode, "development")

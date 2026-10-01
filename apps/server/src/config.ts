@@ -1,4 +1,5 @@
 import { Pool } from "pg"
+import { isIP } from "node:net"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
@@ -280,7 +281,7 @@ export function resolveServerConfig(
     env.BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS
   )
   const corsOrigins = parseCsv(env.BLUMI_CORS_ORIGINS)
-  const trustedProxyAddresses = parseCsv(env.BLUMI_TRUST_PROXY)
+  const trustedProxyAddresses = parseTrustedProxyAddresses(env.BLUMI_TRUST_PROXY)
   const qaAuthEnabledValue = env.BLUMI_QA_AUTH_ENABLED?.trim()
   const qaPhoneNumber = env.BLUMI_QA_PHONE_NUMBER?.trim()
   const qaOtpCode = env.BLUMI_QA_OTP_CODE?.trim()
@@ -382,6 +383,13 @@ export function resolveServerConfig(
     if (paymentsEnabled && Object.keys(revenueCatCoinProductIdMap).length === 0) {
       throw new Error("Production-mode purchases require a nonempty REVENUECAT_COIN_PRODUCT_ID_MAP.")
     }
+  }
+  if (nodeEnv === "production" && trustedProxyAddresses.length === 0) {
+    // Without it request.ip is the platform edge, so every per-IP limit and
+    // the realtime connection caps would key all clients together.
+    throw new Error(
+      "BLUMI_TRUST_PROXY is required in production: list the edge proxy IPs or CIDR ranges (Railway: 100.64.0.0/10)."
+    )
   }
   return {
     host,
@@ -790,6 +798,34 @@ function parseCsv(value: string | undefined): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
+}
+
+/**
+ * Explicit proxy addresses or CIDR ranges only. Trust-all values ("true",
+ * "*", a /0 range) would let any client spoof X-Forwarded-For and pick the
+ * address every rate limit keys on.
+ */
+function parseTrustedProxyAddresses(value: string | undefined): string[] {
+  const entries = parseCsv(value)
+  for (const entry of entries) {
+    if (!isTrustedProxyEntry(entry)) {
+      throw new Error(
+        "BLUMI_TRUST_PROXY must list IP addresses or CIDR ranges (never a /0 range or trust-all)."
+      )
+    }
+  }
+  return entries
+}
+
+function isTrustedProxyEntry(entry: string): boolean {
+  const slash = entry.indexOf("/")
+  if (slash === -1) return isIP(entry) !== 0
+  const address = entry.slice(0, slash)
+  const prefixText = entry.slice(slash + 1)
+  const family = isIP(address)
+  if (family === 0 || !/^\d{1,3}$/.test(prefixText)) return false
+  const prefix = Number(prefixText)
+  return prefix >= 1 && prefix <= (family === 4 ? 32 : 128)
 }
 
 function isSecureWebSocketUrl(value: string): boolean {
