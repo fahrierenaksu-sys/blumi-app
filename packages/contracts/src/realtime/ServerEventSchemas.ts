@@ -209,6 +209,9 @@ export const serverEventPayloadSchemas = {
     message: z.string(),
     clientMessageId: z.string().min(1).max(128).optional(),
   }) satisfies z.ZodType<PayloadOf<"realtime.error">, z.ZodTypeDef, unknown>,
+  "realtime.heartbeat": z.object({
+    intervalMs: z.number().int().min(1_000).max(300_000),
+  }) satisfies z.ZodType<PayloadOf<"realtime.heartbeat">, z.ZodTypeDef, unknown>,
 } as const satisfies { [Type in ServerEvent["type"]]: z.ZodTypeAny };
 
 export type ServerEventType = ServerEvent["type"];
