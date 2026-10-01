@@ -56,7 +56,7 @@ import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewS
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
 import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { hapticLight } from "../ui/haptics"
+import { hapticSelection } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle } from "../ui/primitives"
@@ -267,7 +267,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   })
 
   const handleSelectMode = useCallback((nextMode: ShopMode): void => {
-    hapticLight()
+    hapticSelection()
     publishSelectedShopPreviewWarmup([])
     setShopMode(nextMode)
     setSelectedCategoryId(getDefaultShopCategoryId(nextMode))
@@ -275,7 +275,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   }, [])
 
   const handleSelectCategory = useCallback((categoryId: string): void => {
-    hapticLight()
+    hapticSelection()
     setSelectedCategoryId(categoryId)
   }, [])
 

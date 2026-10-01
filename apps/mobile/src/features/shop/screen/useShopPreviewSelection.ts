@@ -7,7 +7,7 @@ import {
 import type { ImageSourcePropType } from "react-native"
 import type { AvatarCatalogItem, UserAvatar } from "../../avatarV2/avatarV2.types"
 import { publishSelectedShopPreviewWarmup } from "../../performance/sceneAssetWarmupModel"
-import { hapticLight } from "../../../ui/haptics"
+import { hapticLight, hapticSelection } from "../../../ui/haptics"
 import {
   avatarToShopCombinationDraft,
   isAvatarShopItemPreviewing,
@@ -81,7 +81,7 @@ export function useShopPreviewSelection(input: {
   }, [avatar, catalog, combinationStateRef, dispatchCombination, selectedProduct])
 
   const handleSelectProduct = useCallback((product: ShopCatalogItem): void => {
-    hapticLight()
+    hapticSelection()
     const selectedWarmupSources: ImageSourcePropType[] = []
     if (product.previewType === "avatar") {
       setShopMode("avatar")
