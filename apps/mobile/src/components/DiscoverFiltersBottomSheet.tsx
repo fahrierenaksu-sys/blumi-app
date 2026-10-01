@@ -25,9 +25,13 @@ import {
 import { getAppLocale } from "../features/session/appLocale"
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
 import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
+import { hapticSelection } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
 
 export type DiscoverFilters = DiscoveryFilters
+
+const AGE_LONG_PRESS_STEP = 5
+const AGE_ADJUST_ACTIONS = [{ name: "increment" }, { name: "decrement" }]
 
 const GENDER_OPTIONS: readonly DiscoveryGender[] = ["woman", "man"]
 
@@ -91,6 +95,12 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
     })
   }
 
+  // DSC-13: every step ticks; a long press jumps five years.
+  const stepAge = (update: (step: number) => void, step: number) => {
+    hapticSelection()
+    update(step)
+  }
+
   const updateAgeMax = (step: number) => {
     setDraftFilters((previous) => {
       const nextMax = clampAge(previous.ageMax + step)
@@ -113,6 +123,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
           }}
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
         >
+          <View style={styles.grabber} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no" />
           <View style={styles.sheetGlowTop} pointerEvents="none" />
           <View style={styles.sheetGlowBottom} pointerEvents="none" />
           <View style={styles.headerRow}>
@@ -199,12 +210,22 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                 <View style={styles.ageControls}>
                   <View style={styles.ageControlGroup}>
                     <Text style={styles.ageLabel}>{copy.minimum}</Text>
-                    <View style={styles.ageStepper}>
+                    <View
+                      style={styles.ageStepper}
+                      accessible
+                      accessibilityRole="adjustable"
+                      accessibilityLabel={copy.minimum}
+                      accessibilityValue={{ text: String(draftFilters.ageMin) }}
+                      accessibilityActions={AGE_ADJUST_ACTIONS}
+                      onAccessibilityAction={(event) => stepAge(updateAgeMin, event.nativeEvent.actionName === "increment" ? 1 : -1)}
+                    >
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={copy.decreaseMinimumAge(draftFilters.ageMin)}
                         style={styles.stepperButton}
-                        onPress={() => updateAgeMin(-1)}
+                        hitSlop={6}
+                        onPress={() => stepAge(updateAgeMin, -1)}
+                        onLongPress={() => stepAge(updateAgeMin, -AGE_LONG_PRESS_STEP)}
                       >
                         <Text style={styles.stepperText}>−</Text>
                       </Pressable>
@@ -213,7 +234,9 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                         accessibilityRole="button"
                         accessibilityLabel={copy.increaseMinimumAge(draftFilters.ageMin)}
                         style={styles.stepperButton}
-                        onPress={() => updateAgeMin(1)}
+                        hitSlop={6}
+                        onPress={() => stepAge(updateAgeMin, 1)}
+                        onLongPress={() => stepAge(updateAgeMin, AGE_LONG_PRESS_STEP)}
                       >
                         <Text style={styles.stepperText}>+</Text>
                       </Pressable>
@@ -222,12 +245,22 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
 
                   <View style={styles.ageControlGroup}>
                     <Text style={styles.ageLabel}>{copy.maximum}</Text>
-                    <View style={styles.ageStepper}>
+                    <View
+                      style={styles.ageStepper}
+                      accessible
+                      accessibilityRole="adjustable"
+                      accessibilityLabel={copy.maximum}
+                      accessibilityValue={{ text: String(draftFilters.ageMax) }}
+                      accessibilityActions={AGE_ADJUST_ACTIONS}
+                      onAccessibilityAction={(event) => stepAge(updateAgeMax, event.nativeEvent.actionName === "increment" ? 1 : -1)}
+                    >
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={copy.decreaseMaximumAge(draftFilters.ageMax)}
                         style={styles.stepperButton}
-                        onPress={() => updateAgeMax(-1)}
+                        hitSlop={6}
+                        onPress={() => stepAge(updateAgeMax, -1)}
+                        onLongPress={() => stepAge(updateAgeMax, -AGE_LONG_PRESS_STEP)}
                       >
                         <Text style={styles.stepperText}>−</Text>
                       </Pressable>
@@ -236,7 +269,9 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
                         accessibilityRole="button"
                         accessibilityLabel={copy.increaseMaximumAge(draftFilters.ageMax)}
                         style={styles.stepperButton}
-                        onPress={() => updateAgeMax(1)}
+                        hitSlop={6}
+                        onPress={() => stepAge(updateAgeMax, 1)}
+                        onLongPress={() => stepAge(updateAgeMax, AGE_LONG_PRESS_STEP)}
                       >
                         <Text style={styles.stepperText}>+</Text>
                       </Pressable>
@@ -282,7 +317,7 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
 
           </SwipeDismissSheetScrollView>
 
-          <View style={[styles.footer, { marginBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={styles.footer}>
             <View style={styles.footerButton}>
               <SecondaryButton
                 label={copy.reset}
@@ -314,6 +349,16 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(35, 18, 42, 0.16)",
+  },
+  grabber: {
+    position: "absolute",
+    top: 8,
+    alignSelf: "center",
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(32, 22, 42, 0.18)",
+    zIndex: 2,
   },
   sheet: {
     maxHeight: "86%",
