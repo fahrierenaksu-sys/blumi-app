@@ -15,7 +15,12 @@ const ROOM_CHECK_TTL_MS = 10_000
 const IDLE_ROOM_RETENTION_MS = 60_000
 const MAX_IDLE_ROOMS = 128
 
-/** Ephemeral scene state, never persisted room ownership or durable chat. */
+/**
+ * Ephemeral scene state, never persisted room ownership or durable chat.
+ * Seat claims live here too: a participant holds the hotspot of its latest
+ * accepted move while present; standing, leaving the scene, losing the socket
+ * or the room ending releases it. No database write is involved.
+ */
 export function createMiniRoomMotionService(options: {
   findRoom(id: string): Promise<MiniRoomRecord | null>
   hasBlockBetween(a: string, b: string): Promise<boolean>
@@ -79,8 +84,10 @@ export function createMiniRoomMotionService(options: {
       if (!connection) continue
       room.connections.delete(connectionId)
       const avatar = room.avatars.get(connection.userId)!
-      avatar.present = [...room.connections.values()].some(c => c.userId === connection.userId)
-      avatar.revision++
+      const present = [...room.connections.values()].some(c => c.userId === connection.userId)
+      // An absent participant holds no seat: the partner may take it meanwhile.
+      const { hotspotId: _released, ...rest } = avatar
+      room.avatars.set(connection.userId, { ...(present ? avatar : rest), present, revision: avatar.revision + 1 })
       emitSnapshot(id, room)
       if (!room.connections.size) room.idleSince = now()
     }
@@ -106,14 +113,18 @@ export function createMiniRoomMotionService(options: {
       // One scene per socket. A repeated entry for the same room (a client retry)
       // keeps the avatar present instead of flashing it absent to the partner.
       disconnect(connectionId, undefined, id)
+      // One device drives an avatar: the newest scene entry of an account takes
+      // over, and the older device is told so it can leave without ending the
+      // room. Presence stays on, so the partner sees no flicker.
+      const superseded = [...room.connections.entries()]
+        .filter(([otherId, other]) => otherId !== connectionId && other.userId === userId)
+        .map(([otherId]) => otherId)
+      for (const otherId of superseded) room.connections.delete(otherId)
       const avatar = room.avatars.get(userId)!
-      const wasPresent = avatar.present
       room.connections.set(connectionId, { userId, sequence: 0 })
       room.idleSince = undefined
-      if (!wasPresent) {
-        avatar.present = true
-        avatar.revision++
-      }
+      if (!avatar.present) room.avatars.set(userId, { ...avatar, present: true, revision: avatar.revision + 1 })
+      if (superseded.length) options.emit(superseded, { type: "mini_room.scene_superseded", payload: { miniRoomId: id } })
       emitSnapshot(id, room)
     },
     async move(connectionId: string, userId: string, input: MiniRoomMove) {
@@ -131,9 +142,14 @@ export function createMiniRoomMotionService(options: {
       if (!connection || connection.userId !== userId || move.sequence <= connection.sequence) return
       connection.sequence = move.sequence
       const previous = room.avatars.get(userId)!
+      // Seats are exclusive. Claims are decided here, synchronously, in the
+      // order moves reach the room's state; the later claim is refused and
+      // both phones receive the same answer.
+      const heldByPartner = Boolean(move.hotspotId) && [...room.avatars.values()].some(other =>
+        other.userId !== userId && other.present && other.hotspotId === move.hotspotId)
       const avatar: MiniRoomAvatarMotion = { userId, x: move.x, y: move.y,
         present: true, revision: previous.revision + 1,
-        ...(move.hotspotId ? { hotspotId: move.hotspotId } : {}) }
+        ...(move.hotspotId ? heldByPartner ? { deniedHotspotId: move.hotspotId } : { hotspotId: move.hotspotId } : {}) }
       room.avatars.set(userId, avatar)
       emitToRoom(room, { type: "mini_room.avatar_moved", payload: {
         miniRoomId: move.miniRoomId, epoch, participantUserIds: room.participantUserIds, avatar

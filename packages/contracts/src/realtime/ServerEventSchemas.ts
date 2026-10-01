@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { miniRoomMotionSnapshotSchema, miniRoomAvatarMovedSchema } from "../miniRooms/MiniRoomMotion";
+import { miniRoomMotionSnapshotSchema, miniRoomAvatarMovedSchema, miniRoomSceneSupersededSchema } from "../miniRooms/MiniRoomMotion";
 import {
   isAcceptedAvatarLoadout,
   type AvatarLoadout,
@@ -104,6 +104,7 @@ const realtimeErrorCodes = [
 export const serverEventPayloadSchemas = {
   "mini_room.motion_snapshot": miniRoomMotionSnapshotSchema,
   "mini_room.avatar_moved": miniRoomAvatarMovedSchema,
+  "mini_room.scene_superseded": miniRoomSceneSupersededSchema,
   "room.joined": z.object({
     roomId: id,
     currentUserId: id,
