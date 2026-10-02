@@ -23,11 +23,10 @@ export interface MainTabPagerIndicatorValues {
 }
 
 /**
- * Whether the bar's own JS-driven selection motion should run for a newly
- * committed `activeIndex`: not when the pager already moved the pill there
- * on the UI thread.
+ * Whether the bar should place its pill for a newly committed `activeIndex`
+ * from JS: not when the pager already placed it there on the UI thread.
  */
-export function shouldAnimateBottomNavSelectionFromJs(pagerSelection: number, activeIndex: number): boolean {
+export function shouldPlaceBottomNavSelectionFromJs(pagerSelection: number, activeIndex: number): boolean {
   return pagerSelection !== activeIndex
 }
 
@@ -65,10 +64,17 @@ export function publishMainTabPagerIndicator(
   indicator.tracking.value = sample.tracking
 }
 
-/** The pager's fractional page while it is tracking, otherwise null. */
-export function readMainTabPagerIndicatorProgress(indicator: MainTabPagerIndicatorValues): number | null {
+/**
+ * Where the bar's pill sits for the pager's current values: on the pages'
+ * fractional position while a finger drag (and the settle that finishes it)
+ * moves them, otherwise exactly on the selected page. A selection change is
+ * never animated: a tap, a route sync or the end of a settle lands at once.
+ * Null when no pager is mounted (the bar then follows its own route).
+ */
+export function readMainTabPagerIndicatorTarget(indicator: MainTabPagerIndicatorValues): number | null {
   "worklet"
-  return indicator.tracking.value ? indicator.progress.value : null
+  if (indicator.tracking.value) return indicator.progress.value
+  return indicator.selection.value >= 0 ? indicator.selection.value : null
 }
 
 /** Indicator position in tab units, kept on the bar through edge rubber bands. */
@@ -76,97 +82,6 @@ export function resolveBottomNavIndicatorIndex(progress: number, itemCount: numb
   "worklet"
   if (!Number.isFinite(progress) || itemCount <= 0) return 0
   return Math.min(itemCount - 1, Math.max(0, progress))
-}
-
-/** The liquid pill stretches at most this much (scaleX 1.26) at full speed. */
-export const BOTTOM_NAV_LIQUID_MAX_STRETCH = 0.26
-/** Stretch gained per tab per second of indicator speed. */
-export const BOTTOM_NAV_LIQUID_STRETCH_PER_SPEED = 0.05
-/** Frames closer together than this give no usable speed. */
-const BOTTOM_NAV_LIQUID_MIN_FRAME_MS = 4
-
-/**
- * The indicator's speed in tabs per second between two samples, or null when
- * the samples are too close (or out of order) to say.
- */
-export function getBottomNavIndicatorSpeed(deltaTabs: number, deltaMs: number): number | null {
-  "worklet"
-  if (!Number.isFinite(deltaTabs) || !(deltaMs >= BOTTOM_NAV_LIQUID_MIN_FRAME_MS)) return null
-  return (deltaTabs / deltaMs) * 1000
-}
-
-/**
- * "Liquid" pill: it stretches along the bar with the speed it moves at
- * (either direction), 1 at rest, capped so it never covers a neighbour. The
- * pill eases toward this each frame and springs back (snappy) when it stops.
- */
-export function getBottomNavLiquidStretch(speedTabsPerSecond: number): number {
-  "worklet"
-  if (!Number.isFinite(speedTabsPerSecond)) return 1
-  return 1 + Math.min(BOTTOM_NAV_LIQUID_MAX_STRETCH, Math.abs(speedTabsPerSecond) * BOTTOM_NAV_LIQUID_STRETCH_PER_SPEED)
-}
-
-/** Share of the gap to the speed's stretch the pill closes per frame. */
-export const BOTTOM_NAV_LIQUID_EASE = 0.45
-
-/** The pill's stretch for this frame, eased from the last frame's. */
-export function easeBottomNavLiquidStretch(current: number, speedTabsPerSecond: number): number {
-  "worklet"
-  const from = Number.isFinite(current) ? current : 1
-  return from + (getBottomNavLiquidStretch(speedTabsPerSecond) - from) * BOTTOM_NAV_LIQUID_EASE
-}
-
-/**
- * The indicator's latest position and frame timestamp (ms; -1 for none yet),
- * and the last one from an earlier frame.
- */
-export interface BottomNavLiquidSample {
-  index: number
-  time: number
-  fromIndex: number
-  fromTime: number
-}
-
-export function createBottomNavLiquidSample(index: number): BottomNavLiquidSample {
-  "worklet"
-  return { index, time: -1, fromIndex: index, fromTime: -1 }
-}
-
-/**
- * Advances the indicator's speed sampling by one change. Times are UI frame
- * timestamps (readUiFrameTimestamp), never wall-clock reads, so the speed
- * does not wobble with when a reaction happened to run. A second change in
- * the same frame is measured again from the earlier frame, not across a
- * near-zero interval.
- */
-export function stepBottomNavLiquidSample(
-  last: BottomNavLiquidSample,
-  index: number,
-  now: number
-): { next: BottomNavLiquidSample; speed: number | null } {
-  "worklet"
-  if (!(last.time >= 0) || !Number.isFinite(now)) {
-    return { next: { index, time: now, fromIndex: index, fromTime: -1 }, speed: null }
-  }
-  const deltaMs = now - last.time
-  if (deltaMs >= 0 && deltaMs < BOTTOM_NAV_LIQUID_MIN_FRAME_MS) {
-    const next = { index, time: last.time, fromIndex: last.fromIndex, fromTime: last.fromTime }
-    return {
-      next,
-      speed: last.fromTime >= 0 ? getBottomNavIndicatorSpeed(index - last.fromIndex, last.time - last.fromTime) : null
-    }
-  }
-  return {
-    next: { index, time: now, fromIndex: last.index, fromTime: last.time },
-    speed: getBottomNavIndicatorSpeed(index - last.index, deltaMs)
-  }
-}
-
-/** The timestamp of the UI frame being computed (Reanimated's frame clock). */
-export function readUiFrameTimestamp(): number {
-  "worklet"
-  const frame = (globalThis as { __frameTimestamp?: number }).__frameTimestamp
-  return typeof frame === "number" ? frame : performance.now()
 }
 
 /** How strongly a tab shows its selected icon and label (0..1) for an indicator position. */
