@@ -74,3 +74,15 @@ test("press feedback and entrances have a non-moving Reduce Motion path from the
   assert.match(toast, /if \(reduceMotion\) slideAnim\.setValue\(0\)/)
   assert.match(toast, /\.\.\.\(reduceMotion \? \[\] : \[Animated\.spring\(slideAnim/)
 })
+
+test("the room editor dock and the wardrobe panel share one soft entrance with no movement under Reduce Motion", () => {
+  const entrance = read("src/ui/bottomPanelEntrance.ts")
+  // One UI-thread layout animation, switched off entirely under Reduce Motion.
+  assert.match(entrance, /return reduceMotion \? undefined : BOTTOM_PANEL_ENTERING/)
+  assert.match(entrance, /\.reduceMotion\(ReduceMotion\.Never\)/)
+  for (const path of ["src/screens/MyRoomEditorScreen.tsx", "src/screens/WardrobeV2Screen.tsx"]) {
+    const source = read(path)
+    assert.match(source, /const reduceMotion = useReducedMotion\(\)/, path)
+    assert.match(source, /entering=\{getBottomPanelEntering\(reduceMotion\)\}/, path)
+  }
+})

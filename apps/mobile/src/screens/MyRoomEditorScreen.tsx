@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react"
 import { ScrollView, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { useReducedMotion } from "../ui/animations"
+import { getBottomPanelEntering } from "../ui/bottomPanelEntrance"
 import { WardrobeGlass } from "../features/avatarV2/wardrobe/WardrobeGlass"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
@@ -351,7 +352,8 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
               ) : null}
             </Animated.View>
 
-            <Animated.View layout={dockLayout}>
+            {/* The dock rises softly into place when the editor opens (same entrance as the wardrobe panel). */}
+            <Animated.View layout={dockLayout} entering={getBottomPanelEntering(reduceMotion)}>
               <WardrobeGlass
                 tone="panel"
                 radius={30}
