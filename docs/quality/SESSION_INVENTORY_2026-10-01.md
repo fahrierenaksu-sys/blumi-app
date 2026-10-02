@@ -152,7 +152,7 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | AF-06 | Automated guards (canvas, alpha halo, layer order) | ASSET_FIT_AUDIT | NOT STARTED | P2 |
 | ONBV-01 | Android hardware back dead on profile/avatar steps after pre-mount | onboarding-verify F1 | NOT STARTED (onboardingScreenActions.ts:60 has no active arg; Android unreleased) | P1 |
 | ONBV-02 | Scan laser decoded 25x larger than drawn on cold start | onboarding-verify F2 | NEEDS OWNER DECISION (Workbench 804x78 asset) | P1 |
-| ONBV-03 | Greeting wave/profile reaction still JS timers; frames preloaded under Reduce Motion (ONB-04) | onboarding-verify F3 | PARTIAL c6934c6 | P1 |
+| ONBV-03 | Greeting wave/profile reaction still JS timers; frames preloaded under Reduce Motion (ONB-04) | onboarding-verify F3 | PARTIAL c6934c6, 9761cb1 (greeting and ambient waves on one UI-thread clock, only the idle frame mounts under Reduce Motion; profile reaction still on timers; native check open) | P1 |
 | ONBV-04 | Intro frame sampler re-arms and grows unbounded | onboarding-verify F4 | NOT STARTED | P2 |
 | ONBV-05 | Greeting text reveal animates width | onboarding-verify F5 | NOT STARTED | P2 |
 | ONBV-06 | SwipeDismissSheet self presentation unused; interrupted close locks sheet; first-frame flash | onboarding-verify F6 (SYS-4/5) | PARTIAL e9a7047 | P2 |
