@@ -318,9 +318,9 @@ test("a watch with no candidate cools down and the cycle continues to later watc
       profile("candidate", "coffee")
     ]))
   })
-  // The oldest watch asks for a vibe nobody has; the later one can be served.
+  // The oldest watch asks for an age nobody has; the later one can be served.
   await matchService.activateDiscoveryWatch("lonely_watcher",
-    { ageMin: 18, ageMax: 99, genders: ["woman"], vibes: ["nobody_has_this"] }, new Date("2026-07-22T10:00:00.000Z"))
+    { ageMin: 60, ageMax: 99, genders: ["woman"], vibes: ["coffee"] }, new Date("2026-07-22T10:00:00.000Z"))
   await matchService.activateDiscoveryWatch("lucky_watcher",
     { ageMin: 18, ageMax: 99, genders: ["woman"], vibes: ["coffee"] }, new Date("2026-07-22T10:00:30.000Z"))
 

@@ -33,13 +33,12 @@ export function createPostgresMatchRepository(
       const normalizedFilters = normalizeFilters(filters)
       const normalizedPage = normalizePage(page)
       const accountResult = await pool.query(
-        `${discoveryProfilesSql()} LIMIT $6 OFFSET $7`,
+        `${discoveryProfilesSql()} LIMIT $5 OFFSET $6`,
         [
           currentUserId,
           normalizedFilters.ageMin,
           normalizedFilters.ageMax,
           normalizedFilters.genders,
-          normalizedFilters.vibes,
           normalizedPage.limit,
           normalizedPage.offset
         ]
@@ -100,14 +99,6 @@ export function createPostgresMatchRepository(
               cardinality($5::text[]) = 0
               OR lower(trim(COALESCE(identity_gender, gender))) = ANY($5::text[])
             )
-            AND (
-              cardinality($6::text[]) = 0
-              OR EXISTS (
-                SELECT 1
-                  FROM unnest(COALESCE(interests, ARRAY[]::text[])) AS vibe(value)
-                 WHERE lower(trim(vibe.value)) = ANY($6::text[])
-              )
-            )
             AND NOT EXISTS (
               SELECT 1
                 FROM blumi_discovery_decisions d
@@ -147,8 +138,7 @@ export function createPostgresMatchRepository(
           targetUserId,
           normalizedFilters.ageMin,
           normalizedFilters.ageMax,
-          normalizedFilters.genders,
-          normalizedFilters.vibes
+          normalizedFilters.genders
         ]
       )
       return accountResult.rows[0]

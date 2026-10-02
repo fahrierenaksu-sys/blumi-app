@@ -103,10 +103,20 @@ test("discovery never surfaces a legacy gender profile, including the unfiltered
   assert.equal(await service.findProfile("legacy_profile"), null)
 })
 
-test("discovery filters by age, explicit gender preferences, and any matching vibe", async () => {
+test("discovery filters by age and explicit gender preferences; saved vibes never narrow the deck", async () => {
   const service = createMatchService({
     repository: createInMemoryMatchRepository(
       createInMemoryMatchStore([
+        {
+          userId: "woman_bookish",
+          displayName: "Defne",
+          age: 30,
+          gender: "woman",
+          distanceLabel: "",
+          vibeTags: ["bookish"],
+          avatar: TEST_AVATAR,
+          avatarPresetId: "default"
+        },
         {
           userId: "woman_coffee",
           displayName: "Ada",
@@ -148,7 +158,9 @@ test("discovery filters by age, explicit gender preferences, and any matching vi
     vibes: ["coffee dates"]
   })
 
-  assert.deepEqual(profiles.map((profile) => profile.userId), ["woman_coffee"])
+  // A shared vibe may still rank first, but a woman without it stays visible.
+  assert.deepEqual(profiles.map((profile) => profile.userId).sort(), ["woman_bookish", "woman_coffee"])
+  assert.equal(profiles[0]?.userId, "woman_coffee")
 })
 
 test("linked discovery capability keeps a profile visible while enforcing both sides' persisted preferences", async () => {

@@ -161,6 +161,7 @@ interface SeedAccount {
   profileComplete?: boolean
   avatarComplete?: boolean
   roomComplete?: boolean
+  interests?: string[]
 }
 
 const AVATAR_LOADOUT = {
@@ -177,8 +178,8 @@ async function seedAccount(pool: Pool, account: SeedAccount): Promise<void> {
        account_id, user_id, phone_number, display_name, age, gender, identity_gender,
        discovery_genders, avatar_preset_id, avatar_selection, avatar_revision,
        onboarding_profile_complete, onboarding_avatar_complete, onboarding_room_complete,
-       moderation_status, created_at, updated_at
-     ) VALUES ($1, $1, $2, $3, $4, $5, $5, $6, 'avatar_v2_body_default', $7::jsonb, 1, $8, $9, $10, 'active', NOW(), NOW())`,
+       moderation_status, interests, created_at, updated_at
+     ) VALUES ($1, $1, $2, $3, $4, $5, $5, $6, 'avatar_v2_body_default', $7::jsonb, 1, $8, $9, $10, 'active', $11, NOW(), NOW())`,
     [
       account.userId,
       `+1555${String(randomInt(0, 10_000_000)).padStart(7, "0")}`,
@@ -189,7 +190,8 @@ async function seedAccount(pool: Pool, account: SeedAccount): Promise<void> {
       JSON.stringify(AVATAR_LOADOUT),
       account.profileComplete ?? true,
       account.avatarComplete ?? true,
-      account.roomComplete ?? true
+      account.roomComplete ?? true,
+      account.interests ?? []
     ]
   )
 }
@@ -249,6 +251,28 @@ test("PostgreSQL linked-profile eligibility honors the target's discovery gender
       await repository.findEligibleDiscoverProfile(manViewer, target, { ...OPEN_FILTERS, genders: ["man"] }, "man"),
       null
     )
+  } finally {
+    await pool.end()
+  }
+})
+
+test("PostgreSQL: saved vibes never narrow the deck or linked-profile eligibility", requirePostgres, async () => {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const scope = randomUUID().slice(0, 8)
+  const [viewer, sharedVibe, otherVibe, noVibe] = [`viewer_${scope}`, `shared_${scope}`, `other_${scope}`, `none_${scope}`]
+  try {
+    const repository = createPostgresMatchRepository(pool)
+    await seedAccount(pool, { userId: viewer, gender: "man" })
+    await seedAccount(pool, { userId: sharedVibe, interests: ["Coffee dates"] })
+    await seedAccount(pool, { userId: otherVibe, interests: ["Bookish"] })
+    await seedAccount(pool, { userId: noVibe })
+    const withVibes: DiscoveryFilters = { ...OPEN_FILTERS, vibes: ["coffee dates"] }
+
+    const deck = (await repository.listDiscoverProfiles(viewer, withVibes)).map((profile) => profile.userId)
+    for (const userId of [sharedVibe, otherVibe, noVibe]) {
+      assert.ok(deck.includes(userId), "a saved vibe hid a profile from the deck")
+      assert.equal((await repository.findEligibleDiscoverProfile(viewer, userId, withVibes, "man"))?.userId, userId)
+    }
   } finally {
     await pool.end()
   }
