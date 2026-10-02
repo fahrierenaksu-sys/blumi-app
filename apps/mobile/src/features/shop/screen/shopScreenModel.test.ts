@@ -11,6 +11,7 @@ import {
   formatShopShelfCounter,
   getShopShelfPageIndex,
   getShopShelfReleasePageIndex,
+  shouldShowShopBackButton,
   stepShopShelfPageTracker,
   type ShopShelfPageTracker,
   type ShopShelfScrollStep,
@@ -420,6 +421,15 @@ test("the release page clamps to existing pages and ignores invalid geometry", (
   assert.equal(getShopShelfReleasePageIndex(120, 200, 1, 10, 2), 0, "1/1")
   assert.equal(getShopShelfReleasePageIndex(120, 200, 3, 0, 2), 1, "no movement: nearest page")
   assert.equal(getShopShelfReleasePageIndex(80, 200, 3, 10, Number.NaN), 0, "unknown speed: nearest page")
+})
+
+test("the Shop header shows a back button only above a detail screen", () => {
+  assert.equal(shouldShowShopBackButton(undefined), false, "the main tab slot")
+  for (const tab of ["Lobby", "Inbox", "MyRoom", "CosmeticShop"]) {
+    assert.equal(shouldShowShopBackButton(tab), false, `${tab} is a main tab`)
+  }
+  assert.equal(shouldShowShopBackButton("WardrobeV2"), true)
+  assert.equal(shouldShowShopBackButton("MyRoomEditor"), true)
 })
 
 test("the page holding a product is found for deep links and re-selection", () => {

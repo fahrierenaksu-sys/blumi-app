@@ -1,4 +1,5 @@
 import type Ionicons from "@expo/vector-icons/Ionicons"
+import { MAIN_TAB_ROUTE_NAMES } from "../../../navigation/mainTabPager/mainTabPagerConfig"
 import { getAppLocale, type AppLocale } from "../../session/appLocale"
 import type {
   FurnitureCategory,
@@ -18,6 +19,17 @@ import {
   shouldRenderShopContent,
   type ShopPresentationState
 } from "../shopPresentationModel"
+
+/**
+ * The Shop is a main tab, so its header has no back button. Only when a
+ * detail screen (the wardrobe, the room editor) pushed the Shop above itself
+ * does a back button return there. `routeNameBelow` is the stack route right
+ * under the Shop, or undefined when the Shop is the bottom route.
+ */
+export function shouldShowShopBackButton(routeNameBelow: string | undefined): boolean {
+  return routeNameBelow !== undefined &&
+    !(MAIN_TAB_ROUTE_NAMES as readonly string[]).includes(routeNameBelow)
+}
 
 export type ShopCategoryOption = {
   id: string

@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { publishSelectedShopPreviewWarmup } from "../features/performance/sceneAssetWarmupModel"
+import { useNavigationState } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -49,7 +50,8 @@ import { ShopCoinBalance } from "../features/shop/screen/ShopCoinBalance"
 import { ShopShelfSkeleton, useShopContentEntrance } from "../features/shop/screen/ShopShelfSkeleton"
 import {
   getDefaultShopCategoryId,
-  getShopSurfacePolicy
+  getShopSurfacePolicy,
+  shouldShowShopBackButton
 } from "../features/shop/screen/shopScreenModel"
 import { shopScreenStyles as styles } from "../features/shop/screen/shopScreenStyles"
 import { useShopCardRemoval } from "../features/shop/screen/useShopCardRemoval"
@@ -134,6 +136,12 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const [isCoinWalletOpen, setIsCoinWalletOpen] = useState(false)
   const hydratedSessionTokenRef = useRef<string | null>(null)
   const shopScrollRef = useShopScrollToTop()
+  const routeKey = props.route.key
+  const routeNameBelow = useNavigationState((state) => {
+    const index = state?.routes.findIndex((route) => route.key === routeKey) ?? -1
+    return index > 0 ? state?.routes[index - 1]?.name : undefined
+  })
+  const showBackButton = shouldShowShopBackButton(routeNameBelow)
   const shopLayoutMetrics = useMemo(
     () => getShopLayoutMetrics({
       width: viewportMetrics.safeWidth,
@@ -367,15 +375,17 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
         >
         <View style={[styles.header, shopLayoutMetrics.catalog.accessibilityLayout && styles.headerAccessibility]}>
           <View style={styles.headerLeft}>
-            <ActionButtonCircle
-              accessibilityLabel={copy.back}
-              accessibilityState={{ disabled: shopExitLocked }}
-              disabled={shopExitLocked}
-              onPress={handleCloseShop}
-              size={44}
-            >
-              <Ionicons name="chevron-back" size={20} color={uiTheme.colors.textPrimary} />
-            </ActionButtonCircle>
+            {showBackButton ? (
+              <ActionButtonCircle
+                accessibilityLabel={copy.back}
+                accessibilityState={{ disabled: shopExitLocked }}
+                disabled={shopExitLocked}
+                onPress={handleCloseShop}
+                size={44}
+              >
+                <Ionicons name="chevron-back" size={20} color={uiTheme.colors.textPrimary} />
+              </ActionButtonCircle>
+            ) : null}
             <View style={styles.headerCopy}>
               <Text
                 accessibilityRole="header"
