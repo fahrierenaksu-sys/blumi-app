@@ -1,5 +1,5 @@
 import { LinearTransition, ReduceMotion } from "react-native-reanimated"
-import { uiTheme } from "../../ui/theme"
+import { MOTION_SPRINGS } from "../../ui/motion"
 
 /**
  * A conversation that moves to the top glides there and the rows beneath it
@@ -8,6 +8,6 @@ import { uiTheme } from "../../ui/theme"
  * Reanimated's own check is switched off.
  */
 export const INBOX_ROW_LAYOUT = LinearTransition
-  .springify(uiTheme.animation.springSnappy.duration)
+  .springify(MOTION_SPRINGS.snappy.duration)
   .dampingRatio(1)
   .reduceMotion(ReduceMotion.Never)

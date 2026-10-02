@@ -355,6 +355,108 @@ export function createReactNativeStub(overrides: Record<string, unknown> = {}) {
   }
 }
 
+export interface ReanimatedCall {
+  kind: "withSpring" | "withTiming" | "withDelay" | "withRepeat" | "withSequence" | "cancelAnimation"
+  target?: unknown
+  config?: Record<string, unknown>
+}
+
+/**
+ * Minimal react-native-reanimated surface: shared values are refs, animated
+ * styles are evaluated on every render, and each animation driver records its
+ * call and resolves to its end value at once (a settled animation). Layout
+ * animation builders chain and record their configuration.
+ */
+export function createReanimatedStub(runtime: FakeReactRuntime) {
+  const useRef = runtime.react.useRef as <T>(initial: T) => { current: T }
+  const calls: ReanimatedCall[] = []
+  const easing = (..._args: unknown[]) => (value: number) => value
+  const Easing = new Proxy({}, { get: () => easing })
+  const builderCalls: string[] = []
+  const builder = (name: string): Record<string, unknown> => {
+    const chain: Record<string, unknown> = { __builder: name }
+    return new Proxy(chain, {
+      get(target, property) {
+        if (property in target) return target[property as string]
+        return (...args: unknown[]) => {
+          builderCalls.push(`${name}.${String(property)}(${args.map((arg) => JSON.stringify(arg)).join(",")})`)
+          return builder(name)
+        }
+      }
+    })
+  }
+  const settle = (value: unknown) =>
+    value && typeof value === "object" && "__end" in value ? (value as { __end: unknown }).__end : value
+  const AnimatedNamespace = {
+    View: "Animated.View",
+    Text: "Animated.Text",
+    Image: "Animated.Image",
+    ScrollView: "Animated.ScrollView",
+    FlatList: "Animated.FlatList",
+    createAnimatedComponent: <T>(component: T) => component
+  }
+  const module: Record<string, unknown> = {
+    __esModule: true,
+    default: AnimatedNamespace,
+    ...AnimatedNamespace,
+    Easing,
+    ReduceMotion: { Never: "never", System: "system", Always: "always" },
+    useSharedValue: <T>(initial: T) => {
+      const ref = useRef<{ value: T } | null>(null)
+      if (!ref.current) {
+        let current = initial
+        ref.current = {
+          get value() { return current },
+          set value(next: T) { current = settle(next) as T }
+        }
+      }
+      return ref.current
+    },
+    useAnimatedStyle: (worklet: () => unknown) => worklet(),
+    useAnimatedReaction: () => undefined,
+    useDerivedValue: (worklet: () => unknown) => ({ value: worklet() }),
+    interpolate: (value: number, input: number[], output: number[]) => {
+      const [i0 = 0, i1 = 1] = input
+      const [o0 = 0, o1 = 1] = output
+      if (i1 === i0) return o0
+      const t = Math.max(0, Math.min(1, (value - i0) / (i1 - i0)))
+      return o0 + (o1 - o0) * t
+    },
+    Extrapolation: { CLAMP: "clamp", EXTEND: "extend", IDENTITY: "identity" },
+    cancelAnimation: () => { calls.push({ kind: "cancelAnimation" }) },
+    withSpring: (target: unknown, config?: Record<string, unknown>, callback?: (finished: boolean) => void) => {
+      calls.push({ kind: "withSpring", target, config })
+      callback?.(true)
+      return target
+    },
+    withTiming: (target: unknown, config?: Record<string, unknown>, callback?: (finished: boolean) => void) => {
+      calls.push({ kind: "withTiming", target, config })
+      callback?.(true)
+      return target
+    },
+    withDelay: (delay: number, animation: unknown) => {
+      calls.push({ kind: "withDelay", target: animation, config: { delay } })
+      return animation
+    },
+    withRepeat: (animation: unknown, count?: number) => {
+      calls.push({ kind: "withRepeat", target: animation, config: { count } })
+      return animation
+    },
+    withSequence: (...animations: unknown[]) => {
+      calls.push({ kind: "withSequence", target: animations })
+      return animations[animations.length - 1]
+    },
+    FadeIn: builder("FadeIn"),
+    FadeOut: builder("FadeOut"),
+    FadeInDown: builder("FadeInDown"),
+    FadeInUp: builder("FadeInUp"),
+    FadeOutDown: builder("FadeOutDown"),
+    FadeOutUp: builder("FadeOutUp"),
+    LinearTransition: builder("LinearTransition")
+  }
+  return { module, calls, builderCalls }
+}
+
 export interface LoadSourceOptions {
   /** Modules by the exact specifier the source imports. */
   modules?: Record<string, unknown>

@@ -19,6 +19,7 @@ import { getAppLocale } from "../features/session/appLocale"
 import type { SessionActor } from "../features/session/sessionModel"
 import { dismissToast, showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
+import { getRootRouteBeneathSheets } from "./nativeSheets/rootRouteBeneathSheets"
 
 export type ReadyMiniRoomEvent = Extract<ServerEvent, { type: "mini_room.ready" }>
 
@@ -150,7 +151,7 @@ export function useRoomInviteRouting({
       )
       if (!partner) return
 
-      const currentRoute = navigationRef.getCurrentRoute()
+      const currentRoute = getRootRouteBeneathSheets()
       const arrival = resolveReadyRoomArrival({
         requestedByUser: Boolean(options.allowReopen),
         currentRouteName: currentRoute?.name,

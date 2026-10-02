@@ -18,32 +18,31 @@ import {
   type PhoneCountryOption
 } from "../features/session/registerFlowModel"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
+import { SheetPresentationContext, useSheetPresentation, type SheetPresentation } from "../ui/sheetPresentation"
+import { useNativeSheet } from "../navigation/nativeSheets/useNativeSheet"
 
 interface CountryCallingCodePickerProps {
   selectedCountry: PhoneCountryCode
   disabled?: boolean
   onSelect: (countryCode: PhoneCountryCode) => void
   language?: "tr" | "en"
+  /**
+   * "sheet" (default): a native form sheet on iOS. "dialog": the centered
+   * glass dialog, for a picker that already sits inside a React Native
+   * Modal (a native sheet would open underneath it). Android always uses
+   * the dialog.
+   */
+  presentation?: "sheet" | "dialog"
 }
 
-const COUNTRY_OPTIONS = getPhoneCountryOptions()
+export interface CountryPickerSheetContentProps {
+  selectedCountry: PhoneCountryCode
+  onSelect: (countryCode: PhoneCountryCode) => void
+  language: "tr" | "en"
+}
 
-export function CountryCallingCodePicker({
-  selectedCountry,
-  disabled = false,
-  onSelect,
-  language = "tr"
-}: CountryCallingCodePickerProps) {
-  const [visible, setVisible] = useState(false)
-  const [query, setQuery] = useState("")
-  const selectedOption = COUNTRY_OPTIONS.find(
-    (option) => option.countryCode === selectedCountry
-  ) ?? COUNTRY_OPTIONS[0]
-  const filteredOptions = useMemo(
-    () => filterPhoneCountryOptions(COUNTRY_OPTIONS, query),
-    [query]
-  )
-  const copy = language === "tr" ? {
+function getCountryPickerCopy(language: "tr" | "en") {
+  return language === "tr" ? {
     choose: "Ülke telefon kodunu seç",
     current: "Seçili ülke",
     close: "Ülke seçimini kapat",
@@ -62,16 +61,34 @@ export function CountryCallingCodePicker({
     placeholder: "Country or +90",
     empty: "No country found"
   }
+}
 
-  const close = (): void => {
-    setVisible(false)
-    setQuery("")
-  }
+const COUNTRY_OPTIONS = getPhoneCountryOptions()
 
-  const select = (countryCode: PhoneCountryCode): void => {
-    onSelect(countryCode)
-    close()
-  }
+export function CountryCallingCodePicker({
+  selectedCountry,
+  disabled = false,
+  onSelect,
+  language = "tr",
+  presentation = "sheet"
+}: CountryCallingCodePickerProps) {
+  const [visible, setVisible] = useState(false)
+  const selectedOption = COUNTRY_OPTIONS.find(
+    (option) => option.countryCode === selectedCountry
+  ) ?? COUNTRY_OPTIONS[0]
+  const copy = getCountryPickerCopy(language)
+  const presentsNatively = useNativeSheet(
+    "countryPicker",
+    visible && presentation === "sheet" ? { selectedCountry, onSelect, language } : null,
+    () => setVisible(false)
+  )
+  const dialogPresentation = useMemo<SheetPresentation>(() => ({
+    close: (afterDismiss) => {
+      setVisible(false)
+      afterDismiss?.()
+    },
+    setDismissible: () => undefined
+  }), [])
 
   return (
     <>
@@ -104,95 +121,129 @@ export function CountryCallingCodePicker({
         />
       </Pressable>
 
-      <Modal
-        animationType="fade"
-        onRequestClose={close}
-        transparent
-        visible={visible}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalRoot}
+      {presentsNatively && presentation === "sheet" ? null : (
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setVisible(false)}
+          transparent
+          visible={visible}
         >
-          <Pressable
-            accessibilityLabel={copy.close}
-            accessibilityRole="button"
-            onPress={close}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            accessibilityViewIsModal
-            style={styles.sheet}
-          >
-            <View pointerEvents="none" style={styles.sheetGlassTint} />
-            <View pointerEvents="none" style={styles.sheetHighlight} />
-            <View style={styles.header}>
-              <View style={styles.titleCopy}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.eyebrow}>
-                  {copy.eyebrow}
-                </Text>
-                <Text maxFontSizeMultiplier={1.3} style={styles.title}>
-                  {copy.title}
-                </Text>
-              </View>
+          <SheetPresentationContext.Provider value={dialogPresentation}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.modalRoot}
+            >
               <Pressable
                 accessibilityLabel={copy.close}
                 accessibilityRole="button"
-                onPress={close}
-                style={({ pressed }) => [
-                  styles.closeButton,
-                  pressed ? styles.pressed : null
-                ]}
+                onPress={() => setVisible(false)}
+                style={StyleSheet.absoluteFill}
+              />
+              <View
+                accessibilityViewIsModal
+                style={styles.sheet}
               >
-                <Ionicons
-                  accessible={false}
-                  name="close"
-                  size={20}
-                  color={uiTheme.colors.textPrimary}
+                <View pointerEvents="none" style={styles.sheetGlassTint} />
+                <View pointerEvents="none" style={styles.sheetHighlight} />
+                <CountryPickerSheetContent
+                  selectedCountry={selectedCountry}
+                  onSelect={onSelect}
+                  language={language}
                 />
-              </Pressable>
-            </View>
+              </View>
+            </KeyboardAvoidingView>
+          </SheetPresentationContext.Provider>
+        </Modal>
+      )}
+    </>
+  )
+}
 
-            <View style={styles.searchShell}>
-              <Ionicons
-                accessible={false}
-                name="search"
-                size={18}
-                color={uiTheme.colors.textMuted}
-              />
-              <TextInput
-                accessibilityLabel={copy.search}
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={setQuery}
-                placeholder={copy.placeholder}
-                placeholderTextColor={uiTheme.colors.textMuted}
-                returnKeyType="search"
-                style={styles.searchInput}
-                value={query}
-              />
-            </View>
+/** Search and pick a calling code; selecting closes the presenting sheet. */
+export function CountryPickerSheetContent({
+  selectedCountry,
+  onSelect,
+  language
+}: CountryPickerSheetContentProps) {
+  const [query, setQuery] = useState("")
+  const { close } = useSheetPresentation()
+  const copy = getCountryPickerCopy(language)
+  const filteredOptions = useMemo(
+    () => filterPhoneCountryOptions(COUNTRY_OPTIONS, query),
+    [query]
+  )
+  const select = (countryCode: PhoneCountryCode): void => {
+    onSelect(countryCode)
+    close()
+  }
 
-            <FlatList
-              data={filteredOptions}
-              keyboardShouldPersistTaps="handled"
-              keyExtractor={(item) => item.countryCode}
-              renderItem={({ item }) => (
-                <CountryRow
-                  country={item}
-                  selected={item.countryCode === selectedCountry}
-                  onSelect={select}
-                />
-              )}
-              ListEmptyComponent={(
-                <Text style={styles.emptyText}>{copy.empty}</Text>
-              )}
-              showsVerticalScrollIndicator={false}
-              style={styles.list}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+  return (
+    <>
+      <View style={styles.header}>
+        <View style={styles.titleCopy}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.eyebrow}>
+            {copy.eyebrow}
+          </Text>
+          <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
+            {copy.title}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityLabel={copy.close}
+          accessibilityRole="button"
+          onPress={() => close()}
+          style={({ pressed }) => [
+            styles.closeButton,
+            pressed ? styles.pressed : null
+          ]}
+        >
+          <Ionicons
+            accessible={false}
+            name="close"
+            size={20}
+            color={uiTheme.colors.textPrimary}
+          />
+        </Pressable>
+      </View>
+
+      <View style={styles.searchShell}>
+        <Ionicons
+          accessible={false}
+          name="search"
+          size={18}
+          color={uiTheme.colors.textMuted}
+        />
+        <TextInput
+          accessibilityLabel={copy.search}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setQuery}
+          placeholder={copy.placeholder}
+          placeholderTextColor={uiTheme.colors.textMuted}
+          returnKeyType="search"
+          style={styles.searchInput}
+          value={query}
+        />
+      </View>
+
+      <FlatList
+        data={filteredOptions}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        keyExtractor={(item) => item.countryCode}
+        renderItem={({ item }) => (
+          <CountryRow
+            country={item}
+            selected={item.countryCode === selectedCountry}
+            onSelect={select}
+          />
+        )}
+        ListEmptyComponent={(
+          <Text style={styles.emptyText}>{copy.empty}</Text>
+        )}
+        showsVerticalScrollIndicator={false}
+        style={styles.list}
+      />
     </>
   )
 }

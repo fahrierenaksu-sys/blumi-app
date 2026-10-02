@@ -125,6 +125,8 @@ try {
       "src/navigation/globalRealtimeSessionLifecycle.test.ts",
       "src/navigation/mainTabRenderIsolation.test.ts",
       "src/ui/springPressScale.test.ts",
+      "src/ui/motion.test.ts",
+      "src/navigation/nativeSheets/nativeSheets.test.ts",
       "src/ui/bottomPanelEntrance.test.ts",
       "src/navigation/useNotificationResponseRouting.test.ts"
     ],

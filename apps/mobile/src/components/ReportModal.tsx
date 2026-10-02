@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
-import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import type { ReportReason } from "@blumi/contracts"
 import {
   blockUser,
@@ -13,7 +12,9 @@ import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { hapticError, hapticMedium, hapticSuccess } from "../ui/haptics"
 import { showToast } from "../ui/toast"
-import { SwipeDismissSheet } from "../ui/SwipeDismissSheet"
+import { ModalBottomSheet } from "../ui/ModalBottomSheet"
+import { useSheetDismissible, useSheetPresentation } from "../ui/sheetPresentation"
+import { useNativeSheet } from "../navigation/nativeSheets/useNativeSheet"
 import { uiTheme } from "../ui/theme"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getNativeAppLocale } from "../features/session/authLocale"
@@ -52,15 +53,37 @@ function createReportIdempotencyKey(): string {
   return `report-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`
 }
 
+export type ReportSheetContentProps = Omit<ReportModalProps, "visible" | "onClose">
+
+/**
+ * Report or hide a person. A native form sheet on iOS, the app's swipe-down
+ * sheet elsewhere (navigation/nativeSheets). `onActionComplete` runs after
+ * the sheet has gone, so it can leave the screen safely.
+ */
 export function ReportModal(props: ReportModalProps) {
+  const { visible, onClose, ...contentProps } = props
+  const presentsNatively = useNativeSheet("report", visible ? contentProps : null, onClose)
+  if (presentsNatively) return null
+  return (
+    <ModalBottomSheet
+      visible={visible}
+      onClose={onClose}
+      backdrop={{ style: styles.backdrop }}
+      sheetStyle={styles.sheet}
+    >
+      <ReportSheetContent {...contentProps} />
+    </ModalBottomSheet>
+  )
+}
+
+export function ReportSheetContent(props: ReportSheetContentProps) {
   const {
-    visible,
     targetUserId,
     targetDisplayName,
     sessionActor,
-    onClose,
     onActionComplete
   } = props
+  const { close } = useSheetPresentation()
   const copy = getReportModalCopy(
     resolveAccountRecoveryLocale(
       getNativeAppLocale(),
@@ -107,9 +130,7 @@ export function ReportModal(props: ReportModalProps) {
         })
         hapticSuccess()
         showToast({ title: copy.hiddenToast(targetDisplayName), type: "info" })
-        onClose()
-        resetState()
-        onActionComplete?.()
+        close(onActionComplete)
       } catch {
         hapticError()
         showToast({
@@ -121,7 +142,7 @@ export function ReportModal(props: ReportModalProps) {
         setIsSubmitting(false)
       }
     })()
-  }, [copy, isSubmitting, onActionComplete, onClose, sessionActor, targetDisplayName, targetUserId])
+  }, [close, copy, isSubmitting, onActionComplete, sessionActor, targetDisplayName, targetUserId])
 
   const handleReportAndBlock = useCallback(() => {
     if (!selectedReason || isSubmitting) return
@@ -168,9 +189,7 @@ export function ReportModal(props: ReportModalProps) {
         })
         setStep("done")
         setTimeout(() => {
-          onClose()
-          resetState()
-          onActionComplete?.()
+          close(onActionComplete)
         }, 800)
       } catch {
         hapticError()
@@ -183,185 +202,159 @@ export function ReportModal(props: ReportModalProps) {
         setIsSubmitting(false)
       }
     })()
-  }, [copy, details, isSubmitting, onActionComplete, onClose, selectedReason, sessionActor, targetDisplayName, targetUserId])
+  }, [close, copy, details, isSubmitting, onActionComplete, selectedReason, sessionActor, targetDisplayName, targetUserId])
 
-  const resetState = () => {
-    setSelectedReason(null)
-    setDetails("")
-    setStep("reason")
-    setIsSubmitting(false)
-    reportIdempotencyKeyRef.current = null
-  }
+  // Each presentation mounts fresh, so nothing needs resetting on close.
+  useSheetDismissible(!isSubmitting && step !== "done")
 
   const handleClose = useCallback(() => {
     if (isSubmitting) return
-    onClose()
-    resetState()
-  }, [isSubmitting, onClose])
+    close()
+  }, [close, isSubmitting])
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={handleClose}
-    >
-      <GestureHandlerRootView style={styles.overlay}>
-        <SwipeDismissSheet
-          onDismiss={handleClose}
-          enabled={!isSubmitting && step !== "done"}
-          backdrop={{ style: styles.backdrop }}
-          accessibilityViewIsModal
-          style={styles.sheet}
+    <>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          {copy.title(targetDisplayName, step)}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.closeAccessibilityLabel}
+          accessibilityState={{ disabled: isSubmitting }}
+          disabled={isSubmitting}
+          onPress={handleClose}
+          hitSlop={8}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.handle} />
-            <Text style={styles.title}>
-              {copy.title(targetDisplayName, step)}
-            </Text>
+          <Ionicons name="close" size={22} color={uiTheme.colors.textMuted} />
+        </Pressable>
+      </View>
+
+      {step === "reason" ? (
+        <View style={styles.body}>
+          <Text style={styles.subtitle}>
+            {copy.reasonSubtitle}
+          </Text>
+          {REASONS.map((r) => {
+            const reasonLabel = copy.reasonLabel(r.key)
+            return (
             <Pressable
+              key={r.key}
               accessibilityRole="button"
-              accessibilityLabel={copy.closeAccessibilityLabel}
+              accessibilityLabel={copy.reportReasonAccessibilityLabel(reasonLabel)}
               accessibilityState={{ disabled: isSubmitting }}
               disabled={isSubmitting}
-              onPress={handleClose}
-              hitSlop={8}
+              style={({ pressed }) => [
+                styles.reasonCard,
+                pressed ? styles.reasonCardPressed : null
+              ]}
+              onPress={() => {
+                if (!isSubmitting) handleSelectReason(r.key)
+              }}
             >
-              <Ionicons name="close" size={22} color={uiTheme.colors.textMuted} />
-            </Pressable>
-          </View>
-
-          {step === "reason" ? (
-            <View style={styles.body}>
-              <Text style={styles.subtitle}>
-                {copy.reasonSubtitle}
-              </Text>
-              {REASONS.map((r) => {
-                const reasonLabel = copy.reasonLabel(r.key)
-                return (
-                <Pressable
-                  key={r.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.reportReasonAccessibilityLabel(reasonLabel)}
-                  accessibilityState={{ disabled: isSubmitting }}
-                  disabled={isSubmitting}
-                  style={({ pressed }) => [
-                    styles.reasonCard,
-                    pressed ? styles.reasonCardPressed : null
-                  ]}
-                  onPress={() => {
-                    if (!isSubmitting) handleSelectReason(r.key)
-                  }}
-                >
-                  <Ionicons
-                    accessible={false}
-                    name={r.icon}
-                    size={18}
-                    color={uiTheme.colors.primaryDeep}
-                  />
-                  <Text style={styles.reasonLabel}>{reasonLabel}</Text>
-                  <Ionicons
-                    accessible={false}
-                    name="chevron-forward"
-                    size={19}
-                    color={uiTheme.colors.textMuted}
-                  />
-                </Pressable>
-                )
-              })}
-
-              <View style={styles.divider} />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.hideAccessibilityLabel(targetDisplayName)}
-                accessibilityState={{ disabled: isSubmitting }}
-                disabled={isSubmitting}
-                style={({ pressed }) => [
-                  styles.blockOnlyButton,
-                  pressed ? { opacity: 0.85 } : null
-                ]}
-                onPress={handleBlock}
-              >
-                <Text style={styles.blockOnlyText}>
-                  {isSubmitting ? copy.hiding : copy.hideWithoutReporting}
-                </Text>
-              </Pressable>
-            </View>
-          ) : step === "confirm" ? (
-            <View style={styles.body}>
-              <Text style={styles.subtitle}>
-                {copy.confirmBody(targetDisplayName)}
-              </Text>
-              <TextInput
-                accessibilityLabel={copy.detailsAccessibilityLabel}
-                value={details}
-                onChangeText={setDetails}
-                placeholder={copy.detailsPlaceholder}
-                placeholderTextColor={uiTheme.colors.textMuted}
-                maxLength={MAX_REPORT_DETAILS_LENGTH}
-                multiline
-                style={styles.detailsInput}
-                textAlignVertical="top"
-              />
-              <Text style={styles.detailsCounter}>
-                {details.length}/{MAX_REPORT_DETAILS_LENGTH}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.reportAndHideAccessibilityLabel(targetDisplayName)}
-                accessibilityState={{ disabled: isSubmitting }}
-                disabled={isSubmitting}
-                style={({ pressed }) => [
-                  styles.reportButton,
-                  pressed ? { opacity: 0.88 } : null
-                ]}
-                onPress={handleReportAndBlock}
-              >
-                <Text style={styles.reportButtonText}>
-                  {isSubmitting ? copy.sending : copy.reportAndHide}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.goBackAccessibilityLabel}
-                accessibilityState={{ disabled: isSubmitting }}
-                disabled={isSubmitting}
-                onPress={() => setStep("reason")}
-                hitSlop={8}
-              >
-                <View style={styles.backLinkRow}>
-                  <Ionicons name="arrow-back" size={16} color={uiTheme.colors.textMuted} />
-                  <Text style={styles.backLink}>{copy.goBack}</Text>
-                </View>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.body}>
               <Ionicons
                 accessible={false}
-                name="checkmark-circle"
-                size={48}
-                color={uiTheme.colors.successInk}
-                style={styles.doneIcon}
+                name={r.icon}
+                size={18}
+                color={uiTheme.colors.primaryDeep}
               />
-              <Text style={styles.doneText}>
-                {copy.doneMessage}
-              </Text>
+              <Text style={styles.reasonLabel}>{reasonLabel}</Text>
+              <Ionicons
+                accessible={false}
+                name="chevron-forward"
+                size={19}
+                color={uiTheme.colors.textMuted}
+              />
+            </Pressable>
+            )
+          })}
+
+          <View style={styles.divider} />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.hideAccessibilityLabel(targetDisplayName)}
+            accessibilityState={{ disabled: isSubmitting }}
+            disabled={isSubmitting}
+            style={({ pressed }) => [
+              styles.blockOnlyButton,
+              pressed ? { opacity: 0.85 } : null
+            ]}
+            onPress={handleBlock}
+          >
+            <Text style={styles.blockOnlyText}>
+              {isSubmitting ? copy.hiding : copy.hideWithoutReporting}
+            </Text>
+          </Pressable>
+        </View>
+      ) : step === "confirm" ? (
+        <View style={styles.body}>
+          <Text style={styles.subtitle}>
+            {copy.confirmBody(targetDisplayName)}
+          </Text>
+          <TextInput
+            accessibilityLabel={copy.detailsAccessibilityLabel}
+            value={details}
+            onChangeText={setDetails}
+            placeholder={copy.detailsPlaceholder}
+            placeholderTextColor={uiTheme.colors.textMuted}
+            maxLength={MAX_REPORT_DETAILS_LENGTH}
+            multiline
+            style={styles.detailsInput}
+            textAlignVertical="top"
+          />
+          <Text style={styles.detailsCounter}>
+            {details.length}/{MAX_REPORT_DETAILS_LENGTH}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.reportAndHideAccessibilityLabel(targetDisplayName)}
+            accessibilityState={{ disabled: isSubmitting }}
+            disabled={isSubmitting}
+            style={({ pressed }) => [
+              styles.reportButton,
+              pressed ? { opacity: 0.88 } : null
+            ]}
+            onPress={handleReportAndBlock}
+          >
+            <Text style={styles.reportButtonText}>
+              {isSubmitting ? copy.sending : copy.reportAndHide}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.goBackAccessibilityLabel}
+            accessibilityState={{ disabled: isSubmitting }}
+            disabled={isSubmitting}
+            onPress={() => setStep("reason")}
+            hitSlop={8}
+          >
+            <View style={styles.backLinkRow}>
+              <Ionicons name="arrow-back" size={16} color={uiTheme.colors.textMuted} />
+              <Text style={styles.backLink}>{copy.goBack}</Text>
             </View>
-          )}
-        </SwipeDismissSheet>
-      </GestureHandlerRootView>
-    </Modal>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.body}>
+          <Ionicons
+            accessible={false}
+            name="checkmark-circle"
+            size={48}
+            color={uiTheme.colors.successInk}
+            style={styles.doneIcon}
+          />
+          <Text style={styles.doneText}>
+            {copy.doneMessage}
+          </Text>
+        </View>
+      )}
+    </>
   )
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end"
-  },
   // Drawn by the sheet so it fades with a swipe-down instead of trailing it.
   backdrop: {
     backgroundColor: "rgba(35, 18, 42, 0.24)"
@@ -382,16 +375,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiTheme.spacing.lg,
     paddingTop: uiTheme.spacing.md,
     paddingBottom: uiTheme.spacing.sm
-  },
-  handle: {
-    position: "absolute",
-    top: 8,
-    left: "50%",
-    marginLeft: -20,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: uiTheme.colors.border
   },
   title: {
     flex: 1,

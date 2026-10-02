@@ -29,7 +29,8 @@ export const ROOT_ROUTE_NAMES = [
   "AccountRestriction",
   "Legal",
   "ChatThread",
-  "MatchResult"
+  "MatchResult",
+  "NativeSheet"
 ] as const satisfies readonly (keyof RootStackParamList)[]
 
 export type RootRouteName = (typeof ROOT_ROUTE_NAMES)[number]

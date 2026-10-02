@@ -1,7 +1,7 @@
 import type { ChatMessage } from "@blumi/contracts"
 import { useCallback, useState } from "react"
 import { captureProductEvent } from "../../../analytics/productAnalytics"
-import { hapticLight } from "../../../ui/haptics"
+import { hapticSelection } from "../../../ui/haptics"
 import type { SessionMode } from "../../session/sessionModel"
 import type { FetchThreadMessagesOptions } from "../chatApi"
 import type {
@@ -61,7 +61,7 @@ export function useChatMessageSending({
       mode: sessionMode,
       kind: "text"
     })
-    hapticLight()
+    hapticSelection()
     return true
   }, [addOptimisticMessage, currentUserId, sendChatMessage, resolvedThreadId, sessionMode])
 

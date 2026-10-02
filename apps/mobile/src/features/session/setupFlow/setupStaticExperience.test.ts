@@ -62,12 +62,9 @@ function createReanimatedStub(runtime: FakeReactRuntime) {
 }
 
 function reducedMotionModules(reduceMotion: boolean) {
-  const snapshot = { reduceMotion, isResolved: true }
   return {
-    "./reducedMotionStore": {
-      createReducedMotionStore: () => ({ subscribe: () => () => undefined, getSnapshot: () => snapshot })
-    },
-    "./theme": { uiTheme: { animation: { durationEntrance: 320, staggerMs: 40 } } }
+    "./motion": { useReducedMotion: () => reduceMotion, MOTION_STAGGER: { stepMs: 30, maxItems: 6 } },
+    "./theme": { uiTheme: { animation: { durationEntrance: 320 } } }
   }
 }
 
@@ -202,7 +199,7 @@ function loadPreAuthFlow(runtime: FakeReactRuntime) {
         getCurrentSetupFlowCopy: () => ({ room: { continueAction: "Continue" } })
       },
       "../ui/animations": { useReducedMotionPreference: () => ({ reduceMotion: false, isResolved: true }) },
-      "../ui/theme": { uiTheme: { animation: { springSnappy: {} } } },
+      "../ui/motion": { MOTION_SPRINGS: { snappy: {} } },
       "./AvatarSetupScreen": { AvatarSetupScreen: "AvatarSetupScreen" },
       "./ProfileSetupScreen": { ProfileSetupScreen: "ProfileSetupScreen" },
       "./RegisterScreen": { RegisterScreen: "RegisterScreen" },
