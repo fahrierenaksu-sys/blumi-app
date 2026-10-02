@@ -197,18 +197,6 @@ export const uiTheme = {
     durationEntrance: 350,
     scalePress: 0.965,
     scalePop: 1.05,
-    // Named Reanimated springs: `withSpring(target, uiTheme.animation.springSnappy)`.
-    // Use a spring for motion the user starts (press, drag release, selection,
-    // sheet/card settle); use timing (`duration*` above) for opacity and
-    // crossfades. `duration` is Reanimated's perceptual duration.
-    /** Taps, toggles, selection and small settles. */
-    springSnappy: { duration: 350, dampingRatio: 0.85 },
-    /** Larger surfaces (sheets, panels) settling without overshoot. */
-    springGentleTimed: { duration: 500, dampingRatio: 1 },
-    /** Rare celebratory moments (match, unlock) with a visible overshoot. */
-    springCelebrate: { duration: 550, dampingRatio: 0.7 },
-    /** Delay between consecutive items of a staggered list entrance. */
-    staggerMs: 35,
   },
   opacity: {
     disabled: 0.5,

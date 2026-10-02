@@ -38,7 +38,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
 import { useReducedMotionPreference } from "../ui/animations"
-import { uiTheme } from "../ui/theme"
+import { MOTION_SPRINGS } from "../ui/motion"
 import { AvatarSetupScreen } from "./AvatarSetupScreen"
 import { ProfileSetupScreen } from "./ProfileSetupScreen"
 import { RegisterScreen } from "./RegisterScreen"
@@ -115,7 +115,7 @@ export function PersistentStepLayer({
     if (reduceMotion) {
       translateY.value = 0
     } else if (active) {
-      translateY.value = withSpring(0, uiTheme.animation.springSnappy)
+      translateY.value = withSpring(0, MOTION_SPRINGS.snappy)
     } else {
       translateY.value = withTiming(direction * 8, {
         duration,

@@ -3,44 +3,19 @@
  * Uses React Native's Animated API with useNativeDriver for 60fps.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
-import { AccessibilityInfo, Animated, Easing } from "react-native"
-import {
-  createReducedMotionStore,
-  type ReducedMotionPreference
-} from "./reducedMotionStore"
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { Animated, Easing } from "react-native"
 import { getPulseRestProgress } from "./ambientMotionModel"
+import { MOTION_STAGGER, useReducedMotion } from "./motion"
 import { uiTheme } from "./theme"
 
-/** Keeps product motion aligned with the OS accessibility preference. */
-const reducedMotionStore = createReducedMotionStore({
-  isReduceMotionEnabled: () => AccessibilityInfo.isReduceMotionEnabled(),
-  addEventListener: (event, listener) =>
-    AccessibilityInfo.addEventListener(event, listener)
-})
-
-let reducedMotionPrimed = false
-
-/** Called once at the app root so later mounts read a resolved preference. */
-export function primeReducedMotionPreference(): void {
-  if (reducedMotionPrimed) return
-  reducedMotionPrimed = true
-  reducedMotionStore.subscribe(() => undefined)
-}
-
-export function useReducedMotionPreference(): ReducedMotionPreference {
-  // One shared OS subscription; resolved values are available synchronously
-  // to later mounts, and the unresolved default remains fail closed.
-  return useSyncExternalStore(
-    reducedMotionStore.subscribe,
-    reducedMotionStore.getSnapshot,
-    reducedMotionStore.getSnapshot
-  )
-}
-
-export function useReducedMotion(): boolean {
-  return useReducedMotionPreference().reduceMotion
-}
+// The Reduce Motion store lives in ./motion; these re-exports keep the
+// existing import sites working.
+export {
+  primeReducedMotionPreference,
+  useReducedMotion,
+  useReducedMotionPreference
+} from "./motion"
 
 /**
  * Press feedback on a native-driver scale value. Under Reduce Motion the
@@ -121,7 +96,7 @@ export function useStaggeredEntrance(
   itemCount: number,
   options: { staggerMs?: number; duration?: number; translateY?: number } = {}
 ) {
-  const { staggerMs = uiTheme.animation.staggerMs, duration = 320, translateY = 20 } = options
+  const { staggerMs = MOTION_STAGGER.stepMs, duration = 320, translateY = 20 } = options
   const reduceMotion = useReducedMotion()
   const anims = useMemo(
     () => Array.from({ length: itemCount }, () => new Animated.Value(0)),

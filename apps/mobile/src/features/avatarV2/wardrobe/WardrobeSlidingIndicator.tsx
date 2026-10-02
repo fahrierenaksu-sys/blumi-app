@@ -4,17 +4,15 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   type SharedValue
 } from "react-native-reanimated"
-import { useReducedMotion } from "../../../ui/animations"
-import { uiTheme } from "../../../ui/theme"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { getWardrobePageDotWidth, type WardrobeIndicatorFrame } from "./wardrobeIndicatorModel"
 import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
 /**
  * WRD-3: the selection capsule slides to the chosen section or category
- * with the springSnappy token on the UI thread. It appears in place on its
+ * with the snappy motion token on the UI thread. It appears in place on its
  * first measured frame, and jumps under Reduce Motion.
  */
 export function WardrobeSlidingIndicator(props: {
@@ -22,7 +20,8 @@ export function WardrobeSlidingIndicator(props: {
   style: StyleProp<ViewStyle>
 }) {
   const { frame } = props
-  const reduceMotion = useReducedMotion()
+  const motion = useMotion()
+  const { reduceMotion } = motion
   const x = useSharedValue(frame.x)
   const width = useSharedValue(frame.width)
   const placedRef = useRef(false)
@@ -33,8 +32,8 @@ export function WardrobeSlidingIndicator(props: {
       x.value = frame.x
       return
     }
-    x.value = withSpring(frame.x, uiTheme.animation.springSnappy)
-  }, [frame.width, frame.x, reduceMotion, width, x])
+    x.value = animateTo(frame.x, motion.snappy)
+  }, [frame.width, frame.x, motion, reduceMotion, width, x])
   const animatedStyle = useAnimatedStyle(() => ({
     width: width.value,
     transform: [{ translateX: x.value }]

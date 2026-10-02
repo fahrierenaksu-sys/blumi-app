@@ -14,6 +14,7 @@ import {
   useReducedMotion,
   useReducedMotionPreference
 } from "../ui/animations"
+import { MOTION_SPRINGS } from "../ui/motion"
 import Reanimated, {
   useAnimatedStyle,
   useSharedValue,
@@ -93,7 +94,7 @@ function CinematicActionButton({
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: pressScale.value }] }))
   const pressTo = (value: number) => {
     if (reduceMotion) return
-    pressScale.value = withSpring(value, uiTheme.animation.springSnappy)
+    pressScale.value = withSpring(value, MOTION_SPRINGS.press)
   }
   return (
     <Animated.View style={[styles.cinematicActionContainer, entrance]}>

@@ -3,10 +3,9 @@ import { useEffect } from "react"
 import { Pressable } from "react-native"
 import Animated, {
   useAnimatedStyle,
-  useSharedValue,
-  withSpring
+  useSharedValue
 } from "react-native-reanimated"
-import { useReducedMotion } from "../../../ui/animations"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { uiTheme } from "../../../ui/theme"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 
@@ -22,11 +21,12 @@ export function ShopCardRemoveButton(props: {
   testID?: string
   onPress: () => void
 }) {
-  const reduceMotion = useReducedMotion()
+  const motion = useMotion()
+  const { reduceMotion } = motion
   const progress = useSharedValue(reduceMotion ? 1 : 0)
   useEffect(() => {
-    progress.value = reduceMotion ? 1 : withSpring(1, uiTheme.animation.springSnappy)
-  }, [progress, reduceMotion])
+    progress.value = animateTo(1, motion.snappy)
+  }, [motion, progress])
   const dotStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, progress.value),
     transform: [{ scale: HIDDEN_SCALE + (1 - HIDDEN_SCALE) * progress.value }]
