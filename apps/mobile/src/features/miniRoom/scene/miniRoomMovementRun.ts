@@ -28,7 +28,7 @@ export interface MiniRoomMovementRunInput {
   }
   animator: MiniRoomSegmentAnimator
   /** Commits the walking pose (direction change) when a segment starts. */
-  onSegmentStart: (pose: RoomWorldAvatarRuntimePose) => void
+  onSegmentStart: (pose: RoomWorldAvatarRuntimePose, segment: RoomWorldMovementSegment, index: number) => void
   /** Commits the pose a segment ends on; for the final one, the arrival pose. */
   onSegmentEnd: (pose: RoomWorldAvatarRuntimePose, segment: RoomWorldMovementSegment) => void
   /** Called once after the final segment's end pose is committed. */
@@ -52,7 +52,7 @@ export function startMiniRoomMovementRun(input: MiniRoomMovementRunInput): MiniR
   const runSegment = (index: number): void => {
     const segment = input.segments[index]
     if (!segment) return
-    input.onSegmentStart(getRoomWorldMovementSegmentStartPose(segment))
+    input.onSegmentStart(getRoomWorldMovementSegmentStartPose(segment), segment, index)
     input.animator.animate(segment, () => {
       if (!active) return
       const frame = getRoomWorldMovementFrame({

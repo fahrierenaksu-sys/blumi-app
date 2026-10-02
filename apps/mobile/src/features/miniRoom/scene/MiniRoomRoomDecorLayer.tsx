@@ -7,10 +7,12 @@ import { RoomTapFeedback } from "./RoomTapFeedback"
 interface MiniRoomRoomDecorLayerProps {
   scene: ResolvedRoomV2Scene
   interaction: InteractionState
+  /** Furniture the avatar layer draws among the avatars (miniRoomDepthModel). */
+  occluderIds: ReadonlySet<string>
 }
 
 export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
-  const { scene, interaction } = props
+  const { scene, interaction, occluderIds } = props
 
   if (!scene.shell) {
     return null
@@ -21,6 +23,7 @@ export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
         shell={scene.shell}
         renderItems={scene.renderItems}
         showDepthWash={false}
+        hiddenItemRenderIds={occluderIds}
         testID="mini-room-saved-room-decor"
         style={styles.decorRenderer}
       />

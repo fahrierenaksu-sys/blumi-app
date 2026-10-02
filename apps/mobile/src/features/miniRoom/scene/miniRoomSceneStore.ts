@@ -379,6 +379,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         options?.hotspot?.kind === "seat"
           ? options?.hotspot?.id
           : undefined
+      // Draw order only: sitting down and standing up keep the seat's depth.
+      const departingSeatHotspotId = currentSeatExit ? departingHotspotId : undefined
       let run: MiniRoomMovementRun | null = null
       run = startMiniRoomMovementRun({
         segments: plan.segments,
@@ -387,7 +389,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           motion: arrivalMotion
         },
         animator: motionDriver.animator,
-        onSegmentStart: (segmentStartPose) => {
+        onSegmentStart: (segmentStartPose, segment, index) => {
+          const depthSeatHotspotId = segment.isFinal && arrivalSeatedHotspotId
+            ? arrivalSeatedHotspotId
+            : index === 0 ? departingSeatHotspotId : undefined
           setAvatars((current) => {
             const avatar = current[movingUserId]
             if (!avatar) return current
@@ -399,7 +404,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
                 targetY: target.y,
                 facing: segmentStartPose.facing,
                 motion: segmentStartPose.motion,
-                seatedHotspotId: undefined
+                seatedHotspotId: undefined,
+                depthSeatHotspotId
               }
             }
           })
@@ -432,7 +438,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
                 facing: runtimePose.facing,
                 targetX: undefined,
                 targetY: undefined,
-                seatedHotspotId: arrivalSeatedHotspotId
+                seatedHotspotId: arrivalSeatedHotspotId,
+                depthSeatHotspotId: undefined
               }
             }
           })
@@ -524,7 +531,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       snapMiniRoomAvatarPosition(driver.position, position)
       setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
         x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
-        seatedHotspotId: undefined, present: false } }))
+        seatedHotspotId: undefined, depthSeatHotspotId: undefined, present: false } }))
       return
     }
     // Place exactly: seated on its seat when the record carries one, as the
@@ -538,7 +545,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
       x: position.x, y: position.y, targetX: undefined, targetY: undefined,
       motion: seated ? "sitting" : "idle", ...(seated || refused ? { facing } : {}),
-      seatedHotspotId: seated ? hotspot.id : undefined, present: next.present } }))
+      seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, present: next.present } }))
   }, [geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand, roomWorldHotspots, runMovement])
 
   const setRemotePresence = useCallback((userId: string, present: boolean) => {
@@ -546,7 +553,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setAvatars(current => {
       const avatar = current[userId]
       if (!avatar || avatar.present === present) return current
-      return { ...current, [userId]: { ...avatar, present, ...(!present ? { motion: "idle" as const } : {}) } }
+      return { ...current, [userId]: { ...avatar, present,
+        ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined } : {}) } }
     })
   }, [movementRefFor])
 

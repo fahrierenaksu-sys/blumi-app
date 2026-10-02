@@ -25,6 +25,7 @@ import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
 import { MAX_ROOM_MESSAGE_LENGTH, RoomChatComposer } from "./RoomChatComposer"
 import { RoomMapLayer } from "./RoomMapLayer"
 import { useMiniRoomSceneStore } from "./miniRoomSceneStore"
+import { createMiniRoomDepthScene } from "./miniRoomDepthModel"
 import {
   MINI_ROOM_PARTNER_ARRIVAL_MS,
   resolveMiniRoomMotionPolicy
@@ -136,6 +137,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
+  // VIS-04: upright furniture is drawn among the avatars by floor depth.
+  const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
   const layoutInput = useMemo(
     () => ({
       windowWidth: viewport.width,
@@ -309,6 +312,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       partnerJustJoined={partnerJustJoined && partnerPresent}
       typingUserId={props.typing?.partnerTyping ? partnerUser.userId : undefined}
       motionPolicy={motionPolicy}
+      depthScene={depthScene}
     />
   )
 
@@ -335,6 +339,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             <StableMiniRoomRoomDecorLayer
               scene={roomDecorScene}
               interaction={store.interaction}
+              occluderIds={depthScene.occluderIds}
             />
             {hotspotLayer}
             {avatarLayer}

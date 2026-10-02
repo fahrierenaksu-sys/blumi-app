@@ -1,30 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-  getMiniRoomAvatarZIndex,
   resolveMiniRoomAvatarAnchorOffset,
-  resolveMiniRoomAvatarDepthOrder,
   resolveMiniRoomCameraTransform
 } from "./miniRoomAvatarStageModel"
 import { resolveMiniRoomLayout } from "./miniRoomLayout"
-
-test("draw order changes only when one avatar passes the other in depth (was every frame)", () => {
-  const orders: string[] = []
-  let previous: string | null = null
-  // Partner walks from behind the local avatar to in front of it, frame by frame.
-  for (let frame = 0; frame <= 60; frame += 1) {
-    const order = resolveMiniRoomAvatarDepthOrder([
-      { id: "local", y: 0.7 },
-      { id: "partner", y: 0.55 + frame * 0.005 }
-    ])
-    if (order !== previous) orders.push(order)
-    previous = order
-  }
-  assert.deepEqual(orders, ["partner|local", "local|partner"], "one flip, so one React update for 61 frames")
-  assert.equal(getMiniRoomAvatarZIndex("partner|local", "local"), 2)
-  assert.equal(getMiniRoomAvatarZIndex("partner|local", "partner"), 1)
-  assert.equal(resolveMiniRoomAvatarDepthOrder([{ id: "b", y: 0.5 }, { id: "a", y: 0.5 }]), "a|b", "ties agree on both phones")
-})
 
 test("an avatar's anchor moves by transform in room pixels", () => {
   assert.deepEqual(

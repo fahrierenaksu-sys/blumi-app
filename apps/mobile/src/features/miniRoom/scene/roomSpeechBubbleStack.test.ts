@@ -146,11 +146,13 @@ test("the avatar layer hands each avatar only its own lines and the Reduce Motio
       motionPolicy: resolveMiniRoomMotionPolicy(reduceMotion),
       typingUserId: "partner"
     })
-    return Object.fromEntries(children(layer).map((figure) => {
+    // Speech rides in each avatar's overlay (above furniture); bodies carry none.
+    return Object.fromEntries(children(layer).flatMap((figure) => {
       const output = (figure.type as (props: unknown) => Element)(figure.props)
       const [stack] = findAll(output, ({ type }) => type === "RoomSpeechBubbleStack")
+      if (!stack) return []
       const typingDots = findAll(output, ({ type }) => type === "RoomTypingBubble").length
-      return [String(figure.key), { stack: stack!.props, typingDots }]
+      return [[(figure.props.avatar as AvatarState).userId, { stack: stack.props, typingDots }]]
     }))
   })
 

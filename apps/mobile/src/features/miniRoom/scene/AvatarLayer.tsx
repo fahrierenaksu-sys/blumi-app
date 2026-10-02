@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from "react"
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react"
 import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
   useAnimatedReaction,
@@ -8,16 +8,20 @@ import Reanimated, {
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
+import { RoomRendererFurnitureSprite } from "../../roomV2/components/RoomRenderer2D"
 import {
   getMiniRoomAvatarRenderLayers,
   getMiniRoomAvatarSittingScaleY
 } from "../miniRoomAvatarMotion"
 import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
+import { resolveMiniRoomAvatarAnchorOffset } from "./miniRoomAvatarStageModel"
 import {
-  getMiniRoomAvatarZIndex,
-  resolveMiniRoomAvatarAnchorOffset,
-  resolveMiniRoomAvatarDepthOrder
-} from "./miniRoomAvatarStageModel"
+  EMPTY_MINI_ROOM_DEPTH_SCENE,
+  resolveMiniRoomAvatarSortDepth,
+  resolveMiniRoomDepthOrder,
+  resolveMiniRoomDepthZIndices,
+  type MiniRoomDepthScene
+} from "./miniRoomDepthModel"
 import {
   resolveMiniRoomAvatarLoops,
   type MiniRoomMotionPolicy
@@ -32,6 +36,8 @@ import { RoomTypingBubble } from "./RoomTypingBubble"
 import { useMiniRoomAvatarLoops } from "./useMiniRoomAvatarLoops"
 
 const NO_BUBBLES: readonly SpeechBubble[] = []
+/** Speech, typing dots and name plates read above every body and piece of furniture. */
+const OVERLAY_Z_INDEX = 10_000
 
 interface AvatarLayerProps {
   avatars: Record<string, AvatarState>
@@ -45,6 +51,8 @@ interface AvatarLayerProps {
   motionPolicy: MiniRoomMotionPolicy
   /** Who is typing (the partner, from chat.typing_updated); dots over their chibi. */
   typingUserId?: string
+  /** Furniture drawn among the avatars by floor depth (VIS-04). */
+  depthScene?: MiniRoomDepthScene
 }
 
 type BubblePlacement = RoomSpeechBubblePlacement
@@ -60,7 +68,8 @@ export function AvatarLayer(props: AvatarLayerProps) {
     dismissBubbleLabel,
     partnerJustJoined,
     motionPolicy,
-    typingUserId
+    typingUserId,
+    depthScene = EMPTY_MINI_ROOM_DEPTH_SCENE
   } = props
   const sortedAvatars = Object.values(avatars).sort((a, b) => a.y - b.y)
   // Stable per bubble list, so a figure re-renders only when its lines change.
@@ -84,27 +93,68 @@ export function AvatarLayer(props: AvatarLayerProps) {
     stageHeight.value = event.nativeEvent.layout.height
   }, [stageHeight, stageWidth])
 
-  // Draw order follows the live depth, but React hears only when one avatar
-  // passes another (not every frame).
-  const userIds = sortedAvatars.map((avatar) => avatar.userId).join("|")
-  const [depthOrder, setDepthOrder] = useState(userIds)
+  // A seated (or sitting-down / standing-up) avatar sorts at its seat's depth.
+  const { neighbours, occluders, seatDepthByHotspotId } = depthScene
+  const seatKey = sortedAvatars
+    .map((avatar) => `${avatar.userId}:${avatar.seatedHotspotId ?? avatar.depthSeatHotspotId ?? ""}`)
+    .join("|")
+  const pinnedDepths = useMemo(() => {
+    const pinned: Record<string, number> = {}
+    for (const entry of seatKey.split("|")) {
+      const split = entry.lastIndexOf(":")
+      const seat = entry.slice(split + 1)
+      const depth = seat ? seatDepthByHotspotId[seat] : undefined
+      if (depth !== undefined) pinned[entry.slice(0, split)] = depth
+    }
+    return pinned
+  }, [seatDepthByHotspotId, seatKey])
+
+  // Draw order follows the live depth, but React hears only when an avatar
+  // passes another avatar or a piece of furniture (not every frame).
+  const [depthOrder, setDepthOrder] = useState(() => resolveMiniRoomDepthOrder(neighbours,
+    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y }))))
   useAnimatedReaction(
-    () => resolveMiniRoomAvatarDepthOrder(Object.keys(avatarPositions).map((id) => ({
+    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => ({
       id,
-      y: avatarPositions[id]!.y.value
+      depth: resolveMiniRoomAvatarSortDepth(avatarPositions[id]!.y.value, pinnedDepths[id])
     }))),
     (order, previous) => {
       if (order !== previous) scheduleOnRN(setDepthOrder, order)
     },
-    [avatarPositions]
+    [avatarPositions, neighbours, pinnedDepths]
+  )
+  const zIndices = useMemo(
+    () => resolveMiniRoomDepthZIndices(depthOrder, occluders.length),
+    [depthOrder, occluders.length]
   )
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={handleLayout}>
+      {occluders.map((item, index) => (
+        <RoomRendererFurnitureSprite key={item.renderId} item={item} zIndex={zIndices.occluders[index] ?? 0} />
+      ))}
       {sortedAvatars.map((avatar) => {
+        const position = avatarPositions[avatar.userId]
+        if (!position) return null
+        const isLocal = avatar.userId === localUserId
+        return (
+          <AvatarFigure
+            key={avatar.userId}
+            avatar={avatar}
+            position={position}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            zIndex={zIndices.avatars[avatar.userId] ?? 0}
+            showJoinPulse={!isLocal && partnerJustJoined}
+            motionPolicy={motionPolicy}
+          />
+        )
+      })}
+      {sortedAvatars.map((avatar) => {
+        const position = avatarPositions[avatar.userId]
+        if (!position) return null
         const avatarBubbles = bubblesBySpeaker[avatar.userId] ?? NO_BUBBLES
         const isLocal = avatar.userId === localUserId
-        const showJoinPulse = !isLocal && partnerJustJoined
         let bubblePlacement: BubblePlacement = "center"
         if (avatar.x < 0.24) {
           bubblePlacement = "right"
@@ -113,33 +163,60 @@ export function AvatarLayer(props: AvatarLayerProps) {
         } else if (bubblesAreClose) {
           bubblePlacement = avatar.userId === leftBubbleUserId ? "left" : "right"
         }
-        const bubbleRaised =
-          bubblesAreClose && avatar.userId !== leftBubbleUserId
-        const position = avatarPositions[avatar.userId]
-        if (!position) return null
-
         return (
-          <AvatarFigure
-            key={avatar.userId}
+          <AvatarOverlay
+            key={`${avatar.userId}:overlay`}
             avatar={avatar}
             position={position}
             stageWidth={stageWidth}
             stageHeight={stageHeight}
-            zIndex={getMiniRoomAvatarZIndex(depthOrder, avatar.userId)}
             bubbles={avatarBubbles}
             bubblePlacement={bubblePlacement}
-            bubbleRaised={bubbleRaised}
+            bubbleRaised={bubblesAreClose && avatar.userId !== leftBubbleUserId}
             onDismissBubble={onDismissBubble}
             dismissBubbleLabel={dismissBubbleLabel}
             isLocal={isLocal}
             localUserLabel={localUserLabel}
-            showJoinPulse={showJoinPulse}
             motionPolicy={motionPolicy}
             typing={avatar.userId === typingUserId}
           />
         )
       })}
     </View>
+  )
+}
+
+/**
+ * One avatar's anchor at its live room position. Walking moves it on the UI
+ * thread as a transform (no layout per frame); React renders only on pose
+ * changes and depth-order flips. Body and overlay share it, so they never
+ * drift apart.
+ */
+function AvatarAnchor(props: {
+  avatar: AvatarState
+  position: MiniRoomAvatarPosition
+  stageWidth: SharedValue<number>
+  stageHeight: SharedValue<number>
+  zIndex: number
+  children: ReactNode
+}) {
+  const { avatar, position, stageWidth, stageHeight, zIndex, children } = props
+  const presentOpacity = avatar.present === false ? 0.35 : 1
+  const anchorStyle = useAnimatedStyle(() => {
+    const offset = resolveMiniRoomAvatarAnchorOffset(
+      { x: position.x.value, y: position.y.value },
+      { width: stageWidth.value, height: stageHeight.value }
+    )
+    return {
+      // Hidden until the room is measured, so no frame shows it at the corner.
+      opacity: stageWidth.value > 0 ? presentOpacity : 0,
+      transform: [{ translateX: offset.translateX }, { translateY: offset.translateY }]
+    }
+  })
+  return (
+    <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
+      {children}
+    </Reanimated.View>
   )
 }
 
@@ -150,19 +227,11 @@ interface AvatarFigureProps {
   stageHeight: SharedValue<number>
   /** Changes only when the depth order flips. */
   zIndex: number
-  /** This avatar's lines, oldest first. */
-  bubbles: readonly SpeechBubble[]
-  bubblePlacement: BubblePlacement
-  bubbleRaised: boolean
-  onDismissBubble: (bubbleId: string) => void
-  dismissBubbleLabel: string
-  isLocal: boolean
-  localUserLabel: string
   showJoinPulse: boolean
   motionPolicy: MiniRoomMotionPolicy
-  typing: boolean
 }
 
+/** The chibi body and its floor ring: sorted among the furniture by depth. */
 const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   const {
     avatar,
@@ -170,16 +239,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     stageWidth,
     stageHeight,
     zIndex,
-    bubbles,
-    bubblePlacement,
-    bubbleRaised,
-    onDismissBubble,
-    dismissBubbleLabel,
-    isLocal,
-    localUserLabel,
     showJoinPulse,
-    motionPolicy,
-    typing
+    motionPolicy
   } = props
   const roomAvatarLayers = useMemo(
     () => getMiniRoomAvatarRenderLayers({
@@ -235,41 +296,15 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       { rotate: `${2 * speaking.value}deg` }
     ]
   }))
-  // Walking moves these on the UI thread as a transform (no layout per
-  // frame); React renders only on pose changes and depth-order flips.
-  const presentOpacity = avatar.present === false ? 0.35 : 1
-  const anchorStyle = useAnimatedStyle(() => {
-    const offset = resolveMiniRoomAvatarAnchorOffset(
-      { x: position.x.value, y: position.y.value },
-      { width: stageWidth.value, height: stageHeight.value }
-    )
-    return {
-      // Hidden until the room is measured, so no frame shows it at the corner.
-      opacity: stageWidth.value > 0 ? presentOpacity : 0,
-      transform: [{ translateX: offset.translateX }, { translateY: offset.translateY }]
-    }
-  })
   const depthScaleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.9 + position.y.value * 0.2 }]
   }))
 
   return (
-    <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
+    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}>
       {showJoinPulse ? (
         <Reanimated.View style={[styles.joinPulse, ringStyle]} pointerEvents="none" />
       ) : null}
-
-      <RoomSpeechBubbleStack
-        bubbles={bubbles}
-        placement={bubblePlacement}
-        raised={bubbleRaised}
-        animate={motionPolicy.animateBubble}
-        onDismissBubble={onDismissBubble}
-        dismissBubbleLabel={dismissBubbleLabel}
-      />
-      {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
-      {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
-
       {/* Depth scale (from the live y) wraps the same box so it scales about the same centre. */}
       <Reanimated.View
         style={[
@@ -291,12 +326,63 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
           ) : null}
         </Reanimated.View>
       </Reanimated.View>
+    </AvatarAnchor>
+  )
+})
+
+interface AvatarOverlayProps {
+  avatar: AvatarState
+  position: MiniRoomAvatarPosition
+  stageWidth: SharedValue<number>
+  stageHeight: SharedValue<number>
+  /** This avatar's lines, oldest first. */
+  bubbles: readonly SpeechBubble[]
+  bubblePlacement: BubblePlacement
+  bubbleRaised: boolean
+  onDismissBubble: (bubbleId: string) => void
+  dismissBubbleLabel: string
+  isLocal: boolean
+  localUserLabel: string
+  motionPolicy: MiniRoomMotionPolicy
+  typing: boolean
+}
+
+/** Speech, typing dots and the name plate: always readable, above any furniture. */
+const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
+  const {
+    avatar,
+    position,
+    stageWidth,
+    stageHeight,
+    bubbles,
+    bubblePlacement,
+    bubbleRaised,
+    onDismissBubble,
+    dismissBubbleLabel,
+    isLocal,
+    localUserLabel,
+    motionPolicy,
+    typing
+  } = props
+  return (
+    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight}
+      zIndex={OVERLAY_Z_INDEX}>
+      <RoomSpeechBubbleStack
+        bubbles={bubbles}
+        placement={bubblePlacement}
+        raised={bubbleRaised}
+        animate={motionPolicy.animateBubble}
+        onDismissBubble={onDismissBubble}
+        dismissBubbleLabel={dismissBubbleLabel}
+      />
+      {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
+      {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
       <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
           {isLocal ? localUserLabel : avatar.displayName}
         </Text>
       </View>
-    </Reanimated.View>
+    </AvatarAnchor>
   )
 })
 

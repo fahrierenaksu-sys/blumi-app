@@ -92,6 +92,11 @@ interface RoomRenderer2DProps {
   floorUnderlay?: ReactNode
   /** The shell image's first paint (or its load failure): the stage is drawn. */
   onShellDisplay?: () => void
+  /**
+   * Furniture another layer draws (MiniRoom sorts these among its avatars).
+   * Their contact shadows stay here, on the floor under everything.
+   */
+  hiddenItemRenderIds?: ReadonlySet<string>
 }
 
 export function RoomRenderer2D(props: RoomRenderer2DProps) {
@@ -120,7 +125,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     showDepthWash = true,
     liveAvatarPosition,
     floorUnderlay,
-    onShellDisplay
+    onShellDisplay,
+    hiddenItemRenderIds
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
@@ -197,7 +203,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           )
         : null}
       {renderItems.map((item) => (
-        item.kind === "furniture" || item.kind === "avatar" ? (
+        (item.kind === "furniture" || item.kind === "avatar") && !hiddenItemRenderIds?.has(item.renderId) ? (
           <RoomRendererItem
             key={item.renderId}
             item={item}
@@ -240,6 +246,51 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     </Root>
   )
 }
+
+/**
+ * One piece of furniture drawn exactly as the renderer draws it (same frame,
+ * fit and mirroring), for a layer that sorts furniture among avatars. It is
+ * placed in the same stage coordinates and never takes touches.
+ */
+export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSprite(
+  props: { item: RoomV2FurnitureRenderItem; zIndex: number }
+) {
+  const { item, zIndex } = props
+  const perspectiveScale = getRoomRendererItemPerspectiveScale(item)
+  const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
+  const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
+  const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
+  const left = item.x - renderedWidth * item.anchor.x
+  const top = item.y - renderedHeight * item.anchor.y
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.item,
+        {
+          left: `${left * 100}%`,
+          top: `${top * 100}%`,
+          width: `${renderedWidth * 100}%`,
+          height: `${renderedHeight * 100}%`,
+          zIndex
+        }
+      ]}
+    >
+      <View style={styles.itemContent}>
+        <ExpoImage
+          source={item.asset.source}
+          contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
+          cachePolicy="memory-disk"
+          transition={0}
+          style={[
+            styles.itemImage,
+            { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }
+          ]}
+        />
+      </View>
+    </View>
+  )
+}, (previous, next) => previous.item === next.item && previous.zIndex === next.zIndex)
 
 /**
  * Furniture is sorted behind a seated avatar so the avatar can enter the

@@ -4,22 +4,6 @@
  * are plain functions under node:test.
  */
 
-/** Avatars nearest the back first; ties by id so both phones agree. */
-export function resolveMiniRoomAvatarDepthOrder(entries: readonly { id: string; y: number }[]): string {
-  "worklet"
-  const sorted = entries.slice().sort((a, b) => (a.y === b.y ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.y - b.y))
-  let order = ""
-  for (let index = 0; index < sorted.length; index += 1) {
-    order += index === 0 ? sorted[index]!.id : `|${sorted[index]!.id}`
-  }
-  return order
-}
-
-/** Draw order of one avatar for a depth order: nearer avatars on top. */
-export function getMiniRoomAvatarZIndex(order: string, id: string): number {
-  return order.split("|").indexOf(id) + 1
-}
-
 /**
  * The anchor's offset inside the room for a live room position (0..1). It is
  * a transform, so a walking frame never triggers layout.

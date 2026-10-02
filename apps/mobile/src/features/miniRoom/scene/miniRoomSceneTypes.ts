@@ -114,6 +114,12 @@ export interface AvatarState {
   targetY?: number
   facing: AvatarFacing
   motion: "idle" | "walking" | "speaking" | "emoting" | "sitting"
+  /**
+   * Presentation only: the seat whose depth this avatar is drawn at while it
+   * sits down onto it or stands up from it (the seat point lies behind the
+   * furniture's front edge). Never sent, never authoritative.
+   */
+  depthSeatHotspotId?: string
   appearance: AvatarAppearance
   seatedHotspotId?: string
 }
