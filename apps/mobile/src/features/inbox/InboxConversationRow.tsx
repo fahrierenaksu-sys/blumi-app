@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarSelection } from "@blumi/contracts"
-import { memo, useCallback, useEffect, useRef } from "react"
+import { memo, useCallback } from "react"
 import { StyleSheet, Text, View } from "react-native"
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
 import { areChatParticipantAvatarsEquivalent } from "../chat/chatParticipantAvatar"
@@ -47,31 +47,10 @@ function UnreadGlow({ pulse }: { pulse: SharedValue<number> }) {
   return <Animated.View style={[cardStyles.unreadGlow, style]} />
 }
 
-/**
- * A touch warms its thread only once it has stayed a touch this long. A
- * finger that starts a main-page swipe on a row is released (press out) by
- * the pager's pan well before, so a swipe never starts a thread request; a
- * tap opens the thread, which warms it anyway.
- */
-export const INBOX_ROW_WARM_DELAY_MS = 140
-
 export const ConversationCard = memo(function ConversationCard(props: ConversationCardProps) {
   const { threadId, onPress: pressThread, onWarm: warmThread } = props
   const onPress = useCallback(() => pressThread(threadId), [pressThread, threadId])
-  const warmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelWarm = useCallback(() => {
-    if (warmTimerRef.current === null) return
-    clearTimeout(warmTimerRef.current)
-    warmTimerRef.current = null
-  }, [])
-  const onWarm = useCallback(() => {
-    cancelWarm()
-    warmTimerRef.current = setTimeout(() => {
-      warmTimerRef.current = null
-      warmThread(threadId)
-    }, INBOX_ROW_WARM_DELAY_MS)
-  }, [cancelWarm, warmThread, threadId])
-  useEffect(() => cancelWarm, [cancelWarm])
+  const onWarm = useCallback(() => warmThread(threadId), [warmThread, threadId])
   const { onLongPress: openActions } = props
   const onLongPress = useCallback(() => {
     hapticMedium()
@@ -94,7 +73,6 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
         onLongPress={onLongPress}
         pressedScale={0.98}
         onPressIn={onWarm}
-        onPressOut={cancelWarm}
       >
         <LinearGradient
           colors={uiTheme.gradients.primary}
