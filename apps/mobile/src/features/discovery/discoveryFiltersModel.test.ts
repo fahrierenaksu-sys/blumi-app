@@ -12,6 +12,7 @@ import {
   getLoadedLocalDiscoveryFiltersFallback,
   getLocalDiscoveryFiltersFallbackStorageKey,
   getDiscoveryFiltersStorageKey,
+  keepEqualDiscoveryFilters,
   loadLocalDiscoveryFiltersFallback,
   loadDiscoveryFilters,
   normalizeDiscoveryFilters,
@@ -294,4 +295,19 @@ test("hydration gates are independent per hook instance", () => {
   const load = second.beginLoad()
   first.recordSave()
   assert.equal(second.canApply(load), true)
+})
+
+test("a reload with the same filter values keeps the current object; a real change replaces it", () => {
+  const current: DiscoveryFilters = { ageMin: 21, ageMax: 40, genders: ["woman"], vibes: ["cozy"] }
+  const reloaded = normalizeDiscoveryFilters(JSON.parse(JSON.stringify(current)) as unknown)
+  assert.equal(keepEqualDiscoveryFilters(current, reloaded), current)
+  for (const changed of [
+    { ...current, ageMin: 22 },
+    { ...current, ageMax: 39 },
+    { ...current, genders: [] },
+    { ...current, genders: ["man"] as DiscoveryFilters["genders"] },
+    { ...current, vibes: ["cozy", "calm"] }
+  ]) {
+    assert.equal(keepEqualDiscoveryFilters(current, changed), changed)
+  }
 })
