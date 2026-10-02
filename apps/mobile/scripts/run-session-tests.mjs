@@ -148,6 +148,7 @@ try {
       "src/features/session/onboardingArrivalMotionModel.test.ts",
       "src/features/session/onboardingBrandPreludeLifecycle.test.ts",
       "src/features/session/useSessionStateLifecycle.test.ts",
+      "src/features/session/useSessionStateMutationIsolation.test.ts",
       "src/features/session/onboardingGreetingPairModel.test.ts",
       "src/features/session/onboardingIntroPerformanceModel.test.ts",
       "src/features/session/onboardingIntroTelemetry.test.ts",
