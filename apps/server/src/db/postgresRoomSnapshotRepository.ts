@@ -1,9 +1,12 @@
 import type { QueryResultRow } from "pg"
 import {
-  cloneRoomShowcaseSnapshot,
   type RoomShowcaseSnapshot,
+  type RoomShowcaseSnapshotMetadata,
   type RoomSnapshotRepository
 } from "../rooms/roomSnapshotRepository"
+
+const METADATA_COLUMNS = `user_id, room_revision, asset_key, mime_type,
+                renderer_version, is_public, headline, updated_at`
 
 interface QueryExecutor {
   query(
@@ -18,13 +21,12 @@ export function createPostgresRoomSnapshotRepository(
   return {
     async getLatest(userId) {
       const result = await pool.query(
-        `SELECT user_id, room_revision, asset_key, mime_type,
-                renderer_version, body, is_public, headline, updated_at
+        `SELECT ${METADATA_COLUMNS}
            FROM blumi_room_showcase_snapshots
           WHERE user_id = $1`,
         [userId]
       )
-      return result.rows[0] ? mapSnapshot(result.rows[0]) : null
+      return result.rows[0] ? mapMetadata(result.rows[0]) : null
     },
     async findByAssetKey(assetKey) {
       const result = await pool.query(
@@ -50,8 +52,7 @@ export function createPostgresRoomSnapshotRepository(
            body = EXCLUDED.body,
            updated_at = EXCLUDED.updated_at
          WHERE blumi_room_showcase_snapshots.room_revision < EXCLUDED.room_revision
-         RETURNING user_id, room_revision, asset_key, mime_type,
-                   renderer_version, body, is_public, headline, updated_at`,
+         RETURNING ${METADATA_COLUMNS}`,
         [
           input.userId,
           input.roomRevision,
@@ -64,21 +65,20 @@ export function createPostgresRoomSnapshotRepository(
           new Date(input.updatedAt)
         ]
       )
-      if (result.rows[0]) return mapSnapshot(result.rows[0])
+      if (result.rows[0]) return mapMetadata(result.rows[0])
       const current = await this.getLatest(input.userId)
       if (!current) throw new Error("Room showcase snapshot could not be resolved.")
-      return cloneRoomShowcaseSnapshot(current)
+      return current
     },
     async updateVisibility(input) {
       const result = await pool.query(
         `UPDATE blumi_room_showcase_snapshots
             SET is_public = $3, headline = $4
           WHERE user_id = $1 AND room_revision = $2
-          RETURNING user_id, room_revision, asset_key, mime_type,
-                    renderer_version, body, is_public, headline, updated_at`,
+          RETURNING ${METADATA_COLUMNS}`,
         [input.userId, input.roomRevision, input.isPublic, input.headline]
       )
-      return result.rows[0] ? mapSnapshot(result.rows[0]) : null
+      return result.rows[0] ? mapMetadata(result.rows[0]) : null
     }
   }
 }
@@ -87,6 +87,10 @@ function mapSnapshot(row: QueryResultRow): RoomShowcaseSnapshot {
   const body = row.body instanceof Uint8Array
     ? Buffer.from(row.body)
     : Buffer.from(String(row.body), "base64")
+  return { ...mapMetadata(row), body }
+}
+
+function mapMetadata(row: QueryResultRow): RoomShowcaseSnapshotMetadata {
   return {
     userId: String(row.user_id),
     roomRevision: Number(row.room_revision),
@@ -95,7 +99,6 @@ function mapSnapshot(row: QueryResultRow): RoomShowcaseSnapshot {
       ? "image/webp"
       : (() => { throw new Error("Unsupported room snapshot mime type.") })(),
     rendererVersion: String(row.renderer_version),
-    body,
     isPublic: Boolean(row.is_public),
     headline: typeof row.headline === "string" ? row.headline : null,
     updatedAt: new Date(row.updated_at as string | Date).toISOString()

@@ -95,6 +95,8 @@ test("PostgreSQL snapshot saves never replace a newer revision or the owner's vi
     assert.equal(latest?.roomRevision, 4)
     assert.equal(latest?.isPublic, false, "a render never republishes a hidden room")
     assert.equal(latest?.headline, "Mine", "a render never clears the owner's headline")
+    assert.equal(latest && "body" in latest, false, "revision reads leave the image in the database")
+    assert.equal((await repository.findByAssetKey(`asset_4_${userId}`))?.body.toString(), "revision 4")
     assert.equal(await repository.updateVisibility({ userId, roomRevision: 3, isPublic: true, headline: null }), null)
   } finally {
     await pool.end()

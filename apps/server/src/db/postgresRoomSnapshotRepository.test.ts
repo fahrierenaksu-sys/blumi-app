@@ -13,9 +13,11 @@ test("postgres snapshot lookups and visibility updates preserve repository proje
     return { rows }
   } })
   assert.equal((await repository.findByAssetKey("asset-3"))?.isPublic, false)
+  assert.equal((await repository.findByAssetKey("asset-3"))?.body.toString(), "snapshot")
   assert.equal((await repository.updateVisibility({ userId: "user_1", roomRevision: 3, isPublic: false, headline: "Latest" }))?.headline, "Latest")
   rows = []
   assert.equal(await repository.findByAssetKey("missing"), null)
   assert.equal(await repository.getLatest("missing"), null)
   assert.equal(await repository.updateVisibility({ userId: "user_1", roomRevision: 2, isPublic: true, headline: null }), null)
 })
+

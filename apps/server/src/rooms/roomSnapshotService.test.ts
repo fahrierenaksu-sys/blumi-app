@@ -66,7 +66,8 @@ test("room snapshot service publishes the saved room revision", async () => {
 
   assert.equal(snapshot.roomRevision, 4)
   assert.equal(snapshot.isPublic, true)
-  assert.equal(snapshot.body.toString(), "room-4")
+  assert.equal("body" in snapshot, false, "metadata never carries the image")
+  assert.equal((await service.findByAssetKey(snapshot.assetKey))?.body.toString(), "room-4")
   assert.deepEqual(rendered, [4])
 })
 
@@ -91,7 +92,7 @@ test("publishing the same room revision is idempotent and does not rerender", as
 
   assert.equal(renderCount, 1)
   assert.equal(second.assetKey, first.assetKey)
-  assert.deepEqual(second.body, first.body)
+  assert.deepEqual((await service.findByAssetKey(second.assetKey))?.body, Buffer.from("same"))
 })
 
 test("room showcase visibility changes only the current snapshot and normalizes its headline", async () => {
