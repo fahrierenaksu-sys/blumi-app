@@ -218,7 +218,9 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             itemInteractionMode={itemInteractionMode}
             debugPlacement={debugPlacement}
             reduceMotion={reduceMotion || !motionEnabled}
-            motionPaused={motionPaused}
+            // Only avatars run motion loops; furniture keeps one value so a
+            // focus change re-renders the avatars, not every item.
+            motionPaused={item.kind === "avatar" ? motionPaused : false}
             liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
             stageWidthPx={layoutSize.width}
             stageHeightPx={layoutSize.height}
