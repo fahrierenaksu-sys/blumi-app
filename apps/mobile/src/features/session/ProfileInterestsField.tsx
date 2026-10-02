@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { hapticSelection } from "../../ui/haptics"
+import { reconcileComposerTextAfterSend } from "../chat/thread/chatComposerDraftModel"
 import { uiTheme } from "../../ui/theme"
 import { addProfileInterests, removeProfileInterest } from "./profileEditModel"
 
@@ -18,16 +19,34 @@ export function ProfileInterestsField(props: {
 }) {
   const { interestsText, interests, onChangeInterestsText, copy } = props
   const [entry, setEntry] = useState("")
-  const commit = (value: string) => {
+  // A commit clears the field, but a keystroke already on its way arrives
+  // carrying the committed text plus the new letter ("music,a"). Until the
+  // first ordinary edit, only the characters typed after the committed text
+  // are kept, as the chat composer does after a send.
+  const committedTextRef = useRef<string | null>(null)
+  const shownEntryRef = useRef("")
+  const showEntry = (value: string) => {
+    shownEntryRef.current = value
+    setEntry(value)
+  }
+  /** `value` is added; `fieldText` is what the native field held. */
+  const commit = (value: string, fieldText: string = value) => {
     const next = addProfileInterests(interestsText, value)
-    setEntry("")
+    committedTextRef.current = fieldText
+    showEntry("")
     if (next === interestsText) return
     hapticSelection()
     onChangeInterestsText(next)
   }
-  const handleChangeText = (value: string) => {
-    if (/,/.test(value)) commit(value)
-    else setEntry(value)
+  const handleChangeText = (fieldText: string) => {
+    const reconciled = reconcileComposerTextAfterSend({
+      next: fieldText,
+      current: shownEntryRef.current,
+      sentDraft: committedTextRef.current
+    })
+    committedTextRef.current = reconciled.sentDraft
+    if (/,/.test(reconciled.text)) commit(reconciled.text, fieldText)
+    else showEntry(reconciled.text)
   }
 
   return (
