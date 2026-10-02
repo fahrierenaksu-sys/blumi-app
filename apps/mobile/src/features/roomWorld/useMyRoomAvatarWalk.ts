@@ -23,6 +23,8 @@ export interface MyRoomAvatarWalk {
   /** Live avatar point in room coordinates, written only on the UI thread while walking. */
   x: SharedValue<number>
   y: SharedValue<number>
+  /** The current walk's path: its start point, then each step's end. */
+  path: SharedValue<readonly RoomWorldPoint[]>
   /** Walks the steps on the UI thread and reports each finished step on JS. */
   start(steps: readonly MyRoomWalkStep[], onStepEnd: (index: number) => void): void
   /** Stops a walk where the avatar is and returns that exact point. */
@@ -55,6 +57,7 @@ export function useMyRoomAvatarWalk(input: {
   const point = useDerivedValue(() => getMyRoomWalkPoint(origin.value, timeline.value, progress.value))
   const x = useDerivedValue(() => point.value.x)
   const y = useDerivedValue(() => point.value.y)
+  const path = useDerivedValue((): readonly RoomWorldPoint[] => [origin.value, ...timeline.value])
 
   useAnimatedReaction(
     () => getMyRoomAvatarDepthIndex(depthNeighbours, fixedDepth ?? y.value),
@@ -74,21 +77,9 @@ export function useMyRoomAvatarWalk(input: {
       origin.value = current
       timeline.value = steps
       progress.value = 0
-      // One clock for both axes, with ramps only at the walk's ends.
-      const config = (step: MyRoomWalkStep) => {
-        const { rampIn, rampOut } = step
-        return {
-          duration: step.durationMs,
-          easing: (fraction: number) => {
-            "worklet"
-            return easeRoomWorldMovement(fraction, rampIn, rampOut)
-          },
-          reduceMotion: ReduceMotion.Never
-        }
-      }
       progress.value = withSequence(
         ReduceMotion.Never,
-        ...steps.map((step, index) => withTiming(index + 1, config(step), (finished) => {
+        ...steps.map((step, index) => withTiming(index + 1, getMyRoomWalkStepTiming(step), (finished) => {
           "worklet"
           if (finished) scheduleOnRN(onStepEnd, index)
         }))
@@ -113,5 +104,24 @@ export function useMyRoomAvatarWalk(input: {
     })
   }, [origin, progress, timeline])
 
-  return useMemo(() => ({ x, y, start, stop, place }), [place, start, stop, x, y])
+  return useMemo(() => ({ x, y, path, start, stop, place }), [path, place, start, stop, x, y])
+}
+
+/**
+ * One step's timing: one clock for both axes, with ramps only at the walk's
+ * ends. A module-level worklet, never a helper declared inside the walk
+ * worklet: the React Compiler hoists such capture-free helpers out of the
+ * worklet as plain `_temp` functions, which crash on the UI thread.
+ */
+function getMyRoomWalkStepTiming(step: MyRoomWalkStep) {
+  "worklet"
+  const { rampIn, rampOut } = step
+  return {
+    duration: step.durationMs,
+    easing: (fraction: number) => {
+      "worklet"
+      return easeRoomWorldMovement(fraction, rampIn, rampOut)
+    },
+    reduceMotion: ReduceMotion.Never
+  }
 }

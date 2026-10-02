@@ -1,5 +1,13 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import {
+  advanceRoomAvatarStridePhase,
+  getRoomAvatarStrideFrameIndex,
+  getRoomAvatarStrideGain,
+  getRoomAvatarStridePhaseDelta,
+  getRoomAvatarWalkPathPx,
+  ROOM_AVATAR_STRIDE_STEP_PHASE
+} from "../roomV2/components/roomAvatarBodyMotionModel"
 import type { RoomV2RenderItem } from "../roomV2/roomV2.types"
 import { insertRoomV2RenderItemSorted } from "../roomV2/roomV2Selectors"
 import {
@@ -8,9 +16,13 @@ import {
   getMyRoomAvatarDepthIndex,
   getMyRoomWalkPoint
 } from "./myRoomAvatarWalkModel"
+import { MY_ROOM_AVATAR_SIZE } from "./myRoomInteractionModel"
+import type { RoomWorldGeometry, RoomWorldPoint } from "./roomWorldGeometry"
 import {
+  createRoomWorldMovementPlan,
   easeRoomWorldMovement,
   getRoomWorldMovementFrame,
+  ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING,
   type RoomWorldMovementPlan
 } from "./roomWorldRuntime"
 
@@ -82,4 +94,112 @@ test("one walk clock keeps both axes together at turns, including repeated coord
   const redirected = [{ ...steps[0]!, x: 0.1, y: 0.9 }]
   assert.deepEqual(getMyRoomWalkPoint(interrupted, redirected, 0), interrupted)
   assert.deepEqual(getMyRoomWalkPoint(interrupted, [], 0), interrupted)
+})
+
+// ── Every tap walks with the walk cycle (2026-10-02 phone report) ────────
+// Plays a My Room walk the way the device does: the UI-thread timeline at
+// 60 fps (useMyRoomAvatarWalk) feeding the distance-locked stride of
+// RoomRendererAvatarBody, and records which walk frame shows when.
+
+const OPEN_ROOM: RoomWorldGeometry = {
+  walkableAreas: [{ id: "room", points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] }],
+  blockers: []
+}
+const STAGE = { width: 390, height: 420 }
+const BOX_HEIGHT_PX = MY_ROOM_AVATAR_SIZE.compact.height * STAGE.height
+const WALK_FRAMES = 4
+const FRAME_MS = 1000 / 60
+
+function walkProgressAt(steps: ReturnType<typeof createMyRoomWalkTimeline>, elapsedMs: number): number {
+  let start = 0
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index]!
+    if (elapsedMs < start + step.durationMs) {
+      return index + easeRoomWorldMovement((elapsedMs - start) / step.durationMs, step.rampIn, step.rampOut)
+    }
+    start += step.durationMs
+  }
+  return steps.length
+}
+
+function playWalk(input: { from: RoomWorldPoint; to: RoomWorldPoint; phase: number; stopAfterMs?: number }) {
+  const plan = createRoomWorldMovementPlan({
+    geometry: OPEN_ROOM, from: input.from, to: input.to, timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+  })
+  assert.ok(plan, "the walk has a path")
+  const steps = createMyRoomWalkTimeline(plan)
+  const durationMs = steps.reduce((sum, step) => sum + step.durationMs, 0)
+  const pathPx = getRoomAvatarWalkPathPx([input.from, ...steps], STAGE.width, STAGE.height)
+  const gain = getRoomAvatarStrideGain(input.phase, pathPx, BOX_HEIGHT_PX)
+  const endMs = Math.min(durationMs, input.stopAfterMs ?? Infinity)
+  let phase = input.phase
+  let travelled = 0
+  let previous = input.from
+  const shown = [getRoomAvatarStrideFrameIndex(phase, WALK_FRAMES)]
+  for (let elapsed = FRAME_MS; ; elapsed += FRAME_MS) {
+    const now = Math.min(elapsed, endMs)
+    const point = getMyRoomWalkPoint(input.from, steps, walkProgressAt(steps, now))
+    const distancePx = Math.hypot((point.x - previous.x) * STAGE.width, (point.y - previous.y) * STAGE.height)
+    const delta = getRoomAvatarStridePhaseDelta(distancePx, BOX_HEIGHT_PX) * gain
+    phase = advanceRoomAvatarStridePhase(phase, delta)
+    travelled += delta
+    shown.push(getRoomAvatarStrideFrameIndex(phase, WALK_FRAMES))
+    previous = point
+    if (now >= endMs) break
+  }
+  return {
+    point: previous,
+    phase,
+    durationMs,
+    naturalPhase: getRoomAvatarStridePhaseDelta(pathPx, BOX_HEIGHT_PX),
+    travelled,
+    distinctFrames: new Set(shown).size
+  }
+}
+
+function assertWalkedWithSteps(walk: ReturnType<typeof playWalk>, label: string) {
+  assert.ok(walk.distinctFrames >= 2, `${label}: shows ${walk.distinctFrames} walk frame(s)`)
+  assert.ok(walk.travelled >= ROOM_AVATAR_STRIDE_STEP_PHASE - 1e-9, `${label}: took ${walk.travelled} of a cycle`)
+  const offPlant = walk.phase % ROOM_AVATAR_STRIDE_STEP_PHASE
+  assert.ok(Math.min(offPlant, ROOM_AVATAR_STRIDE_STEP_PHASE - offPlant) < 1e-6, `${label}: ends mid-step at ${walk.phase}`)
+}
+
+test("a tap right beside the avatar walks a whole step at a readable pace, in any direction", () => {
+  const at = { x: 0.5, y: 0.7 }
+  for (const [label, to] of [
+    ["sideways right", { x: 0.53, y: 0.7 }],
+    ["sideways left", { x: 0.48, y: 0.7 }],
+    ["toward the back", { x: 0.5, y: 0.67 }],
+    ["a hair away", { x: 0.514, y: 0.7 }]
+  ] as const) {
+    const walk = playWalk({ from: at, to, phase: 0 })
+    assert.ok(walk.durationMs >= 240, `${label}: lasts ${walk.durationMs} ms`)
+    assertWalkedWithSteps(walk, label)
+    assert.ok(Math.abs(walk.point.x - to.x) < 1e-9 && Math.abs(walk.point.y - to.y) < 1e-9, `${label}: arrives`)
+  }
+})
+
+test("a long walk keeps the distance-locked cadence and lands on a planted foot", () => {
+  const walk = playWalk({ from: { x: 0.15, y: 0.75 }, to: { x: 0.8, y: 0.6 }, phase: 0 })
+  assertWalkedWithSteps(walk, "long")
+  assert.ok(walk.distinctFrames === WALK_FRAMES, "every walk frame shows")
+  assert.ok(Math.abs(walk.travelled - walk.naturalPhase) <= ROOM_AVATAR_STRIDE_STEP_PHASE / 2 + 1e-9)
+})
+
+test("retargeting mid-walk, even right beside the avatar, keeps stepping from the current stride", () => {
+  const first = playWalk({ from: { x: 0.2, y: 0.7 }, to: { x: 0.8, y: 0.7 }, phase: 0, stopAfterMs: 430 })
+  assert.ok(first.phase % ROOM_AVATAR_STRIDE_STEP_PHASE > 0.01, "the first walk is interrupted mid-step")
+  for (const [label, to] of [
+    ["back beside it", { x: first.point.x - 0.025, y: 0.7 }],
+    ["ahead beside it", { x: first.point.x + 0.025, y: 0.7 }],
+    ["across the room", { x: 0.3, y: 0.55 }]
+  ] as const) {
+    assertWalkedWithSteps(playWalk({ from: first.point, to, phase: first.phase }), label)
+  }
+})
+
+test("the stride gain is neutral without a walk", () => {
+  assert.equal(getRoomAvatarStrideGain(0.3, 0, BOX_HEIGHT_PX), 1)
+  assert.equal(getRoomAvatarStrideGain(0.3, 40, 0), 1)
+  assert.equal(getRoomAvatarWalkPathPx([{ x: 0.5, y: 0.5 }], STAGE.width, STAGE.height), 0)
 })

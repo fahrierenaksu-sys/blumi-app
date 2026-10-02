@@ -8,6 +8,8 @@ export interface RoomRendererLiveAvatarPosition {
   renderId: string
   x: SharedValue<number>
   y: SharedValue<number>
+  /** The current walk's path (start point, then each corner and the end), set when a walk starts. */
+  walkPath?: SharedValue<readonly { x: number; y: number }[]>
 }
 
 /** Stable avatar box dimensions and its live point on the stage. */

@@ -19,7 +19,9 @@ import {
   getRoomAvatarPoseTransitionKind,
   getRoomAvatarPoseTransitionPose,
   getRoomAvatarStrideBob,
+  getRoomAvatarStrideGain,
   getRoomAvatarStridePhaseDelta,
+  getRoomAvatarWalkPathPx,
   ROOM_AVATAR_POSE_LIFT_BOX_HEIGHTS,
   ROOM_AVATAR_REDUCED_POSE_FADE_FROM_OPACITY,
   ROOM_AVATAR_REDUCED_POSE_FADE_MS,
@@ -83,10 +85,26 @@ export function RoomRendererAvatarBody(props: {
     })
   }, [poseElapsed, poseKind, poseOpacity, reduceMotion, state])
 
-  // Stride phase grows with the distance the live point covers on screen.
+  // Stride phase grows with the distance the live point covers on screen,
+  // scaled per walk so it takes whole steps and at least one (a tap right
+  // beside the avatar still steps) and ends with a foot planted.
   const strideProgress = useSharedValue(0)
+  const strideGain = useSharedValue(1)
   const liveX = live?.x
   const liveY = live?.y
+  const walkPath = live?.walkPath
+  useAnimatedReaction(
+    () => walkPath ? walkPath.value : null,
+    (path, previous) => {
+      if (!path || path === previous) return
+      strideGain.value = getRoomAvatarStrideGain(
+        strideProgress.value,
+        getRoomAvatarWalkPathPx(path, stageWidthPx, stageHeightPx),
+        boxHeightPx
+      )
+    },
+    [boxHeightPx, stageHeightPx, stageWidthPx, walkPath]
+  )
   useAnimatedReaction(
     () => liveX && liveY ? { x: liveX.value, y: liveY.value } : null,
     (current, previous) => {
@@ -95,7 +113,7 @@ export function RoomRendererAvatarBody(props: {
       if (distancePx === 0) return
       strideProgress.value = advanceRoomAvatarStridePhase(
         strideProgress.value,
-        getRoomAvatarStridePhaseDelta(distancePx, boxHeightPx)
+        getRoomAvatarStridePhaseDelta(distancePx, boxHeightPx) * strideGain.value
       )
     },
     [boxHeightPx, liveX, liveY, stageHeightPx, stageWidthPx]

@@ -226,8 +226,9 @@ export function MyRoomScreen({
   const liveAvatarPosition = useMemo(() => ({
     renderId: MY_ROOM_OWNER_AVATAR_RENDER_ID,
     x: avatarWalk.x,
-    y: avatarWalk.y
-  }), [avatarWalk.x, avatarWalk.y])
+    y: avatarWalk.y,
+    walkPath: avatarWalk.path
+  }), [avatarWalk.path, avatarWalk.x, avatarWalk.y])
   const wideStageCamera = usesWideStageCamera && baseRoomScene.shell
     ? {
         stageWidth: resolvedStageWidth,
