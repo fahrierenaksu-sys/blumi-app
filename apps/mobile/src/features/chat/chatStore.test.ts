@@ -32,6 +32,7 @@ import {
   beginChatThreadListRequest,
   removeChatThreadsWithPartner,
   applyChatReceiptUpdated,
+  applyChatParticipantUpdated,
   applyChatThreadHiddenForMe,
   getPartnerReceipts,
   getMessageRenderKey
@@ -194,6 +195,64 @@ test("delayed read does not replace an authoritative offline summary with an inc
   assert.equal(getThreadUnreadCount("partial"), 5, "retain summary while refreshing; cache is not authoritative")
   applyChatThreadListed({ userId: "b", threads: [{ ...thread, unreadCount: 2, lastReadAt: "2026-09-05T10:01:00Z" }] })
   assert.equal(getThreadUnreadCount("partial"), 2)
+})
+
+function identityThread(threadId: string, partner: { userId: string; displayName: string }, sentAt: string) {
+  return {
+    threadId, miniRoomId: `room_${threadId}`, participantUserIds: ["me", partner.userId] as [string, string],
+    participants: [{ userId: "me", displayName: "Me" }, partner] as [{ userId: string; displayName?: string }, { userId: string; displayName?: string }],
+    createdAt: "2026-10-02T09:00:00Z", unreadCount: 1,
+    lastMessage: { messageId: `${threadId}_m`, threadId, senderUserId: partner.userId, body: "hi", sentAt }
+  }
+}
+
+const partnerNames = () => getThreads().map((thread) => `${thread.threadId}:${thread.participants[1].displayName}`)
+
+test("a partner's rename shows at once in every chat with them, without reordering or reading anything", () => {
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [
+    identityThread("first", { userId: "eren", displayName: "Eren" }, "2026-10-02T10:03:00Z"),
+    identityThread("other", { userId: "bora", displayName: "Bora" }, "2026-10-02T10:02:00Z"),
+    identityThread("second", { userId: "eren", displayName: "Eren" }, "2026-10-02T10:01:00Z")
+  ] })
+  let notified = 0
+  const unsubscribe = subscribeToChatStore(() => { notified += 1 })
+  try {
+    applyChatParticipantUpdated({ userId: "eren", displayName: "Irmak" })
+  } finally {
+    unsubscribe()
+  }
+  assert.equal(notified, 1)
+  assert.deepEqual(partnerNames(), ["first:Irmak", "other:Bora", "second:Irmak"])
+  assert.equal(findThreadForPartner("eren")?.participants[1].displayName, "Irmak")
+  assert.equal(getThreadUnreadCount("first"), 1)
+  assert.equal(getThreadUnreadCount("second"), 1)
+})
+
+test("a list requested before a rename cannot bring the old name back; a later list is the truth", () => {
+  resetChatStore()
+  const chat = (displayName: string) => [identityThread("eren_chat", { userId: "eren", displayName }, "2026-10-02T10:00:00Z")]
+  applyChatThreadListed({ userId: "me", threads: chat("Eren") })
+  const before = beginChatThreadListRequest()
+  applyChatParticipantUpdated({ userId: "eren", displayName: "Irmak" })
+  applyChatThreadListed({ userId: "me", threads: chat("Eren") }, { requestSequence: before })
+  assert.deepEqual(partnerNames(), ["eren_chat:Irmak"], "the old reply was served before the rename")
+
+  const after = beginChatThreadListRequest()
+  applyChatThreadListed({ userId: "me", threads: chat("Deniz") }, { requestSequence: after })
+  assert.deepEqual(partnerNames(), ["eren_chat:Deniz"], "a list asked for after the event carries the current name")
+})
+
+test("an update keeps the outfit it does not carry, and a reset forgets it", () => {
+  resetChatStore()
+  const avatar = { presetId: "body", revision: 3, loadout: { accessoryIds: [] } } as unknown as NonNullable<ReturnType<typeof getThreads>[number]["participants"][number]["avatar"]>
+  const thread = identityThread("outfit", { userId: "eren", displayName: "Eren" }, "2026-10-02T10:00:00Z")
+  applyChatThreadListed({ userId: "me", threads: [{ ...thread, participants: [thread.participants[0], { ...thread.participants[1], avatar }] }] })
+  applyChatParticipantUpdated({ userId: "eren", displayName: "Irmak" })
+  assert.equal(getThreads()[0].participants[1].avatar?.revision, 3)
+  resetChatStore()
+  applyChatThreadListed({ userId: "me", threads: [thread] })
+  assert.deepEqual(partnerNames(), ["outfit:Eren"], "another account never sees this one's updates")
 })
 
 test("an in-flight list cannot erase a newer received message or unread count", () => {
