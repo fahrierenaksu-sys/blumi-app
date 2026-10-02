@@ -696,3 +696,57 @@ test("close and retry failures alert, and an unmounted screen stays silent", asy
   await settle()
   assert.equal(switchedUser.alerts.length, 1)
 })
+
+test("the partner's avatar at the top left opens their profile; it waits while the partner is unknown", () => {
+  const headerFile = threadFile("ChatThreadHeader.tsx")
+  const code = ts.transpileModule(`(${declaredFunction(headerFile, "ChatThreadHeader").getText(headerFile)
+    .replace(/^export /, "")})`, {
+    compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 }
+  }).outputText
+  const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) }
+  const styles = new Proxy({}, { get: (_target, key) => String(key) })
+  const Header = runInNewContext(code, {
+    React, styles, View: "View", Text: "Text", Pressable: "Pressable", ParticipantAvatar: "Avatar",
+    ActionButtonCircle: "Circle", Ionicons: "Icon", uiTheme: { colors: {} }
+  })
+  const copy = {
+    back: "Geri", safetyAccessibilityLabel: (name) => `${name} için güvenlik seçenekleri`,
+    openProfileAccessibilityLabel: (name) => `${name} profili`, openProfileHint: "Profilini açar."
+  }
+  const find = (node, predicate) => {
+    if (!node || typeof node !== "object") return undefined
+    if (predicate(node)) return node
+    for (const child of [node.props?.children].flat()) {
+      const found = find(child, predicate)
+      if (found) return found
+    }
+    return undefined
+  }
+  const opened = []
+  const render = (onOpenProfile) => Header({
+    chatCopy: copy, chatLocale: "tr", partnerName: "Ada", partnerUserId: "user-ada", partnerAvatar: undefined,
+    onBack: () => {}, onViewMatch: null, onOpenSafety: () => {}, onOpenProfile
+  })
+  const tree = render(() => opened.push("profile"))
+  const header = tree.props.children
+  assert.equal(header[0].type, "Circle", "back stays first")
+  const avatarButton = header[1]
+  assert.equal(avatarButton.type, "Pressable", "the avatar is the next control at the top left")
+  assert.equal(avatarButton.props.accessibilityLabel, "Ada profili")
+  assert.equal(avatarButton.props.accessibilityHint, "Profilini açar.")
+  assert.equal(find(avatarButton, (node) => node.type === "Avatar")?.props.size, 44)
+  avatarButton.props.onPress()
+  find(tree, (node) => node.type === "Text" && [node.props.children].flat().includes("Ada")).props.onPress()
+  assert.deepEqual(opened, ["profile", "profile"], "the name beside it opens the same profile")
+  assert.equal(JSON.stringify(avatarButton.props.style({ pressed: false })), JSON.stringify(["chatHeaderAvatarButton", null]))
+
+  const unknown = render(null).props.children[1]
+  assert.equal(unknown.props.disabled, true)
+  assert.equal(unknown.props.onPress, undefined)
+
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(screenSource, /onOpenProfile=\{partnerUserId\s*\?\s*\(\) => navigation\.navigate\("ProfilePreview", \{ userId: partnerUserId \}\)\s*:\s*null\}/,
+    "the existing linked profile route loads the partner by id")
+  const stylesSource = threadFile("chatThreadStyles.ts").getText()
+  assert.match(stylesSource, /chatHeaderAvatarButton: \{\s*minWidth: 44,\s*minHeight: 44/)
+})

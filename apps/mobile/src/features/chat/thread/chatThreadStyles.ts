@@ -23,6 +23,16 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(53, 27, 50, 0.08)"
   },
+  chatHeaderAvatarButton: {
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  chatHeaderPressed: {
+    opacity: 0.7
+  },
   chatHeaderCopy: {
     flex: 1,
     minWidth: 0

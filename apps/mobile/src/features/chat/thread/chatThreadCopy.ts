@@ -22,6 +22,8 @@ export type ChatThreadCopy = {
   messageAccessibilityLabel: (partnerName: string) => string
   sendAccessibilityLabel: (partnerName: string) => string
   safetyAccessibilityLabel: (partnerName: string) => string
+  openProfileAccessibilityLabel: (partnerName: string) => string
+  openProfileHint: string
   roomInviteUnavailableTitle: string
   roomInvitePendingReason: string
   roomInviteConversationReason: string
@@ -66,6 +68,8 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     messageAccessibilityLabel: (partnerName) => `Message ${partnerName}`,
     sendAccessibilityLabel: (partnerName) => `Send message to ${partnerName}`,
     safetyAccessibilityLabel: (partnerName) => `Safety options for ${partnerName}`,
+    openProfileAccessibilityLabel: (partnerName) => `${partnerName}'s profile`,
+    openProfileHint: "Opens their profile.",
     roomInviteUnavailableTitle: "Room invitation unavailable",
     roomInvitePendingReason: "There is already a room invitation waiting for a response.",
     roomInviteConversationReason: "Wait until this conversation is ready.",
@@ -109,6 +113,8 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
     messageAccessibilityLabel: (partnerName) => `${partnerName} için mesaj yaz`,
     sendAccessibilityLabel: (partnerName) => `${partnerName} kişisine mesaj gönder`,
     safetyAccessibilityLabel: (partnerName) => `${partnerName} için güvenlik seçenekleri`,
+    openProfileAccessibilityLabel: (partnerName) => `${partnerName} profili`,
+    openProfileHint: "Profilini açar.",
     roomInviteUnavailableTitle: "Oda daveti kullanılamıyor",
     roomInvitePendingReason: "Bu sohbette zaten yanıt bekleyen bir oda daveti var.",
     roomInviteConversationReason: "Bu sohbet hazır olana kadar bekle.",
