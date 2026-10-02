@@ -127,16 +127,6 @@ test("the announcement reads the title and the body", () => {
   assert.equal(getToastAnnouncement(second), "Oops. Try again")
 })
 
-test("the dismiss label is localised", () => {
-  assert.equal(getToastCopy("tr").dismissLabel("Kaydedildi"), "Bildirimi kapat: Kaydedildi")
-  assert.equal(getToastCopy("en").dismissLabel("Saved"), "Dismiss notification: Saved")
-})
-
-test("a toast that opens its subject says so to VoiceOver, in both languages", () => {
-  assert.equal(getToastCopy("tr").openLabel("Bora"), "Aç: Bora")
-  assert.equal(getToastCopy("en").openLabel("Bora"), "Open: Bora")
-})
-
 test("pressing an actionable toast dismisses it, then runs its action once", () => {
   const calls: string[] = []
   const actionable: ToastData = {

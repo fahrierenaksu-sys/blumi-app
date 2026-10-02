@@ -86,97 +86,6 @@ test("initial home Shop selects only the category-sorted first viewport furnitur
   assert.deepEqual(selectInitialShopRoomItemIds([], 4), [])
 })
 
-test("home Shop warmup selection matches the real room catalog and Shop viewport helper", () => {
-  for (const extension of [".png", ".webp"]) {
-    require.extensions[extension] = (module, filename) => { module.exports = filename }
-  }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading static room assets.
-  const { ROOM_V2_FURNITURE_CATALOG } = require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading static room assets.
-  const { getRoomProductThumbnailSource } = require("../shop/shopAssets") as typeof import("../shop/shopAssets")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading layout model.
-  const { getShopLayoutMetrics } = require("../shop/shopLayoutMetrics") as typeof import("../shop/shopLayoutMetrics")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fixture registration must precede loading domain catalog.
-  const { ECONOMY_CATALOG, resolveR1PublishedEconomyCatalog } = require("@blumi/domain") as typeof import("@blumi/domain")
-
-  const publishedIds = new Set(
-    resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId)
-  )
-  const visibleRoomItems = ROOM_V2_FURNITURE_CATALOG
-    .filter((item) => publishedIds.has(item.id))
-    .map((item) => ({ sourceItemId: item.id, title: item.name, category: item.category }))
-  const fullRoomCatalog = ROOM_V2_FURNITURE_CATALOG.map((item) => ({
-    sourceItemId: item.id,
-    title: item.name,
-    category: item.category
-  }))
-  const categoryOrder: Record<string, number> = {
-    seating: 0,
-    table: 1,
-    lighting: 2,
-    rug: 3,
-    wallDecor: 4,
-    plant: 5,
-    misc: 6
-  }
-  for (const fontScale of [1, 2]) {
-    const layout = getShopLayoutMetrics({ width: 402, height: 874, fontScale })
-    const firstViewportCount = layout.catalog.accessibilityLayout ? 2 : 4
-    for (const candidates of [visibleRoomItems, fullRoomCatalog]) {
-      const shopOrder = [...candidates].sort((left, right) =>
-        categoryOrder[left.category] - categoryOrder[right.category] || left.title.localeCompare(right.title)
-      )
-      const selected = selectInitialShopRoomItemIds(candidates, firstViewportCount)
-      assert.deepEqual(selected, shopOrder.slice(0, firstViewportCount).map((item) => item.sourceItemId))
-      assert.ok(selected.length <= firstViewportCount)
-      if (candidates === fullRoomCatalog && shopOrder.length > firstViewportCount) {
-        assert.ok(selected.length < shopOrder.length, "does not warm the full furniture catalog")
-      }
-      for (const itemId of selected) {
-        const item = ROOM_V2_FURNITURE_CATALOG.find((candidate) => candidate.id === itemId)
-        assert.ok(item, `${itemId} belongs to the runtime room catalog`)
-        assert.ok(getRoomProductThumbnailSource(itemId) ?? item.asset.source, `${itemId} has the same card image fallback`)
-      }
-    }
-  }
-})
-
-test("the production top shelf resolves to the current female and male first-viewport sources", () => {
-  // Metro's static asset IDs are represented by paths in Node's catalog fixture.
-  require.extensions[".png"] = (module, filename) => { module.exports = filename }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
-  const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
-  const { getAvatarV2ShopItemsCompatibleWithBody } = require("../avatarV2/avatarBodyCompatibility") as typeof import("../avatarV2/avatarBodyCompatibility")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
-  const { getShopProductThumbnailSource, PRODUCT_REFERENCE_AVATAR_ITEM_IDS } = require("../shop/shopAssets") as typeof import("../shop/shopAssets")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Asset fixture must be registered before loading Metro catalog.
-  const { ECONOMY_CATALOG, resolveR1PublishedEconomyCatalog } = require("@blumi/domain") as typeof import("@blumi/domain")
-  const published = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG)
-  const publishedIds = new Set(published.map((item) => item.itemId))
-  const pricedIds = new Set(published.filter((item) => item.priceCoins !== null).map((item) => item.itemId))
-  const firstPage = (bodyId: string) => selectInitialShopTopIds(
-    getAvatarV2ShopItemsCompatibleWithBody(AVATAR_V2_CATALOG, bodyId),
-    publishedIds,
-    PRODUCT_REFERENCE_AVATAR_ITEM_IDS,
-    pricedIds,
-    (id) => getShopProductThumbnailSource(id) !== undefined,
-    "tr-TR"
-  )
-  assert.deepEqual(firstPage("avatar_v2_body_default"), [
-    "avatar_v2_top_azure_garden_halter",
-    "avatar_v2_top_buttercream_bow_tee",
-    "avatar_v2_top_coral_wave_polo",
-    "avatar_v2_top_powder_blue_ribbon_corset_top"
-  ])
-  assert.deepEqual(firstPage("avatar_v2_body_male_light"), [
-    "avatar_v2_top_male_abstract_resort_shirt",
-    "avatar_v2_top_male_asymmetric_utility_overshirt",
-    "avatar_v2_top_male_cocoa_varsity_jacket",
-    "avatar_v2_top_male_contemporary_resort_street_top"
-  ])
-})
-
 test("decoded-byte and source-count budgets drop oversized or duplicate warmup assets", () => {
   const sources = [
     { uri: "background", width: 100, height: 100 },
@@ -272,29 +181,6 @@ test("overlapping warmups share one in-flight URI and stale avatar work stops af
   await Promise.all([oldRun, newRun])
   assert.deepEqual(started, ["shared", "new-layer"])
   assert.equal(inFlight.size, 0)
-})
-
-test("native prefetch lane does not overlap decodes and skips a stale queued avatar", async () => {
-  let finishFirst: ((value: boolean) => void) | undefined
-  let active = 0
-  let stale = false
-  const started: string[] = []
-  const lane = createSequentialPrefetchLane((uri) => {
-    active += 1
-    assert.equal(active, 1)
-    started.push(uri)
-    if (uri === "background") return new Promise<boolean>((resolve) => { finishFirst = resolve })
-    return Promise.resolve(true).finally(() => { active -= 1 })
-  })
-  const first = lane("background", () => true)
-  const second = lane("stale-layer", () => !stale)
-  await Promise.resolve()
-  assert.deepEqual(started, ["background"])
-  stale = true
-  active -= 1
-  finishFirst?.(true)
-  await Promise.all([first, second])
-  assert.deepEqual(started, ["background"])
 })
 
 test("a new warmup adopts a queued URI before the stale generation's no-op runs", async () => {

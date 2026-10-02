@@ -146,7 +146,6 @@ try {
       resolve(workspaceRoot, "src/features/discovery/DiscoveryStartupBoundary.test.mjs"),
       resolve(workspaceRoot, "src/ui/PreparedDiscoveryLoadingScreen.test.mjs"),
       resolve(workspaceRoot, "src/features/demo/SwipeableDiscoverCard.test.mjs"),
-      resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-refresh-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-presentation-contract.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs"),

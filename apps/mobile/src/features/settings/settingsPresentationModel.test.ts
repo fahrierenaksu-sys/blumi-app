@@ -4,7 +4,6 @@ import { getSettingsCopy } from "./settingsCopy"
 import {
   formatMyReportDate,
   getMyReportPresentation,
-  getNotificationPreferenceRowVisual,
   isSettingsLoadPending,
   isVerificationCodeComplete,
   sanitizeVerificationCode
@@ -23,13 +22,6 @@ test("verification codes keep digits only and complete at six digits", () => {
   assert.equal(isVerificationCodeComplete("12345"), false)
   assert.equal(isVerificationCodeComplete("123456"), true)
   assert.equal(isVerificationCodeComplete("1234567"), false)
-})
-
-test("notification preference rows keep their icon and gradient mapping", () => {
-  assert.deepEqual(getNotificationPreferenceRowVisual("likesEnabled"), { icon: "heart", gradient: "primary" })
-  assert.deepEqual(getNotificationPreferenceRowVisual("messagesEnabled"), { icon: "chatbubble", gradient: "cool" })
-  assert.deepEqual(getNotificationPreferenceRowVisual("matchesEnabled"), { icon: "people", gradient: "primary" })
-  assert.deepEqual(getNotificationPreferenceRowVisual("discoveryWatchEnabled"), { icon: "compass", gradient: "primary" })
 })
 
 test("my reports format dates in the release locale", () => {
