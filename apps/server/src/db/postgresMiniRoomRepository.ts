@@ -89,6 +89,7 @@ export function createPostgresMiniRoomRepository(
            FROM blumi_mini_room_invites AS invite
            LEFT JOIN blumi_mini_rooms AS mini_room
              ON mini_room.invite_id = invite.invite_id
+            AND mini_room.ended_at IS NULL
           WHERE invite.source_thread_id = $1
           ORDER BY invite.created_at DESC
           LIMIT 1`,
@@ -109,6 +110,7 @@ export function createPostgresMiniRoomRepository(
            FROM blumi_mini_room_invites AS invite
            LEFT JOIN blumi_mini_rooms AS mini_room
              ON mini_room.invite_id = invite.invite_id
+            AND mini_room.ended_at IS NULL
           WHERE invite.invite_id = $1`,
         [inviteId]
       )
@@ -131,6 +133,7 @@ export function createPostgresMiniRoomRepository(
            FROM blumi_mini_room_invites AS invite
            LEFT JOIN blumi_mini_rooms AS mini_room
              ON mini_room.invite_id = invite.invite_id
+            AND mini_room.ended_at IS NULL
           WHERE invite.source_thread_id = $1
           ORDER BY invite.created_at ASC`,
         [sourceThreadId, now]
