@@ -113,12 +113,14 @@ export function startDiscoveryWatchWorker(options: {
   notificationService: Pick<NotificationService, "sendPushToUser">
   intervalMs?: number
   reportError?: (error: unknown) => void
+  firstRunDelayMs?: number
 }): DiscoveryWatchWorker {
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS
   if (!Number.isSafeInteger(intervalMs) || intervalMs < 1_000) {
     throw new Error("Discovery Watch worker interval must be at least one second.")
   }
-  return startPeriodicWorker({ run: () => runDiscoveryWatchCycle(options), intervalMs, reportError: options.reportError })
+  return startPeriodicWorker({ run: () => runDiscoveryWatchCycle(options), intervalMs, reportError: options.reportError,
+    firstRunDelayMs: options.firstRunDelayMs })
 }
 
 async function firstUnblockedCandidate(

@@ -20,7 +20,16 @@ export interface AccountRecoveryRequest {
   resolvedByTokenId?: string
 }
 
+/**
+ * Open requests one verified phone may hold (2026-10-02). Anyone with a
+ * verified phone could file a request naming any old number, and every
+ * blocked sign-in filed another, so the operator queue and the stored phone
+ * numbers grew without bound. A repeat of an open (new, old) pair is a no-op.
+ */
+export const MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE = 3
+
 export interface AccountRecoveryRepository {
+  /** Stores a pending request unless the per-phone rules above refuse it. */
   save(request: AccountRecoveryRequest): Promise<void>
   list(limit: number): Promise<readonly AccountRecoveryRequest[]>
   listPage(input: RecoveryPageQuery): Promise<readonly AccountRecoveryRequest[]>
@@ -38,7 +47,12 @@ export interface AccountRecoveryService {
 export function createInMemoryAccountRecoveryRepository(): AccountRecoveryRepository {
   const requests = new Map<string, AccountRecoveryRequest>()
   return {
-    async save(request) { requests.set(request.requestId, { ...request }) },
+    async save(request) {
+      const open = [...requests.values()].filter(r => r.status === "pending" && r.newPhoneNumber === request.newPhoneNumber)
+      if (open.some(r => r.claimedOldPhoneNumber === request.claimedOldPhoneNumber)) return
+      if (open.length >= MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE) return
+      requests.set(request.requestId, { ...request })
+    },
     async list(limit) { return [...requests.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((request) => ({ ...request })) },
     async listPage(input) {
       return [...requests.values()].filter(r => (!input.status || r.status === input.status) &&

@@ -8,7 +8,8 @@ import {
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import { isAuthError } from "../auth/authErrors"
 import { toSessionActor, type AuthService } from "../auth/authService"
-import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import { isFirebaseTokenRejection, type FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { normalizePhoneNumber } from "../auth/phone"
 import { readBearerToken, schemaValidationFailed } from "./routeHelpers"
 import {
@@ -169,8 +170,20 @@ export async function registerAuthRoutes(
         return reply.code(400).send({ error: "Terms acceptance is required to create an account." })
       }
 
+      let identity: Awaited<ReturnType<typeof services.firebaseAuthVerifier.verifyIdToken>>
       try {
-        const identity = await services.firebaseAuthVerifier.verifyIdToken(parsed.idToken)
+        identity = await services.firebaseAuthVerifier.verifyIdToken(parsed.idToken)
+      } catch (error) {
+        // Only a rejected token is the caller's failure (401, counted by the
+        // failed-auth limiter). A provider or credential failure is ours: 503.
+        if (isFirebaseTokenRejection(error)) {
+          return reply.code(401).send({ error: "Phone verification could not be completed." })
+        }
+        request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Firebase verification unavailable")
+        return reply.code(503).header("Retry-After", "5").send({ error: "Phone verification is temporarily unavailable." })
+      }
+
+      try {
         if (await authService.repository.isFirebaseUserDeletionPending(identity.uid)) {
           return reply.code(403).send({ error: "This account is being deleted." })
         }
@@ -201,7 +214,9 @@ export async function registerAuthRoutes(
         if (isAuthError(error)) {
           return reply.code(error.statusCode).send({ error: error.message })
         }
-        return reply.code(401).send({ error: "Phone verification could not be completed." })
+        // A database or other server failure after a valid token: the global
+        // handler answers it (503 when transient), never a failed sign-in.
+        throw error
       }
     }
   )

@@ -502,9 +502,11 @@ export function createPostgresChatRepository(
       [messageId, leaseToken, leaseUntil])
       return result.rows.length > 0
     },
-    async retryDelivery(messageId, leaseToken, availableAt) {
-      await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3, lease_token = NULL
-        WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`, [messageId, leaseToken, availableAt])
+    async retryDelivery(messageId, leaseToken, availableAt, options) {
+      await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3, lease_token = NULL,
+          attempt_count = CASE WHEN $4 THEN GREATEST(attempt_count - 1, 0) ELSE attempt_count END
+        WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`,
+      [messageId, leaseToken, availableAt, options?.refundAttempt === true])
     },
     async deadLetterDelivery(messageId, leaseToken, now) {
       // Terminal like a completed job; the token records why (no schema change).

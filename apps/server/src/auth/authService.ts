@@ -46,7 +46,7 @@ import {
   type BlumiBackendStore,
   type SessionRecord
 } from "./authStore"
-import { isProfileOnboardingReady } from "./authStore"
+import { isProfileOnboardingReady, isSessionTokenShape } from "./authStore"
 import { createPhoneBanHasher } from "./moderationPhoneBan"
 import {
   createDevelopmentSmsProvider,
@@ -666,6 +666,8 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
 
     async getSession(sessionToken, now = new Date()) {
+      // An invented bearer must not cost a database round trip (2026-10-02).
+      if (!isSessionTokenShape(sessionToken)) return null
       return this.getSessionByTokenHash(hashSessionToken(sessionToken), now)
     },
 

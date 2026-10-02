@@ -418,6 +418,23 @@ runRepositoryContract<ChatRepository>({
       await backend.repository.completeDelivery(second.messageId, next[0]!.leaseToken, new Date())
       assert.deepEqual(sortedIds(await claim(65_000, third.messageId)), [third.messageId])
     },
+    "a retry that refunds its attempt leaves the attempt count where it was": async (backend) => {
+      const chat = thread(backend, "refund", "2026-09-30T10:00:00.000Z")
+      await backend.repository.saveThread(chat)
+      const value = message(chat, "r1", "2026-09-30T10:01:00.000Z")
+      await backend.repository.createMessage(value)
+      const startedAt = Date.now()
+      const claim = async (afterMs: number) =>
+        (await backend.repository.claimDeliveries({ now: new Date(startedAt + afterMs), limit: 50, leaseMs: 1000, messageId: value.messageId }))[0]!
+      const first = await claim(1_000)
+      await backend.repository.retryDelivery(value.messageId, first.leaseToken, new Date(startedAt + 2_000), { refundAttempt: true })
+      const second = await claim(3_000)
+      assert.equal(second.attempt, first.attempt)
+      await backend.repository.retryDelivery(value.messageId, second.leaseToken, new Date(startedAt + 4_000))
+      const third = await claim(5_000)
+      assert.equal(third.attempt, first.attempt + 1)
+      await backend.repository.completeDelivery(value.messageId, third.leaseToken, new Date())
+    },
     "a dead-lettered job is terminal and releases its thread; a stale lease cannot dead-letter": async (backend) => {
       const chat = thread(backend, "dead_letter", "2026-09-30T10:00:00.000Z")
       await backend.repository.saveThread(chat)

@@ -167,7 +167,13 @@ export interface ChatRepository {
   completeDelivery(messageId: string, leaseToken: string, now: Date): Promise<void>
   /** Extends a lease the caller still holds; false when it was lost (another dispatcher owns the job). */
   renewDeliveryLease(messageId: string, leaseToken: string, leaseUntil: Date): Promise<boolean>
-  retryDelivery(messageId: string, leaseToken: string, availableAt: Date): Promise<void>
+  /**
+   * Releases a held job until `availableAt`. `refundAttempt` gives back the
+   * attempt its claim counted: a transient infrastructure failure (a busy
+   * pool, a pooler refusal) is not the message's fault and must not move it
+   * toward the dead letter.
+   */
+  retryDelivery(messageId: string, leaseToken: string, availableAt: Date, options?: { refundAttempt?: boolean }): Promise<void>
   /**
    * Gives up on a job the caller still leases: it becomes terminal like a
    * completed job (completed_at, no schema change) and is marked with the
@@ -462,9 +468,12 @@ export function createInMemoryChatRepository(
       store.deliveryJobs.set(messageId, { ...job, availableAt: leaseUntil.getTime() })
       return true
     },
-    async retryDelivery(messageId, leaseToken, availableAt) {
+    async retryDelivery(messageId, leaseToken, availableAt, options) {
       const job = store.deliveryJobs.get(messageId)
-      if (job?.leaseToken === leaseToken) store.deliveryJobs.set(messageId, { ...job, availableAt: availableAt.getTime(), leaseToken: undefined })
+      if (job?.leaseToken === leaseToken) store.deliveryJobs.set(messageId, {
+        ...job, availableAt: availableAt.getTime(), leaseToken: undefined,
+        attempt: options?.refundAttempt ? Math.max(job.attempt - 1, 0) : job.attempt
+      })
     },
     async deadLetterDelivery(messageId, leaseToken) {
       const job = store.deliveryJobs.get(messageId)

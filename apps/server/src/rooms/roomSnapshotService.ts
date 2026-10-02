@@ -1,9 +1,10 @@
 import type { PersonalRoomDecorSnapshot } from "./personalRoomDecorRepository"
 import {
-  cloneRoomShowcaseSnapshot,
   createInMemoryRoomSnapshotRepository,
   roomSnapshotMatchesRoomRevision,
+  toRoomShowcaseMetadata,
   type RoomShowcaseSnapshot,
+  type RoomShowcaseSnapshotMetadata,
   type RoomSnapshotRepository
 } from "./roomSnapshotRepository"
 import {
@@ -15,18 +16,18 @@ import {
 export interface RoomSnapshotService {
   publishForRoomSave(
     room: PersonalRoomDecorSnapshot
-  ): Promise<RoomShowcaseSnapshot>
+  ): Promise<RoomShowcaseSnapshotMetadata>
   getLatestForUser(
     userId: string,
     room: PersonalRoomDecorSnapshot | null
-  ): Promise<RoomShowcaseSnapshot | null>
+  ): Promise<RoomShowcaseSnapshotMetadata | null>
   findByAssetKey(assetKey: string): Promise<RoomShowcaseSnapshot | null>
   setVisibilityForRoom(input: {
     userId: string
     room: PersonalRoomDecorSnapshot | null
     isPublic: boolean
     headline?: string | null
-  }): Promise<RoomShowcaseSnapshot | null>
+  }): Promise<RoomShowcaseSnapshotMetadata | null>
 }
 
 export function createRoomSnapshotService(options: {
@@ -43,7 +44,7 @@ export function createRoomSnapshotService(options: {
     async publishForRoomSave(room) {
       const current = await repository.getLatest(room.userId)
       if (roomSnapshotMatchesRoomRevision(current, room)) {
-        return cloneRoomShowcaseSnapshot(current!)
+        return toRoomShowcaseMetadata(current!)
       }
       try {
         const rendered = await renderer.render({
@@ -77,7 +78,7 @@ export function createRoomSnapshotService(options: {
       if (!room) return null
       const snapshot = await repository.getLatest(userId)
       return roomSnapshotMatchesRoomRevision(snapshot, room)
-        ? cloneRoomShowcaseSnapshot(snapshot!)
+        ? toRoomShowcaseMetadata(snapshot!)
         : null
     },
     async findByAssetKey(assetKey) {

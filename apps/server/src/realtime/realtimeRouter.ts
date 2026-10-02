@@ -72,7 +72,8 @@ export function createRealtimeRouter(
     options.isPresenceRoomAllowed ?? isRealtimePresenceRoomAllowed
   const motion = createMiniRoomMotionService({
     findRoom: id => miniRoomService.findMiniRoom(id),
-    hasBlockBetween: (a, b) => safetyService.hasBlockBetween(a, b),
+    // Re-checked every few seconds per occupied room: cached (RTC-01).
+    hasBlockBetween: (a, b) => safetyService.hasBlockBetweenCached(a, b),
     // Local sockets only: no cross-instance publish (a NOTIFY query) per step.
     emit: (connectionIds, event) => {
       for (const connectionId of connectionIds) connectionManager.sendToConnection(connectionId, event)
@@ -94,7 +95,7 @@ export function createRealtimeRouter(
   const capabilityService = options.capabilityService
   const chatReceipts = createChatReceiptService({
     chatService,
-    blockPolicy: safetyService,
+    blockPolicy: { hasBlockBetween: (a, b) => safetyService.hasBlockBetweenCached(a, b) },
     isRolledOutFor: (userId) => capabilityService
       ? isCapabilityRolledOut(capabilityService, userId, "chat_read_receipts")
       : false,
@@ -102,7 +103,7 @@ export function createRealtimeRouter(
   })
   const chatTyping = createChatTypingService({
     threads: chatService.repository,
-    blockPolicy: safetyService,
+    blockPolicy: { hasBlockBetween: (a, b) => safetyService.hasBlockBetweenCached(a, b) },
     isRolledOutFor: (userId) => capabilityService
       ? isCapabilityRolledOut(capabilityService, userId, "chat_typing")
       : false,

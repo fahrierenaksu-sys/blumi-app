@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createAccountRecoveryService, createInMemoryAccountRecoveryRepository } from "../account/accountRecoveryService"
 import { createAuthService } from "../auth/authService"
+import { createFirebaseAuthVerifier, FirebaseVerifierUnavailableError } from "../auth/firebaseAuth"
 import { createServer } from "../server"
 
 const PHONE = "+905551112233"
@@ -58,8 +59,15 @@ test("Firebase phone completion fails closed when the verifier is not configured
 })
 
 test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a code was sent", async () => {
+  const authService = createAuthService()
+  let recoveryChallenges = 0
+  const requestRecovery = authService.requestRecoveryPhoneVerification.bind(authService)
+  authService.requestRecoveryPhoneVerification = async (phone) => {
+    recoveryChallenges += 1
+    return requestRecovery(phone)
+  }
   const app = createServer({
-    authService: createAuthService(),
+    authService,
     firebaseAuthVerifier: { async verifyIdToken() {
       return { uid: "firebase-user-1", phoneNumber: PHONE, authTime: Math.floor(Date.now() / 1000) }
     } }
@@ -68,13 +76,52 @@ test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a 
     for (const [url, payload] of [
       ["/v1/auth/send-code", { phoneNumber: PHONE }],
       ["/v1/auth/verify", { phoneNumber: PHONE, verificationCode: "123456" }],
-      ["/v1/accounts/register", { phoneNumber: PHONE, verificationCode: "123456", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }]
+      ["/v1/accounts/register", { phoneNumber: PHONE, verificationCode: "123456", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }],
+      ["/v1/account/recovery/challenge", { phoneNumber: PHONE }]
     ] as const) {
       const response = await app.inject({ method: "POST", url, payload })
       assert.equal(response.statusCode, 410, url)
       assert.equal(response.json().code, "FIREBASE_PHONE_AUTH_REQUIRED")
     }
+    // No challenge row is written for a number nobody proved.
+    assert.equal(recoveryChallenges, 0)
   } finally { await app.close() }
+})
+
+test("a Firebase provider or credential failure answers 503 and never counts as a failed sign-in", async () => {
+  let failure: unknown = new FirebaseVerifierUnavailableError()
+  const app = createServer({
+    authService: createAuthService(),
+    firebaseAuthVerifier: { async verifyIdToken() { throw failure } }
+  })
+  try {
+    const complete = () => app.inject({
+      method: "POST", url: "/v1/auth/firebase/complete", remoteAddress: "203.0.113.77",
+      payload: { idToken: "firebase-id-token", authIntent: "sign-in" }
+    })
+    for (const error of [
+      new FirebaseVerifierUnavailableError(),
+      Object.assign(new Error("credential"), { code: "app/invalid-credential" }),
+      Object.assign(new Error("internal"), { code: "auth/internal-error" }),
+      new Error("socket hang up")
+    ]) {
+      failure = error
+      const response = await complete()
+      assert.equal(response.statusCode, 503)
+      assert.equal(response.headers["retry-after"], "5")
+    }
+    // The failed-auth limiter counts 401 answers only, so none of these did.
+    failure = Object.assign(new Error("expired"), { code: "auth/id-token-expired" })
+    assert.equal((await complete()).statusCode, 401, "a rejected token is still the caller's failure")
+  } finally { await app.close() }
+})
+
+test("a malformed or, in production, missing Firebase credential fails at startup", () => {
+  assert.throws(() => createFirebaseAuthVerifier({ serviceAccountJson: "{not json" }), /valid JSON/)
+  assert.throws(() => createFirebaseAuthVerifier({ serviceAccountJson: JSON.stringify({ project_id: "p" }) }), /missing required fields/)
+  assert.throws(() => createFirebaseAuthVerifier({ requireCredential: true }), /required in production/)
+  assert.doesNotThrow(() => createFirebaseAuthVerifier({ requireCredential: true, applicationDefaultCredentialsPath: "/secrets/gcp.json" }))
+  assert.doesNotThrow(() => createFirebaseAuthVerifier({}))
 })
 
 test("a different Firebase uid for a bound phone is routed to manual account recovery", async () => {

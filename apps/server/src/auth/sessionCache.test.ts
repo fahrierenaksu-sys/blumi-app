@@ -92,6 +92,31 @@ test("an answer read while a write was in flight is not cached", async () => {
   assert.equal(cache.get("hash"), undefined)
 })
 
+test("OTP writes keep cached sessions, and an account write drops only that account", async () => {
+  const { authService, token, account, reads } = await fixture()
+  const other = createAccountRecord("+905550000125", new Date())
+  await authService.repository.saveAccount(other)
+  const otherToken = createSessionToken()
+  await authService.repository.saveSession(createSessionRecord(other, otherToken, new Date()))
+  await authService.getSession(token)
+  await authService.getSession(otherToken)
+  assert.equal(reads(), 2)
+
+  // Someone else asking for a sign-in code touches no session or account.
+  assert.equal((await authService.repository.claimOtpSend({
+    phoneNumber: "+905550000999", requestId: "otp-1", now: Date.now(), cooldownMs: 0, windowMs: 60_000, maxRequests: 5
+  })).kind, "claimed")
+  await authService.getSession(token)
+  await authService.getSession(otherToken)
+  assert.equal(reads(), 2)
+
+  // A profile edit drops the editor's entry and keeps the other account's.
+  await authService.repository.updateAccountProfile({ accountId: account.accountId, profile: { bio: "hi" }, now: new Date() })
+  assert.equal((await authService.getSession(token))?.account.profile.bio, "hi")
+  await authService.getSession(otherToken)
+  assert.equal(reads(), 3)
+})
+
 // The in-memory safety store has no accounts; the ban is written by the
 // PostgreSQL safety repository. Runs through the isolated postgres gate.
 const requirePostgres = {

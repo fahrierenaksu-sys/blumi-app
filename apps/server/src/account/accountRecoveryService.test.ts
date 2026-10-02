@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createAccountRecoveryService, createInMemoryAccountRecoveryRepository } from "./accountRecoveryService"
+import { createAccountRecoveryService, createInMemoryAccountRecoveryRepository, MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE } from "./accountRecoveryService"
 import { createAuthService } from "../auth/authService"
 import { createBlumiBackendStore } from "../auth/authStore"
 
@@ -11,8 +11,9 @@ const CODE = "482931"
 test("recovery pagination reaches all pending requests across equal timestamps", async () => {
   const repository = createInMemoryAccountRecoveryRepository()
   const service = createAccountRecoveryService({ repository, authService: createAuthService() })
+  // Distinct verified phones: one phone may hold only a few open requests.
   for (let i = 0; i < 105; i++) await repository.save({ requestId: `recovery_${String(i).padStart(3, "0")}`,
-    newPhoneNumber: NEW_PHONE, createdAt: "2026-09-05T10:00:00.000Z", status: "pending" })
+    newPhoneNumber: `+90555000${String(i).padStart(4, "0")}`, createdAt: "2026-09-05T10:00:00.000Z", status: "pending" })
   await repository.save({ requestId: "recovery_resolved", newPhoneNumber: NEW_PHONE,
     createdAt: "2026-09-05T11:00:00.000Z", status: "rejected" })
   const first = await service.listPage({ limit: 100, status: "pending" })
@@ -59,4 +60,22 @@ test("only an audited admin resolution can close a pending recovery request", as
   assert.equal(resolved?.status, "manual_review_required")
   assert.equal(resolved?.resolvedByOperatorId, "ops-1")
   assert.equal(await service.resolve({ requestId: request.requestId, status: "rejected", operatorId: "ops-2", tokenId: "token-2" }), null)
+})
+
+test("one verified phone cannot flood the recovery queue", async () => {
+  const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
+  const service = createAccountRecoveryService({ authService })
+  const file = (oldPhoneNumber: string) =>
+    service.requestWithVerifiedPhone({ oldPhoneNumber, newPhoneNumber: NEW_PHONE, verifiedPhoneNumber: NEW_PHONE })
+  // A repeated pair (every blocked sign-in files one) stays a single request.
+  for (let i = 0; i < 5; i++) await file(OLD_PHONE)
+  assert.equal((await service.list()).length, 1)
+  // Different claimed numbers are capped per verified phone.
+  for (let i = 0; i < 10; i++) await file(`+90555111${String(i).padStart(4, "0")}`)
+  assert.equal((await service.list()).length, MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE)
+  // A resolved request frees its slot.
+  const [first] = await service.list()
+  await service.resolve({ requestId: first!.requestId, status: "rejected", operatorId: "ops", tokenId: "t" })
+  await file("+905551119999")
+  assert.equal((await service.listPage({ status: "pending" })).requests.length, MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE)
 })

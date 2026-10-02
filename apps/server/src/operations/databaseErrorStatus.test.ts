@@ -50,3 +50,20 @@ test("other database errors stay server errors and non-database errors are not c
   assert.equal(classifyDatabaseError(Object.assign(new Error("x"), { code: "INVITE_EXPIRED", statusCode: 409 })), null)
   assert.equal(classifyDatabaseError("23505"), null)
 })
+
+test("a pooler capacity refusal is transient, other internal errors are not", () => {
+  const refusal = (message: string) => {
+    const error = new DatabaseError(message, 0, "error")
+    error.code = "XX000"
+    error.severity = "FATAL"
+    return error
+  }
+  for (const message of [
+    "(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15",
+    "(EMAXCONN) Max client connections reached",
+    "(ECHECKOUTFAILED) failed to check out a connection"
+  ]) {
+    assert.deepEqual(classifyDatabaseError(refusal(message)), { statusCode: 503, sqlState: "XX000", retryAfterSeconds: 1 })
+  }
+  assert.deepEqual(classifyDatabaseError(refusal("could not open relation")), { statusCode: 500, sqlState: "XX000" })
+})

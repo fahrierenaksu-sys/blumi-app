@@ -72,12 +72,99 @@ test("retention removes only finished work and audit rows older than their windo
   }
 })
 
-test("retention policies never name a table that holds user content or an idempotency key", () => {
+test("retention policies never name a table that holds user content", () => {
   const tables = RETENTION_POLICIES.map((policy) => policy.table).sort()
+  // Idempotency claims appear only with a window far beyond any retry
+  // (chat outbox tombstones, message and like push claims: 30 days).
   assert.deepEqual(tables, [
+    "blumi_account_recovery_requests",
     "blumi_chat_delivery_outbox",
+    "blumi_media_revocations",
     "blumi_notification_policy_audit",
+    "blumi_notification_policy_events",
     "blumi_push_delivery_audit",
-    "blumi_push_receipts"
+    "blumi_push_receipts",
+    "blumi_sessions"
   ])
+})
+
+test("dead session families and stale media revocations are purged, live ones kept", requirePostgres, async () => {
+  const pool = openPool()
+  const suffix = randomUUID()
+  const accountId = `acct_${suffix}`
+  try {
+    await pool.query(`INSERT INTO blumi_accounts(account_id, user_id, phone_number, created_at, updated_at)
+      VALUES ($1, $2, $3, NOW(), NOW())`, [accountId, `user_${suffix}`, "+905550000001"])
+    const session = (name: string, expires: string, familyExpires: string | null, rotated: boolean) => pool.query(
+      `INSERT INTO blumi_sessions(session_token_hash, session_id, account_id, user_id, expires_at, family_expires_at, rotated_at)
+       VALUES ($1, $1, $2, $3, NOW() + $4::interval, NOW() + $5::interval, CASE WHEN $6 THEN NOW() - INTERVAL '100 days' END)`,
+      [`${name}_${suffix}`, accountId, `user_${suffix}`, expires, familyExpires, rotated])
+    // A family that ended 10 days ago: both its rotated and its last row go.
+    await session("dead_rotated", "-100 days", "-10 days", true)
+    await session("dead_last", "-10 days", "-10 days", false)
+    // An open family keeps its rotated rows for reuse detection.
+    await session("open_rotated", "-30 days", "+30 days", true)
+    await session("open_live", "+20 days", "+30 days", false)
+    // Before migration 068: an expired unrotated row goes, a rotated one stays.
+    await session("legacy_expired", "-8 days", null, false)
+    await session("legacy_rotated", "-30 days", null, true)
+    await session("legacy_live", "+5 days", null, false)
+
+    await pool.query(`INSERT INTO blumi_media_revocations(room_name, user_id, available_at, completed_at) VALUES
+      ($1, 'a', NOW() - INTERVAL '8 days', NULL),
+      ($1, 'b', NOW() - INTERVAL '1 day', NULL)`, [`room_${suffix}`])
+
+    const result = await createPostgresRetentionService(pool).purgeExpired()
+    assert.equal(result.blumi_sessions, 3)
+    assert.deepEqual((await pool.query(
+      "SELECT session_token_hash FROM blumi_sessions WHERE account_id = $1 ORDER BY 1", [accountId]
+    )).rows.map((row) => String(row.session_token_hash).replace(`_${suffix}`, "")),
+    ["legacy_live", "legacy_rotated", "open_live", "open_rotated"])
+    assert.deepEqual((await pool.query(
+      "SELECT user_id FROM blumi_media_revocations WHERE room_name = $1", [`room_${suffix}`]
+    )).rows.map((row) => row.user_id), ["b"])
+  } finally {
+    await pool.query("DELETE FROM blumi_media_revocations WHERE room_name = $1", [`room_${suffix}`])
+    await pool.query("DELETE FROM blumi_accounts WHERE account_id = $1", [accountId])
+    await pool.end()
+  }
+})
+
+test("push dedupe claims expire only for per-event message and like keys", requirePostgres, async () => {
+  const pool = openPool()
+  const user = `ret_${randomUUID()}`
+  try {
+    await pool.query(`INSERT INTO blumi_notification_policy_events(user_id, notification_type, dedupe_key, created_at) VALUES
+      ($1, 'message', 'message:old', NOW() - INTERVAL '31 days'),
+      ($1, 'message', 'message:new', NOW() - INTERVAL '1 day'),
+      ($1, 'like', 'like:old', NOW() - INTERVAL '31 days'),
+      ($1, 'match', 'match:old', NOW() - INTERVAL '400 days'),
+      ($1, 'discovery_watch', 'discovery_watch:old', NOW() - INTERVAL '400 days')`, [user])
+    await createPostgresRetentionService(pool).purgeExpired()
+    assert.deepEqual((await pool.query(
+      "SELECT dedupe_key FROM blumi_notification_policy_events WHERE user_id = $1 ORDER BY dedupe_key", [user]
+    )).rows.map((row) => row.dedupe_key), ["discovery_watch:old", "match:old", "message:new"])
+  } finally {
+    await pool.query("DELETE FROM blumi_notification_policy_events WHERE user_id = $1", [user])
+    await pool.end()
+  }
+})
+
+test("only long-rejected recovery requests are purged", requirePostgres, async () => {
+  const pool = openPool()
+  const suffix = randomUUID()
+  try {
+    await pool.query(`INSERT INTO blumi_account_recovery_requests(request_id, new_phone_number, status, created_at, resolved_at) VALUES
+      ($1 || '_rejected_old', '+905550000002', 'rejected', NOW() - INTERVAL '120 days', NOW() - INTERVAL '100 days'),
+      ($1 || '_rejected_new', '+905550000003', 'rejected', NOW() - INTERVAL '120 days', NOW() - INTERVAL '10 days'),
+      ($1 || '_review_old', '+905550000004', 'manual_review_required', NOW() - INTERVAL '120 days', NOW() - INTERVAL '100 days'),
+      ($1 || '_pending_old', '+905550000005', 'pending', NOW() - INTERVAL '120 days', NULL)`, [suffix])
+    await createPostgresRetentionService(pool).purgeExpired()
+    assert.deepEqual((await pool.query(
+      "SELECT request_id FROM blumi_account_recovery_requests WHERE request_id LIKE $1 ORDER BY 1", [`${suffix}%`]
+    )).rows.map((row) => String(row.request_id).slice(suffix.length + 1)), ["pending_old", "rejected_new", "review_old"])
+  } finally {
+    await pool.query("DELETE FROM blumi_account_recovery_requests WHERE request_id LIKE $1", [`${suffix}%`])
+    await pool.end()
+  }
 })

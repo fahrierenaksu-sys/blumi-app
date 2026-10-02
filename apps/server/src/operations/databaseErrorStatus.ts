@@ -28,6 +28,14 @@ const TRANSIENT_MESSAGES = [
   "Connection terminated unexpectedly",
   "Connection terminated due to connection timeout"
 ]
+/**
+ * Supabase's pooler (Supavisor) refuses a client with SQLSTATE XX000 and a
+ * message prefixed by its own code, for example "(EMAXCONNSESSION) max clients
+ * reached in session mode". Every deploy overlap briefly exhausts the session
+ * pool (2026-10-02 live logs); that is capacity, not a server bug, so the
+ * client is told to back off and retry. Other XX000 errors stay 500.
+ */
+const POOLER_CAPACITY_MESSAGE = /^\((EMAXCONN[A-Z]*|ECHECKOUTFAILED|ECHECKOUTTIMEOUT)\)/
 const TRANSIENT_SOCKET_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EAI_AGAIN"])
 
 /**
@@ -49,7 +57,8 @@ export function classifyDatabaseError(error: unknown): DatabaseErrorStatus | nul
   const code = (error as { code?: unknown }).code
   if (isPostgresServerError(error) && typeof code === "string") {
     if (CONFLICT_STATES.has(code)) return { statusCode: 409, sqlState: code }
-    if (TRANSIENT_STATES.has(code) || code.startsWith("08")) return { statusCode: 503, sqlState: code, retryAfterSeconds: 1 }
+    if (TRANSIENT_STATES.has(code) || code.startsWith("08") ||
+      (code === "XX000" && POOLER_CAPACITY_MESSAGE.test(error.message))) return { statusCode: 503, sqlState: code, retryAfterSeconds: 1 }
     return { statusCode: 500, sqlState: code }
   }
   if (TRANSIENT_MESSAGES.includes(error.message)) return { statusCode: 503, retryAfterSeconds: 1 }

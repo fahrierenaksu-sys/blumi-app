@@ -32,7 +32,44 @@ export interface FirebaseAuthVerifierOptions {
   serviceAccountJson?: string
   serviceAccountJsonBase64?: string
   authClient?: FirebaseAdminAuthClient
+  /**
+   * Production: refuse to start without a credential (a service account, or
+   * GOOGLE_APPLICATION_CREDENTIALS for the default credential). A given
+   * service account is always parsed at construction, so a bad value fails
+   * at startup instead of turning every sign-in into an error.
+   */
+  requireCredential?: boolean
+  applicationDefaultCredentialsPath?: string
 }
+
+/**
+ * A failure of the identity provider or of this server's credential, not of
+ * the caller's token: answered 503 so it is retried later and never counted
+ * as a failed sign-in.
+ */
+export class FirebaseVerifierUnavailableError extends Error {
+  constructor() {
+    super("Phone verification is temporarily unavailable.")
+    this.name = "FirebaseVerifierUnavailableError"
+  }
+}
+
+/** firebase-admin codes that mean "this server or Firebase failed", not "bad token". */
+const PROVIDER_FAILURE_CODES = new Set([
+  "auth/internal-error", "auth/insufficient-permission", "auth/invalid-credential",
+  "auth/project-not-found", "auth/quota-exceeded", "app/invalid-credential",
+  "app/network-error", "app/network-timeout", "app/internal-error"
+])
+
+/** Whether a verifyIdToken failure is the token's fault (401) rather than the provider's (503). */
+export function isFirebaseTokenRejection(error: unknown): boolean {
+  if (error instanceof FirebaseVerifierUnavailableError) return false
+  const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined
+  if (typeof code === "string") return code.startsWith("auth/") && !PROVIDER_FAILURE_CODES.has(code)
+  return error instanceof FirebaseIdentityShapeError
+}
+
+class FirebaseIdentityShapeError extends Error {}
 
 export function createFirebaseAuthVerifier(
   options: FirebaseAuthVerifierOptions = {}
@@ -41,6 +78,14 @@ export function createFirebaseAuthVerifier(
   revokeRefreshTokens(uid: string): Promise<void>
 } {
   let authClient: FirebaseAdminAuthClient | undefined = options.authClient
+  if (!authClient) {
+    // Fail fast on a malformed service account (throws), and in production
+    // on a missing credential.
+    const serviceAccount = readServiceAccount(options)
+    if (!serviceAccount && options.requireCredential && !options.applicationDefaultCredentialsPath?.trim()) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON (or _BASE64) is required in production.")
+    }
+  }
 
   function getAuthClient(): FirebaseAdminAuthClient {
     if (authClient) return authClient
@@ -59,13 +104,19 @@ export function createFirebaseAuthVerifier(
     async verifyIdToken(idToken) {
       // checkRevoked: tokens minted before revokeRefreshTokens (auth_time
       // older than tokensValidAfterTime) and disabled users are rejected.
-      const decoded = await getAuthClient().verifyIdToken(idToken, true)
+      let client: FirebaseAdminAuthClient
+      try {
+        client = getAuthClient()
+      } catch {
+        throw new FirebaseVerifierUnavailableError()
+      }
+      const decoded = await client.verifyIdToken(idToken, true)
       if (
         typeof decoded.uid !== "string" ||
         typeof decoded.phone_number !== "string" ||
         typeof decoded.auth_time !== "number"
       ) {
-        throw new Error("Firebase token is not a verified phone identity.")
+        throw new FirebaseIdentityShapeError("Firebase token is not a verified phone identity.")
       }
       return {
         uid: decoded.uid,

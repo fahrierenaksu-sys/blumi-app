@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS } from "./miniRoomMotionService"
+import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS, MINI_ROOM_MOTION_REVALIDATE_AFTER_MS } from "./miniRoomMotionService"
 
 test("room motion relays immediately, snapshots recover positions, and disconnect is per connection", async () => {
   const events: any[] = []
@@ -69,6 +69,11 @@ test("a seat move is relayed with its hotspot even where the seat overhangs the 
   assert.equal(events[0].payload.avatar.hotspotId, "chair:front_edge")
   await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .4, y: .93 })
   assert.equal(events.length, 1, "a plain walk target must still be on the floor")
+  // A claimed seat far from the floor (a wall, a corner) is refused, whatever its id.
+  for (const [sequence, point] of [[3, { x: .02, y: .02 }], [4, { x: .5, y: .2 }], [5, { x: .98, y: .98 }]] as const) {
+    await service.move("ca", "a", { miniRoomId: "room", sequence, ...point, hotspotId: "invented:seat" })
+  }
+  assert.equal(events.length, 1)
 })
 
 test("motion reaches only the sockets that entered the scene, never every device of both users", async () => {
@@ -165,7 +170,7 @@ test("a due access re-check runs in the background while moves keep relaying, an
   events.length = 0
   lookups = 0
   gate = new Promise<void>(resolve => { release = resolve })
-  clock += 10_000
+  clock += MINI_ROOM_MOTION_REVALIDATE_AFTER_MS
   // The re-check is due but slow: the move is relayed without waiting for it.
   await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
   assert.equal(events.length, 1)
@@ -222,7 +227,9 @@ test("occupied rooms are re-checked on a timer, so a move after a quiet minute d
     t.mock.timers.tick(5_000)
     await new Promise(resolve => setImmediate(resolve))
   }
-  assert.ok(lookups >= 6, "re-checked about every 10 s while occupied")
+  assert.ok(lookups >= Math.floor(70_000 / MINI_ROOM_MOTION_REVALIDATE_AFTER_MS),
+    "re-checked about every MINI_ROOM_MOTION_REVALIDATE_AFTER_MS while occupied")
+  assert.ok(lookups <= Math.ceil(70_000 / MINI_ROOM_MOTION_REVALIDATE_AFTER_MS), "and not more often")
   gate = new Promise<void>(() => undefined)
   events.length = 0
   void service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
@@ -277,7 +284,7 @@ test("a room just verified by its acceptance is entered without another lookup; 
   assert.equal(lookups, 1, "an ended or blocked room is looked up again")
 
   service.prime(record)
-  clock += 10_000
+  clock += MINI_ROOM_MOTION_REVALIDATE_AFTER_MS
   await service.enter("ca", "a", "room")
   assert.equal(lookups, 2, "a stale verification is not reused")
   service.prime({ ...record, endedAt: new Date(0).toISOString() })

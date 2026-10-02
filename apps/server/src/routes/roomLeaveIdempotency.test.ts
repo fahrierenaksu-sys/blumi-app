@@ -155,7 +155,9 @@ test("failed-auth address limits still refuse room leave requests", async () => 
     // the address is refused before any session lookup, even with a valid one.
     const sharedAddress = bora.clientAddress
     for (let index = 0; index < FAILED_AUTH_RESPONSES_PER_IP_PER_MINUTE; index += 1) {
-      const response = await harness.request("GET", "/v1/threads", { sessionToken: "not-a-session", clientAddress: sharedAddress })
+      // Session-shaped but unknown (an invented shape is refused even earlier).
+      const sessionToken = "dv_00000000-0000-4000-8000-000000000000_00000000-0000-4000-8000-000000000000"
+      const response = await harness.request("GET", "/v1/threads", { sessionToken, clientAddress: sharedAddress })
       assert.equal(response.status, 401)
     }
     const sameNetwork = await phoneLeave(harness, bora, miniRoomId, { clientAddress: sharedAddress })

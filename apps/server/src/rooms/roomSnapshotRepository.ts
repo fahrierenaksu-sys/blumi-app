@@ -12,17 +12,25 @@ export interface RoomShowcaseSnapshot {
   updatedAt: string
 }
 
+/**
+ * A snapshot without its image (2026-10-02). Only serving the image needs
+ * the ~27 KB body; revision checks, visibility changes and Discovery read
+ * the metadata, so they never pull the body out of the database.
+ */
+export type RoomShowcaseSnapshotMetadata = Omit<RoomShowcaseSnapshot, "body">
+
 export interface RoomSnapshotRepository {
-  getLatest(userId: string): Promise<RoomShowcaseSnapshot | null>
+  getLatest(userId: string): Promise<RoomShowcaseSnapshotMetadata | null>
+  /** The only read that returns the image body. */
   findByAssetKey(assetKey: string): Promise<RoomShowcaseSnapshot | null>
   /** Publish render content; existing visibility/headline remain authoritative. */
-  save(input: RoomShowcaseSnapshot): Promise<RoomShowcaseSnapshot>
+  save(input: RoomShowcaseSnapshot): Promise<RoomShowcaseSnapshotMetadata>
   updateVisibility(input: {
     userId: string
     roomRevision: number
     isPublic: boolean
     headline: string | null
-  }): Promise<RoomShowcaseSnapshot | null>
+  }): Promise<RoomShowcaseSnapshotMetadata | null>
 }
 
 export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
@@ -31,7 +39,7 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
   return {
     async getLatest(userId) {
       const snapshot = snapshots.get(userId)
-      return snapshot ? cloneRoomShowcaseSnapshot(snapshot) : null
+      return snapshot ? toRoomShowcaseMetadata(snapshot) : null
     },
     async findByAssetKey(assetKey) {
       for (const snapshot of snapshots.values()) {
@@ -42,7 +50,7 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
     async save(input) {
       const current = snapshots.get(input.userId)
       if (current && current.roomRevision >= input.roomRevision) {
-        return cloneRoomShowcaseSnapshot(current)
+        return toRoomShowcaseMetadata(current)
       }
       const next = cloneRoomShowcaseSnapshot({
         ...input,
@@ -51,7 +59,7 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
       })
       snapshots = new Map(snapshots)
       snapshots.set(next.userId, next)
-      return cloneRoomShowcaseSnapshot(next)
+      return toRoomShowcaseMetadata(next)
     },
     async updateVisibility(input) {
       const current = snapshots.get(input.userId)
@@ -63,8 +71,21 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
       })
       snapshots = new Map(snapshots)
       snapshots.set(next.userId, next)
-      return cloneRoomShowcaseSnapshot(next)
+      return toRoomShowcaseMetadata(next)
     }
+  }
+}
+
+export function toRoomShowcaseMetadata(snapshot: RoomShowcaseSnapshotMetadata): RoomShowcaseSnapshotMetadata {
+  return {
+    userId: snapshot.userId,
+    roomRevision: snapshot.roomRevision,
+    assetKey: snapshot.assetKey,
+    mimeType: snapshot.mimeType,
+    rendererVersion: snapshot.rendererVersion,
+    isPublic: snapshot.isPublic,
+    headline: snapshot.headline ?? null,
+    updatedAt: snapshot.updatedAt
   }
 }
 
@@ -79,7 +100,7 @@ export function cloneRoomShowcaseSnapshot(
 }
 
 export function roomSnapshotMatchesRoomRevision(
-  snapshot: RoomShowcaseSnapshot | null,
+  snapshot: RoomShowcaseSnapshotMetadata | null,
   room: PersonalRoomDecorSnapshot
 ): boolean {
   return Boolean(

@@ -104,6 +104,34 @@ test("chat over its budget is refused for a retry while the socket and other tra
   }
 })
 
+test("two quick in-room sends reach the partner live in the order they were sent", async () => {
+  const harness = await createHarness()
+  try {
+    const sender = await harness.createSession("+905554440011", "Quick")
+    const partner = await harness.createSession("+905554440012", "Partner")
+    const thread = await harness.saveThread(sender, partner, "thread_order")
+    // The first send's persist is slow (a busy database); the second is fast.
+    const sendChecked = harness.chatService.sendMessageChecked.bind(harness.chatService)
+    let calls = 0
+    harness.chatService.sendMessageChecked = async (input) => {
+      calls += 1
+      if (calls === 1) await new Promise((resolve) => setTimeout(resolve, 150))
+      return sendChecked(input)
+    }
+    const socket = await harness.connect(sender.sessionToken)
+    const partnerSocket = await harness.connect(partner.sessionToken)
+    const received = collect(partnerSocket)
+    for (const body of ["first", "second"]) {
+      socket.send(JSON.stringify({ type: "chat.send_message", payload: { threadId: thread.threadId, body, clientMessageId: `client-${body}` } }))
+    }
+    await waitUntil(() => received.ofType("chat.message_received").length === 2, 3_000)
+    assert.deepEqual(received.ofType("chat.message_received").map((event) =>
+      event.type === "chat.message_received" ? event.payload.body : ""), ["first", "second"])
+  } finally {
+    await harness.close()
+  }
+})
+
 test("an old client's chat over budget, without a retry id, is still closed with 4429", async () => {
   const harness = await createHarness()
   try {
@@ -284,6 +312,7 @@ async function createHarness(options: {
   assert.ok(heartbeat)
   return {
     authService,
+    chatService,
     url,
     tickHeartbeat: () => heartbeat.callback(),
     async issueTicket(sessionToken: string) {

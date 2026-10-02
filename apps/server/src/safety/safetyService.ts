@@ -48,6 +48,15 @@ export interface SafetyService {
     candidateUserIds: readonly string[]
   ): Promise<string[]>
   hasBlockBetween(userAId: string, userBId: string): Promise<boolean>
+  /**
+   * hasBlockBetween through a short in-process cache, for best-effort
+   * realtime hints only (typing, receipts, room motion re-checks), which
+   * otherwise cost a database query each. A block, unblock or report on this
+   * instance drops the pair at once; another instance's block reaches it
+   * within BLOCK_PAIR_CACHE_TTL_MS. Message delivery and access decisions
+   * keep using hasBlockBetween.
+   */
+  hasBlockBetweenCached(userAId: string, userBId: string): Promise<boolean>
   reportUser(
     actorUserId: string,
     input: ReportUserInput,
@@ -127,6 +136,53 @@ export interface CreateSafetyServiceOptions {
    * else are refused. Omitted in unit tests that use free-form ids.
    */
   isKnownUser?: (userId: string) => Promise<boolean>
+  /** hasBlockBetweenCached lifetime; 0 turns the cache off. */
+  blockPairCacheTtlMs?: number
+  now?: () => number
+}
+
+/** How long a cached block answer is trusted (2026-10-02, RTC-01). */
+export const BLOCK_PAIR_CACHE_TTL_MS = 30_000
+const BLOCK_PAIR_CACHE_MAX_ENTRIES = 50_000
+
+function createBlockPairCache(ttlMs: number, now: () => number) {
+  const entries = new Map<string, { blocked: boolean; expiresAt: number }>()
+  const reads = new Map<string, { epoch: number; read: Promise<boolean> }>()
+  let epoch = 0
+  const pairKey = (a: string, b: string) => a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`
+  return {
+    async read(a: string, b: string, load: () => Promise<boolean>): Promise<boolean> {
+      if (ttlMs <= 0) return load()
+      const key = pairKey(a, b)
+      const cached = entries.get(key)
+      if (cached && cached.expiresAt > now()) return cached.blocked
+      const shared = reads.get(key)
+      if (shared && shared.epoch === epoch) return shared.read
+      const readEpoch = epoch
+      const read = load()
+      reads.set(key, { epoch: readEpoch, read })
+      try {
+        const blocked = await read
+        // An answer read while a block changed is used once, never stored.
+        if (readEpoch === epoch) {
+          entries.delete(key)
+          if (entries.size >= BLOCK_PAIR_CACHE_MAX_ENTRIES) {
+            const oldest = entries.keys().next().value
+            if (oldest !== undefined) entries.delete(oldest)
+          }
+          entries.set(key, { blocked, expiresAt: now() + ttlMs })
+        }
+        return blocked
+      } finally {
+        if (reads.get(key)?.read === read) reads.delete(key)
+      }
+    },
+    invalidate(a: string, b: string) {
+      epoch += 1
+      entries.delete(pairKey(a, b))
+      reads.delete(pairKey(a, b))
+    }
+  }
 }
 
 export function createSafetyService(
@@ -135,6 +191,7 @@ export function createSafetyService(
   const repository = options.repository ?? createInMemorySafetyRepository()
   const idFactory = options.idFactory ?? createReportId
   const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
+  const blockPairs = createBlockPairCache(options.blockPairCacheTtlMs ?? BLOCK_PAIR_CACHE_TTL_MS, options.now ?? Date.now)
   const assertKnownTarget = async (userId: string) => {
     if (options.isKnownUser && !(await options.isKnownUser(userId))) {
       throw new PublicRequestError("That person is not available.")
@@ -163,12 +220,22 @@ export function createSafetyService(
         blockedUserId: targetUserId,
         createdAt: now.toISOString()
       }
-      await repository.saveBlock(block)
+      blockPairs.invalidate(actorUserId, targetUserId)
+      try {
+        await repository.saveBlock(block)
+      } finally {
+        blockPairs.invalidate(actorUserId, targetUserId)
+      }
       return (await repository.findBlock(actorUserId, targetUserId)) ?? block
     },
     async unblockUser(actorUserId, blockedUserId) {
       const targetUserId = normalizeTargetUserId(blockedUserId)
-      await repository.deleteBlock(actorUserId, targetUserId)
+      blockPairs.invalidate(actorUserId, targetUserId)
+      try {
+        await repository.deleteBlock(actorUserId, targetUserId)
+      } finally {
+        blockPairs.invalidate(actorUserId, targetUserId)
+      }
     },
     async listBlockedUserIdsBetween(viewerUserId, candidateUserIds) {
       const normalizedCandidateUserIds = [...new Set(
@@ -188,6 +255,9 @@ export function createSafetyService(
       // Both directions in one indexed query (was two findBlock round trips;
       // this check runs on every chat send, delivery and private push).
       return (await repository.listBlockedUserIdsBetween(userAId, [userBId])).length > 0
+    },
+    async hasBlockBetweenCached(userAId, userBId) {
+      return blockPairs.read(userAId, userBId, () => this.hasBlockBetween(userAId, userBId))
     },
     async reportUser(actorUserId, input, now = new Date()) {
       const reportedUserId = normalizeTargetUserId(input.reportedUserId)
@@ -212,10 +282,16 @@ export function createSafetyService(
         blockedUserId: reportedUserId,
         createdAt: now.toISOString()
       }
-      const saved = await repository.saveReportAndBlock(report, block, {
-        windowStartedAt: new Date(now.getTime() - REPORT_WINDOW_MS).toISOString(),
-        maxReportsInWindow: MAX_REPORTS_PER_DAY
-      })
+      blockPairs.invalidate(actorUserId, reportedUserId)
+      let saved: Awaited<ReturnType<SafetyRepository["saveReportAndBlock"]>>
+      try {
+        saved = await repository.saveReportAndBlock(report, block, {
+          windowStartedAt: new Date(now.getTime() - REPORT_WINDOW_MS).toISOString(),
+          maxReportsInWindow: MAX_REPORTS_PER_DAY
+        })
+      } finally {
+        blockPairs.invalidate(actorUserId, reportedUserId)
+      }
       if (saved.kind === "conflict") {
         throw new ReportIdempotencyConflictError()
       }
