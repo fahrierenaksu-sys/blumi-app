@@ -127,6 +127,7 @@ try {
       "src/ui/PressableScale.test.ts",
       "src/ui/animations.test.ts",
       "src/ui/motion.test.ts",
+      "src/navigation/nativeSheets/nativeSheets.test.ts",
       "src/ui/bottomPanelEntrance.test.ts",
       "src/navigation/useNotificationResponseRouting.test.ts"
     ],

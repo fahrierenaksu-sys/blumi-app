@@ -33,8 +33,20 @@ interface CommittedEntranceState {
   hasPresentedList: boolean
 }
 
+export interface ChatTimelineEntrances {
+  /** Rows that play the entrance animation on this render (none under Reduce Motion). */
+  enteringKeys: ReadonlySet<string>
+  /**
+   * Rows that just arrived at the newest edge, whatever the motion setting:
+   * a sent row may claim its send flight (which crossfades under Reduce Motion).
+   */
+  arrivedKeys: ReadonlySet<string>
+}
+
+const NO_ENTRANCES: ChatTimelineEntrances = { enteringKeys: NO_ENTERING_KEYS, arrivedKeys: NO_ENTERING_KEYS }
+
 /**
- * Keys of the timeline rows that should play the entrance on this render.
+ * The timeline rows that arrive (and enter) on this render.
  *
  * The plan is made once per timeline (pure rules in chatTimelineEntranceModel)
  * and its bookkeeping is committed after render, so a discarded or repeated
@@ -47,7 +59,7 @@ export function useChatTimelineEntrances({
 }: {
   timeline: readonly ChatTimelineItem[]
   isListPresented: boolean
-}): ReadonlySet<string> {
+}): ChatTimelineEntrances {
   const reduceMotion = useReducedMotion()
   const committedRef = useRef<CommittedEntranceState>({
     entrance: EMPTY_CHAT_TIMELINE_ENTRANCE_STATE,
@@ -56,16 +68,19 @@ export function useChatTimelineEntrances({
   const plan = useMemo(() => {
     if (!isListPresented) return null
     const committed = committedRef.current
+    // Planned with motion so arrivals are known; Reduce Motion only drops the animation.
     return planChatTimelineEntrances({
       ...committed.entrance,
       nextItems: timeline,
       isInitialLoad: !committed.hasPresentedList,
-      reduceMotion
+      reduceMotion: false
     })
-  }, [isListPresented, reduceMotion, timeline])
+  }, [isListPresented, timeline])
   useEffect(() => {
     if (!plan) return
     committedRef.current = { entrance: plan.state, hasPresentedList: true }
   }, [plan])
-  return plan?.enteringKeys ?? NO_ENTERING_KEYS
+  return useMemo(() => plan
+    ? { enteringKeys: reduceMotion ? NO_ENTERING_KEYS : plan.enteringKeys, arrivedKeys: plan.enteringKeys }
+    : NO_ENTRANCES, [plan, reduceMotion])
 }

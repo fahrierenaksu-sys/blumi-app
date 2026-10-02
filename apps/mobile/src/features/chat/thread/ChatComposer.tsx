@@ -1,18 +1,24 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useState } from "react"
+import { useState, type RefObject } from "react"
 import { Pressable, TextInput, View } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
 import { PressableScale } from "../../../ui/PressableScale"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { styles } from "./chatThreadStyles"
 import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 
+/** Scale the send button springs back from after a send (MOTION_PLAN §D.4). */
+const SEND_POP_SCALE = 0.8
+
 /**
- * Owns the draft text so typing never re-renders the timeline owner.
+ * Owns the draft text so typing never re-renders the timeline owner. The
+ * input surface (`surfaceRef`) is where a send flight starts.
  */
 export function ChatComposer({
   chatCopy,
@@ -25,7 +31,8 @@ export function ChatComposer({
   roomInviteDisabledReason,
   onRoomInvitePress,
   onSend,
-  draftTyping
+  draftTyping,
+  surfaceRef
 }: {
   chatCopy: ChatThreadCopy
   partnerName: string
@@ -39,14 +46,31 @@ export function ChatComposer({
   onSend: (body: string) => boolean
   /** Typing signal for the partner (chat_typing); never sees programmatic text. */
   draftTyping?: ChatDraftTyping
+  /** The input's surface, measured as the start of the send flight. */
+  surfaceRef?: RefObject<View | null>
 }) {
   const [inputText, setInputText] = useState("")
+  const motion = useMotion()
+  // The press itself is PressableScale's (the shared `press` token); this
+  // outer scale only carries the post-send pop, so the two never fight.
+  const sendPop = useSharedValue(1)
+  const sendPopStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendPop.value }] }))
   const isSendDisabled = inputText.trim().length === 0 || isPendingThread
 
-  const handleSend = (): void => {
+  const handleSend = (): boolean => {
     const body = inputText.trim()
-    if (!body || isPendingThread) return
-    if (onSend(body)) setInputText("")
+    if (!body || isPendingThread) return false
+    if (!onSend(body)) return false
+    setInputText("")
+    return true
+  }
+
+  // An accepted send answers with a small pop back to rest; Reduce Motion
+  // keeps the button still (the haptic stays).
+  const popSendButton = () => {
+    if (motion.reduceMotion) return
+    sendPop.value = SEND_POP_SCALE
+    sendPop.value = animateTo(1, motion.snappy)
   }
 
   return (
@@ -72,7 +96,7 @@ export function ChatComposer({
         >
           <RoomInviteComposerIcon ready={roomInviteReady} />
         </Pressable>
-        <View style={styles.inputWrap}>
+        <View ref={surfaceRef} style={styles.inputWrap}>
           <TextInput
             accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
             style={styles.input}
@@ -86,15 +110,15 @@ export function ChatComposer({
             maxLength={500}
           />
         </View>
+        <Animated.View style={sendPopStyle}>
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
             onPress={() => {
-              handleSend()
+              if (handleSend()) popSendButton()
               draftTyping?.endDraft()
             }}
-            pressedScale={0.96}
             disabled={isSendDisabled}
             style={({ pressed }) => [
               styles.sendButton,
@@ -115,6 +139,7 @@ export function ChatComposer({
               <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
           </PressableScale>
+        </Animated.View>
       </View>
     </SafeAreaView>
   )

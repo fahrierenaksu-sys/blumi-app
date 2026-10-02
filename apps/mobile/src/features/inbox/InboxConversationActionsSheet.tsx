@@ -1,11 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarSelection } from "@blumi/contracts"
 import { useEffect, useState } from "react"
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
-import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { Pressable, StyleSheet, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { ParticipantAvatar } from "../../ui/participantAvatar"
-import { SwipeDismissSheet } from "../../ui/SwipeDismissSheet"
+import { ModalBottomSheet } from "../../ui/ModalBottomSheet"
+import { useSheetPresentation } from "../../ui/sheetPresentation"
+import { useNativeSheet } from "../../navigation/nativeSheets/useNativeSheet"
 import { uiTheme } from "../../ui/theme"
 import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
 import { PressableScale } from "../../ui/PressableScale"
@@ -20,11 +21,19 @@ export interface InboxConversationActionsTarget {
   isPinned: boolean
 }
 
+export interface InboxConversationActionsSheetContentProps {
+  target: InboxConversationActionsTarget
+  copy: InboxConversationActionsCopy
+  onTogglePin: (threadId: string) => void
+  onDelete: (threadId: string) => void
+}
+
 /**
  * Long-press options for one conversation in the Chats list: pin or unpin,
- * and delete for me (with a confirmation step in the same sheet). The app's
- * one bottom-sheet surface: swipe down, backdrop tap and VoiceOver escape
- * close it; Reduce Motion is handled by the sheet itself.
+ * and delete for me (with a confirmation step in the same sheet). A native
+ * form sheet on iOS, the app's swipe-down sheet elsewhere
+ * (navigation/nativeSheets): swipe down, tap outside and VoiceOver escape
+ * close it.
  */
 export function InboxConversationActionsSheet(props: {
   target: InboxConversationActionsTarget | null
@@ -35,90 +44,106 @@ export function InboxConversationActionsSheet(props: {
 }) {
   const { target, copy, onTogglePin, onDelete, onClose } = props
   const insets = useSafeAreaInsets()
+  const presentsNatively = useNativeSheet(
+    "inboxConversationActions",
+    target ? { target, copy, onTogglePin, onDelete } : null,
+    onClose
+  )
+  if (presentsNatively) return null
+  return (
+    <ModalBottomSheet
+      visible={target !== null}
+      onClose={onClose}
+      backdrop={{ style: styles.backdrop, onPress: onClose, accessibilityLabel: copy.close }}
+      testID="inbox-conversation-actions"
+      sheetStyle={[styles.sheet, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }]}
+    >
+      {target ? (
+        <InboxConversationActionsSheetContent
+          target={target}
+          copy={copy}
+          onTogglePin={onTogglePin}
+          onDelete={onDelete}
+        />
+      ) : null}
+    </ModalBottomSheet>
+  )
+}
+
+export function InboxConversationActionsSheetContent(props: InboxConversationActionsSheetContentProps) {
+  const { target, copy, onTogglePin, onDelete } = props
+  const { close } = useSheetPresentation()
   const [confirming, setConfirming] = useState(false)
-  const targetThreadId = target?.threadId
+  const targetThreadId = target.threadId
   useEffect(() => { setConfirming(false) }, [targetThreadId])
 
   return (
-    <Modal visible={target !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <GestureHandlerRootView style={styles.overlay}>
-        {target ? (
-          <SwipeDismissSheet
-            onDismiss={onClose}
-            backdrop={{ style: styles.backdrop, onPress: onClose, accessibilityLabel: copy.close }}
-            accessibilityViewIsModal
-            grabber
-            testID="inbox-conversation-actions"
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }]}
-          >
-            <View style={styles.header}>
-              <ParticipantAvatar
-                name={target.partnerName}
-                seed={target.partnerUserId || target.partnerName}
-                avatar={target.partnerAvatar}
-                size={44}
-                ring="soft"
-              />
-              <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.title}>
-                {confirming ? copy.confirmTitle : copy.sheetTitle(target.partnerName)}
-              </Text>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={copy.close}
-                onPress={onClose}
-                hitSlop={6}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={20} color={uiTheme.colors.textMuted} />
-              </PressableScale>
-            </View>
+    <View style={styles.content}>
+      <View style={styles.header}>
+        <ParticipantAvatar
+          name={target.partnerName}
+          seed={target.partnerUserId || target.partnerName}
+          avatar={target.partnerAvatar}
+          size={44}
+          ring="soft"
+        />
+        <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.title}>
+          {confirming ? copy.confirmTitle : copy.sheetTitle(target.partnerName)}
+        </Text>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={copy.close}
+          onPress={() => close()}
+          hitSlop={6}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={20} color={uiTheme.colors.textMuted} />
+        </PressableScale>
+      </View>
 
-            {confirming ? (
-              <>
-                <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.body}>
-                  {copy.confirmBody(target.partnerName)}
-                </Text>
-                <View style={styles.confirmRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.cancel}
-                    onPress={() => setConfirming(false)}
-                    style={({ pressed }) => [styles.confirmButton, styles.secondaryButton, pressed ? styles.pressed : null]}
-                  >
-                    <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.secondaryText}>{copy.cancel}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.confirmDelete}
-                    accessibilityHint={copy.deleteHint}
-                    onPress={() => onDelete(target.threadId)}
-                    style={({ pressed }) => [styles.confirmButton, styles.destructiveButton, pressed ? styles.pressed : null]}
-                  >
-                    <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.destructiveText}>{copy.confirmDelete}</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <View style={styles.actions}>
-                <ActionRow
-                  icon={target.isPinned ? "pin" : "pin-outline"}
-                  label={target.isPinned ? copy.unpin : copy.pin}
-                  hint={target.isPinned ? copy.unpinHint : copy.pinHint}
-                  onPress={() => onTogglePin(target.threadId)}
-                />
-                <ActionRow
-                  icon="trash-outline"
-                  label={copy.delete}
-                  hint={copy.deleteHint}
-                  destructive
-                  onPress={() => setConfirming(true)}
-                />
-              </View>
-            )}
-          </SwipeDismissSheet>
-        ) : null}
-      </GestureHandlerRootView>
-    </Modal>
+      {confirming ? (
+        <>
+          <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.body}>
+            {copy.confirmBody(target.partnerName)}
+          </Text>
+          <View style={styles.confirmRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.cancel}
+              onPress={() => setConfirming(false)}
+              style={({ pressed }) => [styles.confirmButton, styles.secondaryButton, pressed ? styles.pressed : null]}
+            >
+              <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.secondaryText}>{copy.cancel}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.confirmDelete}
+              accessibilityHint={copy.deleteHint}
+              onPress={() => onDelete(target.threadId)}
+              style={({ pressed }) => [styles.confirmButton, styles.destructiveButton, pressed ? styles.pressed : null]}
+            >
+              <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.destructiveText}>{copy.confirmDelete}</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <View style={styles.actions}>
+          <ActionRow
+            icon={target.isPinned ? "pin" : "pin-outline"}
+            label={target.isPinned ? copy.unpin : copy.pin}
+            hint={target.isPinned ? copy.unpinHint : copy.pinHint}
+            onPress={() => onTogglePin(target.threadId)}
+          />
+          <ActionRow
+            icon="trash-outline"
+            label={copy.delete}
+            hint={copy.deleteHint}
+            destructive
+            onPress={() => setConfirming(true)}
+          />
+        </View>
+      )}
+    </View>
   )
 }
 
@@ -147,10 +172,6 @@ function ActionRow(props: {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end"
-  },
   // Drawn by the sheet so it fades with a swipe-down instead of trailing it.
   backdrop: {
     backgroundColor: "rgba(35, 18, 42, 0.24)"
@@ -161,10 +182,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 250, 253, 0.97)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.80)",
-    paddingHorizontal: uiTheme.spacing.lg,
     paddingTop: uiTheme.spacing.xs,
-    gap: uiTheme.spacing.md,
     ...uiTheme.shadow.card
+  },
+  content: {
+    paddingHorizontal: uiTheme.spacing.lg,
+    gap: uiTheme.spacing.md
   },
   header: {
     flexDirection: "row",

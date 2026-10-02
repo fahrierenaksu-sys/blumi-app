@@ -228,6 +228,8 @@ function openReadyMiniRoomFor(navigationRef, currentActor = actor) {
   const bindings = {
     latestSessionActorRef: { current: currentActor },
     navigationRef,
+    // The screen beneath any native sheet (navigation/nativeSheets).
+    getRootRouteBeneathSheets: () => navigationRef.getCurrentRoute(),
     handledReadyMiniRoomIdsRef,
     announcedReadyMiniRoomIdsRef,
     dismissToast: () => announced.push(["dismiss"]),
@@ -835,7 +837,7 @@ test("the realtime active-conversation resync follows the focused chat or MiniRo
     .replace(/,$/, "")
   const resynchronized = []
   const resync = (route) => evaluate(body, {
-    navigationRef: { getCurrentRoute: () => route },
+    getRootRouteBeneathSheets: () => route,
     resynchronizeLatestMessages: async (threadId) => { resynchronized.push(threadId) }
   })
   await resync({ name: "ChatThread", params: { threadId: "thread-chat" } })()

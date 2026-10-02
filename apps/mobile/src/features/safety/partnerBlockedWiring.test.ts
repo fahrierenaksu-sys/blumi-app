@@ -47,6 +47,10 @@ test("chat cleanup applies only the signed-in owner's blocks, and stops on unmou
       "./blockedPartnerChatExit": {
         applyBlockedPartnerToChat: ({ blockedUserId }: { blockedUserId: string }) => { applied.push(blockedUserId) }
       },
+      "./nativeSheets/rootRouteBeneathSheets": {
+        getRootRouteBeneathSheets: () => undefined,
+        popRootRouteBeneathSheets: () => undefined
+      },
       "./rootNavigationRef": { navigationRef: { isReady: () => false } }
     }
   })

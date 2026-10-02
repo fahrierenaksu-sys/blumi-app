@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useIsFocused } from "@react-navigation/native"
+import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import {
   KeyboardAvoidingView,
   type ListRenderItem,
@@ -37,6 +37,7 @@ import {
 } from "../features/chat/thread/chatThreadCopy"
 import {
   isChatTimelineRowInviteBusy,
+  normalizeOutgoingChatBody,
   selectChatPartnerSummary
 } from "../features/chat/thread/chatThreadModel"
 import { ChatScrollToLatestPill } from "../features/chat/thread/ChatScrollToLatestPill"
@@ -57,6 +58,7 @@ import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLif
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
+import { getChatSendFlightChannel, launchChatSendFlight } from "../features/chat/thread/chatSendFlight"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
 import { ChatNotificationPermissionCard, type ChatPushRegistration } from "../features/notifications/ChatNotificationPermissionCard"
@@ -77,7 +79,7 @@ const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
-  const isFocused = useIsFocused()
+  const isFocused = useIsFocusedBeneathSheets()
   const { height: windowHeight } = useWindowDimensions()
   const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
   const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
@@ -233,13 +235,26 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   })
 
   const scrollToLatestState = useChatScrollToLatest({ newestFirstTimeline, currentUserId })
-  const { scrollToLatest } = scrollToLatestState
+  const { scrollToLatest, isAway: isScrolledAway } = scrollToLatestState
+  const sendFlightChannel = getChatSendFlightChannel(resolvedThreadId)
+  const composerSurfaceRef = useRef<View>(null)
   // CHT-05: my own message is always shown, even when I had scrolled up.
+  // The send is published first; the flight (composer → new bubble) only
+  // decorates it, and is skipped while the list scrolls back from history.
   const handleSend = useCallback((draft: string): boolean => {
     const accepted = sendMessage(draft)
-    if (accepted) scrollToLatest()
-    return accepted
-  }, [scrollToLatest, sendMessage])
+    if (!accepted) return false
+    if (!isScrolledAway) {
+      launchChatSendFlight({
+        composerSurface: composerSurfaceRef.current,
+        channel: sendFlightChannel,
+        match: normalizeOutgoingChatBody(draft),
+        text: draft.trim()
+      })
+    }
+    scrollToLatest()
+    return true
+  }, [isScrolledAway, scrollToLatest, sendFlightChannel, sendMessage])
 
   const rowModels = useChatTimelineRowModels({
     timeline,
@@ -249,7 +264,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     partnerReceipts: bindings.receiptsEnabled ? partnerReceipts : undefined
   })
 
-  const enteringRowKeys = useChatTimelineEntrances({
+  const { enteringKeys: enteringRowKeys, arrivedKeys: arrivedRowKeys } = useChatTimelineEntrances({
     timeline,
     isListPresented: !showsTimelineEmptyState
   })
@@ -269,6 +284,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           you={inviteYou}
           partner={invitePartner}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
+          isArrival={arrivedRowKeys.has(getChatTimelineItemKey(item))}
+          sendFlightChannel={sendFlightChannel}
           isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
           onRoomInviteAction={handleRoomInviteAction}
           onRetry={handleRetry}
@@ -284,6 +301,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       inviteYou,
       invitePartner,
       enteringRowKeys,
+      arrivedRowKeys,
+      sendFlightChannel,
       activeRoomInviteAction,
       handleRoomInviteAction,
       handleRetry
@@ -422,6 +441,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             roomInviteDisabledReason={roomInviteDisabledReason}
             onRoomInvitePress={handleRoomInvitePress}
             onSend={handleSend}
+            surfaceRef={composerSurfaceRef}
           />
         </KeyboardAvoidingView>
       </SafeAreaView>

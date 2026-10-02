@@ -107,6 +107,7 @@ export function PhoneChangeModal(props: {
           {phoneChangeStep === "new_number" ? (
             <View style={styles.phoneChangeControl}>
               <CountryCallingCodePicker
+                presentation="dialog"
                 disabled={isChangingPhone}
                 selectedCountry={newPhoneCountry}
                 onSelect={selectNewPhoneCountry}

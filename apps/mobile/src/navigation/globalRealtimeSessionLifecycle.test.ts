@@ -61,6 +61,7 @@ function mount() {
       "@blumi/realtime-client": { isRealtimeAuthInvalidClose: (code?: number) => code === 4401 },
       "../features/safety/blockStore": { hydrateBlockedUsersFromServer: async () => undefined },
       "../ui/toast": { showToast: (toast: { title: string }) => { events.push(`toast:${toast.title}`) } },
+      "./nativeSheets/rootRouteBeneathSheets": { getRootRouteBeneathSheets: () => undefined },
       "./rootNavigationRef": { navigationRef: {
         getCurrentRoute: () => undefined,
         isReady: () => true,

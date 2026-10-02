@@ -4,11 +4,13 @@ import { removeChatThreadsWithPartner } from "../features/chat/chatStore"
 import { subscribeToPartnerBlocked } from "../features/safety/partnerBlockedEvents"
 import { applyBlockedPartnerToChat, type BlockedPartnerNavigation } from "./blockedPartnerChatExit"
 import { navigationRef } from "./rootNavigationRef"
+import { getRootRouteBeneathSheets, popRootRouteBeneathSheets } from "./nativeSheets/rootRouteBeneathSheets"
 
 const rootBlockedPartnerNavigation: BlockedPartnerNavigation = {
-  getCurrentRoute: () => navigationRef.getCurrentRoute(),
+  // A report sheet may sit over the chat: read and leave the chat beneath it.
+  getCurrentRoute: () => getRootRouteBeneathSheets(),
   canGoBack: () => navigationRef.canGoBack(),
-  goBack: () => navigationRef.goBack(),
+  goBack: () => popRootRouteBeneathSheets(),
   replaceWithInbox: () => navigationRef.dispatch(StackActions.replace("Inbox"))
 }
 
