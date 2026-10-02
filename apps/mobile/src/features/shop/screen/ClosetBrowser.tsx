@@ -1,28 +1,26 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { type FlatList, Pressable, Text, View } from "react-native"
-import Reanimated, { useAnimatedReaction, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
-import { scheduleOnRN } from "react-native-worklets"
+import { useCallback, useEffect, useMemo, useRef } from "react"
+import { type FlatList, Text, View } from "react-native"
+import Reanimated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 import { MainTabPagerEdgeHandoffScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
 import { useMainTabReselect } from "../../../ui/layout/useMainTabReselect"
 import type { AppLocale } from "../../session/appLocale"
 import { useReducedMotion } from "../../../ui/animations"
-import { uiTheme } from "../../../ui/theme"
 import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
 import type { ShopMode } from "../ShopNavigationControls"
 import {
   buildShopShelfPages,
+  createShopShelfPageTracker,
   findShopShelfPageIndex,
-  formatShopShelfCounter,
   getShopShelfMaxScrollOffset,
-  getShopShelfPageIndex,
   shouldShopShelfOwnHorizontalDrags,
+  stepShopShelfPageTracker,
   type ShopCategoryOption
 } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 import { ShopProductCard } from "./ShopProductCard"
+import { ShopShelfPagination } from "./ShopShelfPagination"
 import { VerticalShopCategoryRail } from "./VerticalShopCategoryRail"
 
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
@@ -54,41 +52,76 @@ export function ClosetBrowser(props: {
   const productShelfWidth = catalog.productShelfWidth
   const productCardWidth = catalog.productCardWidth
   const productScrollerRef = useRef<FlatList<ShopCatalogItem[][]>>(null)
-  const [pageIndex, setPageIndex] = useState(0)
   // The live shelf offset, on the UI thread, decides whether a drag at the
   // first or last page belongs to the main pager (no JS per scroll frame).
   const shelfScrollOffset = useSharedValue(0)
+  // SHOP-4: the counter's page, stepped by scroll events on the UI thread.
+  const shelfPageTracker = useSharedValue(createShopShelfPageTracker(0))
   useEffect(() => {
-    setPageIndex(0)
+    shelfPageTracker.value = createShopShelfPageTracker(0)
     // A jump to an offset the shelf already has emits no scroll event.
     shelfScrollOffset.value = 0
     productScrollerRef.current?.scrollToOffset({ offset: 0, animated: false })
-  }, [props.activeCategoryId, props.mode, shelfScrollOffset])
+  }, [props.activeCategoryId, props.mode, shelfPageTracker, shelfScrollOffset])
   const productPages = useMemo(
     () => buildShopShelfPages(props.products, catalog.accessibilityLayout ? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE),
     [catalog.accessibilityLayout, props.products]
   )
   const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags(productPages.length)
   const shelfMaxScrollOffset = getShopShelfMaxScrollOffset(productPages.length, productShelfWidth)
+  const pageCount = productPages.length
+  // The counter changes when the finger crosses half a page, and on release
+  // it jumps to the page paging settles on, before the snap animation runs.
   const handleShelfScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       shelfScrollOffset.value = event.contentOffset.x
-    }
-  })
-  // SHOP-4: the counter follows the live offset on the UI thread; React
-  // renders only when the shown page changes, not per scroll frame.
-  const pageCount = productPages.length
-  useAnimatedReaction(
-    () => getShopShelfPageIndex(shelfScrollOffset.value, productShelfWidth, pageCount),
-    (index, previous) => {
-      if (index !== previous) scheduleOnRN(setPageIndex, index)
+      shelfPageTracker.value = stepShopShelfPageTracker(
+        shelfPageTracker.value,
+        { type: "scroll", offset: event.contentOffset.x },
+        productShelfWidth,
+        pageCount
+      )
     },
-    [pageCount, productShelfWidth]
-  )
+    onBeginDrag: (event) => {
+      shelfPageTracker.value = stepShopShelfPageTracker(
+        shelfPageTracker.value,
+        { type: "begin_drag", offset: event.contentOffset.x },
+        productShelfWidth,
+        pageCount
+      )
+    },
+    onEndDrag: (event) => {
+      shelfPageTracker.value = stepShopShelfPageTracker(
+        shelfPageTracker.value,
+        { type: "end_drag", offset: event.contentOffset.x, speed: event.velocity?.x ?? 0 },
+        productShelfWidth,
+        pageCount
+      )
+    },
+    onMomentumEnd: (event) => {
+      shelfPageTracker.value = stepShopShelfPageTracker(
+        shelfPageTracker.value,
+        { type: "momentum_end", offset: event.contentOffset.x },
+        productShelfWidth,
+        pageCount
+      )
+    }
+  }, [pageCount, productShelfWidth])
   const scrollShelfToPage = useCallback((nextPageIndex: number, animated: boolean): void => {
-    setPageIndex(nextPageIndex)
+    shelfPageTracker.value = stepShopShelfPageTracker(
+      shelfPageTracker.value,
+      { type: "jump", page: nextPageIndex },
+      productShelfWidth,
+      pageCount
+    )
     productScrollerRef.current?.scrollToOffset({ offset: nextPageIndex * productShelfWidth, animated })
-  }, [productShelfWidth])
+  }, [pageCount, productShelfWidth, shelfPageTracker])
+  // Page buttons step from the page the counter shows; Reduce Motion jumps.
+  const showRelativeShelfPage = useCallback((step: -1 | 1): void => {
+    const pageIndex = shelfPageTracker.value.page
+    const nextPageIndex = Math.max(0, Math.min(pageCount - 1, pageIndex + step))
+    if (nextPageIndex !== pageIndex) scrollShelfToPage(nextPageIndex, !reduceMotion)
+  }, [pageCount, reduceMotion, scrollShelfToPage, shelfPageTracker])
   // SHOP-2: re-tapping the selected Shop tab returns the shelf to its first page.
   const scrollShelfToStart = useCallback((): void => {
     scrollShelfToPage(0, !reduceMotion)
@@ -160,39 +193,14 @@ export function ClosetBrowser(props: {
             {subtitle}
           </Text>
         </View>
-        <View style={styles.catalogPagination}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.previousPage}
-            disabled={pageIndex === 0}
-            accessibilityState={{ disabled: pageIndex === 0 }}
-            onPress={() => {
-              scrollShelfToPage(pageIndex - 1, !reduceMotion)
-            }}
-            style={[styles.catalogPageButton, pageIndex === 0 && styles.catalogPageButtonDisabled]}
-          >
-            <Ionicons name="chevron-back" size={17} color={uiTheme.colors.primary} />
-          </Pressable>
-          <Text
-            accessibilityLabel={copy.shelfPage(pageIndex + 1, Math.max(1, productPages.length))}
-            maxFontSizeMultiplier={1.4}
-            style={styles.catalogPageCount}
-          >
-            {formatShopShelfCounter(pageIndex, productPages.length)}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.nextPage}
-            disabled={pageIndex >= productPages.length - 1}
-            accessibilityState={{ disabled: pageIndex >= productPages.length - 1 }}
-            onPress={() => {
-              scrollShelfToPage(pageIndex + 1, !reduceMotion)
-            }}
-            style={[styles.catalogPageButton, pageIndex >= productPages.length - 1 && styles.catalogPageButtonDisabled]}
-          >
-            <Ionicons name="chevron-forward" size={17} color={uiTheme.colors.primary} />
-          </Pressable>
-        </View>
+        <ShopShelfPagination
+          tracker={shelfPageTracker}
+          pageCount={pageCount}
+          previousLabel={copy.previousPage}
+          nextLabel={copy.nextPage}
+          pageLabel={copy.shelfPage}
+          onShowPage={showRelativeShelfPage}
+        />
       </View>
       <View style={[styles.closetBrowserBody, catalog.accessibilityLayout && styles.closetBrowserBodyAccessibility, { gap: catalog.bodyGap }]}>
         <VerticalShopCategoryRail

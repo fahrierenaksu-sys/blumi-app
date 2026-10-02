@@ -6,9 +6,14 @@ import { resolveHorizontalScrollerDragOwner } from "../../../ui/mainTabPagerEdge
 import {
   buildShopCategoryOptions,
   buildShopShelfPages,
+  createShopShelfPageTracker,
   findShopShelfPageIndex,
   formatShopShelfCounter,
   getShopShelfPageIndex,
+  getShopShelfReleasePageIndex,
+  stepShopShelfPageTracker,
+  type ShopShelfPageTracker,
+  type ShopShelfScrollStep,
   resolveShopProductFocus,
   createRoomPreviewDecor,
   filterProductsByCategory,
@@ -330,6 +335,91 @@ test("the shelf counter follows the live offset and clamps to existing pages", (
   assert.equal(getShopShelfPageIndex(width, 0, 3), 0)
   assert.equal(formatShopShelfCounter(1, 3), "2/3")
   assert.equal(formatShopShelfCounter(0, 0), "1/1", "an empty shelf still reads 1/1")
+})
+
+function runShelfSteps(steps: readonly ShopShelfScrollStep[], width: number, pageCount: number): number[] {
+  let tracker: ShopShelfPageTracker = createShopShelfPageTracker(0)
+  return steps.map((step) => {
+    tracker = stepShopShelfPageTracker(tracker, step, width, pageCount)
+    return tracker.page
+  })
+}
+
+test("a flick shows the next page when the finger lifts, before the snap animation", () => {
+  const width = 200
+  const pages = runShelfSteps([
+    { type: "begin_drag", offset: 0 },
+    { type: "scroll", offset: 30 },
+    { type: "scroll", offset: 60 },
+    { type: "end_drag", offset: 60, speed: 1.4 },
+    // Paging snap frames: the counter must not wait for them.
+    { type: "scroll", offset: 90 },
+    { type: "scroll", offset: 160 },
+    { type: "scroll", offset: 200 },
+    { type: "momentum_end", offset: 200 }
+  ], width, 4)
+  assert.deepEqual(pages, [0, 0, 0, 1, 1, 1, 1, 1])
+})
+
+test("a slow drag past half a page changes the page during the drag", () => {
+  const pages = runShelfSteps([
+    { type: "jump", page: 1 },
+    { type: "begin_drag", offset: 200 },
+    { type: "scroll", offset: 260 },
+    { type: "scroll", offset: 310 },
+    { type: "end_drag", offset: 310, speed: 0 },
+    { type: "momentum_end", offset: 400 }
+  ], 200, 4)
+  assert.deepEqual(pages, [1, 1, 1, 2, 2, 2])
+})
+
+test("a flick backwards pages back, using the movement direction, not the velocity sign", () => {
+  const steps: ShopShelfScrollStep[] = [
+    { type: "jump", page: 2 },
+    { type: "scroll", offset: 400 },
+    { type: "begin_drag", offset: 400 },
+    { type: "scroll", offset: 370 },
+    { type: "end_drag", offset: 370, speed: 1.2 }
+  ]
+  assert.deepEqual(runShelfSteps(steps, 200, 4), [2, 2, 2, 2, 1])
+  const negativeVelocity = steps.map((step) => step.type === "end_drag" ? { ...step, speed: -1.2 } : step)
+  assert.deepEqual(runShelfSteps(negativeVelocity, 200, 4), [2, 2, 2, 2, 1])
+})
+
+test("a slow release that springs back keeps the page, and momentum end corrects a wrong guess", () => {
+  assert.deepEqual(runShelfSteps([
+    { type: "begin_drag", offset: 0 },
+    { type: "scroll", offset: 40 },
+    { type: "end_drag", offset: 40, speed: 0.02 },
+    { type: "scroll", offset: 20 },
+    { type: "momentum_end", offset: 0 }
+  ], 200, 3), [0, 0, 0, 0, 0])
+  assert.deepEqual(runShelfSteps([
+    { type: "begin_drag", offset: 0 },
+    { type: "scroll", offset: 40 },
+    { type: "end_drag", offset: 40, speed: 0.8 },
+    { type: "momentum_end", offset: 0 }
+  ], 200, 3), [0, 0, 1, 0], "the settled offset has the last word")
+})
+
+test("page buttons and resets jump the counter; programmatic scroll frames do not move it", () => {
+  assert.deepEqual(runShelfSteps([
+    { type: "jump", page: 3 },
+    { type: "scroll", offset: 100 },
+    { type: "scroll", offset: 500 },
+    { type: "momentum_end", offset: 600 },
+    { type: "jump", page: 9 },
+    { type: "jump", page: Number.NaN }
+  ], 200, 4), [3, 3, 3, 3, 3, 0])
+})
+
+test("the release page clamps to existing pages and ignores invalid geometry", () => {
+  assert.equal(getShopShelfReleasePageIndex(590, 200, 3, 10, 2), 2, "last page")
+  assert.equal(getShopShelfReleasePageIndex(-10, 200, 3, -10, 2), 0, "first page")
+  assert.equal(getShopShelfReleasePageIndex(120, 0, 3, 10, 2), 0)
+  assert.equal(getShopShelfReleasePageIndex(120, 200, 1, 10, 2), 0, "1/1")
+  assert.equal(getShopShelfReleasePageIndex(120, 200, 3, 0, 2), 1, "no movement: nearest page")
+  assert.equal(getShopShelfReleasePageIndex(80, 200, 3, 10, Number.NaN), 0, "unknown speed: nearest page")
 })
 
 test("the page holding a product is found for deep links and re-selection", () => {

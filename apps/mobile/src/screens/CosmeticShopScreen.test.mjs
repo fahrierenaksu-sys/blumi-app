@@ -318,11 +318,19 @@ test("re-tapping the Shop tab scrolls to the top, without motion under Reduce Mo
   assert.match(closet, /scrollShelfToPage\(0, !reduceMotion\)/)
 })
 
-test("the shelf counter follows the live scroll offset on the UI thread", () => {
+// The page logic itself (drag crossing, release target, momentum correction)
+// is behavior-tested in shopScreenModel.test.ts; this pins only the wiring:
+// UI-thread scroll events step it, and no JS momentum callback drives it.
+test("the shelf counter is stepped by UI-thread scroll events and written on the UI thread", () => {
   const closet = readScreenModule("ClosetBrowser.tsx")
-  assert.match(closet, /useAnimatedReaction\(\s*\(\) => getShopShelfPageIndex\(shelfScrollOffset\.value, productShelfWidth, pageCount\)/)
-  assert.match(closet, /if \(index !== previous\) scheduleOnRN\(setPageIndex, index\)/)
-  assert.doesNotMatch(closet, /onMomentumScrollEnd/)
+  const pagination = readScreenModule("ShopShelfPagination.tsx")
+  for (const event of ["onScroll", "onBeginDrag", "onEndDrag", "onMomentumEnd"]) {
+    assert.match(closet, new RegExp(`${event}: \\(event\\) => \\{\\s*[\\s\\S]*?shelfPageTracker\\.value = stepShopShelfPageTracker\\(`), event)
+  }
+  assert.doesNotMatch(closet, /onMomentumScrollEnd|useState/, "the shelf holds no page state, so a page change never re-renders it")
+  // Digits come from animated props; React renders the header only when the page changes.
+  assert.match(pagination, /useAnimatedProps\(\(\) => \{\s*const text = formatShopShelfCounter\(/)
+  assert.match(pagination, /if \(index !== previous\) scheduleOnRN\(setPageIndex, index\)/)
   assert.doesNotMatch(cardFile.getText(), /"Sende"/, "compact owned label comes from shopCopy")
 })
 

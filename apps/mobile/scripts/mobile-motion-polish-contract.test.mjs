@@ -99,7 +99,7 @@ test("account and shop selection changes use restrained shared transitions", () 
   assert.match(shop, /shopMode === "avatar" \? undefined : previewTransition/)
   assert.match(shopClosetBrowser, /useReducedMotion/)
   // Page buttons and the tab re-tap scroll through one helper; Reduce Motion jumps.
-  assert.match(shopClosetBrowser, /scrollShelfToPage\(pageIndex \+ 1, !reduceMotion\)/)
+  assert.match(shopClosetBrowser, /scrollShelfToPage\(nextPageIndex, !reduceMotion\)/)
   assert.match(shopClosetBrowser, /scrollToOffset\(\{ offset: nextPageIndex \* productShelfWidth, animated \}\)/)
 })
 
