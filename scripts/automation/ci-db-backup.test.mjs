@@ -7,7 +7,7 @@ import test from "node:test"
 import YAML from "yaml"
 import {
   ARCHIVE_NAME, backupConfiguration, connectionEnvironment, createBackupFrom, decryptBackup,
-  decryptFile, encryptFile, failureCategory, pickBackupArtifact, restoreAndSmoke
+  decryptFile, encryptFile, failureCategory, pickBackupArtifact, redactedRehearsal, restoreAndSmoke
 } from "./ci-db-backup.mjs"
 
 const root = new URL("../../", import.meta.url)
@@ -185,6 +185,30 @@ test("the restore proof picks only this repository's own backup artifacts", () =
   }
   assert.throws(() => pickBackupArtifact(lines, { repositoryId: "" }), /repository id/)
   assert.throws(() => pickBackupArtifact("", { repositoryId: "7" }), /No unexpired/)
+})
+
+test("the upgrade rehearsal keeps row data and raw errors out of the public log", () => {
+  const directory = mkdtempSync(join(tmpdir(), "blumi-ci-rehearsal-"))
+  const gate = (body) => { const file = join(directory, `gate-${Math.random()}.mjs`); writeFileSync(file, body); return file }
+  const fail = (stderr) => gate(`console.error(${JSON.stringify(stderr)}); process.exitCode = 1`)
+  const PRIVATE = "+905551112233"
+  try {
+    const ok = redactedRehearsal({ archive: "/x.dump", gate: gate(`console.log(JSON.stringify({ archiveSha256: "${"a".repeat(64)}", archiveBytes: 10, restored: { beforeMigrations: 68, applied: 2, rerunApplied: 0, accounts: 4, note: "${PRIVATE}" } }))`) })
+    assert.deepEqual(ok, { ok: true, report: { archiveSha256: "a".repeat(64), archiveBytes: 10, restored: { beforeMigrations: 68, applied: 2, rerunApplied: 0, accounts: 4 } } })
+    const outcomes = [
+      [fail(`/opt/node/bin/node failed: error: column "x" violates not-null constraint\n  detail: 'Failing row contains (7, ${PRIVATE}).'`), /migration or audit step/],
+      [fail(`/usr/lib/postgresql/17/bin/pg_restore failed: pg_restore: error: COPY failed: ERROR: duplicate key (phone)=(${PRIVATE})`), /pg_restore/],
+      [fail(`node failed: Error: Restored database has release integrity findings: {"orphanInventories":2}`), /integrity findings \{"orphanInventories":2\}/],
+      [fail(`node failed: Error: Restored database has release integrity findings: {"orphanInventories":"${PRIVATE}"}`), /withheld/],
+      [gate(`console.log("not json ${PRIVATE}")`), /unreadable/]
+    ]
+    for (const [file, expected] of outcomes) {
+      const outcome = redactedRehearsal({ archive: "/x.dump", gate: file })
+      assert.equal(outcome.ok, false)
+      assert.match(outcome.message, expected)
+      assert.ok(!outcome.message.includes(PRIVATE) && !outcome.message.includes("/opt/node"), outcome.message)
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }) }
 })
 
 const gpgAvailable = spawnSync("gpg", ["--version"]).status === 0

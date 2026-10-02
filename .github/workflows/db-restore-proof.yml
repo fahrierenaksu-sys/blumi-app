@@ -115,7 +115,7 @@ jobs:
 
       - name: Rehearse pending migrations on the restored archive
         if: steps.configured.outputs.enabled == 'true' && inputs.upgrade_rehearsal
-        run: node scripts/security/restore-upgrade-gate.mjs "$RUNNER_TEMP/blumi-restore/blumi-public.dump"
+        run: node scripts/automation/ci-db-backup.mjs rehearse "$RUNNER_TEMP/blumi-restore/blumi-public.dump"
 
       - name: Delete the decrypted archive
         if: always()

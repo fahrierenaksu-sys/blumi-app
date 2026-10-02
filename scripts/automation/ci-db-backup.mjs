@@ -254,6 +254,42 @@ export function pickBackupArtifact(artifactLines, { repositoryId, runId = "" }) 
   return String(own[0].workflow_run.id)
 }
 
+/**
+ * Runs scripts/security/restore-upgrade-gate.mjs on a restored archive and
+ * returns only what is safe for a public Actions log. The gate prints raw
+ * PostgreSQL and node-postgres errors, which can quote a failing row
+ * ("Failing row contains ..."), so a failure is reduced to the step that failed,
+ * a fixed category and, for the integrity audit, its numeric counts.
+ */
+export function redactedRehearsal({ archive, gate, env = process.env }) {
+  const result = spawnSync(process.execPath, [gate, archive], { env, encoding: "utf8", timeout: 1_800_000, maxBuffer: 64 * 1024 * 1024 })
+  if (!result.error && result.status === 0) {
+    const summaryLine = String(result.stdout).split("\n").reverse().find((line) => line.startsWith("{"))
+    try {
+      const parsed = JSON.parse(summaryLine)
+      const restored = parsed.restored ?? {}
+      const numbers = Object.fromEntries(Object.entries(restored).filter(([, value]) => Number.isFinite(value)))
+      return { ok: true, report: { archiveSha256: /^[0-9a-f]{64}$/.test(parsed.archiveSha256) ? parsed.archiveSha256 : undefined, archiveBytes: Number(parsed.archiveBytes) || undefined, restored: numbers } }
+    } catch {
+      return { ok: false, message: "Upgrade rehearsal finished but its report was unreadable; details withheld." }
+    }
+  }
+  const stderr = String(result.stderr ?? "")
+  const findings = /release integrity findings: (\{[^\n]*?\})(?:\n|$)/.exec(stderr)
+  if (findings) {
+    try {
+      const counts = JSON.parse(findings[1])
+      if (Object.values(counts).every((value) => Number.isFinite(value))) {
+        return { ok: false, message: `Upgrade rehearsal failed: the restored data has release integrity findings ${JSON.stringify(counts)}.` }
+      }
+    } catch { /* fall through to the generic category */ }
+  }
+  if (/Migration rerun was not idempotent/.test(stderr)) return { ok: false, message: "Upgrade rehearsal failed: a second migration run applied migrations again." }
+  const step = /(?:^|\/)(pg_restore|initdb|pg_ctl|psql|node)\b[^\n]*? failed:/m.exec(stderr)?.[1]
+  const where = step === "node" ? "the migration or audit step" : step ?? "an unidentified step"
+  return { ok: false, message: `Upgrade rehearsal failed in ${where}: ${failureCategory(stderr)}.` }
+}
+
 async function main([command, ...args]) {
   const pgBin = process.env.BLUMI_PG17_BIN || "/usr/lib/postgresql/17/bin"
   if (command === "config") {
@@ -265,6 +301,14 @@ async function main([command, ...args]) {
     const runId = pickBackupArtifact(readFileSync(0, "utf8"), { repositoryId: process.env.GITHUB_REPOSITORY_ID, runId: args[0] ?? "" })
     console.log(`Using the backup from workflow run ${runId}.`)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${runId}\n`)
+  } else if (command === "rehearse") {
+    const archive = resolve(args[0] ?? "")
+    const gate = new URL("../security/restore-upgrade-gate.mjs", import.meta.url).pathname
+    const outcome = redactedRehearsal({ archive, gate })
+    if (!outcome.ok) throw new SafeError(outcome.message)
+    console.log(JSON.stringify(outcome.report, null, 2))
+    summary(["### Upgrade rehearsal", "", "- pending migrations applied, rerun applied none, release integrity audit clean",
+      ...Object.entries(outcome.report.restored).map(([key, value]) => `- ${key}: ${value}`)])
   } else if (command === "backup") {
     const outDir = resolve(args[0] ?? "")
     const manifest = await createBackup({ outDir, pgBin })
@@ -291,7 +335,7 @@ async function main([command, ...args]) {
       `- restored ${result.tables} tables; migration ledger ${result.ledgerRows} rows, latest \`${result.latestMigration}\``,
       "", "| table | rows |", "|---|---|", ...Object.entries(result.tableRows).map(([table, rows]) => `| ${table} | ${rows} |`)])
   } else {
-    throw new SafeError("Usage: ci-db-backup.mjs config backup|restore | backup <out-dir> | pick-artifact [run-id] | restore-proof <artifact-dir> <work-dir>")
+    throw new SafeError("Usage: ci-db-backup.mjs config backup|restore | backup <out-dir> | pick-artifact [run-id] | rehearse <archive> | restore-proof <artifact-dir> <work-dir>")
   }
 }
 
