@@ -144,6 +144,7 @@ try {
       "src/features/session/authLocaleResolver.test.ts",
       "src/features/session/nativeUiSessionReset.test.ts",
       "src/features/session/onboardingArrivalMotionModel.test.ts",
+      "src/features/session/onboardingDoneMoment.test.ts",
       "src/features/session/onboardingBrandPreludeLifecycle.test.ts",
       "src/features/session/useSessionStateLifecycle.test.ts",
       "src/features/session/useSessionStateMutationIsolation.test.ts",
