@@ -53,6 +53,9 @@ function CanonicalParticipantAvatar(props: {
   return (
     <View
       accessible={false}
+      // Static layered portrait in a circular clip: iOS keeps it as one
+      // bitmap instead of masking every layer each frame (Inbox rows).
+      shouldRasterizeIOS
       style={[
         styles.root,
         {
