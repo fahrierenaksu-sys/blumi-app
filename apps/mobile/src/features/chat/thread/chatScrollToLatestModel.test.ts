@@ -5,6 +5,8 @@ import {
   CHAT_SCROLL_TO_LATEST_THRESHOLD,
   countNewIncomingAtNewestEdge,
   formatScrollToLatestCount,
+  getChatLatestScrollOffset,
+  getChatNewestEdgeInset,
   isChatScrolledAwayFromLatest
 } from "./chatScrollToLatestModel"
 
@@ -31,4 +33,20 @@ test("new partner messages at the newest edge are counted; my own and history ar
 test("the counter caps its label", () => {
   assert.equal(formatScrollToLatestCount(3), "3")
   assert.equal(formatScrollToLatestCount(120), "99+")
+})
+
+test("with the keyboard open the newest message sits above it, not under it", () => {
+  // 336 pt keyboard, 34 pt home-indicator padding under the composer.
+  const inset = getChatNewestEdgeInset(-336, 34)
+  assert.equal(inset, 302)
+  assert.equal(getChatNewestEdgeInset(0, 34), 0)
+  assert.equal(getChatNewestEdgeInset(20, 34), 0)
+  // Returning to the latest scrolls to the lifted newest edge.
+  assert.equal(getChatLatestScrollOffset(inset), -302)
+  assert.equal(getChatLatestScrollOffset(0), 0)
+  // At the lifted newest edge the reader is not "away"; the threshold is
+  // measured from that edge.
+  assert.equal(isChatScrolledAwayFromLatest(-302, inset), false)
+  assert.equal(isChatScrolledAwayFromLatest(-302 + CHAT_SCROLL_TO_LATEST_THRESHOLD, inset), false)
+  assert.equal(isChatScrolledAwayFromLatest(-302 + CHAT_SCROLL_TO_LATEST_THRESHOLD + 1, inset), true)
 })
