@@ -272,6 +272,25 @@ test("hydrates and immutably updates room invites through the chat coordinator",
   ])
 })
 
+test("an unchanged invitation refresh keeps the same invite list, so its holder does not re-render", async () => {
+  let served: ChatRoomInviteTimelineItem[] = [{ ...invite }]
+  const other: ChatRoomInviteTimelineItem = { ...invite, inviteId: "invite_2", threadId: "thread_2" }
+  const dependencies = createDependencies({
+    roomInvites: [other],
+    fetchThreadRoomInvites: async () => served.map((entry) => ({ ...entry }))
+  })
+  const coordinator = createChatCoordinator(dependencies)
+  await coordinator.refreshThreadRoomInvites("thread_1")
+  const first = dependencies.roomInvites
+  assert.deepEqual(first, [other, invite])
+  await coordinator.refreshThreadRoomInvites("thread_1")
+  assert.equal(dependencies.roomInvites, first, "same values from the server: same list")
+  served = [{ ...invite, status: "accepted", roomSessionId: "room-session-1" }]
+  await coordinator.refreshThreadRoomInvites("thread_1")
+  assert.notEqual(dependencies.roomInvites, first)
+  assert.deepEqual(dependencies.roomInvites, [other, served[0]])
+})
+
 test("acceptance updates the card without entering; a separate entry joins with fresh server authority", async () => {
   let joins = 0
   const decided = { ...invite, status: "accepted" as const, roomSessionId: "room_1" }

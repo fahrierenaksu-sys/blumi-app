@@ -23,6 +23,7 @@ import {
   getRoomInvitationActionErrorMessageForDisplay,
   getRoomInvitationLoadErrorMessageForDisplay
 } from "./chatErrorCopy"
+import { areRoomInviteListsEqual } from "./roomInviteListEquality"
 
 const pendingMessageSendsBySessionThread = new Map<string, Promise<void>>()
 
@@ -174,24 +175,33 @@ export function createChatCoordinator(
     refreshStartedAt = getRoomInviteRevision(threadId)
   ): void => {
     const preserveNewerUpdates = getRoomInviteRevision(threadId) > refreshStartedAt
-    dependencies.setRoomInvites((current) => [
-      ...current.filter((invite) => invite.threadId !== threadId),
-      ...nextInvites.map((invite) => {
-        const currentInvite = current.find((entry) => entry.inviteId === invite.inviteId)
-        const currentRevision = roomInviteMutationRevisions.get(invite.inviteId) ?? 0
-        return preserveNewerUpdates && currentInvite && currentRevision > refreshStartedAt
-          ? currentInvite
-          : invite
-      }),
-      ...(preserveNewerUpdates
-        ? current.filter(
-            (invite) =>
-              invite.threadId === threadId &&
-              !nextInvites.some((nextInvite) => nextInvite.inviteId === invite.inviteId) &&
-              (roomInviteMutationRevisions.get(invite.inviteId) ?? 0) > refreshStartedAt
-          )
-        : [])
-    ])
+    dependencies.setRoomInvites((current) => {
+      const threadInvites = [
+        ...nextInvites.map((invite) => {
+          const currentInvite = current.find((entry) => entry.inviteId === invite.inviteId)
+          const currentRevision = roomInviteMutationRevisions.get(invite.inviteId) ?? 0
+          return preserveNewerUpdates && currentInvite && currentRevision > refreshStartedAt
+            ? currentInvite
+            : invite
+        }),
+        ...(preserveNewerUpdates
+          ? current.filter(
+              (invite) =>
+                invite.threadId === threadId &&
+                !nextInvites.some((nextInvite) => nextInvite.inviteId === invite.inviteId) &&
+                (roomInviteMutationRevisions.get(invite.inviteId) ?? 0) > refreshStartedAt
+            )
+          : [])
+      ]
+      // An unchanged refresh keeps the current list, so the navigator that
+      // holds it does not re-render (up to six refreshes per Inbox visit).
+      const currentThreadInvites = current.filter((invite) => invite.threadId === threadId)
+      if (areRoomInviteListsEqual(currentThreadInvites, threadInvites)) return current as ChatRoomInviteTimelineItem[]
+      return [
+        ...current.filter((invite) => invite.threadId !== threadId),
+        ...threadInvites
+      ]
+    })
   }
 
   const upsertRoomInvite = (invite: ChatRoomInviteTimelineItem): void => {

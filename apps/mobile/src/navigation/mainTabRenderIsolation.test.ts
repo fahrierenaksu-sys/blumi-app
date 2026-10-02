@@ -8,6 +8,8 @@ import {
   type FakeReactRuntime
 } from "../testing/hookHarness"
 import { requestMainTabPagerPage } from "./mainTabPager/mainTabPagerController"
+import { createChatCoordinator, type ChatCoordinatorDependencies } from "../features/chat/chatCoordinator"
+import type { ChatRoomInviteTimelineItem } from "../features/chat/chatRoomInviteModel"
 
 // Render-count evidence for SYS-2 / SYS-3 / PERF-1 (UX audit 2026-09-30).
 // The hook harness renders one component function at a time, so these tests
@@ -212,6 +214,13 @@ function mountRoot() {
     screenListeners: () => ({})
   })
   const demoStore = stable({ roomInvites: [], matchedProfiles: [] })
+  // Room invites live in the navigator's state, as in useRoomInviteRouting.
+  let setRoomInvites: ((update: (current: ChatRoomInviteTimelineItem[]) => ChatRoomInviteTimelineItem[]) => void) | null = null
+  const roomInviteRouting = {
+    openReadyMiniRoom: () => undefined,
+    handleDemoRoomInviteAction: () => undefined,
+    resetRoomInviteRouting: () => undefined
+  }
   const inventory = stable({ claimDailyRewardFromServer: async () => 0, hydrateFromServer: async () => ({ success: false }) })
   const exports = loadSourceWithFakeReact<{ RootNavigator: () => unknown }>("navigation/RootNavigator.tsx", runtime, {
     inertUnknown: true,
@@ -266,6 +275,13 @@ function mountRoot() {
         ROOT_STACK_SCREEN_OPTIONS: {}
       },
       "./useRootChatSync": { useRootChatSync: () => chatSync },
+      "./useRoomInviteRouting": {
+        useRoomInviteRouting: () => {
+          const [roomInvites, setState] = useState<ChatRoomInviteTimelineItem[]>([])
+          setRoomInvites = setState as never
+          return { ...roomInviteRouting, visibleRoomInvites: roomInvites, setRoomInvites: setState }
+        }
+      },
       "./useBottomNavChrome": { useBottomNavChrome: () => bottomNavChrome },
       "../ui/animations": { useReducedMotion: () => false },
       "./mainTabPager/renderMainTabPage": { renderMainTabPage: () => null }
@@ -295,6 +311,16 @@ function mountRoot() {
     },
     setStatus(next: string) {
       for (const listener of [...statusListeners]) listener(next)
+    },
+    /** The chat coordinator wired to the navigator's invite state, as useRootChatSync wires it. */
+    createCoordinator(fetchThreadRoomInvites: () => Promise<ChatRoomInviteTimelineItem[]>) {
+      return createChatCoordinator({
+        getSessionActor: () => sessionActor,
+        isCurrentSession: () => true,
+        setRoomInvites: (update: (current: readonly ChatRoomInviteTimelineItem[]) => ChatRoomInviteTimelineItem[]) => setRoomInvites?.((current) => update(current)),
+        fetchThreadRoomInvites,
+        baseHttpUrl: "https://api.blumi.test"
+      } as unknown as ChatCoordinatorDependencies)
     }
   }
 }
@@ -312,6 +338,26 @@ test("a connection-state change does not re-render the root navigator (was one r
   const renders = root.runtime.renderCount
   root.setStatus("reconnecting")
   root.setStatus("connected")
+  assert.equal(root.runtime.renderCount - renders, 0)
+})
+
+test("an unchanged room-invite refresh does not re-render the root navigator (was one per refresh)", async () => {
+  const root = mountRoot()
+  const invite: ChatRoomInviteTimelineItem = {
+    kind: "room_invite",
+    inviteId: "invite-1",
+    threadId: "thread-1",
+    senderUserId: "user-a",
+    recipientUserId: "user-b",
+    createdAt: "2026-10-01T00:00:00.000Z",
+    status: "pending"
+  }
+  // Every refresh answers with fresh objects, as the HTTP client does.
+  const coordinator = root.createCoordinator(async () => [{ ...invite }])
+  await coordinator.refreshThreadRoomInvites("thread-1")
+  const renders = root.runtime.renderCount
+  await coordinator.refreshThreadRoomInvites("thread-1")
+  await coordinator.refreshThreadRoomInvites("thread-1")
   assert.equal(root.runtime.renderCount - renders, 0)
 })
 
