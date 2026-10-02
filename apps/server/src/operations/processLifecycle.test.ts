@@ -125,9 +125,15 @@ test("a shutdown that never settles is ended by the forced-exit backstop", async
     reportError: (message, kind) => { reports.push([message, kind]) },
     forcedExitAfterMs: 20
   })
-  target.emit("SIGTERM")
-  target.emit("SIGTERM")
-  await exited
+  // The backstop timer is unref'd (it never keeps a real process alive).
+  const keepAlive = setInterval(() => {}, 1_000)
+  try {
+    target.emit("SIGTERM")
+    target.emit("SIGTERM")
+    await exited
+  } finally {
+    clearInterval(keepAlive)
+  }
   assert.deepEqual(exits, [1])
   assert.deepEqual(reports, [["Blumi shutdown failed", "ForcedExitDeadline"]])
 })
