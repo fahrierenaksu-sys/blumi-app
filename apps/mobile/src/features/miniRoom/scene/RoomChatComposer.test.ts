@@ -28,13 +28,14 @@ function renderInput(disabled: boolean) {
       "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
     },
     real: ["./miniRoomLayout"],
+    inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
   let focusCalls = 0
   const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
   const tree = runtime.render(() => render({
     copy: getMiniRoomCopy("en"), value: "", suggestionsEnabled: true, disabled, mode: "history",
-    maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => undefined,
+    maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => false,
     onToggleHistory: () => undefined, onContentHeightChange: () => undefined, onFocus: () => { focusCalls += 1 }
   }))
   const input = findInput(tree)

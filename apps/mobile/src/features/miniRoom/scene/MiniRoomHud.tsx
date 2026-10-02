@@ -2,6 +2,8 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { SymbolView } from "expo-symbols"
 import { useCallback, useState, type ComponentProps } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
+import { hapticLight, hapticSelection } from "../../../ui/haptics"
+import { PressableScale } from "../../../ui/PressableScale"
 import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
 import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
@@ -32,7 +34,13 @@ interface MiniRoomHudProps {
   onCloseKeyboard: () => void
 }
 
-/** Small glass header: leave on the left, microphone and room menu on the right. */
+/**
+ * Small glass header: leave on the left, microphone and room menu on the right.
+ * Every control presses with the shared `press` spring (PressableScale; Reduce
+ * Motion dims instead) and plays one haptic per action (ui/haptics map):
+ * selection for the suggestions switch and the menu, light for leave, retry and
+ * menu actions.
+ */
 export function MiniRoomHud(props: MiniRoomHudProps) {
   const {
     copy,
@@ -74,7 +82,10 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
             icon="arrow-back"
             accessibilityLabel={copy.leaveRoom}
             disabled={leaveDisabled}
-            onPress={onLeave}
+            onPress={() => {
+              hapticLight()
+              onLeave()
+            }}
           />
         </View>
         <Text
@@ -87,21 +98,23 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
           {copy.roomTitle}
         </Text>
         <View style={[styles.side, styles.sideEnd]} pointerEvents="box-none">
-          <Pressable
+          <PressableScale
             accessibilityRole="switch"
             accessibilityLabel={copy.keyboardSuggestions}
             accessibilityHint={copy.keyboardSuggestionsHint}
             accessibilityState={{ checked: suggestionsEnabled }}
             accessibilityValue={{ text: suggestionsEnabled ? copy.keyboardSuggestionsOn : copy.keyboardSuggestionsOff }}
             hitSlop={3}
-            onPress={onToggleSuggestions}
-            style={({ pressed }) => pressed ? styles.pressed : null}
+            onPress={() => {
+              hapticSelection()
+              onToggleSuggestions()
+            }}
           >
             <View style={[styles.headerControl, styles.center, suggestionsEnabled ? styles.suggestionsSelected : null]}>
               <SymbolView name={{ ios: "keyboard", android: "keyboard", web: "keyboard" }} size={28} tintColor={suggestionsEnabled ? MIC_SELECTED_INK : "#645269"} />
               <View pointerEvents="none" style={[styles.suggestionsMark, { backgroundColor: suggestionsEnabled ? MIC_SELECTED_INK : "#B8A9BD" }]} />
             </View>
-          </Pressable>
+          </PressableScale>
           {voiceAvailable ? <MicrophoneButton
             copy={copy}
             micEnabled={localMedia.micEnabled}
@@ -115,6 +128,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
             accessibilityLabel={copy.roomOptions}
             expanded={menuOpen}
             onPress={() => {
+              hapticSelection()
               onCloseKeyboard()
               setMenuOpen((open) => !open)
             }}
@@ -157,6 +171,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
               label={copy.safetyOptions}
               accessibilityLabel={copy.openSafetyOptions}
               onPress={() => {
+                hapticLight()
                 closeMenu()
                 onOpenSafety()
               }}
@@ -167,6 +182,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
               accessibilityLabel={copy.leaveRoom}
               disabled={leaveDisabled}
               onPress={() => {
+                hapticLight()
                 closeMenu()
                 onLeave()
               }}
@@ -188,19 +204,19 @@ function GlassIconButton(props: {
 }) {
   const { size, icon, accessibilityLabel, disabled = false, expanded, onPress } = props
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, expanded }}
       disabled={disabled}
       hitSlop={(44 - size) / 2 + 2}
       onPress={onPress}
-      style={({ pressed }) => [disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
     >
-      <View style={[styles.headerControl, styles.center, { width: size, height: size }]}>
+      {/* The dim of a disabled control lives inside: the press layer owns the outer opacity under Reduce Motion. */}
+      <View style={[styles.headerControl, styles.center, { width: size, height: size }, disabled ? styles.disabled : null]}>
         <Ionicons name={icon} size={20} color="#645269" />
       </View>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -217,7 +233,7 @@ function MicrophoneButton(props: {
     ? copy.voiceUnavailableHint
     : connected ? undefined : copy.voiceWaitsForConnectionHint
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={micEnabled ? copy.muteMicrophone : copy.turnOnMicrophone}
       accessibilityHint={hint}
@@ -226,9 +242,9 @@ function MicrophoneButton(props: {
       disabled={disabled}
       hitSlop={5}
       onPress={onToggleMic}
-      style={({ pressed }) => [disabled ? styles.micUnavailable : null, pressed ? styles.pressed : null]}
     >
-      <WardrobeGlass tone="control" radius={19} style={styles.round38} contentStyle={styles.center}>
+      <WardrobeGlass tone="control" radius={19} style={[styles.round38, disabled ? styles.micUnavailable : null]}
+        contentStyle={styles.center}>
         {micEnabled ? <View pointerEvents="none" style={styles.micSelected} /> : null}
         <Ionicons
           name={micEnabled ? "mic" : "mic-off-outline"}
@@ -236,7 +252,7 @@ function MicrophoneButton(props: {
           color={micEnabled ? MIC_SELECTED_INK : wardrobeTheme.ink}
         />
       </WardrobeGlass>
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -253,15 +269,18 @@ function NoticePill(props: {
         {text}
       </Text>
       {action ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={action.accessibilityLabel}
           hitSlop={8}
-          onPress={action.onPress}
-          style={({ pressed }) => [styles.noticeAction, pressed ? styles.pressed : null]}
+          onPress={() => {
+            hapticLight()
+            action.onPress()
+          }}
+          style={styles.noticeAction}
         >
           <Text maxFontSizeMultiplier={1.3} style={styles.noticeActionText}>{action.label}</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </WardrobeGlass>
   )
@@ -276,21 +295,19 @@ function MenuItem(props: {
 }) {
   const { icon, label, accessibilityLabel, disabled = false, onPress } = props
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="menuitem"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.menuItem,
-        pressed ? styles.menuItemPressed : null,
-        disabled ? styles.disabled : null
-      ]}
+      style={({ pressed }) => [styles.menuItem, pressed ? styles.menuItemPressed : null]}
     >
-      <Ionicons name={icon} size={18} color={MENU_ICON} />
-      <Text maxFontSizeMultiplier={1.4} style={styles.menuText}>{label}</Text>
-    </Pressable>
+      <View style={[styles.menuItemContent, disabled ? styles.disabled : null]}>
+        <Ionicons name={icon} size={18} color={MENU_ICON} />
+        <Text maxFontSizeMultiplier={1.4} style={styles.menuText}>{label}</Text>
+      </View>
+    </PressableScale>
   )
 }
 
@@ -407,6 +424,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12
   },
+  menuItemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
   menuItemPressed: {
     backgroundColor: "#F4EAF2"
   },
@@ -418,8 +440,5 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.42
-  },
-  pressed: {
-    opacity: 0.72
   }
 })

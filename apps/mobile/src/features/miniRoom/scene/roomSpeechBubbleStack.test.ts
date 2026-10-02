@@ -32,7 +32,12 @@ function loadStack() {
   const { RoomSpeechBubbleStack } = loadSourceWithFakeReact<{
     RoomSpeechBubbleStack: (props: RoomSpeechBubbleStackProps) => Element | null
   }>("features/miniRoom/scene/RoomSpeechBubbleStack.tsx", runtime, {
-    modules: { "react-native": createReactNativeStub().module, "react-native-reanimated": reanimated }
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": reanimated,
+      "../../../ui/PressableScale": { PressableScale: "PressableScale" },
+      "../../../ui/haptics": { hapticSelection: () => undefined }
+    }
   })
   return RoomSpeechBubbleStack
 }
@@ -84,7 +89,7 @@ test("lines stack oldest to newest in one column; only the newest points at the 
   const tails = lines.map((line) => findAll(line, ({ type, props }) => type === "View" && props.pointerEvents === "none").length)
   assert.deepEqual(tails, [0, 1])
 
-  const buttons = findAll(root, ({ type }) => type === "Pressable")
+  const buttons = findAll(root, ({ props }) => props.accessibilityRole === "button")
   ;(buttons[0]!.props.onPress as () => void)()
   assert.deepEqual(dismissed, ["one"], "each line is dismissed on its own")
 })

@@ -1,6 +1,8 @@
 import { memo } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Reanimated, { FadeOut, LinearTransition, ReduceMotion, ZoomIn } from "react-native-reanimated"
+import { hapticSelection } from "../../../ui/haptics"
+import { PressableScale } from "../../../ui/PressableScale"
 import type { SpeechBubble } from "./miniRoomSceneTypes"
 
 export type RoomSpeechBubblePlacement = "center" | "left" | "right"
@@ -53,10 +55,13 @@ export const RoomSpeechBubbleStack = memo(function RoomSpeechBubbleStack(props: 
             layout={animate ? LAYOUT : undefined}
             style={styles.line}
           >
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={dismissBubbleLabel}
-              onPress={() => onDismissBubble(bubble.id)}
+              onPress={() => {
+                hapticSelection()
+                onDismissBubble(bubble.id)
+              }}
               hitSlop={4}
               style={styles.bubbleWrap}
             >
@@ -73,7 +78,7 @@ export const RoomSpeechBubbleStack = memo(function RoomSpeechBubbleStack(props: 
                   ]}
                 />
               ) : null}
-            </Pressable>
+            </PressableScale>
           </Reanimated.View>
         )
       })}

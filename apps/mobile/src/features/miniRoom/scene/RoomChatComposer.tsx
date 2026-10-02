@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { memo, useEffect, useRef } from "react"
-import { Pressable, StyleSheet, TextInput, View } from "react-native"
+import { StyleSheet, TextInput, View } from "react-native"
+import { hapticSelection } from "../../../ui/haptics"
+import { PressableScale } from "../../../ui/PressableScale"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import {
@@ -23,7 +25,8 @@ export interface RoomChatComposerProps {
   maxInputHeight: number
   inputHeight: number
   onChangeText: (value: string) => void
-  onSubmit: () => void
+  /** Sends the draft; true when the message was accepted. */
+  onSubmit: () => boolean
   onToggleHistory: () => void
   onContentHeightChange: (contentHeight: number) => void
   onFocus: () => void
@@ -58,27 +61,33 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     const timer = setTimeout(() => inputRef.current?.focus(), 0)
     return () => clearTimeout(timer)
   }, [suggestionsEnabled])
+  // One send, one haptic (ui/haptics: a chat message sent → selection), from
+  // the send button or the keyboard's return key alike.
+  const submit = () => {
+    if (onSubmit()) hapticSelection()
+    draftTyping?.endDraft()
+  }
   const sendDisabled = disabled || value.trim().length === 0
   // Name what the button does: typing closes the keyboard; history jumps to the newest message.
   const toggleLabel = mode === "typing" ? copy.returnToRoom : copy.goToLatestMessage
   return (
     <View style={styles.composerRow}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={toggleLabel}
         hitSlop={6}
-        onPress={onToggleHistory}
-        style={({ pressed }) => [
-          styles.historyToggle,
-          pressed ? styles.composerButtonPressed : null
-        ]}
+        onPress={() => {
+          hapticSelection()
+          onToggleHistory()
+        }}
+        style={styles.historyToggle}
       >
         <Ionicons
           name={mode === "typing" ? "chatbubbles-outline" : "chevron-down"}
           size={18}
           color={TOGGLE_INK}
         />
-      </Pressable>
+      </PressableScale>
       <View style={styles.inputWrap}>
       <Ionicons name="happy-outline" size={20} color="#8D7794" accessible={false} />
       <TextInput
@@ -97,10 +106,7 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         // A disabled field never focuses, so its touch must not lift the dock.
         onTouchStart={disabled ? undefined : onFocus}
         onFocus={onFocus}
-        onSubmitEditing={() => {
-          onSubmit()
-          draftTyping?.endDraft()
-        }}
+        onSubmitEditing={submit}
         onLayout={(event) => onContentHeightChange(event.nativeEvent.layout.height)}
         placeholder={copy.roomMessagePlaceholder}
         placeholderTextColor="#8B7A8A"
@@ -117,24 +123,17 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         keyboardAppearance="light"
       />
       </View>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={copy.sendRoomMessage}
         accessibilityState={{ disabled: sendDisabled }}
         disabled={sendDisabled}
         hitSlop={4}
-        onPress={() => {
-          onSubmit()
-          draftTyping?.endDraft()
-        }}
-        style={({ pressed }) => [
-          styles.composerSend,
-          sendDisabled ? styles.composerSendDisabled : null,
-          pressed ? styles.composerButtonPressed : null
-        ]}
+        onPress={submit}
+        style={[styles.composerSend, sendDisabled ? styles.composerSendDisabled : null]}
       >
         <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-      </Pressable>
+      </PressableScale>
     </View>
   )
 })
@@ -149,6 +148,5 @@ const styles = StyleSheet.create({
     lineHeight: MINI_ROOM_INPUT_LINE_HEIGHT, textAlignVertical: "center" },
   composerSend: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
     backgroundColor: "#F45A9F" },
-  composerSendDisabled: { backgroundColor: "#DDCFDF" },
-  composerButtonPressed: { opacity: 0.72 }
+  composerSendDisabled: { backgroundColor: "#DDCFDF" }
 })

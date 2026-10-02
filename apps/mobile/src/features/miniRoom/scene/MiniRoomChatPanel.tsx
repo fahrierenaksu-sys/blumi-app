@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { ReactNode } from "react"
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
+import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
+import { hapticSelection } from "../../../ui/haptics"
+import { PressableScale } from "../../../ui/PressableScale"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import { MiniRoomChatHistory } from "./MiniRoomChatHistory"
@@ -66,10 +68,13 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
           <Text numberOfLines={2} ellipsizeMode="tail" maxFontSizeMultiplier={1.35} style={styles.recentText}>
             {recentMessage?.body ?? copy.historyEmpty}
           </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={copy.closeKeyboard} hitSlop={6}
-            onPress={onCloseKeyboard} style={styles.closeKeyboard}>
+          <PressableScale accessibilityRole="button" accessibilityLabel={copy.closeKeyboard} hitSlop={6}
+            onPress={() => {
+              hapticSelection()
+              onCloseKeyboard()
+            }} style={styles.closeKeyboard}>
             <Ionicons name="chevron-down" size={18} color="#70596E" />
-          </Pressable>
+          </PressableScale>
         </Animated.View>
         <Animated.View style={[styles.historyContent, { width: textWidths.history, bottom: composerHeight + 18 }, historyStyle]}
           pointerEvents={typing ? "none" : "auto"} accessibilityElementsHidden={typing}

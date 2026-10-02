@@ -240,13 +240,14 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     moveLocalAvatarToHotspot(hotspotId)
   }, [handleCloseKeyboard, moveLocalAvatarToHotspot])
 
-  const handleSubmitComposer = useCallback((): void => {
+  const handleSubmitComposer = useCallback((): boolean => {
     const result = resolveRoomComposerSubmit(composerText, onSendRoomMessage)
-    if (result.kind !== "sent") return
+    if (result.kind !== "sent") return false
     sayPhrase(localUser.userId, result.body, "chat")
     // The keyboard stays up for the next message; the input returns to one line.
     setComposerText("")
     setComposerLines(1)
+    return true
   }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
 
   // An unacknowledged message comes back into an empty composer: sending the
