@@ -64,3 +64,39 @@ test("two PostgreSQL connections preserve accepted hide and headline during rend
     await pool.end()
   }
 })
+
+test("PostgreSQL snapshot saves never replace a newer revision or the owner's visibility and headline", {
+  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+}, async () => {
+  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const userId = `snapshot_order_${randomUUID()}`
+  const snapshot = (roomRevision: number, isPublic: boolean, headline: string | null) => ({
+    userId, roomRevision, assetKey: `asset_${roomRevision}_${userId}`, mimeType: "image/webp" as const,
+    rendererVersion: "test", body: Buffer.from(`revision ${roomRevision}`), isPublic, headline,
+    updatedAt: new Date().toISOString()
+  })
+  try {
+    await pool.query(`INSERT INTO blumi_accounts
+      (account_id, user_id, phone_number, created_at, updated_at)
+      VALUES ($1, $1, $2, NOW(), NOW())`, [userId, userId])
+    const repository = createPostgresRoomSnapshotRepository(pool)
+
+    await repository.save(snapshot(3, true, null))
+    const stale = await repository.save(snapshot(2, true, null))
+    assert.equal(stale.roomRevision, 3, "an older render returns the stored newer one")
+    assert.equal((await repository.getLatest(userId))?.roomRevision, 3)
+    assert.equal(await repository.findByAssetKey(`asset_2_${userId}`), null)
+
+    assert.equal((await repository.updateVisibility({ userId, roomRevision: 3, isPublic: false, headline: "Mine" }))?.isPublic, false)
+    const next = await repository.save(snapshot(4, true, null))
+    assert.equal(next.roomRevision, 4)
+    const latest = await repository.getLatest(userId)
+    assert.equal(latest?.roomRevision, 4)
+    assert.equal(latest?.isPublic, false, "a render never republishes a hidden room")
+    assert.equal(latest?.headline, "Mine", "a render never clears the owner's headline")
+    assert.equal(await repository.updateVisibility({ userId, roomRevision: 3, isPublic: true, headline: null }), null)
+  } finally {
+    await pool.end()
+  }
+})
