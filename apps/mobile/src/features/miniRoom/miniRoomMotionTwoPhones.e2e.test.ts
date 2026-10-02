@@ -155,6 +155,7 @@ interface PhoneView {
 /** One simulated app: its own socket, provider, hooks and scene. */
 function createPhone(input: {
   harness: ServerHarness; me: SimUser; partner: SimUser; miniRoomId: string; roomDecorScene: ResolvedRoomV2Scene
+  reduceMotion?: boolean
 }) {
   const runtime = createFakeReactRuntime()
   const sockets: WebSocket[] = []
@@ -215,7 +216,8 @@ function createPhone(input: {
       "./miniRoomMovementLifecycle",
       "./miniRoomMovementRun",
       "./miniRoomSpeechStack",
-      "./miniRoomSeatRefusalModel"
+      "./miniRoomSeatRefusalModel",
+      "./miniRoomEntryModel"
     ]
   })
   const presentation = loadSourceWithFakeReact<typeof PresentationModule>(
@@ -240,7 +242,8 @@ function createPhone(input: {
       onLocalMove: motion.onLocalMove, onSeatTaken: motion.reportSeatTaken,
       roomDecorScene: input.roomDecorScene, bubbleLifetimeMs: 4000
     })
-    const partnerPresent = presentation.useMiniRoomMotionPresentation(motion, store, localUser.userId, partnerUser.userId)
+    const partnerPresent = presentation.useMiniRoomMotionPresentation(motion, store, localUser.userId, partnerUser.userId,
+      input.reduceMotion ?? false)
     return { motion, store, partnerPresent }
   })
   const view = () => runtime.output as PhoneView
@@ -490,6 +493,64 @@ test("a late scene entry from the phone's own abandoned socket never takes the r
   assert.notEqual(phoneA.view().motion.superseded, true, "Ada's phone is not told another device took over")
   await assertPartnerSeesWalk(phoneA, phoneB, { x: 0.6, y: 0.8 })
   await assertPartnerSeesWalk(phoneB, phoneA, { x: 0.45, y: 0.75 })
+})
+
+test("a partner who comes in later walks in from the door to where the server put them; their steps still win", async (t) => {
+  const { harness, ada, bora, miniRoomId } = await startServer()
+  const roomDecorScene = loadSharedRoomScene()
+  const entry = roomDecorScene.shell?.entry
+  assert.ok(entry, "the shared room shell has a door")
+  const phoneA = createPhone({ harness, me: ada, partner: bora, miniRoomId, roomDecorScene })
+  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene })
+  t.after(async () => {
+    phoneA.close()
+    phoneB.close()
+    await harness.close()
+  })
+  phoneA.open()
+  await waitUntil("A is in the scene", () => phoneA.view().motion.avatars.some((avatar) => avatar.userId === ada.userId))
+  phoneB.open()
+  const entering = await waitUntil("A shows B walking in from the door", () => {
+    const partner = phoneA.view().store.avatars[bora.userId]
+    return partner?.enteringFromDoor && partner.motion === "walking" ? partner : undefined
+  })
+  assert.ok(entering.arrivalId !== undefined, "the arrival fades in")
+  const record = phoneA.view().motion.avatars.find((avatar) => avatar.userId === bora.userId)!
+  assert.deepEqual({ x: entering.targetX, y: entering.targetY }, { x: record.x, y: record.y },
+    "the walk ends at the server's position")
+  assert.equal(phoneA.view().store.deferUntilArrivalLands(bora.userId, () => undefined), true)
+  const [onA, onB] = await Promise.all([
+    waitUntil("A shows B arrived", () => settledAvatar(phoneA, bora.userId)),
+    waitUntil("B is settled", () => settledAvatar(phoneB, bora.userId))
+  ])
+  assert.deepEqual({ x: onA.x, y: onA.y }, { x: onB.x, y: onB.y }, "both phones show B at the same spot")
+  assert.equal(onA.enteringFromDoor, undefined)
+  // B's next step takes over at once, from wherever B is.
+  await assertPartnerSeesWalk(phoneB, phoneA, { x: 0.6, y: 0.78 })
+  await assertPartnerSeesWalk(phoneA, phoneB, { x: 0.45, y: 0.8 })
+})
+
+test("under Reduce Motion a later partner fades in at the server's position, without a walk", async (t) => {
+  const { harness, ada, bora, miniRoomId } = await startServer()
+  const roomDecorScene = loadSharedRoomScene()
+  const phoneA = createPhone({ harness, me: ada, partner: bora, miniRoomId, roomDecorScene, reduceMotion: true })
+  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene })
+  t.after(async () => {
+    phoneA.close()
+    phoneB.close()
+    await harness.close()
+  })
+  phoneA.open()
+  await waitUntil("A is in the scene", () => phoneA.view().motion.avatars.some((avatar) => avatar.userId === ada.userId))
+  phoneB.open()
+  const arrived = await waitUntil("A shows B arrived", () => {
+    const partner = phoneA.view().store.avatars[bora.userId]
+    return partner?.arrivalId !== undefined && partner.present !== false ? partner : undefined
+  })
+  assert.notEqual(arrived.motion, "walking")
+  assert.equal(arrived.enteringFromDoor, undefined)
+  const onB = await waitUntil("B is settled", () => settledAvatar(phoneB, bora.userId))
+  assert.deepEqual({ x: arrived.x, y: arrived.y }, { x: onB.x, y: onB.y })
 })
 
 function loadSeatHotspotId(scene: ResolvedRoomV2Scene): string {

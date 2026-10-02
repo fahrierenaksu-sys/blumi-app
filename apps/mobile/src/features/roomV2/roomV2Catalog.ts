@@ -116,6 +116,12 @@ const BASE_ROOM_V2_SHELL_CATALOG: RoomShell[] = [
     },
     walkablePolygon: MINI_ROOM_FLOOR,
     floorGrid: ROOM_V2_BLUMI_WORLD_FLOOR_GRID,
+    // Measured on the shell art: the arched door's threshold on the back-left
+    // wall, and the first walkable tile in front of it.
+    entry: {
+      door: { x: 0.169, y: 0.572 },
+      doorstep: { x: 0.215, y: 0.62 }
+    },
     placementLanes: [
       {
         id: "room_v2_world_lane_wall",

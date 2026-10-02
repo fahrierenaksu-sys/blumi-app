@@ -24,6 +24,8 @@ import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
 import { cozyPinkBedroomScene } from "./roomMaps"
 import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
+import { createMiniRoomEntryPlan } from "./miniRoomEntryModel"
+import type { RoomShellEntry } from "../../roomV2/roomV2.types"
 import {
   createMiniRoomAvatarPosition,
   createMiniRoomSegmentAnimator,
@@ -103,6 +105,8 @@ interface MoveOptions {
   arrivalFacing?: AvatarFacing
   /** Leave through this seat's exit when the avatar is already on its way in. */
   departFromHotspotId?: string
+  /** Presentation only: start at the shell's door and walk in (an arrival). */
+  entry?: RoomShellEntry
 }
 
 export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRoomStore {
@@ -176,6 +180,17 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const publishSpeechRef = useRef<(next: MiniRoomSpeechStack) => void>(() => undefined)
   const speechMotionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  // Walks in from the door that are still running, with what runs when each lands.
+  const arrivalWalksRef = useRef(new Map<string, { onLanded?: () => void }>())
+  const arrivalCounterRef = useRef(0)
+  const shellEntry = usesRoomV2Scene ? input.roomDecorScene?.shell?.entry : undefined
+  /** Ends a running walk in; `landed` runs its callback (the avatar is in the room). */
+  const endArrivalWalk = useCallback((userId: string, landed: boolean) => {
+    const walk = arrivalWalksRef.current.get(userId)
+    if (!walk) return
+    arrivalWalksRef.current.delete(userId)
+    if (landed) walk.onLanded?.()
+  }, [])
 
   useEffect(() => {
     for (const ref of movementsRef.current.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
@@ -203,6 +218,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setBubbles([])
     for (const timer of speechMotionTimersRef.current.values()) clearTimeout(timer)
     speechMotionTimersRef.current.clear()
+    arrivalWalksRef.current.clear()
     setPressedPoint(undefined)
     setSelectedHotspotId(undefined)
     // Display names are not read here, but a renamed participant restarts the scene.
@@ -222,7 +238,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     // The timer map is created once and only cleared, never replaced.
     const speechMotionTimers = speechMotionTimersRef.current
     const movements = movementsRef.current
+    const arrivalWalks = arrivalWalksRef.current
     return () => {
+      arrivalWalks.clear()
       for (const ref of movements.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
       cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
@@ -244,11 +262,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const committedLocalAvatar = currentAvatars[userId]
       if (!committedLocalAvatar) return false
       const motionDriver = getMotionDriver(committedLocalAvatar)
-      // A retarget during a walk starts from where the avatar is on screen.
-      const localAvatar = {
-        ...committedLocalAvatar,
-        ...readMiniRoomAvatarPosition(motionDriver.position)
-      }
+      const entry = options?.entry
+      // A retarget during a walk starts from where the avatar is on screen;
+      // an arrival starts at the door, standing.
+      const localAvatar = entry
+        ? { ...committedLocalAvatar, x: entry.door.x, y: entry.door.y, seatedHotspotId: undefined }
+        : { ...committedLocalAvatar, ...readMiniRoomAvatarPosition(motionDriver.position) }
       const occupants = options?.ignoreOccupants ? [] : createMiniRoomOccupants(currentAvatars)
       const seatHotspot = options?.roomWorldHotspot?.kind === "seat"
         ? options.roomWorldHotspot
@@ -337,15 +356,25 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         ? seatDeparturePlan
           ? combineRoomWorldMovementPlans([seatDeparturePlan, seatPlan])
           : seatPlan
-        : exitPlan ?? createRoomWorldMovementPlan({
-          geometry: currentSeatGeometry,
-          from: localAvatar,
-          to: target,
-          clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-          timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
-          occupants,
-          movingOccupantId: userId
-        })
+        : exitPlan ?? (entry
+          ? createMiniRoomEntryPlan({
+            geometry: currentSeatGeometry,
+            entry,
+            to: target,
+            clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+            timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+            occupants,
+            movingOccupantId: userId
+          })
+          : createRoomWorldMovementPlan({
+            geometry: currentSeatGeometry,
+            from: localAvatar,
+            to: target,
+            clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+            timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+            occupants,
+            movingOccupantId: userId
+          }))
       if (!plan) return false
 
       const activeMovementRef = movementRefFor(userId)
@@ -353,6 +382,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       if (sendsLocalMove && onLocalMove &&
         !onLocalMove(target, options?.hotspot?.id)) return false
       cancelActiveMiniRoomMovement(activeMovementRef, cancelMiniRoomMovementRun)
+      // A newer step takes over a walk in: the partner is in the room.
+      if (!entry) endArrivalWalk(userId, true)
       if (userId === localUserId) cancelPendingMiniRoomMovementCompletion(
         movementCompletionTimerRef,
         clearTimeout
@@ -405,7 +436,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
                 facing: segmentStartPose.facing,
                 motion: segmentStartPose.motion,
                 seatedHotspotId: undefined,
-                depthSeatHotspotId
+                depthSeatHotspotId,
+                enteringFromDoor: entry ? true : undefined
               }
             }
           })
@@ -439,13 +471,15 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
                 targetX: undefined,
                 targetY: undefined,
                 seatedHotspotId: arrivalSeatedHotspotId,
-                depthSeatHotspotId: undefined
+                depthSeatHotspotId: undefined,
+                enteringFromDoor: undefined
               }
             }
           })
         },
         onArrival: () => {
           if (activeMovementRef.current === run) activeMovementRef.current = null
+          if (entry) endArrivalWalk(userId, true)
           if (userId === localUserId) scheduleMiniRoomMovementCompletion(
             movementCompletionTimerRef,
             setTimeout,
@@ -458,7 +492,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       activeMovementRef.current = run
       return true
     },
-    [geometry, getMotionDriver, localUserId, onLocalMove, movementRefFor, roomWorldHotspots]
+    [endArrivalWalk, geometry, getMotionDriver, localUserId, onLocalMove, movementRefFor, roomWorldHotspots]
   )
 
   const moveLocalAvatar = useCallback(
@@ -524,6 +558,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         runMovement(next.userId, target, { ...options, ignoreOccupants: true })) return
     }
     cancelActiveMiniRoomMovement(movementRefFor(next.userId), cancelMiniRoomMovementRun)
+    // Placed exactly: an arrival in progress is over (silently if they left).
+    endArrivalWalk(next.userId, next.present)
     const driver = getMotionDriver(avatar)
     if (!snap && !next.present) {
       // Absent: freeze where it is on screen, dimmed, until it returns.
@@ -531,7 +567,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       snapMiniRoomAvatarPosition(driver.position, position)
       setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
         x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
-        seatedHotspotId: undefined, depthSeatHotspotId: undefined, present: false } }))
+        seatedHotspotId: undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined, present: false } }))
       return
     }
     // Place exactly: seated on its seat when the record carries one, as the
@@ -545,18 +581,52 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
       x: position.x, y: position.y, targetX: undefined, targetY: undefined,
       motion: seated ? "sitting" : "idle", ...(seated || refused ? { facing } : {}),
-      seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, present: next.present } }))
-  }, [geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand, roomWorldHotspots, runMovement])
+      seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined,
+      present: next.present } }))
+  }, [endArrivalWalk, geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand,
+    roomWorldHotspots, runMovement])
+
+  const presentArrival = useCallback<MiniRoomStore["presentArrival"]>((next, options) => {
+    const avatar = avatarsRef.current[next.userId]
+    if (!avatar || !next.present || next.userId === localUserId) return false
+    const arrivalId = ++arrivalCounterRef.current
+    const markArrival = () => setAvatars(current => current[next.userId]
+      ? { ...current, [next.userId]: { ...current[next.userId], present: true, arrivalId } } : current)
+    if (!options.walk) {
+      // Reduce Motion: no walk; place at the authoritative spot and fade in there.
+      applyRemoteAvatar(next, true)
+      markArrival()
+      return true
+    }
+    // A seat claim or a refused one is placed by the ordinary record path.
+    if (!shellEntry || next.hotspotId || next.deniedHotspotId) return false
+    const walkIn = (ignoreOccupants: boolean) =>
+      runMovement(next.userId, next, { authoritative: true, entry: shellEntry, ignoreOccupants })
+    if (!walkIn(false) && !walkIn(true)) return false
+    arrivalWalksRef.current.set(next.userId, {})
+    markArrival()
+    return true
+  }, [applyRemoteAvatar, localUserId, runMovement, shellEntry])
+
+  const deferUntilArrivalLands = useCallback<MiniRoomStore["deferUntilArrivalLands"]>((userId, onLanded) => {
+    const walk = arrivalWalksRef.current.get(userId)
+    if (!walk) return false
+    walk.onLanded = onLanded
+    return true
+  }, [])
 
   const setRemotePresence = useCallback((userId: string, present: boolean) => {
-    if (!present) cancelActiveMiniRoomMovement(movementRefFor(userId), cancelMiniRoomMovementRun)
+    if (!present) {
+      cancelActiveMiniRoomMovement(movementRefFor(userId), cancelMiniRoomMovementRun)
+      endArrivalWalk(userId, false)
+    }
     setAvatars(current => {
       const avatar = current[userId]
       if (!avatar || avatar.present === present) return current
       return { ...current, [userId]: { ...avatar, present,
-        ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined } : {}) } }
+        ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined, enteringFromDoor: undefined } : {}) } }
     })
-  }, [movementRefFor])
+  }, [endArrivalWalk, movementRefFor])
 
   const returnAvatarToIdle = useCallback((speakerUserId: string): void => {
     const speechTimer = speechMotionTimersRef.current.get(speakerUserId)
@@ -702,6 +772,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     moveLocalAvatarToHotspot,
     applyRemoteAvatar,
     setRemotePresence,
+    presentArrival,
+    deferUntilArrivalLands,
     addSpeechBubble,
     sayPhrase,
     dismissSpeechBubble

@@ -5,18 +5,27 @@ export interface MiniRoomMotionPresentationCursor {
   snapKey: number
   sceneEpoch: number
   applied: ReadonlyMap<string, MiniRoomAvatarMotion>
+  /** Participants this scene has already shown present (an arrival plays once). */
+  seenPresent: ReadonlySet<string>
 }
 
 export const INITIAL_MINI_ROOM_MOTION_PRESENTATION_CURSOR: MiniRoomMotionPresentationCursor = {
   snapKey: -1,
   sceneEpoch: -1,
-  applied: new Map()
+  applied: new Map(),
+  seenPresent: new Set()
 }
 
 export interface MiniRoomMotionApplication {
   avatar: MiniRoomAvatarMotion
   /** Place exactly (join snapshot or rebuilt scene) instead of walking. */
   snap: boolean
+  /**
+   * The partner comes into the room for the first time while this phone is
+   * already there: the scene may present it as a walk in from the door. The
+   * record's target stays the authoritative end point.
+   */
+  arrival: boolean
 }
 
 /**
@@ -37,19 +46,24 @@ export function planMiniRoomMotionPresentation(
 ): { apply: MiniRoomMotionApplication[]; cursor: MiniRoomMotionPresentationCursor } {
   const snap = input.snapKey !== cursor.snapKey || input.sceneEpoch !== cursor.sceneEpoch
   const applied = new Map(snap ? [] : cursor.applied)
+  // A new scene (new partner or appearance) starts its own arrivals; a
+  // reconnect of this phone does not replay one already seen.
+  const seenPresent = new Set(input.sceneEpoch === cursor.sceneEpoch ? cursor.seenPresent : [])
   const apply: MiniRoomMotionApplication[] = []
   for (const avatar of input.avatars) {
     const previous = applied.get(avatar.userId)
     if (!snap && previous && avatar.revision <= previous.revision) continue
     applied.set(avatar.userId, avatar)
+    const firstPresence = avatar.present && !seenPresent.has(avatar.userId)
+    if (avatar.present) seenPresent.add(avatar.userId)
     if (snap) {
-      apply.push({ avatar, snap: true })
+      apply.push({ avatar, snap: true, arrival: false })
       continue
     }
     if (avatar.userId === input.localUserId) continue
     if (previous?.present && avatar.present && previous.x === avatar.x &&
       previous.y === avatar.y && previous.hotspotId === avatar.hotspotId) continue
-    apply.push({ avatar, snap: false })
+    apply.push({ avatar, snap: false, arrival: firstPresence })
   }
-  return { apply, cursor: { snapKey: input.snapKey, sceneEpoch: input.sceneEpoch, applied } }
+  return { apply, cursor: { snapKey: input.snapKey, sceneEpoch: input.sceneEpoch, applied, seenPresent } }
 }

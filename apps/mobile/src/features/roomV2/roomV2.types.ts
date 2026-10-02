@@ -285,6 +285,17 @@ export interface RoomShell {
    */
   floorGrid?: RoomV2FloorGrid
   placementLanes?: RoomPlacementLane[]
+  /**
+   * Where a visitor comes in: the threshold of the shell's drawn door and the
+   * first walkable floor point in front of it (normalized canvas units).
+   * Presentation only; spawn and positions stay server-authoritative.
+   */
+  entry?: RoomShellEntry
+}
+
+export interface RoomShellEntry {
+  door: RoomPoint2D
+  doorstep: RoomPoint2D
 }
 
 export interface RoomFurnitureSurfaceSupport {

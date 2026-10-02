@@ -57,6 +57,40 @@ test("a presence flap at the same target does not restart the partner's walk; a 
   ])
 })
 
+function arrivals(steps: { avatars: MiniRoomAvatarMotion[]; snapKey: number; sceneEpoch: number }[]) {
+  let cursor = INITIAL_MINI_ROOM_MOTION_PRESENTATION_CURSOR
+  return steps.map((step) => {
+    const plan = planMiniRoomMotionPresentation(cursor, { ...step, localUserId: "local" })
+    cursor = plan.cursor
+    return plan.apply.filter(({ arrival }) => arrival).map(({ avatar: value }) => value.userId)
+  })
+}
+
+test("a partner who comes in after this phone arrives once; one already inside does not", () => {
+  const away = avatar("partner", { present: false })
+  assert.deepEqual(arrivals([
+    { avatars: [avatar("local"), away], snapKey: 1, sceneEpoch: 1 },
+    { avatars: [avatar("local"), avatar("partner", { revision: 2 })], snapKey: 1, sceneEpoch: 1 },
+    // Backgrounded and back: a presence flap, not a new entrance.
+    { avatars: [avatar("local"), avatar("partner", { present: false, revision: 3 })], snapKey: 1, sceneEpoch: 1 },
+    { avatars: [avatar("local"), avatar("partner", { revision: 4 })], snapKey: 1, sceneEpoch: 1 },
+    // This phone joins again: the partner it already saw is placed, not walked in again.
+    { avatars: [avatar("local", { revision: 5 }), avatar("partner", { present: false, revision: 5 })], snapKey: 2, sceneEpoch: 1 },
+    { avatars: [avatar("local", { revision: 5 }), avatar("partner", { revision: 6 })], snapKey: 2, sceneEpoch: 1 }
+  ]), [[], ["partner"], [], [], [], []])
+  assert.deepEqual(arrivals([
+    { avatars: [avatar("local"), avatar("partner")], snapKey: 1, sceneEpoch: 1 },
+    { avatars: [avatar("local"), avatar("partner", { x: .5, revision: 2 })], snapKey: 1, sceneEpoch: 1 }
+  ]), [[], []], "already in the room when this phone joined")
+  assert.deepEqual(arrivals([
+    { avatars: [avatar("local"), away], snapKey: 1, sceneEpoch: 1 },
+    { avatars: [avatar("local"), avatar("partner", { revision: 2 })], snapKey: 1, sceneEpoch: 1 },
+    // A new partner rebuilds the scene: their own first entrance plays.
+    { avatars: [avatar("local"), avatar("partner", { present: false, revision: 3 })], snapKey: 1, sceneEpoch: 2 },
+    { avatars: [avatar("local"), avatar("partner", { revision: 4 })], snapKey: 1, sceneEpoch: 2 }
+  ]), [[], ["partner"], [], ["partner"]])
+})
+
 test("leaving the scene clears nothing on screen and the next join snaps again", () => {
   assert.deepEqual(present([
     { avatars: [avatar("local"), avatar("partner")], snapKey: 1, sceneEpoch: 1 },

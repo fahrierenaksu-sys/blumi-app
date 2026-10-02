@@ -120,6 +120,10 @@ export interface AvatarState {
    * furniture's front edge). Never sent, never authoritative.
    */
   depthSeatHotspotId?: string
+  /** Presentation only: changes once per arrival; the avatar fades in when it does. */
+  arrivalId?: number
+  /** Presentation only: walking in from the door (the walk is the arrival's one hero). */
+  enteringFromDoor?: boolean
   appearance: AvatarAppearance
   seatedHotspotId?: string
 }
@@ -161,6 +165,18 @@ export interface MiniRoomStore {
   sceneEpoch: number
   applyRemoteAvatar: (avatar: import("@blumi/contracts").MiniRoomAvatarMotion, snap?: boolean) => void
   setRemotePresence: (userId: string, present: boolean) => void
+  /**
+   * Shows the partner's first arrival: a walk in from the shell's door to the
+   * record's authoritative position (`walk`), or a fade in place at it. False
+   * when the scene cannot present it (no door or a blocked route): apply the
+   * record as usual. Never sends anything.
+   */
+  presentArrival: (avatar: import("@blumi/contracts").MiniRoomAvatarMotion, options: { walk: boolean }) => boolean
+  /**
+   * Runs `onLanded` when the avatar's walk in from the door ends (it reached
+   * its spot or a newer step took over). False when no walk in is running.
+   */
+  deferUntilArrivalLands: (userId: string, onLanded: () => void) => boolean
   addSpeechBubble: (bubble: Omit<SpeechBubble, "id" | "createdAt" | "expiresAt">) => void
   sayPhrase: (userId: string, body: string, tone?: SpeechBubbleTone) => void
   dismissSpeechBubble: (bubbleId: string) => void

@@ -32,7 +32,10 @@ function mount() {
         "./miniRoomAvatarPositions": {
           createMiniRoomAvatarPosition: (point: { x: number; y: number }) => ({ x: { value: point.x }, y: { value: point.y } }),
           createMiniRoomSegmentAnimator: (position: { x: { value: number }; y: { value: number } }) => ({
-            animate: (segment: { to: { x: number; y: number } }, onComplete: () => void) => {
+            animate: (segment: { from: { x: number; y: number }; to: { x: number; y: number } }, onComplete: () => void) => {
+              // As the UI-thread animator: each segment starts from its own first point.
+              position.x.value = segment.from.x
+              position.y.value = segment.from.y
               pendingSegments.push(() => { position.x.value = segment.to.x; position.y.value = segment.to.y; onComplete() })
             },
             cancel: () => { cancelledDrivers.push(position) }
@@ -54,7 +57,8 @@ function mount() {
         "./miniRoomMovementLifecycle",
         "./miniRoomMovementRun",
         "./miniRoomSpeechStack",
-        "./miniRoomSeatRefusalModel"
+        "./miniRoomSeatRefusalModel",
+        "./miniRoomEntryModel"
       ],
       globals: {
         setTimeout: (run: () => void, delay: number) => {
@@ -209,6 +213,75 @@ test("sitting down keeps the seat's draw depth until seated; nothing about it is
   assert.equal(local.seatedHotspotId, "sofa_corner")
   assert.equal(local.depthSeatHotspotId, undefined, "seated: the seat itself now holds the depth")
   assert.equal(sent.length, 1, "one authoritative step; the draw depth is local presentation")
+  f.runtime.unmount()
+})
+
+const doorRoom = {
+  shell: {
+    id: "door_room", canvasSize: { width: 1254, height: 714 },
+    placeableArea: { minX: 0.2, maxX: 0.8, minY: 0.45, maxY: 0.88 },
+    walkablePolygon: [{ x: .48, y: .42 }, { x: .8, y: .55 }, { x: .83, y: .72 }, { x: .7, y: .9 },
+      { x: .3, y: .9 }, { x: .17, y: .72 }, { x: .2, y: .55 }],
+    entry: { door: { x: .169, y: .572 }, doorstep: { x: .215, y: .62 } }
+  },
+  renderItems: []
+} as unknown as NonNullable<StoreInput["roomDecorScene"]>
+
+test("a later partner walks in from the door to the server's spot; a newer step takes over at once", () => {
+  const f = mount()
+  f.render({ roomDecorScene: doorRoom })
+  let landed = 0
+  const record = { userId: "partner", x: .62, y: .74, present: true, revision: 2 }
+  assert.equal(f.store().presentArrival(record, { walk: true }), true)
+  const partner = f.store().avatars.partner
+  assert.equal(partner.enteringFromDoor, true)
+  assert.equal(partner.motion, "walking")
+  assert.ok(partner.arrivalId !== undefined)
+  assert.deepEqual({ x: partner.targetX, y: partner.targetY }, { x: .62, y: .74 }, "ends at the authoritative spot")
+  assert.deepEqual(f.store().avatarPositions.partner, { x: { value: .169 }, y: { value: .572 } }, "starts at the door")
+  assert.equal(f.store().deferUntilArrivalLands("partner", () => { landed += 1 }), true)
+  // Through the door and onto the floor; then the partner taps elsewhere
+  // before reaching the spot: that step wins, from where they are.
+  f.finishSegment()
+  f.store().applyRemoteAvatar({ userId: "partner", x: .5, y: .8, present: true, revision: 3 })
+  const overridden = f.store().avatars.partner
+  assert.equal(overridden.motion, "walking")
+  assert.deepEqual({ x: overridden.targetX, y: overridden.targetY }, { x: .5, y: .8 })
+  assert.equal(overridden.enteringFromDoor, undefined)
+  assert.equal(landed, 1, "the arrival is felt once, when it ends")
+  assert.equal(f.store().deferUntilArrivalLands("partner", () => { landed += 1 }), false)
+  f.runtime.unmount()
+})
+
+test("a step that arrives while the partner is still in the doorway places them at it at once", () => {
+  const f = mount()
+  f.render({ roomDecorScene: doorRoom })
+  assert.equal(f.store().presentArrival({ userId: "partner", x: .62, y: .74, present: true, revision: 2 }, { walk: true }), true)
+  f.store().applyRemoteAvatar({ userId: "partner", x: .5, y: .8, present: true, revision: 3 })
+  const partner = f.store().avatars.partner
+  const at = partner.targetX === undefined ? { x: partner.x, y: partner.y } : { x: partner.targetX, y: partner.targetY }
+  assert.deepEqual(at, { x: .5, y: .8 }, "the newest record wins")
+  assert.equal(partner.enteringFromDoor, undefined)
+  f.runtime.unmount()
+})
+
+test("under Reduce Motion the arrival is placed at the server's spot and only fades in", () => {
+  const f = mount()
+  f.render({ roomDecorScene: doorRoom })
+  assert.equal(f.store().presentArrival({ userId: "partner", x: .62, y: .74, present: true, revision: 2 }, { walk: false }), true)
+  const partner = f.store().avatars.partner
+  assert.notEqual(partner.motion, "walking")
+  assert.equal(partner.enteringFromDoor, undefined)
+  assert.ok(partner.arrivalId !== undefined)
+  assert.deepEqual({ x: partner.x, y: partner.y }, { x: .62, y: .74 })
+  assert.equal(f.store().deferUntilArrivalLands("partner", () => undefined), false, "nothing to wait for: felt now")
+  f.runtime.unmount()
+})
+
+test("a room without a door presents no walk; the record applies as usual", () => {
+  const f = mount()
+  f.render()
+  assert.equal(f.store().presentArrival({ userId: "partner", x: .62, y: .74, present: true, revision: 2 }, { walk: true }), false)
   f.runtime.unmount()
 })
 

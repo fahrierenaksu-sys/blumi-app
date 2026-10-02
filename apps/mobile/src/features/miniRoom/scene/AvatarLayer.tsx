@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type ReactNode } from "react"
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
   useAnimatedReaction,
@@ -9,6 +9,7 @@ import Reanimated, {
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { RoomRendererFurnitureSprite } from "../../roomV2/components/RoomRenderer2D"
+import { animateTo, useMotion } from "../../../ui/motion"
 import {
   getMiniRoomAvatarRenderLayers,
   getMiniRoomAvatarSittingScaleY
@@ -145,7 +146,8 @@ export function AvatarLayer(props: AvatarLayerProps) {
             stageWidth={stageWidth}
             stageHeight={stageHeight}
             zIndex={zIndices.avatars[avatar.userId] ?? 0}
-            showJoinPulse={!isLocal && partnerJustJoined}
+            // A walk in from the door is the arrival's one hero; the ring is for a plain fade-in.
+            showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor}
             motionPolicy={motionPolicy}
           />
         )
@@ -202,6 +204,16 @@ function AvatarAnchor(props: {
 }) {
   const { avatar, position, stageWidth, stageHeight, zIndex, children } = props
   const presentOpacity = avatar.present === false ? 0.35 : 1
+  // An arrival fades the avatar in (at the door, or in place under Reduce
+  // Motion, where fadeIn resolves to the crossfade).
+  const motion = useMotion()
+  const entrance = useSharedValue(1)
+  const arrivalId = avatar.arrivalId
+  useEffect(() => {
+    if (arrivalId === undefined) return
+    entrance.value = 0
+    entrance.value = animateTo(1, motion.fadeIn)
+  }, [arrivalId, entrance, motion.fadeIn])
   const anchorStyle = useAnimatedStyle(() => {
     const offset = resolveMiniRoomAvatarAnchorOffset(
       { x: position.x.value, y: position.y.value },
@@ -209,7 +221,7 @@ function AvatarAnchor(props: {
     )
     return {
       // Hidden until the room is measured, so no frame shows it at the corner.
-      opacity: stageWidth.value > 0 ? presentOpacity : 0,
+      opacity: stageWidth.value > 0 ? presentOpacity * entrance.value : 0,
       transform: [{ translateX: offset.translateX }, { translateY: offset.translateY }]
     }
   })

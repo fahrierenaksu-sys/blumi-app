@@ -15,7 +15,7 @@ import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHist
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { resolveComposerRestore, resolveRoomComposerSubmit } from "../roomComposerModel"
 import { useReducedMotion } from "../../../ui/animations"
-import { hapticLight } from "../../../ui/haptics"
+import { hapticSoft } from "../../../ui/haptics"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
 import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
@@ -118,8 +118,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     roomDecorScene,
     bubbleLifetimeMs: ROOM_CHAT_BUBBLE_LIFETIME_MS
   })
-  const partnerPresent = useMiniRoomMotionPresentation(props.roomMotion, store, localUser.userId, partnerUser.userId)
   const reduceMotion = useReducedMotion()
+  const partnerPresent = useMiniRoomMotionPresentation(props.roomMotion, store, localUser.userId, partnerUser.userId,
+    reduceMotion)
   const motionPolicy = useMemo(
     () => resolveMiniRoomMotionPolicy(reduceMotion),
     [reduceMotion]
@@ -209,8 +210,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       announcedPartnerUserId: announcedPartnerUserIdRef.current
     })) return
     announcedPartnerUserIdRef.current = partnerUser.userId
-    hapticLight()
-  }, [partnerPresent, partnerUser.userId])
+    // A walk in from the door is felt when it lands, not when it starts.
+    if (store.deferUntilArrivalLands(partnerUser.userId, hapticSoft)) return
+    hapticSoft()
+  }, [partnerPresent, partnerUser.userId, store.deferUntilArrivalLands])
 
   useEffect(() => {
     if (inRoomMessages.length === 0) return

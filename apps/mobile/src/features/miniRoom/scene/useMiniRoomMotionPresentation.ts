@@ -7,8 +7,8 @@ import {
 import type { MiniRoomStore } from "./miniRoomSceneTypes"
 
 export function useMiniRoomMotionPresentation(motion: ReturnType<typeof useMiniRoomMotion> | undefined,
-  store: MiniRoomStore, localUserId: string, partnerUserId: string) {
-  const { applyRemoteAvatar, setRemotePresence, sceneEpoch } = store
+  store: MiniRoomStore, localUserId: string, partnerUserId: string, reduceMotion: boolean) {
+  const { applyRemoteAvatar, presentArrival, setRemotePresence, sceneEpoch } = store
   const enabled = motion?.enabled, avatars = motion?.avatars, snapKey = motion?.snapKey ?? 0
   const present = motion?.partnerPresent ?? false
   const refusalRevision = motion?.seatRefusal?.revision
@@ -19,8 +19,13 @@ export function useMiniRoomMotionPresentation(motion: ReturnType<typeof useMiniR
       avatars: avatars ?? [], snapKey, sceneEpoch, localUserId
     })
     cursorRef.current = plan.cursor
-    for (const { avatar, snap } of plan.apply) applyRemoteAvatar(avatar, snap)
-  }, [applyRemoteAvatar, avatars, enabled, localUserId, sceneEpoch, snapKey])
+    for (const { avatar, snap, arrival } of plan.apply) {
+      // The partner's first entrance walks in from the door (a fade in place
+      // under Reduce Motion); the record's position stays the end point.
+      if (arrival && presentArrival(avatar, { walk: !reduceMotion })) continue
+      applyRemoteAvatar(avatar, snap)
+    }
+  }, [applyRemoteAvatar, avatars, enabled, localUserId, presentArrival, reduceMotion, sceneEpoch, snapKey])
   // This phone walks its own avatar, so its own records are echoes, except a
   // refused seat claim: the server's answer then moves the avatar beside it.
   const appliedRefusalRef = useRef<number | undefined>(undefined)
