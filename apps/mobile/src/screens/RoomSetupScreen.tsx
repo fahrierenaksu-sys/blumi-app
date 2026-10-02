@@ -237,7 +237,7 @@ export function RoomSetupScreen({
     setPlacementErrorMessage(feedback.errorMessage)
     if (feedback.message === undefined) return
     setBedSelected(feedback.selectBed)
-    setPlacementMessage(copy.placement.placed)
+    setPlacementMessage(feedback.message)
     hapticLight()
   }, [copy, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
 
