@@ -19,6 +19,8 @@ founder-facing status remains in `LAUNCH_CONTROL.md`.
   archive is the owner-only public-schema dump of 2026-09-30 (SHA-256
   `c6cb8355c8cf8fabe2addf9cf2025279d2908e6fb14ffd9f7dc24e9334603020`,
   68 migrations; see `LAUNCH_CONTROL.md`); its path is not recorded here.
+  A daily encrypted GitHub Actions backup is written but off until the owner
+  adds its two secrets (see "Daily GitHub Actions backup").
 - **Before 070:** record the path and SHA-256 of a fresh restore-tested dump
   here (the 068 archive was never recorded), and have the owner confirm the
   host and port of Railway's `DATABASE_URL` without reading the password
@@ -142,6 +144,64 @@ delete through the reviewed account-deletion path; verify zero account,
 session, inventory, chat, room, report, push and test-persona residue (deleting
 a PostgreSQL row does not delete the Firebase identity); keep the original
 backup under the agreed retention policy.
+
+## Daily GitHub Actions backup
+
+`.github/workflows/db-backup.yml` runs at 02:17 UTC every day and on demand. It
+installs `pg_dump` 17, dumps the `public` schema with the conventions above
+(`--format=custom --schema=public --no-owner --no-acl`, read-only TLS session),
+checks it with `pg_restore --list`, encrypts it with gpg (AES256, symmetric
+passphrase) and uploads only the encrypted file and a manifest (both SHA-256
+values) as the artifact `blumi-db-backup`, kept 14 days. The repository is
+public, so any signed-in GitHub user can download that artifact and read the
+run logs: the passphrase is the only protection of the data, and the logs carry
+only hashes and counts. The run
+summary shows the SHA-256. It costs nothing on GitHub's free minutes.
+
+It is **off** until both secrets exist: without them every run succeeds and
+says "Database backup is off". GitHub runs the schedule only from `main`, so
+it starts after the workflow reaches `main`.
+
+Owner's one-time setup:
+
+1. Optional but recommended, a read-only role. Run in the Supabase SQL editor
+   (a write to the live database, so only by the owner; pick your own password):
+
+   ```sql
+   CREATE ROLE blumi_backup WITH LOGIN BYPASSRLS PASSWORD '<long random password>';
+   ALTER ROLE blumi_backup SET default_transaction_read_only = on;
+   GRANT USAGE ON SCHEMA public TO blumi_backup;
+   GRANT SELECT ON ALL TABLES IN SCHEMA public TO blumi_backup;
+   GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO blumi_backup;
+   ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABLES TO blumi_backup;
+   ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON SEQUENCES TO blumi_backup;
+   ```
+
+   `BYPASSRLS` is needed because the tables have row-level security and
+   `pg_dump` refuses a partial read. Without this role the existing `postgres`
+   URL also works; the job forces a read-only session either way.
+2. GitHub → repository → Settings → Secrets and variables → Actions → New
+   repository secret:
+   - `BLUMI_BACKUP_DATABASE_URL`: the **Session pooler** URL from Supabase →
+     Connect (host `aws-…pooler.supabase.com`, port 5432, user
+     `blumi_backup.nkqcbxufbhfibrgvajim` or `postgres.nkqcbxufbhfibrgvajim`).
+     GitHub runners have no IPv6, so the direct `db.…supabase.co` host fails,
+     and port 6543 is refused.
+   - `BLUMI_BACKUP_ENCRYPTION_KEY`: a random passphrase of at least 24
+     characters (a generated 32+ character one is better, since the encrypted
+     file is downloadable by anyone). Keep a copy in your password manager: without it no backup
+     can be opened.
+3. Actions → Database backup → Run workflow, then Actions → Database restore
+   proof → Run workflow. The restore proof downloads the newest backup, checks
+   both SHA-256 values, restores it into a throwaway PostgreSQL 17 container,
+   prints table, row and migration-ledger counts, and (by default) runs
+   `restore-upgrade-gate.mjs` on it. It never connects to the live database.
+
+To open a backup on the Mac: download the artifact, then
+`gpg --decrypt --output blumi-public.dump blumi-public.dump.gpg` (`brew install
+gnupg`) and compare `shasum -a 256` with `plaintextSha256` in the manifest.
+Artifacts expire after 14 days and live in GitHub; keep a monthly copy
+elsewhere. This does not replace the offsite S3 plan below or a PITR plan.
 
 ## Independent S3 backup
 
