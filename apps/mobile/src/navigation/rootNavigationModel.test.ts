@@ -10,6 +10,7 @@ import {
   getOnboardingEntryRoute,
   getChatThreadScreenOptions,
   getDetailScreenOptions,
+  getStudioScreenOptions,
   CHAT_THREAD_SCREEN_OPTIONS,
   DETAIL_SCREEN_OPTIONS,
   MAIN_TAB_SCREEN_OPTIONS,
@@ -45,6 +46,24 @@ test("detail screens open with the platform push so the edge swipe-back closes t
   assert.equal("fullScreenGestureEnabled" in getDetailScreenOptions(false), false)
   // The stack default stays a fade for onboarding and room entry screens.
   assert.equal(ROOT_STACK_SCREEN_OPTIONS.animation, "fade")
+})
+
+test("the avatar wardrobe and the room editor open and close with the soft fade, never the side slide", () => {
+  const options = getStudioScreenOptions(false)
+  assert.equal(options.headerShown, false)
+  assert.equal(options.animation, "fade")
+  assert.equal(options.animation, ROOT_STACK_SCREEN_OPTIONS.animation)
+  assert.equal(options.animationDuration, ROOT_STACK_SCREEN_OPTIONS.animationDuration)
+  // The iOS edge swipe-back plays the same fade instead of the native slide.
+  assert.equal(options.animationMatchesGesture, true)
+  // The editor drags furniture, so only the edge swipe may close it.
+  assert.equal("fullScreenGestureEnabled" in options, false)
+})
+
+test("Reduce Motion: the avatar wardrobe and the room editor appear and leave without a transition", () => {
+  const options = getStudioScreenOptions(true)
+  assert.equal(options.animation, "none")
+  assert.equal(options.headerShown, false)
 })
 
 test("faded routes close with the same fade when swiped back", () => {

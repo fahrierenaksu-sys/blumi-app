@@ -4,6 +4,23 @@ import type { SessionEntryRoute } from "../features/session/sessionRouting"
 import type { BottomNavKey } from "../ui/bottomNav"
 import type { RootStackParamList } from "./RootNavigator"
 
+/*
+ * One transition rule for the root stack; every route opens and closes the
+ * same way, by button or by swipe:
+ * - Main tabs (MAIN_TAB_SCREEN_OPTIONS): no transition; the bottom bar owns
+ *   the selection motion.
+ * - Places and editors (onboarding, auth, MiniRoom, the avatar wardrobe, the
+ *   room editor, QA studios): the 240 ms fade. animationMatchesGesture makes
+ *   an iOS edge swipe-back play the same fade instead of the native slide.
+ * - Drill-in details (profile, match, You, profile edit, settings, legal):
+ *   the native push with the UIKit curve; its edge swipe is the native pop.
+ * - The chat thread: simple_push. Its swipe works anywhere on screen, and
+ *   iOS can only run that full-screen gesture as a simple push (the native
+ *   push curve is not available to it), so it opens with simple_push too.
+ * - Bottom sheets: native form sheets (nativeSheets).
+ * Reduce Motion turns every transition off.
+ */
+
 /**
  * Keep every root-level route on the same transition. The default native-stack
  * push/pop slides two independently measured screens across one another; on
@@ -35,10 +52,10 @@ export const MAIN_TAB_SCREEN_OPTIONS = {
 } as const
 
 /**
- * Detail screens pushed over the main tabs (profile, editor, match, settings,
- * legal) use the platform push. iOS always closes an edge swipe-back with the
- * native slide, so opening with the stack's fade made push and pop disagree.
- * Detail screens keep the edge-only swipe: MyRoomEditor drags objects.
+ * Detail screens pushed over the main tabs (profile, match, settings, legal)
+ * use the platform push. Without animationMatchesGesture iOS closes an edge
+ * swipe-back with the native slide, so a plain fade made push and pop
+ * disagree. Detail screens keep the edge-only swipe.
  */
 export const DETAIL_SCREEN_OPTIONS = {
   headerShown: false,
@@ -56,6 +73,28 @@ export const CHAT_THREAD_SCREEN_OPTIONS = {
   animation: "simple_push",
   fullScreenGestureEnabled: true
 } as const
+
+/**
+ * The avatar wardrobe and the room editor (and the QA Home Studio) open as a
+ * soft fade over the room, the way the wardrobe first shipped, instead of the
+ * platform slide. With animationMatchesGesture an iOS edge swipe-back closes
+ * them with the same fade, so opening, the Back button and the swipe all
+ * agree. They keep the edge-only swipe: MyRoomEditor drags objects across
+ * its canvas.
+ */
+export const STUDIO_SCREEN_OPTIONS = {
+  headerShown: false,
+  animation: ROOT_STACK_SCREEN_OPTIONS.animation,
+  animationDuration: ROOT_STACK_SCREEN_OPTIONS.animationDuration,
+  animationMatchesGesture: true
+} as const
+
+/** Native-stack options for the avatar wardrobe and the room editor. */
+export function getStudioScreenOptions(reduceMotion: boolean) {
+  return reduceMotion
+    ? { ...STUDIO_SCREEN_OPTIONS, animation: "none" as const }
+    : STUDIO_SCREEN_OPTIONS
+}
 
 export function getDetailScreenOptions(reduceMotion: boolean) {
   return reduceMotion
