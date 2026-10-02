@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   type ListRenderItem,
   type ScrollViewProps,
@@ -44,7 +44,6 @@ import {
 } from "../features/chat/thread/chatThreadCopy"
 import {
   isChatTimelineRowInviteBusy,
-  normalizeOutgoingChatBody,
   selectChatPartnerSummary
 } from "../features/chat/thread/chatThreadModel"
 import { ChatScrollToLatestPill } from "../features/chat/thread/ChatScrollToLatestPill"
@@ -66,7 +65,6 @@ import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
-import { getChatSendFlightChannel, launchChatSendFlight } from "../features/chat/thread/chatSendFlight"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
 import { ChatNotificationPermissionCard, type ChatPushRegistration } from "../features/notifications/ChatNotificationPermissionCard"
@@ -270,26 +268,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     currentUserId,
     bottomOffset: composerBottomInset
   })
-  const { scrollToLatest, isAway: isScrolledAway } = scrollToLatestState
-  const sendFlightChannel = getChatSendFlightChannel(resolvedThreadId)
-  const composerSurfaceRef = useRef<View>(null)
+  const { scrollToLatest } = scrollToLatestState
   // CHT-05: my own message is always shown, even when I had scrolled up:
-  // useChatScrollToLatest follows it once its row is in the list. The send is
-  // published first; the flight (composer → new bubble) only decorates it,
-  // and is skipped while the list scrolls back from history.
-  const handleSend = useCallback((draft: string): boolean => {
-    const accepted = sendMessage(draft)
-    if (!accepted) return false
-    if (!isScrolledAway) {
-      launchChatSendFlight({
-        composerSurface: composerSurfaceRef.current,
-        channel: sendFlightChannel,
-        match: normalizeOutgoingChatBody(draft),
-        text: draft.trim()
-      })
-    }
-    return true
-  }, [isScrolledAway, sendFlightChannel, sendMessage])
+  // useChatScrollToLatest follows it once its row is in the list, where it
+  // enters like every new row (no flight from the composer).
 
   const rowModels = useChatTimelineRowModels({
     timeline,
@@ -320,8 +302,6 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           you={inviteYou}
           partner={invitePartner}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
-          isArrival={arrivedRowKeys.has(getChatTimelineItemKey(item))}
-          sendFlightChannel={sendFlightChannel}
           isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
           onRoomInviteAction={handleRoomInviteAction}
           onRetry={handleRetry}
@@ -337,8 +317,6 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       inviteYou,
       invitePartner,
       enteringRowKeys,
-      arrivedRowKeys,
-      sendFlightChannel,
       activeRoomInviteAction,
       handleRoomInviteAction,
       handleRetry
@@ -503,8 +481,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             isCreatingRoomInvite={isCreatingRoomInvite}
             roomInviteDisabledReason={roomInviteDisabledReason}
             onRoomInvitePress={handleRoomInvitePress}
-            onSend={handleSend}
-            surfaceRef={composerSurfaceRef}
+            onSend={sendMessage}
           />
           </KeyboardGluedFooter>
         </View>

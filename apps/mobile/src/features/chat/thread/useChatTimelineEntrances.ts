@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef } from "react"
-import { Easing, FadeIn, FadeInDown, ReduceMotion } from "react-native-reanimated"
 import { useReducedMotion } from "../../../ui/animations"
 import type { ChatTimelineItem } from "../chatRoomInviteModel"
 import {
@@ -7,24 +6,6 @@ import {
   planChatTimelineEntrances,
   type ChatTimelineEntranceState
 } from "./chatTimelineEntranceModel"
-
-const CHAT_ROW_ENTER_DURATION_MS = 200
-/** Points the bubble rises from; the stock FadeInDown travels 25. */
-const CHAT_OWN_ROW_ENTER_RISE = 10
-
-/**
- * My message rises a few points from the composer while it fades in; a
- * message that arrives only fades. Both run on the UI thread. Reduce Motion is
- * decided before a row mounts (no entering at all), so Reanimated's own
- * reduce-motion switch is pinned off to keep one source of truth.
- */
-export const CHAT_OWN_ROW_ENTERING = FadeInDown.duration(CHAT_ROW_ENTER_DURATION_MS)
-  .easing(Easing.out(Easing.cubic))
-  .withInitialValues({ transform: [{ translateY: CHAT_OWN_ROW_ENTER_RISE }] })
-  .reduceMotion(ReduceMotion.Never)
-
-export const CHAT_INCOMING_ROW_ENTERING = FadeIn.duration(CHAT_ROW_ENTER_DURATION_MS)
-  .reduceMotion(ReduceMotion.Never)
 
 const NO_ENTERING_KEYS: ReadonlySet<string> = new Set<string>()
 
@@ -38,7 +19,7 @@ export interface ChatTimelineEntrances {
   enteringKeys: ReadonlySet<string>
   /**
    * Rows that just arrived at the newest edge, whatever the motion setting:
-   * a sent row may claim its send flight (which crossfades under Reduce Motion).
+   * a partner's arrival still taps softly (useIncomingArrivalHaptic).
    */
   arrivedKeys: ReadonlySet<string>
 }

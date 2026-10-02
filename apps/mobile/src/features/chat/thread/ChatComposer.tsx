@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef, useState, type RefObject } from "react"
+import { useRef, useState } from "react"
 import { Pressable, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
@@ -17,10 +17,7 @@ import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 /** Scale the send button springs back from after a send (MOTION_PLAN §D.4). */
 const SEND_POP_SCALE = 0.8
 
-/**
- * Owns the draft text so typing never re-renders the timeline owner. The
- * input surface (`surfaceRef`) is where a send flight starts.
- */
+/** Owns the draft text so typing never re-renders the timeline owner. */
 export function ChatComposer({
   chatCopy,
   partnerName,
@@ -32,8 +29,7 @@ export function ChatComposer({
   roomInviteDisabledReason,
   onRoomInvitePress,
   onSend,
-  draftTyping,
-  surfaceRef
+  draftTyping
 }: {
   chatCopy: ChatThreadCopy
   partnerName: string
@@ -47,8 +43,6 @@ export function ChatComposer({
   onSend: (body: string) => boolean
   /** Typing signal for the partner (chat_typing); never sees programmatic text. */
   draftTyping?: ChatDraftTyping
-  /** The input's surface, measured as the start of the send flight. */
-  surfaceRef?: RefObject<View | null>
 }) {
   const [inputText, setInputText] = useState("")
   const inputRef = useRef<TextInput>(null)
@@ -118,7 +112,7 @@ export function ChatComposer({
         >
           <RoomInviteComposerIcon ready={roomInviteReady} />
         </Pressable>
-        <View ref={surfaceRef} style={styles.inputWrap}>
+        <View style={styles.inputWrap}>
           <TextInput
             ref={inputRef}
             accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
