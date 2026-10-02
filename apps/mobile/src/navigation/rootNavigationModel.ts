@@ -77,15 +77,6 @@ export function getReducedMotionScreenOptions(reduceMotion: boolean):
   return reduceMotion ? { animation: "none" } : {}
 }
 
-/** Inbox may be the stack root after a direct link or a restored session. */
-export function goBackFromInbox(navigation: {
-  canGoBack: () => boolean
-  goBack: () => void
-  replace: (route: "Lobby") => void
-}): void {
-  goBackOrFallback(navigation, () => navigation.replace("Lobby"))
-}
-
 /** Use a registered route when an explicit back action has no stack history. */
 export function goBackOrFallback(
   navigation: {

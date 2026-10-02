@@ -28,13 +28,10 @@ import {
 } from "../features/inbox/inboxRowModel"
 import { useInboxClock } from "../features/inbox/useInboxClock"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { goBackFromInbox } from "../navigation/rootNavigationModel"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
-import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { BackButton } from "../ui/backButton"
 import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
 import { InboxLoadingSkeleton } from "../features/inbox/InboxLoadingSkeleton"
 import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
@@ -263,9 +260,6 @@ export function InboxScreen(props: InboxScreenProps) {
     }
     updateConversationPrefs((prefs) => deleteConversationForMe(prefs, thread))
   }, [currentUserId, getThreadUnreadCount, onMarkThreadRead, storeThreads, updateConversationPrefs])
-  const handleGoBack = useCallback(() => {
-    goBackFromInbox(navigation)
-  }, [navigation])
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
   }, [navigation])
@@ -299,14 +293,11 @@ export function InboxScreen(props: InboxScreenProps) {
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
       <SafeAreaView contentGutter style={styles.safe} edges={["top", "left", "right", "bottom"]}>
-        <TopBar
-          title={copy.title}
-          titleAlign="start"
-          leftSlot={
-            <BackButton accessibilityLabel={copy.back} onPress={handleGoBack} />
-          }
-          rightSlot={<View style={styles.topRightSpacer} />}
-        />
+        {/* A main tab: no back button (the tab bar leaves it), and the
+            title sits on the content's leading edge. */}
+        <View style={styles.titleBar}>
+          <Text accessibilityRole="header" numberOfLines={1} style={styles.titleBarText}>{copy.title}</Text>
+        </View>
 
         <Animated.View style={[styles.header, headerAnim]}>
           {/* The count has its own reserved slot, so the header keeps one
@@ -516,8 +507,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: uiTheme.spacing.sm
   },
-  topRightSpacer: {
-    width: 40
+  titleBar: {
+    minHeight: 60,
+    justifyContent: "center",
+    paddingHorizontal: 2
+  },
+  titleBarText: {
+    ...uiTheme.font.heading,
+    color: uiTheme.colors.textPrimary
   },
   header: {
     gap: uiTheme.spacing.xxs,

@@ -235,6 +235,15 @@ test("CHT-08/CHT-10: rows are measured, and a thread moving to the top slides wi
   assert.match(motion, /LinearTransition[\s\S]*\.dampingRatio\(1\)[\s\S]*ReduceMotion\.Never/)
 })
 
+test("Chats is a main tab: its header has no back button and the title starts at the leading edge", () => {
+  // d34afe1 once restored a back button here; main tabs are left through the tab bar.
+  assert.doesNotMatch(source, /BackButton|goBackFromInbox|handleGoBack|leftSlot|<TopBar/)
+  assert.match(source, /<View style=\{styles\.titleBar\}>\s*<Text accessibilityRole="header"[^>]*>\{copy\.title\}<\/Text>/)
+  const titleBar = evaluate(source.match(/titleBar: \{[^}]*\}/)[0].replace(/^titleBar: /, ""), {})
+  assert.equal(titleBar.paddingHorizontal, 2, "the same leading inset as the header text below it")
+  assert.equal(titleBar.minHeight, 60, "the same height as the other screens' top bars")
+})
+
 test("CHT-09: rows read their unread count, preview and live time", () => {
   assert.match(source, /const now = useInboxClock\(navigation\)/)
   assert.match(source, /formatInboxTimestamp\(thread\.lastMessage\?\.sentAt, now, copy, timeFormatter\)/)
