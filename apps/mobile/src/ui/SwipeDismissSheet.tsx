@@ -13,18 +13,19 @@ import type { LayoutChangeEvent, ScrollViewProps, StyleProp, ViewStyle } from "r
 import { Gesture, GestureDetector, State, type GestureType } from "react-native-gesture-handler"
 import Reanimated, {
   cancelAnimation,
+  Easing,
   ReduceMotion,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { useReducedMotion } from "./animations"
 import {
   SHEET_ENTER_SPRING,
-  SHEET_EXIT_SPRING,
   SHEET_RETURN_SPRING,
   getSheetBackdropOpacity,
   getSheetExitOffset,
@@ -117,6 +118,11 @@ export function SwipeDismissSheet({
     onDismissRef.current = onDismiss
   }, [onDismiss])
   const dismiss = useCallback(() => onDismissRef.current(), [])
+  // A programmatic close is under way (backdrop tap, close button); see closeWith.
+  const closingRef = useRef(false)
+  const releaseClosing = useCallback(() => {
+    closingRef.current = false
+  }, [])
 
   const offset = useSharedValue(0)
   const sheetHeight = useSharedValue(0)
@@ -159,7 +165,8 @@ export function SwipeDismissSheet({
     })
     .onStart((event) => {
       "worklet"
-      // A touch on a sheet that is still springing back catches it in place.
+      // A touch on a sheet that is still moving (springing back, or leaving)
+      // catches it in place; a caught exit never dismisses.
       cancelAnimation(offset)
       startTranslation.value = event.translationY - offset.value
     })
@@ -176,7 +183,8 @@ export function SwipeDismissSheet({
         const exit = resolveSheetExit({
           reduceMotion: reduceMotionValue.value,
           sheetHeight: sheetHeight.value,
-          velocityY: event.velocityY
+          velocityY: event.velocityY,
+          offset: offset.value
         })
         // Reduce Motion: sheet and backdrop leave at once, before the Modal closes.
         if (!exit.animate) {
@@ -184,14 +192,12 @@ export function SwipeDismissSheet({
           scheduleOnRN(dismiss)
           return
         }
-        // The exit carries the flick's speed and never overshoots (SYS-5).
-        offset.value = withSpring(
+        // An ease-out that starts at the flick's speed and never overshoots
+        // (SYS-5). It ends as the sheet leaves the screen, so the Modal
+        // closes then instead of at a spring's late rest.
+        offset.value = withTiming(
           exit.offset,
-          {
-            ...SHEET_EXIT_SPRING,
-            velocity: exit.velocity,
-            reduceMotion: ReduceMotion.Never
-          },
+          { duration: exit.durationMs, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never },
           (finished) => {
             "worklet"
             if (finished) scheduleOnRN(dismiss)
@@ -243,7 +249,8 @@ export function SwipeDismissSheet({
   }, [offset, reduceMotionValue, sheetHeight])
 
   // Programmatic close (backdrop tap, close button): the same exit as a swipe.
-  const closingRef = useRef(false)
+  // A grab that catches the exit (the pan's cancelAnimation) ends the close,
+  // so the close button and the backdrop work again afterwards.
   const closeWith = useCallback((callback: () => void) => {
     if (closingRef.current) return
     closingRef.current = true
@@ -251,22 +258,27 @@ export function SwipeDismissSheet({
       closingRef.current = false
       callback()
     }
-    const exit = resolveSheetExit({ reduceMotion: reduceMotionValue.value, sheetHeight: sheetHeight.value })
+    const exit = resolveSheetExit({
+      reduceMotion: reduceMotionValue.value,
+      sheetHeight: sheetHeight.value,
+      offset: offset.value
+    })
     if (!exit.animate) {
       offset.value = exit.offset
       finish()
       return
     }
     cancelAnimation(offset)
-    offset.value = withSpring(
+    offset.value = withTiming(
       exit.offset,
-      { ...SHEET_EXIT_SPRING, reduceMotion: ReduceMotion.Never },
+      { duration: exit.durationMs, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never },
       (finished) => {
         "worklet"
         if (finished) scheduleOnRN(finish)
+        else scheduleOnRN(releaseClosing)
       }
     )
-  }, [offset, reduceMotionValue, sheetHeight])
+  }, [offset, reduceMotionValue, releaseClosing, sheetHeight])
   const close = useCallback(() => {
     if (!enabled) return
     closeWith(dismiss)

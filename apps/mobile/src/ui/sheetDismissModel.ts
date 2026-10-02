@@ -2,6 +2,8 @@
 // (ui/SwipeDismissSheet.tsx). Functions marked 'worklet' run inside the sheet's
 // pan gesture on the UI thread; they are plain functions under node:test.
 
+import { getEaseOutExitDurationMs } from "./motionTokens"
+
 export const SHEET_DISMISS = Object.freeze({
   /** Downward travel (px) before the sheet follows the finger. */
   activeOffsetY: 10,
@@ -20,21 +22,12 @@ export const SHEET_DISMISS = Object.freeze({
   flickMinDistance: 24,
   /** Seconds of release velocity added to the offset before deciding. */
   projectionSeconds: 0.12,
-  /** Exit animation duration (ms) after a dismissing release. */
+  /** Longest exit (ms): an ease-out to below the screen edge. */
   exitDurationMs: 180,
+  /** Shortest exit (ms), for a fast flick from far down. */
+  minExitDurationMs: 100,
   /** Furthest (px) an upward drag can stretch the sheet above rest. */
   rubberBandLimit: 32
-})
-
-/**
- * Exit after a dismissing release or a backdrop tap: carries the release
- * velocity, never overshoots back into view (SYS-5).
- */
-export const SHEET_EXIT_SPRING = Object.freeze({
-  stiffness: 260,
-  mass: 1,
-  damping: 2 * Math.sqrt(260),
-  overshootClamping: true
 })
 
 /** Opening from below when the sheet owns its presentation (SYS-4). */
@@ -81,7 +74,7 @@ export function resolveSheetDragOffset(translationY: number): number {
   return -(limit * pull) / (pull + limit * 2)
 }
 
-/** Initial release velocity (px/s) for the exit spring: downward only. */
+/** Release velocity (px/s) the exit starts from: downward only. */
 export function getSheetExitVelocity(velocityY: number): number {
   "worklet"
   return Number.isFinite(velocityY) ? Math.max(0, velocityY) : 0
@@ -125,22 +118,35 @@ export function getSheetExitOffset(sheetHeight: number): number {
 
 export type SheetExit =
   | { readonly animate: false; readonly offset: number }
-  | { readonly animate: true; readonly offset: number; readonly velocity: number }
+  | { readonly animate: true; readonly offset: number; readonly velocity: number; readonly durationMs: number }
 
 /**
  * How a dismissed sheet leaves: under Reduce Motion it jumps to its exit
- * offset at once (no movement); otherwise it springs there carrying the
- * downward release velocity.
+ * offset at once (no movement); otherwise it eases out there in at most
+ * `exitDurationMs`, starting at the downward release velocity (a fast flick
+ * leaves sooner). A timing, not a spring: it never overshoots back into view
+ * (SYS-5), and its end is the moment the sheet is gone, so `onDismiss` runs
+ * then and not at a spring's late rest.
  */
 export function resolveSheetExit(input: {
   reduceMotion: boolean
   sheetHeight: number
   velocityY?: number
+  /** Where the sheet is now (px below rest); 0 when omitted. */
+  offset?: number
 }): SheetExit {
   "worklet"
   const offset = getSheetExitOffset(input.sheetHeight)
   if (input.reduceMotion) return { animate: false, offset }
-  return { animate: true, offset, velocity: getSheetExitVelocity(input.velocityY ?? 0) }
+  const velocity = getSheetExitVelocity(input.velocityY ?? 0)
+  const from = input.offset !== undefined && Number.isFinite(input.offset) ? Math.max(0, input.offset) : 0
+  const durationMs = getEaseOutExitDurationMs(
+    offset - from,
+    velocity,
+    SHEET_DISMISS.exitDurationMs,
+    SHEET_DISMISS.minExitDurationMs
+  )
+  return { animate: true, offset, velocity, durationMs }
 }
 
 /**
