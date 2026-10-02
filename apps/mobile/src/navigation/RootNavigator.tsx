@@ -381,6 +381,7 @@ export function RootNavigator() {
     refreshProductionThreads,
     resynchronizeMessages,
     upsertRoomInvite,
+    closeEndedRoom,
     warmThreadMessagesForInbox,
     hideThreadForMeOnServer,
     chatThreadBindings
@@ -581,6 +582,7 @@ export function RootNavigator() {
     refreshProductionThreads,
     resynchronizeMessages,
     upsertRoomInvite,
+    closeEndedRoom,
     applyRealtimeThreadList,
     applyNewThread,
     openReadyMiniRoom,

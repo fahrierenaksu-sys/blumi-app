@@ -173,7 +173,8 @@ export function useRootChatSync({
     requestMessages,
     resynchronizeMessages,
     sendChatMessage,
-    upsertRoomInvite
+    upsertRoomInvite,
+    closeEndedRoom
   } = chatCoordinator
 
   const sendChatMessageForRoute = useCallback(async (
@@ -264,6 +265,7 @@ export function useRootChatSync({
     refreshProductionThreads,
     resynchronizeMessages,
     upsertRoomInvite,
+    closeEndedRoom,
     warmThreadMessagesForInbox,
     hideThreadForMeOnServer,
     chatThreadBindings

@@ -25,6 +25,8 @@ export interface GlobalRealtimeEventHandlerDependencies {
   getMatchDeduplicationState: () => ConnectionMatchDeduplicationState
   normalizeRoomInviteRecord: (value: unknown) => ChatRoomInviteTimelineItem
   upsertRoomInvite: (invite: ChatRoomInviteTimelineItem) => void
+  /** `mini_room.ended`: the server ended this room; its invite closes its door. */
+  closeEndedRoom?: (roomSessionId: string) => void
   applyChatThreadListed: (payload: ChatThreadList) => void
   applyChatThreadRead?: (payload: ChatThreadRead) => void
   requestThreadPage?: (cursor: string) => void
@@ -95,6 +97,13 @@ export function createGlobalRealtimeEventHandler(
 
     if (event.type === "safety.user_blocked") {
       dependencies.onPartnerBlocked?.(event.payload.blockedUserId)
+      return
+    }
+
+    if (event.type === "mini_room.ended") {
+      // Other listeners (an open MiniRoom) also react; this only closes the
+      // chat invite's entry for the room the server ended.
+      dependencies.closeEndedRoom?.(event.payload.miniRoomId)
       return
     }
 
