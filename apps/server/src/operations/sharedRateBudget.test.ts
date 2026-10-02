@@ -4,6 +4,7 @@ import { createInMemoryRateBudget, createPostgresRateBudget, USER_RATE_BUDGET_LI
 import { createAuthService } from "../auth/authService"
 import { createServer } from "../server"
 import { AUTHENTICATED_IP_REQUESTS_PER_MINUTE } from "./requestLimits"
+import { createBudgetRefusalLog } from "./sharedRateBudgetHook"
 import { createChatService } from "../chat/chatService"
 
 test("chat and leave budgets are independent, bounded per user, and renew with the window", async () => {
@@ -158,4 +159,19 @@ test("cheap local limit stops excess requests before shared budget access", asyn
       headers: { authorization: `Bearer ${session.sessionToken}` } })
     assert.equal(sharedChecks, AUTHENTICATED_IP_REQUESTS_PER_MINUTE)
   } finally { await app.close() }
+})
+
+test("budget refusals are logged as per-scope counts at most once a minute, without ids", () => {
+  let clock = 0
+  const lines: unknown[] = []
+  const record = createBudgetRefusalLog({ warn: (entry) => lines.push(entry), now: () => clock })
+  for (let index = 0; index < 25; index += 1) record("deviceRegistration")
+  record("chatSend")
+  assert.equal(lines.length, 0)
+  clock = 61_000
+  record("deviceRegistration")
+  assert.deepEqual(lines, [{ metric: "user_budget_refused", windowSeconds: 61, counts: { deviceRegistration: 26, chatSend: 1 } }])
+  clock = 62_000
+  record("general")
+  assert.equal(lines.length, 1, "the next line waits for the next minute")
 })
