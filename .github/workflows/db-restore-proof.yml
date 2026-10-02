@@ -1,0 +1,133 @@
+# Restore proof for the daily backup (db-backup.yml). Manual only.
+# Downloads the newest unexpired backup artifact (or the run you name), checks
+# both SHA-256 values in its manifest, decrypts it, restores it into a
+# throwaway PostgreSQL 17 service container and reports aggregate counts
+# (tables, rows per table, migration ledger rows). Optionally it also runs
+# scripts/security/restore-upgrade-gate.mjs on the same archive, which applies
+# the pending migrations and the release integrity audit in another throwaway
+# cluster. Nothing here connects to the live database.
+# Needs only the BLUMI_BACKUP_ENCRYPTION_KEY secret; without it the run is a no-op.
+name: Database restore proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_run_id:
+        description: "Backup workflow run id (empty = newest backup)"
+        required: false
+        default: ""
+      upgrade_rehearsal:
+        description: "Also apply pending migrations with restore-upgrade-gate.mjs"
+        type: boolean
+        default: true
+
+concurrency:
+  group: db-restore-proof
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      BLUMI_PG17_BIN: /usr/lib/postgresql/17/bin
+      BLUMI_RESTORE_PGHOST: localhost
+      BLUMI_RESTORE_PGPORT: "55432"
+      BLUMI_RESTORE_PGUSER: postgres
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Check that the decryption secret is configured
+        id: configured
+        env:
+          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/automation/ci-db-backup.mjs config restore
+
+      - name: Find the backup artifact
+        id: artifact
+        if: steps.configured.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "$BACKUP_RUN_ID" ] && ! [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::backup_run_id must be a number."
+            exit 1
+          fi
+          run_id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?name=blumi-db-backup&per_page=100" \
+            --jq '.artifacts[] | select(.expired | not) | [.created_at, (.workflow_run.id | tostring)] | @tsv' \
+            | sort -r | awk -F'\t' -v want="$BACKUP_RUN_ID" '!found && (want == "" || $2 == want) { print $2; found = 1 }')"
+          if [ -z "$run_id" ]; then
+            echo "::error::No unexpired blumi-db-backup artifact was found. Run the Database backup workflow first."
+            exit 1
+          fi
+          echo "Using the backup from workflow run $run_id."
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        if: steps.configured.outputs.enabled == 'true'
+        with:
+          name: blumi-db-backup
+          run-id: ${{ steps.artifact.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/blumi-backup
+
+      - name: Install PostgreSQL 17 tools
+        if: steps.configured.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common gnupg
+          # No default cluster: the service container is the restore target.
+          echo "create_main_cluster = false" | sudo tee -a /etc/postgresql-common/createcluster.conf > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-17
+          "$BLUMI_PG17_BIN/pg_restore" --version
+
+      - name: Verify, decrypt, restore and count
+        if: steps.configured.outputs.enabled == 'true'
+        env:
+          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/automation/ci-db-backup.mjs restore-proof "$RUNNER_TEMP/blumi-backup" "$RUNNER_TEMP/blumi-restore"
+
+      - name: Install dependencies for the upgrade rehearsal
+        if: steps.configured.outputs.enabled == 'true' && inputs.upgrade_rehearsal
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:packages
+
+      - name: Rehearse pending migrations on the restored archive
+        if: steps.configured.outputs.enabled == 'true' && inputs.upgrade_rehearsal
+        run: node scripts/security/restore-upgrade-gate.mjs "$RUNNER_TEMP/blumi-restore/blumi-public.dump"
+
+      - name: Delete the decrypted archive
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/blumi-restore" "$RUNNER_TEMP/blumi-backup"

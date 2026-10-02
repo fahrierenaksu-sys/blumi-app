@@ -1,0 +1,78 @@
+# Daily encrypted backup of the release database's public schema.
+# It stays off until the owner adds two repository secrets (see
+# docs/release/DATABASE_RELEASE_RUNBOOK.md, "Daily GitHub Actions backup"):
+#   BLUMI_BACKUP_DATABASE_URL     Supabase session-pooler URL, read-only role recommended
+#   BLUMI_BACKUP_ENCRYPTION_KEY   long random passphrase, also kept outside GitHub
+# Without them every run succeeds as a no-op and says so. GitHub runs the
+# schedule only from the default branch (main).
+# Secrets are mapped into the env of the single step that needs them and are
+# read by scripts/automation/ci-db-backup.mjs; no run script names them.
+# The restore proof is db-restore-proof.yml.
+name: Database backup
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      BLUMI_EXPECTED_PROJECT_REF: nkqcbxufbhfibrgvajim
+      BLUMI_PG17_BIN: /usr/lib/postgresql/17/bin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check that backup secrets are configured
+        id: configured
+        env:
+          BLUMI_BACKUP_DATABASE_URL: ${{ secrets.BLUMI_BACKUP_DATABASE_URL }}
+          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/automation/ci-db-backup.mjs config backup
+
+      - name: Install PostgreSQL 17 client tools
+        if: steps.configured.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common gnupg
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          "$BLUMI_PG17_BIN/pg_dump" --version
+
+      - name: Dump, verify and encrypt the public schema
+        if: steps.configured.outputs.enabled == 'true'
+        env:
+          BLUMI_BACKUP_DATABASE_URL: ${{ secrets.BLUMI_BACKUP_DATABASE_URL }}
+          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/automation/ci-db-backup.mjs backup "$RUNNER_TEMP/blumi-backup"
+
+      - name: Upload the encrypted archive and its manifest
+        if: steps.configured.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: blumi-db-backup
+          path: |
+            ${{ runner.temp }}/blumi-backup/blumi-public.dump.gpg
+            ${{ runner.temp }}/blumi-backup/blumi-public.manifest.json
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error
