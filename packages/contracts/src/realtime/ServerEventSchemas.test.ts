@@ -225,6 +225,10 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
     valid: { threadId: "thread-1", userId: "bora", state: "start", expiresInMs: 6000 },
     invalid: { threadId: "thread-1", userId: "bora", state: "typing", expiresInMs: 6000 },
   },
+  "chat.participant_updated": {
+    valid: { participant: { userId: "bora", displayName: "Irmak" } },
+    invalid: { participant: { userId: "" } },
+  },
   "reaction.received": {
     valid: { roomId: "lobby", actorUserId: "ada", targetUserId: "bora", reaction: "wave", createdAt: NOW },
     invalid: { roomId: "lobby", actorUserId: "ada", reaction: "kiss", createdAt: NOW },

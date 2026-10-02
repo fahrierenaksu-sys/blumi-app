@@ -29,6 +29,8 @@ export interface ChatService {
   repository: ChatRepository
   listThreads(userId: string): Promise<ChatThread[]>
   listThreadsPage(userId: string, options?: ChatThreadPageOptions): Promise<ChatThreadPage>
+  /** Everyone `userId` has a chat they can see with: no block in either direction. */
+  listVisibleChatPartnerUserIds(userId: string): Promise<string[]>
   listMessages(
     userId: string,
     threadId: string,
@@ -248,6 +250,12 @@ export function createChatService(
       return blockPolicy ? withoutBlockedPartners(blockPolicy, userId, threads) : threads
     },
     async listThreadsPage(userId, options) { return listVisibleThreadsPage(userId, options) },
+    async listVisibleChatPartnerUserIds(userId) {
+      const partnerUserIds = await repository.listChatPartnerUserIds(userId)
+      if (!blockPolicy || partnerUserIds.length === 0) return partnerUserIds
+      const blocked = new Set(await blockPolicy.listBlockedUserIdsBetween(userId, partnerUserIds))
+      return partnerUserIds.filter((partnerUserId) => !blocked.has(partnerUserId))
+    },
     async listMessages(userId, threadId, options = {}) {
       const thread = await getVisibleThread(userId, threadId)
       return repository.listMessages(thread.threadId, { ...normalizePageOptions(options), viewerUserId: userId })

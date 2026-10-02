@@ -133,6 +133,11 @@ export interface ChatRepository {
   listThreadsPage(userId: string, options?: ChatThreadPageOptions): Promise<ChatThreadPage>
   findThread(threadId: string): Promise<ChatThread | null>
   findExistingThreadIds(threadIds: readonly string[]): Promise<Set<string>>
+  /**
+   * Everyone `userId` has a chat with, once each, in no guaranteed order
+   * (one indexed read; blocks are the caller's to filter).
+   */
+  listChatPartnerUserIds(userId: string): Promise<string[]>
   saveThread(thread: ChatThread): Promise<void>
   listMessages(
     threadId: string,
@@ -349,6 +354,12 @@ export function createInMemoryChatRepository(
     },
     async findExistingThreadIds(threadIds) {
       return new Set(threadIds.filter((id) => store.threads.has(id)))
+    },
+    async listChatPartnerUserIds(userId) {
+      return [...new Set([...store.threads.values()]
+        .filter((thread) => thread.participantUserIds.includes(userId))
+        .flatMap((thread) => thread.participantUserIds)
+        .filter((id) => id !== userId))]
     },
     async saveThread(thread) {
       if (!store.threads.has(thread.threadId)) store.threads.set(thread.threadId, cloneThread(thread))

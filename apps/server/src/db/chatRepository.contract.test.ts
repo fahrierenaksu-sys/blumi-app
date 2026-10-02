@@ -63,6 +63,18 @@ runRepositoryContract<ChatRepository>({
       )
     },
 
+    "listChatPartnerUserIds names everyone a user has a chat with, once each": async (backend) => {
+      const [ada, bo, cem, dan, eda] = ["ada", "bo", "cem", "dan", "eda"].map((name) => backend.id(name)) as
+        [string, string, string, string, string]
+      await backend.repository.saveThread(thread(backend, "p1", "2026-09-30T10:00:00.000Z", [ada, bo]))
+      await backend.repository.saveThread(thread(backend, "p2", "2026-09-30T10:01:00.000Z", [cem, ada]))
+      await backend.repository.saveThread(thread(backend, "p3", "2026-09-30T10:02:00.000Z", [ada, bo]))
+      await backend.repository.saveThread(thread(backend, "p4", "2026-09-30T10:03:00.000Z", [dan, eda]))
+      assert.deepEqual((await backend.repository.listChatPartnerUserIds(ada)).sort(), [bo, cem].sort())
+      assert.deepEqual(await backend.repository.listChatPartnerUserIds(eda), [dan])
+      assert.deepEqual(await backend.repository.listChatPartnerUserIds(backend.id("nobody")), [])
+    },
+
     "findMessage returns one message of its own thread only": async (backend) => {
       const chat = thread(backend, "find", "2026-09-30T10:00:00.000Z")
       const other = thread(backend, "find_other", "2026-09-30T10:00:00.000Z")

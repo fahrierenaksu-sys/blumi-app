@@ -169,6 +169,18 @@ export function createPostgresChatRepository(
       return new Set(result.rows.map((row) => String(row.thread_id)))
     },
 
+    async listChatPartnerUserIds(userId) {
+      const result = await pool.query(
+        `SELECT DISTINCT partner.user_id
+           FROM blumi_chat_thread_participants AS mine
+           JOIN blumi_chat_thread_participants AS partner
+             ON partner.thread_id = mine.thread_id AND partner.user_id <> mine.user_id
+          WHERE mine.user_id = $1`,
+        [userId]
+      )
+      return result.rows.map((row) => String(row.user_id))
+    },
+
     async saveThread(thread) {
       // One statement: participants are written only when this call created
       // the thread, so a concurrent or repeated save can never add or rename
