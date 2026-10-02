@@ -1,9 +1,6 @@
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
 import {
-  Animated,
-  Easing,
   Keyboard,
-  LayoutAnimation,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +8,15 @@ import {
   useWindowDimensions
 } from "react-native"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Reanimated from "react-native-reanimated"
+import Reanimated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
 import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
@@ -23,7 +28,7 @@ import { useReducedMotion } from "../../../ui/animations"
 import { hapticLight } from "../../../ui/haptics"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
-import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
+import { getMiniRoomPanelTransition, MiniRoomChatPanel } from "./MiniRoomChatPanel"
 import { MiniRoomHud } from "./MiniRoomHud"
 import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
 import { MAX_ROOM_MESSAGE_LENGTH, RoomChatComposer } from "./RoomChatComposer"
@@ -135,7 +140,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   })
   const [chatExpanded, setChatExpanded] = useState(true)
   const [composerLines, setComposerLines] = useState(1)
-  const keyboard = useMiniRoomKeyboard(reduceMotion)
+  const keyboard = useMiniRoomKeyboard()
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
@@ -173,60 +178,44 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     sayPhrase
   } = store
 
-  const entryValueRef = useRef(new Animated.Value(0)).current
-  const welcomeValueRef = useRef(new Animated.Value(0)).current
+  const entryProgress = useSharedValue(0)
+  const welcomeOpacity = useSharedValue(0)
   const [partnerJustJoined, setPartnerJustJoined] = useState(false)
   const [composerText, setComposerText] = useState("")
 
   useEffect(() => {
-    entryValueRef.stopAnimation()
-    if (!motionPolicy.animateJoin) {
-      entryValueRef.setValue(1)
-      return
-    }
-    const animation = Animated.timing(entryValueRef, {
-      toValue: 1,
-      duration: MINI_ROOM_ENTRY_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [entryValueRef, motionPolicy.animateJoin])
+    entryProgress.value = motionPolicy.animateJoin
+      ? withTiming(1, {
+        duration: MINI_ROOM_ENTRY_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        reduceMotion: ReduceMotion.Never
+      })
+      : 1
+  }, [entryProgress, motionPolicy.animateJoin])
 
   useEffect(() => {
-    welcomeValueRef.stopAnimation()
-    if (!partnerPresent) { welcomeValueRef.setValue(0); return }
-    welcomeValueRef.setValue(motionPolicy.animateJoin ? 0 : 1)
-
-    const animation = motionPolicy.animateJoin
-      ? Animated.sequence([
-          Animated.timing(welcomeValueRef, {
-            toValue: 1,
-            duration: MINI_ROOM_WELCOME_REVEAL_MS,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true
-          }),
-          Animated.delay(MINI_ROOM_WELCOME_HOLD_MS),
-          Animated.timing(welcomeValueRef, {
-            toValue: 0,
-            duration: MINI_ROOM_WELCOME_FADE_MS,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true
-          })
-        ])
-      : Animated.sequence([
-          Animated.delay(MINI_ROOM_WELCOME_HOLD_MS),
-          Animated.timing(welcomeValueRef, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true
-          })
-        ])
-
-    animation.start()
-    return () => animation.stop()
-  }, [motionPolicy.animateJoin, partnerPresent, partnerUser.userId, welcomeValueRef])
+    if (!partnerPresent) {
+      welcomeOpacity.value = 0
+      return
+    }
+    const never = ReduceMotion.Never
+    // The welcome ribbon reveals, holds and fades on the UI thread; without
+    // join motion it simply shows for the hold and then disappears.
+    welcomeOpacity.value = motionPolicy.animateJoin
+      ? withSequence(
+        withTiming(0, { duration: 0, reduceMotion: never }),
+        withTiming(1, { duration: MINI_ROOM_WELCOME_REVEAL_MS, easing: Easing.out(Easing.cubic), reduceMotion: never }),
+        withDelay(
+          MINI_ROOM_WELCOME_HOLD_MS,
+          withTiming(0, { duration: MINI_ROOM_WELCOME_FADE_MS, easing: Easing.inOut(Easing.quad), reduceMotion: never }),
+          never
+        )
+      )
+      : withSequence(
+        withTiming(1, { duration: 0, reduceMotion: never }),
+        withDelay(MINI_ROOM_WELCOME_HOLD_MS, withTiming(0, { duration: 0, reduceMotion: never }), never)
+      )
+  }, [motionPolicy.animateJoin, partnerPresent, partnerUser.userId, welcomeOpacity])
 
   useEffect(() => {
     if (!motionPolicy.animateJoin || !partnerPresent) {
@@ -299,7 +288,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   }, [])
 
   const handleToggleHistory = useCallback((): void => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     if (layout.panelMode === "typing") {
       // "Back to the room": close the keyboard and leave only the composer.
       Keyboard.dismiss()
@@ -307,7 +295,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       return
     }
     setChatExpanded((expanded) => !expanded)
-  }, [layout.panelMode, reduceMotion])
+  }, [layout.panelMode])
 
   const handleComposerContentSize = useCallback((contentHeight: number): void => {
     const lines = resolveComposerLineCount({ contentHeight, fontScale: viewport.fontScale })
@@ -323,19 +311,15 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     )
   }, [])
 
-  const entryOpacity = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1]
-  })
-  const entryScale = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.94, 1]
-  })
-  const entryTranslateY = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [14, 0]
-  })
-  const welcomeOpacity = welcomeValueRef
+  const entryStyle = useAnimatedStyle(() => ({
+    opacity: entryProgress.value,
+    transform: [
+      { translateY: (1 - entryProgress.value) * 14 },
+      { scale: 0.94 + 0.06 * entryProgress.value }
+    ]
+  }))
+  const welcomeStyle = useAnimatedStyle(() => ({ opacity: welcomeOpacity.value }))
+  const panelTransition = getMiniRoomPanelTransition(reduceMotion, keyboard.durationMs)
 
   const partnerFirstName = useMemo(
     () => partnerUser.displayName.split(" ")[0] || partnerUser.displayName,
@@ -384,19 +368,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
           onPress={Keyboard.dismiss}
         />
       ) : null}
-      <Animated.View
-        pointerEvents="box-none"
-        style={[
-          styles.roomStageFrame,
-          {
-            opacity: entryOpacity,
-            transform: [
-              { translateY: entryTranslateY },
-              { scale: entryScale }
-            ]
-          }
-        ]}
-      >
+      <Reanimated.View pointerEvents="box-none" style={[styles.roomStageFrame, entryStyle]}>
         {roomDecorScene?.shell ? (
           <AnimatedPressable
             accessibilityRole="button"
@@ -412,14 +384,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             />
             {hotspotLayer}
             {avatarLayer}
-            <Animated.View
-              style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
-              pointerEvents="none"
-            >
+            <Reanimated.View style={[styles.welcomeRibbon, welcomeStyle]} pointerEvents="none">
               <Text style={styles.welcomeText} numberOfLines={1}>
                 {copy.welcome(partnerFirstName)}
               </Text>
-            </Animated.View>
+            </Reanimated.View>
           </AnimatedPressable>
         ) : (
           <AnimatedPressable
@@ -435,7 +404,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             {avatarLayer}
           </AnimatedPressable>
         )}
-      </Animated.View>
+      </Reanimated.View>
 
       <MiniRoomChatPanel
         copy={copy}
@@ -446,6 +415,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         historyItems={chatHistory}
         historyStatus={chatHistoryStatus}
         partnerName={partnerFirstName}
+        layoutTransition={panelTransition}
       >
         <RoomChatComposer
           value={composerText}

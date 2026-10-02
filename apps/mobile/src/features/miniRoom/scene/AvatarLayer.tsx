@@ -1,10 +1,15 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Animated, Easing, Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
+  Easing,
+  ReduceMotion,
+  type SharedValue,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
-  type SharedValue
+  withRepeat,
+  withSequence,
+  withTiming
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
@@ -180,10 +185,12 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     motionPolicy,
     typing
   } = props
-  const breatheRef = useRef(new Animated.Value(0)).current
-  const walkBobRef = useRef(new Animated.Value(0)).current
-  const joinPulseRef = useRef(new Animated.Value(0)).current
-  const speakingRef = useRef(new Animated.Value(0)).current
+  // Idle breath, walk bob, speaking sway and the join pulse all run on the
+  // UI thread; React renders only on pose changes.
+  const breathe = useSharedValue(0)
+  const walkBob = useSharedValue(0)
+  const joinPulse = useSharedValue(1)
+  const speaking = useSharedValue(0)
   const roomAvatarLayers = useMemo(
     () => getMiniRoomAvatarRenderLayers({
       appearance: avatar.appearance,
@@ -217,34 +224,15 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       avatar.motion !== "idle" ||
       usesAnimatedAvatarFrames
     ) {
-      breatheRef.stopAnimation()
-      breatheRef.setValue(0)
+      breathe.value = 0
       return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheRef, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        }),
-        Animated.timing(breatheRef, {
-          toValue: 0,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      breatheRef.setValue(0)
-    }
+    const half = { duration: 1600, easing: Easing.inOut(Easing.sin), reduceMotion: ReduceMotion.Never }
+    breathe.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
+    return () => { breathe.value = 0 }
   }, [
     avatar.motion,
-    breatheRef,
+    breathe,
     motionPolicy.animateBreathe,
     usesAnimatedAvatarFrames
   ])
@@ -255,120 +243,72 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       avatar.motion !== "walking" ||
       usesAnimatedWalkingFrames
     ) {
-      walkBobRef.stopAnimation()
-      walkBobRef.setValue(0)
+      walkBob.value = 0
       return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(walkBobRef, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        }),
-        Animated.timing(walkBobRef, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true
-        })
-      ])
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      walkBobRef.setValue(0)
-    }
+    const half = { duration: 220, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.Never }
+    walkBob.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
+    return () => { walkBob.value = 0 }
   }, [
     avatar.motion,
     motionPolicy.animateWalking,
     usesAnimatedWalkingFrames,
-    walkBobRef
+    walkBob
   ])
 
   useEffect(() => {
     if (!motionPolicy.animateSpeaking || avatar.motion !== "speaking") {
-      speakingRef.stopAnimation()
-      speakingRef.setValue(0)
+      speaking.value = 0
       return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(speakingRef, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true
-        }),
-        Animated.timing(speakingRef, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true
-        })
-      ]),
-      { iterations: 4 }
-    )
-    loop.start()
-    return () => {
-      loop.stop()
-      speakingRef.setValue(0)
-    }
-  }, [avatar.motion, motionPolicy.animateSpeaking, speakingRef])
+    const half = { duration: 180, reduceMotion: ReduceMotion.Never }
+    speaking.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), 4)
+    return () => { speaking.value = 0 }
+  }, [avatar.motion, motionPolicy.animateSpeaking, speaking])
 
   useEffect(() => {
     if (!showJoinPulse || !motionPolicy.animateJoin) {
-      joinPulseRef.stopAnimation()
-      joinPulseRef.setValue(1)
+      joinPulse.value = 1
       return
     }
-    joinPulseRef.setValue(0)
-    const animation = Animated.sequence([
-      Animated.timing(joinPulseRef, {
-        toValue: 0.72,
+    joinPulse.value = withSequence(
+      withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+      withTiming(0.72, {
         duration: MINI_ROOM_PARTNER_ARRIVAL_MS * 0.47,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
+        reduceMotion: ReduceMotion.Never
       }),
-      Animated.timing(joinPulseRef, {
-        toValue: 1,
+      withTiming(1, {
         duration: MINI_ROOM_PARTNER_ARRIVAL_MS * 0.53,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true
+        reduceMotion: ReduceMotion.Never
       })
-    ])
-    animation.start()
-    return () => animation.stop()
-  }, [joinPulseRef, motionPolicy.animateJoin, showJoinPulse])
+    )
+  }, [joinPulse, motionPolicy.animateJoin, showJoinPulse])
 
   const facingSignX = avatar.facing === "left" ? -1 : 1
   const facingLean = avatar.facing === "left" || avatar.facing === "right" ? 1 : 0
   const isSitting = avatar.motion === "sitting"
 
-  const breatheScaleY = breatheRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.018]
-  })
-  const breatheTranslateY = breatheRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -1.2]
-  })
-  const walkTranslateY = walkBobRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -3]
-  })
-  const speakingRotate = speakingRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "2deg"]
-  })
   const leanRotate = `${facingLean * (avatar.facing === "right" ? 2 : -2)}deg`
-  const pulseScale = joinPulseRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.8, 1.9]
+  const joinPulseStyle = useAnimatedStyle(() => {
+    const t = joinPulse.value
+    return {
+      opacity: t < 0.7 ? 0.55 - (0.45 * t) / 0.7 : 0.1 - (0.1 * (t - 0.7)) / 0.3,
+      transform: [{ scale: 0.8 + 1.1 * t }]
+    }
   })
-  const pulseOpacity = joinPulseRef.interpolate({
-    inputRange: [0, 0.7, 1],
-    outputRange: [0.55, 0.1, 0]
-  })
+  const figureMotionStyle = useAnimatedStyle(() => ({
+    // ROOM-03: a back-facing avatar stays fully opaque (no ghost).
+    transform: [
+      { translateY: -3 * walkBob.value - 1.2 * breathe.value },
+      { scaleX: facingSignX },
+      // ROOM-04: squash only the standing idle fallback, never real sitting art.
+      { scaleY: (1 + 0.018 * breathe.value) * sittingScaleY },
+      { rotate: leanRotate },
+      { rotate: `${2 * speaking.value}deg` }
+    ]
+  }))
   // Walking moves these on the UI thread as a transform (no layout per
   // frame); React renders only on pose changes and depth-order flips.
   const presentOpacity = avatar.present === false ? 0.35 : 1
@@ -390,16 +330,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   return (
     <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
       {showJoinPulse ? (
-        <Animated.View
-          style={[
-            styles.joinPulse,
-            {
-              opacity: pulseOpacity,
-              transform: [{ scale: pulseScale }]
-            }
-          ]}
-          pointerEvents="none"
-        />
+        <Reanimated.View style={[styles.joinPulse, joinPulseStyle]} pointerEvents="none" />
       ) : null}
 
       <RoomSpeechBubbleStack
@@ -422,22 +353,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
           depthScaleStyle
         ]}
       >
-        <Animated.View
-          style={[
-            styles.avatarImageFill,
-            {
-              // ROOM-03: a back-facing avatar stays fully opaque (no ghost).
-              transform: [
-                { translateY: Animated.add(walkTranslateY, breatheTranslateY) },
-                { scaleX: facingSignX },
-                // ROOM-04: squash only the standing idle fallback, never real sitting art.
-                { scaleY: Animated.multiply(breatheScaleY, sittingScaleY) },
-                { rotate: leanRotate },
-                { rotate: speakingRotate }
-              ]
-            }
-          ]}
-        >
+        <Reanimated.View style={[styles.avatarImageFill, figureMotionStyle]}>
           {roomAvatarLayers.length ? (
             <RoomAvatarRenderer2D layers={roomAvatarLayers} />
           ) : avatar.appearance.fullBodyAsset ? (
@@ -447,7 +363,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
               style={styles.avatarImage}
             />
           ) : null}
-        </Animated.View>
+        </Reanimated.View>
       </Reanimated.View>
       <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
