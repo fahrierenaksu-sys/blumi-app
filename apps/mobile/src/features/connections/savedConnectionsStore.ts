@@ -189,7 +189,8 @@ export async function recordMutualConnection(input: {
     ? { ...existing, status: "mutual" }
     : {
         userId: partnerUserId,
-        displayName: partnerUserId,
+        // The name is not known here; never store the raw id as one.
+        displayName: "",
         savedAt: new Date().toISOString(),
         status: "mutual"
       }

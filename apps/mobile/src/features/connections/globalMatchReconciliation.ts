@@ -80,14 +80,20 @@ export async function reconcileRealtimeConnectionMatch(
     if (thread) partner = findThreadPartner(thread, expectedActor.profile.userId)
   }
 
-  if (!isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())) {
+  // Without a real name the moment is not shown (never an id); the chat
+  // and the push still carry the match.
+  const matchedUserName = getMatchedUserName(partner, connection)
+  if (
+    !matchedUserName ||
+    !isSameAuthenticatedSession(expectedActor, dependencies.getCurrentSessionActor())
+  ) {
     return
   }
 
   dependencies.presentMatch({
     miniRoomId: payload.miniRoomId,
     matchedUserId: connection.userId,
-    matchedUserName: partner?.displayName || connection.displayName,
+    matchedUserName,
     ...(partner?.avatar ? { matchedAvatarSelection: partner.avatar } : {}),
     mode: expectedActor.session.mode
   })
@@ -176,6 +182,21 @@ export async function reconcileRealtimeDiscoveryMatch(
     mode: expectedActor.session.mode,
     source: "discovery"
   })
+}
+
+/**
+ * The name a match moment may show: the chat's server name, else a name
+ * saved for the connection. A connection first seen through the match has
+ * no name (older builds saved the raw user id as one); that is never shown.
+ */
+export function getMatchedUserName(
+  partner: Pick<ChatParticipantSummary, "displayName"> | undefined,
+  connection: Pick<SavedConnection, "userId" | "displayName">
+): string | undefined {
+  const serverName = partner?.displayName?.trim()
+  if (serverName) return serverName
+  const savedName = connection.displayName.trim()
+  return savedName && savedName !== connection.userId ? savedName : undefined
 }
 
 /** The other participant of a chat, with the server's name and avatar. */

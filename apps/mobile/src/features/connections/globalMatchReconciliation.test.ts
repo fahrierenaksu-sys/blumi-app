@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { SessionActor } from "../session/sessionModel"
 import {
+  getMatchedUserName,
   reconcileRealtimeConnectionMatch,
   reconcileRealtimeDiscoveryMatch,
   type DiscoveryMatchReconciliationDependencies,
@@ -207,6 +208,53 @@ test("a slow chat never holds the match back: it presents after a short wait and
   })
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(dependencies.createdThreads, ["thread_match"], "the late chat is still applied")
+})
+
+test("a connection match never shows a raw user id: without a real name the moment is skipped", async () => {
+  const placeholderPartnerId = "placeholder-partner-id"
+  const nameless = {
+    miniRoomId: "room_placeholder",
+    participantUserIds: ["ada", placeholderPartnerId] as [string, string],
+    matchedAt: "2026-07-22T00:00:00.000Z"
+  }
+  // A partner first seen through the match (no name), and one an older build
+  // saved under the raw id; the chat cannot be opened or has no name.
+  const threadOpeners: GlobalMatchReconciliationDependencies["createThread"][] = [
+    async () => { throw new Error("offline") },
+    async () => ({
+      threadId: "thread_placeholder",
+      miniRoomId: "room_placeholder",
+      participantUserIds: ["ada", placeholderPartnerId] as [string, string],
+      participants: [{ userId: "ada" }, { userId: placeholderPartnerId }],
+      createdAt: "2026-07-22T00:00:00.000Z"
+    })
+  ]
+  for (const savedName of ["", placeholderPartnerId]) {
+    for (const createThread of threadOpeners) {
+      const presented: unknown[] = []
+      const dependencies = createDependencies(() => actor, {
+        recordMutualConnection: async () => ({
+          userId: placeholderPartnerId,
+          displayName: savedName,
+          savedAt: "2026-07-22T00:00:00.000Z",
+          status: "mutual" as const
+        }),
+        createThread,
+        presentMatch: (match) => { presented.push(match) }
+      })
+      await reconcileRealtimeConnectionMatch(nameless, actor, dependencies)
+      assert.deepEqual(presented, [], `saved name ${JSON.stringify(savedName)}`)
+    }
+  }
+})
+
+test("the match name is the chat's server name, else a real saved name, never the id", () => {
+  const connection = { userId: "placeholder-partner-id", displayName: "Saved Name" }
+  assert.equal(getMatchedUserName({ displayName: "Server Name" }, connection), "Server Name")
+  assert.equal(getMatchedUserName({ displayName: "  " }, connection), "Saved Name")
+  assert.equal(getMatchedUserName(undefined, connection), "Saved Name")
+  assert.equal(getMatchedUserName(undefined, { ...connection, displayName: "" }), undefined)
+  assert.equal(getMatchedUserName(undefined, { ...connection, displayName: connection.userId }), undefined)
 })
 
 test("contains a failed account hydration request inside the match flow", async () => {
