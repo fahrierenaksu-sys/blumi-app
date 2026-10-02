@@ -16,6 +16,15 @@ test("snapshot pagination never skips unseen profiles after nine decisions", asy
   await assert.rejects(service.page({ userId: "viewer", filters: { ...filters, ageMin: 22 }, limit: 12, cursor: first.page.nextCursor! }), /cursor/i)
 })
 
+test("a cursor stays valid when only the saved vibes change; deck filters still invalidate it", async () => {
+  const service = createDiscoverySnapshotService(createInMemoryDiscoverySnapshots(async () =>
+    Array.from({ length: 30 }, (_, i) => ({ userId: `profile_${String(i).padStart(2, "0")}` }) as DiscoverProfileRecord)))
+  const first = await service.page({ userId: "viewer", filters: { ...filters, vibes: ["Coffee dates"] }, limit: 12 })
+  const next = await service.page({ userId: "viewer", filters: { ...filters, vibes: ["Bookish", "Pets"] }, limit: 12, cursor: first.page.nextCursor! })
+  assert.deepEqual(next.profiles.map(p => p.userId), Array.from({ length: 12 }, (_, i) => `profile_${i + 12}`))
+  await assert.rejects(service.page({ userId: "viewer", filters: { ...filters, genders: ["woman"] }, limit: 12, cursor: first.page.nextCursor! }), /cursor/i)
+})
+
 test("expired snapshot is explicit and fresh pagination starts independently", async () => {
   const service = createDiscoverySnapshotService(createInMemoryDiscoverySnapshots(async () => Array.from({ length: 20 }, (_, i) => ({ userId: String(i) }) as DiscoverProfileRecord)))
   const now = new Date("2026-09-05T10:00:00.000Z")

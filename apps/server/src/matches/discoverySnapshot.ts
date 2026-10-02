@@ -31,10 +31,14 @@ export class DiscoveryRefreshLimitError extends Error {
   }
 }
 export type DiscoverySnapshotService = ReturnType<typeof createDiscoverySnapshotService>
+/**
+ * Keys a snapshot to the filters that shape its deck. Saved vibes never
+ * narrow the deck (discoveryProfilesSql), so editing them must not invalidate
+ * open cursors or spend the refresh budget on a new snapshot.
+ */
 export function discoveryFilterHash(filters: DiscoveryFilters): string {
   return createHash("sha256").update(JSON.stringify({ ageMin: filters.ageMin, ageMax: filters.ageMax,
-    genders: [...new Set(filters.genders.map(v => v.trim().toLowerCase()))].sort(),
-    vibes: [...new Set(filters.vibes.map(v => v.trim().toLowerCase()))].sort() })).digest("hex")
+    genders: [...new Set(filters.genders.map(v => v.trim().toLowerCase()))].sort() })).digest("hex")
 }
 export function createDiscoverySnapshotService(repository: DiscoverySnapshotRepository) {
   return {
