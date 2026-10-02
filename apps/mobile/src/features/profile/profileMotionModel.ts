@@ -14,10 +14,6 @@ export const PROFILE_CHIBI_HOP_PT = 22
 export const PROFILE_HERO_PARALLAX = 0.42
 export const PROFILE_HERO_FADE_DISTANCE = 320
 
-/** Delay between the page's section entrances. */
-export const PROFILE_SECTION_STAGGER_MS = 70
-export const PROFILE_SECTION_BASE_DELAY_MS = 120
-
 export function getProfileHeroParallax(
   scrollY: number,
   reduceMotion: boolean
@@ -29,10 +25,4 @@ export function getProfileHeroParallax(
     translateY: scrollY * PROFILE_HERO_PARALLAX,
     opacity: 1 - progress * 0.5
   }
-}
-
-/** Entrance delay for the n-th section below the hero, or none under Reduce Motion. */
-export function getProfileSectionEntranceDelay(index: number, reduceMotion: boolean): number | null {
-  if (reduceMotion) return null
-  return PROFILE_SECTION_BASE_DELAY_MS + Math.max(0, index) * PROFILE_SECTION_STAGGER_MS
 }
