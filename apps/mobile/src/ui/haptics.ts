@@ -13,8 +13,10 @@
  * - Placing / dropping a piece (valid)      → hapticLight
  * - Mic toggle                              → hapticLight
  * - Partner joins the shared room           → hapticLight, once per partner
+ * - A message arrives in the open chat while the composer is not focused,
+ *   or the partner lands after the room door opens → hapticSoft
  * - Tab tap                                 → hapticSelection
- * - Match                                   → hapticSuccess
+ * - Match (the two chibis meet)             → hapticSuccess, on contact
  * - A real, server-confirmed save or sign-in (not "Done" without changes)
  *                                           → hapticSuccess
  * - Report / block submitted                → hapticSuccess
@@ -42,6 +44,12 @@ export function hapticSelection(): void {
 export function hapticLight(): void {
   if (Platform.OS === "web") return
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+}
+
+/** Soft, cushioned tap for something arriving: a message, the partner. */
+export function hapticSoft(): void {
+  if (Platform.OS === "web") return
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)
 }
 
 /** Medium tap for card transitions, filter apply */

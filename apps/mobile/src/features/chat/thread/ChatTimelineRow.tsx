@@ -15,6 +15,7 @@ import { formatMessageTime, type ChatTimelineRowModel } from "./chatThreadModel"
 import { bubbleGroupStyles, bubbleStyles } from "./chatThreadStyles"
 import { CHAT_INCOMING_ROW_ENTERING, CHAT_OWN_ROW_ENTERING } from "./useChatTimelineEntrances"
 import { claimFlight, FlightTargetView } from "../../../ui/flight/FlightLayer"
+import { claimTypingMorph } from "../typing/typingMorphFlight"
 
 /**
  * One timeline row: an optional day separator, then either a room invitation
@@ -24,6 +25,8 @@ import { claimFlight, FlightTargetView } from "../../../ui/flight/FlightLayer"
  * UI-thread entrance on mount; history, pagination and Reduce Motion never do.
  * My just-sent message (`isArrival`) instead claims its send flight when one
  * is in the air: the bubble stays hidden until the flying words land on it.
+ * The partner's arriving message grows out of their typing dots the same way
+ * when the dots were on screen.
  * The bubble's words, time and delivery state are one accessibility element;
  * the retry button stays separately focusable.
  */
@@ -64,11 +67,12 @@ function ChatTimelineRow({
 }) {
   const { isMe, deliveryState, groupPosition, closesGroup, dateLabel } = row
   // Decided once, at mount: a claimed row is the flight's landing spot.
-  const [sendFlightId] = useState(() =>
-    isArrival && isMe && item.kind === "message"
+  const [sendFlightId] = useState(() => {
+    if (!isArrival || item.kind !== "message") return null
+    return isMe
       ? claimFlight(sendFlightChannel, item.message.body)
-      : null
-  )
+      : claimTypingMorph(sendFlightChannel, item.message.messageId)
+  })
   const entering = isEntering && sendFlightId === null
     ? isMe ? CHAT_OWN_ROW_ENTERING : CHAT_INCOMING_ROW_ENTERING
     : undefined
