@@ -19,6 +19,7 @@ import type {
   RoomAvatarLayerType
 } from "../avatarRoom.types"
 import { useReducedMotion } from "../../../../ui/animations"
+import { getRoomAvatarStrideFrameIndex } from "../../../roomV2/components/roomAvatarBodyMotionModel"
 import {
   getRoomAvatarAtlasCropLayout,
   getRoomAvatarFrameIndex,
@@ -36,6 +37,12 @@ interface RoomAvatarRenderer2DProps {
   imagePriority?: "low" | "normal" | "high"
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
+  /**
+   * Walk-cycle phase (0..1) driven by distance travelled. When set, a looping
+   * motion shows the frame for this phase instead of following the clock, so
+   * the feet plant while the avatar moves and hold still when it stops.
+   */
+  strideProgress?: SharedValue<number>
 }
 
 /** The frame the UI thread shows, tagged with the motion it belongs to. */
@@ -61,7 +68,7 @@ interface RoomAvatarBoxSize {
  * still avatars show frame 0 with the frame callback inactive.
  */
 export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
-  const { layers, imagePriority = "high" } = props
+  const { layers, imagePriority = "high", strideProgress } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
     () => getRoomAvatarLayerAnimationState(layers, !reduceMotion),
@@ -81,9 +88,11 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
       frameState.value = { signature, index: 0 }
       return
     }
-    const index = getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
+    const index = strideProgress && loops
+      ? getRoomAvatarStrideFrameIndex(strideProgress.value, frameCount)
+      : getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
     if (index !== current.index) frameState.value = { signature, index }
-  }, [baseTick, frameCount, frameDurationMs, frameState, loops, signature])
+  }, [baseTick, frameCount, frameDurationMs, frameState, loops, signature, strideProgress])
   // useFrameCallback reads `autostart` only on its first render, and the
   // shared Reduce Motion store starts reduced until the OS answers, so the
   // clock is switched on and off explicitly whenever `hasAnimation` changes.
