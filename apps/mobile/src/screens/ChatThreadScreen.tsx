@@ -64,7 +64,7 @@ import { useRequestedRoomInvite } from "../features/chat/thread/useRequestedRoom
 import { useRequestedRoomInviteAccept } from "../features/chat/thread/useRequestedRoomInviteAccept"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
-import { useAfterPushTransition } from "../features/chat/thread/useAfterPushTransition"
+import { useAfterPushTransition } from "../navigation/useAfterPushTransition"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
