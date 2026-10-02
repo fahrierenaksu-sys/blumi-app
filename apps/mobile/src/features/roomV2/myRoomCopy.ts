@@ -3,7 +3,6 @@ import type { AppLocale } from "../session/appLocale"
 export interface MyRoomCopy {
   title: string
   subtitle: string
-  profileOptions: string
   wardrobe: string
   wardrobeShort: string
   openWardrobe: string
@@ -33,7 +32,6 @@ const COPY: Record<AppLocale, MyRoomCopy> = {
   en: {
     title: "My Room",
     subtitle: "Move around your little world",
-    profileOptions: "Open profile options",
     wardrobe: "Avatar Studio",
     wardrobeShort: "Avatar",
     openWardrobe: "Open Avatar Studio",
@@ -61,7 +59,6 @@ const COPY: Record<AppLocale, MyRoomCopy> = {
   tr: {
     title: "Odam",
     subtitle: "Küçük dünyanda dolaş",
-    profileOptions: "Profil seçeneklerini aç",
     wardrobe: "Avatar Stüdyosu",
     wardrobeShort: "Avatar",
     openWardrobe: "Avatar Stüdyosu’nu aç",

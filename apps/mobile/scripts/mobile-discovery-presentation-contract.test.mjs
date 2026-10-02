@@ -64,8 +64,10 @@ test("production Discover reuses the approved demo deck presentation", () => {
   assert.match(sharedDeckSource, /actionRow:\s*\{[\s\S]*?position:\s*"absolute"[\s\S]*?bottom:\s*30/)
   assert.match(sharedDeckSource, /progressRow:\s*\{[\s\S]*?marginTop:\s*-uiTheme\.spacing\.xs/)
   assert.doesNotMatch(deckSource, /demoContainer:\s*\{[\s\S]*?paddingHorizontal:\s*20/)
-  assert.match(headerSource, /<View style=\{styles\.homeProfileSheen\}/)
-  assert.match(headerSource, /homeProfileChip:\s*\{[\s\S]*?paddingHorizontal:\s*8[\s\S]*?paddingVertical:\s*7[\s\S]*?backgroundColor:\s*uiTheme\.ambientGlass\.surface/)
+  // The header keeps its title and filters; the profile opens from My Room only.
+  assert.match(headerSource, /<Text accessibilityRole="header" style=\{styles\.homeTitle\}/)
+  assert.match(headerSource, /filterButton:\s*\{[\s\S]*?width:\s*58[\s\S]*?backgroundColor:\s*uiTheme\.ambientGlass\.surface/)
+  assert.doesNotMatch(headerSource, /homeProfileChip|CandidateAvatarPreview|myAvatarSnapshot/)
 })
 
 test("production Discover reserves the shared responsive bottom navigation inset", () => {
@@ -475,7 +477,7 @@ test("production and demo share the approved end-of-deck screen", () => {
   assert.match(emptySource, /backgroundColor:\s*"#FFF7FC"/)
   assert.doesNotMatch(emptySource, /emptyPhotoProgress/, "loading must not imply profile-photo progress")
   assert.doesNotMatch(emptySource, /cardWash|heroGlow/)
-  assert.match(headerSource, /<CandidateAvatarPreview[\s\S]*?snapshot=\{myAvatarSnapshot\}/)
+  assert.doesNotMatch(headerSource, /<CandidateAvatarPreview/, "Discover's header has no profile chip avatar")
   assert.match(emptySource, /refreshing\?:\s*boolean/)
   assert.match(emptySource, /disabled=\{props\.refreshing\}/)
   assert.match(emptySource, /<ActivityIndicator/)

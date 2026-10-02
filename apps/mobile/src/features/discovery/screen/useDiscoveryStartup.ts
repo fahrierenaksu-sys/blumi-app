@@ -9,8 +9,8 @@ import type { DiscoveryCandidate } from "../discoveryCandidateModel"
 import type { SessionActor } from "../../session/sessionModel"
 import type { ProductionDiscoveryPlaceholderState } from "./discoveryScreenModel"
 
-// First-frame readiness for production Discover: the background, header avatar
-// and front card must report a real display (not a prefetch) for the current
+// First-frame readiness for production Discover: the background and the
+// front card must report a real display (not a prefetch) for the current
 // session, attempt and front card before the startup boundary is released.
 export function useDiscoveryStartup(input: {
   sessionActor: SessionActor
@@ -47,7 +47,7 @@ export function useDiscoveryStartup(input: {
   const startupScope = `${startupSessionScope}:${imageAttempt}`
   const firstCardScope = `${startupScope}:${visibleDiscoverDeck[0]?.userId ?? "empty"}:${JSON.stringify(visibleDiscoverDeck[0]?.avatar ?? null)}`
   requiredImagesRef.current = [
-    `${startupScope}:background`, `${startupScope}:header`,
+    `${startupScope}:background`,
     `${firstCardScope}:layout`, `${firstCardScope}:surface`, `${firstCardScope}:avatar`
   ]
   validImageFailureScopesRef.current = [startupScope, firstCardScope]
@@ -58,7 +58,6 @@ export function useDiscoveryStartup(input: {
     setImageFailures((current) => recordDiscoveryImageReceipt(current, validImageFailureScopesRef.current, key))
   }, [])
   const onBackgroundDisplay = useCallback(() => recordImage(`${startupScope}:background`), [recordImage, startupScope])
-  const onHeaderDisplay = useCallback(() => recordImage(`${startupScope}:header`), [recordImage, startupScope])
   const onBackgroundError = useCallback(() => recordImageFailure(startupScope), [recordImageFailure, startupScope])
   const onFrontDisplay = useCallback((part: "layout" | "surface" | "avatar") => recordImage(`${firstCardScope}:${part}`), [firstCardScope, recordImage])
   const onFrontError = useCallback(() => recordImageFailure(firstCardScope), [firstCardScope, recordImageFailure])
@@ -68,7 +67,7 @@ export function useDiscoveryStartup(input: {
     safetyReady: !isProductionDiscovery || isSafetyListReady,
     dataReady: filtersReady && !isInitialPagePending,
     hasCard: visibleDiscoverDeck.length > 0,
-    chromeReady: areDiscoveryImagesDisplayed([`${startupScope}:background`, `${startupScope}:header`], imageReceipts),
+    chromeReady: areDiscoveryImagesDisplayed([`${startupScope}:background`], imageReceipts),
     imagesReady: startupImagesReady,
     failed: discoveryPlaceholderState === "error" || startupImageFailed
   })
@@ -79,7 +78,7 @@ export function useDiscoveryStartup(input: {
   const showStartupFailure = isProductionDiscovery && !startupComplete && (startupImageFailed || discoveryPlaceholderState === "error" ||
     (startupBoundary?.deadlineExpired === true && startupStatus === "pending"))
 
-  // A retry remounts every scoped image (background, header, deck) under a new attempt.
+  // A retry remounts every scoped image (background, deck) under a new attempt.
   const retryStartupImages = useCallback(() => {
     setImageAttempt((current) => current + 1)
   }, [])
@@ -90,7 +89,6 @@ export function useDiscoveryStartup(input: {
     startupImagesReady,
     showStartupFailure,
     onBackgroundDisplay,
-    onHeaderDisplay,
     onBackgroundError,
     onFrontDisplay,
     onFrontError,

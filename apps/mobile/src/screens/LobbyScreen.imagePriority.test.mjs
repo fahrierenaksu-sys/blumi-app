@@ -1,30 +1,23 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
-import ts from "typescript"
 
-// LobbyScreen renders the profile chip through DiscoverHomeHeader.
-const lobbySource = readFileSync(new URL("../features/discovery/screen/DiscoverHomeHeader.tsx", import.meta.url), "utf8")
-const lobbyFile = ts.createSourceFile("DiscoverHomeHeader.tsx", lobbySource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+// The Discover header used to carry a decorative 48 px profile-chip avatar that
+// had to yield image priority to the front card. The chip moved to My Room (the
+// single profile entry), so the front card is the only avatar Discover loads
+// first, and startup no longer waits for a header image.
+const headerSource = readFileSync(new URL("../features/discovery/screen/DiscoverHomeHeader.tsx", import.meta.url), "utf8")
 const lobbyScreenSource = readFileSync(new URL("./LobbyScreen.tsx", import.meta.url), "utf8")
 const frontDeckSource = readFileSync(new URL("../features/discovery/DiscoveryDeckView.tsx", import.meta.url), "utf8")
+const startupSource = readFileSync(new URL("../features/discovery/screen/useDiscoveryStartup.ts", import.meta.url), "utf8")
 
-function findHeaderAvatar(node) {
-  if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(lobbyFile) === "CandidateAvatarPreview") {
-    const size = node.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(lobbyFile) === "size")
-    if (size?.initializer && ts.isJsxExpression(size.initializer) && size.initializer.expression?.getText(lobbyFile) === "48") return node
-  }
-  let found
-  ts.forEachChild(node, (child) => { found ??= findHeaderAvatar(child) })
-  return found
-}
-
-test("Lobby's decorative 48px avatar yields to the visible front Discover card", () => {
-  const headerAvatar = findHeaderAvatar(lobbyFile)
-  assert.ok(headerAvatar, "expected the Lobby profile-chip avatar")
+test("Discover's visible front card is the only avatar competing for high image priority", () => {
   assert.match(lobbyScreenSource, /<DiscoverHomeHeader\b/)
-  const priority = headerAvatar.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(lobbyFile) === "imagePriority")
-
-  assert.equal(priority?.initializer && ts.isStringLiteral(priority.initializer) ? priority.initializer.text : undefined, "normal")
+  assert.doesNotMatch(headerSource, /CandidateAvatarPreview|imagePriority/)
   assert.match(frontDeckSource, /imagePriority=\{isTop \? "high" : "low"\}/)
+})
+
+test("Discover startup waits only for images it actually shows", () => {
+  assert.doesNotMatch(startupSource, /:header`/)
+  assert.match(startupSource, /chromeReady: areDiscoveryImagesDisplayed\(\[`\$\{startupScope\}:background`\], imageReceipts\)/)
 })

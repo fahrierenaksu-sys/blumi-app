@@ -8,8 +8,7 @@ import {
 test("Discover header and filters read in Turkish on a Turkish device", () => {
   const copy = getDiscoveryHomeCopy("tr")
 
-  assert.equal(copy.header.profileAccessibilityLabel, "Blumi profilini aç")
-  assert.equal(copy.header.profileMeta, "Vibe'ını düzenle")
+  assert.equal(copy.header.title, "Keşfet")
   assert.equal(copy.header.filtersAccessibilityLabel, "Discover filtrelerini aç")
   assert.equal(copy.filters.closeAccessibilityLabel, "Discover filtrelerini kapat")
   assert.equal(copy.filters.showEveryoneAccessibilityLabel, "Herkesi göster")
@@ -27,8 +26,7 @@ test("Discover header and filters read in Turkish on a Turkish device", () => {
 test("Discover header and filters keep the approved English wording", () => {
   const copy = getDiscoveryHomeCopy("en")
 
-  assert.equal(copy.header.profileAccessibilityLabel, "Open your Blumi profile")
-  assert.equal(copy.header.profileMeta, "Edit your vibe")
+  assert.equal(copy.header.title, "Discover")
   assert.equal(copy.header.filtersAccessibilityLabel, "Open discover filters")
   assert.equal(copy.filters.closeAccessibilityLabel, "Close discovery filters")
   assert.equal(copy.filters.eyebrow, "DISCOVERY")

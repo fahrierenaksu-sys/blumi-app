@@ -95,7 +95,7 @@ const OVERSIZED_DEBT = {
   "features/roomV2/components/RoomRenderer2D.tsx": 967,
   "navigation/RootNavigator.tsx": 1123,
   "features/session/useSessionState.ts": 1117,
-  "screens/MyRoomScreen.tsx": 1082,
+  "screens/MyRoomScreen.tsx": 1057,
   "features/avatarV2/avatarV2Catalog.ts": 949,
   "screens/ProfileEditScreen.tsx": 758,
   "features/session/sessionApi.ts": 847,
