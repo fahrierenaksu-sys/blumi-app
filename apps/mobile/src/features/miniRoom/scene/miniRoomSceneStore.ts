@@ -567,7 +567,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       snapMiniRoomAvatarPosition(driver.position, position)
       setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
         x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
-        seatedHotspotId: undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined, present: false } }))
+        seatedHotspotId: undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined, arrivedByWalk: undefined,
+        present: false } }))
       return
     }
     // Place exactly: seated on its seat when the record carries one, as the
@@ -590,12 +591,13 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const avatar = avatarsRef.current[next.userId]
     if (!avatar || !next.present || next.userId === localUserId) return false
     const arrivalId = ++arrivalCounterRef.current
-    const markArrival = () => setAvatars(current => current[next.userId]
-      ? { ...current, [next.userId]: { ...current[next.userId], present: true, arrivalId } } : current)
+    const markArrival = (walkedIn: boolean) => setAvatars(current => current[next.userId]
+      ? { ...current, [next.userId]: { ...current[next.userId], present: true, arrivalId,
+        arrivedByWalk: walkedIn || undefined } } : current)
     if (!options.walk) {
       // Reduce Motion: no walk; place at the authoritative spot and fade in there.
       applyRemoteAvatar(next, true)
-      markArrival()
+      markArrival(false)
       return true
     }
     // A seat claim or a refused one is placed by the ordinary record path.
@@ -604,7 +606,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       runMovement(next.userId, next, { authoritative: true, entry: shellEntry, ignoreOccupants })
     if (!walkIn(false) && !walkIn(true)) return false
     arrivalWalksRef.current.set(next.userId, {})
-    markArrival()
+    markArrival(true)
     return true
   }, [applyRemoteAvatar, localUserId, runMovement, shellEntry])
 
@@ -624,7 +626,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const avatar = current[userId]
       if (!avatar || avatar.present === present) return current
       return { ...current, [userId]: { ...avatar, present,
-        ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined, enteringFromDoor: undefined } : {}) } }
+        ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined, enteringFromDoor: undefined,
+          arrivedByWalk: undefined } : {}) } }
     })
   }, [endArrivalWalk, movementRefFor])
 

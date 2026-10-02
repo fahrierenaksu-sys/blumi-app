@@ -146,8 +146,9 @@ export function AvatarLayer(props: AvatarLayerProps) {
             stageWidth={stageWidth}
             stageHeight={stageHeight}
             zIndex={zIndices.avatars[avatar.userId] ?? 0}
-            // A walk in from the door is the arrival's one hero; the ring is for a plain fade-in.
-            showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor}
+            // A walk in from the door is the arrival's one hero; the ring is for a plain
+            // fade-in, so it stays off for a walk-in even after it lands.
+            showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor && !avatar.arrivedByWalk}
             motionPolicy={motionPolicy}
           />
         )

@@ -124,6 +124,12 @@ export interface AvatarState {
   arrivalId?: number
   /** Presentation only: walking in from the door (the walk is the arrival's one hero). */
   enteringFromDoor?: boolean
+  /**
+   * Presentation only: this arrival was a walk in from the door. It outlasts
+   * the walk (a short walk lands inside the join window) so the plain join
+   * ring never pops at the landing; cleared when the avatar leaves.
+   */
+  arrivedByWalk?: boolean
   appearance: AvatarAppearance
   seatedHotspotId?: string
 }

@@ -253,6 +253,19 @@ test("a later partner walks in from the door to the server's spot; a newer step 
   f.runtime.unmount()
 })
 
+test("a short walk-in that lands keeps the join ring off until the partner leaves", () => {
+  const f = mount()
+  f.render({ roomDecorScene: doorRoom })
+  assert.equal(f.store().presentArrival({ userId: "partner", x: .3, y: .7, present: true, revision: 2 }, { walk: true }), true)
+  for (let guard = 0; guard < 20 && f.store().avatars.partner.motion === "walking"; guard += 1) f.finishSegment()
+  const landed = f.store().avatars.partner
+  assert.equal(landed.enteringFromDoor, undefined)
+  assert.equal(landed.arrivedByWalk, true, "the landing is still the walk's moment, not a plain join")
+  f.store().setRemotePresence("partner", false)
+  assert.equal(f.store().avatars.partner.arrivedByWalk, undefined, "a later return is a plain join")
+  f.runtime.unmount()
+})
+
 test("a step that arrives while the partner is still in the doorway places them at it at once", () => {
   const f = mount()
   f.render({ roomDecorScene: doorRoom })
@@ -272,6 +285,7 @@ test("under Reduce Motion the arrival is placed at the server's spot and only fa
   const partner = f.store().avatars.partner
   assert.notEqual(partner.motion, "walking")
   assert.equal(partner.enteringFromDoor, undefined)
+  assert.equal(partner.arrivedByWalk, undefined)
   assert.ok(partner.arrivalId !== undefined)
   assert.deepEqual({ x: partner.x, y: partner.y }, { x: .62, y: .74 })
   assert.equal(f.store().deferUntilArrivalLands("partner", () => undefined), false, "nothing to wait for: felt now")
