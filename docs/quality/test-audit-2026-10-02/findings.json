@@ -1,5 +1,5 @@
 {
-"status": "Verified chunks: 15/17",
+"status": "Verified chunks: 17/17",
 "runIds": [
 "wf_2665c6c0-354",
 "wf_3206769a-6b2",
@@ -11760,6 +11760,654 @@
 "apps/mobile/scripts/measure-mobile-bundle.mjs and apps/mobile/scripts/run-mobile-bundle-size.mjs: unwired dev tooling, and the baseline docs/quality/mobile-bundle-baseline.json is missing (tooling, not app runtime)."
 ],
 "notes": "The verifier confirmed all 37 files. Each appears exactly once and matches the chunk list. No verdict changed: 1 KEEP_SAFETY, 2 TRIM, 5 REWRITE, 29 REMOVE.\n\nChecks run:\n- grep for dead tools: the bundle-size tool and RoomDebriefScreen are dead.\n- The root verify chain includes doctor. It does not include test:workbench. verify:workbench-tools covers only tools/workbench.\n- The env-gate test expects one constant for every case.\n- The legacy invite branch runs only outside production mode.\n- metro.config.js wires the homeStudio resolver.\n- app.config.js loads apps/mobile/scripts/mobile-release-assets.cjs. The classifier cited the wrong path, scripts/ at the root.\n- 96998ca backs the composer REWRITE. 1fdd561 backs the refresh REWRITE.\n- All covering model tests named by the classifier exist.\n\nWiring and helper notes from the classifier still apply. Fingerprint caution: removals wired through package.json inline lists must wait for a planned native build."
+},
+"mobile/avatarV2": {
+"items": [
+{
+"file": "apps/mobile/src/features/avatarV2/avatarApi.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Avatar save HTTP contract. Covers the bounded-request deadline (no hang), caller abort reaching both the request and a stalled body, revision conflicts, a legacy-safe V1 write unless V2 is negotiated, and fail-closed handling of malformed or unknown-409 responses.",
+"evidence": "docs/quality/ENGINEERING_RULES.md hang class ('A direct call once left room invites busy forever'); 030b279 'refactor: move remaining mobile API modules onto requestJson'; uses the shared registerBoundedRequestTests contract (line 131).",
+"wiring": "apps/mobile/scripts/run-session-tests.mjs",
+"verifierNote": "Confirmed. Line 131 uses the shared registerBoundedRequestTests. The test checks behavior and does not read source text."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarBodyCompatibility.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the body-isolation behavior. Two assertions call getAvatarV2ItemsCompatibleWithBody, which only tests use.",
+"casesToRemove": [
+"the getAvatarV2ItemsCompatibleWithBody(...) deepEqual in 'returns only items compatible with the selected body' (keep its isAvatarV2ItemCompatibleWithBody assertion)",
+"the getAvatarV2ItemsCompatibleWithBody(normalizationCatalog, 'face', 'male-body') deepEqual in 'keeps hidden starter foundations out of wardrobe lists but uses them for normalization' (keep the normalizeAvatarV2ForBody assertions)"
+],
+"rewritePlan": "If list filtering should stay covered, assert it through the live getAvatarV2ShopItemsCompatibleWithBody.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (sourceFiles + node --test list); cases only",
+"verifierNote": "Grep confirms getAvatarV2ItemsCompatibleWithBody has no reference outside avatarBodyCompatibility.ts and tests."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarEquipLifecycle.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the stale-completion race guards: no commit after an external reset or after unmount. The third case asserts that a function whose body is `return true` returns true.",
+"evidence": "Generation guard in AvatarV2Provider; added in 922fe89 'fix: harden Blumi closed beta candidate'.",
+"casesToRemove": [
+"a local equip marks the avatar as customized"
+],
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (tsx --test list); cases only",
+"verifierNote": "markAvatarLocallyCustomized is used only in avatarEquipLifecycle.ts and AvatarV2Provider.tsx, and its body is a constant `return true`. Confirmed TRIM."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarEquipSave.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Per-attempt save error mapping with no network or abort leak to the UI.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarRoomCatalogMotionCoverage.test.ts",
+"verdict": "TRIM",
+"reason": "Keep catalog integrity: no visible layer silently drops to a static fallback. The test also pins the 120 ms step clock (VIS-03 moonwalk cause) and the 4-frame flipbook count.",
+"evidence": "ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01 row 3 (fixed 120 ms step clock); SESSION_INVENTORY VIS-03.",
+"casesToRemove": [
+"the `assert.equal(ROOM_AVATAR_FRAME_DURATION_MS, 120)` line (line 69) in 'every runtime walking sequence uses the shared 120ms playback contract'; keep the shared-duration consistency check"
+],
+"rewritePlan": "Replace the '>= 4 frames' (line 46) and '>= 1 frame' counts with a selector-level check. For each visible AVATAR_V2_CATALOG item projected onto its body's default avatar, require getRoomAvatarAssetCoverage({state:'walking'|'sitting', direction:'front'}).fallbackLayerCount === 0. getRoomAvatarAssetCoverage is live (MyRoomScreen.tsx).",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (sourceFiles + node --test list)",
+"verifierNote": "Checked line 69 (equal to 120) and line 47 ('walking front requires 4 frames'). getRoomAvatarAssetCoverage is used in MyRoomScreen.tsx, so the rewrite targets live code."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarRoomCatalogRuntime.test.ts",
+"verdict": "TRIM",
+"reason": "Mixed file. Keep canonical item-to-room projection completeness, quarantine and promotion-hold exclusion, fail-closed body isolation, persisted loadouts with retired items, layer ordering, seat fail-closed, and the owner-approved Cream Tee v17 binding. Remove the flipbook pins (exact frame keys and counts, rigid head), rigId/fitProfileId strings, constants deep-equal to themselves, and the case that enforces open P0 bug AF-01.",
+"evidence": "ASSET_FIT_AUDIT_2026-10-01 F-01/P0 #1 (beanie at behindHairFront, order 79 < hairFront 80); SESSION_INVENTORY AF-01 'NOT STARTED (data-only fix)'; ART_GATE_DECISIONS_2026-09-30 (owner removed the pose-specific frame gates).",
+"casesToRemove": [
+"new room wardrobe layers resolve dedicated walking and sitting assets at module load (hard-coded 20-ID list; duplicates motion coverage)",
+"the male walking body and clothes use four-frame motion while head layers stay anchored",
+"the male sitting face and hair keep the same rigid-head source",
+"premium female hairstyles use their dedicated four-frame walk and sitting art",
+"male headwear accessories resolve behind the front hair layer (line 598; enforces open P0 AF-01, blocks the data-only fix)",
+"promoted female wardrobe layers carry an explicit rig and fit profile",
+"in 'the fitted male starter stack resolves walking and sitting without static fallbacks': drop exact rigId/fitProfileId/layerCount 6/motionTreatment asserts, keep fallbackLayerCount 0 and isProductionReady",
+"in 'the default male room avatar uses an independent fitted starter stack': drop the deepEqual of DEFAULT_ROOM_AVATAR_MALE to itself, keep 'every default layer is a male catalog item'",
+"in 'the default female room avatar is fully dressed': assert top/bottom/shoes defined and resolving, not exact IDs",
+"in 'reviewed charcoal chinos preserve fit behind the shoe upper': drop deepEqual([...MALE_BOTTOMS_BEHIND_SHOES_IDS], [charcoalId]), keep layer order",
+"in split-accessory cases: drop part-ID lists, frame-count 4 and '_part_' key regexes, keep rear-below/front-above hair ordering"
+],
+"rewritePlan": "Keep: seat fail-closed; every visible wardrobe item has a room projection; Cream Basic Tee v17 binding (style-owner; loosen 'six motion assets' to 'all motion assets are the art_v17 set'); female accessory on a male avatar fails closed; male-only projection (could become a loop over all male items); pants-over-shoe and shorts-behind-shoe ordering; split-accessory ordering; quarantined crops unresolvable; promotion-hold hidden; trouser occlusion from the shared contract; persisted male loadout falls back from retired hair. When AF-01 is fixed, add 'headwear renders above hairFront'.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (sourceFiles + node --test list); cases only",
+"verifierNote": "Confirmed: line 598 asserts the beanie's headwear-back layer index is below hairFront, while SESSION_INVENTORY line 147 lists AF-01 as P0 NOT STARTED. The Cream Tee v17 case (line 347) protects owner-approved art, so keep it. The layer-order fix changes only data, not the hash-locked runtime bytes."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarSelectionModel.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Loadout V1/V2 wire canonicalization and fail-closed normalization.",
+"wiring": "apps/mobile/scripts/run-session-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarSetupLayout.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the invariant cases: compact thresholds, Dynamic Type, alignment, pod ordering inside the stage, arrow clearance, index wrap. Remove the exact pixel snapshots, which fail on any visual retune.",
+"casesToRemove": [
+"compresses the visual hierarchy on the shorter reference viewport (exact metrics; keep compact true / veryCompact false)",
+"compresses the mirror before CTA and progress can clip on short screens (exact metrics; keep veryCompact true)",
+"reserves enough room for the immersive confirmation sheet (exact 468/392/354)",
+"keeps the avatar confirmation sheet roomy enough for room-style copy (exact 144/116/104)",
+"orders starter product groups from head to feet (constant deep-equals its literal)",
+"in 'maps orbit controls to the canonical rig's actual body zones': drop exact pixel equals and orbitPod deepEquals, keep ordering, inside-stage and stageHeight invariants"
+],
+"wiring": "apps/mobile/scripts/run-avatar-starter-tests.mjs; cases only"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarSetupStudioContract.test.ts",
+"verdict": "REMOVE",
+"reason": "Pure source-text regexes over AvatarSetupScreen.tsx, AvatarSetupStudioStage.tsx and setupFlowCopy.ts. They pin hook names, style names, testIDs, colors, sizes, animation constants (0.85/0.97), Turkish copy and JSX structure. The broad rules are enforced tree-wide in mobile-engineering-rules.test.mjs (no rAF/setInterval loops at line 56, shared Reduce Motion store at line 70). Layout is in avatarSetupLayout.test.ts and selector behavior in avatarStarterModel.test.ts.",
+"evidence": "Commits 922fe89, e6cfb6e (ONB-14 copy move forced a test edit), 1658808 (ONB-10 constant change forced a test edit).",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove the avatarSetupStudioContract.test.ts entry from the tsx --test list",
+"verifierNote": "Tried to refute this using the flash bug class. Searching history for flash/blink/flicker finds only 1658808 (ONB-10, the studio blink) and 9a9013a (the wardrobe flash, which wardrobeCatalogTransitionModel already guards with a behavior test). The 'hidden start before paint' and 'min opacity 0.85' checks pin one file's exact code and are a one-off fix, not a frequent class. REMOVE stands. Optional: if the selection visual is ever extracted into a pure progress-to-opacity function, a behavior test that opacity stays > 0 and that Reduce Motion is static would keep the ONB-10 intent."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarStarterModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep starter body, slot normalization, no premium leakage into the free starter, legacy-female isolation and refresh on a newer revision. Remove one source-regex case, five cases for test-only buildInitialProfileStarterAvatar (three of them with duplicate inputs) and two constant-mirror cases.",
+"casesToRemove": [
+"Orbit Stylist uses the starter catalog selector instead of every owned wardrobe item (regex over AvatarSetupScreen.tsx)",
+"first profile completion turns an untouched revision-zero avatar into the selected starter (dead code)",
+"first profile completion can replace the server-created revision-one starter (dead code)",
+"profile review refreshes an untouched canonical starter after the gender changes (dead code)",
+"profile review never replaces a customized avatar even at revision one (dead code)",
+"does not create a new canonical revision when the untouched starter already matches (dead code)",
+"female starter styling exposes exactly two free choices in every category (constant mirror)",
+"male starter styling excludes retired hair and preserves other free choices (constant mirror)"
+],
+"rewritePlan": "Replace the two mirror tests with one invariant over the real catalog. For each body and category, every getAvatarStarterCategoryItems item must be ownedByDefault, priced 0 in ECONOMY_CATALOG, body-compatible, not retired and not hiddenFromWardrobe, and the list must be non-empty.",
+"wiring": "apps/mobile/scripts/run-avatar-starter-tests.mjs; cases only",
+"verifierNote": "Grep confirms buildInitialProfileStarterAvatar is referenced only in avatarStarterModel.ts and its test."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarV2BottomWardrobeAssets.test.ts",
+"verdict": "REMOVE",
+"reason": "One-off wiring check for a past wave of six female bottoms. It runs regexes over the source of the catalog, room, shop and economy files and existsSync on hard-coded filenames. The generic guarantees are covered by shopCatalogParity ('every mobile shop item is represented by the shared economy catalog', 'server loadout metadata exactly follows the runtime mobile avatar catalog'), by avatarRoomCatalogRuntime projection completeness, and by catalog module load with the png require hook.",
+"evidence": "History: only 922fe89 and 38fe5e5 (a rename that forced an edit). It has never caught a bug.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from sourceFiles and the compiled node --test list",
+"verifierNote": "Read the shopCatalogParity test names (lines 56 and 260), which provide the generic coverage. History shows no bug fixes. Confirmed."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarV2EquippedState.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Semantic dressId equip state.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarV2FeatureWardrobeAssets.test.ts",
+"verdict": "TRIM",
+"reason": "Remove the three one-off 'wired through' wave checks (source regexes and about 45 existsSync filenames). Keep the behavior cases: persisted removed IDs resolve to defaults, slot independence, male fail-closed, accessory group stacking, and removed legacy IDs not reused.",
+"casesToRemove": [
+"soft doll feature assets are wired through avatar, room, shop, and motion layers",
+"female accessory assets are wired through avatar, room, shop, and motion layers",
+"supported tops retain assets while retired tops remain hidden under stable IDs"
+],
+"rewritePlan": "After removal, delete the unused features/accessoryFeatures/outerwearFeatures tables, the readProjectFile helper and the existsSync import.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs; cases only",
+"verifierNote": "The stable-ID guarantee in the third case is covered by retiredWardrobe.test.ts ('retired wardrobe entries preserve IDs but cannot be browsed or equipped even when owned'). Confirmed."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarV2Outfits.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Dress/separates state machine and persisted-pair normalization.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/avatarV2Persistence.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Per-user local storage (account isolation), and the server selection beats stale local storage (server authority).",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs",
+"verifierNote": "Test names at lines 15, 27 and 39 confirm both behaviors. There are no source reads."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/candidateAvatarSnapshot.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the trusted server body preset, the retired remote top fallback, snapshot validation and MiniRoom/discovery parity. Remove the case that pins the private hash-to-variant table.",
+"casesToRemove": [
+"female preview seeds keep their deterministic wardrobe variants"
+],
+"rewritePlan": "Replace with a check that the same seed twice is deep-equal and renders with no fallback layers. Assert no item IDs.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs; cases only"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/femaleSweetCapsuleCatalog.test.ts",
+"verdict": "REMOVE",
+"reason": "Pins one capsule wave: exact counts, display-name regexes over source, Coral Wave prices and layerOrder, asset keys, 4-frame keys, source mentions of FEMALE_SWEET_CAPSULE_* and premium count 109. The safety parts are covered generically. shopCatalogParity has dress pairing (line 227), loadout parity (260) and 'the 109 premium avatar items, including Coral Wave' (211). shopReleaseCatalog hash-locks Coral Wave's bytes and receipts. retiredWardrobe covers retirement.",
+"evidence": "History: 263cd8a (Coral Wave feature), then d34cca5, 8dc11af and 38fe5e5, which were refactors that only forced source-path edits. No bug fixes.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from sourceFiles and the node --test list",
+"verifierNote": "Verified that the duplicate tests exist in shopCatalogParity.test.ts (lines 211, 227 and 260). History contains only feature and refactor commits."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/maleAvatarRigContract.test.ts",
+"verdict": "REMOVE",
+"reason": "Pixel-level art QA on the male starter PNGs: alpha bounding boxes, neckline luminance rows, overlap rectangles, distinct SHA-256 per frame, green fringe and RGB residue. This is the same gate class the owner removed for female art on 2026-09-30. It freezes art bytes and blocks re-exports and atlas/mesh renderers. The drawn look is protected by the owner's ship-time approval.",
+"evidence": "ART_GATE_DECISIONS_2026-09-30: 'all four gates removed by the owner' (pose-specific frames, F04 anchor, green fringe, tee outlines).",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from sourceFiles and the node --test list; keep pngjs (used elsewhere)",
+"verifierNote": "Read ART_GATE_DECISIONS: the owner removed all four gates on 2026-09-30. History of this file is only dbb1c13 and 922fe89, with no bug fix. Confirmed."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/maleCapsuleCatalogIntegration.test.ts",
+"verdict": "REMOVE",
+"reason": "Mostly exact counts and frozen slug lists, plus a 'distinct walking art' check (the owner-removed gate class) and a fixed-head identical-frames check that blocks head bob (VIS-03). The rest duplicates shopCatalogParity: loadout parity (line 260), male starter basics (305), the male fixture never getting female products (337), and R1 Shop receipted items (129).",
+"evidence": "The unwired test_male_rejected_top_and_glasses_cancelled.py contradicts this file's modern_track_luxury_top expectation. History: 922fe89, dbb1c13, 38fe5e5, with no bug fixes.",
+"rewritePlan": "Optional: in shopCatalogParity.test.ts, add one loop over ECONOMY_CATALOG avatar items asserting ownedByDefault === (priceCoins === 0), mirrored on AVATAR_V2_CATALOG.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from sourceFiles and the node --test list",
+"verifierNote": "Confirmed the shopCatalogParity duplicates by test name. modern_track_luxury_top is in malePremiumCapsuleInventory.ts line 135 and in RETIRED ids (retiredWardrobe.test.ts line 34), so retirement is already covered by the safety test."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/maleHairV2SurfaceIntegration.test.ts",
+"verdict": "REMOVE",
+"reason": "Freezes 8 hair slugs, filenames, 4 identical walking frames (a rigid head, which blocks VIS-03 head bob) and identity between the Shop preview and the room source. Parity and visibility are covered generically. Its '/candidates/' check is weaker than the build guard.",
+"evidence": "History: cd32a68 (feature) and 38fe5e5 (rename) only.",
+"rewritePlan": "When removing, widen CANDIDATE_IMPORT in apps/mobile/scripts/mobile-release-assets.cjs (line 5: `(?:-candidate|candidate)\\/`) to also match a plural `candidates/` directory, and add a case to mobile-release-config.test.mjs.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from the tsx --test list",
+"verifierNote": "Confirmed that the CANDIDATE_IMPORT regex at mobile-release-assets.cjs line 5 does not match 'candidates/'. The release-safety part is preserved by widening that tree-wide guard instead."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/maleRigThumbnailPresentation.test.ts",
+"verdict": "REMOVE",
+"reason": "Test 1 deep-equals a constant table to itself. Tests 2 and 3 use stale stage sizes (wardrobe 114x100, while the real WARDROBE_THUMB_BOX is 100x68) and pin per-type counts parsed by regex from source. Test 4 is a source regex over four UI files. Test 5 duplicates avatarBodyCompatibility. Generic thumbnail containment is in shop/shopThumbnailLayout.test.ts.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: remove from sourceFiles and the node --test list (and the maleRigThumbnailPresentation.ts sourceFiles entry if listed only for it; the module itself is live in ShopProductCard.tsx and WardrobeCatalogCard.tsx, so keep it compiling via those). Delete the orphan runner apps/mobile/scripts/run-male-rig-thumbnail-tests.mjs. apps/mobile/scripts/test_male_rejected_top_and_glasses_cancelled.py reads this file by path; it is unwired and already failing.",
+"verifierNote": "Confirmed WARDROBE_THUMB_BOX = 100x68 (wardrobeStageLayout.ts line 51) against the test's 114x100 (lines 62 and 114). The orphan runner is referenced only by audit docs. Note that the module is live production code, so check that the tsc sourceFiles list still compiles it through its importers before dropping the entry."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/myRoomAvatarSource.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "In production, My Room shows the server-saved avatar, not a stale local preview.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/qa/avatarQaInventory.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Env gate (dev mode + flag + non-production). QA mode disables local and remote persistence, so fake ownership never reaches the server, and the real inventory is not mutated.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs",
+"verifierNote": "Read lines 13-140. The gate and persistence-policy cases are safety. The premium-male-capsule and slug cases are small behavior checks over live data with no exact counts, so they are harmless. Kept."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/retiredWardrobe.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Canonical-ID rule: retired items keep their IDs and art, are hidden and non-equippable even when owned, persisted loadouts fall back, and retained purchased items stay equippable.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs",
+"verifierNote": "Read lines 52-100. The explicit ID lists encode the owner's retirement and retention decisions on purchased items (an ownership and canonical-ID concern), not layout. Kept."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Render-model behavior guarding jank and Reduce Motion: no image reload on position updates, UI-thread frame index, shared-tick phase, each frame mounted once, static under Reduce Motion.",
+"evidence": "bdac79e 'perf: select room avatar frames on the UI thread'; afe2ab8 'fix: start the avatar frame clock when Reduce Motion resolves'; e429594 merge.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (tsx --test list)",
+"verifierNote": "Checked that the 120 values here are fixture inputs (animatedLayer default parameter), not an assertion on the production constant, so the test does not block the VIS-03 clock change."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobe/wardrobeCatalogModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep card, lock and preview behavior and the owner's MICRO-3 ordering rule. Remove one exact-pixel characterization case and one case for test-only code.",
+"casesToRemove": [
+"legacy preview image styles keep their per-type frames (exact width/height/translateY)",
+"equipped label names the equipped item or asks to choose (resolveWardrobeEquippedLabel is test-only)"
+],
+"wiring": "apps/mobile/package.json script test:wardrobe; cases only, package.json untouched",
+"verifierNote": "Grep confirms resolveWardrobeEquippedLabel has no runtime caller."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobe/wardrobeCatalogTransitionModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the no-flash rule and the Reduce Motion instant swap (bug 9a9013a). The duration-relationship case is a tuning choice.",
+"evidence": "9a9013a 'fix: change wardrobe categories without a flash of the new products'.",
+"casesToRemove": [
+"the swap stays short: fade out and in together under a quarter second"
+],
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs; cases only",
+"verifierNote": "Confirmed 9a9013a in the flash/flicker history search."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobe/wardrobeDoneModel.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Done never closes over an in-flight or failed save.",
+"wiring": "apps/mobile/package.json script test:wardrobe"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobe/wardrobeIndicatorModel.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Indicator geometry with invalid-input guards.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobe/wardrobeStageLayout.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the invariant layout cases. Remove the case for test-only getWardrobePageIndex.",
+"casesToRemove": [
+"the page index follows the scroll offset and stays in range"
+],
+"wiring": "apps/mobile/package.json script test:wardrobe; cases only",
+"verifierNote": "Grep confirms getWardrobePageIndex is test-only."
+},
+{
+"file": "apps/mobile/src/features/avatarV2/wardrobeCategoryModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the live model behavior: tabs and filters, fallback, body switch refitting every slot, identity parts free outside the Shop, thumbnail frame mapping. Remove two source-regex cases, the constant-literal case and the cases for dead equipped-slot helpers.",
+"casesToRemove": [
+"Avatar Studio exposes real Avatar and My Closet controls (source regex)",
+"wardrobe announces server save rejection instead of failing silently (source regex; behavior is covered by wardrobeDoneModel and avatarEquipSave)",
+"Avatar Studio separates identity editing from the owned closet (constant literal + dead getAvatarStudioCategories)",
+"equipped wardrobe slots resolve only the item worn in their category (dead)",
+"an equipped dress is represented by one atomic Look slot (dead)",
+"a regular outfit keeps independent Top and Bottom slots (dead)",
+"the compact Extra slot honestly summarizes every equipped accessory (dead)",
+"the compact slot layout starts at large text sizes (dead)",
+"equipped slot previews enlarge transparent room layers by category (dead + exact scale constants)",
+"in 'female identity parts and the rendered male face are free Studio choices': drop the getAvatarStudioCategories assertion",
+"in 'wardrobe exposes both starter body bases after onboarding': drop the WARDROBE_CATEGORIES.some(...) line"
+],
+"rewritePlan": "After trimming, remove readWardrobeSources and the readdirSync/readFileSync imports.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs; cases only",
+"verifierNote": "Grep confirms getAvatarStudioCategories, getWardrobeEquippedSlotItem, getWardrobeVisibleSlots, shouldUseWardrobeSlotCompactLayout and getWardrobeEquippedSlotPreviewScale have no reference outside wardrobeCategoryModel.ts and tests."
+}
+],
+"deadCode": [
+"apps/mobile/src/features/avatarV2/wardrobeCategoryModel.ts: getAvatarStudioCategories, getWardrobeSecondaryCategories, shouldUseWardrobeSlotCompactLayout, getWardrobeEquippedSlotPreviewScale, getWardrobeEquippedSlotItem, getWardrobeVisibleSlots, WARDROBE_EQUIPPED_SLOTS, WardrobeVisibleSlot, WARDROBE_CATEGORIES (test-only after the 2766909 wardrobe redesign)",
+"apps/mobile/src/features/avatarV2/avatarStarterModel.ts: buildInitialProfileStarterAvatar, InitialProfileStarterAvatarInput and private helpers isUntouchedCanonicalStarter, avatarsMatch (test-only)",
+"apps/mobile/src/features/avatarV2/avatarBodyCompatibility.ts: getAvatarV2ItemsCompatibleWithBody (test-only)",
+"apps/mobile/src/features/avatarV2/wardrobe/wardrobeCatalogModel.ts: resolveWardrobeEquippedLabel (test-only)",
+"apps/mobile/src/features/avatarV2/wardrobe/wardrobeStageLayout.ts: getWardrobePageIndex (test-only)",
+"apps/mobile/src/features/avatarV2/avatarEquipLifecycle.ts: markAvatarLocallyCustomized is a live but trivial `return true` wrapper",
+"apps/mobile/scripts/run-male-rig-thumbnail-tests.mjs: orphan runner referenced by no package.json or CI",
+"apps/mobile/scripts/test_male_rejected_top_and_glasses_cancelled.py: unwired python test that already fails"
+],
+"notes": "The chunk has 31 files, and each appears exactly once. I agree with all of the classifier's verdicts and changed none. Each was checked as follows.\n- Dead-code claims: confirmed by grep over apps/mobile/src and app. getRoomAvatarAssetCoverage, which the motion-coverage rewrite relies on, is live in MyRoomScreen.tsx.\n- AF-01: the beanie case at avatarRoomCatalogRuntime.test.ts:598 enforces the open P0 bug, which SESSION_INVENTORY line 147 lists as NOT STARTED.\n- ART_GATE_DECISIONS_2026-09-30: confirms the owner removed the same class of art pixel gates. This supports removing maleAvatarRigContract and the rigid-head and distinct-frame checks.\n- shopCatalogParity.test.ts: has generic duplicates for the capsule and wave tests (lines 56, 129, 211, 227, 260, 305, 337).\n- avatarSetupStudioContract: I tried to refute its removal using the flash bug class. History shows only two flash fixes. The wardrobe one is guarded by a behavior test, and the studio one (ONB-10) is a one-off pinned by source regex. The tree-wide rAF/setInterval and Reduce Motion rules in mobile-engineering-rules.test.mjs (lines 56 and 70) remain.\n- maleRigThumbnailPresentation: its stage sizes are stale (wardrobe 114x100 in the test, 100x68 in WARDROBE_THUMB_BOX). The production module stays live through ShopProductCard and WardrobeCatalogCard.\n- CANDIDATE_IMPORT gap: confirmed. Widen the regex when maleHairV2SurfaceIntegration is removed.\n- roomAvatarLayerRenderModel: its 120 values are only fixture inputs.\nNone of the removals touch apps/mobile/package.json. The changes are all to runner .mjs lists or to cases inside files."
+},
+"mobile/shop-inventory": {
+"items": [
+{
+"file": "apps/mobile/src/features/commerce/coinPackCommerce.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Money. Coin packs are credited only after the server reconciles them. Cancelled, offline and timed-out purchases never grant coins. The RevenueCat identity follows the signed-in account. Reconcile is deadline-bounded and sends only transaction IDs.",
+"evidence": "ENGINEERING_RULES.md row 12; 922fe89/4d016d2/030b279.",
+"wiring": "apps/mobile/scripts/run-inventory-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/commerce/coinPackWalletModel.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Purchase gating: no coin-pack purchase while offline, pending, processing, or with no provider.",
+"wiring": "run-inventory-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/inventory/dailyRewardCopy.test.ts",
+"verdict": "REWRITE",
+"reason": "It guards a frequent bug (English text on Turkish devices) but pins the exact TR and EN copy.",
+"evidence": "Localization fixes 27b29d9 (this toast), e6cfb6e, 0ab5fba, ea57b35, fdb0aa6, 2a8e928.",
+"rewritePlan": "For both onboardingCompleted values, assert that the tr title and body differ from en, that both titles contain String(rewardCoins), and that the body changes with onboardingCompleted. Use no literal copy.",
+"wiring": "apps/mobile/scripts/run-session-tests.mjs (test list)",
+"verifierNote": "Confirmed: the file is only deepEqual checks on literal TR and EN strings."
+},
+{
+"file": "apps/mobile/src/features/inventory/economyApi.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Server-authoritative economy request shape (the daily reward has no body; a purchase sends only type and itemId), plus the frequent hang bug: whole-operation deadlines, cancellation, no retry. economyApi.ts is the allowlisted direct-fetcher module.",
+"evidence": "ENGINEERING_RULES.md row 12; ENGINEERING_AUDIT_2026-09-28 P1.",
+"wiring": "run-inventory-tests.mjs",
+"verifierNote": "Optional cleanup: switch the inline bounded-request loop to boundedRequestContract.ts. Nothing to remove."
+},
+{
+"file": "apps/mobile/src/features/inventory/inventoryHydrationPolicy.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Demo never calls the production economy; hydration waits for onboarding."
+},
+{
+"file": "apps/mobile/src/features/inventory/inventoryHydrationSingleFlight.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Race and stale-state guard: concurrent hydrations share one request, an older completion cannot clear a newer flight, and a failed flight is released.",
+"evidence": "ENGINEERING_AUDIT_2026-09-28 P1 'a stalled GET retained hydration single-flight'; e426714, 4c24fbc.",
+"wiring": "run-inventory-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/inventory/inventoryModel.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Unlock math, immutability and restart normalization."
+},
+{
+"file": "apps/mobile/src/features/inventory/inventoryScopeModel.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Account isolation and entitlement integrity: no cross-account apply, no stale overwrite, and a failed hydration never marks paid inventory as ready.",
+"wiring": "run-inventory-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/inventory/inventoryStore.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Purchase integrity in the real store: an ambiguous purchase reconciles without replay, deadlines release the mutation queue, and paid authority is revoked when reconcile fails.",
+"evidence": "ENGINEERING_AUDIT_2026-09-28 P1 purchase-queue hang.",
+"wiring": "run-inventory-tests.mjs (tsx step)"
+},
+{
+"file": "apps/mobile/src/features/inventory/useInventoryStoreView.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "View identity is stable unless the inventory changes (replaced an exhaustive-deps suppression, f8c173e)."
+},
+{
+"file": "apps/mobile/src/features/referrals/referralApi.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the claim path: it is authenticated, uses the server endpoint and is deadline-bounded (66a675a). Remove the createReferralInvite cases, because that function is dead.",
+"evidence": "grep: createReferralInvite appears only in referralApi.ts and referralApi.test.ts.",
+"casesToRemove": [
+"the createReferralInvite call and its URL/auth assertions in 'referral APIs use authenticated server endpoints and reject malformed server links'",
+"the createReferralInvite entry in the loop of 'referral requests time out a stalled transport'"
+],
+"wiring": "apps/mobile/scripts/run-session-tests.mjs (tsc list and test list)",
+"verifierNote": "Confirmed with grep over apps/ and packages/ that createReferralInvite has no runtime caller."
+},
+{
+"file": "apps/mobile/src/features/referrals/referralCaptureSignal.test.ts",
+"verdict": "REMOVE",
+"reason": "Trivial. It tests a Set-based pub-sub of about 10 lines with no logic. The only history is the bulk commit 922fe89, and no bug is recorded.",
+"wiring": "run-session-tests.mjs: the test file entry in the tsc list, plus the test list entry. Keep the source entry if other compiled files import it.",
+"verifierNote": "Read the source: only a Set add, delete and iterate. git log shows only 922fe89."
+},
+{
+"file": "apps/mobile/src/features/referrals/referralModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the link-shape parsing and the rule that binds a pending referral to its first verified account. Remove the cases that cover dead functions.",
+"casesToRemove": [
+"referral share outcomes separate completed shares from a dismissed sheet (resolveReferralShareOutcome is dead)",
+"the referral share message has no inviter identity or location (createReferralShareMessage is dead)"
+],
+"wiring": "run-session-tests.mjs",
+"verifierNote": "Confirmed with grep: both functions are referenced only in referralModel.ts and its test."
+},
+{
+"file": "apps/mobile/src/features/shop/ShopNavigationControls.test.mjs",
+"verdict": "REMOVE",
+"reason": "Source-text and AST test that pins the ShopModeDock JSX child order, pixel insets and the RN Animated API. It blocks moving to Reanimated or Skia and has no safety or bug reason.",
+"evidence": "Only commit is 4d016d2. No mode dock or indicator bug appears in docs/quality or in commit subjects (git log --grep selector/indicator).",
+"wiring": "apps/mobile/package.json script test:shop-preview-assets. Editing that script changes the native fingerprint, so unwire it only together with a planned native build.",
+"verifierNote": "Searched commit messages and docs/quality for a selector or indicator bug and found none."
+},
+{
+"file": "apps/mobile/src/features/shop/ShopPreviewPanel.combinationThumbnail.test.mjs",
+"verdict": "REMOVE",
+"reason": "Source-text test that pins expo-image props, a 34x34 style, JSX positions and a map regex. shopCombinationViewport already tests reachability as behavior.",
+"evidence": "Only 4d016d2. WRD-02 was a one-time polish.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (fingerprint caveat)."
+},
+{
+"file": "apps/mobile/src/features/shop/coralWaveShopCatalog.test.ts",
+"verdict": "REMOVE",
+"reason": "Test for a single merch wave, with hard-coded IDs and titles. Its general check (Shop price === economy price) moves into the shopCatalogParity rewrite.",
+"evidence": "263cd8a.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (fingerprint caveat)."
+},
+{
+"file": "apps/mobile/src/features/shop/screen/coinCountModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the worklet/JS formatter parity, the rule that unverified balances never reach the counter, the Reduce Motion path and the stale-count guard. Remove the duration pin.",
+"casesToRemove": [
+"the COIN_COUNT_DURATION_MS 400-600 bound assertion (keep animate === true and durationMs === COIN_COUNT_DURATION_MS; rename the case)"
+],
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)"
+},
+{
+"file": "apps/mobile/src/features/shop/screen/shopAvatarProductOrder.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Sort priority and locale-aware collation."
+},
+{
+"file": "apps/mobile/src/features/shop/screen/shopScreenModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the surface policy and ownership masking (safety), the shelf drag handoff (a repeated bug: 1c342bc, 93f3217, a54d389), and paging and deep links. Remove the design pins.",
+"casesToRemove": [
+"avatar placeholder icons cover every wearable type (Ionicons glyph names)",
+"the icon field and English label strings in the category deepEquals (keep id, count and order)",
+"the exact x/y preview coordinates in 'room preview decor replaces the previous preview item...'"
+],
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)"
+},
+{
+"file": "apps/mobile/src/features/shop/shopAssets.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the check that the bounds metadata matches the real alpha bounds (runtime data drift). The other cases pin file structure, hand-picked IDs and one-off art choices.",
+"casesToRemove": [
+"shop asset registries live outside the screen monolith",
+"shop asset registries retain representative capsule and room entries",
+"sweet capsule shoe cards use the 512x768 profile layer, not the half-size room layer",
+"shop keeps live avatar previews separate from square product thumbnails (optional)"
+],
+"rewritePlan": "Replace the hard-coded ID list and the path regex in 'garment thumbnails never substitute a full-character square image' with a loop over every AVATAR_V2_CATALOG id that has a garment thumbnail override, asserting the override bounds equal the computed alpha bbox. Merge it into the bounds test and drop the source reads.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopAvatarCategoryModel.test.ts",
+"verdict": "TRIM",
+"reason": "The filtering behavior is worth keeping: normal tops exclude atomic outfit tops, Dress shows only those, and identity parts never become categories. The first case deepEquals SHOP_AVATAR_CATEGORY_ORDER against a literal list, which only pins a design ordering constant to itself.",
+"casesToRemove": [
+"the deepEqual of SHOP_AVATAR_CATEGORY_ORDER to the literal [top,bottom,dress,outerwear,shoes,accessory,hair] in 'avatar categories follow the approved catalog order' (the featured/owned exclusion can stay or merge into the identity-parts case)"
+],
+"wiring": "run-avatar-v2-tests.mjs (file edit only)",
+"verifierNote": "Changed from KEEP_BEHAVIOR. Lines 53-65 assert that the exported order constant equals a literal list, which is a constant-equals-itself pin of a merchandising design choice. The other cases are behavior."
+},
+{
+"file": "apps/mobile/src/features/shop/shopAvatarDraft.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Preview and draft slot semantics and round-trip."
+},
+{
+"file": "apps/mobile/src/features/shop/shopAvatarPreviewAssets.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "The Shop prefetches only the added layer.",
+"verifierNote": "Read the file. The pins assets.length <= 14, 'base_female', 'walking' and 'coral_wave_polo' are tied to the layered-PNG renderer, so delete them with that renderer. They are not a blocker today."
+},
+{
+"file": "apps/mobile/src/features/shop/shopCapabilityPolicy.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the capability gating. Remove the assertion on the dead constant-false function.",
+"casesToRemove": [
+"assert.equal(isMobileOuterwearMerchandisingEnabled(), false)"
+],
+"wiring": "run-avatar-v2-tests.mjs",
+"verifierNote": "Confirmed with grep that the function is referenced only by its module and this test."
+},
+{
+"file": "apps/mobile/src/features/shop/shopCatalogParity.test.ts",
+"verdict": "REWRITE",
+"reason": "The guarantees are real safety: canonical IDs and loadout parity, receipt-only R1, real dress pairs, no female products for male bodies. But some cases are source regexes and exact counts.",
+"evidence": "Lines 211-220 assert exactly 109 premium items (bumped from 106), line 69 asserts 7 room items, and line 232 asserts 8 dresses. readFileSync on economyCatalog.ts, shopCatalog.ts and maleCapsulePreviewSources.ts.",
+"casesToRemove": [
+"the shared catalog contains the 109 premium avatar items, including Coral Wave",
+"mobile pricing delegates to the shared server catalog (import regex)"
+],
+"rewritePlan": "(1) Use ECONOMY_CATALOG/findEconomyCatalogItem lookups instead of regexes, and drop roomItemIds.length === 7. (2) Add a behavior check that every built product's priceCoins equals the economy catalog price (this absorbs coralWave). (3) Drop dressTops.length === 8 and keep the per-dress invariants. (4) Replace the male preview-source regex with getAvatarItemPreviewSource(id) for every visible ownedByDefault item. (5) In the placed-room-item case, keep actionType 'disabled' and drop the exact English copy. Keep the QA, demo, R1, loadout parity, male-never-female and pseudo-product cases.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)",
+"verifierNote": "Confirmed the count, regex and readFileSync lines, and the churn history (fa97f7c, c03af39, 38fe5e5, dbb1c13, 263cd8a)."
+},
+{
+"file": "apps/mobile/src/features/shop/shopCatalogRuntime.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Production enforces the published catalog and server inventory; QA and demo never leak into production.",
+"wiring": "apps/mobile/scripts/run-navigation-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopCheckoutModel.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Checkout state machine: confirming needs a verified, sufficient balance; an unknown price fails closed; the first failure stops the queue.",
+"evidence": "61e235b SHOP-01.",
+"wiring": "run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopCombinationState.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Buy-the-look reducer: a single approval names the exact IDs, each item is purchased once, and there is never a partial equip.",
+"evidence": "61e235b SHOP-01.",
+"wiring": "run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopCombinationSummary.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Charges only unowned pieces; an unknown price fails closed."
+},
+{
+"file": "apps/mobile/src/features/shop/shopCombinationViewport.test.ts",
+"verdict": "TRIM",
+"reason": "Keep reachability on short screens and with large text. The first case re-derives pixel constants.",
+"casesToRemove": [
+"four rows fit without clipping either navigation or purchase action"
+],
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)"
+},
+{
+"file": "apps/mobile/src/features/shop/shopCopy.test.ts",
+"verdict": "REWRITE",
+"reason": "The real guarantee is TR/EN completeness (a frequent localization bug). Today it pins about 20 literal strings plus a source regex over screen files.",
+"evidence": "27b29d9, e6cfb6e, 0ab5fba, ea57b35, fdb0aa6, 2a8e928. The source regexes needed edits in 8dc11af and 61e235b.",
+"casesToRemove": [
+"shop combination messages come from the localized copy contract (source-text regexes)"
+],
+"rewritePlan": "Walk getShopCopy('en') and getShopCopy('tr') recursively. Check that string leaves are non-empty and tr !== en, apart from a small allowlist of brand words. Call function leaves with sample args and check the output is non-empty, tr !== en, and contains the numeric args. Use no literal copy.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)",
+"verifierNote": "Confirmed the two test cases (lines 7 and 33), and that the one-checkout guarantee is covered by shopCombinationState."
+},
+{
+"file": "apps/mobile/src/features/shop/shopFormatters.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Locale-correct coin formatting (the fixed-TR-locale bug)."
+},
+{
+"file": "apps/mobile/src/features/shop/shopLayoutMetrics.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the stage bounds, the 44pt touch targets, 320pt with no overflow, finite metrics on invalid input, and usable large text. Remove the designer pixel budgets.",
+"casesToRemove": [
+"larger iPhones keep the same Shop hierarchy and only gain bounded space",
+"four-piece preview redistributes space without expanding the screen (magic numbers 228/108/246)",
+"shop metrics depend on width and ignore height-only changes (optional)"
+],
+"wiring": "apps/mobile/package.json script test:layout (file edit only)"
+},
+{
+"file": "apps/mobile/src/features/shop/shopListingModel.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Publication gate: only published, priced items with Shop art become Shop links.",
+"wiring": "run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopPresentationModel.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the presentation state machine and the content gating. getShopInteractionPolicy is dead code.",
+"casesToRemove": [
+"the three getShopInteractionPolicy deepEqual assertions"
+],
+"wiring": "run-avatar-v2-tests.mjs",
+"verifierNote": "Confirmed with grep that getShopInteractionPolicy is referenced only by its module and this test."
+},
+{
+"file": "apps/mobile/src/features/shop/shopPreviewPanel.test.ts",
+"verdict": "REMOVE",
+"reason": "Source-text test over six files. It pins testIDs, component and hook names, style numbers (minHeight 64, borderRadius 18), TR copy and file layout. The safety intents are covered behaviorally: shopScreenModel covers surface policy and masking, shopCheckoutModel covers checkout gating, and shopCatalogRuntime covers QA and demo isolation.",
+"evidence": "Edited for pure refactors in 8dc11af, a39a204 and 0a952e7. Its negative guard checks for ROOM_V3_QA_INTERACTION_CATALOG, which grep finds only in this test.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs: the test entry in the tsc list, plus the ShopPreviewPanel.tsx and shopPreviewStyles.ts entries if only this test needs them (confirm with tsc), plus the test list entry.",
+"verifierNote": "Read the assertions on lines 101-239. One gap: the wiring check that production renderMainTabPage passes isRoomCatalogQaPreview={false} and an empty qaOnlyOwnedRoomItemIds has no behavioral equivalent. The risk is low because the server alone decides ownership and shopCatalogRuntime covers the policy. If it is wanted, add a small test that renders or evaluates renderMainTabPage's Shop props. Optionally, extract the primary-action label and disabled derivation into a pure model and test it."
+},
+{
+"file": "apps/mobile/src/features/shop/shopProductPresentation.test.ts",
+"verdict": "REWRITE",
+"reason": "The behavior is real (localized labels; identity, price and owned/equipped/placed states preserved), but it pins exact TR copy.",
+"rewritePlan": "Assert that the tr labels differ from en and contain formatCoins(100,'tr'), that priceCoins and sourceItemId are unchanged, that the three states give distinct stateLabels, and that the placed label contains placedCount. Use no literal copy.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (file edit only)"
+},
+{
+"file": "apps/mobile/src/features/shop/shopPurchaseCoordinator.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Production uses the server purchase path; an offline read-only Shop never mutates; analytics events carry no IDs or PII.",
+"wiring": "run-avatar-v2-tests.mjs"
+},
+{
+"file": "apps/mobile/src/features/shop/shopQueueProductPolicy.test.ts",
+"verdict": "REMOVE",
+"reason": "Trivial: it tests a one-line Array.find wrapper. The visible-products-only rule for the look queue is exercised through shopCombinationState and checkout.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs (tsc list and test list)",
+"verifierNote": "Read the source: one find. It is live in useShopLookCheckout.ts:96, so it is not dead code. git log shows only 922fe89, with no bug history."
+},
+{
+"file": "apps/mobile/src/features/shop/shopReleaseCatalog.test.ts",
+"verdict": "KEEP_SAFETY",
+"reason": "Hash-locked publication gate that AGENTS.md names: paid items are sold only with owner receipts whose bytes match.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets"
+},
+{
+"file": "apps/mobile/src/features/shop/shopSelectionModel.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "No stale or cross-section selection."
+},
+{
+"file": "apps/mobile/src/features/shop/shopThumbnailLayout.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Contain-fit geometry; invalid metadata falls back."
+}
+],
+"deadCode": [
+"apps/mobile/src/features/shop/shopCapabilityPolicy.ts: isMobileOuterwearMerchandisingEnabled (only referenced by its test; returns false)",
+"apps/mobile/src/features/shop/shopPresentationModel.ts: getShopInteractionPolicy (only referenced by its test)",
+"apps/mobile/src/features/referrals/referralModel.ts: createReferralShareMessage, resolveReferralShareOutcome (only referenced by their test)",
+"apps/mobile/src/features/referrals/referralApi.ts: createReferralInvite (only referenced by its test)"
+],
+"notes": "I verified on b8d2737 and changed nothing. All 42 chunk files appear exactly once.\n\nWhat I checked:\n- grep confirmed every deadCode claim and that ROOM_V3_QA_INTERACTION_CATALOG exists only in shopPreviewPanel.test.ts.\n- resolveQueuedAvatarProduct is live, but the test is trivial, so the REMOVE stands.\n- git log --grep found no selector or indicator bug behind ShopNavigationControls.\n- shopCatalogParity's pins (109, 7, 8) and its readFileSync calls are confirmed.\n\nOne verdict changed: shopAvatarCategoryModel moves from KEEP_BEHAVIOR to TRIM, because it pins the literal category order constant. Ignore the extra 'verdictChangedFrom' key on that item if the schema does not take it.\n\nOne small gap is noted on shopPreviewPanel: the check that production nav passes QA props as false/empty has no behavioral twin. The risk is low because the server owns ownership.\n\nFingerprint caveat as the classifier said: ShopNavigationControls.test.mjs, ShopPreviewPanel.combinationThumbnail.test.mjs and coralWaveShopCatalog.test.ts are wired in the apps/mobile/package.json test:shop-preview-assets script. Unwire them only together with a planned native build."
 }
 }
 }
