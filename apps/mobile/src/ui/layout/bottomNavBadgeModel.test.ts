@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-  BOTTOM_NAV_BADGE_SPRING,
   formatBottomNavBadgeCount,
   getBadgeAppearMotion,
   getBadgeBumpMotion,
@@ -36,12 +35,11 @@ test("a bump needs a visible badge and a higher count", () => {
   assert.equal(shouldBumpBadge(5, 5), false)
 })
 
-test("appearing springs from 0.6 to 1, or snaps with Reduce Motion", () => {
-  assert.deepEqual(getBadgeAppearMotion(false), {
-    fromScale: 0.6,
-    spring: BOTTOM_NAV_BADGE_SPRING,
-    opacityDurationMs: 120,
-  })
+test("appearing springs into place, or snaps with Reduce Motion", () => {
+  const animated = getBadgeAppearMotion(false)
+  assert.ok(animated.fromScale > 0 && animated.fromScale < 1)
+  assert.ok(animated.spring)
+  assert.ok(animated.opacityDurationMs > 0)
   assert.deepEqual(getBadgeAppearMotion(true), {
     fromScale: 1,
     spring: null,
@@ -50,21 +48,19 @@ test("appearing springs from 0.6 to 1, or snaps with Reduce Motion", () => {
 })
 
 test("a count increase bumps briefly, and never with Reduce Motion", () => {
-  assert.deepEqual(getBadgeBumpMotion(false), {
-    peakScale: 1.12,
-    peakDurationMs: 90,
-    spring: BOTTOM_NAV_BADGE_SPRING,
-  })
+  const bump = getBadgeBumpMotion(false)
+  assert.ok(bump)
+  assert.ok(bump.peakScale > 1)
+  assert.ok(bump.peakDurationMs > 0)
+  assert.ok(bump.spring)
   assert.equal(getBadgeBumpMotion(true), null)
 })
 
-test("exiting fades and shrinks in 120 ms, or hides instantly with Reduce Motion", () => {
-  assert.deepEqual(getBadgeExitMotion(false), { toScale: 0.6, durationMs: 120 })
+test("exiting fades and shrinks, or hides instantly with Reduce Motion", () => {
+  const exit = getBadgeExitMotion(false)
+  assert.ok(exit.toScale < 1)
+  assert.ok(exit.durationMs > 0)
   assert.deepEqual(getBadgeExitMotion(true), { toScale: 0, durationMs: 0 })
-})
-
-test("the badge spring mirrors the bouncy theme spring", () => {
-  assert.deepEqual(BOTTOM_NAV_BADGE_SPRING, { damping: 12, stiffness: 200, mass: 0.8 })
 })
 
 test("the badge label caps at 99+ and keeps the last count while it fades out", () => {

@@ -2,7 +2,12 @@ import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { resolve } from "node:path"
 import test, { mock } from "node:test"
+import { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS } from "../features/session/onboardingBrandPreludeModel"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../testing/hookHarness"
+
+const DISSOLVE_START = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveStart
+const DISSOLVE_END = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete
+const DISSOLVE_MS = DISSOLVE_END - DISSOLVE_START
 
 // The boot loading surface owns the scan. It dissolves the characters itself
 // before an onboarding prelude takes over (ONB-02) and never dissolves when
@@ -81,8 +86,8 @@ test("with a waiting prelude the scan dissolves on the shared clock, then hands 
   let ready = 0
   screen.runtime.render(() => screen.BlumiLoadingScreen({ onPreludeReady: () => { ready += 1 } }))
 
-  assert.deepEqual(dissolveOf(screen.started), { delayMs: 1_700, durationMs: 250, toValue: 0 })
-  mock.timers.tick(1_949)
+  assert.deepEqual(dissolveOf(screen.started), { delayMs: DISSOLVE_START, durationMs: DISSOLVE_MS, toValue: 0 })
+  mock.timers.tick(DISSOLVE_END - 1)
   assert.equal(ready, 0, "the prelude never mounts over visible characters")
   mock.timers.tick(1)
   assert.equal(ready, 1)
@@ -94,11 +99,11 @@ test("a late handoff still plays a full dissolve instead of cutting the characte
   // Splash: no prelude yet, the scan stays.
   screen.runtime.render(() => screen.BlumiLoadingScreen({}))
   assert.equal(dissolveOf(screen.started), null)
-  mock.timers.tick(2_400)
+  mock.timers.tick(DISSOLVE_END + 450)
   // Hydration resolves to AuthEntry well after the authored dissolve time.
   screen.runtime.render(() => screen.BlumiLoadingScreen({ onPreludeReady: () => { ready += 1 } }))
-  assert.deepEqual(dissolveOf(screen.started), { delayMs: 0, durationMs: 250, toValue: 0 })
-  mock.timers.tick(249)
+  assert.deepEqual(dissolveOf(screen.started), { delayMs: 0, durationMs: DISSOLVE_MS, toValue: 0 })
+  mock.timers.tick(DISSOLVE_MS - 1)
   assert.equal(ready, 0)
   mock.timers.tick(1)
   assert.equal(ready, 1)

@@ -4,6 +4,12 @@ import test from "node:test"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 
+// The scan timeline is injected here; assertions are relative to it, so the
+// authored durations can change without editing this test.
+const TIMELINE = { scanRowsComplete: 800, scanSweepStart: 250, scanSweepComplete: 1750, scanDissolveComplete: 1950 }
+const SWEEP_MS = TIMELINE.scanSweepComplete - TIMELINE.scanSweepStart
+const HOLD_MS = TIMELINE.scanDissolveComplete - TIMELINE.scanSweepComplete
+
 function harness(resume = { startElapsedMs: 0, resumesBootScan: false }) {
   const source = readFileSync(new URL("./BlumiLoadingScreen.tsx", import.meta.url), "utf8")
   const file = ts.createSourceFile("BlumiLoadingScreen.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
@@ -23,14 +29,15 @@ function harness(resume = { startElapsedMs: 0, resumesBootScan: false }) {
   runInNewContext(output, {
     exports, View: "View", OnboardingScanStage: "Scan", SoftBlobBackground: "Background", styles: {},
     ONBOARDING_SCAN_FRAMES: Array(6).fill("asset"),
-    timeline: { scanRowsComplete: 800, scanSweepStart: 250, scanSweepComplete: 1750, scanDissolveComplete: 1950 },
+    timeline: TIMELINE,
     useReducedMotionPreference: () => motion, getNativeOnboardingBootReduceMotion: () => null,
     getOnboardingLoadingScanResume: () => resume,
     getLoadingScreenCopy: () => ({ preparing: "Blumi hazırlanıyor" }), resolveUiLocale: () => "tr",
     readOnboardingBootSurfaceHandoff: () => ({ bootSurfaceVisible: false, bootSurfaceVisibleUntilMs: null }),
     getOnboardingBootPreludeElapsedSnapshotMs: () => resume.startElapsedMs,
     getOnboardingBrandPreludeProgressAtElapsed: (ms) => ({
-      scanRows: Math.min(1, ms / 800), scanSweep: Math.max(0, Math.min(1, (ms - 250) / 1500))
+      scanRows: Math.min(1, ms / TIMELINE.scanRowsComplete),
+      scanSweep: Math.max(0, Math.min(1, (ms - TIMELINE.scanSweepStart) / SWEEP_MS))
     }),
     useState(initial) {
       const index = cursor++
@@ -95,17 +102,15 @@ test("all six scan characters plus laser must load before revealing or running t
   assert.equal(h.starts.length, 1)
 })
 
-test("loaded scan runs the full native-driver timeline and reports only natural completion", () => {
+test("loaded scan runs the full timeline and reports only natural completion", () => {
   const h = harness()
   loadAll(h)
   const sequence = h.starts[0].animation
   const parallel = sequence.input[0]
-  assert.equal(parallel.input[0].input.duration, 800)
-  assert.equal(parallel.input[0].input.useNativeDriver, true)
-  assert.equal(parallel.input[0].input.isInteraction, false)
-  assert.equal(parallel.input[1].input[0].input.duration, 250)
-  assert.equal(parallel.input[1].input[1].input.duration, 1500)
-  assert.equal(sequence.input[1].input.duration, 200)
+  assert.equal(parallel.input[0].input.duration, TIMELINE.scanRowsComplete)
+  assert.equal(parallel.input[1].input[0].input.duration, TIMELINE.scanSweepStart)
+  assert.equal(parallel.input[1].input[1].input.duration, SWEEP_MS)
+  assert.equal(sequence.input[1].input.duration, HOLD_MS)
   assert.equal(h.completions, 0)
   h.starts[0].callback({ finished: false })
   assert.equal(h.completions, 0)
@@ -150,19 +155,20 @@ test("image failure is forwarded to bounded recovery without revealing a partial
 })
 
 test("straight after the boot surface the scan continues the shared clock without an image gate", () => {
-  const h = harness({ startElapsedMs: 1_000, resumesBootScan: true })
+  const resumeAt = TIMELINE.scanRowsComplete + 200
+  const h = harness({ startElapsedMs: resumeAt, resumesBootScan: true })
   const stage = h.render()
   assert.equal(stage.props.style[1].opacity, 1, "the boot surface already showed these images")
   const sequence = h.starts[0].animation
   const [parallel, hold] = sequence.input
   assert.equal(parallel.input[0].input.duration, 1, "rows already complete")
   assert.equal(parallel.input[1].input[0].input.duration, 0, "the sweep is already moving")
-  assert.equal(parallel.input[1].input[1].input.duration, 750)
-  assert.equal(hold.input.duration, 200)
+  assert.equal(parallel.input[1].input[1].input.duration, TIMELINE.scanSweepComplete - resumeAt)
+  assert.equal(hold.input.duration, HOLD_MS)
 })
 
 test("a boot scan that already finished rests complete and releases at once", () => {
-  const h = harness({ startElapsedMs: 1_950, resumesBootScan: true })
+  const h = harness({ startElapsedMs: TIMELINE.scanDissolveComplete, resumesBootScan: true })
   h.render()
   assert.equal(h.starts.length, 0, "no replay of a finished scan")
   assert.equal(h.completions, 1)

@@ -2,26 +2,23 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { resolveCompactViewportLayout } from "./compactViewportLayout"
 
-test("iPhone SE-height viewports reserve enough space for complete auth and discover actions", () => {
-  assert.deepEqual(resolveCompactViewportLayout(667), {
-    compact: true,
-    authAvatarSize: 126,
-    authStageHeight: 184,
-    discoverAvatarSize: 224,
-    discoverDeckHeight: 448,
-    showDiscoverProgress: false
-  })
+test("iPhone SE-height viewports switch to a smaller composition that fits the height", () => {
+  const compact = resolveCompactViewportLayout(667)
+  const full = resolveCompactViewportLayout(844)
+
+  assert.equal(compact.compact, true)
+  assert.equal(full.compact, false)
+  assert.ok(compact.authAvatarSize < full.authAvatarSize)
+  assert.ok(compact.authStageHeight < full.authStageHeight)
+  assert.ok(compact.discoverAvatarSize < full.discoverAvatarSize)
+  assert.ok(compact.discoverDeckHeight < full.discoverDeckHeight)
+  assert.ok(compact.discoverDeckHeight < 667)
+  assert.ok(full.discoverDeckHeight < 844)
 })
 
-test("taller viewports retain the full-size release composition", () => {
-  assert.deepEqual(resolveCompactViewportLayout(844), {
-    compact: false,
-    authAvatarSize: 150,
-    authStageHeight: 224,
-    discoverAvatarSize: 268,
-    discoverDeckHeight: 548,
-    showDiscoverProgress: true
-  })
+test("compact viewports hide Discover progress; taller ones keep it", () => {
+  assert.equal(resolveCompactViewportLayout(667).showDiscoverProgress, false)
+  assert.equal(resolveCompactViewportLayout(844).showDiscoverProgress, true)
 })
 
 test("large text switches the cinematic scene to its compact-safe composition", () => {

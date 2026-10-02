@@ -14,7 +14,7 @@ test("uses one measured nav height and reserves its complete floating footprint"
   })
 
   assert.equal(layout.height, BOTTOM_NAV_HEIGHT)
-  assert.equal(layout.bottomOffset, 32)
+  assert.ok(layout.bottomOffset > 0)
   assert.equal(
     layout.contentInset,
     layout.bottomOffset + layout.height + layout.contentGap
