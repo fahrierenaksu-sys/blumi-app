@@ -11,8 +11,14 @@ import {
   type NotificationPreferenceToggleKey,
   updateNotificationPreferenceToggle
 } from "../notifications/notificationPreferencesModel"
+import type { WhenPushSettled } from "../../navigation/useAfterPushTransition"
 import type { SessionActor } from "../session/sessionModel"
 import type { SettingsLoadStatus } from "./settingsPresentationModel"
+
+const runNow: WhenPushSettled = (task) => {
+  task()
+  return () => undefined
+}
 
 export type PushPermissionStatus = "unknown" | "undetermined" | "granted" | "denied"
 
@@ -24,8 +30,13 @@ export function useNotificationSettings(input: {
   sessionActor: SessionActor
   pushPermissionStatus: PushPermissionStatus
   onRequestPushPermission: () => Promise<void>
+  /**
+   * Runs the first server refresh once the screen's push has settled, so
+   * it never re-renders the page mid-slide. Defaults to at once.
+   */
+  whenSettled?: WhenPushSettled
 }) {
-  const { sessionActor, pushPermissionStatus, onRequestPushPermission } = input
+  const { sessionActor, pushPermissionStatus, onRequestPushPermission, whenSettled = runNow } = input
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null)
   const [notificationPreferencesStatus, setNotificationPreferencesStatus] = useState<SettingsLoadStatus>("idle")
   const [isSavingNotificationPreferences, setIsSavingNotificationPreferences] = useState(false)
@@ -47,8 +58,8 @@ export function useNotificationSettings(input: {
 
   useEffect(() => {
     if (sessionActor.session.mode !== "production") return
-    void loadNotificationPreferences()
-  }, [loadNotificationPreferences, sessionActor.session.mode])
+    return whenSettled(() => { void loadNotificationPreferences() })
+  }, [loadNotificationPreferences, sessionActor.session.mode, whenSettled])
 
   const handleNotificationToggle = useCallback((key: NotificationPreferenceToggleKey, enabled: boolean) => {
     if (!notificationPreferences || isSavingNotificationPreferences || sessionActor.session.mode !== "production") return

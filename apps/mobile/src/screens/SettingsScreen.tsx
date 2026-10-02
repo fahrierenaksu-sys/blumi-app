@@ -5,6 +5,7 @@ import { useCallback } from "react"
 import { Alert, Platform, Text, View } from "react-native"
 import { PageSafeArea as SafeAreaView, PageScrollContent } from "../ui/layout/PageContainer"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
+import { useAfterPushTransition } from "../navigation/useAfterPushTransition"
 import { useBlockStore } from "../features/safety/blockStore"
 import type { UpdateSessionProfileInput } from "../features/session/sessionApi"
 import type { SessionActor } from "../features/session/sessionModel"
@@ -90,6 +91,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const locale = getAppLocale()
   const copy = getSettingsCopy(locale)
   const isProduction = sessionActor.session.mode === "production"
+  // Server refreshes start once the push has settled: the page slides in
+  // drawn from what the app already knows, without mid-slide re-renders.
+  const whenPushSettled = useAfterPushTransition(navigation)
   const { blockedUserIds, blockedProfilesById, unblockUser } = useBlockStore(
     sessionActor.profile.userId,
     sessionActor.session.mode === "production"
@@ -103,13 +107,15 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const notifications = useNotificationSettings({
     sessionActor,
     pushPermissionStatus,
-    onRequestPushPermission
+    onRequestPushPermission,
+    whenSettled: whenPushSettled
   })
-  const handleUnblock = useHiddenPeople({ sessionActor, copy, locale, unblockUser })
+  const handleUnblock = useHiddenPeople({ sessionActor, copy, locale, unblockUser, whenSettled: whenPushSettled })
   const readReceipts = useReadReceiptsSetting({
     sessionActor,
     capabilityEnabled: props.readReceiptsCapability === true,
-    copy
+    copy,
+    whenSettled: whenPushSettled
   })
   const handleGoBack = useCallback(() => {
     goBackOrFallback(navigation, () => navigation.replace("You"))
