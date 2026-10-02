@@ -52,6 +52,10 @@ pick up the setting on their next call.
 - The app always hides the chat on the phone first (today's behaviour) and
   then calls the route. On 404 (older server), 409 (before 071) or any error,
   the on-device hide is the whole effect.
+- After 071 a hidden thread stays in the caller's thread list with
+  `hiddenThrough`, so notification taps, room invites and room chat still
+  find it. Every device on the new app hides the row until a newer message
+  arrives; history starts after the hide point and unread counts stay 0.
 
 ## Compatibility matrix
 
@@ -139,3 +143,9 @@ statement is idempotent (`IF NOT EXISTS`, `ALTER FUNCTION ... SET`).
   thread is not filtered either (the app does not show it for a hidden chat).
 - Two messages in the same millisecond as the hide point are both hidden
   (the point is a time, like the 070 cursors' known limit).
+- Deleting a chat whose row showed no message sends no message id, so the
+  server hides through its newest message, including one that arrived after
+  the row was drawn and before the tap.
+- A room invitation in a hidden chat does not bring the row back (only a
+  message does), as with today's on-device hide; its notification still
+  opens the chat.
