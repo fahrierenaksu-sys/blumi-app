@@ -1,13 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useEffect, useRef } from "react"
+import { memo, useEffect, useLayoutEffect, useRef } from "react"
 import { StyleSheet, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { PressableScale } from "../../../ui/PressableScale"
+import { reconcileComposerTextAfterSend } from "../../chat/thread/chatComposerDraftModel"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
-import { reconcileRoomComposerChange } from "../roomComposerModel"
 import {
   MINI_ROOM_INPUT_LINE_HEIGHT,
   MINI_ROOM_INPUT_VERTICAL_PADDING,
@@ -73,13 +73,21 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
   // One send, one haptic (ui/haptics: a chat message sent → selection) and one
   // pop, from the send button or the keyboard's return key alike. Reduce
   // Motion keeps the button still; the haptic stays.
-  // The text of the latest accepted send, until the field's next change (the
-  // send's epoch): a letter typed in the same instant must not bring it back.
+  // The draft of the last accepted send while a late keystroke may still
+  // bring it back (chatComposerDraftModel, as in the chat composer); null
+  // otherwise.
   const sentDraft = useRef<string | null>(null)
+  // What the input shows, also between a send and the parent's next render.
+  const shownText = useRef(value)
+  // The parent owns the draft (a failed message comes back into it).
+  useLayoutEffect(() => {
+    shownText.current = value
+  }, [value])
   const submit = () => {
     const draft = value
     if (onSubmit()) {
       sentDraft.current = draft
+      shownText.current = ""
       // Clear the native field too, not only the controlled value.
       inputRef.current?.clear()
       hapticSelection()
@@ -119,11 +127,16 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         spellCheck={suggestionsEnabled}
         accessibilityLabel={copy.roomMessage}
         value={value}
-        onChangeText={(raw) => {
-          const text = reconcileRoomComposerChange(raw, sentDraft.current)
-          sentDraft.current = null
-          onChangeText(text)
-          draftTyping?.noteDraft(text)
+        onChangeText={(next) => {
+          const reconciled = reconcileComposerTextAfterSend({
+            next,
+            current: shownText.current,
+            sentDraft: sentDraft.current
+          })
+          sentDraft.current = reconciled.sentDraft
+          shownText.current = reconciled.text
+          onChangeText(reconciled.text)
+          draftTyping?.noteDraft(reconciled.text)
         }}
         onBlur={draftTyping?.endDraft}
         // The scene opens with the keyboard itself (useMiniRoomKeyboard), never ahead of it.

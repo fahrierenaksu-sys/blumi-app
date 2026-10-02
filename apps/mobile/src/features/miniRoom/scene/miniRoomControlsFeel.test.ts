@@ -155,7 +155,7 @@ function loadControls(osReduceMotion: boolean, options: { hold?: boolean } = {})
     { modules, real })
   const { RoomChatComposer } = loadSourceWithFakeReact<typeof ComposerModule>(
     "features/miniRoom/scene/RoomChatComposer.tsx", runtime,
-    { modules, real: [...real, "../roomComposerModel"], globals: { setTimeout, clearTimeout } })
+    { modules, real: [...real, "../../chat/thread/chatComposerDraftModel"], globals: { setTimeout, clearTimeout } })
   const { MiniRoomChatPanel } = loadSourceWithFakeReact<typeof ChatPanelModule>(
     "features/miniRoom/scene/MiniRoomChatPanel.tsx", runtime, { modules, real })
   const { MiniRoomChatHistory } = loadSourceWithFakeReact<typeof HistoryModule>(

@@ -27,7 +27,7 @@ function renderInput(disabled: boolean) {
       "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
       "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
     },
-    real: ["./miniRoomLayout", "../roomComposerModel"],
+    real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"],
     inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
@@ -58,7 +58,7 @@ function mountDraft(accept: () => boolean) {
       "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
       "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
     },
-    real: ["./miniRoomLayout", "../roomComposerModel"],
+    real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"],
     inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
@@ -86,8 +86,63 @@ function mountDraft(accept: () => boolean) {
     ;(button[0]!.props.onPress as () => void)()
     show()
   }
-  return { runtime, type, pressReturn, pressSend, draft: () => draft, sent }
+  /** The parent puts text into the draft itself (a failed message comes back). */
+  const restore = (text: string) => { draft = text; show() }
+  /** The native field reports a change before the parent re-renders. */
+  const typeBeforeRender = (text: string) => { (input().props.onChangeText as (text: string) => void)(text) }
+  return { runtime, type, typeBeforeRender, pressReturn, pressSend, restore, show, draft: () => draft, sent }
 }
+
+test("several late keystrokes after a send, anywhere in the old text, never bring it back", () => {
+  const composer = mountDraft(() => true)
+  try {
+    composer.type("Selam")
+    composer.pressSend()
+    // Two keys pressed with Send: the stale field reports the old text each time.
+    composer.type("Selamn")
+    composer.type("Selamna")
+    assert.equal(composer.draft(), "na", "both new letters stay, the sent text does not")
+    assert.deepEqual(composer.sent, ["Selam"])
+  } finally {
+    composer.runtime.unmount()
+  }
+  const caret = mountDraft(() => true)
+  try {
+    caret.type("Selam")
+    caret.pressReturn()
+    // The caret was not at the end: the late letter lands inside the old text.
+    caret.type("SeXlam")
+    assert.equal(caret.draft(), "X")
+  } finally {
+    caret.runtime.unmount()
+  }
+})
+
+test("a late keystroke that arrives before the parent re-renders still drops the sent text", () => {
+  const composer = mountDraft(() => true)
+  try {
+    composer.type("Selam")
+    composer.pressSend()
+    composer.typeBeforeRender("Selamn")
+    composer.show()
+    assert.equal(composer.draft(), "n")
+  } finally {
+    composer.runtime.unmount()
+  }
+})
+
+test("a failed message put back into the composer is edited as typed, not trimmed as a late echo", () => {
+  const composer = mountDraft(() => true)
+  try {
+    composer.type("Selam")
+    composer.pressSend()
+    composer.restore("Selam")
+    composer.type("Selam!")
+    assert.equal(composer.draft(), "Selam!")
+  } finally {
+    composer.runtime.unmount()
+  }
+})
 
 test("a letter typed in the same instant as a send starts the next message, without the sent text", () => {
   for (const send of ["pressReturn", "pressSend"] as const) {
