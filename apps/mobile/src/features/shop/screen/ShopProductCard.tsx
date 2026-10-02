@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
 import { memo, useCallback } from "react"
 import {
+  type AccessibilityActionEvent,
   type ImageSourcePropType,
   StyleSheet,
   Text,
@@ -24,6 +25,8 @@ import { getShopCopy } from "../shopCopy"
 import { formatCoins } from "../shopFormatters"
 import { getShopProductPresentation } from "../shopProductPresentation"
 import { getShopThumbnailLayout } from "../shopThumbnailLayout"
+import type { ShopCardRemoveAction } from "../shopCardRemoveModel"
+import { ShopCardRemoveButton } from "./ShopCardRemoveButton"
 import { ShopCardSelectionRing, ShopCardViewingBadge } from "./ShopCardSelection"
 import { getAvatarIcon } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
@@ -41,6 +44,9 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   metaLabel?: string
   locale: AppLocale
   onSelectProduct: (product: ShopCatalogItem) => void
+  /** Shows the corner X (see shopCardRemoveModel); omitted or "none" hides it. */
+  removeAction?: ShopCardRemoveAction
+  onRemoveProduct?: (product: ShopCatalogItem) => void
 }) {
   const {
     product,
@@ -54,7 +60,9 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     thumbHeight,
     metaLabel,
     locale,
-    onSelectProduct
+    onSelectProduct,
+    removeAction,
+    onRemoveProduct
   } = props
   const copy = getShopCopy(locale)
   const presentation = getShopProductPresentation(product, locale)
@@ -93,12 +101,23 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   const handlePress = useCallback(() => {
     onSelectProduct(product)
   }, [onSelectProduct, product])
+  const canRemove = removeAction !== undefined && removeAction !== "none" && onRemoveProduct !== undefined
+  const removeLabel = canRemove ? copy.removeFromAvatar(product.title) : undefined
+  const handleRemove = useCallback(() => {
+    onRemoveProduct?.(product)
+  }, [onRemoveProduct, product])
+  // VoiceOver reads the card as one element, so the X is also a card action.
+  const handleAccessibilityAction = useCallback((event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === "remove") onRemoveProduct?.(product)
+  }, [onRemoveProduct, product])
   return (
     <PressableScale
       testID={`shop-item-${automationSlug}`}
       accessibilityRole="button"
       accessibilityLabel={`${product.title}, ${visibleMetaLabel}`}
       accessibilityState={{ selected }}
+      accessibilityActions={removeLabel ? [{ name: "remove", label: removeLabel }] : undefined}
+      onAccessibilityAction={removeLabel ? handleAccessibilityAction : undefined}
       onPress={handlePress}
       pressedScale={0.97}
       style={[
@@ -149,6 +168,13 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
         </Text>
       </View>
       <ShopCardSelectionRing selected={selected} />
+      {removeLabel ? (
+        <ShopCardRemoveButton
+          testID={`shop-item-${automationSlug}-remove`}
+          accessibilityLabel={removeLabel}
+          onPress={handleRemove}
+        />
+      ) : null}
     </PressableScale>
   )
 })

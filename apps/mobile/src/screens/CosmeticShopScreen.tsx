@@ -52,6 +52,7 @@ import {
   getShopSurfacePolicy
 } from "../features/shop/screen/shopScreenModel"
 import { shopScreenStyles as styles } from "../features/shop/screen/shopScreenStyles"
+import { useShopCardRemoval } from "../features/shop/screen/useShopCardRemoval"
 import { useShopCatalogProducts } from "../features/shop/screen/useShopCatalogProducts"
 import { useShopCombinationSession } from "../features/shop/screen/useShopCombinationSession"
 import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel"
@@ -327,6 +328,21 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     selectedProduct
   })
 
+  const { removeActionById, onRemoveProduct, isRemoving } = useShopCardRemoval({
+    products: filteredProducts,
+    previewAvatar,
+    avatar: avatarV2.avatar,
+    catalog: avatarV2.catalog,
+    inventoryVerified,
+    canSave: canPerformShopActions && !isPurchasing && combinationState.phase === "editing",
+    combinationStateRef,
+    setCombinationState,
+    dispatchCombination,
+    ownedAvatarItemIds: inventoryStore.inventory.ownedAvatarItemIds,
+    equipAndSaveItem: avatarV2.equipAndSaveItem,
+    copy
+  })
+
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="homeLiquid" />
@@ -435,7 +451,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   roomPreviewScene={roomPreviewScene}
                   layoutMetrics={shopLayoutMetrics}
                   isPurchasing={
-                    isPurchasing || combinationState.phase !== "editing"
+                    isPurchasing || isRemoving || combinationState.phase !== "editing"
                   }
                   locale={locale}
                   isActionAvailable={isActionAvailable}
@@ -496,6 +512,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 onSelectCategory={handleSelectCategory}
                 onSelectProduct={handleSelectProduct}
                 revealRequest={shelfRevealRequest}
+                removeActionById={removeActionById}
+                onRemoveProduct={onRemoveProduct}
               />
             </Reanimated.View>
           ) : showSkeleton ? (

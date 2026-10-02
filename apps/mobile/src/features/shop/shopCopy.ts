@@ -19,6 +19,9 @@ export interface ShopCopy {
   saving: string
   unlock: string
   removePreview: string
+  /** Card X: takes the item off the avatar (`title` is the product name). */
+  removeFromAvatar: (title: string) => string
+  removedFromAvatar: (title: string) => string
   liveTryOn: string
   previewOnAvatar: string
   showcaseTitle: string
@@ -130,6 +133,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     saving: "Saving…",
     unlock: "Unlock",
     removePreview: "Remove preview",
+    removeFromAvatar: (title) => `Take ${title} off your avatar`,
+    removedFromAvatar: (title) => `${title} taken off`,
     liveTryOn: "Live try-on",
     previewOnAvatar: "Preview on avatar",
     showcaseTitle: "Find your\nnext favorite.",
@@ -243,6 +248,8 @@ const COPY: Record<AppLocale, ShopCopy> = {
     saving: "Kaydediliyor…",
     unlock: "Aç",
     removePreview: "Önizlemeyi kaldır",
+    removeFromAvatar: (title) => `${title}: avatardan çıkar`,
+    removedFromAvatar: (title) => `${title} çıkarıldı`,
     liveTryOn: "Canlı dene",
     previewOnAvatar: "Avatarında önizle",
     showcaseTitle: "Yeni favorini\nkeşfet.",

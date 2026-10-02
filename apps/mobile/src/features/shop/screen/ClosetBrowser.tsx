@@ -5,6 +5,7 @@ import { MainTabPagerEdgeHandoffScrollOwner } from "../../../ui/MainTabPagerGest
 import { useMainTabReselect } from "../../../ui/layout/useMainTabReselect"
 import type { AppLocale } from "../../session/appLocale"
 import { useReducedMotion } from "../../../ui/animations"
+import type { ShopCardRemoveAction } from "../shopCardRemoveModel"
 import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
@@ -39,6 +40,9 @@ export function ClosetBrowser(props: {
   onSelectProduct: (product: ShopCatalogItem) => void
   /** Scrolls the shelf to this product's page once per `requestId` (deep links). */
   revealRequest?: { productId: string; requestId: number }
+  /** Cards that show the corner X, by product id (see shopCardRemoveModel). */
+  removeActionById?: ReadonlyMap<string, ShopCardRemoveAction>
+  onRemoveProduct?: (product: ShopCatalogItem) => void
 }) {
   const reduceMotion = useReducedMotion()
   const copy = getShopCopy(props.locale)
@@ -175,13 +179,15 @@ export function ClosetBrowser(props: {
                 thumbHeight={catalog.productThumbHeight}
                 locale={props.locale}
                 onSelectProduct={props.onSelectProduct}
+                removeAction={props.removeActionById?.get(product.id)}
+                onRemoveProduct={props.onRemoveProduct}
               />
             ))}
           </View>
         ))}
       </View>
     ),
-    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onSelectProduct, props.pendingInventoryLabel, props.selectedId]
+    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onRemoveProduct, props.onSelectProduct, props.pendingInventoryLabel, props.removeActionById, props.selectedId]
   )
 
   return (
