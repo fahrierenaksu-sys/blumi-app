@@ -29,7 +29,7 @@ export interface PushDeliveryOptions {
   categoryId?: string
   /** iOS: run the app's notification service extension before showing it. */
   mutableContent?: boolean
-  /** A picture for the notification (Expo `richContent.image`; also in data for the extension). */
+  /** The sender picture link (sent to the phone in data as `senderImage`). */
   imageUrl?: string
 }
 
@@ -152,8 +152,9 @@ function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record
     ...(delivery.expiration !== undefined ? { expiration: delivery.expiration } : {}),
     ...(Number.isSafeInteger(delivery.badge) && delivery.badge! >= 0 ? { badge: delivery.badge! } : {}),
     ...(delivery.categoryId ? { categoryId: delivery.categoryId } : {}),
-    ...(delivery.mutableContent ? { mutableContent: true } : {}),
-    ...(delivery.imageUrl ? { richContent: { image: delivery.imageUrl } } : {})
+    // The picture itself travels in data (`senderImage`), where the app's
+    // notification service extension reads it.
+    ...(delivery.mutableContent ? { mutableContent: true } : {})
   }
 }
 

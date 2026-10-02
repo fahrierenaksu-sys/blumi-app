@@ -86,7 +86,7 @@ test("expo push provider asks iOS for the notification category and the picture 
   })
   assert.equal(bodies[0]?.categoryId, "ROOM_INVITE")
   assert.equal(bodies[0]?.mutableContent, true)
-  assert.deepEqual(bodies[0]?.richContent, { image: "https://api.example.test/p" })
+  assert.deepEqual(bodies[0]?.data, { type: "chat.room_invite", senderImage: "https://api.example.test/p" })
 })
 
 test("receipt lookup forwards cancellation and reads only requested ticket", async () => {
