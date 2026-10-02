@@ -85,7 +85,7 @@ Avatar and room (current state, not a mandate):
 
 - The production avatar is `avatarV2`: layered PNGs with the fit baked in, drawn on every surface by one renderer, `RoomAvatarRenderer2D`. Room code lives in `roomWorld`, `roomV2`, `roomStudio` and `miniRoom`. `lobby` is the retired public lobby.
 - No Skia, Spine, GL or 3D dependency is installed, and nothing forbids one. Adding a dependency, native or not, is your call. Only the EAS/TestFlight build that ships a native one, or a paid licence, needs the owner's yes.
-- Prior research is input, not a decision. `git show 1627800:docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md` measured why room motion feels artificial (commit `d34afe1` deleted it from `develop`). Its backlog items are VIS-01..13 in the session inventory.
+- Prior research is input, not a decision. `docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md` measured why room motion feels artificial. Its backlog items are VIS-01..13 in the session inventory.
 - Art sources, masters and QA renders live outside the repo in the Workbench, `/Users/evrenevren/BlumiArtWorkbench/`, on the owner's Mac. The cloud container has only a stub.
   - EAS and the cloud have no Workbench, so an app import from it breaks the build. Only runtime files the app actually uses go into the repo.
   - Tests that need Workbench fixtures run with `BLUMI_WORKBENCH_ROOT=… npm --workspace @blumi/mobile run test:workbench`.
