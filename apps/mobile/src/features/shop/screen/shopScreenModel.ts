@@ -312,6 +312,16 @@ export function getShopShelfPageIndex(scrollOffset: number, shelfWidth: number, 
   return Math.max(0, Math.min(Math.floor(pageCount) - 1, index))
 }
 
+/**
+ * Total pages the counter shows: "1/1" for an empty shelf. Declared before
+ * the worklets that call it: the worklets plugin turns a worklet function
+ * into a value captured when the module runs, so a later one reads undefined.
+ */
+export function getShopShelfCounterTotal(pageCount: number): number {
+  "worklet"
+  return Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1
+}
+
 /** "2/3"; an empty shelf reads "1/1". Runs on the UI thread for the counter. */
 export function formatShopShelfCounter(pageIndex: number, pageCount: number): string {
   "worklet"
@@ -399,12 +409,6 @@ export function getShopShelfPageButtons(pageIndex: number, pageCount: number): {
 } {
   const lastPage = getShopShelfCounterTotal(pageCount) - 1
   return { canShowPrevious: pageIndex > 0, canShowNext: pageIndex < lastPage }
-}
-
-/** Total pages the counter shows: "1/1" for an empty shelf. */
-export function getShopShelfCounterTotal(pageCount: number): number {
-  "worklet"
-  return Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1
 }
 
 export function stepShopShelfPageTracker(

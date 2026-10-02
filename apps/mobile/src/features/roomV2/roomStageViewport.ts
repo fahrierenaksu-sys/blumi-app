@@ -22,6 +22,27 @@ export interface RoomStageViewport {
   zoom: number
 }
 
+/**
+ * Stage point of a touch given in the stage view's own coordinates (Gesture
+ * Handler's `x`/`y` on the stage view already undo every ancestor transform),
+ * with the box size measured at the moment of the tap. Not clamped: a touch
+ * past the floor's edge resolves to the floor point nearest it later, so the
+ * walk ends next to the finger rather than at a clamped corner. Declared
+ * before mapRoomScreenPointToStage, which captures it as a worklet.
+ */
+export function mapRoomStageLocalPointToStage(
+  localX: number,
+  localY: number,
+  width: number,
+  height: number
+): RoomWorldPoint {
+  "worklet"
+  return {
+    x: width > 0 ? localX / width : 0,
+    y: height > 0 ? localY / height : 0
+  }
+}
+
 /** Stage point under a screen point. */
 export function mapRoomScreenPointToStage(
   viewport: RoomStageViewport,
@@ -48,25 +69,5 @@ export function mapRoomStagePointToScreen(
   return {
     x: viewport.originX + point.x * viewport.width * zoom,
     y: viewport.originY + point.y * viewport.height * zoom
-  }
-}
-
-/**
- * Stage point of a touch given in the stage view's own coordinates (Gesture
- * Handler's `x`/`y` on the stage view already undo every ancestor transform),
- * with the box size measured at the moment of the tap. Not clamped: a touch
- * past the floor's edge resolves to the floor point nearest it later, so the
- * walk ends next to the finger rather than at a clamped corner.
- */
-export function mapRoomStageLocalPointToStage(
-  localX: number,
-  localY: number,
-  width: number,
-  height: number
-): RoomWorldPoint {
-  "worklet"
-  return {
-    x: width > 0 ? localX / width : 0,
-    y: height > 0 ? localY / height : 0
   }
 }

@@ -123,6 +123,17 @@ export function resolveMiniRoomPoseOffset(before: MiniRoomPoseEndpoints, after: 
   return { closed: differenceFrame(before.closed, after.closed), open: differenceFrame(before.open, after.open) }
 }
 
+// Declared before the worklets that capture it (see ENGINEERING_RULES, Motion).
+function addFrame(a: MiniRoomTransitionFrame, b: MiniRoomTransitionFrame): MiniRoomTransitionFrame {
+  "worklet"
+  return {
+    progress: a.progress,
+    bottom: a.bottom + b.bottom, height: a.height + b.height, margin: a.margin + b.margin,
+    cameraX: a.cameraX + b.cameraX, cameraY: a.cameraY + b.cameraY, cameraScale: a.cameraScale + b.cameraScale,
+    restHeight: a.restHeight + b.restHeight, roomWidth: a.roomWidth + b.roomWidth
+  }
+}
+
 export function applyMiniRoomPoseOffset(
   endpoints: MiniRoomPoseEndpoints, offset: MiniRoomPoseEndpoints, weight: number
 ): MiniRoomPoseEndpoints {
@@ -131,16 +142,6 @@ export function applyMiniRoomPoseOffset(
   return {
     closed: mixFrame(endpoints.closed, addFrame(endpoints.closed, offset.closed), weight),
     open: mixFrame(endpoints.open, addFrame(endpoints.open, offset.open), weight)
-  }
-}
-
-function addFrame(a: MiniRoomTransitionFrame, b: MiniRoomTransitionFrame): MiniRoomTransitionFrame {
-  "worklet"
-  return {
-    progress: a.progress,
-    bottom: a.bottom + b.bottom, height: a.height + b.height, margin: a.margin + b.margin,
-    cameraX: a.cameraX + b.cameraX, cameraY: a.cameraY + b.cameraY, cameraScale: a.cameraScale + b.cameraScale,
-    restHeight: a.restHeight + b.restHeight, roomWidth: a.roomWidth + b.roomWidth
   }
 }
 
@@ -241,6 +242,9 @@ export const MINI_ROOM_PAPER_CAP = 26
 export const MINI_ROOM_PAPER_REST_MARGIN = 13
 /** Layout height of the paper's straight middle; it is stretched by scaleY. */
 export const MINI_ROOM_PAPER_BODY_UNIT = 100
+/** Layout height of the shadow caster (stretched by scaleY like the middle). */
+export const MINI_ROOM_PAPER_SHADOW_UNIT = 200
+const MINI_ROOM_PAPER_SHADOW_INSET = 10
 
 /**
  * The paper drawn with transforms only (no width/height/top/left animation):
@@ -277,7 +281,3 @@ export function resolveMiniRoomPaperGeometry(frame: MiniRoomTransitionFrame, win
     shadowScaleY: Math.max(0, frame.height - 2 * inset) / MINI_ROOM_PAPER_SHADOW_UNIT
   }
 }
-
-/** Layout height of the shadow caster (stretched by scaleY like the middle). */
-export const MINI_ROOM_PAPER_SHADOW_UNIT = 200
-const MINI_ROOM_PAPER_SHADOW_INSET = 10

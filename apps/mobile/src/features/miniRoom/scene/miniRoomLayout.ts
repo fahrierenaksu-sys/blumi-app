@@ -41,6 +41,12 @@ const HISTORY_READING_GAIN = 20
 const HISTORY_MAX_GAIN = 28
 const FLOOR_GAP = 20
 
+// Declared before the worklets that capture it (see ENGINEERING_RULES, Motion).
+function clamp(value: number, minimum: number, maximum: number): number {
+  "worklet"
+  return Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : minimum
+}
+
 export function resolveMiniRoomLayout(input: MiniRoomLayoutInput): MiniRoomLayout {
   "worklet"
   const scale = clamp(input.fontScale, 1, MINI_ROOM_MAX_TEXT_SCALE)
@@ -95,8 +101,4 @@ export function resolveComposerLineCount(input: { contentHeight: number; fontSca
   // Native reports the capped visible height, including a partly visible last
   // line. Reserve that line too so the room stays clear of the actual input.
   return clamp(Math.ceil((Math.round(input.contentHeight) - MINI_ROOM_INPUT_VERTICAL_PADDING * 2) / line), 1, MINI_ROOM_INPUT_MAX_LINES)
-}
-function clamp(value: number, minimum: number, maximum: number): number {
-  "worklet"
-  return Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : minimum
 }

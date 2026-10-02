@@ -291,12 +291,53 @@ function compileLikeMetro(file, options) {
   }).code
 }
 
+// A module-level worklet compiles to `var f = function fFactory({...}){...}({g})`,
+// which reads `g` when the module runs, not when `f` is called. A function
+// declaration is hoisted in the source, but a worklet declared further down
+// is still undefined at that point, so `f` throws "undefined is not a
+// function" even on the JS thread (the 2026-10-03 shop counter crash).
+function findCapturesBeforeDefinition(compiled) {
+  const problems = []
+  const body = parse(compiled, { sourceType: "module" }).program.body
+  const declaredAt = new Map()
+  body.forEach((statement, index) => {
+    if (statement.type !== "VariableDeclaration") return
+    for (const declarator of statement.declarations) {
+      if (declarator.id.type === "Identifier" && !declaredAt.has(declarator.id.name)) {
+        declaredAt.set(declarator.id.name, index)
+      }
+    }
+  })
+  body.forEach((statement, index) => {
+    if (statement.type !== "VariableDeclaration") return
+    for (const declarator of statement.declarations) {
+      let init = declarator.init
+      // `var f = exports.f = function fFactory(...){...}(...)`
+      while (init?.type === "AssignmentExpression") init = init.right
+      if (init?.type !== "CallExpression" || !/Factory$/.test(init.callee.id?.name ?? "")) continue
+      const captured = init.arguments[0]
+      if (captured?.type !== "ObjectExpression") continue
+      for (const property of captured.properties) {
+        const name = property.value?.type === "Identifier" ? property.value.name : undefined
+        if (!name || name.startsWith("_worklet_")) continue
+        if ((declaredAt.get(name) ?? -1) > index) {
+          problems.push(`worklet '${declarator.id.name}' captures '${name}' before it is defined; declare '${name}' first`)
+        }
+      }
+    }
+  })
+  return problems
+}
+
 function newReport() {
   return { failures: [], unknownCalls: [], workletCount: 0, classifiedCalls: 0 }
 }
 
 function checkWorklets(file, compiled, report) {
   const compiledKinds = classifyCompiledTopLevel(compiled)
+  for (const problem of findCapturesBeforeDefinition(compiled)) {
+    report.failures.push(`${relative(srcRoot, file).split(sep).join("/")}: ${problem}`)
+  }
   for (const code of extractWorkletCodes(compiled)) {
     report.workletCount += 1
     const name = code.match(/^function\s+([\w$]+)/)?.[1] ?? "<anonymous>"
@@ -367,6 +408,25 @@ test("the checker flags a compiler-hoisted helper that a worklet calls through a
     )
     const plain = checkWorklets(probe, compileLikeMetro(probe, { isDev: true, supportsReactCompiler: false }), newReport())
     assert.deepEqual(plain.failures, [])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test("the checker flags a worklet that calls a module worklet declared below it", () => {
+  const directory = mkdtempSync(join(tmpdir(), "blumi-worklet-order-probe-"))
+  try {
+    const probe = join(directory, "orderProbe.ts")
+    const later = "export function total(n: number): number {\n  \"worklet\"\n  return Math.max(1, n)\n}\n"
+    const caller = "export function label(i: number, n: number): string {\n  \"worklet\"\n  return `${i}/${total(n)}`\n}\n"
+    writeFileSync(probe, caller + later)
+    const misordered = checkWorklets(probe, compileLikeMetro(probe, { isDev: true }), newReport())
+    assert.ok(
+      misordered.failures.some((failure) => /'label' captures 'total' before it is defined/.test(failure)),
+      `expected the order problem to be flagged, got ${JSON.stringify(misordered.failures)}`
+    )
+    writeFileSync(probe, later + caller)
+    assert.deepEqual(checkWorklets(probe, compileLikeMetro(probe, { isDev: true }), newReport()).failures, [])
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
