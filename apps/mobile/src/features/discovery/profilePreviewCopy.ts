@@ -19,7 +19,11 @@ export interface ProfilePreviewCopy {
   sayHi: string
   saving: string
   viewOnlyExplanation: string
-  deepLinkHeadline: string
+  yourMatch: string
+  selfPreviewNote: string
+  backToChat: string
+  inviteToRoom: string
+  inviteToRoomHint: (displayName: string) => string
 }
 
 const COPY: Record<AppLocale, ProfilePreviewCopy> = {
@@ -42,7 +46,11 @@ const COPY: Record<AppLocale, ProfilePreviewCopy> = {
     sayHi: "Say hi",
     saving: "Saving…",
     viewOnlyExplanation: "This profile is visible, but it is not available for a decision right now.",
-    deepLinkHeadline: "Discover profile"
+    yourMatch: "Your match",
+    selfPreviewNote: "This is how people in Discover see your profile.",
+    backToChat: "Back to chat",
+    inviteToRoom: "Invite to room",
+    inviteToRoomHint: (displayName) => `Sends ${displayName} a room invitation in your chat`
   },
   tr: {
     loading: "Görünüm hazırlanıyor…",
@@ -63,7 +71,11 @@ const COPY: Record<AppLocale, ProfilePreviewCopy> = {
     sayHi: "Selam ver",
     saving: "Kaydediliyor…",
     viewOnlyExplanation: "Bu profil görünür, ancak şu anda karar vermeye uygun değil.",
-    deepLinkHeadline: "Keşfet profili"
+    yourMatch: "Eşleşmen",
+    selfPreviewNote: "Keşfet'teki insanlar profilini böyle görüyor.",
+    backToChat: "Sohbete dön",
+    inviteToRoom: "Odaya davet et",
+    inviteToRoomHint: (displayName) => `Sohbetinizde ${displayName} kişisine oda daveti gönderir`
   }
 }
 

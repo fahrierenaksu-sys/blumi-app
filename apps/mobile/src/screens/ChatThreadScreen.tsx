@@ -50,6 +50,7 @@ import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
 import { styles } from "../features/chat/thread/chatThreadStyles"
 import { useChatMessageSending } from "../features/chat/thread/useChatMessageSending"
 import { useChatRoomInviteActions } from "../features/chat/thread/useChatRoomInviteActions"
+import { useRequestedRoomInvite } from "../features/chat/thread/useRequestedRoomInvite"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
@@ -212,6 +213,13 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     screenMountedRef,
     activeUserIdRef
   })
+  // "Invite to room" on the partner's profile comes back here as a one-shot param.
+  useRequestedRoomInvite({
+    request: route.params.roomInviteRequest,
+    isFocused,
+    onInvite: handleRoomInvitePress,
+    clearRequest: () => navigation.setParams({ roomInviteRequest: undefined })
+  })
 
   const scrollToLatestState = useChatScrollToLatest({ newestFirstTimeline, currentUserId })
   const { scrollToLatest } = scrollToLatestState
@@ -317,7 +325,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             : null}
           onOpenSafety={() => setReportVisible(true)}
           onOpenProfile={partnerUserId
-            ? () => navigation.navigate("ProfilePreview", { userId: partnerUserId })
+            ? () => navigation.navigate("ProfilePreview", { userId: partnerUserId, context: "matched" })
             : null}
         />
 

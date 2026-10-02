@@ -30,6 +30,7 @@ import { resetChatStore } from "../features/chat/chatStore"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
+import type { ProfilePreviewContext } from "../features/profile/profileViewModel"
 import { ChatThreadScreen } from "../screens/ChatThreadScreen"
 import { YouScreen } from "../screens/YouScreen"
 import { ProfileEditScreen } from "../screens/ProfileEditScreen"
@@ -170,14 +171,18 @@ export type RootStackParamList = {
     pendingLikeUserId?: string
     pendingPassUserId?: string
   } | undefined
+  // `context` picks the actions: discover (Pass / Say hi), matched (back to
+  // chat, invite to room) or self (no actions). See resolveProfilePreviewContext.
   ProfilePreview:
     | {
         profile: ProfilePreviewData
         userId?: never
+        context?: ProfilePreviewContext
       }
     | {
         userId: string
         profile?: never
+        context?: ProfilePreviewContext
       }
   MiniRoom: {
     readyMiniRoom: ReadyMiniRoomRouteParam
@@ -221,6 +226,8 @@ export type RootStackParamList = {
     threadId?: string
     partnerId?: string
     partnerName?: string
+    /** A one-shot "invite to room" request from the partner's profile. */
+    roomInviteRequest?: string
   }
   MatchResult: {
     match: BlumiMatch

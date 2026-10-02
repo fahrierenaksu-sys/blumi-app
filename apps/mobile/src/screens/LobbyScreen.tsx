@@ -13,7 +13,6 @@ import {
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { IncomingInviteCallout } from "../components/IncomingInviteCallout"
-import { createCandidateAvatarSnapshot } from "../components/DiscoverCard"
 import { DiscoverFiltersBottomSheet } from "../components/DiscoverFiltersBottomSheet"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import type { DiscoveryPreferences } from "@blumi/contracts"
@@ -94,11 +93,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
   const myUserId = sessionActor.profile.userId
   const myDisplayName = sessionActor.profile.displayName
-  const myAvatarSnapshot = useMemo(() => createCandidateAvatarSnapshot({
-    userId: myUserId,
-    displayName: myDisplayName,
-    avatarSelection: sessionActor.profile.avatar
-  }), [myDisplayName, myUserId, sessionActor.profile.avatar])
   const isDemoSession = sessionActor.session.mode === "demo"
   const isProductionDiscovery = sessionActor.session.mode === "production"
   const showcaseRequest = useMemo(() => isProductionDiscovery ? ({
@@ -287,7 +281,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
     startupImagesReady,
     showStartupFailure,
     onBackgroundDisplay,
-    onHeaderDisplay,
     onBackgroundError,
     onFrontDisplay,
     onFrontError,
@@ -301,10 +294,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
     visibleDiscoverDeck,
     discoveryPlaceholderState
   })
-
-  const handleOpenProfileEdit = useCallback(() => {
-    navigation.navigate("You")
-  }, [navigation])
 
   const scrollContentStyle = useMemo(
     () => [
@@ -334,13 +323,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
           }
         >
           <DiscoverHomeHeader
-            myDisplayName={myDisplayName}
-            myAvatarSnapshot={myAvatarSnapshot}
-            startupScope={startupScope}
-            onHeaderDisplay={onHeaderDisplay}
-            onBackgroundError={onBackgroundError}
             activeFilterCount={activeFilterCount}
-            handleOpenProfileEdit={handleOpenProfileEdit}
             handleOpenFilters={handleOpenFilters}
           />
 

@@ -91,6 +91,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { hapticError, hapticLight } from "../ui/haptics"
 import { useAppViewportMetrics } from "../ui/layout/useAppViewportMetrics"
 import { useMyRoomShowcase } from "../features/roomV2/useMyRoomShowcase"
+import { MyRoomProfileButton } from "../features/profile/MyRoomProfileButton"
 import {
   cancelMyRoomMotionTasks,
   createMyRoomMotionLifecycle,
@@ -750,22 +751,15 @@ export function MyRoomScreen({
         ]}
       >
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerText}>
             <Text style={styles.myRoomTitle}>{copy.title}</Text>
             <Text style={styles.myRoomSubtitle}>{copy.subtitle}</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.profileOptions}
-            style={styles.myRoomIconButton}
+          <MyRoomProfileButton
+            displayName={sessionActor.profile.displayName}
+            userId={sessionActor.profile.userId}
             onPress={() => navigation.navigate("You")}
-          >
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={20}
-              color={uiTheme.colors.textPrimary}
-            />
-          </Pressable>
+          />
         </View>
 
         <View style={styles.roomStack}>
@@ -885,7 +879,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiTheme.spacing.xs,
     paddingTop: uiTheme.spacing.sm,
     paddingBottom: 0,
+    gap: uiTheme.spacing.sm,
   },
+  headerText: { flex: 1 },
   title: {
     ...uiTheme.font.heading,
     color: "#FFFFFF",
@@ -913,16 +909,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
-  },
-  myRoomIconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F2DDEA",
   },
   roomStack: {
     gap: 0,

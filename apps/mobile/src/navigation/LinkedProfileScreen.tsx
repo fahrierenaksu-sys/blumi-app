@@ -40,7 +40,6 @@ function createDeepLinkedProfile(
   response: DiscoverProfileResponse
 ): ProfilePreviewData {
   const { profile } = response
-  const copy = getProfilePreviewCopy(getAppLocale())
   return {
     userId: profile.userId,
     displayName: profile.displayName,
@@ -51,17 +50,37 @@ function createDeepLinkedProfile(
       avatarPresetId: profile.avatarPresetId,
       avatarSelection: profile.avatar
     }),
-    headline: copy.deepLinkHeadline,
-    vibeLine: profile.vibeTags.join(" · "),
     tags: [...profile.vibeTags],
     bio: profile.bio ?? "",
-    cues: [],
-    prompts: toProfilePreviewPrompts(profile.prompts),
+    prompts: toProfilePreviewPrompts(profile.prompts, getAppLocale()),
     decisionCapability: response.decision.capability,
     blocked: false,
     isSelf: false,
     spotId: `backend:${profile.userId}`,
     distanceLabel: profile.distanceLabel
+  }
+}
+
+// "See how others see you": the viewer's own profile, built from the session
+// (no request), with the avatar drawn the way Discover draws it.
+function createSelfProfilePreview(profile: SessionActor["profile"]): ProfilePreviewData {
+  return {
+    userId: profile.userId,
+    displayName: profile.displayName,
+    age: profile.age,
+    avatarSnapshot: createCandidateAvatarSnapshot({
+      userId: profile.userId,
+      displayName: profile.displayName,
+      avatarSelection: profile.avatar
+    }),
+    tags: [...(profile.interests ?? [])],
+    bio: profile.bio ?? "",
+    prompts: toProfilePreviewPrompts(profile.prompts, getAppLocale()),
+    decisionCapability: "unavailable",
+    blocked: false,
+    isSelf: true,
+    spotId: `self:${profile.userId}`,
+    distanceLabel: ""
   }
 }
 
@@ -158,8 +177,13 @@ function LinkedProfileReveal(props: { children: ReactNode }) {
 export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
   const { demoMode, navigation, route, sessionActor, sessionToken } = props
   const copy = getProfilePreviewCopy(getAppLocale())
-  const directProfile = "profile" in route.params ? route.params.profile : undefined
   const deepLinkedUserId = "userId" in route.params ? route.params.userId : undefined
+  const isSelfTarget = deepLinkedUserId !== undefined && deepLinkedUserId === sessionActor.profile.userId
+  const directProfile = "profile" in route.params
+    ? route.params.profile
+    : isSelfTarget ? createSelfProfilePreview(sessionActor.profile) : undefined
+  // A boolean, so a self profile rebuilt on each render never restarts the effect.
+  const hasDirectProfile = directProfile !== undefined
   const target: LinkedProfileTarget<ProfilePreviewData> | null = directProfile
     ? { kind: "direct", profile: directProfile }
     : deepLinkedUserId
@@ -178,11 +202,8 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
     userId: demoProfile.userId,
     displayName: demoProfile.displayName,
     age: demoProfile.age,
-    headline: copy.discoverProfile,
-    vibeLine: demoProfile.bio,
     tags: [],
     bio: demoProfile.bio,
-    cues: [],
     prompts: [],
     decisionCapability: "live-invite",
     blocked: false,
@@ -192,7 +213,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
   }))
 
   useEffect(() => {
-    if (directProfile || !deepLinkedUserId) {
+    if (hasDirectProfile || !deepLinkedUserId) {
       setLoadState(createLinkedProfileLoadState(null))
       return
     }
@@ -251,7 +272,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
       isActive = false
       controller.abort()
     }
-  }, [deepLinkedUserId, demoMode, directProfile, retryNonce, sessionToken])
+  }, [deepLinkedUserId, demoMode, hasDirectProfile, retryNonce, sessionToken])
 
   const viewState = target
     ? getLinkedProfileViewState(target, loadState)

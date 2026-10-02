@@ -9,8 +9,7 @@ interface GenderOptionCopy {
 // User-facing and VoiceOver text for the Discover header and filters sheet.
 export interface DiscoveryHomeCopy {
   readonly header: {
-    readonly profileAccessibilityLabel: string
-    readonly profileMeta: string
+    readonly title: string
     readonly filtersAccessibilityLabel: string
   }
   readonly filters: {
@@ -34,8 +33,7 @@ export interface DiscoveryHomeCopy {
 const COPY: Record<AppLocale, DiscoveryHomeCopy> = {
   tr: {
     header: {
-      profileAccessibilityLabel: "Blumi profilini aç",
-      profileMeta: "Vibe'ını düzenle",
+      title: "Keşfet",
       filtersAccessibilityLabel: "Discover filtrelerini aç"
     },
     filters: {
@@ -60,8 +58,7 @@ const COPY: Record<AppLocale, DiscoveryHomeCopy> = {
   },
   en: {
     header: {
-      profileAccessibilityLabel: "Open your Blumi profile",
-      profileMeta: "Edit your vibe",
+      title: "Discover",
       filtersAccessibilityLabel: "Open discover filters"
     },
     filters: {
