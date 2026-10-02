@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef } from "react"
 import { AppState } from "react-native"
 import type { FetchThreadMessagesOptions } from "../chatApi"
 
+const runNow = (task: () => void): (() => void) => {
+  task()
+  return () => undefined
+}
+
 /**
  * Keeps the open conversation in sync: requests history on entry, marks it
  * read (read receipts), and flags it active for unread tracking. Effects run
@@ -15,8 +20,20 @@ export function useChatThreadSync({
   requestMessages,
   refreshParticipants,
   markThreadRead,
-  setActiveThread
+  setActiveThread,
+  historyReady = false,
+  whenSettled = runNow
 }: {
+  /**
+   * The store already holds this thread's history: the entry refresh can
+   * wait for the push to settle. Unknown history is requested at once.
+   */
+  historyReady?: boolean
+  /**
+   * Defers background work until the push transition settles (see
+   * useAfterPushTransition); defaults to running it at once.
+   */
+  whenSettled?: (task: () => void) => () => void
   resolvedThreadId: string | undefined
   currentUserId: string
   isFocused: boolean
@@ -36,20 +53,34 @@ export function useChatThreadSync({
   const current = useRef({ currentUserId, isFocused, latestIncomingMessageId })
   current.current = { currentUserId, isFocused, latestIncomingMessageId }
   const readSync = useRef<{ visibility(visible: boolean): void; incoming(id: string | undefined): void } | null>(null)
+  const historyReadyRef = useRef(historyReady)
+  historyReadyRef.current = historyReady
   useEffect(() => {
     if (!isFocused || !resolvedThreadId || !refreshParticipants) return
-    void refreshParticipants().catch(() => undefined)
+    // The thread-list refresh re-renders the Inbox and this screen when it
+    // lands: it waits for the push to settle (the header already shows the
+    // cached partner).
+    const cancel = whenSettled(() => { void refreshParticipants().catch(() => undefined) })
     const subscription = AppState.addEventListener("change", state => {
       if (state === "active") void refreshParticipants().catch(() => undefined)
     })
-    return () => subscription.remove()
-  }, [isFocused, refreshParticipants, resolvedThreadId])
-  // Request messages from server when entering thread
-  useEffect(() => {
-    if (requestMessages && resolvedThreadId) {
-      void requestMessages(resolvedThreadId).catch(() => undefined)
+    return () => {
+      cancel()
+      subscription.remove()
     }
-  }, [requestMessages, resolvedThreadId])
+  }, [isFocused, refreshParticipants, resolvedThreadId, whenSettled])
+  // Request messages from server when entering thread. Unknown history is
+  // what the screen waits for, so it goes at once; a refresh of cached
+  // history (and its invitation refresh) waits for the push to settle.
+  useEffect(() => {
+    if (!requestMessages || !resolvedThreadId) return
+    const request = () => { void requestMessages(resolvedThreadId).catch(() => undefined) }
+    if (!historyReadyRef.current) {
+      request()
+      return
+    }
+    return whenSettled(request)
+  }, [requestMessages, resolvedThreadId, whenSettled])
 
   const handleRetryMessages = useCallback((): void => {
     if (!requestMessages || !resolvedThreadId) return

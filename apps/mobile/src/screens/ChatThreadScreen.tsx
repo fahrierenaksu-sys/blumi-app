@@ -13,7 +13,7 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { getMessageRenderKey, useChatThreadStore } from "../features/chat/chatStore"
+import { useChatThreadStore } from "../features/chat/chatStore"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
@@ -32,7 +32,6 @@ import { createMatchFromPersistedThread } from "../features/matches/matchRoomMod
 import { useRoomInviteExpiryClock } from "../features/chat/useRoomInviteExpiryClock"
 import {
   applyRoomInviteExpiry,
-  buildChatTimeline,
   getChatTimelineItemKey,
   getChatInitialRenderCount,
   type ChatRoomInviteTimelineItem,
@@ -53,11 +52,8 @@ import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
 import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
 import { ChatThreadSkeleton } from "../features/chat/thread/ChatThreadSkeleton"
-import {
-  getChatTimelineInitialOpacity,
-  resolveChatThreadBody,
-  resolveChatTimelineReveal
-} from "../features/chat/thread/chatThreadOpeningModel"
+import { getChatTimelineInitialOpacity } from "../features/chat/thread/chatThreadOpeningModel"
+import { useChatThreadOpening } from "../features/chat/thread/useChatThreadOpening"
 import { animateTo, CROSSFADE_ENTERING, useMotion } from "../ui/motion"
 import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
 import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
@@ -68,6 +64,7 @@ import { useRequestedRoomInvite } from "../features/chat/thread/useRequestedRoom
 import { useRequestedRoomInviteAccept } from "../features/chat/thread/useRequestedRoomInviteAccept"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
+import { useAfterPushTransition } from "../features/chat/thread/useAfterPushTransition"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
@@ -134,31 +131,32 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     () => applyRoomInviteExpiry(storedThreadRoomInvites, inviteClockMs),
     [inviteClockMs, storedThreadRoomInvites]
   )
-  const timeline = useMemo(
-    // Acknowledged messages keep their optimistic bubble's key (CHT-04).
-    () => buildChatTimeline(messages, threadRoomInvites, getMessageRenderKey),
-    [messages, threadRoomInvites]
-  )
+  // UXO-03 (useChatThreadOpening): whatever the store holds, cached history
+  // or at least the Chats row's last message, is drawn in the push's first
+  // frame. Only a chat with nothing to show waits, and its skeleton appears
+  // only if that wait outlasts a short delay.
+  const {
+    timeline,
+    body: threadBody,
+    showsSkeleton: showsHistorySkeleton,
+    skeletonWasShown: historySkeletonShown,
+    timelineReveal
+  } = useChatThreadOpening({
+    threadId: resolvedThreadId,
+    messages,
+    lastMessage: thread?.lastMessage,
+    historyReady,
+    listStatus: messageListState.status,
+    roomInvites: threadRoomInvites,
+    waitsForServerHistory: sessionActor.session.mode === "production",
+    isPendingThread
+  })
   // Inverted FlatList starts at offset zero with the newest message visible.
   // The chronological timeline remains the authority for grouping and dates.
   const newestFirstTimeline = useMemo(() => [...timeline].reverse(), [timeline])
-  // UXO-03 (chatThreadOpeningModel): cached history opens on its messages in
-  // the push's first frame; only unknown history shows the skeleton, and
-  // whatever replaces it (messages or the empty state) crossfades in.
-  const threadBody = resolveChatThreadBody({
-    waitsForServerHistory: sessionActor.session.mode === "production",
-    historyReady,
-    timelineLength: timeline.length,
-    isPendingThread,
-    listStatus: messageListState.status
-  })
-  const showsHistorySkeleton = threadBody === "skeleton"
   const showsTimelineEmptyState = threadBody !== "timeline"
   const isListPresented = threadBody === "timeline"
-  const [historySkeletonShown, setHistorySkeletonShown] = useState(showsHistorySkeleton)
-  if (showsHistorySkeleton && !historySkeletonShown) setHistorySkeletonShown(true)
   const timelineEntering = historySkeletonShown ? CROSSFADE_ENTERING : undefined
-  const timelineReveal = resolveChatTimelineReveal({ body: threadBody, skeletonWasShown: historySkeletonShown })
   const motion = useMotion()
   const listOpacity = useSharedValue(getChatTimelineInitialOpacity(threadBody))
   const listRevealStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }))
@@ -207,7 +205,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     [currentUserId, sessionActor.session.mode, thread]
   )
 
+  // Refreshes that would only re-render what is already drawn wait for the
+  // push to settle, so they never compete with its first frames.
+  const whenPushSettled = useAfterPushTransition(navigation)
   const { handleRetryMessages } = useChatThreadSync({
+    historyReady,
+    whenSettled: whenPushSettled,
     resolvedThreadId,
     currentUserId,
     isFocused,
@@ -452,9 +455,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             </Animated.View>
             {/* Always mounted, so the skeleton's own exit still plays. */}
             <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-            {showsHistorySkeleton ? (
-              <ChatThreadSkeleton label={chatCopy.openingChat} />
-            ) : showsTimelineEmptyState ? (
+            {threadBody === "loading" ? (
+              showsHistorySkeleton ? <ChatThreadSkeleton label={chatCopy.openingChat} /> : null
+            ) : threadBody === "empty" ? (
               <Animated.View entering={timelineEntering} style={styles.flex}>
               <KeyboardCenteredView bottomInset={composerBottomInset} style={styles.flex}>
               <ChatThreadEmptyState

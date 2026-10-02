@@ -136,9 +136,9 @@ test("screen callbacks stay stable on unrelated updates but invalidate changed p
   const calls = []
   const navigation = { navigate: (route, params) => calls.push(`${route}:${params.threadId}`) }
   const provider = (id) => calls.push(`old:${id}`)
-  function render(onWarmThread, mode) {
+  function render(onWarmThread, mode, nav = navigation) {
     hook.reset()
-    const context = { ...hook, navigation, onWarmThread, sessionActor: { session: { mode } } }
+    const context = { ...hook, navigation: nav, onWarmThread, sessionActor: { session: { mode } } }
     return {
       open: evaluate(initializer("openThread"), context),
       warm: evaluate(initializer("warmThread"), context)
@@ -149,14 +149,30 @@ test("screen callbacks stay stable on unrelated updates but invalidate changed p
   assert.equal(first.open, unchanged.open)
   assert.equal(first.warm, unchanged.warm)
   const changed = render((id) => calls.push(`new:${id}`), "production")
-  assert.notEqual(first.open, changed.open)
   assert.notEqual(first.warm, changed.warm)
   changed.warm("thread-a"); changed.open("thread-a")
   const demo = render(provider, "demo")
-  assert.notEqual(first.open, demo.open)
   assert.notEqual(first.warm, demo.warm)
   demo.warm("thread-b"); demo.open("thread-b")
-  assert.deepEqual(calls, ["new:thread-a", "new:thread-a", "ChatThread:thread-a", "ChatThread:thread-b"])
+  assert.deepEqual(calls, ["new:thread-a", "ChatThread:thread-a", "ChatThread:thread-b"])
+  const otherNavigation = { navigate: (route, params) => calls.push(`other:${route}:${params.threadId}`) }
+  const moved = render(provider, "production", otherNavigation)
+  assert.notEqual(first.open, moved.open, "opening follows the current navigation")
+  moved.open("thread-c")
+  assert.equal(calls.at(-1), "other:ChatThread:thread-c")
+})
+
+test("a tap on a row navigates at once and does no warming or store work of its own", () => {
+  const calls = []
+  const open = evaluate(initializer("openThread"), {
+    useCallback: (fn) => fn,
+    navigation: { navigate: (route, params) => calls.push(JSON.parse(JSON.stringify({ route, params }))) },
+    // The press-in already warmed the thread; a tap must not repeat it before the push.
+    onWarmThread: () => { throw new Error("a tap must not warm before navigating") },
+    sessionActor: { session: { mode: "production" } }
+  })
+  open("thread-a")
+  assert.deepEqual(calls, [{ route: "ChatThread", params: { threadId: "thread-a" } }])
 })
 
 test("prefetch selects only the first six eligible conversations and warms at most two concurrently", async () => {

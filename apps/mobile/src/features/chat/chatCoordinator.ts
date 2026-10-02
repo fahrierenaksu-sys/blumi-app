@@ -372,7 +372,11 @@ export function createChatCoordinator(
       }
     }
 
-    dependencies.applyChatMessageListLoading(threadId)
+    // A prefetch is invisible: it starts on a row's press-in, and marking the
+    // thread "loading" would notify every chat store reader (the Inbox
+    // re-render) while the finger is down, delaying the tap's own navigation.
+    // An opened chat waiting on it shows its loading state without the flag.
+    if (config?.purpose !== "prefetch") dependencies.applyChatMessageListLoading(threadId)
     const request = (async () => {
       try {
         const messageList = await dependencies.fetchThreadMessages(

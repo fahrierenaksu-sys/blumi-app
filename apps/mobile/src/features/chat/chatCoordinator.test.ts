@@ -389,6 +389,24 @@ test("quiet inbox warmup starts history and invitations together and opening reu
   assert.equal(dependencies.listedMessages.length, 1)
 })
 
+test("a press-in warmup never flags the thread loading; opening it does", async () => {
+  let finishHistory!: (value: ChatMessageList) => void
+  const dependencies = createDependencies({
+    fetchThreadMessages: async () => new Promise<ChatMessageList>((resolve) => { finishHistory = resolve })
+  })
+  const coordinator = createChatCoordinator(dependencies)
+  const warmup = coordinator.requestMessages("thread_1", {}, { purpose: "prefetch" })
+  assert.deepEqual(dependencies.messageListLoading, [], "a warmup notifies no store reader while the finger is down")
+  const open = coordinator.requestMessages("thread_1")
+  assert.deepEqual(dependencies.messageListLoading, [], "opening during the warmup reuses it")
+  finishHistory({ userId: "ada", threadId: "thread_1", messages: [message] })
+  await Promise.all([warmup, open])
+  assert.equal(dependencies.listedMessages.length, 1, "the warmed page still lands in the store")
+  const openedDependencies = createDependencies()
+  await createChatCoordinator(openedDependencies).requestMessages("thread_1")
+  assert.deepEqual(openedDependencies.messageListLoading, ["thread_1"], "an opened chat shows that it loads")
+})
+
 test("quiet invitation warmup failures do not toast, and opening retries the invitation", async () => {
   let attempts = 0
   const dependencies = createDependencies({

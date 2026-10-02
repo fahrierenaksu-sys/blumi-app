@@ -664,8 +664,20 @@ export function getThreadUnreadCount(threadId: string): number {
 }
 
 // ─── Read helpers ───────────────────────────────────────────
+// Every reducer replaces `threadCache` with a new array, so one clone per
+// thread-list change serves every read until the next change. Unread, typing
+// and message notifications no longer deep-clone every thread (the Inbox
+// read this on each store notification, including on a row's press-in).
+let threadSnapshotSource: ChatThread[] | null = null
+let threadSnapshot: ChatThread[] = []
+
+/** The threads, newest first. Shared between reads until the list changes: treat it as read-only. */
 export function getThreads(): ChatThread[] {
-  return threadCache.map(cloneThread)
+  if (threadSnapshotSource !== threadCache) {
+    threadSnapshot = threadCache.map(cloneThread)
+    threadSnapshotSource = threadCache
+  }
+  return threadSnapshot
 }
 
 export function getMessages(threadId: string): ChatMessage[] {

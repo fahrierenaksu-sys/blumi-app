@@ -24,9 +24,11 @@ const PULSE_MIN_OPACITY = 0.55
 const PULSE_HALF_MS = 800
 
 /**
- * Stands in for the timeline while a thread's first history page loads
- * (UXO-03): quiet bubble shapes in the thread's own colours, then a
- * crossfade to the real messages. The breathing pulse stops under Reduce
+ * Stands in for the timeline when a thread with nothing on this phone is
+ * still loading after CHAT_THREAD_SKELETON_DELAY_MS (UXO-03): quiet bubble
+ * shapes in the thread's own colours, then a crossfade to the real
+ * messages. A conversation the store holds never shows it
+ * (useChatThreadOpening). The breathing pulse stops under Reduce
  * Motion; the crossfade stays (it is only opacity).
  */
 export function ChatThreadSkeleton({ label }: { label: string }) {

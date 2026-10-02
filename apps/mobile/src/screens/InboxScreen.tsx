@@ -128,9 +128,13 @@ export function InboxScreen(props: InboxScreenProps) {
   // Keyed by thread id and stable across renders: a new thread enters alone.
   const getItemAnim = useInboxRowEntrance(threadKeys, reduceMotion)
   const isOpeningThreads = shouldShowInboxSkeleton(threadListState.status, threads.length)
+  // The store keeps one thread snapshot per list change, so `threads` alone
+  // does not change when only a badge does; the rows follow the counts too.
+  const unreadSignature = threads.map((thread) => getThreadUnreadCount(thread.threadId)).join(",")
 
   const threadRows = useMemo(() => {
-    return threads.map((thread) => {
+    const unreadCounts = unreadSignature.split(",")
+    return threads.map((thread, index) => {
       const partnerSummary = thread.participants.find(
         (p) => p.userId !== currentUserId
       ) ?? thread.participants[0]
@@ -139,7 +143,7 @@ export function InboxScreen(props: InboxScreenProps) {
       const partnerAvatar = partnerSummary?.avatar
       const preview = buildInboxRowPreview({ lastMessage: thread.lastMessage, currentUserId, copy })
       const time = formatInboxTimestamp(thread.lastMessage?.sentAt, now, copy, timeFormatter)
-      const unreadCount = getThreadUnreadCount(thread.threadId)
+      const unreadCount = Number(unreadCounts[index]) || 0
       const isPinned = isConversationPinned(conversationPrefs, thread.threadId)
       const rowLabel = buildInboxRowAccessibilityLabel(copy, {
         partnerName, unreadCount, preview, timeSpoken: time.spoken
@@ -158,7 +162,7 @@ export function InboxScreen(props: InboxScreenProps) {
         isPinned
       }
     })
-  }, [actionsCopy, conversationPrefs, copy, currentUserId, getThreadUnreadCount, now, threads, timeFormatter])
+  }, [actionsCopy, conversationPrefs, copy, currentUserId, now, threads, timeFormatter, unreadSignature])
   const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
   const scrollToTop = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
@@ -216,12 +220,13 @@ export function InboxScreen(props: InboxScreenProps) {
     )
   }, [hasUnreadThread, reduceMotion, unreadPulse])
 
+  // A tap navigates and nothing else: the row's press-in already warmed the
+  // thread, and the chat screen requests its history itself (deduplicated).
   const openThread = useCallback(
     (threadId: string) => {
-      if (sessionActor.session.mode === "production") void onWarmThread(threadId)
       navigation.navigate("ChatThread", { threadId })
     },
-    [navigation, onWarmThread, sessionActor.session.mode]
+    [navigation]
   )
   const warmThread = useCallback((threadId: string) => {
     if (sessionActor.session.mode === "production") void onWarmThread(threadId)

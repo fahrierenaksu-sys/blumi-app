@@ -2,8 +2,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import type * as Hook from "./useChatThreadSync"
+import { createPushSettleGate } from "./useAfterPushTransition"
+import type * as PushTransition from "./useAfterPushTransition"
 
-function mount(refreshParticipants?: () => Promise<void>) {
+function mount(refreshParticipants?: () => Promise<void>, extra: Partial<Parameters<typeof Hook.useChatThreadSync>[0]> = {}) {
   const runtime = createFakeReactRuntime()
   const timers = new Map<number, () => void>()
   const listeners = new Set<(state: string) => void>()
@@ -19,11 +21,11 @@ function mount(refreshParticipants?: () => Promise<void>) {
     globals: { setTimeout: (fn: () => void) => { timers.set(++counter, fn); return counter },
       clearTimeout: (id: number) => timers.delete(id) }
   })
-  let input = { resolvedThreadId: "thread-a", currentUserId: "a", isFocused: true,
+  let input: Parameters<typeof Hook.useChatThreadSync>[0] = { resolvedThreadId: "thread-a", currentUserId: "a", isFocused: true,
     refreshParticipants,
     latestIncomingMessageId: "one", requestMessages: undefined,
     markThreadRead: (id: string, upToMessageId?: string) => { reads.push(id); readCursors.push(upToMessageId) },
-    setActiveThread: (id: string | null) => { active.push(id) } }
+    setActiveThread: (id: string | null) => { active.push(id) }, ...extra }
   const render = (patch: Partial<typeof input> = {}) => {
     input = { ...input, ...patch }; runtime.render(() => hook.useChatThreadSync(input))
   }
@@ -121,4 +123,66 @@ test("blur flushes a pending observed message once; account switches cancel it",
   f.flush()
   assert.equal(f.reads.length, 4)
   f.runtime.unmount()
+})
+
+test("entering a cached chat leaves its refreshes until the push settles; unknown history loads at once", () => {
+  const cached = createPushSettleGate()
+  const requests: string[] = []
+  let refreshes = 0
+  const requestMessages = async (id: string) => { requests.push(id) }
+  const f = mount(async () => { refreshes += 1 }, { historyReady: true, whenSettled: cached.whenSettled, requestMessages })
+  assert.deepEqual(requests, [], "the cached history refresh waits")
+  assert.equal(refreshes, 0, "the thread-list refresh waits")
+  assert.deepEqual(f.active, ["thread-a"], "the chat is still active (badge cleared) at once")
+  cached.settle()
+  assert.deepEqual(requests, ["thread-a"])
+  assert.equal(refreshes, 1)
+  f.runtime.unmount()
+
+  const cold = createPushSettleGate()
+  const coldRequests: string[] = []
+  const g = mount(undefined, { historyReady: false, whenSettled: cold.whenSettled,
+    requestMessages: async (id: string) => { coldRequests.push(id) } })
+  assert.deepEqual(coldRequests, ["thread-a"], "what the screen waits for is never deferred")
+  g.runtime.unmount()
+
+  const left = createPushSettleGate()
+  const leftRequests: string[] = []
+  const h = mount(undefined, { historyReady: true, whenSettled: left.whenSettled,
+    requestMessages: async (id: string) => { leftRequests.push(id) } })
+  h.runtime.unmount()
+  left.settle()
+  assert.deepEqual(leftRequests, [], "a chat closed during its push starts no refresh")
+})
+
+test("the push settles on its own transitionEnd, or after the fallback when none arrives", () => {
+  for (const ending of ["transition", "fallback"] as const) {
+    const runtime = createFakeReactRuntime()
+    const timers = new Map<number, () => void>()
+    let counter = 0
+    const listeners = new Set<(event: { data?: { closing?: boolean } }) => void>()
+    const transition = loadSourceWithFakeReact<typeof PushTransition>("features/chat/thread/useAfterPushTransition.ts", runtime, {
+      globals: { setTimeout: (fn: () => void) => { timers.set(++counter, fn); return counter },
+        clearTimeout: (id: number) => timers.delete(id) }
+    })
+    const navigation = { addListener: (_type: "transitionEnd", listener: (event: { data?: { closing?: boolean } }) => void) => {
+      listeners.add(listener); return () => listeners.delete(listener)
+    } }
+    let whenSettled!: PushTransition.WhenPushSettled
+    runtime.render(() => { whenSettled = transition.useAfterPushTransition(navigation) })
+    const first = whenSettled
+    const ran: string[] = []
+    whenSettled(() => ran.push("task"))
+    runtime.rerender()
+    assert.equal(whenSettled, first, "a stable function, so effects that use it do not re-run")
+    for (const listener of listeners) listener({ data: { closing: true } })
+    assert.deepEqual([...ran], [], "a closing transition is not this screen settling")
+    if (ending === "transition") for (const listener of listeners) listener({ data: { closing: false } })
+    else for (const fn of timers.values()) fn()
+    assert.deepEqual([...ran], ["task"])
+    whenSettled(() => ran.push("later"))
+    assert.deepEqual(ran, ["task", "later"], "after settling, work runs at once")
+    runtime.unmount()
+    assert.equal(listeners.size, 0)
+  }
 })
