@@ -50,18 +50,18 @@ import { getDiscoverySurfaceCopy } from "../discovery/discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
 import type { DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
 import { useDiscoverCardSwipe, type DiscoverCardExitRequest } from "./useDiscoverCardSwipe"
+import {
+  doesShowcaseAuthorizationMatch,
+  isBundledDemoShowcase,
+  nextShowcaseAuthorizationOnFlip,
+  resolveCardBackRoom,
+  selectAuthorizedShowcase,
+  type ShowcaseAuthorization
+} from "../discovery/discoveryShowcaseAuthorizationModel"
 
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
 const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
 let nextShowcaseAuthorizationId = 0
-
-interface ShowcaseAuthorization {
-  id: number
-  baseHttpUrl: string
-  viewerUserId: string
-  candidateUserId: string
-  sessionToken: string
-}
 
 export interface SwipeableDiscoverProfile {
   userId: string
@@ -160,13 +160,12 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     showcaseAuthorization,
     profile.userId
   ])
-  const authorizationMatches = Boolean(
-    isBackVisible && showcaseRequest && showcaseAuthorization &&
-    showcaseAuthorization.baseHttpUrl === showcaseRequest.baseHttpUrl &&
-    showcaseAuthorization.viewerUserId === showcaseRequest.viewerUserId &&
-    showcaseAuthorization.sessionToken === showcaseRequest.sessionToken &&
-    showcaseAuthorization.candidateUserId === profile.userId
-  )
+  const authorizationMatches = doesShowcaseAuthorizationMatch({
+    isBackVisible,
+    request: showcaseRequest,
+    authorization: showcaseAuthorization,
+    candidateUserId: profile.userId
+  })
   const showcaseQuery = useQuery(createDiscoveryRoomShowcaseQueryOptions({
     baseHttpUrl: showcaseAuthorization?.baseHttpUrl ?? "",
     viewerUserId: showcaseAuthorization?.viewerUserId ?? "",
@@ -175,29 +174,39 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     authorizationId: showcaseAuthorization?.id ?? 0,
     enabled: authorizationMatches
   }))
-  const authorizedShowcase = authorizationMatches && showcaseQuery.isSuccess && !showcaseQuery.isFetching
-    ? showcaseQuery.data
-    : undefined
+  const authorizedShowcase = selectAuthorizedShowcase({
+    matches: authorizationMatches,
+    isSuccess: showcaseQuery.isSuccess,
+    isFetching: showcaseQuery.isFetching,
+    data: showcaseQuery.data
+  })
   // Demo uses one bundled fixture. A missing production request must never
   // make embedded profile room fields a substitute for current authorization.
-  const showEmbeddedDemoRoom = Boolean(
-    !showcaseRequest && !showcaseAuthorization &&
-    /^demo-user-\d{3}$/.test(profile.userId) &&
-    profile.roomSnapshot === bundledDemoRoomSnapshot &&
-    !profile.roomSnapshotUrl
-  )
+  const showEmbeddedDemoRoom = isBundledDemoShowcase({
+    request: showcaseRequest,
+    authorization: showcaseAuthorization,
+    userId: profile.userId,
+    roomSnapshot: profile.roomSnapshot,
+    roomSnapshotUrl: profile.roomSnapshotUrl,
+    bundledSnapshot: bundledDemoRoomSnapshot
+  })
+  const cardBackRoom = resolveCardBackRoom({
+    showEmbeddedDemoRoom,
+    profileRoomSnapshot: profile.roomSnapshot,
+    profileRoomHeadline: profile.roomHeadline,
+    authorizedShowcase
+  })
 
   useEffect(() => {
     if (!isBackVisible || !showcaseRequest || authorizationMatches) return
     // A session or account changed while the back face was open. Hide its old
     // result immediately, then authorize this viewer with a fresh request.
-    setShowcaseAuthorization({
-      id: ++nextShowcaseAuthorizationId,
-      baseHttpUrl: showcaseRequest.baseHttpUrl,
-      viewerUserId: showcaseRequest.viewerUserId,
+    setShowcaseAuthorization(nextShowcaseAuthorizationOnFlip({
+      nextVisible: true,
+      request: showcaseRequest,
       candidateUserId: profile.userId,
-      sessionToken: showcaseRequest.sessionToken
-    })
+      nextId: ++nextShowcaseAuthorizationId
+    }))
   }, [
     authorizationMatches,
     isBackVisible,
@@ -238,13 +247,12 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
       void queryClient.cancelQueries({ queryKey: showcaseQueryKey, exact: true })
       setShowcaseAuthorization(null)
     } else if (showcaseRequest) {
-      setShowcaseAuthorization({
-        id: ++nextShowcaseAuthorizationId,
-        baseHttpUrl: showcaseRequest.baseHttpUrl,
-        viewerUserId: showcaseRequest.viewerUserId,
+      setShowcaseAuthorization(nextShowcaseAuthorizationOnFlip({
+        nextVisible,
+        request: showcaseRequest,
         candidateUserId: profile.userId,
-        sessionToken: showcaseRequest.sessionToken
-      })
+        nextId: ++nextShowcaseAuthorizationId
+      }))
     }
     setIsBackVisible(nextVisible)
     onFlipChange?.(nextVisible)
@@ -488,14 +496,8 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
             snapshot={avatarSnapshot}
             content={cardBack}
             firstName={firstName}
-            roomSnapshot={showEmbeddedDemoRoom
-              ? profile.roomSnapshot
-              : authorizedShowcase?.roomSnapshotUrl
-                ? { uri: authorizedShowcase.roomSnapshotUrl }
-                : undefined}
-            roomHeadline={showEmbeddedDemoRoom
-              ? profile.roomHeadline ?? undefined
-              : authorizedShowcase?.roomHeadline ?? undefined}
+            roomSnapshot={cardBackRoom.roomSnapshot}
+            roomHeadline={cardBackRoom.roomHeadline}
             imagePriority={isBackVisible ? imagePriority : "low"}
           />
         </Animated.View>
