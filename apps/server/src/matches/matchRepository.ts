@@ -629,9 +629,9 @@ function matchesDiscoveryFilters(
     return false
   }
 
-  if (filters.vibes.length === 0) return true
-  const desiredVibes = new Set(filters.vibes.map((vibe) => vibe.toLowerCase()))
-  return profile.vibeTags.some((vibe) => desiredVibes.has(vibe.trim().toLowerCase()))
+  // Stored vibes are kept for compatibility but never narrow the deck: the
+  // app no longer shows or edits them, so a saved vibe must not hide people.
+  return true
 }
 
 function isDiscoverableProfile(profile: DiscoverProfileRecord): boolean {

@@ -105,6 +105,8 @@ test("postgres match repository lists real accounts with parameterized filters",
     /lower\(trim\(COALESCE\(identity_gender, gender\)\)\)/
   )
   assert.match(selectCall?.text ?? "", /unnest/)
+  // Saved vibes only rank (viewer interests); they never filter candidates.
+  assert.doesNotMatch(selectCall?.text ?? "", /AS vibe\(value\)/)
   assert.match(selectCall?.text ?? "", /avatar_selection/)
   assert.match(selectCall?.text ?? "", /avatar_revision/)
   assert.match(selectCall?.text ?? "", /profile_prompts/)
@@ -124,7 +126,6 @@ test("postgres match repository lists real accounts with parameterized filters",
     23,
     31,
     ["woman"],
-    ["coffee dates", "slow burn"],
     101,
     0
   ])
@@ -275,7 +276,8 @@ test("postgres linked-profile eligibility reuses the normal deck policy without 
   assert.match(query?.text ?? "", /blumi_accounts\.user_id\s*=\s*\$2/i)
   assert.match(query?.text ?? "", /age BETWEEN \$3 AND \$4/i)
   assert.match(query?.text ?? "", /ANY\(\$5::text\[\]\)/i)
-  assert.match(query?.text ?? "", /ANY\(\$6::text\[\]\)/i)
+  // Saved vibes never narrow eligibility.
+  assert.doesNotMatch(query?.text ?? "", /\$6|AS vibe\(value\)/i)
   assert.match(query?.text ?? "", /blumi_discovery_decisions/i)
   assert.match(query?.text ?? "", /blumi_matches/i)
   assert.match(query?.text ?? "", /viewer\.viewer_gender\s*=\s*ANY\(discovery_genders\)/i)
@@ -288,8 +290,7 @@ test("postgres linked-profile eligibility reuses the normal deck policy without 
     "target_user",
     24,
     30,
-    ["man"],
-    ["coffee"]
+    ["man"]
   ])
 })
 

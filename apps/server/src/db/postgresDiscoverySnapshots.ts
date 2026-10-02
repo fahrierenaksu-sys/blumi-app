@@ -14,7 +14,8 @@ function deletedCount(result: { rowCount?: number | null }): number { return res
 interface SnapshotPool extends Executor { connect(): Promise<Executor & {release():void}> }
 function params(userId: string, filters: DiscoveryFilters): unknown[] {
   const f = normalizeFilters(filters)
-  return [userId, f.ageMin, f.ageMax, f.genders, f.vibes]
+  // Vibes never narrow the deck (discoveryProfilesSql), so they are not bound.
+  return [userId, f.ageMin, f.ageMax, f.genders]
 }
 function eligibleSql(projection: "profile" | "candidate" = "profile", candidateSource?: "page_candidates"): string {
   const columns = projection === "candidate" ? "ranked.user_id, ranked.rank_score" : "ranked.*"
@@ -50,7 +51,7 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
           ORDER BY ranked.rank_score DESC, ranked.user_id ASC LIMIT ${DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT}),
         meta AS (INSERT INTO blumi_discovery_snapshots
           (snapshot_id,user_id,filter_hash,created_at,expires_at,candidate_count)
-          SELECT $6::uuid,$1,$7,$8::timestamptz,$8::timestamptz + INTERVAL '30 minutes',COUNT(*) FROM candidates RETURNING *),
+          SELECT $5::uuid,$1,$6,$7::timestamptz,$7::timestamptz + INTERVAL '30 minutes',COUNT(*) FROM candidates RETURNING *),
         inserted AS (INSERT INTO blumi_discovery_snapshot_candidates(snapshot_id,position,user_id)
           SELECT meta.snapshot_id,(ROW_NUMBER() OVER (ORDER BY candidates.rank_score DESC,candidates.user_id ASC)-1)::integer,candidates.user_id
             FROM candidates CROSS JOIN meta)
@@ -75,9 +76,9 @@ export function createPostgresDiscoverySnapshots(pool: SnapshotPool): DiscoveryS
       const result = await pool.query(`WITH page_candidates AS MATERIALIZED (
         SELECT c.position,c.user_id FROM blumi_discovery_snapshot_candidates c
         JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id
-        WHERE c.snapshot_id=$6 AND c.position >= $7 AND s.expires_at > NOW()
-          AND s.user_id=$1 AND s.filter_hash=$9
-        ORDER BY c.position LIMIT $8),
+        WHERE c.snapshot_id=$5 AND c.position >= $6 AND s.expires_at > NOW()
+          AND s.user_id=$1 AND s.filter_hash=$8
+        ORDER BY c.position LIMIT $7),
         current_eligible AS MATERIALIZED (${eligibleSql("profile", "page_candidates")})
         SELECT page_candidates.position,current_eligible.* FROM page_candidates
         LEFT JOIN current_eligible ON current_eligible.user_id=page_candidates.user_id ORDER BY page_candidates.position`,

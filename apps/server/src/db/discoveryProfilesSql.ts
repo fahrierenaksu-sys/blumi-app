@@ -2,6 +2,8 @@
  * Shared eligibility/ranking query. Snapshot storage returns only IDs to SQL.
  * `candidateSource` names an outer CTE with a `user_id` column; eligibility is
  * then evaluated for those accounts only (a page read), never the whole pool.
+ * Parameters: $1 viewer, $2/$3 age range, $4 genders. Stored filter vibes are
+ * not a parameter: they never narrow the deck.
  */
 export function discoveryProfilesSql(candidateSource?: "page_candidates"): string {
   const candidateFilter = candidateSource
@@ -67,14 +69,6 @@ export function discoveryProfilesSql(candidateSource?: "page_candidates"): strin
             AND (
               cardinality($4::text[]) = 0
               OR lower(trim(COALESCE(identity_gender, gender))) = ANY($4::text[])
-            )
-            AND (
-              cardinality($5::text[]) = 0
-              OR EXISTS (
-                SELECT 1
-                  FROM unnest(COALESCE(interests, ARRAY[]::text[])) AS vibe(value)
-                 WHERE lower(trim(vibe.value)) = ANY($5::text[])
-              )
             )
             AND NOT EXISTS (
               SELECT 1
