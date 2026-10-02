@@ -72,12 +72,35 @@ test("retention removes only finished work and audit rows older than their windo
   }
 })
 
-test("retention policies never name a table that holds user content or an idempotency key", () => {
+test("retention policies never name a table that holds user content", () => {
   const tables = RETENTION_POLICIES.map((policy) => policy.table).sort()
+  // Idempotency claims appear only with a window far beyond any retry
+  // (chat outbox tombstones, message and like push claims: 30 days).
   assert.deepEqual(tables, [
     "blumi_chat_delivery_outbox",
     "blumi_notification_policy_audit",
+    "blumi_notification_policy_events",
     "blumi_push_delivery_audit",
     "blumi_push_receipts"
   ])
+})
+
+test("push dedupe claims expire only for per-event message and like keys", requirePostgres, async () => {
+  const pool = openPool()
+  const user = `ret_${randomUUID()}`
+  try {
+    await pool.query(`INSERT INTO blumi_notification_policy_events(user_id, notification_type, dedupe_key, created_at) VALUES
+      ($1, 'message', 'message:old', NOW() - INTERVAL '31 days'),
+      ($1, 'message', 'message:new', NOW() - INTERVAL '1 day'),
+      ($1, 'like', 'like:old', NOW() - INTERVAL '31 days'),
+      ($1, 'match', 'match:old', NOW() - INTERVAL '400 days'),
+      ($1, 'discovery_watch', 'discovery_watch:old', NOW() - INTERVAL '400 days')`, [user])
+    await createPostgresRetentionService(pool).purgeExpired()
+    assert.deepEqual((await pool.query(
+      "SELECT dedupe_key FROM blumi_notification_policy_events WHERE user_id = $1 ORDER BY dedupe_key", [user]
+    )).rows.map((row) => row.dedupe_key), ["discovery_watch:old", "match:old", "message:new"])
+  } finally {
+    await pool.query("DELETE FROM blumi_notification_policy_events WHERE user_id = $1", [user])
+    await pool.end()
+  }
 })

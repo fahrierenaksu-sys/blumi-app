@@ -8,14 +8,26 @@
  * - blumi_push_receipts: only receipts with an outcome; open ones are work.
  * - blumi_push_delivery_audit, blumi_notification_policy_audit: operational
  *   audit, 30 days.
- * blumi_notification_policy_events is deliberately absent: its dedupe keys are
- * documented as permanent claims (migration 036).
+ * - blumi_notification_policy_events, 'message' and 'like' claims only, 30
+ *   days (2026-10-02). Each pushed chat message added one row per recipient
+ *   forever. Their keys are unique per event (message id, anonymous like id),
+ *   so a claim is only needed for the producer's retry window and the
+ *   one-hour frequency cap; 30 days matches the chat outbox tombstone.
+ *   'match' and 'discovery_watch' claims stay permanent (migration 036).
+ *   No index serves this global time scan yet; at today's size a scan every
+ *   ten minutes is cheap. The next migration should add
+ *   (created_at) WHERE notification_type IN ('message', 'like').
  */
 export const RETENTION_POLICIES = Object.freeze([
   { table: "blumi_chat_delivery_outbox", key: "message_id", expired: "completed_at < NOW() - INTERVAL '30 days'" },
   { table: "blumi_push_receipts", key: "ticket_id", expired: "outcome IS NOT NULL AND created_at < NOW() - INTERVAL '7 days'" },
   { table: "blumi_push_delivery_audit", key: "audit_id", expired: "occurred_at < NOW() - INTERVAL '30 days'" },
-  { table: "blumi_notification_policy_audit", key: "audit_id", expired: "occurred_at < NOW() - INTERVAL '30 days'" }
+  { table: "blumi_notification_policy_audit", key: "audit_id", expired: "occurred_at < NOW() - INTERVAL '30 days'" },
+  {
+    table: "blumi_notification_policy_events",
+    key: "event_id",
+    expired: "notification_type IN ('message', 'like') AND created_at < NOW() - INTERVAL '30 days'"
+  }
 ] as const)
 
 export type RetentionTable = (typeof RETENTION_POLICIES)[number]["table"]
@@ -49,7 +61,7 @@ export function createPostgresRetentionService(
         let deleted = 0
         for (let batch = 0; batch < maxBatches; batch++) {
           const removed = await pool.query(
-            `DELETE FROM ${policy.table} WHERE ${policy.key} IN (
+            `DELETE FROM ${policy.table} WHERE (${policy.key}) IN (
                SELECT ${policy.key} FROM ${policy.table}
                 WHERE ${policy.expired}
                 LIMIT $1 FOR UPDATE SKIP LOCKED)`,
