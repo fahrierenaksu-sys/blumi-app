@@ -27,7 +27,8 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
 }
 
 export function requestBudgetScope(method: string, route: string | undefined): UserRateBudgetScope {
-  if (route === "/v1/devices" && (method === "POST" || method === "DELETE")) return "deviceRegistration"
+  if (route === "/v1/devices" && method === "POST") return "deviceRegistration"
+  if (route === "/v1/devices" && method === "DELETE") return "deviceRemoval"
   if (method !== "POST") return "general"
   if (route === "/v1/threads/:threadId/messages") return "chatSend"
   if (route === "/v1/room-sessions/:roomSessionId/leave" || route === "/v1/users/me/active-room/leave") return "roomLeave"

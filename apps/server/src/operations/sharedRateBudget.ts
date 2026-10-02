@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 
 export interface RateBudgetResult { allowed: boolean; retryAfterSeconds: number }
-export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration"
+export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration" | "deviceRemoval"
 export interface SharedRateBudget {
   consumeUser(userId: string, scope?: UserRateBudgetScope): Promise<RateBudgetResult>
   purgeExpired(): Promise<void>
@@ -18,7 +18,11 @@ export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, numbe
   // Push-token registration has its own small budget: a looping client
   // (build 14 posted every ~340 ms) must never 429 the person's chat,
   // invites or discovery. An unchanged repeat costs no database write.
-  deviceRegistration: 30
+  deviceRegistration: 30,
+  // Unregistering at sign-out has its own budget (2026-10-02): sharing the
+  // registration budget let a looping client 429 the sign-out DELETE, and
+  // the phone kept receiving the signed-out account's pushes.
+  deviceRemoval: 30
 }
 const WINDOW_MS = 60_000
 

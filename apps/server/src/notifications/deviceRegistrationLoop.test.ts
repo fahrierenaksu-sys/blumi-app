@@ -87,6 +87,11 @@ test("a looping device registration never 429s the same person's chat reads", as
     assert.equal(messages.status, 200, JSON.stringify(messages.body))
     const threads = await ada.http("GET", "/v1/threads")
     assert.equal(threads.status, 200)
+
+    // Signing out still unregisters the token while the loop holds its budget.
+    const removed = await ada.http("DELETE", "/v1/devices", { pushToken })
+    assert.equal(removed.status, 204, JSON.stringify(removed.body))
+    assert.equal((await harness.services.notificationService.repository.listDevices(ada.userId)).length, 0)
   } finally {
     await harness.close()
   }
