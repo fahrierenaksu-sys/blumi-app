@@ -87,7 +87,9 @@ try {
       "src/features/inventory/useInventoryStoreView.test.ts",
       "src/features/shop/screen/useShopPurchaseActions.test.ts",
       // The Shop card X changes only what the avatar wears, never ownership.
-      "src/features/shop/shopCardRemoveModel.test.ts"
+      "src/features/shop/shopCardRemoveModel.test.ts",
+      // Swiping an outfit row away: claim, threshold, flick and spring back.
+      "src/features/shop/shopCombinationRowSwipe.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

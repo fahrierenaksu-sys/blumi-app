@@ -67,6 +67,8 @@ export interface ShopCopy {
     individualPurchase: string
     previousPieces: string
     nextPieces: string
+    /** The outfit row's X and swipe action. */
+    removeFromOutfit: string
     selectionSummary: (count: number, purchaseCount: number) => string
     applyLook: string
     itemUnavailable: string
@@ -178,6 +180,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
       individualPurchase: "Open selected item below",
       previousPieces: "Show previous pieces",
       nextPieces: "Show more pieces",
+      removeFromOutfit: "Remove from outfit",
       selectionSummary: (count, purchaseCount) => `${count} selected · ${purchaseCount} to buy`,
       applyLook: "Apply look",
       itemUnavailable: "This item cannot be applied right now",
@@ -293,6 +296,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
       individualPurchase: "Aşağıdan seçili parçayı aç",
       previousPieces: "Önceki parçaları göster",
       nextPieces: "Diğer parçaları göster",
+      removeFromOutfit: "Kombinden çıkar",
       selectionSummary: (count, purchaseCount) => `${count} parça · ${purchaseCount} yeni`,
       applyLook: "Kombini uygula",
       itemUnavailable: "Bu ürün şu anda uygulanamıyor",

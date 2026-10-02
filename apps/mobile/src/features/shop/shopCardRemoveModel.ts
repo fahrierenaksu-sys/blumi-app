@@ -69,6 +69,32 @@ export function applyShopCardRemoveAction(input: {
   return null
 }
 
+/**
+ * A row of the outfit list ("Kombinin · 3 parça") can leave the outfit when
+ * its piece is only tried on: the draft gets the saved item for that slot
+ * back. Nothing is saved, bought or taken from the inventory. A piece of the
+ * saved look changes only through the card X and the avatar save.
+ */
+export function canRemoveShopCombinationItem(input: {
+  item: AvatarCatalogItem | undefined
+  draft: UserAvatar
+  equipped: UserAvatar
+}): boolean {
+  return getShopCardRemoveAction({ ...input, owned: false, canSave: false }) === "undo_try_on"
+}
+
+/** The draft without a tried-on outfit piece, or null when it cannot leave. */
+export function removeShopCombinationItem(input: {
+  item: AvatarCatalogItem | undefined
+  draft: UserAvatar
+  equipped: UserAvatar
+  catalog: readonly AvatarCatalogItem[]
+}): UserAvatar | null {
+  const { item, draft, equipped, catalog } = input
+  if (!item || !canRemoveShopCombinationItem({ item, draft, equipped })) return null
+  return applyShopCardRemoveAction({ action: "undo_try_on", item, draft, equipped, catalog })?.draft ?? null
+}
+
 function withoutAccessory(avatar: UserAvatar, itemId: string): UserAvatar {
   return { ...avatar, accessoryIds: avatar.accessoryIds.filter((id) => id !== itemId) }
 }

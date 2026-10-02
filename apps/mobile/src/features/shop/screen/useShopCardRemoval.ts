@@ -18,7 +18,9 @@ import {
 } from "../shopAvatarDraft"
 import {
   applyShopCardRemoveAction,
+  canRemoveShopCombinationItem,
   getShopCardRemoveAction,
+  removeShopCombinationItem,
   type ShopCardRemoveAction
 } from "../shopCardRemoveModel"
 import type { ShopCatalogItem } from "../shopCatalog"
@@ -38,6 +40,10 @@ import type { ShopCopy } from "../shopCopy"
  */
 export function useShopCardRemoval(input: {
   products: readonly ShopCatalogItem[]
+  /** Every avatar product, for the outfit list rows (by canonical source item id). */
+  avatarProducts: readonly ShopCatalogItem[]
+  /** Canonical source item ids of the outfit list rows. */
+  combinationItemIds: readonly string[]
   previewAvatar: UserAvatar
   avatar: UserAvatar
   catalog: readonly AvatarCatalogItem[]
@@ -53,6 +59,8 @@ export function useShopCardRemoval(input: {
 }) {
   const {
     products,
+    avatarProducts,
+    combinationItemIds,
     previewAvatar,
     avatar,
     catalog,
@@ -155,5 +163,33 @@ export function useShopCardRemoval(input: {
     void handleRemoveProduct(product)
   }, [handleRemoveProduct])
 
-  return { removeActionById, onRemoveProduct, isRemoving }
+  // The outfit list: a row whose piece is only tried on can leave the outfit
+  // (its X or a swipe). It only edits the draft; the row plays the haptic.
+  const removableCombinationIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (!inventoryVerified) return ids
+    for (const id of combinationItemIds) {
+      const item = avatarProducts.find((product) => product.sourceItemId === id)?.avatarItem
+      if (canRemoveShopCombinationItem({ item, draft: previewAvatar, equipped: avatar })) ids.add(id)
+    }
+    return ids
+  }, [avatar, avatarProducts, combinationItemIds, inventoryVerified, previewAvatar])
+
+  const removeCombinationItem = useCallback((sourceItemId: string): boolean => {
+    const state = combinationStateRef.current
+    if (state.phase !== "editing" || isRemovingRef.current) return false
+    const item = avatarProducts.find((product) => product.sourceItemId === sourceItemId)?.avatarItem
+    const draft = removeShopCombinationItem({
+      item,
+      draft: shopCombinationDraftToAvatar(state.draft, avatar),
+      equipped: avatar,
+      catalog
+    })
+    if (!draft) return false
+    dispatchCombination({ type: "replace_draft", draft: avatarToShopCombinationDraft(draft) })
+    publishSelectedShopPreviewWarmup([])
+    return true
+  }, [avatar, avatarProducts, catalog, combinationStateRef, dispatchCombination])
+
+  return { removeActionById, onRemoveProduct, isRemoving, removableCombinationIds, removeCombinationItem }
 }

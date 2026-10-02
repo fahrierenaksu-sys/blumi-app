@@ -344,8 +344,17 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   })
   useShopCheckoutFlight(checkout, flyPurchasedPieces)
 
-  const { removeActionById, onRemoveProduct, isRemoving } = useShopCardRemoval({
+  const combinationItemIds = useMemo(() => combinationItems.map((item) => item.id), [combinationItems])
+  const {
+    removeActionById,
+    onRemoveProduct,
+    isRemoving,
+    removableCombinationIds,
+    removeCombinationItem
+  } = useShopCardRemoval({
     products: filteredProducts,
+    avatarProducts,
+    combinationItemIds,
     previewAvatar,
     avatar: avatarV2.avatar,
     catalog: avatarV2.catalog,
@@ -483,6 +492,12 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                       setSelectedId(item.id)
                     }
                   }}
+                  removableCombinationIds={
+                    isPurchasing || isRemoving || combinationState.phase !== "editing"
+                      ? undefined
+                      : removableCombinationIds
+                  }
+                  onRemoveCombinationItem={removeCombinationItem}
                   supportsCombinationAction={inventoryVerified && multiItemApplyEnabled}
                   primaryActionLabel={
                     !inventoryVerified

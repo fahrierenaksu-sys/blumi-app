@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { Image as ExpoImage } from "expo-image"
 import { useMemo, useState, useLayoutEffect } from "react"
 import {
   useWindowDimensions,
@@ -26,13 +25,12 @@ import { getShopProductPresentation } from "./shopProductPresentation"
 import { formatCoins } from "./shopFormatters"
 import type { ShopLayoutMetrics } from "./shopLayoutMetrics"
 import type { ShopCombinationItem, ShopCombinationSummary } from "./shopCombinationSummary"
-import { getShopProductThumbnailBounds, getShopProductThumbnailSource } from "./shopAssets"
 import type { ShopMode } from "./ShopNavigationControls"
-import { getShopThumbnailLayout } from "./shopThumbnailLayout"
 import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage } from "./shopCombinationViewport"
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
 import { PressableScale } from "../../ui/PressableScale"
+import { ShopCombinationRow } from "./ShopCombinationRow"
 
 export function ShopPreviewPanel(props: {
   mode: ShopMode
@@ -51,6 +49,9 @@ export function ShopPreviewPanel(props: {
   combinationItems?: readonly ShopCombinationItem[]
   supportsCombinationAction?: boolean
   onSelectCombinationItem?: (id: string) => void
+  /** Outfit rows whose piece can leave the outfit (X or swipe), by source item id. */
+  removableCombinationIds?: ReadonlySet<string>
+  onRemoveCombinationItem?: (id: string) => boolean
   canRemovePreview?: boolean
   onRemovePreview?: () => void
   onPrimaryAction: () => void
@@ -68,6 +69,8 @@ export function ShopPreviewPanel(props: {
     combinationItems = [],
     supportsCombinationAction = false,
     onSelectCombinationItem,
+    removableCombinationIds,
+    onRemoveCombinationItem,
     canRemovePreview = false,
     onRemovePreview,
     previewAvatar,
@@ -226,7 +229,7 @@ export function ShopPreviewPanel(props: {
                   {page.pageCount > 1 ? <PressableScale style={styles.combinationPageButton} disabled={page.page + 1 === page.pageCount} accessibilityRole="button" accessibilityLabel={copy.combination.nextPieces} accessibilityState={{ disabled: page.page + 1 === page.pageCount }} onPress={() => navigateCombinationPage(page.page + 1)}><Ionicons name="chevron-forward" size={17} color={page.page + 1 === page.pageCount ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></PressableScale> : null}
                 </View>
                 <View style={styles.combinationRows}>
-                  {page.items.map((item) => <CombinationRow key={item.id} item={item} locale={locale} selected={item.id === product.sourceItemId} onSelect={onSelectCombinationItem} />)}
+                  {page.items.map((item) => <ShopCombinationRow key={item.id} item={item} locale={locale} selected={item.id === product.sourceItemId} onSelect={onSelectCombinationItem} removable={removableCombinationIds?.has(item.id) ?? false} onRemove={onRemoveCombinationItem} />)}
                 </View>
               </>
             ) : <View style={[
@@ -339,30 +342,6 @@ export function ShopPreviewPanel(props: {
 
       </View>
     </View>
-  )
-}
-
-function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombinationItem; locale: AppLocale; selected: boolean; onSelect?: (id: string) => void }) {
-  const copy = getShopCopy(locale)
-  const source = getShopProductThumbnailSource(item.id)
-  const bounds = getShopProductThumbnailBounds(item.id)
-  const frame = getShopThumbnailLayout(bounds, 34, 34)
-  return (
-      <PressableScale
-        style={[styles.combinationRow, selected ? styles.combinationRowSelected : null]}
-        onPress={() => onSelect?.(item.id)}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
-        accessibilityLabel={`${item.title ?? copy.combination.itemUnavailable}, ${item.owned ? copy.owned : item.price === null ? copy.combination.priceNeedsRefresh : `${formatCoins(item.price, locale)} ${copy.coins}`}`}
-      >
-        <View style={styles.combinationThumbnail}>
-          {source ? <ExpoImage source={source} contentFit="contain" cachePolicy="memory-disk" priority={selected ? "high" : "normal"} transition={0} style={frame ? { position: "absolute", ...frame } : { width: 34, height: 34 }} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
-        </View>
-        <View style={styles.combinationRowCopy}>
-          <Text style={styles.combinationItemTitle} numberOfLines={1}>{item.title ?? copy.combination.itemUnavailable}</Text>
-          <Text style={styles.combinationItemPrice} numberOfLines={1}>{item.owned ? `✓ ${copy.owned}` : item.price === null ? "—" : `◇ ${formatCoins(item.price, locale)}`}</Text>
-        </View>
-      </PressableScale>
   )
 }
 
