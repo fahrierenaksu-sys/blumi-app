@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
   StyleSheet,
@@ -163,16 +163,21 @@ function NavBadge(props: { count: number; ambient: boolean; reduceMotion: boolea
   )
 }
 
-function NavTab(props: {
+interface NavTabProps {
   item: LocalizedBottomNavItem
   index: number
   indicator: SharedValue<number>
   isCurrent: boolean
   badgeCount: number | null
-  onPress: () => void
+  /** Stable across renders; called with this tab's key. */
+  onPress: (key: BottomNavKey) => void
   ambient: boolean
   reduceMotion: boolean
-}) {
+}
+
+// Memoised with a stable onPress: a selection change re-renders only the two
+// tabs whose `isCurrent` flips, and an unread change only the Chats tab.
+const NavTab = memo(function NavTab(props: NavTabProps) {
   const {
     item,
     index,
@@ -184,13 +189,18 @@ function NavTab(props: {
     reduceMotion,
   } = props
   // The selected icon and label fade in as the indicator arrives, so the
-  // whole bar moves with a swipe instead of switching after it settles.
+  // whole bar moves with a swipe instead of switching after it settles. They
+  // share one layer (one animated view per side, two per tab).
   const selectedLayerStyle = useAnimatedStyle(() => ({
     opacity: getBottomNavItemEmphasis(index, indicator.value)
   }))
   const restingLayerStyle = useAnimatedStyle(() => ({
     opacity: 1 - getBottomNavItemEmphasis(index, indicator.value)
   }))
+  const handlePress = useCallback(() => {
+    if (!isCurrent) hapticSelection()
+    onPress(item.key)
+  }, [isCurrent, item.key, onPress])
 
   return (
     <View style={styles.bottomNavItemOuter}>
@@ -205,10 +215,7 @@ function NavTab(props: {
           styles.bottomNavItem,
           isCurrent ? styles.bottomNavItemActive : null,
         ]}
-        onPress={() => {
-          if (!isCurrent) hapticSelection()
-          onPress()
-        }}
+        onPress={handlePress}
         pressedScale={BOTTOM_NAV_PRESSED_SCALE}
         hitSlop={6}
       >
@@ -220,35 +227,44 @@ function NavTab(props: {
               color={uiTheme.colors.textMuted}
             />
           </Reanimated.View>
-          <Reanimated.View pointerEvents="none" style={[styles.iconLayer, selectedLayerStyle]}>
+        </View>
+        {/* Keeps the label's place in the column; the label itself is drawn
+            by the selected layer below, at the same position. */}
+        <View style={styles.bottomNavLabelFrame} />
+        <Reanimated.View pointerEvents="none" style={[styles.selectedLayer, selectedLayerStyle]}>
+          <View style={styles.bottomNavIconWrap}>
             <Ionicons
               name={item.activeIcon}
               size={22}
               color={uiTheme.colors.primary}
               style={styles.iconZ}
             />
-          </Reanimated.View>
-        </View>
+          </View>
+          <View style={styles.bottomNavLabelFrame}>
+            <Text
+              accessible={false}
+              style={[styles.bottomNavLabel, styles.bottomNavLabelActive]}
+            >
+              {item.label}
+            </Text>
+          </View>
+        </Reanimated.View>
         {badgeCount === null ? null : (
           <NavBadge count={badgeCount} ambient={ambient} reduceMotion={reduceMotion} />
         )}
-        <Reanimated.View pointerEvents="none" style={[styles.bottomNavLabelFrame, selectedLayerStyle]}>
-          <Text
-            accessible={false}
-            style={[styles.bottomNavLabel, styles.bottomNavLabelActive]}
-          >
-            {item.label}
-          </Text>
-        </Reanimated.View>
       </PressableScale>
     </View>
   )
-}
+})
 
 export function BottomNav(props: BottomNavProps) {
   const { currentKey, chatCount, onPress, appearance = "default", visible = true } = props
   const ambient = appearance === "ambient"
   const reduceMotion = useReducedMotion()
+  // One callback for every tab, stable across renders, always the latest onPress.
+  const onPressRef = useRef(onPress)
+  onPressRef.current = onPress
+  const handleTabPress = useCallback((key: BottomNavKey) => onPressRef.current(key), [])
   const locale = useMemo(
     () => resolveAccountRecoveryLocale(
       getNativeAppLocale(),
@@ -346,7 +362,7 @@ export function BottomNav(props: BottomNavProps) {
             indicator={indicator}
             isCurrent={isCurrent}
             badgeCount={item.key === "chats" ? chatCount : null}
-            onPress={() => onPress(item.key)}
+            onPress={handleTabPress}
             ambient={ambient}
             reduceMotion={reduceMotion}
           />
@@ -428,6 +444,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
+  },
+  // Lays its icon and label out exactly like bottomNavItem lays out the
+  // resting icon and the label placeholder.
+  selectedLayer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingVertical: 3,
   },
   iconZ: {
     zIndex: 1,
