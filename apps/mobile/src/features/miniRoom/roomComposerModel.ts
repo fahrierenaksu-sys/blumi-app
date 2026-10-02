@@ -21,6 +21,17 @@ export function resolveRoomComposerSubmit(
   return { kind: "sent", body }
 }
 
+/**
+ * A send and a key press can cross: the native field reports "sent text +
+ * the new letter" after the composer was already cleared. The first change
+ * after a send (its epoch) that still starts with the sent text keeps only
+ * the new characters. Any later change is the person's own text.
+ */
+export function reconcileRoomComposerChange(text: string, sentDraft: string | null): string {
+  if (sentDraft === null || sentDraft.length === 0 || !text.startsWith(sentDraft)) return text
+  return text.slice(sentDraft.length)
+}
+
 export interface RoomComposerFailedMessage {
   clientMessageId: string
   body: string

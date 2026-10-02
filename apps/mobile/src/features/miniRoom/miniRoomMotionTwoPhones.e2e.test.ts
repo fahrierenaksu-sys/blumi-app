@@ -217,7 +217,8 @@ function createPhone(input: {
       "./miniRoomMovementRun",
       "./miniRoomSpeechStack",
       "./miniRoomSeatRefusalModel",
-      "./miniRoomEntryModel"
+      "./miniRoomEntryModel",
+      "./miniRoomPresentation"
     ]
   })
   const presentation = loadSourceWithFakeReact<typeof PresentationModule>(

@@ -1,79 +1,115 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { createFakeReactRuntime, createReactNativeStub, createReanimatedStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import type * as Hook from "./useMiniRoomKeyboard"
 
-type KeyboardListener = (event: { duration: number; endCoordinates: { screenY: number; height: number } }) => void
+type KeyboardEvent = { height: number; progress: number; duration: number; target: number }
+type Handler = Partial<Record<"onStart" | "onMove" | "onInteractive" | "onEnd", (event: KeyboardEvent) => void>>
 
-function mount(platform: "ios" | "android") {
+function mount(platform: "ios" | "android", reduceMotion = false) {
   const runtime = createFakeReactRuntime()
-  const listeners = new Map<string, Set<KeyboardListener>>()
+  let handler: Handler = {}
+  const listeners = new Map<string, Set<() => void>>()
   const Keyboard = {
-    addListener: (name: string, listener: KeyboardListener) => {
-      const set = listeners.get(name) ?? new Set<KeyboardListener>()
+    addListener: (name: string, listener: () => void) => {
+      const set = listeners.get(name) ?? new Set<() => void>()
       set.add(listener)
       listeners.set(name, set)
       return { remove: () => set.delete(listener) }
     }
   }
-  const reactNative = createReactNativeStub({ Keyboard, Platform: { OS: platform } }).module
+  const crossings: boolean[] = []
+  const animations: { target: number; motion: string }[] = []
   const hook = loadSourceWithFakeReact<typeof Hook>("features/miniRoom/scene/useMiniRoomKeyboard.ts", runtime, {
-    modules: { "react-native": reactNative },
-    real: ["./miniRoomLayout"]
+    modules: {
+      "react-native": createReactNativeStub({ Keyboard, Platform: { OS: platform } }).module,
+      "react-native-reanimated": createReanimatedStub(runtime).module,
+      "react-native-keyboard-controller": { useKeyboardHandler: (next: Handler) => { handler = next } },
+      "react-native-worklets": {
+        scheduleOnRN: (work: (value: boolean) => void, value: boolean) => { crossings.push(value); work(value) }
+      },
+      "../../../ui/motion": {
+        resolveMotion: (reduced: boolean) => ({ smooth: reduced ? "instant" : "smooth" }),
+        animateTo: (target: number, motion: string) => { animations.push({ target, motion }); return target }
+      }
+    },
+    real: ["./miniRoomTransitionModel", "./miniRoomLayout", "./miniRoomAvatarStageModel"]
   })
-  const frames: Hook.MiniRoomKeyboardState[] = []
-  // What React had committed when each frame was published.
-  const committedAtPublish: Hook.MiniRoomKeyboardState[] = []
-  const render = () => runtime.render(() => hook.useMiniRoomKeyboard((frame) => {
-    frames.push(frame)
-    committedAtPublish.push(runtime.output as Hook.MiniRoomKeyboardState)
-  }))
-  render()
-  const emit = (name: string, screenY = 0, height = 0, duration = 250) => {
-    for (const listener of [...(listeners.get(name) ?? [])]) {
-      listener({ duration, endCoordinates: { screenY, height } })
-    }
-  }
+  runtime.render(() => hook.useMiniRoomKeyboard(reduceMotion))
+  const api = () => runtime.output as Hook.MiniRoomKeyboard
+  const frame = (name: keyof Handler, height: number, progress: number) =>
+    handler[name]?.({ height, progress, duration: 250, target: 1 })
+  const emit = (name: string) => { for (const listener of [...(listeners.get(name) ?? [])]) listener() }
   const listenerCount = () => [...listeners.values()].reduce((sum, set) => sum + set.size, 0)
-  return { runtime, frames, committedAtPublish, emit, listenerCount }
+  return { runtime, api, frame, emit, crossings, animations, listenerCount }
 }
 
-test("an iOS keyboard frame starts the room pose before React commits it, once per real change", () => {
-  const { runtime, frames, committedAtPublish, emit, listenerCount } = mount("ios")
+test("iOS: the scene's progress is the keyboard's own position, every frame, and reverses with it", () => {
+  const { runtime, api, frame, crossings } = mount("ios")
   try {
-    // 844-point window; a 336-point keyboard whose top is at 508.
-    emit("keyboardWillShow", 508, 336, 250)
-    assert.deepEqual(frames.at(-1), { visible: true, inset: 336, durationMs: 250 })
-    assert.equal(committedAtPublish.at(-1)?.visible, false, "the pose starts before the React commit")
-    assert.deepEqual(runtime.output, { visible: true, inset: 336, durationMs: 250 })
+    frame("onStart", 336, 1)
+    assert.equal(api().visible, true, "React hears the opening once, as it starts")
+    assert.equal(api().openHeight.value, 336, "the open pose is known from the first frame")
+    const seen: number[] = []
+    for (const height of [0, 40, 120, 210, 290, 336]) {
+      frame("onMove", height, height / 336)
+      seen.push(api().progress.value)
+    }
+    assert.deepEqual(seen, [0, 40, 120, 210, 290, 336].map((height) => height / 336))
+    // Tapped away mid-way: the keyboard turns back and the progress follows it down.
+    frame("onStart", 0, 0)
+    for (const height of [300, 180, 60, 0]) frame("onMove", height, height / 336)
+    frame("onEnd", 0, 0)
+    assert.equal(api().progress.value, 0)
+    assert.equal(api().visible, false)
+    assert.deepEqual(crossings, [true, false], "one React update per show and per hide, never per frame")
+  } finally {
+    runtime.unmount()
+  }
+})
 
-    // UIKit repeats the same frame through keyboardWillChangeFrame: no second pose.
-    emit("keyboardWillChangeFrame", 508, 336, 250)
-    assert.equal(frames.length, 1)
+test("iOS: a keyboard that changes size while open moves the open pose, with no extra React update", () => {
+  const { runtime, api, frame, crossings } = mount("ios")
+  try {
+    frame("onStart", 336, 1)
+    frame("onEnd", 336, 1)
+    frame("onStart", 380, 1)
+    frame("onMove", 358, 1)
+    assert.equal(api().openHeight.value, 358)
+    frame("onEnd", 380, 1)
+    assert.equal(api().openHeight.value, 380)
+    assert.deepEqual(crossings, [true])
+  } finally {
+    runtime.unmount()
+  }
+})
 
-    // The suggestion bar appears: the inset grows, a new pose starts.
-    emit("keyboardWillChangeFrame", 464, 380, 0)
-    assert.deepEqual(frames.at(-1), { visible: true, inset: 380, durationMs: 0 })
+test("iOS Reduce Motion: the scene lands at its next pose when the keyboard starts and does not travel", () => {
+  const { runtime, api, frame } = mount("ios", true)
+  try {
+    frame("onStart", 336, 1)
+    assert.equal(api().progress.value, 1)
+    frame("onMove", 100, 100 / 336)
+    assert.equal(api().progress.value, 1, "no frame-by-frame travel")
+    frame("onStart", 0, 0)
+    assert.equal(api().progress.value, 0)
+  } finally {
+    runtime.unmount()
+  }
+})
 
-    emit("keyboardWillHide", 844, 0, 250)
-    assert.deepEqual(frames.at(-1), { visible: false, inset: 0, durationMs: 250 })
-    assert.deepEqual(runtime.output, { visible: false, inset: 0, durationMs: 250 })
+test("Android keeps the resized window and eases between the two poses on the smooth token", () => {
+  const { runtime, api, emit, animations, listenerCount } = mount("android")
+  try {
+    emit("keyboardDidShow")
+    assert.equal(api().visible, true)
+    assert.equal(api().progress.value, 1)
+    assert.equal(api().openHeight.value, 0, "the window itself is above the keyboard")
+    emit("keyboardDidHide")
+    assert.equal(api().visible, false)
+    assert.deepEqual(animations, [{ target: 1, motion: "smooth" }, { target: 0, motion: "smooth" }])
   } finally {
     runtime.unmount()
   }
   assert.equal(listenerCount(), 0, "every keyboard listener is removed on unmount")
-})
-
-test("Android reports visibility only; the resized window carries the keyboard", () => {
-  const { runtime, frames, emit } = mount("android")
-  try {
-    emit("keyboardWillShow", 508, 336)
-    assert.equal(frames.length, 0, "Android has no will-events")
-    emit("keyboardDidShow", 508, 336)
-    assert.deepEqual(frames.at(-1), { visible: true, inset: 0, durationMs: 0 })
-    emit("keyboardDidHide")
-    assert.deepEqual(frames.at(-1), { visible: false, inset: 0, durationMs: 0 })
-  } finally {
-    runtime.unmount()
-  }
 })

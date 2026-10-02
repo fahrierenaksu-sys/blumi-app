@@ -7,6 +7,7 @@ import { animateTo, useMotion } from "../../../ui/motion"
 import { PressableScale } from "../../../ui/PressableScale"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
+import { reconcileRoomComposerChange } from "../roomComposerModel"
 import {
   MINI_ROOM_INPUT_LINE_HEIGHT,
   MINI_ROOM_INPUT_VERTICAL_PADDING,
@@ -33,7 +34,6 @@ export interface RoomChatComposerProps {
   onSubmit: () => boolean
   onToggleHistory: () => void
   onContentHeightChange: (contentHeight: number) => void
-  onFocus: () => void
   /** Typing signal for the partner (chat_typing); never sees restored text. */
   draftTyping?: ChatDraftTyping
 }
@@ -51,7 +51,6 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     onSubmit,
     onToggleHistory,
     onContentHeightChange,
-    onFocus,
     draftTyping
   } = props
   const inputRef = useRef<TextInput>(null)
@@ -74,8 +73,15 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
   // One send, one haptic (ui/haptics: a chat message sent → selection) and one
   // pop, from the send button or the keyboard's return key alike. Reduce
   // Motion keeps the button still; the haptic stays.
+  // The text of the latest accepted send, until the field's next change (the
+  // send's epoch): a letter typed in the same instant must not bring it back.
+  const sentDraft = useRef<string | null>(null)
   const submit = () => {
+    const draft = value
     if (onSubmit()) {
+      sentDraft.current = draft
+      // Clear the native field too, not only the controlled value.
+      inputRef.current?.clear()
       hapticSelection()
       if (!motion.reduceMotion) {
         sendPop.value = SEND_POP_SCALE
@@ -113,16 +119,14 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         spellCheck={suggestionsEnabled}
         accessibilityLabel={copy.roomMessage}
         value={value}
-        onChangeText={(text) => {
+        onChangeText={(raw) => {
+          const text = reconcileRoomComposerChange(raw, sentDraft.current)
+          sentDraft.current = null
           onChangeText(text)
           draftTyping?.noteDraft(text)
         }}
         onBlur={draftTyping?.endDraft}
-        // A measured warm opening starts on touch-down, before UIKit focuses.
-        // First focus still uses the real system frame; no guessed keyboard size.
-        // A disabled field never focuses, so its touch must not lift the dock.
-        onTouchStart={disabled ? undefined : onFocus}
-        onFocus={onFocus}
+        // The scene opens with the keyboard itself (useMiniRoomKeyboard), never ahead of it.
         onSubmitEditing={submit}
         onLayout={(event) => onContentHeightChange(event.nativeEvent.layout.height)}
         placeholder={copy.roomMessagePlaceholder}

@@ -32,6 +32,7 @@ import type {
   SpeechBubble
 } from "./miniRoomSceneTypes"
 import { groupMiniRoomSpeechBySpeaker } from "./miniRoomSpeechStack"
+import { resolveMiniRoomAvatarOpacity } from "./miniRoomPresentation"
 import { RoomSpeechBubbleStack, type RoomSpeechBubblePlacement } from "./RoomSpeechBubbleStack"
 import { RoomTypingBubble } from "./RoomTypingBubble"
 import { useMiniRoomAvatarLoops } from "./useMiniRoomAvatarLoops"
@@ -204,10 +205,16 @@ function AvatarAnchor(props: {
   children: ReactNode
 }) {
   const { avatar, position, stageWidth, stageHeight, zIndex, children } = props
-  const presentOpacity = avatar.present === false ? 0.35 : 1
+  // Present: opaque. Stepped away: dimmed (the HUD says so). Not here yet:
+  // not drawn. A change of presence fades; it never jumps.
+  const motion = useMotion()
+  const presenceOpacity = resolveMiniRoomAvatarOpacity(avatar)
+  const presence = useSharedValue(presenceOpacity)
+  useEffect(() => {
+    presence.value = animateTo(presenceOpacity, motion.crossfade)
+  }, [motion.crossfade, presence, presenceOpacity])
   // An arrival fades the avatar in (at the door, or in place under Reduce
   // Motion, where fadeIn resolves to the crossfade).
-  const motion = useMotion()
   const entrance = useSharedValue(1)
   const arrivalId = avatar.arrivalId
   useEffect(() => {
@@ -222,7 +229,7 @@ function AvatarAnchor(props: {
     )
     return {
       // Hidden until the room is measured, so no frame shows it at the corner.
-      opacity: stageWidth.value > 0 ? presentOpacity * entrance.value : 0,
+      opacity: stageWidth.value > 0 ? presence.value * entrance.value : 0,
       transform: [{ translateX: offset.translateX }, { translateY: offset.translateY }]
     }
   })

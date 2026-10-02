@@ -27,34 +27,98 @@ function renderInput(disabled: boolean) {
       "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
       "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
     },
-    real: ["./miniRoomLayout"],
+    real: ["./miniRoomLayout", "../roomComposerModel"],
     inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
-  let focusCalls = 0
   const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
   const tree = runtime.render(() => render({
     copy: getMiniRoomCopy("en"), value: "", suggestionsEnabled: true, disabled, mode: "history",
     maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => false,
-    onToggleHistory: () => undefined, onContentHeightChange: () => undefined, onFocus: () => { focusCalls += 1 }
+    onToggleHistory: () => undefined, onContentHeightChange: () => undefined
   }))
   const input = findInput(tree)
   runtime.unmount()
   assert.ok(input, "the composer renders its text field")
-  return { input, focusCalls: () => focusCalls }
+  return { input }
 }
 
-test("touching an enabled composer pre-opens the typing pose", () => {
-  const { input, focusCalls } = renderInput(false)
-  ;(input.props.onTouchStart as (() => void) | undefined)?.()
-  assert.equal(focusCalls(), 1)
+// The scene moves only with a real keyboard (useMiniRoomCameraTransform.test):
+// a disabled field never focuses, so touching it can never lift the dock.
+test("a disabled composer never focuses; an enabled one does", () => {
+  assert.equal(renderInput(true).input.props.editable, false)
+  assert.equal(renderInput(false).input.props.editable, true)
 })
 
-test("touching a disabled composer never lifts the dock: no keyboard will come", () => {
-  const { input, focusCalls } = renderInput(true)
-  assert.equal(input.props.editable, false)
-  ;(input.props.onTouchStart as (() => void) | undefined)?.()
-  assert.equal(focusCalls(), 0)
+/** The composer inside a parent that owns the draft, as MiniRoomScene does. */
+function mountDraft(accept: () => boolean) {
+  const runtime = createFakeReactRuntime()
+  const { RoomChatComposer } = loadSourceWithFakeReact<typeof Composer>("features/miniRoom/scene/RoomChatComposer.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
+      "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
+    },
+    real: ["./miniRoomLayout", "../roomComposerModel"],
+    inertUnknown: true,
+    globals: { setTimeout, clearTimeout }
+  })
+  const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
+  let draft = ""
+  const sent: string[] = []
+  const show = () => runtime.render(() => render({
+    copy: getMiniRoomCopy("en"), value: draft, suggestionsEnabled: false, disabled: false, mode: "typing",
+    maxInputHeight: 92, inputHeight: 44,
+    onChangeText: (text) => { draft = text },
+    onSubmit: () => {
+      if (!accept()) return false
+      sent.push(draft)
+      draft = ""
+      return true
+    },
+    onToggleHistory: () => undefined, onContentHeightChange: () => undefined
+  }))
+  show()
+  const input = () => findInput(runtime.output)!
+  const type = (text: string) => { (input().props.onChangeText as (text: string) => void)(text); show() }
+  const pressReturn = () => { (input().props.onSubmitEditing as () => void)(); show() }
+  const pressSend = () => {
+    const button = findAll(runtime.output, (element) => element.props?.accessibilityLabel === getMiniRoomCopy("en").sendRoomMessage)
+    ;(button[0]!.props.onPress as () => void)()
+    show()
+  }
+  return { runtime, type, pressReturn, pressSend, draft: () => draft, sent }
+}
+
+test("a letter typed in the same instant as a send starts the next message, without the sent text", () => {
+  for (const send of ["pressReturn", "pressSend"] as const) {
+    const composer = mountDraft(() => true)
+    try {
+      composer.type("Selam")
+      composer[send]()
+      assert.deepEqual(composer.sent, ["Selam"])
+      assert.equal(composer.draft(), "")
+      // The native field still reported the old text plus the new key.
+      composer.type("Selamn")
+      assert.equal(composer.draft(), "n", `${send}: only the new letter stays`)
+      // After that, the person's own text is never trimmed, even if it repeats.
+      composer.type("nSelam")
+      assert.equal(composer.draft(), "nSelam")
+    } finally {
+      composer.runtime.unmount()
+    }
+  }
+})
+
+test("a refused send keeps the draft exactly as typed", () => {
+  const composer = mountDraft(() => false)
+  try {
+    composer.type("Selam")
+    composer.pressReturn()
+    composer.type("Selamn")
+    assert.equal(composer.draft(), "Selamn")
+  } finally {
+    composer.runtime.unmount()
+  }
 })
 
 function findAll(node: unknown, match: (element: Element) => boolean, found: Element[] = []): Element[] {
@@ -88,7 +152,7 @@ test("the history-mode left button names its action: going to the latest message
       const tree = runtime.render(() => render({
         copy, value: "", suggestionsEnabled: false, disabled: false, mode,
         maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => false,
-        onToggleHistory: () => { toggles += 1 }, onContentHeightChange: () => undefined, onFocus: () => undefined
+        onToggleHistory: () => { toggles += 1 }, onContentHeightChange: () => undefined
       }))
       const toggle = findAll(tree, (element) => element.props?.accessibilityLabel === (mode === "history"
         ? copy.goToLatestMessage : copy.returnToRoom))

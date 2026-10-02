@@ -9,10 +9,9 @@ import {
   type ListRenderItemInfo,
   type LayoutChangeEvent
 } from "react-native"
-import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { animateToAfter, MOTION_STAGGER, useMotion } from "../../../ui/motion"
 import { createFirstAppearanceStagger } from "./miniRoomFirstAppearance"
-import { MINI_ROOM_DESIGN_EASING, MINI_ROOM_DOCK_STEP_MS } from "./miniRoomReducedMotion"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import { formatRoomChatTime, type RoomChatHistoryItem, type RoomChatHistoryStatus } from "../roomChatHistoryModel"
 
@@ -32,16 +31,9 @@ interface MiniRoomChatHistoryProps {
  */
 export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
   const { copy, items, status, partnerName, height, onRecentRowsHeightChange, scrollToLatestRequest } = props
-  const { reduceMotion } = useMotion()
-  const animatedHeight = useSharedValue(height)
-  // The viewport rides the dock's step (MINI_ROOM_DOCK_STEP_MS), so the
-  // transcript and its dock resize together; Reduce Motion lands at once.
-  useEffect(() => {
-    animatedHeight.value = reduceMotion ? height : withTiming(height, {
-      duration: MINI_ROOM_DOCK_STEP_MS, easing: Easing.bezier(...MINI_ROOM_DESIGN_EASING), reduceMotion: ReduceMotion.Never
-    })
-  }, [animatedHeight, height, reduceMotion])
-  const heightStyle = useAnimatedStyle(() => ({ height: animatedHeight.value }))
+  // The viewport is laid out at its final height at once (never animated: that
+  // would re-lay out the list every frame). The paper settles around it with
+  // transforms, and the panel keeps the transcript's bottom on the composer.
   const listRef = useRef<FlatList<RoomChatHistoryItem>>(null)
   const measuredHeights = useRef(new Map<string, number>())
   const lastReportedHeight = useRef<number | null>(null)
@@ -107,7 +99,7 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
   }
 
   return (
-    <Animated.View style={heightStyle} accessibilityLabel={copy.chatHistory}>
+    <View style={{ height }} accessibilityLabel={copy.chatHistory}>
       <FlatList
         ref={listRef}
         inverted
@@ -123,7 +115,7 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
         maxToRenderPerBatch={10}
         windowSize={5}
       />
-    </Animated.View>
+    </View>
   )
 }
 
