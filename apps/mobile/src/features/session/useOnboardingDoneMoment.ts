@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { SessionActor } from "./sessionModel"
-import { shouldCelebrateOnboardingDone } from "./onboardingDoneMoment"
+import { shouldCelebrateOnboardingDone } from "./onboardingDoneMomentModel"
 
 /** Accounts that already had their moment in this app run. */
 const celebratedUserIds = new Set<string>()

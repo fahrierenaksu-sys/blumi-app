@@ -13,7 +13,7 @@ import { animateTo, animateToAfter, useMotion } from "../../ui/motion"
 import { MyAvatar } from "../../ui/myAvatar"
 import { uiTheme } from "../../ui/theme"
 import { getAppLocale } from "./appLocale"
-import { getOnboardingDoneCopy, ONBOARDING_DONE_HOLD_MS } from "./onboardingDoneMoment"
+import { getOnboardingDoneCopy, ONBOARDING_DONE_HOLD_MS } from "./onboardingDoneMomentModel"
 
 /**
  * The "you did it" beat after a new account finishes setting up

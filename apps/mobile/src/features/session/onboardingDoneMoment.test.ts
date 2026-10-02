@@ -4,7 +4,7 @@ import {
   getOnboardingDoneCopy,
   ONBOARDING_DONE_RECENT_MS,
   shouldCelebrateOnboardingDone
-} from "./onboardingDoneMoment"
+} from "./onboardingDoneMomentModel"
 
 // "You did it" plays once, for the account that just finished setting up,
 // and never for a restored session, a returning sign-in or demo mode.
