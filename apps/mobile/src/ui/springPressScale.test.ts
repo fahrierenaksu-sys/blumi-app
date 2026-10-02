@@ -16,8 +16,11 @@ function load() {
     "ui/animations.ts",
     createFakeReactRuntime(),
     {
-      modules: { "react-native": reactNative.module },
-      real: ["./reducedMotionStore", "./ambientMotionModel", "./theme"]
+      modules: {
+        "react-native": reactNative.module,
+        "./motion": { useReducedMotion: () => false, MOTION_STAGGER: { stepMs: 30, maxItems: 6 } }
+      },
+      real: ["./ambientMotionModel", "./theme"]
     }
   )
   return { springPressScale, reactNative }
