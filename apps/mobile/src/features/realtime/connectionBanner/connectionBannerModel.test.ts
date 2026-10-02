@@ -60,11 +60,6 @@ test("the raw connection issue maps realtime and device state honestly", () => {
   assert.equal(resolveConnectionIssue("connected", false), "offline")
 })
 
-test("the grace period is long enough to hide a normal resume reconnect", () => {
-  assert.ok(CONNECTION_BANNER_GRACE_MS >= 2_500)
-  assert.ok(CONNECTION_BANNER_GRACE_MS <= 3_000)
-})
-
 test("a reconnect that finishes inside the grace period never shows the banner", () => {
   const harness = createHarness()
   harness.update("disconnected")

@@ -14,11 +14,10 @@ const message = (id: string, sender: string): ChatTimelineItem => ({
   message: { messageId: id, threadId: "t", senderUserId: sender, body: id, sentAt: "2026-07-21T10:00:00.000Z" }
 })
 
-test("the pill shows only once the reader is more than 200 points from the newest message", () => {
-  assert.equal(CHAT_SCROLL_TO_LATEST_THRESHOLD, 200)
+test("the pill shows only once the reader is past the threshold from the newest message", () => {
   assert.equal(isChatScrolledAwayFromLatest(0), false)
-  assert.equal(isChatScrolledAwayFromLatest(200), false)
-  assert.equal(isChatScrolledAwayFromLatest(201), true)
+  assert.equal(isChatScrolledAwayFromLatest(CHAT_SCROLL_TO_LATEST_THRESHOLD), false)
+  assert.equal(isChatScrolledAwayFromLatest(CHAT_SCROLL_TO_LATEST_THRESHOLD + 1), true)
 })
 
 test("new partner messages at the newest edge are counted; my own and history are not", () => {

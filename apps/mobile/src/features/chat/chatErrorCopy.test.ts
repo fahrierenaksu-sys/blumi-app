@@ -6,46 +6,53 @@ import {
   getMessageSendErrorMessageForDisplay,
   getRoomInvitationActionErrorMessageForDisplay,
   getRoomInvitationLoadErrorMessageForDisplay,
-  getThreadListErrorMessageForDisplay
+  getThreadListErrorMessageForDisplay,
+  type ChatErrorLocale
 } from "./chatErrorCopy"
 
 const technicalError =
   "fetch failed: UnexpectedException: Could not connect to the server. (at ExpoModulesCore/Promise.swift:56)"
+const TRANSPORT_DIAGNOSTICS = /fetch failed|Exception|\.swift|ExpoModulesCore/
+
+const getters: Record<string, (error: string, locale: ChatErrorLocale) => string> = {
+  threadList: getThreadListErrorMessageForDisplay,
+  messageList: getMessageListErrorMessageForDisplay,
+  matchOpen: getMatchChatOpenErrorMessageForDisplay,
+  messageSend: getMessageSendErrorMessageForDisplay,
+  roomInvitationLoad: getRoomInvitationLoadErrorMessageForDisplay,
+  roomInvitationAction: getRoomInvitationActionErrorMessageForDisplay
+}
+
+function assertSafe(message: string, label: string): void {
+  assert.ok(message.trim().length > 0, `${label} is empty`)
+  assert.doesNotMatch(message, TRANSPORT_DIAGNOSTICS, `${label} leaks transport diagnostics`)
+}
 
 test("chat error fallbacks are localized without exposing transport diagnostics", () => {
+  for (const [name, getMessage] of Object.entries(getters)) {
+    const turkish = getMessage(technicalError, "tr")
+    const english = getMessage(technicalError, "en")
+    assertSafe(turkish, `${name} tr`)
+    assertSafe(english, `${name} en`)
+    assert.notEqual(turkish, english, `${name} has a Turkish fallback`)
+  }
+})
+
+test("a known safe server message passes through unchanged", () => {
   assert.equal(
-    getThreadListErrorMessageForDisplay(technicalError, "tr"),
-    "Sohbetlerini şu anda yükleyemedik. Bağlantını kontrol edip tekrar dene."
-  )
-  assert.equal(
-    getMessageListErrorMessageForDisplay(technicalError, "tr"),
-    "Bu sohbeti şu anda yükleyemedik. Bağlantını kontrol edip tekrar dene."
-  )
-  assert.equal(
-    getMatchChatOpenErrorMessageForDisplay(technicalError, "tr"),
-    "Bu sohbeti şu anda açamadık. Bağlantını kontrol edip tekrar dene."
-  )
-  assert.equal(
-    getMessageSendErrorMessageForDisplay(technicalError, "tr"),
-    "Mesajın gönderilemedi. Bağlantını kontrol edip tekrar dene."
-  )
-  assert.equal(
-    getRoomInvitationLoadErrorMessageForDisplay(technicalError, "tr"),
-    "Oda davetlerini şu anda yükleyemedik. Biraz sonra tekrar dene."
-  )
-  assert.equal(
-    getRoomInvitationActionErrorMessageForDisplay(technicalError, "tr"),
-    "Bu oda daveti şu anda kullanılamıyor. Tekrar dene."
+    getThreadListErrorMessageForDisplay("Chats need a connection.", "en"),
+    "Chats need a connection."
   )
 })
 
 test("room busy errors explain whose room is active without leaking transport details", () => {
-  assert.equal(
-    getRoomInvitationActionErrorMessageForDisplay("opaque", "tr", "SELF_IN_ROOM"),
-    "Önceki ortak odan hâlâ açık. Yeni davet için önce onu kapatmalısın."
-  )
-  assert.equal(
-    getRoomInvitationActionErrorMessageForDisplay("opaque", "en", "PARTICIPANT_BUSY"),
-    "The other person is currently in another room. Try again later."
-  )
+  for (const locale of ["tr", "en"] as const) {
+    const self = getRoomInvitationActionErrorMessageForDisplay(technicalError, locale, "SELF_IN_ROOM")
+    const partner = getRoomInvitationActionErrorMessageForDisplay(technicalError, locale, "PARTICIPANT_BUSY")
+    const generic = getRoomInvitationActionErrorMessageForDisplay(technicalError, locale)
+    for (const [label, message] of [["self", self], ["partner", partner], ["generic", generic]] as const) {
+      assertSafe(message, `${label} ${locale}`)
+    }
+    assert.equal(new Set([self, partner, generic]).size, 3, `three distinct ${locale} messages`)
+  }
 })

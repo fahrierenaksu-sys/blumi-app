@@ -242,7 +242,7 @@ test("pending messages stay fully visible and only show a clock until server ack
 
   assert.doesNotMatch(screenSource, /isOptimistic \? \{ opacity: 0\.65 \}/)
   // Since 2026-10-01 the clock / ✓ / ✓✓ / read icons live in ChatDeliveryTicks;
-  // the state-to-icon mapping is unit-tested in chatDeliveryTickModel.test.ts and
+  // the state-to-icon mapping is chatDeliveryTickModel.ts, and
   // the spoken state ("sending", "iletildi", "görüldü") in chatBubbleAccessibility.test.ts.
   assert.match(screenSource, /\{isMe \? <ChatDeliveryTicks state=\{deliveryState\} \/> : null\}/)
   const ticks = declaredFunction(threadFile("ChatDeliveryTicks.tsx"), "ChatDeliveryTicks").getText()

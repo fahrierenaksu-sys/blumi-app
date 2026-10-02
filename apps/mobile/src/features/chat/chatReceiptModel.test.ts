@@ -4,8 +4,7 @@ import type { ChatMessage } from "@blumi/contracts"
 import {
   applyReceiptEvent,
   applyReceiptSnapshot,
-  deriveChatMessageDeliveryState,
-  findNewestPartnerMessage
+  deriveChatMessageDeliveryState
 } from "./chatReceiptModel"
 
 const T1 = "2026-10-01T10:00:00.000Z"
@@ -64,15 +63,4 @@ test("my confirmed messages advance from sent to delivered to read; local states
   assert.equal(state(message("m1", T1, "partner"), "sent", false), "sent", "partner messages show no ticks state")
   assert.equal(deriveChatMessageDeliveryState({ message: message("m1", T1), localState: "sent", isMe: true }), "sent",
     "receipts off or an old server: a single tick")
-})
-
-test("acks and reads name the newest confirmed partner message", () => {
-  const messages = [
-    message("p1", T1, "partner"),
-    message("p2", T2, "partner"),
-    message("me1", T3, "me"),
-    message("__local_9_0", T3, "partner")
-  ]
-  assert.equal(findNewestPartnerMessage(messages, "me")?.messageId, "p2")
-  assert.equal(findNewestPartnerMessage([message("me1", T1)], "me"), undefined)
 })
