@@ -5,6 +5,7 @@ import { type LayoutChangeEvent, StyleSheet, Text, View } from "react-native"
 import { Gesture, GestureDetector, State } from "react-native-gesture-handler"
 import Reanimated, {
   cancelAnimation,
+  Easing,
   type EntryAnimationsValues,
   type LayoutAnimationsValues,
   type StyleProps,
@@ -14,13 +15,14 @@ import Reanimated, {
 import { scheduleOnRN } from "react-native-worklets"
 import { hapticLight } from "../../ui/haptics"
 import { useMainTabPagerGestureRef } from "../../ui/MainTabPagerGestureOwnership"
-import { animateTo, animateToAfter, resolveMotion, useMotion, type Motion } from "../../ui/motion"
+import { animateSegment, animateTo, animateToAfter, resolveMotion, useMotion, type Motion } from "../../ui/motion"
 import { PressableScale } from "../../ui/PressableScale"
 import { uiTheme } from "../../ui/theme"
 import type { AppLocale } from "../session/appLocale"
 import { getShopProductThumbnailBounds, getShopProductThumbnailSource } from "./shopAssets"
 import type { ShopCombinationItem } from "./shopCombinationSummary"
 import {
+  getCombinationRowLeave,
   getCombinationRowRemoveThreshold,
   getCombinationRowRevealProgress,
   getCombinationRowSwipeClaim,
@@ -36,8 +38,6 @@ import { getShopThumbnailLayout } from "./shopThumbnailLayout"
 const REMOVE_ICON_SIZE = 16
 /** How much bigger the backdrop icon gets when a release would remove the row. */
 const ARMED_ICON_SCALE = 1.15
-/** The row's slide-out starts its fade after this much of the slide (ms). */
-const LEAVE_FADE_DELAY_MS = 150
 
 type RowAnimation = { initialValues: StyleProps; animations: StyleProps }
 
@@ -119,7 +119,9 @@ export const ShopCombinationRow = memo(function ShopCombinationRow(props: {
   }, [armed, fadeIn, iconScale, itemId, leaving, offset, onRemove, rowOpacity])
 
   // Slides the row off to the right (or fades it under Reduce Motion), then
-  // removes the piece. Runs from the pan (UI thread) and from the X (JS).
+  // removes the piece the moment the row is gone: an ease-out timing, not a
+  // spring (a spring rests long after the row has left). Its fade ends with
+  // the slide. Runs from the pan (UI thread) and from the X (JS).
   const leave = useCallback((velocityX: number): void => {
     "worklet"
     if (leaving.value) return
@@ -132,9 +134,10 @@ export const ShopCombinationRow = memo(function ShopCombinationRow(props: {
       rowOpacity.value = animateTo(0, fadeOut, done)
       return
     }
-    offset.value = animateTo(Math.max(rowWidth.value, 1) + 8, snappy, done, Math.max(0, velocityX))
-    rowOpacity.value = animateToAfter(LEAVE_FADE_DELAY_MS, 0, fadeOut)
-  }, [commitRemove, fadeOut, leaving, offset, reduceMotion, rowOpacity, rowWidth, snappy])
+    const slide = getCombinationRowLeave({ offset: offset.value, velocityX, rowWidth: rowWidth.value })
+    offset.value = animateSegment(slide.to, { durationMs: slide.durationMs, easing: Easing.out(Easing.cubic) }, done)
+    rowOpacity.value = animateToAfter(Math.max(0, slide.durationMs - fadeOut.duration), 0, fadeOut)
+  }, [commitRemove, fadeOut, leaving, offset, reduceMotion, rowOpacity, rowWidth])
 
   const restore = useCallback((velocityX: number): void => {
     "worklet"
