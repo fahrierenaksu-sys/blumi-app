@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo } from "react"
 import { Image, StyleSheet, Text, View } from "react-native"
 import Animated, {
+  cancelAnimation,
   Easing,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming
@@ -18,7 +20,12 @@ import {
   PROFILE_CHARACTER_REACTION_ASSET_MODE,
   shouldUseProfileCharacterReactionAssets
 } from "./profileCharacterReactionAssetGate"
-import { getProfileCharacterReaction } from "./profileCharacterReactionModel"
+import {
+  getProfileCharacterReaction,
+  getProfileCharacterReactionAtlasOffset,
+  getProfileCharacterReactionFrameSteps,
+  getProfileCharacterReactionSettleDelayMs
+} from "./profileCharacterReactionModel"
 import { getProfileCharacterReactionGeometry } from "./profileSetupVisualModel"
 
 const FEMALE_TWIRL_ATLAS_V4 = require("./assets/profile-character-reaction-v4-runtime/blumi_profile_twirling_female_atlas_v4_final.png")
@@ -71,7 +78,7 @@ interface ProfileCharacterReactionStageProps {
   motionActive: boolean
 }
 
-function GeneratedReactionSprite({
+export function GeneratedReactionSprite({
   compact,
   gender,
   motionActive
@@ -81,7 +88,9 @@ function GeneratedReactionSprite({
     isResolved: motionPreferenceResolved
   } = useReducedMotionPreference()
   const reaction = getProfileCharacterReaction(gender)
-  const [frameIndex, setFrameIndex] = useState(0)
+  // The atlas frame lives on the UI thread: the reaction plays without a
+  // React render per frame.
+  const frame = useSharedValue(0)
   const settleFloat = useSharedValue(0)
   const reveal = useSharedValue(1)
   const timeline = reaction.timeline
@@ -99,48 +108,66 @@ function GeneratedReactionSprite({
 
   useEffect(() => {
     if (!motionActive || !motionPreferenceResolved || reduceMotion || !gender || !timeline) {
-      setFrameIndex(0)
+      frame.value = 0
       settleFloat.value = 0
       return
     }
 
-    setFrameIndex(0)
+    frame.value = 0
     settleFloat.value = 0
-    const timers: ReturnType<typeof setTimeout>[] = []
-    let elapsedMs = 0
-    timeline.frameDurationsMs.forEach((durationMs, index) => {
-      elapsedMs += durationMs
-      timers.push(setTimeout(() => {
-        setFrameIndex(index + 1)
-        if (index + 1 === timeline.settleFrameIndex) settleFloat.value = sineLoop(1400)
-      }, elapsedMs))
-    })
+    // Each authored hold, then an instant cut to the next frame.
+    const cut = { duration: 0, reduceMotion: ReduceMotion.Never }
+    frame.value = withSequence(
+      ReduceMotion.Never,
+      ...getProfileCharacterReactionFrameSteps(timeline).map((step) =>
+        withDelay(step.holdMs, withTiming(step.frameIndex, cut), ReduceMotion.Never)
+      )
+    )
+    settleFloat.value = withDelay(
+      getProfileCharacterReactionSettleDelayMs(timeline),
+      sineLoop(1400),
+      ReduceMotion.Never
+    )
 
     return () => {
-      timers.forEach(clearTimeout)
+      cancelAnimation(frame)
+      frame.value = 0
       settleFloat.value = 0
     }
-  }, [gender, motionActive, motionPreferenceResolved, reduceMotion, settleFloat, timeline])
+  }, [frame, gender, motionActive, motionPreferenceResolved, reduceMotion, settleFloat, timeline])
+
+  const cellWidth = compact ? 128 : 152
+  const cellHeight = getProfileCharacterReactionGeometry(compact).characterHeight
+  const atlasColumns = timeline?.atlasColumns ?? 1
+  const frameCount = timeline?.frameCount ?? 1
 
   const spriteMotionStyle = useAnimatedStyle(() => ({
     opacity: reveal.value,
     transform: [{ translateY: -2 * settleFloat.value }]
   }))
+  const atlasFrameStyle = useAnimatedStyle(() => {
+    const offset = getProfileCharacterReactionAtlasOffset(
+      frame.value,
+      { atlasColumns, frameCount },
+      cellWidth,
+      cellHeight
+    )
+    return { transform: [{ translateX: offset.x }, { translateY: offset.y }] }
+  })
 
   if (!gender || !timeline) return null
 
   const source = gender === "woman" ? FEMALE_TWIRL_ATLAS_V4 : MALE_COLLAR_ATLAS_V4
-  const cellWidth = compact ? 128 : 152
-  const geometry = getProfileCharacterReactionGeometry(compact)
-  const cellHeight = geometry.characterHeight
-  const frameColumn = frameIndex % timeline.atlasColumns
-  const frameRow = Math.floor(frameIndex / timeline.atlasColumns)
   const atlasWidth = cellWidth * timeline.atlasColumns
   const atlasHeight = cellHeight * timeline.atlasRows
 
   return (
     <Animated.View style={[styles.spriteFrame, { height: cellHeight, width: cellWidth }, spriteMotionStyle]}>
-      <Image resizeMode="stretch" source={source} style={{ height: atlasHeight, left: -frameColumn * cellWidth, position: "absolute", top: -frameRow * cellHeight, width: atlasWidth }} />
+      <Animated.Image
+        resizeMode="stretch"
+        source={source}
+        style={[styles.atlasImage, { height: atlasHeight, width: atlasWidth }, atlasFrameStyle]}
+      />
     </Animated.View>
   )
 }
@@ -274,6 +301,11 @@ const styles = StyleSheet.create({
   },
   spriteFrame: {
     overflow: "hidden"
+  },
+  atlasImage: {
+    left: 0,
+    position: "absolute",
+    top: 0
   },
   avatarPreview: {
     borderRadius: uiTheme.radius.xl,

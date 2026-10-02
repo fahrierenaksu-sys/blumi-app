@@ -33,6 +33,46 @@ const MALE_COLLAR_TIMELINE: ProfileCharacterReactionTimeline = {
   settleFrameIndex: 15
 }
 
+export interface ProfileCharacterReactionFrameStep {
+  /** The atlas frame shown from this step on. */
+  frameIndex: number
+  /** How long the previous frame holds before this one shows. */
+  holdMs: number
+}
+
+/** Each frame change of the reaction, in order, after frame 0. */
+export function getProfileCharacterReactionFrameSteps(
+  timeline: ProfileCharacterReactionTimeline
+): ProfileCharacterReactionFrameStep[] {
+  return timeline.frameDurationsMs.map((holdMs, index) => ({ frameIndex: index + 1, holdMs }))
+}
+
+/** When the settle frame shows, from the reaction's start. */
+export function getProfileCharacterReactionSettleDelayMs(
+  timeline: ProfileCharacterReactionTimeline
+): number {
+  return timeline.frameDurationsMs
+    .slice(0, timeline.settleFrameIndex)
+    .reduce((total, durationMs) => total + durationMs, 0)
+}
+
+/**
+ * Where the atlas sits so frame `frame` fills the cell (a translate of the
+ * whole atlas). UI thread: the frame advances without a React render.
+ */
+export function getProfileCharacterReactionAtlasOffset(
+  frame: number,
+  timeline: Pick<ProfileCharacterReactionTimeline, "atlasColumns" | "frameCount">,
+  cellWidth: number,
+  cellHeight: number
+): { x: number; y: number } {
+  "worklet"
+  const index = Math.max(0, Math.min(timeline.frameCount - 1, Math.round(Number.isFinite(frame) ? frame : 0)))
+  const column = index % timeline.atlasColumns
+  const row = Math.floor(index / timeline.atlasColumns)
+  return { x: -column * cellWidth, y: -row * cellHeight }
+}
+
 export function getProfileCharacterReaction(
   gender: "woman" | "man" | undefined
 ): ProfileCharacterReaction {

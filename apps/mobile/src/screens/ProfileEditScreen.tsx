@@ -2,8 +2,6 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +17,7 @@ import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 import { BackButton } from "../ui/backButton"
 import { hapticSuccess } from "../ui/haptics"
+import { AppKeyboardAvoidingView } from "../ui/keyboard"
 import { ProfileEditSaveButton } from "../features/session/ProfileEditSaveButton"
 import { ProfileInterestsField } from "../features/session/ProfileInterestsField"
 import { useProfileEditExitGuard } from "../features/session/useProfileEditExitGuard"
@@ -254,10 +253,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           }
         />
 
-        <KeyboardAvoidingView
-          style={styles.content}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <AppKeyboardAvoidingView style={styles.content}>
           <PageScrollContent
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -543,7 +539,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
             </Text>
           ) : null}
           </PageScrollContent>
-        </KeyboardAvoidingView>
+        </AppKeyboardAvoidingView>
       </SafeAreaView>
     </View>
   )

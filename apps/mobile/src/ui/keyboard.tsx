@@ -7,22 +7,34 @@
  * KeyboardAvoidingView re-layout.
  *
  * Android keeps today's window-resize behaviour: no provider is mounted, the
- * glued components render plain views, and nothing changes there. Enabling
+ * glued components render plain views, and nothing changes there (the
+ * keyboard-open amount follows the keyboard events instead). Enabling
  * the provider on Android stops the window from resizing for the keyboard
  * app-wide, which every other screen still relies on; that needs its own pass
  * on an Android device.
  */
-import { forwardRef, type ReactNode } from "react"
-import { Platform, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewProps } from "react-native"
+import { forwardRef, useEffect, type ReactNode } from "react"
 import {
+  Keyboard,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ScrollViewProps,
+  type ViewProps
+} from "react-native"
+import {
+  KeyboardAvoidingView,
   KeyboardChatScrollView,
   KeyboardProvider,
   KeyboardStickyView,
   useReanimatedKeyboardAnimation
 } from "react-native-keyboard-controller"
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
   type SharedValue
 } from "react-native-reanimated"
 import { getGluedFooterLift } from "./keyboardGlueModel"
@@ -57,6 +69,65 @@ function useGluedKeyboardOff(): GluedKeyboard {
 export const useGluedKeyboard = KEYBOARD_GLUE_ENABLED
   ? useGluedKeyboardIos
   : useGluedKeyboardOff
+
+/** How long the keyboard-open amount takes to follow the keyboard on Android. */
+const KEYBOARD_FALLBACK_MOTION_MS = 250
+
+function useKeyboardOpenAmountIos(): SharedValue<number> {
+  return useReanimatedKeyboardAnimation().progress
+}
+
+/**
+ * Android keeps the window-resize behaviour (no provider): the keyboard's
+ * show and hide events ease a shared value on the UI thread instead, so
+ * nothing re-renders per toggle.
+ */
+function useKeyboardOpenAmountFallback(): SharedValue<number> {
+  const amount = useSharedValue(0)
+  useEffect(() => {
+    const ease = (target: number) => {
+      amount.value = withTiming(target, {
+        duration: KEYBOARD_FALLBACK_MOTION_MS,
+        easing: Easing.out(Easing.cubic)
+      })
+    }
+    const show = Keyboard.addListener("keyboardDidShow", () => ease(1))
+    const hide = Keyboard.addListener("keyboardDidHide", () => ease(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [amount])
+  return amount
+}
+
+/**
+ * How far open the keyboard is, 0 closed to 1 open, on the UI thread. iOS
+ * follows the keyboard frame by frame (also while it is dragged down);
+ * Android eases after the show or hide event.
+ */
+export const useKeyboardOpenAmount = KEYBOARD_GLUE_ENABLED
+  ? useKeyboardOpenAmountIos
+  : useKeyboardOpenAmountFallback
+
+/**
+ * Keeps its content above the keyboard by bottom padding, driven on the UI
+ * thread by react-native-keyboard-controller on iOS. Android resizes the
+ * window for the keyboard instead, so it is a plain view there (what React
+ * Native's KeyboardAvoidingView did with no behaviour).
+ */
+export function AppKeyboardAvoidingView({
+  keyboardVerticalOffset = 0,
+  children,
+  ...rest
+}: ViewProps & { keyboardVerticalOffset?: number }) {
+  if (!KEYBOARD_GLUE_ENABLED) return <View {...rest}>{children}</View>
+  return (
+    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={keyboardVerticalOffset} {...rest}>
+      {children}
+    </KeyboardAvoidingView>
+  )
+}
 
 /**
  * A footer that rides the keyboard. `bottomInset` is the safe-area padding the

@@ -8,7 +8,9 @@ import {
   getRoomEditorDockRowCount,
   getRoomEditorDockCardWidth,
   getRoomEditorDockPageCount,
+  getRoomEditorDockPageDotPresence,
   getRoomEditorDockPageIndex,
+  getRoomEditorDockPagePosition,
   getRoomEditorHighlightedTrayItemId,
   getRoomEditorStageFrame,
   getRoomEditorStageZoomFlip
@@ -74,6 +76,22 @@ test("the compact tray shows three cards per page", () => {
   assert.equal(getRoomEditorDockPageIndex(330, 324, 3), 1)
   assert.equal(getRoomEditorDockPageIndex(5000, 324, 3), 2)
   assert.equal(getRoomEditorDockPageIndex(330, 0, 3), 0)
+})
+
+test("the tray dots follow the live swipe position, one dot fully active at a time", () => {
+  // Mid-swipe the position is fractional, so the dots move with the finger.
+  assert.equal(getRoomEditorDockPagePosition(162, 324, 3), 0.5)
+  assert.equal(getRoomEditorDockPagePosition(-40, 324, 3), 0, "an overscroll stays on page one")
+  assert.equal(getRoomEditorDockPagePosition(5000, 324, 3), 2, "and past the end on the last page")
+  assert.equal(getRoomEditorDockPagePosition(162, 0, 3), 0, "an unmeasured tray is on page one")
+  assert.equal(getRoomEditorDockPagePosition(Number.NaN, 324, 3), 0)
+  assert.equal(getRoomEditorDockPageDotPresence(0, 0), 1)
+  assert.equal(getRoomEditorDockPageDotPresence(0, 1), 0)
+  assert.equal(getRoomEditorDockPageDotPresence(0.25, 1), 0.25)
+  for (const position of [0, 0.3, 0.5, 1, 1.8, 2]) {
+    const total = [0, 1, 2].reduce((sum, index) => sum + getRoomEditorDockPageDotPresence(position, index), 0)
+    assert.equal(total, 1, `the active dot is shared, never doubled, at ${position}`)
+  }
 })
 
 test("the capsule serves the room selection first, then a picked tray piece, else hides", () => {

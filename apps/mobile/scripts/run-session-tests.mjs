@@ -158,6 +158,7 @@ try {
       "src/features/session/profileSetupValidation.test.ts",
       "src/features/session/onboardingWorldCompositionModel.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
+      "src/features/session/ProfileInterestsField.test.ts",
       "src/features/session/setupFlow/setupFlowShellModel.test.ts",
       "src/features/session/setupFlow/setupFlowCopy.test.ts",
       "src/features/session/setupFlow/setupStaticExperience.test.ts",

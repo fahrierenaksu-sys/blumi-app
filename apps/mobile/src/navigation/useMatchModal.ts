@@ -11,6 +11,7 @@ import {
 } from "../features/connections/connectionMatchPresentation"
 import {
   findThreadPartner,
+  getMatchedUserName,
   reconcileRealtimeConnectionMatch,
   reconcileRealtimeDiscoveryMatch,
   type ConnectionMatchedPayload
@@ -100,10 +101,13 @@ export function useMatchModal({
       if (!isCurrentSession(actor)) return
       applyNewThread(thread)
       const partner = findThreadPartner(thread, actor.profile.userId)
+      // Never an id as the name: without one the chat carries the match.
+      const matchedUserName = getMatchedUserName(partner, connection)
+      if (!matchedUserName) return
       presentMatch({
         miniRoomId: response.match.miniRoomId,
         matchedUserId: connection.userId,
-        matchedUserName: partner?.displayName || connection.displayName,
+        matchedUserName,
         ...(partner?.avatar ? { matchedAvatarSelection: partner.avatar } : {}),
         mode: actor.session.mode
       })

@@ -3,6 +3,7 @@ import test from "node:test"
 import {
   createFakeReactRuntime,
   createReactNativeStub,
+  createReanimatedStub as createSettlingReanimatedStub,
   loadSourceWithFakeReact,
   type FakeReactRuntime
 } from "../../../testing/hookHarness"
@@ -118,15 +119,13 @@ test("deferred auth destinations render the real screen on their first frame", (
   assert.equal(loads, 1, "the screen module loads once and is reused")
 })
 
-function loadShell(runtime: FakeReactRuntime) {
+function loadShell(runtime: FakeReactRuntime, extraModules: Record<string, unknown> = {}) {
   return loadSourceWithFakeReact<{
     BlumiSetupShell: (props: Record<string, unknown>) => Element
   }>("features/session/setupFlow/BlumiSetupShell.tsx", runtime, {
     modules: {
-      "react-native": createReactNativeStub({
-        Keyboard: { addListener: () => ({ remove: () => undefined }) },
-        KeyboardAvoidingView: "KeyboardAvoidingView"
-      }).module,
+      ...extraModules,
+      "react-native": createReactNativeStub().module,
       "../../../ui/animations": { useReducedMotion: () => false },
       "./setupFlowShellModel": setupFlowShellModel,
       "./setupFlowLocale": {
@@ -155,6 +154,71 @@ test("reactivated setup layers reset their scroll position before paint", () => 
   motionActive = true
   runtime.rerender()
   assert.deepEqual(scrolls, [{ y: 0, animated: false }])
+})
+
+test("the keyboard collapses the visible step's stage on the UI thread, never a hidden layer's", () => {
+  const render = (input: { keyboardOpen: number; motionActive: boolean; reduceMotion?: boolean }) => {
+    const runtime = createFirstFrameRuntime()
+    const reanimated = createSettlingReanimatedStub(runtime)
+    const { BlumiSetupShell } = loadShell(runtime, {
+      "react-native-reanimated": reanimated.module,
+      "react-native-worklets": { scheduleOnRN: () => undefined },
+      "../../../ui/theme": {
+        blumiEntryTheme: { spacing: { xs: 4, sm: 8, md: 16, xl: 24 }, colors: {}, font: {} }
+      },
+      "../../../ui/keyboard": {
+        AppKeyboardAvoidingView: "AppKeyboardAvoidingView",
+        useKeyboardOpenAmount: () => ({ value: input.keyboardOpen })
+      }
+    })
+    runtime.render(() => BlumiSetupShell({
+      step: "profile",
+      onBack: () => undefined,
+      onPrimaryAction: () => undefined,
+      motionActive: input.motionActive,
+      reduceMotion: input.reduceMotion ?? false,
+      collapseStageOnKeyboard: true,
+      stage: null
+    }))
+    const slots = findElements(runtime.output, (element) =>
+      typeof element.type === "function" && (element.type as { name?: string }).name === "KeyboardCollapsibleSlot"
+    )
+    const [content] = findElements(runtime.output, (element) =>
+      element.type === "Animated.View" && flattenStyle(element.props.style).paddingTop !== undefined
+    )
+    return {
+      slots,
+      collapse: slots[0]?.props.collapse.value as number,
+      paddingTop: flattenStyle(content?.props.style).paddingTop,
+      renders: runtime.renderCount
+    }
+  }
+
+  const closed = render({ keyboardOpen: 0, motionActive: true })
+  assert.equal(closed.slots.length, 1, "only the stage collapses; the heading stays")
+  assert.equal(closed.collapse, 0)
+
+  const halfway = render({ keyboardOpen: 0.5, motionActive: true })
+  assert.equal(halfway.collapse, 0.5, "the stage follows the keyboard, frame by frame")
+  const open = render({ keyboardOpen: 1, motionActive: true })
+  assert.equal(open.collapse, 1)
+  assert.equal(open.paddingTop, 0, "the column moves up with it")
+  assert.equal(open.renders, 1, "following the keyboard needs no React render")
+
+  const hiddenLayer = render({ keyboardOpen: 1, motionActive: false })
+  assert.equal(hiddenLayer.collapse, 0, "a hidden layer keeps its open layout (ONB-08)")
+  assert.equal(render({ keyboardOpen: 0.4, motionActive: true, reduceMotion: true }).collapse, 0)
+  assert.equal(render({ keyboardOpen: 0.6, motionActive: true, reduceMotion: true }).collapse, 1, "Reduce Motion switches without a glide")
+})
+
+test("a collapsing panel closes its height and the gap after it, and fades out first", () => {
+  const { getSetupCollapsibleSlotStyle } = setupFlowShellModel
+  assert.deepEqual(getSetupCollapsibleSlotStyle(0, 300, 16), { height: 300, opacity: 1, marginBottom: -0 })
+  assert.deepEqual(getSetupCollapsibleSlotStyle(1, 300, 16), { height: 0, opacity: 0, marginBottom: -16 })
+  const mid = getSetupCollapsibleSlotStyle(0.3, 300, 16)
+  assert.equal(mid.height, 210)
+  assert.equal(mid.opacity, 0.5)
+  assert.deepEqual(getSetupCollapsibleSlotStyle(0.5, 0, 16), { opacity: 1 - 0.5 / 0.6, marginBottom: 0 }, "unmeasured, it keeps its own height")
 })
 
 function loadPreAuthFlow(runtime: FakeReactRuntime) {
