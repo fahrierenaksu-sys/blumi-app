@@ -1,9 +1,13 @@
 /**
  * Foreground presentation of pushes (the app is open when they arrive).
  * The server queues every push; the phone decides here whether the OS banner
- * adds anything: it stays hidden when the conversation is already on screen or
- * when an in-app surface (message toast, match screen, match modal) already
- * showed the same event. Whichever surface is first claims the event.
+ * adds anything: it stays hidden when the conversation is already on screen
+ * (a chat, the shared room, or the Chats list for messages) or when another
+ * surface (the match screen or modal, an earlier banner, a message already
+ * shown in its open chat) presented the same event. Whichever is first claims
+ * the event. There is no in-app message toast (owner decision 2026-10-02):
+ * a message for a conversation that is not on screen is announced only by
+ * the OS banner.
  */
 export interface ForegroundNotificationPresentation {
   shouldShowBanner: boolean
@@ -54,18 +58,28 @@ export function resolveForegroundNotificationPresentation(input: {
   return show(key ? input.claimAlert(key) : true)
 }
 
-/** Whether the in-app toast should present a message received over the socket. */
-export function shouldShowInAppMessageAlert(
+/**
+ * A message received over the socket while the app is open. A message whose
+ * conversation is visible (or while message alerts are suppressed) claims its
+ * alert, so a push that arrives late for it never banners. A message that is
+ * not visible leaves the claim to its push banner. Returns whether it was seen.
+ */
+export function claimVisibleIncomingMessage(
   message: { threadId: string; messageId: string },
-  isConversationFocused: (threadId: string) => boolean,
+  isVisible: (threadId: string) => boolean,
   claimAlert: (key: string) => boolean
 ): boolean {
+  if (!isVisible(message.threadId)) return false
   const key = keyFor("message", message.messageId)
-  if (isConversationFocused(message.threadId)) {
-    if (key) claimAlert(key)
-    return false
-  }
-  return key ? claimAlert(key) : true
+  if (key) claimAlert(key)
+  return true
+}
+
+/** A delivered message or room-invite notification of this conversation. */
+export function isConversationNotificationData(data: unknown, threadId: string): boolean {
+  const record = asRecord(data)
+  return (record?.type === "chat.message" || record?.type === "chat.room_invite") &&
+    identifier(record.threadId) === threadId
 }
 
 export interface ForegroundAlertLedger {

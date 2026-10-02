@@ -55,6 +55,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   let activeThreadId = null
   const removals = []
   const presentedClears = []
+  const presented = []
+  const dismissed = []
   const notifications = {
     getPermissionsAsync: async () => ({ status: permission }),
     requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
@@ -71,6 +73,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     getLastNotificationResponseAsync: async () => lastResponse,
     clearLastNotificationResponseAsync: async () => { clearCount += 1; lastResponse = null },
     dismissAllNotificationsAsync: async () => { presentedClears.push("dismiss") },
+    getPresentedNotificationsAsync: async () => presented.map((data, index) => ({ request: { identifier: `presented-${index}`, content: { data } } })),
+    dismissNotificationAsync: async (identifier) => { dismissed.push(identifier) },
     setBadgeCountAsync: async (count) => { presentedClears.push(`badge:${count}`); return true }
   }
   const actor = {
@@ -191,7 +195,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     chatTaps, channels,
     rotatePushToken: (token) => { expoToken = token; pushTokenListener?.({ type: platform, data: "device-token" }) },
     navigations, errors,
-    registrations, removals, presentedClears,
+    registrations, removals, presentedClears, presented, dismissed,
     modules,
     setActiveThread: (id) => { activeThreadId = id },
     handleForegroundNotification: (data) => notificationHandler.handleNotification({ request: { content: { data } } }),
@@ -279,7 +283,7 @@ test("iOS inactive transitions do not turn a visible conversation into a push ba
 test("room message banners stay hidden before thread resolution and recover after room exit", async () => {
   const runtime = createRuntime()
   await settle()
-  const release = runtime.modules.get("./foregroundNotificationState").registerRoomMessageAlertSuppression()
+  const release = runtime.modules.get("./foregroundNotificationState").registerMessageAlertSuppression()
   const received = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "unresolved-room-thread", messageId: "room-push" })
   assert.equal(received.shouldShowBanner, false)
   assert.equal(received.shouldShowList, false)
@@ -470,7 +474,7 @@ test("changing the response callback keeps its subscription and retries pending 
   assert.equal(runtime.navigations[0][1].threadId, "thread-one")
 })
 
-test("a room invite for the open conversation and a message the toast already showed do not banner", async () => {
+test("a room invite for the open conversation and a message already seen in its chat do not banner", async () => {
   const runtime = createRuntime()
   await settle()
   runtime.setActiveThread("thread-one")
@@ -480,9 +484,11 @@ test("a room invite for the open conversation and a message the toast already sh
   const otherInvite = await runtime.handleForegroundNotification({ type: "chat.room_invite", threadId: "thread-one", inviteId: "invite-two" })
   assert.equal(otherInvite.shouldShowBanner, true)
   const state = runtime.modules.get("./foregroundNotificationState")
-  assert.equal(state.claimForegroundAlert("message:toast-shown"), true, "the in-app toast claims first")
-  const toastShown = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "toast-shown" })
-  assert.equal(toastShown.shouldShowBanner, false)
+  const seen = state.registerFocusedConversation("thread-two")
+  state.noteIncomingMessage({ threadId: "thread-two", messageId: "seen-in-chat" })
+  seen()
+  const lateSeen = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-two", messageId: "seen-in-chat" })
+  assert.equal(lateSeen.shouldShowBanner, false, "the socket message seen in its open chat claimed the alert")
   const release = state.registerFocusedConversation("thread-room")
   const inRoom = await runtime.handleForegroundNotification({ type: "chat.message", threadId: "thread-room", messageId: "room-message" })
   assert.equal(inRoom.shouldShowBanner, false, "the shared room shows its conversation's messages itself")
@@ -574,4 +580,25 @@ test("the Android channel every push uses is created with HIGH importance for he
   assert.equal(runtime.channels.length > 0, true)
   assert.deepEqual(runtime.channels.map((channel) => [channel.id, channel.importance]).at(-1), ["default", 4])
   assert.equal(runtime.registrations.at(-1)?.platform, "android")
+})
+
+test("opening a conversation clears only its delivered banners, while signed in", async () => {
+  const runtime = createRuntime()
+  await settle()
+  runtime.presented.push(
+    { type: "chat.message", threadId: "thread-open", messageId: "m1" },
+    { type: "chat.room_invite", threadId: "thread-open", inviteId: "i1" },
+    { type: "chat.message", threadId: "thread-other", messageId: "m2" },
+    { type: "discovery.match", matchId: "match-1" }
+  )
+  const state = runtime.modules.get("./foregroundNotificationState")
+  const release = state.registerFocusedConversation("thread-open")
+  await settle()
+  assert.deepEqual(runtime.dismissed, ["presented-0", "presented-1"])
+  release()
+  runtime.dispose()
+  state.registerFocusedConversation("thread-other")()
+  await settle()
+  assert.deepEqual(runtime.dismissed, ["presented-0", "presented-1"], "a signed-out runtime clears nothing")
+  assert.deepEqual(runtime.errors, [])
 })

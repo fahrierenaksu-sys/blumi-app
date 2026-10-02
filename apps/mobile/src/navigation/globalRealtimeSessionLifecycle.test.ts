@@ -38,9 +38,6 @@ function mount() {
         getThreads: () => [],
         noteRealtimeThreadListRequested: () => undefined
       },
-      "../features/chat/inboxCopy": { getInboxCopy: () => ({ unknownPartner: "Someone" }) },
-      "../features/session/accountRecoveryCopy": { resolveAccountRecoveryLocale: () => "en" },
-      "../features/session/authLocale": { getNativeAppLocale: () => "en" },
       "../features/demo/demoStore": { isDemoMode: () => false, setDemoMode: () => undefined },
       "../features/realtime/globalRealtimeEventHandler": {
         createGlobalRealtimeEventHandler: (dependencies: Record<string, (...args: unknown[]) => unknown>) => {
@@ -49,7 +46,7 @@ function mount() {
           return () => undefined
         }
       },
-      "../features/notifications/foregroundNotificationState": { shouldShowIncomingMessageAlert: () => true },
+      "../features/notifications/foregroundNotificationState": { noteIncomingMessage: () => undefined },
       "../features/realtime/globalRealtimeProvider": {
         connectGlobal: (_ws: string, _http: string, token: string) => { events.push(`connect:${token}`) },
         disconnectGlobal: () => { events.push("disconnect") },
@@ -202,12 +199,11 @@ test("session callbacks are read at call time without reconnecting", async () =>
   assert.deepEqual(f.events, ["connect:token-1", "disconnect", "clear:latest"])
 })
 
-test("incoming message alerts go through the one foreground alert gate and open the chat", () => {
+test("incoming messages reach the foreground alert ledger and never an in-app toast", () => {
   const f = mount()
   f.render()
   const dependencies = f.handler.dependencies!
-  assert.equal(typeof dependencies.shouldShowIncomingMessageAlert, "function")
-  assert.equal(dependencies.unknownSenderName, "Someone")
-  ;(dependencies.openConversation as (threadId: string) => void)("thread-1")
-  assert.deepEqual(f.events.slice(-1), ["navigate:ChatThread:thread-1"])
+  assert.equal(typeof dependencies.noteIncomingMessage, "function")
+  assert.equal("showIncomingMessageToast" in dependencies, false)
+  assert.equal("openConversation" in dependencies, false)
 })

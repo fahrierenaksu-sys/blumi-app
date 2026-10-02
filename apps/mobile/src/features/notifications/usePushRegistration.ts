@@ -9,12 +9,13 @@ import { registerDevice, removeDevice, updateNotificationPreferences } from "./n
 import { createNotificationTimeZoneSync } from "./notificationTimeZoneSync"
 import { shouldInitializeNativeNotifications } from "./notificationRuntimePolicy"
 import { shouldRemovePushRegistration, syncPushRegistration } from "./pushRegistrationCoordinator"
-import { resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
+import { isConversationNotificationData, resolveForegroundNotificationPresentation } from "./notificationPresentationModel"
 import {
-  areRoomMessageAlertsSuppressed,
+  areMessageAlertsSuppressed,
   claimForegroundAlert,
   isConversationFocused,
-  resetForegroundNotificationAlerts
+  resetForegroundNotificationAlerts,
+  subscribeToConversationFocus
 } from "./foregroundNotificationState"
 import { rememberRegisteredPushDevice, removeRegisteredPushDevice } from "./pushDeviceRegistry"
 
@@ -104,6 +105,7 @@ export function usePushRegistration(
     let syncQueue = Promise.resolve()
     let pushTokenSubscription: { remove(): void } | null = null
     let responseSubscription: { remove(): void } | null = null
+    let conversationFocusSubscription: (() => void) | null = null
     let notificationsForDelivery: NotificationsModule | null = null
     const pendingResponses = new Map<string, {
       response: import("expo-notifications").NotificationResponse
@@ -270,6 +272,10 @@ export function usePushRegistration(
           notifications.addNotificationResponseReceivedListener((response) => {
             deliverResponse(notifications, response, false)
           })
+        // Opening a conversation clears its banners from Notification Center.
+        conversationFocusSubscription = subscribeToConversationFocus((threadId) => {
+          if (active) dismissConversationNotifications(notifications, threadId)
+        })
         const response = await notifications.getLastNotificationResponseAsync()
         if (!active || !response) return
         deliverResponse(notifications, response, true)
@@ -288,6 +294,7 @@ export function usePushRegistration(
       foregroundSubscription.remove()
       pushTokenSubscription?.remove()
       responseSubscription?.remove()
+      conversationFocusSubscription?.()
       // Credential rotation is not logout: its old effect must not remove the
       // same account's newly refreshed registration and queued notifications.
       // Sign-out waits for this same removal before revoking the session.
@@ -349,6 +356,17 @@ function clearPresentedNotifications(notifications: NotificationsModule): void {
   })
 }
 
+function dismissConversationNotifications(notifications: NotificationsModule, threadId: string): void {
+  void Promise.resolve()
+    .then(() => notifications.getPresentedNotificationsAsync())
+    .then((presented) => Promise.all(presented
+      .filter((notification) => isConversationNotificationData(notification.request.content.data, threadId))
+      .map((notification) => notifications.dismissNotificationAsync(notification.request.identifier))))
+    .catch((error) => {
+      captureAppException(error, { feature: "push_conversation_cleanup" })
+    })
+}
+
 function normalizePermissionStatus(
   status: NotificationsPermissionStatus
 ): "granted" | "denied" | "undetermined" {
@@ -376,7 +394,7 @@ function ensureNotificationHandler(notifications: NotificationsModule): void {
       // iOS inactive is a foreground transition (including Notification
       // Center); it must not bypass the open-conversation presentation gate.
       appActive: AppState.currentState === "active" || AppState.currentState === "inactive",
-      suppressMessageAlerts: areRoomMessageAlertsSuppressed(),
+      suppressMessageAlerts: areMessageAlertsSuppressed(),
       isConversationFocused,
       claimAlert: claimForegroundAlert
     })

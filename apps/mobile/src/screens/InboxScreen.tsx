@@ -1,3 +1,4 @@
+import { useIsFocused } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import {
@@ -41,6 +42,7 @@ import { useInboxRowEntrance } from "../features/inbox/useInboxRowEntrance"
 import { getInboxUnreadPulse } from "../features/inbox/inboxUnreadPulseModel"
 import { useInboxPullToRefresh } from "../features/inbox/useInboxPullToRefresh"
 import { useMainTabReselect } from "../ui/layout/useMainTabReselect"
+import { useMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
 import type { SessionActor } from "../features/session/sessionModel"
 
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
@@ -60,6 +62,9 @@ export function InboxScreen(props: InboxScreenProps) {
   const { threads, threadListState, getThreadUnreadCount } = useChatStore()
   const currentUserId = sessionActor.profile.userId
   const lastFocusRefreshAtRef = useRef(0)
+  // The list shows each new message in its row: no message banner on top.
+  const isFocused = useIsFocused()
+  useMessageAlertSuppression(isFocused)
 
   useEffect(() => {
     if (sessionActor.session.mode !== "production") return

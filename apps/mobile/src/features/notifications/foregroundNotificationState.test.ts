@@ -2,23 +2,29 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { setActiveThread } from "../chat/chatStore"
 import {
+  areMessageAlertsSuppressed,
   claimForegroundAlert,
   isConversationFocused,
+  noteIncomingMessage,
   registerFocusedConversation,
+  registerMessageAlertSuppression,
   resetForegroundNotificationAlerts,
-  shouldShowIncomingMessageAlert
+  subscribeToConversationFocus
 } from "./foregroundNotificationState"
-import * as foreground from "./foregroundNotificationState"
 
-test("a focused room suppresses message toasts even before its thread resolves, and releases suppression on exit", () => {
+test("a focused room or the Chats list claims every arriving message until it is released", () => {
   resetForegroundNotificationAlerts()
-  const release = foreground.registerRoomMessageAlertSuppression()
-  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_room", messageId: "room_early" }), false)
-  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_other", messageId: "room_other" }), false)
+  const release = registerMessageAlertSuppression()
+  assert.equal(areMessageAlertsSuppressed(), true)
+  noteIncomingMessage({ threadId: "thread_room", messageId: "room_early" })
+  noteIncomingMessage({ threadId: "thread_other", messageId: "room_other" })
   release()
   release()
-  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_other", messageId: "after_exit" }), true)
-  assert.equal(claimForegroundAlert("message:room_early"), false, "a delayed push does not repeat the suppressed alert")
+  assert.equal(areMessageAlertsSuppressed(), false)
+  noteIncomingMessage({ threadId: "thread_other", messageId: "after_exit" })
+  assert.equal(claimForegroundAlert("message:room_early"), false, "a delayed push does not repeat the seen message")
+  assert.equal(claimForegroundAlert("message:room_other"), false)
+  assert.equal(claimForegroundAlert("message:after_exit"), true, "an unseen message leaves its alert to the push banner")
 })
 
 test("a conversation stays focused until every surface showing it releases it", () => {
@@ -39,13 +45,25 @@ test("the open chat thread counts as focused through the chat store", () => {
   assert.equal(isConversationFocused("thread_chat"), false)
 })
 
-test("one alert per message across the toast and the push, reset on account change", () => {
+test("a message seen in its open chat is never alerted again; the ledger resets on account change", () => {
   resetForegroundNotificationAlerts()
-  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_x", messageId: "m1" }), true)
-  assert.equal(claimForegroundAlert("message:m1"), false, "the later push sees the toast's claim")
+  const release = registerFocusedConversation("thread_x")
+  noteIncomingMessage({ threadId: "thread_x", messageId: "m1" })
+  release()
+  assert.equal(claimForegroundAlert("message:m1"), false, "the late push sees the open chat's claim")
   resetForegroundNotificationAlerts()
   assert.equal(claimForegroundAlert("message:m1"), true)
-  const release = registerFocusedConversation("thread_x")
-  assert.equal(shouldShowIncomingMessageAlert({ threadId: "thread_x", messageId: "m2" }), false)
+})
+
+test("opening a conversation tells subscribers, so its delivered banners can be cleared", () => {
+  const opened: string[] = []
+  const unsubscribe = subscribeToConversationFocus((threadId) => { opened.push(threadId) })
+  const throwing = subscribeToConversationFocus(() => { throw new Error("native failure") })
+  const release = registerFocusedConversation("thread_a")
+  assert.equal(isConversationFocused("thread_a"), true, "a failing subscriber does not break focus")
   release()
+  unsubscribe()
+  throwing()
+  registerFocusedConversation("thread_b")()
+  assert.deepEqual(opened, ["thread_a"])
 })

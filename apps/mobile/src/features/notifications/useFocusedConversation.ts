@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { registerFocusedConversation, registerRoomMessageAlertSuppression } from "./foregroundNotificationState"
+import { registerFocusedConversation, registerMessageAlertSuppression } from "./foregroundNotificationState"
 
 /**
  * Marks a conversation as on screen while `isFocused`, so its message and
@@ -12,9 +12,13 @@ export function useFocusedConversation(threadId: string | undefined, isFocused: 
   }, [isFocused, threadId])
 }
 
-export function useRoomMessageAlertSuppression(isFocused: boolean): void {
+/**
+ * While `isFocused`, no message banner is shown: for the shared room (its
+ * composer and chat) and the Chats list (each new message moves its row up).
+ */
+export function useMessageAlertSuppression(isFocused: boolean): void {
   useEffect(() => {
     if (!isFocused) return
-    return registerRoomMessageAlertSuppression()
+    return registerMessageAlertSuppression()
   }, [isFocused])
 }
