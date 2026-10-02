@@ -29,6 +29,10 @@
  *   Only the LiveKit worker completes and prunes them, and voice is off, so
  *   the triggers of migration 053 added rows forever. A week-old revocation
  *   outlived every media token it could revoke.
+ * - blumi_account_recovery_requests, rejected requests 90 days after they
+ *   were rejected (2026-10-02): they hold phone numbers and nothing acts on
+ *   them again. Pending requests are the operator queue and requests sent to
+ *   manual review stay until the owner sets their window.
  */
 export const RETENTION_POLICIES = Object.freeze([
   { table: "blumi_chat_delivery_outbox", key: "message_id", expired: "completed_at < NOW() - INTERVAL '30 days'" },
@@ -51,6 +55,12 @@ export const RETENTION_POLICIES = Object.freeze([
     table: "blumi_media_revocations",
     key: "room_name, user_id",
     expired: "completed_at IS NULL AND available_at < NOW() - INTERVAL '7 days'"
+  },
+  {
+    table: "blumi_account_recovery_requests",
+    key: "request_id",
+    // created_at <= resolved_at; the created_at bound lets the status index serve it.
+    expired: "status = 'rejected' AND created_at < NOW() - INTERVAL '90 days' AND resolved_at < NOW() - INTERVAL '90 days'"
   }
 ] as const)
 

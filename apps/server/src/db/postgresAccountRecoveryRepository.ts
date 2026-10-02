@@ -1,5 +1,9 @@
 import type { QueryResultRow } from "pg"
-import type { AccountRecoveryRepository, AccountRecoveryRequest } from "../account/accountRecoveryService"
+import {
+  MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE,
+  type AccountRecoveryRepository,
+  type AccountRecoveryRequest
+} from "../account/accountRecoveryService"
 
 interface QueryExecutor {
   query(text: string, values?: readonly unknown[]): Promise<{ rows: QueryResultRow[] }>
@@ -8,16 +12,27 @@ interface QueryExecutor {
 export function createPostgresAccountRecoveryRepository(pool: QueryExecutor): AccountRecoveryRepository {
   return {
     async save(request) {
+      // One open request per (verified new phone, claimed old phone), and at
+      // most MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE open per verified phone.
+      // Not serialised: concurrent first requests may both land, which the
+      // per-route limit bounds.
       await pool.query(
         `INSERT INTO blumi_account_recovery_requests (request_id, account_id, claimed_old_phone_number, new_phone_number, status, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         SELECT $1, $2, $3, $4, $5, $6
+          WHERE NOT EXISTS (
+                  SELECT 1 FROM blumi_account_recovery_requests
+                   WHERE status = 'pending' AND new_phone_number = $4
+                     AND claimed_old_phone_number IS NOT DISTINCT FROM $3)
+            AND (SELECT count(*) FROM blumi_account_recovery_requests
+                  WHERE status = 'pending' AND new_phone_number = $4) < $7`,
         [
           request.requestId,
           request.accountId ?? null,
           request.claimedOldPhoneNumber ?? null,
           request.newPhoneNumber,
           request.status,
-          new Date(request.createdAt)
+          new Date(request.createdAt),
+          MAX_PENDING_RECOVERY_REQUESTS_PER_PHONE
         ]
       )
     },

@@ -77,6 +77,7 @@ test("retention policies never name a table that holds user content", () => {
   // Idempotency claims appear only with a window far beyond any retry
   // (chat outbox tombstones, message and like push claims: 30 days).
   assert.deepEqual(tables, [
+    "blumi_account_recovery_requests",
     "blumi_chat_delivery_outbox",
     "blumi_media_revocations",
     "blumi_notification_policy_audit",
@@ -145,6 +146,25 @@ test("push dedupe claims expire only for per-event message and like keys", requi
     )).rows.map((row) => row.dedupe_key), ["discovery_watch:old", "match:old", "message:new"])
   } finally {
     await pool.query("DELETE FROM blumi_notification_policy_events WHERE user_id = $1", [user])
+    await pool.end()
+  }
+})
+
+test("only long-rejected recovery requests are purged", requirePostgres, async () => {
+  const pool = openPool()
+  const suffix = randomUUID()
+  try {
+    await pool.query(`INSERT INTO blumi_account_recovery_requests(request_id, new_phone_number, status, created_at, resolved_at) VALUES
+      ($1 || '_rejected_old', '+905550000002', 'rejected', NOW() - INTERVAL '120 days', NOW() - INTERVAL '100 days'),
+      ($1 || '_rejected_new', '+905550000003', 'rejected', NOW() - INTERVAL '120 days', NOW() - INTERVAL '10 days'),
+      ($1 || '_review_old', '+905550000004', 'manual_review_required', NOW() - INTERVAL '120 days', NOW() - INTERVAL '100 days'),
+      ($1 || '_pending_old', '+905550000005', 'pending', NOW() - INTERVAL '120 days', NULL)`, [suffix])
+    await createPostgresRetentionService(pool).purgeExpired()
+    assert.deepEqual((await pool.query(
+      "SELECT request_id FROM blumi_account_recovery_requests WHERE request_id LIKE $1 ORDER BY 1", [`${suffix}%`]
+    )).rows.map((row) => String(row.request_id).slice(suffix.length + 1)), ["pending_old", "rejected_new", "review_old"])
+  } finally {
+    await pool.query("DELETE FROM blumi_account_recovery_requests WHERE request_id LIKE $1", [`${suffix}%`])
     await pool.end()
   }
 })
