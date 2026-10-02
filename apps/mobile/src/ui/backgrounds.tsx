@@ -1,6 +1,16 @@
 import { NavigationContext } from "@react-navigation/native"
-import { useContext, useEffect, useRef, useState } from "react"
-import { Animated, AppState, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import { useContext, useEffect, useState } from "react"
+import { AppState, Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  type SharedValue
+} from "react-native-reanimated"
 import { blumiEntryTheme, uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
 import { useReducedMotion } from "./animations"
@@ -119,39 +129,64 @@ const blobConfig: Record<BackgroundVariant, { baseColors: string[]; blobs: BlobS
   }
 }
 
+type SoftBlobConfig = BlobSpec
+
+function SoftBlob(props: {
+  blob: SoftBlobConfig
+  index: number
+  pulse: SharedValue<number>
+  motionEnabled: boolean
+}) {
+  const { blob, index, pulse, motionEnabled } = props
+  const [from, to] = index % 2 === 0 ? [1, 1.12] : [1.08, 0.96]
+  const driftStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: motionEnabled ? from + (to - from) * pulse.value : 1 }]
+  }))
+  return (
+    <Animated.View
+      style={[
+        {
+          position: "absolute",
+          width: blob.size,
+          height: blob.size,
+          borderRadius: blob.size / 2,
+          top: blob.top,
+          left: blob.left,
+          right: blob.right,
+          bottom: blob.bottom,
+          opacity: blob.opacity,
+          overflow: "hidden"
+        },
+        driftStyle
+      ]}
+    >
+      <LinearGradient
+        colors={[blob.color, "transparent"]}
+        start={{ x: 0.2, y: 0.2 }}
+        end={{ x: 0.8, y: 0.8 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
+  )
+}
+
 export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
   const { variant = "lobby", style, animated = true } = props
   const config = blobConfig[variant]
-  const pulseAnim = useRef(new Animated.Value(0)).current
+  const pulse = useSharedValue(0)
   const reduceMotion = useReducedMotion()
   const { screenFocused, appActive } = useAmbientMotionVisible()
   const motionEnabled = shouldRunSoftBlobLoop({ variant, animated, reduceMotion, screenFocused, appActive })
 
   useEffect(() => {
     if (!motionEnabled) {
-      pulseAnim.stopAnimation()
-      pulseAnim.setValue(0)
-      return undefined
+      pulse.value = 0
+      return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 8000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 8000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [motionEnabled, pulseAnim])
+    // A slow 16 s drift on the UI thread while the screen is visible.
+    const half = { duration: 8000, easing: Easing.inOut(Easing.ease), reduceMotion: ReduceMotion.Never }
+    pulse.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
+  }, [motionEnabled, pulse])
 
   if (variant === "register") {
     return (
@@ -207,41 +242,9 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {config.blobs.map((blob, index) => {
-        const isEven = index % 2 === 0
-        const scaleInterp = motionEnabled
-          ? pulseAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: isEven ? [1, 1.12] : [1.08, 0.96],
-            })
-          : 1
-
-        return (
-          <Animated.View
-            key={index}
-            style={{
-              position: "absolute",
-              width: blob.size,
-              height: blob.size,
-              borderRadius: blob.size / 2,
-              top: blob.top,
-              left: blob.left,
-              right: blob.right,
-              bottom: blob.bottom,
-              opacity: blob.opacity,
-              transform: [{ scale: scaleInterp }],
-              overflow: "hidden"
-            }}
-          >
-            <LinearGradient
-              colors={[blob.color, "transparent"]}
-              start={{ x: 0.2, y: 0.2 }}
-              end={{ x: 0.8, y: 0.8 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-        )
-      })}
+      {config.blobs.map((blob, index) => (
+        <SoftBlob key={index} blob={blob} index={index} pulse={pulse} motionEnabled={motionEnabled} />
+      ))}
     </View>
   )
 }
