@@ -11,7 +11,6 @@ import {
 } from "react-native"
 import Reanimated from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { useReducedMotion } from "../ui/animations"
 import { IS_BLUMI_PAID_COINS_ENABLED } from "../config/env"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { CoinPackWalletPanel } from "../features/commerce/CoinPackWalletPanel"
@@ -95,7 +94,6 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   const copy = getShopCopy(locale)
   const coinPackCopy = getCoinPackCopy(locale)
   const viewportMetrics = useAppViewportMetrics({ bottomNavVisible: true })
-  const reduceMotion = useReducedMotion()
   const { isConnected } = useNetworkStatus()
   const avatarV2 = useAvatarV2()
   const shopCatalogRuntime = resolveShopCatalogRuntime({
@@ -235,7 +233,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     shopPresentationState === "ready" ? "loading" : shopPresentationState
   // SHOP-5: the first load draws the shelf's shape, then crossfades into it.
   const showSkeleton = !showShopContent && shopStatusState === "loading"
-  const contentEntering = useShopContentEntrance({ showSkeleton, reduceMotion })
+  const contentEntering = useShopContentEntrance({ showSkeleton })
   const isActionAvailable = !requiresServerInventory || isConnected
   const inventoryGateLabel = shopPresentationState === "error"
     ? copy.error.title
