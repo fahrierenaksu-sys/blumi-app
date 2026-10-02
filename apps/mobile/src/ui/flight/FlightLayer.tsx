@@ -131,7 +131,7 @@ const landFlight = (id: string) => {
 function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
   const motion = useMotion()
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions()
-  const { id, source, sourceSurface, targetSurface, content } = flight
+  const { id, source, sourceSurface, targetSurface, content, targetFrame } = flight
   const carriesContent = flight.contentMode === "carry"
 
   const subscribe = useCallback(
@@ -164,9 +164,16 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
     return () => clearTimeout(timer)
   }, [abandon, targetSize])
 
+  // A fixed landing frame needs no claim and no measuring.
+  useEffect(() => {
+    if (!targetFrame) return
+    landing.value = targetFrame
+    setTargetSize({ width: targetFrame.width, height: targetFrame.height })
+  }, [landing, targetFrame])
+
   // Measure the target on the UI thread; an unmeasurable or off-screen target ends the flight.
   useEffect(() => {
-    if (!targetHandle) return
+    if (!targetHandle || targetFrame) return
     const ref = targetHandle.ref
     const viewport = { width: viewportWidth, height: viewportHeight }
     scheduleOnUI(() => {
@@ -182,14 +189,14 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       landing.value = frame
       scheduleOnRN(setTargetSize, { width: frame.width, height: frame.height })
     })
-  }, [id, landing, targetHandle, viewportHeight, viewportWidth])
+  }, [id, landing, targetFrame, targetHandle, viewportHeight, viewportWidth])
 
   // Land once the target surface is laid out at the target's size.
   useEffect(() => {
-    if (!targetSize || !targetHandle) return
-    const targetOpacity = targetHandle.opacity
+    if (!targetSize || (!targetHandle && !targetFrame)) return
+    const targetOpacity = targetHandle?.opacity ?? null
     if (motion.reduceMotion) {
-      targetOpacity.value = animateTo(1, motion.crossfade)
+      if (targetOpacity) targetOpacity.value = animateTo(1, motion.crossfade)
       cloneOpacity.value = animateTo(0, motion.crossfade, () => {
         "worklet"
         scheduleOnRN(landFlight, id)
@@ -201,14 +208,14 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
     progress.value = animateTo(1, motion.snappy, () => {
       "worklet"
       // Revealed in the clone's last frame, so nothing blinks.
-      targetOpacity.value = 1
+      if (targetOpacity) targetOpacity.value = 1
       scheduleOnRN(landFlight, id)
       cloneOpacity.value = animateTo(0, fadeOut, () => {
         "worklet"
         scheduleOnRN(finishFlight, id)
       })
     })
-  }, [cloneOpacity, id, motion, progress, targetHandle, targetSize])
+  }, [cloneOpacity, id, motion, progress, targetFrame, targetHandle, targetSize])
 
   const targetRef = targetHandle?.ref ?? null
   // The live frame: follows the target if its list moves during the flight.

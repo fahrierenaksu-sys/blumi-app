@@ -13,8 +13,8 @@
  * - Placing / dropping a piece (valid)      → hapticLight
  * - Mic toggle                              → hapticLight
  * - Partner joins the shared room           → hapticLight, once per partner
- * - A message arrives in the open chat while the composer is not focused,
- *   or the partner lands after the room door opens → hapticSoft
+ * - A message arrives in the open chat while the composer is not focused
+ *                                           → hapticSoft
  * - Tab tap                                 → hapticSelection
  * - Match (the two chibis meet)             → hapticSuccess, on contact
  * - A real, server-confirmed save or sign-in (not "Done" without changes)

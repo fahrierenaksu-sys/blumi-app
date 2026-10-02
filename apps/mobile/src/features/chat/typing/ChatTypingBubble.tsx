@@ -7,6 +7,7 @@ import { uiTheme } from "../../../ui/theme"
 import { getChatTypingCopy } from "./chatTypingCopy"
 import { usePartnerTyping } from "./usePartnerTyping"
 import { typingMorphSources } from "./typingMorphSource"
+import { measureViewInWindow } from "../../../ui/flight/flightSources"
 import { getChatSendFlightChannel } from "../thread/chatSendFlight"
 
 /** Reduce Motion is decided from the shared store; Reanimated's own switch stays off. */
@@ -34,14 +35,7 @@ export function ChatTypingBubble({ threadId, partnerUserId, partnerName, locale 
   const conversationKey = getChatSendFlightChannel(threadId)
   useLayoutEffect(() => {
     if (!typing) return
-    return typingMorphSources.attach(conversationKey, () => {
-      // Fabric measures synchronously; anything else simply skips the morph.
-      let frame: { x: number; y: number; width: number; height: number } | null = null
-      bubbleRef.current?.measureInWindow((x, y, width, height) => {
-        frame = { x, y, width, height }
-      })
-      return frame
-    })
+    return typingMorphSources.attach(conversationKey, () => measureViewInWindow(bubbleRef.current))
   }, [conversationKey, typing])
   if (!typing) return null
   return (

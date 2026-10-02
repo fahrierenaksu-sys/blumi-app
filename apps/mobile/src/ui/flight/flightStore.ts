@@ -44,6 +44,12 @@ export interface FlightRequest<Content = unknown> {
    * landing (no target, off screen, unmounted). Never delays anything.
    */
   readonly onSettled?: (landed: boolean) => void
+  /**
+   * A fixed landing frame instead of a claiming view (for example the whole
+   * window, as the next route takes over). Nothing is hidden or revealed:
+   * the clone lands there and fades.
+   */
+  readonly targetFrame?: FlightFrame
 }
 
 export interface FlightTarget<Handle = unknown> {

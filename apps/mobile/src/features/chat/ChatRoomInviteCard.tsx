@@ -1,10 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { useLayoutEffect, useRef } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
 import { ChatRoomInviteScene, type RoomInviteSceneParticipant } from "./ChatRoomInviteScene"
 import { getRoomInviteCardState } from "./chatRoomInviteCardModel"
 import type { ChatLocale, ChatRoomInviteAction, ChatRoomInviteTimelineItem } from "./chatRoomInviteModel"
+import { getRoomDoorKey, roomDoorSources } from "./roomDoorFlight"
+import { measureViewInWindow } from "../../ui/flight/flightSources"
 
 interface ChatRoomInviteCardProps {
   invite: ChatRoomInviteTimelineItem
@@ -20,8 +23,15 @@ export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner
   const card = getRoomInviteCardState(invite, currentUserId, locale)
   const disabled = isBusy || !card.primaryAction || !onAction
   const primaryIcon = card.primaryAction?.type === "accept" ? "checkmark" : card.doorOpen ? "arrow-forward" : "lock-closed-outline"
+  // An open door is where the room opens from (roomDoorFlight).
+  const cardRef = useRef<View>(null)
+  const doorKey = card.doorOpen && invite.roomSessionId ? getRoomDoorKey(invite.threadId) : null
+  useLayoutEffect(() => {
+    if (!doorKey) return
+    return roomDoorSources.attach(doorKey, () => measureViewInWindow(cardRef.current))
+  }, [doorKey])
   return (
-    <View style={styles.card}>
+    <View ref={cardRef} collapsable={false} style={styles.card}>
       <ChatRoomInviteScene open={card.doorOpen} label={card.label} note={card.note}
         sender={card.isSender ? you : partner} recipient={card.isSender ? partner : you} />
       <View style={styles.content}>
