@@ -26,12 +26,55 @@ function createReanimatedStub(runtime: ReturnType<typeof createFakeReactRuntime>
   }
 }
 
+// Timers the test advances by hand (the skeleton delay, the push fallback).
+function createFakeTimers() {
+  let now = 0
+  let nextId = 1
+  const timers = new Map<number, { at: number; run: () => void }>()
+  return {
+    setTimeout: (run: () => void, ms = 0) => {
+      const id = nextId++
+      timers.set(id, { at: now + ms, run })
+      return id
+    },
+    clearTimeout: (id: number) => { timers.delete(id) },
+    advance(ms: number) {
+      now += ms
+      for (const [id, timer] of [...timers].sort((a, b) => a[1].at - b[1].at)) {
+        if (timer.at > now || !timers.has(id)) continue
+        timers.delete(id)
+        timer.run()
+      }
+    }
+  }
+}
+
+// One profile cache per test file run, shared by every mount like the app's
+// module: a test that fills it reuses the same viewer with its own user ids.
+const cacheRuntime = createFakeReactRuntime()
+const profileCache = loadSourceWithFakeReact<Record<string, unknown>>(
+  "features/discovery/discoverProfileCache.ts",
+  cacheRuntime
+)
+
 function mount(options: { demoMode?: boolean; directProfile?: Record<string, unknown>; reduceMotion?: boolean; userId?: string } = {}) {
   const runtime = createFakeReactRuntime()
   const reanimated = createReanimatedStub(runtime)
+  const timers = createFakeTimers()
+  const timerGlobals = { setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout }
+  const transitionListeners = new Set<(event: { data?: { closing?: boolean } }) => void>()
+  const navigation = {
+    navigate: () => undefined,
+    addListener: (_type: string, listener: (event: { data?: { closing?: boolean } }) => void) => {
+      transitionListeners.add(listener)
+      return () => { transitionListeners.delete(listener) }
+    }
+  }
   let locale = "en"
-  const requests: { userId: string; signal: AbortSignal; resolve: (value: unknown) => void }[] = []
+  const requests: { userId: string; signal: AbortSignal; resolve: (value: unknown) => void; reject: (error: unknown) => void }[] = []
   class DiscoveryProfileUnavailableError extends Error {}
+  const delayedSkeleton = loadSourceWithFakeReact("ui/useDelayedSkeleton.ts", runtime, { globals: timerGlobals })
+  const afterPush = loadSourceWithFakeReact("navigation/useAfterPushTransition.ts", runtime, { globals: timerGlobals })
   const { LinkedProfileScreen, LoadingProfile } = loadSourceWithFakeReact<{
     LinkedProfileScreen: (props: unknown) => any
     LoadingProfile: () => any
@@ -53,8 +96,11 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
         "../features/discovery/discoveryApi": {
           DiscoveryProfileUnavailableError,
           fetchDiscoverProfile: (_url: string, _token: string, userId: string, _fetch: unknown, signal: AbortSignal) =>
-            new Promise((resolve) => { requests.push({ userId, signal, resolve }) })
+            new Promise((resolve, reject) => { requests.push({ userId, signal, resolve, reject }) })
         },
+        "../features/discovery/discoverProfileCache": profileCache,
+        "../ui/useDelayedSkeleton": delayedSkeleton,
+        "./useAfterPushTransition": afterPush,
         // A fresh copy object per call, as a locale-aware copy lookup may return.
         "../features/discovery/profilePreviewCopy": {
           getProfilePreviewCopy: (current: string) => ({
@@ -77,7 +123,7 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
   let userId = options.userId ?? (options.demoMode ? "demo-1" : "remote-1")
   const render = () => runtime.render(() => LinkedProfileScreen({
     demoMode: options.demoMode === true,
-    navigation: { navigate: () => undefined },
+    navigation,
     route: { params: options.directProfile ? { profile: options.directProfile } : { userId } },
     sessionActor: {
       profile: {
@@ -95,6 +141,9 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
   return {
     runtime,
     requests,
+    UnavailableError: DiscoveryProfileUnavailableError,
+    timers,
+    endPush: () => { for (const listener of [...transitionListeners]) listener({ data: { closing: false } }) },
     reanimated,
     LoadingProfile,
     render,
@@ -127,10 +176,8 @@ test("a new target aborts the previous request and starts one for the new user",
 test("a demo profile resolves with the current locale's labels", () => {
   const f = mount({ demoMode: true })
   f.setLocale("tr")
-  const output = f.render() as Element
-  // A profile that arrives after loading is revealed by a fade wrapper.
-  assert.equal((output.type as { name?: string }).name, "LinkedProfileReveal")
-  const content = output.props.children as Element
+  const content = f.render() as Element
+  // It resolved before the skeleton delay, so it is simply there (no fade).
   assert.equal(content.type, "ProfilePreviewScreen")
   assert.equal(content.props.profileOverride.distanceLabel, "available:tr")
   assert.equal("headline" in content.props.profileOverride, false)
@@ -163,10 +210,87 @@ test("the viewer's own profile renders from the session at once, without a reque
   assert.equal(f.requests.length, 0)
 })
 
-test("a pending deep link shows the loading placeholder until the profile resolves", () => {
+function remoteResponse(userId: string, displayName: string) {
+  return {
+    profile: { userId, displayName, age: 25, vibeTags: [], bio: "", prompts: [], distanceLabel: "near" },
+    decision: { capability: "mutual-like" }
+  }
+}
+
+const flushPromises = () => new Promise((resolve) => setImmediate(resolve))
+
+test("a pending deep link shows the plain page first and the skeleton only after the delay", () => {
   const f = mount()
-  const output = f.render() as Element
-  assert.equal(output.type, f.LoadingProfile)
+  const first = f.render() as Element
+  assert.notEqual(first.type, f.LoadingProfile, "no placeholder flashes for a fast load")
+  f.timers.advance(299)
+  assert.notEqual((f.runtime.output as Element | undefined)?.type, f.LoadingProfile)
+  f.timers.advance(1)
+  assert.equal((f.runtime.output as Element).type, f.LoadingProfile)
+})
+
+test("a profile that replaces the skeleton fades in; one that beat the delay is simply there", async () => {
+  const slow = mount({ userId: "slow-1" })
+  slow.render()
+  slow.timers.advance(300)
+  slow.requests[0].resolve(remoteResponse("slow-1", "Slow"))
+  await flushPromises()
+  assert.equal(((slow.runtime.output as Element).type as { name?: string }).name, "LinkedProfileReveal")
+
+  const fast = mount({ userId: "fast-1" })
+  fast.render()
+  fast.requests[0].resolve(remoteResponse("fast-1", "Fast"))
+  await flushPromises()
+  const output = fast.runtime.output as Element
+  assert.equal(output.type, "ProfilePreviewScreen")
+  assert.equal(output.props.profileOverride.displayName, "Fast")
+})
+
+test("a profile loaded before opens on the push's first frame and refreshes only after the push", async () => {
+  const first = mount({ userId: "cached-1" })
+  first.render()
+  first.requests[0].resolve(remoteResponse("cached-1", "Before"))
+  await flushPromises()
+  first.runtime.unmount()
+
+  const again = mount({ userId: "cached-1" })
+  const output = again.render() as Element
+  assert.equal(output.type, "ProfilePreviewScreen")
+  assert.equal(output.props.profileOverride.displayName, "Before")
+  assert.equal(again.requests.length, 0, "nothing competes with the push")
+  again.endPush()
+  assert.equal(again.requests.length, 1)
+  again.requests[0].resolve(remoteResponse("cached-1", "After"))
+  await flushPromises()
+  assert.equal((again.runtime.output as Element).props.profileOverride.displayName, "After")
+})
+
+test("a failed refresh keeps the cached profile; an unavailable one is dropped from the cache", async () => {
+  const seed = mount({ userId: "cached-2" })
+  seed.render()
+  seed.requests[0].resolve(remoteResponse("cached-2", "Kept"))
+  await flushPromises()
+  seed.runtime.unmount()
+
+  const offline = mount({ userId: "cached-2" })
+  offline.render()
+  offline.timers.advance(600)
+  offline.requests[0].reject(new Error("offline"))
+  await flushPromises()
+  assert.equal((offline.runtime.output as Element).props.profileOverride.displayName, "Kept")
+  offline.runtime.unmount()
+
+  const gone = mount({ userId: "cached-2" })
+  gone.render()
+  gone.endPush()
+  gone.requests[0].reject(new gone.UnavailableError("gone"))
+  await flushPromises()
+  assert.notEqual((gone.runtime.output as Element).type, "ProfilePreviewScreen")
+  gone.runtime.unmount()
+
+  const after = mount({ userId: "cached-2" })
+  assert.notEqual((after.render() as Element).type, "ProfilePreviewScreen", "the dropped profile is not drawn again")
+  assert.equal(after.requests.length, 1, "with nothing cached the request starts at once")
 })
 
 function renderLoading(reduceMotion: boolean) {

@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useLayoutEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import {
   type ListRenderItem,
   type ScrollViewProps,
@@ -65,6 +65,9 @@ import { useRequestedRoomInviteAccept } from "../features/chat/thread/useRequest
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useAfterPushTransition } from "../navigation/useAfterPushTransition"
+import { fetchDiscoverProfile } from "../features/discovery/discoveryApi"
+import { warmDiscoverProfile } from "../features/discovery/discoverProfileCache"
+import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
@@ -208,6 +211,18 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   // Refreshes that would only re-render what is already drawn wait for the
   // push to settle, so they never compete with its first frames.
   const whenPushSettled = useAfterPushTransition(navigation)
+  // The partner's profile loads once the push settles (and again on the
+  // header's press-in if it has not), so the header opens it on loaded data.
+  const sessionMode = sessionActor.session.mode
+  const sessionToken = sessionActor.session.sessionToken
+  const warmPartnerProfile = useCallback(() => {
+    if (sessionMode !== "production" || !partnerUserId) return
+    warmDiscoverProfile(
+      { viewerUserId: currentUserId, userId: partnerUserId },
+      (signal) => fetchDiscoverProfile(MOBILE_HTTP_BASE_URL, sessionToken, partnerUserId, fetch, signal)
+    )
+  }, [currentUserId, partnerUserId, sessionMode, sessionToken])
+  useEffect(() => whenPushSettled(warmPartnerProfile), [warmPartnerProfile, whenPushSettled])
   const { handleRetryMessages } = useChatThreadSync({
     historyReady,
     whenSettled: whenPushSettled,
@@ -392,6 +407,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           onOpenProfile={partnerUserId
             ? () => navigation.navigate("ProfilePreview", { userId: partnerUserId, context: "matched" })
             : null}
+          onWarmProfile={warmPartnerProfile}
         />
 
         <ReportModal

@@ -524,4 +524,19 @@ test("the partner's avatar at the top left opens their profile; it waits while t
   assert.equal(unknown.props.disabled, true)
   assert.equal(unknown.props.onPress, undefined)
 
+  // The finger landing on the avatar or the name starts loading the profile.
+  const warmed = []
+  const warming = Header({
+    chatCopy: copy, chatLocale: "tr", partnerName: "Ada", partnerUserId: "user-ada", partnerAvatar: undefined,
+    onBack: () => {}, onViewMatch: null, onOpenSafety: () => {}, onOpenProfile: () => {}, onWarmProfile: () => warmed.push("warm")
+  })
+  warming.props.children[1].props.onPressIn()
+  find(warming, (node) => node.type === "Text" && [node.props.children].flat().includes("Ada")).props.onPressIn()
+  assert.deepEqual(warmed, ["warm", "warm"])
+  const noTarget = Header({
+    chatCopy: copy, chatLocale: "tr", partnerName: "Ada", partnerUserId: "", partnerAvatar: undefined,
+    onBack: () => {}, onViewMatch: null, onOpenSafety: () => {}, onOpenProfile: null, onWarmProfile: () => warmed.push("warm")
+  })
+  assert.equal(noTarget.props.children[1].props.onPressIn, undefined, "nothing loads while the partner is unknown")
+
 })

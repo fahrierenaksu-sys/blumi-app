@@ -16,6 +16,11 @@ import {
   fetchDiscoverProfile,
   type DiscoverProfileResponse
 } from "../features/discovery/discoveryApi"
+import {
+  forgetDiscoverProfile,
+  loadDiscoverProfile,
+  readCachedDiscoverProfile
+} from "../features/discovery/discoverProfileCache"
 import { getProfilePreviewCopy } from "../features/discovery/profilePreviewCopy"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import {
@@ -33,9 +38,12 @@ import {
   failLinkedProfileRequest,
   getLinkedProfileViewState,
   resolveLinkedProfileRequest,
+  type LinkedProfileLoadState,
   type LinkedProfileTarget
 } from "./linkedProfileResolutionModel"
 import { PressableScale } from "../ui/PressableScale"
+import { useDelayedSkeleton } from "../ui/useDelayedSkeleton"
+import { useAfterPushTransition } from "./useAfterPushTransition"
 
 function createDeepLinkedProfile(
   response: DiscoverProfileResponse
@@ -178,8 +186,9 @@ function LinkedProfileReveal(props: { children: ReactNode }) {
 export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
   const { demoMode, navigation, route, sessionActor, sessionToken } = props
   const copy = getProfilePreviewCopy(getAppLocale())
+  const viewerUserId = sessionActor.profile.userId
   const deepLinkedUserId = "userId" in route.params ? route.params.userId : undefined
-  const isSelfTarget = deepLinkedUserId !== undefined && deepLinkedUserId === sessionActor.profile.userId
+  const isSelfTarget = deepLinkedUserId !== undefined && deepLinkedUserId === viewerUserId
   const directProfile = "profile" in route.params
     ? route.params.profile
     : isSelfTarget ? createSelfProfilePreview(sessionActor.profile) : undefined
@@ -190,12 +199,16 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
     : deepLinkedUserId
       ? { kind: "remote", userId: deepLinkedUserId }
       : null
-  const [loadState, setLoadState] = useState(
-    createLinkedProfileLoadState<ProfilePreviewData>(
-      directProfile ? null : deepLinkedUserId ?? null
+  // A profile this account already loaded (the chat partner, warmed when the
+  // chat opened) is drawn in the push's first frame and refreshed after it.
+  const [loadState, setLoadState] = useState(() =>
+    createInitialLoadState(
+      directProfile ? null : deepLinkedUserId ?? null,
+      demoMode ? undefined : viewerUserId
     )
   )
   const [retryNonce, setRetryNonce] = useState(0)
+  const whenPushSettled = useAfterPushTransition(navigation)
   // Demo labels follow the current locale without restarting the request.
   const createDemoLinkedProfile = useEffectEvent((
     demoProfile: (typeof DUMMY_PROFILES)[number]
@@ -215,14 +228,21 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
 
   useEffect(() => {
     if (hasDirectProfile || !deepLinkedUserId) {
-      setLoadState(createLinkedProfileLoadState(null))
+      setLoadState((state) => isEmptyLoadState(state, null) ? state : createLinkedProfileLoadState(null))
       return
     }
     const userId = deepLinkedUserId
     const controller = new AbortController()
     let isActive = true
-
-    setLoadState(createLinkedProfileLoadState(userId))
+    const cacheKey = { viewerUserId, userId }
+    const cached = demoMode ? undefined : readCachedDiscoverProfile(cacheKey)
+    // Keep a profile already on screen for this user; otherwise start from
+    // the cache, or from an empty request (kept as is when already empty).
+    setLoadState((state) => {
+      if (state.userId === userId && state.profile !== null) return state
+      const next = createInitialLoadState(userId, demoMode ? undefined : viewerUserId)
+      return isEmptyLoadState(state, userId) && isEmptyLoadState(next, userId) ? state : next
+    })
 
     async function resolveProfile(): Promise<void> {
       if (demoMode) {
@@ -239,11 +259,9 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
       }
 
       try {
-        const profile = await fetchDiscoverProfile(
-          MOBILE_HTTP_BASE_URL,
-          sessionToken,
-          userId,
-          fetch,
+        const profile = await loadDiscoverProfile(
+          cacheKey,
+          (signal) => fetchDiscoverProfile(MOBILE_HTTP_BASE_URL, sessionToken, userId, fetch, signal),
           controller.signal
         )
         if (!isActive) return
@@ -256,24 +274,27 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
         )
       } catch (error) {
         if (!isActive || controller.signal.aborted) return
+        const unavailable = error instanceof DiscoveryProfileUnavailableError
+        if (unavailable) forgetDiscoverProfile(cacheKey)
+        // A failed refresh keeps the cached profile on screen.
+        else if (cached) return
         setLoadState((state) =>
-          failLinkedProfileRequest(
-            state,
-            userId,
-            error instanceof DiscoveryProfileUnavailableError
-              ? "unavailable"
-              : "failed"
-          )
+          failLinkedProfileRequest(state, userId, unavailable ? "unavailable" : "failed")
         )
       }
     }
 
-    void resolveProfile()
+    // What the screen waits for loads at once; refreshing a cached profile
+    // waits for the push to settle.
+    const cancelDeferred = cached
+      ? whenPushSettled(() => { void resolveProfile() })
+      : (void resolveProfile(), undefined)
     return () => {
       isActive = false
+      cancelDeferred?.()
       controller.abort()
     }
-  }, [deepLinkedUserId, demoMode, hasDirectProfile, retryNonce, sessionToken])
+  }, [deepLinkedUserId, demoMode, hasDirectProfile, retryNonce, sessionToken, viewerUserId, whenPushSettled])
 
   const viewState = target
     ? getLinkedProfileViewState(target, loadState)
@@ -282,6 +303,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
         loadError: "unavailable" as const,
         loading: false
       }
+  const { showsSkeleton, skeletonWasShown } = useDelayedSkeleton(viewState.loading)
 
   if (viewState.profile) {
     const profileScreen = (
@@ -292,8 +314,9 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
         profileOverride={viewState.profile}
       />
     )
-    // Only a fetched profile passed through the loading placeholder.
-    return target?.kind === "remote"
+    // Only a profile that replaces the skeleton fades in; one that beat the
+    // skeleton delay (or came from the cache) is simply there.
+    return skeletonWasShown
       ? <LinkedProfileReveal>{profileScreen}</LinkedProfileReveal>
       : profileScreen
   }
@@ -338,7 +361,25 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
     )
   }
 
-  return <LoadingProfile />
+  // Nothing to show yet: the page's own background, and the skeleton only
+  // once the wait outlasts SKELETON_DELAY_MS.
+  return showsSkeleton ? <LoadingProfile /> : <View style={styles.pending} />
+}
+
+function createInitialLoadState(
+  userId: string | null,
+  viewerUserId: string | undefined
+): LinkedProfileLoadState<ProfilePreviewData> {
+  const empty = createLinkedProfileLoadState<ProfilePreviewData>(userId)
+  if (!userId || !viewerUserId) return empty
+  const cached = readCachedDiscoverProfile({ viewerUserId, userId })
+  return cached
+    ? resolveLinkedProfileRequest(empty, userId, createDeepLinkedProfile(cached))
+    : empty
+}
+
+function isEmptyLoadState(state: LinkedProfileLoadState<ProfilePreviewData>, userId: string | null): boolean {
+  return state.userId === userId && state.profile === null && state.loadError === null
 }
 
 const styles = {
@@ -414,5 +455,9 @@ const styles = {
   },
   reveal: {
     flex: 1
+  },
+  pending: {
+    flex: 1,
+    backgroundColor: uiTheme.colors.background
   }
 }
