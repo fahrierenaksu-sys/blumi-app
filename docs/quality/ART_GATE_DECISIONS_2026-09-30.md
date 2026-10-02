@@ -1,5 +1,7 @@
 # Art QA gate decisions — 2026-09-30
 
+Historical record — not an instruction; see AGENTS.md.
+
 Status: **Decided — all four gates removed by the owner on 2026-09-30.** The
 test files were deleted (recoverable from git history). The shipped art and
 its measured failures below are unchanged: nothing now checks walking-frame

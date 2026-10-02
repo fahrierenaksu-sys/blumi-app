@@ -1,5 +1,7 @@
 # Backend teknoloji kararı (2026-10-01)
 
+Historical record — not an instruction; see AGENTS.md.
+
 ## Sahip için özet (Türkçe)
 
 **Soru:** "En iyi, en hızlı, en sağlam, en yeni teknoloji; ama ek masraf yok."

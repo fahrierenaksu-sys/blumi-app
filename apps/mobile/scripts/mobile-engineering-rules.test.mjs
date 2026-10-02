@@ -47,8 +47,8 @@ test("injected fetchers run only inside requestJson", () => {
   assert.deepEqual(offenders, [], "pass the fetcher to requestJson instead of calling it directly")
 })
 
-// Per-frame JS loops. Animation must run on the UI thread (Reanimated shared
-// values). Existing entries are known debt (see ENGINEERING_RULES.md).
+// Per-frame JS loops. Animation must run on the UI or native thread, not in
+// JS timers. Existing entries are known debt (see ENGINEERING_RULES.md).
 const FRAME_LOOP_DEBT = new Set([
   "features/roomV2/editor/useRoomEditorStageLayout.ts"
 ])
@@ -58,7 +58,7 @@ test("no new requestAnimationFrame or setInterval loops in production code", () 
     .filter(({ text }) => /requestAnimationFrame\(|setInterval\(/.test(text))
     .map(({ path }) => path)
     .filter((path) => !FRAME_LOOP_DEBT.has(path))
-  assert.deepEqual(offenders, [], "drive motion with Reanimated shared values, not JS timers")
+  assert.deepEqual(offenders, [], "run motion on the UI or native thread, not JS timers")
 })
 
 // Only the shared reduced-motion source may talk to AccessibilityInfo for
@@ -85,8 +85,7 @@ test("reduce-transparency is read from the shared store only", () => {
   assert.deepEqual(offenders, [], "use the shared reduce-transparency hook from ui/reduceTransparency")
 })
 
-// Large files are split into feature hooks, views and pure models. Existing
-// oversized files may not grow; no new file may exceed the limit.
+// Existing oversized files may not grow; no new file may exceed the limit.
 const MAX_LINES = 800
 const OVERSIZED_DEBT = {
   "features/avatarV2/room/avatarRoomCatalog.ts": 1304,
@@ -112,7 +111,7 @@ test("production files stay small; oversized debt may only shrink", () => {
     const cap = OVERSIZED_DEBT[path] ?? MAX_LINES
     if (lines > cap) offenders.push(`${path}: ${lines} > ${cap}`)
   }
-  assert.deepEqual(offenders, [], "split screens into feature hooks, views and pure models")
+  assert.deepEqual(offenders, [], "split the file")
 })
 
 // A worklet's default parameters are not captured by the worklet transform,

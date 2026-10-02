@@ -52,11 +52,11 @@ This repository contains the React Native application, backend API, real-time se
 
 | 🌷 Make it yours | 💬 Find a connection | 🏡 Share a space |
 | :--- | :--- | :--- |
-| Build an avatar with clothing and accessories. Decorate a room that expresses your style. | Discover profiles and interests. Start a text conversation after a mutual match. | Send a room invitation from chat. Meet in a shared copy of the host's decor, with optional live voice. |
+| Build an avatar with clothing and accessories. Decorate a room that expresses your style. | Discover profiles and interests. Start a text conversation after a mutual match. | Send a room invitation from chat. Meet in a shared copy of the host's decor and keep the conversation going in durable text. |
 
 **Your pace, your boundaries.** Notification preferences, blocking, reporting, account export, and deletion give users control over their experience.
 
-The product centers on avatars, text, and optional live voice. Photos, video calls, and voice messages are outside the current product scope.
+The product centers on avatars and text. Live voice is off for the first release: the server rejects `BLUMI_VOICE_ENABLED=1` and the mobile voice SDK was removed. Photos, video calls, and voice messages are outside the current product scope.
 
 <a id="engineering-highlights"></a>
 
@@ -174,7 +174,7 @@ SENTRY_DISABLE_AUTO_UPLOAD=true npm run ios
 npm run verify
 ```
 
-The pipeline is a multi-step release gate; the authoritative list of steps is in the Commands section of [AGENTS.md](AGENTS.md).
+The pipeline is a multi-step release gate; the step list is the `verify` script in the root [package.json](package.json).
 
 The PostgreSQL gate creates a temporary cluster accessible through a local Unix socket. It does not use an existing `DATABASE_URL`. Migrations are tested from an empty database and on a repeated run; missing tools or skipped database tests fail the gate. The cluster is stopped and its generated data removed afterward, while diagnostic logs are retained. Set `BLUMI_PG_KEEP_TEST_DATA=1` only when retaining a test database for investigation.
 
@@ -186,8 +186,13 @@ Automated source checks complement device testing. Real-device audio, push deliv
 
 ## Release status
 
-**Current as of 2026-09-30: not ready for public release.** The latest full `npm run verify` passed on 2026-09-30 on the integration branch `claude/busy-cray-dl5wvr` (not merged to `main`), including package builds, type checks, lint, workspace tests, isolated PostgreSQL migration checks, the release dependency audit, and Expo Doctor (21/21); see the [2026-09-30 engineering audit](docs/quality/ENGINEERING_AUDIT_2026-09-30.md). These checks validate the repository and disposable test database; they do not prove a live deployment or native-device release.
+**As of 2026-10-02: not publicly released.**
 
-The earlier candidate-import build block is resolved: the owner-approved artwork was promoted to runtime paths and the release candidate-import gate remains in place. Railway and external provider setup, EAS/TestFlight distribution, real-device OTP/push/voice/purchase flows, production backup/restore, and continuous monitoring still need verification. The protected Supabase test database was last inspected read-only on 2026-09-28: 18 accounts, 65 applied migration checksums matching source, and integrity migration 066 not live (this supersedes the earlier 2026-09-27 note that migrations 062–063 were not applied; see [Launch Control](docs/release/LAUNCH_CONTROL.md) and the [database release runbook](docs/release/DATABASE_RELEASE_RUNBOOK.md)).
+- Work happens on `develop`; merging to `main`, deploying and migrating need the owner's approval. On 2026-10-02 GitHub `main` and `develop` were both at `76a195e`.
+- Internal TestFlight builds exist (group `Blumi QA`). No App Store submission has been made.
+- Railway has one `production` environment, which serves the API (`main` @ `76a195e`, `/health` and `/ready` 200). It runs `NODE_ENV=production` with `BLUMI_DEPLOY_ENV=staging`, so it serves no app links and uses sandbox purchases; it must switch to `BLUMI_DEPLOY_ENV=production` before public release. A separate staging environment is planned, not present.
+- The Supabase migration ledger is at 069. Migration 070 (chat receipts) is written but not applied; see the [database release runbook](docs/release/DATABASE_RELEASE_RUNBOOK.md).
+- The hosted privacy, terms, child-safety, support and account-deletion pages return 200. Human legal review is still open.
+- Native, physical-device and App Store gates are open.
 
-See [Launch Control](docs/release/LAUNCH_CONTROL.md) for the dated readiness snapshot and [the staging and production guide](docs/release/railway-supabase-launch.md) for the deployment sequence and evidence requirements. Provider and account statuses can change, so recheck those documents before taking release action.
+`npm run verify` validates the repository and a disposable database. It does not prove a live deployment or a native-device release. [Launch Control](docs/release/LAUNCH_CONTROL.md) holds the dated status of each area, and [the Railway and Supabase guide](docs/release/railway-supabase-launch.md) the deployment sequence. Provider and account states change, so recheck them before acting.

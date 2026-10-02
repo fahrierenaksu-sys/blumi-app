@@ -1,5 +1,7 @@
 # Blumi — Derin UX / hareket / "vay" denetimi (2026-09-30, `develop` @ 10c5e38)
 
+Historical record — not an instruction; see AGENTS.md.
+
 **Ne yapıldı:** Beş ayrı inceleme uygulamayı satır satır okudu. Hiçbir dosya değiştirilmedi.
 **Doğrulama durumu:** Hiçbir bulgu **Native verified** değil. Hepsi güncel koddan okunan dosya:satır kanıtına dayanıyor.
 - Titreşim (haptic) bulguları yalnızca gerçek iPhone'da doğrulanabilir.

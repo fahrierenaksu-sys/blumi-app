@@ -64,9 +64,10 @@ receipts off. Receipts stored before the change can still be revealed if
 that reader turns receipts on. This SQL removes the stored receipt of every
 participant who does not currently share read receipts. It does not touch
 `last_read_at`, so unread counts do not change. It is a data change: run it
-only after a restore-tested PostgreSQL 17 dump (`ENGINEERING_RULES.md`),
-and only after the binary with option A is deployed (otherwise new receipts
-keep being stored while off).
+only after a restore-tested PostgreSQL 17 dump
+(`docs/release/DATABASE_RELEASE_RUNBOOK.md`), and only after the binary
+with option A is deployed (otherwise new receipts keep being stored while
+off).
 
 Limit: a reader who has receipts **on** today but stored a receipt earlier
 while they were off is not covered: the schema does not record when a

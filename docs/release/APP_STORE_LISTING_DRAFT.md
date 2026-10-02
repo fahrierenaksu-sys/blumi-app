@@ -1,6 +1,6 @@
 # Blumi App Store listing and reviewer packet — draft
 
-Status: **NOT SUBMITTED / NOT APPROVED** (draft prepared 2026-09-28). This copy describes the agreed first-release scope only. Confirm every sentence against the signed iPhone build before entering it in App Store Connect. Apple Developer membership, a working support/privacy URL, screenshots and reviewer access remain open.
+Status: **NOT SUBMITTED / NOT APPROVED** (draft prepared 2026-09-28). This copy describes the agreed first-release scope only. Confirm every sentence against the signed iPhone build before entering it in App Store Connect. Updated 2026-10-02: Apple Developer membership is active, and internal TestFlight builds exist (group `Blumi QA`). The support and privacy URLs serve 200 but are not yet entered in App Store Connect. Screenshots, reviewer access and App Store Connect entry remain open.
 
 ## Turkish product-page draft
 
@@ -14,8 +14,8 @@ Status: **NOT SUBMITTED / NOT APPROVED** (draft prepared 2026-09-28). This copy 
 
   İlk sürümde canlı ses, fotoğraf/video paylaşımı ve ücretli jeton satın alma yoktur.
 
-- Destek URL'si: **OPEN** — `https://www.agentsworkerplus.online/blumi/support`; alan adı HTTPS üzerinden çalışıyor, destek yolu canlı sunucuda henüz 404.
-- Gizlilik URL'si: **OPEN** — `https://www.agentsworkerplus.online/blumi/legal/privacy`; alan adı HTTPS üzerinden çalışıyor, hukuk sayfası canlı sunucuda henüz 404.
+- Destek URL'si: **OPEN** — `https://www.agentsworkerplus.online/blumi/support`; 2026-10-02'de HTTPS üzerinden 200 döndü. App Store Connect'e henüz girilmedi; destek kutusunun yanıt verdiği henüz kanıtlanmadı.
+- Gizlilik URL'si: **OPEN** — `https://www.agentsworkerplus.online/blumi/legal/privacy`; 2026-10-02'de 200 döndü ve Blumi gizlilik metnini sundu. App Store Connect'e henüz girilmedi; insan hukuk incelemesi açık.
 - Anahtar kelimeler, kategori, yaş derecesi ve ekran görüntüleri: **OPEN** — gerçek App Store Connect seçenekleri ve onaylı native ekranlar üzerinden sonlandırılacak.
 
 ## English product-page draft

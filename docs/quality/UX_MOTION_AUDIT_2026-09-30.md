@@ -1,5 +1,7 @@
 # Blumi UX & Motion Audit — 2026-09-30
 
+Historical record — not an instruction; see AGENTS.md.
+
 **Kapsam:** `apps/mobile/src` (screens, navigation, ui, features) + `apps/mobile/App.tsx`, `app.json`.
 **Checkout:** `develop` @ ffd4d24 (`/home/user/blumi-app`, read-only; hiçbir dosya değişmedi).
 **Kurulu stack (doğrulandı, `apps/mobile/package.json` + `node_modules`):** Expo ~57.0.26, RN 0.86.3, React 19.2.3, Reanimated 4.5.1, Worklets 0.10.1, Gesture Handler 2.32.0, react-native-screens 4.26.2, @react-navigation/native-stack 7.3.16, expo-haptics 57.0.3, expo-image ~57.0.5, expo-blur 57.0.3, expo-symbols ~57.0.3 (kurulu ama kullanılmıyor).

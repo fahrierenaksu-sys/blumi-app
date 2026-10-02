@@ -1,5 +1,7 @@
 # Blumi kapanış denetimi — 2026-09-30
 
+Historical record — not an instruction; see AGENTS.md.
+
 Bu belge ilk kapsamlı dönüşüm talebinin bugünkü durumunu ölçer. Önceki
 raporlardaki "tamamlandı" kayıtları kopyalanmadı. Her satır bu denetimde
 yeniden okunan kod, git geçmişi, test çıktısı ya da salt okunur ortam sorgusuna

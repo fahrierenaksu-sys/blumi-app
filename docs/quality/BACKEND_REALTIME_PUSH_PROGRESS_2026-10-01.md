@@ -1,5 +1,7 @@
 # Blumi backend, realtime ve push — 2026-10-01
 
+Historical record — not an instruction; see AGENTS.md.
+
 Bu kayıt `/Users/evrenevren/blumison`, `develop` dalındaki yerel değişiklikleri
 anlatır. Başlangıç commit'i `10c5e38`; uzak develop'ın doküman/güvenlik
 commit'leri `ed5b484` noktasına kadar fast-forward ile korundu. Kullanıcı

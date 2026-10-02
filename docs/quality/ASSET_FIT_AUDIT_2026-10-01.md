@@ -1,5 +1,7 @@
 # Asset Fit Audit — Avatar V2 runtime cosmetics (2026-10-01)
 
+Historical record — not an instruction; see AGENTS.md.
+
 Status: **AUDIT / OPEN**. This is evidence for the owner, not approval. A code
 test or a composite cannot approve visual quality; native Simulator evidence
 is not part of this audit.

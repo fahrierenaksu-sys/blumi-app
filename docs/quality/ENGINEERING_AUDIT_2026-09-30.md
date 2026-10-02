@@ -1,5 +1,7 @@
 # Blumi engineering audit — 2026-09-30 (wave 1)
 
+Historical record — not an instruction; see AGENTS.md.
+
 Supersedes the status sections of
 [`ENGINEERING_AUDIT_2026-09-28.md`](./ENGINEERING_AUDIT_2026-09-28.md), which
 remains the historical record of that run. This is an evidence log, not a

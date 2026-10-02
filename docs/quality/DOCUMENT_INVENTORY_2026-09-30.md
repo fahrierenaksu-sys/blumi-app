@@ -1,5 +1,7 @@
 # Markdown document inventory — 2026-09-30
 
+Historical record — not an instruction; see AGENTS.md.
+
 Scope: every `*.md` file in the repository, excluding `node_modules`, `.git` and `.claude/worktrees`. Checked on the integration branch `claude/busy-cray-dl5wvr` (merged into the audit worktree) under Node 22.22.2. This is an inventory and verification record; it changes no document. Findings are listed as a checklist at the end. Historical reports are not rewritten.
 
 Method: a script resolved every relative Markdown link, extracted every `npm run X` / `npm --workspace W run X` occurrence and looked the script up in the matching `package.json`, and resolved every backticked repository path. Version claims were compared by hand against `apps/mobile/package.json` and the root `package.json` / `.nvmrc`. Contradictions were found by reading the status statements of each document.

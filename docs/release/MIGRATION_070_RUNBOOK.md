@@ -2,6 +2,11 @@
 
 > **STATUS: WRITTEN, NOT APPLIED.** No database was touched. Apply only with
 > the owner's explicit approval, after a restore-tested backup.
+>
+> **2026-10-02:** the code that tolerates 070 is on `main` and deployed (`main`
+> @ `76a195e`, Railway deployment `8909a8ee`, SUCCESS 2026-10-01 23:56 UTC;
+> `/health` and `/ready` 200). The ledger still has 69 rows and no 070 row
+> (read-only check). Step 1 is therefore done; step 2 is next.
 
 File: `apps/server/db/migrations/070_chat_delivery_receipts.sql`, SHA-256
 `48c21b7964a69a04fb328f1b3d597e2b7b6f7fbdcaee48c9b48f7391ce492dd1` (what the
@@ -59,7 +64,7 @@ applies 070 with the migrator and sees receipts switch on without a restart),
 | # | Step | Who |
 |---|---|---|
 | 1 | Merge the reviewed change to `main`; confirm the Railway deployment commit; `/health` and `/ready` 200. Receipts stay off. | Owner |
-| 2 | PostgreSQL 17 dump of production and a restore test (`DATABASE_RELEASE_RUNBOOK.md`). | Owner |
+| 2 | PostgreSQL 17 dump of production and a restore test (`DATABASE_RELEASE_RUNBOOK.md`). Record the archive path and SHA-256 in `DATABASE_RELEASE_RUNBOOK.md`, and confirm the host and port of Railway's `DATABASE_URL` without reading the password. | Owner |
 | 3 | Preflight: 69 ledger rows, no 070 row, none of the new columns or table, no transaction older than 60 s. | Operator |
 | 4 | Apply: `npm run db:migrate` against production, or the same transaction by hand as for 068 (`BEGIN`, `SET LOCAL lock_timeout = '5000ms'`, `pg_advisory_xact_lock(hashtextextended('blumi:migrations', 0))`, the file's SQL, the ledger row with the checksum above, `COMMIT`). | Operator, owner approval |
 | 5 | Verify (below). Within 30 s the running binary's probe sees 070; a restart is not needed. | Operator |

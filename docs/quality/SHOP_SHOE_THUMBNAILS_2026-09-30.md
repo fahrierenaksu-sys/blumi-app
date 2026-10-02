@@ -50,12 +50,14 @@ The five women's R1 shoes also have profile layers, but those show a
 
 ## Workbench export required (owner, on the Mac)
 
-Export one Shop thumbnail per item from the highest-resolution approved master
-of the **same artwork the app ships now**. For each item, that artwork is the
-room layer named below. Use only a crop and a high-quality downscale: no
-redraw, no generation, no recolour, and no upscaling of the runtime layer. If
-no master is at least 432px wide, record `MANUAL_MASTER_REQUIRED` for that
-item instead of exporting.
+Each thumbnail must show exactly the design the app ships for that item ID
+(the room layer named below): buyers must see what they get, and published
+items are receipt-bound. Upscaling the 256px runtime layer adds no detail. Any
+approach that gives a sharper image of the same design works, for example a
+crop and downscale of a higher-resolution master, a re-render or a new
+thumbnail pipeline. A visibly different design is an item change, which needs
+owner approval and a re-issued receipt. If no source of at least 432px width
+exists for an item, one option is to mark it as needing a hand-made master.
 
 - **Format:** RGBA PNG, sRGB, straight alpha. The canvas is 480 x 240 with the
   shoe pair centred on it. The visible pair is 432px wide, or at most 192px
@@ -64,7 +66,7 @@ item instead of exporting.
   gives at least 3 device pixels per point for a visible shoe up to 144pt wide.
 - **Target path:** `apps/mobile/src/features/avatarV2/assets/shop-thumbnails/avatar_v2_shoes_<slug>_v2.png`.
   The filename is versioned so that the promotion stays reversible.
-- **Required (14):**
+- **Required (13):**
   - men's shoes, matching `room/avatar_room_shoes_male_<slug>_v1.png`, for the
     slugs `male_milk_tea_court`, `male_cloud_white_trainers`,
     `male_cocoa_penny_loafers`, `male_dusty_blue_canvas_sneakers`,

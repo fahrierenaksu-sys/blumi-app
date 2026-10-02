@@ -3,7 +3,28 @@
 This is an implementation and verification guide, not a release approval. The
 founder-facing status remains in `LAUNCH_CONTROL.md`.
 
-## Current evidence (2026-09-28)
+## Current state (2026-10-02)
+
+- **Classification (owner decision, 2026-09-30):** Supabase project
+  `nkqcbxufbhfibrgvajim` and the Railway `production` environment are the
+  release target. Handle the database as production: backup, restore proof and
+  explicit owner approval before any write. All 18 accounts are the owner's own
+  test accounts and are kept. There is no separate staging database yet.
+- **Ledger:** 69 rows, latest `069_moderation_phone_bans.sql` (read-only check
+  2026-10-02). 066–069 are applied. 070 is written but not applied; the
+  deployed server (`main` @ `76a195e`, Railway deployment `8909a8ee`,
+  2026-10-01 23:56 UTC) runs without it with receipts off.
+- **Backups:** the Supabase organisation is on the Free plan, so there is no
+  PITR and no platform restore point. The latest recorded restore-tested
+  archive is the owner-only public-schema dump of 2026-09-30 (SHA-256
+  `c6cb8355c8cf8fabe2addf9cf2025279d2908e6fb14ffd9f7dc24e9334603020`,
+  68 migrations; see `LAUNCH_CONTROL.md`); its path is not recorded here.
+- **Before 070:** record the path and SHA-256 of a fresh restore-tested dump
+  here (the 068 archive was never recorded), and have the owner confirm the
+  host and port of Railway's `DATABASE_URL` without reading the password
+  (`OPEN_WORK_2026-09-30.md` REL-4).
+
+## Evidence of 2026-09-28 (dated; superseded by the state above)
 
 - `nkqcbxufbhfibrgvajim` is still the test database. Read-only inspection found
   18 accounts, 14 inventories, 16 test personas, 20 chat messages, four mini
@@ -81,30 +102,41 @@ classified environment. A missing migration is expected until an authorized
 staging/production rollout. Do not run `npm run db:migrate` against a URL whose
 project and environment have not been independently confirmed.
 
-## Environment conversion order
+## Environments and migration order
 
-1. Create a separate staging Supabase project. Apply source migrations there
-   and seed only synthetic identities. Point the currently staging-configured
-   Railway API at it; verify `/ready`, authenticated API paths, account
-   creation/deletion, Chat, Room and avatar equip/reload. Staging and production
-   must never share a database or Firebase test identity.
-2. Freeze writes to the existing test project. Produce an exact account and
-   dependent-record inventory privately, including the 18th account and any
-   Firebase identity. Confirm that **every** listed account is disposable.
-   Do not infer this from the old 17-account snapshot or a `blumi_test_personas`
-   marker alone. Take a fresh archive and restore it before any deletion.
-3. Clean the confirmed test identities through the reviewed account-deletion
-   path and reconcile remaining linked records. Verify zero account, session,
-   inventory, chat, room, report, push and test-persona residue. Deleting a
-   PostgreSQL row alone does not prove Firebase identity deletion. Keep the
-   original backup under the agreed retention policy and verify no production
-   session points at test data.
-4. Apply migration 066 and later reviewed migrations to staging first, rerun
-   idempotently, then repeat on the classified production project with a fresh
-   restorable backup. The matching API commit must be deployed only after the
-   database is compatible. Stop rollout on any checksum, integrity, grant or
-   `/ready` failure; restore to a **new** database or use a reviewed forward
-   repair rather than assuming SQL rollback is safe.
+Under the 2026-09-30 classification there is one database, the release target
+above. A separate staging Supabase project is recommended and still open
+(`OPEN_WORK_2026-09-30.md` REL-5):
+
+1. Create the staging project, apply source migrations, seed only synthetic
+   identities, and point a separate Railway staging environment at it (none
+   exists yet; reconcile `.railway/railway.ts` with the live project first).
+   Verify `/ready`, authenticated API paths, account creation/deletion, chat,
+   room and avatar equip/reload. Staging and production must never share a
+   database or Firebase test identity.
+2. Apply each new migration to staging first and rerun it to prove zero new
+   applications, then repeat on the release target with a fresh restore-tested
+   backup. Deploy the matching API commit only after the database is
+   compatible (070 is the documented exception: its binary ships first). Stop
+   on any checksum, integrity, grant or `/ready` failure; restore to a **new**
+   database or use a reviewed forward repair rather than assuming SQL rollback
+   is safe.
+
+Until staging exists, rehearse each migration on the fresh dump instead: run
+`node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`
+(below), which restores it into a throwaway PostgreSQL 17 cluster, applies the
+pending migrations and proves the rerun applies none. Only then apply to the
+release target, with the owner's approval. The fresh backup, that rehearsal
+and the approval are the only safety net.
+
+If the owner reverses the classification and wants test identities removed:
+freeze writes; list every account and dependent record privately, including
+Firebase identities; confirm each one is disposable (not from an old snapshot
+or a `blumi_test_personas` marker alone); take and restore a fresh archive;
+delete through the reviewed account-deletion path; verify zero account,
+session, inventory, chat, room, report, push and test-persona residue (deleting
+a PostgreSQL row does not delete the Firebase identity); keep the original
+backup under the agreed retention policy.
 
 ## Independent S3 backup
 
@@ -150,8 +182,8 @@ hold public release until the observed backup process meets the target.
 ## Acceptance gate
 
 Before public users enter: isolated PostgreSQL suite and source checks pass;
-staging and production identities are distinct; all test data is classified and
-cleaned; backup and restore are proven; permissions are closed; production
+staging and production identities are distinct; all test data is classified
+(the owner's 18 test accounts are kept by decision); backup and restore are proven; permissions are closed; production
 migration hashes match; `/ready` is healthy; 1,000-DAU launch traffic is
 measured and tested at twice observed peak concurrency; connection and query
 latency are inside the measured budget; alarms reach an operator; rollback to

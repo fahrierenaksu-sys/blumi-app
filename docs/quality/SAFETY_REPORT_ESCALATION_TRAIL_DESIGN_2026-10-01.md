@@ -82,7 +82,8 @@ table unchanged but needs a key lookup in two places.
 
 ## Rollout
 
-1. Take and restore-test the PostgreSQL 17 dump (`ENGINEERING_RULES.md`).
+1. Take and restore-test the PostgreSQL 17 dump
+   (`docs/release/DATABASE_RELEASE_RUNBOOK.md`).
 2. Apply the additive migration, then deploy the binary that writes child
    rows and reads `queue_reason`; the interim note markers stay readable.
 3. Optional backfill: parse existing markers into `queue_reason` only; the

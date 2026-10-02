@@ -191,6 +191,11 @@ Values and rationale (implemented in `apps/server/src/auth/authStore.ts`):
 
 ## 7. Deploy note for this wave
 
+Status: migrations 068 and 069 were both applied to the Supabase database on
+2026-09-30 (see [`MIGRATION_068_RUNBOOK.md`](../release/MIGRATION_068_RUNBOOK.md)
+and [`MIGRATION_069_NOTE.md`](../release/MIGRATION_069_NOTE.md)). The order
+below is kept as the record of why.
+
 Migration `apps/server/db/migrations/068_session_reuse_detection_and_firebase_uid.sql`
 is additive (nullable columns, a partial unique index). It must be applied to
 the Supabase database **before** the binary that uses it (`/ready` stays 503

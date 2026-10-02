@@ -1,5 +1,7 @@
 # Blumi oturum envanteri (develop @ 99a29d1, 2026-10-01)
 
+Not (2026-10-02): Bu dosya güncel backlog'dur; satırlardaki kanıtlar 2026-10-01 anına aittir, güvenmeden önce kodla ve `git log` ile doğrula. 2026-10-02'de `main` = `develop` = `76a195e` ve Railway'de canlı (REL-02, PRD-4, REL-11 buna göre güncellendi). Teknoloji ve bağımlılık seçimi (ör. VIS-11, VIS-13, KBD-01) ajanındır; sahip yalnızca native bağımlılığı taşıyan EAS/TestFlight build'i, ücretli lisans (VIS-12 Spine) ve çizili görünümde görünür değişiklik için gerekir.
+
 ## Türkçe özet
 
 Yalnızca okuma yapıldı; repoda hiçbir dosya değişmedi. Envanter şu kaynaklardan çıkarıldı: 2026-09-30 ve 2026-10-01 tarihli `docs/quality` ve `docs/release` belgeleri, 17 workflow journal'ı ve 30.09'dan bu yana `develop` üzerindeki commit'ler.
@@ -17,23 +19,23 @@ Hiçbir madde native ortamda doğrulanmadı. "DONE" kodun commit'lenip test edil
 
 **Kapsam dışı bırakılanlar** (başka bir mühendis üzerinde çalışıyor): oda çıkış hatası (17cc370, 2a85f47); sparkle balonu ve eski UI temizliği (3dd5fcb, f497d6b, demo lobi ve CHT-17); Firebase refresh iptali (615da71, auth#2); hesap silmede güvenlik kanıtı (05ff8a9, DB-15, safety#2, privacy#1, auth#3); delivery ack düşmesi (5176455, 8e00798, receipts#0, merge#1, security#1); `avatar_moved` yeniden senkronu (3692bf3, motion#1).
 
-**Duruma göre sayılar (252 kalem):**
+**Duruma göre sayılar (252 kalem; 2026-10-02 güncellemesiyle):**
 
 | Durum | Sayı |
 |---|---|
-| DONE | 73 |
-| PARTIAL | 33 |
-| NOT STARTED | 106 |
-| NEEDS OWNER DECISION | 32 |
+| DONE | 74 |
+| PARTIAL | 34 |
+| NOT STARTED | 109 |
+| NEEDS OWNER DECISION | 27 |
 | NEEDS NATIVE CHECK | 8 |
 
 **En önemli 15 açık iş:**
-1. **MR-11 / REL-02 (P0):** Hiçbir yüklü build canlı oda hareketini taşımıyor (build 14'te motion client yok). Sunucu düzeltmeleri deploy edilmedi ve `develop` push edilmedi. Sahibin kararı gerekiyor: yeni build/OTA ve deploy.
+1. **MR-11 / REL-02 (P0):** Hiçbir yüklü build canlı oda hareketini taşımıyor (build 14'te motion client yok). Sunucu düzeltmeleri deploy edilmedi ve `develop` push edilmedi. Sahibin kararı gerekiyor: yeni build/OTA ve deploy. (2026-10-02: push ve deploy yapıldı, `76a195e`; motion client'lı yeni build hâlâ gerekli.)
 2. **BE-36 (P0):** Yedek yok. Supabase Free'de PITR yok, son restore-test edilmiş yedek 2026-09-28 tarihli; 067, 068 ve 069 bu yedekten sonra uygulandı.
 3. **PSH-01 / REL-13 (P0):** EAS'ta APNs anahtarı yüklü mü bilinmiyor. İki fiziksel telefonla push testi yapılmadı.
 4. **AF-01 (P0):** Erkek Soft Patch Beanie saçın altında çiziliyor. Yalnızca veriyle düzeltilebilir.
 5. **NQA-1 (P0):** 105 maddelik native QA planı (24'ü P0) hiç çalıştırılmadı.
-6. **REL-08/09/10/11/12 (P0):** App Store engelleri: imzalı arşiv incelemesi, App Store Connect formları, Apple 5.1.1(ix)/1.2 sınıflandırması, hukuk sayfaları ve AASA 404 veriyor.
+6. **REL-08/09/10/11/12 (P0):** App Store engelleri: imzalı arşiv incelemesi, App Store Connect formları, Apple 5.1.1(ix)/1.2 sınıflandırması, hukuk metninin insan incelemesi (sayfalar 2026-10-02'de 200) ve AASA 404.
 7. **BE-12 (P1):** 409/503 hata eşlemesi production'da çalışmıyor. `databaseErrorStatus.ts:34` `name === "DatabaseError"` kontrol ediyor, pg ise `"error"` veriyor; gerçek hatalar 500'e düşüyor.
 8. **CH-01 (P1):** Mesaj belirtmeden yapılan okuma `readUpTo`'yu sunucu saatine çekiyor. Henüz ekranda görünmemiş bir mesaj "okundu" sayılabiliyor.
 9. **BE-29 (P1):** Aynı kişiye ikinci rapor öncelik yükseltmesini kaybediyor (spam'den sonra underage standart kuyrukta kalıyor).
@@ -139,9 +141,9 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | VIS-08 | Editor placement guides + draw authored contact shadows in production (U10) | research:upgrade | NOT STARTED | P2 |
 | VIS-09 | One motion clock / consistent scale / frame prefetch (U11-U13) | research:upgrade | NOT STARTED | P3 |
 | VIS-10 | Navmesh with clearance (U14, only with 20+ blockers) | research:upgrade | NOT STARTED | P3 |
-| VIS-11 | Skia measured slice (T1); Skia 2.6.2 broken on RN 0.86 Android, pin >=2.11.1 | research:twofive | NEEDS OWNER DECISION | P2 |
+| VIS-11 | Skia measured slice (T1); Skia 2.6.2 broken on RN 0.86 Android, pin >=2.11.1 | research:twofive | NOT STARTED (agent's call; shipping the native dep needs an owner-approved EAS/TestFlight build) | P2 |
 | VIS-12 | Spine Pro ($379-449/seat) for V3 rig | research:twofive | NEEDS OWNER DECISION | P2 |
-| VIS-13 | True 3D / impostor-in-3D | research:threed | NEEDS OWNER DECISION (recommendation: reject full 3D, park impostor) | P3 |
+| VIS-13 | True 3D / impostor-in-3D | research:threed | NOT STARTED (agent's call; the research's "reject full 3D, park impostor" is input, not a decision) | P3 |
 | AF-01 | Male Soft Patch Beanie drawn under hair (layer order) | ASSET_FIT_AUDIT | NOT STARTED (data-only fix) | P0 |
 | AF-02 | Default female Denim Skort reads as jeans standing, skirt sitting (ID drift) | ASSET_FIT_AUDIT | NEEDS OWNER DECISION (redraw) | P1 |
 | AF-03 | Horizontal light lines in male shorts/baggy pants walk frames | ASSET_FIT_AUDIT | NOT STARTED (Workbench re-export) | P1 |
@@ -249,13 +251,13 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | UXO-04 | My Room tab re-tap scroll to top | OPEN_UX_WORK #4 | NOT STARTED | P3 |
 | UXO-05 | Inbox refresh failure toast | OPEN_UX_WORK #5 | NOT STARTED | P3 |
 | UXO-07 | Chat entrance may replay after offscreen | OPEN_UX_WORK #7 | NOT STARTED | P3 |
-| UXO-09 | Safe QA backend to open MiniRoom in Simulator without hitting production | OPEN_UX_WORK | NEEDS OWNER DECISION | P1 |
+| UXO-09 | Safe QA backend to open MiniRoom in Simulator without hitting production | OPEN_UX_WORK | NOT STARTED (a local memory server, `npm run server:qa` with `BLUMI_AUTH_REPOSITORY=memory`, is free and needs no owner decision; only a paid hosted QA backend does) | P1 |
 | UXM-01 | PERF-2 freezeOnBlur for pager pages | UX_MOTION | NOT STARTED | P2 |
 | UXM-02 | FONT-1 embed Inter (native build) | UX_MOTION | NOT STARTED (needs native build) | P2 |
 | UXM-03 | SHEET-1 native form sheet; filter copy | UX_MOTION | NOT STARTED | P2 |
 | UXM-04 | MICRO-4 Inbox back arrow removal | UX_MOTION | NEEDS OWNER DECISION | P3 |
 | SIG-01 | Signature moments (chibi greeting on match, door-opening invite, outfit flies to avatar, bubble flight, liquid tab pill, scan-to-first-card) | UX_MOTION §6, UX_DELIGHT wave E | NOT STARTED | P2 |
-| KBD-01 | react-native-keyboard-controller (native dep) | UX_DELIGHT, method:3 | NEEDS OWNER DECISION | P3 |
+| KBD-01 | react-native-keyboard-controller (native dep) | UX_DELIGHT, method:3 | NOT STARTED (agent's call; ships in an owner-approved native build, e.g. with FONT-1) | P3 |
 | PSH-01 | APNs key in EAS credentials (P-02) | TASKS P-02, REL-13 | NEEDS OWNER DECISION | P0 |
 | PSH-02 | P-01 permission card, P-03 queue regardless of socket, P-04 chat exempt, P-05 safe errors | TASKS | DONE 911e075, 0cf68b3, 2310948, a3ed175 | P0 |
 | PSH-03 | RT-04 speech bubble queue | TASKS | DONE 911e075 | P1 |
@@ -273,16 +275,16 @@ Status meanings: DONE = committed and covered by named tests, but no native evid
 | NQA-1 | 105-item native QA plan (24 P0) | OPEN_WORK, NATIVE_QA_WAVE | NEEDS NATIVE CHECK (all NOT RUN) | P0 |
 | NQA-2..5 | Pager 11 checks, 29 promoted images, binary-commit log, ERR-05/DSC-04 | OPEN_WORK | NEEDS NATIVE CHECK | P1 |
 | NQA-6 | Two-account E2E match -> chat -> invite -> room | OPEN_WORK | PARTIAL 2128e7c, a77b3c8 (automated over real HTTP/WS); native two-phone open | P0 |
-| PRD-01..07 | ProfilePreview likes vs limit; local data on sign-out; two match screens; dev bundle id; 069 ban retention/OTP secret rotation; recycled numbers | OPEN_WORK §4 | NEEDS OWNER DECISION (PRD-4 DONE bae0ee7, needs deploy) | P2 |
+| PRD-01..07 | ProfilePreview likes vs limit; local data on sign-out; two match screens; dev bundle id; 069 ban retention/OTP secret rotation; recycled numbers | OPEN_WORK §4 | NEEDS OWNER DECISION (PRD-4 DONE bae0ee7, deployed in `76a195e` 2026-10-02) | P2 |
 | PERF-A | Device measurements (cold start, frame time, memory) | OPEN_WORK §5 | NEEDS NATIVE CHECK | P1 |
 | PERF-C/D/E | Animated-avatar memory; EXPLAIN of Discover/chat; 1000-DAU load test | OPEN_WORK §5 | PARTIAL 574f84f (local harness, pg_stat_statements); no Railway/Supabase/device numbers | P2 |
 | REL-01 | OTA file cap (~1221 files > 1000) | OPEN_WORK | NOT STARTED | P1 |
-| REL-02 | develop -> main merge and Railway deploy (develop is 20 commits ahead of origin) | OPEN_WORK | NEEDS OWNER DECISION | P0 |
+| REL-02 | develop -> main merge and Railway deploy (develop is 20 commits ahead of origin) | OPEN_WORK | DONE 2026-10-02 (`main` = `develop` = `76a195e`, Railway deployment `8909a8ee`) | P0 |
 | REL-03 | 24 h log watch after deploy with old/new apps | OPEN_WORK | NOT STARTED | P1 |
 | REL-05 | Separate staging environment and DB | OPEN_WORK | NEEDS OWNER DECISION | P1 |
 | REL-08/09 | Signed archive review; App Store Connect forms | OPEN_WORK, APP_STORE_SUBMISSION_GATE | NOT STARTED | P0 |
 | REL-10 | Apple 5.1.1(ix) / 1.2 classification | OPEN_WORK, APP_STORE_SUBMISSION_GATE | NEEDS OWNER DECISION | P0 |
-| REL-11/12 | Legal pages 404; AASA/assetlinks 404 | OPEN_WORK | NOT STARTED | P0 |
+| REL-11/12 | Legal pages 404; AASA/assetlinks 404 | OPEN_WORK | PARTIAL (2026-10-02: legal pages 200, human legal review open; AASA/assetlinks still 404 because the live service runs `BLUMI_DEPLOY_ENV=staging` without app-link identities) | P0 |
 | REL-13 | Real providers: APNs on two phones, SMS OTP cost, Firebase deletion | OPEN_WORK | NEEDS NATIVE CHECK | P0 |
 | REL-15 | Maestro smoke test | OPEN_WORK | NEEDS NATIVE CHECK | P2 |
 | REL-16 | RevenueCat sandbox purchase, product IDs | OPEN_WORK | NOT STARTED (before payments) | P2 |
