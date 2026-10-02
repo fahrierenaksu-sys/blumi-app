@@ -48,7 +48,7 @@ test("before 071 chat and /ready work on PostgreSQL with server hide off; applyi
     assert.equal((await chatService.listThreads("pre071_b"))[0]?.unreadCount, 1)
     assert.equal(await chatService.countUnreadMessages("pre071_b"), 1)
     await assert.rejects(chatService.hideThreadForMe("pre071_b", "pre071_thread"), ChatHideUnavailableError)
-    assert.equal((await chatService.listThreads("pre071_b")).length, 1, "nothing was hidden")
+    assert.equal((await chatService.listThreads("pre071_b"))[0]?.hiddenThrough, undefined, "nothing was hidden")
 
     // The owner applies 071 with the migrator: the running service picks it
     // up on the next probe.
@@ -62,7 +62,7 @@ test("before 071 chat and /ready work on PostgreSQL with server hide off; applyi
 
     const hidden = await chatService.hideThreadForMe("pre071_b", "pre071_thread")
     assert.equal(hidden.hiddenThrough, first.sentAt)
-    assert.deepEqual(await chatService.listThreads("pre071_b"), [])
+    assert.equal((await chatService.listThreads("pre071_b"))[0]?.hiddenThrough, first.sentAt)
     assert.deepEqual(await chatService.listMessages("pre071_b", "pre071_thread"), [])
     assert.equal(await chatService.countUnreadMessages("pre071_b"), 0)
     assert.equal((await chatService.listMessages("pre071_a", "pre071_thread")).length, 1)

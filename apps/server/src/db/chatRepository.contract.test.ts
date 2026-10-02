@@ -460,11 +460,14 @@ runRepositoryContract<ChatRepository>({
 
       const hidden = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: bora })
       assert.deepEqual(hidden, { hiddenThrough: two.sentAt, readAt: two.sentAt })
-      assert.deepEqual(await listed(bora), [], "gone from the hider's list")
+      const marked = await listed(bora)
+      assert.equal(marked.length, 1, "still listed, so links, invites and room chat find it")
+      assert.equal(marked[0]?.hiddenThrough, two.sentAt, "the app hides the row through this point")
+      assert.equal(marked[0]?.unreadCount, 0)
       assert.deepEqual(await history(bora), [])
       assert.deepEqual(await history(bora, two.messageId), [], "older pages stay hidden too")
       assert.deepEqual(await history(ada), ["one", "two"], "the partner sees no change")
-      assert.equal((await listed(ada)).length, 1)
+      assert.equal((await listed(ada))[0]?.hiddenThrough, undefined, "the partner's thread is never marked")
       assert.equal((await backend.repository.countUnreadMessagesBySender(bora))
         .find((entry) => entry.senderUserId === ada)?.unreadCount, undefined, "hidden messages are not unread")
 
@@ -484,8 +487,8 @@ runRepositoryContract<ChatRepository>({
       await backend.repository.saveThread(other)
       const empty = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada })
       assert.equal(empty?.hiddenThrough, chat.createdAt, "an empty thread hides through its creation")
-      assert.deepEqual((await backend.repository.listThreadsPage(ada, { limit: 50 })).threads
-        .filter((item) => item.threadId === chat.threadId), [])
+      assert.equal((await backend.repository.listThreadsPage(ada, { limit: 50 })).threads
+        .find((item) => item.threadId === chat.threadId)?.hiddenThrough, chat.createdAt)
 
       const one = message(chat, "p1", "2026-10-02T10:01:00.000Z", "one", bora)
       const two = message(chat, "p2", "2026-10-02T10:02:00.000Z", "two", bora)

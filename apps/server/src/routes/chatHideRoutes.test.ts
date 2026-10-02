@@ -30,7 +30,7 @@ async function send(server: AdversarialServer, account: SyntheticAccount, thread
 async function threadsOf(server: AdversarialServer, account: SyntheticAccount) {
   const response = await server.call("GET", "/v1/threads", { token: account.sessionToken })
   assert.equal(response.statusCode, 200, response.body)
-  return response.json().threads as Array<{ threadId: string; unreadCount: number; lastMessage?: { body: string } }>
+  return response.json().threads as Array<{ threadId: string; unreadCount: number; hiddenThrough?: string; lastMessage?: { body: string; sentAt: string } }>
 }
 
 async function bodiesOf(server: AdversarialServer, account: SyntheticAccount, threadId: string) {
@@ -55,14 +55,19 @@ test("delete chat for me hides the thread and its history from the caller only, 
     assert.ok(readEvent, "chat.thread_read reaches the caller")
     assert.equal(events.some((entry) => entry.userId === ada.userId), false, "the partner is never told")
 
-    assert.equal((await threadsOf(server, bora)).some((thread) => thread.threadId === threadId), false)
+    // Still listed (links, room invites and room chat find it), marked so every device hides the row.
+    const marked = (await threadsOf(server, bora)).find((thread) => thread.threadId === threadId)
+    assert.equal(marked?.hiddenThrough, hidden.json().hiddenThrough)
+    assert.ok(marked?.lastMessage && Date.parse(marked.lastMessage.sentAt) <= Date.parse(marked.hiddenThrough!))
+    assert.equal(marked?.unreadCount, 0)
     assert.deepEqual(await bodiesOf(server, bora, threadId), [])
     assert.deepEqual(await bodiesOf(server, ada, threadId), ["one", "two"], "the partner keeps everything")
-    assert.equal((await threadsOf(server, ada)).some((thread) => thread.threadId === threadId), true)
+    assert.equal((await threadsOf(server, ada)).find((thread) => thread.threadId === threadId)?.hiddenThrough, undefined)
 
     await send(server, ada, threadId, "three")
     const back = (await threadsOf(server, bora)).find((thread) => thread.threadId === threadId)
     assert.equal(back?.lastMessage?.body, "three")
+    assert.ok(Date.parse(back!.lastMessage!.sentAt) > Date.parse(back!.hiddenThrough!), "newer than the hide point: shown again")
     assert.equal(back?.unreadCount, 1)
     assert.deepEqual(await bodiesOf(server, bora, threadId), ["three"])
   } finally {
@@ -83,7 +88,7 @@ test("the hide point is a message of this thread and never moves back", async ()
     assert.equal(named.statusCode, 200, named.body)
     assert.equal(named.json().hiddenThrough, first.sentAt)
     assert.deepEqual(await bodiesOf(server, bora, threadId), ["two"])
-    assert.equal((await threadsOf(server, bora)).some((thread) => thread.threadId === threadId), true)
+    assert.equal((await threadsOf(server, bora)).find((thread) => thread.threadId === threadId)?.lastMessage?.body, "two")
 
     const all = await hide({})
     assert.equal(all.statusCode, 200, all.body)

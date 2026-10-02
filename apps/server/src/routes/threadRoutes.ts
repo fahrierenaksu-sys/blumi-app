@@ -907,9 +907,10 @@ export async function registerThreadRoutes(
     }
   })
 
-  // "Delete chat for me" (2026-10-02, migration 071). The thread leaves the
-  // caller's list until a newer message arrives, and their history then starts
-  // after the hide point; the partner's view never changes. Before 071 the
+  // "Delete chat for me" (2026-10-02, migration 071). The caller's thread list
+  // marks the thread with `hiddenThrough` (the app hides the row until a newer
+  // message arrives) and their history starts after the hide point; the
+  // partner's view never changes. Before 071 the
   // answer is 409 CHAT_HIDE_UNAVAILABLE and the app keeps its on-device hide.
   app.post("/v1/threads/:threadId/hide", {
     attachValidation: true,

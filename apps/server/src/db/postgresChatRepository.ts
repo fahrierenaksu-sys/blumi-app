@@ -56,11 +56,11 @@ export function createPostgresChatRepository(
     },
     async listThreadsPage(userId, options) {
       const { limit, cursor } = normalizeThreadPage(userId, options)
-      // After 071 a thread the viewer hid stays out of their list until its
-      // newest message is after the hide point. The preview is the newest
-      // message, so it is never a hidden one.
-      const hiddenFilter = await hideSchema.isReady()
-        ? "AND (p.hidden_through IS NULL OR m.sent_at > p.hidden_through)"
+      // After 071 a thread the viewer hid stays listed with its hide point, so
+      // links, room invites and room chat still find it; the app hides the
+      // row until its newest message is after that point.
+      const hiddenColumn = await hideSchema.isReady()
+        ? "p.hidden_through AS viewer_hidden_through,"
         : ""
       const result = await pool.query(
         `SELECT
@@ -76,6 +76,7 @@ export function createPostgresChatRepository(
             m.read_at AS last_read_at,
             m.edited_at AS last_edited_at,
             p.last_read_at AS viewer_last_read_at,
+            ${hiddenColumn}
             (SELECT count(*)::int FROM blumi_chat_messages AS unread
               WHERE unread.thread_id = t.thread_id AND unread.sender_user_id <> $1
                 AND unread.sent_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)) AS unread_count
@@ -86,7 +87,6 @@ export function createPostgresChatRepository(
              ON m.message_id = t.last_message_id
           WHERE p.user_id = $1
             AND ($2::timestamptz IS NULL OR (t.created_at, t.thread_id) < ($2::timestamptz, $3::text))
-            ${hiddenFilter}
           ORDER BY t.created_at DESC, t.thread_id DESC LIMIT $4`,
         [userId, cursor?.createdAt ?? null, cursor?.threadId ?? null, limit + 1]
       )
@@ -111,7 +111,8 @@ export function createPostgresChatRepository(
         if (participants.length !== 2) throw new Error("Chat thread is missing participants.")
         return { ...await mapThread(pool, row, [participants[0]!, participants[1]!]),
           unreadCount: Number(row.unread_count ?? 0),
-          ...(row.viewer_last_read_at ? { lastReadAt: new Date(row.viewer_last_read_at).toISOString() } : {}) }
+          ...(row.viewer_last_read_at ? { lastReadAt: new Date(row.viewer_last_read_at).toISOString() } : {}),
+          ...(row.viewer_hidden_through ? { hiddenThrough: new Date(row.viewer_hidden_through).toISOString() } : {}) }
       }))
       const last = threads.at(-1)!
       return { threads, nextCursor: result.rows.length > limit ? encodeThreadCursor({ userId, threadId: last.threadId, createdAt: String(rows.at(-1)?.cursor_created_at ?? last.createdAt) }) : null }

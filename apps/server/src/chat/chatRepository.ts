@@ -197,7 +197,8 @@ export interface ChatRepository {
   saveChatPreferences(userId: string, preferences: ChatPreferences, now: Date): Promise<ChatPreferences>
   /**
    * False until migration 071 is applied. Before that no query names
-   * `hidden_through`: thread lists and history show everything, and
+   * `hidden_through`: thread lists carry no `hiddenThrough`, history shows
+   * everything, and
    * `hideThreadForParticipant` must not be called.
    */
   supportsHide(): Promise<boolean>
@@ -205,8 +206,10 @@ export interface ChatRepository {
    * "Delete chat for me": hides the thread from `userId` through the target
    * message's time (default: its newest message, or its creation when it has
    * none) and moves the unread cursor there. Both only move forward. The
-   * thread leaves `userId`'s list until a later message arrives, and their
-   * history then starts after the hide point; the partner sees no change.
+   * thread stays in `userId`'s list with `hiddenThrough`, so links, room
+   * invites and room chat still find it, and the app hides the row until a
+   * later message arrives; their history starts after the hide point. The
+   * partner sees no change.
    * Null when `userId` is not a participant or the message is not in this
    * thread. Throws before migration 071.
    */
@@ -295,18 +298,20 @@ export function createInMemoryChatRepository(
       const { limit, cursor } = normalizeThreadPage(userId, options)
       const candidates = [...store.threads.values()]
         .filter((thread) => thread.participantUserIds.includes(userId))
-        // A hidden thread comes back only with a message after the hide point.
-        .filter((thread) => !hideSupported || cursorsOf(thread.threadId, userId).hiddenThrough === undefined ||
-          (thread.lastMessage !== undefined && isShownTo(userId, thread.lastMessage)))
         .filter((thread) => !cursor || Date.parse(thread.createdAt) < Date.parse(cursor.createdAt) ||
           (Date.parse(thread.createdAt) === Date.parse(cursor.createdAt) && thread.threadId < cursor.threadId))
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
       const threads = candidates.slice(0, limit).map((thread) => {
-          const lastReadAt = cursorsOf(thread.threadId, userId).readAt
+          const { readAt: lastReadAt, hiddenThrough } = cursorsOf(thread.threadId, userId)
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
             .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
-          return { ...cloneThread(thread), unreadCount, ...(lastReadAt ? { lastReadAt } : {}) }
+          return {
+            ...cloneThread(thread),
+            unreadCount,
+            ...(lastReadAt ? { lastReadAt } : {}),
+            ...(hideSupported && hiddenThrough ? { hiddenThrough } : {})
+          }
         })
       const last = threads.at(-1)
       return { threads, nextCursor: candidates.length > limit && last ? encodeThreadCursor({ userId, createdAt: last.createdAt, threadId: last.threadId }) : null }

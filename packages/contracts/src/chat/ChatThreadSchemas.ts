@@ -142,7 +142,8 @@ export const chatThreadSchema = z.object({
   lastMessage: chatMessageSchema.optional(),
   unreadCount: z.number().int().nonnegative().optional(),
   lastReadAt: isoDateSchema.optional(),
-  partnerReceipts: chatPartnerReceiptsSchema.optional()
+  partnerReceipts: chatPartnerReceiptsSchema.optional(),
+  hiddenThrough: isoDateSchema.optional()
 })
 
 export const chatThreadListSchema = z.object({
