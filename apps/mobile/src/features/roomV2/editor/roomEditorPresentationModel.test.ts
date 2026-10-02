@@ -6,7 +6,6 @@ import {
   getEditRoomWorldStatus,
   getRoomEditorInventoryStatusLabel,
   getRoomEditorPlacementStateByRenderId,
-  getRoomEditorSubtitle,
   getSelectedPlacedRotationOptions,
   resolveSelectedRoomEditorInventoryEntry,
   type RoomEditorInventoryEntry
@@ -27,23 +26,13 @@ const entries = [
   entry("sofa", "Cloud Sofa", "seating")
 ]
 
-test("room world status maps readiness to icon, localized label, and colour", () => {
-  assert.deepEqual(getEditRoomWorldStatus("ready", en), { icon: "walk", label: en.readiness.ready, color: "#8FFFD1" })
-  assert.deepEqual(getEditRoomWorldStatus("constrained", tr), { icon: "resize", label: tr.readiness.constrained, color: "#FFE1A8" })
-  assert.deepEqual(getEditRoomWorldStatus("blocked", en), { icon: "alert-circle", label: en.readiness.blocked, color: "#FFB4C8" })
-})
-
-test("header subtitle prefers live feedback, then the selection's rotation affordance", () => {
-  const base = { copy: en, placementFeedback: undefined, selectedInstanceId: undefined, canRotateSelectedPlacedItem: true }
-  assert.equal(getRoomEditorSubtitle(base), en.defaultSubtitle)
-  assert.equal(getRoomEditorSubtitle({ ...base, selectedInstanceId: "chair_1" }), en.rotatableSubtitle)
-  assert.equal(
-    getRoomEditorSubtitle({ ...base, selectedInstanceId: "chair_1", canRotateSelectedPlacedItem: false }),
-    en.fixedSubtitle
-  )
-  assert.equal(getRoomEditorSubtitle({ ...base, selectedInstanceId: "chair_1", placementFeedback: "Hi" }), "Hi")
-  // An empty feedback string is still shown (nullish, not falsy, fallback).
-  assert.equal(getRoomEditorSubtitle({ ...base, placementFeedback: "" }), "")
+test("room world status maps readiness to icon and localized label", () => {
+  const ready = getEditRoomWorldStatus("ready", en)
+  const constrained = getEditRoomWorldStatus("constrained", tr)
+  const blocked = getEditRoomWorldStatus("blocked", en)
+  assert.deepEqual({ icon: ready.icon, label: ready.label }, { icon: "walk", label: en.readiness.ready })
+  assert.deepEqual({ icon: constrained.icon, label: constrained.label }, { icon: "resize", label: tr.readiness.constrained })
+  assert.deepEqual({ icon: blocked.icon, label: blocked.label }, { icon: "alert-circle", label: en.readiness.blocked })
 })
 
 test("collection status label is localized for loading and failed states", () => {

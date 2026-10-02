@@ -54,6 +54,10 @@ import {
 } from "./components/onboardingScreenActions"
 import { getAppLocale } from "../features/session/appLocale"
 import { getRoomSetupCopy } from "../features/roomV2/roomSetupCopy"
+import {
+  resolveRoomSetupMutationFeedback,
+  resolveRoomSetupStatusLine
+} from "../features/roomV2/roomSetupPlacementFeedback"
 
 export interface RoomSetupScreenProps {
   isSubmitting: boolean
@@ -85,7 +89,6 @@ export function RoomSetupScreen({
     setUserRoomDecor
   } = useRoomV2()
   const copy = getRoomSetupCopy(getAppLocale())
-  const feedbackCopy = copy.feedback
   const { avatar, catalog: avatarCatalog } = useAvatarV2()
   const roomFrameRef = useRef<View>(null)
   const [bedSelected, setBedSelected] = useState(false)
@@ -226,15 +229,17 @@ export function RoomSetupScreen({
       setPlacementMessage(copy.placement.chooseAnotherSpot)
       return
     }
-    if (!setUserRoomDecor(nextDecor)) {
-      setPlacementErrorMessage(feedbackCopy.mutationRejected)
-      return
-    }
-    setPlacementErrorMessage("")
-    setBedSelected(true)
+    const feedback = resolveRoomSetupMutationFeedback({
+      accepted: setUserRoomDecor(nextDecor),
+      action: "placed",
+      copy
+    })
+    setPlacementErrorMessage(feedback.errorMessage)
+    if (feedback.message === undefined) return
+    setBedSelected(feedback.selectBed)
     setPlacementMessage(copy.placement.placed)
     hapticLight()
-  }, [copy, feedbackCopy.mutationRejected, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
+  }, [copy, persistenceState, setUserRoomDecor, starterBed, userRoomDecor.placedItems])
 
   const rotatePlacedBed = useCallback((): void => {
     if (!starterBed || !hasPlacedStarterBed(userRoomDecor)) return
@@ -262,13 +267,14 @@ export function RoomSetupScreen({
       setPlacementMessage(copy.placement.moveInBeforeRotating)
       return
     }
-    if (!setUserRoomDecor(nextDecor)) {
-      setPlacementErrorMessage(feedbackCopy.mutationRejected)
-      return
-    }
-    setPlacementErrorMessage("")
-    setPlacementMessage(copy.placement.rotated)
-  }, [copy, feedbackCopy.mutationRejected, setUserRoomDecor, starterBed, userRoomDecor])
+    const feedback = resolveRoomSetupMutationFeedback({
+      accepted: setUserRoomDecor(nextDecor),
+      action: "rotated",
+      copy
+    })
+    setPlacementErrorMessage(feedback.errorMessage)
+    if (feedback.message !== undefined) setPlacementMessage(feedback.message)
+  }, [copy, setUserRoomDecor, starterBed, userRoomDecor])
 
   const handlePlacedBedLongPress = useCallback((): void => {
     hapticMedium()
@@ -347,6 +353,13 @@ export function RoomSetupScreen({
 
   const { busy } = useOnboardingSignOut(onSignOut, isSubmitting)
   useOnboardingHardwareBack(onBackToAvatar, busy)
+  const statusLine = resolveRoomSetupStatusLine({
+    persistenceState,
+    errorMessage: placementErrorMessage,
+    message: placementMessage,
+    showMessage: !starterRoomReady && bedSelected,
+    copy
+  })
 
   return (
     <View style={styles.screenRoot}>
@@ -516,25 +529,17 @@ export function RoomSetupScreen({
             </GestureDetector>
           ) : null}
         </View>
-        {persistenceState === "failed" ? (
+        {statusLine?.tone === "alert" ? (
           <Text
             accessibilityLiveRegion="assertive"
             accessibilityRole="alert"
             style={styles.placementMessage}
           >
-            {feedbackCopy.persistenceAttention}
+            {statusLine.text}
           </Text>
-        ) : placementErrorMessage ? (
-          <Text
-            accessibilityLiveRegion="assertive"
-            accessibilityRole="alert"
-            style={styles.placementMessage}
-          >
-            {placementErrorMessage}
-          </Text>
-        ) : !starterRoomReady && bedSelected && placementMessage ? (
+        ) : statusLine?.tone === "polite" ? (
           <Text accessibilityLiveRegion="polite" style={styles.placementMessage}>
-            {placementMessage}
+            {statusLine.text}
           </Text>
         ) : null}
       </View>

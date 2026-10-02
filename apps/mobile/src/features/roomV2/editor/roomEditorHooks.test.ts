@@ -11,7 +11,7 @@ import type {
   useShopPlacementIntent as UseShopPlacementIntent,
   useShopPlacementIntentMemory as UseShopPlacementIntentMemory
 } from "./useShopPlacementIntent"
-import { createTestPlaced } from "./roomEditorTestFixtures"
+import { createTestPlaced, createTestRenderItem } from "./roomEditorTestFixtures"
 
 // A minimal synchronous hooks runtime (state slots, memo/callback/effect
 // dependencies, refs, effect cleanup) to drive the editor hooks the way the
@@ -345,7 +345,11 @@ test("blurring the reused editor route lets the same Shop intent apply again", (
 // through usePreventRemove, which native-stack forwards as
 // `preventNativeDismiss` so UIKit cancels the swipe and the dialog opens on
 // the editor.
-function mountSave(initial: { isDirty: boolean }) {
+function mountSave(initial: {
+  isDirty: boolean
+  saveStatus?: "saved" | "conflict" | "failed" | "throws"
+  placementPreview?: Parameters<typeof UseRoomEditorSave>[0]["selection"]["placementPreview"]
+}) {
   const runtime = createHookRuntime()
   const haptics: string[] = []
   const doubles = createNavigationDoubles()
@@ -383,11 +387,13 @@ function mountSave(initial: { isDirty: boolean }) {
       editorSessionRef,
       saveUserRoomDecorConfirmed: async (decor) => {
         saved.push(decor)
-        return { status: "saved", decor }
+        const status = initial.saveStatus ?? "saved"
+        if (status === "throws") throw new Error("network down")
+        return status === "saved" ? { status, decor } : { status }
       },
       cancelActiveDrag: () => { dragCancels += 1 },
       selection: {
-        placementPreview: undefined,
+        placementPreview: initial.placementPreview,
         setPlacementPreview: () => undefined,
         setPlacementFeedback: (feedback) => { calls.push(`feedback:${String(feedback)}`) },
         setSelectedInstanceId: () => undefined
@@ -450,6 +456,46 @@ test("save from the dialog persists the draft, then completes the intercepted ex
   await new Promise((resolveTick) => setImmediate(resolveTick))
   assert.equal(harness.saved.length, 1)
   assert.deepEqual(harness.dispatched, [popAction])
+})
+
+for (const saveStatus of ["conflict", "failed", "throws"] as const) {
+  test(`a ${saveStatus} save from the exit dialog keeps the editor open with feedback`, async () => {
+    const harness = mountSave({ isDirty: true, saveStatus })
+    harness.render()
+    harness.doubles.preventRemove.callback?.({ data: { action: popAction } })
+    harness.doubles.alerts[0].buttons[2].onPress?.()
+    await new Promise((resolveTick) => setImmediate(resolveTick))
+    assert.equal(harness.saved.length, 1, "the save was attempted")
+    assert.deepEqual(harness.dispatched, [], "the intercepted exit is not completed")
+    assert.equal(harness.calls.includes("goBack"), false)
+    assert.equal(harness.calls.some((call) => call.startsWith("replace:")), false)
+    assert.ok(harness.calls.some((call) => call.startsWith("feedback:") && call.length > "feedback:".length))
+  })
+
+  test(`a ${saveStatus} top-bar save never leaves the editor`, async () => {
+    const harness = mountSave({ isDirty: true, saveStatus })
+    await harness.render().handleSave()
+    assert.deepEqual(harness.dispatched, [])
+    assert.equal(harness.calls.includes("goBack"), false)
+    assert.ok(harness.calls.some((call) => call.startsWith("feedback:")))
+  })
+}
+
+test("an invalid placement preview sets feedback without saving or leaving", async () => {
+  const harness = mountSave({
+    isDirty: true,
+    placementPreview: {
+      item: createTestRenderItem(),
+      isValid: false,
+      feedback: "blocked",
+      blockingRenderIds: []
+    }
+  })
+  await harness.render().handleSave()
+  assert.equal(harness.saved.length, 0)
+  assert.deepEqual(harness.dispatched, [])
+  assert.equal(harness.calls.includes("goBack"), false)
+  assert.ok(harness.calls.some((call) => call.startsWith("feedback:")))
 })
 
 test("an approved or no longer dirty exit is re-dispatched without a second dialog", async () => {

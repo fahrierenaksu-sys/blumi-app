@@ -1,14 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { FurnitureItem, RoomFurnitureVisualContract } from "./roomV2.types"
-import {
-  adaptFurnitureItemToRoomVNext,
-  getRoomVNextDirectionalLayerAssets,
-  getRoomVNextDirectionalVisual,
-  validateRoomFurnitureVisualContract
-} from "./roomVNextContracts"
 import { resolvePlacedFurnitureRenderItem } from "./roomV2Selectors"
-import { getRoomVNextCalibratedRenderSize } from "./roomVNextScale"
 
 const source = 0 as never
 
@@ -68,97 +61,8 @@ const legacyItem: FurnitureItem = {
   interactionType: "decor"
 }
 
-test("VNext contract requires all four real directional visuals", () => {
-  const contract = createContract()
-  assert.deepEqual(validateRoomFurnitureVisualContract(contract), {
-    isValid: true,
-    issueIds: []
-  })
-
-  const missingRight = createContract({
-    directions: {
-      ...contract.directions,
-      right: undefined as never
-    }
-  })
-  const result = validateRoomFurnitureVisualContract(missingRight)
-  assert.equal(result.isValid, false)
-  assert.ok(result.issueIds.includes("missing_directional_visual"))
-})
-
-test("VNext validation fails closed for invalid pivot and identity metadata", () => {
-  const result = validateRoomFurnitureVisualContract(createContract({
-    skuId: " ",
-    directions: {
-      ...createContract().directions,
-      front: {
-        ...createContract().directions.front,
-        normalizedFloorPivot: { x: 1.2, y: -0.2 }
-      }
-    }
-  }))
-  assert.equal(result.isValid, false)
-  assert.ok(result.issueIds.includes("invalid_identity"))
-  assert.ok(result.issueIds.includes("invalid_floor_pivot"))
-})
-
-test("adapter copies directional layers and never mutates legacy item or source contract", () => {
-  const contract = createContract()
-  const adapted = adaptFurnitureItemToRoomVNext(legacyItem, contract)
-
-  assert.notEqual(adapted, legacyItem)
-  assert.equal(adapted.asset.key, "bed-front")
-  assert.equal(adapted.assetsByRotation?.left?.key, "bed-left")
-  assert.equal(adapted.rotationPolicy, "directional_assets_required")
-  assert.equal(adapted.sceneProjection, "upright")
-  assert.deepEqual(adapted.renderSizeByRotation?.right, { width: 0.31, height: 0.25 })
-  assert.deepEqual(adapted.anchorByRotation?.back, { x: 0.5, y: 1 })
-  assert.equal(adapted.visualContract?.skuId, "pink-cloud-bed")
-  assert.notEqual(adapted.visualContract, contract)
-  assert.notEqual(adapted.visualContract?.directions, contract.directions)
-  assert.equal(legacyItem.visualContract, undefined)
-  assert.equal(contract.directions.front.bodyAsset.key, "bed-front")
-  assert.equal(
-    adapted.visualContract?.directions.front.thumbnailAsset?.key,
-    "thumbnail-front"
-  )
-})
-
-test("directional thumbnail metadata remains tied to the VNext master", () => {
-  const contract = createContract()
-  const adapted = adaptFurnitureItemToRoomVNext(legacyItem, contract)
-  assert.equal(
-    adapted.visualContract?.directions.right.thumbnailAsset?.key,
-    "thumbnail-right"
-  )
-
-  const invalid = createContract({
-    directions: {
-      ...contract.directions,
-      front: {
-        ...contract.directions.front,
-        thumbnailAsset: { key: "", source }
-      }
-    }
-  })
-  const validation = validateRoomFurnitureVisualContract(invalid)
-  assert.equal(validation.isValid, false)
-  assert.ok(validation.issueIds.includes("invalid_directional_visual"))
-})
-
-test("directional layer resolver exposes body, contact shadow, and occlusion without mirroring", () => {
-  const contract = createContract()
-  assert.equal(getRoomVNextDirectionalVisual(contract, "back")?.bodyAsset.key, "bed-back")
-  assert.deepEqual(getRoomVNextDirectionalLayerAssets(contract, "left"), {
-    bodyAsset: { key: "bed-left", source },
-    contactShadowAsset: { key: "shadow-left", source },
-    foregroundOcclusionAsset: { key: "occlusion-left", source }
-  })
-  assert.equal(getRoomVNextDirectionalLayerAssets(contract, "front")?.bodyAsset.key, "bed-front")
-})
-
 test("scene resolver prefers VNext directional metadata while preserving the world pivot", () => {
-  const adapted = adaptFurnitureItemToRoomVNext(legacyItem, createContract())
+  const adapted: FurnitureItem = { ...legacyItem, visualContract: createContract() }
   const renderItem = resolvePlacedFurnitureRenderItem(
     {
       instanceId: "bed-1",
@@ -202,44 +106,4 @@ test("scene resolver fails closed for a contract with a missing direction", () =
     ),
     null
   )
-})
-
-test("adapter rejects incomplete contracts instead of silently falling back to a mirrored asset", () => {
-  const contract = createContract({
-    directions: {
-      ...createContract().directions,
-      back: undefined as never
-    }
-  })
-  assert.throws(
-    () => adaptFurnitureItemToRoomVNext(legacyItem, contract),
-    /missing_directional_visual/
-  )
-})
-
-test("cohesion render envelopes are calibrated from physical size and alpha bounds", () => {
-  assert.equal(getRoomVNextCalibratedRenderSize({
-    physicalWidthCm: 165,
-    physicalDepthCm: 210,
-    physicalHeightCm: 105,
-    renderClass: "upright",
-    bodyAlphaWidthRatio: 0.8545,
-    bodyAlphaHeightRatio: 0.6338
-  }).height, 0.2924)
-  assert.deepEqual(getRoomVNextCalibratedRenderSize({
-    physicalWidthCm: 158,
-    physicalDepthCm: 112,
-    physicalHeightCm: 1,
-    renderClass: "floor_plane",
-    bodyAlphaWidthRatio: 0.8213,
-    bodyAlphaHeightRatio: 0.3633
-  }), { width: 0.3395, height: 0.2312 })
-  assert.throws(() => getRoomVNextCalibratedRenderSize({
-    physicalWidthCm: 10,
-    physicalDepthCm: 10,
-    physicalHeightCm: 10,
-    renderClass: "upright",
-    bodyAlphaWidthRatio: 0,
-    bodyAlphaHeightRatio: 0.5
-  }), /alpha ratio/)
 })

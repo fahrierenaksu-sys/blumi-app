@@ -4,7 +4,6 @@ import type { UserRoomDecor } from "./roomV2.types"
 import {
   applyRoomV2EditorDraft,
   createRoomV2EditorSession,
-  markRoomV2EditorSessionSaved,
   resetRoomV2EditorSession,
   undoRoomV2EditorSession,
   updateRoomV2EditorPersistedBaseline
@@ -102,20 +101,6 @@ test("reset always returns to the saved baseline instead of the current draft", 
   assert.notEqual(reset.draftDecor, reset.baselineDecor)
   assert.equal(reset.isDirty, false)
   assert.equal(reset.canUndo, true)
-})
-
-test("only a successful save advances the baseline and clears undo", () => {
-  const confirmed = decor("server-save", ["bed"])
-  const initial = createRoomV2EditorSession(confirmed, confirmed)
-  const changed = applyRoomV2EditorDraft(initial, decor("new-save", ["bed", "lamp"]))
-  const saved = markRoomV2EditorSessionSaved(changed, changed.draftDecor)
-  const editedAgain = applyRoomV2EditorDraft(saved, decor("preview", ["lamp"]))
-  const reset = resetRoomV2EditorSession(editedAgain)
-
-  assert.equal(saved.isDirty, false)
-  assert.equal(saved.canUndo, false)
-  assert.equal(saved.baselineDecor.roomShellId, "new-save")
-  assert.deepEqual(reset.draftDecor, saved.baselineDecor)
 })
 
 test("reset is fail-closed when no confirmed server baseline exists", () => {

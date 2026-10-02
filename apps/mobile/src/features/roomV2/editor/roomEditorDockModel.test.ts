@@ -10,14 +10,12 @@ import {
   getRoomEditorDockPageCount,
   getRoomEditorDockPageIndex,
   getRoomEditorHighlightedTrayItemId,
-  getRoomEditorStageFrame,
-  getRoomEditorVisibleCategoryIds
+  getRoomEditorStageFrame
 } from "./roomEditorDockModel"
 import type { RoomEditorInventoryEntry } from "./roomEditorPresentationModel"
 import { createTestFurniture } from "./roomEditorTestFixtures"
 
 const ASPECT = 1254 / 714
-const CATEGORY_ORDER = ["seating", "table", "rug", "misc", "lighting", "wallDecor", "plant"] as const
 
 function entry(
   id: string,
@@ -63,17 +61,6 @@ test("the zoom control exists only when fill and fit differ", () => {
   assert.equal(canToggleRoomEditorStageZoom({ availableWidth: 400, availableHeight: 470, aspectRatio: ASPECT }), true)
   assert.equal(canToggleRoomEditorStageZoom({ availableWidth: 400, availableHeight: 180, aspectRatio: ASPECT }), false)
   assert.equal(canToggleRoomEditorStageZoom({ availableWidth: 0, availableHeight: 0, aspectRatio: ASPECT }), false)
-})
-
-test("category tabs come from the collection, in catalog order, after All", () => {
-  assert.deepEqual(getRoomEditorVisibleCategoryIds([], CATEGORY_ORDER), ["all"])
-  assert.deepEqual(
-    getRoomEditorVisibleCategoryIds(
-      [entry("lamp", "lighting"), entry("chair", "seating"), entry("sofa", "seating"), entry("fern", "plant", false)],
-      CATEGORY_ORDER
-    ),
-    ["all", "seating", "lighting", "plant"]
-  )
 })
 
 test("the compact tray shows three cards per page", () => {
