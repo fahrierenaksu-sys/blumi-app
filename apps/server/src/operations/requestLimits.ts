@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import type { FastifyInstance, FastifyRequest } from "fastify"
+import { isSessionTokenShape } from "../auth/authStore"
 
 /**
  * Per-IP and per-user request limits (2026-10-01).
@@ -19,9 +20,16 @@ export const FAILED_AUTH_RESPONSES_PER_IP_PER_MINUTE = 100
 const MINUTE_MS = 60_000
 const MAX_TRACKED_KEYS = 50_000
 
+/**
+ * Whether the request carries a bearer shaped like a session token. Only the
+ * shape is checked here (no lookup): an invented or admin bearer keeps the
+ * strict unauthenticated ceiling, so a made-up header cannot buy 10x more
+ * requests per address.
+ */
 export function hasBearerAuthorization(request: FastifyRequest): boolean {
   const authorization = request.headers.authorization
-  return typeof authorization === "string" && /^Bearer \S/.test(authorization)
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) return false
+  return isSessionTokenShape(authorization.slice("Bearer ".length).trim())
 }
 
 /** Global per-IP ceiling for @fastify/rate-limit. */

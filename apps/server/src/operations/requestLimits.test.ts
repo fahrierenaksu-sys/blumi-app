@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createInMemoryAuthRepository } from "../auth/authRepository"
 import { createAuthService, type AuthService } from "../auth/authService"
+import { createBlumiBackendStore } from "../auth/authStore"
 import { createRealtimeTicketService } from "../realtime/realtimeTicketService"
 import { createServer } from "../server"
 import { createFixedWindowLimiter } from "./requestLimits"
@@ -30,6 +32,33 @@ test("rotating invented bearer tokens cannot escape the per-IP limit on Discover
       remoteAddress: "203.0.113.21"
     })
     assert.equal(otherAddress.statusCode, 401)
+  } finally {
+    await app.close()
+  }
+})
+
+test("an invented bearer on a public route costs no session lookup and keeps the strict per-IP ceiling", async () => {
+  const repository = createInMemoryAuthRepository(createBlumiBackendStore())
+  let lookups = 0
+  const lookup = repository.getSessionWithAccountByTokenHash.bind(repository)
+  repository.getSessionWithAccountByTokenHash = async (hash) => {
+    lookups += 1
+    return lookup(hash)
+  }
+  const app = createServer({ authService: createAuthService({ repository }) })
+  try {
+    const statuses: number[] = []
+    for (let index = 0; index < 101; index += 1) {
+      statuses.push((await app.inject({
+        method: "GET",
+        url: "/v1/commerce/coin-packs",
+        headers: { authorization: `Bearer invented-token-${index}` },
+        remoteAddress: SHARED_IP
+      })).statusCode)
+    }
+    assert.deepEqual(statuses.slice(0, 100), Array(100).fill(200))
+    assert.equal(statuses[100], 429)
+    assert.equal(lookups, 0)
   } finally {
     await app.close()
   }

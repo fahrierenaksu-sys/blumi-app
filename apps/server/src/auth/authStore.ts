@@ -279,6 +279,16 @@ export function createSessionToken(): string {
   return `dv_${randomUUID()}_${randomUUID()}`
 }
 
+const SESSION_TOKEN_SHAPE = /^dv_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/**
+ * Whether a bearer value could be a session token this server issued
+ * (createSessionToken). Anything else is refused without a database lookup.
+ */
+export function isSessionTokenShape(token: string): boolean {
+  return SESSION_TOKEN_SHAPE.test(token)
+}
+
 export function hashSessionToken(sessionToken: string): string {
   return createHash("sha256").update(sessionToken).digest("hex")
 }
