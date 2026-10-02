@@ -1,5 +1,6 @@
 import { useMemo } from "react"
-import { Animated, View } from "react-native"
+import { View } from "react-native"
+import Animated from "react-native-reanimated"
 import type { useEntranceAnimation, useSelectionTransition } from "../../../ui/animations"
 import type { AccountRecoveryLocale } from "../accountRecoveryCopy"
 import type { AuthEntryCopy } from "../authEntryCopy"

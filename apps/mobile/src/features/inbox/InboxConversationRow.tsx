@@ -1,12 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarSelection } from "@blumi/contracts"
-import { memo, useCallback, useEffect, useRef } from "react"
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import { memo, useCallback } from "react"
+import { StyleSheet, Text, View } from "react-native"
+import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
 import { areChatParticipantAvatarsEquivalent } from "../chat/chatParticipantAvatar"
 import type { InboxCopy } from "../chat/inboxCopy"
 import { hapticMedium } from "../../ui/haptics"
 import { LinearGradient } from "../../ui/linearGradient"
 import { ParticipantAvatar } from "../../ui/participantAvatar"
+import { PressableScale } from "../../ui/PressableScale"
 import { uiTheme } from "../../ui/theme"
 import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
 
@@ -24,8 +26,8 @@ export interface ConversationCardProps {
   lastTime: string
   unreadBadge: string | null
   accessibilityLabel: string
-  reduceMotion: boolean
-  unreadPulseAnim: Animated.Value
+  /** The screen's shared UI-thread pulse for the unread glow (scale). */
+  unreadPulse: SharedValue<number>
   onPress: (threadId: string) => void
   onWarm: (threadId: string) => void
   /** Pinned rows stay above the others and show a pin. */
@@ -40,9 +42,13 @@ export interface ConversationCardProps {
  * pink time and a count badge; VoiceOver reads one label (name, unread count,
  * preview, time) and a hint.
  */
+function UnreadGlow({ pulse }: { pulse: SharedValue<number> }) {
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }))
+  return <Animated.View style={[cardStyles.unreadGlow, style]} />
+}
+
 export const ConversationCard = memo(function ConversationCard(props: ConversationCardProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const { threadId, onPress: pressThread, onWarm: warmThread, reduceMotion } = props
+  const { threadId, onPress: pressThread, onWarm: warmThread } = props
   const onPress = useCallback(() => pressThread(threadId), [pressThread, threadId])
   const onWarm = useCallback(() => warmThread(threadId), [warmThread, threadId])
   const { onLongPress: openActions } = props
@@ -55,35 +61,8 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
   }, [openActions, threadId])
   const hasUnread = props.unreadBadge !== null
 
-  const handlePressIn = useCallback(() => {
-    onWarm()
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, { toValue: 0.98, useNativeDriver: true, speed: 50, bounciness: 4 }).start()
-  }, [onWarm, reduceMotion, scaleAnim])
-
-  const handlePressOut = useCallback(() => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 4 }).start()
-  }, [reduceMotion, scaleAnim])
-
-  useEffect(() => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-    }
-  }, [reduceMotion, scaleAnim])
-
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={props.accessibilityLabel}
         accessibilityHint={props.copy.openChatHint}
@@ -92,8 +71,8 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
         style={cardStyles.card}
         onPress={onPress}
         onLongPress={onLongPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        pressedScale={0.98}
+        onPressIn={onWarm}
       >
         <LinearGradient
           colors={uiTheme.gradients.primary}
@@ -140,7 +119,7 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
         <View style={cardStyles.trailing}>
           {hasUnread ? (
             <View style={cardStyles.unreadWrap}>
-              <Animated.View style={[cardStyles.unreadGlow, { transform: [{ scale: props.unreadPulseAnim }] }]} />
+              <UnreadGlow pulse={props.unreadPulse} />
               <LinearGradient
                 colors={uiTheme.gradients.primary}
                 style={cardStyles.unreadBadge}
@@ -156,8 +135,7 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
             <Ionicons name="chevron-forward" size={20} color={uiTheme.colors.textMuted} />
           )}
         </View>
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
   )
 }, (previous, next) =>
   previous.threadId === next.threadId &&
@@ -170,8 +148,7 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
   previous.lastTime === next.lastTime &&
   previous.unreadBadge === next.unreadBadge &&
   previous.accessibilityLabel === next.accessibilityLabel &&
-  previous.reduceMotion === next.reduceMotion &&
-  previous.unreadPulseAnim === next.unreadPulseAnim &&
+  previous.unreadPulse === next.unreadPulse &&
   previous.onWarm === next.onWarm &&
   previous.onPress === next.onPress &&
   previous.isPinned === next.isPinned &&

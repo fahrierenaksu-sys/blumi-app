@@ -1,4 +1,5 @@
-import { Animated, Image, StyleSheet, Text, View } from "react-native"
+import { Image, StyleSheet, Text, View } from "react-native"
+import Animated from "react-native-reanimated"
 import {
   ONBOARDING_HERO_FRAME,
   ONBOARDING_MALE_HERO_FRAME

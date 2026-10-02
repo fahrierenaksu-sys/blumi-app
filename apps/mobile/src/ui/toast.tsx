@@ -11,11 +11,9 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { ComponentProps } from "react"
-import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react"
+import { useEffect, useReducer, useState, useSyncExternalStore } from "react"
 import {
   AccessibilityInfo,
-  Animated,
-  Easing,
   Keyboard,
   Platform,
   Pressable,
@@ -24,8 +22,16 @@ import {
   useWindowDimensions,
   View
 } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { useReducedMotion } from "./animations"
+import { scheduleOnRN } from "react-native-worklets"
+import { animateTo, useMotion } from "./motion"
 import { hapticError, hapticSuccess } from "./haptics"
 import { uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
@@ -116,7 +122,8 @@ const TYPE_CONFIG: Record<ToastType, {
   }
 }
 
-const TOAST_LIFT_DURATION_MS = 220
+/** How far below its resting place the toast starts and leaves. */
+const TOAST_HIDDEN_OFFSET = 100
 const KEYBOARD_HIDDEN: ToastKeyboardState = { visible: false, inset: 0 }
 
 function initToastPresentation(toast: ToastData | null): ToastPresentationState {
@@ -169,7 +176,8 @@ export function ToastContainer() {
     initToastPresentation
   )
   const { toast, phase } = presentation
-  const reduceMotion = useReducedMotion()
+  const motion = useMotion()
+  const { reduceMotion } = motion
   const [copy] = useState(() => getToastCopy(resolveToastLocale()))
   const insets = useSafeAreaInsets()
   const keyboard = useToastKeyboard()
@@ -183,13 +191,20 @@ export function ToastContainer() {
     bottomBarInset,
     keyboard
   })
-  const slideAnim = useRef(new Animated.Value(100)).current
-  const opacityAnim = useRef(new Animated.Value(0)).current
-  const progressAnim = useRef(new Animated.Value(0)).current
-  // The resting position is a native-driver translateY above the screen
-  // bottom, so a bar, safe-area or keyboard change never animates layout.
-  const liftAnim = useRef(new Animated.Value(-bottomOffset)).current
-  const translateY = useMemo(() => Animated.add(slideAnim, liftAnim), [slideAnim, liftAnim])
+  // All toast motion runs on the UI thread. The resting position is a
+  // translateY above the screen bottom (`lift`), so a bar, safe-area or
+  // keyboard change never animates layout.
+  const slide = useSharedValue(TOAST_HIDDEN_OFFSET)
+  const opacity = useSharedValue(0)
+  const progress = useSharedValue(0)
+  const lift = useSharedValue(-bottomOffset)
+  const containerMotionStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: slide.value + lift.value }]
+  }))
+  const progressMotionStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: progress.value }]
+  }))
   const isOnScreen = toast !== null
   const announcedToast = phase === "visible" ? toast : null
 
@@ -201,18 +216,8 @@ export function ToastContainer() {
   }, [])
 
   useEffect(() => {
-    liftAnim.stopAnimation()
-    if (!isOnScreen || reduceMotion) {
-      liftAnim.setValue(-bottomOffset)
-      return
-    }
-    Animated.timing(liftAnim, {
-      toValue: -bottomOffset,
-      duration: TOAST_LIFT_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    }).start()
-  }, [bottomOffset, isOnScreen, liftAnim, reduceMotion])
+    lift.value = isOnScreen ? animateTo(-bottomOffset, motion.smooth) : -bottomOffset
+  }, [bottomOffset, isOnScreen, lift, motion])
 
   useEffect(() => {
     // iOS has no live regions: announce each toast once it is shown.
@@ -223,50 +228,28 @@ export function ToastContainer() {
   useEffect(() => {
     if (!toast) return
     if (phase === "visible") {
-      progressAnim.setValue(1)
       // Reduce Motion: the toast fades in place instead of sliding up.
-      if (reduceMotion) slideAnim.setValue(0)
-      Animated.parallel([
-        ...(reduceMotion ? [] : [Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          damping: 22,
-          stiffness: 280,
-        })]),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true
-        })
-      ]).start()
-
-      // Progress bar countdown: a native-driver scaleX from the left edge
-      // instead of animating layout width on the JS thread.
-      Animated.timing(progressAnim, {
-        toValue: 0,
+      slide.value = reduceMotion ? 0 : animateTo(0, motion.snappy)
+      opacity.value = animateTo(1, motion.fadeIn)
+      // Progress bar countdown: a UI-thread scaleX from the left edge
+      // instead of animating layout width.
+      progress.value = 1
+      progress.value = withTiming(0, {
         duration: toast.durationMs ?? 3000,
-        useNativeDriver: true,
-      }).start()
+        easing: Easing.linear,
+        reduceMotion: ReduceMotion.Never
+      })
       return
     }
     // Exiting: the last toast stays mounted until its own exit finishes. A
-    // new toast restarts these values, which stops this exit unfinished.
+    // new toast restarts these values, which ends this exit unfinished.
     const exitingId = toast.id
-    Animated.parallel([
-      ...(reduceMotion ? [] : [Animated.timing(slideAnim, {
-        toValue: 100,
-        duration: 220,
-        useNativeDriver: true
-      })]),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true
-      })
-    ]).start(({ finished }) => {
-      if (finished) dispatch({ type: "exitFinished", id: exitingId })
+    if (!reduceMotion) slide.value = animateTo(TOAST_HIDDEN_OFFSET, motion.fadeOut)
+    opacity.value = animateTo(0, motion.fadeOut, (finished) => {
+      "worklet"
+      if (finished) scheduleOnRN(dispatch, { type: "exitFinished", id: exitingId })
     })
-  }, [toast, phase, slideAnim, opacityAnim, progressAnim, reduceMotion])
+  }, [toast, phase, slide, opacity, progress, motion, reduceMotion])
 
   if (!toast) return null
 
@@ -276,14 +259,7 @@ export function ToastContainer() {
     <Animated.View
       accessibilityLiveRegion="polite"
       pointerEvents={phase === "exiting" ? "none" : "auto"}
-      style={[
-        styles.container,
-        {
-          borderColor: config.border,
-          transform: [{ translateY }],
-          opacity: opacityAnim
-        }
-      ]}
+      style={[styles.container, { borderColor: config.border }, containerMotionStyle]}
     >
       <LinearGradient
         colors={config.bgGradient}
@@ -320,13 +296,7 @@ export function ToastContainer() {
         {/* Progress bar */}
         <View style={styles.progressTrack}>
           <Animated.View
-            style={[
-              styles.progressBar,
-              {
-                transform: [{ scaleX: progressAnim }],
-                backgroundColor: config.textColor,
-              }
-            ]}
+            style={[styles.progressBar, { backgroundColor: config.textColor }, progressMotionStyle]}
           />
         </View>
       </LinearGradient>
@@ -337,7 +307,7 @@ export function ToastContainer() {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    // Anchored to the screen bottom; `liftAnim` raises it above the bar,
+    // Anchored to the screen bottom; `lift` raises it above the bar,
     // safe area or keyboard.
     bottom: 0,
     left: uiTheme.spacing.lg,

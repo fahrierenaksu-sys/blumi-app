@@ -1,5 +1,17 @@
 import { useCallback, useRef, useState } from "react"
-import { Animated, Easing, StyleSheet, Text } from "react-native"
+import { StyleSheet, Text } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
+import { MOTION_DURATIONS } from "../../../ui/motion"
 import { useReducedMotion } from "../../../ui/animations"
 import { uiTheme } from "../../../ui/theme"
 
@@ -11,6 +23,8 @@ export interface DiscoverFeedback {
   tone: DiscoverFeedbackTone
 }
 
+const FEEDBACK_HOLD_MS = 1050
+
 export type ShowDiscoverFeedback = (text: string, tone: DiscoverFeedbackTone) => void
 
 // Short-lived decision feedback ("Like sent.", "Passed for now."). The latest
@@ -18,7 +32,7 @@ export type ShowDiscoverFeedback = (text: string, tone: DiscoverFeedbackTone) =>
 export function useDiscoveryFeedback() {
   const [discoverFeedback, setDiscoverFeedback] =
     useState<DiscoverFeedback | null>(null)
-  const feedbackAnim = useRef(new Animated.Value(0)).current
+  const feedbackAnim = useSharedValue(0)
   const feedbackCounterRef = useRef(0)
 
   const showDiscoverFeedback = useCallback(
@@ -26,27 +40,23 @@ export function useDiscoveryFeedback() {
       feedbackCounterRef.current += 1
       const nextId = feedbackCounterRef.current
       setDiscoverFeedback({ id: nextId, text, tone })
-      feedbackAnim.stopAnimation()
-      feedbackAnim.setValue(0)
-      Animated.sequence([
-        Animated.timing(feedbackAnim, {
-          toValue: 1,
-          duration: 140,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true
-        }),
-        Animated.delay(1050),
-        Animated.timing(feedbackAnim, {
-          toValue: 0,
-          duration: 180,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true
-        })
-      ]).start(() => {
-        setDiscoverFeedback((current) =>
-          current?.id === nextId ? null : current
+      const clearIfLatest = (id: number) => {
+        setDiscoverFeedback((current) => (current?.id === id ? null : current))
+      }
+      // Fades in, holds, fades out on the UI thread; a newer message
+      // restarts it, and only the latest message is ever cleared.
+      feedbackAnim.value = withSequence(
+        withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+        withTiming(1, { duration: MOTION_DURATIONS.fadeIn, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never }),
+        withDelay(
+          FEEDBACK_HOLD_MS,
+          withTiming(0, { duration: MOTION_DURATIONS.fadeOut, easing: Easing.in(Easing.cubic), reduceMotion: ReduceMotion.Never }, () => {
+            "worklet"
+            scheduleOnRN(clearIfLatest, nextId)
+          }),
+          ReduceMotion.Never
         )
-      })
+      )
     },
     [feedbackAnim]
   )
@@ -56,10 +66,15 @@ export function useDiscoveryFeedback() {
 
 export function DiscoveryFeedbackPill(props: {
   discoverFeedback: DiscoverFeedback
-  feedbackAnim: Animated.Value
+  feedbackAnim: SharedValue<number>
 }) {
   const { discoverFeedback, feedbackAnim } = props
   const reduceMotion = useReducedMotion()
+  // Reduce Motion: the pill fades without rising.
+  const pillMotionStyle = useAnimatedStyle(() => ({
+    opacity: feedbackAnim.value,
+    transform: [{ translateY: reduceMotion ? 0 : (1 - feedbackAnim.value) * 8 }]
+  }))
   return (
     <Animated.View
       style={[
@@ -67,18 +82,7 @@ export function DiscoveryFeedbackPill(props: {
         discoverFeedback.tone === "warm"
           ? styles.feedbackPillWarm
           : styles.feedbackPillSoft,
-        {
-          opacity: feedbackAnim,
-          // Reduce Motion: the pill fades without rising.
-          transform: reduceMotion ? [] : [
-            {
-              translateY: feedbackAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [8, 0]
-              })
-            }
-          ]
-        }
+        pillMotionStyle
       ]}
     >
       <Text

@@ -1,8 +1,7 @@
-import { useRef } from "react"
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
-import { springPressScale, useReducedMotion } from "../ui/animations"
+import { Pressable, StyleSheet, Text, View } from "react-native"
 import { Avatar } from "../ui/avatar"
 import { LinearGradient } from "../ui/linearGradient"
+import { PressableScale } from "../ui/PressableScale"
 import { uiTheme } from "../ui/theme"
 
 interface IncomingInviteCalloutProps {
@@ -14,12 +13,6 @@ interface IncomingInviteCalloutProps {
 
 export function IncomingInviteCallout(props: IncomingInviteCalloutProps) {
   const { senderDisplayName, senderUserId, onAccept, onDecline } = props
-  const acceptScaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  const handleAcceptPressIn = () => springPressScale(acceptScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handleAcceptPressOut = () => springPressScale(acceptScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
-
   return (
     <View style={styles.card}>
       <LinearGradient
@@ -53,15 +46,12 @@ export function IncomingInviteCallout(props: IncomingInviteCalloutProps) {
         >
           <Text style={styles.declineText}>Not now</Text>
         </Pressable>
-        <Animated.View style={[styles.acceptWrap, { transform: [{ scale: acceptScaleAnim }] }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Accept ${senderDisplayName}'s room invite`}
-            onPress={onAccept}
-            onPressIn={handleAcceptPressIn}
-            onPressOut={handleAcceptPressOut}
-            style={styles.acceptButton}
-          >
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`Accept ${senderDisplayName}'s room invite`}
+          onPress={onAccept}
+          style={[styles.acceptWrap, styles.acceptButton]}
+        >
             <LinearGradient
               colors={uiTheme.gradients.primary as [string, string]}
               start={{ x: 0, y: 0 }}
@@ -70,8 +60,7 @@ export function IncomingInviteCallout(props: IncomingInviteCalloutProps) {
             >
               <Text style={styles.acceptText}>Let&apos;s go</Text>
             </LinearGradient>
-          </Pressable>
-        </Animated.View>
+        </PressableScale>
       </View>
     </View>
   )

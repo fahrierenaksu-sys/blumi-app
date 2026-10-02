@@ -81,12 +81,23 @@ function evaluate(expression, bindings) {
   })
 }
 
+// Loads a pure module; its relative imports of pure data modules listed here
+// load for real, anything else is an empty stub.
+const PURE_IMPORTS = new Set(["ui/motionTokens.ts"])
+
 function loadModule(path) {
   const module = { exports: {} }
-  const executable = ts.transpileModule(read(path), {
+  const url = new URL(path, import.meta.url)
+  const executable = ts.transpileModule(readFileSync(url, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
   }).outputText
-  runInNewContext(executable, { module, exports: module.exports, require: () => ({}), URL })
+  const requireImport = (specifier) => {
+    if (!specifier.startsWith(".")) return {}
+    const target = new URL(`${specifier}.ts`, url)
+    const sourceRelative = target.pathname.split("/src/").pop()
+    return PURE_IMPORTS.has(sourceRelative) ? loadModule(target.href) : {}
+  }
+  runInNewContext(executable, { module, exports: module.exports, require: requireImport, URL })
   return module.exports
 }
 

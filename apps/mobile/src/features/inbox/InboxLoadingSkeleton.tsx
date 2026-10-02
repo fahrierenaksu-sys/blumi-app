@@ -1,5 +1,15 @@
-import { useEffect, useRef, useState } from "react"
-import { Animated, Easing, StyleSheet, View } from "react-native"
+import { useEffect } from "react"
+import { StyleSheet, View } from "react-native"
+import Animated, {
+  Easing,
+  FadeOut,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 import { uiTheme } from "../../ui/theme"
 import {
   INBOX_SKELETON_FADE_MS,
@@ -20,83 +30,53 @@ interface InboxLoadingSkeletonProps {
 const SKELETON_ROWS = Array.from({ length: INBOX_SKELETON_ROW_COUNT }, (_, index) => index)
 const AVATAR_SIZE = 56
 
+/** Skeleton → content is a crossfade: the placeholder fades out over the arriving rows. */
+const SKELETON_EXITING = FadeOut
+  .duration(INBOX_SKELETON_FADE_MS)
+  .easing(Easing.out(Easing.quad))
+  .reduceMotion(ReduceMotion.Never)
+
 /**
- * Placeholder rows shown over the list while conversations open. It fades out
- * over the arriving rows, and is static and instant under Reduce Motion.
+ * Placeholder rows shown over the list while conversations open. It
+ * crossfades out over the arriving rows (a UI-thread exiting animation, kept
+ * under Reduce Motion because it is only opacity); its breathing pulse stops
+ * under Reduce Motion.
  */
 export function InboxLoadingSkeleton(props: InboxLoadingSkeletonProps) {
   const { isVisible, label, reduceMotion, rowHeight, rowGap } = props
-  const fade = useRef(new Animated.Value(isVisible ? 1 : 0)).current
-  const pulse = useRef(new Animated.Value(1)).current
-  const [wasVisible, setWasVisible] = useState(isVisible)
-  const [isFadingOut, setIsFadingOut] = useState(false)
-
-  if (wasVisible !== isVisible) {
-    setWasVisible(isVisible)
-    setIsFadingOut(!isVisible && !reduceMotion)
-  }
-  if (isFadingOut && reduceMotion) setIsFadingOut(false)
-
-  useEffect(() => {
-    if (isVisible) {
-      fade.stopAnimation()
-      fade.setValue(1)
-      return undefined
-    }
-    if (!isFadingOut) return undefined
-    const animation = Animated.timing(fade, {
-      toValue: 0,
-      duration: INBOX_SKELETON_FADE_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true
-    })
-    animation.start(() => setIsFadingOut(false))
-    return () => animation.stop()
-  }, [fade, isFadingOut, isVisible])
+  const pulse = useSharedValue(1)
 
   useEffect(() => {
     if (!isVisible || reduceMotion) {
-      pulse.stopAnimation()
-      pulse.setValue(1)
-      return undefined
+      pulse.value = 1
+      return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: INBOX_SKELETON_PULSE_MIN_OPACITY,
-          duration: INBOX_SKELETON_PULSE_HALF_MS,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        }),
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: INBOX_SKELETON_PULSE_HALF_MS,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        })
-      ])
+    const half = { duration: INBOX_SKELETON_PULSE_HALF_MS, easing: Easing.inOut(Easing.ease), reduceMotion: ReduceMotion.Never }
+    pulse.value = withRepeat(
+      withSequence(withTiming(INBOX_SKELETON_PULSE_MIN_OPACITY, half), withTiming(1, half)),
+      -1
     )
-    loop.start()
-    return () => loop.stop()
   }, [isVisible, pulse, reduceMotion])
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }))
 
-  if (!isVisible && !isFadingOut) return null
+  if (!isVisible) return null
 
   return (
     <Animated.View
       testID="inbox-loading-skeleton"
       pointerEvents="none"
-      accessible={isVisible}
+      accessible
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       accessibilityState={{ busy: true }}
       accessibilityLiveRegion="polite"
-      style={[styles.overlay, { opacity: fade }]}
+      exiting={SKELETON_EXITING}
+      style={styles.overlay}
     >
       <Animated.View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        style={{ gap: rowGap, opacity: pulse }}
+        style={[{ gap: rowGap }, pulseStyle]}
       >
         {SKELETON_ROWS.map((row) => (
           <View key={row} style={[styles.row, { minHeight: rowHeight }]}>

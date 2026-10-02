@@ -1,6 +1,5 @@
 import { Image as ExpoImage } from "expo-image"
 import {
-  Animated,
   type GestureResponderEvent,
   type AccessibilityValue,
   type LayoutChangeEvent,
@@ -12,6 +11,7 @@ import {
   type ViewStyle
 } from "react-native"
 import { memo, useCallback, useRef, useState, type ReactNode } from "react"
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
@@ -22,7 +22,7 @@ import type {
   RoomV2FurnitureRenderItem,
   RoomV2RenderItem
 } from "../roomV2.types"
-import { getRenderableRoomV2AvatarMotionProfile } from "../roomV2AvatarMotion"
+import { getRenderableRoomV2AvatarMotionProfile, getRoomV2AvatarSittingTranslateY } from "../roomV2AvatarMotion"
 import {
   getAvatarMotionRotate,
   getAvatarMotionScaleY,
@@ -374,30 +374,20 @@ const StageMarker = memo(function StageMarker(props: {
   paused: boolean
 }) {
   const { marker, reduceMotion, paused } = props
-  const pulseRef = useRoomRendererMarkerPulse({ reduceMotion, paused })
+  const pulse = useRoomRendererMarkerPulse({ reduceMotion, paused })
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.82 + 0.18 * pulse.value,
+    transform: [{ scale: 0.94 + 0.14 * pulse.value }]
+  }))
 
   return (
-    <Animated.View
+    <Reanimated.View
       pointerEvents="none"
       style={[
         styles.stageMarker,
         marker.tone === "blocked" ? styles.stageMarkerBlocked : null,
-        {
-          left: `${marker.x * 100}%`,
-          top: `${marker.y * 100}%`,
-          opacity: pulseRef.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.82, 1]
-          }),
-          transform: [
-            {
-              scale: pulseRef.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.94, 1.08]
-              })
-            }
-          ]
-        }
+        { left: `${marker.x * 100}%`, top: `${marker.y * 100}%` },
+        pulseStyle
       ]}
     >
       <View
@@ -406,7 +396,7 @@ const StageMarker = memo(function StageMarker(props: {
           marker.tone === "blocked" ? styles.stageMarkerCoreBlocked : null
         ]}
       />
-    </Animated.View>
+    </Reanimated.View>
   )
 }, (previous, next) =>
   previous.marker.id === next.marker.id &&
@@ -493,12 +483,29 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
       usesRuntimeGesture: false,
       usesAnimatedAssets: false
     }
-  const { breatheRef, walkRef, gestureRef, usesIdleBreathe } = useRoomRendererAvatarLoops({
+  const { breathe, walk, gesture, usesIdleBreathe } = useRoomRendererAvatarLoops({
     isAvatar: item.kind === "avatar",
     avatarMotion,
     reduceMotion,
     paused: motionPaused
   })
+
+  const sittingTranslateY = getRoomV2AvatarSittingTranslateY(
+    item.kind === "avatar" ? item.seatRig : undefined,
+    stageHeightPx
+  )
+  const avatarDirection = item.kind === "avatar" ? item.direction : undefined
+  const avatarMotionStyle = useAnimatedStyle(() => ({
+    // ROOM-03: walking toward the back wall only shrinks slightly; no ghost opacity.
+    transform: [
+      { translateX: getAvatarMotionTranslateX(avatarMotion, gesture.value) },
+      { translateY: getAvatarMotionTranslateY(avatarMotion, breathe.value, walk.value, gesture.value, usesIdleBreathe, sittingTranslateY) },
+      { scaleX: avatarDirection === "left" ? -1 : 1 },
+      { scaleY: getAvatarMotionScaleY(avatarMotion, breathe.value, gesture.value, usesIdleBreathe) },
+      { scale: avatarDirection === "back" ? 0.96 : 1 },
+      { rotate: getAvatarMotionRotate(avatarMotion, gesture.value) }
+    ]
+  }))
 
   // If an interaction is provided, we need to allow touches. Otherwise pass through.
   const isTouchInteractive = Boolean(onItemTap || onItemLongPress || onItemLongPressMove)
@@ -619,24 +626,9 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             />
           ) : null}
           {item.kind === "avatar" ? (
-            <Animated.View
-              style={[
-                styles.avatarImage,
-                {
-                  // ROOM-03: walking toward the back wall only shrinks slightly; no ghost opacity.
-                  transform: [
-                    { translateX: getAvatarMotionTranslateX(avatarMotion, gestureRef) },
-                    { translateY: getAvatarMotionTranslateY(avatarMotion, breatheRef, walkRef, gestureRef, usesIdleBreathe, item.kind === "avatar" ? item.seatRig : undefined, stageHeightPx) },
-                    { scaleX: item.direction === "left" ? -1 : 1 },
-                    { scaleY: getAvatarMotionScaleY(avatarMotion, breatheRef, gestureRef, usesIdleBreathe) },
-                    { scale: item.direction === "back" ? 0.96 : 1 },
-                    { rotate: getAvatarMotionRotate(avatarMotion, gestureRef) }
-                  ]
-                }
-              ]}
-            >
+            <Reanimated.View style={[styles.avatarImage, avatarMotionStyle]}>
               <RoomAvatarRenderer2D layers={item.layers} />
-            </Animated.View>
+            </Reanimated.View>
           ) : (
             <ExpoImage
               source={item.asset.source}

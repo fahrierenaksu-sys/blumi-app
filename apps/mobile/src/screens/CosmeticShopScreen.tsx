@@ -4,7 +4,6 @@ import { useNavigationState } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   Pressable,
   ScrollView,
   Text,
@@ -446,7 +445,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
 
           {showShopContent ? (
             <Reanimated.View entering={contentEntering} style={{ gap: shopLayoutMetrics.sectionGap }}>
-              <Animated.View
+              <Reanimated.View
                 testID="shop-preview-motion"
                 style={[
                   styles.showcaseCard,
@@ -498,7 +497,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                     void handlePrimaryAction()
                   }}
                 />
-              </Animated.View>
+              </Reanimated.View>
 
               {!inventoryVerified && shopPresentationState === "error" ? (
                 <ShopStatusCard
