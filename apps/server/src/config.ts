@@ -713,7 +713,10 @@ export function createConfiguredServerServices(
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
   })
   safetyService.subscribeRealtimeAccessRevocations((revocation) => authService.invalidateCachedSessions?.(revocation))
-  const chatService = createChatService({ blockPolicy: safetyService })
+  const chatService = createChatService({
+    blockPolicy: safetyService,
+    profileSource: (userIds) => authService.repository.findAccountsByUserIds(userIds)
+  })
   const economyService = createEconomyService()
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({

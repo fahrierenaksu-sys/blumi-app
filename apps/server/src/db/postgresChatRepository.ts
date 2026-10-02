@@ -92,8 +92,11 @@ export function createPostgresChatRepository(
       )
       const rows = result.rows.slice(0, limit)
       if (rows.length === 0) return { threads: [], nextCursor: null }
+      // The account's current name; the copy stored with the chat is only a
+      // fallback for an account that is gone or has no name.
       const participantRows = await pool.query(
-        `SELECT participant.thread_id, participant.user_id, participant.display_name,
+        `SELECT participant.thread_id, participant.user_id,
+                COALESCE(NULLIF(account.display_name, ''), participant.display_name) AS display_name,
                 account.avatar_preset_id, account.avatar_selection, account.avatar_revision
            FROM blumi_chat_thread_participants AS participant
            LEFT JOIN blumi_accounts AS account ON account.user_id = participant.user_id
@@ -673,7 +676,8 @@ async function loadParticipants(
   threadId: string
 ): Promise<ChatThread["participants"]> {
   const result = await pool.query(
-    `SELECT participant.user_id, participant.display_name,
+    `SELECT participant.user_id,
+            COALESCE(NULLIF(account.display_name, ''), participant.display_name) AS display_name,
             account.avatar_preset_id, account.avatar_selection, account.avatar_revision
        FROM blumi_chat_thread_participants AS participant
        LEFT JOIN blumi_accounts AS account

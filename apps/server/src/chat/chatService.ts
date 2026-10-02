@@ -15,6 +15,7 @@ import {
   containsControlCharacters
 } from "../safety/publicTextFilter"
 import { normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
+import type { ChatParticipantProfileSource } from "./chatParticipantIdentity"
 
 const MAX_MESSAGE_LENGTH = 500
 const DEFAULT_MESSAGE_PAGE_LIMIT = 50
@@ -195,13 +196,18 @@ export interface CreateChatServiceOptions {
   repository?: ChatRepository
   idFactory?: () => string
   blockPolicy?: ChatBlockPolicy
+  /** In-memory repository only: where participants' current names and outfits come from. */
+  profileSource?: ChatParticipantProfileSource
 }
 
 export function createChatService(
   options: CreateChatServiceOptions = {}
 ): ChatService {
   const blockPolicy = options.blockPolicy
-  const repository = options.repository ?? createInMemoryChatRepository(undefined, { blockSource: blockPolicy })
+  const repository = options.repository ?? createInMemoryChatRepository(undefined, {
+    blockSource: blockPolicy,
+    ...(options.profileSource ? { profileSource: options.profileSource } : {})
+  })
   const idFactory = options.idFactory ?? createMessageId
 
   const getVisibleThread = async (userId: string, threadId: string): Promise<ChatThread> => {

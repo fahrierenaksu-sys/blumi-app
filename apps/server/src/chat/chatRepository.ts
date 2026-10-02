@@ -2,6 +2,7 @@ import type { ChatMessage, ChatPreferences, ChatReceiptCursor, ChatThread } from
 import { compareChatMessagePositions } from "@blumi/domain"
 import { randomUUID } from "node:crypto"
 import { encodeThreadCursor, normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
+import { withCurrentIdentity, type ChatParticipantProfileSource } from "./chatParticipantIdentity"
 
 export interface ChatThreadPage { threads: ChatThread[]; nextCursor: string | null }
 
@@ -259,11 +260,29 @@ export function createInMemoryChatStore(): InMemoryChatStore {
 
 export function createInMemoryChatRepository(
   store: InMemoryChatStore = createInMemoryChatStore(),
-  options: { receiptsSupported?: boolean; hideSupported?: boolean; blockSource?: ChatRepositoryBlockSource } = {}
+  options: {
+    receiptsSupported?: boolean
+    hideSupported?: boolean
+    blockSource?: ChatRepositoryBlockSource
+    /** Accounts' current names and outfits (PostgreSQL joins blumi_accounts instead). */
+    profileSource?: ChatParticipantProfileSource
+  } = {}
 ): ChatRepository {
   const receiptsSupported = options.receiptsSupported ?? true
   const hideSupported = options.hideSupported ?? true
   const blockSource = options.blockSource
+  const profileSource = options.profileSource
+  /** One batched account lookup for every participant of `threads`. */
+  const withCurrentParticipants = async <Thread extends ChatThread>(threads: Thread[]): Promise<Thread[]> => {
+    if (!profileSource || threads.length === 0) return threads
+    const accounts = new Map((await profileSource([...new Set(threads.flatMap((thread) => thread.participantUserIds))]))
+      .map((account) => [account.userId, account]))
+    return threads.map((thread) => ({
+      ...thread,
+      participants: thread.participants.map((participant) =>
+        withCurrentIdentity(participant, accounts.get(participant.userId))) as ChatThread["participants"]
+    }))
+  }
   const cursorKey = (threadId: string, userId: string) => `${threadId}\0${userId}`
   const cursorsOf = (threadId: string, userId: string): InMemoryParticipantCursors =>
     store.cursorsByParticipant.get(cursorKey(threadId, userId)) ?? {}
@@ -310,7 +329,7 @@ export function createInMemoryChatRepository(
           (Date.parse(thread.createdAt) === Date.parse(cursor.createdAt) && thread.threadId < cursor.threadId))
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
-      const threads = candidates.slice(0, limit).map((thread) => {
+      const threads = await withCurrentParticipants(candidates.slice(0, limit).map((thread) => {
           const { readAt: lastReadAt, hiddenThrough } = cursorsOf(thread.threadId, userId)
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
             .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
@@ -320,13 +339,13 @@ export function createInMemoryChatRepository(
             ...(lastReadAt ? { lastReadAt } : {}),
             ...(hideSupported && hiddenThrough ? { hiddenThrough } : {})
           }
-        })
+        }))
       const last = threads.at(-1)
       return { threads, nextCursor: candidates.length > limit && last ? encodeThreadCursor({ userId, createdAt: last.createdAt, threadId: last.threadId }) : null }
     },
     async findThread(threadId) {
       const thread = store.threads.get(threadId)
-      return thread ? cloneThread(thread) : null
+      return thread ? (await withCurrentParticipants([cloneThread(thread)]))[0]! : null
     },
     async findExistingThreadIds(threadIds) {
       return new Set(threadIds.filter((id) => store.threads.has(id)))
