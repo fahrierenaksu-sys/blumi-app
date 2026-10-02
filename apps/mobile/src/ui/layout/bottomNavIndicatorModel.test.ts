@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  BOTTOM_NAV_LIQUID_MAX_STRETCH,
+  getBottomNavIndicatorSpeed,
   getBottomNavItemEmphasis,
+  getBottomNavLiquidStretch,
   publishMainTabPagerIndicator,
   readMainTabPagerIndicatorProgress,
   resolveBottomNavIndicatorIndex,
@@ -54,6 +57,25 @@ test("the bar reads the pager position only while the pager is tracking", () => 
   publishMainTabPagerIndicator(indicator, { progress: 2, tracking: false })
   assert.equal(readMainTabPagerIndicatorProgress(indicator), null)
   assert.equal(indicator.progress.value, 1.9, "a snap does not overwrite the last tracked position")
+})
+
+test("the liquid pill rests at 1, stretches with speed in either direction, and is capped", () => {
+  assert.equal(getBottomNavLiquidStretch(0), 1)
+  assert.equal(getBottomNavLiquidStretch(Number.NaN), 1)
+  const slow = getBottomNavLiquidStretch(1)
+  const fast = getBottomNavLiquidStretch(4)
+  assert.ok(slow > 1 && fast > slow, "faster swipes stretch more")
+  assert.equal(getBottomNavLiquidStretch(-4), fast, "direction does not matter")
+  assert.equal(getBottomNavLiquidStretch(1000), 1 + BOTTOM_NAV_LIQUID_MAX_STRETCH)
+  assert.ok(1 + BOTTOM_NAV_LIQUID_MAX_STRETCH < 1.5, "never wide enough to cover half a neighbour")
+})
+
+test("indicator speed comes from two frames, and frames too close give none", () => {
+  assert.equal(getBottomNavIndicatorSpeed(0.5, 125), 4)
+  assert.equal(getBottomNavIndicatorSpeed(-0.5, 125), -4)
+  assert.equal(getBottomNavIndicatorSpeed(0.1, 0), null)
+  assert.equal(getBottomNavIndicatorSpeed(0.1, -16), null)
+  assert.equal(getBottomNavIndicatorSpeed(Number.NaN, 16), null)
 })
 
 test("the indicator stays on the bar through edge rubber bands", () => {

@@ -7,21 +7,25 @@ import {
   View
 } from "react-native"
 import Reanimated, {
-  Easing as ReanimatedEasing,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSequence,
   withSpring,
   withTiming,
+  ReduceMotion,
   type SharedValue
 } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useReducedMotion } from "./animations"
+import { animateTo, useMotion } from "./motion"
 import { PressableScale } from "./PressableScale"
 import {
   BOTTOM_NAV_KEY_ORDER,
+  getBottomNavIndicatorSpeed,
   getBottomNavItemEmphasis,
+  getBottomNavLiquidStretch,
   readMainTabPagerIndicatorProgress,
   resolveBottomNavIndicatorIndex,
   shouldAnimateBottomNavSelectionFromJs
@@ -40,10 +44,7 @@ import {
   BOTTOM_NAV_VERTICAL_PADDING,
   resolveBottomNavLayout,
 } from "./layout/bottomNavLayout"
-import {
-  BOTTOM_NAV_PRESSED_SCALE,
-  getBottomNavMotionDuration,
-} from "./layout/bottomNavMotionModel"
+import { BOTTOM_NAV_PRESSED_SCALE } from "./layout/bottomNavMotionModel"
 import {
   formatBottomNavBadgeCount,
   getBadgeAppearMotion,
@@ -56,6 +57,11 @@ import {
 } from "./layout/bottomNavBadgeModel"
 
 export type BottomNavKey = "discover" | "chats" | "myroom" | "shop"
+
+/** Share of the gap to the speed's stretch the pill closes per frame. */
+const LIQUID_EASE = 0.45
+/** After the last movement frame, the pill springs back to its shape. */
+const LIQUID_RELEASE_DELAY_MS = 60
 
 interface BottomNavItem {
   key: BottomNavKey
@@ -288,14 +294,13 @@ export function BottomNav(props: BottomNavProps) {
   // main-page pager is dragged or settling, it follows the pages frame by
   // frame instead, so the bar never trails the page.
   const indicator = useSharedValue(activeIndex)
-  const selectionDuration = getBottomNavMotionDuration(reduceMotion)
+  // Selections settle on the snappy spring; Reduce Motion lands at once.
+  const { snappy } = useMotion()
   useEffect(() => {
     // A pager tap already moved the pill on the UI thread (reaction below).
     if (!shouldAnimateBottomNavSelectionFromJs(mainTabPagerIndicator.selection.value, activeIndex)) return
-    indicator.value = selectionDuration === 0
-      ? activeIndex
-      : withTiming(activeIndex, { duration: selectionDuration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
-  }, [activeIndex, indicator, selectionDuration])
+    indicator.value = animateTo(activeIndex, snappy)
+  }, [activeIndex, indicator, snappy])
   useAnimatedReaction(
     () => readMainTabPagerIndicatorProgress(mainTabPagerIndicator),
     (progress) => {
@@ -308,14 +313,38 @@ export function BottomNav(props: BottomNavProps) {
     (selection, previous) => {
       if (selection < 0 || selection === previous || mainTabPagerIndicator.tracking.value) return
       const target = resolveBottomNavIndicatorIndex(selection, itemCount)
-      indicator.value = selectionDuration === 0
-        ? target
-        : withTiming(target, { duration: selectionDuration, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) })
+      indicator.value = animateTo(target, snappy)
     },
-    [itemCount, selectionDuration]
+    [itemCount, snappy]
+  )
+  // Liquid pill: it stretches with the speed it moves at (pager drag, settle
+  // or a tap's spring) and springs back once it stops. All on the UI thread.
+  const stretch = useSharedValue(1)
+  const lastIndicatorSample = useSharedValue({ index: activeIndex, time: 0 })
+  useAnimatedReaction(
+    () => indicator.value,
+    (index) => {
+      const now = Date.now()
+      const last = lastIndicatorSample.value
+      lastIndicatorSample.value = { index, time: now }
+      if (reduceMotion) return
+      const speed = getBottomNavIndicatorSpeed(index - last.index, now - last.time)
+      if (speed === null) return
+      const eased = stretch.value + (getBottomNavLiquidStretch(speed) - stretch.value) * LIQUID_EASE
+      stretch.value = withSequence(
+        withTiming(eased, { duration: 0, reduceMotion: ReduceMotion.Never }),
+        withDelay(LIQUID_RELEASE_DELAY_MS, animateTo(1, snappy), ReduceMotion.Never)
+      )
+    },
+    [reduceMotion, snappy]
   )
   const activePillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicator.value * tabWidth }]
+    transform: [
+      { translateX: indicator.value * tabWidth },
+      { scaleX: stretch.value },
+      // A touch thinner as it stretches, like a drop pulled along.
+      { scaleY: 1 / Math.sqrt(stretch.value) }
+    ]
   }))
 
   return (
