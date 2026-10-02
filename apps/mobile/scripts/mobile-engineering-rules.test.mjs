@@ -94,18 +94,6 @@ test("Animated never runs on the JS driver", () => {
   assert.deepEqual(offenders, [], "animate transform/opacity with the native driver or Reanimated")
 })
 
-// Gestures belong to Gesture Handler on the UI thread. A JS PanResponder runs
-// every move on the JS thread. The list is debt and may only shrink.
-const PAN_RESPONDER_DEBT = new Set([])
-
-test("no new PanResponder gestures", () => {
-  const offenders = sources
-    .filter(({ text }) => /PanResponder\.create\(/.test(text))
-    .map(({ path }) => path)
-    .filter((path) => !PAN_RESPONDER_DEBT.has(path))
-  assert.deepEqual(offenders, [], "use a Gesture Handler gesture with worklet callbacks")
-})
-
 // Per-frame UI-thread callbacks (useFrameCallback, gesture onUpdate/onChange,
 // useAnimatedReaction reactions) may hop to JS only when a value changed:
 // an unguarded scheduleOnRN/runOnJS there renders React on every frame.
@@ -254,8 +242,9 @@ function stripComments(text) {
 }
 
 // PanResponder handlers spread onto a Pressable never fire on a device (the
-// room editor and room setup drags shipped dead twice). Drags use Gesture
-// Handler. Comments that mention the old implementation are fine.
+// room editor and room setup drags shipped dead twice), and a JS PanResponder
+// runs every move on the JS thread. Drags use Gesture Handler with worklet
+// callbacks. Comments that mention the old implementation are fine.
 test("no production source uses PanResponder; drags use Gesture Handler", () => {
   const offenders = sources
     .filter(({ text }) => /\b(?:PanResponder|panHandlers|GestureResponderHandlers)\b/.test(stripComments(text)))
