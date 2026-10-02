@@ -263,17 +263,13 @@ test("native no-media config plugin strips every camera and microphone declarati
   ])
 })
 
-test("release builds require native media and reject QA inventory unlocks", () => {
+test("release builds reject QA inventory unlocks, demo sessions and dev entry routes", () => {
   const secureReleaseEnvironment = {
     EAS_BUILD_PROFILE: "production",
     EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.blumi.app",
     EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://realtime.blumi.app"
   }
 
-  assert.throws(
-    () => resolveMobileReleaseEnvironment(secureReleaseEnvironment),
-    /native media/
-  )
   assert.throws(
     () => resolveMobileReleaseEnvironment({
       ...secureReleaseEnvironment,
