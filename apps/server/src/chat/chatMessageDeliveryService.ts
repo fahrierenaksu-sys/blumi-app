@@ -247,9 +247,9 @@ export function createChatMessageDeliveryService(options: {
       const jobs = await chatService.repository.claimDeliveries({ now: claimAt, limit, leaseMs: DELIVERY_LEASE_MS })
       if (jobs.length === 0) return
       recoveryInFlight += jobs.length
-      const dispatches = jobs.map((job) => dispatchJob(job, claimAt)
+      const dispatches = jobs.map((job) => trackRecoveryDispatch(chatService, dispatchJob(job, claimAt)
         .catch((error) => options.reportError?.(error))
-        .finally(() => { recoveryInFlight -= 1 }))
+        .finally(() => { recoveryInFlight -= 1 })))
       const remainingMs = deadline - Date.now()
       if (remainingMs <= 0 || !(await settleWithin(Promise.all(dispatches), remainingMs))) return
     }
@@ -427,6 +427,43 @@ function settleWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
  * lease).
  */
 const threadDispatchChains = new WeakMap<ChatService, Map<string, Promise<void>>>()
+
+/** Recovered dispatches still running after their tick returned, per chat service. */
+const recoveryDispatches = new WeakMap<ChatService, Set<Promise<unknown>>>()
+
+function trackRecoveryDispatch<T>(chatService: ChatService, dispatch: Promise<T>): Promise<T> {
+  let running = recoveryDispatches.get(chatService)
+  if (!running) {
+    running = new Set()
+    recoveryDispatches.set(chatService, running)
+  }
+  const set = running
+  set.add(dispatch)
+  void dispatch.finally(() => set.delete(dispatch)).catch(() => undefined)
+  return dispatch
+}
+
+/**
+ * Waits, up to `timeoutMs`, for every post-persist dispatch of this chat
+ * service: the inline per-thread chains (live fan-out, push enqueue, outbox
+ * completion) and recovered jobs. Shutdown runs it before the pool closes
+ * (2026-10-02): a dispatch cut off by a closed pool kept its job leased for
+ * DELIVERY_LEASE_MS, so the next instance pushed it 30 s late. Work queued
+ * while it waits is waited for too. Never throws.
+ */
+export async function drainChatDispatches(chatService: ChatService, timeoutMs = 20_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const pending = [
+      ...(threadDispatchChains.get(chatService)?.values() ?? []),
+      ...(liveFanoutChains.get(chatService)?.values() ?? []),
+      ...(recoveryDispatches.get(chatService) ?? [])
+    ].map((work) => work.catch(() => undefined))
+    if (pending.length === 0) return
+    const remainingMs = deadline - Date.now()
+    if (remainingMs <= 0 || !(await settleWithin(Promise.all(pending), remainingMs))) return
+  }
+}
 
 /** What a live fan-out did; the outbox dispatch of the same message reuses it. */
 type LiveFanoutOutcome = { kind: "delivered" } | { kind: "blocked" } | { kind: "failed"; error: unknown }

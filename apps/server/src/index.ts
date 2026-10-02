@@ -17,7 +17,7 @@ import { createAdminTokenService } from "./admin/adminTokenService"
 import { createGracefulShutdown } from "./operations/serviceLifecycle"
 import { installProcessLifecycle } from "./operations/processLifecycle"
 import { startPeriodicWorker } from "./operations/periodicWorker"
-import { createChatMessageDeliveryService } from "./chat/chatMessageDeliveryService"
+import { createChatMessageDeliveryService, drainChatDispatches } from "./chat/chatMessageDeliveryService"
 import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
 import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
 import { createFirebaseUserDeletionDispatch } from "./auth/firebaseUserDeletionWorker"
@@ -191,6 +191,9 @@ const shutdown = createGracefulShutdown({
     () => notificationOutboxWorker.stop(),
     () => firebaseDeletionWorker.stop(),
     () => chatDeliveryWorker.stop(),
+    // Post-persist chat dispatches finish before the pool closes, so their
+    // outbox jobs are not left leased (and pushed 30 s late) by a restart.
+    () => drainChatDispatches(services.chatService),
     () => mediaRevocationWorker?.stop() ?? Promise.resolve(),
     () => ticketCleanupWorker.stop(),
     () => rateBudgetCleanupWorker.stop(),
