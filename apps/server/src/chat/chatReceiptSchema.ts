@@ -42,9 +42,24 @@ export function createStaticChatReceiptSchema(ready: boolean): ChatReceiptSchema
 
 export function createChatReceiptSchemaProbe(
   pool: LedgerQueryExecutor,
-  options: { checksum?: string; ttlMs?: number; now?: () => number } = {}
+  options: MigrationLedgerProbeOptions = {}
 ): ChatReceiptSchemaProbe {
-  const checksum = options.checksum ?? readPackagedChecksum()
+  return createMigrationLedgerProbe(pool, CHAT_RECEIPTS_MIGRATION_ID, options)
+}
+
+export interface MigrationLedgerProbeOptions { checksum?: string; ttlMs?: number; now?: () => number }
+
+/**
+ * Whether one optional migration is applied with the packaged checksum, for
+ * features that deploy before their migration (070, 071). Same caching and
+ * fail-closed rules as the receipt probe.
+ */
+export function createMigrationLedgerProbe(
+  pool: LedgerQueryExecutor,
+  migrationId: string,
+  options: MigrationLedgerProbeOptions = {}
+): ChatReceiptSchemaProbe {
+  const checksum = options.checksum ?? readPackagedChecksum(migrationId)
   const ttlMs = options.ttlMs ?? DEFAULT_PROBE_TTL_MS
   const now = options.now ?? Date.now
   let known = false
@@ -54,7 +69,7 @@ export function createChatReceiptSchemaProbe(
   const refresh = (): Promise<boolean> => {
     pending ??= pool.query(
       "SELECT checksum FROM blumi_migrations WHERE id = $1",
-      [CHAT_RECEIPTS_MIGRATION_ID]
+      [migrationId]
     ).then((result) => {
       known = String(result.rows[0]?.checksum ?? "").trim() === checksum
       checkedAt = now()
@@ -79,7 +94,7 @@ export function createChatReceiptSchemaProbe(
   })
 }
 
-function readPackagedChecksum(): string {
-  const path = resolve(__dirname, "../../db/migrations", CHAT_RECEIPTS_MIGRATION_ID)
+function readPackagedChecksum(migrationId: string): string {
+  const path = resolve(__dirname, "../../db/migrations", migrationId)
   return createHash("sha256").update(readFileSync(path, "utf8")).digest("hex")
 }
