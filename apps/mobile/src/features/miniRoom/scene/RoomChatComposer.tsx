@@ -33,7 +33,6 @@ export interface RoomChatComposerProps {
   onSubmit: () => boolean
   onToggleHistory: () => void
   onContentHeightChange: (contentHeight: number) => void
-  onFocus: () => void
   /** Typing signal for the partner (chat_typing); never sees restored text. */
   draftTyping?: ChatDraftTyping
 }
@@ -51,7 +50,6 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     onSubmit,
     onToggleHistory,
     onContentHeightChange,
-    onFocus,
     draftTyping
   } = props
   const inputRef = useRef<TextInput>(null)
@@ -118,11 +116,7 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
           draftTyping?.noteDraft(text)
         }}
         onBlur={draftTyping?.endDraft}
-        // A measured warm opening starts on touch-down, before UIKit focuses.
-        // First focus still uses the real system frame; no guessed keyboard size.
-        // A disabled field never focuses, so its touch must not lift the dock.
-        onTouchStart={disabled ? undefined : onFocus}
-        onFocus={onFocus}
+        // The scene opens with the keyboard itself (useMiniRoomKeyboard), never ahead of it.
         onSubmitEditing={submit}
         onLayout={(event) => onContentHeightChange(event.nativeEvent.layout.height)}
         placeholder={copy.roomMessagePlaceholder}

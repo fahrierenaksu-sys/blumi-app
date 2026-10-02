@@ -270,7 +270,6 @@ function composerProps(overrides: Partial<ComposerModule.RoomChatComposerProps> 
     maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined,
     onSubmit: () => { calls.push("submit"); return true },
     onToggleHistory: () => calls.push("toggleHistory"), onContentHeightChange: () => undefined,
-    onFocus: () => undefined,
     ...overrides
   }
   return { props, calls }
@@ -326,10 +325,11 @@ test("the chat panel's close-keyboard button presses with the spring and ticks o
   const { runtime, MiniRoomChatPanel, haptics } = controls
   let closed = 0
   const shared = <T,>(value: T) => ({ value })
-  const frame = { progress: 1, margin: 0, bottom: 0, height: 120, cameraX: 0, cameraY: 0, cameraScale: 1 }
+  const frame = { progress: 1, margin: 0, bottom: 0, height: 120, cameraX: 0, cameraY: 0, cameraScale: 1,
+    restHeight: 297, roomWidth: 546 }
   runtime.render(() => expand(MiniRoomChatPanel({
     copy, mode: "typing", transition: shared(frame) as never, contentProgress: shared(1) as never,
-    windowWidth: 390, historyHeight: 200, composerHeight: 44, historyItems: [], historyStatus: "ready",
+    windowWidth: 390, windowHeight: 844, historyHeight: 200, historyItems: [], historyStatus: "ready",
     partnerName: "Bora", onRecentHeightChange: () => undefined, onRecentRowsHeightChange: () => undefined,
     onCloseKeyboard: () => { closed += 1 }, scrollToLatestRequest: 0, children: null
   })))
@@ -442,9 +442,9 @@ function panelProps(mode: "history" | "typing") {
   const shared = <T,>(value: T) => ({ value })
   return {
     copy, mode, transition: shared({ progress: mode === "typing" ? 1 : 0, margin: 0, bottom: 0, height: 120,
-      cameraX: 0, cameraY: 0, cameraScale: 1 }) as never,
+      cameraX: 0, cameraY: 0, cameraScale: 1, restHeight: 297, roomWidth: 546 }) as never,
     contentProgress: shared(mode === "typing" ? 1 : 0) as never,
-    windowWidth: 390, historyHeight: 200, composerHeight: 44, historyItems: [], historyStatus: "ready" as const,
+    windowWidth: 390, windowHeight: 844, historyHeight: 200, historyItems: [], historyStatus: "ready" as const,
     partnerName: "Bora", onRecentHeightChange: () => undefined, onRecentRowsHeightChange: () => undefined,
     onCloseKeyboard: () => undefined, scrollToLatestRequest: 0, children: null
   }

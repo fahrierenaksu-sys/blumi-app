@@ -32,6 +32,7 @@ export function resolveMiniRoomCameraTransform(
   rest: MiniRoomCameraFrame,
   target: MiniRoomCameraFrame
 ): { translateX: number; translateY: number; scale: number } {
+  "worklet"
   if (!(rest.width > 0)) return { translateX: 0, translateY: 0, scale: 1 }
   return {
     translateX: target.left + target.width / 2 - (rest.left + rest.width / 2),

@@ -42,6 +42,7 @@ import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
 import { useMiniRoomCameraTransform } from "./useMiniRoomCameraTransform"
 import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
 import { useMiniRoomKeyboardPreference } from "../useMiniRoomKeyboardPreference"
+import type { MiniRoomPoseInput } from "./miniRoomTransitionModel"
 
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable)
 interface MiniRoomSceneProps {
@@ -134,20 +135,20 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const [recentHistoryRowsHeight, setRecentHistoryRowsHeight] = useState(0)
   const [composerLines, setComposerLines] = useState(1)
   const keyboardPreference = useMiniRoomKeyboardPreference()
-  const keyboard = useMiniRoomKeyboard((frame) => animateKeyboard(frame))
+  // ROOM-15: the keyboard's own progress drives the whole scene on the UI thread.
+  const keyboard = useMiniRoomKeyboard(reduceMotion)
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
   // VIS-04: upright furniture is drawn among the avatars by floor depth.
   const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
-  const layoutInput = useMemo(
-    () => ({
+  // Everything the pose depends on except the keyboard (that is a progress).
+  const poseInput = useMemo(
+    (): MiniRoomPoseInput => ({
       windowWidth: viewport.width,
       windowHeight: viewport.height,
       safeTop: safeAreaInsets.top,
       safeBottom: safeAreaInsets.bottom,
-      keyboardVisible: keyboard.visible,
-      keyboardInset: keyboard.inset,
       recentMessageHeight,
       recentHistoryRowsHeight,
       fontScale: viewport.fontScale,
@@ -156,22 +157,25 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         ? roomShell.canvasSize.width / roomShell.canvasSize.height
         : 1
     }),
-    [composerLines, recentMessageHeight, recentHistoryRowsHeight, keyboard.inset, keyboard.visible, roomShell,
+    [composerLines, recentMessageHeight, recentHistoryRowsHeight, roomShell,
       safeAreaInsets.bottom, safeAreaInsets.top, viewport.fontScale, viewport.height, viewport.width]
   )
-  const layout = useMemo(() => resolveMiniRoomLayout(layoutInput), [layoutInput])
-  // Keep the transcript mounted at its resting viewport throughout the morph.
+  // React only needs the discrete mode (roles, the composer's width, the
+  // backdrop); every position comes from the UI-thread pose.
+  const layout = useMemo(() => resolveMiniRoomLayout({
+    ...poseInput, keyboardVisible: keyboard.visible, keyboardInset: 0
+  }), [keyboard.visible, poseInput])
+  // The transcript stays laid out at its resting viewport throughout the morph.
   const historyLayout = useMemo(() => resolveMiniRoomLayout({
-    ...layoutInput, keyboardVisible: false, keyboardInset: 0
-  }), [layoutInput])
-  // ROOM-15: the room keeps its resting frame; the keyboard framing is a UI-thread transform.
+    ...poseInput, keyboardVisible: false, keyboardInset: 0
+  }), [poseInput])
+  // The room keeps its resting frame; the keyboard framing is a UI-thread transform.
   const restCamera = useMemo(
-    () => resolveMiniRoomRestCamera(layoutInput),
-    [layoutInput]
+    () => resolveMiniRoomRestCamera({ ...poseInput, keyboardVisible: false, keyboardInset: 0 }),
+    [poseInput]
   )
-  const { cameraStyle, transition, contentProgress, animateKeyboard, prepareKeyboardOpen } = useMiniRoomCameraTransform({
-    rest: restCamera, layout, layoutInput, keyboardInset: keyboard.inset,
-    keyboardDurationMs: keyboard.durationMs, reduceMotion
+  const { cameraStyle, transition, contentProgress, followTo } = useMiniRoomCameraTransform({
+    poseInput, keyboard, reduceMotion
   })
   const {
     dismissSpeechBubble,
@@ -182,11 +186,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const [partnerJustJoined, setPartnerJustJoined] = useState(false)
   const [composerText, setComposerText] = useState("")
+  // The scene follows the keyboard down: nothing collapses ahead of it.
   const handleCloseKeyboard = useCallback(() => {
-    // Begin the return before requesting UIKit dismissal, not after its layout.
-    animateKeyboard({ visible: false, inset: 0, durationMs: keyboard.durationMs }, "intent")
     Keyboard.dismiss()
-  }, [animateKeyboard, keyboard.durationMs])
+  }, [])
 
   useEffect(() => {
     if (!motionPolicy.animateJoin || !partnerPresent) {
@@ -225,14 +228,18 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const handleRoomPress = useCallback(
     (event: GestureResponderEvent): void => {
-      handleCloseKeyboard()
       const { locationX, locationY } = event.nativeEvent
-      moveLocalAvatar({
+      const target = {
         x: Math.max(0, Math.min(1, locationX / stageSize.width)),
         y: Math.max(0, Math.min(1, locationY / stageSize.height))
-      })
+      }
+      // The avatar starts at once; the keyboard (if any) eases down with the
+      // scene; the room pans only if the target would leave the safe frame.
+      moveLocalAvatar(target)
+      followTo(target.x)
+      handleCloseKeyboard()
     },
-    [handleCloseKeyboard, moveLocalAvatar, stageSize.height, stageSize.width]
+    [followTo, handleCloseKeyboard, moveLocalAvatar, stageSize.height, stageSize.width]
   )
 
   const handleHotspotSelect = useCallback((hotspotId: string): void => {
@@ -366,12 +373,12 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
       <MiniRoomChatPanel
         windowWidth={viewport.width}
+        windowHeight={viewport.height}
         copy={copy}
         mode={layout.panelMode}
         transition={transition}
         contentProgress={contentProgress}
         historyHeight={historyLayout.historyHeight}
-        composerHeight={layout.composerInputHeight}
         historyItems={chatHistory}
         historyStatus={chatHistoryStatus}
         partnerName={partnerFirstName}
@@ -392,7 +399,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
           onSubmit={handleSubmitComposer}
           onToggleHistory={handleToggleHistory}
           onContentHeightChange={handleComposerContentSize}
-          onFocus={prepareKeyboardOpen}
           disabled={composerDisabled}
           draftTyping={props.typing?.draft}
         />

@@ -10,18 +10,8 @@ export interface MiniRoomMotionPolicy {
   animateWalkBob: boolean
 }
 
-/**
- * The dock and room share one keyboard-coupled clock
- * (useMiniRoomCameraTransform). It is custom on purpose rather than a
- * ui/motion spring: it follows UIKit's own keyboard duration, so the dock
- * stays glued to the keyboard edge. Changes that are not the keyboard (a
- * longer draft, a measured history row) take this short step, and the
- * history viewport resizes on the same step and curve so the transcript
- * and its dock move together. Reduce Motion makes both instant; the
- * content fades still crossfade (ui/motion `crossfade`).
- */
-export const MINI_ROOM_DOCK_STEP_MS = 180
-export const MINI_ROOM_DESIGN_EASING = [0.25, 0.1, 0.25, 1] as const
+// The dock and room have no clock of their own: they follow the keyboard's
+// progress (useMiniRoomKeyboard → useMiniRoomCameraTransform).
 export const MINI_ROOM_PARTNER_ARRIVAL_MS = 900
 
 /** Ambient avatar loops; plain data for the UI-thread drivers. */

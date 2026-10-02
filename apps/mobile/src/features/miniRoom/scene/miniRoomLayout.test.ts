@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { resolveMiniRoomLayout, resolveMiniRoomRestCamera, resolveComposerLineCount, resolveKeyboardInset, type MiniRoomLayoutInput } from "./miniRoomLayout"
+import { resolveMiniRoomLayout, resolveMiniRoomRestCamera, resolveComposerLineCount, type MiniRoomLayoutInput } from "./miniRoomLayout"
 
 const roomAspectRatio = 1254 / 714
 const iphone11: MiniRoomLayoutInput = {
@@ -101,11 +101,4 @@ test("drafts grow to the selected input cap then scroll without further layout g
   assert.equal(resolveComposerLineCount({ contentHeight: 92, fontScale: 1 }), 4)
   assert.equal(resolveComposerLineCount({ contentHeight: 64.2, fontScale: 1 }), 2)
   assert.equal(resolveComposerLineCount({ contentHeight: 999, fontScale: 1 }), 4)
-})
-test("keyboard overlap follows the actual frame, including a dismissed frame", () => {
-  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:594,keyboardHeight:302}),302)
-  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:896,keyboardHeight:302}),0)
-  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:1198,keyboardHeight:302}),0)
-  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:undefined,keyboardHeight:302}),302)
-  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:NaN,keyboardHeight:undefined}),0)
 })

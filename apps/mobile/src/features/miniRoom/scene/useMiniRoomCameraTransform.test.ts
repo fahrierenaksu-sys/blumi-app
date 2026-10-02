@@ -1,121 +1,132 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, createReanimatedStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
-import { resolveMiniRoomLayout, resolveMiniRoomRestCamera, type MiniRoomLayoutInput } from "./miniRoomLayout"
+import {
+  resolveMiniRoomFollowTarget, resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, type MiniRoomPoseInput
+} from "./miniRoomTransitionModel"
 import type * as Hook from "./useMiniRoomCameraTransform"
 
-const closed: MiniRoomLayoutInput = {
-  windowWidth: 414, windowHeight: 896, safeTop: 44, safeBottom: 34,
-  keyboardVisible: false, keyboardInset: 0, fontScale: 1, roomAspectRatio: 1254 / 714
+const phone: MiniRoomPoseInput = {
+  windowWidth: 414, windowHeight: 896, safeTop: 44, safeBottom: 34, fontScale: 1, roomAspectRatio: 1254 / 714
 }
 
-function mount(reduceMotion = false) {
+function mount(options: { reduceMotion?: boolean; holdAnimations?: boolean } = {}) {
   const runtime = createFakeReactRuntime()
   const reanimated = createReanimatedStub(runtime)
-  const timers = new Map<number, () => void>()
-  let timerId = 0
-  const fades: { target: number; duration: number }[] = []
+  const animations: { target: number; motion: string }[] = []
   const hook = loadSourceWithFakeReact<typeof Hook>("features/miniRoom/scene/useMiniRoomCameraTransform.ts", runtime, {
     modules: {
       "react-native-reanimated": reanimated.module,
       "react-native-worklets": { scheduleOnUI: (work: (...args: unknown[]) => void, ...args: unknown[]) => work(...args) },
       "../../../ui/motion": {
-        resolveMotion: () => ({ crossfade: { kind: "timing", duration: 200 } }),
-        animateTo: (target: number, motion: { duration: number }) => { fades.push({ target, duration: motion.duration }); return target }
+        resolveMotion: (reduced: boolean) => ({
+          smooth: reduced ? "instant" : "smooth", crossfade: "crossfade"
+        }),
+        // A held settle stays at its start weight (1), so a test can read the first frame.
+        animateTo: (target: number, motion: string) => {
+          animations.push({ target, motion })
+          return options.holdAnimations ? 1 : target
+        }
       }
     },
-    real: ["./miniRoomLayout", "./miniRoomTransitionModel", "./miniRoomReducedMotion"],
-    globals: {
-      setTimeout: (run: () => void) => { timerId += 1; timers.set(timerId, run); return timerId },
-      clearTimeout: (id: number) => { timers.delete(id) }
-    }
+    real: ["./miniRoomTransitionModel", "./miniRoomLayout", "./miniRoomAvatarStageModel"]
   })
-  let layoutInput = closed
+  const keyboard = { visible: false, progress: { value: 0 }, openHeight: { value: 0 } }
+  let poseInput = phone
   const render = () => runtime.render(() => hook.useMiniRoomCameraTransform({
-    rest: resolveMiniRoomRestCamera(layoutInput),
-    layout: resolveMiniRoomLayout(layoutInput),
-    layoutInput,
-    keyboardInset: layoutInput.keyboardInset,
-    keyboardDurationMs: 250,
-    reduceMotion
+    poseInput, keyboard: keyboard as never, reduceMotion: options.reduceMotion ?? false
   }))
   render()
   const api = () => runtime.output as ReturnType<typeof Hook.useMiniRoomCameraTransform>
-  /** The pose once the running transition has settled (the stub settles at once). */
-  const settledProgress = () => { runtime.rerender(); return api().transition.value.progress }
-  const commit = (patch: Partial<MiniRoomLayoutInput>) => { layoutInput = { ...layoutInput, ...patch }; render() }
-  const runTimers = () => { for (const [id, run] of [...timers]) { timers.delete(id); run() } }
-  return { runtime, api, settledProgress, commit, runTimers, timers, fades }
+  /** One UI frame: the derived pose recomputed from the current shared values. */
+  const frame = () => { runtime.rerender(); return api() }
+  const keyboardAt = (progress: number, openHeight = 336) => {
+    keyboard.progress.value = progress
+    keyboard.openHeight.value = openHeight
+    return frame()
+  }
+  const commit = (patch: Partial<MiniRoomPoseInput>) => { poseInput = { ...poseInput, ...patch }; render() }
+  const setVisible = (visible: boolean) => { keyboard.visible = visible; render() }
+  return { runtime, api, frame, keyboardAt, commit, setVisible, animations }
 }
 
-test("a touch-down that no keyboard confirms returns the room to rest after the fallback", () => {
-  const { runtime, api, settledProgress, commit, runTimers } = mount()
-  try {
-    // A real keyboard was measured once, so the next touch-down may pre-open.
-    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
-    commit({ keyboardVisible: true, keyboardInset: 336 })
-    api().animateKeyboard({ visible: false, inset: 0, durationMs: 250 })
-    commit({ keyboardVisible: false, keyboardInset: 0 })
-    assert.equal(settledProgress(), 0)
+const translateX = (style: unknown) => (style as { transform: { translateX?: number }[] }).transform[0]!.translateX!
+const scaleOf = (style: unknown) => (style as { transform: { scale?: number }[] }).transform[2]!.scale!
 
-    api().prepareKeyboardOpen()
-    assert.equal(settledProgress(), 1, "the warm opening starts on touch-down")
-    runTimers()
-    assert.equal(settledProgress(), 0, "no keyboard arrived: the dock and camera go back down")
+test("the room stays at rest until a real keyboard moves; nothing opens ahead of it", () => {
+  const { runtime, api, keyboardAt, setVisible } = mount()
+  try {
+    const closed = resolveMiniRoomPoseEndpoints(phone, 336).closed
+    assert.deepEqual(api().transition.value, closed)
+    // A focus with a hardware keyboard: React may hear "visible", but no frame moved.
+    setVisible(true)
+    assert.deepEqual(keyboardAt(0).transition.value, closed)
   } finally {
     runtime.unmount()
   }
 })
 
-test("the first focus waits for the real keyboard frame; nothing is guessed", () => {
-  const { runtime, api, settledProgress, timers } = mount()
+test("room camera, paper and content all follow the same keyboard progress, frame by frame and back", () => {
+  const { runtime, keyboardAt } = mount()
   try {
-    api().prepareKeyboardOpen()
-    assert.equal(settledProgress(), 0)
-    assert.equal(timers.size, 0)
+    const endpoints = resolveMiniRoomPoseEndpoints(phone, 336)
+    for (const progress of [0.1, 0.35, 0.7, 1, 0.8, 0.4, 0]) {
+      const api = keyboardAt(progress)
+      assert.deepEqual(api.transition.value, resolveMiniRoomPose(endpoints, progress))
+      assert.equal(api.contentProgress.value, api.transition.value.progress, "the content rides the same progress")
+      assert.equal(scaleOf(api.cameraStyle), api.transition.value.cameraScale)
+    }
   } finally {
     runtime.unmount()
   }
 })
 
-test("a close tap wins over a late native frame from the opening keyboard", () => {
-  const { runtime, api, settledProgress, commit } = mount()
+test("a longer draft settles from the visible pose on the smooth token instead of jumping", () => {
+  const { runtime, keyboardAt, commit, frame, animations } = mount({ holdAnimations: true })
   try {
-    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
-    commit({ keyboardVisible: true, keyboardInset: 336 })
-    assert.equal(settledProgress(), 1)
-    api().animateKeyboard({ visible: false, inset: 0, durationMs: 250 }, "intent")
-    assert.equal(settledProgress(), 0)
-    // The suggestion bar's frame arrives after the tap: it must not reopen the dock.
-    api().animateKeyboard({ visible: true, inset: 380, durationMs: 0 })
-    assert.equal(settledProgress(), 0)
+    const visible = keyboardAt(1).transition.value
+    commit({ composerLines: 3 })
+    const first = frame().transition.value
+    assert.equal(first.height, visible.height, "the first frame is where the paper was")
+    assert.equal(first.cameraScale, visible.cameraScale)
+    assert.deepEqual(animations.at(-1), { target: 0, motion: "smooth" })
   } finally {
     runtime.unmount()
   }
 })
 
-test("Reduce Motion lands the pose at once and crossfades the dock's content", () => {
-  const { runtime, api, commit, fades } = mount(true)
+test("floor tap: the room pans only when the target would leave the safe frame, and never zooms", () => {
+  const { runtime, api, frame, keyboardAt, animations } = mount()
   try {
-    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
-    commit({ keyboardVisible: true, keyboardInset: 336 })
-    runtime.rerender()
-    assert.equal(api().transition.value.progress, 1, "the dock and camera do not travel")
-    assert.deepEqual(fades.at(-1), { target: 1, duration: 200 }, "the text still crossfades")
+    keyboardAt(1)
+    const scale = scaleOf(api().cameraStyle)
+    api().followTo(0.5)
+    assert.equal(animations.length, 0, "a target in the middle moves nothing")
+    api().followTo(0.04)
+    const closed = resolveMiniRoomPoseEndpoints(phone, 336).closed
+    const pan = resolveMiniRoomFollowTarget({ pointX: 0.04, frame: closed, windowWidth: phone.windowWidth, current: 0 })
+    assert.ok(pan > 0)
+    assert.deepEqual(animations.at(-1), { target: pan, motion: "smooth" })
+    assert.equal(scaleOf(frame().cameraStyle), scale, "a tap never changes the zoom")
+    // The keyboard goes down after the tap; at rest the pan is fully applied.
+    assert.equal(translateX(keyboardAt(0).cameraStyle), closed.cameraX + pan)
+    api().followTo(0.04)
+    assert.equal(animations.length, 1, "the same target again: no second camera move")
+  } finally {
+    runtime.unmount()
+  }
+})
+
+test("Reduce Motion: the pose lands with the keyboard and the dock's text crossfades", () => {
+  const { runtime, keyboardAt, setVisible, animations, api } = mount({ reduceMotion: true })
+  try {
+    setVisible(true)
+    const open = keyboardAt(1)
+    assert.equal(open.transition.value.progress, 1)
+    assert.deepEqual(animations.at(-1), { target: 1, motion: "crossfade" })
     assert.equal(api().contentProgress.value, 1)
-  } finally {
-    runtime.unmount()
-  }
-})
-
-test("with motion on, the content follows the moving dock", () => {
-  const { runtime, api, commit, fades } = mount(false)
-  try {
-    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
-    commit({ keyboardVisible: true, keyboardInset: 336 })
-    runtime.rerender()
-    assert.equal(fades.length, 0)
-    assert.equal(api().contentProgress.value, api().transition.value.progress)
+    api().followTo(0.02)
+    assert.equal(animations.at(-1)?.motion, "instant", "a pan lands at once")
   } finally {
     runtime.unmount()
   }

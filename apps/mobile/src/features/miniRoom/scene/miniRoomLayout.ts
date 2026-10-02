@@ -42,6 +42,7 @@ const HISTORY_MAX_GAIN = 28
 const FLOOR_GAP = 20
 
 export function resolveMiniRoomLayout(input: MiniRoomLayoutInput): MiniRoomLayout {
+  "worklet"
   const scale = clamp(input.fontScale, 1, MINI_ROOM_MAX_TEXT_SCALE)
   const typing = input.keyboardVisible || input.keyboardInset > 0
   const panelMode = typing ? "typing" : "history"
@@ -86,6 +87,7 @@ export function resolveMiniRoomLayout(input: MiniRoomLayoutInput): MiniRoomLayou
 }
 /** A stable world canvas: draft/strip/history growth changes only its transform. */
 export function resolveMiniRoomRestCamera(input: MiniRoomLayoutInput): MiniRoomCameraFrame {
+  "worklet"
   return resolveMiniRoomLayout({ ...input, keyboardVisible: false, keyboardInset: 0, composerLines: 1 }).camera
 }
 export function resolveComposerLineCount(input: { contentHeight: number; fontScale: number }): number {
@@ -94,11 +96,7 @@ export function resolveComposerLineCount(input: { contentHeight: number; fontSca
   // line. Reserve that line too so the room stays clear of the actual input.
   return clamp(Math.ceil((Math.round(input.contentHeight) - MINI_ROOM_INPUT_VERTICAL_PADDING * 2) / line), 1, MINI_ROOM_INPUT_MAX_LINES)
 }
-export function resolveKeyboardInset(input: { windowHeight: number; keyboardScreenY: number | undefined; keyboardHeight: number | undefined }): number {
-  const height = Number.isFinite(input.keyboardHeight) ? Math.max(0, input.keyboardHeight ?? 0) : 0
-  if (!Number.isFinite(input.keyboardScreenY)) return Math.round(height)
-  return Math.round(clamp(input.windowHeight - (input.keyboardScreenY ?? input.windowHeight), 0, height > 0 ? height : input.windowHeight))
-}
 function clamp(value: number, minimum: number, maximum: number): number {
+  "worklet"
   return Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : minimum
 }

@@ -31,30 +31,23 @@ function renderInput(disabled: boolean) {
     inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
-  let focusCalls = 0
   const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
   const tree = runtime.render(() => render({
     copy: getMiniRoomCopy("en"), value: "", suggestionsEnabled: true, disabled, mode: "history",
     maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => false,
-    onToggleHistory: () => undefined, onContentHeightChange: () => undefined, onFocus: () => { focusCalls += 1 }
+    onToggleHistory: () => undefined, onContentHeightChange: () => undefined
   }))
   const input = findInput(tree)
   runtime.unmount()
   assert.ok(input, "the composer renders its text field")
-  return { input, focusCalls: () => focusCalls }
+  return { input }
 }
 
-test("touching an enabled composer pre-opens the typing pose", () => {
-  const { input, focusCalls } = renderInput(false)
-  ;(input.props.onTouchStart as (() => void) | undefined)?.()
-  assert.equal(focusCalls(), 1)
-})
-
-test("touching a disabled composer never lifts the dock: no keyboard will come", () => {
-  const { input, focusCalls } = renderInput(true)
-  assert.equal(input.props.editable, false)
-  ;(input.props.onTouchStart as (() => void) | undefined)?.()
-  assert.equal(focusCalls(), 0)
+// The scene moves only with a real keyboard (useMiniRoomCameraTransform.test):
+// a disabled field never focuses, so touching it can never lift the dock.
+test("a disabled composer never focuses; an enabled one does", () => {
+  assert.equal(renderInput(true).input.props.editable, false)
+  assert.equal(renderInput(false).input.props.editable, true)
 })
 
 function findAll(node: unknown, match: (element: Element) => boolean, found: Element[] = []): Element[] {
@@ -88,7 +81,7 @@ test("the history-mode left button names its action: going to the latest message
       const tree = runtime.render(() => render({
         copy, value: "", suggestionsEnabled: false, disabled: false, mode,
         maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => false,
-        onToggleHistory: () => { toggles += 1 }, onContentHeightChange: () => undefined, onFocus: () => undefined
+        onToggleHistory: () => { toggles += 1 }, onContentHeightChange: () => undefined
       }))
       const toggle = findAll(tree, (element) => element.props?.accessibilityLabel === (mode === "history"
         ? copy.goToLatestMessage : copy.returnToRoom))

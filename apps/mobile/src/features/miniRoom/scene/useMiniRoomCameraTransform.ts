@@ -1,158 +1,89 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
-import {
-  Easing,
-  ReduceMotion,
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withTiming
-} from "react-native-reanimated"
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { useAnimatedStyle, useDerivedValue, useSharedValue, type SharedValue } from "react-native-reanimated"
 import { scheduleOnUI } from "react-native-worklets"
 import { animateTo, resolveMotion } from "../../../ui/motion"
-import type { MiniRoomCameraFrame } from "./miniRoomAvatarStageModel"
-import { resolveMiniRoomLayout, type MiniRoomLayout, type MiniRoomLayoutInput, type MiniRoomPanelMode } from "./miniRoomLayout"
-import { resolveMiniRoomMorphFrame, resolveMiniRoomOpeningProgress, resolveMiniRoomSettlingProgress, resolveMiniRoomTransitionDuration, resolveMiniRoomTransitionTarget, shouldDeferMiniRoomLayout, type MiniRoomTransitionFrame } from "./miniRoomTransitionModel"
-import { MINI_ROOM_DOCK_STEP_MS } from "./miniRoomReducedMotion"
-import type { MiniRoomKeyboardState } from "./useMiniRoomKeyboard"
+import {
+  applyMiniRoomPoseOffset, clampMiniRoomFollow, MINI_ROOM_NO_POSE_OFFSET, resolveMiniRoomFollowTarget,
+  resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, resolveMiniRoomPoseOffset, type MiniRoomPoseInput
+} from "./miniRoomTransitionModel"
 
 /**
- * ROOM-15: the canvas keeps its layout. Room transform, dock position, height
- * and content morph share ONE UI-thread clock. The keyboard edge leads the
- * opening; camera and dock top settle together with guaranteed floor clearance.
- * Closing never expands the history at the still-raised keyboard position.
- * The clock follows UIKit's keyboard duration on purpose (see
- * MINI_ROOM_DOCK_STEP_MS); Reduce Motion lands the pose at once and
- * crossfades the content with the ui/motion `crossfade` token.
+ * ROOM-15: one continuous MiniRoom scene. The room camera, the chat paper and
+ * the composer are a single pose, mixed on the UI thread from the two resting
+ * poses at the keyboard's own progress (useMiniRoomKeyboard). Nothing here
+ * runs a clock of its own for the keyboard, so nothing can start late or jump
+ * when the keyboard arrives, and a reversal mid-way just follows the keyboard.
+ *
+ * Changes that are not the keyboard (a draft growing a line, a measured
+ * message) settle on the `smooth` token from the visible pose. A floor tap
+ * pans the room only when its target would leave the safe frame (follow
+ * camera); there is no zoom per tap. Reduce Motion lands every pose at once
+ * and crossfades the paper's content (ui/motion `crossfade`).
  */
 export function useMiniRoomCameraTransform(input: {
-  rest: MiniRoomCameraFrame
-  layout: MiniRoomLayout
-  layoutInput: MiniRoomLayoutInput
-  keyboardInset: number
-  keyboardDurationMs: number
+  poseInput: MiniRoomPoseInput
+  keyboard: { visible: boolean; progress: SharedValue<number>; openHeight: SharedValue<number> }
   reduceMotion: boolean
 }) {
-  const { rest, layout, layoutInput, keyboardInset, keyboardDurationMs, reduceMotion } = input
-  const target = useMemo(() => resolveMiniRoomTransitionTarget(rest, layout), [rest, layout])
-  const origin = useSharedValue(target)
-  const destination = useSharedValue(target)
-  const clock = useSharedValue(1)
-  const timing = useSharedValue({ opening: false, keyboardFraction: 1 })
-  const composerClearance = layout.composerInputHeight + 18
-  // Under Reduce Motion the pose lands at once, but the history and recent
-  // text still crossfade (house rule: movement snaps, opacity fades).
-  const contentFade = useSharedValue(target.progress)
-  const contentFadesAlone = useSharedValue(false)
-  const transition = useDerivedValue(() => {
-    const time = clock.value
-    const opening = timing.value.opening
-    const roomProgress = opening ? resolveMiniRoomOpeningProgress(time) : resolveMiniRoomSettlingProgress(time)
-    const keyboardProgress = opening
-      ? resolveMiniRoomOpeningProgress(time / timing.value.keyboardFraction) : roomProgress
-    return resolveMiniRoomMorphFrame(origin.value, destination.value, roomProgress, keyboardProgress, composerClearance)
-  })
-  /** The progress the dock's content opacities follow. */
-  const contentProgress = useDerivedValue(() =>
-    contentFadesAlone.value ? contentFade.value : transition.value.progress)
-  const previousKeyboard = useRef({ mode: layout.panelMode, inset: keyboardInset })
-  const previousTarget = useRef(target)
-  const actualTarget = useRef(target)
-  const keyboardIntent = useRef<MiniRoomPanelMode | null>(null)
-  const previousReduceMotion = useRef(reduceMotion)
-  const knownKeyboardInset = useRef(0)
-  const focusFallback = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (focusFallback.current !== null) clearTimeout(focusFallback.current)
-  }, [])
+  const { poseInput, keyboard, reduceMotion } = input
+  const { progress, openHeight, visible } = keyboard
+  const appliedInput = useSharedValue(poseInput)
+  const offset = useSharedValue(MINI_ROOM_NO_POSE_OFFSET)
+  const offsetWeight = useSharedValue(0)
+  const follow = useSharedValue(0)
+  const followTarget = useSharedValue(0)
+  const endpoints = useDerivedValue(() => applyMiniRoomPoseOffset(
+    resolveMiniRoomPoseEndpoints(appliedInput.value, openHeight.value), offset.value, offsetWeight.value))
+  const transition = useDerivedValue(() => resolveMiniRoomPose(endpoints.value, progress.value))
 
-  const animatePose = useCallback((next: MiniRoomTransitionFrame, durationMs: number, force = false) => {
-    if (!force && Object.keys(next).every((key) => {
-      const field = key as keyof MiniRoomTransitionFrame
-      return next[field] === previousTarget.current[field]
-    })) return
-    const opening = next.progress > previousTarget.current.progress
-    previousTarget.current = next
-    // Keep the input fast; let the room's last few points settle more slowly.
-    const totalDurationMs = opening && durationMs > 0 ? Math.max(durationMs, 320) : durationMs
-    const crossfade = resolveMotion(true).crossfade
-    scheduleOnUI((nextPose: MiniRoomTransitionFrame, duration: number, keyboardDuration: number, isOpening: boolean) => {
-      "worklet"
-      if (duration === 0) {
-        contentFade.value = contentProgress.value
-        contentFade.value = animateTo(nextPose.progress, crossfade)
-      }
-      contentFadesAlone.value = duration === 0
-      origin.value = transition.value
-      destination.value = nextPose
-      timing.value = { opening: isOpening, keyboardFraction: duration > 0 ? keyboardDuration / duration : 1 }
-      clock.value = 0
-      clock.value = duration === 0 ? 1 : withTiming(1, {
-        duration, easing: Easing.linear, reduceMotion: ReduceMotion.Never
-      })
-    }, next, totalDurationMs, durationMs, opening)
-  }, [clock, contentFade, contentFadesAlone, contentProgress, destination, origin, timing, transition])
+  // Under Reduce Motion the pose snaps, so the history ↔ recent handoff fades
+  // on its own; otherwise the content follows the moving paper.
+  const contentFade = useSharedValue(visible ? 1 : 0)
+  useEffect(() => {
+    if (!reduceMotion) return
+    contentFade.value = animateTo(visible ? 1 : 0, resolveMotion(true).crossfade)
+  }, [contentFade, reduceMotion, visible])
+  const contentProgress = useDerivedValue(() => reduceMotion ? contentFade.value : transition.value.progress)
 
-  const animateKeyboard = useCallback((frame: MiniRoomKeyboardState, source: "native" | "intent" = "native") => {
-    const nextLayout = resolveMiniRoomLayout({ ...layoutInput,
-      keyboardVisible: frame.visible, keyboardInset: frame.inset })
-    // An old native frame or text measurement must not reverse a newer tap.
-    if (source === "native" && keyboardIntent.current !== null && keyboardIntent.current !== nextLayout.panelMode) return
-    if (focusFallback.current !== null) {
-      clearTimeout(focusFallback.current)
-      focusFallback.current = null
-    }
-    if (source === "intent") {
-      keyboardIntent.current = nextLayout.panelMode === layout.panelMode ? null : nextLayout.panelMode
-      if (keyboardIntent.current !== null) {
-        // Hardware focus / missing confirmation: return to the latest actual
-        // layout, including measurements received while the intent was pending.
-        focusFallback.current = setTimeout(() => {
-          focusFallback.current = null
-          keyboardIntent.current = null
-          animatePose(actualTarget.current, reduceMotion ? 0 : MINI_ROOM_DOCK_STEP_MS)
-        }, 450)
-      }
-    }
-    if (frame.inset > 0) knownKeyboardInset.current = frame.inset
-    const opening = nextLayout.panelMode === "typing" && previousKeyboard.current.mode !== "typing"
-    previousKeyboard.current = { mode: nextLayout.panelMode, inset: frame.inset }
-    animatePose(resolveMiniRoomTransitionTarget(rest, nextLayout), resolveMiniRoomTransitionDuration({
-      keyboardChanged: true, keyboardDurationMs: frame.durationMs, reduceMotion, opening
-    }))
-  }, [animatePose, layout.panelMode, layoutInput, reduceMotion, rest])
-
-  const prepareKeyboardOpen = useCallback(() => {
-    // Use a measured previous frame only. First focus waits for keyboardWillShow.
-    if (layoutInput.keyboardVisible || knownKeyboardInset.current <= 0) return
-    animateKeyboard({
-      visible: true, inset: knownKeyboardInset.current, durationMs: keyboardDurationMs
-    }, "intent")
-  }, [animateKeyboard, keyboardDurationMs, layoutInput.keyboardVisible])
-
+  const lastInput = useRef(poseInput)
   useLayoutEffect(() => {
-    actualTarget.current = target
-    const accessibilityChanged = previousReduceMotion.current !== reduceMotion
-    previousReduceMotion.current = reduceMotion
-    // Keep the tap's direction through late measurements until React has also
-    // committed the matching native frame (not just until its event arrives).
-    if (shouldDeferMiniRoomLayout({ intent: keyboardIntent.current,
-      actual: layout.panelMode, accessibilityChanged })) return
-    if (keyboardIntent.current === layout.panelMode) keyboardIntent.current = null
-    const previous = previousKeyboard.current
-    const keyboardChanged = previous.mode !== layout.panelMode || previous.inset !== keyboardInset
-    previousKeyboard.current = { mode: layout.panelMode, inset: keyboardInset }
-    const changed = Object.keys(target).some((key) => {
-      const field = key as keyof MiniRoomTransitionFrame
-      return target[field] !== previousTarget.current[field]
-    })
-    if (!changed && !accessibilityChanged) return
-    const durationMs = resolveMiniRoomTransitionDuration({ keyboardChanged, keyboardDurationMs, reduceMotion,
-      opening: layout.panelMode === "typing" && previous.mode !== "typing" })
-    animatePose(target, durationMs, accessibilityChanged)
-  }, [animatePose, keyboardDurationMs, keyboardInset, layout.panelMode, layoutInput.keyboardVisible, reduceMotion, target])
+    if (lastInput.current === poseInput) return
+    lastInput.current = poseInput
+    const settle = resolveMotion(reduceMotion).smooth
+    scheduleOnUI((next: MiniRoomPoseInput) => {
+      "worklet"
+      const height = openHeight.value
+      const before = applyMiniRoomPoseOffset(
+        resolveMiniRoomPoseEndpoints(appliedInput.value, height), offset.value, offsetWeight.value)
+      appliedInput.value = next
+      offset.value = resolveMiniRoomPoseOffset(before, resolveMiniRoomPoseEndpoints(next, height))
+      offsetWeight.value = 1
+      offsetWeight.value = animateTo(0, settle)
+    }, poseInput)
+  }, [appliedInput, offset, offsetWeight, openHeight, poseInput, reduceMotion])
 
-  const cameraStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: transition.value.cameraX }, { translateY: transition.value.cameraY }, { scale: transition.value.cameraScale }]
-  }))
-  return { cameraStyle, transition, contentProgress, animateKeyboard, prepareKeyboardOpen }
+  /** A walk towards room point `pointX` (0..1): pan only if it would leave the safe frame at rest. */
+  const followTo = useCallback((pointX: number) => {
+    const pan = resolveMotion(reduceMotion).smooth
+    scheduleOnUI((x: number) => {
+      "worklet"
+      // A floor tap also closes the keyboard, so judge the frame the walk ends in.
+      const closed = resolveMiniRoomPoseEndpoints(appliedInput.value, openHeight.value).closed
+      const target = resolveMiniRoomFollowTarget({
+        pointX: x, frame: closed, windowWidth: appliedInput.value.windowWidth, current: followTarget.value
+      })
+      if (target === followTarget.value) return
+      followTarget.value = target
+      follow.value = animateTo(target, pan)
+    }, pointX)
+  }, [appliedInput, follow, followTarget, openHeight, reduceMotion])
+
+  const cameraStyle = useAnimatedStyle(() => {
+    const frame = transition.value
+    const pan = clampMiniRoomFollow(follow.value, frame, appliedInput.value.windowWidth)
+    return {
+      transform: [{ translateX: frame.cameraX + pan }, { translateY: frame.cameraY }, { scale: frame.cameraScale }]
+    }
+  })
+  return { cameraStyle, transition, contentProgress, followTo }
 }
