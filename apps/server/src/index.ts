@@ -16,7 +16,7 @@ import { startDiscoveryWatchWorker } from "./matches/discoveryWatchWorker"
 import { createAdminTokenService } from "./admin/adminTokenService"
 import { createGracefulShutdown } from "./operations/serviceLifecycle"
 import { installProcessLifecycle } from "./operations/processLifecycle"
-import { startPeriodicWorker } from "./operations/periodicWorker"
+import { startPeriodicWorker, startupJitterMs } from "./operations/periodicWorker"
 import { createChatMessageDeliveryService, drainChatDispatches } from "./chat/chatMessageDeliveryService"
 import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
 import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
@@ -36,6 +36,8 @@ const firebaseDeletionWorker = startPeriodicWorker({
     deleteUser: (uid) => firebaseAuthVerifier.deleteUser(uid)
   }),
   intervalMs: 30_000,
+  // Maintenance cycles start spread out, not all with the first connections.
+  firstRunDelayMs: startupJitterMs(30_000),
   reportError: (error) => console.error("Firebase user deletion worker failed", safeOperationalErrorKind(error))
 })
 const mediaRevocationWorker = config.livekitUrl && config.livekitApiKey && config.livekitApiSecret
@@ -78,24 +80,26 @@ const chatDeliveryWorker = startChatDeliveryWorker({
 const ticketCleanupWorker = startPeriodicWorker({
   run: () => services.realtimeTicketStore.purgeExpired(new Date(), 500),
   intervalMs: 60_000,
+  firstRunDelayMs: startupJitterMs(60_000),
   reportError: (error) => console.error("Realtime ticket cleanup failed", safeOperationalErrorKind(error))
 })
 const rateBudgetCleanupWorker = startPeriodicWorker({
-  run: () => services.sharedRateLimiter.purgeExpired(), intervalMs: 60_000,
+  run: () => services.sharedRateLimiter.purgeExpired(), intervalMs: 60_000, firstRunDelayMs: startupJitterMs(60_000),
   reportError: (error) => console.error("Shared request budget cleanup failed", safeOperationalErrorKind(error))
 })
 const discoverySnapshotCleanupWorker = startPeriodicWorker({
-  run: () => services.discoverySnapshots.purgeExpired(), intervalMs: 60_000,
+  run: () => services.discoverySnapshots.purgeExpired(), intervalMs: 60_000, firstRunDelayMs: startupJitterMs(60_000),
   reportError: (error) => console.error("Discovery snapshot cleanup failed", safeOperationalErrorKind(error))
 })
 const retentionWorker = startPeriodicWorker({
-  run: () => services.retentionService.purgeExpired(), intervalMs: 600_000,
+  run: () => services.retentionService.purgeExpired(), intervalMs: 600_000, firstRunDelayMs: startupJitterMs(600_000),
   reportError: (error) => console.error("Retention cleanup failed", safeOperationalErrorKind(error))
 })
 const discoveryWatchWorker = startDiscoveryWatchWorker({
   matchService: services.matchService,
   safetyService: services.safetyService,
   notificationService: services.notificationService,
+  firstRunDelayMs: startupJitterMs(15_000),
   reportError: (error) => {
     console.error("Discovery Watch worker failed", safeOperationalErrorKind(error))
   }
