@@ -51,7 +51,10 @@ import type {
 import type { PreAuthOnboardingResumeStep } from "../features/session/preAuthOnboardingStorage"
 import { usePreAuthOnboardingDraft } from "../features/session/usePreAuthOnboardingDraft"
 import {
+  completeAvatarStepAndNavigate,
+  completeProfileStepAndNavigate,
   getOnboardingScreenMode,
+  resolveAvatarSetupInitialGender,
   shouldGateOnboardingBootPrelude,
   shouldWaitForPreAuthDraftHydration,
   getUnauthenticatedNavigatorInitialRoute,
@@ -977,25 +980,16 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       mode={profileMode}
                       isSubmitting={isBootstrapping}
                       errorMessage={errorMessage}
-                      onComplete={async (input: UpdateSessionProfileInput) => {
-                        // Start the durable save first, but do not make the
-                        // user wait on the network before seeing the next
-                        // onboarding step. The setup screens keep the
-                        // submitting state while the save settles and
-                        // surface any error through the shared feedback.
-                        const profileSave = completeProfileSetup(input)
-                        const nextRoute = profileMode === "review"
-                          ? profileReviewReturnTarget
-                          : "AvatarSetup"
-                        if (nextRoute === "AvatarSetup") {
-                          screenProps.navigation.replace("AvatarSetup", {
-                            initialGender: input.gender
-                          })
-                        } else {
-                          screenProps.navigation.replace(nextRoute)
-                        }
-                        await profileSave
-                      }}
+                      onComplete={(input: UpdateSessionProfileInput) =>
+                        completeProfileStepAndNavigate({
+                          input,
+                          mode: profileMode,
+                          reviewReturnTarget: profileReviewReturnTarget,
+                          save: completeProfileSetup,
+                          replace: (route, params) =>
+                            screenProps.navigation.replace(route, params)
+                        })
+                      }
                       onBack={() =>
                         screenProps.navigation.navigate(profileReviewReturnTarget)
                       }
@@ -1012,16 +1006,19 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
                       <avatarSetupScreenBundle.DeferredScreen
                         displayName={sessionActor.profile.displayName}
                         age={sessionActor.profile.age}
-                        initialGender={
-                          screenProps.route.params?.initialGender ??
+                        initialGender={resolveAvatarSetupInitialGender(
+                          screenProps.route.params?.initialGender,
                           sessionActor.profile.gender
-                        }
+                        )}
                     isSubmitting={isBootstrapping}
                     errorMessage={errorMessage}
-                    onComplete={async (avatar: UserAvatar) => {
-                      await completeAvatarSetup(avatar)
-                      screenProps.navigation.replace("RoomSetup")
-                    }}
+                    onComplete={(avatar: UserAvatar) =>
+                      completeAvatarStepAndNavigate({
+                        avatar,
+                        save: completeAvatarSetup,
+                        replace: (route) => screenProps.navigation.replace(route)
+                      })
+                    }
                     onBackToProfile={() =>
                       screenProps.navigation.navigate("ProfileSetup", {
                         reviewReturnTo: "AvatarSetup"
