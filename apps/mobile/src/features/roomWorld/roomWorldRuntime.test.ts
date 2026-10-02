@@ -71,7 +71,8 @@ test("every segment of a walk moves at the same cruise speed; corners do not sto
 })
 
 test("walk duration follows distance with one cap for the whole walk (was clamped 240-760 ms per segment)", () => {
-  const timing = ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+  // The floor for very short walks has its own test below.
+  const timing = { ...ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING, minWalkDurationMs: 0 }
   const total = (segments: RoomWorldMovementSegment[]) => segments.reduce((sum, segment) => sum + segment.durationMs, 0)
   const short = timeRoomWorldMovementSegments([rawSegment([0.5, 0.5], [0.55, 0.5], true)], timing)
   const long = timeRoomWorldMovementSegments([rawSegment([0.1, 0.5], [0.6, 0.5], true)], timing)
@@ -87,6 +88,26 @@ test("walk duration follows distance with one cap for the whole walk (was clampe
     rawSegment([0.95, 0.1], [0.05, 0.1], true)
   ], timing)
   assert.ok(Math.abs(total(capped) - timing.maxWalkDurationMs) < 1e-6, "a long walk is walked faster as a whole")
+})
+
+test("a tap right beside the avatar still walks long enough for a step; longer walks keep cruise pace", () => {
+  const timing = ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+  const minMs = timing.minWalkDurationMs ?? 0
+  assert.ok(minMs >= 240, "one step of the walk cycle needs about two authored frames")
+  const total = (segments: RoomWorldMovementSegment[]) => segments.reduce((sum, segment) => sum + segment.durationMs, 0)
+  for (const distance of [0.004, 0.02, 0.05]) {
+    const walk = timeRoomWorldMovementSegments([rawSegment([0.5, 0.5], [0.5 + distance, 0.5], true)], timing)
+    assert.ok(Math.abs(total(walk) - minMs) < 1e-6, `a ${distance} walk lasts ${total(walk)} ms`)
+    // Still starts and ends at rest, and arrives exactly.
+    const segment = walk[0]!
+    assert.ok(speedAt(segment, 0.0001) < speedAt(segment, 0.5) * 0.05)
+    assert.ok(speedAt(segment, 0.9999) < speedAt(segment, 0.5) * 0.05)
+    const end = getRoomWorldMovementFrame({ segment, startedAt: 0, now: segment.durationMs })
+    assert.ok(Math.abs(end.x - segment.to.x) < 1e-12 && Math.abs(end.y - segment.to.y) < 1e-12)
+  }
+  // A walk already longer than the floor is untouched.
+  const ordinary = timeRoomWorldMovementSegments([rawSegment([0.2, 0.5], [0.5, 0.5], true)], timing)
+  assert.ok(Math.abs(total(ordinary) - (0.3 + 2 * timing.rampDistance) * timing.durationPerDistanceMs) < 1e-6)
 })
 
 test("the walk curve is linear without ramps and ends exactly at the segment end", () => {

@@ -27,6 +27,13 @@ export interface RoomWorldMovementTiming {
   durationPerDistanceMs: number
   /** The longest a whole walk may take. */
   maxWalkDurationMs: number
+  /**
+   * The shortest a whole walk may take. A tap right beside the avatar is a
+   * walk of a few pixels: at cruise pace it would last about 100 ms, too
+   * short for even one step of the walk cycle, so it reads as a slide.
+   * Such a walk is slowed down as a whole to this length instead.
+   */
+  minWalkDurationMs?: number
   /** Room units spent accelerating at the start and decelerating at the end. */
   rampDistance: number
 }
@@ -34,6 +41,9 @@ export interface RoomWorldMovementTiming {
 export const ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING: RoomWorldMovementTiming = {
   durationPerDistanceMs: 1_800,
   maxWalkDurationMs: 1_800,
+  // One step of the four-frame walk cycle (two frames) at about the authored
+  // 120 ms per frame, plus the ramps.
+  minWalkDurationMs: 320,
   rampDistance: 0.04
 }
 
@@ -247,7 +257,8 @@ export function createRoomWorldMovementPlan(input: {
  * Times a whole walk at one speed: duration = distance x pace for every
  * segment, plus a short acceleration on the first segment and deceleration
  * on the last (velocity is continuous at every corner). One cap scales the
- * whole walk when it would take longer than `maxWalkDurationMs`.
+ * whole walk when it would take longer than `maxWalkDurationMs`, and one
+ * floor slows it when it would be shorter than `minWalkDurationMs`.
  */
 export function timeRoomWorldMovementSegments(
   segments: readonly RoomWorldMovementSegment[],
@@ -261,9 +272,12 @@ export function timeRoomWorldMovementSegments(
   const rampOut = Math.min(timing.rampDistance, count === 1 ? last.distance / 2 : last.distance)
   const totalDistance = segments.reduce((sum, segment) => sum + segment.distance, 0)
   const uncappedMs = (totalDistance + rampIn + rampOut) * timing.durationPerDistanceMs
+  const minWalkDurationMs = timing.minWalkDurationMs ?? 0
   const pace = uncappedMs > timing.maxWalkDurationMs
     ? timing.durationPerDistanceMs * (timing.maxWalkDurationMs / uncappedMs)
-    : timing.durationPerDistanceMs
+    : uncappedMs > 0 && uncappedMs < minWalkDurationMs
+      ? timing.durationPerDistanceMs * (minWalkDurationMs / uncappedMs)
+      : timing.durationPerDistanceMs
   return segments.map((segment, index) => {
     const segmentRampIn = index === 0 ? rampIn : 0
     const segmentRampOut = index === count - 1 ? rampOut : 0

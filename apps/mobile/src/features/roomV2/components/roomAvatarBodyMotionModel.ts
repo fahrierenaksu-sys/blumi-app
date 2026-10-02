@@ -130,6 +130,42 @@ export function getRoomAvatarStridePhaseDelta(distancePx: number, avatarBoxHeigh
   return distancePx / cyclePx
 }
 
+/** A step is half a walk cycle; a foot plants at every multiple of it. */
+export const ROOM_AVATAR_STRIDE_STEP_PHASE = 0.5
+
+/** On-screen length of a walk path given in stage-relative points. */
+export function getRoomAvatarWalkPathPx(
+  path: readonly { x: number; y: number }[],
+  stageWidthPx: number,
+  stageHeightPx: number
+): number {
+  "worklet"
+  let total = 0
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1]!
+    const to = path[index]!
+    total += Math.hypot((to.x - from.x) * stageWidthPx, (to.y - from.y) * stageHeightPx)
+  }
+  return total
+}
+
+/**
+ * How fast the feet cycle relative to the distance alone, for one walk of
+ * `walkPx` that starts at stride `phase`. The walk takes whole steps and at
+ * least one, so a tap right beside the avatar still steps instead of
+ * sliding, and every walk (a retarget mid-step included) ends on a planted
+ * foot. Long walks stay within half a step of the distance-locked cadence.
+ */
+export function getRoomAvatarStrideGain(phase: number, walkPx: number, avatarBoxHeightPx: number): number {
+  "worklet"
+  const natural = getRoomAvatarStridePhaseDelta(walkPx, avatarBoxHeightPx)
+  if (!(natural > 0) || !Number.isFinite(phase)) return 1
+  const step = ROOM_AVATAR_STRIDE_STEP_PHASE
+  const nearestPlant = Math.round((phase + natural) / step) * step
+  const firstPlantAfterAStep = Math.ceil((phase + step) / step - 1e-6) * step
+  return (Math.max(nearestPlant, firstPlantAfterAStep) - phase) / natural
+}
+
 /** Advances a phase and keeps it in [0, 1). */
 export function advanceRoomAvatarStridePhase(phase: number, delta: number): number {
   "worklet"

@@ -44,7 +44,9 @@ The allowlists in that file are the tolerated debt and may only shrink (exceptio
 - `mobile-worklet-closure.test.mjs` compiles worklets with the real Babel and Worklets plugin.
   - A worklet sees only the names it captures in its body or receives as parameters, which is why default parameters break.
   - It may call only other worklets or functions from packages in `UI_SAFE_PACKAGES` (today Reanimated, Worklets, Gesture Handler), and it reaches JS through `scheduleOnRN`. When you add a UI-thread library such as Skia, add it to that list in the same change.
-  - Violations crash only on the device ("Property … doesn't exist"). Plain node tests can't see them.
+  - Violations crash only on the device ("Property … doesn't exist", "Tried to synchronously call a Remote Function"). Plain node tests can't see them.
+  - It compiles with the caller Metro uses, including `experiments.reactCompiler` from `app.json`, and judges compiler-made names (`_temp`) by the compiled module, aliases included.
+  - The React Compiler is off. Turned on in `a9dc1f7`, it hoisted a capture-free helper inside a worklet to a module-level `_temp`, which the Worklets plugin then shipped as a plain JS function: My Room crashed on the first floor tap (2026-10-02). Nothing in Expo SDK 57 keeps the compiler out of worklet bodies. Before turning it on again, prove every worklet survives it (this test with the flag on) and measure render counts on a device.
 - `mobile-theme-scope.test.mjs` pins the approved palette tokens (owner-approved look).
 
 `test:accessibility` runs `mobile-accessibility-baseline.test.mjs`: every `Pressable`, `TextInput` and `FieldInput` in a non-test `.tsx` under `src` needs an accessible role and name.

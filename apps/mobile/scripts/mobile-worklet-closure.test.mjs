@@ -156,12 +156,15 @@ function classifyName(file, name, seen = new Set()) {
     VariableDeclarator(path) {
       if (path.node.id?.type !== "Identifier" || path.node.id.name !== name) return
       let init = path.node.init
-      if (init?.type === "CallExpression" && init.callee.type === "Identifier" &&
-        ["useCallback", "useMemo"].includes(init.callee.name)) {
+      if (init?.type === "CallExpression" && init.callee.type === "Identifier" && init.callee.name === "useCallback") {
         init = init.arguments[0]
-        if (init?.type === "ArrowFunctionExpression" && init.callee === undefined && init.body.type !== "BlockStatement" && isFunctionNode(init.body)) {
-          init = init.body
-        }
+      } else if (init?.type === "CallExpression" && init.callee.type === "Identifier" && init.callee.name === "useMemo") {
+        // useMemo holds what its factory returns: a function only when the
+        // factory's expression body is one.
+        const factory = init.arguments[0]
+        init = factory?.type === "ArrowFunctionExpression" && factory.body.type !== "BlockStatement"
+          ? factory.body
+          : undefined
       }
       result = isFunctionNode(init) ? (hasWorkletDirective(init) ? "worklet" : "plain") : "unknown"
       path.stop()
@@ -170,9 +173,17 @@ function classifyName(file, name, seen = new Set()) {
   return result
 }
 
-// Names a worklet calls that it received through this.__closure.
-function findClosureCalls(code) {
+// Functions that only hand a JS function back to the JS thread.
+const JS_HANDOFF_CALLEES = new Set(["scheduleOnRN", "runOnJS"])
+
+// How a worklet uses the names it received through this.__closure:
+// `called` names are called directly; `used` names are read any other way
+// (aliased, passed on, stored) except as the function handed to
+// scheduleOnRN/runOnJS. A plain function read through an alias
+// (`const config = _temp; config(x)`) crashes exactly like a direct call.
+function findClosureUses(code) {
   const called = new Set()
+  const used = new Set()
   const closureNames = new Set()
   traverse(parse(code, { sourceType: "script" }), {
     VariableDeclarator(path) {
@@ -184,50 +195,181 @@ function findClosureCalls(code) {
         }
       }
     },
-    CallExpression(path) {
-      if (path.node.callee.type === "Identifier") called.add(path.node.callee.name)
+    ReferencedIdentifier(path) {
+      const name = path.node.name
+      // Only references that resolve to the closure itself (a nested
+      // worklet's factory parameters shadow the same names).
+      const binding = path.scope.getBinding(name)
+      const init = binding?.path.isVariableDeclarator() ? binding.path.node.init : undefined
+      if (!(init?.type === "MemberExpression" && init.object.type === "ThisExpression" &&
+        init.property.name === "__closure")) return
+      const parent = path.parentPath
+      if (parent.isCallExpression() && parent.node.callee === path.node) {
+        called.add(name)
+        return
+      }
+      if (parent.isCallExpression() && parent.node.arguments[0] === path.node &&
+        parent.node.callee.type === "Identifier" && JS_HANDOFF_CALLEES.has(parent.node.callee.name)) {
+        return
+      }
+      // Rebuilding a nested worklet's factory passes its captured names on;
+      // that worklet's own code is checked separately.
+      if (parent.isObjectProperty() && parent.node.value === path.node &&
+        parent.parentPath.parentPath?.isCallExpression() &&
+        /Factory$/.test(parent.parentPath.parentPath.node.callee.id?.name ?? "")) {
+        return
+      }
+      used.add(name)
     }
   })
-  return [...called].filter((name) => closureNames.has(name) && !name.startsWith("_worklet_"))
+  const fromClosure = (name) => closureNames.has(name) && !name.startsWith("_worklet_")
+  return {
+    called: [...called].filter(fromClosure),
+    used: [...used].filter((name) => fromClosure(name) && !called.has(name))
+  }
 }
 
-const files = listCandidateFiles(srcRoot)
-// Metro tells babel-preset-expo to run the React Compiler before the worklets
-// plugin when app.json turns it on; compile the same way here, because the
-// compiler rewrites the components that hold worklets.
-const supportsReactCompiler =
-  JSON.parse(readFileSync(join(mobileRoot, "app.json"), "utf8")).expo.experiments?.reactCompiler === true
+// Kept for the probe test below: names a worklet calls from its closure.
+function findClosureCalls(code) {
+  return findClosureUses(code).called
+}
 
-test("worklet code shipped to the UI thread has every name it uses", () => {
-  assert.ok(files.length > 5, `expected to find the app's animation files, found ${files.length}`)
-  const failures = []
-  const unknownCalls = []
-  let workletCount = 0
-  let classifiedCalls = 0
-  for (const file of files) {
-    const compiled = babel.transformFileSync(file, {
-      cwd: mobileRoot,
-      configFile: join(mobileRoot, "babel.config.js"),
-      caller: { name: "metro", bundler: "metro", platform: "ios", supportsReactCompiler },
-      sourceMaps: false
-    }).code
-    for (const code of extractWorkletCodes(compiled)) {
-      workletCount += 1
-      const name = code.match(/^function\s+([\w$]+)/)?.[1] ?? "<anonymous>"
-      const where = `${relative(srcRoot, file).split(sep).join("/")} ${name}`
-      for (const problem of findUnboundNames(code)) failures.push(`${where}: ${problem}`)
-      for (const callee of findClosureCalls(code)) {
-        const kind = classifyName(file, callee)
-        if (kind === "worklet" || kind === "ui-safe") classifiedCalls += 1
-        if (kind === "plain") failures.push(`${where}: calls non-worklet function '${callee}' on the UI thread`)
-        if (kind === "unknown") unknownCalls.push(`${where}: '${callee}'`)
+// Top-level functions of the compiled module (what Metro actually ships).
+// The React Compiler hoists functions that capture nothing to module scope
+// as `_temp`, `_temp2`, … even when they sit inside a worklet; the Worklets
+// plugin then sees a plain function, not a worklet. A worklet function
+// declaration compiles to a factory call, so a remaining function
+// declaration or function expression is plain.
+function classifyCompiledTopLevel(compiled) {
+  const kinds = new Map()
+  for (const statement of parse(compiled, { sourceType: "module" }).program.body) {
+    if (statement.type === "FunctionDeclaration" && statement.id) {
+      kinds.set(statement.id.name, "plain")
+    } else if (statement.type === "VariableDeclaration") {
+      for (const declarator of statement.declarations) {
+        if (declarator.id.type !== "Identifier") continue
+        if (isFunctionNode(declarator.init)) kinds.set(declarator.id.name, "plain")
       }
     }
   }
+  return kinds
+}
+
+function classifyClosureName(file, compiledKinds, name) {
+  // Only names the compiler or the plugins introduced are judged by the
+  // compiled module; everything else is judged by the source as written.
+  if (/^_temp\d*$/.test(name) && compiledKinds.has(name)) return compiledKinds.get(name)
+  const fromSource = classifyName(file, name)
+  if (fromSource !== "unknown") return fromSource
+  return compiledKinds.get(name) ?? "unknown"
+}
+
+const files = listCandidateFiles(srcRoot)
+// Metro (@expo/metro-config's babel transformer) tells babel-preset-expo to
+// run the React Compiler before the worklets plugin when app.json turns it
+// on, so the check compiles with the caller a device build uses.
+const supportsReactCompiler =
+  JSON.parse(readFileSync(join(mobileRoot, "app.json"), "utf8")).expo.experiments?.reactCompiler === true
+
+function compileLikeMetro(file, options) {
+  return babel.transformFileSync(file, {
+    cwd: mobileRoot,
+    configFile: join(mobileRoot, "babel.config.js"),
+    caller: {
+      name: "metro",
+      bundler: "metro",
+      platform: "ios",
+      engine: "hermes",
+      isDev: options.isDev,
+      isServer: false,
+      isNodeModule: false,
+      isHMREnabled: true,
+      projectRoot: mobileRoot,
+      supportsReactCompiler: options.supportsReactCompiler ? true : undefined
+    },
+    sourceMaps: false
+  }).code
+}
+
+function newReport() {
+  return { failures: [], unknownCalls: [], workletCount: 0, classifiedCalls: 0 }
+}
+
+function checkWorklets(file, compiled, report) {
+  const compiledKinds = classifyCompiledTopLevel(compiled)
+  for (const code of extractWorkletCodes(compiled)) {
+    report.workletCount += 1
+    const name = code.match(/^function\s+([\w$]+)/)?.[1] ?? "<anonymous>"
+    const where = `${relative(srcRoot, file).split(sep).join("/")} ${name}`
+    for (const problem of findUnboundNames(code)) report.failures.push(`${where}: ${problem}`)
+    const { called, used } = findClosureUses(code)
+    for (const callee of called) {
+      const kind = classifyClosureName(file, compiledKinds, callee)
+      if (kind === "worklet" || kind === "ui-safe") report.classifiedCalls += 1
+      if (kind === "plain") report.failures.push(`${where}: calls non-worklet function '${callee}' on the UI thread`)
+      if (kind === "unknown") report.unknownCalls.push(`${where}: '${callee}'`)
+    }
+    for (const value of used) {
+      if (classifyClosureName(file, compiledKinds, value) === "plain") {
+        report.failures.push(`${where}: uses non-worklet function '${value}' on the UI thread`)
+      }
+    }
+  }
+  return report
+}
+
+test("worklet code shipped to the UI thread has every name it uses", () => {
+  assert.ok(files.length > 5, `expected to find the app's animation files, found ${files.length}`)
+  const report = newReport()
+  for (const file of files) {
+    // A device dev build (the 2026-10-02 crash) and a release bundle compile
+    // worklets the same way; dev only adds React Refresh and stack details.
+    checkWorklets(file, compileLikeMetro(file, { isDev: true, supportsReactCompiler }), report)
+  }
+  const { failures, unknownCalls, workletCount, classifiedCalls } = report
   assert.ok(workletCount > 10, `expected many worklets, found ${workletCount}`)
   assert.ok(classifiedCalls > 10, `expected the checker to classify worklet calls, classified ${classifiedCalls}`)
   assert.deepEqual(failures, [], "pass the value through the closure (use it in the body) or a parameter; mark called functions 'worklet' or use scheduleOnRN")
   assert.deepEqual(unknownCalls, [], "a worklet calls a closure function whose origin the checker cannot classify; mark it 'worklet' or extend the checker")
+})
+
+// The 2026-10-02 My Room crash: with the React Compiler on, a capture-free
+// helper declared inside a worklet was hoisted to a module-level `_temp`,
+// reached the UI thread as a plain JS function through an alias
+// (`const config = _temp`) and threw "Tried to synchronously call a Remote
+// Function. Called "_temp"" on the first floor tap.
+test("the checker flags a compiler-hoisted helper that a worklet calls through an alias", () => {
+  const directory = mkdtempSync(join(tmpdir(), "blumi-worklet-compiler-probe-"))
+  try {
+    const probe = join(directory, "useProbeWalk.ts")
+    writeFileSync(probe, [
+      "import { useCallback } from \"react\"",
+      "import { useSharedValue, withSequence, withTiming } from \"react-native-reanimated\"",
+      "import { runOnUISync } from \"react-native-worklets\"",
+      "",
+      "export function useProbeWalk() {",
+      "  const progress = useSharedValue(0)",
+      "  return useCallback((durations: readonly number[]) => {",
+      "    runOnUISync(() => {",
+      "      \"worklet\"",
+      "      const config = (duration: number) => ({ duration })",
+      "      progress.value = withSequence(...durations.map((duration, index) => withTiming(index + 1, config(duration))))",
+      "    })",
+      "  }, [progress])",
+      "}",
+      ""
+    ].join("\n"))
+    const compiled = checkWorklets(probe, compileLikeMetro(probe, { isDev: true, supportsReactCompiler: true }), newReport())
+    assert.ok(compiled.workletCount > 0)
+    assert.ok(
+      compiled.failures.some((failure) => /non-worklet function '_temp\d*'/.test(failure)),
+      `expected the hoisted helper to be flagged, got ${JSON.stringify(compiled.failures)}`
+    )
+    const plain = checkWorklets(probe, compileLikeMetro(probe, { isDev: true, supportsReactCompiler: false }), newReport())
+    assert.deepEqual(plain.failures, [])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test("the checker catches a default parameter that names an imported constant", () => {
