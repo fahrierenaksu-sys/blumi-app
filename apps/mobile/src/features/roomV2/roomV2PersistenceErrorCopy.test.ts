@@ -5,27 +5,32 @@ import { getRoomV2PersistenceErrorMessageForDisplay } from "./roomV2PersistenceE
 const technicalError =
   "fetch failed: UnexpectedException: Could not connect to the server. (at ExpoModulesCore/Promise.swift:56)"
 
+const technicalFragments = ["fetch failed", "UnexpectedException", "Promise.swift", "ExpoModulesCore"]
+
 test("Room persistence errors preserve the available local state without technical diagnostics", () => {
-  assert.equal(
-    getRoomV2PersistenceErrorMessageForDisplay("load", technicalError, {
+  const messages = {
+    loadWithLocalRoom: getRoomV2PersistenceErrorMessageForDisplay("load", technicalError, {
       hasLocalRoom: true
     }),
-    "Your room is available offline. We couldn't sync it yet."
-  )
-  assert.equal(
-    getRoomV2PersistenceErrorMessageForDisplay("load", technicalError, {
+    loadWithoutLocalRoom: getRoomV2PersistenceErrorMessageForDisplay("load", technicalError, {
       hasLocalRoom: false
     }),
-    "A fresh room is ready on this device. We couldn't sync your saved room yet."
-  )
-  assert.equal(
-    getRoomV2PersistenceErrorMessageForDisplay("sync", technicalError),
-    "Your room is saved on this device. We couldn't sync it yet. Try again later."
-  )
-  assert.equal(
-    getRoomV2PersistenceErrorMessageForDisplay("sync", technicalError, {
+    syncSavedOnDevice: getRoomV2PersistenceErrorMessageForDisplay("sync", technicalError),
+    syncNotSavedOnDevice: getRoomV2PersistenceErrorMessageForDisplay("sync", technicalError, {
       isSavedOnDevice: false
-    }),
-    "Your room is open, but the latest change could not be saved on this device or synced yet. Keep this screen open and try again."
+    })
+  }
+
+  for (const [state, message] of Object.entries(messages)) {
+    assert.equal(typeof message, "string", state)
+    assert.ok(message.trim().length > 0, `${state} shows a message`)
+    for (const fragment of technicalFragments) {
+      assert.equal(message.includes(fragment), false, `${state} must not show "${fragment}"`)
+    }
+  }
+  assert.equal(
+    new Set(Object.values(messages)).size,
+    Object.keys(messages).length,
+    "each local-state situation explains itself differently"
   )
 })

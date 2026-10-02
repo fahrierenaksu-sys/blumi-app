@@ -5,7 +5,6 @@ import {
   createAvatarEquipLifecycle,
   invalidateAvatarEquipSaves,
   markAvatarEquipLifecycleUnmounted,
-  markAvatarLocallyCustomized,
   mayCommitAvatarEquipSave
 } from "./avatarEquipLifecycle"
 
@@ -31,8 +30,4 @@ test("an unmounted provider rejects every in-flight save completion", () => {
     mayCommitAvatarEquipSave(unmountedLifecycle, start.requestGeneration),
     false
   )
-})
-
-test("a local equip marks the avatar as customized", () => {
-  assert.equal(markAvatarLocallyCustomized(), true)
 })

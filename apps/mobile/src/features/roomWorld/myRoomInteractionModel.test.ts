@@ -77,15 +77,23 @@ test("my room walk action skips targets blocked by authored room geometry", () =
 })
 
 test("wide stage camera keeps avatar feet inside the authored lower-third", () => {
-  const translateY = getWideStageRendererTranslateY({
+  const input = {
     stageWidth: 720,
     stageHeight: 420,
     shellCanvasWidth: 1024,
     shellCanvasHeight: 768,
     avatarWorldY: 0.84
-  })
+  }
+  const translateY = getWideStageRendererTranslateY(input)
+  const rendererHeight = input.stageWidth * input.shellCanvasHeight / input.shellCanvasWidth
+  const rendererTop = (input.stageHeight - rendererHeight) / 2 + translateY
+  const feetY = rendererTop + rendererHeight * input.avatarWorldY
 
-  assert.equal(translateY, -49)
+  assert.ok(translateY <= 0)
+  assert.ok(feetY >= input.stageHeight * 2 / 3 && feetY <= input.stageHeight, `feet at ${feetY}`)
+  // The shell always covers the stage: no edge is revealed above or below.
+  assert.ok(rendererTop <= 0.5)
+  assert.ok(rendererTop + rendererHeight >= input.stageHeight - 0.5)
 })
 
 test("default My Room chair exposes a reachable seat from the avatar spawn", () => {

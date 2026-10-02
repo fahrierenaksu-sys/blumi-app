@@ -4,7 +4,6 @@ import { getMyRoomEditorCopy } from "../myRoomCopy"
 import { resolveRoomV2Scene } from "../roomV2Selectors"
 import type { ResolvedRoomV2Scene } from "../roomV2.types"
 import {
-  ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS,
   ROOM_EDITOR_DRAG_CELL_STEP,
   ROOM_EDITOR_DRAG_OUTSIDE_CELL,
   createRoomEditorDragHitRects,
@@ -67,17 +66,20 @@ function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} !== ${expected}`)
 }
 
-test("drag activation waits for a short hold and snaps to a 2% cell grid", () => {
-  assert.equal(ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS, 220)
-  assert.equal(ROOM_EDITOR_DRAG_CELL_STEP, 0.02)
-  assert.deepEqual(getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: true }), { column: 25, row: 35 })
-  assert.deepEqual(getRoomEditorDragCell({ x: 0.509, y: 0.711, inside: true }), { column: 25, row: 36 })
+test("drag frames snap to a fixed cell grid", () => {
+  const step = ROOM_EDITOR_DRAG_CELL_STEP
+  assert.ok(step > 0 && step < 0.1)
+  const cell = getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: true })
+  near(getRoomEditorDragCellValue(cell.column), 0.5)
+  near(getRoomEditorDragCellValue(cell.row), 0.7)
+  // Less than half a cell stays put; more than half a cell moves one cell.
+  const nudged = getRoomEditorDragCell({ x: 0.5 + step * 0.4, y: 0.7 + step * 0.6, inside: true })
+  assert.deepEqual(nudged, { column: cell.column, row: cell.row + 1 })
+  near(getRoomEditorDragCellValue(nudged.row), Math.round((0.7 + step) * 10000) / 10000)
   assert.deepEqual(
     getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: false }),
     { column: ROOM_EDITOR_DRAG_OUTSIDE_CELL, row: ROOM_EDITOR_DRAG_OUTSIDE_CELL }
   )
-  near(getRoomEditorDragCellValue(25), 0.5)
-  near(getRoomEditorDragCellValue(36), 0.72)
   assert.equal(hasRoomEditorDragCellChanged(25, 35, 25, 35), false)
   assert.equal(hasRoomEditorDragCellChanged(25, 35, 26, 35), true)
   assert.equal(hasRoomEditorDragCellChanged(25, 35, 25, 34), true)

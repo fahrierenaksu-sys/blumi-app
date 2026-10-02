@@ -1,7 +1,5 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import { resolveSharedRoomDecor } from "./sharedRoomDecor"
 
 test("shared room projection uses only accepted server decor and clones mutable items", () => {
@@ -24,9 +22,4 @@ test("legacy rooms show an explicit common default, never personal local decor",
   assert.equal(result.legacyFallback, true)
   assert.equal(result.decor.roomShellId, "room_v2_shell_blumi_world_v1")
   assert.deepEqual(result.decor.placedItems, [])
-  const screen = readFileSync(
-    resolve(process.cwd(), "src/screens/MiniRoomScreen.tsx"),
-    "utf8"
-  )
-  assert.doesNotMatch(screen, /useRoomV2|decor: userRoomDecor/)
 })

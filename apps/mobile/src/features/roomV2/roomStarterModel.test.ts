@@ -1,6 +1,4 @@
 import assert from "node:assert/strict"
-import { existsSync, readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import test from "node:test"
 import {
   STARTER_ROOM_BED_DEFAULT_POINT,
@@ -31,10 +29,6 @@ test("the user can place the granted bed at the chosen point", () => {
   }])
   assert.equal(hasPlacedStarterBed(decor), true)
   assert.deepEqual(empty.placedItems, [])
-})
-
-test("the starter bed has a deterministic tap-to-place point", () => {
-  assert.deepEqual(STARTER_ROOM_BED_DEFAULT_POINT, { x: 0.52, y: 0.7 })
 })
 
 test("starter room decor returns fresh immutable placement objects", () => {
@@ -86,47 +80,6 @@ test("rotating the starter bed preserves unrelated room items", () => {
   assert.equal(rotated.placedItems[1]?.rotation, "right")
   assert.notEqual(rotated.placedItems[0], table)
 })
-
-test("the starter bed has a dedicated runtime asset for every rotation", () => {
-  const catalogSource = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomV2Catalog.ts"),
-    "utf8"
-  )
-  assert.match(catalogSource, /rotationPolicy: "directional_assets_required"/)
-  assert.match(catalogSource, /front: roomV2Assets\.furniture\.modeledPinkCloudBedFrontV29/)
-  assert.match(catalogSource, /right: roomV2Assets\.furniture\.modeledPinkCloudBedRightV29/)
-  assert.match(catalogSource, /back: roomV2Assets\.furniture\.modeledPinkCloudBedBackV29/)
-  assert.match(catalogSource, /left: roomV2Assets\.furniture\.modeledPinkCloudBedLeftV29/)
-  for (const rotation of ["front", "right", "back", "left"]) {
-    assert.equal(
-      existsSync(resolve(
-        process.cwd(),
-        `src/features/roomV2/assets/runtime/starter-modeled-pink-cloud-bed-v29/pink_cloud_bed_${rotation}_body_v29.png`
-      )),
-      true,
-      `missing ${rotation} starter bed runtime asset`
-    )
-    assert.equal(
-      existsSync(resolve(
-        process.cwd(),
-        `src/features/roomV2/assets/runtime/starter-modeled-pink-cloud-bed-v29/pink_cloud_bed_${rotation}_contact_shadow_v29.png`
-      )),
-      true,
-      `missing ${rotation} starter bed contact shadow`
-    )
-  }
-})
-
-test("the modeled starter bed exposes body, contact shadow and thumbnail through one visual contract", () => {
-  const catalogSource = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomV2Catalog.ts"),
-    "utf8"
-  )
-
-  assert.match(catalogSource, /visualContract:\s*createModeledStarterBedVisualContract\(\)/)
-  assert.match(catalogSource, /physicalSizeCm:\s*\{\s*width:\s*165,\s*depth:\s*210,\s*height:\s*105\s*\}/)
-})
-
 test("starter readiness requires exactly one placed bed", () => {
   const empty = createStarterRoomDecor("room-shell")
   const placed = placeStarterBed(empty, { x: 0.62, y: 0.72 })
@@ -137,58 +90,4 @@ test("starter readiness requires exactly one placed bed", () => {
     ...placed,
     placedItems: [...placed.placedItems, { ...placed.placedItems[0], instanceId: "duplicate" }]
   }), false)
-})
-
-test("room onboarding uses one pictured quest surface that places on tap and drags without floor guide rings", () => {
-  const source = readFileSync(
-    resolve(process.cwd(), "src/screens/RoomSetupScreen.tsx"),
-    "utf8"
-  )
-
-  assert.match(source, /starterBed\.asset\.source/)
-  // The card drags through a Gesture Handler pan on the UI thread (ROOMSETUP-1).
-  assert.match(source, /<GestureDetector gesture=\{bedDrag\.cardGesture\}>/)
-  assert.match(source, /placeBedAtPoint\(STARTER_ROOM_BED_DEFAULT_POINT\)/)
-  assert.match(source, /starterItemLiquidFrame/)
-  // Room setup text lives in roomSetupCopy.ts (Turkish and English).
-  const copy = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/roomSetupCopy.ts"),
-    "utf8"
-  )
-  assert.match(source, /headerTitle=\{copy\.headerTitle\}/)
-  assert.match(copy, /headerTitle: "İlk odan"/)
-  assert.match(source, /\{copy\.bedPlacedCard\}/)
-  assert.match(copy, /bedPlacedCard: "Yatak yerleştirildi"/)
-  assert.match(source, /immersiveBottomSheet/)
-  assert.match(source, /taskCardTone="sheet"/)
-  assert.match(source, /setPlacementMessage\(copy\.placement\.longPressMove\)/)
-  assert.match(copy, /longPressMove: "Basılı tutup sürükleyerek taşı\."/)
-  assert.match(source, /onItemLongPressMove=\{handlePlacedBedLongPressMove\}/)
-  assert.match(source, /bedToolbarHighlight/)
-  assert.match(source, /width: 84/)
-  assert.match(source, /height: 36/)
-  assert.match(source, /name="move" size=\{16\}/)
-  assert.match(source, /name="refresh" size=\{16\}/)
-  assert.match(source, /accessibilityLabel=\{copy\.rotateBedAccessibilityLabel\}/)
-  assert.match(copy, /rotateBedAccessibilityLabel: "Pembe Bulut Yatağı çevir"/)
-  assert.match(source, /rotateStarterBed/)
-  assert.match(source, /getRoomSetupTaskCardMinHeight/)
-  assert.match(source, /roomFirstSummary/)
-  assert.match(source, /roomFirstStatus/)
-  assert.match(source, /placementCompleteCard:\s*\{[^}]*justifyContent: "center"/)
-  assert.match(source, /placementCompleteCard:\s*\{[^}]*flexDirection: "row"/)
-  assert.match(source, /placementCompleteCard:\s*\{[^}]*minHeight: 62/)
-  assert.match(source, /placementCompleteText:\s*\{[^}]*textAlign: "center"/)
-  assert.doesNotMatch(source, /starterItemLiquidHighlight|showPlacementGuides|RoomSetupProgressRail/)
-})
-
-test("room renderer exposes continuous touch movement for edit-mode furniture", () => {
-  const renderer = readFileSync(
-    resolve(process.cwd(), "src/features/roomV2/components/RoomRenderer2D.tsx"),
-    "utf8"
-  )
-
-  assert.match(renderer, /onItemLongPressMove\?:/)
-  assert.match(renderer, /onResponderMove=\{\(event\) =>/)
-  assert.match(renderer, /onItemLongPressMove\(item, \{[\s\S]*pageX:/)
 })

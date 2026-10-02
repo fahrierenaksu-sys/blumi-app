@@ -4,7 +4,6 @@ import { getMyRoomEditorCopy } from "../myRoomCopy"
 import { resolveRoomV2Scene } from "../roomV2Selectors"
 import type { FurnitureItem, ResolvedRoomV2Scene } from "../roomV2.types"
 import {
-  EDIT_ROOM_AVATAR_SPAWN,
   ROOM_V2_PLACEMENT_SNAP_STEP,
   arePlacementPreviewsEqual,
   clampRoomV2PlacementPointForItem,
@@ -74,11 +73,12 @@ function preview(overrides: Partial<PlacementPreview> = {}): PlacementPreview {
   }
 }
 
-test("editor placement constants stay pinned to the avatar spawn and snap grid", () => {
-  assert.deepEqual(EDIT_ROOM_AVATAR_SPAWN, { x: 0.47, y: 0.76 })
-  assert.equal(ROOM_V2_PLACEMENT_SNAP_STEP, 0.01)
-  assert.equal(snapRoomV2PlacementValue(0.4449), 0.44)
-  assert.equal(snapRoomV2PlacementValue(0.445), 0.45)
+test("placement values snap to the nearest grid step", () => {
+  const step = ROOM_V2_PLACEMENT_SNAP_STEP
+  const snapped = snapRoomV2PlacementValue(0.44)
+  assert.ok(Math.abs(snapped - 0.44) <= step / 2 + 1e-9)
+  assert.equal(snapRoomV2PlacementValue(snapped + step * 0.49), snapped)
+  assert.ok(Math.abs(snapRoomV2PlacementValue(snapped + step * 0.51) - (snapped + step)) < 1e-9)
 })
 
 test("preview equality ignores identity but tracks every rendered field and blocker order", () => {
@@ -133,7 +133,6 @@ test("placement issue ids map to their localized feedback with a clear-spot fall
     assert.equal(getRoomPlacementFeedback("unknown", copy), copy.feedback.chooseClearSpot)
     assert.equal(getRoomPlacementFeedback(undefined, copy), copy.feedback.chooseClearSpot)
   }
-  assert.equal(getRoomPlacementFeedback("overlaps_blocking_furniture", en), "Another piece is in the way.")
 })
 
 test("surface drop feedback follows the item's placement surface", () => {

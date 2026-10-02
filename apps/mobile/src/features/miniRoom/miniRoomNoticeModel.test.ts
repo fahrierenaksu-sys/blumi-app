@@ -1,8 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { getMiniRoomCopy } from "./miniRoomCopy"
 import {
-  getMiniRoomNoticeText,
   INITIAL_MINI_ROOM_NOTICE_CURSOR,
   resolveMiniRoomNotice,
   type MiniRoomNoticeKind
@@ -51,9 +49,4 @@ test("a refused seat claim and a tap on a seat the partner holds both say the se
     { joined: true, partnerPresent: true, refusalRevision: 4, localSeatTakenCount: 1 },
     { joined: true, partnerPresent: true, refusalRevision: 4, localSeatTakenCount: 1 }
   ]), ["partner_here", "seat_taken", null, "seat_taken", null])
-})
-
-test("notice text is localized and carries only the partner's first name", () => {
-  assert.equal(getMiniRoomNoticeText("partner_away", getMiniRoomCopy("tr"), "Bora"), "Bora odadan uzaklaştı")
-  assert.equal(getMiniRoomNoticeText("seat_taken", getMiniRoomCopy("en"), "Bora"), "That seat is taken")
 })

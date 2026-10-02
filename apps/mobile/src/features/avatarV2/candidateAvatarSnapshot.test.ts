@@ -79,20 +79,16 @@ test("a trusted remote snapshot keeps its server-derived body preset", () => {
   assert.equal(snapshot.bodyPreset, "male")
 })
 
-test("female preview seeds keep their deterministic wardrobe variants", () => {
-  const cases = [
-    ["d", "room_avatar_top_female_blush_lace_cardigan_v2"],
-    ["a", "room_avatar_top_female_noir_rose_heart_cardigan_v2"],
-    ["b", "room_avatar_top_female_powder_blue_ribbon_corset_top_v2"],
-    ["c", "room_avatar_top_female_sage_ribbon_knit_jacket_v2"]
-  ] as const
-
-  for (const [userId, topId] of cases) {
-    const snapshot = createCandidateAvatarSnapshot({
-      userId,
-      displayName: "Candidate"
-    })
-    assert.equal(createCandidateAvatarAppearance(snapshot).topId, topId)
+test("female preview seeds are deterministic and render without fallback layers", () => {
+  for (const userId of ["a", "b", "c", "d", "candidate-42"]) {
+    const first = createCandidateAvatarSnapshot({ userId, displayName: "Candidate" })
+    const second = createCandidateAvatarSnapshot({ userId, displayName: "Candidate" })
+    assert.deepEqual(first, second, userId)
+    const appearance = createCandidateAvatarAppearance(first)
+    assert.deepEqual(appearance, createCandidateAvatarAppearance(second), userId)
+    const layers = getRoomAvatarRenderLayers({ appearance })
+    assert.ok(layers.length > 0, userId)
+    assert.ok(layers.every((layer) => !layer.usingFallbackAsset), userId)
   }
 })
 

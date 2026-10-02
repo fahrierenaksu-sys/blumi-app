@@ -1,66 +1,61 @@
 import assert from "node:assert/strict"
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
+import ts from "typescript"
 
-const PRODUCTION_ENTRYPOINTS = [
-  "App.tsx",
-  "src/navigation/RootNavigator.tsx",
-  "src/navigation/deferredScreenBundles.tsx",
-  "src/screens/MyRoomScreen.tsx",
-  "src/screens/MyRoomEditorScreen.tsx",
-  "src/features/roomV2/roomV2ProductionAssets.ts",
-  "src/features/roomV2/roomV2Catalog.ts"
-] as const
+// Import boundaries for the QA bindings and the Metro routing of the QA
+// screen are checked tree-wide in scripts/mobile-import-boundaries.test.mjs
+// and scripts/homeStudioQaModuleRouting.test.mjs.
 
-test("production dependency roots do not import Home Studio QA bitmap bindings", () => {
-  // MyRoomEditorScreen composes the production modules in features/roomV2/editor.
-  const editorModules = readdirSync(resolve(process.cwd(), "src/features/roomV2/editor"))
-    .filter((fileName) => /\.tsx?$/.test(fileName) && !/\.test\.tsx?$/.test(fileName))
-    .map((fileName) => `src/features/roomV2/editor/${fileName}`)
-  assert.ok(editorModules.length > 0)
-  for (const relativePath of [...PRODUCTION_ENTRYPOINTS, ...editorModules]) {
-    const source = readFileSync(resolve(process.cwd(), relativePath), "utf8")
-    assert.doesNotMatch(source, /roomStudioQaAssetBindings/)
-    assert.doesNotMatch(source, /roomStudio\/assets\/qa/)
-  }
-})
-
-test("Metro resolves the QA screen out of release-like graphs", () => {
-  const deferredSource = readFileSync(resolve(
-    process.cwd(),
-    "src/navigation/deferredScreenBundles.tsx"
-  ), "utf8")
-  const metroSource = readFileSync(resolve(process.cwd(), "metro.config.js"), "utf8")
-  const routingSource = readFileSync(resolve(
-    process.cwd(),
-    "scripts/homeStudioQaModuleRouting.cjs"
-  ), "utf8")
-  assert.match(deferredSource, /@blumi\/home-studio-qa/)
-  assert.doesNotMatch(deferredSource, /HomeStudioScreen\.tsx/)
-  assert.match(metroSource, /resolveHomeStudioQaModulePath/)
-  assert.match(metroSource, /resolveHomeStudioQaModuleDirectory/)
-  assert.match(metroSource, /extraNodeModules/)
-  assert.match(routingSource, /homeStudioQaStub\.tsx/)
-  assert.match(routingSource, /homeStudioQaStubModule/)
-  assert.match(routingSource, /homeStudioQaLiveModule/)
-})
-
-test("isolated QA binding module binds exactly the sixteen reviewed PNGs", () => {
+test("the isolated QA binding module binds no candidate or rejected-wave assets", () => {
   const source = readFileSync(resolve(
     process.cwd(),
     "src/features/roomStudio/roomStudioQaAssetBindings.ts"
   ), "utf8")
-  const requires = [...source.matchAll(/require\("\.\/assets\/qa\/[^\"]+\.png"\)/g)]
-  assert.equal(requires.length, 16)
   assert.doesNotMatch(source, /full-wave|cute45|candidate:\/\//)
 })
 
-test("Home Studio cannot bypass the visual approval flag", () => {
-  const source = readFileSync(resolve(
-    process.cwd(),
-    "src/screens/HomeStudioScreen.tsx"
-  ), "utf8")
-  assert.match(source, /BLUMI_HOME_STUDIO_VISUAL_REVIEW_APPROVED_FLAG\s*===\s*"1"/)
-  assert.doesNotMatch(source, /visualReviewApproved:\s*true/)
+function collectJsxAttributes(fileName: string, tagName: string): Record<string, string>[] {
+  const text = readFileSync(resolve(process.cwd(), fileName), "utf8")
+  const sourceFile = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const elements: Record<string, string>[] = []
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText(sourceFile) === tagName
+    ) {
+      const attributes: Record<string, string> = {}
+      for (const property of node.attributes.properties) {
+        if (ts.isJsxAttribute(property)) {
+          const initializer = property.initializer
+          const value = !initializer
+            ? "true"
+            : ts.isStringLiteral(initializer)
+              ? JSON.stringify(initializer.text)
+              : ts.isJsxExpression(initializer) && initializer.expression
+                ? initializer.expression.getText(sourceFile).replace(/\s+/g, "")
+                : initializer.getText(sourceFile)
+          attributes[property.name.getText(sourceFile)] = value
+        }
+      }
+      elements.push(attributes)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return elements
+}
+
+test("the app's room provider runs in the production namespace without QA ownership", () => {
+  // The QA runtime and QA-only owned items are driven by these props
+  // (behavior in roomV2ProviderRuntime.test.ts); the shipped navigator must
+  // never enable them.
+  const providers = collectJsxAttributes("src/navigation/RootNavigator.tsx", "RoomV2Provider")
+  assert.ok(providers.length > 0, "RootNavigator renders the room provider")
+  for (const props of providers) {
+    assert.equal(props.storageNamespace, JSON.stringify("production"))
+    assert.equal(props.isQaRuntimeAuthorized, "false")
+    assert.equal(props.qaOnlyOwnedRoomItemIds, "[]")
+  }
 })

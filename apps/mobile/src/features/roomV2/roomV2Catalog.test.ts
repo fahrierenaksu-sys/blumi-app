@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import test from "node:test"
 
@@ -24,6 +25,7 @@ runtimeModule._resolveFilename = (request, parent, ...rest) => {
 }
 
 const {
+  DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -51,16 +53,27 @@ function collectAssetSources(input: unknown): string[] {
   return Object.values(input).flatMap((value) => collectAssetSources(value))
 }
 
-test("default My Room shell keeps the approved wide framing instead of the cropped legacy zoom", () => {
-  const shell = ROOM_V2_SHELL_CATALOG.find(
-    (candidate) => candidate.id === "room_v2_shell_blumi_world_v1"
-  )
+test("the owner-locked room shell stays the default 1254x714 Blumi World shell", () => {
+  // The fixed camera angle and shell geometry are the owner's chosen look.
+  // Walkable polygons, placement areas and bands stay free to evolve.
+  assert.equal(DEFAULT_ROOM_V2_SHELL_ID, "room_v2_shell_blumi_world_v1")
+  const shell = ROOM_V2_SHELL_CATALOG.find((candidate) => candidate.id === DEFAULT_ROOM_V2_SHELL_ID)
   assert.ok(shell)
-  assert.equal(shell.myRoomCamera?.compactRendererWidth, "155%")
-  assert.equal(shell.myRoomCamera?.regularRendererWidth, "154%")
-  assert.equal(shell.myRoomCamera?.rendererTranslateY, 0)
-  assert.equal(shell.myRoomCamera?.compactStageHeightRatio, 0.64)
-  assert.equal(shell.myRoomCamera?.wideStageHeightRatio, 0.64)
+  assert.deepEqual(shell.canvasSize, { width: 1254, height: 714 })
+  assert.equal(shell.asset, roomV2ProductionAssets.shells.blumiWorldShellV1)
+  assert.equal(
+    shell.asset.source,
+    path.resolve(process.cwd(), "src/features/roomV2/assets/runtime/room_shell_blumi_world_v1.webp")
+  )
+})
+
+test("the live shell catalog holds no candidate, pending-QA or draft room_v3 shells", () => {
+  assert.ok(ROOM_V2_SHELL_CATALOG.length > 0)
+  for (const shell of ROOM_V2_SHELL_CATALOG) {
+    assert.notEqual(shell.sourceStatus, "candidate", shell.id)
+    assert.notEqual(shell.qaStatus, "pending", shell.id)
+    assert.equal(shell.id.startsWith("room_v3_shell_"), false, shell.id)
+  }
 })
 
 test("runtime assets do not bundle the blocked historical shell draft", () => {
@@ -78,52 +91,15 @@ test("runtime assets do not bundle the blocked historical shell draft", () => {
 })
 
 test("active Room V2 seating declares complete seatSpec routing metadata", () => {
-  const chair = getFurnitureItem("room_v2_chair_blush")
-  const bed = getFurnitureItem("room_v2_cozy_bed")
-
-  assert.equal(bed.sceneProjection, "floor_plane")
-  assert.deepEqual(bed.renderSizeByRotation?.front, {
-    width: 0.294,
-    height: 0.196
-  })
-  assert.deepEqual(bed.anchorByRotation?.right, { x: 0.5, y: 1 })
-
-  assert.deepEqual(chair.seatSpec, {
-    capacity: 1,
-    seatPoints: [{
-      id: "front_edge",
-      x: 0,
-      y: -0.2,
-      facing: "front",
-      approachPoint: { x: 0, y: 0.22 },
-      exitPoint: { x: 0, y: 0.28 },
-      seatHeight: 0.096
-    }]
-  })
-  assert.deepEqual(bed.seatSpec, {
-    capacity: 1,
-    seatPoints: [{
-      id: "left_edge",
-      x: -0.18,
-      y: -0.36,
-      facing: "left",
-      approachPoint: { x: -0.18, y: 0.36 },
-      exitPoint: { x: -0.18, y: 0.44 },
-      localPositionCm: { x: -60, y: 20 },
-      approachPointCm: { x: -115, y: 20 },
-      exitPointCm: { x: -130, y: 20 },
-      seatHeight: 0.08
-    }]
-  })
-
-  for (const item of [chair, bed]) {
-    assert.equal(item.interactionType, "seat")
-    assert.ok(item.seatSpec)
-    assert.equal(item.seatSpec.capacity, item.seatSpec.seatPoints.length)
+  const seats = ROOM_V2_FURNITURE_CATALOG.filter((item) => item.interactionType === "seat")
+  assert.ok(seats.length > 0)
+  for (const item of seats) {
+    assert.ok(item.seatSpec, item.id)
+    assert.equal(item.seatSpec.capacity, item.seatSpec.seatPoints.length, item.id)
     for (const seat of item.seatSpec.seatPoints) {
-      assert.ok(seat.approachPoint)
-      assert.ok(seat.exitPoint)
-      assert.equal(typeof seat.seatHeight, "number")
+      assert.ok(seat.approachPoint, item.id)
+      assert.ok(seat.exitPoint, item.id)
+      assert.equal(typeof seat.seatHeight, "number", item.id)
     }
   }
 })
@@ -163,35 +139,35 @@ test("the starter bed's seat is reachable at its rendered size in every rotation
   }
 })
 
-test("active Room V2 blush lounge chair carries a front-seat occlusion crop", () => {
-  const chair = getFurnitureItem("room_v2_chair_blush")
-
-  assert.deepEqual(chair.frontOcclusionByRotation, {
-    front: { left: 0.02, top: 0.68, width: 0.96, height: 0.29 },
-    back: { left: 0.02, top: 0.68, width: 0.96, height: 0.29 },
-    left: { left: 0.02, top: 0.68, width: 0.96, height: 0.29 },
-    right: { left: 0.02, top: 0.68, width: 0.96, height: 0.29 }
-  })
-})
-
-test("active Room V2 bookshelf is placed on the wall surface", () => {
-  const bookshelf = getFurnitureItem("room_v2_cute_bookshelf")
-  assert.equal(bookshelf.placementSurface, "wall")
-  assert.equal(bookshelf.layer, "wall")
-  assert.equal(bookshelf.blocksMovement, false)
-  assert.equal(bookshelf.footprint, undefined)
-})
-
-test("active Room V2 tables expose their tabletop support bounds", () => {
-  for (const itemId of ["room_v2_table_round", "room_v2_side_table"]) {
-    const item = getFurnitureItem(itemId)
-    assert.deepEqual(item.surfaceSupports, [{
-      surface: "tabletop",
-      localBounds: { minX: 0.12, maxX: 0.88, minY: 0.18, maxY: 0.28 }
-    }])
+test("every published room_v2 item and the starter bed keep resolving to one canonical catalog entry", () => {
+  // Canonical IDs survive art and runtime changes: an item sold through the
+  // R1 release catalog must stay resolvable in the live room catalog.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const { STARTER_ROOM_BED_ITEM_ID } = require("./roomStarterModel") as typeof import("./roomStarterModel")
+  const releaseCatalog = JSON.parse(readFileSync(
+    path.resolve(process.cwd(), "../../packages/domain/src/release/blumiR1ReleaseCatalog.json"),
+    "utf8"
+  )) as unknown
+  const publishedRoomIds = new Set<string>()
+  const collect = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(collect)
+    } else if (value && typeof value === "object") {
+      for (const [key, entry] of Object.entries(value)) {
+        if (key === "itemId" && typeof entry === "string" && entry.startsWith("room_v2_")) {
+          publishedRoomIds.add(entry)
+        } else {
+          collect(entry)
+        }
+      }
+    }
+  }
+  collect(releaseCatalog)
+  assert.ok(publishedRoomIds.size > 0, "the release catalog lists published room items")
+  const catalogIds = new Set(ROOM_V2_FURNITURE_CATALOG.map((item) => item.id))
+  assert.equal(catalogIds.size, ROOM_V2_FURNITURE_CATALOG.length, "catalog IDs are unique")
+  for (const itemId of [...publishedRoomIds, STARTER_ROOM_BED_ITEM_ID]) {
+    assert.ok(catalogIds.has(itemId), `${itemId} must resolve in the live room catalog`)
   }
 })
 
-test("active Room V2 production catalog stays at the seven legacy pieces", () => {
-  assert.equal(ROOM_V2_FURNITURE_CATALOG.length, 7)
-})

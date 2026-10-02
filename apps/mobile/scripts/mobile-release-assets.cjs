@@ -2,7 +2,7 @@ const { readdirSync, readFileSync } = require("node:fs")
 const { extname, join, relative, resolve } = require("node:path")
 
 const RUNTIME_SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx"])
-const CANDIDATE_IMPORT = /\b(?:require\s*\(\s*|from\s*|import\s*)(["'])([^"']*(?:-candidate|candidate)\/[^"']+)\1/g
+const CANDIDATE_IMPORT = /\b(?:require\s*\(\s*|from\s*|import\s*)(["'])([^"']*(?:-candidate|candidate)s?\/[^"']+)\1/g
 
 function findCandidateAssetImports(sources) {
   const references = []

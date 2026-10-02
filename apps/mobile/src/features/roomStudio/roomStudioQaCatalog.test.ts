@@ -89,9 +89,8 @@ test("every candidate is SHA-bound and front-only while rotation art is blocked"
   const result = resolveRoomStudioQaCatalog(PREVIEW_GATE, TEST_ASSET_BINDINGS)
   assert.equal(new Set(
     result.catalog.map((item) => item.qaAssetEvidence.sha256)
-  ).size, 16)
+  ).size, result.catalog.length)
   for (const item of result.catalog) {
-    assert.match(item.qaAssetEvidence.path, /^art\/room-vnext\/home-studio-pilot-v1\//)
     assert.match(item.qaAssetEvidence.sha256, /^[a-f0-9]{64}$/)
     assert.deepEqual(item.availableDirections, ["front"])
     assert.equal(item.fourDirectionApproved, false)

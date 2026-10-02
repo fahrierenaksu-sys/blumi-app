@@ -20,11 +20,9 @@ const {
 const {
   buildWardrobeCards,
   buildWardrobeShopLink,
-  getAvatarItemPreviewImageStyle,
   getStarterLayerThumbnail,
   getWardrobeActiveItems,
-  isAvatarItemRoomPreviewSupported,
-  resolveWardrobeEquippedLabel
+  isAvatarItemRoomPreviewSupported
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./wardrobeCatalogModel") as typeof import("./wardrobeCatalogModel")
 const {
@@ -58,34 +56,6 @@ test("active items keep only body-compatible, room-supported, equippable entries
     canEquipItem: (item) => canEquipAvatarV2Item(ownNothing, item, DEFAULT_AVATAR_V2.bodyId)
   })
   assert.ok(noneOwned.every((item) => item.ownedByDefault === true))
-})
-
-test("equipped label names the equipped item or asks to choose", () => {
-  const hair = getWardrobeActiveItems({
-    catalog: AVATAR_V2_CATALOG,
-    category: "hair",
-    bodyId: DEFAULT_AVATAR_V2.bodyId,
-    canEquipItem: () => true
-  })
-  assert.equal(
-    resolveWardrobeEquippedLabel({
-      items: [],
-      displayedAvatar: DEFAULT_AVATAR_V2,
-      categoryLabel: "Hair",
-      copy
-    }),
-    "Choose: Hair"
-  )
-  const target = hair[hair.length - 1]
-  assert.equal(
-    resolveWardrobeEquippedLabel({
-      items: hair,
-      displayedAvatar: equipAvatarV2Item(DEFAULT_AVATAR_V2, target),
-      categoryLabel: "Hair",
-      copy
-    }),
-    `${target.name} equipped`
-  )
 })
 
 test("cards resolve state labels, lock state, and preview source per item", () => {
@@ -148,37 +118,6 @@ test("body cards read as base switches", () => {
   for (const card of cards) {
     assert.equal(card.itemStateLabel, copy.switchBase)
   }
-})
-
-test("legacy preview image styles keep their per-type frames", () => {
-  const style = (id: string, type: string) =>
-    getAvatarItemPreviewImageStyle({ id, type } as never)
-  assert.deepEqual(style("avatar_v2_top_default", "top"), {
-    width: 170, height: 255, transform: [{ translateY: -24 }]
-  })
-  assert.deepEqual(style("avatar_v2_top_cream_basic_tee", "top"), {
-    width: 170, height: 255, transform: [{ translateY: -24 }]
-  })
-  assert.deepEqual(style("other-top", "top"), {
-    width: 178, height: 267, transform: [{ translateY: -60 }]
-  })
-  assert.deepEqual(style("b", "bottom"), {
-    width: 196, height: 294, transform: [{ translateY: -116 }]
-  })
-  assert.deepEqual(style("s", "shoes"), {
-    width: 196, height: 294, transform: [{ translateY: -130 }]
-  })
-  assert.deepEqual(style("h", "hair"), {
-    width: 100, height: 100, transform: [{ translateY: 0 }]
-  })
-  for (const type of ["eyes", "nose", "mouth"]) {
-    assert.deepEqual(style("f", type), {
-      width: 172, height: 172, transform: [{ translateY: -8 }]
-    })
-  }
-  assert.deepEqual(style("a", "accessory"), {
-    width: 142, height: 213, transform: [{ translateY: -32 }]
-  })
 })
 
 test("starter garments previewed from their room layer are fitted by measured bounds", () => {

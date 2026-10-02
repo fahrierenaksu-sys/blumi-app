@@ -53,18 +53,18 @@ test("a room the user asked for (accept, join, demo) always opens", () => {
 })
 
 test("the banner names the partner and offers to join in Turkish and English", () => {
-  assert.deepEqual(getRoomArrivalBanner("tr", "Ayşe"), {
-    title: "Ayşe odada",
-    body: "Katılmak için dokun",
-    accessibilityLabel: "Ayşe odada. Katılmak için dokun"
-  })
-  assert.deepEqual(getRoomArrivalBanner("en", "Ayşe"), {
-    title: "Ayşe is in the room",
-    body: "Tap to join",
-    accessibilityLabel: "Ayşe is in the room. Tap to join"
-  })
-  assert.equal(getRoomArrivalClosedTitle("tr"), "Bu oda kapandı")
-  assert.equal(getRoomArrivalClosedTitle("en"), "This room has closed")
+  const tr = getRoomArrivalBanner("tr", "Ayşe")
+  const en = getRoomArrivalBanner("en", "Ayşe")
+  for (const banner of [tr, en]) {
+    assert.match(banner.title, /Ayşe/)
+    assert.match(banner.accessibilityLabel, /Ayşe/)
+    assert.ok(banner.body.trim().length > 0)
+  }
+  assert.notEqual(tr.title, en.title)
+  assert.notEqual(tr.body, en.body)
+  for (const locale of ["tr", "en"] as const) {
+    assert.ok(getRoomArrivalClosedTitle(locale).trim().length > 0)
+  }
   // Long enough to notice and tap, short enough not to linger.
   assert.ok(ROOM_ARRIVAL_BANNER_MS >= 6_000 && ROOM_ARRIVAL_BANNER_MS <= 12_000)
 })

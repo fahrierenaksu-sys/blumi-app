@@ -64,9 +64,9 @@ test("a bubble pops once per id, not per re-created bubble object", () => {
 test("removing the bubble resets the pop, and Reduce Motion shows it without a spring", () => {
   const f = mount()
   f.render([bubble("bubble-1")])
-  const before = f.animatedCalls.length
   f.render([])
-  assert.deepEqual(f.animatedCalls.slice(before).map(({ kind }) => kind), ["spring.stop", "stopAnimation", "setValue"])
+  f.render([bubble("bubble-1")])
+  assert.equal(f.pops(), 2, "a bubble that left and came back pops again")
   const reduced = mount(true)
   reduced.render([bubble("bubble-1")])
   assert.equal(reduced.pops(), 0)
