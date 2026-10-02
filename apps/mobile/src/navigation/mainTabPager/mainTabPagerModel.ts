@@ -179,10 +179,13 @@ export function getMainTabPageOpacity(pageIndex: number, committedIndex: number)
 // ── Selection state shared by taps, swipes and navigation ───────────────
 //
 // One source of truth: the native-stack slot route name. The UI thread keeps
-// `committedIndex` as its view of that value, advances it when a tap shows a
-// page or a released swipe starts settling on one (then asks JS to commit
-// once), and resynchronises from the route when navigation changed it
-// elsewhere (deep link, back, notification).
+// `committedIndex` as its view of that value. A tap shows its page at once and
+// asks JS to commit it straight away. A released swipe decides its page at
+// once too, but asks JS to commit it only when the settle has ended: the
+// commit re-renders the navigator, the bottom bar and the two pages whose
+// selection flips, and fires page focus work, none of which may compete with
+// the settle's frames. The UI thread resynchronises from the route when
+// navigation changed it elsewhere (deep link, back, notification).
 
 export interface MainTabPagerUiState {
   /** Page the UI thread shows: being settled on, tapped, or synced from navigation. */
@@ -190,12 +193,18 @@ export interface MainTabPagerUiState {
   /** Incremented to invalidate an in-flight gesture or settle animation. */
   epoch: number
   /**
-   * Page a bottom-bar tap or a released swipe already shows on the UI thread
-   * while its navigation commit is on the way, or -1. Route syncs of earlier
-   * commits (rapid taps or swipes) are ignored until this one lands, so the
-   * pager never jumps back through intermediate pages.
+   * Page whose commit JS has been asked to dispatch and whose route has not
+   * arrived yet, or -1. Route syncs of earlier commits (rapid taps or swipes)
+   * are ignored until this one lands, so the pager never jumps back through
+   * intermediate pages.
    */
   pendingCommitIndex: number
+  /**
+   * Page a released swipe is settling on whose commit waits for the settle to
+   * end, or -1. Navigation has not been asked yet, so a route change that
+   * arrives meanwhile came from elsewhere and wins.
+   */
+  deferredCommitIndex: number
 }
 
 export interface MainTabPagerUiTransition {
@@ -210,7 +219,7 @@ export interface MainTabPagerUiTransition {
 
 export function createMainTabPagerUiState(committedIndex: number): MainTabPagerUiState {
   "worklet"
-  return { committedIndex, epoch: 0, pendingCommitIndex: -1 }
+  return { committedIndex, epoch: 0, pendingCommitIndex: -1, deferredCommitIndex: -1 }
 }
 
 /**
@@ -219,7 +228,8 @@ export function createMainTabPagerUiState(committedIndex: number): MainTabPagerU
  * shown at once on the UI thread (optimistic snap), so the tap never waits
  * for the JS navigation round trip; a never-visited page waits for the route
  * sync that mounts it, so the pager never shows an empty page. Tapping the
- * page already shown only returns an interrupted pager to it.
+ * page already shown only returns an interrupted pager to it (and commits it
+ * if a swipe had chosen it but its settle never ended).
  */
 export function reduceMainTabPagerTap(
   state: MainTabPagerUiState,
@@ -229,23 +239,29 @@ export function reduceMainTabPagerTap(
   "worklet"
   const epoch = state.epoch + 1
   if (index === state.committedIndex) {
+    const deferred = state.deferredCommitIndex
     return {
-      state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: state.pendingCommitIndex },
-      commitIndex: null,
+      state: {
+        committedIndex: state.committedIndex,
+        epoch,
+        pendingCommitIndex: deferred >= 0 ? deferred : state.pendingCommitIndex,
+        deferredCommitIndex: -1
+      },
+      commitIndex: deferred >= 0 ? deferred : null,
       snap: true,
       interrupt: true
     }
   }
   if (targetMounted) {
     return {
-      state: { committedIndex: index, epoch, pendingCommitIndex: index },
+      state: { committedIndex: index, epoch, pendingCommitIndex: index, deferredCommitIndex: -1 },
       commitIndex: index,
       snap: true,
       interrupt: true
     }
   }
   return {
-    state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: -1 },
+    state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: index,
     snap: false,
     interrupt: true
@@ -253,13 +269,12 @@ export function reduceMainTabPagerTap(
 }
 
 /**
- * A released drag starts settling on `index`. The page is decided at the
- * release, so it is committed then, not when the spring comes to rest: the
- * JS commit and the page's render run while the pages are still moving, and
- * the page takes touches the moment it arrives (a touch near the end of a
- * settle also lands it at once, see shouldMainTabPagerTouchCatchSettle).
- * The commit is pending like a tap's, so the route syncs of earlier commits
- * (a quick second swipe) never pull the pager back.
+ * A released drag starts settling on `index`. The UI thread shows that page
+ * from now on (the bottom bar's pill follows it), but navigation is asked
+ * only when the settle ends (reduceMainTabPagerSettleEnd). The page takes
+ * touches the whole time: touches never depend on the committed route, and a
+ * touch near the end of a settle lands it at once (see
+ * shouldMainTabPagerTouchCatchSettle).
  */
 export function reduceMainTabPagerSettleStart(
   state: MainTabPagerUiState,
@@ -270,8 +285,35 @@ export function reduceMainTabPagerSettleStart(
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
   return {
-    state: { committedIndex: index, epoch: state.epoch, pendingCommitIndex: index },
-    commitIndex: index,
+    state: {
+      committedIndex: index,
+      epoch: state.epoch,
+      pendingCommitIndex: state.pendingCommitIndex,
+      deferredCommitIndex: index
+    },
+    commitIndex: null,
+    snap: false,
+    interrupt: false
+  }
+}
+
+/**
+ * The settle came to rest (or was landed by a touch): commit the page the
+ * release chose, once. Nothing happens when the release returned to the page
+ * navigation already shows.
+ */
+export function reduceMainTabPagerSettleEnd(state: MainTabPagerUiState): MainTabPagerUiTransition {
+  "worklet"
+  const deferred = state.deferredCommitIndex
+  if (deferred < 0) return { state, commitIndex: null, snap: false, interrupt: false }
+  return {
+    state: {
+      committedIndex: state.committedIndex,
+      epoch: state.epoch,
+      pendingCommitIndex: deferred,
+      deferredCommitIndex: -1
+    },
+    commitIndex: deferred,
     snap: false,
     interrupt: false
   }
@@ -280,10 +322,11 @@ export function reduceMainTabPagerSettleStart(
 /**
  * Navigation now selects `routeIndex`. When the UI already shows it (the
  * commit of its own swipe or tap) nothing moves, so a follow-up swipe that
- * already started is not interrupted. While a tap is pending, the commits of
- * earlier rapid taps land first and are ignored; the pending tap's own commit
- * clears it. Otherwise the change came from elsewhere and the pager jumps to
- * it, invalidating any drag or settle.
+ * already started is not interrupted. While a commit is pending, the commits
+ * of earlier rapid taps land first and are ignored; the pending commit's own
+ * route clears it. Otherwise the change came from elsewhere (also while a
+ * settle still waits to commit: navigation was not asked yet) and the pager
+ * jumps to it, invalidating any drag or settle.
  */
 export function reduceMainTabPagerRouteSync(
   state: MainTabPagerUiState,
@@ -298,17 +341,29 @@ export function reduceMainTabPagerRouteSync(
       return { state, commitIndex: null, snap: false, interrupt: false }
     }
     return {
-      state: { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1 },
+      state: {
+        committedIndex: state.committedIndex,
+        epoch: state.epoch,
+        pendingCommitIndex: -1,
+        deferredCommitIndex: state.deferredCommitIndex
+      },
       commitIndex: null,
       snap: false,
       interrupt: false
     }
   }
   if (routeIndex === state.committedIndex) {
-    return { state, commitIndex: null, snap: false, interrupt: false }
+    if (state.deferredCommitIndex < 0) return { state, commitIndex: null, snap: false, interrupt: false }
+    // Navigation selected the page the settle is going to: let it land, commit nothing.
+    return {
+      state: { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1, deferredCommitIndex: -1 },
+      commitIndex: null,
+      snap: false,
+      interrupt: false
+    }
   }
   return {
-    state: { committedIndex: routeIndex, epoch: state.epoch + 1, pendingCommitIndex: -1 },
+    state: { committedIndex: routeIndex, epoch: state.epoch + 1, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
@@ -317,7 +372,7 @@ export function reduceMainTabPagerRouteSync(
 
 /**
  * JS could not commit (navigation already shows another answer): drop any
- * pending tap and follow the route navigation actually shows.
+ * pending commit and follow the route navigation actually shows.
  */
 export function reduceMainTabPagerCommitRejected(
   state: MainTabPagerUiState,
@@ -325,19 +380,28 @@ export function reduceMainTabPagerCommitRejected(
 ): MainTabPagerUiTransition {
   "worklet"
   return reduceMainTabPagerRouteSync(
-    { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1 },
+    { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     routeIndex
   )
 }
 
-/** App backgrounding or a cancelled gesture: return to the committed page. */
+/**
+ * App backgrounding, a layout change or a cancelled gesture: land on the
+ * committed page now, and commit it if a settle was still waiting to.
+ */
 export function reduceMainTabPagerSettleToCommitted(
   state: MainTabPagerUiState
 ): MainTabPagerUiTransition {
   "worklet"
+  const deferred = state.deferredCommitIndex
   return {
-    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1, pendingCommitIndex: state.pendingCommitIndex },
-    commitIndex: null,
+    state: {
+      committedIndex: state.committedIndex,
+      epoch: state.epoch + 1,
+      pendingCommitIndex: deferred >= 0 ? deferred : state.pendingCommitIndex,
+      deferredCommitIndex: -1
+    },
+    commitIndex: deferred >= 0 ? deferred : null,
     snap: true,
     interrupt: true
   }
@@ -400,18 +464,23 @@ export function isMainTabPageInMountedMask(mask: number, index: number): boolean
 export interface MainTabPageAccessibility {
   accessibilityElementsHidden: boolean
   importantForAccessibility: "auto" | "no-hide-descendants"
-  pointerEvents: "auto" | "none"
+  pointerEvents: "auto"
 }
 
 /**
- * Only the selected page is reachable by touch and assistive technology. It
- * takes the page's own selection, not the selected index, so a tab change
- * reaches only the two pages whose selection flips.
+ * Only the selected page is reachable by assistive technology. It takes the
+ * page's own selection, not the selected index, so a tab change reaches only
+ * the two pages whose selection flips.
+ *
+ * Touch is never gated on the selection: a swipe commits its route only when
+ * its settle ends, and the page it landed on must take a tap at once. Pages
+ * off screen cannot be hit anyway (the pager clips them), and while a drag
+ * shows two pages the pager's pan owns the touch.
  */
 export function getMainTabPageAccessibility(selected: boolean): MainTabPageAccessibility {
   return {
     accessibilityElementsHidden: !selected,
     importantForAccessibility: selected ? "auto" : "no-hide-descendants",
-    pointerEvents: selected ? "auto" : "none"
+    pointerEvents: "auto"
   }
 }

@@ -40,6 +40,7 @@ import {
   MAIN_TAB_PAGER_ACTIVE_OFFSET_X,
   MAIN_TAB_PAGER_FAIL_OFFSET_Y,
   MAIN_TAB_PAGER_NEIGHBOUR_MOUNT_DELAY_MS,
+  MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS,
   MAIN_TAB_PAGER_SPRING,
   MAIN_TAB_PAGES,
   type MainTabRouteName
@@ -63,6 +64,7 @@ import {
   isMainTabPageSwipeable,
   reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
+  reduceMainTabPagerSettleEnd,
   reduceMainTabPagerSettleStart,
   reduceMainTabPagerSettleToCommitted,
   reduceMainTabPagerTap,
@@ -127,12 +129,45 @@ function scheduleIdle(work: () => void): () => void {
   }
 }
 
+/** Runs `work` after the next frame, in an idle slot. Returns a cancel. */
+function scheduleAfterNextFrame(work: () => void): () => void {
+  let cancelled = false
+  let frameId: number | null = null
+  let idleId: number | null = null
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  const run = () => {
+    if (!cancelled) work()
+  }
+  const afterFrame = () => {
+    frameId = null
+    if (cancelled) return
+    if (typeof globalThis.requestIdleCallback === "function") {
+      idleId = globalThis.requestIdleCallback(run, { timeout: 120 })
+    } else {
+      timeoutId = setTimeout(run, 0)
+    }
+  }
+  if (typeof globalThis.requestAnimationFrame === "function") {
+    frameId = globalThis.requestAnimationFrame(afterFrame)
+  } else {
+    timeoutId = setTimeout(afterFrame, 16)
+  }
+  return () => {
+    cancelled = true
+    if (frameId !== null && typeof globalThis.cancelAnimationFrame === "function") globalThis.cancelAnimationFrame(frameId)
+    if (idleId !== null && typeof globalThis.cancelIdleCallback === "function") globalThis.cancelIdleCallback(idleId)
+    if (timeoutId !== null) clearTimeout(timeoutId)
+  }
+}
+
 /**
  * Hosts the four main pages in one native-stack slot route and moves between
  * them with the finger. The slot route name is the only selected-page state:
  * bottom-bar taps and swipes both commit through the router's select action,
- * the UI thread follows the route, and the route changes once per release
- * (when the settle starts, so the page is interactive by the time it lands).
+ * the UI thread follows the route, and the route changes once per release,
+ * when the settle ends, so its renders and the pages' focus work never run
+ * during the settle. Pages take touches regardless of the route, so the
+ * swiped-to page is interactive the moment it lands.
  * Every frame of a drag or settle runs on the UI thread with shared values.
  */
 export function MainTabPager({ navigation: rawNavigation, route, renderPage, bottomBar }: MainTabPagerProps) {
@@ -184,8 +219,21 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     () => createMainTabPageFocusHub((page) => `${slotKeyRef.current}:${page}`),
     []
   )
+  const focusInitializedRef = useRef(false)
   useEffect(() => {
-    focusHub.update({ selectedPage: selectedPage.routeName, slotFocused: navigation.isFocused() })
+    const update = () => focusHub.update({
+      selectedPage: selectedRouteNameRef.current,
+      slotFocused: navigation.isFocused()
+    })
+    if (!focusInitializedRef.current) {
+      focusInitializedRef.current = true
+      update()
+      return
+    }
+    // Page blur/focus work (refreshes, loops, state resets) runs after the
+    // commit render has reached the screen, in the next idle slot, never in
+    // the frames of a settle or of the commit itself.
+    return scheduleAfterNextFrame(update)
   }, [focusHub, navigation, selectedPage.routeName])
   useEffect(() => {
     const sync = () => focusHub.update({
@@ -321,19 +369,45 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     syncFromRoute(selectedIndex)
   }, [selectedIndex, syncFromRoute])
 
+  // The settle's end (or a touch that lands it) commits the page the release
+  // chose. If the spring's end is ever lost, commit anyway shortly after.
+  const commitSettledPage = useCallback(() => {
+    "worklet"
+    applyTransition(reduceMainTabPagerSettleEnd(ui.value))
+  }, [applyTransition, ui])
+  const settleFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const armSettleCommitFallback = useCallback((epoch: number) => {
+    if (settleFallbackRef.current !== null) clearTimeout(settleFallbackRef.current)
+    settleFallbackRef.current = setTimeout(() => {
+      settleFallbackRef.current = null
+      scheduleOnUI((epochAtStart: number) => {
+        "worklet"
+        if (ui.value.epoch !== epochAtStart || dragging.value || caught.value) return
+        commitSettledPage()
+      }, epoch)
+    }, MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS)
+  }, [caught, commitSettledPage, dragging, ui])
+  useEffect(() => () => {
+    if (settleFallbackRef.current !== null) clearTimeout(settleFallbackRef.current)
+  }, [])
+
   const settleTo = useCallback((target: number, velocity: number) => {
     "worklet"
     settleTarget.value = target
     const targetPosition = target * width.value
-    // The page is decided now: commit it while the pages still move, so the
-    // JS render that makes it touchable has run by the time it lands.
+    // The page is decided now and the UI thread shows it, but navigation is
+    // asked only when the pages rest: the commit's renders and the pages'
+    // focus work must not compete with the settle's frames. Touch never
+    // waits for the commit (getMainTabPageAccessibility).
     applyTransition(reduceMainTabPagerSettleStart(ui.value, target))
     if (reduceMotionValue.value) {
       animating.value = false
       position.value = targetPosition
+      commitSettledPage()
       return
     }
     const epochAtStart = ui.value.epoch
+    if (ui.value.deferredCommitIndex >= 0) scheduleOnRN(armSettleCommitFallback, epochAtStart)
     const startVelocity = resolveMainTabPagerSettleVelocity({
       position: position.value,
       targetPosition,
@@ -358,9 +432,20 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
         "worklet"
         if (!finished || ui.value.epoch !== epochAtStart) return
         animating.value = false
+        commitSettledPage()
       }
     )
-  }, [animating, applyTransition, position, reduceMotionValue, settleTarget, ui, width])
+  }, [
+    animating,
+    applyTransition,
+    armSettleCommitFallback,
+    commitSettledPage,
+    position,
+    reduceMotionValue,
+    settleTarget,
+    ui,
+    width
+  ])
 
   // ── Bottom-bar taps use the same commit path ──────────────────────────
   useEffect(() => registerMainTabPagerController({
@@ -445,6 +530,7 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
       } else {
         // In its last pixels the page lands now; the touch is meant for it.
         position.value = targetPosition
+        commitSettledPage()
       }
     })
     .onStart((event) => {
@@ -504,6 +590,7 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     animating,
     baseIndex,
     caught,
+    commitSettledPage,
     dragging,
     gestureEpoch,
     mountNeighbours,

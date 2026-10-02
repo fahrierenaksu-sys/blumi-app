@@ -6,14 +6,15 @@ import {
   loadSourceWithFakeReact,
   type FakeReactRuntime
 } from "../../testing/hookHarness"
+import { getMainTabPageAccessibility } from "./mainTabPagerModel"
 
 // Regression (owner, iPhone, 2026-10-02): after a swipe between main pages
 // the new page ignored taps for a while; a bottom-bar tap did not. The page
-// only takes touches once navigation selects it, and a swipe used to commit
-// that only when the settle spring came to rest (Reanimated's default rest
-// is ~0.65 s, the page looks still after ~0.25 s); a tap in that window
-// caught the settle and restarted it. These tests drive the real pager's pan
-// handlers and read what navigation and the pages receive.
+// took touches only once navigation selected it. Touch no longer depends on
+// the route, and the route is committed when the settle ends (energy
+// threshold, ~0.25 s), so its renders and the pages' focus work never run in
+// the settle's frames (tab swipe jank, 2026-10-03). These tests drive the
+// real pager's pan handlers and read what navigation and the pages receive.
 
 const W = 390
 
@@ -85,6 +86,9 @@ function mountPager(initialRoute: string) {
   const reanimated = createReanimatedStub(runtime)
   const indicator = { progress: { value: 0 }, tracking: { value: false }, selection: { value: -1 } }
   const dispatched: { payload?: { name?: string } }[] = []
+  // Timers run only when a test flushes them (idle mounts, deferred focus).
+  let timers: { id: number; delay: number; run: () => void }[] = []
+  let nextTimerId = 1
   const exports = loadSourceWithFakeReact<{ MainTabPager: (props: Record<string, unknown>) => unknown }>(
     "navigation/mainTabPager/MainTabPager.tsx",
     runtime,
@@ -117,7 +121,16 @@ function mountPager(initialRoute: string) {
         "./mainTabPagerRouter",
         "../../ui/layout/bottomNavIndicatorModel"
       ],
-      globals: { setTimeout: () => 0, clearTimeout: () => undefined }
+      globals: {
+        setTimeout: (run: () => void, delay = 0) => {
+          const id = nextTimerId++
+          timers.push({ id, delay, run })
+          return id
+        },
+        clearTimeout: (id: number) => {
+          timers = timers.filter((timer) => timer.id !== id)
+        }
+      }
     }
   )
   let route = { key: "slot", name: initialRoute }
@@ -145,9 +158,26 @@ function mountPager(initialRoute: string) {
     visit(runtime.output)
     return found
   }
+  const pageNavigation = (routeName: string) =>
+    pageProps().find((props) => props.routeName === routeName)?.navigation as {
+      addListener: (type: string, listener: () => void) => () => void
+      isFocused: () => boolean
+    }
   return {
+    runtime,
     reanimated,
     dispatched,
+    pageProps,
+    pageNavigation,
+    /** Runs timers due within `ms` (frame and idle callbacks fall back to timers here). */
+    advance(ms: number) {
+      for (let guard = 0; guard < 20; guard += 1) {
+        const due = timers.filter((timer) => timer.delay <= ms)
+        if (due.length === 0) return
+        timers = timers.filter((timer) => timer.delay > ms)
+        for (const timer of due) timer.run()
+      }
+    },
     /** Navigation answers the pager's commit (the slot route changes). */
     navigate(name: string) {
       route = { key: "slot", name }
@@ -172,16 +202,62 @@ function mountPager(initialRoute: string) {
   }
 }
 
-test("a swipe commits its page when the settle starts, so the page is touchable when it lands", () => {
+
+/** Whether a page view takes touches, from the props the pager hands it. */
+function isTouchable(props: Record<string, unknown> | undefined): boolean {
+  return props !== undefined && getMainTabPageAccessibility(props.isSelected === true).pointerEvents === "auto"
+}
+
+test("a swipe commits its page when the settle ends, and the page takes touches before that", () => {
   const pager = mountPager("Inbox")
   pager.swipe(-0.6 * W, -300)
   assert.equal(pager.reanimated.springs.length, 1, "the pages are settling")
-  assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"], "committed before the spring rests")
-  pager.navigate("MyRoom")
-  assert.equal(pager.selectedPage(), "MyRoom", "the page takes touches while the spring still runs")
+  assert.equal(pager.dispatched.length, 0, "nothing reaches navigation while the pages move")
+  assert.equal(
+    isTouchable(pager.pageProps().find((props) => props.routeName === "MyRoom")),
+    true,
+    "the swiped-to page already takes taps"
+  )
   pager.reanimated.springs[0]!.done(true)
-  assert.equal(pager.dispatched.length, 1, "the spring's end commits nothing more")
+  assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"], "one commit when it rests")
+  pager.navigate("MyRoom")
   assert.equal(pager.selectedPage(), "MyRoom")
+})
+
+test("a swipe's settle re-renders no page and fires no focus until it ends", () => {
+  const pager = mountPager("Inbox")
+  pager.advance(1000) // idle time after launch: the neighbours are warm
+  const events: string[] = []
+  for (const routeName of ["Inbox", "MyRoom"]) {
+    const navigation = pager.pageNavigation(routeName)
+    navigation.addListener("focus", () => events.push(`${routeName}:focus`))
+    navigation.addListener("blur", () => events.push(`${routeName}:blur`))
+  }
+  const rendersBefore = pager.runtime.renderCount
+  const pagesBefore = pager.pageProps()
+  pager.swipe(-0.6 * W, -300)
+  pager.advance(16)
+  assert.equal(pager.runtime.renderCount, rendersBefore, "the pager (and so every page) did not render")
+  assert.deepEqual(pager.pageProps(), pagesBefore, "no page received new props")
+  assert.deepEqual(events, [], "no blur or focus during the settle")
+  assert.equal(pager.pageNavigation("Inbox").isFocused(), true)
+
+  pager.reanimated.springs[0]!.done(true)
+  pager.navigate("MyRoom")
+  assert.deepEqual(events, [], "focus waits for the commit render to reach the screen")
+  pager.advance(16)
+  assert.deepEqual(events, ["Inbox:blur", "MyRoom:focus"], "then blur and focus run once, in an idle slot")
+  assert.equal(pager.pageNavigation("MyRoom").isFocused(), true)
+})
+
+test("a settle whose end is never reported still commits its page", () => {
+  const pager = mountPager("Inbox")
+  pager.swipe(-0.6 * W, -300)
+  assert.equal(pager.dispatched.length, 0)
+  pager.advance(1000)
+  assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"])
+  pager.reanimated.springs[0]!.done(true)
+  assert.equal(pager.dispatched.length, 1, "a late spring end commits nothing more")
 })
 
 test("the settle spring ends when the page looks still, not after Reanimated's sub-pixel tail", () => {
@@ -195,24 +271,26 @@ test("a tap in the last pixels of a settle lands the page and reaches it, withou
   const pager = mountPager("Inbox")
   pager.reanimated.setVisiblePosition((target) => target - 0.4)
   pager.swipe(-0.6 * W, -300)
-  pager.navigate("MyRoom")
   pager.tap()
   assert.equal(pager.reanimated.springs.length, 1, "no second settle")
-  assert.equal(pager.dispatched.length, 1)
-  assert.equal(pager.selectedPage(), "MyRoom", "the tapped page is the touchable one")
+  assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"], "landing commits the page")
+  pager.navigate("MyRoom")
+  assert.equal(pager.selectedPage(), "MyRoom", "the tapped page is the selected one")
 })
 
 test("a tap that catches a settle mid-way lets it finish on the same page, which stays touchable", () => {
   const pager = mountPager("Inbox")
   pager.reanimated.setVisiblePosition((target) => target - 0.3 * W)
   pager.swipe(-0.6 * W, -300)
-  pager.navigate("MyRoom")
   pager.tap()
   assert.equal(pager.reanimated.springs.length, 2, "the caught settle resumes")
   assert.equal(pager.reanimated.springs[1]!.target, pager.reanimated.springs[0]!.target, "to the same page")
+  assert.equal(isTouchable(pager.pageProps().find((props) => props.routeName === "MyRoom")), true)
   // The interrupted first spring reports finished=false; nothing may hang on it.
   pager.reanimated.springs[0]!.done(false)
+  assert.equal(pager.dispatched.length, 0)
   pager.reanimated.springs[1]!.done(true)
   assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"], "one commit")
+  pager.navigate("MyRoom")
   assert.equal(pager.selectedPage(), "MyRoom")
 })

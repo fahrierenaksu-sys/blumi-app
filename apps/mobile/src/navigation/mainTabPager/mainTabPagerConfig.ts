@@ -91,6 +91,13 @@ export const MAIN_TAB_PAGER_SPRING = Object.freeze({
 })
 
 /**
+ * A released swipe commits its page to navigation when the settle spring
+ * ends (about 250 ms). Should that end never be reported, the page is
+ * committed this long after the release anyway.
+ */
+export const MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS = 600
+
+/**
  * A never-visited swipe neighbour is mounted only after the selected page has
  * settled and this delay has passed (then on the next idle callback), so its
  * first render never competes with a settle animation or a tab switch.

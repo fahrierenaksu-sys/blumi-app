@@ -22,6 +22,7 @@ import {
   isMainTabPageSwipeable,
   reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
+  reduceMainTabPagerSettleEnd,
   reduceMainTabPagerSettleStart,
   reduceMainTabPagerSettleToCommitted,
   reduceMainTabPagerTap,
@@ -294,10 +295,12 @@ function createHarness(initialRoute = "Lobby") {
       animation = { target, epoch: ui.epoch }
     },
     get settling() { return animation !== null },
+    /** The settle spring comes to rest (its finish callback in MainTabPager.settleTo). */
     finishAnimation() {
       if (!animation || animation.epoch !== ui.epoch) return
       position = animation.target
       animation = null
+      apply(reduceMainTabPagerSettleEnd(ui))
     },
     external(routeName: string) {
       route = routeName
@@ -336,31 +339,48 @@ function isPageTouchable(route: string, index: number): boolean {
   return getMainTabPageAccessibility(getMainTabPageIndex(route) === index).pointerEvents === "auto"
 }
 
-test("a swiped-to page takes touches while it is still settling, not after the spring rests", () => {
+test("a swipe asks navigation only once its settle ends, and its page takes touches meanwhile", () => {
   const pager = createHarness("Inbox")
   pager.release(MYROOM)
-  assert.deepEqual(pager.dispatches, [], "JS has not run yet")
   pager.flushJs()
   assert.equal(pager.settling, true, "the pages are still moving")
-  assert.deepEqual(pager.dispatches, ["MyRoom"], "the release committed the page")
-  assert.equal(isPageTouchable(pager.route, MYROOM), true, "so it is touchable the moment it lands")
-  assert.equal(isPageTouchable(pager.route, CHATS), false)
+  assert.deepEqual(pager.dispatches, [], "no navigation (and no re-render or focus work) during the settle")
+  assert.equal(pager.ui.committedIndex, MYROOM, "the UI thread already shows the page")
+  // Regression (owner, 2026-10-02): a swiped-to page ignored taps until its
+  // route was committed. Touch no longer depends on the route.
+  assert.equal(isPageTouchable(pager.route, MYROOM), true, "touchable before its route arrives")
   pager.finishAnimation()
-  assert.deepEqual(pager.dispatches, ["MyRoom"], "the spring's end commits nothing more")
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, ["MyRoom"], "one commit when the spring rests")
   assert.deepEqual(pager.snaps, [])
+  assert.equal(pager.ui.pendingCommitIndex, -1)
 })
 
-test("a settle interrupted by a touch keeps the page it was going to, still touchable", () => {
+test("a settle interrupted by a touch keeps the page it was going to and commits it once", () => {
   const pager = createHarness("Inbox")
   pager.release(MYROOM)
   pager.flushJs()
   // A tap catches the settle, never drags, and the settle resumes to the same page.
   pager.release(MYROOM)
   pager.flushJs()
+  assert.deepEqual(pager.dispatches, [])
   pager.finishAnimation()
+  pager.flushJs()
   assert.deepEqual(pager.dispatches, ["MyRoom"])
   assert.equal(pager.position, MYROOM)
   assert.equal(isPageTouchable(pager.route, MYROOM), true)
+})
+
+test("tapping the tab a swipe is settling on commits that page at once", () => {
+  const pager = createHarness("Inbox")
+  pager.release(MYROOM)
+  pager.tap("myroom")
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, ["MyRoom"])
+  assert.deepEqual(pager.snaps, [MYROOM])
+  pager.finishAnimation()
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, ["MyRoom"], "the interrupted settle commits nothing more")
 })
 
 test("a touch in the last pixels of a settle lands the page instead of catching it", () => {
@@ -436,9 +456,9 @@ test("a tap whose page another source already selected commits nothing", () => {
 })
 
 test("a commit rejected while the slot shows another page returns the pager to it", () => {
-  const state = { committedIndex: SHOP, epoch: 4, pendingCommitIndex: SHOP }
+  const state = { committedIndex: SHOP, epoch: 4, pendingCommitIndex: SHOP, deferredCommitIndex: -1 }
   assert.deepEqual(reduceMainTabPagerCommitRejected(state, MYROOM), {
-    state: { committedIndex: MYROOM, epoch: 5, pendingCommitIndex: -1 },
+    state: { committedIndex: MYROOM, epoch: 5, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
@@ -475,8 +495,8 @@ test("a tap during a settle cancels it so the settle can never commit afterwards
   pager.finishAnimation()
   pager.flushJs()
   assert.equal(pager.route, "Lobby")
-  // The swipe committed at its release, before the tap; nothing after it.
-  assert.deepEqual(pager.dispatches, ["MyRoom", "Lobby"])
+  // The swipe would have committed when its settle ended; the tap came first.
+  assert.deepEqual(pager.dispatches, ["Lobby"])
   assert.equal(pager.position, DISCOVER)
   assert.deepEqual(pager.snaps, [DISCOVER], "the swipe's late route sync never pulls the pager back")
 })
@@ -488,7 +508,7 @@ test("a new swipe that catches a settle ends on its own final page", () => {
   pager.release(SHOP)
   pager.finishAnimation()
   pager.flushJs()
-  assert.deepEqual(pager.dispatches, ["MyRoom", "CosmeticShop"], "one commit per release")
+  assert.deepEqual(pager.dispatches, ["CosmeticShop"], "one commit, for the settle that came to rest")
   assert.equal(pager.route, "CosmeticShop")
   assert.equal(pager.position, SHOP)
   assert.deepEqual(pager.snaps, [], "the first swipe's route sync does not interrupt the second")
@@ -500,7 +520,8 @@ test("a swipe back to the start page after catching a settle returns there witho
   pager.release(CHATS)
   pager.flushJs()
   pager.finishAnimation()
-  assert.deepEqual(pager.dispatches, ["MyRoom", "Inbox"])
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, [], "navigation never left Chats")
   assert.equal(pager.route, "Inbox")
   assert.equal(pager.position, CHATS)
   assert.deepEqual(pager.snaps, [])
@@ -529,8 +550,30 @@ test("navigation from elsewhere (deep link, back, notification) moves the pager 
   pager.flushJs()
   assert.equal(pager.route, "Inbox")
   assert.equal(pager.position, CHATS)
-  assert.deepEqual(pager.dispatches, ["CosmeticShop"], "the pager does not navigate back")
+  assert.deepEqual(pager.dispatches, [], "the interrupted swipe never navigates over it")
   assert.deepEqual(pager.snaps, [CHATS])
+})
+
+test("navigation from elsewhere after a swipe's commit was dispatched still wins", () => {
+  const pager = createHarness("MyRoom")
+  pager.release(SHOP)
+  pager.finishAnimation()
+  pager.flushJs()
+  pager.external("Inbox")
+  assert.equal(pager.position, CHATS)
+  assert.deepEqual(pager.dispatches, ["CosmeticShop"])
+})
+
+test("navigation to the page a swipe is settling on lets it land without a commit", () => {
+  const pager = createHarness("MyRoom")
+  pager.release(SHOP)
+  pager.external("CosmeticShop")
+  assert.equal(pager.settling, true, "the settle keeps running")
+  pager.finishAnimation()
+  pager.flushJs()
+  assert.deepEqual(pager.dispatches, [])
+  assert.deepEqual(pager.snaps, [])
+  assert.equal(pager.position, SHOP)
 })
 
 test("backgrounding lands an interrupted pager on the committed page", () => {
@@ -548,33 +591,41 @@ test("backgrounding lands an interrupted pager on the committed page", () => {
 test("reducers keep the committed page and epoch rules explicit", () => {
   const state = createMainTabPagerUiState(CHATS)
   assert.deepEqual(reduceMainTabPagerSettleStart(state, CHATS), { state, commitIndex: null, snap: false, interrupt: false })
-  assert.deepEqual(reduceMainTabPagerSettleStart(state, MYROOM), {
-    state: { committedIndex: MYROOM, epoch: 0, pendingCommitIndex: MYROOM },
+  const settling = reduceMainTabPagerSettleStart(state, MYROOM)
+  assert.deepEqual(settling, {
+    state: { committedIndex: MYROOM, epoch: 0, pendingCommitIndex: -1, deferredCommitIndex: MYROOM },
+    commitIndex: null,
+    snap: false,
+    interrupt: false
+  }, "a release shows its page but neither commits it nor moves the pages itself")
+  assert.deepEqual(reduceMainTabPagerSettleEnd(settling.state), {
+    state: { committedIndex: MYROOM, epoch: 0, pendingCommitIndex: MYROOM, deferredCommitIndex: -1 },
     commitIndex: MYROOM,
     snap: false,
     interrupt: false
-  }, "a release commits its page at once and never moves the pages itself")
+  }, "the settle's end commits it once")
+  assert.equal(reduceMainTabPagerSettleEnd(state).commitIndex, null, "a returned swipe commits nothing")
   assert.deepEqual(reduceMainTabPagerRouteSync(state, CHATS), { state, commitIndex: null, snap: false, interrupt: false })
   assert.deepEqual(reduceMainTabPagerRouteSync(state, -1).snap, false)
   assert.deepEqual(reduceMainTabPagerTap(state, CHATS, true), {
-    state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1 },
+    state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
   }, "tapping the committed page only settles an interrupted pager")
   assert.deepEqual(reduceMainTabPagerTap(state, SHOP, true), {
-    state: { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP },
+    state: { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP, deferredCommitIndex: -1 },
     commitIndex: SHOP,
     snap: true,
     interrupt: true
   }, "a mounted page is shown at once and committed once")
   assert.deepEqual(reduceMainTabPagerTap(state, SHOP, false), {
-    state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1 },
+    state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: SHOP,
     snap: false,
     interrupt: true
   }, "a never-visited page waits for navigation")
-  const pending = { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP }
+  const pending = { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP, deferredCommitIndex: -1 }
   assert.deepEqual(reduceMainTabPagerRouteSync(pending, MYROOM).snap, false, "an earlier tap's commit is ignored")
   assert.deepEqual(reduceMainTabPagerRouteSync(pending, SHOP).state.pendingCommitIndex, -1, "its own commit clears it")
   assert.equal(resolveMainTabPagerCommitRoute("Inbox", CHATS), null)
@@ -593,13 +644,11 @@ test("every swipeable page stays visible so a drag reveals its neighbour", () =>
   }
 })
 
-test("only the selected page is exposed to touch and accessibility, matching the bottom bar", () => {
+test("only the selected page is exposed to accessibility, matching the bottom bar; touch is never gated", () => {
   for (const [selectedIndex, selected] of MAIN_TAB_PAGES.entries()) {
     const exposed = MAIN_TAB_PAGES.filter((_, index) => {
       const a11y = getMainTabPageAccessibility(index === selectedIndex)
-      return !a11y.accessibilityElementsHidden &&
-        a11y.importantForAccessibility === "auto" &&
-        a11y.pointerEvents === "auto"
+      return !a11y.accessibilityElementsHidden && a11y.importantForAccessibility === "auto"
     })
     assert.deepEqual(exposed.map((page) => page.key), [selected.key])
     // The bottom bar derives its selected item from the same slot route name.
@@ -609,8 +658,8 @@ test("only the selected page is exposed to touch and accessibility, matching the
       assert.deepEqual(getMainTabPageAccessibility(index === selectedIndex), {
         accessibilityElementsHidden: true,
         importantForAccessibility: "no-hide-descendants",
-        pointerEvents: "none"
-      })
+        pointerEvents: "auto"
+      }, "a page whose route is not committed yet (a swipe still settling) still takes taps")
     }
   }
 })
