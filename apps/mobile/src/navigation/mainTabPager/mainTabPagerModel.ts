@@ -1,5 +1,4 @@
 import {
-  MAIN_TAB_PAGER_RUBBER_BAND_COEFFICIENT,
   MAIN_TAB_PAGER_SETTLE,
   MAIN_TAB_PAGER_SPRING,
   MAIN_TAB_PAGES,
@@ -29,28 +28,18 @@ function clampIndex(index: number, minIndex: number, maxIndex: number): number {
   return Math.min(maxIndex, Math.max(minIndex, index))
 }
 
-/** Offset shown for `overscroll` px past an edge; always smaller than the finger travel. */
-export function rubberBand(
-  overscroll: number,
-  dimension: number,
-  coefficientOverride?: number
-): number {
+/** Keep every rendered frame inside the page range, including spring overshoot. */
+export function clampMainTabPagerPosition(position: number, width: number): number {
   "worklet"
-  // Resolve the default in the body: the worklet transform captures values
-  // used in the body, not in default parameters, so a default that names an
-  // imported constant is undefined on the UI thread.
-  const coefficient = coefficientOverride ?? MAIN_TAB_PAGER_RUBBER_BAND_COEFFICIENT
-  if (dimension <= 0 || overscroll === 0) return 0
-  const distance = Math.abs(overscroll)
-  const banded = (1 - 1 / ((distance * coefficient) / dimension + 1)) * dimension
-  return overscroll < 0 ? -banded : banded
+  if (!(width > 0) || !Number.isFinite(position)) return 0
+  return Math.min(MAIN_TAB_SWIPE_MAX_INDEX * width, Math.max(MAIN_TAB_SWIPE_MIN_INDEX * width, position))
 }
 
 /**
  * Visible pager position (px, page index * width) for a raw finger position.
  * The drag follows the finger 1:1 within one page of its base page, meets a
- * hard stop one page away (a settle can only move one page), and rubber-bands
- * past the first or last swipeable page.
+ * hard stop one page away (a settle can only move one page), and never moves
+ * past the first or last swipeable page into an empty background.
  */
 export function resolveMainTabPagerDragPosition(input: {
   rawPosition: number
@@ -68,17 +57,7 @@ export function resolveMainTabPagerDragPosition(input: {
   const upperIndex = baseIndex + 1
   const lower = Math.max(minIndex, lowerIndex) * width
   const upper = Math.min(maxIndex, upperIndex) * width
-  if (rawPosition < lower) {
-    return lowerIndex < minIndex
-      ? lower + rubberBand(rawPosition - lower, width)
-      : lower
-  }
-  if (rawPosition > upper) {
-    return upperIndex > maxIndex
-      ? upper + rubberBand(rawPosition - upper, width)
-      : upper
-  }
-  return rawPosition
+  return Math.min(upper, Math.max(lower, rawPosition))
 }
 
 /**
@@ -155,8 +134,7 @@ export function resolveMainTabPagerBaseIndex(position: number, width: number): n
 /**
  * Visibility of a page while the pager moves. A page outside the swipeable
  * range (none today; kept for a page that opts out) is shown only while it
- * is the committed page, so an edge rubber band reveals the background
- * instead of an unreachable page.
+ * is the committed page.
  */
 export function getMainTabPageOpacity(pageIndex: number, committedIndex: number): number {
   "worklet"
