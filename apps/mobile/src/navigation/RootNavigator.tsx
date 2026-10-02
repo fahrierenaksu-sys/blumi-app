@@ -65,6 +65,7 @@ import {
   getChatLocale,
   getChatThreadScreenOptions,
   getDetailScreenOptions,
+  getStudioScreenOptions,
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
@@ -289,6 +290,7 @@ export function RootNavigator() {
   const reduceMotion = useReducedMotion()
   const reducedMotionScreenOptions = getReducedMotionScreenOptions(reduceMotion)
   const detailScreenOptions = getDetailScreenOptions(reduceMotion)
+  const studioScreenOptions = getStudioScreenOptions(reduceMotion)
   const nativeSheetScreenOptions = useCallback(
     ({ route }: { route: { params?: NativeSheetRouteParams } }) => getNativeSheetScreenOptions({
       kind: route.params?.sheet,
@@ -789,7 +791,7 @@ export function RootNavigator() {
               {CAN_REGISTER_HOME_STUDIO ? (
                 <Stack.Screen
                   name="HomeStudio"
-                  options={detailScreenOptions}
+                  options={studioScreenOptions}
                 >
                   {(screenProps) => (
                     <homeStudioScreenBundle.DeferredScreen
@@ -815,11 +817,11 @@ export function RootNavigator() {
               <Stack.Screen
                 name="WardrobeV2"
                 component={wardrobeV2ScreenBundle.DeferredScreen}
-                options={detailScreenOptions}
+                options={studioScreenOptions}
               />
               <Stack.Screen
                 name="MyRoomEditor"
-                options={detailScreenOptions}
+                options={studioScreenOptions}
               >
                 {(screenProps) => (
                   <myRoomEditorScreenBundle.DeferredScreen

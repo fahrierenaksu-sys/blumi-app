@@ -9,7 +9,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { hapticSelection } from "../ui/haptics"
 import { useReducedMotion } from "../ui/animations"
-import { getBottomPanelEntering } from "../ui/bottomPanelEntrance"
+import { useBottomPanelEntrance } from "../ui/bottomPanelEntrance"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   findAvatarStudioTab,
@@ -51,6 +51,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     getAvatarStudioDefaultCategory("closet")
   )
   const reduceMotion = useReducedMotion()
+  const panelEntranceStyle = useBottomPanelEntrance(navigation, reduceMotion)
   const {
     avatar,
     catalog,
@@ -181,8 +182,8 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           ) : null}
         </View>
 
-        {/* The panel rises softly into place, like the room editor's dock. */}
-        <Animated.View entering={getBottomPanelEntering(reduceMotion)}>
+        {/* Once the screen fades in, the panel rises softly into place, like the room editor's dock. */}
+        <Animated.View style={panelEntranceStyle}>
           <WardrobeGlass tone="panel" radius={30} style={styles.panelShell} contentStyle={styles.panelContent}>
             <WardrobeSectionSwitcher
               activeSection={activeSection}

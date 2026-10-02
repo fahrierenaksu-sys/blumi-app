@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import { ScrollView, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { useReducedMotion } from "../ui/animations"
-import { getBottomPanelEntering } from "../ui/bottomPanelEntrance"
+import { useBottomPanelEntrance } from "../ui/bottomPanelEntrance"
 import { WardrobeGlass } from "../features/avatarV2/wardrobe/WardrobeGlass"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
@@ -211,6 +211,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
 
   const dock = useRoomEditorDock()
   const reduceMotion = useReducedMotion()
+  const dockEntranceStyle = useBottomPanelEntrance(navigation, reduceMotion)
   const dockLayout = reduceMotion ? undefined : ROOM_EDITOR_DOCK_LAYOUT
   const fadeIn = reduceMotion ? undefined : ROOM_EDITOR_FADE_IN
   const fadeOut = reduceMotion ? undefined : ROOM_EDITOR_FADE_OUT
@@ -364,7 +365,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             </Animated.View>
 
             {/* The dock rises softly into place when the editor opens (same entrance as the wardrobe panel). */}
-            <Animated.View layout={dockLayout} entering={getBottomPanelEntering(reduceMotion)}>
+            <Animated.View layout={dockLayout} style={dockEntranceStyle}>
               <WardrobeGlass
                 tone="panel"
                 radius={30}

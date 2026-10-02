@@ -257,6 +257,7 @@ function mountRoot() {
         getChatLocale: () => "en",
         getChatThreadScreenOptions: () => ({}),
         getDetailScreenOptions: () => ({}),
+        getStudioScreenOptions: () => ({}),
         getReducedMotionScreenOptions: () => ({}),
         getOnboardingEntryRoute: () => null,
         MAIN_TAB_SCREEN_OPTIONS: {},
