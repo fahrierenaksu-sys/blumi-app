@@ -249,7 +249,6 @@ const FIXTURES: Record<ServerEventType, { valid: unknown; invalid: unknown }> = 
 
 test("fixtures cover every server event type in the contract", () => {
   assert.deepEqual(Object.keys(FIXTURES).sort(), [...SERVER_EVENT_TYPES].sort());
-  assert.equal(SERVER_EVENT_TYPES.length, 25);
 });
 
 test("a typing update names the typist, a known state and a bounded lifetime, never text", () => {

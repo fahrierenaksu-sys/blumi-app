@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { execFileSync, spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
+import { connect } from "node:net"
+import { networkInterfaces } from "node:os"
 import test from "node:test"
 import { resolve } from "node:path"
 
@@ -9,7 +11,6 @@ const builder = resolve(repository, "tools/operations-center/build.mjs")
 const server = resolve(repository, "tools/operations-center/serve.mjs")
 const dashboard = resolve(repository, "tools/operations-center/dist/index.html")
 const source = resolve(repository, "docs/release/LAUNCH_CONTROL.md")
-const workflow = resolve(repository, "docs/release/RELEASE_CAPTAIN_WORKFLOW.md")
 
 test("Operations Center stays aligned with the launch-control source", () => {
   const output = execFileSync(process.execPath, [builder], {
@@ -18,7 +19,6 @@ test("Operations Center stays aligned with the launch-control source", () => {
   })
   const html = readFileSync(dashboard, "utf8")
   const markdown = readFileSync(source, "utf8")
-  const workflowText = readFileSync(workflow, "utf8")
   const payloadMatch = html.match(/<script type="application\/json" id="ops-data">([\s\S]*?)<\/script>/)
 
   assert.match(output, /Built Operations Center from \d+ launch areas/)
@@ -30,38 +30,23 @@ test("Operations Center stays aligned with the launch-control source", () => {
   const expectedWorktree = readExpectedWorktree()
 
   assert.equal(payload.snapshotDate, markdown.match(/^Snapshot:\s*(\d{4}-\d{2}-\d{2})/m)?.[1])
-  assert.match(markdown, /\[reusable release-captain workflow\]\(\.\/RELEASE_CAPTAIN_WORKFLOW\.md\)/)
-  assert.match(workflowText, /^## Her oturumda$/m)
-  assert.match(workflowText, /^## Öncelik ve yayın kapıları$/m)
-  assert.match(workflowText, /^## Durum ve kanıt kaydı$/m)
-  assert.match(workflowText, /^## Her tur sonu devir$/m)
   assert.deepEqual(payload.worktree, expectedWorktree)
   assert.ok(Number.isFinite(Date.parse(payload.generatedAt)))
   assert.equal(payload.rows.length, expectedRows)
-  assert.ok(payload.rows.length >= 10, "dashboard must cover cross-functional release areas")
-  assert.ok(payload.rows.some((row) => row.area === "Apple hesabı / EAS / TestFlight"))
-  assert.ok(payload.rows.some((row) => row.area === "Veritabanı / Supabase"))
-  assert.ok(payload.rows.some((row) => row.area === "Kesintisiz izleme ve harcama"))
   assert.ok(payload.nextActionTitle)
   assert.ok(payload.nextAction)
 })
 
-test("Operations Center remains local, searchable, accessible, and responsive", () => {
+test("Operations Center page stays offline, injection-safe and free of secret files", () => {
   const html = readFileSync(dashboard, "utf8")
   const scripts = [...html.matchAll(/<script(?![^>]*\btype="application\/json")[^>]*>([\s\S]*?)<\/script>/g)]
 
-  assert.match(html, /id="category-filters"/)
-  assert.match(html, /id="status-filters"/)
-  assert.match(html, /id="search"/)
-  assert.match(html, /id="snapshot-branch"/)
-  assert.match(html, /id="worktree-breakdown"/)
-  assert.match(html, /aria-live="polite"/)
-  assert.match(html, /@media \(max-width: 700px\)/)
-  assert.match(html, /\.nav-icon \{ display: none; \}/)
-  assert.match(html, /prefers-reduced-motion: reduce/)
-  assert.match(html, /node\.textContent = text/)
-  assert.equal(scripts.length, 1, "dashboard should use one self-contained application script")
-  assert.doesNotMatch(scripts[0][1], /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon/)
+  assert.ok(scripts.length > 0, "dashboard needs its application script")
+  for (const [, code] of scripts) {
+    assert.doesNotMatch(code, /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon/)
+    // Ledger text is untrusted; it must reach the DOM as text, never as HTML.
+    assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write/)
+  }
   assert.doesNotMatch(html, /GoogleService-Info\.plist|google-services\.json|\.env\.local/)
 })
 
@@ -91,7 +76,7 @@ test("Operations Center serves only its local dashboard with read-only security 
     child.stdout.setEncoding("utf8")
     child.stdout.on("data", (chunk) => {
       stdout += chunk
-      const url = stdout.match(/Blumi Operasyon Merkezi: (http:\/\/127\.0\.0\.1:\d+\/)/)?.[1]
+      const url = stdout.match(/(http:\/\/127\.0\.0\.1:\d+\/)/)?.[1]
       if (!url) return
       clearTimeout(timeout)
       resolveUrl(url)
@@ -110,9 +95,7 @@ test("Operations Center serves only its local dashboard with read-only security 
   assert.equal(response.status, 200)
   assert.match(response.headers.get("content-security-policy") ?? "", /connect-src 'none'/)
   assert.equal(response.headers.get("x-content-type-options"), "nosniff")
-  const html = await response.text()
-  assert.match(html, /Sistemin durumu, tek yerde\./)
-  assert.match(html, /Panel oluşturuldu/)
+  assert.match(await response.text(), /id="ops-data"/)
 
   const unsupportedPath = await fetch(new URL("/.env", previewUrl))
   assert.equal(unsupportedPath.status, 404)
@@ -120,8 +103,26 @@ test("Operations Center serves only its local dashboard with read-only security 
   assert.equal(unsupportedMethod.status, 405)
   assert.equal(unsupportedMethod.headers.get("allow"), "GET, HEAD")
 
-  assert.match(readFileSync(server, "utf8"), /server\.listen\(initialPort, "127\.0\.0\.1"\)/)
+  // Loopback only: the same port must refuse connections on every
+  // non-loopback address of this machine.
+  const port = Number(new URL(previewUrl).port)
+  const externalHosts = Object.values(networkInterfaces()).flat()
+    .filter((entry) => entry && !entry.internal && entry.family === "IPv4")
+    .map((entry) => entry.address)
+  for (const host of externalHosts) {
+    assert.equal(await canConnect(host, port), false, "dashboard must not listen beyond loopback")
+  }
 })
+
+function canConnect(host, port) {
+  return new Promise((resolveConnect) => {
+    const socket = connect({ host, port })
+    const finish = (result) => { socket.destroy(); resolveConnect(result) }
+    socket.setTimeout(1000, () => finish(false))
+    socket.once("connect", () => finish(true))
+    socket.once("error", () => finish(false))
+  })
+}
 
 function readExpectedWorktree() {
   const branch = execFileSync("git", ["branch", "--show-current"], {

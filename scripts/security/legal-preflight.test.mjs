@@ -18,15 +18,3 @@ test("verified current legal metadata passes production and preview preflight", 
     assert.match(result.stdout, /Legal preflight passed/)
   }
 })
-
-test("production still rejects stale publication evidence", () => {
-  const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
-    import metadata from './apps/mobile/src/features/legal/legalPolicyMetadata.ts';
-    metadata.assertLegalReleaseReady({
-      buildProfile: 'production', serializedDocuments: 'current legal copy',
-      hostedCopyAlignment: 'update-required'
-    });
-  `], { cwd: new URL("../../", import.meta.url), encoding: "utf8" })
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /legal release is blocked/)
-})

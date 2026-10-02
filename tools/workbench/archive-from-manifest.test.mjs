@@ -6,7 +6,6 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
 import {
-  DEFAULT_DESTINATION,
   REPO_RECORD_PATH,
   archiveFromManifest,
   parseArgs
@@ -40,8 +39,7 @@ function fixture() {
   return { root, repo, dest, files, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
 
-test("defaults point at the 2026-09-30 Workbench archive and flags override them", () => {
-  assert.equal(DEFAULT_DESTINATION, "/Users/evrenevren/BlumiArtWorkbench/2026-09-30/repo-cleanup-archive/")
+test("flags override the default archive options", () => {
   const options = parseArgs(["--dest", "/tmp/x", "--manifest", "m.json", "--record-in-repo"])
   assert.equal(options.dest, "/tmp/x")
   assert.equal(options.manifest, "m.json")

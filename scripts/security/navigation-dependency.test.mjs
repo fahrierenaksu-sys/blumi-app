@@ -7,7 +7,13 @@ test("navigation uses the patched decoder through a compatible query-string adap
   const lock = JSON.parse(readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8"))
   const decoders = Object.entries(lock.packages).filter(([path]) => path.endsWith("node_modules/decode-uri-component"))
   assert.ok(decoders.length > 0)
-  for (const [, pkg] of decoders) assert.equal(pkg.version, "0.5.0")
+  // CVE-2022-38900 is fixed from 0.2.2; any later release is fine.
+  const atLeast = (version, floor) => {
+    const a = version.split(".").map(Number), b = floor.split(".").map(Number)
+    for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] > b[i]
+    return true
+  }
+  for (const [, pkg] of decoders) assert.ok(atLeast(pkg.version, "0.2.2"), pkg.version)
 })
 
 test("actual navigation parser retains deep links and bounds malformed input", () => {
