@@ -2,6 +2,12 @@
 // the UI thread. Functions marked 'worklet' run inside Reanimated reactions;
 // they are plain functions under node:test.
 
+/**
+ * Bottom-bar order. It must equal the main-page pager order (MAIN_TAB_PAGES),
+ * because the pager's fractional page index drives the bar's indicator.
+ */
+export const BOTTOM_NAV_KEY_ORDER = Object.freeze(["discover", "chats", "myroom", "shop"] as const)
+
 /** Shared values the pager writes and the bottom bar reads (see ui/mainTabPagerIndicator.ts). */
 export interface MainTabPagerIndicatorValues {
   /** Fractional page index (0 = Discover ... 3 = Shop) last shown while tracking. */

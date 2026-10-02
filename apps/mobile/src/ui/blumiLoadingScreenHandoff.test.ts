@@ -2,9 +2,12 @@ import assert from "node:assert/strict"
 import { createRequire } from "node:module"
 import { resolve } from "node:path"
 import test, { mock } from "node:test"
-import { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS } from "../features/session/onboardingBrandPreludeModel"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../testing/hookHarness"
 
+// The timeline the loading screen itself loads (see `real` below).
+const { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS } = createRequire(resolve(__dirname, "index.ts"))(
+  "../features/session/onboardingBrandPreludeModel"
+) as { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS: { scanDissolveStart: number; scanDissolveComplete: number } }
 const DISSOLVE_START = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveStart
 const DISSOLVE_END = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS.scanDissolveComplete
 const DISSOLVE_MS = DISSOLVE_END - DISSOLVE_START

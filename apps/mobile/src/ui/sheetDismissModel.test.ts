@@ -9,7 +9,8 @@ import {
   resolveSheetDismissRelease,
   resolveSheetDragOffset,
   getSheetExitVelocity,
-  SHEET_EXIT_SPRING
+  SHEET_EXIT_SPRING,
+  resolveSheetExit
 } from "./sheetDismissModel"
 
 const H = 520
@@ -90,4 +91,19 @@ test("the exit spring carries a downward flick and never bounces back into view"
   assert.equal(getSheetExitVelocity(-300), 0)
   assert.equal(getSheetExitVelocity(Number.NaN), 0)
   assert.equal(SHEET_EXIT_SPRING.overshootClamping, true)
+})
+
+test("Reduce Motion closes the sheet without movement; otherwise it springs out with the release speed", () => {
+  for (const sheetHeight of [0, 420]) {
+    assert.deepEqual(
+      resolveSheetExit({ reduceMotion: true, sheetHeight, velocityY: 1_200 }),
+      { animate: false, offset: getSheetExitOffset(sheetHeight) }
+    )
+  }
+  const animated = resolveSheetExit({ reduceMotion: false, sheetHeight: 420, velocityY: 1_200 })
+  assert.equal(animated.animate, true)
+  assert.equal(animated.offset, getSheetExitOffset(420))
+  assert.ok(animated.animate && animated.velocity === 1_200)
+  const upward = resolveSheetExit({ reduceMotion: false, sheetHeight: 420, velocityY: -600 })
+  assert.ok(upward.animate && upward.velocity === 0, "an exit never starts moving back up")
 })

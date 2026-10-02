@@ -22,6 +22,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useReducedMotion } from "./animations"
 import {
+  BOTTOM_NAV_KEY_ORDER,
   getBottomNavItemEmphasis,
   readMainTabPagerIndicatorProgress,
   resolveBottomNavIndicatorIndex,
@@ -67,22 +68,19 @@ interface BottomNavItem {
 
 type LocalizedBottomNavItem = BottomNavItem & { label: string }
 
+const BOTTOM_NAV_ICONS: Readonly<Record<BottomNavKey, Omit<BottomNavItem, "key">>> = {
+  discover: { icon: "compass-outline", activeIcon: "compass" },
+  chats: { icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
+  myroom: { icon: "home-outline", activeIcon: "home" },
+  shop: { icon: "bag-outline", activeIcon: "bag" }
+}
+
 // Same order as the main-page pager (MAIN_TAB_PAGES), whose fractional page
 // index drives the selection indicator while a swipe moves the pages.
-const BOTTOM_NAV_ITEMS: readonly BottomNavItem[] = [
-  {
-    key: "discover",
-    icon: "compass-outline",
-    activeIcon: "compass"
-  },
-  {
-    key: "chats",
-    icon: "chatbubble-ellipses-outline",
-    activeIcon: "chatbubble-ellipses"
-  },
-  { key: "myroom", icon: "home-outline", activeIcon: "home" },
-  { key: "shop", icon: "bag-outline", activeIcon: "bag" }
-]
+const BOTTOM_NAV_ITEMS: readonly BottomNavItem[] = BOTTOM_NAV_KEY_ORDER.map((key) => ({
+  key,
+  ...BOTTOM_NAV_ICONS[key]
+}))
 
 export interface BottomNavProps {
   currentKey: BottomNavKey

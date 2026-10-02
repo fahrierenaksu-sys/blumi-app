@@ -123,6 +123,26 @@ export function getSheetExitOffset(sheetHeight: number): number {
   return (sheetHeight > 0 ? sheetHeight : SHEET_DISMISS.fallbackDistance * 4) + 48
 }
 
+export type SheetExit =
+  | { readonly animate: false; readonly offset: number }
+  | { readonly animate: true; readonly offset: number; readonly velocity: number }
+
+/**
+ * How a dismissed sheet leaves: under Reduce Motion it jumps to its exit
+ * offset at once (no movement); otherwise it springs there carrying the
+ * downward release velocity.
+ */
+export function resolveSheetExit(input: {
+  reduceMotion: boolean
+  sheetHeight: number
+  velocityY?: number
+}): SheetExit {
+  "worklet"
+  const offset = getSheetExitOffset(input.sheetHeight)
+  if (input.reduceMotion) return { animate: false, offset }
+  return { animate: true, offset, velocity: getSheetExitVelocity(input.velocityY ?? 0) }
+}
+
 /**
  * Backdrop opacity (0..1) for a sheet offset: fully shown at rest, fading
  * linearly with the drag, and gone once the sheet reaches its exit offset,

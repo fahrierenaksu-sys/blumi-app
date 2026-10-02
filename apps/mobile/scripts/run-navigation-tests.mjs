@@ -104,7 +104,7 @@ try {
       resolve(workspaceRoot, "scripts/mobile-core-flow-presentation-contract.test.mjs"),
       resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeParamsSerialisable.test.mjs"),
-      resolve(workspaceRoot, "src/navigation/mainTabPager/mainTabPagerContract.test.mjs"),
+      resolve(workspaceRoot, "src/ui/gestureFrameWork.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeErrorBoundary.test.mjs")
     ],
     {
