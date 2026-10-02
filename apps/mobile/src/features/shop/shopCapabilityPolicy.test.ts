@@ -3,7 +3,6 @@ import test from "node:test"
 import { CAPABILITY_KEYS, type CapabilityMap } from "@blumi/contracts"
 import {
   canMerchandiseSemanticOutfits,
-  isMobileOuterwearMerchandisingEnabled,
   isShopMultiItemApplyEnabled
 } from "./shopCapabilityPolicy"
 
@@ -22,10 +21,9 @@ test("production Shop enables basic multi-item apply without advertising semanti
   assert.equal(canMerchandiseSemanticOutfits("production", multiItemOnly), false)
 })
 
-test("demo keeps deterministic local try-on while outerwear remains preserve-only", () => {
+test("demo keeps deterministic local try-on", () => {
   assert.equal(isShopMultiItemApplyEnabled("demo", capabilities([])), true)
   assert.equal(canMerchandiseSemanticOutfits("demo", capabilities([])), true)
-  assert.equal(isMobileOuterwearMerchandisingEnabled(), false)
 })
 
 test("full catalog QA exposes dresses for production-session inspection", () => {

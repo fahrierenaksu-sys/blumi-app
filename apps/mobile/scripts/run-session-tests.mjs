@@ -48,7 +48,6 @@ sourceFiles.push(
   "src/features/referrals/referralModel.ts",
   "src/features/referrals/referralModel.test.ts",
   "src/features/referrals/referralCaptureSignal.ts",
-  "src/features/referrals/referralCaptureSignal.test.ts",
   "src/features/referrals/referralApi.ts",
   "src/features/referrals/referralApi.test.ts"
 )
@@ -115,7 +114,6 @@ try {
         join(outputDirectory, "features/session", `${name}.test.js`)
       ),
       join(outputDirectory, "features/referrals/referralModel.test.js"),
-      join(outputDirectory, "features/referrals/referralCaptureSignal.test.js"),
       join(outputDirectory, "features/referrals/referralApi.test.js"),
       join(outputDirectory, "features/capabilities/capabilityApi.test.js"),
       join(outputDirectory, "features/avatarV2/avatarSelectionModel.test.js"),

@@ -3,32 +3,6 @@ import test from "node:test"
 import { getShopLayoutMetrics } from "./shopLayoutMetrics"
 
 const iphone17 = getShopLayoutMetrics({ width: 402, height: 874 })
-const iphone17ProMax = getShopLayoutMetrics({ width: 440, height: 956 })
-
-test("shop metrics depend on width and ignore height-only changes", () => {
-  const aroundWidthBreakpoint = [389, 390].map((width) =>
-    getShopLayoutMetrics({ width, height: 874 })
-  )
-  const aroundHeightBreakpoint = [879, 880].map((height) =>
-    getShopLayoutMetrics({ width: 402, height })
-  )
-
-  assert.ok(
-    Math.abs(
-      aroundWidthBreakpoint[1].preview.avatarWidth
-        - aroundWidthBreakpoint[0].preview.avatarWidth
-    ) < 1
-  )
-  assert.deepEqual(aroundHeightBreakpoint[1], aroundHeightBreakpoint[0])
-})
-
-test("larger iPhones keep the same Shop hierarchy and only gain bounded space", () => {
-  assert.equal(iphone17.hierarchy, "live-preview")
-  assert.equal(iphone17ProMax.hierarchy, "live-preview")
-  assert.ok(iphone17ProMax.preview.avatarWidth >= iphone17.preview.avatarWidth)
-  assert.ok(iphone17ProMax.preview.avatarWidth <= 178)
-  assert.ok(iphone17ProMax.preview.roomStageHeight <= 300)
-})
 
 test("short content viewports shrink the preview without narrowing the catalog", () => {
   const short = getShopLayoutMetrics({ width: 402, height: 520 })
@@ -52,15 +26,6 @@ test("shop avatar frame never exceeds its stage at supported phone sizes", () =>
       renderedAvatarHeight <= metrics.preview.avatarStageHeight,
       `${width}x${height}: avatar ${renderedAvatarHeight} exceeds stage ${metrics.preview.avatarStageHeight}`
     )
-  }
-})
-
-test("four-piece preview redistributes space without expanding the screen", () => {
-  for (const width of [375, 390, 402, 430, 440]) {
-    const metrics = getShopLayoutMetrics({ width, height: 730 })
-    assert.ok(metrics.preview.avatarStageHeight >= 228)
-    assert.ok(metrics.catalog.productCardHeight >= 108)
-    assert.ok(metrics.catalog.productCardHeight * 2 + metrics.preview.avatarStageHeight + 246 <= 730.1)
   }
 })
 

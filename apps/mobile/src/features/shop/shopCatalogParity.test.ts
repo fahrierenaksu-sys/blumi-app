@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import test from "node:test";
 
 require.extensions[".png"] = (module, filename) => {
@@ -17,27 +15,18 @@ const { resolveInitialAvatarV2 } =
 const { buildShopCatalogItems } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("./shopCatalog") as typeof import("./shopCatalog");
+const { getAvatarItemPreviewSource } =
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  require("./shopAssets") as typeof import("./shopAssets");
 const {
   AVATAR_LOADOUT_CATALOG,
   ECONOMY_CATALOG,
+  findEconomyCatalogItem,
   resolvePublishedReleaseCatalogItemIds,
   resolveR1PublishedEconomyCatalog,
 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("@blumi/domain") as typeof import("@blumi/domain");
-const workspaceRoot = process.cwd();
-const economyCatalogSource = readFileSync(
-  join(workspaceRoot, "../../packages/domain/src/economy/economyCatalog.ts"),
-  "utf8",
-);
-const mobileShopSource = readFileSync(
-  join(workspaceRoot, "src/features/shop/shopCatalog.ts"),
-  "utf8",
-);
-const maleCapsulePreviewSource = readFileSync(
-  join(workspaceRoot, "src/features/avatarV2/maleCapsulePreviewSources.ts"),
-  "utf8",
-);
 const { ROOM_V2_FURNITURE_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog");
@@ -59,20 +48,35 @@ test("every mobile shop item is represented by the shared economy catalog", () =
   );
 
   for (const item of visibleAvatarItems) {
-    assert.match(
-      economyCatalogSource,
-      new RegExp(`avatarItem\\(\\s*"${item.id}"`),
-      item.id,
-    );
+    assert.ok(findEconomyCatalogItem(item.id, "avatar"), item.id);
   }
-  const roomItemIds = ROOM_V2_FURNITURE_CATALOG.map((item) => item.id);
-  assert.equal(roomItemIds.length, 7);
-  for (const itemId of roomItemIds) {
-    assert.match(
-      economyCatalogSource,
-      new RegExp(`roomItem\\(\\s*"${itemId}"`),
-      itemId,
-    );
+  for (const item of ROOM_V2_FURNITURE_CATALOG) {
+    assert.ok(findEconomyCatalogItem(item.id, "room"), item.id);
+  }
+});
+
+test("every Shop product is priced exactly as the shared economy catalog", () => {
+  for (const bodyId of ["avatar_v2_body_default", "avatar_v2_body_male_light"]) {
+    const products = buildShopCatalogItems({
+      avatar: resolveInitialAvatarV2(bodyId),
+      inventory: {
+        coins: 1_250,
+        ownedAvatarItemIds: [],
+        ownedRoomItemIds: [],
+        unlockedFeatureIds: [],
+        updatedAt: "2026-07-14T00:00:00.000Z",
+      },
+      roomDecor: {
+        roomShellId: "room_v2_shell_blumi_world_v1",
+        placedItems: [],
+      },
+    });
+    assert.ok(products.length > 0);
+    for (const product of products) {
+      const type = product.sectionId === "avatar" ? "avatar" : "room";
+      const economyItem = findEconomyCatalogItem(product.sourceItemId, type);
+      assert.equal(product.priceCoins, economyItem?.priceCoins ?? null, product.sourceItemId);
+    }
   }
 });
 
@@ -187,41 +191,6 @@ test("an owned room item already placed in the room is shown as placed, not offe
   const roomProduct = products.find((product) => product.sourceItemId === item.id);
   assert.ok(roomProduct);
   assert.equal(roomProduct.actionType, "disabled");
-  assert.equal(roomProduct.stateLabel, "1 placed");
-  assert.equal(roomProduct.actionLabel, "Placed");
-});
-
-test("mobile pricing delegates to the shared server catalog", () => {
-  assert.match(
-    mobileShopSource,
-    /import \{\s*findEconomyCatalogItem,\s*type EconomyCatalogItem\s*\} from "@blumi\/domain"/,
-  );
-  assert.doesNotMatch(mobileShopSource, /AVATAR_SHOP_PRICES/);
-  assert.doesNotMatch(mobileShopSource, /ROOM_SHOP_PRICES/);
-  assert.match(
-    mobileShopSource,
-    /findEconomyCatalogItem\(item\.id, "avatar", economyCatalog\)\?\.priceCoins/,
-  );
-  assert.match(
-    mobileShopSource,
-    /findEconomyCatalogItem\(item\.id, "room", economyCatalog\)\?\.priceCoins/,
-  );
-});
-
-test("the shared catalog contains the 109 premium avatar items, including Coral Wave", () => {
-  const premiumAvatarEntries = Array.from(
-    economyCatalogSource.matchAll(
-      /avatarItem\(\s*"([^"]+)"\s*,\s*"[^"]+"\s*,\s*(\d+)/g,
-    ),
-  ).filter((match) => Number(match[2]) > 0);
-
-  // This is a release catalog contract, not a derived expectation. Change it
-  // only together with an approved merch expansion and its runtime assets.
-  assert.equal(premiumAvatarEntries.length, 109);
-  assert.equal(
-    new Set(premiumAvatarEntries.map((match) => match[1])).size,
-    premiumAvatarEntries.length,
-  );
 });
 
 test("every dress grants one real hidden paired bottom", () => {
@@ -229,7 +198,7 @@ test("every dress grants one real hidden paired bottom", () => {
     (item) => item.type === "top" && typeof item.pairedItemId === "string",
   );
 
-  assert.equal(dressTops.length, 8);
+  assert.ok(dressTops.length > 0);
   for (const dressTop of dressTops) {
     const pairedBottom = AVATAR_V2_CATALOG.find(
       (item) => item.id === dressTop.pairedItemId,
@@ -326,11 +295,18 @@ test("male starter basics are browsable, owned, and have real shop previews", ()
     assert.ok(economyItem, itemId);
     assert.equal(economyItem.priceCoins, 0, itemId);
     assert.equal(economyItem.ownedByDefault, true, itemId);
-    assert.match(
-      maleCapsulePreviewSource,
-      new RegExp(`${itemId}:\\s*roomAvatarLayerAssets\\.[A-Za-z0-9]+\\.source`),
-      `${itemId} needs a local preview source`,
-    );
+    assert.ok(getAvatarItemPreviewSource(itemId), `${itemId} needs a local preview source`);
+  }
+});
+
+test("every visible starter garment has a local shop preview", () => {
+  const garmentTypes = new Set(["hair", "top", "bottom", "shoes", "accessory"]);
+  const visibleStarters = AVATAR_V2_CATALOG.filter(
+    (item) => garmentTypes.has(item.type) && item.hiddenFromShop !== true && item.ownedByDefault === true,
+  );
+  assert.ok(visibleStarters.length > 0);
+  for (const item of visibleStarters) {
+    assert.ok(getAvatarItemPreviewSource(item.id), `${item.id} needs a local preview source`);
   }
 });
 

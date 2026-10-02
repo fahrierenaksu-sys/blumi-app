@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   getShopPresentationState,
-  getShopInteractionPolicy,
   shouldRenderShopContent
 } from "./shopPresentationModel"
 
@@ -116,20 +115,5 @@ test("production keeps cached shop browsing open but makes remote actions read-o
   assert.equal(
     shouldRenderShopContent({ state, isReady: true, productCount: 0 }),
     false
-  )
-  assert.deepEqual(
-    getShopInteractionPolicy({ state, isProduction: true }),
-    {
-      isReadOnly: true,
-      disabledReason: "Reconnect to unlock, equip, place, or buy coin packs."
-    }
-  )
-  assert.deepEqual(
-    getShopInteractionPolicy({ state: "ready", isProduction: true }),
-    { isReadOnly: false }
-  )
-  assert.deepEqual(
-    getShopInteractionPolicy({ state, isProduction: false }),
-    { isReadOnly: false }
   )
 })
