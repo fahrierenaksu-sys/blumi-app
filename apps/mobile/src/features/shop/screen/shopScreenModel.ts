@@ -315,7 +315,7 @@ export function getShopShelfPageIndex(scrollOffset: number, shelfWidth: number, 
 /** "2/3"; an empty shelf reads "1/1". Runs on the UI thread for the counter. */
 export function formatShopShelfCounter(pageIndex: number, pageCount: number): string {
   "worklet"
-  return `${pageIndex + 1}/${Math.max(1, pageCount)}`
+  return `${pageIndex + 1}/${getShopShelfCounterTotal(pageCount)}`
 }
 
 /**
@@ -351,6 +351,12 @@ export function getShopShelfReleasePageIndex(
  * word. Momentum frames never move the page, so it cannot flicker back.
  */
 export interface ShopShelfPageTracker {
+  /**
+   * The shelf this page belongs to (mode and category). A tracker from
+   * another shelf never shows its page: a new category reads page 1 on the
+   * frame it appears, before the reset effect runs.
+   */
+  scope: string
   page: number
   dragging: boolean
   offset: number
@@ -364,9 +370,41 @@ export type ShopShelfScrollStep =
   | { type: "momentum_end"; offset: number }
   | { type: "jump"; page: number }
 
-export function createShopShelfPageTracker(page: number): ShopShelfPageTracker {
+export function createShopShelfPageTracker(page: number, scope = ""): ShopShelfPageTracker {
   "worklet"
-  return { page, dragging: false, offset: 0, lastDelta: 0 }
+  return { scope, page, dragging: false, offset: 0, lastDelta: 0 }
+}
+
+/** The shelf scope a tracker belongs to: one per mode and category. */
+export function getShopShelfScope(mode: string, categoryId: string): string {
+  return `${mode}:${categoryId}`
+}
+
+/**
+ * The page index the counter and page buttons show for the shelf `scope`
+ * with `pageCount` pages: the tracker's page, clamped to existing pages, or
+ * the first page when the tracker still belongs to another shelf.
+ */
+export function getShopShelfCounterPage(tracker: ShopShelfPageTracker, scope: string, pageCount: number): number {
+  "worklet"
+  if (tracker.scope !== scope || !Number.isFinite(tracker.page)) return 0
+  const lastPage = Math.max(0, Math.floor(Number.isFinite(pageCount) ? pageCount : 1) - 1)
+  return Math.max(0, Math.min(lastPage, Math.round(tracker.page)))
+}
+
+/** The page buttons for a shown page: each is disabled at its end. */
+export function getShopShelfPageButtons(pageIndex: number, pageCount: number): {
+  canShowPrevious: boolean
+  canShowNext: boolean
+} {
+  const lastPage = getShopShelfCounterTotal(pageCount) - 1
+  return { canShowPrevious: pageIndex > 0, canShowNext: pageIndex < lastPage }
+}
+
+/** Total pages the counter shows: "1/1" for an empty shelf. */
+export function getShopShelfCounterTotal(pageCount: number): number {
+  "worklet"
+  return Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1
 }
 
 export function stepShopShelfPageTracker(
@@ -379,15 +417,16 @@ export function stepShopShelfPageTracker(
   if (step.type === "jump") {
     const lastPage = Math.max(0, Math.floor(pageCount) - 1)
     const page = Number.isFinite(step.page) ? Math.max(0, Math.min(lastPage, Math.round(step.page))) : 0
-    return { page, dragging: false, offset: tracker.offset, lastDelta: 0 }
+    return { scope: tracker.scope, page, dragging: false, offset: tracker.offset, lastDelta: 0 }
   }
   const delta = step.offset - tracker.offset
   const lastDelta = Number.isFinite(delta) && delta !== 0 ? delta : tracker.lastDelta
   if (step.type === "begin_drag") {
-    return { page: tracker.page, dragging: true, offset: step.offset, lastDelta: 0 }
+    return { scope: tracker.scope, page: tracker.page, dragging: true, offset: step.offset, lastDelta: 0 }
   }
   if (step.type === "scroll") {
     return {
+      scope: tracker.scope,
       page: tracker.dragging ? getShopShelfPageIndex(step.offset, shelfWidth, pageCount) : tracker.page,
       dragging: tracker.dragging,
       offset: step.offset,
@@ -396,6 +435,7 @@ export function stepShopShelfPageTracker(
   }
   if (step.type === "end_drag") {
     return {
+      scope: tracker.scope,
       page: getShopShelfReleasePageIndex(step.offset, shelfWidth, pageCount, lastDelta, step.speed),
       dragging: false,
       offset: step.offset,
@@ -403,6 +443,7 @@ export function stepShopShelfPageTracker(
     }
   }
   return {
+    scope: tracker.scope,
     page: getShopShelfPageIndex(step.offset, shelfWidth, pageCount),
     dragging: false,
     offset: step.offset,

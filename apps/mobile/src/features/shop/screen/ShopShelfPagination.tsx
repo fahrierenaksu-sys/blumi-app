@@ -1,56 +1,64 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { memo, useState } from "react"
-import { StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Animated, {
   type SharedValue,
-  useAnimatedProps,
-  useAnimatedReaction
+  useAnimatedReaction,
+  useAnimatedStyle
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { uiTheme } from "../../../ui/theme"
-import { formatShopShelfCounter, type ShopShelfPageTracker } from "./shopScreenModel"
+import {
+  formatShopShelfCounter,
+  getShopShelfCounterPage,
+  getShopShelfCounterTotal,
+  getShopShelfPageButtons,
+  type ShopShelfPageTracker
+} from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 import { PressableScale } from "../../../ui/PressableScale"
 
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 const COUNTER_FONT_SCALE_LIMIT = 1.4
 
 /**
- * The shelf's "2/4" counter and its page buttons. The digits are written on
- * the UI thread from the scroll-stepped tracker, so they change on the frame
+ * The shelf's "2/4" counter and its page buttons. Every "n/total" label of
+ * the current shelf is laid out once, stacked, and the UI thread shows the
+ * one for the tracker's page by opacity, so the digits change on the frame
  * the page changes even while JS renders the next shelf page. React renders
- * this small header (button states, the spoken label) only when the page
- * changes, never per scroll frame, and never re-renders the shelf itself.
+ * this small header (button states, the spoken label) only when the page or
+ * the shelf changes, never per scroll frame, and never re-renders the shelf.
+ *
+ * The labels are plain Text, not an animated TextInput `text` prop:
+ * Reanimated hands settled animated props back to React, and TextInput
+ * replaces a `text` prop with its value/defaultValue, which left the counter
+ * stuck on the first shelf's "1/4".
  */
 export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
   tracker: SharedValue<ShopShelfPageTracker>
+  /** The shelf on screen (mode and category); see getShopShelfScope. */
+  scope: string
   pageCount: number
   previousLabel: string
   nextLabel: string
   pageLabel: (page: number, total: number) => string
   onShowPage: (step: -1 | 1) => void
 }) {
-  const { tracker, pageCount, previousLabel, nextLabel, pageLabel, onShowPage } = props
-  const lastPage = Math.max(0, pageCount - 1)
-  const [pageIndex, setPageIndex] = useState(0)
-  // Frozen at mount: after that the UI thread owns the digits, and a changing
-  // defaultValue would make React push a competing text.
-  const [initialText] = useState(() => formatShopShelfCounter(0, pageCount))
+  const { tracker, scope, pageCount, previousLabel, nextLabel, pageLabel, onShowPage } = props
+  const total = getShopShelfCounterTotal(pageCount)
+  const lastPage = total - 1
+  const [shown, setShown] = useState(() => ({ scope, index: 0 }))
   useAnimatedReaction(
-    () => Math.max(0, Math.min(lastPage, tracker.value.page)),
+    () => getShopShelfCounterPage(tracker.value, scope, total),
     (index, previous) => {
-      if (index !== previous) scheduleOnRN(setPageIndex, index)
+      if (index !== previous) scheduleOnRN(setShown, { scope, index })
     },
-    [lastPage]
+    [scope, total]
   )
-  const counterProps = useAnimatedProps(() => {
-    const text = formatShopShelfCounter(Math.max(0, Math.min(lastPage, tracker.value.page)), pageCount)
-    // `text` is the native TextInput prop; it is not part of TextInputProps.
-    return { text } as Partial<TextInputProps>
-  }, [lastPage, pageCount])
-  const shownIndex = Math.min(pageIndex, lastPage)
-  const atFirst = shownIndex === 0
-  const atLast = shownIndex >= lastPage
+  // A new shelf starts on its first page even before the reaction reports.
+  const shownIndex = shown.scope === scope ? Math.min(shown.index, lastPage) : 0
+  const buttons = getShopShelfPageButtons(shownIndex, total)
+  const atFirst = !buttons.canShowPrevious
+  const atLast = !buttons.canShowNext
   return (
     <View style={styles.catalogPagination}>
       <PressableScale
@@ -67,24 +75,21 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
         testID="shop-shelf-counter"
         accessible
         accessibilityRole="text"
-        accessibilityLabel={pageLabel(shownIndex + 1, Math.max(1, pageCount))}
+        accessibilityLabel={pageLabel(shownIndex + 1, total)}
       >
         {/* The widest counter sizes the slot so changing digits never clip. */}
         <Text maxFontSizeMultiplier={COUNTER_FONT_SCALE_LIMIT} style={[styles.catalogPageCount, local.sizer]}>
-          {formatShopShelfCounter(lastPage, pageCount)}
+          {formatShopShelfCounter(lastPage, total)}
         </Text>
-        <AnimatedTextInput
-          editable={false}
-          caretHidden
-          contextMenuHidden
-          scrollEnabled={false}
-          underlineColorAndroid="transparent"
-          importantForAccessibility="no"
-          maxFontSizeMultiplier={COUNTER_FONT_SCALE_LIMIT}
-          defaultValue={initialText}
-          animatedProps={counterProps}
-          style={[styles.catalogPageCount, local.value]}
-        />
+        {Array.from({ length: total }, (_, index) => (
+          <ShopShelfCounterLabel
+            key={`${scope}:${total}:${index}`}
+            tracker={tracker}
+            scope={scope}
+            pageCount={total}
+            index={index}
+          />
+        ))}
       </View>
       <PressableScale
         accessibilityRole="button"
@@ -100,6 +105,30 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
   )
 })
 
+/** One "n/total" label, visible only while the tracker is on its page. */
+const ShopShelfCounterLabel = memo(function ShopShelfCounterLabel(props: {
+  tracker: SharedValue<ShopShelfPageTracker>
+  scope: string
+  pageCount: number
+  index: number
+}) {
+  const { tracker, scope, pageCount, index } = props
+  const visibility = useAnimatedStyle(() => ({
+    opacity: getShopShelfCounterPage(tracker.value, scope, pageCount) === index ? 1 : 0
+  }), [scope, pageCount, index])
+  return (
+    <Animated.Text
+      accessible={false}
+      importantForAccessibility="no"
+      maxFontSizeMultiplier={COUNTER_FONT_SCALE_LIMIT}
+      numberOfLines={1}
+      style={[styles.catalogPageCount, local.value, visibility]}
+    >
+      {formatShopShelfCounter(index, pageCount)}
+    </Animated.Text>
+  )
+})
+
 const local = StyleSheet.create({
   sizer: {
     opacity: 0
@@ -110,11 +139,7 @@ const local = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    margin: 0,
-    marginHorizontal: 5,
-    padding: 0,
     pointerEvents: "none",
-    textAlign: "center",
-    textAlignVertical: "center"
+    textAlign: "center"
   }
 })
