@@ -380,6 +380,7 @@ export function RootNavigator() {
     resynchronizeMessages,
     upsertRoomInvite,
     warmThreadMessagesForInbox,
+    hideThreadForMeOnServer,
     chatThreadBindings
   } = useRootChatSync({
     latestSessionActorRef,
@@ -607,10 +608,12 @@ export function RootNavigator() {
     onRetryThreads: refreshProductionThreads,
     onWarmThread: warmThreadMessagesForInbox,
     onMarkThreadRead: markThreadReadFromInbox,
+    onHideThreadForMe: hideThreadForMeOnServer,
     resolvedCapabilities,
     isFullShopCatalogQaPreview: IS_FULL_SHOP_CATALOG_QA_PREVIEW
   }), [
     clearSessionActor,
+    hideThreadForMeOnServer,
     markThreadReadFromInbox,
     refreshProductionThreads,
     resolvedCapabilities,

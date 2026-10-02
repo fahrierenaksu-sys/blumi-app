@@ -28,6 +28,12 @@ export interface GlobalRealtimeEventHandlerDependencies {
   applyChatThreadRead?: (payload: ChatThreadRead) => void
   requestThreadPage?: (cursor: string) => void
   requestThreadRefresh?: () => void
+  /**
+   * Whether the thread list holds this thread. A message for one it does not
+   * (a conversation this account deleted for itself, brought back by the
+   * partner's new message) refreshes the list so the conversation reappears.
+   */
+  hasThread?: (threadId: string) => boolean
   applyChatThreadCreated: (
     payload: Extract<ServerEvent, { type: "chat.thread_created" }>["payload"]
   ) => void
@@ -127,9 +133,11 @@ export function createGlobalRealtimeEventHandler(
       // useInRoomChat settles that bubble. The store keeps the canonical shape.
       const { clientMessageId: _clientMessageId, ...message } = event.payload
       dependencies.clearChatTypingForMessage?.(message)
+      const knownThread = dependencies.hasThread?.(message.threadId) ?? true
       dependencies.applyChatMessageReceived(message, {
         localUserId: dependencies.currentUserId
       })
+      if (!knownThread) dependencies.requestThreadRefresh?.()
 
       const fromPartner = Boolean(dependencies.currentUserId) &&
         event.payload.senderUserId !== dependencies.currentUserId

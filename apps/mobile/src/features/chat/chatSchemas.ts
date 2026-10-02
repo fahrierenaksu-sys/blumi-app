@@ -4,6 +4,7 @@ export {
   chatMessageSchema,
   chatParticipantSummarySchema,
   chatThreadEnvelopeSchema,
+  chatThreadHiddenSchema,
   chatThreadListSchema,
   chatThreadReadSchema,
   chatThreadSchema

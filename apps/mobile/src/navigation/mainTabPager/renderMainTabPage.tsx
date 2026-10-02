@@ -30,6 +30,7 @@ export interface MainTabPageDependencies {
   onRetryThreads: InboxProps["onRetryThreads"]
   onWarmThread: InboxProps["onWarmThread"]
   onMarkThreadRead: InboxProps["onMarkThreadRead"]
+  onHideThreadForMe: InboxProps["onHideThreadForMe"]
   resolvedCapabilities: MyRoomProps["resolvedCapabilities"]
   isFullShopCatalogQaPreview: boolean
 }
@@ -61,6 +62,7 @@ export function renderMainTabPage(
         onRetryThreads={dependencies.onRetryThreads}
         onWarmThread={dependencies.onWarmThread}
         onMarkThreadRead={dependencies.onMarkThreadRead}
+        onHideThreadForMe={dependencies.onHideThreadForMe}
       />
     )
   }

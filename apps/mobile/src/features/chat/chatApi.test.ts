@@ -4,6 +4,7 @@ import {
   createThread,
   fetchChatThreads,
   fetchThreadMessages,
+  hideThreadForMe,
   markThreadRead,
   sendThreadMessage
 } from "./chatApi"
@@ -325,6 +326,39 @@ test("a read that names the newest partner message sends it as the only body fie
       assert.equal((init?.headers as Record<string, string>)["content-type"], undefined)
       return createJsonResponse(200, { userId: "user_one", threadId: "thread_one", readAt: "2026-10-01T10:00:00.000Z" })
     }) as typeof fetch)
+})
+
+test("delete for me reaches the server when it supports it and reports when it does not", async () => {
+  const hidden = await hideThreadForMe("http://localhost:4000", "session_token", "thread one",
+    { throughMessageId: "message_9", expectedUserId: "user_one" },
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      assert.equal(String(url), "http://localhost:4000/v1/threads/thread%20one/hide")
+      assert.equal(init?.method, "POST")
+      assert.equal((init?.headers as Record<string, string>).authorization, "Bearer session_token")
+      assert.equal(init?.body, JSON.stringify({ throughMessageId: "message_9" }))
+      return createJsonResponse(200, {
+        userId: "user_one", threadId: "thread one",
+        hiddenThrough: "2026-10-02T10:00:00.000Z", readAt: "2026-10-02T10:00:00.000Z"
+      })
+    }) as typeof fetch)
+  assert.deepEqual(hidden, { hidden: true, hiddenThrough: "2026-10-02T10:00:00.000Z", readAt: "2026-10-02T10:00:00.000Z" })
+
+  // Migration 071 not applied (409) or an older server without the route (404).
+  for (const status of [404, 409]) {
+    const result = await hideThreadForMe("http://localhost:4000", "session_token", "thread_one", {},
+      (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        assert.equal(init?.body, "{}")
+        return createJsonResponse(status, { code: "CHAT_HIDE_UNAVAILABLE", error: "not yet" })
+      }) as typeof fetch)
+    assert.deepEqual(result, { hidden: false })
+  }
+  await assert.rejects(hideThreadForMe("http://localhost:4000", "session_token", "thread_one", {},
+    (async () => createJsonResponse(503, { error: "busy" })) as typeof fetch))
+  await assert.rejects(hideThreadForMe("http://localhost:4000", "session_token", "thread_one", { expectedUserId: "user_one" },
+    (async () => createJsonResponse(200, {
+      userId: "someone_else", threadId: "thread_one",
+      hiddenThrough: "2026-10-02T10:00:00.000Z", readAt: "2026-10-02T10:00:00.000Z"
+    })) as typeof fetch), /confirm/)
 })
 
 test("message lists keep the partner's receipt cursors and stay valid without them", async () => {

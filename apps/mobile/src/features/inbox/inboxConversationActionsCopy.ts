@@ -31,7 +31,7 @@ const COPY: Record<AccountRecoveryLocale, InboxConversationActionsCopy> = {
     deleteHint: "Removes this chat from your list.",
     confirmTitle: "Delete this chat?",
     confirmBody: (partnerName) =>
-      `It is removed from your Chats list on this phone. ${partnerName} still has the conversation, and a new message brings it back.`,
+      `It is removed from your Chats list. ${partnerName} still has the conversation, and a new message brings it back.`,
     confirmDelete: "Delete",
     cancel: "Cancel",
     close: "Close chat options",
@@ -49,7 +49,7 @@ const COPY: Record<AccountRecoveryLocale, InboxConversationActionsCopy> = {
     deleteHint: "Bu sohbeti listenden kaldırır.",
     confirmTitle: "Bu sohbet silinsin mi?",
     confirmBody: (partnerName) =>
-      `Bu telefondaki Sohbetler listenden kaldırılır. ${partnerName} konuşmayı görmeye devam eder; yeni bir mesaj gelirse sohbet geri gelir.`,
+      `Sohbetler listenden kaldırılır. ${partnerName} konuşmayı görmeye devam eder; yeni bir mesaj gelirse sohbet geri gelir.`,
     confirmDelete: "Sil",
     cancel: "Vazgeç",
     close: "Sohbet seçeneklerini kapat",
