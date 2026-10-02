@@ -197,6 +197,42 @@ export function resolveDiscoveryFiltersForFocus(
   )
 }
 
+/**
+ * Filters count as ready only for the account they were hydrated for, so a
+ * switched account never queries production discovery with the previous
+ * account's filters.
+ */
+export function areDiscoveryFiltersReadyFor(
+  readyForUserId: string | null,
+  userId: string
+): boolean {
+  return readyForUserId !== null && readyForUserId === userId
+}
+
+export interface DiscoveryFiltersHydrationGate {
+  /** Marks the start of a filter load; pass the token to `canApply`. */
+  beginLoad(): number
+  /** A load may apply its result only if no save happened since it began. */
+  canApply(loadToken: number): boolean
+  /** A save supersedes every load that started before it. Returns its token. */
+  recordSave(): number
+  /** True while no later save superseded the save behind `saveToken`. */
+  isLatestSave(saveToken: number): boolean
+}
+
+export function createDiscoveryFiltersHydrationGate(): DiscoveryFiltersHydrationGate {
+  let generation = 0
+  return {
+    beginLoad: () => generation,
+    canApply: (loadToken) => loadToken === generation,
+    recordSave: () => {
+      generation += 1
+      return generation
+    },
+    isLatestSave: (saveToken) => saveToken === generation
+  }
+}
+
 function copyDefaultDiscoveryFilters(): DiscoveryFilters {
   return {
     ...DEFAULT_DISCOVERY_FILTERS,
