@@ -1,12 +1,8 @@
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
 import {
-  Animated,
-  Easing,
   Keyboard,
-  LayoutAnimation,
   Pressable,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions
 } from "react-native"
@@ -18,23 +14,19 @@ import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { resolveComposerRestore, resolveRoomComposerSubmit } from "../roomComposerModel"
-import { uiTheme } from "../../../ui/theme"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticLight } from "../../../ui/haptics"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
 import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
+import { MiniRoomContext } from "./MiniRoomContext"
 import { MiniRoomHud } from "./MiniRoomHud"
 import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
 import { MAX_ROOM_MESSAGE_LENGTH, RoomChatComposer } from "./RoomChatComposer"
 import { RoomMapLayer } from "./RoomMapLayer"
 import { useMiniRoomSceneStore } from "./miniRoomSceneStore"
 import {
-  MINI_ROOM_ENTRY_DURATION_MS,
   MINI_ROOM_PARTNER_ARRIVAL_MS,
-  MINI_ROOM_WELCOME_FADE_MS,
-  MINI_ROOM_WELCOME_HOLD_MS,
-  MINI_ROOM_WELCOME_REVEAL_MS,
   resolveMiniRoomMotionPolicy
 } from "./miniRoomReducedMotion"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
@@ -42,11 +34,13 @@ import type { MiniRoomCopy } from "../miniRoomCopy"
 import { shouldAnnouncePartnerJoin } from "./miniRoomPresentation"
 import {
   resolveComposerLineCount,
-  resolveMiniRoomLayout
+  resolveMiniRoomLayout,
+  resolveMiniRoomRestCamera
 } from "./miniRoomLayout"
 import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
 import { useMiniRoomCameraTransform } from "./useMiniRoomCameraTransform"
 import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
+import { useMiniRoomKeyboardPreference } from "../useMiniRoomKeyboardPreference"
 
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable)
 interface MiniRoomSceneProps {
@@ -133,9 +127,12 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     width: ROOM_STAGE_CAMERA_FALLBACK_WIDTH,
     height: ROOM_STAGE_CAMERA_FALLBACK_HEIGHT
   })
-  const [chatExpanded, setChatExpanded] = useState(true)
+  const [scrollToLatestRequest, setScrollToLatestRequest] = useState(0)
+  const [recentMessageHeight, setRecentMessageHeight] = useState(39)
+  const [recentHistoryRowsHeight, setRecentHistoryRowsHeight] = useState(0)
   const [composerLines, setComposerLines] = useState(1)
-  const keyboard = useMiniRoomKeyboard(reduceMotion)
+  const keyboardPreference = useMiniRoomKeyboardPreference()
+  const keyboard = useMiniRoomKeyboard((frame) => animateKeyboard(frame))
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
@@ -147,24 +144,30 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       safeBottom: safeAreaInsets.bottom,
       keyboardVisible: keyboard.visible,
       keyboardInset: keyboard.inset,
-      chatExpanded,
+      recentMessageHeight,
+      recentHistoryRowsHeight,
       fontScale: viewport.fontScale,
       composerLines,
       roomAspectRatio: roomShell
         ? roomShell.canvasSize.width / roomShell.canvasSize.height
         : 1
     }),
-    [chatExpanded, composerLines, keyboard.inset, keyboard.visible, roomShell,
+    [composerLines, recentMessageHeight, recentHistoryRowsHeight, keyboard.inset, keyboard.visible, roomShell,
       safeAreaInsets.bottom, safeAreaInsets.top, viewport.fontScale, viewport.height, viewport.width]
   )
   const layout = useMemo(() => resolveMiniRoomLayout(layoutInput), [layoutInput])
+  // Keep the transcript mounted at its resting viewport throughout the morph.
+  const historyLayout = useMemo(() => resolveMiniRoomLayout({
+    ...layoutInput, keyboardVisible: false, keyboardInset: 0
+  }), [layoutInput])
   // ROOM-15: the room keeps its resting frame; the keyboard framing is a UI-thread transform.
   const restCamera = useMemo(
-    () => resolveMiniRoomLayout({ ...layoutInput, keyboardVisible: false, keyboardInset: 0 }).camera,
+    () => resolveMiniRoomRestCamera(layoutInput),
     [layoutInput]
   )
-  const cameraStyle = useMiniRoomCameraTransform({
-    rest: restCamera, target: layout.camera, durationMs: keyboard.durationMs, reduceMotion
+  const { cameraStyle, transition, animateKeyboard, prepareKeyboardOpen } = useMiniRoomCameraTransform({
+    rest: restCamera, layout, layoutInput, keyboardInset: keyboard.inset,
+    keyboardDurationMs: keyboard.durationMs, reduceMotion
   })
   const {
     dismissSpeechBubble,
@@ -173,60 +176,13 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     sayPhrase
   } = store
 
-  const entryValueRef = useRef(new Animated.Value(0)).current
-  const welcomeValueRef = useRef(new Animated.Value(0)).current
   const [partnerJustJoined, setPartnerJustJoined] = useState(false)
   const [composerText, setComposerText] = useState("")
-
-  useEffect(() => {
-    entryValueRef.stopAnimation()
-    if (!motionPolicy.animateJoin) {
-      entryValueRef.setValue(1)
-      return
-    }
-    const animation = Animated.timing(entryValueRef, {
-      toValue: 1,
-      duration: MINI_ROOM_ENTRY_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [entryValueRef, motionPolicy.animateJoin])
-
-  useEffect(() => {
-    welcomeValueRef.stopAnimation()
-    if (!partnerPresent) { welcomeValueRef.setValue(0); return }
-    welcomeValueRef.setValue(motionPolicy.animateJoin ? 0 : 1)
-
-    const animation = motionPolicy.animateJoin
-      ? Animated.sequence([
-          Animated.timing(welcomeValueRef, {
-            toValue: 1,
-            duration: MINI_ROOM_WELCOME_REVEAL_MS,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true
-          }),
-          Animated.delay(MINI_ROOM_WELCOME_HOLD_MS),
-          Animated.timing(welcomeValueRef, {
-            toValue: 0,
-            duration: MINI_ROOM_WELCOME_FADE_MS,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true
-          })
-        ])
-      : Animated.sequence([
-          Animated.delay(MINI_ROOM_WELCOME_HOLD_MS),
-          Animated.timing(welcomeValueRef, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true
-          })
-        ])
-
-    animation.start()
-    return () => animation.stop()
-  }, [motionPolicy.animateJoin, partnerPresent, partnerUser.userId, welcomeValueRef])
+  const handleCloseKeyboard = useCallback(() => {
+    // Begin the return before requesting UIKit dismissal, not after its layout.
+    animateKeyboard({ visible: false, inset: 0, durationMs: keyboard.durationMs }, "intent")
+    Keyboard.dismiss()
+  }, [animateKeyboard, keyboard.durationMs])
 
   useEffect(() => {
     if (!motionPolicy.animateJoin || !partnerPresent) {
@@ -263,20 +219,20 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const handleRoomPress = useCallback(
     (event: GestureResponderEvent): void => {
-      Keyboard.dismiss()
+      handleCloseKeyboard()
       const { locationX, locationY } = event.nativeEvent
       moveLocalAvatar({
         x: Math.max(0, Math.min(1, locationX / stageSize.width)),
         y: Math.max(0, Math.min(1, locationY / stageSize.height))
       })
     },
-    [moveLocalAvatar, stageSize.height, stageSize.width]
+    [handleCloseKeyboard, moveLocalAvatar, stageSize.height, stageSize.width]
   )
 
   const handleHotspotSelect = useCallback((hotspotId: string): void => {
-    Keyboard.dismiss()
+    handleCloseKeyboard()
     moveLocalAvatarToHotspot(hotspotId)
-  }, [moveLocalAvatarToHotspot])
+  }, [handleCloseKeyboard, moveLocalAvatarToHotspot])
 
   const handleSubmitComposer = useCallback((): void => {
     const result = resolveRoomComposerSubmit(composerText, onSendRoomMessage)
@@ -284,6 +240,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     sayPhrase(localUser.userId, result.body, "chat")
     // The keyboard stays up for the next message; the input returns to one line.
     setComposerText("")
+    setComposerLines(1)
   }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
 
   // An unacknowledged message comes back into an empty composer: sending the
@@ -296,18 +253,13 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const handleComposerChange = useCallback((value: string): void => {
     setComposerText(value.slice(0, MAX_ROOM_MESSAGE_LENGTH))
+    if (value.length === 0) setComposerLines(1)
   }, [])
 
   const handleToggleHistory = useCallback((): void => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-    if (layout.panelMode === "typing") {
-      // "Back to the room": close the keyboard and leave only the composer.
-      Keyboard.dismiss()
-      setChatExpanded(false)
-      return
-    }
-    setChatExpanded((expanded) => !expanded)
-  }, [layout.panelMode, reduceMotion])
+    handleCloseKeyboard()
+    setScrollToLatestRequest((request) => request + 1)
+  }, [handleCloseKeyboard])
 
   const handleComposerContentSize = useCallback((contentHeight: number): void => {
     const lines = resolveComposerLineCount({ contentHeight, fontScale: viewport.fontScale })
@@ -322,20 +274,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         : { width, height }
     )
   }, [])
-
-  const entryOpacity = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1]
-  })
-  const entryScale = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.94, 1]
-  })
-  const entryTranslateY = entryValueRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [14, 0]
-  })
-  const welcomeOpacity = welcomeValueRef
 
   const partnerFirstName = useMemo(
     () => partnerUser.displayName.split(" ")[0] || partnerUser.displayName,
@@ -381,22 +319,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
           accessibilityRole="button"
           accessibilityLabel={copy.closeKeyboard}
           style={StyleSheet.absoluteFill}
-          onPress={Keyboard.dismiss}
+          onPress={handleCloseKeyboard}
         />
       ) : null}
-      <Animated.View
-        pointerEvents="box-none"
-        style={[
-          styles.roomStageFrame,
-          {
-            opacity: entryOpacity,
-            transform: [
-              { translateY: entryTranslateY },
-              { scale: entryScale }
-            ]
-          }
-        ]}
-      >
+      <View pointerEvents="box-none" style={styles.roomStageFrame}>
         {roomDecorScene?.shell ? (
           <AnimatedPressable
             accessibilityRole="button"
@@ -412,14 +338,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             />
             {hotspotLayer}
             {avatarLayer}
-            <Animated.View
-              style={[styles.welcomeRibbon, { opacity: welcomeOpacity }]}
-              pointerEvents="none"
-            >
-              <Text style={styles.welcomeText} numberOfLines={1}>
-                {copy.welcome(partnerFirstName)}
-              </Text>
-            </Animated.View>
           </AnimatedPressable>
         ) : (
           <AnimatedPressable
@@ -435,31 +353,43 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             {avatarLayer}
           </AnimatedPressable>
         )}
-      </Animated.View>
+      </View>
 
       <MiniRoomChatPanel
+        windowWidth={viewport.width}
         copy={copy}
         mode={layout.panelMode}
-        margin={layout.panelMargin}
-        bottom={layout.panelBottom}
-        historyHeight={layout.historyHeight}
+        transition={transition}
+        historyHeight={historyLayout.historyHeight}
+        composerHeight={layout.composerInputHeight}
         historyItems={chatHistory}
         historyStatus={chatHistoryStatus}
         partnerName={partnerFirstName}
+        recentMessage={chatHistory[0]}
+        onRecentHeightChange={setRecentMessageHeight}
+        onRecentRowsHeightChange={setRecentHistoryRowsHeight}
+        onCloseKeyboard={handleCloseKeyboard}
+        scrollToLatestRequest={scrollToLatestRequest}
       >
         <RoomChatComposer
           value={composerText}
+          suggestionsEnabled={keyboardPreference.suggestionsEnabled}
           copy={copy}
           mode={layout.panelMode}
           maxInputHeight={layout.composerMaxInputHeight}
+          inputHeight={layout.composerInputHeight}
           onChangeText={handleComposerChange}
           onSubmit={handleSubmitComposer}
           onToggleHistory={handleToggleHistory}
           onContentHeightChange={handleComposerContentSize}
+          onFocus={prepareKeyboardOpen}
           disabled={composerDisabled}
           draftTyping={props.typing?.draft}
         />
       </MiniRoomChatPanel>
+
+      <MiniRoomContext copy={copy} top={layout.contextTop} transition={transition}
+        visible={layout.historyVisible} partnerName={partnerFirstName} snapshots={participantAvatarSnapshots} />
 
       <StableMiniRoomHud
         partnerFirstName={partnerFirstName}
@@ -476,6 +406,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         onOpenSafety={onOpenSafety}
         onRetryConnect={onRetryConnect}
         onToggleMic={onToggleMic}
+        suggestionsEnabled={keyboardPreference.suggestionsEnabled}
+        onToggleSuggestions={keyboardPreference.toggle}
       />
     </View>
   )
@@ -489,12 +421,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#FFF7FA",
-    experimental_backgroundImage:
-      "radial-gradient(ellipse at 10% 34%, rgba(249, 222, 235, 1) 0%, rgba(249, 222, 235, 0) 60%), " +
-      "radial-gradient(ellipse at 92% 48%, rgba(230, 221, 240, 1) 0%, rgba(230, 221, 240, 0) 60%)"
+    experimental_backgroundImage: "linear-gradient(145deg, #FBE1EC 0%, #FCF6FA 43%, #E9DEFB 100%)"
   },
   roomStageFrame: {
-    ...StyleSheet.absoluteFill
+    ...StyleSheet.absoluteFill,
+    overflow: "hidden"
   },
   roomWorldCamera: {
     position: "absolute",
@@ -509,22 +440,5 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     overflow: "hidden",
     backgroundColor: "#F8ECF2"
-  },
-  /* ── Welcome Ribbon ────────────── */
-  welcomeRibbon: {
-    position: "absolute",
-    top: 72,
-    alignSelf: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.78)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.86)",
-  },
-  welcomeText: {
-    ...uiTheme.font.micro,
-    color: uiTheme.colors.brandPlum,
-    letterSpacing: 0.4,
   },
 })

@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import {
   Keyboard,
-  LayoutAnimation,
   Platform,
   useWindowDimensions,
   type KeyboardEvent
@@ -20,18 +19,17 @@ const HIDDEN: MiniRoomKeyboardState = { visible: false, inset: 0, durationMs: 0 
 
 /**
  * The system keyboard's measured frame, updated once per keyboard event (show,
- * hide, suggestion bar or layout change) — never per frame. The chat panel's
- * small layout change rides the keyboard's own native animation curve unless
- * Reduce Motion is on; the room camera does not re-lay out at all (it moves
- * by UI-thread transform, useMiniRoomCameraTransform).
+ * hide, suggestion bar or layout change) — never per frame. The dock and room
+ * animate as one UI-thread pose, without a whole-scene layout animation.
  *
  * iOS reports the end frame, so the overlap is exact for every keyboard size.
  * Android keeps its window-resize behaviour: the flag changes, no inset is added.
  */
-export function useMiniRoomKeyboard(reduceMotion: boolean): MiniRoomKeyboardState {
+export function useMiniRoomKeyboard(onFrame: (frame: MiniRoomKeyboardState) => void): MiniRoomKeyboardState {
   const { height: windowHeight } = useWindowDimensions()
   const [state, setState] = useState<MiniRoomKeyboardState>(HIDDEN)
   const lastRef = useRef<MiniRoomKeyboardState>(HIDDEN)
+  const publishFrame = useEffectEvent(onFrame)
 
   useEffect(() => {
     const apply = (frame: Omit<MiniRoomKeyboardState, "durationMs">, event?: KeyboardEvent): void => {
@@ -39,27 +37,26 @@ export function useMiniRoomKeyboard(reduceMotion: boolean): MiniRoomKeyboardStat
       if (last.visible === frame.visible && last.inset === frame.inset) return
       const next = { ...frame, durationMs: event && event.duration > 0 ? event.duration : 0 }
       lastRef.current = next
-      if (!reduceMotion && event && event.duration > 0) {
-        LayoutAnimation.configureNext({
-          duration: event.duration,
-          update: { duration: event.duration, type: LayoutAnimation.Types.keyboard }
-        })
-      }
+      // Start the UI-thread pose before waiting for React's next layout commit.
+      publishFrame(next)
       setState(next)
     }
 
     if (Platform.OS === "ios") {
-      const frameSubscription = Keyboard.addListener("keyboardWillChangeFrame", (event) => {
+      const handleFrame = (event: KeyboardEvent) => {
         const inset = resolveKeyboardInset({
           windowHeight,
           keyboardScreenY: event.endCoordinates.screenY,
           keyboardHeight: event.endCoordinates.height
         })
         apply(inset > 0 ? { visible: true, inset } : HIDDEN, event)
-      })
+      }
+      const showSubscription = Keyboard.addListener("keyboardWillShow", handleFrame)
+      const frameSubscription = Keyboard.addListener("keyboardWillChangeFrame", handleFrame)
       const hideSubscription = Keyboard.addListener("keyboardWillHide", (event) => apply(HIDDEN, event))
       return () => {
         frameSubscription.remove()
+        showSubscription.remove()
         hideSubscription.remove()
       }
     }
@@ -70,7 +67,7 @@ export function useMiniRoomKeyboard(reduceMotion: boolean): MiniRoomKeyboardStat
       showSubscription.remove()
       hideSubscription.remove()
     }
-  }, [reduceMotion, windowHeight])
+  }, [windowHeight])
 
   return state
 }

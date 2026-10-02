@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatMessage } from "@blumi/contracts"
 import {
+  formatRoomChatTime,
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
   type RoomChatDelivery
@@ -21,6 +22,32 @@ function message(messageId: string, senderUserId: string, body: string): ChatMes
 }
 
 const allSent = (): RoomChatDelivery => "sent"
+
+test("history keeps each durable timestamp while retaining real sending and failed states", () => {
+  const earlier = { ...message("earlier", partner, "a"), sentAt: "2026-10-02T08:04:00.000Z" }
+  const pending = { ...message("pending", local, "b"), sentAt: "2026-10-02T08:05:00.000Z" }
+  const failed = { ...message("failed", local, "c"), sentAt: "2026-10-02T08:06:00.000Z" }
+  const history = selectRoomChatHistory({
+    messages: [earlier, pending, failed],
+    localUserId: local,
+    deliveryOf: (id) => id === "pending" ? "sending" : id === "failed" ? "failed" : "sent"
+  })
+
+  assert.deepEqual(history.map((item) => [item.sentAt, item.delivery]), [
+    [failed.sentAt, "failed"],
+    [pending.sentAt, "sending"],
+    [earlier.sentAt, "sent"]
+  ])
+})
+
+test("bubble time uses the device-local clock and never substitutes a missing or invalid time", () => {
+  const localDate = new Date(2026, 9, 2, 8, 4)
+  assert.equal(formatRoomChatTime(localDate.toISOString()), "08:04")
+  assert.equal(formatRoomChatTime(new Date(2026, 9, 2, 23, 59).toISOString()), "23:59")
+  assert.equal(formatRoomChatTime(undefined), null)
+  assert.equal(formatRoomChatTime(""), null)
+  assert.equal(formatRoomChatTime("invalid-time"), null)
+})
 
 test("room history is the durable thread, newest first, without invitation sentinels", () => {
   const history = selectRoomChatHistory({

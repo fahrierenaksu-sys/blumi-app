@@ -20,6 +20,32 @@ const traverse = require("@babel/traverse").default
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const srcRoot = join(mobileRoot, "src")
 
+test("MiniRoom morph keeps history/input mounted with one UI-thread clock and coupled room/dock top", () => {
+  const read = (path) => readFileSync(resolve(mobileRoot, path), "utf8")
+  const motion = read("src/features/miniRoom/scene/useMiniRoomCameraTransform.ts")
+  const panel = read("src/features/miniRoom/scene/MiniRoomChatPanel.tsx")
+  const scene = read("src/features/miniRoom/scene/MiniRoomScene.tsx")
+  assert.match(motion, /const transition = useDerivedValue/)
+  assert.match(motion, /resolveMiniRoomMorphFrame\(origin\.value, destination\.value/)
+  assert.match(motion, /origin\.value = transition\.value/)
+  assert.match(motion, /clock\.value = duration === 0 \? 1 : withTiming\(1/)
+  assert.match(motion, /scheduleOnUI\(/)
+  assert.match(read("src/features/miniRoom/scene/RoomChatComposer.tsx"), /onTouchStart=\{onFocus\}/)
+  assert.match(read("src/features/miniRoom/scene/useMiniRoomKeyboard.ts"), /publishFrame\(next\)\s*setState\(next\)/)
+  assert.match(scene, /animateKeyboard\(\{ visible: false, inset: 0, durationMs: keyboard\.durationMs \}, "intent"\)\s*Keyboard\.dismiss\(\)/)
+  assert.match(scene, /reduceMotion = useReducedMotion\(\)/)
+  assert.match(scene, /keyboardDurationMs: keyboard\.durationMs, reduceMotion/)
+  assert.match(panel, /const pose = transition\.value/)
+  assert.match(panel, /bottom: pose\.bottom, height: pose\.height/)
+  assert.match(panel, /width: textWidths\.history/)
+  assert.match(panel, /width: textWidths\.recent/)
+  assert.match(panel, /width: composerWidth/)
+  assert.match(motion, /shouldDeferMiniRoomLayout\(\{ intent: keyboardIntent\.current/)
+  assert.doesNotMatch(panel, /typing \? \(/)
+  assert.doesNotMatch(panel, /withTiming|useSharedValue/)
+  assert.doesNotMatch(motion + panel, /requestAnimationFrame|LayoutAnimation/)
+})
+
 // Globals that exist on the Worklets UI runtime. Keep this list short and
 // standard; anything app-specific must reach a worklet through its closure.
 const UI_RUNTIME_GLOBALS = new Set([

@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { SymbolView } from "expo-symbols"
 import { useCallback, useState, type ComponentProps } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native"
 import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
 import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
@@ -25,6 +26,8 @@ interface MiniRoomHudProps {
   onOpenSafety: () => void
   onRetryConnect: () => void
   onToggleMic: () => void
+  suggestionsEnabled: boolean
+  onToggleSuggestions: () => void
 }
 
 /** Small glass header: leave on the left, microphone and room menu on the right. */
@@ -43,7 +46,9 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     onLeave,
     onOpenSafety,
     onRetryConnect,
-    onToggleMic
+    onToggleMic,
+    suggestionsEnabled,
+    onToggleSuggestions
   } = props
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -62,7 +67,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
       >
         <View style={styles.side} pointerEvents="box-none">
           <GlassIconButton
-            size={42}
+            size={44}
             icon="arrow-back"
             accessibilityLabel={copy.leaveRoom}
             disabled={leaveDisabled}
@@ -79,19 +84,37 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
           {copy.roomTitle}
         </Text>
         <View style={[styles.side, styles.sideEnd]} pointerEvents="box-none">
-          <MicrophoneButton
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel={copy.keyboardSuggestions}
+            accessibilityHint={copy.keyboardSuggestionsHint}
+            accessibilityState={{ checked: suggestionsEnabled }}
+            accessibilityValue={{ text: suggestionsEnabled ? copy.keyboardSuggestionsOn : copy.keyboardSuggestionsOff }}
+            hitSlop={3}
+            onPress={onToggleSuggestions}
+            style={({ pressed }) => pressed ? styles.pressed : null}
+          >
+            <View style={[styles.headerControl, styles.center, suggestionsEnabled ? styles.suggestionsSelected : null]}>
+              <SymbolView name={{ ios: "keyboard", android: "keyboard", web: "keyboard" }} size={28} tintColor={suggestionsEnabled ? MIC_SELECTED_INK : "#645269"} />
+              <View pointerEvents="none" style={[styles.suggestionsMark, { backgroundColor: suggestionsEnabled ? MIC_SELECTED_INK : "#B8A9BD" }]} />
+            </View>
+          </Pressable>
+          {voiceAvailable ? <MicrophoneButton
             copy={copy}
             micEnabled={localMedia.micEnabled}
             voiceAvailable={voiceAvailable}
             connected={connectionStatus === "connected"}
             onToggleMic={onToggleMic}
-          />
+          /> : null}
           <GlassIconButton
-            size={38}
+            size={44}
             icon="ellipsis-horizontal"
             accessibilityLabel={copy.roomOptions}
             expanded={menuOpen}
-            onPress={() => setMenuOpen((open) => !open)}
+            onPress={() => {
+              Keyboard.dismiss()
+              setMenuOpen((open) => !open)
+            }}
           />
         </View>
       </View>
@@ -171,9 +194,9 @@ function GlassIconButton(props: {
       onPress={onPress}
       style={({ pressed }) => [disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
     >
-      <WardrobeGlass tone="control" radius={size / 2} style={{ width: size, height: size }} contentStyle={styles.center}>
-        <Ionicons name={icon} size={size > 40 ? 20 : 18} color={wardrobeTheme.ink} />
-      </WardrobeGlass>
+      <View style={[styles.headerControl, styles.center, { width: size, height: size }]}>
+        <Ionicons name={icon} size={20} color="#645269" />
+      </View>
     </Pressable>
   )
 }
@@ -275,18 +298,20 @@ const MENU_ICON = "#7D677C"
 const styles = StyleSheet.create({
   header: {
     position: "absolute",
-    height: 42,
+    height: 44,
     flexDirection: "row",
     alignItems: "center"
   },
   side: {
-    width: 83,
+    width: 94,
     flexDirection: "row",
     alignItems: "center"
   },
   sideEnd: {
+    flexShrink: 0,
+    width: 94,
     justifyContent: "flex-end",
-    gap: 7
+    gap: 6
   },
   title: {
     flex: 1,
@@ -296,7 +321,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 17,
     lineHeight: 22,
-    letterSpacing: -0.5
+    letterSpacing: -0.55
   },
   center: {
     alignItems: "center",
@@ -305,6 +330,16 @@ const styles = StyleSheet.create({
   round38: {
     width: 38,
     height: 38
+  },
+  headerControl: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.75)" },
+  suggestionsSelected: { backgroundColor: "#F2E1EA" },
+  suggestionsMark: {
+    position: "absolute",
+    right: 9,
+    bottom: 9,
+    width: 5,
+    height: 5,
+    borderRadius: 3
   },
   micSelected: {
     ...StyleSheet.absoluteFill,
@@ -382,7 +417,6 @@ const styles = StyleSheet.create({
     opacity: 0.42
   },
   pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.96 }]
+    opacity: 0.72
   }
 })

@@ -1,204 +1,111 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import {
-  MINI_ROOM_INPUT_LINE_HEIGHT,
-  MINI_ROOM_INPUT_MAX_LINES,
-  MINI_ROOM_INPUT_VERTICAL_PADDING,
-  resolveComposerLineCount,
-  resolveKeyboardInset,
-  resolveMiniRoomLayout,
-  type MiniRoomLayout,
-  type MiniRoomLayoutInput
-} from "./miniRoomLayout"
+import { resolveMiniRoomLayout, resolveMiniRoomRestCamera, resolveComposerLineCount, resolveKeyboardInset, type MiniRoomLayoutInput } from "./miniRoomLayout"
 
-const ROOM_ASPECT = 1254 / 714
-
-const iphone17: MiniRoomLayoutInput = {
-  windowWidth: 402,
-  windowHeight: 874,
-  safeTop: 62,
-  safeBottom: 34,
-  keyboardVisible: false,
-  keyboardInset: 0,
-  chatExpanded: true,
-  fontScale: 1,
-  roomAspectRatio: ROOM_ASPECT
+const roomAspectRatio = 1254 / 714
+const iphone11: MiniRoomLayoutInput = {
+  windowWidth: 414, windowHeight: 896, safeTop: 44, safeBottom: 34,
+  keyboardVisible: false, keyboardInset: 0, fontScale: 1, roomAspectRatio
 }
-
-const iphoneSe: MiniRoomLayoutInput = {
-  ...iphone17,
-  windowWidth: 375,
-  windowHeight: 667,
-  safeTop: 20,
-  safeBottom: 0
+const phones = [
+  iphone11,
+  { ...iphone11, windowWidth: 430, windowHeight: 932, safeTop: 59 },
+  { ...iphone11, windowWidth: 402, windowHeight: 874, safeTop: 62 },
+  { ...iphone11, windowWidth: 375, windowHeight: 667, safeTop: 20, safeBottom: 0 },
+  { ...iphone11, windowWidth: 360, windowHeight: 780, safeTop: 24, safeBottom: 24 }
+]
+const floor = (input: MiniRoomLayoutInput) => {
+  const l = resolveMiniRoomLayout(input)
+  return input.windowHeight - l.panelBottom - l.panelHeight - (l.camera.top + l.camera.height)
 }
-
-function withKeyboard(input: MiniRoomLayoutInput, inset: number): MiniRoomLayoutInput {
-  return { ...input, keyboardVisible: true, keyboardInset: inset }
-}
-
-function panelTop(input: MiniRoomLayoutInput, layout: MiniRoomLayout): number {
-  return input.windowHeight - layout.panelBottom - layout.panelHeight
-}
-
-function cameraBottom(layout: MiniRoomLayout): number {
-  return layout.camera.top + layout.camera.height
-}
-
-test("the default shared room opens with chat history between a balanced room and the composer", () => {
-  const layout = resolveMiniRoomLayout(iphone17)
-
-  assert.equal(layout.panelMode, "history")
-  assert.equal(layout.historyVisible, true)
-  assert.ok(layout.historyHeight > 0)
-  assert.equal(layout.panelBottom, 34, "the panel rests on the home-indicator safe area")
-  assert.ok(layout.headerTop >= iphone17.safeTop, "the header clears the status bar")
-  // The room is wider than the phone and centred horizontally.
-  assert.ok(layout.camera.width > iphone17.windowWidth)
-  assert.equal(layout.camera.left, Math.round((iphone17.windowWidth - layout.camera.width) / 2))
-  assert.ok(layout.camera.top >= layout.headerBottom + 12, "room stays below the header")
-  assert.ok(cameraBottom(layout) <= panelTop(iphone17, layout) - 22, "room is clearly separated from chat")
+test("the only resting state is the selected history with a modest reading gain", () => {
+  const l = resolveMiniRoomLayout(iphone11)
+  assert.equal(l.panelMode, "history")
+  assert.equal(l.historyVisible, true)
+  assert.equal(l.historyHeight, 155)
+  assert.equal(l.panelMargin, 13)
+  assert.equal(l.panelBottom, 46)
+  assert.ok(Math.abs(l.camera.width - 414 * 1.4) < 0.01)
+  assert.equal(l.camera.left, (414 - l.camera.width) / 2)
 })
-
-test("an open keyboard hides history, compacts the header and keeps the room scale", () => {
-  const closed = resolveMiniRoomLayout(iphone17)
-  const input = withKeyboard(iphone17, 336)
-  const open = resolveMiniRoomLayout(input)
-
+test("message length spends only bounded free space and never changes the resting camera", () => {
+  const baseline = resolveMiniRoomLayout(iphone11)
+  const two = resolveMiniRoomLayout({ ...iphone11, recentHistoryRowsHeight: 162 })
+  const long = resolveMiniRoomLayout({ ...iphone11, recentHistoryRowsHeight: 1200 })
+  assert.equal(two.historyHeight, 162)
+  assert.equal(long.historyHeight, baseline.historyHeight)
+  assert.deepEqual(two.camera, baseline.camera)
+  assert.deepEqual(long.camera, baseline.camera)
+  assert.ok(floor({ ...iphone11, recentHistoryRowsHeight: 162 }) >= 20)
+})
+test("the keyboard has only the typing state and closing restores history exactly", () => {
+  const before = resolveMiniRoomLayout(iphone11)
+  const open = resolveMiniRoomLayout({ ...iphone11, keyboardVisible: true, keyboardInset: 302 })
   assert.equal(open.panelMode, "typing")
   assert.equal(open.historyVisible, false)
+  assert.equal(open.panelMargin, 0)
+  assert.equal(open.panelBottom, 302)
   assert.equal(open.historyHeight, 0)
-  assert.ok(open.headerTop < closed.headerTop)
-  // The keyboard replaces the safe-area inset instead of stacking on it.
-  assert.equal(open.panelBottom, 336)
-  assert.equal(open.camera.width, closed.camera.width, "no zoom-out when the room still fits")
-  assert.ok(open.camera.top < closed.camera.top, "the room is raised above the composer")
-  assert.ok(cameraBottom(open) <= panelTop(input, open))
-  assert.ok(open.camera.top >= open.headerBottom)
+  assert.ok(open.camera.top < before.camera.top)
+  assert.deepEqual(resolveMiniRoomLayout(iphone11), before)
 })
-
-test("closing the keyboard restores the previous history and room framing exactly", () => {
-  const before = resolveMiniRoomLayout(iphone17)
-  resolveMiniRoomLayout(withKeyboard(iphone17, 336))
-  assert.deepEqual(resolveMiniRoomLayout({ ...iphone17 }), before)
-
-  const collapsed = { ...iphone17, chatExpanded: false }
-  const collapsedBefore = resolveMiniRoomLayout(collapsed)
-  assert.equal(resolveMiniRoomLayout(withKeyboard(collapsed, 336)).panelMode, "typing")
-  assert.deepEqual(resolveMiniRoomLayout(collapsed), collapsedBefore)
-})
-
-test("the panel follows the measured keyboard height, including suggestions and taller layouts", () => {
-  for (const inset of [291, 336, 346, 390]) {
-    const input = withKeyboard(iphone17, inset)
-    const layout = resolveMiniRoomLayout(input)
-    assert.equal(layout.panelBottom, inset)
-    assert.ok(cameraBottom(layout) <= panelTop(input, layout), `room floor clears the composer at ${inset}`)
-    assert.ok(layout.camera.width >= Math.round(402 * 1.12), `room is not a thumbnail at ${inset}`)
+test("draft and transcript changes cannot relayout the camera's animation canvas", () => {
+  for (const phone of phones) {
+    const rest = resolveMiniRoomRestCamera(phone)
+    for (const composerLines of [1, 2, 4]) for (const keyboardInset of [0, 302, 390]) {
+      assert.deepEqual(resolveMiniRoomRestCamera({ ...phone, composerLines, keyboardInset,
+        keyboardVisible: keyboardInset > 0, recentMessageHeight: 55, recentHistoryRowsHeight: 900 }), rest)
+    }
   }
 })
-
-test("a keyboard that does not overlap the window (Android resize) adds no bottom space", () => {
-  const layout = resolveMiniRoomLayout(withKeyboard(iphone17, 0))
-  assert.equal(layout.panelMode, "typing")
-  assert.equal(layout.panelBottom, 0)
+test("two-line recent messages add only sixteen points; longer messages stay capped", () => {
+  const base = { ...iphone11, keyboardVisible: true, keyboardInset: 302 }
+  const one = resolveMiniRoomLayout({ ...base, recentMessageHeight: 39 })
+  const two = resolveMiniRoomLayout({ ...base, recentMessageHeight: 55 })
+  const long = resolveMiniRoomLayout({ ...base, recentMessageHeight: 800 })
+  assert.equal(two.panelHeight - one.panelHeight, 16)
+  assert.equal(long.panelHeight, two.panelHeight)
+  assert.ok(floor({ ...base, recentMessageHeight: 55 }) >= 20)
 })
-
-test("the small supported phone keeps a readable room with the keyboard open", () => {
-  const input = withKeyboard(iphoneSe, 260)
-  const layout = resolveMiniRoomLayout(input)
-
-  assert.ok(layout.camera.width >= Math.round(375 * 1.12))
-  assert.ok(cameraBottom(layout) <= panelTop(input, layout))
-  assert.ok(layout.camera.top >= layout.headerBottom)
-
-  // A much taller keyboard limits the zoom-out; the ceiling slides under the
-  // glass header while the floor and avatars stay above the composer.
-  const tallInput = withKeyboard(iphoneSe, 320)
-  const tall = resolveMiniRoomLayout(tallInput)
-  assert.ok(tall.camera.width >= tallInput.windowWidth && tall.camera.width <= layout.camera.width)
-  assert.ok(cameraBottom(tall) <= panelTop(tallInput, tall))
-})
-
-test("collapsing chat keeps only the compact composer and gives the room more space", () => {
-  const expanded = resolveMiniRoomLayout(iphone17)
-  const collapsed = resolveMiniRoomLayout({ ...iphone17, chatExpanded: false })
-
-  assert.equal(collapsed.panelMode, "compact")
-  assert.equal(collapsed.historyVisible, false)
-  assert.ok(collapsed.panelHeight < expanded.panelHeight)
-  assert.ok(collapsed.camera.top >= expanded.camera.top)
-  assert.equal(collapsed.camera.width, expanded.camera.width)
-})
-
-test("large text grows history and the composer within bounds without shrinking the room to a preview", () => {
-  const regular = resolveMiniRoomLayout(iphone17)
-  const large = resolveMiniRoomLayout({ ...iphone17, fontScale: 2.2 })
-
-  assert.ok(large.historyHeight > regular.historyHeight)
-  assert.ok(large.composerMaxInputHeight > regular.composerMaxInputHeight)
-  assert.equal(large.camera.width, regular.camera.width)
-
-  const smallLarge = resolveMiniRoomLayout({ ...iphoneSe, fontScale: 1.35 })
-  const band = panelTop(iphoneSe, smallLarge) - 22 - (smallLarge.headerBottom + 12)
-  assert.ok(band >= 230 || smallLarge.historyHeight === 96, "history gives way before the room")
-})
-
-test("the composer grows to four lines before scrolling inside itself", () => {
-  const layout = resolveMiniRoomLayout(iphone17)
-  assert.equal(
-    layout.composerMaxInputHeight,
-    MINI_ROOM_INPUT_LINE_HEIGHT * MINI_ROOM_INPUT_MAX_LINES + MINI_ROOM_INPUT_VERTICAL_PADDING * 2
-  )
-})
-
-test("every mode keeps the room's aspect ratio so world coordinates never move", () => {
-  const modes = [
-    iphone17,
-    { ...iphone17, chatExpanded: false },
-    withKeyboard(iphone17, 336),
-    withKeyboard(iphoneSe, 320),
-    { ...iphoneSe, windowWidth: 350 }
-  ]
-  for (const input of modes) {
-    const { camera } = resolveMiniRoomLayout(input)
-    assert.ok(Math.abs(camera.width / camera.height - ROOM_ASPECT) < 0.01)
+test("supported dimensions, keyboard heights and growing drafts keep the room floor clear", () => {
+  for (const phone of phones) for (const inset of [0, 260, 302, 335, 390]) for (const lines of [1, 2, 4]) {
+    const input = { ...phone, keyboardVisible: inset > 0, keyboardInset: inset, composerLines: lines, recentMessageHeight: 55 }
+    const l = resolveMiniRoomLayout(input)
+    assert.ok(floor(input) >= 19.99)
+    assert.ok(Math.abs(l.camera.width / l.camera.height - roomAspectRatio) < 0.001)
+    assert.equal(l.camera.left, (phone.windowWidth - l.camera.width) / 2)
+    assert.ok(l.historyHeight <= 163)
   }
 })
-
-test("keyboard inset is the real overlap of the reported keyboard frame", () => {
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: 538, keyboardHeight: 336 }), 336)
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: 874, keyboardHeight: 336 }), 0)
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: 1210, keyboardHeight: 336 }), 0)
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: undefined, keyboardHeight: 291 }), 291)
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: 400, keyboardHeight: 336 }), 336)
-  assert.equal(resolveKeyboardInset({ windowHeight: 874, keyboardScreenY: Number.NaN, keyboardHeight: undefined }), 0)
+test("larger text is bounded and the bottom inset never doubles the safe area", () => {
+  const large = resolveMiniRoomLayout({ ...iphone11, fontScale: 2.2, keyboardVisible: true, keyboardInset: 335, recentMessageHeight: 500 })
+  assert.equal(large.panelBottom, 335)
+  assert.ok(large.composerMaxInputHeight > 92)
+  assert.ok(floor({ ...iphone11, fontScale: 2.2, keyboardVisible: true, keyboardInset: 335, recentMessageHeight: 500 }) >= 20)
 })
-
-test("a wrapped message lifts the room with the growing composer instead of covering it", () => {
-  const oneLine = withKeyboard(iphone17, 336)
-  const threeLines = { ...oneLine, composerLines: 3 }
-  const single = resolveMiniRoomLayout(oneLine)
-  const wrapped = resolveMiniRoomLayout(threeLines)
-
-  const fourLines = resolveMiniRoomLayout({ ...oneLine, composerLines: 4 })
-  assert.ok(single.panelHeight < wrapped.panelHeight, "the panel grows with the text")
-  assert.ok(wrapped.panelHeight < fourLines.panelHeight)
-  assert.ok(cameraBottom(wrapped) <= panelTop(threeLines, wrapped), "floor stays above the taller composer")
-  // Beyond four lines the input scrolls inside itself; the panel stops growing.
-  assert.equal(
-    resolveMiniRoomLayout({ ...oneLine, composerLines: 9 }).panelHeight,
-    resolveMiniRoomLayout({ ...oneLine, composerLines: 4 }).panelHeight
-  )
-  // Sending clears the text: back to one line and the previous framing.
-  assert.deepEqual(resolveMiniRoomLayout({ ...oneLine, composerLines: 1 }), single)
+test("Android resized windows have no second keyboard offset", () => {
+  const l = resolveMiniRoomLayout({ ...iphone11, keyboardVisible: true, keyboardInset: 0 })
+  assert.equal(l.panelMode, "typing")
+  assert.equal(l.panelBottom, 0)
 })
-
-test("the composer line count follows the reported text height", () => {
-  assert.equal(resolveComposerLineCount({ contentHeight: 37, fontScale: 1 }), 1)
-  assert.equal(resolveComposerLineCount({ contentHeight: 18 + 19 * 2, fontScale: 1 }), 2)
-  assert.equal(resolveComposerLineCount({ contentHeight: 18 + 19 * 3, fontScale: 1 }), 3)
-  assert.equal(resolveComposerLineCount({ contentHeight: 18 + 19 * 12, fontScale: 1 }), 4)
-  assert.equal(resolveComposerLineCount({ contentHeight: 0, fontScale: 1 }), 1)
-  assert.equal(resolveComposerLineCount({ contentHeight: 18 + 26 * 2, fontScale: 1.35 }), 2)
+test("drafts grow to the selected input cap then scroll without further layout growth", () => {
+  const input = { ...iphone11, keyboardVisible: true, keyboardInset: 302 }
+  const one = resolveMiniRoomLayout({ ...input, composerLines: 1 })
+  const four = resolveMiniRoomLayout({ ...input, composerLines: 4 })
+  assert.equal(one.composerInputHeight, 44)
+  assert.equal(four.composerInputHeight, 92)
+  assert.equal(four.panelHeight - one.panelHeight, 48)
+  assert.equal(resolveMiniRoomLayout({ ...input, composerLines: 30 }).panelHeight, four.panelHeight)
+  assert.equal(resolveComposerLineCount({ contentHeight: 44, fontScale: 1 }), 1)
+  assert.equal(resolveComposerLineCount({ contentHeight: 64, fontScale: 1 }), 2)
+  assert.equal(resolveComposerLineCount({ contentHeight: 92, fontScale: 1 }), 4)
+  assert.equal(resolveComposerLineCount({ contentHeight: 64.2, fontScale: 1 }), 2)
+  assert.equal(resolveComposerLineCount({ contentHeight: 999, fontScale: 1 }), 4)
+})
+test("keyboard overlap follows the actual frame, including a dismissed frame", () => {
+  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:594,keyboardHeight:302}),302)
+  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:896,keyboardHeight:302}),0)
+  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:1198,keyboardHeight:302}),0)
+  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:undefined,keyboardHeight:302}),302)
+  assert.equal(resolveKeyboardInset({windowHeight:896,keyboardScreenY:NaN,keyboardHeight:undefined}),0)
 })

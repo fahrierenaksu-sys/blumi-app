@@ -28,7 +28,15 @@ export interface MiniRoomCopy {
   openChatHistory: string
   hideChatHistory: string
   returnToRoom: string
+  historyHeading: string
+  today: string
+  roomPairCaption: string
+  roomPairTitle: (partnerName: string) => string
   closeKeyboard: string
+  keyboardSuggestions: string
+  keyboardSuggestionsHint: string
+  keyboardSuggestionsOn: string
+  keyboardSuggestionsOff: string
   chatHistory: string
   historyEmpty: string
   historyLoading: string
@@ -89,8 +97,16 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     voiceWaitsForConnectionHint: "Available once the room is connected",
     openChatHistory: "Show chat history",
     hideChatHistory: "Hide chat history",
-    returnToRoom: "Close the keyboard and return to the room",
+    returnToRoom: "Close the keyboard and return to the conversation",
+    historyHeading: "Your conversation",
+    today: "Today",
+    roomPairCaption: "Just the two of you.",
+    roomPairTitle: (partnerName) => `You and ${partnerName}`,
     closeKeyboard: "Close keyboard",
+    keyboardSuggestions: "MiniRoom keyboard suggestions",
+    keyboardSuggestionsHint: "Only changes this room's keyboard suggestions, autocorrection and spelling checks",
+    keyboardSuggestionsOn: "On",
+    keyboardSuggestionsOff: "Off",
     chatHistory: "Room chat",
     historyEmpty: "No messages yet",
     historyLoading: "Loading messages…",
@@ -142,8 +158,16 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     voiceWaitsForConnectionHint: "Oda bağlanınca kullanılabilir",
     openChatHistory: "Sohbet geçmişini aç",
     hideChatHistory: "Sohbet geçmişini gizle",
-    returnToRoom: "Klavyeyi kapat ve oda görünümüne dön",
+    returnToRoom: "Klavyeyi kapat ve sohbete dön",
+    historyHeading: "Sohbetiniz",
+    today: "Bugün",
+    roomPairCaption: "Sadece ikiniz.",
+    roomPairTitle: (partnerName) => `Sen ve ${partnerName}`,
     closeKeyboard: "Klavyeyi kapat",
+    keyboardSuggestions: "MiniRoom klavye önerileri",
+    keyboardSuggestionsHint: "Yalnızca bu odadaki kelime önerilerini, otomatik düzeltmeyi ve yazım denetimini değiştirir",
+    keyboardSuggestionsOn: "Açık",
+    keyboardSuggestionsOff: "Kapalı",
     chatHistory: "Oda sohbeti",
     historyEmpty: "Henüz mesaj yok",
     historyLoading: "Mesajlar yükleniyor…",

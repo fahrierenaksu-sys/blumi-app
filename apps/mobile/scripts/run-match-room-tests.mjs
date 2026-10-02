@@ -14,6 +14,8 @@ const coverageArguments = nodeMajorVersion >= 22
   ? ["--experimental-test-coverage"]
   : []
 const sourceFiles = [
+  "src/features/miniRoom/miniRoomKeyboardPreference.ts",
+  "src/features/miniRoom/miniRoomKeyboardPreference.test.ts",
   "src/features/miniRoom/sharedRoomDecor.ts",
   "src/features/miniRoom/sharedRoomDecor.test.ts",
   "src/features/miniRoom/scene/miniRoomPresentation.ts",
@@ -30,6 +32,8 @@ const sourceFiles = [
   "src/features/miniRoom/scene/miniRoomSpeechStack.test.ts",
   "src/features/miniRoom/scene/miniRoomLayout.ts",
   "src/features/miniRoom/scene/miniRoomLayout.test.ts",
+  "src/features/miniRoom/scene/miniRoomTransitionModel.ts",
+  "src/features/miniRoom/scene/miniRoomTransitionModel.test.ts",
   "src/features/miniRoom/scene/miniRoomStatusNotice.ts",
   "src/features/miniRoom/scene/miniRoomStatusNotice.test.ts",
   "src/features/miniRoom/roomChatHistoryModel.ts",
@@ -171,6 +175,7 @@ try {
     [
       ...coverageArguments,
       "--test",
+      join(outputDirectory, "features/miniRoom/miniRoomKeyboardPreference.test.js"),
       join(outputDirectory, "features/miniRoom/sharedRoomDecor.test.js"),
       join(outputDirectory, "features/miniRoom/scene/miniRoomPresentation.test.js"),
       join(outputDirectory, "features/miniRoom/roomEntryReplayGate.test.js"),
@@ -179,6 +184,7 @@ try {
       join(outputDirectory, "features/miniRoom/scene/miniRoomReducedMotion.test.js"),
       join(outputDirectory, "features/miniRoom/scene/miniRoomSpeechStack.test.js"),
       join(outputDirectory, "features/miniRoom/scene/miniRoomLayout.test.js"),
+      join(outputDirectory, "features/miniRoom/scene/miniRoomTransitionModel.test.js"),
       join(outputDirectory, "features/miniRoom/scene/miniRoomStatusNotice.test.js"),
       join(outputDirectory, "features/miniRoom/roomChatHistoryModel.test.js"),
       join(outputDirectory, "features/matches/matchRoomModel.test.js"),

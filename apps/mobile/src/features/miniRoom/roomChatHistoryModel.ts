@@ -8,7 +8,9 @@ export interface RoomChatHistoryItem {
   body: string
   mine: boolean
   delivery: RoomChatDelivery
-  /** Sender/status line under the bubble; shown once per run of one sender. */
+  /** Original durable-message time; absent in older presentation fixtures. */
+  sentAt?: string
+  /** Legacy sender grouping, retained for existing presentation consumers. */
   showMeta: boolean
 }
 
@@ -39,6 +41,7 @@ export function selectRoomChatHistory(input: {
       id: message.messageId,
       body: message.body,
       mine: message.senderUserId === input.localUserId,
+      sentAt: message.sentAt,
       delivery: input.deliveryOf(message.messageId)
     })
   }
@@ -49,6 +52,14 @@ export function selectRoomChatHistory(input: {
       showMeta: item.delivery !== "sent" || !newer || newer.mine !== item.mine
     }
   })
+}
+
+/** Device-local clock time; invalid or absent source times never become invented timestamps. */
+export function formatRoomChatTime(sentAt?: string): string | null {
+  if (!sentAt) return null
+  const timestamp = new Date(sentAt)
+  if (!Number.isFinite(timestamp.getTime())) return null
+  return `${String(timestamp.getHours()).padStart(2, "0")}:${String(timestamp.getMinutes()).padStart(2, "0")}`
 }
 
 export function resolveRoomChatHistoryStatus(input: {
