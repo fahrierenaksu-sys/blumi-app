@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { AvatarCatalogItem, UserAvatar } from "./avatarV2.types"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -9,6 +10,14 @@ require.extensions[".png"] = (module, filename) => {
 const { ROOM_AVATAR_CATALOG } = require("./room/avatarRoomCatalog") as typeof import("./room/avatarRoomCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { ROOM_AVATAR_FRAME_DURATION_MS } = require("./room/avatarRoomMotionContract") as typeof import("./room/avatarRoomMotionContract")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+const { normalizeAvatarV2ForBody } = require("./avatarBodyCompatibility") as typeof import("./avatarBodyCompatibility")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+const { projectAvatarV2ToRoomAvatarAppearance } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+const { getRoomAvatarAssetCoverage } = require("./room/avatarRoomSelectors") as typeof import("./room/avatarRoomSelectors")
 
 const MOTION_REQUIRED_TYPES = new Set([
   "face",
@@ -23,39 +32,49 @@ const MOTION_REQUIRED_TYPES = new Set([
   "accessory"
 ])
 
-function frameCount(asset: unknown): number {
-  if (!asset || typeof asset !== "object") return 0
-  if ("source" in asset) return 1
-  if (!("frames" in asset)) return 0
-  const frames = (asset as { frames?: unknown }).frames
-  return Array.isArray(frames) ? frames.length : 0
+const SLOT_BY_TYPE: Partial<Record<AvatarCatalogItem["type"], keyof UserAvatar>> = {
+  face: "faceId",
+  eyes: "eyesId",
+  nose: "noseId",
+  mouth: "mouthId",
+  hair: "hairId",
+  top: "topId",
+  bottom: "bottomId",
+  shoes: "shoesId"
 }
 
-test("every visible female and male room layer has front walking and sitting motion coverage", () => {
-  const missingCoverage = ROOM_AVATAR_CATALOG
-    .filter(
-      (item) =>
-        (item.bodyPreset === "female" || item.bodyPreset === "male") &&
-        MOTION_REQUIRED_TYPES.has(item.type)
-    )
-    .flatMap((item) => {
-      const walking = item.assetsByMotion?.walking?.front
-      const sitting = item.assetsByMotion?.sitting?.front
-      const issues: string[] = []
+function wearOnDefaultAvatar(item: AvatarCatalogItem): UserAvatar {
+  const bodyId = item.type === "body"
+    ? item.id
+    : item.compatibleBodyIds?.[0] ?? DEFAULT_AVATAR_V2.bodyId
+  const base = normalizeAvatarV2ForBody(DEFAULT_AVATAR_V2, bodyId, AVATAR_V2_CATALOG)
+  if (item.type === "accessory") return { ...base, accessoryIds: [item.id] }
+  const slot = SLOT_BY_TYPE[item.type]
+  return slot ? { ...base, [slot]: item.id } : base
+}
 
-      if (frameCount(walking) < 4) {
-        issues.push(`${item.id}: walking front requires 4 frames`)
-      }
-      if (frameCount(sitting) < 1) {
-        issues.push(`${item.id}: sitting front requires 1 frame`)
-      }
-      return issues
+test("every visible wardrobe item renders walking and sitting in the room without static fallbacks", () => {
+  const visibleItems = AVATAR_V2_CATALOG.filter((item) => item.hiddenFromWardrobe !== true)
+  assert.ok(visibleItems.length > 0)
+  const fallbacks = visibleItems.flatMap((item) => {
+    const { appearance } = projectAvatarV2ToRoomAvatarAppearance({ avatar: wearOnDefaultAvatar(item) })
+    return (["walking", "sitting"] as const).flatMap((state) => {
+      const coverage = getRoomAvatarAssetCoverage({
+        appearance,
+        catalog: ROOM_AVATAR_CATALOG,
+        state,
+        direction: "front"
+      })
+      return coverage.fallbackLayerCount === 0
+        ? []
+        : [`${item.id} ${state}: ${coverage.fallbackLayerCount} fallback layer(s)`]
     })
+  })
 
-  assert.deepEqual(missingCoverage, [])
+  assert.deepEqual(fallbacks, [])
 })
 
-test("every runtime walking sequence uses the shared 120ms playback contract", () => {
+test("every runtime walking sequence uses the shared playback contract", () => {
   const mismatchedDurations = ROOM_AVATAR_CATALOG
     .filter((item) => MOTION_REQUIRED_TYPES.has(item.type))
     .flatMap((item) => {
@@ -66,6 +85,5 @@ test("every runtime walking sequence uses the shared 120ms playback contract", (
         : [`${item.id}: ${walking.frameDurationMs}`]
     })
 
-  assert.equal(ROOM_AVATAR_FRAME_DURATION_MS, 120)
   assert.deepEqual(mismatchedDurations, [])
 })

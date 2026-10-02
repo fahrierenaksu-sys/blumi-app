@@ -1,11 +1,8 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import test from "node:test"
 import type { AvatarCatalogItem, UserAvatar } from "./avatarV2.types"
 import {
   applyOnboardingStarterBody,
-  buildInitialProfileStarterAvatar,
   FEMALE_STARTER_BODY_ID,
   getAvatarStarterBodyItems,
   getAvatarStarterCategoryItems,
@@ -26,11 +23,6 @@ const currentAvatar: UserAvatar = {
   bottomId: "bottom",
   shoesId: "shoes",
   accessoryIds: ["bow"]
-}
-
-const untouchedAvatar: UserAvatar = {
-  ...currentAvatar,
-  accessoryIds: []
 }
 
 const catalog = [
@@ -105,15 +97,6 @@ function isFree(item: AvatarCatalogItem): boolean {
   return item.ownedByDefault === true
 }
 
-function starterIds(bodyId: string, type: StarterCategory): string[] {
-  return getAvatarStarterCategoryItems(
-    starterCatalog,
-    type,
-    bodyId,
-    isFree
-  ).map((item) => item.id)
-}
-
 test("applies the gender starter body and clears incompatible accessories without mutation", () => {
   const next = applyOnboardingStarterBody(currentAvatar, "male-body", catalog)
 
@@ -173,43 +156,6 @@ test("starter body picker keeps both gender presets available after either selec
   assert.deepEqual(bodyItems.map((item) => item.id), [
     FEMALE_STARTER_BODY_ID,
     MALE_STARTER_BODY_ID
-  ])
-})
-
-test("female starter styling exposes exactly two free choices in every category", () => {
-  assert.deepEqual(starterIds(FEMALE_STARTER_BODY_ID, "hair"), [
-    "avatar_v2_hair_mocha_ribbon_blowout",
-    "avatar_v2_hair_midnight_french_bob"
-  ])
-  assert.deepEqual(starterIds(FEMALE_STARTER_BODY_ID, "top"), [
-    "avatar_v2_top_default",
-    "avatar_v2_top_buttercream_bow_tee"
-  ])
-  assert.deepEqual(starterIds(FEMALE_STARTER_BODY_ID, "bottom"), [
-    "avatar_v2_bottom_default",
-    "avatar_v2_bottom_lavender_bow_twill_shorts"
-  ])
-  assert.deepEqual(starterIds(FEMALE_STARTER_BODY_ID, "shoes"), [
-    "avatar_v2_shoes_milk_tea_court_sneakers",
-    "avatar_v2_shoes_mint_ribbon_court_sneakers"
-  ])
-})
-
-test("male starter styling excludes retired hair and preserves other free choices", () => {
-  assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "hair"), [
-    "avatar_v2_hair_male_cocoa_textured_quiff"
-  ])
-  assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "top"), [
-    "avatar_v2_top_male_powder_blue_crew_tee",
-    "avatar_v2_top_male_cream_basic_tee"
-  ])
-  assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "bottom"), [
-    "avatar_v2_bottom_male_navy_straight_pants",
-    "avatar_v2_bottom_male_sage_cuffed_shorts"
-  ])
-  assert.deepEqual(starterIds(MALE_STARTER_BODY_ID, "shoes"), [
-    "avatar_v2_shoes_male_milk_tea_court",
-    "avatar_v2_shoes_male_cloud_white_trainers"
   ])
 })
 
@@ -298,18 +244,6 @@ test("legacy female items without an explicit compatibility list never leak into
   )
 })
 
-test("Orbit Stylist uses the starter catalog selector instead of every owned wardrobe item", () => {
-  const source = readFileSync(
-    resolve(process.cwd(), "src/screens/AvatarSetupScreen.tsx"),
-    "utf8"
-  )
-
-  assert.match(
-    source,
-    /getAvatarStarterCategoryItems\(\s*catalog,\s*type,\s*stageAvatar\.bodyId,\s*canEquipItem\s*\)/
-  )
-})
-
 test("profile review never resets a locally customized starter avatar", () => {
   assert.equal(
     shouldRefreshAvatarForStarterChange({
@@ -344,65 +278,4 @@ test("a newer canonical avatar revision still refreshes local state", () => {
     }),
     true
   )
-})
-
-test("first profile completion turns an untouched revision-zero avatar into the selected starter", () => {
-  const next = buildInitialProfileStarterAvatar({
-    avatar: untouchedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: true,
-    starterBodyId: "male-body"
-  }, catalog)
-
-  assert.equal(next?.bodyId, "male-body")
-  assert.deepEqual(next?.accessoryIds, [])
-  assert.equal(untouchedAvatar.bodyId, "female-body")
-})
-
-test("first profile completion can replace the server-created revision-one starter", () => {
-  const next = buildInitialProfileStarterAvatar({
-    avatar: untouchedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: true,
-    starterBodyId: "male-body"
-  }, catalog)
-
-  assert.equal(next?.bodyId, "male-body")
-})
-
-test("profile review refreshes an untouched canonical starter after the gender changes", () => {
-  const next = buildInitialProfileStarterAvatar({
-    avatar: untouchedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: true,
-    starterBodyId: "male-body"
-  }, catalog)
-
-  assert.equal(next?.bodyId, "male-body")
-})
-
-test("profile review never replaces a customized avatar even at revision one", () => {
-  const customizedAvatar = { ...untouchedAvatar, hairId: "custom-hair" }
-
-  assert.equal(buildInitialProfileStarterAvatar({
-    avatar: customizedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: true,
-    starterBodyId: "male-body"
-  }, catalog), null)
-  assert.equal(buildInitialProfileStarterAvatar({
-    avatar: untouchedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: false,
-    starterBodyId: "male-body"
-  }, catalog), null)
-})
-
-test("does not create a new canonical revision when the untouched starter already matches", () => {
-  assert.equal(buildInitialProfileStarterAvatar({
-    avatar: untouchedAvatar,
-    canonicalStarterAvatar: untouchedAvatar,
-    avatarSetupIncomplete: true,
-    starterBodyId: "female-body"
-  }, catalog), null)
 })

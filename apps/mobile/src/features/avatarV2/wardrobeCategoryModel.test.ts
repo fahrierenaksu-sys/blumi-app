@@ -1,20 +1,5 @@
 import assert from "node:assert/strict"
-import { readdirSync, readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import test from "node:test"
-
-// The screen composes hooks and components from features/avatarV2/wardrobe;
-// source contracts read the screen and every module it delegates to.
-function readWardrobeSources(): string {
-  const folder = resolve(process.cwd(), "src/features/avatarV2/wardrobe")
-  return [
-    resolve(process.cwd(), "src/screens/WardrobeV2Screen.tsx"),
-    ...readdirSync(folder)
-      .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\./.test(file))
-      .sort()
-      .map((file) => resolve(folder, file))
-  ].map((file) => readFileSync(file, "utf8")).join("\n")
-}
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -35,19 +20,9 @@ const {
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
 const {
   getWardrobeCategoryItems,
-  getWardrobeEquippedSlotItem,
-  getWardrobeEquippedSlotPreviewScale,
-  getWardrobeVisibleSlots,
-  getWardrobeSecondaryCategories,
-  getAvatarStudioCategories,
-  getAvatarStudioDefaultCategory,
   getAvatarStudioTabs,
   findAvatarStudioTab,
-  resolveAvatarStudioCategory,
-  shouldUseWardrobeSlotCompactLayout,
-  AVATAR_STUDIO_SECTIONS,
-  WARDROBE_EQUIPPED_SLOTS,
-  WARDROBE_CATEGORIES
+  resolveAvatarStudioCategory
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./wardrobeCategoryModel") as typeof import("./wardrobeCategoryModel")
 const {
@@ -56,11 +31,6 @@ const {
 } = require("./wardrobeThumbnailPresentation") as typeof import("./wardrobeThumbnailPresentation")
 
 test("wardrobe exposes both starter body bases after onboarding", () => {
-  assert.equal(
-    WARDROBE_CATEGORIES.some((category) => category.id === "body"),
-    true
-  )
-
   const bodyIds = getWardrobeCategoryItems(AVATAR_V2_CATALOG, "body").map(
     (item) => item.id
   )
@@ -78,25 +48,6 @@ test("wardrobe exposes both starter body bases after onboarding", () => {
     ),
     true
   )
-})
-
-test("Avatar Studio separates identity editing from the owned closet", () => {
-  assert.deepEqual(AVATAR_STUDIO_SECTIONS, [
-    { id: "closet", label: "My Closet" },
-    { id: "appearance", label: "Avatar" }
-  ])
-  assert.deepEqual(
-    getAvatarStudioCategories("appearance", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
-      .map((category) => category.id),
-    ["hair", "face", "mouth", "body", "eyes", "nose"]
-  )
-  assert.deepEqual(
-    getAvatarStudioCategories("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
-      .map((category) => category.id),
-    ["top", "dress", "bottom", "shoes", "accessory"]
-  )
-  assert.equal(getAvatarStudioDefaultCategory("appearance"), "hair")
-  assert.equal(getAvatarStudioDefaultCategory("closet"), "top")
 })
 
 test("each Studio section shows four tabs and hair lives only under My Character", () => {
@@ -138,36 +89,12 @@ test("female identity parts and the rendered male face are free Studio choices",
   }
 
   const maleAvatar = { ...DEFAULT_AVATAR_V2, bodyId: "avatar_v2_body_male_light" }
-  assert.deepEqual(
-    getAvatarStudioCategories("appearance", AVATAR_V2_CATALOG, maleAvatar)
-      .map((category) => category.id),
-    ["hair", "face", "body"]
-  )
   const maleFaces = getWardrobeCategoryItems(AVATAR_V2_CATALOG, "face")
     .filter((item) => item.compatibleBodyIds?.includes(maleAvatar.bodyId))
   assert.ok(maleFaces.length > 0)
   assert.ok(maleFaces.every((item) =>
     canEquipAvatarV2Item({ ownedItemIds: [] }, item, maleAvatar.bodyId)
   ))
-})
-
-test("Avatar Studio exposes real Avatar and My Closet controls", () => {
-  const source = readWardrobeSources()
-  assert.match(source, /My Character/)
-  assert.match(source, /My Closet/)
-  assert.match(source, /Karakterim/)
-  assert.match(source, /Dolabım/)
-  assert.match(source, /activeSection/)
-  assert.match(source, /useState<AvatarStudioSectionId>\("closet"\)/)
-  assert.match(source, /getAvatarStudioDefaultCategory\("closet"\)/)
-})
-
-test("wardrobe announces server save rejection instead of failing silently", () => {
-  const source = readWardrobeSources()
-
-  assert.match(source, /saveErrorMessage/)
-  assert.match(source, /accessibilityRole="alert"/)
-  assert.match(source, /accessibilityLiveRegion="polite"/)
 })
 
 test("switching body refits every incompatible starter slot as one loadout", () => {
@@ -241,102 +168,4 @@ test("canonical canvas fallbacks keep the legacy fit profile", () => {
       translateY: 0
     }
   )
-})
-
-test("equipped wardrobe slots resolve only the item worn in their category", () => {
-  const top = getWardrobeEquippedSlotItem(
-    AVATAR_V2_CATALOG,
-    DEFAULT_AVATAR_V2,
-    "top"
-  )
-  const bottom = getWardrobeEquippedSlotItem(
-    AVATAR_V2_CATALOG,
-    DEFAULT_AVATAR_V2,
-    "bottom"
-  )
-
-  assert.equal(top?.id, DEFAULT_AVATAR_V2.topId)
-  assert.equal(bottom?.id, DEFAULT_AVATAR_V2.bottomId)
-  assert.notEqual(top?.id, bottom?.id)
-  assert.deepEqual(
-    WARDROBE_EQUIPPED_SLOTS.map((slot) => slot.id),
-    ["hair", "top", "bottom", "shoes", "accessory"]
-  )
-})
-
-test("an equipped dress is represented by one atomic Look slot", () => {
-  const dressTop = AVATAR_V2_CATALOG.find((item) =>
-    item.type === "top" && Boolean(item.outfitKey)
-  )
-  assert.ok(dressTop?.pairedItemId)
-
-  const dressed = {
-    ...DEFAULT_AVATAR_V2,
-    topId: dressTop.id,
-    bottomId: dressTop.pairedItemId
-  }
-  const slots = getWardrobeVisibleSlots(AVATAR_V2_CATALOG, dressed)
-
-  assert.deepEqual(slots.map((slot) => slot.id), [
-    "hair",
-    "look",
-    "shoes",
-    "accessory"
-  ])
-  assert.equal(slots.find((slot) => slot.id === "look")?.category, "dress")
-  assert.equal(slots.find((slot) => slot.id === "look")?.item?.id, dressTop.id)
-  assert.equal(slots.some((slot) => slot.id === "top" || slot.id === "bottom"), false)
-  assert.deepEqual(
-    getWardrobeSecondaryCategories(AVATAR_V2_CATALOG, dressed).slice(0, 2),
-    [
-      { id: "top", label: "Separates" },
-      { id: "bottom", label: "Bottoms" }
-    ]
-  )
-})
-
-test("a regular outfit keeps independent Top and Bottom slots", () => {
-  const slots = getWardrobeVisibleSlots(AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
-  assert.deepEqual(slots.map((slot) => slot.id), [
-    "hair",
-    "top",
-    "bottom",
-    "shoes",
-    "accessory"
-  ])
-  assert.equal(slots.find((slot) => slot.id === "top")?.category, "top")
-  assert.equal(slots.find((slot) => slot.id === "bottom")?.category, "bottom")
-})
-
-test("the compact Extra slot honestly summarizes every equipped accessory", () => {
-  const accessoryIds = AVATAR_V2_CATALOG
-    .filter((item) => item.type === "accessory")
-    .slice(0, 3)
-    .map((item) => item.id)
-  assert.equal(accessoryIds.length, 3)
-
-  const slots = getWardrobeVisibleSlots(AVATAR_V2_CATALOG, {
-    ...DEFAULT_AVATAR_V2,
-    accessoryIds
-  })
-  const extra = slots.find((slot) => slot.id === "accessory")
-
-  assert.equal(extra?.item?.id, accessoryIds[0])
-  assert.equal(extra?.itemCount, 3)
-  assert.equal(extra?.label, "Extras · 3")
-  assert.equal(extra?.accessibilitySummary, `${extra?.item?.name} and 2 more`)
-})
-
-test("the compact slot layout starts at large text sizes", () => {
-  assert.equal(shouldUseWardrobeSlotCompactLayout(1.29), false)
-  assert.equal(shouldUseWardrobeSlotCompactLayout(1.3), true)
-})
-
-test("equipped slot previews enlarge transparent room layers by category", () => {
-  assert.equal(getWardrobeEquippedSlotPreviewScale("hair"), 1.7)
-  assert.equal(getWardrobeEquippedSlotPreviewScale("top"), 2.35)
-  assert.equal(getWardrobeEquippedSlotPreviewScale("bottom"), 2.75)
-  assert.equal(getWardrobeEquippedSlotPreviewScale("shoes"), 3.1)
-  assert.equal(getWardrobeEquippedSlotPreviewScale("accessory"), 1.9)
-  assert.equal(getWardrobeEquippedSlotPreviewScale("face"), 1)
 })

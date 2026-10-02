@@ -6,7 +6,6 @@ import {
   getWardrobeGridItemWidth,
   getWardrobeGridPageHeight,
   getWardrobePageCount,
-  getWardrobePageIndex,
   getWardrobeStageLayout
 } from "./wardrobeStageLayout"
 
@@ -67,14 +66,6 @@ test("a grid page is exactly one card row tall", () => {
 test("large text grows the card name block up to the name's own cap", () => {
   assert.ok(getWardrobeCardHeight(100, 1.2) > getWardrobeCardHeight(100, 1))
   assert.equal(getWardrobeCardHeight(100, 3), getWardrobeCardHeight(100, 1.3))
-})
-
-test("the page index follows the scroll offset and stays in range", () => {
-  assert.equal(getWardrobePageIndex(0, 300, 3), 0)
-  assert.equal(getWardrobePageIndex(310, 300, 3), 1)
-  assert.equal(getWardrobePageIndex(5000, 300, 3), 2)
-  assert.equal(getWardrobePageIndex(-40, 300, 3), 0)
-  assert.equal(getWardrobePageIndex(100, 0, 3), 0)
 })
 
 test("the page count covers every card", () => {

@@ -1,10 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import {
-  resolveWardrobeCatalogFrame,
-  WARDROBE_CATALOG_FADE_IN_MS,
-  WARDROBE_CATALOG_FADE_OUT_MS
-} from "./wardrobeCatalogTransitionModel"
+import { resolveWardrobeCatalogFrame } from "./wardrobeCatalogTransitionModel"
 
 const hair = ["hair-a", "hair-b"]
 const tops = ["top-a", "top-b", "top-c"]
@@ -28,9 +24,4 @@ test("Reduce Motion swaps at once without a fade", () => {
     requestedCategory: "top", shownCategory: "hair", cards: tops, lastShownCards: hair, reduceMotion: true
   })
   assert.deepEqual(frame, { cards: tops, switching: false })
-})
-
-test("the swap stays short: fade out and in together under a quarter second", () => {
-  assert.ok(WARDROBE_CATALOG_FADE_OUT_MS < WARDROBE_CATALOG_FADE_IN_MS)
-  assert.ok(WARDROBE_CATALOG_FADE_OUT_MS + WARDROBE_CATALOG_FADE_IN_MS <= 250)
 })

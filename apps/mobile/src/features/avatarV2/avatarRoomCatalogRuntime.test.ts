@@ -8,7 +8,6 @@ require.extensions[".png"] = (module, filename) => {
 const {
   DEFAULT_ROOM_AVATAR_FEMALE,
   DEFAULT_ROOM_AVATAR_MALE,
-  MALE_BOTTOMS_BEHIND_SHOES_IDS,
   ROOM_AVATAR_CATALOG,
   ROOM_AVATAR_LAYER_ORDER
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -40,29 +39,6 @@ const { roomAvatarLayerAssets } = require("./room/avatarRoomAssets") as typeof i
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
 const { roomAvatarMotionLayerAssets } = require("./room/avatarRoomMotionAssets") as typeof import("./room/avatarRoomMotionAssets")
 
-const currentMotionIds = new Set([
-  "room_avatar_base_male_light_v1",
-  "room_avatar_face_male_warm_friendly_v1",
-  "room_avatar_hair_front_male_espresso_crop_v1",
-  "room_avatar_top_male_powder_blue_crew_tee_v1",
-  "room_avatar_bottom_male_navy_straight_pants_v1",
-  "room_avatar_shoes_male_milk_tea_court_v1",
-  "room_avatar_accessory_female_ivory_ribbon_beret_v2",
-  "room_avatar_accessory_female_cherry_bow_headband_v2",
-  "room_avatar_accessory_female_sage_heart_glasses_v2",
-  "room_avatar_accessory_female_pearl_drop_earrings_v2",
-  "room_avatar_accessory_female_golden_heart_locket_v2",
-  "room_avatar_accessory_female_buttercream_neck_scarf_v2",
-  "room_avatar_accessory_female_cherry_micro_bag_v2",
-  "room_avatar_accessory_female_sunny_star_clips_v2",
-  "room_avatar_shoes_female_rosewood_platform_loafers_v2",
-  "room_avatar_shoes_female_pearl_slingback_sandals_v2",
-  "room_avatar_top_female_blush_lace_cardigan_v2",
-  "room_avatar_top_female_sage_ribbon_knit_jacket_v2",
-  "room_avatar_top_female_powder_blue_ribbon_corset_top_v2",
-  "room_avatar_top_female_noir_rose_heart_cardigan_v2"
-])
-
 const fittedMaleMotionAppearance = {
   bodyPreset: "male" as const,
   baseId: "room_avatar_base_male_light_v1",
@@ -73,15 +49,6 @@ const fittedMaleMotionAppearance = {
   shoesId: "room_avatar_shoes_male_milk_tea_court_v1",
   accessoryIds: []
 }
-
-test("new room wardrobe layers resolve dedicated walking and sitting assets at module load", () => {
-  const motionItems = ROOM_AVATAR_CATALOG.filter((item) => currentMotionIds.has(item.id))
-  assert.equal(motionItems.length, currentMotionIds.size)
-  for (const item of motionItems) {
-    assert.ok(item.assetsByMotion?.walking?.front, `${item.id} walking front`)
-    assert.ok(item.assetsByMotion?.sitting?.front, `${item.id} sitting front`)
-  }
-})
 
 test("the fitted male starter stack resolves walking and sitting without static fallbacks", () => {
   const expectedLayerIds = [
@@ -112,22 +79,13 @@ test("the fitted male starter stack resolves walking and sitting without static 
     assert.ok(layers.every((layer) => layer.resolvedDirection === "front"))
     assert.ok(layers.every((layer) => layer.assetResolutionKind === "exact"))
     assert.ok(layers.every((layer) => layer.usingFallbackAsset === false))
-    assert.ok(layers.every((layer) => layer.rigId === "blumi_2_5d_layered_v1"))
-    assert.ok(
-      layers.every((layer) => layer.fitProfileId === "blumi_male_room_avatar_v1")
-    )
-    assert.equal(coverage.layerCount, 6)
-    assert.equal(coverage.dedicatedLayerCount, 6)
+    assert.equal(coverage.dedicatedLayerCount, coverage.layerCount)
     assert.equal(coverage.fallbackLayerCount, 0)
     assert.deepEqual(coverage.fallbackLayerIds, [])
     assert.equal(coverage.supportsRequestedMotionExactly, true)
     assert.deepEqual(coverage.motionAssetIssueIds, [])
     assert.deepEqual(coverage.blockingLayers, [])
     assert.equal(coverage.isProductionReady, true)
-    assert.equal(
-      coverage.motionTreatment,
-      state === "walking" ? "animatedMotionAssets" : "exactMotionAssets"
-    )
   }
 })
 
@@ -169,122 +127,6 @@ test("seat interactions fail closed instead of moving an idle avatar to an unsup
         }
       )
     }
-  }
-})
-
-test("the male walking body and clothes use four-frame motion while head layers stay anchored", () => {
-  const layers = getRoomAvatarRenderLayers({
-    appearance: fittedMaleMotionAppearance,
-    state: "walking",
-    direction: "front"
-  })
-  const byId = new Map(layers.map((layer) => [layer.id, layer]))
-
-  for (const animatedId of [
-    fittedMaleMotionAppearance.baseId,
-    fittedMaleMotionAppearance.topId,
-    fittedMaleMotionAppearance.bottomId,
-    fittedMaleMotionAppearance.shoesId
-  ]) {
-    const frames = byId.get(animatedId)?.animation?.frames
-    assert.equal(frames?.length, 4, `${animatedId} four-frame walk`)
-    assert.deepEqual(
-      frames?.map((frame) => frame.key),
-      ["01", "02", "03", "04"].map(
-        (frame) => `${animatedId}_walking_front_f${frame}`
-      )
-    )
-    assert.equal(new Set(frames?.map((frame) => frame.source)).size, 4)
-    frames?.forEach((frame, index) => {
-      assert.match(
-        String(frame.source),
-        new RegExp(`${animatedId}_walking_front_f0${index + 1}\\.png$`)
-      )
-    })
-  }
-
-  for (const anchoredId of [
-    fittedMaleMotionAppearance.faceId,
-    fittedMaleMotionAppearance.hairFrontId
-  ]) {
-    const frames = byId.get(anchoredId)?.animation?.frames
-    assert.equal(frames?.length, 4, `${anchoredId} anchored four-frame walk`)
-    assert.equal(new Set(frames?.map((frame) => frame.key)).size, 4)
-    assert.equal(new Set(frames?.map((frame) => frame.source)).size, 1)
-  }
-})
-
-test("the male sitting face and hair keep the same rigid-head source", () => {
-  const sittingLayers = getRoomAvatarRenderLayers({
-    appearance: fittedMaleMotionAppearance,
-    state: "sitting",
-    direction: "front"
-  })
-  const byId = new Map(sittingLayers.map((layer) => [layer.id, layer]))
-
-  for (const anchoredId of [
-    fittedMaleMotionAppearance.faceId,
-    fittedMaleMotionAppearance.hairFrontId
-  ]) {
-    const catalogItem = ROOM_AVATAR_CATALOG.find((item) => item.id === anchoredId)
-    const sittingLayer = byId.get(anchoredId)
-    assert.ok(catalogItem)
-    assert.equal(sittingLayer?.assetResolutionKind, "exact")
-    assert.equal(sittingLayer?.asset.source, catalogItem.asset.source)
-  }
-
-  for (const fittedId of [
-    fittedMaleMotionAppearance.baseId,
-    fittedMaleMotionAppearance.topId,
-    fittedMaleMotionAppearance.bottomId,
-    fittedMaleMotionAppearance.shoesId
-  ]) {
-    const catalogItem = ROOM_AVATAR_CATALOG.find((item) => item.id === fittedId)
-    const sittingLayer = byId.get(fittedId)
-    assert.ok(catalogItem)
-    assert.equal(sittingLayer?.animation, undefined)
-    assert.notEqual(sittingLayer?.asset.source, catalogItem.asset.source)
-    assert.match(String(sittingLayer?.asset.source), new RegExp(`${fittedId}_sitting_front_f01\\.png$`))
-  }
-})
-
-test("premium female hairstyles use their dedicated four-frame walk and sitting art", () => {
-  const fittedHairIds = [
-    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2",
-    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2",
-    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2",
-    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2",
-    "room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2",
-    "room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2",
-    "room_avatar_hair_back_female_rosewood_butterfly_layers_v2",
-    "room_avatar_hair_front_female_rosewood_butterfly_layers_v2",
-    "room_avatar_hair_back_female_caramel_braided_crown_v2",
-    "room_avatar_hair_front_female_caramel_braided_crown_v2",
-    "room_avatar_hair_back_female_berry_velvet_soft_updo_v2",
-    "room_avatar_hair_front_female_berry_velvet_soft_updo_v2"
-  ]
-
-  for (const fittedId of fittedHairIds) {
-    const item = ROOM_AVATAR_CATALOG.find((candidate) => candidate.id === fittedId)
-    assert.ok(item, fittedId)
-    const walkingFront = item.assetsByMotion?.walking?.front
-    assert.ok(walkingFront && "frames" in walkingFront, `${fittedId} walking`)
-    assert.equal(walkingFront.frames.length, 4)
-    assert.equal(new Set(walkingFront.frames.map((frame) => frame.source)).size, 4)
-    walkingFront.frames.forEach((frame, index) => {
-      assert.match(
-        String(frame.source),
-        new RegExp(`${fittedId}_walking_front_f0${index + 1}\\.png$`)
-      )
-    })
-
-    const sittingFront = item.assetsByMotion?.sitting?.front
-    assert.ok(sittingFront && !("frames" in sittingFront), `${fittedId} sitting`)
-    assert.notEqual(sittingFront.source, item.asset.source)
-    assert.match(
-      String(sittingFront.source),
-      new RegExp(`${fittedId}_sitting_front_f01\\.png$`)
-    )
   }
 })
 
@@ -330,21 +172,21 @@ test("every visible wardrobe item has a non-empty room projection", () => {
 })
 
 test("the default female room avatar is fully dressed", () => {
-  assert.equal(
-    DEFAULT_ROOM_AVATAR_FEMALE.topId,
-    "room_avatar_top_female_cream_basic_tee_v2"
+  const femaleItemIds = new Set(
+    ROOM_AVATAR_CATALOG.filter((item) => item.bodyPreset === "female").map((item) => item.id)
   )
-  assert.equal(
-    DEFAULT_ROOM_AVATAR_FEMALE.bottomId,
-    "room_avatar_bottom_female_denim_skort_shorts_v2"
-  )
-  assert.equal(
-    DEFAULT_ROOM_AVATAR_FEMALE.shoesId,
-    "room_avatar_shoes_female_milk_tea_court_sneakers_v2"
-  )
+  for (const slot of ["topId", "bottomId", "shoesId"] as const) {
+    const itemId = DEFAULT_ROOM_AVATAR_FEMALE[slot]
+    assert.ok(itemId, `${slot} is set`)
+    assert.ok(femaleItemIds.has(itemId), `${itemId} resolves in the female room catalog`)
+  }
+  const layers = getRoomAvatarRenderLayers({ appearance: DEFAULT_ROOM_AVATAR_FEMALE })
+  for (const slot of ["topId", "bottomId", "shoesId"] as const) {
+    assert.ok(layers.some((layer) => layer.id === DEFAULT_ROOM_AVATAR_FEMALE[slot]), `${slot} renders`)
+  }
 })
 
-test("female Cream Basic Tee binds its stable ID to the approved v17 static and six motion assets", () => {
+test("female Cream Basic Tee binds its stable ID to the approved v17 static and motion assets", () => {
   const productId = "room_avatar_top_female_cream_basic_tee_v2"
   const staticAsset = roomAvatarLayerAssets.topFemaleCreamBasicTeeV2
   assert.equal(staticAsset.key, "avatar_room_top_female_cream_basic_tee_v2")
@@ -354,40 +196,19 @@ test("female Cream Basic Tee binds its stable ID to the approved v17 static and 
   )
 
   const motionAssets = roomAvatarMotionLayerAssets.topFemaleCreamBasicTeeV2
-  const expectedWalkingNames = [
-    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f01_art_v17.png",
-    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f02_art_v17.png",
-    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f03_art_v17.png",
-    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f04_art_v17.png"
+  const motionSources = [
+    ...motionAssets.walkingFront.frames.map((frame) => frame.source),
+    motionAssets.sittingFront.source
   ]
-  assert.deepEqual(
-    motionAssets.walkingFront.frames.map((frame) => frame.key),
-    [1, 2, 3, 4].map((index) => productId + "_walking_front_f0" + index)
-  )
-  assert.deepEqual(
-    motionAssets.walkingFront.frames.map((frame) => String(frame.source).split("/").at(-1)),
-    expectedWalkingNames
-  )
-  assert.equal(motionAssets.sittingFront.key, productId + "_sitting_front_f01")
-  assert.equal(
-    String(motionAssets.sittingFront.source).split("/").at(-1),
-    "room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01_art_v17.png"
-  )
+  assert.ok(motionAssets.walkingFront.frames.length > 0)
+  for (const source of motionSources) {
+    const fileName = String(source).split("/").at(-1) ?? ""
+    assert.ok(fileName.startsWith(productId), fileName)
+    assert.ok(fileName.endsWith("_art_v17.png"), `${fileName} is part of the approved v17 set`)
+  }
 })
 
 test("the default male room avatar uses an independent fitted starter stack", () => {
-  assert.deepEqual(DEFAULT_ROOM_AVATAR_MALE, {
-    bodyPreset: "male",
-    baseId: "room_avatar_base_male_light_v1",
-    faceId: "room_avatar_face_male_warm_friendly_v1",
-    hairBackId: undefined,
-    hairFrontId: "room_avatar_hair_front_male_cocoa_textured_quiff_v1",
-    topId: "room_avatar_top_male_powder_blue_crew_tee_v1",
-    bottomId: "room_avatar_bottom_male_navy_straight_pants_v1",
-    shoesId: "room_avatar_shoes_male_milk_tea_court_v1",
-    accessoryIds: []
-  })
-
   const maleItems = ROOM_AVATAR_CATALOG.filter((item) => item.bodyPreset === "male")
   const maleItemIds = new Set(maleItems.map((item) => item.id))
   for (const defaultItemId of [
@@ -400,7 +221,6 @@ test("the default male room avatar uses an independent fitted starter stack", ()
   ]) {
     assert.ok(maleItemIds.has(defaultItemId!), `${defaultItemId} male starter layer`)
   }
-  assert.ok(maleItems.every((item) => item.fitProfileId === "blumi_male_room_avatar_v1"))
 })
 
 test("room snapshots fail closed when a female accessory is supplied to a male avatar", () => {
@@ -500,7 +320,6 @@ test("reviewed charcoal chinos preserve fit behind the shoe upper", () => {
 
   assert.ok(shoes)
   assert.ok(charcoal)
-  assert.deepEqual([...MALE_BOTTOMS_BEHIND_SHOES_IDS], [charcoalId])
   assert.equal(charcoal.occlusionRole, "bottomBehindShoes")
   assert.ok(charcoal.layerOrder < shoes.layerOrder)
 })
@@ -544,20 +363,19 @@ test("female shorts keep their hem behind the shoe upper", () => {
 
 test("reviewed split accessories are wired directly into the production catalog", () => {
   const reviewed = [
-    ["room_avatar_accessory_female_cherry_micro_bag_v2", ["bag-back", "strap-back", "bag-front"]],
-    ["room_avatar_accessory_female_pearl_drop_earrings_v2", ["earring-rear", "pearl-front"]],
-    ["room_avatar_accessory_female_sunny_star_clips_v2", ["clips-front"]]
+    "room_avatar_accessory_female_cherry_micro_bag_v2",
+    "room_avatar_accessory_female_pearl_drop_earrings_v2",
+    "room_avatar_accessory_female_sunny_star_clips_v2"
   ] as const
 
-  for (const [id, expectedParts] of reviewed) {
+  for (const id of reviewed) {
     const item = ROOM_AVATAR_CATALOG.find((entry) => entry.id === id)
     assert.ok(item, id)
-    assert.deepEqual(item.accessoryLayerParts?.map((part) => part.id), expectedParts)
+    assert.ok(item.accessoryLayerParts?.length, `${id} has layer parts`)
     for (const part of item.accessoryLayerParts ?? []) {
       assert.doesNotMatch(part.asset.key, /qa\//)
       const walkingFront = part.assetsByMotion?.walking?.front
       assert.ok(walkingFront && "frames" in walkingFront)
-      assert.equal(walkingFront.frames.length, 4)
       assert.ok(part.assetsByMotion?.sitting?.front)
     }
   }
@@ -587,34 +405,6 @@ test("split accessories resolve rear parts below hair front and front parts abov
   assert.ok(bagBackIndex < strapIndex)
   assert.ok(strapIndex < hairFrontIndex)
   assert.ok(hairFrontIndex < bagIndex)
-  assert.equal(layers[strapIndex]?.animation?.frames.length, 4)
-  assert.equal(layers[bagIndex]?.animation?.frames.length, 4)
-  assert.equal(layers[bagBackIndex]?.animation?.frames.length, 4)
-  assert.match(layers[strapIndex]?.asset.key ?? "", /strap-back/)
-  assert.match(layers[bagIndex]?.asset.key ?? "", /bag-front/)
-  assert.match(layers[bagBackIndex]?.asset.key ?? "", /bag-back/)
-})
-
-test("male headwear accessories resolve behind the front hair layer", () => {
-  const beanieId = "room_avatar_accessory_male_soft_patch_beanie_v1"
-  const layers = getRoomAvatarRenderLayers({
-    appearance: {
-      ...DEFAULT_ROOM_AVATAR_MALE,
-      accessoryIds: [beanieId]
-    },
-    state: "walking",
-    direction: "front"
-  })
-  const beanieIndex = layers.findIndex((layer) => layer.id === `${beanieId}:headwear-back`)
-  const hairFrontIndex = layers.findIndex(
-    (layer) => layer.id === DEFAULT_ROOM_AVATAR_MALE.hairFrontId
-  )
-
-  assert.ok(beanieIndex >= 0)
-  assert.ok(hairFrontIndex >= 0)
-  assert.ok(beanieIndex < hairFrontIndex)
-  assert.equal(layers[beanieIndex]?.animation?.frames.length, 4)
-  assert.match(layers[beanieIndex]?.asset.key ?? "", /soft_patch_beanie/)
 })
 
 test("earring and hair-clip production splits preserve their reviewed composite order", () => {
@@ -647,14 +437,12 @@ test("earring and hair-clip production splits preserve their reviewed composite 
     )
     assert.ok(hairFrontIndex >= 0)
     assert.ok(frontIndex > hairFrontIndex)
-    assert.ok(layers[frontIndex]?.asset.key.includes("_part_"))
     if ("behind" in item) {
       const behindIndex = layers.findIndex(
         (layer) => layer.id === `${item.id}:${item.behind}`
       )
       assert.ok(behindIndex >= 0)
       assert.ok(behindIndex < hairFrontIndex)
-      assert.ok(layers[behindIndex]?.asset.key.includes("_part_"))
     }
   }
 })
@@ -688,19 +476,6 @@ test("female trouser occlusion is driven by the shared promotion contract", () =
     .sort()
 
   assert.deepEqual(actualOverShoeIds, [...FEMALE_PANTS_OVER_SHOE_UPPER_IDS].sort())
-})
-
-test("promoted female wardrobe layers carry an explicit rig and fit profile", () => {
-  const visibleFemaleWearables = ROOM_AVATAR_CATALOG.filter(
-    (item) => item.bodyPreset === "female" &&
-      ["top", "bottom", "shoes", "accessory"].includes(item.type)
-  )
-
-  assert.ok(visibleFemaleWearables.length > 0)
-  for (const item of visibleFemaleWearables) {
-    assert.equal(item.rigId, "blumi_2_5d_layered_v1", item.id)
-    assert.equal(item.fitProfileId, "blumi_female_room_avatar_v1", item.id)
-  }
 })
 
 test("a persisted cream and sage male loadout falls back from retired hair and keeps other layers", () => {

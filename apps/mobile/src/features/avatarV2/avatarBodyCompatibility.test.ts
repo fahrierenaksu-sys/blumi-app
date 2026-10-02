@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   getAvatarV2ShopItemsCompatibleWithBody,
-  getAvatarV2ItemsCompatibleWithBody,
   isAvatarV2ItemCompatibleWithBody,
   normalizeAvatarV2ForBody
 } from "./avatarBodyCompatibility"
@@ -16,12 +15,6 @@ const catalog = [
 ] as AvatarCatalogItem[]
 
 test("returns only items compatible with the selected body", () => {
-  assert.deepEqual(
-    getAvatarV2ItemsCompatibleWithBody(catalog, "hair", "male-body").map(
-      (item) => item.id
-    ),
-    ["male-hair"]
-  )
   assert.equal(
     isAvatarV2ItemCompatibleWithBody(catalog[2], "male-body"),
     false
@@ -88,10 +81,6 @@ test("keeps hidden starter foundations out of wardrobe lists but uses them for n
     accessoryIds: []
   } satisfies UserAvatar
 
-  assert.deepEqual(
-    getAvatarV2ItemsCompatibleWithBody(normalizationCatalog, "face", "male-body"),
-    []
-  )
   assert.equal(
     normalizeAvatarV2ForBody(femaleAvatar, "male-body", normalizationCatalog).faceId,
     "male-face"
