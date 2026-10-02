@@ -81,7 +81,14 @@ try {
   )
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/inventory/inventoryStore.test.ts", "src/features/inventory/useInventoryStoreView.test.ts", "src/features/shop/screen/useShopPurchaseActions.test.ts"],
+    [
+      "--import", "tsx", "--test",
+      "src/features/inventory/inventoryStore.test.ts",
+      "src/features/inventory/useInventoryStoreView.test.ts",
+      "src/features/shop/screen/useShopPurchaseActions.test.ts",
+      // The Shop card X changes only what the avatar wears, never ownership.
+      "src/features/shop/shopCardRemoveModel.test.ts"
+    ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

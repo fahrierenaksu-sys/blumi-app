@@ -315,6 +315,30 @@ export const shopScreenStyles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  // The card X: a 44 pt corner touch target around a small dot.
+  productRemoveHitArea: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 44,
+    height: 44,
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    padding: 3,
+  },
+  productRemoveDot: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: uiTheme.radius.full,
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 79, 152, 0.28)",
+  },
+  productRemoveDotPressed: {
+    backgroundColor: "rgba(255, 219, 236, 0.98)",
+  },
   productDropBadge: {
     position: "absolute",
     left: 4,

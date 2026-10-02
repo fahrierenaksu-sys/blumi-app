@@ -1,4 +1,5 @@
 import type Ionicons from "@expo/vector-icons/Ionicons"
+import { MAIN_TAB_ROUTE_NAMES } from "../../../navigation/mainTabPager/mainTabPagerConfig"
 import { getAppLocale, type AppLocale } from "../../session/appLocale"
 import type {
   FurnitureCategory,
@@ -18,6 +19,17 @@ import {
   shouldRenderShopContent,
   type ShopPresentationState
 } from "../shopPresentationModel"
+
+/**
+ * The Shop is a main tab, so its header has no back button. Only when a
+ * detail screen (the wardrobe, the room editor) pushed the Shop above itself
+ * does a back button return there. `routeNameBelow` is the stack route right
+ * under the Shop, or undefined when the Shop is the bottom route.
+ */
+export function shouldShowShopBackButton(routeNameBelow: string | undefined): boolean {
+  return routeNameBelow !== undefined &&
+    !(MAIN_TAB_ROUTE_NAMES as readonly string[]).includes(routeNameBelow)
+}
 
 export type ShopCategoryOption = {
   id: string
@@ -300,9 +312,102 @@ export function getShopShelfPageIndex(scrollOffset: number, shelfWidth: number, 
   return Math.max(0, Math.min(Math.floor(pageCount) - 1, index))
 }
 
-/** "2/3"; an empty shelf reads "1/1". */
+/** "2/3"; an empty shelf reads "1/1". Runs on the UI thread for the counter. */
 export function formatShopShelfCounter(pageIndex: number, pageCount: number): string {
+  "worklet"
   return `${pageIndex + 1}/${Math.max(1, pageCount)}`
+}
+
+/**
+ * The page a paged shelf will settle on when the finger lifts. A quick
+ * release (a flick) pages one step in the direction the content last moved;
+ * a slow release settles on the nearest page, like a paging scroll view.
+ * `lastDelta` is the last offset change, so the direction never depends on a
+ * platform's velocity sign; `releaseSpeed` is only compared by magnitude.
+ */
+export function getShopShelfReleasePageIndex(
+  scrollOffset: number,
+  shelfWidth: number,
+  pageCount: number,
+  lastDelta: number,
+  releaseSpeed: number
+): number {
+  "worklet"
+  if (!(shelfWidth > 0) || !(pageCount > 1) || !Number.isFinite(scrollOffset)) return 0
+  const position = scrollOffset / shelfWidth
+  // Points per millisecond; slower releases are not flicks.
+  const flick = Number.isFinite(releaseSpeed) && Math.abs(releaseSpeed) >= 0.1 && lastDelta !== 0
+  const index = flick
+    ? lastDelta > 0 ? Math.ceil(position) : Math.floor(position)
+    : Math.round(position)
+  return Math.max(0, Math.min(Math.floor(pageCount) - 1, index))
+}
+
+/**
+ * SHOP-4: the shelf counter's page, stepped by the shelf's scroll events on
+ * the UI thread. While a finger drags, the page follows the nearest page;
+ * when it lifts, the page jumps to where paging will settle, before the snap
+ * animation runs; when the momentum ends, the settled offset has the last
+ * word. Momentum frames never move the page, so it cannot flicker back.
+ */
+export interface ShopShelfPageTracker {
+  page: number
+  dragging: boolean
+  offset: number
+  lastDelta: number
+}
+
+export type ShopShelfScrollStep =
+  | { type: "begin_drag"; offset: number }
+  | { type: "scroll"; offset: number }
+  | { type: "end_drag"; offset: number; speed: number }
+  | { type: "momentum_end"; offset: number }
+  | { type: "jump"; page: number }
+
+export function createShopShelfPageTracker(page: number): ShopShelfPageTracker {
+  "worklet"
+  return { page, dragging: false, offset: 0, lastDelta: 0 }
+}
+
+export function stepShopShelfPageTracker(
+  tracker: ShopShelfPageTracker,
+  step: ShopShelfScrollStep,
+  shelfWidth: number,
+  pageCount: number
+): ShopShelfPageTracker {
+  "worklet"
+  if (step.type === "jump") {
+    const lastPage = Math.max(0, Math.floor(pageCount) - 1)
+    const page = Number.isFinite(step.page) ? Math.max(0, Math.min(lastPage, Math.round(step.page))) : 0
+    return { page, dragging: false, offset: tracker.offset, lastDelta: 0 }
+  }
+  const delta = step.offset - tracker.offset
+  const lastDelta = Number.isFinite(delta) && delta !== 0 ? delta : tracker.lastDelta
+  if (step.type === "begin_drag") {
+    return { page: tracker.page, dragging: true, offset: step.offset, lastDelta: 0 }
+  }
+  if (step.type === "scroll") {
+    return {
+      page: tracker.dragging ? getShopShelfPageIndex(step.offset, shelfWidth, pageCount) : tracker.page,
+      dragging: tracker.dragging,
+      offset: step.offset,
+      lastDelta
+    }
+  }
+  if (step.type === "end_drag") {
+    return {
+      page: getShopShelfReleasePageIndex(step.offset, shelfWidth, pageCount, lastDelta, step.speed),
+      dragging: false,
+      offset: step.offset,
+      lastDelta
+    }
+  }
+  return {
+    page: getShopShelfPageIndex(step.offset, shelfWidth, pageCount),
+    dragging: false,
+    offset: step.offset,
+    lastDelta
+  }
 }
 
 /** The page that holds `productId`, or -1. */

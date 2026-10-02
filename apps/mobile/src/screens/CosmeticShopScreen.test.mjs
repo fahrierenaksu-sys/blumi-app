@@ -43,3 +43,47 @@ test("unverified catalog cards show neutral pending status, not ownership or pri
   assert.equal(metaPill.props.children[0], null)
   assert.equal(metaPill.props.children[1].props.children, "Mağazan hazırlanıyor")
 })
+
+test("a worn card shows a labelled X that removes it without selecting the card", () => {
+  const declaration = cardFile.statements
+    .flatMap((entry) => ts.isVariableStatement(entry) ? entry.declarationList.declarations : [])
+    .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === "ShopProductCard")
+  const component = declaration.initializer.arguments[0]
+  const code = ts.transpileModule(`const renderCard = ${component.getText(cardFile)}; renderCard(input)`, {
+    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText
+  const product = { id: "avatar:glasses", sourceItemId: "glasses", previewType: "avatar", title: "Kalp gözlük", priceCoins: 90, owned: true }
+  const render = (removeAction, calls) => runInNewContext(code, {
+    exports: {}, require: () => ({ jsx, jsxs: jsx }),
+    input: {
+      product, selected: false, selectedCompact: true, inventoryVerified: true, pendingInventoryLabel: "",
+      cardWidth: 90, cardPadding: 6, thumbHeight: 60, locale: "tr", removeAction,
+      onSelectProduct: () => calls.push("select"), onRemoveProduct: (item) => calls.push(`remove:${item.id}`)
+    },
+    useCallback: (callback) => callback,
+    getShopCopy: () => ({ ownedCompact: "Sende", removeFromAvatar: (title) => `${title}: avatardan çıkar` }),
+    getShopProductPresentation: () => ({ stateLabel: "Sende" }),
+    getAvatarAutomationSlug: () => "glasses", formatCoins: String,
+    styles: {}, uiTheme: { colors: { successInk: "green" } },
+    PressableScale: "PressableScale", ShopCardSelectionRing: "Ring", ShopCardViewingBadge: "Badge",
+    ShopCardRemoveButton: "RemoveButton", View: "View", Text: "Text", Ionicons: "Icon", AvatarProductThumbnail: "Thumb"
+  })
+
+  const calls = []
+  const tree = render("unequip", calls)
+  const removeButton = tree.props.children.find((child) => child?.type === "RemoveButton")
+  assert.ok(removeButton, "the X renders on the card")
+  assert.equal(removeButton.props.accessibilityLabel, "Kalp gözlük: avatardan çıkar")
+  removeButton.props.onPress()
+  assert.deepEqual(calls, ["remove:avatar:glasses"], "the X never selects or buys")
+  // VoiceOver reads the card as one element: the X is also a named card action.
+  assert.deepEqual(JSON.parse(JSON.stringify(tree.props.accessibilityActions)), [{ name: "remove", label: "Kalp gözlük: avatardan çıkar" }])
+  tree.props.onAccessibilityAction({ nativeEvent: { actionName: "remove" } })
+  assert.deepEqual(calls, ["remove:avatar:glasses", "remove:avatar:glasses"])
+
+  for (const hidden of ["none", undefined]) {
+    const plain = render(hidden, [])
+    assert.equal(plain.props.children.some((child) => child?.type === "RemoveButton"), false)
+    assert.equal(plain.props.accessibilityActions, undefined)
+  }
+})
