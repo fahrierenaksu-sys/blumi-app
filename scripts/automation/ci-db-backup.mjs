@@ -234,6 +234,26 @@ export function backupConfiguration(env, purpose = "backup") {
   return { enabled: true, message: `Database ${purpose} is configured.` }
 }
 
+/**
+ * Picks the backup artifact to restore from the repository's artifact list
+ * (one API object per line). On a public repository a fork's pull request
+ * run can upload an artifact with the same name, so only artifacts whose run
+ * belongs to this repository, with this repository as its head, count.
+ * Returns the newest matching workflow run id, or the requested one.
+ */
+export function pickBackupArtifact(artifactLines, { repositoryId, runId = "" }) {
+  if (!/^\d+$/.test(String(repositoryId ?? ""))) throw new SafeError("Restore refused: the repository id is unknown.")
+  if (runId && !/^\d+$/.test(runId)) throw new SafeError("Restore refused: backup_run_id must be a number.")
+  const artifacts = artifactLines.split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
+  const own = artifacts.filter((artifact) => artifact.name === "blumi-db-backup" && !artifact.expired &&
+    String(artifact.workflow_run?.repository_id) === String(repositoryId) &&
+    String(artifact.workflow_run?.head_repository_id) === String(repositoryId))
+    .filter((artifact) => !runId || String(artifact.workflow_run.id) === runId)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+  if (!own.length) throw new SafeError("No unexpired blumi-db-backup artifact from this repository was found. Run the Database backup workflow first.")
+  return String(own[0].workflow_run.id)
+}
+
 async function main([command, ...args]) {
   const pgBin = process.env.BLUMI_PG17_BIN || "/usr/lib/postgresql/17/bin"
   if (command === "config") {
@@ -241,6 +261,10 @@ async function main([command, ...args]) {
     console.log(enabled ? message : `::notice title=Backup off::${message}`)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `enabled=${enabled}\n`)
     if (!enabled) summary([`> ${message}`])
+  } else if (command === "pick-artifact") {
+    const runId = pickBackupArtifact(readFileSync(0, "utf8"), { repositoryId: process.env.GITHUB_REPOSITORY_ID, runId: args[0] ?? "" })
+    console.log(`Using the backup from workflow run ${runId}.`)
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${runId}\n`)
   } else if (command === "backup") {
     const outDir = resolve(args[0] ?? "")
     const manifest = await createBackup({ outDir, pgBin })
@@ -267,7 +291,7 @@ async function main([command, ...args]) {
       `- restored ${result.tables} tables; migration ledger ${result.ledgerRows} rows, latest \`${result.latestMigration}\``,
       "", "| table | rows |", "|---|---|", ...Object.entries(result.tableRows).map(([table, rows]) => `| ${table} | ${rows} |`)])
   } else {
-    throw new SafeError("Usage: ci-db-backup.mjs config backup|restore | backup <out-dir> | restore-proof <artifact-dir> <work-dir>")
+    throw new SafeError("Usage: ci-db-backup.mjs config backup|restore | backup <out-dir> | pick-artifact [run-id] | restore-proof <artifact-dir> <work-dir>")
   }
 }
 

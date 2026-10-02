@@ -7,7 +7,7 @@ import test from "node:test"
 import YAML from "yaml"
 import {
   ARCHIVE_NAME, backupConfiguration, connectionEnvironment, createBackupFrom, decryptBackup,
-  decryptFile, encryptFile, failureCategory, restoreAndSmoke
+  decryptFile, encryptFile, failureCategory, pickBackupArtifact, restoreAndSmoke
 } from "./ci-db-backup.mjs"
 
 const root = new URL("../../", import.meta.url)
@@ -165,6 +165,26 @@ test("client errors are reduced to a category that never repeats their text", ()
   assert.match(category, /authentication/)
   assert.ok(!category.includes(REF) && !category.includes("supabase"))
   assert.match(failureCategory('ERROR: secret row "+905551112233"'), /withheld/)
+})
+
+test("the restore proof picks only this repository's own backup artifacts", () => {
+  const artifact = (runId, createdAt, headRepositoryId = 7, extra = {}) => JSON.stringify({
+    name: "blumi-db-backup", expired: false, created_at: createdAt,
+    workflow_run: { id: runId, repository_id: 7, head_repository_id: headRepositoryId }, ...extra
+  })
+  const lines = [
+    artifact(11, "2026-10-01T02:20:00Z"),
+    artifact(12, "2026-10-02T02:20:00Z"),
+    artifact(99, "2026-10-03T09:00:00Z", 555), // a fork's pull request run
+    artifact(13, "2026-10-04T02:20:00Z", 7, { expired: true })
+  ].join("\n")
+  assert.equal(pickBackupArtifact(lines, { repositoryId: "7" }), "12")
+  assert.equal(pickBackupArtifact(lines, { repositoryId: "7", runId: "11" }), "11")
+  for (const runId of ["99", "13", "1 || true"]) {
+    assert.throws(() => pickBackupArtifact(lines, { repositoryId: "7", runId }))
+  }
+  assert.throws(() => pickBackupArtifact(lines, { repositoryId: "" }), /repository id/)
+  assert.throws(() => pickBackupArtifact("", { repositoryId: "7" }), /No unexpired/)
 })
 
 const gpgAvailable = spawnSync("gpg", ["--version"]).status === 0

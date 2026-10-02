@@ -77,19 +77,8 @@ jobs:
           BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
         run: |
           set -euo pipefail
-          if [ -n "$BACKUP_RUN_ID" ] && ! [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "::error::backup_run_id must be a number."
-            exit 1
-          fi
-          run_id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?name=blumi-db-backup&per_page=100" \
-            --jq '.artifacts[] | select(.expired | not) | [.created_at, (.workflow_run.id | tostring)] | @tsv' \
-            | sort -r | awk -F'\t' -v want="$BACKUP_RUN_ID" '!found && (want == "" || $2 == want) { print $2; found = 1 }')"
-          if [ -z "$run_id" ]; then
-            echo "::error::No unexpired blumi-db-backup artifact was found. Run the Database backup workflow first."
-            exit 1
-          fi
-          echo "Using the backup from workflow run $run_id."
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?name=blumi-db-backup&per_page=100" --jq '.artifacts[] | tojson' \
+            | node scripts/automation/ci-db-backup.mjs pick-artifact "$BACKUP_RUN_ID"
 
       - uses: actions/download-artifact@v4
         if: steps.configured.outputs.enabled == 'true'
