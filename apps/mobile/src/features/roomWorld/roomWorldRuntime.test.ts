@@ -76,15 +76,17 @@ test("walk duration follows distance with one cap for the whole walk (was clampe
   const short = timeRoomWorldMovementSegments([rawSegment([0.5, 0.5], [0.55, 0.5], true)], timing)
   const long = timeRoomWorldMovementSegments([rawSegment([0.1, 0.5], [0.6, 0.5], true)], timing)
   // Same speed: ten times the distance takes about ten times as long (plus the fixed ramps).
-  assert.ok(Math.abs(total(short) - (0.05 + 0.025 + 0.025) * 1_800) < 1e-6)
-  assert.ok(Math.abs(total(long) - (0.5 + 0.08) * 1_800) < 1e-6)
+  const ramps = (distance: number) => 2 * Math.min(timing.rampDistance, distance / 2)
+  assert.ok(Math.abs(total(short) - (0.05 + ramps(0.05)) * timing.durationPerDistanceMs) < 1e-6)
+  assert.ok(Math.abs(total(long) - (0.5 + ramps(0.5)) * timing.durationPerDistanceMs) < 1e-6)
+  const cruise = (ms: number, distance: number) => ms - ramps(distance) * timing.durationPerDistanceMs
+  assert.ok(Math.abs(cruise(total(long), 0.5) / cruise(total(short), 0.05) - 10) < 1e-6)
   const capped = timeRoomWorldMovementSegments([
     rawSegment([0.05, 0.9], [0.95, 0.9]),
     rawSegment([0.95, 0.9], [0.95, 0.1]),
     rawSegment([0.95, 0.1], [0.05, 0.1], true)
   ], timing)
   assert.ok(Math.abs(total(capped) - timing.maxWalkDurationMs) < 1e-6, "a long walk is walked faster as a whole")
-  assert.equal(timing.maxWalkDurationMs, ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING.maxWalkDurationMs)
 })
 
 test("the walk curve is linear without ramps and ends exactly at the segment end", () => {

@@ -106,6 +106,42 @@ const UI_TO_FEATURES_BASELINE = [
   "src/ui/participantAvatar.tsx -> src/features/chat/chatParticipantAvatar"
 ]
 
+const TEST_FILE = /\.test\.[cm]?[jt]sx?$/
+
+// The shared room renders only the server-accepted shared decor (or the
+// explicit default), never the viewer's personal local room.
+test("the shared room never reads the viewer's personal room state or storage", () => {
+  const edges = collectImports("").filter((edge) =>
+    !TEST_FILE.test(edge.from) &&
+    (edge.from.startsWith("src/features/miniRoom/") || edge.from === "src/screens/MiniRoomScreen.tsx")
+  )
+  const offenders = edges.filter((edge) =>
+    edge.to === "src/features/roomV2/state/RoomV2Provider" ||
+    edge.to === "src/features/roomV2/roomV2Persistence"
+  )
+  assert.deepEqual(describe(offenders), [], "use resolveSharedRoomDecor for the shared room")
+})
+
+// Home Studio QA bitmaps and candidate assets must never reach the production
+// or preview graph. Only the QA feature itself may import them, and the QA
+// screen is reachable only through the Metro-routed live module.
+test("Home Studio QA bindings and screen stay behind the QA module routing", () => {
+  const edges = collectImports("").filter((edge) => !TEST_FILE.test(edge.from))
+  const qaAssetOffenders = edges.filter((edge) =>
+    (edge.to === "src/features/roomStudio/roomStudioQaAssetBindings" ||
+      edge.to.startsWith("src/features/roomStudio/assets/qa/")) &&
+    !edge.from.startsWith("src/features/roomStudio/") &&
+    edge.from !== "src/screens/HomeStudioScreen.tsx"
+  )
+  assert.deepEqual(describe(qaAssetOffenders), [], "QA bitmaps stay inside the Home Studio QA feature")
+
+  const screenOffenders = edges.filter((edge) =>
+    edge.to === "src/screens/HomeStudioScreen" &&
+    !edge.from.startsWith("src/features/roomStudio/homeStudioQaLiveModule/")
+  )
+  assert.deepEqual(describe(screenOffenders), [], "import Home Studio through @blumi/home-studio-qa")
+})
+
 test("src/ui -> src/features imports only shrink against the recorded baseline", () => {
   const actual = describe(importsInto(collectImports("ui"), "features"))
   const baseline = [...UI_TO_FEATURES_BASELINE].sort()

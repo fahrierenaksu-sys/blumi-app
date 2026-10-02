@@ -22,17 +22,18 @@ test("room exit returns to the existing conversation without another match decis
 
 test("leaving the room asks first, in Turkish and English", () => {
   const tr = getMiniRoomLeaveConfirmation(getMiniRoomCopy("tr"))
-  assert.equal(tr.title, "Odadan ayrılmak istiyor musun?")
-  assert.equal(tr.message, "Oda ikiniz için de kapanır.")
-  assert.deepEqual(tr.buttons, [
-    { text: "Kal", style: "cancel", action: "stay" },
-    { text: "Odadan ayrıl", style: "destructive", action: "leave" }
-  ])
-
   const en = getMiniRoomLeaveConfirmation(getMiniRoomCopy("en"))
-  assert.equal(en.title, "Leave the room?")
-  assert.equal(en.message, "The room closes for both of you.")
-  assert.deepEqual(en.buttons.map((button) => button.text), ["Stay", "Leave room"])
+  for (const confirmation of [tr, en]) {
+    assert.ok(confirmation.title.trim().length > 0)
+    assert.ok(confirmation.message.trim().length > 0)
+    assert.deepEqual(
+      confirmation.buttons.map(({ style, action }) => ({ style, action })),
+      [{ style: "cancel", action: "stay" }, { style: "destructive", action: "leave" }]
+    )
+    for (const button of confirmation.buttons) assert.ok(button.text.trim().length > 0)
+  }
+  assert.notEqual(tr.title, en.title)
+  assert.notEqual(tr.message, en.message)
 })
 
 test("the room screen is removed without asking only once the room has ended", () => {

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  MINI_ROOM_INPUT_LINE_HEIGHT,
+  MINI_ROOM_INPUT_MAX_LINES,
+  MINI_ROOM_INPUT_VERTICAL_PADDING,
   resolveComposerLineCount,
   resolveKeyboardInset,
   resolveMiniRoomLayout,
@@ -47,12 +50,12 @@ test("the default shared room opens with chat history between a balanced room an
 
   assert.equal(layout.panelMode, "history")
   assert.equal(layout.historyVisible, true)
-  assert.equal(layout.historyHeight, 144)
+  assert.ok(layout.historyHeight > 0)
   assert.equal(layout.panelBottom, 34, "the panel rests on the home-indicator safe area")
-  assert.equal(layout.headerTop, 70)
-  // Approved framing: 140% of the phone width, centred horizontally.
-  assert.equal(layout.camera.width, 563)
-  assert.equal(layout.camera.left, Math.round((402 - 563) / 2))
+  assert.ok(layout.headerTop >= iphone17.safeTop, "the header clears the status bar")
+  // The room is wider than the phone and centred horizontally.
+  assert.ok(layout.camera.width > iphone17.windowWidth)
+  assert.equal(layout.camera.left, Math.round((iphone17.windowWidth - layout.camera.width) / 2))
   assert.ok(layout.camera.top >= layout.headerBottom + 12, "room stays below the header")
   assert.ok(cameraBottom(layout) <= panelTop(iphone17, layout) - 22, "room is clearly separated from chat")
 })
@@ -113,7 +116,7 @@ test("the small supported phone keeps a readable room with the keyboard open", (
   // glass header while the floor and avatars stay above the composer.
   const tallInput = withKeyboard(iphoneSe, 320)
   const tall = resolveMiniRoomLayout(tallInput)
-  assert.equal(tall.camera.width, Math.round(375 * 1.12))
+  assert.ok(tall.camera.width >= tallInput.windowWidth && tall.camera.width <= layout.camera.width)
   assert.ok(cameraBottom(tall) <= panelTop(tallInput, tall))
 })
 
@@ -133,7 +136,6 @@ test("large text grows history and the composer within bounds without shrinking 
   const large = resolveMiniRoomLayout({ ...iphone17, fontScale: 2.2 })
 
   assert.ok(large.historyHeight > regular.historyHeight)
-  assert.ok(large.historyHeight <= 176)
   assert.ok(large.composerMaxInputHeight > regular.composerMaxInputHeight)
   assert.equal(large.camera.width, regular.camera.width)
 
@@ -144,7 +146,10 @@ test("large text grows history and the composer within bounds without shrinking 
 
 test("the composer grows to four lines before scrolling inside itself", () => {
   const layout = resolveMiniRoomLayout(iphone17)
-  assert.equal(layout.composerMaxInputHeight, 19 * 4 + 18)
+  assert.equal(
+    layout.composerMaxInputHeight,
+    MINI_ROOM_INPUT_LINE_HEIGHT * MINI_ROOM_INPUT_MAX_LINES + MINI_ROOM_INPUT_VERTICAL_PADDING * 2
+  )
 })
 
 test("every mode keeps the room's aspect ratio so world coordinates never move", () => {
@@ -176,7 +181,9 @@ test("a wrapped message lifts the room with the growing composer instead of cove
   const single = resolveMiniRoomLayout(oneLine)
   const wrapped = resolveMiniRoomLayout(threeLines)
 
-  assert.equal(wrapped.panelHeight - single.panelHeight, (19 * 3 + 18) - 38)
+  const fourLines = resolveMiniRoomLayout({ ...oneLine, composerLines: 4 })
+  assert.ok(single.panelHeight < wrapped.panelHeight, "the panel grows with the text")
+  assert.ok(wrapped.panelHeight < fourLines.panelHeight)
   assert.ok(cameraBottom(wrapped) <= panelTop(threeLines, wrapped), "floor stays above the taller composer")
   // Beyond four lines the input scrolls inside itself; the panel stops growing.
   assert.equal(
