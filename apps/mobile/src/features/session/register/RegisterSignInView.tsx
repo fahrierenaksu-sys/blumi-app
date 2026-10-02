@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useMemo, type ReactNode } from "react"
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,6 +8,7 @@ import {
   Text,
   View
 } from "react-native"
+import Animated from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import type { useEntranceAnimation, useSelectionTransition } from "../../../ui/animations"
 import { SoftBlobBackground } from "../../../ui/backgrounds"

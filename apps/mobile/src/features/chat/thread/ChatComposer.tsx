@@ -5,7 +5,8 @@ import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanima
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
-import { animateTo, MOTION_PRESS_SCALE, useMotion } from "../../../ui/motion"
+import { animateTo, useMotion } from "../../../ui/motion"
+import { PressableScale } from "../../../ui/PressableScale"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
@@ -62,18 +63,8 @@ export function ChatComposer({
     return true
   }
 
-  // UI-thread springs; Reduce Motion keeps the button still (the haptic stays).
-  const handleSendPressIn = () => {
-    if (motion.reduceMotion) return
-    sendScale.value = animateTo(MOTION_PRESS_SCALE, motion.press)
-  }
-
-  const handleSendPressOut = () => {
-    if (motion.reduceMotion) return
-    sendScale.value = animateTo(1, motion.press)
-  }
-
-  // An accepted send answers with a small pop back to rest.
+  // PressableScale owns the press feel; an accepted send answers with a
+  // small pop back to rest. Reduce Motion keeps it still (the haptic stays).
   const popSendButton = () => {
     if (motion.reduceMotion) return
     sendScale.value = SEND_POP_SCALE
@@ -118,7 +109,7 @@ export function ChatComposer({
           />
         </View>
         <Animated.View style={sendScaleStyle}>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
@@ -126,8 +117,7 @@ export function ChatComposer({
               if (handleSend()) popSendButton()
               draftTyping?.endDraft()
             }}
-            onPressIn={handleSendPressIn}
-            onPressOut={handleSendPressOut}
+            pressedScale={0.96}
             disabled={isSendDisabled}
             style={({ pressed }) => [
               styles.sendButton,
@@ -147,7 +137,7 @@ export function ChatComposer({
             >
               <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
-          </Pressable>
+          </PressableScale>
         </Animated.View>
       </View>
     </SafeAreaView>

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react"
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from "react-native"
+import { useEffect, useState } from "react"
+import { AccessibilityInfo, StyleSheet, Text, View } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
-import { useReducedMotion } from "../../../ui/animations"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { uiTheme } from "../../../ui/theme"
 import { getAppLocale } from "../../session/appLocale"
 import { getConnectionBannerLabel } from "./connectionBannerCopy"
@@ -23,9 +24,10 @@ interface ConnectionBannerProps {
 export function ConnectionBanner({ status }: ConnectionBannerProps) {
   const bannerState = useConnectionBannerState(status)
   const insets = useSafeAreaInsets()
-  const reduceMotion = useReducedMotion()
+  const motion = useMotion()
+  const { reduceMotion } = motion
   const [locale] = useState(getAppLocale)
-  const progress = useRef(new Animated.Value(0)).current
+  const progress = useSharedValue(0)
   const visible = bannerState !== "hidden"
   // The pill stays mounted; while it fades out it keeps its last message.
   const [lastVisibleState, setLastVisibleState] = useState<VisibleBannerState>("reconnecting")
@@ -39,20 +41,14 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
   }, [bannerState, locale])
 
   useEffect(() => {
-    if (reduceMotion) {
-      progress.stopAnimation()
-      progress.setValue(visible ? 1 : 0)
-      return undefined
-    }
-    const animation = Animated.timing(progress, {
-      toValue: visible ? 1 : 0,
-      duration: visible ? 220 : 160,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [progress, reduceMotion, visible])
+    // Fades in (and drops 6 pt) when a problem shows, fades out when it
+    // clears; Reduce Motion keeps only the fade.
+    progress.value = animateTo(visible ? 1 : 0, visible ? motion.fadeIn : motion.fadeOut)
+  }, [motion, progress, visible])
+  const pillMotionStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: reduceMotion ? 0 : (1 - progress.value) * -6 }]
+  }))
 
   const label = getConnectionBannerLabel(displayedState, locale)
   const isWarning = displayedState !== "reconnecting"
@@ -72,12 +68,7 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
         style={[
           styles.pill,
           isWarning ? styles.pillWarning : styles.pillNeutral,
-          {
-            opacity: progress,
-            transform: [{
-              translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] })
-            }]
-          }
+          pillMotionStyle
         ]}
       >
         <View style={[styles.dot, isWarning ? styles.dotWarning : styles.dotNeutral]} />

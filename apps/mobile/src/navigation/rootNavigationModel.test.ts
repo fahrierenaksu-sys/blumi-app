@@ -47,10 +47,16 @@ test("detail screens open with the platform push so the edge swipe-back closes t
   assert.equal(ROOT_STACK_SCREEN_OPTIONS.animation, "fade")
 })
 
+test("faded routes close with the same fade when swiped back", () => {
+  assert.equal(ROOT_STACK_SCREEN_OPTIONS.animation, "fade")
+  assert.equal(ROOT_STACK_SCREEN_OPTIONS.animationMatchesGesture, true)
+})
+
 test("only the chat thread closes with a full-screen swipe, with or without motion", () => {
+  // iOS runs the full-screen swipe as a simple push, so the thread opens with it too.
   assert.deepEqual(CHAT_THREAD_SCREEN_OPTIONS, {
     headerShown: false,
-    animation: "default",
+    animation: "simple_push",
     fullScreenGestureEnabled: true
   })
   assert.deepEqual(getChatThreadScreenOptions(false), CHAT_THREAD_SCREEN_OPTIONS)

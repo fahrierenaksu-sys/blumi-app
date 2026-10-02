@@ -10,6 +10,7 @@
  * contract for actions, analytics attribution, and Reduce Motion.
  */
 import type { AppLocale } from "../session/appLocale"
+import { MOTION_DURATIONS, MOTION_SPRINGS, type MotionSpringToken } from "../../ui/motionTokens"
 import { getMatchResultCopy } from "./matchResultCopy"
 
 export const MATCH_RESULT_ENTRY_POINTS = ["connection_modal", "discovery_route"] as const
@@ -135,46 +136,14 @@ export function getDiscoveryMatchCreatedProperties(
   return { source: "discovery", mode }
 }
 
-/**
- * One spring in both vocabularies: `tension`/`friction` for the React Native
- * Animated (native driver) surfaces that play it today, and the equivalent
- * `damping`/`stiffness`/`mass` for a Reanimated `withSpring` port.
- */
-export interface MatchEntranceSpring {
-  readonly tension: number
-  readonly friction: number
-  readonly damping: number
-  readonly stiffness: number
-  readonly mass: number
-}
-
-/** React Native's own origami conversion (Libraries/Animated/SpringConfig). */
-export function springFromOrigami(tension: number, friction: number): MatchEntranceSpring {
-  const roundTo2 = (value: number): number => Math.round(value * 100) / 100
-  return {
-    tension,
-    friction,
-    damping: roundTo2((friction - 8) * 3 + 25),
-    stiffness: roundTo2((tension - 30) * 3.62 + 194),
-    mass: 1
-  }
-}
-
-// Damping ratio ≈ 0.76: a hint of overshoot on a 0.92 → 1 settle.
-const ENTRANCE_SPRING_TENSION = 70
-const ENTRANCE_SPRING_FRICTION = 9
+// The card settles from just below size with the celebration spring
+// (motion token `bouncy`: a visible, short overshoot).
 const ENTRANCE_FROM_SCALE = 0.92
 const ENTRANCE_OPACITY_MS = 220
-const REDUCED_CROSSFADE_MS = 160
+const REDUCED_CROSSFADE_MS = MOTION_DURATIONS.crossfade
 const CONTENT_STAGGER_MS = 70
 const HEART_PULSE_ITERATIONS = 2
 const HALO_PULSE_ITERATIONS = 2
-
-// Frozen and shared so the value keeps one identity across renders (it sits in
-// hook dependency lists) and callers cannot mutate it.
-const MATCH_ENTRANCE_SPRING: MatchEntranceSpring = Object.freeze(
-  springFromOrigami(ENTRANCE_SPRING_TENSION, ENTRANCE_SPRING_FRICTION)
-)
 
 interface MatchCelebrationMotionBase {
   confetti: boolean
@@ -186,14 +155,14 @@ interface MatchCelebrationMotionBase {
   entranceOpacityDurationMs: number
   /** Delay between the headline group and the avatar row. */
   contentStaggerMs: number
-  /** Finite pulse counts (RN Animated.loop `iterations`); 0 means no pulse. */
+  /** Finite pulse counts; 0 means no pulse. */
   heartPulseIterations: number
   haloPulseIterations: number
 }
 
 /** Under Reduce Motion there is no spring: no scale movement, only the crossfade. */
 export type MatchCelebrationMotion =
-  | (MatchCelebrationMotionBase & { entranceSpring: true; entranceSpringConfig: MatchEntranceSpring })
+  | (MatchCelebrationMotionBase & { entranceSpring: true; entranceSpringConfig: MotionSpringToken })
   | (MatchCelebrationMotionBase & { entranceSpring: false; entranceSpringConfig: null })
 
 export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrationMotion {
@@ -220,7 +189,7 @@ export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrati
     entranceFromOpacity: 0,
     entranceFromScale: ENTRANCE_FROM_SCALE,
     entranceOpacityDurationMs: ENTRANCE_OPACITY_MS,
-    entranceSpringConfig: MATCH_ENTRANCE_SPRING,
+    entranceSpringConfig: MOTION_SPRINGS.bouncy,
     contentStaggerMs: CONTENT_STAGGER_MS,
     heartPulseIterations: HEART_PULSE_ITERATIONS,
     haloPulseIterations: HALO_PULSE_ITERATIONS

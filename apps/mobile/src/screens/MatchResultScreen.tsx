@@ -1,7 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -114,9 +113,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     }))
     heroScale.value = entranceSpring
       ? withDelay(timeline.heroDelayMs, withSpring(1, {
-        damping: entranceSpring.damping,
-        stiffness: entranceSpring.stiffness,
-        mass: entranceSpring.mass,
+        ...entranceSpring,
         reduceMotion: ReduceMotion.Never
       }))
       : 1
@@ -156,7 +153,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
       <SafeAreaView contentGutter style={styles.safe} edges={["top", "left", "right", "bottom"]}>
-        <Animated.View style={headerAnim}>
+        <Reanimated.View style={headerAnim}>
           <GlassHeader
             title={presentation.headline}
             eyebrow={presentation.eyebrow}
@@ -181,7 +178,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
               </ActionButtonCircle>
             }
           />
-        </Animated.View>
+        </Reanimated.View>
 
         <ReportModal
           visible={reportVisible}
@@ -197,9 +194,9 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
         >
           <Reanimated.View style={heroStyle}>
             <GlassCard tone="accent" style={styles.heroCard}>
-              <Animated.View style={[styles.matchHaloContainer, haloAnim]} pointerEvents="none">
+              <Reanimated.View style={[styles.matchHaloContainer, haloAnim]} pointerEvents="none">
                 <Ionicons name="heart" size={260} color="rgba(255, 79, 152, 0.16)" />
-              </Animated.View>
+              </Reanimated.View>
               <Text style={styles.heroTitle}>{presentation.title}</Text>
               <Text style={styles.heroBody}>{presentation.body}</Text>
               <View style={styles.avatarRow}>
@@ -233,7 +230,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
           </GlassCard>
         </ScrollView>
 
-        <Animated.View style={dockAnim}>
+        <Reanimated.View style={dockAnim}>
           <FloatingGlassDock style={styles.actionDock}>
             <GlassCTA
               label={sendMessageAction.label}
@@ -251,7 +248,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
               />
             </View>
           </FloatingGlassDock>
-        </Animated.View>
+        </Reanimated.View>
       </SafeAreaView>
     </View>
   )

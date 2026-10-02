@@ -786,7 +786,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               {CAN_REGISTER_HOME_STUDIO ? (
                 <Stack.Screen
                   name="HomeStudio"
-                  options={{ headerShown: false }}
+                  options={detailScreenOptions}
                 >
                   {(screenProps) => (
                     <homeStudioScreenBundle.DeferredScreen
@@ -812,7 +812,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
               <Stack.Screen
                 name="WardrobeV2"
                 component={wardrobeV2ScreenBundle.DeferredScreen}
-                options={{ headerShown: false }}
+                options={detailScreenOptions}
               />
               <Stack.Screen
                 name="MyRoomEditor"
