@@ -92,12 +92,42 @@ test("a startup failure drains and exits 1 through the same path", async () => {
   assert.deepEqual(reports, [["Blumi startup failed", "Error"]])
 })
 
-test("signals are handled once so a second signal keeps its default force-quit", () => {
-  const { target } = harness()
-  assert.equal(target.listenerCount("SIGTERM"), 1)
+test("repeated signals while stopping are ignored: one drain, one exit, listeners stay installed", async () => {
+  let release!: () => void
+  const { target, exits, exited, shutdowns } = harness(() => new Promise((resolve) => { release = resolve }))
   target.emit("SIGTERM")
-  assert.equal(target.listenerCount("SIGTERM"), 0)
+  // npm forwards SIGTERM and the platform signals the process group: node
+  // sees it twice. The second copy must never reach Node's default handler.
+  target.emit("SIGTERM")
+  target.emit("SIGINT")
+  assert.equal(target.listenerCount("SIGTERM"), 1)
   assert.equal(target.listenerCount("SIGINT"), 1)
   assert.equal(target.listenerCount("uncaughtException"), 1)
   assert.equal(target.listenerCount("unhandledRejection"), 1)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(shutdowns(), 1)
+  assert.deepEqual(exits, [])
+  release()
+  await exited
+  assert.deepEqual(exits, [0])
+})
+
+test("a shutdown that never settles is ended by the forced-exit backstop", async () => {
+  const target = new EventEmitter()
+  const exits: number[] = []
+  const reports: [string, string][] = []
+  let resolveExit!: () => void
+  const exited = new Promise<void>((resolve) => { resolveExit = resolve })
+  installProcessLifecycle({
+    process: target,
+    shutdown: () => new Promise(() => {}),
+    exit: (code) => { exits.push(code); resolveExit() },
+    reportError: (message, kind) => { reports.push([message, kind]) },
+    forcedExitAfterMs: 20
+  })
+  target.emit("SIGTERM")
+  target.emit("SIGTERM")
+  await exited
+  assert.deepEqual(exits, [1])
+  assert.deepEqual(reports, [["Blumi shutdown failed", "ForcedExitDeadline"]])
 })
