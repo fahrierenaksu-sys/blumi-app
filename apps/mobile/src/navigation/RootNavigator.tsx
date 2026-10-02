@@ -72,6 +72,7 @@ import {
 } from "./rootNavigationModel"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
+import { FlightLayer } from "../ui/flight/FlightLayer"
 import { ToastContainer, showToast } from "../ui/toast"
 import { getDailyRewardToastCopy } from "../features/inventory/dailyRewardCopy"
 import { getAppLocale } from "../features/session/appLocale"
@@ -106,6 +107,11 @@ import {
 } from "./mainTabPager/mainTabPagerConfig"
 import { MainTabPager, type MainTabPageProps } from "./mainTabPager/MainTabPager"
 import { withMainTabPagerRouter } from "./mainTabPager/mainTabPagerRouter"
+import { NativeSheetRoute } from "./nativeSheets/NativeSheetRoute"
+import {
+  getNativeSheetScreenOptions,
+  type NativeSheetRouteParams
+} from "./nativeSheets/nativeSheetModel"
 import {
   renderMainTabPage as renderMainTabPageWith,
   type MainTabPageDependencies
@@ -233,6 +239,11 @@ export type RootStackParamList = {
     match: BlumiMatch
     celebrate?: boolean
   }
+  /**
+   * iOS form sheet over the current screen (navigation/nativeSheets). Ids
+   * only: the sheet's props stay in memory with the screen that opened it.
+   */
+  NativeSheet: NativeSheetRouteParams
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -274,6 +285,15 @@ export function RootNavigator() {
   const reduceMotion = useReducedMotion()
   const reducedMotionScreenOptions = getReducedMotionScreenOptions(reduceMotion)
   const detailScreenOptions = getDetailScreenOptions(reduceMotion)
+  const nativeSheetScreenOptions = useCallback(
+    ({ route }: { route: { params?: NativeSheetRouteParams } }) => getNativeSheetScreenOptions({
+      kind: route.params?.sheet,
+      reduceMotion,
+      backgroundColor: uiTheme.colors.background,
+      cornerRadius: uiTheme.radius.xl
+    }),
+    [reduceMotion]
+  )
   const {
     sessionActor,
     hasSeenIntro,
@@ -885,6 +905,11 @@ export function RootNavigator() {
                 component={legalScreenBundle.DeferredScreen}
                 options={detailScreenOptions}
               />
+              <Stack.Screen
+                name="NativeSheet"
+                component={NativeSheetRoute}
+                options={nativeSheetScreenOptions}
+              />
             </>
           ) : sessionEntryRoute === "AuthEntry" ? (
             <>
@@ -964,6 +989,11 @@ export function RootNavigator() {
                 name="Legal"
                 component={legalScreenBundle.DeferredScreen}
                 options={detailScreenOptions}
+              />
+              <Stack.Screen
+                name="NativeSheet"
+                component={NativeSheetRoute}
+                options={nativeSheetScreenOptions}
               />
             </>
           ) : onboardingEntryRoute && sessionActor ? (
@@ -1090,6 +1120,7 @@ export function RootNavigator() {
         isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
         onBottomNavPress={handleBottomNavPress}
       />
+      <FlightLayer />
       <ToastContainer />
     </View>
     </DiscoveryStartupBoundary>

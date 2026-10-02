@@ -8,6 +8,7 @@
  * - Threshold crossing (Discover card drag) → hapticSelection, once per
  *   crossing; re-arms when the drag returns inside the threshold.
  * - Primary button / CTA press               → hapticLight
+ * - Chat message sent                       → hapticSelection
  * - Like / pass commit                      → hapticLight
  * - Placing / dropping a piece (valid)      → hapticLight
  * - Mic toggle                              → hapticLight

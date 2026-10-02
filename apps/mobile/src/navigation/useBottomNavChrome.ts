@@ -25,6 +25,7 @@ import { MAIN_TAB_PAGER_ENABLED } from "./mainTabPager/mainTabPagerConfig"
 import { requestMainTabPagerPage } from "./mainTabPager/mainTabPagerController"
 import { shouldDispatchMainTabNavigation } from "./rootNavigationModel"
 import { navigationRef } from "./rootNavigationRef"
+import { getRootRouteBeneathSheets } from "./nativeSheets/rootRouteBeneathSheets"
 import type { RootStackParamList } from "./RootNavigator"
 
 interface BottomNavChromeInput {
@@ -52,7 +53,7 @@ export function useBottomNavChrome({
   dismissGlobalMatch
 }: BottomNavChromeInput) {
   const syncCurrentRouteName = useCallback((): void => {
-    const currentRoute = navigationRef.getCurrentRoute()
+    const currentRoute = getRootRouteBeneathSheets()
     const routeName = currentRoute?.name as keyof RootStackParamList | undefined
     const shopParams = currentRoute?.params as RootStackParamList["CosmeticShop"]
     const previousSnapshot = getRootNavigationChromeSnapshot()

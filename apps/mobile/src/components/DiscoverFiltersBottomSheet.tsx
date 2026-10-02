@@ -1,14 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View
 } from "react-native"
-import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { DiscoveryFilters } from "@blumi/contracts"
 import { DEFAULT_DISCOVERY_FILTERS } from "../features/discovery/discoveryFiltersModel"
@@ -27,7 +25,10 @@ import {
 import { getDiscoveryHomeCopy } from "../features/discovery/discoveryHomeCopy"
 import { getAppLocale } from "../features/session/appLocale"
 import { PrimaryButton } from "../ui/primitives"
-import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
+import { SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
+import { ModalBottomSheet } from "../ui/ModalBottomSheet"
+import { useSheetPresentation } from "../ui/sheetPresentation"
+import { useNativeSheet } from "../navigation/nativeSheets/useNativeSheet"
 import { hapticSelection } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
 import { DiscoverAgeRangeSlider } from "./DiscoverAgeRangeSlider"
@@ -43,23 +44,54 @@ interface DiscoverFiltersBottomSheetProps {
   onApply: (filters: DiscoverFilters) => void
 }
 
+export interface DiscoverFiltersSheetContentProps {
+  initialFilters: DiscoverFilters
+  onApply: (filters: DiscoverFilters) => void
+}
+
 /**
- * Discover preferences: who you see and their age range. Fields the sheet
- * does not show (legacy vibes) pass through every edit, Reset and Apply
- * unchanged (discoveryFiltersSheetModel).
+ * Discover preferences, presented as a native form sheet on iOS and as the
+ * app's swipe-down sheet elsewhere (navigation/nativeSheets). `visible` shows
+ * it, `onClose` reports a dismissal.
  */
 export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProps) {
   const { visible, initialFilters, onClose, onApply } = props
-  const [draftFilters, setDraftFilters] = useState<DiscoverFilters>(initialFilters)
   const insets = useSafeAreaInsets()
+  const copy = getDiscoveryHomeCopy(getAppLocale()).filters
+  const presentsNatively = useNativeSheet(
+    "discoverFilters",
+    visible ? { initialFilters, onApply } : null,
+    onClose
+  )
+  if (presentsNatively) return null
+  return (
+    <ModalBottomSheet
+      visible={visible}
+      onClose={onClose}
+      backdrop={{
+        style: styles.backdrop,
+        onPress: onClose,
+        accessibilityLabel: copy.closeAccessibilityLabel
+      }}
+      sheetStyle={[styles.sheet, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }]}
+    >
+      <DiscoverFiltersSheetContent initialFilters={initialFilters} onApply={onApply} />
+    </ModalBottomSheet>
+  )
+}
+
+/**
+ * Who you see and their age range. Fields the sheet does not show (legacy
+ * vibes) pass through every edit, Reset and Apply unchanged
+ * (discoveryFiltersSheetModel). The draft starts from `initialFilters` each
+ * time the sheet is presented.
+ */
+export function DiscoverFiltersSheetContent(props: DiscoverFiltersSheetContentProps) {
+  const { initialFilters, onApply } = props
+  const [draftFilters, setDraftFilters] = useState<DiscoverFilters>(initialFilters)
+  const { close } = useSheetPresentation()
   const { width: windowWidth, fontScale } = useWindowDimensions()
   const copy = getDiscoveryHomeCopy(getAppLocale()).filters
-
-  useEffect(() => {
-    if (visible) {
-      setDraftFilters(initialFilters)
-    }
-  }, [initialFilters, visible])
 
   const audience = getDiscoveryAudience(draftFilters.genders)
   const canReset = hasVisibleDiscoveryFilterChanges(draftFilters)
@@ -87,139 +119,121 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <GestureHandlerRootView style={styles.overlay}>
-        <SwipeDismissSheet
-          onDismiss={onClose}
-          backdrop={{
-            style: styles.backdrop,
-            onPress: onClose,
-            accessibilityLabel: copy.closeAccessibilityLabel
-          }}
-          grabber
-          accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }]}
+    <>
+      <View style={styles.sheetGlow} pointerEvents="none" />
+      <View style={styles.toolbar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.closeAccessibilityLabel}
+          style={({ pressed }) => [styles.closeButton, pressed ? styles.closeButtonPressed : null]}
+          onPress={() => close()}
         >
-          <View style={styles.sheetGlow} pointerEvents="none" />
-          <View style={styles.toolbar}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={copy.closeAccessibilityLabel}
-              style={({ pressed }) => [styles.closeButton, pressed ? styles.closeButtonPressed : null]}
-              onPress={onClose}
-            >
-              <Ionicons accessible={false} name="close" size={22} color={uiTheme.colors.secondaryText} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={copy.resetAccessibilityLabel}
-              accessibilityState={{ disabled: !canReset }}
-              disabled={!canReset}
-              style={({ pressed }) => [styles.resetButton, pressed ? styles.resetButtonPressed : null]}
-              onPress={() => {
-                hapticSelection()
-                setDraftFilters(resetVisibleDiscoveryFilters)
-              }}
-            >
-              <Text style={[styles.resetText, canReset ? null : styles.resetTextDisabled]}>
-                {copy.reset}
-              </Text>
-            </Pressable>
-          </View>
+          <Ionicons accessible={false} name="close" size={22} color={uiTheme.colors.secondaryText} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.resetAccessibilityLabel}
+          accessibilityState={{ disabled: !canReset }}
+          disabled={!canReset}
+          style={({ pressed }) => [styles.resetButton, pressed ? styles.resetButtonPressed : null]}
+          onPress={() => {
+            hapticSelection()
+            setDraftFilters(resetVisibleDiscoveryFilters)
+          }}
+        >
+          <Text style={[styles.resetText, canReset ? null : styles.resetTextDisabled]}>
+            {copy.reset}
+          </Text>
+        </Pressable>
+      </View>
 
-          <SwipeDismissSheetScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
+      <SwipeDismissSheetScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.titleBlock}>
+          <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.showMe}</Text>
+          <View style={stackAudience ? styles.audienceList : styles.segmentTrack}>
+            {DISCOVERY_AUDIENCE_OPTIONS.map((option) => {
+              const selected = option === audience
+              const optionCopy = audienceLabels[option]
+              return (
+                <Pressable
+                  key={option}
+                  accessibilityRole="button"
+                  accessibilityLabel={optionCopy.accessibilityLabel}
+                  accessibilityState={{ selected }}
+                  style={({ pressed }) => stackAudience
+                    ? [
+                        styles.audienceRow,
+                        selected ? styles.audienceRowSelected : null,
+                        pressed && !selected ? styles.audienceRowPressed : null
+                      ]
+                    : [
+                        styles.segment,
+                        selected ? styles.segmentSelected : null,
+                        pressed && !selected ? styles.segmentPressed : null
+                      ]}
+                  onPress={() => selectAudience(option)}
+                >
+                  <Text
+                    style={[
+                      stackAudience ? styles.audienceRowText : styles.segmentText,
+                      selected ? styles.optionTextSelected : null
+                    ]}
+                  >
+                    {optionCopy.label}
+                  </Text>
+                  {stackAudience && selected ? (
+                    <Ionicons accessible={false} name="checkmark" size={22} color={uiTheme.colors.primaryDeep} />
+                  ) : null}
+                </Pressable>
+              )
+            })}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View
+            style={styles.sectionHeader}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={copy.ageRangeAccessibilityLabel(draftFilters.ageMin, draftFilters.ageMax)}
           >
-            <View style={styles.titleBlock}>
-              <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
-              <Text style={styles.subtitle}>{copy.subtitle}</Text>
-            </View>
-
-            <View style={styles.sectionCard}>
-              <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.showMe}</Text>
-              <View style={stackAudience ? styles.audienceList : styles.segmentTrack}>
-                {DISCOVERY_AUDIENCE_OPTIONS.map((option) => {
-                  const selected = option === audience
-                  const optionCopy = audienceLabels[option]
-                  return (
-                    <Pressable
-                      key={option}
-                      accessibilityRole="button"
-                      accessibilityLabel={optionCopy.accessibilityLabel}
-                      accessibilityState={{ selected }}
-                      style={({ pressed }) => stackAudience
-                        ? [
-                            styles.audienceRow,
-                            selected ? styles.audienceRowSelected : null,
-                            pressed && !selected ? styles.audienceRowPressed : null
-                          ]
-                        : [
-                            styles.segment,
-                            selected ? styles.segmentSelected : null,
-                            pressed && !selected ? styles.segmentPressed : null
-                          ]}
-                      onPress={() => selectAudience(option)}
-                    >
-                      <Text
-                        style={[
-                          stackAudience ? styles.audienceRowText : styles.segmentText,
-                          selected ? styles.optionTextSelected : null
-                        ]}
-                      >
-                        {optionCopy.label}
-                      </Text>
-                      {stackAudience && selected ? (
-                        <Ionicons accessible={false} name="checkmark" size={22} color={uiTheme.colors.primaryDeep} />
-                      ) : null}
-                    </Pressable>
-                  )
-                })}
-              </View>
-            </View>
-
-            <View style={styles.sectionCard}>
-              <View
-                style={styles.sectionHeader}
-                accessible
-                accessibilityRole="header"
-                accessibilityLabel={copy.ageRangeAccessibilityLabel(draftFilters.ageMin, draftFilters.ageMax)}
-              >
-                <Text style={styles.sectionTitle}>{copy.ageRange}</Text>
-                <Text style={styles.sectionValue}>
-                  {formatDiscoveryAgeRange(draftFilters.ageMin, draftFilters.ageMax)}
-                </Text>
-              </View>
-              <DiscoverAgeRangeSlider
-                ageMin={draftFilters.ageMin}
-                ageMax={draftFilters.ageMax}
-                minimumAccessibilityLabel={copy.minimumAge}
-                maximumAccessibilityLabel={copy.maximumAge}
-                onChange={changeAge}
-              />
-            </View>
-          </SwipeDismissSheetScrollView>
-
-          <View style={styles.footer}>
-            <PrimaryButton
-              label={copy.apply}
-              onPress={() => {
-                onApply(draftFilters)
-              }}
-            />
+            <Text style={styles.sectionTitle}>{copy.ageRange}</Text>
+            <Text style={styles.sectionValue}>
+              {formatDiscoveryAgeRange(draftFilters.ageMin, draftFilters.ageMax)}
+            </Text>
           </View>
-        </SwipeDismissSheet>
-      </GestureHandlerRootView>
-    </Modal>
+          <DiscoverAgeRangeSlider
+            ageMin={draftFilters.ageMin}
+            ageMax={draftFilters.ageMax}
+            minimumAccessibilityLabel={copy.minimumAge}
+            maximumAccessibilityLabel={copy.maximumAge}
+            onChange={changeAge}
+          />
+        </View>
+      </SwipeDismissSheetScrollView>
+
+      <View style={styles.footer}>
+        <PrimaryButton
+          label={copy.apply}
+          onPress={() => {
+            onApply(draftFilters)
+          }}
+        />
+      </View>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: uiTheme.colors.overlaySoft,
