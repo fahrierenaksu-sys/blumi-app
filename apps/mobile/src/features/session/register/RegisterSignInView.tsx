@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useMemo, type ReactNode } from "react"
 import {
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import type { useEntranceAnimation, useSelectionTransition } from "../../../ui/a
 import { SoftBlobBackground } from "../../../ui/backgrounds"
 import { BrandMark } from "../../../ui/brandMark"
 import { GlassCard, GlassPill } from "../../../ui/glass"
+import { AppKeyboardAvoidingView } from "../../../ui/keyboard"
 import { PrimaryButton } from "../../../ui/primitives"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
@@ -114,10 +114,7 @@ export function RegisterSignInView({
         animated={motionActive}
       />
       <SafeAreaView contentGutter={false} style={styles.safe}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.flex}
-        >
+        <AppKeyboardAvoidingView style={styles.flex}>
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -330,7 +327,7 @@ export function RegisterSignInView({
               />
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </AppKeyboardAvoidingView>
         <AccountRecoveryModal
           recovery={recovery}
           recoveryCopy={recoveryCopy}

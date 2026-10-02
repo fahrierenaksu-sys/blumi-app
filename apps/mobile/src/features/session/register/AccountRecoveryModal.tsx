@@ -1,8 +1,6 @@
 import { useEffect } from "react"
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -10,6 +8,7 @@ import {
   View
 } from "react-native"
 import { hapticError } from "../../../ui/haptics"
+import { AppKeyboardAvoidingView } from "../../../ui/keyboard"
 import type { AccountRecoveryCopy } from "../accountRecoveryCopy"
 import {
   resolveRecoveryPrimaryControl,
@@ -58,9 +57,8 @@ export function AccountRecoveryModal({
   return (
     <Modal visible={recoveryVisible} transparent animationType="fade" onRequestClose={closeRecovery}>
       <View style={styles.recoveryBackdrop}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+        <AppKeyboardAvoidingView
+          keyboardVerticalOffset={12}
           style={styles.recoveryKeyboard}
         >
           <ScrollView
@@ -86,7 +84,7 @@ export function AccountRecoveryModal({
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </AppKeyboardAvoidingView>
       </View>
     </Modal>
   )

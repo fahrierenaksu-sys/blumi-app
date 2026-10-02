@@ -188,3 +188,51 @@ export function getSetupTransitionFrame(
     )
   }
 }
+
+/**
+ * How far the setup column has made room for the keyboard: 0 the open
+ * layout, 1 the keyboard layout. It follows the keyboard (UI thread). Only
+ * the visible step follows it, so hidden layers never re-layout behind it
+ * (ONB-08); Reduce Motion switches at half way instead of gliding.
+ */
+export function getSetupKeyboardAmount(
+  keyboardOpen: number,
+  active: boolean,
+  reduceMotion: boolean
+): number {
+  "worklet"
+  if (!active || !Number.isFinite(keyboardOpen)) return 0
+  const amount = Math.max(0, Math.min(1, keyboardOpen))
+  if (reduceMotion) return amount >= 0.5 ? 1 : 0
+  return amount
+}
+
+/** The panel is gone by this share of the collapse, before its space closes. */
+const SETUP_COLLAPSE_FADE_END = 0.6
+
+/**
+ * A panel that collapses for the keyboard (the stage, or the heading): its
+ * height closes with the keyboard, it fades out a little ahead, and the gap
+ * after it closes too. Unmeasured, it keeps its own height. UI thread.
+ */
+export function getSetupCollapsibleSlotStyle(
+  collapse: number,
+  naturalHeight: number,
+  gapAfter: number
+): { height?: number; opacity: number; marginBottom: number } {
+  "worklet"
+  const amount = Math.max(0, Math.min(1, Number.isFinite(collapse) ? collapse : 0))
+  const opacity = Math.max(0, 1 - amount / SETUP_COLLAPSE_FADE_END)
+  if (naturalHeight <= 0) return { opacity, marginBottom: 0 }
+  return {
+    height: naturalHeight * (1 - amount),
+    opacity,
+    marginBottom: -gapAfter * amount
+  }
+}
+
+/** Value at `amount` (0 to 1) of the way from `from` to `to`. UI thread. */
+export function mixSetupKeyboardValue(from: number, to: number, amount: number): number {
+  "worklet"
+  return from + (to - from) * amount
+}
