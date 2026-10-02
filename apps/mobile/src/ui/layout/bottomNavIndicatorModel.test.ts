@@ -1,19 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-  BOTTOM_NAV_LIQUID_MAX_STRETCH,
-  createBottomNavLiquidSample,
-  easeBottomNavLiquidStretch,
-  getBottomNavIndicatorSpeed,
   getBottomNavItemEmphasis,
-  getBottomNavLiquidStretch,
   publishMainTabPagerIndicator,
-  readMainTabPagerIndicatorProgress,
+  readMainTabPagerIndicatorTarget,
   resolveBottomNavIndicatorIndex,
   resolveMainTabPagerIndicatorSample,
-  shouldAnimateBottomNavSelectionFromJs,
-  stepBottomNavLiquidSample,
-  type BottomNavLiquidSample,
+  shouldPlaceBottomNavSelectionFromJs,
   type MainTabPagerIndicatorValues
 } from "./bottomNavIndicatorModel"
 
@@ -23,10 +16,10 @@ function createIndicator(): MainTabPagerIndicatorValues {
   return { progress: { value: 0 }, tracking: { value: false }, selection: { value: -1 } }
 }
 
-test("a selection the pager already showed on the UI thread is not animated again from JS", () => {
-  assert.equal(shouldAnimateBottomNavSelectionFromJs(2, 2), false, "a pager tap moved the pill already")
-  assert.equal(shouldAnimateBottomNavSelectionFromJs(-1, 2), true, "no pager (rollback path): JS animates")
-  assert.equal(shouldAnimateBottomNavSelectionFromJs(1, 2), true, "the pager shows another page: JS follows the route")
+test("a selection the pager already showed on the UI thread is not placed again from JS", () => {
+  assert.equal(shouldPlaceBottomNavSelectionFromJs(2, 2), false, "a pager tap moved the pill already")
+  assert.equal(shouldPlaceBottomNavSelectionFromJs(-1, 2), true, "no pager (rollback path): JS places it")
+  assert.equal(shouldPlaceBottomNavSelectionFromJs(1, 2), true, "the pager shows another page: JS follows the route")
 })
 
 test("the pager publishes its fractional page only while a drag or settle moves it", () => {
@@ -51,63 +44,28 @@ test("the pager publishes its fractional page only while a drag or settle moves 
   )
 })
 
-test("the bar reads the pager position only while the pager is tracking", () => {
+test("the pill follows the pages while they move and sits on the selected page otherwise", () => {
   const indicator = createIndicator()
-  assert.equal(readMainTabPagerIndicatorProgress(indicator), null)
-  publishMainTabPagerIndicator(indicator, { progress: 1.4, tracking: true })
-  assert.equal(readMainTabPagerIndicatorProgress(indicator), 1.4)
-  publishMainTabPagerIndicator(indicator, { progress: 1.9, tracking: true })
-  assert.equal(readMainTabPagerIndicatorProgress(indicator), 1.9)
-  publishMainTabPagerIndicator(indicator, { progress: 2, tracking: false })
-  assert.equal(readMainTabPagerIndicatorProgress(indicator), null)
-  assert.equal(indicator.progress.value, 1.9, "a snap does not overwrite the last tracked position")
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), null, "no pager: the bar follows its route")
+  indicator.selection.value = 0
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 0)
+  publishMainTabPagerIndicator(indicator, { progress: 0.4, tracking: true })
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 0.4, "a finger drag moves the pill 1:1")
+  indicator.selection.value = 1
+  publishMainTabPagerIndicator(indicator, { progress: 0.9996, tracking: true })
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 0.9996, "the settle that finishes the drag still tracks")
+  publishMainTabPagerIndicator(indicator, { progress: 1, tracking: false })
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 1, "at rest the pill sits exactly on the page")
+  assert.equal(indicator.progress.value, 0.9996, "a snap does not overwrite the last tracked position")
 })
 
-test("the liquid pill rests at 1, stretches with speed in either direction, and is capped", () => {
-  assert.equal(getBottomNavLiquidStretch(0), 1)
-  assert.equal(getBottomNavLiquidStretch(Number.NaN), 1)
-  const slow = getBottomNavLiquidStretch(1)
-  const fast = getBottomNavLiquidStretch(4)
-  assert.ok(slow > 1 && fast > slow, "faster swipes stretch more")
-  assert.equal(getBottomNavLiquidStretch(-4), fast, "direction does not matter")
-  assert.equal(getBottomNavLiquidStretch(1000), 1 + BOTTOM_NAV_LIQUID_MAX_STRETCH)
-  assert.ok(1 + BOTTOM_NAV_LIQUID_MAX_STRETCH < 1.5, "never wide enough to cover half a neighbour")
-})
-
-test("indicator speed comes from two frames, and frames too close give none", () => {
-  assert.equal(getBottomNavIndicatorSpeed(0.5, 125), 4)
-  assert.equal(getBottomNavIndicatorSpeed(-0.5, 125), -4)
-  assert.equal(getBottomNavIndicatorSpeed(0.1, 0), null)
-  assert.equal(getBottomNavIndicatorSpeed(0.1, -16), null)
-  assert.equal(getBottomNavIndicatorSpeed(Number.NaN, 16), null)
-})
-
-test("the pill's speed follows frame timestamps, so a frame with two changes is no spike", () => {
-  // A steady 2 tabs/s swipe sampled at 120 Hz frames.
-  const frameMs = 1000 / 120
-  let sample: BottomNavLiquidSample = createBottomNavLiquidSample(1)
-  const step = (index: number, time: number) => {
-    const result = stepBottomNavLiquidSample(sample, index, time)
-    sample = result.next
-    return result.speed
-  }
-  assert.equal(step(1, 1000), null, "the first sample has no speed")
-  for (let frame = 1; frame <= 6; frame += 1) {
-    // Reactions run at uneven moments inside a frame; only the frame time counts.
-    const time = 1000 + frame * frameMs
-    const index = 1 + (2 * frame * frameMs) / 1000
-    // Two changes in one frame: the frame's final speed is still the steady one.
-    if (frame === 3) step(index - 0.008, time)
-    const speed = step(index, time)
-    assert.ok(speed !== null && Math.abs(speed - 2) < 1e-6, `frame ${frame}: steady speed, got ${speed}`)
-  }
-})
-
-test("the pill eases toward the speed's stretch and starts from its shape at rest", () => {
-  const fast = easeBottomNavLiquidStretch(1, 4)
-  assert.ok(fast > 1 && fast < getBottomNavLiquidStretch(4), "eases, never jumps to full stretch")
-  assert.ok(easeBottomNavLiquidStretch(fast, 4) > fast, "keeps stretching while the speed holds")
-  assert.equal(easeBottomNavLiquidStretch(Number.NaN, 0), 1)
+test("a tap lands the pill on the target at once: no tracking, no in-between positions", () => {
+  const indicator = createIndicator()
+  indicator.selection.value = 3
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 3)
+  // Shop -> Discover: the next value the bar reads is already Discover.
+  indicator.selection.value = 0
+  assert.equal(readMainTabPagerIndicatorTarget(indicator), 0)
 })
 
 test("the indicator stays on the bar through edge rubber bands", () => {

@@ -60,7 +60,8 @@ export const shopScreenStyles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.3)", // Liquid glass
     borderWidth: 1.5,
     borderColor: "rgba(255, 255, 255, 0.6)",
-    ...uiTheme.shadow.soft,
+    // No shadow: under a 30% background iOS would compute it from the
+    // pill's pixels on every frame; at 5% opacity it did not show.
   },
   coinPillAccessibility: {
     alignSelf: "flex-end"
@@ -82,8 +83,8 @@ export const shopScreenStyles = StyleSheet.create({
     backgroundColor: "rgba(255, 247, 252, 0.58)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.86)",
+    // Its own clip cuts any shadow off, so it carries none.
     overflow: "hidden",
-    ...uiTheme.shadow.soft,
   },
   closetBrowserCard: {
     gap: 6,
@@ -93,8 +94,8 @@ export const shopScreenStyles = StyleSheet.create({
     backgroundColor: "rgba(255, 250, 253, 0.58)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.86)",
+    // Its own clip cuts any shadow off, so it carries none.
     overflow: "hidden",
-    ...uiTheme.shadow.soft,
   },
   closetBrowserHeader: {
     minHeight: 34,

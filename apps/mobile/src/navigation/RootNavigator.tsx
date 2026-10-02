@@ -5,7 +5,7 @@ import type {
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { StyleSheet, View } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
@@ -634,6 +634,22 @@ export function RootNavigator() {
       sessionActor ? renderMainTabPage(sessionActor, pageRouteName, pageProps) : null,
     [renderMainTabPage, sessionActor]
   )
+  // Hoisted so a navigator render hands the stack and the pager slot the
+  // same options and bottom-bar elements (the memoised pager then skips).
+  const rootStackScreenOptions = useMemo(() => ({
+    ...ROOT_STACK_SCREEN_OPTIONS,
+    ...getReducedMotionScreenOptions(reduceMotion),
+    contentStyle: styles.screenContent
+  }), [reduceMotion])
+  const mainTabScreenOptions = useMemo(() => Object.fromEntries(MAIN_TAB_ROUTE_NAMES.map((routeName) => [routeName, {
+    ...MAIN_TAB_SCREEN_OPTIONS,
+    ...getReducedMotionScreenOptions(reduceMotion),
+    ...(routeName === "Lobby" ? { title: "Discover" } : null)
+  }])) as Record<MainTabRouteName, object>, [reduceMotion])
+  const mainTabBottomBars = useMemo(() => Object.fromEntries(MAIN_TAB_ROUTE_NAMES.map((routeName) => [
+    routeName,
+    <MainTabBottomBar key={routeName} routeName={routeName} onPress={handleBottomNavPress} />
+  ])) as Record<MainTabRouteName, ReactNode>, [handleBottomNavPress])
 
   const shouldShowBootPrelude =
     sessionEntryRoute === "Splash" ||
@@ -705,11 +721,7 @@ export function RootNavigator() {
                 ? getUnauthenticatedNavigatorInitialRoute()
                 : onboardingEntryRoute ?? undefined
           }
-          screenOptions={{
-            ...ROOT_STACK_SCREEN_OPTIONS,
-            ...reducedMotionScreenOptions,
-            contentStyle: styles.screenContent
-          }}
+          screenOptions={rootStackScreenOptions}
         >
           {isAccountRestricted && accountModeration ? (
             <>
@@ -746,23 +758,14 @@ export function RootNavigator() {
                 <Stack.Screen
                   key={routeName}
                   name={routeName}
-                  options={{
-                    ...MAIN_TAB_SCREEN_OPTIONS,
-                    ...reducedMotionScreenOptions,
-                    ...(routeName === "Lobby" ? { title: "Discover" } : null)
-                  }}
+                  options={mainTabScreenOptions[routeName]}
                 >
                   {(screenProps) => MAIN_TAB_PAGER_ENABLED ? (
                     <MainTabPager
                       navigation={screenProps.navigation}
                       route={screenProps.route}
                       renderPage={renderPagerPage}
-                      bottomBar={
-                        <MainTabBottomBar
-                          routeName={screenProps.route.name}
-                          onPress={handleBottomNavPress}
-                        />
-                      }
+                      bottomBar={mainTabBottomBars[screenProps.route.name as MainTabRouteName]}
                     />
                   ) : renderMainTabPage(sessionActor, routeName, screenProps)}
                 </Stack.Screen>

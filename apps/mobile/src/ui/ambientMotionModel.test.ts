@@ -1,6 +1,15 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { getPulseRestProgress, shouldRunSoftBlobLoop } from "./ambientMotionModel"
+import { foldSoftBlobOpacity, getPulseRestProgress, shouldRunSoftBlobLoop } from "./ambientMotionModel"
+
+test("a blob's view opacity folds into its colour's alpha, so the blob draws the same without group opacity", () => {
+  assert.equal(foldSoftBlobOpacity("#FFC8DF", 0.5), "rgba(255, 200, 223, 0.5)")
+  assert.equal(foldSoftBlobOpacity("#fff", 0.25), "rgba(255, 255, 255, 0.25)")
+  assert.equal(foldSoftBlobOpacity("rgba(247,196,207,0.46)", 0.5), "rgba(247, 196, 207, 0.23)")
+  assert.equal(foldSoftBlobOpacity("#B2418F80", 0.5), "rgba(178, 65, 143, 0.251)")
+  assert.equal(foldSoftBlobOpacity("#B2418F", 1), "#B2418F", "an opaque blob keeps its colour")
+  assert.equal(foldSoftBlobOpacity("plum", 0.5), null, "an unreadable colour keeps the view opacity")
+})
 
 const visible = { variant: "lobby" as const, animated: true, reduceMotion: false, screenFocused: true, appActive: true }
 

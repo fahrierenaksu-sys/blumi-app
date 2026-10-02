@@ -124,7 +124,13 @@ export function InboxScreen(props: InboxScreenProps) {
   // One UI-thread pulse shared by every unread row's glow.
   const unreadPulse = useSharedValue(1)
   const reduceMotion = useReducedMotion()
-  const threadKeys = useMemo(() => threads.map((thread) => thread.threadId), [threads])
+  // Keyed on the joined ids, not the thread objects: a store update that
+  // keeps the same conversations keeps getItemAnim and renderThreadRow.
+  const threadKeySignature = threads.map((thread) => thread.threadId).join("\u0000")
+  const threadKeys = useMemo(
+    () => (threadKeySignature === "" ? [] : threadKeySignature.split("\u0000")),
+    [threadKeySignature]
+  )
   // Keyed by thread id and stable across renders: a new thread enters alone.
   const getItemAnim = useInboxRowEntrance(threadKeys, reduceMotion)
   const isOpeningThreads = shouldShowInboxSkeleton(threadListState.status, threads.length)

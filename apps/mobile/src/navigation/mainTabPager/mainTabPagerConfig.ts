@@ -91,8 +91,19 @@ export const MAIN_TAB_PAGER_SPRING = Object.freeze({
 })
 
 /**
- * A never-visited swipe neighbour is mounted only after the selected page has
- * settled and this delay has passed (then on the next idle callback), so its
- * first render never competes with a settle animation or a tab switch.
+ * A released swipe commits its page to navigation when the settle spring
+ * ends (about 250 ms). Should that end never be reported, the page is
+ * committed this long after the release anyway.
  */
-export const MAIN_TAB_PAGER_NEIGHBOUR_MOUNT_DELAY_MS = 350
+export const MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS = 600
+
+/**
+ * After the shown page is up, every other page is mounted once, one page per
+ * idle slot: this delay, then the next idle callback. A slot never renders
+ * while a drag or settle moves the pages, so no first render competes with
+ * a swipe or a tab switch.
+ */
+export const MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS = 350
+
+/** A page that a drag had to mount while showing it fades its content in this fast. */
+export const MAIN_TAB_PAGE_FADE_IN_MS = 160

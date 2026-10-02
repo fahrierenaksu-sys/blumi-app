@@ -1009,9 +1009,9 @@ const styles = StyleSheet.create({
   stageCard: {
     alignItems: "center",
     justifyContent: "center",
+    // A rectangular clip only: roomStack already rounds these corners, and
+    // uneven per-corner radii here made iOS add a mask layer to the stage.
     overflow: "hidden",
-    borderTopLeftRadius: 33,
-    borderTopRightRadius: 33,
     backgroundColor: "#E8B698",
   },
   stageBackdrop: {

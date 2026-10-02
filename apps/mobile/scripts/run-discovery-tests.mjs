@@ -165,6 +165,7 @@ try {
       "--test",
       "src/features/discovery/screen/useDiscoveryDecisions.test.ts",
       "src/features/discovery/screen/useDiscoveryDeck.test.ts",
+      "src/features/discovery/screen/useDiscoveryFilters.test.ts",
       "src/features/discovery/discoverySwipeModel.test.ts",
       "src/features/discovery/copyLocaleParity.test.ts",
       "src/ui/preparedDiscoveryLoadingScreen.test.ts"

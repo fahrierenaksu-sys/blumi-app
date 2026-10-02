@@ -201,6 +201,7 @@ export function createFakeReactRuntime(): FakeReactRuntime {
       return slot.value
     },
     useTransition: () => [false, (work: () => void) => work()],
+    startTransition: (work: () => void) => work(),
     useDeferredValue: <T>(value: T) => value,
     useImperativeHandle: () => undefined,
     useDebugValue: () => undefined,

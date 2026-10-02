@@ -197,6 +197,26 @@ export function resolveDiscoveryFiltersForFocus(
   )
 }
 
+/** Same filter values (order of genders and vibes included). */
+export function areDiscoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters): boolean {
+  if (a === b) return true
+  return a.ageMin === b.ageMin &&
+    a.ageMax === b.ageMax &&
+    a.genders.length === b.genders.length &&
+    a.genders.every((gender, index) => gender === b.genders[index]) &&
+    a.vibes.length === b.vibes.length &&
+    a.vibes.every((vibe, index) => vibe === b.vibes[index])
+}
+
+/**
+ * Keeps `current` when `next` holds the same values, so a focus that reloads
+ * unchanged filters does not hand Discover a new object (which would clear
+ * the cards seen this session and rebuild the deck).
+ */
+export function keepEqualDiscoveryFilters<T extends DiscoveryFilters>(current: T, next: T): T {
+  return areDiscoveryFiltersEqual(current, next) ? current : next
+}
+
 /**
  * Filters count as ready only for the account they were hydrated for, so a
  * switched account never queries production discovery with the previous
