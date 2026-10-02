@@ -152,7 +152,10 @@ installs `pg_dump` 17, dumps the `public` schema with the conventions above
 (`--format=custom --schema=public --no-owner --no-acl`, read-only TLS session),
 checks it with `pg_restore --list`, encrypts it with gpg (AES256, symmetric
 passphrase) and uploads only the encrypted file and a manifest (both SHA-256
-values) as the private artifact `blumi-db-backup`, kept 14 days. The run
+values) as the artifact `blumi-db-backup`, kept 14 days. The repository is
+public, so any signed-in GitHub user can download that artifact and read the
+run logs: the passphrase is the only protection of the data, and the logs carry
+only hashes and counts. The run
 summary shows the SHA-256. It costs nothing on GitHub's free minutes.
 
 It is **off** until both secrets exist: without them every run succeeds and
@@ -185,7 +188,8 @@ Owner's one-time setup:
      GitHub runners have no IPv6, so the direct `db.…supabase.co` host fails,
      and port 6543 is refused.
    - `BLUMI_BACKUP_ENCRYPTION_KEY`: a random passphrase of at least 24
-     characters. Keep a copy in your password manager: without it no backup
+     characters (a generated 32+ character one is better, since the encrypted
+     file is downloadable by anyone). Keep a copy in your password manager: without it no backup
      can be opened.
 3. Actions → Database backup → Run workflow, then Actions → Database restore
    proof → Run workflow. The restore proof downloads the newest backup, checks
