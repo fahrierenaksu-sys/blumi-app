@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import { ScrollView, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { useReducedMotion } from "../ui/animations"
-import { useBottomPanelEntrance } from "../ui/bottomPanelEntrance"
+import { useBottomPanelEntranceProps } from "../ui/bottomPanelEntrance"
 import { WardrobeGlass } from "../features/avatarV2/wardrobe/WardrobeGlass"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
@@ -35,7 +35,6 @@ import {
   getRoomEditorStageFrame
 } from "../features/roomV2/editor/roomEditorDockModel"
 import {
-  ROOM_EDITOR_DOCK_LAYOUT,
   ROOM_EDITOR_FADE_IN,
   ROOM_EDITOR_FADE_OUT
 } from "../features/roomV2/editor/roomEditorMotion"
@@ -211,8 +210,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
 
   const dock = useRoomEditorDock()
   const reduceMotion = useReducedMotion()
-  const dockEntranceStyle = useBottomPanelEntrance(navigation, reduceMotion)
-  const dockLayout = reduceMotion ? undefined : ROOM_EDITOR_DOCK_LAYOUT
+  const dockEntrance = useBottomPanelEntranceProps(navigation, reduceMotion)
   const fadeIn = reduceMotion ? undefined : ROOM_EDITOR_FADE_IN
   const fadeOut = reduceMotion ? undefined : ROOM_EDITOR_FADE_OUT
 
@@ -305,7 +303,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             ) : null}
 
             <Animated.View
-              layout={dockLayout}
+              layout={dockEntrance.layout}
               style={styles.stageRegion}
               onLayout={dock.handleStageAreaLayout}
             >
@@ -365,7 +363,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             </Animated.View>
 
             {/* The dock rises softly into place when the editor opens (same entrance as the wardrobe panel). */}
-            <Animated.View layout={dockLayout} style={dockEntranceStyle}>
+            <Animated.View {...dockEntrance}>
               <WardrobeGlass
                 tone="panel"
                 radius={30}

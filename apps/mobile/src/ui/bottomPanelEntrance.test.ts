@@ -112,3 +112,103 @@ test("Reduce Motion: the panel is simply in place, with no rise and no fade", ()
   assert.equal(panel.offset(), 0)
   assert.equal(panel.navigation.listenerCount(), 0)
 })
+
+// ── One entrance for both panels ───────────────────────────────────────────
+
+function mountPanelProps(reduceMotion: boolean) {
+  const runtime = createFakeReactRuntime()
+  const reactNative = createReactNativeStub().module
+  const clock = createClockedReanimatedStub(runtime)
+  const entrance = loadSourceWithFakeReact<typeof Entrance>("ui/bottomPanelEntrance.ts", runtime, {
+    modules: {
+      "react-native-reanimated": clock.module,
+      "./motion": loadClockedMotion(runtime, clock.module, reactNative)
+    }
+  })
+  const navigation = fakeNavigation()
+  let props: { style: { opacity: number }; layout: unknown } | undefined
+  runtime.render(() => {
+    props = entrance.useBottomPanelEntranceProps(navigation, reduceMotion) as unknown as typeof props
+    return null
+  })
+  return { entrance, navigation, props: () => props! }
+}
+
+test("the panel props carry the rise and a layout glide; Reduce Motion drops the glide", () => {
+  const moving = mountPanelProps(false)
+  assert.ok(moving.props().layout, "the panel glides while its height settles")
+  assert.equal(moving.props().style.opacity, 0)
+  moving.navigation.emit(false)
+  mock.timers.tick(moving.entrance.BOTTOM_PANEL_ENTRANCE_MS)
+  assert.equal(moving.props().style.opacity, 1)
+
+  const still = mountPanelProps(true)
+  assert.equal(still.props().layout, undefined)
+  assert.equal(still.props().style.opacity, 1)
+})
+
+type ScreenElement = { type: unknown; props: Record<string, unknown> }
+
+function collectScreenElements(node: unknown, found: ScreenElement[] = []): ScreenElement[] {
+  if (Array.isArray(node)) {
+    for (const child of node) collectScreenElements(child, found)
+    return found
+  }
+  if (typeof node !== "object" || node === null || !("props" in node) || !("type" in node)) return found
+  const element = node as ScreenElement
+  found.push(element)
+  for (const value of Object.values(element.props ?? {})) {
+    if (Array.isArray(value) || (typeof value === "object" && value !== null && "props" in value)) {
+      collectScreenElements(value, found)
+    }
+  }
+  return found
+}
+
+/**
+ * Renders one screen with its dependencies inert except the shared entrance,
+ * which hands out marked props, and reports where those props land.
+ */
+function renderScreenEntrance(sourcePath: string, exportName: string) {
+  const runtime = createFakeReactRuntime()
+  const shared = { style: { marker: "shared rise" }, layout: { marker: "shared glide" } }
+  const calls: { navigation: unknown; reduceMotion: boolean }[] = []
+  const screen = loadSourceWithFakeReact<Record<string, (props: unknown) => unknown>>(sourcePath, runtime, {
+    inertUnknown: true,
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "../ui/animations": { useReducedMotion: () => false },
+      "../ui/bottomPanelEntrance": {
+        useBottomPanelEntranceProps: (navigation: unknown, reduceMotion: boolean) => {
+          calls.push({ navigation, reduceMotion })
+          return shared
+        }
+      }
+    }
+  })
+  const navigation = { addListener: () => () => undefined }
+  runtime.render(() => screen[exportName]!({ navigation, route: { key: "screen", name: exportName, params: {} } }))
+  const elements = collectScreenElements(runtime.output)
+  return {
+    navigation,
+    calls,
+    panels: elements.filter((element) => element.props.style === shared.style && element.props.layout === shared.layout),
+    gliding: elements.filter((element) => element.props.layout === shared.layout && element.props.style !== shared.style)
+  }
+}
+
+for (const [label, sourcePath, exportName] of [
+  ["the room editor", "screens/MyRoomEditorScreen.tsx", "MyRoomEditorScreen"],
+  ["the avatar wardrobe", "screens/WardrobeV2Screen.tsx", "WardrobeV2Screen"]
+] as const) {
+  test(`${label} raises its bottom panel with the shared entrance, and the region above glides with it`, () => {
+    const screen = renderScreenEntrance(sourcePath, exportName)
+    assert.ok(screen.calls.length > 0, "the screen asks the shared entrance")
+    for (const call of screen.calls) {
+      assert.equal(call.navigation, screen.navigation, "it listens to the screen's own transition")
+      assert.equal(call.reduceMotion, false)
+    }
+    assert.equal(screen.panels.length, 1, "the bottom panel takes the shared rise and glide")
+    assert.equal(screen.gliding.length, 1, "the region above the panel takes the same glide")
+  })
+}

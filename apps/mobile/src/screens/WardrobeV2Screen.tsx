@@ -9,7 +9,7 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { hapticSelection } from "../ui/haptics"
 import { useReducedMotion } from "../ui/animations"
-import { useBottomPanelEntrance } from "../ui/bottomPanelEntrance"
+import { useBottomPanelEntranceProps } from "../ui/bottomPanelEntrance"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   findAvatarStudioTab,
@@ -51,7 +51,8 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     getAvatarStudioDefaultCategory("closet")
   )
   const reduceMotion = useReducedMotion()
-  const panelEntranceStyle = useBottomPanelEntrance(navigation, reduceMotion)
+  // The room editor dock's entrance, from the same shared call.
+  const panelEntrance = useBottomPanelEntranceProps(navigation, reduceMotion)
   const {
     avatar,
     catalog,
@@ -158,7 +159,8 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           onDone={handleDone}
         />
 
-        <View style={styles.heroRegion}>
+        {/* Like the editor's room above its dock, the avatar glides while the panel settles. */}
+        <Animated.View layout={panelEntrance.layout} style={styles.heroRegion}>
           <WardrobePreviewStage
             avatar={stageAvatar}
             catalog={catalog}
@@ -180,10 +182,10 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
               <WardrobeSaveError message={saveIssue} />
             </View>
           ) : null}
-        </View>
+        </Animated.View>
 
-        {/* As the screen slides in, the panel rises softly into place, like the room editor's dock. */}
-        <Animated.View style={panelEntranceStyle}>
+        {/* As the screen slides in, the panel rises softly into place: the room editor dock's entrance. */}
+        <Animated.View {...panelEntrance}>
           <WardrobeGlass tone="panel" radius={30} style={styles.panelShell} contentStyle={styles.panelContent}>
             <WardrobeSectionSwitcher
               activeSection={activeSection}
