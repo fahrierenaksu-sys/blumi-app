@@ -7,6 +7,7 @@ import {
   initialWindowMetrics
 } from "react-native-safe-area-context"
 import { useFonts } from "expo-font"
+import * as SplashScreen from "expo-splash-screen"
 import { RootNavigator } from "./src/navigation/RootNavigator"
 import { AppKeyboardProvider } from "./src/ui/keyboard"
 import { useOtaUpdates } from "./src/features/appUpdates/useOtaUpdates"
@@ -66,7 +67,8 @@ function App() {
   return (
     <ErrorBoundary>
       {/* Required for Gesture Handler gestures (the main-page pager). */}
-      <GestureHandlerRootView style={styles.gestureRoot}>
+      {/* Reveal the native surface once laid out; RootNavigator owns boot readiness. */}
+      <GestureHandlerRootView style={styles.gestureRoot} onLayout={SplashScreen.hide}>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <AppKeyboardProvider>
             <QueryClientProvider client={queryClient}>
