@@ -23,7 +23,11 @@ import {
   getDefaultFurnitureRotation,
   getDefaultShopCategoryId,
   getPrimaryProductCategoryId,
+  getShopShelfCounterPage,
+  getShopShelfCounterTotal,
   getShopShelfMaxScrollOffset,
+  getShopShelfPageButtons,
+  getShopShelfScope,
   getShopSurfacePolicy,
   shouldShopShelfOwnHorizontalDrags,
   maskUnverifiedProductOwnership,
@@ -486,4 +490,77 @@ test("T-2: every shelf size hands drags past its ends to the main pager, from th
       }
     }
   }
+})
+
+// The counter the owner sees: digits and page buttons from the tracker, the
+// shelf on screen and its page count (the same functions the header uses).
+function readShelfCounter(tracker: ShopShelfPageTracker, scope: string, pageCount: number) {
+  const index = getShopShelfCounterPage(tracker, scope, pageCount)
+  return { text: formatShopShelfCounter(index, pageCount), ...getShopShelfPageButtons(index, pageCount) }
+}
+
+const OWNER_RAIL = { top: 16, bottom: 14, shoes: 8, accessory: 5, hair: 8 } as const
+
+test("the counter total is the selected category's pages, 4 cards a page", () => {
+  const totals = Object.fromEntries(Object.entries(OWNER_RAIL).map(([category, count]) => {
+    const pages = buildShopShelfPages(Array.from({ length: count }, (_, index) => ({ id: `${category}-${index}` })), 2)
+    const scope = getShopShelfScope("avatar", category)
+    return [category, readShelfCounter(createShopShelfPageTracker(0, scope), scope, pages.length).text]
+  }))
+  assert.deepEqual(totals, { top: "1/4", bottom: "1/4", shoes: "1/2", accessory: "1/2", hair: "1/2" })
+  const largeTextHair = buildShopShelfPages(Array.from({ length: 8 }, (_, index) => ({ id: `h${index}` })), 1)
+  assert.equal(formatShopShelfCounter(0, largeTextHair.length), "1/4", "Large Text: 2 cards a page")
+  assert.equal(getShopShelfCounterTotal(0), 1, "an empty category reads 1/1")
+  assert.equal(getShopShelfCounterTotal(Number.NaN), 1)
+})
+
+test("changing category shows page 1 of the new shelf at once, and the new shelf then pages", () => {
+  const width = 200
+  const top = getShopShelfScope("avatar", "top")
+  const hair = getShopShelfScope("avatar", "hair")
+  let tracker = createShopShelfPageTracker(0, top)
+  for (const step of [
+    { type: "jump", page: 3 }
+  ] as const) tracker = stepShopShelfPageTracker(tracker, step, width, 4)
+  assert.equal(readShelfCounter(tracker, top, 4).text, "4/4")
+  // Hair is selected: before the reset effect runs, the old tracker must not leak.
+  assert.deepEqual(readShelfCounter(tracker, hair, 2), { text: "1/2", canShowPrevious: false, canShowNext: true })
+  tracker = createShopShelfPageTracker(0, hair)
+  const seen: string[] = []
+  for (const step of [
+    { type: "begin_drag", offset: 0 },
+    { type: "scroll", offset: 60 },
+    { type: "end_drag", offset: 60, speed: 1.3 },
+    { type: "scroll", offset: 150 },
+    { type: "momentum_end", offset: 200 }
+  ] as ShopShelfScrollStep[]) {
+    tracker = stepShopShelfPageTracker(tracker, step, width, 2)
+    seen.push(readShelfCounter(tracker, hair, 2).text)
+  }
+  assert.deepEqual(seen, ["1/2", "1/2", "2/2", "2/2", "2/2"], "a swipe right shows 2/2 as the finger lifts")
+  assert.deepEqual(readShelfCounter(tracker, hair, 2), { text: "2/2", canShowPrevious: true, canShowNext: false })
+  assert.equal(readShelfCounter(tracker, getShopShelfScope("room", "hair"), 2).text, "1/2", "the mode is part of the shelf")
+})
+
+test("page buttons walk the shelf and are disabled at its ends", () => {
+  const scope = getShopShelfScope("avatar", "top")
+  let tracker = createShopShelfPageTracker(0, scope)
+  const press = (step: -1 | 1) => {
+    const index = getShopShelfCounterPage(tracker, scope, 4)
+    tracker = stepShopShelfPageTracker(tracker, { type: "jump", page: index + step }, 200, 4)
+    return readShelfCounter(tracker, scope, 4)
+  }
+  assert.deepEqual(readShelfCounter(tracker, scope, 4), { text: "1/4", canShowPrevious: false, canShowNext: true })
+  assert.deepEqual([press(1), press(1), press(1)].map((view) => view.text), ["2/4", "3/4", "4/4"])
+  assert.deepEqual(readShelfCounter(tracker, scope, 4), { text: "4/4", canShowPrevious: true, canShowNext: false })
+  assert.equal(press(1).text, "4/4", "next at the end stays on the last page")
+  assert.equal(press(-1).text, "3/4")
+  assert.deepEqual(getShopShelfPageButtons(0, 1), { canShowPrevious: false, canShowNext: false }, "1/1")
+  assert.deepEqual(getShopShelfPageButtons(0, 0), { canShowPrevious: false, canShowNext: false }, "empty")
+})
+
+test("a page from a longer shelf is clamped when the same shelf gets fewer pages", () => {
+  const scope = getShopShelfScope("avatar", "top")
+  const tracker = stepShopShelfPageTracker(createShopShelfPageTracker(0, scope), { type: "jump", page: 7 }, 100, 8)
+  assert.equal(readShelfCounter(tracker, scope, 4).text, "4/4", "Large Text off: 8 pages become 4")
 })

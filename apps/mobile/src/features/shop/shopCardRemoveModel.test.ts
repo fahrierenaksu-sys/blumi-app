@@ -4,7 +4,9 @@ import type { AvatarCatalogItem, UserAvatar } from "../avatarV2/avatarV2.types"
 import { previewAvatarShopItem } from "./shopAvatarDraft"
 import {
   applyShopCardRemoveAction,
-  getShopCardRemoveAction
+  canRemoveShopCombinationItem,
+  getShopCardRemoveAction,
+  removeShopCombinationItem
 } from "./shopCardRemoveModel"
 
 const SAVED: UserAvatar = {
@@ -75,6 +77,30 @@ test("a saved accessory is taken off the draft and the saved look, keeping other
 test("a saved accessory has no X when it cannot be saved or is not owned", () => {
   assert.equal(actionFor(earringsSaved, SAVED, { canSave: false }), "none", "offline or busy")
   assert.equal(actionFor(earringsSaved, SAVED, { owned: false }), "none", "ownership is never assumed")
+})
+
+test("an outfit row removes only a tried-on piece and puts the saved one back", () => {
+  const withTop = previewAvatarShopItem(SAVED, topNew, CATALOG)
+  const draft = previewAvatarShopItem(withTop, glassesNew, CATALOG)
+  assert.equal(canRemoveShopCombinationItem({ item: topNew, draft, equipped: SAVED }), true)
+  const withoutTop = removeShopCombinationItem({ item: topNew, draft, equipped: SAVED, catalog: CATALOG })
+  assert.equal(withoutTop?.topId, "top_saved", "the saved top is back")
+  assert.ok(withoutTop?.accessoryIds.includes("glasses_new"), "other tried-on pieces stay in the outfit")
+  const withoutGlasses = removeShopCombinationItem({ item: glassesNew, draft: withoutTop!, equipped: SAVED, catalog: CATALOG })
+  assert.deepEqual([...(withoutGlasses?.accessoryIds ?? [])].sort(), ["earrings_saved", "glasses_saved"])
+  assert.deepEqual(
+    { ...withoutGlasses, accessoryIds: [...(withoutGlasses?.accessoryIds ?? [])].sort() },
+    { ...SAVED, accessoryIds: [...SAVED.accessoryIds].sort() },
+    "removing every row returns the saved look"
+  )
+})
+
+test("an outfit row never changes the saved look", () => {
+  assert.equal(canRemoveShopCombinationItem({ item: earringsSaved, draft: SAVED, equipped: SAVED }), false, "saved accessory")
+  assert.equal(removeShopCombinationItem({ item: earringsSaved, draft: SAVED, equipped: SAVED, catalog: CATALOG }), null)
+  assert.equal(removeShopCombinationItem({ item: topSaved, draft: SAVED, equipped: SAVED, catalog: CATALOG }), null)
+  assert.equal(removeShopCombinationItem({ item: glassesNew, draft: SAVED, equipped: SAVED, catalog: CATALOG }), null, "not in the outfit")
+  assert.equal(removeShopCombinationItem({ item: undefined, draft: SAVED, equipped: SAVED, catalog: CATALOG }), null, "unknown piece")
 })
 
 test("required slots and items not on the avatar have no X", () => {

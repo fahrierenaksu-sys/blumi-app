@@ -14,7 +14,9 @@ import {
   buildShopShelfPages,
   createShopShelfPageTracker,
   findShopShelfPageIndex,
+  getShopShelfCounterPage,
   getShopShelfMaxScrollOffset,
+  getShopShelfScope,
   shouldShopShelfOwnHorizontalDrags,
   stepShopShelfPageTracker,
   type ShopCategoryOption
@@ -62,13 +64,16 @@ export function ClosetBrowser(props: {
   // first or last page belongs to the main pager (no JS per scroll frame).
   const shelfScrollOffset = useSharedValue(0)
   // SHOP-4: the counter's page, stepped by scroll events on the UI thread.
-  const shelfPageTracker = useSharedValue(createShopShelfPageTracker(0))
+  // The tracker belongs to one shelf (mode and category); the counter shows
+  // page 1 for any other shelf, so a category change never shows a stale page.
+  const shelfScope = getShopShelfScope(props.mode, props.activeCategoryId)
+  const shelfPageTracker = useSharedValue(createShopShelfPageTracker(0, shelfScope))
   useEffect(() => {
-    shelfPageTracker.value = createShopShelfPageTracker(0)
+    shelfPageTracker.value = createShopShelfPageTracker(0, shelfScope)
     // A jump to an offset the shelf already has emits no scroll event.
     shelfScrollOffset.value = 0
     productScrollerRef.current?.scrollToOffset({ offset: 0, animated: false })
-  }, [props.activeCategoryId, props.mode, shelfPageTracker, shelfScrollOffset])
+  }, [shelfScope, shelfPageTracker, shelfScrollOffset])
   const productPages = useMemo(
     () => buildShopShelfPages(props.products, catalog.accessibilityLayout ? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE),
     [catalog.accessibilityLayout, props.products]
@@ -124,10 +129,10 @@ export function ClosetBrowser(props: {
   }, [pageCount, productShelfWidth, shelfPageTracker])
   // Page buttons step from the page the counter shows; Reduce Motion jumps.
   const showRelativeShelfPage = useCallback((step: -1 | 1): void => {
-    const pageIndex = shelfPageTracker.value.page
+    const pageIndex = getShopShelfCounterPage(shelfPageTracker.value, shelfScope, pageCount)
     const nextPageIndex = Math.max(0, Math.min(pageCount - 1, pageIndex + step))
     if (nextPageIndex !== pageIndex) scrollShelfToPage(nextPageIndex, !reduceMotion)
-  }, [pageCount, reduceMotion, scrollShelfToPage, shelfPageTracker])
+  }, [pageCount, reduceMotion, scrollShelfToPage, shelfPageTracker, shelfScope])
   // SHOP-2: re-tapping the selected Shop tab returns the shelf to its first page.
   const scrollShelfToStart = useCallback((): void => {
     scrollShelfToPage(0, !reduceMotion)
@@ -204,6 +209,7 @@ export function ClosetBrowser(props: {
         </View>
         <ShopShelfPagination
           tracker={shelfPageTracker}
+          scope={shelfScope}
           pageCount={pageCount}
           previousLabel={copy.previousPage}
           nextLabel={copy.nextPage}
