@@ -34,7 +34,7 @@ test("the bottom panel rises and fades in on the UI thread, ignoring Reanimated'
   assert.ok(calls.includes("reduceMotion:never"))
   const initial = calls.find((call) => call.startsWith("withInitialValues:"))
   assert.ok(initial, "the panel starts below its resting place")
-  const values = JSON.parse(initial.slice("withInitialValues:".length)) as { opacity: number; transform: Array<{ translateY: number }> }
+  const values = JSON.parse(initial.slice("withInitialValues:".length)) as { opacity: number; transform: { translateY: number }[] }
   assert.equal(values.opacity, 0)
   assert.ok(values.transform[0]!.translateY > 0)
 })
