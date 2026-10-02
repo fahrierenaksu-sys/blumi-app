@@ -222,6 +222,9 @@ export function createRealtimeServer(
   })
   const handleAccessRevocation = (revocation: RealtimeAccessRevocation, origin: "local" | "remote") => {
     authorizationCache.invalidate(revocation)
+    // Cached HTTP bearer sessions follow the same revocations, including
+    // ones forwarded from another instance.
+    options.authService.invalidateCachedSessions?.(revocation)
     // Other instances drop their cached decision too (fanout control channel).
     if (origin === "local") void connectionManager.publishAccessRevocation(revocation)
     if (closing || revocation.kind !== "user") return

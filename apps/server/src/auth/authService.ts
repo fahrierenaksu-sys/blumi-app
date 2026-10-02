@@ -17,6 +17,7 @@ import {
   type RealtimeAccessRevocation,
   type RealtimeAccessRevocationListener
 } from "./realtimeAccessRevocation"
+import { createSessionCache, withSessionCacheInvalidation, type ResolvedSession } from "./sessionCache"
 import {
   checkRealtimeSessions,
   type RealtimeSessionDecision,
@@ -172,6 +173,11 @@ export interface AuthService {
    * tokens on it (firebaseSessionRevocation.ts).
    */
   subscribeSessionReuse(listener: (userId: string) => void): () => void
+  /**
+   * Drops cached bearer sessions after a revocation announced elsewhere
+   * (moderation, or another instance over the fanout control channel).
+   */
+  invalidateCachedSessions?(revocation: RealtimeAccessRevocation): void
 }
 
 export interface AccountDataExport {
@@ -202,12 +208,21 @@ export interface CreateAuthServiceOptions {
   otpHmacSecret?: string | Buffer
   accountDeletionHandlers?: Array<(account: AccountRecord) => Promise<void>>
   accountDataExporter?: AccountDataExporter
+  /**
+   * Bearer session cache TTL (sessionCache.ts). Off (0) by default; the
+   * production wiring (config.ts) turns it on.
+   */
+  sessionCacheTtlMs?: number
 }
 
 export function createAuthService(options: CreateAuthServiceOptions = {}): AuthService {
   const store = options.store ?? createBlumiBackendStore()
-  const repository =
-    options.repository ?? createInMemoryAuthRepository(store)
+  const sessionCache = createSessionCache({ ttlMs: options.sessionCacheTtlMs ?? 0 })
+  // Every write through the repository invalidates cached sessions first.
+  const repository = withSessionCacheInvalidation(
+    options.repository ?? createInMemoryAuthRepository(store),
+    sessionCache
+  )
   const smsProvider = options.smsProvider ?? createDevelopmentSmsProvider()
   const codeFactory = options.codeFactory ?? createSixDigitCode
   const otpHmacSecret = options.otpHmacSecret ?? randomBytes(32)
@@ -215,6 +230,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
   const accountDeletionHandlers = options.accountDeletionHandlers ?? []
   const accountDataExporter = options.accountDataExporter ?? createEmptyAccountDataExporter()
   const realtimeAccessRevocations = createRealtimeAccessRevocationChannel()
+  realtimeAccessRevocations.subscribeRealtimeAccessRevocations((revocation) => sessionCache.invalidate(revocation))
   const sessionReuseListeners = new Set<(userId: string) => void>()
 
   async function requestAccountActionChallenge(input: {
@@ -654,8 +670,11 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
     },
 
     async getSessionByTokenHash(sessionTokenHash, now = new Date()) {
+      const cached = sessionCache.get(sessionTokenHash)
+      if (cached && isCachedSessionCurrent(cached, now)) return cached
       // One read for the session and its account (was two round trips on
       // every authenticated request).
+      const readEpoch = sessionCache.epoch()
       const found = await repository.getSessionWithAccountByTokenHash(sessionTokenHash)
       const session = found?.session
       // A rotated token only survives for the refresh grace window, never for
@@ -677,7 +696,12 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         })
         return restored ? { account: restored, session } : null
       }
-      return account ? { account, session } : null
+      if (!account) return null
+      sessionCache.remember(sessionTokenHash, { account, session }, readEpoch)
+      return { account, session }
+    },
+    invalidateCachedSessions(revocation) {
+      sessionCache.invalidate(revocation)
     },
     async isRealtimeUserAllowed(userId, now = new Date()) {
       const account = await repository.findAccountByUserId(userId)
@@ -1442,4 +1466,15 @@ export function toSessionActor(
     },
     profile: account.profile
   }
+}
+
+/**
+ * A cached session answers only while it would still pass the database
+ * path's checks at `now`; an ended suspension needs the database write.
+ */
+function isCachedSessionCurrent(resolved: ResolvedSession, now: Date): boolean {
+  const { session, account } = resolved
+  if (session.rotatedAt || new Date(session.expiresAt).getTime() <= now.getTime()) return false
+  return !(account.moderation?.status === "suspended" && account.moderation.suspendedUntil &&
+    Date.parse(account.moderation.suspendedUntil) <= now.getTime())
 }
