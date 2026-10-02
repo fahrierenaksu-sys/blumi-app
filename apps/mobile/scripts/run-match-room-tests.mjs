@@ -265,6 +265,7 @@ try {
       "src/features/miniRoom/scene/miniRoomAvatarStageModel.test.ts",
       "src/features/miniRoom/scene/useMiniRoomKeyboard.test.ts",
       "src/features/miniRoom/scene/useMiniRoomCameraTransform.test.ts",
+      "src/features/miniRoom/scene/RoomChatComposer.test.ts",
       "src/features/miniRoom/useMiniRoomMotion.test.ts",
       "src/features/notifications/useFocusedConversation.test.ts",
       "src/features/miniRoom/scene/roomSpeechBubbleStack.test.ts",

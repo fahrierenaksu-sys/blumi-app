@@ -1,0 +1,57 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { createFakeReactRuntime, createInertModule, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { getMiniRoomCopy } from "../miniRoomCopy"
+import type * as Composer from "./RoomChatComposer"
+
+interface Element { type: unknown; props: Record<string, unknown> }
+
+function findInput(node: unknown): Element | undefined {
+  if (!node || typeof node !== "object") return undefined
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findInput(child)
+      if (found) return found
+    }
+    return undefined
+  }
+  const element = node as Element
+  if (element.type === "TextInput") return element
+  return findInput(element.props?.children)
+}
+
+function renderInput(disabled: boolean) {
+  const runtime = createFakeReactRuntime()
+  const { RoomChatComposer } = loadSourceWithFakeReact<typeof Composer>("features/miniRoom/scene/RoomChatComposer.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
+      "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
+    },
+    real: ["./miniRoomLayout"],
+    globals: { setTimeout, clearTimeout }
+  })
+  let focusCalls = 0
+  const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
+  const tree = runtime.render(() => render({
+    copy: getMiniRoomCopy("en"), value: "", suggestionsEnabled: true, disabled, mode: "history",
+    maxInputHeight: 92, inputHeight: 44, onChangeText: () => undefined, onSubmit: () => undefined,
+    onToggleHistory: () => undefined, onContentHeightChange: () => undefined, onFocus: () => { focusCalls += 1 }
+  }))
+  const input = findInput(tree)
+  runtime.unmount()
+  assert.ok(input, "the composer renders its text field")
+  return { input, focusCalls: () => focusCalls }
+}
+
+test("touching an enabled composer pre-opens the typing pose", () => {
+  const { input, focusCalls } = renderInput(false)
+  ;(input.props.onTouchStart as (() => void) | undefined)?.()
+  assert.equal(focusCalls(), 1)
+})
+
+test("touching a disabled composer never lifts the dock: no keyboard will come", () => {
+  const { input, focusCalls } = renderInput(true)
+  assert.equal(input.props.editable, false)
+  ;(input.props.onTouchStart as (() => void) | undefined)?.()
+  assert.equal(focusCalls(), 0)
+})

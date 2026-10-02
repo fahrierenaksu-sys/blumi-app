@@ -14,7 +14,7 @@ export const MAX_ROOM_MESSAGE_LENGTH = 140
 const TOGGLE_INK = "#806780"
 
 /** The MiniRoom composer row: history toggle, message field and send. */
-interface RoomChatComposerProps {
+export interface RoomChatComposerProps {
   copy: MiniRoomCopy
   value: string
   suggestionsEnabled: boolean
@@ -95,7 +95,8 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         onBlur={draftTyping?.endDraft}
         // A measured warm opening starts on touch-down, before UIKit focuses.
         // First focus still uses the real system frame; no guessed keyboard size.
-        onTouchStart={onFocus}
+        // A disabled field never focuses, so its touch must not lift the dock.
+        onTouchStart={disabled ? undefined : onFocus}
         onFocus={onFocus}
         onSubmitEditing={() => {
           onSubmit()
