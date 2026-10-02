@@ -50,6 +50,7 @@ export {
   MOTION_REDUCED_PRESS_OPACITY,
   MOTION_SPRINGS,
   MOTION_STAGGER,
+  getEaseOutExitDurationMs,
   staggerDelayMs,
   type MotionFadeName,
   type MotionSpringName,
@@ -165,6 +166,31 @@ export function animateToAfter(
   "worklet"
   const animation = animateTo(target, motion, callback)
   return delayMs > 0 ? withDelay(delayMs, animation, ReduceMotion.Never) : animation
+}
+
+/**
+ * A clock for the moment a movement started now with `motion` (after
+ * `delayMs`) visibly arrives: assign it to a dedicated shared value and
+ * `callback(true)` runs at `delayMs + motion.duration`, or `callback(false)`
+ * when the clock is reassigned or cancelled first. A spring's own completion
+ * callback fires only at rest, about 1.5× its perceptual duration, so input,
+ * unmounts and follow-up motion wait on this clock instead.
+ */
+export function arrivalClock(
+  delayMs: number,
+  motion: ResolvedMotion,
+  callback: (finished?: boolean) => void
+): number {
+  "worklet"
+  return withSequence(
+    ReduceMotion.Never,
+    withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+    withTiming(
+      1,
+      { duration: Math.max(0, delayMs) + motion.duration, easing: Easing.linear, reduceMotion: ReduceMotion.Never },
+      callback
+    )
+  )
 }
 
 /* ── Authored timelines (worklet-safe) ─────────────────────── */
