@@ -1,7 +1,7 @@
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { useFocusEffect } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
 import {
   type LayoutChangeEvent,
   Pressable,
@@ -22,10 +22,7 @@ import {
   getRoomAvatarAssetCoverage
 } from "../features/avatarV2/room/avatarRoomSelectors"
 import { resolveRoomAvatarSeatInteractionDecision } from "../features/avatarV2/room/avatarRoomSeatInteraction"
-import {
-  RoomRenderer2D,
-  type RoomRendererStageMarker
-} from "../features/roomV2/components/RoomRenderer2D"
+import { RoomRenderer2D } from "../features/roomV2/components/RoomRenderer2D"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
@@ -84,6 +81,10 @@ import {
   createMyRoomWalkTimeline
 } from "../features/roomWorld/myRoomAvatarWalkModel"
 import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
+import {
+  INITIAL_ROOM_TAP_MARKER_STATE,
+  reduceRoomTapMarker
+} from "../features/roomWorld/roomTapMarkerModel"
 import type {
   RoomFurnitureRotation,
   RoomV2AvatarMotionState,
@@ -155,7 +156,22 @@ export function MyRoomScreen({
   const transientPoseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const movementFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [movementFeedback, setMovementFeedback] = useState<string | undefined>()
-  const [stageMarker, setStageMarker] = useState<RoomRendererStageMarker | undefined>()
+  // The walk destination marker; roomTapMarkerModel guarantees it leaves
+  // with its walk, however that walk ends.
+  const [tapMarker, dispatchTapMarker] = useReducer(reduceRoomTapMarker, INITIAL_ROOM_TAP_MARKER_STATE)
+  const markerCounterRef = useRef(0)
+  const stageMarkers = useMemo(() => tapMarker.marker
+    ? [{
+        id: String(tapMarker.marker.id),
+        x: tapMarker.marker.x,
+        y: tapMarker.marker.y,
+        tone: "target" as const,
+        leaving: tapMarker.marker.leaving
+      }]
+    : undefined, [tapMarker.marker])
+  const handleStageMarkerFaded = useCallback((markerId: string): void => {
+    dispatchTapMarker({ type: "faded", markerId: Number(markerId) })
+  }, [])
   const [stageWidth, setStageWidth] = useState(0)
   const { roomShowcasePublic, openRoomShowcase } = useMyRoomShowcase({
     sessionActor,
@@ -354,7 +370,7 @@ export function MyRoomScreen({
         setSeatedFurnitureRenderId(undefined)
         setSeatedSeatId(undefined)
       }
-      setStageMarker(undefined)
+      dispatchTapMarker({ type: "walk_ended" })
       setMovementFeedback(undefined)
     }
   }, [cancelPendingMotionWork, motionLifecycle]))
@@ -385,7 +401,7 @@ export function MyRoomScreen({
       // Placing the avatar cancels the UI-thread walk; its steps must not land.
       liveWalkRef.current = null
       motionLifecycle.begin()
-      setStageMarker(undefined)
+      dispatchTapMarker({ type: "walk_ended" })
     }
     const nextPose = {
       ...MY_ROOM_AVATAR_SPAWN,
@@ -455,7 +471,6 @@ export function MyRoomScreen({
       })
       : undefined
     if (arrival?.seat && currentSeatExit && !seatDeparturePlan) {
-      setStageMarker(undefined)
       hapticError()
       showMovementFeedback(copy.makeRoom)
       return
@@ -472,7 +487,6 @@ export function MyRoomScreen({
       })
       : null
     if (arrival?.seat && !seatPlan) {
-      setStageMarker(undefined)
       hapticError()
       showMovementFeedback(copy.makeRoom)
       return
@@ -485,7 +499,6 @@ export function MyRoomScreen({
       from: start
     })
     if (!resolvedTarget) {
-      setStageMarker(undefined)
       hapticError()
       showMovementFeedback(copy.chooseOpenFloor)
       return
@@ -505,7 +518,6 @@ export function MyRoomScreen({
       }
       setSeatedFurnitureRenderId(arrival?.seatedFurnitureRenderId)
       setSeatedSeatId(arrival?.seatedSeatId ?? arrival?.seat?.seatId)
-      setStageMarker(undefined)
       hapticLight()
       showMovementFeedback(restingPose.state === "sitting" ? copy.settledIn : copy.alreadyHere)
       return
@@ -522,7 +534,6 @@ export function MyRoomScreen({
       })
       : null
     if (!seatPlan && currentSeatExit && !exitPlan) {
-      setStageMarker(undefined)
       hapticError()
       showMovementFeedback(copy.chooseOpenFloor)
       return
@@ -539,7 +550,6 @@ export function MyRoomScreen({
         timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
       })
     if (!plan) {
-      setStageMarker(undefined)
       hapticError()
       showMovementFeedback(copy.nearbyTile)
       return
@@ -556,12 +566,10 @@ export function MyRoomScreen({
       movementFeedbackTimerRef.current = null
     }
     setMovementFeedback(undefined)
-    setStageMarker({
-      id: `my_room_target_${Date.now()}`,
-      x: resolvedTarget.x,
-      y: resolvedTarget.y,
-      tone: "target"
-    })
+    // The marker shows where the avatar is going: the resolved destination.
+    markerCounterRef.current += 1
+    const markerId = markerCounterRef.current
+    dispatchTapMarker({ type: "walk_started", markerId, point: plan.target })
 
     // React takes a pose at each step start and on arrival; every frame in
     // between runs on the UI thread (useMyRoomAvatarWalk).
@@ -604,7 +612,7 @@ export function MyRoomScreen({
       setAvatarPose(arrivedPose)
       setSeatedFurnitureRenderId(arrival?.seatedFurnitureRenderId)
       setSeatedSeatId(arrival?.seatedSeatId ?? arrival?.seat?.seatId)
-      setStageMarker(undefined)
+      dispatchTapMarker({ type: "arrived", markerId })
       hapticLight()
     })
   }, [avatarWalk, copy, motionLifecycle, readAvatarPose, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
@@ -624,6 +632,8 @@ export function MyRoomScreen({
     if (liveWalkRef.current !== null) {
       liveWalkRef.current = null
       stopLiveWalk()
+      // The walk is over where the avatar stopped: its marker goes too.
+      dispatchTapMarker({ type: "walk_ended" })
     }
 
     const nextPose: MyRoomAvatarPose = {
@@ -783,7 +793,8 @@ export function MyRoomScreen({
               shell={baseRoomScene.shell}
               liveAvatarPosition={liveAvatarPosition}
               renderItems={renderItems}
-              stageMarkers={stageMarker ? [stageMarker] : undefined}
+              stageMarkers={stageMarkers}
+              onStageMarkerFaded={handleStageMarkerFaded}
               testID="my-room-production-stage"
               roomVNextRuntimeMode="disabled"
               accessibilityValue={{ text: getMyRoomStageAccessibilityValue({ savedItemCount: userRoomDecor.placedItems.length, locale: getAppLocale() }) }}

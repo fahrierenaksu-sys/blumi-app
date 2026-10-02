@@ -12,8 +12,7 @@ import {
 } from "react-native-reanimated"
 import type { RoomRendererAvatarMotion } from "./roomRendererAvatarMotionStyle"
 import {
-  getRoomRendererAvatarLoops,
-  shouldRunRoomRendererMarkerPulse
+  getRoomRendererAvatarLoops
 } from "./roomRendererLoopModel"
 
 /**
@@ -108,22 +107,4 @@ export function useRoomRendererAvatarLoops(input: {
   }, [gesture, gestureDurationMs, loops.gesture])
 
   return { breathe, walk, gesture, usesIdleBreathe }
-}
-
-/** The tap-target marker pulse; still under Reduce Motion and while unfocused. */
-export function useRoomRendererMarkerPulse(input: { reduceMotion: boolean; paused: boolean }): SharedValue<number> {
-  const pulse = useSharedValue(0)
-  const runs = shouldRunRoomRendererMarkerPulse(input)
-  useEffect(() => {
-    if (!runs) {
-      pulse.value = 0
-      return
-    }
-    pulse.value = withRepeat(withSequence(
-      withTiming(1, { duration: 620, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never }),
-      withTiming(0, { duration: 620, easing: Easing.in(Easing.quad), reduceMotion: ReduceMotion.Never })
-    ), -1)
-    return () => { pulse.value = 0 }
-  }, [pulse, runs])
-  return pulse
 }

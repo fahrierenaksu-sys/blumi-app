@@ -9,8 +9,9 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useRef, useState, type ReactNode } from "react"
-import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import Reanimated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
 import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
@@ -32,9 +33,9 @@ import {
 } from "./roomRendererAvatarMotionStyle"
 import {
   useRoomRendererAvatarLoops,
-  useRoomRendererMarkerPulse,
   useRoomRendererScreenFocused
 } from "./useRoomRendererLoops"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { getAppLocale } from "../../session/appLocale"
 import { getPlacementGuideSpan } from "./roomRendererPlacementGuideModel"
 import {
@@ -63,12 +64,16 @@ type RoomRendererStageMarkerTone = "target" | "blocked"
 export interface RoomRendererStageMarker extends RoomWorldPoint {
   id: string
   tone?: RoomRendererStageMarkerTone
+  /** The walk it marked is over: fade out, then `onStageMarkerFaded`. */
+  leaving?: boolean
 }
 
 interface RoomRenderer2DProps {
   shell: RoomShell | null
   renderItems: RoomV2RenderItem[]
   stageMarkers?: RoomRendererStageMarker[]
+  /** A leaving stage marker finished fading out (or vanished under Reduce Motion). */
+  onStageMarkerFaded?: (markerId: string) => void
   debugPlacement?: boolean
   style?: StyleProp<ViewStyle>
   testID?: string
@@ -105,6 +110,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     shell,
     renderItems,
     stageMarkers,
+    onStageMarkerFaded,
     debugPlacement = false,
     style,
     testID,
@@ -182,7 +188,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
         <PlacementGuideLayer shell={shell} />
       ) : null}
       {stageMarkers?.map((marker) => (
-        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} paused={motionPaused} />
+        <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} onFaded={onStageMarkerFaded} />
       ))}
       {roomVNextRuntimeMode !== "disabled"
         ? renderItems.map((item) =>
@@ -420,17 +426,38 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
   )
 }, (previous, next) => previous.item === next.item)
 
+/**
+ * The walk destination on the floor (roomTapMarkerModel owns its life): it
+ * fades in when a walk starts and out when the walk is over, then reports
+ * `onFaded` so the owner drops it. Under Reduce Motion it just appears and
+ * disappears.
+ */
 const StageMarker = memo(function StageMarker(props: {
   marker: RoomRendererStageMarker
   reduceMotion: boolean
-  paused: boolean
+  onFaded?: (markerId: string) => void
 }) {
-  const { marker, reduceMotion, paused } = props
-  const pulse = useRoomRendererMarkerPulse({ reduceMotion, paused })
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: 0.82 + 0.18 * pulse.value,
-    transform: [{ scale: 0.94 + 0.14 * pulse.value }]
-  }))
+  const { marker, reduceMotion, onFaded } = props
+  const motion = useMotion()
+  const opacity = useSharedValue(reduceMotion ? 1 : 0)
+  const leaving = Boolean(marker.leaving)
+  const markerId = marker.id
+  useEffect(() => {
+    if (!leaving) {
+      opacity.value = reduceMotion ? 1 : animateTo(1, motion.fadeIn)
+      return
+    }
+    if (reduceMotion) {
+      opacity.value = 0
+      onFaded?.(markerId)
+      return
+    }
+    opacity.value = animateTo(0, motion.fadeOut, (finished) => {
+      "worklet"
+      if (finished && onFaded) scheduleOnRN(onFaded, markerId)
+    })
+  }, [leaving, markerId, motion.fadeIn, motion.fadeOut, onFaded, opacity, reduceMotion])
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
   return (
     <Reanimated.View
@@ -439,7 +466,7 @@ const StageMarker = memo(function StageMarker(props: {
         styles.stageMarker,
         marker.tone === "blocked" ? styles.stageMarkerBlocked : null,
         { left: `${marker.x * 100}%`, top: `${marker.y * 100}%` },
-        pulseStyle
+        fadeStyle
       ]}
     >
       <View
@@ -455,7 +482,9 @@ const StageMarker = memo(function StageMarker(props: {
   previous.marker.x === next.marker.x &&
   previous.marker.y === next.marker.y &&
   previous.marker.tone === next.marker.tone &&
-  previous.reduceMotion === next.reduceMotion
+  previous.marker.leaving === next.marker.leaving &&
+  previous.reduceMotion === next.reduceMotion &&
+  previous.onFaded === next.onFaded
 )
 
 function PlacementGuideLayer(props: { shell: RoomShell }) {
