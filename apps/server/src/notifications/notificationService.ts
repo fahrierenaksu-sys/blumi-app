@@ -27,6 +27,7 @@ import {
 import { createPushBadgeResolver, withPushBadge } from "./pushBadge"
 import { logPushFailure, resolveTicketFailure, safePushErrorCode } from "./pushFailurePolicy"
 import { forEachWithConcurrency } from "./boundedConcurrency"
+import { createDeviceRegistrationCache, withDeviceRegistrationInvalidation } from "./deviceRegistrationCache"
 
 const MAX_PUSH_TOKEN_LENGTH = 4096
 const MAX_PUSH_TITLE_LENGTH = 120
@@ -53,6 +54,16 @@ export interface NotificationService {
     input: { platform: "ios" | "android"; pushToken: string },
     now?: Date
   ): Promise<DeviceRegistration>
+  /**
+   * registerDevice that reports whether anything changed. An unchanged
+   * registration (same account, platform and token) is answered without a
+   * database write, usually without a database read.
+   */
+  ensureDeviceRegistered(
+    userId: string,
+    input: { platform: "ios" | "android"; pushToken: string },
+    now?: Date
+  ): Promise<{ device: DeviceRegistration; changed: boolean }>
   removeDevice(userId: string, pushToken: string): Promise<void>
   getPreferences(userId: string): Promise<NotificationPreferences>
   updatePreferences(userId: string, preferences: NotificationPreferences, fields?: (keyof NotificationPreferences)[]): Promise<NotificationPreferences>
@@ -73,6 +84,8 @@ export interface CreateNotificationServiceOptions {
   resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
   /** Provider calls in flight per dispatch cycle (default 3; pool max is 10). */
   dispatchConcurrency?: number
+  /** How long a confirmed registration answers repeats from memory (default 10 min; 0 disables). */
+  deviceRegistrationCacheTtlMs?: number
   /** The recipient's unread message total, read at dispatch for the iOS badge. */
   resolveRecipientBadge?: (userId: string) => Promise<number | undefined>
   /**
@@ -96,8 +109,11 @@ export interface SafePushFailure {
 export function createNotificationService(
   options: CreateNotificationServiceOptions = {}
 ): NotificationService {
-  const repository =
-    options.repository ?? createInMemoryNotificationRepository()
+  const registrationCache = createDeviceRegistrationCache({ ttlMs: options.deviceRegistrationCacheTtlMs })
+  const repository = withDeviceRegistrationInvalidation(
+    options.repository ?? createInMemoryNotificationRepository(),
+    registrationCache
+  )
   const pushProvider = options.pushProvider ?? createDevelopmentPushProvider()
   const now = options.now ?? (() => new Date())
   const deliveryIdFactory = options.deliveryIdFactory ?? createDeliveryId
@@ -134,21 +150,38 @@ export function createNotificationService(
     }
   }
 
+  const ensureDeviceRegistered: NotificationService["ensureDeviceRegistered"] = async (userId, input, now = new Date()) => {
+    const device: DeviceRegistration = {
+      registrationId: randomUUID(),
+      userId: normalizeUserId(userId),
+      platform: normalizePlatform(input.platform),
+      pushToken: normalizePushToken(input.pushToken),
+      registeredAt: now.toISOString()
+    }
+    const cached = registrationCache.get(device.userId, device.platform, device.pushToken)
+    if (cached) return { device: cached, changed: false }
+    const findCurrent = async () => (await repository.listDevices(device.userId))
+      .find((entry) => entry.pushToken === device.pushToken)
+    const readEpoch = registrationCache.epoch()
+    const existing = await findCurrent()
+    if (existing?.platform === device.platform) {
+      registrationCache.remember(existing, readEpoch)
+      return { device: existing, changed: false }
+    }
+    await repository.saveDevice(device)
+    const savedEpoch = registrationCache.epoch()
+    const current = await findCurrent()
+    if (!current) throw new Error("Device registration changed. Please try again.")
+    registrationCache.remember(current, savedEpoch)
+    return { device: current, changed: true }
+  }
+
   return {
     repository,
     async registerDevice(userId, input, now = new Date()) {
-      const device: DeviceRegistration = {
-        registrationId: randomUUID(),
-        userId: normalizeUserId(userId),
-        platform: normalizePlatform(input.platform),
-        pushToken: normalizePushToken(input.pushToken),
-        registeredAt: now.toISOString()
-      }
-      await repository.saveDevice(device)
-      const current = (await repository.listDevices(device.userId)).find((entry) => entry.pushToken === device.pushToken)
-      if (!current) throw new Error("Device registration changed. Please try again.")
-      return current
+      return (await ensureDeviceRegistered(userId, input, now)).device
     },
+    ensureDeviceRegistered,
     async removeDevice(userId, pushToken) {
       await repository.removeDevice(
         normalizeUserId(userId),

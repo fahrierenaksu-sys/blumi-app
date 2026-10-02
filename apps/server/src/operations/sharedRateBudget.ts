@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 
 export interface RateBudgetResult { allowed: boolean; retryAfterSeconds: number }
-export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave"
+export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration"
 export interface SharedRateBudget {
   consumeUser(userId: string, scope?: UserRateBudgetScope): Promise<RateBudgetResult>
   purgeExpired(): Promise<void>
@@ -9,11 +9,16 @@ export interface SharedRateBudget {
 export const USER_REQUESTS_PER_MINUTE = 100
 // Match realtime's sustained chat allowance (30 per 10 seconds). Reads and
 // background refreshes must never exhaust the sender's allowance or prevent
-// a person from closing a room. All scopes remain bounded across instances.
+// a person from closing a room, and a device registration loop must not
+// starve anything else. All scopes remain bounded across instances.
 export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, number>> = {
   general: USER_REQUESTS_PER_MINUTE,
   chatSend: 180,
-  roomLeave: 20
+  roomLeave: 20,
+  // Push-token registration has its own small budget: a looping client
+  // (build 14 posted every ~340 ms) must never 429 the person's chat,
+  // invites or discovery. An unchanged repeat costs no database write.
+  deviceRegistration: 30
 }
 const WINDOW_MS = 60_000
 

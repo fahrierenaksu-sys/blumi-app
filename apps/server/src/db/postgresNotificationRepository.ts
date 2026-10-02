@@ -117,7 +117,12 @@ export function createPostgresNotificationRepository(
             registered_at = EXCLUDED.registered_at,
             registration_id = CASE
               WHEN blumi_push_devices.user_id = EXCLUDED.user_id THEN blumi_push_devices.registration_id
-              ELSE EXCLUDED.registration_id END`,
+              ELSE EXCLUDED.registration_id END
+          -- A repeat of an unchanged registration writes nothing (no row
+          -- version, no WAL); registered_at is refreshed at most hourly.
+          WHERE blumi_push_devices.user_id IS DISTINCT FROM EXCLUDED.user_id
+             OR blumi_push_devices.platform IS DISTINCT FROM EXCLUDED.platform
+             OR blumi_push_devices.registered_at < EXCLUDED.registered_at - interval '1 hour'`,
         [
           device.userId,
           device.platform,
