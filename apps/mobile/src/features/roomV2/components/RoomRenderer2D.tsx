@@ -83,7 +83,11 @@ interface RoomRenderer2DProps {
   onItemTap?: (item: RoomV2RenderItem) => void
   onItemLongPress?: (item: RoomV2RenderItem) => void
   onItemLongPressMove?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
-  onItemLongPressRelease?: (item: RoomV2RenderItem, point: RoomWorldPoint) => void
+  /**
+   * Release of a long-press drag, in window coordinates like the move. The
+   * touched image may be mirrored, so its local coordinates are not a room point.
+   */
+  onItemLongPressRelease?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
   itemInteractionMode?: "edit" | "interact"
   onStagePress?: (point: RoomWorldPoint) => void
   /** Explicit QA-only switch; omitted callers stay on the legacy renderer. */
@@ -512,7 +516,11 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   onItemTap?: (item: RoomV2RenderItem) => void
   onItemLongPress?: (item: RoomV2RenderItem) => void
   onItemLongPressMove?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
-  onItemLongPressRelease?: (item: RoomV2RenderItem, point: RoomWorldPoint) => void
+  /**
+   * Release of a long-press drag, in window coordinates like the move. The
+   * touched image may be mirrored, so its local coordinates are not a room point.
+   */
+  onItemLongPressRelease?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
   itemInteractionMode: "edit" | "interact"
   debugPlacement: boolean
   reduceMotion: boolean
@@ -622,11 +630,6 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     stageHeightPx
   }
 
-  const resolvePressPoint = useCallback((locationX: number, locationY: number) => ({
-    x: Math.max(0, Math.min(1, left + locationX / Math.max(1, stageWidthPx))),
-    y: Math.max(0, Math.min(1, top + locationY / Math.max(1, stageHeightPx)))
-  }), [left, stageHeightPx, stageWidthPx, top])
-
   return (
     <RoomRendererLiveAvatarLayoutContext.Provider value={liveAvatarLayout}>
       <Wrapper
@@ -652,10 +655,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
           if (!longPressActiveRef.current) return
           longPressActiveRef.current = false
           suppressPressRef.current = true
-          onItemLongPressRelease?.(
-            item,
-            resolvePressPoint(event.nativeEvent.locationX, event.nativeEvent.locationY)
-          )
+          onItemLongPressRelease?.(item, {
+            pageX: event.nativeEvent.pageX,
+            pageY: event.nativeEvent.pageY
+          })
         }}
         onResponderMove={(event) => {
           if (!longPressActiveRef.current || !onItemLongPressMove) return
