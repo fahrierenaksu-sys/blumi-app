@@ -278,6 +278,7 @@ export function createClockedReanimatedStub(
     withSequence: (...args: unknown[]) => tag({ kind: "sequence", items: sequenceItems(args) }),
     withRepeat: (inner: Tagged, count = 2, _reverse = false, callback?: Callback) =>
       tag({ kind: "repeat", inner, count, callback }),
+    LinearTransition: builder(),
     FadeIn: builder(),
     FadeOut: builder()
   }
