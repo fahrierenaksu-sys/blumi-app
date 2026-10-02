@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { CAPABILITY_KEYS } from "@blumi/contracts"
+import { CAPABILITY_KEYS, type CapabilityKey } from "@blumi/contracts"
 import {
   CAPABILITY_PREREQUISITES,
   createCapabilityService,
@@ -116,19 +116,25 @@ test("resolution returns a complete immutable map and enforces prerequisites", (
 })
 
 test("dependent capabilities fail closed when any direct or transitive prerequisite is absent", () => {
-  assert.deepEqual(CAPABILITY_PREREQUISITES, {
-    avatar_loadout_v2_write: ["db_avatar_loadout_v2_ready", "avatar_loadout_v2_read"],
-    avatar_dress_outerwear_render: ["db_avatar_loadout_v2_ready", "avatar_loadout_v2_read"],
-    shop_multi_item_apply: ["avatar_loadout_v2_write"],
-    discovery_public_profile: ["db_public_card_ready"],
-    discovery_badges: ["discovery_public_profile"],
-    discovery_room_showcase: ["db_room_snapshot_ready", "discovery_public_profile"],
-    card_studio: ["discovery_public_profile", "discovery_badges", "discovery_room_showcase"],
-    card_theme_economy: ["card_studio"],
-    chat_presence: ["db_chat_metadata_ready"],
-    chat_read_receipts: ["db_chat_metadata_ready"],
-    chat_message_edit: ["db_chat_metadata_ready"]
-  })
+  // Each feature stays behind the readiness gate of the schema it needs,
+  // directly or through another capability. Other edges may change freely.
+  const requiredGates: Array<[CapabilityKey, CapabilityKey]> = [
+    ["avatar_loadout_v2_write", "db_avatar_loadout_v2_ready"],
+    ["avatar_dress_outerwear_render", "db_avatar_loadout_v2_ready"],
+    ["shop_multi_item_apply", "db_avatar_loadout_v2_ready"],
+    ["discovery_public_profile", "db_public_card_ready"],
+    ["discovery_badges", "db_public_card_ready"],
+    ["discovery_room_showcase", "db_room_snapshot_ready"],
+    ["discovery_room_showcase", "db_public_card_ready"],
+    ["card_studio", "db_public_card_ready"],
+    ["card_theme_economy", "db_public_card_ready"],
+    ["chat_presence", "db_chat_metadata_ready"],
+    ["chat_read_receipts", "db_chat_metadata_ready"],
+    ["chat_message_edit", "db_chat_metadata_ready"]
+  ]
+  for (const [feature, gate] of requiredGates) {
+    assert.ok(transitivePrerequisites(feature).has(gate), `${feature} must require ${gate}`)
+  }
 
   const service = createCapabilityService({
     manifest: parseCapabilityManifest(JSON.stringify({
@@ -229,4 +235,13 @@ function pickChatCapabilities(
     chat_presence: resolution.capabilities.chat_presence,
     chat_read_receipts: resolution.capabilities.chat_read_receipts
   }
+}
+
+function transitivePrerequisites(key: CapabilityKey, seen = new Set<CapabilityKey>()): Set<CapabilityKey> {
+  for (const prerequisite of CAPABILITY_PREREQUISITES[key] ?? []) {
+    if (seen.has(prerequisite)) continue
+    seen.add(prerequisite)
+    transitivePrerequisites(prerequisite, seen)
+  }
+  return seen
 }

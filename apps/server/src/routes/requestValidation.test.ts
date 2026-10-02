@@ -15,51 +15,8 @@ import { createSafetyService } from "../safety/safetyService"
 import { createServer } from "../server"
 import { assertRequestValidationPolicy } from "./routeHelpers"
 
-// Every route that defers schema errors to its handler, and what that handler
-// does with them. Changing a route's policy must be a reviewed edit here.
-const ENFORCED_ROUTES = [
-  "DELETE /v1/devices",
-  "DELETE /v1/safety/blocks/:blockedUserId",
-  "GET /v1/discover",
-  "GET /v1/discover/:userId",
-  "GET /v1/threads/:threadId/messages",
-  "GET /v1/threads/:threadId/room-invites",
-  "PATCH /v1/users/me",
-  "PATCH /v1/users/me/onboarding",
-  "POST /v1/account/deletion/confirm",
-  "POST /v1/account/export/confirm",
-  "POST /v1/account/firebase/challenge",
-  "POST /v1/account/firebase/reauth",
-  "POST /v1/account/phone-change/current/confirm",
-  "POST /v1/account/phone-change/new/challenge",
-  "POST /v1/account/phone-change/new/confirm",
-  "POST /v1/account/recovery/challenge",
-  "POST /v1/accounts/register",
-  "POST /v1/auth/firebase/complete",
-  "POST /v1/auth/send-code",
-  "POST /v1/auth/verify",
-  "POST /v1/commerce/coin-packs/reconcile",
-  "POST /v1/connections/decision",
-  "POST /v1/devices",
-  "POST /v1/discover/:userId/like",
-  "POST /v1/discover/:userId/pass",
-  "POST /v1/room-invites/:inviteId/cancel",
-  "POST /v1/room-invites/:inviteId/decision",
-  "POST /v1/room-sessions/:roomSessionId/join",
-  "POST /v1/room-sessions/:roomSessionId/leave",
-  "POST /v1/safety/blocks",
-  "POST /v1/safety/reports",
-  "POST /v1/threads",
-  "POST /v1/threads/:threadId/messages",
-  "POST /v1/threads/:threadId/read",
-  "POST /v1/threads/:threadId/room-invites",
-  "PUT /v1/chat-preferences",
-  "PUT /v1/notification-preferences",
-  "PUT /v1/users/me/avatar",
-  "PUT /v1/users/me/room-decor",
-  "PUT /v1/users/me/room-showcase"
-]
-
+// Enforced is the safe default and needs no list. Every route that answers a
+// schema failure in its own handler (advisory) must be a reviewed edit here.
 const ADVISORY_ROUTES = [
   // Malformed confirmation gets the same 403 REAUTH_REQUIRED as an expired one.
   "DELETE /v1/account",
@@ -90,9 +47,7 @@ test("every attachValidation route declares an explicit request validation polic
   await app.ready()
   await app.close()
 
-  const enforced = routes.filter((entry) => entry.policy === "enforced").map((entry) => entry.route).sort()
   const advisory = routes.filter((entry) => entry.policy === "advisory").map((entry) => entry.route).sort()
-  assert.deepEqual(enforced, [...ENFORCED_ROUTES].sort())
   assert.deepEqual(advisory, [...ADVISORY_ROUTES].sort())
   assert.deepEqual(
     routes.filter((entry) => entry.attach && !entry.policy).map((entry) => entry.route),

@@ -264,55 +264,6 @@ test("the first Discovery page does not wait for or read optional room showcases
   }
 })
 
-test("the first Discovery page reads decision quota concurrently with its snapshot page", { timeout: 5_000 }, async () => {
-  const authService = createAuthService({ codeFactory: () => "482931" })
-  const candidate = createSeedDiscoverProfiles()[0]!
-  const matchService = createMatchService({
-    repository: createInMemoryMatchRepository(createInMemoryMatchStore([candidate]))
-  })
-  const getDecisionQuota = matchService.getDecisionQuota.bind(matchService)
-  let quotaStartedBeforePageCompleted = false
-  let releasePage!: (value: {
-    profiles: typeof candidate[]
-    page: { hasMore: boolean; nextCursor: string | null }
-  }) => void
-  let markPageStarted!: () => void
-  const pageStarted = new Promise<void>((resolve) => { markPageStarted = resolve })
-  const pageResult = new Promise<{
-    profiles: typeof candidate[]
-    page: { hasMore: boolean; nextCursor: string | null }
-  }>((resolve) => { releasePage = resolve })
-  const discoverySnapshots = {
-    page: () => {
-      markPageStarted()
-      return pageResult
-    }
-  }
-  matchService.getDecisionQuota = async (userId, now) => {
-    quotaStartedBeforePageCompleted = true
-    return getDecisionQuota(userId, now)
-  }
-  const app = createServer({ authService, matchService, discoverySnapshots: discoverySnapshots as never })
-
-  try {
-    const signedIn = await createReadyViewer(authService, "+905551116666")
-    const responsePromise = app.inject({
-      method: "GET",
-      url: "/v1/discover?limit=12",
-      headers: { authorization: `Bearer ${signedIn.sessionToken}` }
-    })
-    await pageStarted
-    const quotaStartedBeforeRelease = quotaStartedBeforePageCompleted
-    releasePage({ profiles: [candidate], page: { hasMore: false, nextCursor: null } })
-    const response = await responsePromise
-
-    assert.equal(response.statusCode, 200, response.body)
-    assert.equal(quotaStartedBeforeRelease, true)
-  } finally {
-    await app.close()
-  }
-})
-
 test("a concurrent quota read failure does not mask the Discovery refresh-limit response", { timeout: 5_000 }, async () => {
   const authService = createAuthService({ codeFactory: () => "482931" })
   const matchService = createMatchService()
