@@ -79,7 +79,7 @@ Branches and release:
   - Railway builds the API from `main` but has not reliably auto-deployed, so check which commit is actually live.
   - TestFlight (`apps/mobile/.eas/workflows/testflight.yml`) starts by hand only.
 - Codex works on the owner's Mac (`codex/*` branches; it has the iOS Simulator and the art Workbench). Claude works in a Linux cloud container (`claude/*` and `worktree-*` branches) with no Simulator. Native visual checks happen on the Mac or the owner's phone. Until then, report them as Open.
-- Develop OTA updates are paused. The iOS bundle has about 1,220 assets, mostly avatar room motion PNGs, and EAS Update accepts at most 1,000. A new native module (for example Skia) needs a new TestFlight build. See `docs/release/OTA_AND_TESTFLIGHT.md`.
+- Develop OTA updates are manual only. EAS Update accepts at most 1,000 assets; the iOS bundle has 888 since room motion frames that no receipt binds were packed into atlases (`apps/mobile/scripts/build-room-motion-atlases.mjs`, run it after adding room motion art). A new native module (for example Skia) needs a new TestFlight build. See `docs/release/OTA_AND_TESTFLIGHT.md`.
 - Status and backlog: `docs/release/LAUNCH_CONTROL.md` is the release ledger, and the operations-center gate parses its table, so keep the column layout. `docs/quality/SESSION_INVENTORY_2026-10-01.md` is the newest full backlog. Dated docs are snapshots, and current code wins.
 
 Avatar and room (current state, not a mandate):

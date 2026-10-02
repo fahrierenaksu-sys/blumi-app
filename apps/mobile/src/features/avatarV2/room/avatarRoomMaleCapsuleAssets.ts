@@ -2,12 +2,17 @@ import type {
   RoomV2AssetRef,
   RoomV2AvatarAssetSequence
 } from "../../roomV2/roomV2.types"
+import {
+  roomAvatarFrameAsset,
+  roomAvatarMotionAtlasFrame,
+  type RoomAvatarFrameSource
+} from "./roomAvatarMotionAtlas"
 
-const asset = (key: string, source: RoomV2AssetRef["source"]): RoomV2AssetRef => ({ key, source })
+const asset = (key: string, source: RoomAvatarFrameSource): RoomV2AssetRef => roomAvatarFrameAsset(key, source)
 
 const walking = (
   prefix: string,
-  sources: readonly [number, number, number, number]
+  sources: readonly [RoomAvatarFrameSource, RoomAvatarFrameSource, RoomAvatarFrameSource, RoomAvatarFrameSource]
 ): RoomV2AvatarAssetSequence => ({
   frames: [
     asset(`${prefix}_walking_front_f01`, sources[0]),
@@ -21,8 +26,8 @@ const walking = (
 
 const motion = (
   prefix: string,
-  walkingSources: readonly [number, number, number, number],
-  sittingSource: number
+  walkingSources: readonly [RoomAvatarFrameSource, RoomAvatarFrameSource, RoomAvatarFrameSource, RoomAvatarFrameSource],
+  sittingSource: RoomAvatarFrameSource
 ) => ({
   walkingFront: walking(prefix, walkingSources),
   sittingFront: asset(`${prefix}_sitting_front_f01`, sittingSource)
@@ -95,131 +100,131 @@ export const roomAvatarMaleCapsuleMotionAssets = {
   topMaleCreamBasicTeeV1: motion(
     "room_avatar_top_male_cream_basic_tee_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_cream_basic_tee_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_cream_basic_tee_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_cream_basic_tee_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_cream_basic_tee_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cream_basic_tee_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cream_basic_tee_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cream_basic_tee_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cream_basic_tee_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_cream_basic_tee_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_cream_basic_tee_v1_sitting_front_f01")
   ),
   topMaleDustyNavyTeeV1: motion(
     "room_avatar_top_male_dusty_navy_tee_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_tee_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_tee_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_tee_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_tee_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_tee_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_tee_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_tee_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_tee_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_dusty_navy_tee_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_tee_v1_sitting_front_f01")
   ),
   topMaleSageBasicTeeV1: motion(
     "room_avatar_top_male_sage_basic_tee_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_sage_basic_tee_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_sage_basic_tee_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_sage_basic_tee_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_sage_basic_tee_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_sage_basic_tee_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_sage_basic_tee_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_sage_basic_tee_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_sage_basic_tee_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_sage_basic_tee_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_sage_basic_tee_v1_sitting_front_f01")
   ),
   topMaleMistBlueOxfordShirtV1: motion(
     "room_avatar_top_male_mist_blue_oxford_shirt_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_mist_blue_oxford_shirt_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_mist_blue_oxford_shirt_v1_sitting_front_f01")
   ),
   topMaleSoftSageLinenShirtV1: motion(
     "room_avatar_top_male_soft_sage_linen_shirt_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_soft_sage_linen_shirt_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_soft_sage_linen_shirt_v1_sitting_front_f01")
   ),
   topMaleCocoaVarsityJacketV1: motion(
     "room_avatar_top_male_cocoa_varsity_jacket_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_cocoa_varsity_jacket_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_cocoa_varsity_jacket_v1_sitting_front_f01")
   ),
   topMaleDustyNavyChoreJacketV1: motion(
     "room_avatar_top_male_dusty_navy_chore_jacket_v1",
     [
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_top_male_dusty_navy_chore_jacket_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_top_male_dusty_navy_chore_jacket_v1_sitting_front_f01")
   ),
   bottomMaleMidBlueStraightJeansV1: motion(
     "room_avatar_bottom_male_mid_blue_straight_jeans_v1",
     [
-      require("../assets/room/motion/room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_bottom_male_mid_blue_straight_jeans_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_bottom_male_mid_blue_straight_jeans_v1_sitting_front_f01")
   ),
   bottomMaleCharcoalTaperedChinosV1: motion(
     "room_avatar_bottom_male_charcoal_tapered_chinos_v1",
     [
-      require("../assets/room/motion/room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_bottom_male_charcoal_tapered_chinos_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_bottom_male_charcoal_tapered_chinos_v1_sitting_front_f01")
   ),
   bottomMaleWarmSandRelaxedPantsV1: motion(
     "room_avatar_bottom_male_warm_sand_relaxed_pants_v1",
     [
-      require("../assets/room/motion/room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_bottom_male_warm_sand_relaxed_pants_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_bottom_male_warm_sand_relaxed_pants_v1_sitting_front_f01")
   ),
   shoesMaleCloudWhiteTrainersV1: motion(
     "room_avatar_shoes_male_cloud_white_trainers_v1",
     [
-      require("../assets/room/motion/room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_shoes_male_cloud_white_trainers_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cloud_white_trainers_v1_sitting_front_f01")
   ),
   shoesMaleCocoaPennyLoafersV1: motion(
     "room_avatar_shoes_male_cocoa_penny_loafers_v1",
     [
-      require("../assets/room/motion/room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_shoes_male_cocoa_penny_loafers_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_shoes_male_cocoa_penny_loafers_v1_sitting_front_f01")
   ),
   shoesMaleDustyBlueCanvasSneakersV1: motion(
     "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1",
     [
-      require("../assets/room/motion/room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f04.png")
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f01"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f02"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f03"),
+      roomAvatarMotionAtlasFrame("room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f04")
     ],
-    require("../assets/room/motion/room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_sitting_front_f01.png")
+    roomAvatarMotionAtlasFrame("room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_sitting_front_f01")
   )
 } as const

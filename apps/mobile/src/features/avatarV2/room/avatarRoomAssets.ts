@@ -6,16 +6,14 @@ import { femaleSweetCapsuleRoomLayerAssets } from "../femaleSweetCapsuleRoomAsse
 import { roomAvatarMaleCapsuleLayerAssets } from "./avatarRoomMaleCapsuleAssets"
 import { roomAvatarMalePremiumCapsuleLayerAssets } from "./avatarRoomMalePremiumCapsuleAssets"
 import { ROOM_AVATAR_FRAME_DURATION_MS } from "./avatarRoomMotionContract"
+import { roomAvatarFrameAsset, type RoomAvatarFrameSource } from "./roomAvatarMotionAtlas"
 
 // Room avatar v1 assets use one 256x384 transparent canvas, one centerline,
 // and one shared feet baseline so clothing layers can stack without offsets.
 export const roomAvatarAsset = (
   key: string,
-  source: RoomV2AssetRef["source"]
-): RoomV2AssetRef => ({
-  key,
-  source
-})
+  source: RoomAvatarFrameSource
+): RoomV2AssetRef => roomAvatarFrameAsset(key, source)
 
 export const roomAvatarAssetSequence = (
   frames: RoomV2AvatarAssetSequence["frames"],
