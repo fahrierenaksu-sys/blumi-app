@@ -2,6 +2,7 @@ import { Image as ExpoImage } from "expo-image"
 import { useCallback, useEffect, useRef } from "react"
 import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
+import { ROOM_EDITOR_DRAG_LIFT_HEIGHT } from "./roomEditorDragModel"
 import {
   ROOM_EDITOR_FLOOR_SHAPE_BASE,
   type RoomEditorFloorShape
@@ -49,6 +50,17 @@ export function RoomEditorDragGhost(props: {
     ]
   }))
 
+  // Held: the piece floats over a soft shadow on the floor; dropped: it
+  // comes down onto it. Only transform and opacity animate.
+  const liftValue = values.lift
+  const pieceStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -(liftValue?.value ?? 0) * ROOM_EDITOR_DRAG_LIFT_HEIGHT }]
+  }))
+  const shadowStyle = useAnimatedStyle(() => {
+    const lift = liftValue?.value ?? 0
+    return { opacity: lift, transform: [{ scaleX: 0.9 + 0.1 * lift }] }
+  })
+
   return (
     <View
       ref={overlayRef}
@@ -61,20 +73,36 @@ export function RoomEditorDragGhost(props: {
       {ghost ? (
         <Animated.View style={[styles.dragGhostAnchor, animatedStyle]}>
           {ghost.plate ? <RoomEditorDragGhostPlate plate={ghost.plate} values={values} /> : null}
-          <ExpoImage
-            source={ghost.source}
-            contentFit="contain"
-            cachePolicy="memory-disk"
-            transition={0}
-            style={{
-              position: "absolute",
-              left: ghost.frame.offsetX,
-              top: ghost.frame.offsetY,
-              width: ghost.frame.width,
-              height: ghost.frame.height,
-              transform: [{ scaleX: ghost.mirrored ? -1 : 1 }]
-            }}
-          />
+          {liftValue ? (
+            <Animated.View
+              style={[
+                ghostShadowStyles.shadow,
+                {
+                  left: ghost.frame.offsetX + ghost.frame.width * 0.14,
+                  top: ghost.frame.offsetY + ghost.frame.height * 0.94,
+                  width: ghost.frame.width * 0.72,
+                  height: Math.max(6, ghost.frame.height * 0.08)
+                },
+                shadowStyle
+              ]}
+            />
+          ) : null}
+          <Animated.View style={[StyleSheet.absoluteFill, pieceStyle]}>
+            <ExpoImage
+              source={ghost.source}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={0}
+              style={{
+                position: "absolute",
+                left: ghost.frame.offsetX,
+                top: ghost.frame.offsetY,
+                width: ghost.frame.width,
+                height: ghost.frame.height,
+                transform: [{ scaleX: ghost.mirrored ? -1 : 1 }]
+              }}
+            />
+          </Animated.View>
         </Animated.View>
       ) : null}
     </View>
@@ -111,3 +139,12 @@ function RoomEditorDragGhostPlate(props: {
     />
   )
 }
+
+const ghostShadowStyles = StyleSheet.create({
+  shadow: {
+    position: "absolute",
+    borderRadius: 999,
+    backgroundColor: "rgba(32, 22, 42, 0.2)",
+    marginTop: -3
+  }
+})

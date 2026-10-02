@@ -49,12 +49,15 @@ export const ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT = 36
 export const ROOM_EDITOR_DRAG_SNAP_MS = 70
 /** Cell index used while a tray drag is off the stage. */
 export const ROOM_EDITOR_DRAG_OUTSIDE_CELL = -100000
-export const ROOM_EDITOR_DRAG_LIFT_SCALE = 1.06
+export const ROOM_EDITOR_DRAG_LIFT_SCALE = 1.04
+/** A valid drop lands with this squash before settling at 1. */
+export const ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE = 0.97
+/** How far the held piece floats above its shadow, in points. */
+export const ROOM_EDITOR_DRAG_LIFT_HEIGHT = 6
 /** The lifted piece stays fully opaque (ROOM-10); the lift scale shows it is held. */
 export const ROOM_EDITOR_DRAG_GHOST_OPACITY = 1
 /** After a valid drop the ghost settles onto the placed piece and fades. */
 export const ROOM_EDITOR_DRAG_SETTLE_FADE_MS = 140
-export const ROOM_EDITOR_DRAG_RETURN_SPRING = { damping: 20, stiffness: 260, mass: 1 } as const
 
 export type RoomEditorDragSource = "stage" | "tray"
 export type RoomEditorDragRelease = "commit" | "reject" | "cancel"
@@ -306,12 +309,20 @@ export function resolveRoomEditorDragRelease(input: {
   return "reject"
 }
 
-/** A selection tick when the spot under a drag flips valid ↔ invalid; never on entering or leaving the stage. */
-export function shouldTickRoomEditorDragValidity(
+export type RoomEditorDragCellHaptic = "selection" | "rigid"
+
+/**
+ * The one haptic for a drag reaching a new spot: a selection tick when the
+ * spot flips valid ↔ invalid, otherwise a rigid tick for the new grid cell,
+ * and nothing off the stage. Called only when the cell under the drag changes.
+ */
+export function getRoomEditorDragCellHaptic(
   previous: PlacementPreview | undefined,
   next: PlacementPreview | undefined
-): boolean {
-  return previous !== undefined && next !== undefined && previous.isValid !== next.isValid
+): RoomEditorDragCellHaptic | null {
+  if (next === undefined) return null
+  if (previous !== undefined && previous.isValid !== next.isValid) return "selection"
+  return "rigid"
 }
 
 export function getRoomEditorDragFeedback(

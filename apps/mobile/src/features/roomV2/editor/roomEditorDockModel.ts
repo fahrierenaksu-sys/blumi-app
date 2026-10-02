@@ -58,6 +58,24 @@ export function getRoomEditorStageFrame(input: RoomEditorStageFrameInput): RoomE
   }
 }
 
+/**
+ * A zoom changes the real frame at once (so touches map to the true room)
+ * and then plays back from the old frame: this transform makes the new frame
+ * look exactly like the old one, and a spring takes it to identity. Scale is
+ * about the frame's centre. Unusable frames give identity.
+ */
+export function getRoomEditorStageZoomFlip(
+  previous: RoomEditorStageFrame,
+  next: RoomEditorStageFrame
+): { scale: number; translateX: number; translateY: number } {
+  if (previous.width <= 0 || next.width <= 0) return { scale: 1, translateX: 0, translateY: 0 }
+  return {
+    scale: previous.width / next.width,
+    translateX: previous.left + previous.width / 2 - (next.left + next.width / 2),
+    translateY: previous.top + previous.height / 2 - (next.top + next.height / 2)
+  }
+}
+
 /** The zoom control only exists when the two modes draw different rooms. */
 export function canToggleRoomEditorStageZoom(
   input: Omit<RoomEditorStageFrameInput, "zoom">

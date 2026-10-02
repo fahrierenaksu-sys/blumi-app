@@ -19,7 +19,7 @@ import {
   getRoomEditorTrayDragPoint,
   hasRoomEditorDragCellChanged,
   resolveRoomEditorDragRelease,
-  shouldTickRoomEditorDragValidity
+  getRoomEditorDragCellHaptic
 } from "./roomEditorDragModel"
 import type { PlacementPreview } from "./roomEditorPlacementModel"
 import {
@@ -213,14 +213,15 @@ test("release commits a valid move, springs back an invalid one, and cancels a n
   assert.equal(resolveRoomEditorDragRelease({ source: "tray", moved: false, inside: false, preview: undefined }), "cancel")
 })
 
-test("ROOM-10: a drag ticks once each time the spot flips between valid and invalid", () => {
+test("ROOM-10: a drag plays one haptic per new cell: a tick on a validity flip, a rigid tick otherwise, none off the stage", () => {
   const valid: PlacementPreview = { item: createTestRenderItem(), isValid: true }
   const invalid: PlacementPreview = { item: createTestRenderItem(), isValid: false }
-  assert.equal(shouldTickRoomEditorDragValidity(undefined, valid), false, "entering the stage is not a flip")
-  assert.equal(shouldTickRoomEditorDragValidity(valid, invalid), true)
-  assert.equal(shouldTickRoomEditorDragValidity(invalid, valid), true)
-  assert.equal(shouldTickRoomEditorDragValidity(valid, { ...valid }), false, "a new cell with the same validity is silent")
-  assert.equal(shouldTickRoomEditorDragValidity(invalid, undefined), false, "leaving the stage is silent")
+  assert.equal(getRoomEditorDragCellHaptic(valid, invalid), "selection")
+  assert.equal(getRoomEditorDragCellHaptic(invalid, valid), "selection")
+  assert.equal(getRoomEditorDragCellHaptic(valid, { ...valid }), "rigid", "a new cell with the same validity is a grid tick")
+  assert.equal(getRoomEditorDragCellHaptic(undefined, valid), "rigid", "entering the stage lands on a cell")
+  assert.equal(getRoomEditorDragCellHaptic(invalid, undefined), null, "leaving the stage is silent")
+  assert.equal(getRoomEditorDragCellHaptic(undefined, undefined), null)
 })
 
 test("drag feedback prefers the preview's own message and falls back per validity", () => {

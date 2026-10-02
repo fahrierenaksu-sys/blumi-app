@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ScrollView, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { useReducedMotion } from "../ui/animations"
@@ -248,6 +248,14 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   const { setPickedTrayItemId } = dock
   const { setSelectedInventoryItemId } = inventoryState
   const { measureStageWindow } = stage
+  const [undoCount, setUndoCount] = useState(0)
+  const { handleUndoDraft } = session
+  const canUndo = editorSession.canUndo
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return
+    handleUndoDraft()
+    setUndoCount((count) => count + 1)
+  }, [canUndo, handleUndoDraft])
   const handlePickTrayItem = useCallback((itemId: string) => {
     setPickedTrayItemId(itemId)
     setSelectedInventoryItemId(itemId)
@@ -314,6 +322,9 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 placementStateByRenderId={placementStateByRenderId}
                 floorOverlay={floorOverlay}
                 onItemTap={gestures.handleItemTap}
+                zoom={dock.zoom}
+                undoCount={undoCount}
+                onFrameSettled={measureStageWindow}
               />
               <RoomEditorStageNotice
                 placementFeedback={placementFeedback}
@@ -324,7 +335,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 canUndo={editorSession.canUndo}
                 zoom={dock.zoom}
                 canToggleZoom={canToggleRoomEditorStageZoom(stageAreaInput)}
-                onUndo={session.handleUndoDraft}
+                onUndo={handleUndo}
                 onToggleZoom={dock.toggleZoom}
               />
               {capsuleMode !== "hidden" && capsuleItemName ? (
