@@ -165,6 +165,9 @@ test("a bottom-bar tap snaps the pager on the UI thread before navigation answer
 
 // ── Root navigator: unread and connection changes stay out of the root ────
 
+/** What the stubbed model hands out as the detail (native push) options. */
+const DETAIL_OPTIONS_STUB = Object.freeze({ stub: "detail push" })
+
 function mountRoot() {
   const runtime = createFakeReactRuntime()
   const unreadListeners = new Set<() => void>()
@@ -256,8 +259,7 @@ function mountRoot() {
       "./rootNavigationModel": {
         getChatLocale: () => "en",
         getChatThreadScreenOptions: () => ({}),
-        getDetailScreenOptions: () => ({}),
-        getStudioScreenOptions: () => ({}),
+        getDetailScreenOptions: () => DETAIL_OPTIONS_STUB,
         getReducedMotionScreenOptions: () => ({}),
         getOnboardingEntryRoute: () => null,
         MAIN_TAB_SCREEN_OPTIONS: {},
@@ -278,9 +280,15 @@ function mountRoot() {
     assert.ok(screen, "the main tab slot screen is declared")
     return (screen.props.children as (props: unknown) => Element)({ navigation: {}, route: { key: "slot", name: "Lobby" } })
   }
+  const screenOptions = (name: string) => {
+    const [screen] = collectElements(runtime.output, (element) => element.props.name === name)
+    assert.ok(screen, `${name} is declared`)
+    return screen.props.options
+  }
   return {
     runtime,
     slotScreen,
+    screenOptions,
     setUnread(next: number) {
       unread = next
       for (const listener of [...unreadListeners]) listener()
@@ -317,4 +325,13 @@ test("a root render hands the pager the same page renderer and bottom-bar props"
   const afterBar = after.props.bottomBar as Element
   assert.deepEqual(changedProps(beforeBar.props, afterBar.props), [])
   assert.equal("chatCount" in afterBar.props, false, "the bar reads the unread count itself")
+})
+
+test("the avatar wardrobe and the room editor are pushed from the right like every detail screen", () => {
+  // Owner decision 2026-10-02: both open with the native push, and the Back
+  // button and the edge swipe close them with the matching native pop.
+  const root = mountRoot()
+  assert.equal(root.screenOptions("WardrobeV2"), DETAIL_OPTIONS_STUB)
+  assert.equal(root.screenOptions("MyRoomEditor"), DETAIL_OPTIONS_STUB)
+  assert.equal(root.screenOptions("ProfileEdit"), DETAIL_OPTIONS_STUB, "the same options as a drill-in detail")
 })
