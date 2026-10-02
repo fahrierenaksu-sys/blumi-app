@@ -1,5 +1,5 @@
 import { memo } from "react"
-import { Pressable, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { ChatRoomInviteCard } from "../ChatRoomInviteCard"
 import type { RoomInviteSceneParticipant } from "../ChatRoomInviteScene"
@@ -14,6 +14,7 @@ import type { ChatThreadCopy } from "./chatThreadCopy"
 import { formatMessageTime, type ChatTimelineRowModel } from "./chatThreadModel"
 import { bubbleGroupStyles, bubbleStyles } from "./chatThreadStyles"
 import { CHAT_INCOMING_ROW_ENTERING, CHAT_OWN_ROW_ENTERING } from "./useChatTimelineEntrances"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /**
  * One timeline row: an optional day separator, then either a room invitation
@@ -144,7 +145,7 @@ function ChatTimelineRow({
             </View>
           </View>
           {isMe && deliveryState === "failed" ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={chatCopy.tryAgain}
               onPress={() => onRetry(item.message.messageId)}
@@ -152,7 +153,7 @@ function ChatTimelineRow({
               <Text style={[bubbleStyles.time, bubbleStyles.timeMe, { marginTop: 3, textDecorationLine: "underline" }]}>
                 {chatCopy.notSent} · {chatCopy.tryAgain}
               </Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       )}

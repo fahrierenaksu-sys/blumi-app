@@ -18,6 +18,7 @@ import {
 } from "../shopCheckoutModel"
 import { getShopCopy, type ShopCopy } from "../shopCopy"
 import { formatCoins } from "../shopFormatters"
+import { PressableScale } from "../../../ui/PressableScale"
 
 const COIN_COLOR = "#D79111"
 const TEXT_SCALE_CAP = 1.6
@@ -138,7 +139,7 @@ function CheckoutContent(props: {
             {text.itemCount(checkout.lines.length)}
           </Text>
         </View>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={text.closeAccessibility}
           accessibilityState={{ disabled: isBusy }}
@@ -148,7 +149,7 @@ function CheckoutContent(props: {
           style={[styles.closeButton, isBusy ? styles.disabled : null]}
         >
           <Ionicons name="close" size={20} color={uiTheme.colors.textMuted} />
-        </Pressable>
+        </PressableScale>
       </View>
 
       <SwipeDismissSheetScrollView style={styles.lines} contentContainerStyle={styles.linesContent}>

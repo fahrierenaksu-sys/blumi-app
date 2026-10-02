@@ -61,38 +61,9 @@ function createReanimatedStub(runtime: FakeReactRuntime) {
   }
 }
 
-function reducedMotionModules(reduceMotion: boolean) {
-  const snapshot = { reduceMotion, isResolved: true }
-  return {
-    "./reducedMotionStore": {
-      createReducedMotionStore: () => ({ subscribe: () => () => undefined, getSnapshot: () => snapshot })
-    },
-    "./theme": { uiTheme: { animation: { durationEntrance: 320, staggerMs: 40 } } }
-  }
-}
-
-for (const reduceMotion of [true, false]) {
-  test(`shared onboarding entrances establish their initial frame before paint (reduce motion ${reduceMotion})`, () => {
-    const runtime = createFirstFrameRuntime()
-    const reactNative = createReactNativeStub()
-    const { useEntranceAnimation } = loadSourceWithFakeReact<{
-      useEntranceAnimation: () => { opacity: { value: number } }
-    }>("ui/animations.ts", runtime, {
-      modules: { "react-native": reactNative.module, ...reducedMotionModules(reduceMotion) },
-      inertUnknown: true
-    })
-
-    const style = runtime.render(() => useEntranceAnimation())
-    if (reduceMotion) {
-      assert.equal(style.opacity.value, 1, "Reduce Motion shows the settled entrance on the first frame")
-    } else {
-      assert.ok(
-        reactNative.animatedCalls.some((call) => call.kind === "timing.start"),
-        "the entrance animation starts before paint, not one frame later"
-      )
-    }
-  })
-}
+// The shared entrance hook's first-frame guarantee (it starts before paint,
+// and Reduce Motion never travels) is tested with the hook itself in
+// src/ui/animations.test.ts.
 
 test("the shared progress rail has the correct fill before its width is measured", () => {
   const runtime = createFirstFrameRuntime()
@@ -202,7 +173,7 @@ function loadPreAuthFlow(runtime: FakeReactRuntime) {
         getCurrentSetupFlowCopy: () => ({ room: { continueAction: "Continue" } })
       },
       "../ui/animations": { useReducedMotionPreference: () => ({ reduceMotion: false, isResolved: true }) },
-      "../ui/theme": { uiTheme: { animation: { springSnappy: {} } } },
+      "../ui/motion": { MOTION_SPRINGS: { snappy: {} } },
       "./AvatarSetupScreen": { AvatarSetupScreen: "AvatarSetupScreen" },
       "./ProfileSetupScreen": { ProfileSetupScreen: "ProfileSetupScreen" },
       "./RegisterScreen": { RegisterScreen: "RegisterScreen" },

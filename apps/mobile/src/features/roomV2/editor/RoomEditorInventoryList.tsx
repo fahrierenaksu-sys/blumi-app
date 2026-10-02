@@ -1,7 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   FlatList,
-  Pressable,
   Text,
   View,
   type NativeScrollEvent,
@@ -24,6 +23,7 @@ import { getDefaultRoomV2FurnitureRotation } from "./roomEditorPlacementModel"
 import type { RoomEditorInventoryEntry } from "./roomEditorPresentationModel"
 import type { RoomEditorInventoryState } from "./useRoomEditorInventory"
 import { ROOM_EDITOR_DOCK_GRID_GAP, styles } from "./roomEditorStyles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 type TrayColumn = RoomEditorInventoryEntry[]
 
@@ -167,14 +167,14 @@ export function RoomEditorInventoryList(props: {
             : inventoryStatusLabel}
       </Text>
       {inventoryViewState.emptyState === "no-pieces" ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.browseShop}
           onPress={onBrowseShop}
           style={styles.inventoryEmptyAction}
         >
           <Text style={styles.inventoryEmptyActionText}>{copy.browseShop}</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </View>
   )

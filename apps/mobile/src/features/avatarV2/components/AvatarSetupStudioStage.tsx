@@ -24,6 +24,7 @@ import {
 } from "../avatarSetupLayout"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import { AvatarPreview2D } from "./AvatarPreview2D"
+import { PressableScale } from "../../../ui/PressableScale"
 
 export interface AvatarStudioCategoryDescriptor {
   type: AvatarStudioCategory
@@ -282,7 +283,7 @@ function GenderButton({
   testID: string
 }) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ disabled, selected: active }}
@@ -299,7 +300,7 @@ function GenderButton({
       <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.genderButtonText, active ? styles.genderButtonTextActive : null]}>
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   )
 }
 

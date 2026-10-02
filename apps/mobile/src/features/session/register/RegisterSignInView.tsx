@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useMemo, type ReactNode } from "react"
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,6 +8,7 @@ import {
   Text,
   View
 } from "react-native"
+import Animated from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import type { useEntranceAnimation, useSelectionTransition } from "../../../ui/animations"
 import { SoftBlobBackground } from "../../../ui/backgrounds"
@@ -38,6 +38,7 @@ import { registerStyles as styles } from "./registerStyles"
 import { useAccountRecoveryFlow } from "./useAccountRecoveryFlow"
 import type { RegisterFlowController } from "./useRegisterFlowController"
 import type { RegisterLayout } from "./useRegisterLayout"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /**
  * Returning-account phone sign-in: its own keyboard-avoiding scroll page with
@@ -308,14 +309,14 @@ export function RegisterSignInView({
                 </Text>
               </View>
               {authIntent === "sign-in" ? (
-                <Pressable
+                <PressableScale
                   accessibilityRole="button"
                   accessibilityLabel={recoveryCopy.linkAccessibilityLabel}
                   onPress={recovery.openRecovery}
                   style={styles.recoveryLink}
                 >
                   <Text style={styles.recoveryLinkText}>{recoveryCopy.link}</Text>
-                </Pressable>
+                </PressableScale>
               ) : null}
               </GlassCard>
               </Animated.View>

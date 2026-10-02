@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { AvatarSelection } from "@blumi/contracts"
-import { Animated, Easing, ImageBackground, StyleSheet, Text, View } from "react-native"
+import { ImageBackground, StyleSheet, Text, View } from "react-native"
+import Animated from "react-native-reanimated"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
 import {
   ROOM_AVATAR_CATALOG
@@ -15,7 +16,7 @@ import {
   type CandidateAvatarSnapshot
 } from "../features/avatarV2/candidateAvatarSnapshot"
 import { LinearGradient } from "../ui/linearGradient"
-import { useReducedMotion } from "../ui/animations"
+import { usePulse } from "../ui/animations"
 import { MyAvatar } from "../ui/myAvatar"
 import { TagChip } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
@@ -24,39 +25,9 @@ const discoverCardSurface = require("../../assets/ui/discover-card-surface.png")
 
 // ── Breathing pulse for online presence ─────────────────────
 
+/** A slow UI-thread breath while the person is online; still under Reduce Motion. */
 function useBreathingPulse(active: boolean) {
-  const anim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  useEffect(() => {
-    if (!active || reduceMotion) {
-      anim.stopAnimation()
-      anim.setValue(1)
-      return undefined
-    }
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, {
-          toValue: 1.08,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        }),
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        })
-      ])
-    )
-
-    loop.start()
-    return () => loop.stop()
-  }, [active, anim, reduceMotion])
-
-  return anim
+  return usePulse({ minScale: 1, maxScale: 1.08, duration: 3000, iterations: active ? -1 : 0 })
 }
 
 // ── DiscoverCard ────────────────────────────────────────────
@@ -125,7 +96,7 @@ export function DiscoverCard(props: DiscoverCardProps) {
         />
         <View style={cardStyles.heroGlassWash} pointerEvents="none" />
         <Animated.View
-          style={[cardStyles.heroGlow, { transform: [{ scale: breathScale }] }]}
+          style={[cardStyles.heroGlow, breathScale]}
           pointerEvents="none"
         />
         <View style={cardStyles.heroGlowSecondary} pointerEvents="none" />

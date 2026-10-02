@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useEffect, useEffectEvent, useState, type ReactNode } from "react"
-import { Pressable, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import Reanimated, {
   Easing,
   cancelAnimation,
@@ -35,6 +35,7 @@ import {
   resolveLinkedProfileRequest,
   type LinkedProfileTarget
 } from "./linkedProfileResolutionModel"
+import { PressableScale } from "../ui/PressableScale"
 
 function createDeepLinkedProfile(
   response: DiscoverProfileResponse
@@ -311,7 +312,7 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
             : copy.failedBody}
         </Text>
         {viewState.loadError === "failed" ? (
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={copy.tryAgain}
             onPress={() => {
@@ -323,16 +324,16 @@ export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
             style={styles.action}
           >
           <Text style={styles.actionText}>{copy.tryAgain}</Text>
-          </Pressable>
+          </PressableScale>
         ) : null}
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.backToDiscover}
           onPress={() => navigation.navigate("Lobby")}
           style={styles.secondaryAction}
         >
           <Text style={styles.secondaryActionText}>{copy.backToDiscover}</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     )
   }

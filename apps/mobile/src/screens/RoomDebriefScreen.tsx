@@ -2,7 +2,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import type { ServerEvent } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { CandidateAvatarPreview } from "../components/DiscoverCard"
 import { LinearGradient } from "../ui/linearGradient"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
@@ -21,7 +22,8 @@ import type { RootStackParamList } from "../navigation/RootNavigator"
 import { Avatar } from "../ui/avatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { uiTheme } from "../ui/theme"
-import { springPressScale, useReducedMotion } from "../ui/animations"
+import { animateTo, useMotion } from "../ui/motion"
+import { PressableScale } from "../ui/PressableScale"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getRoomDebriefCopy } from "../features/miniRoom/roomDebriefCopy"
@@ -57,19 +59,20 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const reduceMotion = useReducedMotion()
-  const heroAnim = useRef(new Animated.Value(0)).current
-  const saveScaleAnim = useRef(new Animated.Value(1)).current
-  const passScaleAnim = useRef(new Animated.Value(1)).current
-
-  // Entrance animation
+  const motion = useMotion()
+  const { reduceMotion } = motion
+  const heroProgress = useSharedValue(0)
+  // Entrance: the hero settles in on the UI thread. Reduce Motion: it fades
+  // in without sliding or scaling.
   useEffect(() => {
-    Animated.spring(heroAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springGentle,
-    }).start()
-  }, [heroAnim])
+    heroProgress.value = animateTo(1, reduceMotion ? motion.crossfade : motion.smooth)
+  }, [heroProgress, motion, reduceMotion])
+  const heroMotionStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, heroProgress.value),
+    transform: reduceMotion
+      ? [{ translateY: 0 }, { scale: 1 }]
+      : [{ translateY: (1 - heroProgress.value) * -20 }, { scale: 0.9 + 0.1 * heroProgress.value }]
+  }))
 
   const clearFallbackTimer = useCallback((): void => {
     if (!fallbackTimerRef.current) return
@@ -250,12 +253,6 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
 
   const buttonsLocked = decision !== "idle"
 
-  const handleSavePressIn = () => springPressScale(saveScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handleSavePressOut = () => springPressScale(saveScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
-
-  const handlePassPressIn = () => springPressScale(passScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handlePassPressOut = () => springPressScale(passScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
-
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
@@ -264,29 +261,7 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
           <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
         </View>
 
-        <Animated.View
-          style={[
-            styles.hero,
-            {
-              opacity: heroAnim,
-              // Reduce Motion: the hero fades in without sliding or scaling.
-              transform: reduceMotion ? [] : [
-                {
-                  translateY: heroAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-20, 0],
-                  })
-                },
-                {
-                  scale: heroAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.9, 1],
-                  })
-                }
-              ],
-            }
-          ]}
-        >
+        <Animated.View style={[styles.hero, heroMotionStyle]}>
           <View style={styles.avatarGlow}>
             {partner.avatarSnapshot ? (
               <CandidateAvatarPreview
@@ -338,8 +313,8 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
         </View>
 
         <View style={styles.choices}>
-          <Animated.View style={[styles.choiceFlex, { transform: [{ scale: passScaleAnim }] }]}>
-            <Pressable
+          <View style={styles.choiceFlex}>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.passAccessibilityLabel}
               accessibilityState={{ disabled: buttonsLocked }}
@@ -347,8 +322,6 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
               onPress={() => {
                 void onPass()
               }}
-              onPressIn={handlePassPressIn}
-              onPressOut={handlePassPressOut}
               style={[
                 styles.choiceButton,
                 styles.passButton,
@@ -363,11 +336,11 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
               />
               <Text style={styles.passLabel}>{copy.passLabel}</Text>
               <Text style={styles.choiceHint}>{copy.passHint}</Text>
-            </Pressable>
-          </Animated.View>
+            </PressableScale>
+          </View>
 
-          <Animated.View style={[styles.choiceFlex, { transform: [{ scale: saveScaleAnim }] }]}>
-            <Pressable
+          <View style={styles.choiceFlex}>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.keepAccessibilityLabel}
               accessibilityState={{ disabled: buttonsLocked }}
@@ -375,8 +348,6 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
               onPress={() => {
                 void onSave()
               }}
-              onPressIn={handleSavePressIn}
-              onPressOut={handleSavePressOut}
               style={[
                 styles.choiceButton,
                 buttonsLocked ? styles.choiceButtonLocked : null
@@ -398,11 +369,11 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
               <Text style={[styles.choiceHint, styles.saveHint]}>
                 {copy.keepHint}
               </Text>
-            </Pressable>
-          </Animated.View>
+            </PressableScale>
+          </View>
         </View>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.decideLaterAccessibilityLabel}
           accessibilityState={{ disabled: buttonsLocked }}
@@ -412,7 +383,7 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
           disabled={buttonsLocked}
         >
           <Text style={styles.laterText}>{copy.decideLater}</Text>
-        </Pressable>
+        </PressableScale>
         {decisionError ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.decisionError}>
             {decisionError}

@@ -1,9 +1,6 @@
-import { useEffect, useRef } from "react"
 import type { ReactNode } from "react"
 import {
-  Animated,
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,63 +12,7 @@ import {
 } from "react-native"
 import { blumiEntryTheme, uiTheme } from "./theme"
 import { LinearGradient } from "./linearGradient"
-import { useReducedMotion } from "./animations"
-
-/* ── Animated Pressable ─────────────────────────────────────── */
-
-interface AnimatedPressableProps {
-  children: ReactNode
-  onPress?: (event: GestureResponderEvent) => void
-  disabled?: boolean
-  style?: StyleProp<ViewStyle>
-  scaleValue?: number
-  accessibilityLabel: string
-}
-
-export function AnimatedPressable(props: AnimatedPressableProps) {
-  const { children, onPress, disabled, style, scaleValue = uiTheme.animation.scalePress, accessibilityLabel } = props
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  const handlePressIn = () => {
-    if (reduceMotion) return
-    Animated.spring(scaleAnim, {
-      toValue: scaleValue,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled }}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={disabled}
-        style={{ width: "100%" }}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  )
-}
+import { PressableScale } from "./PressableScale"
 
 /* ── Screen Surface ─────────────────────────────────────────── */
 
@@ -142,52 +83,6 @@ export function GradientCard(props: GradientCardProps) {
   )
 }
 
-/* ── Section Card ───────────────────────────────────────────── */
-
-interface SectionCardProps {
-  children: ReactNode
-  icon?: string
-  title?: string
-  action?: ReactNode
-  onPress?: () => void
-  style?: StyleProp<ViewStyle>
-}
-
-export function SectionCard(props: SectionCardProps) {
-  const { children, icon, title, action, onPress, style } = props
-
-  const content = (
-    <View style={[styles.sectionCard, style]}>
-      {(title || action) ? (
-        <View style={styles.sectionCardHeader}>
-          <View style={styles.sectionCardTitleRow}>
-            {icon ? (
-              <View style={styles.sectionCardIcon}>
-                <Text style={styles.sectionCardIconText}>{icon}</Text>
-              </View>
-            ) : null}
-            {title ? (
-              <Text style={styles.sectionCardTitle}>{title}</Text>
-            ) : null}
-          </View>
-          {action}
-        </View>
-      ) : null}
-      {children}
-    </View>
-  )
-
-  if (onPress) {
-    return (
-      <AnimatedPressable onPress={onPress} accessibilityLabel={title ?? "Open section"}>
-        {content}
-      </AnimatedPressable>
-    )
-  }
-
-  return content
-}
-
 /* ── Primary Button ─────────────────────────────────────────── */
 
 interface SharedButtonProps {
@@ -204,41 +99,14 @@ interface SharedButtonProps {
 export function PrimaryButton(props: SharedButtonProps) {
   const { label, onPress, disabled = false, busy = false, style, icon, testID, tone = "default" } = props
   const buttonTheme = tone === "entry" ? blumiEntryTheme : uiTheme
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  const handlePressIn = () => {
-    if (reduceMotion) return
-    Animated.spring(scaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
+    <View>
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled, busy }}
         disabled={disabled || busy}
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         style={({ pressed }) => [
           styles.buttonBase,
           styles.primaryButton,
@@ -264,8 +132,8 @@ export function PrimaryButton(props: SharedButtonProps) {
             <Text style={styles.primaryButtonText}>{label}</Text>
           </>}
         </LinearGradient>
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
+    </View>
   )
 }
 
@@ -274,41 +142,14 @@ export function PrimaryButton(props: SharedButtonProps) {
 export function SecondaryButton(props: SharedButtonProps) {
   const { label, onPress, disabled = false, busy = false, style, icon, testID, tone = "default" } = props
   const buttonTheme = tone === "entry" ? blumiEntryTheme : uiTheme
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  const handlePressIn = () => {
-    if (reduceMotion) return
-    Animated.spring(scaleAnim, {
-      toValue: uiTheme.animation.scalePress,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
+    <View>
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled, busy }}
         disabled={disabled || busy}
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         style={({ pressed }) => [
           styles.buttonBase,
           styles.secondaryButton,
@@ -329,8 +170,8 @@ export function SecondaryButton(props: SharedButtonProps) {
             tone === "entry" ? { color: buttonTheme.colors.primaryDeep } : null
           ]}>{label}</Text>
         </>}
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
+    </View>
   )
 }
 
@@ -439,51 +280,19 @@ export function ActionButtonCircle(props: ActionButtonCircleProps) {
     accessibilityState
   } = props
 
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
   const isPrimary = variant === "primary"
   const isDanger = variant === "danger"
   const isGlass = variant === "glass"
 
-  useEffect(() => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-    }
-  }, [reduceMotion, scaleAnim])
-
-  const handlePressIn = () => {
-    if (reduceMotion) return
-    Animated.spring(scaleAnim, {
-      toValue: 0.9,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springBouncy,
-    }).start()
-  }
-
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
+    <View>
+      <PressableScale
+        pressedScale={0.9}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled, ...accessibilityState }}
         disabled={disabled}
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         style={({ pressed }) => [
           styles.circleButton,
           {
@@ -539,8 +348,8 @@ export function ActionButtonCircle(props: ActionButtonCircleProps) {
         ) : (
           children
         )}
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
+    </View>
   )
 }
 
@@ -586,41 +395,6 @@ const styles = StyleSheet.create({
   gradientCardInner: {
     padding: uiTheme.spacing.lg,
     gap: uiTheme.spacing.sm,
-  },
-  /* ── Section Card ────────────────────────────────── */
-  sectionCard: {
-    borderRadius: uiTheme.radius.xl,
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    padding: uiTheme.spacing.lg,
-    gap: uiTheme.spacing.md,
-    ...uiTheme.shadow.soft,
-  },
-  sectionCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionCardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.sm,
-  },
-  sectionCardIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: uiTheme.colors.chipBackground,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sectionCardIconText: {
-    fontSize: 16,
-  },
-  sectionCardTitle: {
-    ...uiTheme.font.subheading,
-    color: uiTheme.colors.textPrimary,
   },
   /* ── Buttons ─────────────────────────────────────── */
   buttonBase: {

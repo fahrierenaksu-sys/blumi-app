@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { memo, useState } from "react"
-import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native"
+import { StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native"
 import Animated, {
   type SharedValue,
   useAnimatedProps,
@@ -10,6 +10,7 @@ import { scheduleOnRN } from "react-native-worklets"
 import { uiTheme } from "../../../ui/theme"
 import { formatShopShelfCounter, type ShopShelfPageTracker } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 const COUNTER_FONT_SCALE_LIMIT = 1.4
@@ -52,7 +53,7 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
   const atLast = shownIndex >= lastPage
   return (
     <View style={styles.catalogPagination}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={previousLabel}
         disabled={atFirst}
@@ -61,7 +62,7 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
         style={[styles.catalogPageButton, atFirst && styles.catalogPageButtonDisabled]}
       >
         <Ionicons name="chevron-back" size={17} color={uiTheme.colors.primary} />
-      </Pressable>
+      </PressableScale>
       <View
         testID="shop-shelf-counter"
         accessible
@@ -85,7 +86,7 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
           style={[styles.catalogPageCount, local.value]}
         />
       </View>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={nextLabel}
         disabled={atLast}
@@ -94,7 +95,7 @@ export const ShopShelfPagination = memo(function ShopShelfPagination(props: {
         style={[styles.catalogPageButton, atLast && styles.catalogPageButtonDisabled]}
       >
         <Ionicons name="chevron-forward" size={17} color={uiTheme.colors.primary} />
-      </Pressable>
+      </PressableScale>
     </View>
   )
 })

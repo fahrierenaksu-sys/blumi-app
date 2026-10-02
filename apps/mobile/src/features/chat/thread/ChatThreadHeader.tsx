@@ -7,6 +7,7 @@ import { uiTheme } from "../../../ui/theme"
 import type { ChatLocale } from "../chatRoomInviteModel"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { styles } from "./chatThreadStyles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /**
  * Static conversation header: back, partner avatar and name, the optional
@@ -70,7 +71,7 @@ export function ChatThreadHeader({
           {partnerName}
         </Text>
         {onViewMatch ? (
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
             hitSlop={8}
@@ -79,10 +80,10 @@ export function ChatThreadHeader({
             <Text style={styles.matchReplayText}>
               {chatLocale === "tr" ? "Eşleşmeyi gör" : "View match"}
             </Text>
-          </Pressable>
+          </PressableScale>
         ) : null}
       </View>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={chatCopy.safetyAccessibilityLabel(partnerName)}
         onPress={onOpenSafety}
@@ -90,7 +91,7 @@ export function ChatThreadHeader({
         style={styles.moreButton}
       >
         <Ionicons name="ellipsis-horizontal" size={20} color={uiTheme.colors.textSecondary} />
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }

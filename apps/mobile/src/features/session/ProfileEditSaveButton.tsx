@@ -1,8 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef } from "react"
-import { Animated, Pressable, StyleSheet, Text } from "react-native"
-import { springPressScale, useReducedMotion } from "../../ui/animations"
+import { StyleSheet, Text } from "react-native"
 import { LinearGradient } from "../../ui/linearGradient"
+import { PressableScale } from "../../ui/PressableScale"
 import { uiTheme } from "../../ui/theme"
 
 /**
@@ -17,20 +16,13 @@ export function ProfileEditSaveButton(props: {
   copy: { saveShort: string; save: string; saving: string; saved: string; savedStatus: string; savingAccessibility: string }
 }) {
   const { enabled, isSaving, saved, copy } = props
-  const saveScaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-  const handlePressIn = () => springPressScale(saveScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handlePressOut = () => springPressScale(saveScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
 
   return (
-    <Animated.View style={{ transform: [{ scale: saveScaleAnim }] }}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={saved ? copy.savedStatus : isSaving ? copy.savingAccessibility : copy.save}
         accessibilityState={{ disabled: !enabled, busy: isSaving }}
         onPress={props.onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         disabled={!enabled}
         hitSlop={4}
         style={[styles.button, !enabled && !saved ? styles.buttonDisabled : null]}
@@ -48,8 +40,7 @@ export function ProfileEditSaveButton(props: {
             {saved ? copy.saved : isSaving ? copy.saving : copy.saveShort}
           </Text>
         </LinearGradient>
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
   )
 }
 

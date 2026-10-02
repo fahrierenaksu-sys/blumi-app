@@ -1,15 +1,25 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarSelection } from "@blumi/contracts"
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react"
+import { useEffect, useRef, useState, type ComponentProps } from "react"
 import {
-  Animated,
-  Easing,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View
 } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+  type SharedValue
+} from "react-native-reanimated"
 import { MyAvatar } from "../ui/myAvatar"
 import {
   CandidateAvatarPreview,
@@ -26,6 +36,7 @@ import {
 } from "../features/matches/matchResultPresentation"
 import { getAppLocale } from "../features/session/appLocale"
 import { uiTheme } from "../ui/theme"
+import { PressableScale } from "../ui/PressableScale"
 
 interface MatchResultModalProps {
   visible: boolean
@@ -78,87 +89,52 @@ function buildParticles(): ParticleConfig[] {
   }))
 }
 
-function ConfettiOverlay(props: { playing: boolean }) {
-  const particles = useRef(buildParticles()).current
-  const anims = useRef(particles.map(() => new Animated.Value(0))).current
-  const confettiAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
-
+/** One confetti piece: its own UI-thread progress, from the burst centre outwards. */
+function ConfettiParticle(props: { particle: ParticleConfig; index: number }) {
+  const { particle, index } = props
+  const progress = useSharedValue(0)
   useEffect(() => {
-    confettiAnimationRef.current?.stop()
-    confettiAnimationRef.current = null
-    if (!props.playing) {
-      anims.forEach((a) => a.setValue(0))
-      return undefined
-    }
-
-    const animations = anims.map((anim, i) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 900 + i * 60,
-        delay: i * 50,
+    progress.value = withDelay(
+      index * 85,
+      withTiming(1, {
+        duration: 900 + index * 60,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
+        reduceMotion: ReduceMotion.Never
       })
     )
-
-    const animation = Animated.stagger(35, animations)
-    confettiAnimationRef.current = animation
-    animation.start()
-    return () => {
-      animation.stop()
-      if (confettiAnimationRef.current === animation) {
-        confettiAnimationRef.current = null
-      }
+  }, [index, progress])
+  const rotation = parseFloat(particle.rotation)
+  const style = useAnimatedStyle(() => {
+    const t = progress.value
+    return {
+      opacity: t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7,
+      transform: [
+        { translateX: particle.startX * t },
+        { translateY: particle.endY * t },
+        { rotate: `${rotation * t}deg` },
+        { scale: t < 0.4 ? (t / 0.4) * 1.2 : 1.2 - ((t - 0.4) / 0.6) * 0.6 }
+      ]
     }
-  }, [anims, props.playing])
+  })
+  return (
+    <AnimatedIonicons
+      accessible={false}
+      name={particle.icon}
+      color={particle.color}
+      size={particle.size}
+      style={[confettiStyles.particle, style]}
+    />
+  )
+}
 
+/** Mounted only while playing, so every burst starts from the centre. */
+function ConfettiOverlay(props: { playing: boolean }) {
+  const particles = useRef(buildParticles()).current
   if (!props.playing) return null
-
   return (
     <View style={confettiStyles.container} pointerEvents="none">
-      {particles.map((p, i) => (
-        <AnimatedIonicons
-          accessible={false}
-          key={i}
-          name={p.icon}
-          color={p.color}
-          size={p.size}
-          style={[
-            confettiStyles.particle,
-            {
-              opacity: anims[i].interpolate({
-                inputRange: [0, 0.3, 1],
-                outputRange: [0, 1, 0]
-              }),
-              transform: [
-                {
-                  translateX: anims[i].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, p.startX]
-                  })
-                },
-                {
-                  translateY: anims[i].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, p.endY]
-                  })
-                },
-                {
-                  rotate: anims[i].interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["0deg", p.rotation]
-                  })
-                },
-                {
-                  scale: anims[i].interpolate({
-                    inputRange: [0, 0.4, 1],
-                    outputRange: [0, 1.2, 0.6]
-                  })
-                }
-              ]
-            }
-          ]}
-        />
+      {particles.map((particle, index) => (
+        <ConfettiParticle key={index} particle={particle} index={index} />
       ))}
     </View>
   )
@@ -178,6 +154,60 @@ const confettiStyles = StyleSheet.create({
   }
 })
 
+// ── Entrance ────────────────────────────────────────────────
+
+const ENTRANCE_EASING = Easing.out(Easing.cubic)
+const HEART_BEAT_PEAK = 1.18
+const HEART_BEAT_HALF_MS = 500
+
+function runMatchEntrance(input: {
+  cardScale: SharedValue<number>
+  cardOpacity: SharedValue<number>
+  avatarsReveal: SharedValue<number>
+  heartPulse: SharedValue<number>
+  fromScale: number
+  fromOpacity: number
+  opacityDurationMs: number
+  spring: { duration: number; dampingRatio: number } | null
+  contentStaggerMs: number
+  heartPulseIterations: number
+}): void {
+  const never = ReduceMotion.Never
+  input.cardOpacity.value = withSequence(
+    withTiming(input.fromOpacity, { duration: 0, reduceMotion: never }),
+    withTiming(1, { duration: input.opacityDurationMs, easing: ENTRANCE_EASING, reduceMotion: never })
+  )
+  if (!input.spring) {
+    // Reduce Motion: a short crossfade only; no scale, stagger, or pulse.
+    input.cardScale.value = 1
+    input.avatarsReveal.value = 1
+    input.heartPulse.value = 1
+    return
+  }
+  input.cardScale.value = withSequence(
+    withTiming(input.fromScale, { duration: 0, reduceMotion: never }),
+    withSpring(1, { ...input.spring, reduceMotion: never })
+  )
+  input.avatarsReveal.value = withSequence(
+    withTiming(0, { duration: 0, reduceMotion: never }),
+    withDelay(
+      input.contentStaggerMs,
+      withTiming(1, { duration: input.opacityDurationMs, easing: ENTRANCE_EASING, reduceMotion: never }),
+      never
+    )
+  )
+  // A bounded heartbeat after the card settles; the heart then rests at full size.
+  const half = { duration: HEART_BEAT_HALF_MS, easing: Easing.inOut(Easing.ease), reduceMotion: never }
+  input.heartPulse.value = withSequence(
+    withTiming(1, { duration: 0, reduceMotion: never }),
+    withDelay(
+      input.opacityDurationMs,
+      withRepeat(withSequence(withTiming(HEART_BEAT_PEAK, half), withTiming(1, half)), input.heartPulseIterations),
+      never
+    )
+  )
+}
+
 // ── Main modal ──────────────────────────────────────────────
 
 export function MatchResultModal(props: MatchResultModalProps) {
@@ -195,11 +225,10 @@ export function MatchResultModal(props: MatchResultModalProps) {
 
   const reduceMotion = useReducedMotion()
   const motion = getMatchCelebrationMotion(reduceMotion)
-  const scaleAnim = useRef(new Animated.Value(motion.entranceFromScale)).current
-  const opacityAnim = useRef(new Animated.Value(motion.entranceFromOpacity)).current
-  const avatarsReveal = useRef(new Animated.Value(0)).current
-  const heartPulse = useRef(new Animated.Value(1)).current
-  const entranceAnimationRef = useRef<Animated.CompositeAnimation | null>(null)
+  const cardScale = useSharedValue(motion.entranceFromScale)
+  const cardOpacity = useSharedValue(motion.entranceFromOpacity)
+  const avatarsReveal = useSharedValue(0)
+  const heartPulse = useSharedValue(1)
   const previousVisibleRef = useRef(false)
   const [locale] = useState(getAppLocale)
   const presentation = getMatchResultPresentation({
@@ -220,96 +249,51 @@ export function MatchResultModal(props: MatchResultModalProps) {
     label: presentation.avatarLabel
   }
 
-  const stopEntrance = useCallback(() => {
-    entranceAnimationRef.current?.stop()
-    entranceAnimationRef.current = null
-    scaleAnim.stopAnimation()
-    opacityAnim.stopAnimation()
-    avatarsReveal.stopAnimation()
-    heartPulse.stopAnimation()
-  }, [avatarsReveal, heartPulse, opacityAnim, scaleAnim])
-
-  const runEntrance = useCallback(() => {
-    stopEntrance()
-    scaleAnim.setValue(motion.entranceFromScale)
-    opacityAnim.setValue(motion.entranceFromOpacity)
-    heartPulse.setValue(1)
-    const crossfade = Animated.timing(opacityAnim, {
-      toValue: 1,
-      duration: motion.entranceOpacityDurationMs,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    })
-
-    if (!motion.entranceSpring) {
-      // Reduce Motion: a short crossfade only; no scale, stagger, or pulse.
-      scaleAnim.setValue(1)
-      avatarsReveal.setValue(1)
-      entranceAnimationRef.current = crossfade
-      crossfade.start()
-      return
-    }
-
-    avatarsReveal.setValue(0)
-    const heartBeat = Animated.sequence([
-      Animated.timing(heartPulse, {
-        toValue: 1.18,
-        duration: 500,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true
-      }),
-      Animated.timing(heartPulse, {
-        toValue: 1,
-        duration: 500,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true
-      })
-    ])
-    const animation = Animated.sequence([
-      Animated.parallel([
-        crossfade,
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: motion.entranceSpringConfig.tension,
-          friction: motion.entranceSpringConfig.friction,
-          useNativeDriver: true
-        }),
-        Animated.timing(avatarsReveal, {
-          toValue: 1,
-          duration: motion.entranceOpacityDurationMs,
-          delay: motion.contentStaggerMs,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true
-        })
-      ]),
-      // A bounded heartbeat; the heart then rests at full size.
-      Animated.loop(heartBeat, { iterations: motion.heartPulseIterations })
-    ])
-    entranceAnimationRef.current = animation
-    animation.start()
-  }, [
-    avatarsReveal,
-    heartPulse,
-    motion.contentStaggerMs,
-    motion.entranceFromOpacity,
-    motion.entranceFromScale,
-    motion.entranceOpacityDurationMs,
-    motion.entranceSpring,
-    motion.entranceSpringConfig,
-    motion.heartPulseIterations,
-    opacityAnim,
-    scaleAnim,
-    stopEntrance
-  ])
+  const {
+    contentStaggerMs,
+    entranceFromOpacity,
+    entranceFromScale,
+    entranceOpacityDurationMs,
+    entranceSpringConfig,
+    heartPulseIterations
+  } = motion
 
   useEffect(() => {
-    if (visible) {
-      runEntrance()
-      return stopEntrance
-    }
-    stopEntrance()
-    return undefined
-  }, [runEntrance, stopEntrance, visible])
+    if (!visible) return
+    // Every value is reset and restarted on the UI thread; assigning a new
+    // animation interrupts any entrance still running.
+    runMatchEntrance({
+      cardScale,
+      cardOpacity,
+      avatarsReveal,
+      heartPulse,
+      fromScale: entranceFromScale,
+      fromOpacity: entranceFromOpacity,
+      opacityDurationMs: entranceOpacityDurationMs,
+      spring: entranceSpringConfig,
+      contentStaggerMs,
+      heartPulseIterations
+    })
+  }, [
+    avatarsReveal,
+    cardOpacity,
+    cardScale,
+    contentStaggerMs,
+    entranceFromOpacity,
+    entranceFromScale,
+    entranceOpacityDurationMs,
+    entranceSpringConfig,
+    heartPulse,
+    heartPulseIterations,
+    visible
+  ])
+
+  const cardMotionStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [{ scale: cardScale.value }]
+  }))
+  const avatarsMotionStyle = useAnimatedStyle(() => ({ opacity: avatarsReveal.value }))
+  const heartMotionStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartPulse.value }] }))
 
   useEffect(() => {
     // Haptics are not motion, so Reduce Motion keeps this one success tap.
@@ -326,25 +310,17 @@ export function MatchResultModal(props: MatchResultModalProps) {
           style={styles.backdrop}
           onPress={onClose}
         />
-        <Animated.View
-          style={[
-            styles.modalCard,
-            {
-              opacity: opacityAnim,
-              transform: [{ scale: scaleAnim }]
-            }
-          ]}
-        >
+        <Animated.View style={[styles.modalCard, cardMotionStyle]}>
           <ConfettiOverlay playing={visible && motion.confetti} />
 
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={presentation.closeLabel}
             style={styles.closeButton}
             onPress={onClose}
           >
             <Ionicons accessible={false} name="close" size={20} color={uiTheme.colors.secondaryText} />
-          </Pressable>
+          </PressableScale>
 
           <Text style={styles.headline}>{presentation.headline}</Text>
           <Text style={styles.supportText}>{presentation.body}</Text>
@@ -354,7 +330,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
             <Text style={styles.confirmedText}>{presentation.badgeLabel}</Text>
           </View>
 
-          <Animated.View style={[styles.connectionRow, { opacity: avatarsReveal }]}>
+          <Animated.View style={[styles.connectionRow, avatarsMotionStyle]}>
             <View style={styles.avatarColumn}>
               <MyAvatar
                 name={currentUserName}
@@ -367,12 +343,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
 
             <View style={styles.heartConnector}>
               <View style={styles.connectorLine} />
-              <Animated.View
-                style={[
-                  styles.heartBadge,
-                  { transform: [{ scale: heartPulse }] }
-                ]}
-              >
+              <Animated.View style={[styles.heartBadge, heartMotionStyle]}>
                 <Ionicons
                   accessible={false}
                   name="heart"

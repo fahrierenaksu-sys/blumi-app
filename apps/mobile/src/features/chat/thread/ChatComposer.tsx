@@ -1,10 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef, useState } from "react"
-import { Animated, Pressable, TextInput, View } from "react-native"
+import { useState } from "react"
+import { Pressable, TextInput, View } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
-import { useReducedMotion } from "../../../ui/animations"
+import { PressableScale } from "../../../ui/PressableScale"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
@@ -41,40 +41,12 @@ export function ChatComposer({
   draftTyping?: ChatDraftTyping
 }) {
   const [inputText, setInputText] = useState("")
-  const sendScaleAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
   const isSendDisabled = inputText.trim().length === 0 || isPendingThread
 
   const handleSend = (): void => {
     const body = inputText.trim()
     if (!body || isPendingThread) return
     if (onSend(body)) setInputText("")
-  }
-
-  const handleSendPressIn = () => {
-    sendScaleAnim.stopAnimation()
-    if (reduceMotion) {
-      sendScaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(sendScaleAnim, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
-  }
-
-  const handleSendPressOut = () => {
-    sendScaleAnim.stopAnimation()
-    if (reduceMotion) {
-      sendScaleAnim.setValue(1)
-      return
-    }
-    Animated.spring(sendScaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.spring,
-    }).start()
   }
 
   return (
@@ -114,8 +86,7 @@ export function ChatComposer({
             maxLength={500}
           />
         </View>
-        <Animated.View style={{ transform: [{ scale: sendScaleAnim }] }}>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
@@ -123,8 +94,7 @@ export function ChatComposer({
               handleSend()
               draftTyping?.endDraft()
             }}
-            onPressIn={handleSendPressIn}
-            onPressOut={handleSendPressOut}
+            pressedScale={0.96}
             disabled={isSendDisabled}
             style={({ pressed }) => [
               styles.sendButton,
@@ -144,8 +114,7 @@ export function ChatComposer({
             >
               <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
-          </Pressable>
-        </Animated.View>
+          </PressableScale>
       </View>
     </SafeAreaView>
   )

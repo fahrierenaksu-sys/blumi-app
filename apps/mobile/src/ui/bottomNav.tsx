@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
-  Animated,
-  Easing,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -21,6 +18,7 @@ import Reanimated, {
 } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useReducedMotion } from "./animations"
+import { PressableScale } from "./PressableScale"
 import {
   BOTTOM_NAV_KEY_ORDER,
   getBottomNavItemEmphasis,
@@ -44,7 +42,6 @@ import {
 } from "./layout/bottomNavLayout"
 import {
   BOTTOM_NAV_PRESSED_SCALE,
-  BOTTOM_NAV_PRESS_DURATION_MS,
   getBottomNavMotionDuration,
 } from "./layout/bottomNavMotionModel"
 import {
@@ -190,7 +187,6 @@ function NavTab(props: {
     ambient,
     reduceMotion,
   } = props
-  const scaleAnim = useRef(new Animated.Value(1)).current
   // The selected icon and label fade in as the indicator arrives, so the
   // whole bar moves with a swipe instead of switching after it settles.
   const selectedLayerStyle = useAnimatedStyle(() => ({
@@ -200,48 +196,12 @@ function NavTab(props: {
     opacity: 1 - getBottomNavItemEmphasis(index, indicator.value)
   }))
 
-  const handlePressIn = () => {
-    scaleAnim.stopAnimation()
-    if (reduceMotion) {
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.timing(scaleAnim, {
-      toValue: BOTTOM_NAV_PRESSED_SCALE,
-      useNativeDriver: true,
-      duration: BOTTOM_NAV_PRESS_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-    }).start()
-  }
-
-  const handlePressOut = () => {
-    scaleAnim.stopAnimation()
-    if (reduceMotion) {
-      scaleAnim.setValue(1)
-      return
-    }
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      duration: BOTTOM_NAV_PRESS_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-    }).start()
-  }
-
-  useEffect(() => {
-    if (reduceMotion) {
-      scaleAnim.stopAnimation()
-      scaleAnim.setValue(1)
-    }
-    return () => scaleAnim.stopAnimation()
-  }, [reduceMotion, scaleAnim])
-
   return (
-    <Animated.View style={[styles.bottomNavItemOuter, { transform: [{ scale: scaleAnim }] }]}>
+    <View style={styles.bottomNavItemOuter}>
       {/* The selected tab stays pressable: a second tap is a reselect
           (scroll to top), which is silent, so only a tab change plays the
           selection haptic. */}
-      <Pressable
+      <PressableScale
         accessibilityRole="tab"
         accessibilityLabel={item.label}
         accessibilityState={{ selected: isCurrent }}
@@ -253,8 +213,7 @@ function NavTab(props: {
           if (!isCurrent) hapticSelection()
           onPress()
         }}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        pressedScale={BOTTOM_NAV_PRESSED_SCALE}
         hitSlop={6}
       >
         <View style={styles.bottomNavIconWrap}>
@@ -285,8 +244,8 @@ function NavTab(props: {
             {item.label}
           </Text>
         </Reanimated.View>
-      </Pressable>
-    </Animated.View>
+      </PressableScale>
+    </View>
   )
 }
 

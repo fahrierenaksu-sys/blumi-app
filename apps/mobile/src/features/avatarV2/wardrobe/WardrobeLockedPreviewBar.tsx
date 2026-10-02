@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 import { WardrobeGlass } from "./WardrobeGlass"
 import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /**
  * MICRO-3: shown under the stage while a locked item is tried on: what is
@@ -44,7 +45,7 @@ export function WardrobeLockedPreviewBar(props: {
             {copy.seeInShop}
           </Text>
         </Pressable>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.closePreview}
           onPress={props.onClose}
@@ -52,7 +53,7 @@ export function WardrobeLockedPreviewBar(props: {
           style={styles.lockedPreviewClose}
         >
           <Ionicons name="close" size={16} color={wardrobeTheme.muted} />
-        </Pressable>
+        </PressableScale>
       </WardrobeGlass>
     </Animated.View>
   )

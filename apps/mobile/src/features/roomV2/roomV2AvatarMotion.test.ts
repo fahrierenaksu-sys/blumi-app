@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import type { Animated } from "react-native"
 import {
   getAvatarMotionScaleY,
   type RoomRendererAvatarMotion
@@ -37,11 +36,9 @@ test("sitting rig fails safe to the calibrated default until layout and metadata
 })
 
 test("a sitting avatar is never squashed: its vertical scale stays exactly 1", () => {
-  // Interpolating refs would return a non-numeric value, so any animated
-  // squash or breathe on a seated avatar fails this check.
-  const animatedRef = {
-    interpolate: () => ({ animated: true })
-  } as unknown as Animated.Value
+  // Mid-loop progress values: any squash or breathe applied to a seated
+  // avatar would move its vertical scale away from 1.
+  const midLoop = 0.6
   const treatments = ["animatedMotionAssets", "exactMotionAssets", "runtimeLocomotion", "runtimeGesture", "static"]
   for (const treatment of treatments) {
     for (const usesRuntimeLocomotion of [false, true]) {
@@ -56,7 +53,7 @@ test("a sitting avatar is never squashed: its vertical scale stays exactly 1", (
               usesAnimatedAssets
             } as unknown as RoomRendererAvatarMotion
             assert.equal(
-              getAvatarMotionScaleY(motion, animatedRef, animatedRef, usesIdleBreathe),
+              getAvatarMotionScaleY(motion, midLoop, midLoop, usesIdleBreathe),
               1,
               `${treatment} locomotion=${usesRuntimeLocomotion} gesture=${usesRuntimeGesture} ` +
                 `assets=${usesAnimatedAssets} breathe=${usesIdleBreathe}`

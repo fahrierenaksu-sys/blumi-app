@@ -21,6 +21,7 @@ import { useAppViewportMetrics } from "../../ui/layout/useAppViewportMetrics"
 import { getAppLocale } from "../session/appLocale"
 import { resolveDiscoveryLayoutMetrics } from "./discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "./discoverySurfaceCopy"
+import { PressableScale } from "../../ui/PressableScale"
 
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
 
@@ -156,7 +157,7 @@ export function EmptyDiscoveryDeck(props: EmptyDiscoveryDeckProps) {
         </Pressable> : null}
 
         {props.state === "low-supply" && props.onActivateWatch && props.onCancelWatch ? (
-          <Pressable
+          <PressableScale
             accessibilityLabel={props.watchActive ? copy.empty.watchCancel : copy.empty.watchActivate}
             accessibilityRole="button"
             accessibilityState={{
@@ -192,7 +193,7 @@ export function EmptyDiscoveryDeck(props: EmptyDiscoveryDeckProps) {
                 <Text style={styles.watchCancel}>{copy.empty.watchCancel}</Text>
               ) : null}
             </View>
-          </Pressable>
+          </PressableScale>
         ) : null}
 
       </DiscoveryCardSurface>
@@ -232,7 +233,7 @@ export function DiscoverErrorCard(props: {
         </View>
         <Text style={styles.emptyTitle}>{copy.empty.errorTitle}</Text>
         <Text style={styles.emptyBody}>{props.message}</Text>
-        <Pressable
+        <PressableScale
           accessibilityLabel={copy.empty.errorAccessibilityLabel}
           accessibilityRole="button"
           accessibilityState={{ busy: props.refreshing === true, disabled: props.refreshing === true }}
@@ -241,7 +242,7 @@ export function DiscoverErrorCard(props: {
           style={styles.retryButton}
         >
           {props.refreshing ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.retryButtonText}>{copy.empty.errorAction}</Text>}
-        </Pressable>
+        </PressableScale>
       </DiscoveryCardSurface>
     </View>
   )

@@ -1,358 +1,145 @@
 /**
- * Reusable animation hooks for screen/component entrance animations.
- * Uses React Native's Animated API with useNativeDriver for 60fps.
+ * Reusable entrance, pulse and selection animations on Reanimated: each runs
+ * on the UI thread from a shared value, so a busy JS thread never delays or
+ * stutters it. The returned styles go on a Reanimated `Animated.View`.
+ *
+ * Timing comes from the motion tokens (`./motion`); Reduce Motion replaces
+ * movement with an opacity crossfade.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
-import { AccessibilityInfo, Animated, Easing } from "react-native"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import {
-  createReducedMotionStore,
-  type ReducedMotionPreference
-} from "./reducedMotionStore"
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 import { getPulseRestProgress } from "./ambientMotionModel"
-import { uiTheme } from "./theme"
+import { animateTo, animateToAfter, useMotion, type ResolvedMotion } from "./motion"
 
-/** Keeps product motion aligned with the OS accessibility preference. */
-const reducedMotionStore = createReducedMotionStore({
-  isReduceMotionEnabled: () => AccessibilityInfo.isReduceMotionEnabled(),
-  addEventListener: (event, listener) =>
-    AccessibilityInfo.addEventListener(event, listener)
-})
-
-let reducedMotionPrimed = false
-
-/** Called once at the app root so later mounts read a resolved preference. */
-export function primeReducedMotionPreference(): void {
-  if (reducedMotionPrimed) return
-  reducedMotionPrimed = true
-  reducedMotionStore.subscribe(() => undefined)
-}
-
-export function useReducedMotionPreference(): ReducedMotionPreference {
-  // One shared OS subscription; resolved values are available synchronously
-  // to later mounts, and the unresolved default remains fail closed.
-  return useSyncExternalStore(
-    reducedMotionStore.subscribe,
-    reducedMotionStore.getSnapshot,
-    reducedMotionStore.getSnapshot
-  )
-}
-
-export function useReducedMotion(): boolean {
-  return useReducedMotionPreference().reduceMotion
-}
-
-/**
- * Press feedback on a native-driver scale value. Under Reduce Motion the
- * scale changes instantly instead of springing, so the pressed state stays
- * visible without movement.
- */
-export function springPressScale(
-  value: Animated.Value,
-  toValue: number,
-  spring: { damping: number; stiffness: number; mass: number },
-  reduceMotion: boolean
-): void {
-  if (reduceMotion) {
-    value.stopAnimation()
-    value.setValue(toValue)
-    return
-  }
-  Animated.spring(value, { toValue, useNativeDriver: true, ...spring }).start()
-}
+// The Reduce Motion store lives in ./motion; these re-exports keep the
+// existing import sites working.
+export {
+  primeReducedMotionPreference,
+  useReducedMotion,
+  useReducedMotionPreference
+} from "./motion"
 
 /* ── Fade + Slide Up ───────────────────────────────────────── */
 
 interface EntranceOptions {
-  /** Delay before animation starts (ms) */
+  /** Delay before the entrance starts (ms). */
   delay?: number
-  /** Duration of the animation (ms) */
+  /** A fixed duration (ms); the default is the `smooth` spring. */
   duration?: number
-  /** How far the element slides up from (px) */
+  /** How far the element rises from (px). */
   translateY?: number
 }
 
 /**
- * Fade-in + slide-up entrance animation.
- * Returns { opacity, transform } to spread onto an Animated.View.
+ * Fade-in + rise entrance. It starts before the first paint (layout effect),
+ * so the element never flashes at rest first. Under Reduce Motion it only
+ * crossfades in place, without delay.
  */
 export function useEntranceAnimation(options: EntranceOptions = {}) {
-  const { delay = 0, duration = uiTheme.animation.durationEntrance, translateY = 20 } = options
-  const progress = useRef(new Animated.Value(0)).current
-  const reduceMotion = useReducedMotion()
+  const { delay = 0, duration, translateY = 20 } = options
+  const motion = useMotion()
+  const { reduceMotion } = motion
+  const progress = useSharedValue(0)
 
   useLayoutEffect(() => {
-    if (reduceMotion) {
-      progress.stopAnimation()
-      progress.setValue(1)
-      return
-    }
-    const anim = Animated.timing(progress, {
-      toValue: 1,
-      duration,
-      delay,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    })
-    anim.start()
-    return () => anim.stop()
-  }, [delay, duration, progress, reduceMotion])
+    const token: ResolvedMotion = reduceMotion
+      ? motion.crossfade
+      : duration === undefined
+        ? motion.smooth
+        : { kind: "timing", duration }
+    progress.value = animateToAfter(reduceMotion ? 0 : delay, 1, token)
+  }, [delay, duration, motion, progress, reduceMotion])
 
-  return {
-    opacity: progress,
-    transform: [
-      {
-        translateY: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [translateY, 0]
-        })
-      }
-    ]
-  }
+  return useAnimatedStyle(() => ({
+    opacity: Math.min(1, progress.value),
+    transform: [{ translateY: reduceMotion ? 0 : (1 - progress.value) * translateY }]
+  }))
 }
 
-/* ── Staggered List Entrance ───────────────────────────────── */
+/* ── Pulse ─────────────────────────────────────────────────── */
 
 /**
- * Creates staggered entrance animations for a list of items.
- * Each item fades in + slides up with a stagger delay.
- */
-export function useStaggeredEntrance(
-  itemCount: number,
-  options: { staggerMs?: number; duration?: number; translateY?: number } = {}
-) {
-  const { staggerMs = uiTheme.animation.staggerMs, duration = 320, translateY = 20 } = options
-  const reduceMotion = useReducedMotion()
-  const anims = useMemo(
-    () => Array.from({ length: itemCount }, () => new Animated.Value(0)),
-    [itemCount]
-  )
-
-  useEffect(() => {
-    if (itemCount === 0) return
-    if (reduceMotion) {
-      for (const anim of anims) anim.setValue(1)
-      return
-    }
-    const animations = anims.slice(0, itemCount).map((anim, i) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration,
-        delay: i * staggerMs,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
-      })
-    )
-    const sequence = Animated.parallel(animations)
-    sequence.start()
-    return () => sequence.stop()
-  }, [anims, duration, itemCount, reduceMotion, staggerMs])
-
-  return (index: number) => {
-    const anim = anims[index] ?? new Animated.Value(1)
-    return {
-      opacity: anim,
-      transform: [
-        {
-          translateY: anim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [translateY, 0]
-          })
-        }
-      ]
-    }
-  }
-}
-
-/* ── Scale Bounce ──────────────────────────────────────────── */
-
-/**
- * Scale bounce entrance — great for match celebrations, unlocks.
- * Scales from 0 → overshoot → 1.
- */
-export function useScaleBounce(options: { delay?: number; tension?: number; friction?: number } = {}) {
-  const { delay = 0, tension = 80, friction = 8 } = options
-  const scale = useRef(new Animated.Value(0)).current
-  const reduceMotion = useReducedMotion()
-
-  useEffect(() => {
-    if (reduceMotion) {
-      scale.stopAnimation()
-      scale.setValue(1)
-      return
-    }
-    const timeout = setTimeout(() => {
-      Animated.spring(scale, {
-        toValue: 1,
-        tension,
-        friction,
-        useNativeDriver: true
-      }).start()
-    }, delay)
-    return () => clearTimeout(timeout)
-  }, [delay, friction, reduceMotion, scale, tension])
-
-  return { transform: [{ scale }] }
-}
-
-/* ── Pulse Glow ────────────────────────────────────────────── */
-
-/**
- * Continuous pulse animation — for glowing rings, attention indicators.
- * `iterations` bounds the pulse to that many beats (it then settles at
- * scale 1); the default -1 keeps the endless loop.
+ * A pulse for glowing rings and attention indicators. `iterations` bounds it
+ * to that many beats, after which it settles at scale 1; the default -1
+ * loops while mounted. Under Reduce Motion it rests at scale 1.
  */
 export function usePulse(
   options: { minScale?: number; maxScale?: number; duration?: number; iterations?: number } = {}
 ) {
   const { minScale = 0.95, maxScale = 1.05, duration = 1500, iterations = -1 } = options
-  const pulse = useRef(new Animated.Value(0)).current
-  const reduceMotion = useReducedMotion()
+  const { reduceMotion } = useMotion()
+  const restProgress = getPulseRestProgress(minScale, maxScale)
+  const pulse = useSharedValue(restProgress)
 
   useEffect(() => {
-    const restProgress = getPulseRestProgress(minScale, maxScale)
-    if (reduceMotion) {
-      pulse.stopAnimation()
-      pulse.setValue(restProgress)
+    if (reduceMotion || iterations === 0) {
+      pulse.value = restProgress
       return
     }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: duration / 2,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: duration / 2,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        })
-      ]),
-      { iterations }
-    )
+    const half = { duration: duration / 2, easing: Easing.inOut(Easing.ease), reduceMotion: ReduceMotion.Never }
+    const beat = withSequence(withTiming(1, half), withTiming(0, half))
     // A bounded pulse settles at full size, never shrunk (SYS-9).
-    let settle: Animated.CompositeAnimation | null = null
-    loop.start(({ finished }) => {
-      if (!finished || iterations < 0) return
-      settle = Animated.timing(pulse, {
-        toValue: restProgress,
-        duration: duration / 2,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true
-      })
-      settle.start()
-    })
-    return () => {
-      loop.stop()
-      settle?.stop()
-    }
-  }, [duration, iterations, maxScale, minScale, pulse, reduceMotion])
+    pulse.value = iterations < 0
+      ? withRepeat(beat, -1)
+      : withSequence(withRepeat(beat, iterations), withTiming(restProgress, half))
+  }, [duration, iterations, pulse, reduceMotion, restProgress])
 
-  return {
-    transform: [
-      {
-        scale: pulse.interpolate({
-          inputRange: [0, 1],
-          outputRange: [minScale, maxScale]
-        })
-      }
-    ]
-  }
+  return useAnimatedStyle(() => ({
+    transform: [{ scale: minScale + (maxScale - minScale) * pulse.value }]
+  }))
 }
 
-/* ── Fade In ───────────────────────────────────────────────── */
-
-/**
- * Simple fade-in without translation. Good for overlays.
- */
-export function useFadeIn(options: { delay?: number; duration?: number } = {}) {
-  const { delay = 0, duration = 350 } = options
-  const opacity = useRef(new Animated.Value(0)).current
-  const reduceMotion = useReducedMotion()
-
-  useEffect(() => {
-    if (reduceMotion) {
-      opacity.stopAnimation()
-      opacity.setValue(1)
-      return
-    }
-    const anim = Animated.timing(opacity, {
-      toValue: 1,
-      duration,
-      delay,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true
-    })
-    anim.start()
-    return () => anim.stop()
-  }, [delay, duration, opacity, reduceMotion])
-
-  return { opacity }
-}
+/* ── Selection change ──────────────────────────────────────── */
 
 interface SelectionTransitionOptions {
   fromScale?: number
   translateY?: number
 }
 
+/** Opacity a changed selection starts from. */
+const SELECTION_FROM_OPACITY = 0.72
+
 /**
- * A short feedback transition for user-triggered selection changes.
- * It animates only opacity and transforms, so it cannot reflow the layout.
+ * A short feedback transition when the user changes a selection: the new
+ * content settles in with the `snappy` spring. Only opacity and transforms
+ * move, so it cannot reflow the layout. Under Reduce Motion it only
+ * crossfades.
  */
 export function useSelectionTransition(
   selectionKey: string | number | undefined,
   options: SelectionTransitionOptions = {}
 ) {
   const { fromScale = 0.985, translateY = 6 } = options
-  const reduceMotion = useReducedMotion()
-  const progress = useRef(new Animated.Value(1)).current
+  const motion = useMotion()
+  const { reduceMotion } = motion
+  const progress = useSharedValue(1)
   const previousKey = useRef(selectionKey)
 
   useLayoutEffect(() => {
-    if (reduceMotion) {
-      previousKey.current = selectionKey
-      progress.stopAnimation()
-      progress.setValue(1)
-      return
-    }
-
     if (previousKey.current === selectionKey) return
     previousKey.current = selectionKey
-    progress.stopAnimation()
+    progress.value = withSequence(
+      withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+      animateTo(1, reduceMotion ? motion.crossfade : motion.snappy)
+    )
+  }, [motion, progress, reduceMotion, selectionKey])
 
-    progress.setValue(0)
-    const animation = Animated.spring(progress, {
-      toValue: 1,
-      damping: 22,
-      stiffness: 260,
-      mass: 0.75,
-      useNativeDriver: true
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [progress, reduceMotion, selectionKey])
-
-  return {
-    opacity: progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.72, 1]
-    }),
-    transform: [
-      {
-        translateY: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [translateY, 0]
-        })
-      },
-      {
-        scale: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [fromScale, 1]
-        })
-      }
-    ]
-  }
+  return useAnimatedStyle(() => ({
+    opacity: SELECTION_FROM_OPACITY + (1 - SELECTION_FROM_OPACITY) * Math.min(1, progress.value),
+    transform: reduceMotion
+      ? [{ translateY: 0 }, { scale: 1 }]
+      : [
+        { translateY: (1 - progress.value) * translateY },
+        { scale: fromScale + (1 - fromScale) * progress.value }
+      ]
+  }))
 }

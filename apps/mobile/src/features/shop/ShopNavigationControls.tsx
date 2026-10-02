@@ -1,17 +1,17 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useEffect, useRef } from "react"
+import { memo, useEffect } from "react"
 import {
   ActivityIndicator,
-  Animated,
   Pressable,
   StyleSheet,
   Text,
   View
 } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import type { ShopPresentationState } from "./shopPresentationModel"
 import type { AppLocale } from "../session/appLocale"
 import { getShopCopy } from "./shopCopy"
-import { useReducedMotion } from "../../ui/animations"
+import { animateTo, useMotion } from "../../ui/motion"
 import { uiTheme } from "../../ui/theme"
 
 export type ShopMode = "avatar" | "home"
@@ -126,44 +126,24 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
   locale: AppLocale
 }) {
   const copy = getShopCopy(props.locale)
-  const slideAnim = useRef(new Animated.Value(props.activeMode === "avatar" ? 0 : 1)).current
-  const reduceMotion = useReducedMotion()
+  const motion = useMotion()
+  const slide = useSharedValue(props.activeMode === "avatar" ? 0 : 1)
   const segmentWidth = (props.width - 8) / 2
 
+  // The selected-mode pill slides with the snappy spring (lands at once
+  // under Reduce Motion).
   useEffect(() => {
-    const nextValue = props.activeMode === "avatar" ? 0 : 1
-    if (reduceMotion) {
-      slideAnim.stopAnimation()
-      slideAnim.setValue(nextValue)
-      return
-    }
-    const animation = Animated.spring(slideAnim, {
-      toValue: nextValue,
-      useNativeDriver: true,
-      damping: 18,
-      stiffness: 210,
-      mass: 0.7
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [props.activeMode, reduceMotion, slideAnim])
-
-  const indicatorTranslateX = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, segmentWidth]
-  })
+    slide.value = animateTo(props.activeMode === "avatar" ? 0 : 1, motion.snappy)
+  }, [motion, props.activeMode, slide])
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slide.value * segmentWidth }]
+  }))
 
   return (
     <View style={styles.modeDock}>
       <Animated.View
         pointerEvents="none"
-        style={[
-          styles.modeIndicator,
-          {
-            width: segmentWidth,
-            transform: [{ translateX: indicatorTranslateX }]
-          }
-        ]}
+        style={[styles.modeIndicator, { width: segmentWidth }, indicatorStyle]}
       />
       {SHOP_MODE_OPTIONS.map((option) => {
         const active = option.mode === props.activeMode

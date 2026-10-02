@@ -3,7 +3,8 @@ import test from "node:test"
 import {
   getMyRoomStageAccessibilityValue,
   getMyRoomStageRevealMotion,
-  getMyRoomStageVeilFrame
+  getMyRoomStageVeilFrame,
+  isMyRoomStageCovered
 } from "./myRoomStageModel"
 
 test("stage accessibility value counts saved items in English", () => {
@@ -31,16 +32,24 @@ test("stage accessibility value treats invalid counts as an empty room", () => {
   assert.equal(getMyRoomStageAccessibilityValue({ savedItemCount: 2.7, locale: "en" }), "2 items")
 })
 
-test("stage reveal crossfades normally and is instant under Reduce Motion", () => {
+test("stage reveal is a short crossfade, kept under Reduce Motion because it does not move", () => {
   assert.ok(getMyRoomStageRevealMotion(false).durationMs > 0)
-  assert.deepEqual(getMyRoomStageRevealMotion(true), { durationMs: 0 })
+  assert.ok(getMyRoomStageRevealMotion(false).durationMs <= 250)
+  assert.deepEqual(getMyRoomStageRevealMotion(true), getMyRoomStageRevealMotion(false))
 })
 
-test("stage veil covers instantly while loading and fades out once the room is ready", () => {
-  assert.deepEqual(getMyRoomStageVeilFrame({ isLoading: true, reduceMotion: false }), { opacity: 1, durationMs: 0 })
-  assert.deepEqual(getMyRoomStageVeilFrame({ isLoading: true, reduceMotion: true }), { opacity: 1, durationMs: 0 })
-  const fadeOut = getMyRoomStageVeilFrame({ isLoading: false, reduceMotion: false })
-  assert.equal(fadeOut.opacity, 0)
-  assert.ok(fadeOut.durationMs > 0)
-  assert.deepEqual(getMyRoomStageVeilFrame({ isLoading: false, reduceMotion: true }), { opacity: 0, durationMs: 0 })
+test("stage veil covers instantly and crossfades out once uncovered", () => {
+  for (const reduceMotion of [false, true]) {
+    assert.deepEqual(getMyRoomStageVeilFrame({ covered: true, reduceMotion }), { opacity: 1, durationMs: 0 })
+    const fadeOut = getMyRoomStageVeilFrame({ covered: false, reduceMotion })
+    assert.equal(fadeOut.opacity, 0)
+    assert.ok(fadeOut.durationMs > 0)
+  }
+})
+
+test("the veil lifts only after the room's first paint, or after the fallback if no paint is reported", () => {
+  assert.equal(isMyRoomStageCovered({ isLoading: true, shellPainted: true, paintFallbackElapsed: true }), true)
+  assert.equal(isMyRoomStageCovered({ isLoading: false, shellPainted: false, paintFallbackElapsed: false }), true)
+  assert.equal(isMyRoomStageCovered({ isLoading: false, shellPainted: true, paintFallbackElapsed: false }), false)
+  assert.equal(isMyRoomStageCovered({ isLoading: false, shellPainted: false, paintFallbackElapsed: true }), false)
 })

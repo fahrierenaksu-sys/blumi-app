@@ -1,4 +1,4 @@
-import { Modal, Pressable, Text, TextInput, View } from "react-native"
+import { Modal, Text, TextInput, View } from "react-native"
 import { CountryCallingCodePicker } from "../../components/CountryCallingCodePicker"
 import { getLocalPhonePlaceholder } from "../session/registerPresentationModel"
 import type { SettingsCopy } from "./settingsCopy"
@@ -8,6 +8,7 @@ import { isVerificationCodeComplete } from "./settingsPresentationModel"
 import type { useAccountDataExport } from "./useAccountDataExport"
 import type { useAccountDeletion } from "./useAccountDeletion"
 import type { usePhoneChange } from "./usePhoneChange"
+import { PressableScale } from "../../ui/PressableScale"
 
 export function AccountDataExportModal(props: {
   copy: SettingsCopy
@@ -40,15 +41,15 @@ export function AccountDataExportModal(props: {
             value={exportCode}
           />
           <View style={styles.deletionModalActions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.cancelExport}
               onPress={closeExportCode}
               style={styles.deletionSecondaryButton}
             >
               <Text style={styles.deletionSecondaryText}>{copy.cancel}</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.verifyExport}
               disabled={!isVerificationCodeComplete(exportCode) || isExportingAccountData}
@@ -56,7 +57,7 @@ export function AccountDataExportModal(props: {
               style={[styles.deletionPrimaryButton, !isVerificationCodeComplete(exportCode) || isExportingAccountData ? styles.deletionButtonDisabled : null]}
             >
               <Text style={styles.deletionPrimaryText}>{isExportingAccountData ? copy.preparing : copy.continue}</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </View>
       </View>
@@ -139,15 +140,15 @@ export function PhoneChangeModal(props: {
             />
           )}
           <View style={styles.deletionModalActions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.cancelPhoneChange}
               onPress={resetPhoneChangeFlow}
               style={styles.deletionSecondaryButton}
             >
               <Text style={styles.deletionSecondaryText}>{copy.cancel}</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={presentation.primaryAccessibilityLabel}
               disabled={isPrimaryDisabled}
@@ -172,7 +173,7 @@ export function PhoneChangeModal(props: {
               <Text style={styles.deletionPrimaryText}>
                 {presentation.primaryText}
               </Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </View>
       </View>
@@ -211,15 +212,15 @@ export function AccountDeletionModal(props: {
             value={deletionCode}
           />
           <View style={styles.deletionModalActions}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.cancelDeletion}
               onPress={closeDeletionCode}
               style={styles.deletionSecondaryButton}
             >
               <Text style={styles.deletionSecondaryText}>{copy.cancel}</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.verifyDeletion}
               disabled={!isVerificationCodeComplete(deletionCode) || isDeletingAccount}
@@ -227,7 +228,7 @@ export function AccountDeletionModal(props: {
               style={[styles.deletionPrimaryButton, !isVerificationCodeComplete(deletionCode) || isDeletingAccount ? styles.deletionButtonDisabled : null]}
             >
               <Text style={styles.deletionPrimaryText}>{isDeletingAccount ? copy.checking : copy.continue}</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </View>
       </View>

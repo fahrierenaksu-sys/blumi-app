@@ -8,6 +8,7 @@ import { ParticipantAvatar } from "../../ui/participantAvatar"
 import { SwipeDismissSheet } from "../../ui/SwipeDismissSheet"
 import { uiTheme } from "../../ui/theme"
 import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
+import { PressableScale } from "../../ui/PressableScale"
 
 const TEXT_SCALE_CAP = 1.6
 
@@ -61,7 +62,7 @@ export function InboxConversationActionsSheet(props: {
               <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.title}>
                 {confirming ? copy.confirmTitle : copy.sheetTitle(target.partnerName)}
               </Text>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={copy.close}
                 onPress={onClose}
@@ -69,7 +70,7 @@ export function InboxConversationActionsSheet(props: {
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={20} color={uiTheme.colors.textMuted} />
-              </Pressable>
+              </PressableScale>
             </View>
 
             {confirming ? (

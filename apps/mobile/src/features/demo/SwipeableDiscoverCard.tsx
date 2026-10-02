@@ -5,22 +5,29 @@
  * - Horizontal drag on the UI thread (Gesture Handler pan, useDiscoverCardSwipe)
  * - Upright translation while dragging
  * - Stamp overlays (LIKE / NOPE) that fade in with swipe direction
- * - Animated spring exit on release (if threshold met)
+ * - Spring exit on release (if threshold met), on the UI thread
  * - Snap-back on release (if threshold not met)
  * - Photo display from dummy profile photo URLs
  * - Age + bio display for richer profile cards
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { AvatarSelection, UserProfilePrompt } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GestureDetector } from "react-native-gesture-handler"
-import Reanimated from "react-native-reanimated"
-import {
-  Animated,
+import Reanimated, {
   Easing,
+  Extrapolation,
+  ReduceMotion,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
+import {
   Image,
   Pressable,
   type ImageSourcePropType,
@@ -39,6 +46,7 @@ import {
   type DiscoveryRoomShowcaseQueryInput
 } from "../discovery/discoveryApi"
 import { useReducedMotion } from "../../ui/animations"
+import { animateTo, useMotion } from "../../ui/motion"
 import { uiTheme } from "../../ui/theme"
 import { formatDiscoveryCardBio } from "../discovery/discoveryCandidateModel"
 import {
@@ -60,6 +68,8 @@ import {
 } from "../discovery/discoveryShowcaseAuthorizationModel"
 
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
+/** Resting size and opacity of the online dot between arrival pulses. */
+const ONLINE_DOT_REST = 0.78
 const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
 let nextShowcaseAuthorizationId = 0
 
@@ -131,9 +141,10 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     if (frontSurfaceReady) onFrontDisplay?.("surface")
   }, [frontLayoutReady, frontSurfaceReady, onFrontDisplay])
   // The deck disables arrival motion: its first commit must already be visible.
-  const entryAnim = useRef(new Animated.Value(disableEntryAnim || reduceMotion ? 1 : 0)).current
-  const pulseAnim = useRef(new Animated.Value(0.78)).current
-  const flipProgress = useRef(new Animated.Value(0)).current
+  const motion = useMotion()
+  const entryProgress = useSharedValue(disableEntryAnim || reduceMotion ? 1 : 0)
+  const onlinePulse = useSharedValue(ONLINE_DOT_REST)
+  const flipProgress = useSharedValue(0)
   const [isBackVisible, setIsBackVisible] = useState(false)
   const [showcaseAuthorization, setShowcaseAuthorization] = useState<ShowcaseAuthorization | null>(null)
   const queryClient = useQueryClient()
@@ -215,27 +226,31 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     void queryClient.cancelQueries({ queryKey: showcaseQueryKey, exact: true })
   }, [queryClient, showcaseQueryKey])
 
-  // Both faces stay mounted while the card turns so no blank swap frame can appear.
-  const frontRotation = flipProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "180deg"],
-    extrapolate: "clamp"
-  })
-  const backRotation = flipProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["180deg", "360deg"],
-    extrapolate: "clamp"
-  })
-  const sheenTranslateX = flipProgress.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [-310, 0, 310],
-    extrapolate: "clamp"
-  })
-  const sheenOpacity = flipProgress.interpolate({
-    inputRange: [0, 0.12, 0.5, 0.88, 1],
-    outputRange: [0, 0.2, 0.34, 0.2, 0],
-    extrapolate: "clamp"
-  })
+  // Both faces stay mounted while the card turns so no blank swap frame can
+  // appear. Reduce Motion crossfades the faces in place instead of turning.
+  const frontFaceStyle = useAnimatedStyle(() => reduceMotion
+    ? { opacity: 1 - flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }] }
+    : { opacity: 1, transform: [{ perspective: 1000 }, { rotateY: `${Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` }] })
+  const backFaceStyle = useAnimatedStyle(() => reduceMotion
+    ? { opacity: flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }] }
+    : { opacity: 1, transform: [{ perspective: 1000 }, { rotateY: `${180 + Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` }] })
+  const sheenStyle = useAnimatedStyle(() => ({
+    opacity: reduceMotion
+      ? 0
+      : interpolate(flipProgress.value, [0, 0.12, 0.5, 0.88, 1], [0, 0.2, 0.34, 0.2, 0], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(flipProgress.value, [0, 0.5, 1], [-310, 0, 310], Extrapolation.CLAMP) },
+      { rotate: "18deg" }
+    ]
+  }))
+  const entryStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, entryProgress.value),
+    transform: [{ scale: reduceMotion ? 1 : 0.92 + 0.08 * entryProgress.value }]
+  }))
+  const onlineDotStyle = useAnimatedStyle(() => ({
+    opacity: onlinePulse.value,
+    transform: [{ scale: onlinePulse.value }]
+  }))
 
   const toggleFlip = useCallback(() => {
     if (disabled) return
@@ -250,20 +265,18 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     }
     setIsBackVisible(nextVisible)
     onFlipChange?.(nextVisible)
-    if (reduceMotion) {
-      flipProgress.setValue(nextVisible ? 1 : 0)
-      return
-    }
-    Animated.timing(flipProgress, {
-      toValue: nextVisible ? 1 : 0,
-      duration: DISCOVERY_CARD_FLIP_DURATION,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true
-    }).start()
+    flipProgress.value = reduceMotion
+      ? animateTo(nextVisible ? 1 : 0, motion.crossfade)
+      : withTiming(nextVisible ? 1 : 0, {
+        duration: DISCOVERY_CARD_FLIP_DURATION,
+        easing: Easing.inOut(Easing.ease),
+        reduceMotion: ReduceMotion.Never
+      })
   }, [
     disabled,
     flipProgress,
     isBackVisible,
+    motion,
     onFlipChange,
     queryClient,
     reduceMotion,
@@ -273,57 +286,35 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   ])
 
   useEffect(() => {
-    flipProgress.stopAnimation()
-    flipProgress.setValue(0)
+    flipProgress.value = 0
     setIsBackVisible(false)
   }, [flipProgress, profile.userId])
 
-  // Entry animation
+  // Entry: the card settles in with the snappy spring (Reduce Motion fades).
   useEffect(() => {
-    if (disableEntryAnim || reduceMotion) {
-      entryAnim.setValue(1)
+    if (disableEntryAnim) {
+      entryProgress.value = 1
       return
     }
-    entryAnim.setValue(0)
-    Animated.spring(entryAnim, {
-      toValue: 1,
-      tension: 68,
-      friction: 9,
-      useNativeDriver: true
-    }).start()
-  }, [disableEntryAnim, entryAnim, profile.userId, reduceMotion])
+    entryProgress.value = withSequence(
+      withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+      animateTo(1, reduceMotion ? motion.crossfade : motion.snappy)
+    )
+  }, [disableEntryAnim, entryProgress, motion, profile.userId, reduceMotion])
 
   // A single arrival pulse keeps online state visible without a perpetual
   // decorative loop competing with the profile content.
   useEffect(() => {
     if (disabled || reduceMotion) {
-      pulseAnim.stopAnimation()
-      pulseAnim.setValue(0.78)
+      onlinePulse.value = ONLINE_DOT_REST
       return
     }
-
-    pulseAnim.setValue(0.78)
-    const arrivalPulse = Animated.sequence([
-      Animated.timing(pulseAnim, {
-        toValue: 1,
-        duration: 240,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
-      }),
-      Animated.timing(pulseAnim, {
-        toValue: 0.78,
-        duration: 360,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true
-      })
-    ])
-    arrivalPulse.start()
-
-    return () => {
-      arrivalPulse.stop()
-      pulseAnim.stopAnimation()
-    }
-  }, [disabled, profile.userId, pulseAnim, reduceMotion])
+    onlinePulse.value = withSequence(
+      withTiming(ONLINE_DOT_REST, { duration: 0, reduceMotion: ReduceMotion.Never }),
+      withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never }),
+      withTiming(ONLINE_DOT_REST, { duration: 360, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never })
+    )
+  }, [disabled, onlinePulse, profile.userId, reduceMotion])
 
   const firstName = profile.displayName.trim().split(/\s+/)[0] || profile.displayName
   const bio = formatDiscoveryCardBio(profile.bio)
@@ -354,22 +345,9 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   return (
     <GestureDetector gesture={swipeGesture}>
     <Reanimated.View style={[styles.swipeFrame, cardSwipeStyle]} onLayout={onCardLayout}>
-    <Animated.View
+    <Reanimated.View
       onLayout={() => setFrontLayoutReady(true)}
-      style={[
-        styles.card,
-        {
-          opacity: entryAnim,
-          transform: [
-            {
-              scale: entryAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.92, 1]
-              })
-            }
-          ]
-        }
-      ]}
+      style={[styles.card, entryStyle]}
     >
       <Pressable
         accessibilityRole="button"
@@ -392,19 +370,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
         </View>
 
         <View style={styles.flipViewport} pointerEvents="none">
-        <Animated.View
-          style={[
-            styles.face,
-            styles.frontFace,
-            {
-              backfaceVisibility: "hidden",
-              transform: [
-                { perspective: 1000 },
-                { rotateY: frontRotation }
-              ]
-            }
-          ]}
-        >
+        <Reanimated.View style={[styles.face, styles.frontFace, styles.faceHiddenBack, frontFaceStyle]}>
           <Reanimated.View style={[styles.stampContainer, styles.stampRight, likeStampStyle]}>
             <View style={styles.likeStamp}>
               <Text style={styles.likeStampText}>{copy.card.likeStamp}</Text>
@@ -451,7 +417,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
           >
             <View style={styles.infoContent}>
               <View style={styles.nameRow}>
-                <Animated.View style={[styles.onlineDot, { opacity: pulseAnim, transform: [{ scale: pulseAnim }] }]} />
+                <Reanimated.View style={[styles.onlineDot, onlineDotStyle]} />
                 <Text style={[styles.nameText, { fontSize: nameFontSize }]}>{firstName}</Text>
                 <Text style={[styles.ageText, { fontSize: ageFontSize }]}>{profile.age}</Text>
               </View>
@@ -469,21 +435,9 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
               </View>
             </View>
           </View>
-        </Animated.View>
+        </Reanimated.View>
 
-        <Animated.View
-          style={[
-            styles.face,
-            styles.backFace,
-            {
-              backfaceVisibility: "hidden",
-              transform: [
-                { perspective: 1000 },
-                { rotateY: backRotation }
-              ]
-            }
-          ]}
-        >
+        <Reanimated.View style={[styles.face, styles.backFace, styles.faceHiddenBack, backFaceStyle]}>
           <DiscoveryCardBack
             deferAvatar={props.deferBackAvatar && !isBackVisible}
             profile={profile}
@@ -494,24 +448,12 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
             roomHeadline={cardBackRoom.roomHeadline}
             imagePriority={isBackVisible ? imagePriority : "low"}
           />
-        </Animated.View>
+        </Reanimated.View>
 
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.flipSheen,
-            {
-              opacity: reduceMotion ? 0 : sheenOpacity,
-              transform: [
-                { translateX: sheenTranslateX },
-                { rotate: "18deg" }
-              ]
-            }
-          ]}
-        />
+        <Reanimated.View pointerEvents="none" style={[styles.flipSheen, sheenStyle]} />
         </View>
         </Pressable>
-    </Animated.View>
+    </Reanimated.View>
     </Reanimated.View>
     </GestureDetector>
   )
@@ -630,12 +572,6 @@ function DiscoveryCardBack(props: {
   )
 }
 
-/** Programmatic swipe trigger — used by action buttons */
-export function useSwipeRef() {
-  const positionRef = useRef(new Animated.ValueXY())
-  return positionRef
-}
-
 const styles = StyleSheet.create({
   // Carries the UI-thread swipe translation; the card inside keeps its entry motion.
   swipeFrame: {
@@ -655,6 +591,9 @@ const styles = StyleSheet.create({
   },
   face: {
     ...StyleSheet.absoluteFill,
+  },
+  faceHiddenBack: {
+    backfaceVisibility: "hidden",
   },
   flipViewport: {
     ...StyleSheet.absoluteFill,

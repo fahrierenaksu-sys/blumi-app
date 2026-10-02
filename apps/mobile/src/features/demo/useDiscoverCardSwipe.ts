@@ -14,7 +14,7 @@ import {
 import { scheduleOnRN } from "react-native-worklets"
 import { hapticLight, hapticSelection } from "../../ui/haptics"
 import { useMainTabPagerGestureRef } from "../../ui/MainTabPagerGestureOwnership"
-import { uiTheme } from "../../ui/theme"
+import { MOTION_SPRINGS } from "../../ui/motion"
 import {
   DISCOVER_SWIPE_RESET_SPRING,
   getDiscoverStampOpacity,
@@ -36,7 +36,7 @@ import { useDiscoverSwipeValues, type DiscoverSwipeValues } from "../discovery/u
 /** The LIKE/PASS stamp starts this large when the drag enters its side. */
 const STAMP_POP_SCALE = 1.08
 const STAMP_POP_START = { duration: 0, reduceMotion: ReduceMotion.Never } as const
-const STAMP_POP_SETTLE = { ...uiTheme.animation.springSnappy, reduceMotion: ReduceMotion.Never } as const
+const STAMP_POP_SETTLE = { ...MOTION_SPRINGS.snappy, reduceMotion: ReduceMotion.Never } as const
 
 /**
  * The Discover card's horizontal swipe as a Gesture Handler pan. Every frame

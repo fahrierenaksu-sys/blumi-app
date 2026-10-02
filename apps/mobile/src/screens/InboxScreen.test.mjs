@@ -43,29 +43,23 @@ function hooks() {
 }
 function cardHarness() {
   const hook = hooks()
-  const springs = []
   const haptics = []
-  class Value {
-    constructor(value) { this.value = value }
-    stopAnimation() {}
-    setValue(value) { this.value = value }
-  }
   const context = {
     ...hook, React, memo: (render, equal) => ({ render, equal }), useEffect: () => {},
-    Animated: { Value, View: "AnimatedView", spring: (_value, config) => ({ start: () => springs.push(config.toValue) }) },
-    Pressable: "Pressable", View: "View", Text: "Text", LinearGradient: "Gradient",
+    // The press feel itself is PressableScale's (tested in ui/PressableScale.test.ts).
+    PressableScale: "PressableScale", UnreadGlow: "UnreadGlow", View: "View", Text: "Text", LinearGradient: "Gradient",
     ParticipantAvatar: "Avatar", Ionicons: "Icon", cardStyles: {}, hapticMedium: () => haptics.push("medium"),
     uiTheme: { gradients: { primary: [] }, colors: {} },
     areChatParticipantAvatarsEquivalent: (a, b) => a === b
   }
   const card = evaluate(initializer("ConversationCard"), context)
-  return { ...card, springs, haptics, render(props) { hook.reset(); return card.render(props).props.children[0].props } }
+  return { ...card, haptics, render(props) { hook.reset(); return card.render(props).props } }
 }
 function props(overrides = {}) {
   return {
     threadId: "thread-a", copy: { openChatHint: "Opens", startWithSpark: "Start" },
     partnerName: "Partner", partnerUserId: "partner", previewPrefix: undefined, lastBody: "Hello", lastTime: "1m",
-    unreadBadge: null, accessibilityLabel: "Partner, Hello, 1m", reduceMotion: false, unreadPulseAnim: {}, onPress: () => {}, onWarm: () => {},
+    unreadBadge: null, accessibilityLabel: "Partner, Hello, 1m", unreadPulse: {}, onPress: () => {}, onWarm: () => {},
     isPinned: false, actionsCopy: { actions: "Chat options" }, onLongPress: () => {}, ...overrides
   }
 }
@@ -75,10 +69,10 @@ test("unaffected row renders keep shared callbacks and memo equality", () => {
   const warmThread = () => {}
   const shared = props()
   const context = {
-    React, useCallback: (fn) => fn, Animated: { View: "AnimatedView" }, ConversationCard: "Card",
+    React, useCallback: (fn) => fn, Reanimated: { View: "AnimatedView" }, ConversationCard: "Card",
     copy: shared.copy, getItemAnim: () => ({}), onWarmThread: warmThread, warmThread, openThread,
     actionsCopy: shared.actionsCopy, openConversationActions: shared.onLongPress,
-    reduceMotion: false, sessionActor: { session: { mode: "production" } }, unreadPulseAnim: shared.unreadPulseAnim
+    reduceMotion: false, sessionActor: { session: { mode: "production" } }, unreadPulse: shared.unreadPulse
   }
   const render = evaluate(initializer("renderThreadRow"), context)
   const item = { ...shared, thread: { threadId: "thread-a" } }
@@ -106,7 +100,7 @@ test("memo and bound press handlers observe changed callbacks and thread identit
   const stable = card.render({ ...first, lastBody: "Updated" })
   assert.equal(a.onPress, stable.onPress)
   assert.equal(a.onPressIn, stable.onPressIn)
-  a.onPress(); a.onPressIn(); a.onPressOut()
+  a.onPress(); a.onPressIn()
   const next = { ...first, onPress: (id) => calls.push(`new-press:${id}`), onWarm: (id) => calls.push(`new-warm:${id}`) }
   assert.equal(card.equal(first, next), false)
   assert.equal(card.equal(first, { ...first, onPress: next.onPress }), false)
@@ -115,16 +109,15 @@ test("memo and bound press handlers observe changed callbacks and thread identit
   const b = card.render({ ...next, threadId: "thread-b" })
   b.onPress(); b.onPressIn()
   assert.deepEqual(calls, ["old-press:thread-a", "old-warm:thread-a", "new-press:thread-b", "new-warm:thread-b"])
-  assert.ok(card.springs.length > 0, "press springs ran")
 })
 
-test("Reduce Motion still warms the selected thread without press springs", () => {
+test("touching a row warms its thread once, whatever the motion preference", () => {
   const card = cardHarness()
   const calls = []
-  const handlers = card.render(props({ reduceMotion: true, onWarm: (id) => calls.push(id) }))
-  handlers.onPressIn(); handlers.onPressOut()
+  const handlers = card.render(props({ onWarm: (id) => calls.push(id) }))
+  handlers.onPressIn()
   assert.deepEqual(calls, ["thread-a"])
-  assert.deepEqual(card.springs, [])
+  assert.equal(handlers.onPressOut, undefined, "release does no work of its own")
 })
 
 test("shared warm callback follows current session mode and provider", () => {

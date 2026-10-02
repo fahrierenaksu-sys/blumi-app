@@ -16,7 +16,10 @@ export const ROOT_STACK_SCREEN_OPTIONS = {
   animation: "fade",
   // Keep a visible transition cue without leaving every route change feeling
   // like a loading delay. Reduced Motion still disables the animation below.
-  animationDuration: 240
+  animationDuration: 240,
+  // iOS otherwise closes a faded route's swipe-back with the native slide;
+  // the swipe now closes it the way it opened.
+  animationMatchesGesture: true
 } as const
 
 /**
@@ -44,10 +47,13 @@ export const DETAIL_SCREEN_OPTIONS = {
 
 /**
  * The chat thread alone may be dismissed by a swipe anywhere on screen; its
- * bubbles own no horizontal gesture. iOS runs that gesture as a simple push.
+ * bubbles own no horizontal gesture. iOS always runs that full-screen
+ * gesture as a simple push, so the thread also opens with the simple push
+ * and open and close match.
  */
 export const CHAT_THREAD_SCREEN_OPTIONS = {
   ...DETAIL_SCREEN_OPTIONS,
+  animation: "simple_push",
   fullScreenGestureEnabled: true
 } as const
 

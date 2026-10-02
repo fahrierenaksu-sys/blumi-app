@@ -1,11 +1,9 @@
 // Motion rules for the bottom navigation unread badge. The badge stays
 // mounted; these plans drive its scale and opacity on the UI thread.
 
-export interface BottomNavBadgeSpring {
-  damping: number
-  stiffness: number
-  mass: number
-}
+import { MOTION_DURATIONS, MOTION_SPRINGS, type MotionSpringToken } from "../motionTokens"
+
+export type BottomNavBadgeSpring = MotionSpringToken
 
 export type BottomNavBadgeTransition = "appear" | "bump" | "exit" | "none"
 
@@ -28,16 +26,12 @@ export interface BottomNavBadgeExitMotion {
 
 const BADGE_MAX_COUNT = 99
 const BADGE_APPEAR_FROM_SCALE = 0.6
-const BADGE_FADE_DURATION_MS = 120
+const BADGE_FADE_DURATION_MS = MOTION_DURATIONS.fadeOut
 const BADGE_BUMP_PEAK_SCALE = 1.12
 const BADGE_BUMP_PEAK_DURATION_MS = 90
 
-// Mirrors uiTheme.animation.springBouncy; kept here so the model stays pure.
-export const BOTTOM_NAV_BADGE_SPRING: BottomNavBadgeSpring = Object.freeze({
-  damping: 12,
-  stiffness: 200,
-  mass: 0.8,
-})
+// Badges pop with the snappy motion token.
+export const BOTTOM_NAV_BADGE_SPRING: BottomNavBadgeSpring = MOTION_SPRINGS.snappy
 
 export function isBottomNavBadgeVisible(count: number): boolean {
   return count > 0

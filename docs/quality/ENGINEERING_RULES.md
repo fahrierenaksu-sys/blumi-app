@@ -20,7 +20,7 @@ This test runs in `npm --workspace @blumi/mobile run test:theme`, which is part 
 | Mobile HTTP only through `requestJson` (deadline, abort, error mapping) | Any raw `fetch(` |
 | Injected fetchers run inside `requestJson` | `await fetcher(` outside `features/network/apiClient.ts` and `features/inventory/economyApi.ts`. A direct call once left room invites busy forever |
 | No per-frame JS loops | Any `requestAnimationFrame(` or `setInterval(`, even when it isn't animation, outside `features/roomV2/editor/useRoomEditorStageLayout.ts`. Drive motion on the UI or native thread. A renderer that must own its loop can join the allowlist with frame-time evidence |
-| Reduce Motion from the shared store | An `AccessibilityInfo` reduce-motion query or listener outside `ui/animations.ts` |
+| Reduce Motion from the shared store | An `AccessibilityInfo` reduce-motion query or listener outside `ui/motion.ts` |
 | Reduce Transparency from the shared store | `isReduceTransparencyEnabled` or `reduceTransparencyChanged` outside `ui/reduceTransparency.ts` and `ui/reduceTransparencyStore.ts` |
 | JS-driver animation | Any `useNativeDriver: false`. Animate transform and opacity on the native driver or with Reanimated |
 | PanResponder | Any `PanResponder`, `panHandlers` or `GestureResponderHandlers` in code. Gestures use Gesture Handler with worklet callbacks; PanResponder handlers spread onto a Pressable shipped dead drags twice |
@@ -50,7 +50,7 @@ The allowlists in that file are the tolerated debt and may only shrink (exceptio
 
 `src/ui/gestureFrameWork.test.mjs` (`run-navigation-tests.mjs`): drag and scroll frame callbacks never call JS work unless a threshold check guards it, and the app root mounts the Gesture Handler root view.
 
-Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts` and `src/ui/springPressScale.test.ts` (a pressed control does not move under Reduce Motion).
+Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts`, `src/ui/motion.test.ts` (token resolution), `src/ui/animations.test.ts` (entrances crossfade without moving) and `src/ui/PressableScale.test.ts` (a pressed control dims and does not move).
 
 Elsewhere (mobile paths are relative to `apps/mobile`):
 
@@ -71,6 +71,19 @@ Elsewhere (mobile paths are relative to `apps/mobile`):
   - The file needs a `Snapshot: YYYY-MM-DD` line.
   - The table between `## At a glance` and `## Work in the right order` must keep exactly the columns Category | Area | Status | What that means | Owner | Next action | Evidence.
 - `npm run verify:release-infra` (`.railway/railway.test.ts`) pins `.railway/railway.ts`, including `BLUMI_TRUST_PROXY=100.64.0.0/10` and a Node version equal to `.nvmrc`. That file is not the live Railway configuration (see `AGENTS.md`).
+
+## Motion
+
+All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useMotion()` (or `resolveMotion`) and driven with `animateTo`, so Reduce Motion is handled in one place: movement lands at once and opacity crossfades (200 ms). Springs: `press` (press in/out, toggles), `snappy` (selection, pills, badges), `smooth` (sheets, panels, overlays), `bouncy` (celebrations only). Opacity: `fadeIn`, `fadeOut`, `crossfade`. `stagger`: first appearance of at most six list items. Taps use `ui/PressableScale`. Choreography (MOTION_PLAN §B):
+
+1. Whatever the finger touched moves first.
+2. A gesture hands off to a spring that inherits the release velocity, never a fixed-duration timing.
+3. Exits run about 0.7× the entrance.
+4. One hero per moment; everything else only fades.
+5. Animate only transform and opacity, never `width`, `height`, `top` or `left`, and never with `LayoutAnimation`.
+6. Haptics fire on the contact or landing frame, one per action (`ui/haptics.ts`).
+7. Every animation is interruptible.
+8. Never a spinner where a skeleton fits; skeleton → content is a crossfade.
 
 ## Server facts
 

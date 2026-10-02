@@ -1,5 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native"
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { Image, StyleSheet, Text, View } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 
 import { useReducedMotionPreference } from "../../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
@@ -17,6 +26,12 @@ const MALE_COLLAR_ATLAS_V4 = require("./assets/profile-character-reaction-v4-run
 
 /** Crossfade when a gender reaction (re)starts (ONB-15). */
 const REACTION_CROSSFADE_MS = 160
+
+/** A 0 → 1 → 0 sine loop on the UI thread. */
+function sineLoop(halfMs: number) {
+  const half = { duration: halfMs, easing: Easing.inOut(Easing.sin), reduceMotion: ReduceMotion.Never }
+  return withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
+}
 
 /**
  * Keeps both reaction atlases decoded while the profile step is on screen.
@@ -67,75 +82,50 @@ function GeneratedReactionSprite({
   } = useReducedMotionPreference()
   const reaction = getProfileCharacterReaction(gender)
   const [frameIndex, setFrameIndex] = useState(0)
-  const settleFloat = useRef(new Animated.Value(0)).current
-  const reveal = useRef(new Animated.Value(1)).current
+  const settleFloat = useSharedValue(0)
+  const reveal = useSharedValue(1)
   const timeline = reaction.timeline
 
   useLayoutEffect(() => {
-    reveal.stopAnimation()
     if (!gender || reduceMotion || !motionPreferenceResolved) {
-      reveal.setValue(1)
-      return undefined
+      reveal.value = 1
+      return
     }
-    reveal.setValue(0)
-    const fade = Animated.timing(reveal, {
-      toValue: 1,
-      duration: REACTION_CROSSFADE_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-      isInteraction: false
-    })
-    fade.start()
-    return () => fade.stop()
+    reveal.value = withSequence(
+      withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Never }),
+      withTiming(1, { duration: REACTION_CROSSFADE_MS, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never })
+    )
   }, [gender, motionPreferenceResolved, reduceMotion, reveal])
 
   useEffect(() => {
-    settleFloat.stopAnimation()
     if (!motionActive || !motionPreferenceResolved || reduceMotion || !gender || !timeline) {
       setFrameIndex(0)
-      settleFloat.setValue(0)
-      return undefined
+      settleFloat.value = 0
+      return
     }
 
     setFrameIndex(0)
-    settleFloat.setValue(0)
+    settleFloat.value = 0
     const timers: ReturnType<typeof setTimeout>[] = []
-    let settleLoop: Animated.CompositeAnimation | null = null
     let elapsedMs = 0
     timeline.frameDurationsMs.forEach((durationMs, index) => {
       elapsedMs += durationMs
       timers.push(setTimeout(() => {
         setFrameIndex(index + 1)
-        if (index + 1 === timeline.settleFrameIndex) {
-          settleLoop = Animated.loop(
-            Animated.sequence([
-              Animated.timing(settleFloat, {
-                toValue: 1,
-                duration: 1400,
-                easing: Easing.inOut(Easing.sin),
-                useNativeDriver: true,
-                isInteraction: false
-              }),
-              Animated.timing(settleFloat, {
-                toValue: 0,
-                duration: 1400,
-                easing: Easing.inOut(Easing.sin),
-                useNativeDriver: true,
-                isInteraction: false
-              })
-            ])
-          )
-          settleLoop.start()
-        }
+        if (index + 1 === timeline.settleFrameIndex) settleFloat.value = sineLoop(1400)
       }, elapsedMs))
     })
 
     return () => {
       timers.forEach(clearTimeout)
-      settleLoop?.stop()
-      settleFloat.stopAnimation()
+      settleFloat.value = 0
     }
   }, [gender, motionActive, motionPreferenceResolved, reduceMotion, settleFloat, timeline])
+
+  const spriteMotionStyle = useAnimatedStyle(() => ({
+    opacity: reveal.value,
+    transform: [{ translateY: -2 * settleFloat.value }]
+  }))
 
   if (!gender || !timeline) return null
 
@@ -149,24 +139,7 @@ function GeneratedReactionSprite({
   const atlasHeight = cellHeight * timeline.atlasRows
 
   return (
-    <Animated.View
-      style={[
-        styles.spriteFrame,
-        {
-          height: cellHeight,
-          opacity: reveal,
-          transform: [
-            {
-              translateY: settleFloat.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -2]
-              })
-            }
-          ],
-          width: cellWidth
-        }
-      ]}
-    >
+    <Animated.View style={[styles.spriteFrame, { height: cellHeight, width: cellWidth }, spriteMotionStyle]}>
       <Image resizeMode="stretch" source={source} style={{ height: atlasHeight, left: -frameColumn * cellWidth, position: "absolute", top: -frameRow * cellHeight, width: atlasWidth }} />
     </Animated.View>
   )
@@ -187,67 +160,30 @@ export function ProfileCharacterReactionStage({
   const useGeneratedReaction =
     Boolean(gender) &&
     shouldUseProfileCharacterReactionAssets(PROFILE_CHARACTER_REACTION_ASSET_MODE)
-  const entrance = useRef(new Animated.Value(1)).current
-  const halo = useRef(new Animated.Value(0)).current
-  const breath = useRef(new Animated.Value(0)).current
+  // The character stands in place; only the halo and a soft breath loop.
+  const halo = useSharedValue(0)
+  const breath = useSharedValue(0)
 
   useLayoutEffect(() => {
-    entrance.stopAnimation()
-    halo.stopAnimation()
-    breath.stopAnimation()
     if (!motionActive || !motionPreferenceResolved || reduceMotion) {
-      entrance.setValue(1)
-      halo.setValue(0)
-      breath.setValue(0)
-      return undefined
+      halo.value = 0
+      breath.value = 0
+      return
     }
-
-    entrance.setValue(1)
-    const haloLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(halo, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        }),
-        Animated.timing(halo, {
-          toValue: 0,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        })
-      ])
-    )
-    const breathLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breath, {
-          toValue: 1,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        }),
-        Animated.timing(breath, {
-          toValue: 0,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        })
-      ])
-    )
-    haloLoop.start()
-    breathLoop.start()
-
+    halo.value = sineLoop(1800)
+    breath.value = sineLoop(1400)
     return () => {
-      haloLoop.stop()
-      breathLoop.stop()
-      breath.stopAnimation()
+      halo.value = 0
+      breath.value = 0
     }
-  }, [breath, entrance, gender, halo, motionActive, motionPreferenceResolved, reduceMotion])
+  }, [breath, gender, halo, motionActive, motionPreferenceResolved, reduceMotion])
+
+  const haloStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + 0.035 * halo.value }]
+  }))
+  const breathStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -1.5 * breath.value }, { scale: 1 + 0.006 * breath.value }]
+  }))
 
   const characterName = useMemo(
     () => displayName.trim(),
@@ -260,68 +196,13 @@ export function ProfileCharacterReactionStage({
       accessibilityLabel={reaction.interactionLabel}
       style={[styles.root, { height: geometry.stageHeight }]}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.glow,
-          {
-            opacity: entrance.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.45, 1]
-            }),
-            transform: [
-              {
-                scale: halo.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.035]
-                })
-              }
-            ]
-          }
-        ]}
-      />
+      <Animated.View pointerEvents="none" style={[styles.glow, haloStyle]} />
       <View style={styles.frame} />
       {shouldUseProfileCharacterReactionAssets(PROFILE_CHARACTER_REACTION_ASSET_MODE)
         ? <ReactionAtlasPreload compact={compact} />
         : null}
-      <Animated.View
-        style={{
-          alignItems: "center",
-          opacity: entrance,
-          transform: [
-            {
-              translateY: entrance.interpolate({
-                inputRange: [0, 1],
-                outputRange: [10 + geometry.characterLift, geometry.characterLift]
-              })
-            },
-            {
-              scale: entrance.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.97, 1]
-              })
-            }
-          ]
-        }}
-      >
-        <Animated.View
-          style={{
-            transform: [
-              {
-                translateY: breath.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -1.5]
-                })
-              },
-              {
-                scale: breath.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.006]
-                })
-              }
-            ]
-          }}
-        >
+      <View style={{ alignItems: "center", transform: [{ translateY: geometry.characterLift }] }}>
+        <Animated.View style={breathStyle}>
           {useGeneratedReaction ? (
             <GeneratedReactionSprite
               compact={compact}
@@ -340,7 +221,7 @@ export function ProfileCharacterReactionStage({
             />
           )}
         </Animated.View>
-      </Animated.View>
+      </View>
       {characterName ? (
         <View style={styles.meta}>
           <Text numberOfLines={1} style={styles.metaText}>
