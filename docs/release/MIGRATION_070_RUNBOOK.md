@@ -67,7 +67,7 @@ applies 070 with the migrator and sees receipts switch on without a restart),
 | 2 | PostgreSQL 17 dump of production and a restore test (`DATABASE_RELEASE_RUNBOOK.md`). Record the archive path and SHA-256 in `DATABASE_RELEASE_RUNBOOK.md`, and confirm the host and port of Railway's `DATABASE_URL` without reading the password. | Owner |
 | 3 | Preflight: 69 ledger rows, no 070 row, none of the new columns or table, no transaction older than 60 s. | Operator |
 | 4 | Apply: `npm run db:migrate` against production, or the same transaction by hand as for 068 (`BEGIN`, `SET LOCAL lock_timeout = '5000ms'`, `pg_advisory_xact_lock(hashtextextended('blumi:migrations', 0))`, the file's SQL, the ledger row with the checksum above, `COMMIT`). | Operator, owner approval |
-| 5 | Verify (below). Within 30 s the running binary's probe sees 070; a restart is not needed. | Operator |
+| 5 | Verify (below). Within 30 s the running binary's probe sees 070; a restart is not needed. Then add `070_chat_delivery_receipts.sql` and its SHA-256 to `apps/server/db/migrations.applied.json` in the commit that records the apply, so the migration ledger test locks it. | Operator |
 | 6 | Roll out with `BLUMI_CAPABILITY_MANIFEST`, e.g. `{"rollouts":{"db_chat_metadata_ready":100,"chat_read_receipts":"internal"},"internalUserIds":["<owner>","<tester>"]}`, then 5 → 25 → 100. Keep every existing rollout entry. | Owner |
 | 7 | Ship the mobile build that declares `chat_read_receipts` (JavaScript only; no native change). | Owner |
 | 8 | Two phones: ✓ when sent, ✓✓ when the other phone is in the foreground or opens the chat, "görüldü" only after both turn on Settings → Gizlilik → Okundu bilgisi. Turning it off on either phone hides it on both after their next refresh. | Owner |

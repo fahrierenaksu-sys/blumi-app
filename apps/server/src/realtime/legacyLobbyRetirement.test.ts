@@ -4,8 +4,6 @@
 // chat-initiated room invite (HTTP) -> shared room. These tests drive the real
 // Fastify routes and the real websocket server over shared services.
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import test from "node:test"
 import type { AddressInfo } from "node:net"
 import type { ServerEvent } from "@blumi/contracts"
@@ -165,10 +163,17 @@ test("blocked accounts receive no presence, snapshot, nearby, or reaction data a
   }
 })
 
-for (const deployEnvironment of ["staging", "production"] as const) {
-  test(`legacy or modified clients cannot join, move in, or invite through the public lobby (BLUMI_DEPLOY_ENV=${deployEnvironment})`, async () => {
+// The lobby rules must not depend on the environment: every deploy and Node
+// environment combination enforces the same refusals.
+const ENVIRONMENTS = (["staging", "production"] as const).flatMap((deployEnvironment) =>
+  (["production", "development"] as const).map((nodeEnvironment) => ({ deployEnvironment, nodeEnvironment })))
+
+for (const { deployEnvironment, nodeEnvironment } of ENVIRONMENTS) {
+  test(`legacy or modified clients cannot join, move in, or invite through the public lobby (BLUMI_DEPLOY_ENV=${deployEnvironment}, NODE_ENV=${nodeEnvironment})`, async () => {
     const previous = process.env.BLUMI_DEPLOY_ENV
+    const previousNodeEnvironment = process.env.NODE_ENV
     process.env.BLUMI_DEPLOY_ENV = deployEnvironment
+    process.env.NODE_ENV = nodeEnvironment
     const harness = await createHarness()
     try {
       const { ada: legacy, bora: target } = await harness.createMatchedPair("03")
@@ -229,6 +234,8 @@ for (const deployEnvironment of ["staging", "production"] as const) {
     } finally {
       if (previous === undefined) delete process.env.BLUMI_DEPLOY_ENV
       else process.env.BLUMI_DEPLOY_ENV = previous
+      if (previousNodeEnvironment === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = previousNodeEnvironment
       await harness.close()
     }
   })
@@ -263,13 +270,6 @@ test("after a socket reconnect the server still rejects the lobby and still deli
     }
   } finally {
     await harness.close()
-  }
-})
-
-test("presence policy and router never branch on the deploy environment", () => {
-  for (const file of ["realtimePresencePolicy.ts", "realtimeRouter.ts"]) {
-    const source = readFileSync(resolve(__dirname, "../../src/realtime", file), "utf8")
-    assert.doesNotMatch(source, /deployEnvironment|BLUMI_DEPLOY_ENV|NODE_ENV/, file)
   }
 })
 

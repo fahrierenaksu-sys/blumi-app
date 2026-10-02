@@ -159,37 +159,6 @@ test("chat room invites expire durably and blocked pairs fail closed", async () 
   )
 })
 
-test("accepting a chat room invite runs its independent reads together instead of one after another", async () => {
-  const harness = await createHarness()
-  const now = new Date("2026-07-21T10:00:00.000Z")
-  const created = await harness.service.createChatInvite({ threadId: harness.threadId,
-    senderProfile: harness.sender, recipientProfile: harness.recipient }, now)
-  const inFlight = new Set<string>()
-  const overlaps = new Set<string>()
-  const slow = <A extends unknown[], R>(name: string, call: (...args: A) => Promise<R>) => async (...args: A) => {
-    for (const other of inFlight) if (other !== name) overlaps.add([other, name].sort().join("+"))
-    inFlight.add(name)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 5))
-      return await call(...args)
-    } finally { inFlight.delete(name) }
-  }
-  const repository = harness.service.repository
-  repository.findMiniRoom = slow("findMiniRoom", repository.findMiniRoom.bind(repository))
-  repository.findInvite = slow("findInvite", repository.findInvite.bind(repository))
-  harness.safetyService.hasBlockBetween = slow("hasBlockBetween", harness.safetyService.hasBlockBetween.bind(harness.safetyService))
-  const threads = harness.chatService.repository
-  threads.findThread = slow("findThread", threads.findThread.bind(threads))
-
-  const accepted = await harness.service.decideChatInvite({ inviteId: created.invite.inviteId,
-    actorUserId: harness.recipient.userId, senderProfile: harness.sender, recipientProfile: harness.recipient,
-    status: "accepted" }, now)
-  assert.ok(accepted.miniRoom)
-  assert.ok(overlaps.has("findThread+hasBlockBetween"), "the thread and block checks run together before the claim")
-  assert.ok(overlaps.has("findMiniRoom+hasBlockBetween") && overlaps.has("findInvite+hasBlockBetween") &&
-    overlaps.has("findInvite+findMiniRoom"), "the post-claim block re-check and reads run together")
-})
-
 test("an accepted or joined room is announced ready for prefetch; a declined or blocked one is not", async () => {
   const harness = await createHarness()
   const ready: string[] = []

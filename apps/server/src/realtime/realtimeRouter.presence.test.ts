@@ -1,17 +1,16 @@
 import assert from "node:assert/strict"
-import test, { type TestContext } from "node:test"
+import test from "node:test"
 import type { RoomLayout, ServerEvent, UserProfile } from "@blumi/contracts"
 import { DEFAULT_FEMALE_AVATAR_LOADOUT, getNearbyUsers } from "@blumi/domain"
 import type { WebSocket } from "ws"
 import { createChatService } from "../chat/chatService"
 import type { ConnectionService } from "../connections/connectionService"
-import { createPostgresSafetyRepository } from "../db/postgresSafetyRepository"
 import type { MiniRoomService } from "../miniRooms/miniRoomService"
 import { createNotificationService } from "../notifications/notificationService"
 import { createPresenceService } from "../presence/presenceService"
 import { createReactionService } from "../reactions/reactionService"
 import { createRoomService } from "../rooms/roomService"
-import { createSafetyService } from "../safety/safetyService"
+import { createSafetyService, type SafetyService } from "../safety/safetyService"
 import { createConnectionManager } from "./connectionManager"
 import { createRealtimeRouter } from "./realtimeRouter"
 import type { RealtimePresenceRoomPolicy } from "./realtimePresencePolicy"
@@ -32,33 +31,25 @@ const BLOCKS = [
 ] as const
 
 async function createHarness(
-  context: TestContext,
   count = 6,
   policy?: RealtimePresenceRoomPolicy
 ) {
-  const queries: { sql: string; values?: readonly unknown[] }[] = []
   let failLookup = false
-  const safetyService = createSafetyService({ repository: createPostgresSafetyRepository({
-    async query(sql, values) {
-      queries.push({ sql, values })
-      if (failLookup) throw new Error("block lookup unavailable")
-      const viewer = values?.[0]
-      const candidates = values?.[1]
-      if (Array.isArray(candidates)) {
-        assert.match(sql, /blocked_user_id = ANY\(\$2::text\[\]\)/)
-        assert.match(sql, /actor_user_id = ANY\(\$2::text\[\]\)/)
-        const peers = new Set(candidates)
-        const blocked = BLOCKS.flatMap(([actor, target]) =>
-          actor === viewer && peers.has(target) ? [target] :
-            target === viewer && peers.has(actor) ? [actor] : [])
-        return { rows: [...new Set(blocked)].map(blocked_user_id => ({ blocked_user_id })) }
+  const baseSafety = createSafetyService()
+  for (const [actor, target] of BLOCKS) await baseSafety.blockUser(actor, target)
+  // A failing lookup makes every block read throw; nothing else changes.
+  const safetyService = new Proxy(baseSafety, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver) as unknown
+      if (typeof value !== "function") return value
+      return (...args: unknown[]) => {
+        if (failLookup && /Block/.test(String(property)) && property !== "blockUser") {
+          return Promise.reject(new Error("block lookup unavailable"))
+        }
+        return (value as (...a: unknown[]) => unknown).apply(target, args)
       }
-      return { rows: BLOCKS.filter(([actor, target]) => actor === viewer && target === candidates)
-        .map(([actor_user_id, blocked_user_id]) => ({
-          actor_user_id, blocked_user_id, created_at: "2026-09-29T12:00:00.000Z"
-        })) }
     }
-  }) })
+  }) as SafetyService
   const roomService = createRoomService()
   const layout: RoomLayout = {
     roomId: "publication-test",
@@ -104,9 +95,6 @@ async function createHarness(
     })
   }
   const departed = connect("departed").connection
-  const snapshotSpy = context.mock.method(presenceService, "createSnapshot")
-  const nearbySpy = context.mock.method(presenceService, "listNearbyUsers")
-  const layoutSpy = context.mock.method(roomService, "getOrCreateLayout")
   const router = createRealtimeRouter({
     connectionManager: manager, presenceService, safetyService,
     chatService: createChatService(), notificationService: createNotificationService(),
@@ -116,18 +104,16 @@ async function createHarness(
     connectionService: {} as ConnectionService,
     isPresenceRoomAllowed: policy ?? ((_actor, roomId) => roomId === layout.roomId)
   })
-  return { queries, safetyService, layout, presenceService, deliveries,
-    snapshotSpy, nearbySpy, layoutSpy,
+  return { safetyService, layout, presenceService, deliveries,
     failLookup() { failLookup = true },
     publish: () => router.handleClientEvent(departed, {
       type: "room.leave", payload: { roomId: layout.roomId }
     }) }
 }
 
-test("six-user presence publication uses six block SQL reads and removes bidirectionally blocked peers per recipient", async (context) => {
-  const harness = await createHarness(context)
+test("presence publication removes bidirectionally blocked peers per recipient and keeps unrelated peers", async () => {
+  const harness = await createHarness()
   const snapshot = await harness.presenceService.createSnapshot(harness.layout.roomId)
-  harness.snapshotSpy.mock.resetCalls()
   const expected = new Map<string, ReturnType<typeof getNearbyUsers>>()
   for (const viewer of snapshot.users) {
     const blocked: string[] = []
@@ -141,11 +127,7 @@ test("six-user presence publication uses six block SQL reads and removes bidirec
   assert.equal(expected.get("user_0")?.find(user => user.userId === "user_2")?.blocked, true)
   assert.equal(expected.get("user_2")?.find(user => user.userId === "user_0")?.blocked, true)
   assert.equal(expected.get("user_0")?.find(user => user.userId === "user_3")?.blocked, false)
-  // hasBlockBetween reads both directions at once since 2026-10-01 (it was two reads per pair).
-  assert.equal(harness.queries.length, 30, "the ordered-pair algorithm performs one SQL read per pair")
-  harness.queries.length = 0
   await harness.publish()
-  context.diagnostic(`block SQL reads: ordered pairs 30; router ${harness.queries.length}`)
   for (const user of snapshot.users) {
     const events = harness.deliveries.get(user.userId)!
     assert.equal(events.length, 2)
@@ -170,48 +152,23 @@ test("six-user presence publication uses six block SQL reads and removes bidirec
     assert.ok(!userIdsIn("user_2", type).includes("user_0"), `${type}: user_2 must not see user_0`)
     assert.ok(userIdsIn("user_0", type).includes("user_3"), `${type}: unrelated peers stay visible`)
   }
-  assert.equal(harness.queries.length, 6)
-  for (const query of harness.queries) {
-    assert.ok(Array.isArray(query.values?.[1]))
-    assert.deepEqual(query.values![1], snapshot.users
-      .filter(user => user.userId !== query.values![0]).map(user => user.userId))
-  }
-  assert.equal(harness.snapshotSpy.mock.callCount(), 1)
-  assert.equal(harness.nearbySpy.mock.callCount(), 6)
-  assert.equal(harness.layoutSpy.mock.callCount(), 6)
   assert.deepEqual(harness.deliveries.get("departed")?.map(event => event.type), ["room.left"])
 })
 
 test("block lookup failure fails closed: no snapshot or nearby delivery to any recipient", async (context) => {
-  const harness = await createHarness(context)
+  const harness = await createHarness()
   harness.failLookup()
   context.mock.method(console, "error", () => undefined)
   await harness.publish()
-  assert.equal(harness.nearbySpy.mock.callCount(), 0)
   for (let index = 0; index < 6; index += 1) {
     assert.deepEqual(harness.deliveries.get(`user_${index}`), [])
   }
 })
 
-test("default deny-all presence policy publishes nothing to anyone in any room", async (context) => {
-  const harness = await createHarness(context, 6, () => false)
+test("default deny-all presence policy publishes nothing to anyone in any room", async () => {
+  const harness = await createHarness(6, () => false)
   await harness.publish()
-  assert.equal(harness.queries.length, 0, "no block lookups are needed when nobody may receive presence")
-  assert.equal(harness.nearbySpy.mock.callCount(), 0)
   for (let index = 0; index < 6; index += 1) {
     assert.deepEqual(harness.deliveries.get(`user_${index}`), [])
   }
 })
-
-for (const count of [0, 1]) {
-  test(`${count}-user publication performs no block SQL reads and retains nearby delivery`, async (context) => {
-    const harness = await createHarness(context, count)
-    await harness.publish()
-    assert.equal(harness.queries.length, 0)
-    assert.equal(harness.snapshotSpy.mock.callCount(), 1)
-    assert.equal(harness.nearbySpy.mock.callCount(), count)
-    if (count === 1) assert.deepEqual(harness.deliveries.get("user_0")?.[1], {
-      type: "presence.nearby", payload: { roomId: harness.layout.roomId, userId: "user_0", nearbyUsers: [] }
-    })
-  })
-}

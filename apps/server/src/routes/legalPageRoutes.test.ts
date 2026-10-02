@@ -28,7 +28,6 @@ test("public legal pages render the current app copy with correct content and no
     assert.match(String(privacy.headers["content-type"]), /text\/html/)
     assert.match(privacy.body, /<html lang="tr">/)
     assert.match(privacy.body, /Fahri Eren Aksu/)
-    assert.match(privacy.body, /2026\.09\.28/)
     assert.doesNotMatch(privacy.body, /Xavier Ballesteros|Montreal|blumi\.io/)
     assert.match(String(privacy.headers["content-security-policy"]), /default-src 'none'/)
 

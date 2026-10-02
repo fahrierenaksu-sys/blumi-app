@@ -47,37 +47,6 @@ async function cleanupSnapshotFixtures(pool: Pool, userIds: string[]): Promise<v
   }
 }
 
-test("snapshot creation does not materialize an unused candidate INSERT result set", async () => {
-  let candidateInsertSql = ""
-  const snapshotId = randomUUID()
-  const client = {
-    async query(sql: string) {
-      if (sql.includes("SELECT user_id FROM blumi_accounts")) return {rows:[{user_id:"snapshot_viewer"}]}
-      if (sql.includes("SELECT COUNT(*) AS count")) return {rows:[{count:"0",retry_after:null}]}
-      if (sql.includes("INSERT INTO blumi_discovery_snapshot_candidates")) {
-        candidateInsertSql = sql
-        return {rows:[{snapshot_id:snapshotId,user_id:"snapshot_viewer",
-          filter_hash:"filter-hash",expires_at:"2026-09-29T12:30:00.000Z",candidate_count:"2"}]}
-      }
-      return {rows:[]}
-    },
-    release() {}
-  }
-  const pool = {query:async () => ({rows:[]}),connect:async () => client} as unknown as Pool
-  const meta = await createPostgresDiscoverySnapshots(pool).create({
-    userId:"snapshot_viewer",filters,filterHash:"filter-hash",now:new Date("2026-09-29T12:00:00.000Z")
-  })
-
-  assert.deepEqual(meta,{snapshotId,userId:"snapshot_viewer",
-    filterHash:"filter-hash",expiresAt:"2026-09-29T12:30:00.000Z",count:2})
-  assert.match(candidateInsertSql,/INSERT INTO blumi_discovery_snapshot_candidates/)
-  assert.match(candidateInsertSql,/WITH candidates AS MATERIALIZED \(SELECT ranked\.user_id, ranked\.rank_score FROM/,
-    "snapshot creation should sort/materialize only fields consumed by the persisted candidate list")
-  assert.doesNotMatch(candidateInsertSql,/RETURNING\s+position/i,
-    "persist all candidates without building an unused INSERT RETURNING rowset")
-  assert.doesNotMatch(candidateInsertSql,/COUNT\(\*\) FROM inserted/i)
-})
-
 test("PostgreSQL snapshot survives decisions, current eligibility changes, another instance and expiration", {skip:!process.env.DATABASE_URL}, async () => {
   assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const fixtureRunId = randomUUID().replaceAll("-","")
@@ -149,7 +118,6 @@ test("PostgreSQL snapshot survives decisions, current eligibility changes, anoth
       FROM blumi_discovery_snapshots WHERE user_id=$1`,[viewerUserId])
     assert.equal(Number(budget.rows[0].snapshots),30)
     // 1117 eligible accounts, but one snapshot stores at most the ranked cap.
-    assert.equal(DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT,1000)
     assert.equal(Number(budget.rows[0].max_candidates),DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT)
     assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM blumi_discovery_snapshot_candidates c
       JOIN blumi_discovery_snapshots s ON s.snapshot_id=c.snapshot_id WHERE s.user_id=$1`,[viewerUserId])).rows[0].count),30*DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT)

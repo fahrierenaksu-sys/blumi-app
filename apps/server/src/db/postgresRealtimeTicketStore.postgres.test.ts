@@ -58,6 +58,7 @@ test("an expired ticket never authenticates and is collected by the bounded purg
     const boundary = digest()
     await store.issue({ digest: boundary, sessionTokenHash: "d".repeat(64), expiresAtMs: now + 5_000 })
     assert.equal(await store.consume(boundary, new Date(now + 5_000)), null)
+    await assert.rejects(store.purgeExpired(new Date(), 0), /batch/i)
     assert.ok(await store.purgeExpired(new Date(now + 5_000), 1000) >= 2)
     const remaining = await pool.query(
       "SELECT ticket_digest FROM blumi_realtime_tickets WHERE ticket_digest = ANY($1::text[])",

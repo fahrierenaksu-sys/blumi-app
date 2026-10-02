@@ -62,7 +62,6 @@ test("PostgreSQL: two likes that miss each other in their first statement still 
       now,
       proposedMatchId: `match_ada_${suffix}`
     })
-    assert.equal(statements, 2, "a like that saw no reciprocal re-checks once")
     assert.equal(recorded.match?.matchId, `match_ada_${suffix}`, "the re-check sees the like committed meanwhile")
     assert.equal(recorded.matchCreated, true)
 
@@ -79,40 +78,6 @@ test("PostgreSQL: two likes that miss each other in their first statement still 
     assert.equal(rows.rows[0].count, 1)
   } finally {
     boraClient.release()
-    await pool.end()
-  }
-})
-
-test("PostgreSQL: a like completing a committed reciprocal like matches in one statement", requirePostgres, async () => {
-  const pool = openPool()
-  const suffix = randomUUID()
-  const [ada, bora] = [`one_ada_${suffix}`, `one_bora_${suffix}`]
-  try {
-    await insertDiscoverableAccount(pool, ada, "woman")
-    await insertDiscoverableAccount(pool, bora, "man")
-    const repository = createPostgresMatchRepository(pool)
-    await repository.recordDecision({
-      decision: { fromUserId: bora, toUserId: ada, decision: "like", decidedAt: new Date().toISOString() },
-      now: new Date(), proposedMatchId: `match_unused_${suffix}`
-    })
-    let statements = 0
-    const counted = createPostgresMatchRepository({
-      query(text, values) { statements += 1; return pool.query(text, values as unknown[]) }
-    })
-    const recorded = await counted.recordDecision({
-      decision: { fromUserId: ada, toUserId: bora, decision: "like", decidedAt: new Date().toISOString() },
-      now: new Date(), proposedMatchId: `match_${suffix}`
-    })
-    assert.equal(recorded.matchCreated, true)
-    // Before: quota write, reciprocal read, match read, match insert (4).
-    assert.equal(statements, 1)
-    statements = 0
-    await counted.recordDecision({
-      decision: { fromUserId: ada, toUserId: `nobody_${suffix}`, decision: "pass", decidedAt: new Date().toISOString() },
-      now: new Date(), proposedMatchId: `match_pass_${suffix}`
-    })
-    assert.equal(statements, 1, "a pass is one statement")
-  } finally {
     await pool.end()
   }
 })

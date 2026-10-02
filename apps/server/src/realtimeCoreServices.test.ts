@@ -16,155 +16,15 @@ import {
 } from "./miniRooms/miniRoomRepository"
 import { createPresenceService } from "./presence/presenceService"
 import { createReactionService } from "./reactions/reactionService"
-import { PUBLIC_LOBBY_ROOM_ID, createRoomService } from "./rooms/roomService"
+import { createRoomService } from "./rooms/roomService"
 import { createSafetyService } from "./safety/safetyService"
 import { createEconomyService } from "./economy/economyService"
 import type { EconomyService } from "./economy/economyService"
 
-test("room and presence services assign, move, filter, and clean presence immutably", async () => {
-  const roomService = createRoomService()
-  const presenceService = createPresenceService({ roomService })
-  const now = new Date("2026-06-28T10:00:00.000Z")
-
-  const joinedA = await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("user_a", "Ada"),
-    initialSpotId: "seat-left"
-  }, now)
-  const joinedB = await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("user_b", "Bora"),
-    initialSpotId: "seat-left"
-  }, now)
-
-  assert.equal(joinedA.assignedSpotId, "seat-left")
-  assert.notEqual(joinedB.assignedSpotId, "seat-left")
-  assert.notEqual(joinedA.layout.spots, joinedB.layout.spots)
-
-  await assert.rejects(
-    presenceService.moveToSpot(
-      PUBLIC_LOBBY_ROOM_ID,
-      "user_b",
-      "seat-left",
-      now
-    ),
-    /not available/i
-  )
-
-  const moved = await presenceService.moveToSpot(
-    PUBLIC_LOBBY_ROOM_ID,
-    "user_a",
-    "hotspot-window",
-    now
-  )
-  assert.equal(
-    moved.users.find((user) => user.userId === "user_a")?.spotId,
-    "hotspot-window"
-  )
-
-  const nearby = await presenceService.listNearbyUsers(
-    PUBLIC_LOBBY_ROOM_ID,
-    "user_a",
-    ["user_b"],
-    now
-  )
-  assert.deepEqual(nearby, [])
-
-  await presenceService.leaveRoom(PUBLIC_LOBBY_ROOM_ID, "user_a")
-  assert.equal(
-    await presenceService.findUserPresence(PUBLIC_LOBBY_ROOM_ID, "user_a", now),
-    null
-  )
-
-  await assert.rejects(roomService.getOrCreateLayout("private-room"), /not available/i)
-})
-
-test("simultaneous joins cannot reserve the same room spot", async () => {
-  const roomService = createRoomService()
-  const presenceService = createPresenceService({ roomService })
-  const now = new Date("2026-06-28T10:00:00.000Z")
-
-  const [joinedA, joinedB] = await Promise.all([
-    presenceService.joinRoom({
-      roomId: PUBLIC_LOBBY_ROOM_ID,
-      profile: profile("concurrent_a", "Ada"),
-      initialSpotId: "seat-left"
-    }, now),
-    presenceService.joinRoom({
-      roomId: PUBLIC_LOBBY_ROOM_ID,
-      profile: profile("concurrent_b", "Bora"),
-      initialSpotId: "seat-left"
-    }, now)
-  ])
-
-  assert.notEqual(joinedA.assignedSpotId, joinedB.assignedSpotId)
-  const users = (await presenceService.createSnapshot(PUBLIC_LOBBY_ROOM_ID, now)).users
-  assert.equal(new Set(users.map((user) => user.spotId)).size, users.length)
-})
-
-test("rejoining a full room preserves the user's existing spot", async () => {
-  const roomService = createRoomService()
-  const presenceService = createPresenceService({ roomService })
-  const now = new Date("2026-06-28T10:00:00.000Z")
-  const layout = await roomService.getOrCreateLayout(PUBLIC_LOBBY_ROOM_ID)
-  let firstSpot = ""
-
-  for (const [index] of layout.spots.entries()) {
-    const joined = await presenceService.joinRoom({
-      roomId: PUBLIC_LOBBY_ROOM_ID,
-      profile: profile(`full-room-${index}`, `User ${index}`)
-    }, now)
-    if (index === 0) firstSpot = joined.assignedSpotId
-  }
-
-  const rejoined = await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("full-room-0", "User 0")
-  }, now)
-  assert.equal(rejoined.assignedSpotId, firstSpot)
-  assert.equal(rejoined.snapshot.users.length, layout.spots.length)
-})
-
-test("concurrent moves cannot place two users at one room spot", async () => {
-  const roomService = createRoomService()
-  const presenceService = createPresenceService({ roomService })
-  const now = new Date("2026-06-28T10:00:00.000Z")
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("move-race-a", "Ada"),
-    initialSpotId: "seat-left"
-  }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("move-race-b", "Bora"),
-    initialSpotId: "seat-right"
-  }, now)
-
-  const outcomes = await Promise.allSettled([
-    presenceService.moveToSpot(PUBLIC_LOBBY_ROOM_ID, "move-race-a", "hotspot-window", now),
-    presenceService.moveToSpot(PUBLIC_LOBBY_ROOM_ID, "move-race-b", "hotspot-window", now)
-  ])
-
-  assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 1)
-  const users = (await presenceService.createSnapshot(PUBLIC_LOBBY_ROOM_ID, now)).users
-  assert.equal(new Set(users.map((user) => user.spotId)).size, users.length)
-})
-
-test("mini room lifecycle creates chat, media sessions, and clears busy presence", async () => {
+test("a room opened from a chat invite rewards a qualifying stay once and ends once", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-06-28T10:00:00.000Z")
-  await joinPair(services.presenceService, now)
-
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
 
   assert.equal(accepted.decision.status, "accepted")
   assert.ok(accepted.miniRoom)
@@ -192,20 +52,6 @@ test("mini room lifecycle creates chat, media sessions, and clears busy presence
       ).avatar
     }
   ])
-  assert.equal(
-    await services.chatService.repository.findThread(
-      `thread_${accepted.miniRoom.miniRoomId}`
-    ).then((thread) => thread?.miniRoomId),
-    accepted.miniRoom.miniRoomId
-  )
-  assert.equal(
-    await services.presenceService.findUserPresence(
-      PUBLIC_LOBBY_ROOM_ID,
-      "user_a",
-      now
-    ).then((presence) => presence?.inMiniRoom),
-    true
-  )
 
   await assert.rejects(
     services.miniRoomService.leaveMiniRoom(
@@ -234,30 +80,13 @@ test("mini room lifecycle creates chat, media sessions, and clears busy presence
   assert.equal(duplicateEnd, null)
   assert.equal((await services.economyService.getInventory("user_a")).coins, 1275)
   assert.equal((await services.economyService.getInventory("user_b")).coins, 1275)
-  assert.equal(
-    await services.presenceService.findUserPresence(
-      PUBLIC_LOBBY_ROOM_ID,
-      "user_a",
-      now
-    ).then((presence) => presence?.inMiniRoom),
-    false
-  )
+  assert.equal(await services.miniRoomService.findActiveMiniRoomForUser("user_a"), null)
 })
 
 test("mini rooms shorter than two minutes do not grant economy rewards", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-06-28T10:00:00.000Z")
-  await joinPair(services.presenceService, now)
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
 
   await services.miniRoomService.leaveMiniRoom(
@@ -285,17 +114,7 @@ test("a transient room reward failure leaves the room retryable without double c
   }
   const services = createRealtimeCoreServices(retryableEconomyService)
   const now = new Date("2026-06-28T10:00:00.000Z")
-  await joinPair(services.presenceService, now)
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
   const endedAt = new Date(now.getTime() + 120_000)
 
@@ -339,17 +158,7 @@ test("an end write failure keeps the original reward day across a midnight retry
   }
   const services = createRealtimeCoreServices(undefined, retryableRepository)
   const now = new Date("2026-07-14T23:57:59.000Z")
-  await joinPair(services.presenceService, now)
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
 
   await assert.rejects(
@@ -374,17 +183,7 @@ test("an end write failure keeps the original reward day across a midnight retry
 test("concurrent qualifying leaves credit each participant exactly once", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-07-14T10:00:00.000Z")
-  await joinPair(services.presenceService, now)
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
   const endedAt = new Date(now.getTime() + 120_000)
 
@@ -413,17 +212,7 @@ test("concurrent qualifying leaves credit each participant exactly once", async 
 test("connection and reaction services validate decisions and reactions", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-06-28T10:00:00.000Z")
-  await joinPair(services.presenceService, now)
-  const invite = await services.miniRoomService.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: profile("user_a", "Ada"),
-    recipientUserId: "user_b"
-  }, now)
-  const accepted = await services.miniRoomService.decideInvite({
-    inviteId: invite.inviteId,
-    actorProfile: profile("user_b", "Bora"),
-    status: "accepted"
-  }, now)
+  const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
 
   const first = await services.connectionService.decide("user_a", {
@@ -500,19 +289,31 @@ function createRealtimeCoreServices(
   }
 }
 
-async function joinPair(
-  presenceService: ReturnType<typeof createPresenceService>,
+async function openChatRoom(
+  services: ReturnType<typeof createRealtimeCoreServices>,
   now: Date
-): Promise<void> {
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("user_a", "Ada", "avatar_v2_body_default"),
-    initialSpotId: "seat-left"
+) {
+  const sender = profile("user_a", "Ada", "avatar_v2_body_default")
+  const recipient = profile("user_b", "Bora", "avatar_v2_body_male_light")
+  const threadId = "thread_match_user_a_user_b"
+  await services.chatService.createThread({
+    threadId,
+    miniRoomId: "match_user_a_user_b",
+    participantUserIds: [sender.userId, recipient.userId],
+    participants: [
+      { userId: sender.userId, displayName: sender.displayName },
+      { userId: recipient.userId, displayName: recipient.displayName }
+    ]
   }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: profile("user_b", "Bora", "avatar_v2_body_male_light"),
-    initialSpotId: "seat-right"
+  const created = await services.miniRoomService.createChatInvite({
+    threadId, senderProfile: sender, recipientProfile: recipient
+  }, now)
+  return services.miniRoomService.decideChatInvite({
+    inviteId: created.invite.inviteId,
+    actorUserId: recipient.userId,
+    senderProfile: sender,
+    recipientProfile: recipient,
+    status: "accepted"
   }, now)
 }
 

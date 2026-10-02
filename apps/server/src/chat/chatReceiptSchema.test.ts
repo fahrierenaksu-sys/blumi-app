@@ -5,8 +5,7 @@ import { resolve } from "node:path"
 import test from "node:test"
 import {
   CHAT_RECEIPTS_MIGRATION_ID,
-  createChatReceiptSchemaProbe,
-  createStaticChatReceiptSchema
+  createChatReceiptSchemaProbe
 } from "./chatReceiptSchema"
 
 function createLedger(initial: string | null) {
@@ -82,9 +81,4 @@ test("the default checksum is the packaged 070 file's SHA-256, as the migrator r
   const sql = readFileSync(resolve(__dirname, "../../db/migrations", CHAT_RECEIPTS_MIGRATION_ID), "utf8")
   const ledger = createLedger(createHash("sha256").update(sql).digest("hex"))
   assert.equal(await createChatReceiptSchemaProbe(ledger.pool).isReady(), true)
-})
-
-test("static probes pin either state", async () => {
-  assert.equal(await createStaticChatReceiptSchema(true).isReady(), true)
-  assert.equal(createStaticChatReceiptSchema(false).peek(), false)
 })

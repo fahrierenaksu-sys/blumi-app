@@ -33,8 +33,13 @@ test("recovery request verifies only the new phone and never rebinds the account
   await authService.verifyCode(OLD_PHONE, CODE)
   const service = createAccountRecoveryService({ authService })
 
-  await authService.requestRecoveryPhoneVerification(NEW_PHONE)
-  await service.request({ oldPhoneNumber: OLD_PHONE, newPhoneNumber: NEW_PHONE, verificationCode: CODE })
+  // The live routes verify the new phone first (Firebase) and pass the verified number.
+  await assert.rejects(
+    service.requestWithVerifiedPhone({ oldPhoneNumber: OLD_PHONE, newPhoneNumber: NEW_PHONE, verifiedPhoneNumber: OLD_PHONE }),
+    /verified phone/i
+  )
+  assert.deepEqual(await service.list(), [])
+  await service.requestWithVerifiedPhone({ oldPhoneNumber: OLD_PHONE, newPhoneNumber: NEW_PHONE, verifiedPhoneNumber: NEW_PHONE })
 
   const [request] = await service.list()
   assert.equal(request?.status, "pending")
@@ -47,8 +52,7 @@ test("recovery request verifies only the new phone and never rebinds the account
 test("only an audited admin resolution can close a pending recovery request", async () => {
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => CODE })
   const service = createAccountRecoveryService({ authService })
-  await authService.requestRecoveryPhoneVerification(NEW_PHONE)
-  await service.request({ oldPhoneNumber: OLD_PHONE, newPhoneNumber: NEW_PHONE, verificationCode: CODE })
+  await service.requestWithVerifiedPhone({ oldPhoneNumber: OLD_PHONE, newPhoneNumber: NEW_PHONE, verifiedPhoneNumber: NEW_PHONE })
   const request = (await service.list())[0]
   assert.ok(request)
   const resolved = await service.resolve({ requestId: request.requestId, status: "manual_review_required", operatorId: "ops-1", tokenId: "token-1" })

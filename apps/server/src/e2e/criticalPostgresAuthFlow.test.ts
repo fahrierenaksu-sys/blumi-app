@@ -4,6 +4,7 @@ import { Pool } from "pg"
 import { createPostgresAccountDataExporter } from "../account/accountDataExporter"
 import { createAuthService } from "../auth/authService"
 import { createDevelopmentSmsProvider } from "../auth/smsProvider"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
 import { createServer } from "../server"
 
@@ -11,8 +12,9 @@ const databaseUrl = process.env.DATABASE_URL?.trim()
 
 test(
   "critical auth flow persists through PostgreSQL and a real loopback HTTP boundary",
-  { skip: !databaseUrl },
+  disposablePostgresSkip(),
   async () => {
+    assertDisposablePostgresDatabase(databaseUrl)
     const pool = new Pool({ connectionString: databaseUrl })
     const authService = createAuthService({
       repository: createPostgresAuthRepository(pool),

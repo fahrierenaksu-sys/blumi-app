@@ -2,9 +2,11 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createPostgresRateBudget, userBudgetKey } from "./sharedRateBudget"
 
-test("independent PostgreSQL instances atomically enforce one user budget", { skip: !process.env.DATABASE_URL }, async () => {
+test("independent PostgreSQL instances atomically enforce one user budget", disposablePostgresSkip(), async () => {
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pools = [new Pool({ connectionString: process.env.DATABASE_URL }), new Pool({ connectionString: process.env.DATABASE_URL })]
   try {
     const instances = pools.map(pool => createPostgresRateBudget(pool))

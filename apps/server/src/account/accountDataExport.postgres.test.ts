@@ -2,12 +2,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { Pool } from "pg"
 import { createPostgresAccountDataExporter } from "./accountDataExporter"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
 import { createAccountRecord } from "../auth/authStore"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
-test("real PostgreSQL export streams 100000 own messages from one stable snapshot", { skip: !databaseUrl }, async () => {
+test("real PostgreSQL export streams 100000 own messages from one stable snapshot", disposablePostgresSkip(), async () => {
+  assertDisposablePostgresDatabase(databaseUrl)
   const pool = new Pool({ connectionString: databaseUrl })
   const account = createAccountRecord("+905559991234")
   let largestBatch = 0
@@ -41,7 +43,8 @@ test("real PostgreSQL export streams 100000 own messages from one stable snapsho
       ending = chunk.value
     }
     assert.equal(count, 100_000)
-    assert.equal(largestBatch, 500)
+    // The memory bound: rows are fetched in batches of at most 500.
+    assert.ok(largestBatch > 0 && largestBatch <= 500, `largest batch ${largestBatch}`)
     assert.equal(ending, "}}\n")
   } finally {
     await pool.end()

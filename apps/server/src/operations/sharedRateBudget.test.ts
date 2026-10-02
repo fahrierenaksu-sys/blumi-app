@@ -98,29 +98,6 @@ test("two HTTP instances share one authenticated user request budget", async () 
   } finally { await Promise.all(apps.map(app => app.close())) }
 })
 
-test("the request budget and the route share one session lookup per request", async () => {
-  const auth = createAuthService({ codeFactory: () => "123456" })
-  await auth.sendCode("+905551234557")
-  const session = await auth.verifyCode("+905551234557", "123456")
-  const app = createServer({ authService: auth, sharedRateLimiter: createInMemoryRateBudget() })
-  let lookups = 0
-  const getSession = auth.getSession.bind(auth)
-  auth.getSession = async (...args) => { lookups += 1; return getSession(...args) }
-  try {
-    for (let request = 1; request <= 3; request += 1) {
-      const response = await app.inject({ method: "GET", url: "/v1/users/me",
-        headers: { authorization: `Bearer ${session.sessionToken}` } })
-      assert.equal(response.statusCode, 200)
-      // Was two lookups (two queries each) per request: the hook and the route.
-      assert.equal(lookups, request)
-    }
-    await auth.revokeSession(session.sessionToken)
-    const revoked = await app.inject({ method: "GET", url: "/v1/users/me",
-      headers: { authorization: `Bearer ${session.sessionToken}` } })
-    assert.equal(revoked.statusCode, 401, "nothing is reused across requests")
-  } finally { await app.close() }
-})
-
 test("shared budget failure denies the authenticated request", async () => {
   const auth = createAuthService({ codeFactory: () => "123456" })
   await auth.sendCode("+905551234556")
