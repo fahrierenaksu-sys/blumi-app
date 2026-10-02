@@ -25,6 +25,7 @@ import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
 import { cozyPinkBedroomScene } from "./roomMaps"
 import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
 import { createMiniRoomEntryPlan } from "./miniRoomEntryModel"
+import { withMiniRoomPresence } from "./miniRoomPresentation"
 import type { RoomShellEntry } from "../../roomV2/roomV2.types"
 import {
   createMiniRoomAvatarPosition,
@@ -548,7 +549,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const target = refused?.point ?? next
     if (refused && next.userId === localUserId) setSelectedHotspotId(undefined)
     if (!snap && next.present) {
-      setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId], present: true } }))
+      setAvatars(current => ({ ...current, [next.userId]: withMiniRoomPresence(current[next.userId]!, true) }))
       const options: MoveOptions = hotspot ? { hotspot, roomWorldHotspot, authoritative: true }
         : { authoritative: true, ...(refused ? { arrivalFacing: refused.facing, departFromHotspotId: next.deniedHotspotId } : {}) }
       // This phone plans around its own view of the other avatar, which can
@@ -565,10 +566,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       // Absent: freeze where it is on screen, dimmed, until it returns.
       const position = readMiniRoomAvatarPosition(driver.position)
       snapMiniRoomAvatarPosition(driver.position, position)
-      setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
+      setAvatars(current => ({ ...current, [next.userId]: withMiniRoomPresence({ ...current[next.userId]!,
         x: position.x, y: position.y, targetX: undefined, targetY: undefined, motion: "idle",
-        seatedHotspotId: undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined, arrivedByWalk: undefined,
-        present: false } }))
+        seatedHotspotId: undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined, arrivedByWalk: undefined
+      }, false) }))
       return
     }
     // Place exactly: seated on its seat when the record carries one, as the
@@ -579,11 +580,11 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const position = seated ? { x: hotspot.x, y: hotspot.y }
       : resolveRoomWorldInteractiveTarget({ geometry, target }) ?? target
     snapMiniRoomAvatarPosition(driver.position, position)
-    setAvatars(current => ({ ...current, [next.userId]: { ...current[next.userId],
+    setAvatars(current => ({ ...current, [next.userId]: withMiniRoomPresence({ ...current[next.userId]!,
       x: position.x, y: position.y, targetX: undefined, targetY: undefined,
       motion: seated ? "sitting" : "idle", ...(seated || refused ? { facing } : {}),
-      seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined,
-      present: next.present } }))
+      seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined
+    }, next.present) }))
   }, [endArrivalWalk, geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand,
     roomWorldHotspots, runMovement])
 
@@ -592,7 +593,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     if (!avatar || !next.present || next.userId === localUserId) return false
     const arrivalId = ++arrivalCounterRef.current
     const markArrival = (walkedIn: boolean) => setAvatars(current => current[next.userId]
-      ? { ...current, [next.userId]: { ...current[next.userId], present: true, arrivalId,
+      ? { ...current, [next.userId]: { ...withMiniRoomPresence(current[next.userId]!, true), arrivalId,
         arrivedByWalk: walkedIn || undefined } } : current)
     if (!options.walk) {
       // Reduce Motion: no walk; place at the authoritative spot and fade in there.
@@ -625,7 +626,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setAvatars(current => {
       const avatar = current[userId]
       if (!avatar || avatar.present === present) return current
-      return { ...current, [userId]: { ...avatar, present,
+      return { ...current, [userId]: { ...withMiniRoomPresence(avatar, present),
         ...(!present ? { motion: "idle" as const, depthSeatHotspotId: undefined, enteringFromDoor: undefined,
           arrivedByWalk: undefined } : {}) } }
     })

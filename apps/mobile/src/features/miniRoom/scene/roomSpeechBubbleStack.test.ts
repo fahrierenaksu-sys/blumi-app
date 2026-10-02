@@ -126,7 +126,7 @@ test("the avatar layer hands each avatar only its own lines and the Reduce Motio
         "./RoomSpeechBubbleStack": { RoomSpeechBubbleStack: "RoomSpeechBubbleStack" },
         "./RoomTypingBubble": { RoomTypingBubble: "RoomTypingBubble" }
       },
-      real: ["./miniRoomSpeechStack", "./miniRoomReducedMotion"],
+      real: ["./miniRoomSpeechStack", "./miniRoomReducedMotion", "./miniRoomPresentation"],
       inertUnknown: true
     }
   )

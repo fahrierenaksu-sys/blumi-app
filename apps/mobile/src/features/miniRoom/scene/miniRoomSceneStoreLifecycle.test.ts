@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, createInertModule, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import type { MiniRoomStore } from "./miniRoomSceneTypes"
+import { MINI_ROOM_AWAY_OPACITY, resolveMiniRoomAvatarOpacity } from "./miniRoomPresentation"
 import type { useMiniRoomSceneStore as UseMiniRoomSceneStore } from "./miniRoomSceneStore"
 
 // Characterizes the MiniRoom scene store lifecycle: the scene resets only for a
@@ -58,7 +59,8 @@ function mount() {
         "./miniRoomMovementRun",
         "./miniRoomSpeechStack",
         "./miniRoomSeatRefusalModel",
-        "./miniRoomEntryModel"
+        "./miniRoomEntryModel",
+        "./miniRoomPresentation"
       ],
       globals: {
         setTimeout: (run: () => void, delay: number) => {
@@ -290,6 +292,28 @@ test("under Reduce Motion the arrival is placed at the server's spot and only fa
   assert.deepEqual({ x: partner.x, y: partner.y }, { x: .62, y: .74 })
   assert.equal(f.store().deferUntilArrivalLands("partner", () => undefined), false, "nothing to wait for: felt now")
   f.runtime.unmount()
+})
+
+test("entering the room the partner is never an unexplained ghost: hidden until here, opaque once here, dim only when away", () => {
+  const opacity = (f: ReturnType<typeof mount>) => resolveMiniRoomAvatarOpacity(f.store().avatars.partner!)
+  for (const arrive of ["snapshot", "walk-in", "fade-in"] as const) {
+    const f = mount()
+    f.render({ roomDecorScene: doorRoom })
+    assert.equal(opacity(f), 1, "before presence is known (no motion sync) the partner is simply there")
+    // Motion sync is on but the room's snapshot has not said the partner is here.
+    f.store().setRemotePresence("partner", false)
+    assert.equal(opacity(f), 0, `${arrive}: not drawn at all while not here yet`)
+    const record = { userId: "partner", x: .62, y: .74, present: true, revision: 2 }
+    if (arrive === "snapshot") f.store().applyRemoteAvatar(record, true)
+    else assert.equal(f.store().presentArrival(record, { walk: arrive === "walk-in" }), true)
+    f.store().setRemotePresence("partner", true)
+    assert.equal(opacity(f), 1, `${arrive}: fully opaque once present`)
+    f.store().setRemotePresence("partner", false)
+    assert.equal(opacity(f), MINI_ROOM_AWAY_OPACITY, "stepped away: dimmed, as the away notice says")
+    f.store().setRemotePresence("partner", true)
+    assert.equal(opacity(f), 1)
+    f.runtime.unmount()
+  }
 })
 
 test("a room without a door presents no walk; the record applies as usual", () => {

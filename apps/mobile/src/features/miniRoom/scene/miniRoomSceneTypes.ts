@@ -105,7 +105,14 @@ export interface MiniRoomParticipantAvatarSnapshots {
 }
 
 export interface AvatarState {
+  /** Undefined until presence is known (no motion sync): drawn as here. */
   present?: boolean
+  /**
+   * Presentation only: this avatar has been present during this visit. A
+   * partner who is not present and was never here is not drawn at all (no
+   * ghost); one who stepped away is dimmed while the HUD says so.
+   */
+  seenPresent?: boolean
   userId: string
   displayName: string
   x: number
