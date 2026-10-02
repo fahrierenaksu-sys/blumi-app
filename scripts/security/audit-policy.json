@@ -1,6 +1,14 @@
 {
   "allowlist": [
     {
+      "id": "GHSA-86w9-cpqp-85rv",
+      "package": "node-forge",
+      "scope": "Exactly node-forge 1.4.0 patched by patches/node-forge+1.4.0.patch; Expo certificate consumer resolves this single copy",
+      "owner": "Blumi mobile",
+      "expiresOn": "2026-10-16",
+      "reason": "No fixed npm release exists. The installed RSA verifier now permits only OID plus absent/empty primitive NULL parameters. run-audit.mjs requires the behavioral mitigation and Expo compatibility tests to pass before evaluating this exception. Replace with an official fixed release and remove patch/exception when available."
+    },
+    {
       "id": "GHSA-w5hq-g745-h8pq",
       "package": "uuid",
       "scope": "@expo/ngrok development tunnel and firebase-admin gaxios dependency",
