@@ -83,6 +83,22 @@ test("surface policy keeps the production catalog visible but closed until a con
     getShopSurfacePolicy({ ...base, isConnected: false, isReady: true, hydrationStatus: "ready", state: "offline" }),
     { showShopContent: true, inventoryVerified: true, canPerformShopActions: false }
   )
+  // Loading, failed and offline-before-first-snapshot keep the catalog shell
+  // but never prove ownership or open actions.
+  for (const state of ["loading", "error", "offline"] as const) {
+    assert.deepEqual(
+      getShopSurfacePolicy({
+        ...base,
+        isConnected: state !== "offline",
+        isReady: false,
+        hydrationStatus: state === "error" ? "failed" : "loading",
+        state,
+        productCount: 24
+      }),
+      { showShopContent: true, inventoryVerified: false, canPerformShopActions: false },
+      state
+    )
+  }
   // A ready flag without a ready hydration is not an ownership proof.
   assert.equal(
     getShopSurfacePolicy({ ...base, isReady: true, hydrationStatus: "failed", state: "error" }).inventoryVerified,
