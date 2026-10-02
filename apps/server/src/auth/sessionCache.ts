@@ -8,11 +8,13 @@ import type { RealtimeAccessRevocation } from "./realtimeAccessRevocation"
  * the Supabase pooler) just to learn who is calling.
  *
  * Correctness comes from invalidation, not from the TTL:
- * - every write through the auth repository on this instance (sign-out,
- *   refresh rotation, account deletion, phone change, profile, onboarding,
- *   avatar, moderation acknowledgement, suspension expiry) drops every entry
- *   before and after the write, and an answer read while a write was in
- *   flight is never stored;
+ * - every write through the auth repository on this instance that can
+ *   change a session or an account drops the affected entries before and
+ *   after the write: that account's entries when the write names one
+ *   (profile, onboarding, avatar, moderation acknowledgement, suspension
+ *   expiry, refresh rotation), otherwise every entry (sign-out, account
+ *   deletion, phone change, sign-in). An answer read while any such write
+ *   was in flight is never stored;
  * - access revocations (auth and safety/moderation, local or forwarded from
  *   another instance over the realtime fanout control channel) drop the
  *   affected user's entries, or all entries;
@@ -36,6 +38,8 @@ export interface SessionCache {
   epoch(): number
   remember(sessionTokenHash: string, resolved: ResolvedSession, epochAtRead: number): void
   invalidate(revocation: RealtimeAccessRevocation): void
+  /** Drops the entries of one account (a write that names its account). */
+  invalidateAccount(accountId: string): void
   size(): number
 }
 
@@ -81,31 +85,74 @@ export function createSessionCache(options: {
         }
       }
     },
+    invalidateAccount(accountId) {
+      mutations += 1
+      for (const [key, entry] of entries) {
+        if (entry.resolved.account.accountId === accountId || entry.resolved.session.accountId === accountId) {
+          entries.delete(key)
+        }
+      }
+    },
     size: () => entries.size
   }
 }
 
-/**
- * Read-only repository methods. Every other method may change a session or
- * an account, so calling it invalidates the whole cache (writes are rare
- * next to authenticated reads; a precise per-user mapping would have to be
- * kept in step with every new repository method).
- */
+/** Read-only repository methods. */
 const READ_ONLY_METHOD = /^(get|find|list|has|is)[A-Z]/
+
+/**
+ * Writes that touch neither sessions nor accounts: OTP, challenge and
+ * confirmation tables and the Firebase deletion queue (2026-10-02). They
+ * used to empty the whole cache, so sign-in and OTP bursts kept the hit rate
+ * near zero. Listed by name: a method added later invalidates by default.
+ */
+const NON_SESSION_WRITES: ReadonlySet<keyof AuthRepository> = new Set<keyof AuthRepository>([
+  "saveFirebaseActionChallenge", "consumeFirebaseActionChallenge",
+  "claimOtpSend", "activatePendingOtp", "verifyAndConsumePendingOtp",
+  "claimRecoveryOtpSend", "activatePendingRecoveryOtp", "verifyAndConsumePendingRecoveryOtp",
+  "claimAccountDeletionOtpSend", "activatePendingAccountDeletionOtp",
+  "createAccountDeletionConfirmation", "verifyAndCreateAccountDeletionConfirmation", "consumeAccountDeletionConfirmation",
+  "claimAccountActionOtpSend", "activatePendingAccountActionOtp", "createAccountActionConfirmation",
+  "verifyAndCreateAccountActionConfirmation", "validateAccountActionConfirmation", "consumeAccountActionConfirmation",
+  "completeFirebaseUserDeletion", "retryFirebaseUserDeletion"
+])
+
+/**
+ * Writes that change only the account their input names, so only that
+ * account's entries are dropped. Everything else drops every entry.
+ */
+const ACCOUNT_SCOPED_WRITES: Readonly<Partial<Record<keyof AuthRepository, (input: unknown) => unknown>>> = {
+  updateAccountProfile: (input) => readAccountId(input),
+  updateAvatarSelection: (input) => readAccountId(input),
+  completeOnboardingStep: (input) => readAccountId(input),
+  acknowledgeModeration: (input) => readAccountId(input),
+  clearExpiredSuspension: (input) => readAccountId(input),
+  // A refresh, or a detected reuse that deletes the family, stays in one account.
+  rotateSession: (input) => readAccountId((input as { nextSession?: unknown } | null)?.nextSession)
+}
+
+function readAccountId(input: unknown): unknown {
+  return typeof input === "object" && input !== null ? (input as { accountId?: unknown }).accountId : undefined
+}
 
 export function withSessionCacheInvalidation(repository: AuthRepository, cache: SessionCache): AuthRepository {
   return new Proxy(repository, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver)
-      if (typeof value !== "function" || typeof property !== "string" || READ_ONLY_METHOD.test(property)) {
+      if (typeof value !== "function" || typeof property !== "string" || READ_ONLY_METHOD.test(property) ||
+        NON_SESSION_WRITES.has(property as keyof AuthRepository)) {
         return typeof value === "function" ? value.bind(target) : value
       }
       return async (...args: unknown[]) => {
-        cache.invalidate({ kind: "all" })
+        const accountId = ACCOUNT_SCOPED_WRITES[property as keyof AuthRepository]?.(args[0])
+        const invalidate = typeof accountId === "string" && accountId
+          ? () => cache.invalidateAccount(accountId)
+          : () => cache.invalidate({ kind: "all" })
+        invalidate()
         try {
           return await (value as (...input: unknown[]) => unknown).apply(target, args)
         } finally {
-          cache.invalidate({ kind: "all" })
+          invalidate()
         }
       }
     }
