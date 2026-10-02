@@ -36,8 +36,13 @@ export interface ShopCoinBalanceMotion {
   /** Animated `text` for a read-only TextInput; written on the UI thread. */
   textProps: Partial<TextInputProps>
   iconStyle: ReturnType<typeof useAnimatedStyle>
-  /** First-paint text before the animated props attach; stable after mount. */
-  initialText: string
+  /**
+   * The text React holds for the TextInput: the confirmed balance (or the
+   * placeholder). Reanimated hands settled animated props back to React, and
+   * TextInput replaces a `text` prop with its defaultValue, so this must be
+   * the balance the count settles on, never the balance at mount.
+   */
+  restingText: string
   /** Invisible text that sizes the pill so counting digits never clip. */
   layoutText: string
 }
@@ -98,11 +103,12 @@ export function useShopCoinBalanceMotion(input: ShopCoinBalanceMotionInput): Sho
   })
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }))
 
-  // Frozen at mount: after that the UI thread owns the text, and a changing
-  // defaultValue would make React push a competing `text` mid-count.
-  const [initialText] = useState(() => verified && balance.current !== null
+  // Mid-count React commits keep the UI thread's text (Reanimated re-applies
+  // running animated props on React commits); once the count settles, this
+  // target is what stays on screen.
+  const restingText = verified && balance.current !== null
     ? formatCoinCount(balance.current, separator)
-    : UNVERIFIED_BALANCE_TEXT)
+    : UNVERIFIED_BALANCE_TEXT
   const layoutText = verified ? getCoinBalanceLayoutText(balance, locale) : UNVERIFIED_BALANCE_TEXT
-  return { textProps, iconStyle, initialText, layoutText }
+  return { textProps, iconStyle, restingText, layoutText }
 }

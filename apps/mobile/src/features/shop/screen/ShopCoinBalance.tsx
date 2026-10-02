@@ -39,7 +39,7 @@ export function ShopCoinBalance({ coins, verified, locale }: ShopCoinBalanceProp
           contextMenuHidden
           scrollEnabled={false}
           underlineColorAndroid="transparent"
-          defaultValue={motion.initialText}
+          defaultValue={motion.restingText}
           animatedProps={motion.textProps}
           style={[shopScreenStyles.coinText, styles.value]}
         />
