@@ -106,6 +106,69 @@ export function getBottomNavLiquidStretch(speedTabsPerSecond: number): number {
   return 1 + Math.min(BOTTOM_NAV_LIQUID_MAX_STRETCH, Math.abs(speedTabsPerSecond) * BOTTOM_NAV_LIQUID_STRETCH_PER_SPEED)
 }
 
+/** Share of the gap to the speed's stretch the pill closes per frame. */
+export const BOTTOM_NAV_LIQUID_EASE = 0.45
+
+/** The pill's stretch for this frame, eased from the last frame's. */
+export function easeBottomNavLiquidStretch(current: number, speedTabsPerSecond: number): number {
+  "worklet"
+  const from = Number.isFinite(current) ? current : 1
+  return from + (getBottomNavLiquidStretch(speedTabsPerSecond) - from) * BOTTOM_NAV_LIQUID_EASE
+}
+
+/**
+ * The indicator's latest position and frame timestamp (ms; -1 for none yet),
+ * and the last one from an earlier frame.
+ */
+export interface BottomNavLiquidSample {
+  index: number
+  time: number
+  fromIndex: number
+  fromTime: number
+}
+
+export function createBottomNavLiquidSample(index: number): BottomNavLiquidSample {
+  "worklet"
+  return { index, time: -1, fromIndex: index, fromTime: -1 }
+}
+
+/**
+ * Advances the indicator's speed sampling by one change. Times are UI frame
+ * timestamps (readUiFrameTimestamp), never wall-clock reads, so the speed
+ * does not wobble with when a reaction happened to run. A second change in
+ * the same frame is measured again from the earlier frame, not across a
+ * near-zero interval.
+ */
+export function stepBottomNavLiquidSample(
+  last: BottomNavLiquidSample,
+  index: number,
+  now: number
+): { next: BottomNavLiquidSample; speed: number | null } {
+  "worklet"
+  if (!(last.time >= 0) || !Number.isFinite(now)) {
+    return { next: { index, time: now, fromIndex: index, fromTime: -1 }, speed: null }
+  }
+  const deltaMs = now - last.time
+  if (deltaMs >= 0 && deltaMs < BOTTOM_NAV_LIQUID_MIN_FRAME_MS) {
+    const next = { index, time: last.time, fromIndex: last.fromIndex, fromTime: last.fromTime }
+    return {
+      next,
+      speed: last.fromTime >= 0 ? getBottomNavIndicatorSpeed(index - last.fromIndex, last.time - last.fromTime) : null
+    }
+  }
+  return {
+    next: { index, time: now, fromIndex: last.index, fromTime: last.time },
+    speed: getBottomNavIndicatorSpeed(index - last.index, deltaMs)
+  }
+}
+
+/** The timestamp of the UI frame being computed (Reanimated's frame clock). */
+export function readUiFrameTimestamp(): number {
+  "worklet"
+  const frame = (globalThis as { __frameTimestamp?: number }).__frameTimestamp
+  return typeof frame === "number" ? frame : performance.now()
+}
+
 /** How strongly a tab shows its selected icon and label (0..1) for an indicator position. */
 export function getBottomNavItemEmphasis(itemIndex: number, indicatorIndex: number): number {
   "worklet"

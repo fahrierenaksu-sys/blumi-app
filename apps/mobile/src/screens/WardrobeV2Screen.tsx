@@ -182,7 +182,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           ) : null}
         </View>
 
-        {/* Once the screen fades in, the panel rises softly into place, like the room editor's dock. */}
+        {/* As the screen slides in, the panel rises softly into place, like the room editor's dock. */}
         <Animated.View style={panelEntranceStyle}>
           <WardrobeGlass tone="panel" radius={30} style={styles.panelShell} contentStyle={styles.panelContent}>
             <WardrobeSectionSwitcher

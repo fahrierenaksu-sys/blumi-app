@@ -8,9 +8,10 @@ import { animateSegment } from "./motion"
  * below while it fades in, on the UI thread with no React render per frame.
  *
  * It waits until the screen is on its way in. A route is mounted a few frames
- * before the native fade starts, so a mount-time entering animation was
- * mostly spent while the screen itself was still invisible. The rise starts
- * on the route's opening `transitionStart` (when the fade begins), or after
+ * before its native transition (the push from the right) starts, so a
+ * mount-time entering animation was mostly spent while the screen itself was
+ * still off screen. The rise starts on the route's opening
+ * `transitionStart` (when the push begins), or after
  * a short fallback when no transition is reported (an initial route, a
  * restored state). It plays once per mount: coming back to the screen from a
  * pushed route does not replay it.

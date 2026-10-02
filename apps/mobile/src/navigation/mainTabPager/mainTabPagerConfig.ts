@@ -66,7 +66,16 @@ export const MAIN_TAB_PAGER_SETTLE = Object.freeze({
   /** Largest overshoot past the target page, as a fraction of page width. */
   maxOvershootFraction: 0.015,
   /** Largest extra excursion when the release velocity points away from the target. */
-  maxAwayExcursionFraction: 0.08
+  maxAwayExcursionFraction: 0.08,
+  /**
+   * A touch that lands while a settle is this close (px) to its page lands
+   * the page at once instead of catching it, and the touch reaches the page.
+   */
+  landDistance: 12,
+  /** The settle is at rest (its spring ends) within this distance (px)... */
+  restDistance: 0.5,
+  /** ...and below this speed (px/s). */
+  restSpeed: 10
 })
 
 /**

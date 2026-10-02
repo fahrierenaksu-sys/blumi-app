@@ -57,7 +57,7 @@ test.afterEach(() => {
   mock.timers.reset()
 })
 
-test("the panel waits below, hidden, until the screen starts to fade in, then rises into place", () => {
+test("the panel waits below, hidden, until the screen starts to slide in, then rises into place", () => {
   const panel = mountPanel(false)
   const { BOTTOM_PANEL_ENTRANCE_MS, BOTTOM_PANEL_ENTRANCE_FALLBACK_MS } = panel.entrance
   mock.timers.tick(BOTTOM_PANEL_ENTRANCE_FALLBACK_MS - 20)
@@ -66,7 +66,7 @@ test("the panel waits below, hidden, until the screen starts to fade in, then ri
 
   panel.navigation.emit(false)
   mock.timers.tick(BOTTOM_PANEL_ENTRANCE_MS / 2)
-  assert.ok(panel.opacity() > 0 && panel.opacity() < 1, "the rise is visible while the screen fades in")
+  assert.ok(panel.opacity() > 0 && panel.opacity() < 1, "the rise is visible while the screen slides in")
   assert.ok(panel.offset() > 0)
   mock.timers.tick(BOTTOM_PANEL_ENTRANCE_MS / 2)
   assert.equal(panel.opacity(), 1)

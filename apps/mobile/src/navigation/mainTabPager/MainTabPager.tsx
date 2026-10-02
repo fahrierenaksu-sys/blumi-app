@@ -62,7 +62,7 @@ import {
   isMainTabPageSwipeable,
   reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
-  reduceMainTabPagerSettled,
+  reduceMainTabPagerSettleStart,
   reduceMainTabPagerSettleToCommitted,
   reduceMainTabPagerTap,
   resolveMainTabPagerBaseIndex,
@@ -71,6 +71,8 @@ import {
   resolveMainTabPagerMountedPages,
   resolveMainTabPagerSettleIndex,
   resolveMainTabPagerSettleVelocity,
+  resolveMainTabPagerSpringEnergyThreshold,
+  shouldMainTabPagerTouchCatchSettle,
   type MainTabPagerUiTransition
 } from "./mainTabPagerModel"
 import { createMainTabPagerSelectAction } from "./mainTabPagerRouter"
@@ -128,7 +130,8 @@ function scheduleIdle(work: () => void): () => void {
  * Hosts the four main pages in one native-stack slot route and moves between
  * them with the finger. The slot route name is the only selected-page state:
  * bottom-bar taps and swipes both commit through the router's select action,
- * the UI thread follows the route, and the route changes once per settle.
+ * the UI thread follows the route, and the route changes once per release
+ * (when the settle starts, so the page is interactive by the time it lands).
  * Every frame of a drag or settle runs on the UI thread with shared values.
  */
 export function MainTabPager({ navigation: rawNavigation, route, renderPage, bottomBar }: MainTabPagerProps) {
@@ -321,17 +324,21 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     "worklet"
     settleTarget.value = target
     const targetPosition = target * width.value
-    const finish = () => {
-      "worklet"
-      applyTransition(reduceMainTabPagerSettled(ui.value, target))
-    }
+    // The page is decided now: commit it while the pages still move, so the
+    // JS render that makes it touchable has run by the time it lands.
+    applyTransition(reduceMainTabPagerSettleStart(ui.value, target))
     if (reduceMotionValue.value) {
       animating.value = false
       position.value = targetPosition
-      finish()
       return
     }
     const epochAtStart = ui.value.epoch
+    const startVelocity = resolveMainTabPagerSettleVelocity({
+      position: position.value,
+      targetPosition,
+      velocity,
+      width: width.value
+    })
     animating.value = true
     position.value = withSpring(
       targetPosition,
@@ -339,18 +346,17 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
         stiffness: MAIN_TAB_PAGER_SPRING.stiffness,
         damping: MAIN_TAB_PAGER_SPRING.damping,
         mass: MAIN_TAB_PAGER_SPRING.mass,
-        velocity: resolveMainTabPagerSettleVelocity({
-          position: position.value,
-          targetPosition,
-          velocity,
-          width: width.value
+        velocity: startVelocity,
+        // End when the page looks still, not ~0.4 s later.
+        energyThreshold: resolveMainTabPagerSpringEnergyThreshold({
+          displacement: position.value - targetPosition,
+          velocity: startVelocity
         })
       },
       (finished) => {
         "worklet"
         if (!finished || ui.value.epoch !== epochAtStart) return
         animating.value = false
-        finish()
       }
     )
   }, [animating, applyTransition, position, reduceMotionValue, settleTarget, ui, width])
@@ -426,13 +432,18 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
     .failOffsetY([-MAIN_TAB_PAGER_FAIL_OFFSET_Y, MAIN_TAB_PAGER_FAIL_OFFSET_Y])
     .onBegin(() => {
       "worklet"
-      // Touching a settling pager catches it where it is.
       gestureEpoch.value = ui.value.epoch
       caught.value = false
-      if (animating.value) {
-        animating.value = false
-        cancelAnimation(position)
+      if (!animating.value) return
+      animating.value = false
+      cancelAnimation(position)
+      const targetPosition = settleTarget.value * width.value
+      if (shouldMainTabPagerTouchCatchSettle({ position: position.value, targetPosition })) {
+        // Touching a settling pager catches it where it is.
         caught.value = true
+      } else {
+        // In its last pixels the page lands now; the touch is meant for it.
+        position.value = targetPosition
       }
     })
     .onStart((event) => {

@@ -145,6 +145,41 @@ export function resolveMainTabPagerSettleVelocity(input: {
   return Math.sign(velocity) * Math.min(Math.abs(velocity), limit)
 }
 
+/**
+ * Reanimated's spring ends when its energy falls to `energyThreshold` times
+ * its starting energy. The default (6e-9) keeps a page "settling" for about
+ * 0.65 s although it looks still after about 0.25 s, so the settle ends
+ * instead once it is within `restDistance` and slower than `restSpeed`.
+ * Energies match Reanimated's: ½·k·x² + ½·m·v².
+ */
+export function resolveMainTabPagerSpringEnergyThreshold(input: {
+  displacement: number
+  velocity: number
+}): number {
+  "worklet"
+  const { stiffness, mass } = MAIN_TAB_PAGER_SPRING
+  const { restDistance, restSpeed } = MAIN_TAB_PAGER_SETTLE
+  const initial = 0.5 * stiffness * input.displacement ** 2 + 0.5 * mass * input.velocity ** 2
+  const rest = 0.5 * stiffness * restDistance ** 2 + 0.5 * mass * restSpeed ** 2
+  if (!Number.isFinite(initial) || initial <= rest) return 1
+  return Math.max(6e-9, rest / initial)
+}
+
+/**
+ * Whether a touch that lands during a settle catches the pages where they
+ * are (so the finger can drag them on). In the last few pixels the page
+ * lands at once instead: the page looks still there, and the touch is meant
+ * for it.
+ */
+export function shouldMainTabPagerTouchCatchSettle(input: {
+  position: number
+  targetPosition: number
+}): boolean {
+  "worklet"
+  const distance = Math.abs(input.targetPosition - input.position)
+  return Number.isFinite(distance) && distance > MAIN_TAB_PAGER_SETTLE.landDistance
+}
+
 /** Nearest swipeable page to a (possibly mid-animation) position. */
 export function resolveMainTabPagerBaseIndex(position: number, width: number): number {
   "worklet"
@@ -166,22 +201,23 @@ export function getMainTabPageOpacity(pageIndex: number, committedIndex: number)
 // ── Selection state shared by taps, swipes and navigation ───────────────
 //
 // One source of truth: the native-stack slot route name. The UI thread keeps
-// `committedIndex` as its view of that value, advances it only when a settle
-// animation finishes (then asks JS to commit once), and resynchronises from
-// the route when navigation changed it elsewhere (tap, deep link, back).
+// `committedIndex` as its view of that value, advances it when a tap shows a
+// page or a released swipe starts settling on one (then asks JS to commit
+// once), and resynchronises from the route when navigation changed it
+// elsewhere (deep link, back, notification).
 
 export interface MainTabPagerUiState {
-  /** Page the UI thread shows: last settled on, tapped, or synced from navigation. */
+  /** Page the UI thread shows: being settled on, tapped, or synced from navigation. */
   committedIndex: number
   /** Incremented to invalidate an in-flight gesture or settle animation. */
   epoch: number
   /**
-   * Page a bottom-bar tap already shows on the UI thread while its
-   * navigation commit is on the way, or -1. Route syncs of earlier commits
-   * (rapid taps) are ignored until this one lands, so the pager never jumps
-   * back through intermediate pages.
+   * Page a bottom-bar tap or a released swipe already shows on the UI thread
+   * while its navigation commit is on the way, or -1. Route syncs of earlier
+   * commits (rapid taps or swipes) are ignored until this one lands, so the
+   * pager never jumps back through intermediate pages.
    */
-  pendingTapIndex: number
+  pendingCommitIndex: number
 }
 
 export interface MainTabPagerUiTransition {
@@ -196,7 +232,7 @@ export interface MainTabPagerUiTransition {
 
 export function createMainTabPagerUiState(committedIndex: number): MainTabPagerUiState {
   "worklet"
-  return { committedIndex, epoch: 0, pendingTapIndex: -1 }
+  return { committedIndex, epoch: 0, pendingCommitIndex: -1 }
 }
 
 /**
@@ -216,7 +252,7 @@ export function reduceMainTabPagerTap(
   const epoch = state.epoch + 1
   if (index === state.committedIndex) {
     return {
-      state: { committedIndex: state.committedIndex, epoch, pendingTapIndex: state.pendingTapIndex },
+      state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: state.pendingCommitIndex },
       commitIndex: null,
       snap: true,
       interrupt: true
@@ -224,22 +260,30 @@ export function reduceMainTabPagerTap(
   }
   if (targetMounted) {
     return {
-      state: { committedIndex: index, epoch, pendingTapIndex: index },
+      state: { committedIndex: index, epoch, pendingCommitIndex: index },
       commitIndex: index,
       snap: true,
       interrupt: true
     }
   }
   return {
-    state: { committedIndex: state.committedIndex, epoch, pendingTapIndex: -1 },
+    state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: -1 },
     commitIndex: index,
     snap: false,
     interrupt: true
   }
 }
 
-/** A settle animation reached `index`: commit it once if it changed the page. */
-export function reduceMainTabPagerSettled(
+/**
+ * A released drag starts settling on `index`. The page is decided at the
+ * release, so it is committed then, not when the spring comes to rest: the
+ * JS commit and the page's render run while the pages are still moving, and
+ * the page takes touches the moment it arrives (a touch near the end of a
+ * settle also lands it at once, see shouldMainTabPagerTouchCatchSettle).
+ * The commit is pending like a tap's, so the route syncs of earlier commits
+ * (a quick second swipe) never pull the pager back.
+ */
+export function reduceMainTabPagerSettleStart(
   state: MainTabPagerUiState,
   index: number
 ): MainTabPagerUiTransition {
@@ -248,7 +292,7 @@ export function reduceMainTabPagerSettled(
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
   return {
-    state: { committedIndex: index, epoch: state.epoch, pendingTapIndex: -1 },
+    state: { committedIndex: index, epoch: state.epoch, pendingCommitIndex: index },
     commitIndex: index,
     snap: false,
     interrupt: false
@@ -271,12 +315,12 @@ export function reduceMainTabPagerRouteSync(
   if (routeIndex < 0) {
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
-  if (state.pendingTapIndex >= 0) {
-    if (routeIndex !== state.pendingTapIndex) {
+  if (state.pendingCommitIndex >= 0) {
+    if (routeIndex !== state.pendingCommitIndex) {
       return { state, commitIndex: null, snap: false, interrupt: false }
     }
     return {
-      state: { committedIndex: state.committedIndex, epoch: state.epoch, pendingTapIndex: -1 },
+      state: { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1 },
       commitIndex: null,
       snap: false,
       interrupt: false
@@ -286,7 +330,7 @@ export function reduceMainTabPagerRouteSync(
     return { state, commitIndex: null, snap: false, interrupt: false }
   }
   return {
-    state: { committedIndex: routeIndex, epoch: state.epoch + 1, pendingTapIndex: -1 },
+    state: { committedIndex: routeIndex, epoch: state.epoch + 1, pendingCommitIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
@@ -303,7 +347,7 @@ export function reduceMainTabPagerCommitRejected(
 ): MainTabPagerUiTransition {
   "worklet"
   return reduceMainTabPagerRouteSync(
-    { committedIndex: state.committedIndex, epoch: state.epoch, pendingTapIndex: -1 },
+    { committedIndex: state.committedIndex, epoch: state.epoch, pendingCommitIndex: -1 },
     routeIndex
   )
 }
@@ -314,7 +358,7 @@ export function reduceMainTabPagerSettleToCommitted(
 ): MainTabPagerUiTransition {
   "worklet"
   return {
-    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1, pendingTapIndex: state.pendingTapIndex },
+    state: { committedIndex: state.committedIndex, epoch: state.epoch + 1, pendingCommitIndex: state.pendingCommitIndex },
     commitIndex: null,
     snap: true,
     interrupt: true
