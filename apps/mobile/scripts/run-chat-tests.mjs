@@ -65,6 +65,7 @@ const sourceFiles = [
   "src/features/chat/typing/chatTypingStore.ts",
   "src/features/chat/typing/chatTypingStore.test.ts",
   "src/features/chat/typing/chatTypingCopy.ts",
+  "src/ui/keyboardGlueModel.ts",
   "src/features/chat/thread/chatScrollToLatestModel.ts",
   "src/features/chat/thread/chatScrollToLatestModel.test.ts"
 ]
