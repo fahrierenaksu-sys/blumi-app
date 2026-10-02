@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useLayoutEffect, useMemo, useState } from "react"
 import {
   type ListRenderItem,
   type ScrollViewProps,
@@ -53,6 +53,11 @@ import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
 import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
 import { ChatThreadSkeleton } from "../features/chat/thread/ChatThreadSkeleton"
+import {
+  getChatTimelineInitialOpacity,
+  resolveChatThreadBody,
+  resolveChatTimelineReveal
+} from "../features/chat/thread/chatThreadOpeningModel"
 import { animateTo, CROSSFADE_ENTERING, useMotion } from "../ui/motion"
 import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
 import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
@@ -137,33 +142,34 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   // Inverted FlatList starts at offset zero with the newest message visible.
   // The chronological timeline remains the authority for grouping and dates.
   const newestFirstTimeline = useMemo(() => [...timeline].reverse(), [timeline])
-  // Do not mount a one-invitation list before the first history page arrives:
-  // otherwise FlatList has already spent its initial render on that lone row.
-  const awaitingInitialHistory = sessionActor.session.mode === "production" &&
-    !historyReady
-  const showsTimelineEmptyState = timeline.length === 0 || isPendingThread || awaitingInitialHistory
-  // UXO-03: while the first history page loads, a skeleton stands in for the
-  // timeline; whatever replaces it (messages or the empty state) crossfades in.
-  const showsHistorySkeleton = showsTimelineEmptyState &&
-    !isPendingThread &&
-    messageListState.status !== "failed" &&
-    (awaitingInitialHistory || messageListState.status !== "ready")
+  // UXO-03 (chatThreadOpeningModel): cached history opens on its messages in
+  // the push's first frame; only unknown history shows the skeleton, and
+  // whatever replaces it (messages or the empty state) crossfades in.
+  const threadBody = resolveChatThreadBody({
+    waitsForServerHistory: sessionActor.session.mode === "production",
+    historyReady,
+    timelineLength: timeline.length,
+    isPendingThread,
+    listStatus: messageListState.status
+  })
+  const showsHistorySkeleton = threadBody === "skeleton"
+  const showsTimelineEmptyState = threadBody !== "timeline"
+  const isListPresented = threadBody === "timeline"
   const [historySkeletonShown, setHistorySkeletonShown] = useState(showsHistorySkeleton)
   if (showsHistorySkeleton && !historySkeletonShown) setHistorySkeletonShown(true)
   const timelineEntering = historySkeletonShown ? CROSSFADE_ENTERING : undefined
-  const isListPresented = !showsTimelineEmptyState
-  // The always-mounted list crossfades in where it used to mount with
-  // CROSSFADE_ENTERING: after the skeleton; otherwise it simply shows.
+  const timelineReveal = resolveChatTimelineReveal({ body: threadBody, skeletonWasShown: historySkeletonShown })
   const motion = useMotion()
-  const listOpacity = useSharedValue(isListPresented ? 1 : 0)
+  const listOpacity = useSharedValue(getChatTimelineInitialOpacity(threadBody))
   const listRevealStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }))
-  useEffect(() => {
-    if (!isListPresented) {
-      listOpacity.value = 0
-      return
-    }
-    listOpacity.value = historySkeletonShown ? animateTo(1, motion.crossfade) : 1
-  }, [historySkeletonShown, isListPresented, listOpacity, motion])
+  // A layout effect, so the fade starts with the commit that mounts the first
+  // rows (the skeleton's exit starts there too), never a frame later with
+  // the rows already in place but still transparent.
+  useLayoutEffect(() => {
+    if (timelineReveal === "hidden") listOpacity.value = 0
+    else if (timelineReveal === "shown") listOpacity.value = 1
+    else listOpacity.value = animateTo(1, motion.crossfade)
+  }, [listOpacity, motion, timelineReveal])
 
   const {
     isCreatingPendingThread,

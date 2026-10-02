@@ -54,6 +54,8 @@ const sourceFiles = [
   "src/features/chat/thread/chatThreadModel.test.ts",
   "src/features/chat/thread/chatTimelineEntranceModel.ts",
   "src/features/chat/thread/chatTimelineEntranceModel.test.ts",
+  "src/features/chat/thread/chatThreadOpeningModel.ts",
+  "src/features/chat/thread/chatThreadOpeningModel.test.ts",
   "src/features/chat/thread/chatBubbleAccessibility.ts",
   "src/features/chat/thread/chatBubbleAccessibility.test.ts",
   "src/features/chat/chatReceiptModel.ts",
@@ -126,6 +128,7 @@ try {
       join(outputDirectory, "features/chat/thread/chatThreadCopy.test.js"),
       join(outputDirectory, "features/chat/thread/chatThreadModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatTimelineEntranceModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatThreadOpeningModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatBubbleAccessibility.test.js"),
       join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
       join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
@@ -159,7 +162,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/thread/chatArrivalHaptic.test.ts", "src/features/chat/thread/chatRowEntranceMotion.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/thread/chatArrivalHaptic.test.ts", "src/features/chat/thread/chatRowEntranceMotion.test.ts", "src/features/chat/thread/useChatTimelineEntrances.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
