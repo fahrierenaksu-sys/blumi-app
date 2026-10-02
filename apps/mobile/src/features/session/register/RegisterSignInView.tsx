@@ -38,6 +38,7 @@ import { registerStyles as styles } from "./registerStyles"
 import { useAccountRecoveryFlow } from "./useAccountRecoveryFlow"
 import type { RegisterFlowController } from "./useRegisterFlowController"
 import type { RegisterLayout } from "./useRegisterLayout"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /**
  * Returning-account phone sign-in: its own keyboard-avoiding scroll page with
@@ -308,14 +309,14 @@ export function RegisterSignInView({
                 </Text>
               </View>
               {authIntent === "sign-in" ? (
-                <Pressable
+                <PressableScale
                   accessibilityRole="button"
                   accessibilityLabel={recoveryCopy.linkAccessibilityLabel}
                   onPress={recovery.openRecovery}
                   style={styles.recoveryLink}
                 >
                   <Text style={styles.recoveryLinkText}>{recoveryCopy.link}</Text>
-                </Pressable>
+                </PressableScale>
               ) : null}
               </GlassCard>
               </Animated.View>

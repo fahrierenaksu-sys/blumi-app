@@ -2,7 +2,6 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useRef, useState } from "react"
 import {
   Image,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -58,6 +57,7 @@ import {
   resolveRoomSetupMutationFeedback,
   resolveRoomSetupStatusLine
 } from "../features/roomV2/roomSetupPlacementFeedback"
+import { PressableScale } from "../ui/PressableScale"
 
 export interface RoomSetupScreenProps {
   isSubmitting: boolean
@@ -436,7 +436,7 @@ export function RoomSetupScreen({
                 <Ionicons color={uiTheme.colors.primary} name="move" size={16} />
               </View>
               <View pointerEvents="none" style={styles.bedToolbarDivider} />
-              <Pressable
+              <PressableScale
                 accessibilityLabel={copy.rotateBedAccessibilityLabel}
                 accessibilityRole="button"
                 hitSlop={6}
@@ -445,7 +445,7 @@ export function RoomSetupScreen({
                 testID="starter-bed-rotate"
               >
                 <Ionicons color={uiTheme.colors.primary} name="refresh" size={16} />
-              </Pressable>
+              </PressableScale>
             </LinearGradient>
           ) : null}
         </View>

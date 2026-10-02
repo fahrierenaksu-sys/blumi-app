@@ -43,6 +43,7 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
         "react-native": createReactNativeStub().module,
         "react-native-reanimated": reanimated.module,
         "../ui/animations": { useReducedMotion: () => options.reduceMotion === true },
+        "../ui/PressableScale": { PressableScale: "PressableScale" },
         "../features/avatarV2/candidateAvatarSnapshot": {
           createCandidateAvatarSnapshot: (input: { userId: string }) => ({ snapshotFor: input.userId })
         },

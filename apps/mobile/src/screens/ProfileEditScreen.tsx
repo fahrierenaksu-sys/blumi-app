@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -44,6 +43,7 @@ import {
   type UserProfilePrompt,
   type UserProfilePromptId
 } from "@blumi/contracts"
+import { PressableScale } from "../ui/PressableScale"
 
 type ProfileEditScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -342,7 +342,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option
                 return (
-                  <Pressable
+                  <PressableScale
                     key={option}
                     accessibilityRole="radio"
                     accessibilityLabel={copy.genderAccessibility(formatGenderLabel(option))}
@@ -361,7 +361,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                     >
                       {formatGenderLabel(option)}
                     </Text>
-                  </Pressable>
+                  </PressableScale>
                 )
               })}
             </View>
@@ -373,7 +373,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
           <Text style={styles.sectionTitle}>{discoveryCopy.audience}</Text>
           <View style={styles.fieldCard}>
             <View style={styles.segmentRow}>
-              <Pressable
+              <PressableScale
                 accessibilityRole="checkbox"
                 accessibilityLabel={discoveryCopy.everyone}
                 accessibilityState={{ checked: discoveryGenders.length === 0 }}
@@ -387,11 +387,11 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                   styles.segmentText,
                   discoveryGenders.length === 0 ? styles.segmentTextSelected : null
                 ]}>{discoveryCopy.everyone}</Text>
-              </Pressable>
+              </PressableScale>
               {GENDER_OPTIONS.map((option) => {
                 const selected = discoveryGenders.includes(option)
                 return (
-                  <Pressable
+                  <PressableScale
                     key={`discovery-${option}`}
                     accessibilityRole="checkbox"
                     accessibilityLabel={formatGenderLabel(option)}
@@ -406,14 +406,14 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                       styles.segmentText,
                       selected ? styles.segmentTextSelected : null
                     ]}>{formatGenderLabel(option)}</Text>
-                  </Pressable>
+                  </PressableScale>
                 )
               })}
             </View>
             <Text style={styles.fieldLabel}>{discoveryCopy.radius}</Text>
             <View style={styles.segmentRow}>
               {([25, 50, 100] as const).map((option) => (
-                <Pressable
+                <PressableScale
                   key={option}
                   accessibilityRole="radio"
                   accessibilityLabel={`${option} km ${discoveryCopy.radius}`}
@@ -428,7 +428,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                     styles.segmentText,
                     radiusKm === option ? styles.segmentTextSelected : null
                   ]}>{option} km</Text>
-                </Pressable>
+                </PressableScale>
               ))}
             </View>
           </View>
@@ -439,14 +439,14 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
               {formatCharacterBodyLabel(currentAvatarBodyId)}
             </Text>
             <Text style={styles.fieldHint}>{discoveryCopy.characterHelp}</Text>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={discoveryCopy.editCharacter}
               onPress={() => navigation.navigate("WardrobeV2")}
               style={styles.characterButton}
             >
               <Text style={styles.characterButtonText}>{discoveryCopy.editCharacter}</Text>
-            </Pressable>
+            </PressableScale>
           </View>
 
           <View style={styles.fieldCard}>
@@ -479,7 +479,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                 )
                 return (
                   <View key={option.promptId} style={styles.promptOption}>
-                    <Pressable
+                    <PressableScale
                       accessibilityLabel={copy.togglePrompt(option.question)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: Boolean(selected) }}
@@ -495,7 +495,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                         size={20}
                         color={uiTheme.colors.primary}
                       />
-                    </Pressable>
+                    </PressableScale>
                     {selected ? (
                       <TextInput
                         accessibilityLabel={copy.answer(option.question)}

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { Pressable, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
 import type { AppLocale } from "../session/appLocale"
@@ -13,6 +13,7 @@ import {
 import { SettingsRow } from "./SettingsRow"
 import { settingsStyles as styles } from "./settingsStyles"
 import type { useMyReports } from "./useMyReports"
+import { PressableScale } from "../../ui/PressableScale"
 
 /* ── Safety / Hidden people ────────────────────── */
 
@@ -77,13 +78,13 @@ export function SettingsSafetySection(props: {
                 ) : myReportsStatus === "error" ? (
                   <View style={styles.myReportErrorRow}>
                     <Text accessibilityRole="alert" style={styles.myReportMessage}>{copy.reportsUnavailable}</Text>
-                    <Pressable
+                    <PressableScale
                       accessibilityRole="button"
                       accessibilityLabel={copy.notificationsRetry}
                       onPress={retryMyReports}
                     >
                       <Text style={styles.myReportRetry}>{copy.notificationsRetry}</Text>
-                    </Pressable>
+                    </PressableScale>
                   </View>
                 ) : myReports.length === 0 ? (
                   <Text style={styles.myReportMessage}>{copy.noReports}</Text>

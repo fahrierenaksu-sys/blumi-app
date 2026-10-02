@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import type { ServerEvent } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { CandidateAvatarPreview } from "../components/DiscoverCard"
 import { LinearGradient } from "../ui/linearGradient"
@@ -373,7 +373,7 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
           </View>
         </View>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.decideLaterAccessibilityLabel}
           accessibilityState={{ disabled: buttonsLocked }}
@@ -383,7 +383,7 @@ export function RoomDebriefScreen(props: RoomDebriefScreenProps) {
           disabled={buttonsLocked}
         >
           <Text style={styles.laterText}>{copy.decideLater}</Text>
-        </Pressable>
+        </PressableScale>
         {decisionError ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.decisionError}>
             {decisionError}
