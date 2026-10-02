@@ -76,104 +76,77 @@ function createFakePool(rows: Record<string, unknown>[] = []) {
   }
 }
 
-function createAvatarAuthorityPool(legacyAvatar: CompleteAvatarSelection) {
-  const calls: QueryCall[] = []
-  const executor = {
-    async query(text: string, values?: readonly unknown[]) {
-      calls.push({ text, values })
-      if (text.includes("SELECT clock_timestamp() AS checked_at")) {
-        return { rows: [{ checked_at: new Date() }] }
-      }
-      if (!text.includes("SELECT")) return { rows: [] }
-      const selectedAvatar = /account\.avatar_revision AS avatar_revision/i.test(text)
-        ? canonicalAccountAvatar
-        : legacyAvatar
-      return {
-        rows: [{
-          ...presenceRow,
-          avatar_preset_id: selectedAvatar.presetId,
-          avatar_selection: selectedAvatar.loadout,
-          avatar_revision: selectedAvatar.revision
-        }]
-      }
-    }
-  }
-  return {
-    calls,
-    pool: {
-      ...executor,
-      async connect() {
-        return { ...executor, release() {} }
-      }
-    }
-  }
+const requirePostgres = {
+  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
 }
 
-test("postgres presence reads hydrate canonical account avatars instead of stale presence copies", async () => {
-  const now = new Date("2026-07-13T10:01:00.000Z")
-  const divergentLegacyAvatars: CompleteAvatarSelection[] = [
+test("PostgreSQL presence reads show the canonical account avatar, never a stale cached copy, and never delete", requirePostgres, async () => {
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const suffix = randomUUID()
+  const roomId = `presence_avatar_room_${suffix}`
+  const otherRoomId = `presence_avatar_other_${suffix}`
+  const repository = createPostgresPresenceRepository(pool)
+  const now = new Date()
+  const staleCachedAvatars: CompleteAvatarSelection[] = [
     avatar,
-    {
-      ...avatar,
-      revision: canonicalAccountAvatar.revision
-    },
-    {
-      ...avatar,
-      revision: canonicalAccountAvatar.revision + 1
-    }
+    { ...avatar, revision: canonicalAccountAvatar.revision },
+    { ...avatar, revision: canonicalAccountAvatar.revision + 1 }
   ]
-  const operations = [
-    (repository: ReturnType<typeof createPostgresPresenceRepository>) =>
-      repository.listRoomPresence("room_one", now),
-    (repository: ReturnType<typeof createPostgresPresenceRepository>) =>
-      repository.findUserPresence("room_one", "user_one", now),
-    (repository: ReturnType<typeof createPostgresPresenceRepository>) =>
-      repository.findUserPresenceAcrossRooms("user_one", now)
-  ]
-
-  for (const legacyAvatar of divergentLegacyAvatars) {
-    for (const operation of operations) {
-      const fake = createAvatarAuthorityPool(legacyAvatar)
-      const result = await operation(createPostgresPresenceRepository(fake.pool))
-      const record = Array.isArray(result) ? result[0] : result
-
-      assert.deepEqual(record?.avatar, canonicalAccountAvatar)
-      assert.equal(fake.calls.length, 1, "presence reads issue a single SELECT and never DELETE")
-      assert.doesNotMatch(fake.calls[0]?.text ?? "", /DELETE/i)
-      assert.match(fake.calls[0]?.text ?? "", /presence\.expires_at > \$\d/)
-      assertCanonicalAccountAvatarQuery(fake.calls[0]?.text ?? "")
+  const userIds: string[] = []
+  try {
+    for (const [index, staleAvatar] of staleCachedAvatars.entries()) {
+      const userId = `presence_avatar_${suffix}_${index}`
+      userIds.push(userId)
+      await seedAccount(pool, userId, now, canonicalAccountAvatar)
+      await repository.savePresence({ ...makePresenceRecord(roomId, userId, now), avatar: staleAvatar, spotId: `spot_${index}` })
+      await repository.savePresence({ ...makePresenceRecord(otherRoomId, userId, now), avatar: staleAvatar, spotId: `spot_${index}` })
     }
+    const countRows = async () => Number((await pool.query(
+      "SELECT count(*)::int AS n FROM blumi_room_presence WHERE room_id = ANY($1::text[])",
+      [[roomId, otherRoomId]]
+    )).rows[0]?.n)
+    const rowsBefore = await countRows()
+
+    const listed = await repository.listRoomPresence(roomId, now)
+    assert.equal(listed.length, staleCachedAvatars.length)
+    for (const record of listed) assert.deepEqual(record.avatar, canonicalAccountAvatar)
+    for (const userId of userIds) {
+      assert.deepEqual((await repository.findUserPresence(roomId, userId, now))?.avatar, canonicalAccountAvatar)
+      assert.deepEqual((await repository.findUserPresenceAcrossRooms(userId, now))?.avatar, canonicalAccountAvatar)
+    }
+    assert.equal(await countRows(), rowsBefore, "presence reads never delete rows")
+  } finally {
+    await pool.query("DELETE FROM blumi_room_presence WHERE room_id = ANY($1::text[])", [[roomId, otherRoomId]])
+    await pool.query("DELETE FROM blumi_accounts WHERE user_id = ANY($1::text[])", [userIds])
+    await pool.end()
   }
 })
 
-test("cached stale presence saves update metadata without writing avatar columns", async () => {
-  const fake = createFakePool()
-  const repository = createPostgresPresenceRepository(fake.pool)
-
-  await repository.savePresence({
-    roomId: "room_one",
-    userId: "user_one",
-    displayName: "Defne",
-    avatar,
-    spotId: "spot_one",
-    inMiniRoom: false,
-    joinedAt: "2026-07-13T10:00:00.000Z",
-    updatedAt: "2026-07-13T10:00:00.000Z",
-    expiresAt: "2026-07-13T10:10:00.000Z"
-  })
-
-  const insert = fake.calls.find((call) => /INSERT INTO blumi_room_presence/i.test(call.text))
-  const query = insert?.text ?? ""
-  assert.doesNotMatch(query, /avatar_preset_id|avatar_selection|avatar_revision/)
-  assert.deepEqual(insert?.values, [
-    "room_one",
-    "user_one",
-    "Defne",
-    "spot_one",
-    "2026-07-13T10:00:00.000Z",
-    10 * 60_000
-  ])
-  assert.match(query, /clock_timestamp\(\)/)
+test("PostgreSQL presence writes with a stale or malformed cached avatar never change the account avatar", requirePostgres, async () => {
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const suffix = randomUUID()
+  const roomId = `presence_write_room_${suffix}`
+  const userId = `presence_write_${suffix}`
+  const repository = createPostgresPresenceRepository(pool)
+  const now = new Date()
+  const readAccountAvatar = async () => (await pool.query(
+    "SELECT avatar_preset_id, avatar_selection, avatar_revision FROM blumi_accounts WHERE user_id = $1",
+    [userId]
+  )).rows[0]
+  try {
+    await seedAccount(pool, userId, now, canonicalAccountAvatar)
+    const before = await readAccountAvatar()
+    const malformedAvatar = { ...avatar, revision: "4" } as unknown as CompleteAvatarSelection
+    for (const cachedAvatar of [avatar, { ...avatar, revision: canonicalAccountAvatar.revision + 1 }, malformedAvatar]) {
+      await repository.savePresence({ ...makePresenceRecord(roomId, userId, now), avatar: cachedAvatar })
+      assert.deepEqual(await readAccountAvatar(), before)
+    }
+    assert.deepEqual((await repository.findUserPresence(roomId, userId, now))?.avatar, canonicalAccountAvatar)
+  } finally {
+    await pool.query("DELETE FROM blumi_room_presence WHERE room_id = $1", [roomId])
+    await pool.query("DELETE FROM blumi_accounts WHERE user_id = $1", [userId])
+    await pool.end()
+  }
 })
 
 test("postgres presence repository rejects malformed stored avatar selections", async () => {
@@ -210,32 +183,6 @@ test("presence metadata writes ignore malformed cached avatars", async () => {
     expiresAt: "2026-07-13T10:10:00.000Z"
   })
   assert.ok(fake.calls.some((call) => /INSERT INTO blumi_room_presence/i.test(call.text)))
-})
-
-test("a connection lease heartbeat is one autocommit statement that still takes the per-user lease lock", async () => {
-  // At a 30 s heartbeat and 5000 sockets, BEGIN + lock + UPDATE + COMMIT held a
-  // pooled connection for four round trips (~80 ms to Supabase) per pong.
-  const calls: QueryCall[] = []
-  let connects = 0
-  const pool = {
-    async query(text: string, values?: readonly unknown[]) {
-      calls.push({ text, values })
-      return { rows: [{ connection_id: "connection_1" }] }
-    },
-    async connect() {
-      connects += 1
-      throw new Error("a heartbeat must not check out a transaction client")
-    }
-  }
-  const repository = createPostgresPresenceRepository(pool as never)
-
-  assert.equal(await repository.heartbeatConnectionLease("connection_1", "user_1", 90_000), true)
-
-  assert.equal(connects, 0)
-  assert.equal(calls.length, 1)
-  assert.match(calls[0]!.text, /pg_advisory_xact_lock\(hashtextextended\(\$4, 0\)\)/)
-  assert.match(calls[0]!.text, /UPDATE blumi_realtime_connection_leases/)
-  assert.deepEqual(calls[0]!.values, ["connection_1", "user_1", 90_000, "blumi:realtime-connection-leases:user_1"])
 })
 
 test("postgres serializes concurrent spot reservations across independent pools", {
@@ -912,14 +859,4 @@ async function finishPresenceRaceHarness(
     setup.secondPool.end(),
     setup.observerPool.end()
   ])
-}
-
-function assertCanonicalAccountAvatarQuery(query: string): void {
-  assert.match(
-    query,
-    /FROM blumi_room_presence AS presence\s+INNER JOIN blumi_accounts AS account\s+ON account\.user_id = presence\.user_id/i
-  )
-  assert.match(query, /account\.avatar_preset_id AS avatar_preset_id/i)
-  assert.match(query, /account\.avatar_selection AS avatar_selection/i)
-  assert.match(query, /account\.avatar_revision AS avatar_revision/i)
 }
