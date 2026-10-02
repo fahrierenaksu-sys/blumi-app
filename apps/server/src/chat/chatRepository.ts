@@ -5,6 +5,9 @@ import { encodeThreadCursor, normalizeThreadPage, type ChatThreadPageOptions } f
 
 export interface ChatThreadPage { threads: ChatThread[]; nextCursor: string | null }
 
+/** Lease token of a dead-lettered outbox job (completed_at is set too). */
+export const CHAT_DELIVERY_DEAD_LETTER = "dead-letter"
+
 export interface ChatDeliveryJob {
   message: ChatMessage
   leaseToken: string
@@ -147,6 +150,13 @@ export interface ChatRepository {
   renewDeliveryLease(messageId: string, leaseToken: string, leaseUntil: Date): Promise<boolean>
   retryDelivery(messageId: string, leaseToken: string, availableAt: Date): Promise<void>
   /**
+   * Gives up on a job the caller still leases: it becomes terminal like a
+   * completed job (completed_at, no schema change) and is marked with the
+   * lease token CHAT_DELIVERY_DEAD_LETTER, so later messages of the thread
+   * are no longer held behind it. The message itself stays stored.
+   */
+  deadLetterDelivery(messageId: string, leaseToken: string, now: Date): Promise<void>
+  /**
    * False until migration 070 is applied. Before that the receipt methods
    * below touch no 070 object and answer null, [] or the defaults.
    */
@@ -183,7 +193,7 @@ export interface InMemoryChatStore {
   threads: Map<string, ChatThread>
   messagesByThread: Map<string, ChatMessage[]>
   messagesByClientMessageId: Map<string, ChatMessage>
-  deliveryJobs: Map<string, { message: ChatMessage; availableAt: number; attempt: number; leaseToken?: string; completed?: boolean }>
+  deliveryJobs: Map<string, { message: ChatMessage; availableAt: number; attempt: number; leaseToken?: string; completed?: boolean; deadLettered?: boolean }>
   cursorsByParticipant: Map<string, InMemoryParticipantCursors>
   preferencesByUser: Map<string, ChatPreferences>
 }
@@ -403,6 +413,12 @@ export function createInMemoryChatRepository(
     async retryDelivery(messageId, leaseToken, availableAt) {
       const job = store.deliveryJobs.get(messageId)
       if (job?.leaseToken === leaseToken) store.deliveryJobs.set(messageId, { ...job, availableAt: availableAt.getTime(), leaseToken: undefined })
+    },
+    async deadLetterDelivery(messageId, leaseToken) {
+      const job = store.deliveryJobs.get(messageId)
+      if (job?.leaseToken === leaseToken && !job.completed) {
+        store.deliveryJobs.set(messageId, { ...job, completed: true, deadLettered: true, leaseToken: CHAT_DELIVERY_DEAD_LETTER })
+      }
     },
     async supportsReceipts() {
       return receiptsSupported

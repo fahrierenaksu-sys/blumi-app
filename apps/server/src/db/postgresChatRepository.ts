@@ -4,6 +4,7 @@ import type {
   ChatMessagePageOptions,
   ChatRepository
 } from "../chat/chatRepository"
+import { CHAT_DELIVERY_DEAD_LETTER } from "../chat/chatRepository"
 import { normalizeStoredAvatarSelection } from "../avatar/avatarSelectionPersistence"
 import { normalizeThreadPage, encodeThreadCursor } from "../chat/chatThreadPagination"
 import { createStaticChatReceiptSchema, type ChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
@@ -490,6 +491,12 @@ export function createPostgresChatRepository(
     async retryDelivery(messageId, leaseToken, availableAt) {
       await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3, lease_token = NULL
         WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`, [messageId, leaseToken, availableAt])
+    },
+    async deadLetterDelivery(messageId, leaseToken, now) {
+      // Terminal like a completed job; the token records why (no schema change).
+      await pool.query(`UPDATE blumi_chat_delivery_outbox SET completed_at = $3, lease_token = $4
+        WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`,
+      [messageId, leaseToken, now, CHAT_DELIVERY_DEAD_LETTER])
     }
   }
 }
