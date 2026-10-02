@@ -1,14 +1,23 @@
 import { useIsFocused } from "@react-navigation/native"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import {
   AppState,
-  Animated,
-  Easing,
   Pressable,
   Text,
   View,
   type AppStateStatus
 } from "react-native"
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { animateSegment, animateSequence, repeatForever } from "../../ui/motion"
 import type { AuthEntryCopy } from "./authEntryCopy"
 import {
   getOnboardingImpactVisualProgressAtElapsed,
@@ -96,6 +105,22 @@ const AVATAR_FLIGHT_OUTPUT_RANGE = IMPACT_VISUAL_CLOCK_SAMPLES.map(
 const LANDING_REACTION_OUTPUT_RANGE = IMPACT_VISUAL_CLOCK_SAMPLES.map(
   (sample) => sample.landingReaction
 )
+const IMPACT_VISUAL_CLOCK_INPUT = [...IMPACT_VISUAL_CLOCK_INPUT_RANGE]
+const ARRIVAL_CLOCK_INPUT = [
+  ONBOARDING_INTRO_TIMELINE_MS.impact - ONBOARDING_ARRIVAL_PREROLL_MS,
+  ONBOARDING_INTRO_TIMELINE_MS.landingComplete
+]
+const COMPOSITION_LIFT_INPUT = [
+  0,
+  ...ONBOARDING_WORLD_COMPOSITION_LIFT.inputRange.map(
+    (progress) => ONBOARDING_INTRO_TIMELINE_MS.impact +
+      progress * (
+        ONBOARDING_INTRO_TIMELINE_MS.landingComplete -
+        ONBOARDING_INTRO_TIMELINE_MS.impact
+      )
+  )
+]
+const COMPOSITION_LIFT_OUTPUT = [0, ...ONBOARDING_WORLD_COMPOSITION_LIFT.translateY]
 interface OnboardingWorldSceneProps {
   copy: AuthEntryCopy
   introState: OnboardingIntroState
@@ -154,68 +179,37 @@ export function OnboardingWorldScene({
     reduceMotion
   )
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState)
-  const impactTimeline = useRef(new Animated.Value(
+  // Milliseconds into the impact sequence: the globe, the flight and the
+  // arrival frames all read this one UI-thread clock.
+  const impactTimeline = useSharedValue(
     shouldReduceMotion ? ONBOARDING_INTRO_TIMELINE_MS.landingComplete : 0
-  )).current
-  const {
-    globeRise,
-    globeImpact,
-    avatarFlight,
-    arrivalProgress,
-    landingReaction,
-    compositionLift
-  } = useMemo(() => ({
-    globeRise: impactTimeline.interpolate({
-      inputRange: [...IMPACT_VISUAL_CLOCK_INPUT_RANGE],
-      outputRange: [...GLOBE_RISE_OUTPUT_RANGE],
-      extrapolate: "clamp"
-    }),
-    globeImpact: impactTimeline.interpolate({
-      inputRange: [...IMPACT_VISUAL_CLOCK_INPUT_RANGE],
-      outputRange: [...GLOBE_IMPACT_OUTPUT_RANGE],
-      extrapolate: "clamp"
-    }),
-    avatarFlight: impactTimeline.interpolate({
-      inputRange: [...IMPACT_VISUAL_CLOCK_INPUT_RANGE],
-      outputRange: [...AVATAR_FLIGHT_OUTPUT_RANGE],
-      extrapolate: "clamp"
-    }),
-    arrivalProgress: impactTimeline.interpolate({
-      inputRange: [
-        ONBOARDING_INTRO_TIMELINE_MS.impact - ONBOARDING_ARRIVAL_PREROLL_MS,
-        ONBOARDING_INTRO_TIMELINE_MS.landingComplete
-      ],
-      outputRange: [0, 1],
-      extrapolate: "clamp"
-    }),
-    landingReaction: impactTimeline.interpolate({
-      inputRange: [...IMPACT_VISUAL_CLOCK_INPUT_RANGE],
-      outputRange: [...LANDING_REACTION_OUTPUT_RANGE],
-      extrapolate: "clamp"
-    }),
-    compositionLift: impactTimeline.interpolate({
-      inputRange: [
-        0,
-        ...ONBOARDING_WORLD_COMPOSITION_LIFT.inputRange.map(
-          (progress) => ONBOARDING_INTRO_TIMELINE_MS.impact +
-            progress * (
-              ONBOARDING_INTRO_TIMELINE_MS.landingComplete -
-              ONBOARDING_INTRO_TIMELINE_MS.impact
-            )
-        )
-      ],
-      outputRange: [0, ...ONBOARDING_WORLD_COMPOSITION_LIFT.translateY],
-      extrapolate: "clamp"
-    })
-  }), [impactTimeline])
-  const populationReveal = useRef(new Animated.Value(shouldReduceMotion ? 1 : 0)).current
-  const chase = useRef(new Animated.Value(shouldReduceMotion ? 1 : 0)).current
-  const catchReaction = useRef(new Animated.Value(shouldReduceMotion ? 1 : 0)).current
-  const preludeOpacity = useRef(new Animated.Value(1)).current
-  const worldReveal = useRef(new Animated.Value(shouldReduceMotion ? 1 : 0)).current
-  const handoff = useRef(new Animated.Value(0)).current
-  const rotation = useRef(new Animated.Value(0)).current
-  const runnerOrbit = useRef(new Animated.Value(0)).current
+  )
+  const globeRise = useDerivedValue(() => interpolate(
+    impactTimeline.value, IMPACT_VISUAL_CLOCK_INPUT, GLOBE_RISE_OUTPUT_RANGE, Extrapolation.CLAMP
+  ))
+  const globeImpact = useDerivedValue(() => interpolate(
+    impactTimeline.value, IMPACT_VISUAL_CLOCK_INPUT, GLOBE_IMPACT_OUTPUT_RANGE, Extrapolation.CLAMP
+  ))
+  const avatarFlight = useDerivedValue(() => interpolate(
+    impactTimeline.value, IMPACT_VISUAL_CLOCK_INPUT, AVATAR_FLIGHT_OUTPUT_RANGE, Extrapolation.CLAMP
+  ))
+  const arrivalProgress = useDerivedValue(() => interpolate(
+    impactTimeline.value, ARRIVAL_CLOCK_INPUT, [0, 1], Extrapolation.CLAMP
+  ))
+  const landingReaction = useDerivedValue(() => interpolate(
+    impactTimeline.value, IMPACT_VISUAL_CLOCK_INPUT, LANDING_REACTION_OUTPUT_RANGE, Extrapolation.CLAMP
+  ))
+  const compositionLift = useDerivedValue(() => interpolate(
+    impactTimeline.value, COMPOSITION_LIFT_INPUT, COMPOSITION_LIFT_OUTPUT, Extrapolation.CLAMP
+  ))
+  const populationReveal = useSharedValue(shouldReduceMotion ? 1 : 0)
+  const chase = useSharedValue(shouldReduceMotion ? 1 : 0)
+  const catchReaction = useSharedValue(shouldReduceMotion ? 1 : 0)
+  const preludeOpacity = useSharedValue(1)
+  const worldReveal = useSharedValue(shouldReduceMotion ? 1 : 0)
+  const handoff = useSharedValue(0)
+  const rotation = useSharedValue(0)
+  const runnerOrbit = useSharedValue(0)
   // Where each resumable clock stopped, read from wall time (no listeners).
   const progressRefs = useRef({
     impactTimeline: shouldReduceMotion ? ONBOARDING_INTRO_TIMELINE_MS.landingComplete : 0,
@@ -333,50 +327,44 @@ export function OnboardingWorldScene({
 
   useLayoutEffect(() => {
     if (shouldReduceMotion) {
-      preludeOpacity.stopAnimation()
-      worldReveal.stopAnimation()
-      preludeOpacity.setValue(isPrelude ? 1 : 0)
-      worldReveal.setValue(isPrelude ? 0 : 1)
+      cancelAnimation(preludeOpacity)
+      cancelAnimation(worldReveal)
+      preludeOpacity.value = isPrelude ? 1 : 0
+      worldReveal.value = isPrelude ? 0 : 1
       return undefined
     }
 
     if (isPrelude) {
-      preludeOpacity.stopAnimation()
-      worldReveal.stopAnimation()
+      cancelAnimation(preludeOpacity)
+      cancelAnimation(worldReveal)
       impactHapticPlayedRef.current = false
       landingHapticPlayedRef.current = false
-      preludeOpacity.setValue(1)
-      worldReveal.setValue(0)
+      preludeOpacity.value = 1
+      worldReveal.value = 0
       return undefined
     }
 
-    const transition = Animated.parallel([
-      Animated.timing(preludeOpacity, {
-        toValue: 0,
-        duration: ONBOARDING_SCENE_HANDOFF_MS.preludeExit,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-        isInteraction: false
-      }),
-      Animated.timing(worldReveal, {
-        toValue: 1,
-        duration: ONBOARDING_SCENE_HANDOFF_MS.worldReveal,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-        isInteraction: false
-      })
-    ])
-    transition.start()
-    return () => transition.stop()
+    preludeOpacity.value = animateSegment(0, {
+      durationMs: ONBOARDING_SCENE_HANDOFF_MS.preludeExit,
+      easing: Easing.out(Easing.quad)
+    })
+    worldReveal.value = animateSegment(1, {
+      durationMs: ONBOARDING_SCENE_HANDOFF_MS.worldReveal,
+      easing: Easing.out(Easing.cubic)
+    })
+    return () => {
+      cancelAnimation(preludeOpacity)
+      cancelAnimation(worldReveal)
+    }
   }, [isPrelude, preludeOpacity, shouldReduceMotion, worldReveal])
 
   useEffect(() => {
     if (!shouldReduceMotion) return
-    impactTimeline.setValue(ONBOARDING_INTRO_TIMELINE_MS.landingComplete)
-    populationReveal.setValue(sceneProgress.population)
-    chase.setValue(sceneProgress.chase)
-    catchReaction.setValue(sceneProgress.chase)
-    handoff.setValue(0)
+    impactTimeline.value = ONBOARDING_INTRO_TIMELINE_MS.landingComplete
+    populationReveal.value = sceneProgress.population
+    chase.value = sceneProgress.chase
+    catchReaction.value = sceneProgress.chase
+    handoff.value = 0
     onEvent({ type: "motion-reduced" })
   }, [
     catchReaction,
@@ -393,10 +381,10 @@ export function OnboardingWorldScene({
   useEffect(() => {
     if (shouldReduceMotion) return
     if (worldIsReady) {
-      impactTimeline.setValue(ONBOARDING_INTRO_TIMELINE_MS.landingComplete)
-      populationReveal.setValue(sceneProgress.population)
-      chase.setValue(sceneProgress.chase)
-      catchReaction.setValue(sceneProgress.chase)
+      impactTimeline.value = ONBOARDING_INTRO_TIMELINE_MS.landingComplete
+      populationReveal.value = sceneProgress.population
+      chase.value = sceneProgress.chase
+      catchReaction.value = sceneProgress.chase
     }
   }, [
     catchReaction,
@@ -412,39 +400,31 @@ export function OnboardingWorldScene({
   useEffect(() => {
     if (shouldReduceMotion) return
     if (handoffActive) {
-      handoff.stopAnimation()
+      cancelAnimation(handoff)
       const run = { startProgress: progressRefs.current.handoff, startedAtMs: Date.now(), durationMs: HANDOFF_DURATION_MS }
-      const fadeOut = Animated.timing(handoff, {
-        toValue: 1,
-        duration: getRemainingDuration(
+      handoff.value = animateSegment(1, {
+        durationMs: getRemainingDuration(
           HANDOFF_DURATION_MS,
           progressRefs.current.handoff
         ),
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-        isInteraction: false
+        easing: Easing.in(Easing.cubic)
       })
-      fadeOut.start()
       return () => {
-        fadeOut.stop()
+        cancelAnimation(handoff)
         clocks.handoff = getClampedClockProgress(run, Date.now())
       }
     }
     if (progressRefs.current.handoff <= 0) return
     const rewind = { startProgress: progressRefs.current.handoff, startedAtMs: Date.now(), durationMs: HANDOFF_ROLLBACK_DURATION_MS }
-    const rollback = Animated.timing(handoff, {
-      toValue: 0,
-      duration: Math.max(
+    handoff.value = animateSegment(0, {
+      durationMs: Math.max(
         1,
         Math.round(HANDOFF_ROLLBACK_DURATION_MS * progressRefs.current.handoff)
       ),
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-      isInteraction: false
+      easing: Easing.out(Easing.cubic)
     })
-    rollback.start()
     return () => {
-      rollback.stop()
+      cancelAnimation(handoff)
       clocks.handoff = getRewindClockProgress(rewind, Date.now())
     }
   }, [clocks, handoff, handoffActive, shouldReduceMotion])
@@ -453,7 +433,7 @@ export function OnboardingWorldScene({
     if (shouldReduceMotion) return
     if (!impactSequenceActive) {
       if (impactSequenceSettled) {
-        impactTimeline.setValue(ONBOARDING_INTRO_TIMELINE_MS.landingComplete)
+        impactTimeline.value = ONBOARDING_INTRO_TIMELINE_MS.landingComplete
       }
       return
     }
@@ -463,25 +443,17 @@ export function OnboardingWorldScene({
       ONBOARDING_INTRO_TIMELINE_MS.landingComplete,
       progressRefs.current.impactTimeline
     ))
-    impactTimeline.setValue(elapsedMs)
-    const animation = Animated.timing(impactTimeline, {
-      toValue: ONBOARDING_INTRO_TIMELINE_MS.landingComplete,
-      duration: Math.max(
-        1,
-        ONBOARDING_INTRO_TIMELINE_MS.landingComplete - elapsedMs
-      ),
-      easing: Easing.linear,
-      useNativeDriver: true,
-      isInteraction: false
+    impactTimeline.value = elapsedMs
+    impactTimeline.value = animateSegment(ONBOARDING_INTRO_TIMELINE_MS.landingComplete, {
+      durationMs: Math.max(1, ONBOARDING_INTRO_TIMELINE_MS.landingComplete - elapsedMs)
     })
     const run = {
       startProgress: elapsedMs / ONBOARDING_INTRO_TIMELINE_MS.landingComplete,
       startedAtMs: Date.now(),
       durationMs: ONBOARDING_INTRO_TIMELINE_MS.landingComplete
     }
-    animation.start()
     return () => {
-      animation.stop()
+      cancelAnimation(impactTimeline)
       clocks.impactTimeline =
         getClampedClockProgress(run, Date.now()) * ONBOARDING_INTRO_TIMELINE_MS.landingComplete
     }
@@ -511,9 +483,11 @@ export function OnboardingWorldScene({
     )
     const remainingPhaseDuration = Math.max(1, phaseDurationMs - elapsedBeforeRun)
     phaseClockRef.current.startedAtMs = Date.now()
-    let animation: Animated.CompositeAnimation | null = null
+    let animated: SharedValue<number> | null = null
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
+    // The phase machine advances on JS timers (each step is a React event);
+    // the motion inside a phase runs on the UI thread.
     switch (introState.phase) {
       case "globe-launching": {
         timeoutId = setTimeout(() => {
@@ -551,49 +525,42 @@ export function OnboardingWorldScene({
         // The counter and its reveal share one clock. Resetting to the
         // resumed phase position prevents a stale/final value from flashing
         // before the first population tick is rendered.
-        populationReveal.setValue(
+        populationReveal.value =
           Math.max(0, Math.min(1, elapsedBeforeRun / POPULATION_PHASE_DURATION_MS))
-        )
-        animation = Animated.timing(populationReveal, {
-          toValue: 1,
-          duration: Math.max(
+        populationReveal.value = animateSegment(1, {
+          durationMs: Math.max(
             1,
             remainingPhaseDuration -
               ONBOARDING_POPULATION_COUNTER_TIMING_MS.finalHold
           ),
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true
+          easing: Easing.inOut(Easing.cubic)
         })
+        animated = populationReveal
         timeoutId = setTimeout(() => {
           onEvent({ type: "population-finished" })
         }, remainingPhaseDuration)
-        animation.start()
         break
       }
       case "chasing": {
-        animation = Animated.timing(chase, {
-          toValue: 1,
-          duration: remainingPhaseDuration,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true
+        chase.value = animateSegment(1, {
+          durationMs: remainingPhaseDuration,
+          easing: Easing.inOut(Easing.cubic)
         })
+        animated = chase
         timeoutId = setTimeout(() => {
           onEvent({ type: "chase-finished" })
         }, remainingPhaseDuration)
-        animation.start()
         break
       }
       case "catching": {
-        animation = Animated.timing(catchReaction, {
-          toValue: 1,
-          duration: remainingPhaseDuration,
-          easing: Easing.out(Easing.back(1.08)),
-          useNativeDriver: true
+        catchReaction.value = animateSegment(1, {
+          durationMs: remainingPhaseDuration,
+          easing: Easing.out(Easing.back(1.08))
         })
+        animated = catchReaction
         timeoutId = setTimeout(() => {
           onEvent({ type: "catch-finished" })
         }, remainingPhaseDuration)
-        animation.start()
         break
       }
       default:
@@ -602,7 +569,7 @@ export function OnboardingWorldScene({
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
-      animation?.stop()
+      if (animated) cancelAnimation(animated)
       if (phaseClockRef.current.startedAtMs !== null) {
         phaseClockRef.current.elapsedMs = Math.min(
           phaseDurationMs,
@@ -622,88 +589,54 @@ export function OnboardingWorldScene({
 
   useEffect(() => {
     if (!shouldRunContinuousMotion) {
-      rotation.stopAnimation()
+      cancelAnimation(rotation)
       return
     }
 
-    rotation.setValue(progressRefs.current.rotation)
     const turn = { startProgress: progressRefs.current.rotation, startedAtMs: Date.now(), durationMs: ONBOARDING_GLOBE_LOOP_DURATION_MS }
-    const firstTurn = Animated.timing(rotation, {
-      toValue: 1,
-      duration: getRemainingDuration(
-        ONBOARDING_GLOBE_LOOP_DURATION_MS,
-        progressRefs.current.rotation
-      ),
-      easing: Easing.linear,
-      useNativeDriver: true,
-      isInteraction: false
-    })
-    const loop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: ONBOARDING_GLOBE_LOOP_DURATION_MS,
-        easing: Easing.linear,
-        useNativeDriver: true,
-        isInteraction: false
+    // Finish the turn in progress, then turn from 0 forever.
+    rotation.value = progressRefs.current.rotation
+    rotation.value = animateSequence(
+      animateSegment(1, {
+        durationMs: getRemainingDuration(
+          ONBOARDING_GLOBE_LOOP_DURATION_MS,
+          progressRefs.current.rotation
+        )
       }),
-      { resetBeforeIteration: true }
+      animateSegment(0, { durationMs: 0 }),
+      repeatForever(animateSegment(1, { durationMs: ONBOARDING_GLOBE_LOOP_DURATION_MS }))
     )
 
-    firstTurn.start(({ finished }) => {
-      if (!finished) return
-      rotation.setValue(0)
-      loop.start()
-    })
-
     return () => {
-      firstTurn.stop()
-      loop.stop()
-      rotation.stopAnimation()
+      cancelAnimation(rotation)
       clocks.rotation = getLoopingClockProgress(turn, Date.now())
     }
   }, [clocks, rotation, shouldRunContinuousMotion])
 
   useEffect(() => {
     if (!shouldRunRunnerOrbit) {
-      runnerOrbit.stopAnimation()
-      runnerOrbit.setValue(0)
+      cancelAnimation(runnerOrbit)
+      runnerOrbit.value = 0
       progressRefs.current.runnerOrbit = 0
       return
     }
 
-    runnerOrbit.setValue(progressRefs.current.runnerOrbit)
-    const firstCycle = Animated.timing(runnerOrbit, {
-      toValue: 1,
-      duration: getRemainingDuration(
-        ONBOARDING_RUNNER_ORBIT_DURATION_MS,
-        progressRefs.current.runnerOrbit
-      ),
-      easing: Easing.inOut(Easing.sin),
-      useNativeDriver: true,
-      isInteraction: false
-    })
-    const loop = Animated.loop(
-      Animated.timing(runnerOrbit, {
-        toValue: 1,
-        duration: ONBOARDING_RUNNER_ORBIT_DURATION_MS,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-        isInteraction: false
+    const easing = Easing.inOut(Easing.sin)
+    runnerOrbit.value = progressRefs.current.runnerOrbit
+    runnerOrbit.value = animateSequence(
+      animateSegment(1, {
+        durationMs: getRemainingDuration(
+          ONBOARDING_RUNNER_ORBIT_DURATION_MS,
+          progressRefs.current.runnerOrbit
+        ),
+        easing
       }),
-      { resetBeforeIteration: true }
+      animateSegment(0, { durationMs: 0 }),
+      repeatForever(animateSegment(1, { durationMs: ONBOARDING_RUNNER_ORBIT_DURATION_MS, easing }))
     )
 
-    firstCycle.start(({ finished }) => {
-      if (!finished) return
-      runnerOrbit.setValue(0)
-      progressRefs.current.runnerOrbit = 0
-      loop.start()
-    })
-
     return () => {
-      firstCycle.stop()
-      loop.stop()
-      runnerOrbit.stopAnimation()
+      cancelAnimation(runnerOrbit)
     }
   }, [runnerOrbit, shouldRunRunnerOrbit])
 
@@ -716,26 +649,15 @@ export function OnboardingWorldScene({
   const sceneLift = compact
     ? ONBOARDING_WORLD_SCENE_LIFT.compact
     : ONBOARDING_WORLD_SCENE_LIFT.regular
-  const sceneHandoffStyle = {
-    opacity: handoff.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 0]
-    }),
+  const sceneHandoffStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(handoff.value, [0, 1], [1, 0]),
     transform: [
-      {
-        translateY: handoff.interpolate({
-          inputRange: [0, 1],
-          outputRange: [sceneLift, sceneLift - 14]
-        })
-      },
-      {
-        scale: handoff.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 0.984]
-        })
-      }
+      { translateY: interpolate(handoff.value, [0, 1], [sceneLift, sceneLift - 14]) },
+      { scale: interpolate(handoff.value, [0, 1], [1, 0.984]) }
     ]
-  }
+  }))
+  const worldRevealStyle = useAnimatedStyle(() => ({ opacity: worldReveal.value }))
+  const preludeStyle = useAnimatedStyle(() => ({ opacity: preludeOpacity.value }))
 
   return (
     <View
@@ -751,7 +673,7 @@ export function OnboardingWorldScene({
       >
         <Animated.View
           pointerEvents="none"
-          style={[styles.worldComposition, { opacity: worldReveal }]}
+          style={[styles.worldComposition, worldRevealStyle]}
         >
           <OnboardingWorldHero
             arrivalProgress={arrivalProgress}
@@ -779,7 +701,7 @@ export function OnboardingWorldScene({
           pointerEvents="none"
           accessibilityElementsHidden={!isPrelude}
           importantForAccessibility={isPrelude ? "yes" : "no-hide-descendants"}
-          style={[styles.preludeOverlay, { opacity: preludeOpacity }]}
+          style={[styles.preludeOverlay, preludeStyle]}
         >
           <OnboardingBrandPrelude
             compact={compact}

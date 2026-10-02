@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native"
-import Reanimated, {
-  Easing as ReanimatedEasing,
+import { Image, StyleSheet, Text, View } from "react-native"
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withTiming
+  withTiming,
+  type SharedValue
 } from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
+import { animateSegment } from "../../ui/motion"
 import { captureProductEvent } from "../../analytics/productAnalytics"
 import { OnboardingGreetingPair } from "./OnboardingGreetingPair"
 import { OnboardingScanStage } from "./OnboardingScanStage"
@@ -53,6 +58,28 @@ function remainingDuration(total: number, progress: number): number {
   return Math.max(1, Math.round(total * (1 - Math.max(0, Math.min(1, progress)))))
 }
 
+/**
+ * One beat of the prelude timeline, resumed from `elapsedMs` of the shared
+ * clock: waits until `startMs`, then plays what is left of the beat.
+ */
+function playBeat(
+  value: SharedValue<number>,
+  beat: {
+    elapsedMs: number
+    startMs: number
+    endMs: number
+    current: number
+    toValue: number
+    easing: (value: number) => number
+  }
+): void {
+  value.value = animateSegment(beat.toValue, {
+    delayMs: Math.max(0, beat.startMs - beat.elapsedMs),
+    durationMs: remainingDuration(beat.endMs - beat.startMs, beat.current),
+    easing: beat.easing
+  })
+}
+
 export function OnboardingBrandPrelude({
   compact,
   greetingText,
@@ -82,14 +109,14 @@ export function OnboardingBrandPrelude({
   const telemetry = useRef(
     createOnboardingIntroTelemetry(Date.now() - initialElapsedMs, Date.now())
   ).current
-  const scanRows = useRef(new Animated.Value(initialProgress.scanRows)).current
-  const scanSweep = useRef(new Animated.Value(initialProgress.scanSweep)).current
-  const scanOpacity = useRef(new Animated.Value(initialProgress.scanOpacity)).current
-  const brandReveal = useRef(new Animated.Value(initialProgress.brand)).current
-  const characterReveal = useRef(new Animated.Value(initialProgress.characters)).current
-  const greetingReveal = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
-  const homeExit = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
-  const greetingPairReveal = useRef(new Animated.Value(showGreetingBubble ? 1 : 0)).current
+  const scanRows = useSharedValue(initialProgress.scanRows)
+  const scanSweep = useSharedValue(initialProgress.scanSweep)
+  const scanOpacity = useSharedValue(initialProgress.scanOpacity)
+  const brandReveal = useSharedValue(initialProgress.brand)
+  const characterReveal = useSharedValue(initialProgress.characters)
+  const greetingReveal = useSharedValue(showGreetingBubble ? 1 : 0)
+  const homeExit = useSharedValue(showGreetingBubble ? 1 : 0)
+  const greetingPairReveal = useSharedValue(showGreetingBubble ? 1 : 0)
   const elapsedMsRef = useRef(initialElapsedMs)
   const didShowActions = useRef(false)
   const didShowSecondaryAction = useRef(false)
@@ -147,80 +174,43 @@ export function OnboardingBrandPrelude({
   }
 
   useEffect(() => {
-    greetingReveal.stopAnimation()
-    homeExit.stopAnimation()
-    greetingPairReveal.stopAnimation()
+    cancelAnimation(greetingReveal)
+    cancelAnimation(homeExit)
+    cancelAnimation(greetingPairReveal)
     if (shouldReduceMotion) {
-      greetingReveal.setValue(showGreetingBubble ? 1 : 0)
-      homeExit.setValue(showGreetingBubble ? 1 : 0)
-      greetingPairReveal.setValue(showGreetingBubble ? 1 : 0)
+      greetingReveal.value = showGreetingBubble ? 1 : 0
+      homeExit.value = showGreetingBubble ? 1 : 0
+      greetingPairReveal.value = showGreetingBubble ? 1 : 0
       setGreetingPairActive(showGreetingBubble)
       return undefined
     }
     let activationTimer: ReturnType<typeof setTimeout> | undefined
     if (showGreetingBubble) {
       setGreetingPairActive(false)
+      // Cues the wave in the pair (React state), as the pair starts to rise.
       activationTimer = setTimeout(() => setGreetingPairActive(true), 140)
+      homeExit.value = animateSegment(1, { durationMs: 300, easing: Easing.inOut(Easing.cubic) })
+      greetingPairReveal.value = animateSegment(1, {
+        delayMs: 140,
+        durationMs: 360,
+        easing: Easing.out(Easing.back(0.72))
+      })
+      greetingReveal.value = animateSegment(1, {
+        delayMs: 220,
+        durationMs: 280,
+        easing: Easing.out(Easing.back(0.76))
+      })
     } else {
       setGreetingPairActive(false)
+      greetingReveal.value = animateSegment(0, { durationMs: 150, easing: Easing.in(Easing.quad) })
+      greetingPairReveal.value = animateSegment(0, { durationMs: 160, easing: Easing.in(Easing.quad) })
+      homeExit.value = animateSegment(0, { durationMs: 240, easing: Easing.out(Easing.cubic) })
     }
-    const animation = showGreetingBubble
-      ? Animated.parallel([
-          Animated.timing(homeExit, {
-            toValue: 1,
-            duration: 300,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-            isInteraction: false
-          }),
-          Animated.sequence([
-            Animated.delay(140),
-            Animated.timing(greetingPairReveal, {
-              toValue: 1,
-              duration: 360,
-              easing: Easing.out(Easing.back(0.72)),
-              useNativeDriver: true,
-              isInteraction: false
-            })
-          ]),
-          Animated.sequence([
-            Animated.delay(220),
-            Animated.timing(greetingReveal, {
-              toValue: 1,
-              duration: 280,
-              easing: Easing.out(Easing.back(0.76)),
-              useNativeDriver: true,
-              isInteraction: false
-            })
-          ])
-        ])
-      : Animated.parallel([
-          Animated.timing(greetingReveal, {
-            toValue: 0,
-            duration: 150,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-            isInteraction: false
-          }),
-          Animated.timing(greetingPairReveal, {
-            toValue: 0,
-            duration: 160,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-            isInteraction: false
-          }),
-          Animated.timing(homeExit, {
-            toValue: 0,
-            duration: 240,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-            isInteraction: false
-          })
-        ])
-    animation.start()
     return () => {
       if (activationTimer) clearTimeout(activationTimer)
-      animation.stop()
+      cancelAnimation(greetingReveal)
+      cancelAnimation(homeExit)
+      cancelAnimation(greetingPairReveal)
     }
   }, [greetingPairReveal, greetingReveal, homeExit, shouldReduceMotion, showGreetingBubble])
 
@@ -241,7 +231,7 @@ export function OnboardingBrandPrelude({
       GREETING_TYPE_DELAY_MS,
       withTiming(1, {
         duration: Math.max(1, greetingText.length * GREETING_TYPE_MS_PER_CHARACTER),
-        easing: ReanimatedEasing.linear
+        easing: Easing.linear
       })
     )
   }, [greetingReveal01, greetingText, shouldReduceMotion, showGreetingBubble])
@@ -249,11 +239,11 @@ export function OnboardingBrandPrelude({
   useEffect(() => {
     if (!motionPreferenceResolved) return undefined
     if (reduceMotion) {
-      scanRows.setValue(1)
-      scanSweep.setValue(1)
-      scanOpacity.setValue(0)
-      brandReveal.setValue(1)
-      characterReveal.setValue(1)
+      scanRows.value = 1
+      scanSweep.value = 1
+      scanOpacity.value = 0
+      brandReveal.value = 1
+      characterReveal.value = 1
       charactersStartedRef.current = true
       setCharactersStarted(true)
       captureBeat("scan", false)
@@ -284,31 +274,14 @@ export function OnboardingBrandPrelude({
     const startedAt = Date.now()
     const timers: ReturnType<typeof setTimeout>[] = []
     const resumed = elapsed > initialElapsedMs + 20
-    const delayedTiming = (
-      value: Animated.Value,
-      startMs: number,
-      endMs: number,
-      current: number,
-      toValue: number,
-      easing: (value: number) => number
-    ) => Animated.sequence([
-      Animated.delay(Math.max(0, startMs - elapsed)),
-      Animated.timing(value, {
-        toValue,
-        duration: remainingDuration(endMs - startMs, current),
-        easing,
-        useNativeDriver: true,
-        isInteraction: false
-      })
-    ])
 
-    const animation = Animated.parallel([
-      delayedTiming(scanRows, 0, timeline.scanRowsComplete, progress.scanRows, 1, Easing.out(Easing.cubic)),
-      delayedTiming(scanSweep, timeline.scanSweepStart, timeline.scanSweepComplete, progress.scanSweep, 1, Easing.inOut(Easing.cubic)),
-      delayedTiming(scanOpacity, timeline.scanDissolveStart, timeline.scanDissolveComplete, 1 - progress.scanOpacity, 0, Easing.out(Easing.cubic)),
-      delayedTiming(brandReveal, timeline.brandRevealStart, timeline.brandRevealComplete, progress.brand, 1, Easing.out(Easing.back(1.04))),
-      delayedTiming(characterReveal, timeline.characterEntranceStart, timeline.characterEntranceComplete, progress.characters, 1, Easing.out(Easing.back(0.82)))
-    ])
+    // The motion runs on the UI thread; only the beats that change React
+    // state (mounting the pair, actions, telemetry) are JS timers.
+    playBeat(scanRows, { elapsedMs: elapsed, startMs: 0, endMs: timeline.scanRowsComplete, current: progress.scanRows, toValue: 1, easing: Easing.out(Easing.cubic) })
+    playBeat(scanSweep, { elapsedMs: elapsed, startMs: timeline.scanSweepStart, endMs: timeline.scanSweepComplete, current: progress.scanSweep, toValue: 1, easing: Easing.inOut(Easing.cubic) })
+    playBeat(scanOpacity, { elapsedMs: elapsed, startMs: timeline.scanDissolveStart, endMs: timeline.scanDissolveComplete, current: 1 - progress.scanOpacity, toValue: 0, easing: Easing.out(Easing.cubic) })
+    playBeat(brandReveal, { elapsedMs: elapsed, startMs: timeline.brandRevealStart, endMs: timeline.brandRevealComplete, current: progress.brand, toValue: 1, easing: Easing.out(Easing.back(1.04)) })
+    playBeat(characterReveal, { elapsedMs: elapsed, startMs: timeline.characterEntranceStart, endMs: timeline.characterEntranceComplete, current: progress.characters, toValue: 1, easing: Easing.out(Easing.back(0.82)) })
 
     if (!charactersStartedRef.current) {
       timers.push(setTimeout(
@@ -349,46 +322,68 @@ export function OnboardingBrandPrelude({
       }, Math.max(0, timeline.interactive - elapsed)))
     }
 
-    animation.start()
     return () => {
       elapsedMsRef.current = Math.min(timeline.interactive, elapsed + Date.now() - startedAt)
-      animation.stop()
+      cancelAnimation(scanRows)
+      cancelAnimation(scanSweep)
+      cancelAnimation(scanOpacity)
+      cancelAnimation(brandReveal)
+      cancelAnimation(characterReveal)
       timers.forEach(clearTimeout)
     }
   }, [brandReveal, captureBeat, capturePerformance, characterReveal, initialElapsedMs, motionEnabled, motionPreferenceResolved, onActionsVisible, onFinished, onSecondaryActionVisible, reduceMotion, scanOpacity, scanRows, scanSweep, sceneReady])
 
-  const pairLift = characterReveal.interpolate({
-    inputRange: [0, 0.62, 0.82, 1],
-    outputRange: [24, -7, 2, 0],
-    extrapolate: "clamp"
-  })
+  const scanLayerStyle = useAnimatedStyle(() => ({ opacity: scanOpacity.value }))
+  const brandStyle = useAnimatedStyle(() => ({
+    opacity: brandReveal.value,
+    transform: [
+      { translateY: interpolate(brandReveal.value, [0, 1], [12, 0]) },
+      { scale: interpolate(brandReveal.value, [0, 1], [0.94, 1]) }
+    ]
+  }))
+  const greetingBubbleStyle = useAnimatedStyle(() => ({
+    opacity: greetingReveal.value,
+    transform: [
+      { translateY: interpolate(greetingReveal.value, [0, 1], [10, 0]) },
+      { scale: interpolate(greetingReveal.value, [0, 1], [0.96, 1]) }
+    ]
+  }))
+  const pairStageStyle = useAnimatedStyle(() => ({
+    opacity: characterReveal.value,
+    transform: [
+      { translateY: interpolate(characterReveal.value, [0, 0.62, 0.82, 1], [24, -7, 2, 0], Extrapolation.CLAMP) },
+      { scale: interpolate(characterReveal.value, [0, 1], [0.9, 1]) }
+    ]
+  }))
+  const homeSceneStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(homeExit.value, [0, 1], [1, 0]),
+    transform: [
+      { translateY: interpolate(homeExit.value, [0, 1], [0, 6]) },
+      { scale: interpolate(homeExit.value, [0, 1], [1, 0.985]) }
+    ]
+  }))
+  const greetingPairStyle = useAnimatedStyle(() => ({
+    opacity: greetingPairReveal.value,
+    transform: [
+      { translateY: interpolate(greetingPairReveal.value, [0, 1], [10, 0]) },
+      { scale: interpolate(greetingPairReveal.value, [0, 1], [0.975, 1]) }
+    ]
+  }))
 
   return (
     <View accessibilityLabel="Blumi" importantForAccessibility="no-hide-descendants" onLayout={handleLayout} pointerEvents="none" style={[styles.root, compact ? styles.rootCompact : null]} testID="onboarding-brand-prelude">
-      <Animated.View style={[styles.scanLayer, { opacity: scanOpacity }]}>
+      <Animated.View style={[styles.scanLayer, scanLayerStyle]}>
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep} />
       </Animated.View>
 
-      <Animated.View style={[styles.brandLayer, { opacity: brandReveal, transform: [
-        { translateY: brandReveal.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
-        { scale: brandReveal.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }
-      ] }]}>
+      <Animated.View style={[styles.brandLayer, brandStyle]}>
         <Image accessibilityIgnoresInvertColors fadeDuration={0} resizeMode="contain" source={BLUMI_MARK} style={styles.brandMark} />
         <Text maxFontSizeMultiplier={1.2} style={styles.brandName}>Blumi</Text>
       </Animated.View>
 
       {showGreetingBubble ? (
         <Animated.View
-          style={[
-            styles.greetingBubble,
-            {
-              opacity: greetingReveal,
-              transform: [
-                { translateY: greetingReveal.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-                { scale: greetingReveal.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }
-              ]
-            }
-          ]}
+          style={[styles.greetingBubble, greetingBubbleStyle]}
           testID="onboarding-character-greeting"
         >
           <View>
@@ -400,7 +395,7 @@ export function OnboardingBrandPrelude({
             >
               {greetingText}
             </Text>
-            <Reanimated.View style={[styles.greetingClip, greetingClipStyle]}>
+            <Animated.View style={[styles.greetingClip, greetingClipStyle]}>
               <Text
                 maxFontSizeMultiplier={1.2}
                 numberOfLines={1}
@@ -408,37 +403,15 @@ export function OnboardingBrandPrelude({
               >
                 {greetingText}
               </Text>
-            </Reanimated.View>
+            </Animated.View>
           </View>
           <View style={styles.greetingTail} />
         </Animated.View>
       ) : null}
 
       <View style={[styles.pairLayer, { opacity: showCharacters ? 1 : 0 }]}>
-        <Animated.View style={[styles.pairStage, { opacity: characterReveal, transform: [
-          { translateY: pairLift },
-          { scale: characterReveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }
-        ] }]}>
-          <Animated.View style={[styles.homeSceneLayer, {
-            opacity: homeExit.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0]
-            }),
-            transform: [
-              {
-                translateY: homeExit.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 6]
-                })
-              },
-              {
-                scale: homeExit.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0.985]
-                })
-              }
-            ]
-          }]}>
+        <Animated.View style={[styles.pairStage, pairStageStyle]}>
+          <Animated.View style={[styles.homeSceneLayer, homeSceneStyle]}>
             <OnboardingWelcomeHomeScene
               compact={compact}
               motionEnabled={motionEnabled}
@@ -447,30 +420,14 @@ export function OnboardingBrandPrelude({
             />
           </Animated.View>
           {charactersStarted ? (
-            <Animated.View style={[styles.greetingPairLayer, {
-              opacity: greetingPairReveal,
-              transform: [
-                {
-                  translateY: greetingPairReveal.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [10, 0]
-                  })
-                },
-                {
-                  scale: greetingPairReveal.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.975, 1]
-                  })
-                }
-              ]
-            }]}>
+            <Animated.View style={[styles.greetingPairLayer, greetingPairStyle]}>
               <View style={styles.pairAura} />
               <OnboardingGreetingPair
                 entranceProgress={characterReveal}
                 greetingActive={greetingPairActive}
                 motionEnabled={motionEnabled}
                 motionPreferenceResolved={motionPreferenceResolved}
-                onFinished={() => undefined}
+                onFinished={ignoreFinished}
                 reduceMotion={shouldReduceMotion}
               />
             </Animated.View>
@@ -480,6 +437,8 @@ export function OnboardingBrandPrelude({
     </View>
   )
 }
+
+const ignoreFinished = () => undefined
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: "center", justifyContent: "center" },

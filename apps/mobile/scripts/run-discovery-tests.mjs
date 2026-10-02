@@ -149,8 +149,7 @@ try {
     process.execPath,
     [
       "--test",
-      resolve(workspaceRoot, "src/features/discovery/DiscoveryStartupBoundary.test.mjs"),
-      resolve(workspaceRoot, "src/ui/PreparedDiscoveryLoadingScreen.test.mjs")
+      resolve(workspaceRoot, "src/features/discovery/DiscoveryStartupBoundary.test.mjs")
     ],
     {
       cwd: workspaceRoot,
@@ -167,7 +166,8 @@ try {
       "src/features/discovery/screen/useDiscoveryDecisions.test.ts",
       "src/features/discovery/screen/useDiscoveryDeck.test.ts",
       "src/features/discovery/discoverySwipeModel.test.ts",
-      "src/features/discovery/copyLocaleParity.test.ts"
+      "src/features/discovery/copyLocaleParity.test.ts",
+      "src/ui/preparedDiscoveryLoadingScreen.test.ts"
     ],
     {
       cwd: workspaceRoot,

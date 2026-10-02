@@ -16,6 +16,7 @@ export function getOnboardingWaveAssetFrameAtElapsed(input: {
   startOffsetMs?: number
   sequence?: readonly number[]
 }): number {
+  "worklet"
   const sequence = input.sequence ?? ONBOARDING_GREETING_WAVE_SEQUENCE
   if (sequence.length === 0) return 0
   const startOffsetMs = input.startOffsetMs ?? 0

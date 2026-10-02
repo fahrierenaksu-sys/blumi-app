@@ -27,8 +27,11 @@ import {
   FadeOut,
   ReduceMotion,
   withDelay,
+  withRepeat,
+  withSequence,
   withSpring,
-  withTiming
+  withTiming,
+  type EasingFunction
 } from "react-native-reanimated"
 import {
   createReducedMotionStore,
@@ -162,6 +165,57 @@ export function animateToAfter(
   "worklet"
   const animation = animateTo(target, motion, callback)
   return delayMs > 0 ? withDelay(delayMs, animation, ReduceMotion.Never) : animation
+}
+
+/* ── Authored timelines (worklet-safe) ─────────────────────── */
+
+/**
+ * One segment of an authored timeline: an exact duration and curve,
+ * optionally after a delay. The onboarding intro and the boot scan are
+ * owner-approved choreography with their own beats, so they keep these
+ * instead of a spring token. Their callers decide Reduce Motion (the intro
+ * lands at once), so Reanimated's own check stays off here too.
+ */
+export interface MotionSegment {
+  readonly durationMs: number
+  /** Linear when omitted (clocks). */
+  readonly easing?: EasingFunction
+  readonly delayMs?: number
+}
+
+/** Tweens a shared value to `target` along an authored segment. */
+export function animateSegment(
+  target: number,
+  segment: MotionSegment,
+  callback?: (finished?: boolean) => void
+): number {
+  "worklet"
+  const timing = withTiming(
+    target,
+    {
+      duration: Math.max(0, segment.durationMs),
+      easing: segment.easing ?? Easing.linear,
+      reduceMotion: ReduceMotion.Never
+    },
+    callback
+  )
+  const delayMs = segment.delayMs ?? 0
+  return delayMs > 0 ? withDelay(delayMs, timing, ReduceMotion.Never) : timing
+}
+
+/** Plays authored segments one after another (a held value is a segment to the same target). */
+export function animateSequence(...animations: number[]): number {
+  "worklet"
+  return withSequence(ReduceMotion.Never, ...animations)
+}
+
+/**
+ * Repeats an animation until it is cancelled. Each pass restarts from the
+ * value the repeat started at, so a clock loops 0 → end → 0 → end.
+ */
+export function repeatForever(animation: number): number {
+  "worklet"
+  return withRepeat(animation, -1, false, undefined, ReduceMotion.Never)
 }
 
 /* ── Layout animations ─────────────────────────────────────── */

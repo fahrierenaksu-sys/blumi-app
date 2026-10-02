@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react"
-import { Animated, Easing, Image, StyleSheet, View } from "react-native"
+import { Image, StyleSheet, View } from "react-native"
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
+import { animateSegment, animateSequence, repeatForever } from "../../ui/motion"
 import { OnboardingGreetingPair } from "./OnboardingGreetingPair"
 import { ONBOARDING_WELCOME_PAIR_SETTLED_TRANSLATE_Y } from "./onboardingWorldCompositionModel"
 import {
@@ -26,17 +37,16 @@ export function OnboardingWelcomeHomeScene({
   reduceMotion
 }: OnboardingWelcomeHomeSceneProps) {
   const shouldReduceMotion = motionPreferenceResolved && reduceMotion
-  const sceneClock = useRef(new Animated.Value(
-    shouldReduceMotion ? timeline.settled : 0
-  )).current
-  const lightPulse = useRef(new Animated.Value(0)).current
+  const sceneClock = useSharedValue(shouldReduceMotion ? timeline.settled : 0)
+  const lightPulse = useSharedValue(0)
   const elapsedMsRef = useRef(shouldReduceMotion ? timeline.settled : 0)
   const [isSettled, setIsSettled] = useState(shouldReduceMotion)
 
   useEffect(() => {
     if (!motionPreferenceResolved) return undefined
     if (reduceMotion) {
-      sceneClock.setValue(timeline.settled)
+      cancelAnimation(sceneClock)
+      sceneClock.value = timeline.settled
       elapsedMsRef.current = timeline.settled
       setIsSettled(true)
       return undefined
@@ -45,17 +55,13 @@ export function OnboardingWelcomeHomeScene({
 
     const startedAt = Date.now()
     const remainingMs = timeline.settled - elapsedMsRef.current
-    const animation = Animated.timing(sceneClock, {
-      toValue: timeline.settled,
-      duration: remainingMs,
-      easing: Easing.linear,
-      useNativeDriver: true,
-      isInteraction: false
-    })
-    animation.start(({ finished }) => {
-      if (!finished) return
+    const settle = () => {
       elapsedMsRef.current = timeline.settled
       setIsSettled(true)
+    }
+    sceneClock.value = animateSegment(timeline.settled, { durationMs: remainingMs }, (finished) => {
+      "worklet"
+      if (finished) scheduleOnRN(settle)
     })
 
     return () => {
@@ -63,35 +69,24 @@ export function OnboardingWelcomeHomeScene({
         timeline.settled,
         elapsedMsRef.current + Date.now() - startedAt
       )
-      animation.stop()
+      cancelAnimation(sceneClock)
     }
   }, [motionEnabled, motionPreferenceResolved, reduceMotion, sceneClock])
 
   useEffect(() => {
     if (!motionEnabled || reduceMotion || !isSettled) {
-      lightPulse.stopAnimation()
+      cancelAnimation(lightPulse)
       return undefined
     }
 
-    const lightLoop = Animated.loop(Animated.sequence([
-      Animated.timing(lightPulse, {
-        toValue: 1,
-        duration: 1_800,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-        isInteraction: false
-      }),
-      Animated.timing(lightPulse, {
-        toValue: 0,
-        duration: 2_050,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-        isInteraction: false
-      })
-    ]))
-    lightLoop.start()
+    const easing = Easing.inOut(Easing.sin)
+    lightPulse.value = 0
+    lightPulse.value = repeatForever(animateSequence(
+      animateSegment(1, { durationMs: 1_800, easing }),
+      animateSegment(0, { durationMs: 2_050, easing })
+    ))
     return () => {
-      lightLoop.stop()
+      cancelAnimation(lightPulse)
     }
   }, [isSettled, lightPulse, motionEnabled, reduceMotion])
 
@@ -99,30 +94,75 @@ export function OnboardingWelcomeHomeScene({
     shouldReduceMotion ? timeline.settled : elapsedMsRef.current,
     shouldReduceMotion
   )
-  const houseOpacity = sceneClock.interpolate({
-    inputRange: [timeline.houseRevealStart, timeline.houseRevealComplete],
-    outputRange: [progress.house, 1],
-    extrapolate: "clamp"
+  const houseFrom = progress.house
+  const doorLightFrom = progress.doorLight
+  const doorLight = (clock: number) => {
+    "worklet"
+    return interpolate(clock, [timeline.doorLightStart, timeline.doorLightComplete], [doorLightFrom, 1], Extrapolation.CLAMP)
+  }
+
+  const cottageStyle = useAnimatedStyle(() => {
+    const clock = sceneClock.value
+    return {
+      opacity: interpolate(clock, [timeline.houseRevealStart, timeline.houseRevealComplete], [houseFrom, 1], Extrapolation.CLAMP),
+      transform: [
+        { translateY: interpolate(clock, [0, 190, timeline.houseRevealComplete], [20, -4, 0], Extrapolation.CLAMP) },
+        { scale: interpolate(clock, [0, 210, timeline.houseRevealComplete], [0.92, 1.018, 1], Extrapolation.CLAMP) }
+      ]
+    }
   })
-  const doorLightOpacity = sceneClock.interpolate({
-    inputRange: [timeline.doorLightStart, timeline.doorLightComplete],
-    outputRange: [progress.doorLight, 1],
-    extrapolate: "clamp"
-  })
-  const entranceOpacity = sceneClock.interpolate({
-    inputRange: [timeline.characterEntranceStart, timeline.characterEntranceComplete],
-    outputRange: [0, 1],
-    extrapolate: "clamp"
-  })
-  const entranceProgress = sceneClock.interpolate({
-    inputRange: [timeline.characterEntranceStart, timeline.characterEntranceComplete],
-    outputRange: [0, 1],
-    extrapolate: "clamp"
-  })
-  const settleLift = sceneClock.interpolate({
-    inputRange: [timeline.settleStart, timeline.settleComplete],
-    outputRange: [0, 1],
-    extrapolate: "clamp"
+  const doorGlowStyle = useAnimatedStyle(() => ({
+    opacity: doorLight(sceneClock.value) * interpolate(lightPulse.value, [0, 1], [0.6, 0.96]),
+    transform: [{ scale: interpolate(lightPulse.value, [0, 1], [0.96, 1.1]) }]
+  }))
+  const windowGlowStyle = useAnimatedStyle(() => ({
+    opacity: doorLight(sceneClock.value) * interpolate(lightPulse.value, [0, 1], [0.26, 0.54])
+  }))
+  const floorLightStyle = useAnimatedStyle(() => ({
+    opacity: doorLight(sceneClock.value) * interpolate(lightPulse.value, [0, 1], [0.2, 0.44]),
+    transform: [
+      { scaleX: interpolate(lightPulse.value, [0, 1], [0.94, 1.08]) },
+      { scaleY: interpolate(lightPulse.value, [0, 1], [0.92, 1.03]) }
+    ]
+  }))
+  const sparkleLeftStyle = useAnimatedStyle(() => ({
+    opacity: doorLight(sceneClock.value) * interpolate(lightPulse.value, [0, 1], [0.12, 0.68]),
+    transform: [
+      { rotate: "45deg" },
+      { scale: interpolate(lightPulse.value, [0, 1], [0.56, 1]) }
+    ]
+  }))
+  const sparkleRightStyle = useAnimatedStyle(() => ({
+    opacity: doorLight(sceneClock.value) * interpolate(lightPulse.value, [0, 1], [0.66, 0.18]),
+    transform: [
+      { rotate: "45deg" },
+      { scale: interpolate(lightPulse.value, [0, 1], [0.88, 0.54]) }
+    ]
+  }))
+  const entranceProgress = useDerivedValue(() => interpolate(
+    sceneClock.value,
+    [timeline.characterEntranceStart, timeline.characterEntranceComplete],
+    [0, 1],
+    Extrapolation.CLAMP
+  ))
+  const entrancePairStyle = useAnimatedStyle(() => {
+    const clock = sceneClock.value
+    const settleLift = interpolate(clock, [timeline.settleStart, timeline.settleComplete], [0, 1], Extrapolation.CLAMP)
+    const keyframes = [timeline.characterEntranceStart, timeline.characterEntranceComplete, timeline.settleComplete]
+    return {
+      opacity: entranceProgress.value,
+      transform: [
+        {
+          translateY: interpolate(clock, keyframes, [
+            -26,
+            ONBOARDING_WELCOME_PAIR_SETTLED_TRANSLATE_Y + 2,
+            ONBOARDING_WELCOME_PAIR_SETTLED_TRANSLATE_Y
+          ], Extrapolation.CLAMP)
+        },
+        { scale: interpolate(clock, keyframes, [0.58, 1.015, 1], Extrapolation.CLAMP) },
+        { translateY: interpolate(settleLift, [0, 0.72, 1], [0, -4, 0]) }
+      ]
+    }
   })
 
   return (
@@ -133,57 +173,9 @@ export function OnboardingWelcomeHomeScene({
       style={[styles.root, compact ? styles.rootCompact : null]}
       testID="onboarding-welcome-home-scene"
     >
-      <Animated.View
-        style={[
-          styles.cottageLayer,
-          {
-            opacity: houseOpacity,
-            transform: [
-              {
-                translateY: sceneClock.interpolate({
-                  inputRange: [0, 190, timeline.houseRevealComplete],
-                  outputRange: [20, -4, 0],
-                  extrapolate: "clamp"
-                })
-              },
-              {
-                scale: sceneClock.interpolate({
-                  inputRange: [0, 210, timeline.houseRevealComplete],
-                  outputRange: [0.92, 1.018, 1],
-                  extrapolate: "clamp"
-                })
-              }
-            ]
-          }
-        ]}
-      >
-        <Animated.View
-          style={[
-            styles.doorGlow,
-            {
-              opacity: Animated.multiply(
-                doorLightOpacity,
-                lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0.96] })
-              ),
-              transform: [
-                {
-                  scale: lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.1] })
-                }
-              ]
-            }
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.windowGlow,
-            {
-              opacity: Animated.multiply(
-                doorLightOpacity,
-                lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.26, 0.54] })
-              )
-            }
-          ]}
-        />
+      <Animated.View style={[styles.cottageLayer, cottageStyle]}>
+        <Animated.View style={[styles.doorGlow, doorGlowStyle]} />
+        <Animated.View style={[styles.windowGlow, windowGlowStyle]} />
         <Image
           accessibilityIgnoresInvertColors
           fadeDuration={0}
@@ -191,106 +183,13 @@ export function OnboardingWelcomeHomeScene({
           source={WELCOME_COTTAGE}
           style={styles.cottage}
         />
-        <Animated.View
-          style={[
-            styles.floorLight,
-            {
-              opacity: Animated.multiply(
-                doorLightOpacity,
-                lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.44] })
-              ),
-              transform: [
-                {
-                  scaleX: lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] })
-                },
-                {
-                  scaleY: lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.03] })
-                }
-              ]
-            }
-          ]}
-        />
+        <Animated.View style={[styles.floorLight, floorLightStyle]} />
       </Animated.View>
 
-      <Animated.View
-        style={[
-          styles.sparkle,
-          styles.sparkleLeft,
-          {
-            opacity: Animated.multiply(
-              doorLightOpacity,
-              lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.68] })
-            ),
-            transform: [
-              { rotate: "45deg" },
-              {
-                scale: lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.56, 1] })
-              }
-            ]
-          }
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.sparkle,
-          styles.sparkleRight,
-          {
-            opacity: Animated.multiply(
-              doorLightOpacity,
-              lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.66, 0.18] })
-            ),
-            transform: [
-              { rotate: "45deg" },
-              {
-                scale: lightPulse.interpolate({ inputRange: [0, 1], outputRange: [0.88, 0.54] })
-              }
-            ]
-          }
-        ]}
-      />
+      <Animated.View style={[styles.sparkle, styles.sparkleLeft, sparkleLeftStyle]} />
+      <Animated.View style={[styles.sparkle, styles.sparkleRight, sparkleRightStyle]} />
 
-      <Animated.View
-        style={[
-          styles.entrancePair,
-          {
-            opacity: entranceOpacity,
-            transform: [
-              {
-                translateY: sceneClock.interpolate({
-                  inputRange: [
-                    timeline.characterEntranceStart,
-                    timeline.characterEntranceComplete,
-                    timeline.settleComplete
-                  ],
-                  outputRange: [
-                    -26,
-                    ONBOARDING_WELCOME_PAIR_SETTLED_TRANSLATE_Y + 2,
-                    ONBOARDING_WELCOME_PAIR_SETTLED_TRANSLATE_Y
-                  ],
-                  extrapolate: "clamp"
-                })
-              },
-              {
-                scale: sceneClock.interpolate({
-                  inputRange: [
-                    timeline.characterEntranceStart,
-                    timeline.characterEntranceComplete,
-                    timeline.settleComplete
-                  ],
-                  outputRange: [0.58, 1.015, 1],
-                  extrapolate: "clamp"
-                })
-              },
-              {
-                translateY: settleLift.interpolate({
-                  inputRange: [0, 0.72, 1],
-                  outputRange: [0, -4, 0]
-                })
-              }
-            ]
-          }
-        ]}
-      >
+      <Animated.View style={[styles.entrancePair, entrancePairStyle]}>
         <OnboardingGreetingPair
           ambientOnly={true}
           entranceVariant="doorway"

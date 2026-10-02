@@ -1,5 +1,15 @@
-import { useEffect, useRef } from "react"
-import { Animated, Easing, Image, Text, View, useWindowDimensions } from "react-native"
+import { useEffect } from "react"
+import { Image, Text, View, useWindowDimensions } from "react-native"
+import Animated, {
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { animateSegment, repeatForever } from "../../ui/motion"
 import type { AuthEntryCopy } from "./authEntryCopy"
 import type { OnboardingIntroPhase } from "./onboardingIntroModel"
 import {
@@ -43,7 +53,26 @@ import {
 const WORLD_TEXTURE = require("./assets/blumi_world_intro_texture_v1.webp")
 const HERO_PAIR_HEIGHT = ONBOARDING_SHARED_CHARACTER_HEIGHT
 const HERO_PAIR_WIDTH = 232
-type MotionProgress = Animated.Value | Animated.AnimatedInterpolation<number>
+const FLIGHT_INPUT = [...ONBOARDING_WORLD_FLIGHT.inputRange]
+const FLIGHT = {
+  male: {
+    translateX: [...ONBOARDING_WORLD_FLIGHT.male.translateX],
+    translateY: [...ONBOARDING_WORLD_FLIGHT.male.translateY],
+    scale: [...ONBOARDING_WORLD_FLIGHT.male.scale],
+    rotate: ONBOARDING_WORLD_FLIGHT.male.rotate.map((degrees) => Number.parseFloat(degrees))
+  },
+  female: {
+    translateX: [...ONBOARDING_WORLD_FLIGHT.female.translateX],
+    translateY: [...ONBOARDING_WORLD_FLIGHT.female.translateY],
+    scale: [...ONBOARDING_WORLD_FLIGHT.female.scale],
+    rotate: ONBOARDING_WORLD_FLIGHT.female.rotate.map((degrees) => Number.parseFloat(degrees))
+  }
+}
+const ARRIVAL_REVEAL_INPUT = [
+  0,
+  ONBOARDING_ARRIVAL_PRELOAD_GLOBE_PROGRESS.start,
+  ONBOARDING_ARRIVAL_PRELOAD_GLOBE_PROGRESS.complete
+]
 
 interface OnboardingWorldHeroProps {
   copy: AuthEntryCopy
@@ -54,17 +83,17 @@ interface OnboardingWorldHeroProps {
   showHeroCharacter: boolean
   showRunners: boolean
   motionEnabled: boolean
-  compositionLift: MotionProgress
-  arrivalProgress: MotionProgress
-  globeRise: MotionProgress
-  globeImpact: MotionProgress
-  avatarFlight: MotionProgress
-  landingReaction: MotionProgress
-  populationReveal: Animated.Value
-  chaseProgress: Animated.Value
-  catchProgress: Animated.Value
-  rotation: Animated.Value
-  runnerOrbit: Animated.Value
+  compositionLift: SharedValue<number>
+  arrivalProgress: SharedValue<number>
+  globeRise: SharedValue<number>
+  globeImpact: SharedValue<number>
+  avatarFlight: SharedValue<number>
+  landingReaction: SharedValue<number>
+  populationReveal: SharedValue<number>
+  chaseProgress: SharedValue<number>
+  catchProgress: SharedValue<number>
+  rotation: SharedValue<number>
+  runnerOrbit: SharedValue<number>
 }
 
 export function OnboardingWorldHero({
@@ -89,113 +118,143 @@ export function OnboardingWorldHero({
   runnerOrbit
 }: OnboardingWorldHeroProps) {
   const { width, height } = useWindowDimensions()
-  const runnerFrameClock = useRef(new Animated.Value(0)).current
+  // One run cycle clock for both runners (0 → frame count, looping).
+  const runnerFrameClock = useSharedValue(0)
   const layout = getOnboardingWorldLayout({ width, height, compact })
   const stageScale = layout.globeSize / ONBOARDING_GLOBE_SIZE
   const leaderPlacement = getOnboardingWorldRunnerPlacement("leader", 1)
   const chaserPlacement = getOnboardingWorldRunnerPlacement("chaser", 1)
-  const populationOpacity = phase === "population-counting"
-    ? populationReveal.interpolate({
-        inputRange: [0, 0.22, 1],
-        outputRange: [0, 0.78, 1]
-      })
-    : showPopulationStat
-      ? 1
-      : 0
-  const heroOpacity = phase === "population-counting"
-    ? populationReveal.interpolate({
-        inputRange: [0, 0.04, 0.1],
-        outputRange: [1, 0.45, 0],
-        extrapolate: "clamp"
-      })
-    : showHeroCharacter
-      ? 1
-      : 0
-  const runnerOpacity = phase === "population-counting"
-    ? populationReveal.interpolate({
-        inputRange: [0, 0.04, 0.1],
-        outputRange: [0, 0.55, 1],
-        extrapolate: "clamp"
-      })
-    : showRunners
-      ? 1
-      : 0
-  const textureTranslateX = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -ONBOARDING_TEXTURE_WIDTH]
-  })
-  const flight = ONBOARDING_WORLD_FLIGHT
-  const populationLift = phase === "population-counting"
-    ? populationReveal.interpolate({
-        inputRange: [0, 1],
-        outputRange: [12, 0]
-      })
-    : 0
+  const counting = phase === "population-counting"
   const arrivalAssetsEnabled = shouldUseOnboardingArrivalAssets(
     ONBOARDING_RUN_ASSET_MODE
   )
   const arrivalFramesEnabled =
     arrivalAssetsEnabled && shouldUseOnboardingArrivalFrames(phase)
-  const arrivalReveal = phase === "globe-launching"
-    ? globeRise.interpolate({
-        inputRange: [
-          0,
-          ONBOARDING_ARRIVAL_PRELOAD_GLOBE_PROGRESS.start,
-          ONBOARDING_ARRIVAL_PRELOAD_GLOBE_PROGRESS.complete
-        ],
-        outputRange: [0, 0, 1],
-        extrapolate: "clamp"
-      })
-    : 1
+  const globeLaunching = phase === "globe-launching"
+  const impactPhase = phase === "impact"
   const showRunnerCrownMask = shouldShowOnboardingRunnerCrownMask(phase)
-  const crownMaskOpacity = phase === "population-counting"
-    ? populationReveal.interpolate({
-        inputRange: [0, 0.2, 0.45, 1],
-        outputRange: [0, 0, 1, 1]
-      })
-    : 1
-  const pairOpacity = arrivalAssetsEnabled
-    ? phase === "globe-launching"
-      ? heroOpacity
-      : phase === "impact"
-        ? globeImpact.interpolate({
-            inputRange: [0, 0.08, 0.18],
-            outputRange: [1, 0.42, 0],
-            extrapolate: "clamp"
-          })
-        : 0
-    : heroOpacity
-  const actorOpacity = runnerOpacity
-  const unifiedActorOpacity = arrivalAssetsEnabled
-    ? phase === "globe-launching"
+  const unifiedActorOpacityHeld = arrivalAssetsEnabled
+    ? globeLaunching
       ? 0
       : showHeroCharacter || showRunners
         ? 1
         : 0
-    : actorOpacity
+    : null
   // Warm the shared run clock as feet meet the globe. Waiting for the
   // population phase leaves the final landing pose visibly frozen.
   const shouldAnimateRunners = showRunners || phase === "landing"
 
   useEffect(() => {
-    runnerFrameClock.stopAnimation()
-    runnerFrameClock.setValue(0)
+    cancelAnimation(runnerFrameClock)
+    runnerFrameClock.value = 0
     if (!motionEnabled || !shouldAnimateRunners) return undefined
 
-    const animation = Animated.loop(
-      Animated.timing(runnerFrameClock, {
-        toValue: ONBOARDING_RUNNER_FRAME_COUNT,
-        duration: RUNNER_FRAME_DURATION_MS * ONBOARDING_RUNNER_FRAME_COUNT,
-        easing: Easing.linear,
-        useNativeDriver: true
-      }),
-      { resetBeforeIteration: true }
-    )
-    animation.start()
+    runnerFrameClock.value = repeatForever(animateSegment(ONBOARDING_RUNNER_FRAME_COUNT, {
+      durationMs: RUNNER_FRAME_DURATION_MS * ONBOARDING_RUNNER_FRAME_COUNT
+    }))
     return () => {
-      animation.stop()
+      cancelAnimation(runnerFrameClock)
     }
   }, [motionEnabled, runnerFrameClock, shouldAnimateRunners])
+
+  const arrivalReveal = useDerivedValue(() => globeLaunching
+    ? interpolate(globeRise.value, ARRIVAL_REVEAL_INPUT, [0, 0, 1], Extrapolation.CLAMP)
+    : 1)
+  const heroOpacity = (reveal: number) => {
+    "worklet"
+    return counting
+      ? interpolate(reveal, [0, 0.04, 0.1], [1, 0.45, 0], Extrapolation.CLAMP)
+      : showHeroCharacter ? 1 : 0
+  }
+
+  const populationStyle = useAnimatedStyle(() => ({
+    opacity: counting
+      ? interpolate(populationReveal.value, [0, 0.22, 1], [0, 0.78, 1])
+      : showPopulationStat ? 1 : 0,
+    transform: [{ translateY: counting ? interpolate(populationReveal.value, [0, 1], [12, 0]) : 0 }]
+  }))
+  const stageStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: compositionLift.value }, { scale: stageScale }]
+  }))
+  const auraStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(globeRise.value, [0, 0.35, 1], [0, 0.12, 1]),
+    transform: [{ scale: interpolate(globeRise.value, [0, 1], [0.72, 1]) }]
+  }))
+  const impactRingStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(globeImpact.value, [0, 0.18, 0.62, 1], [0, 0.58, 0.18, 0]),
+    transform: [{ scale: interpolate(globeImpact.value, [0, 1], [0.76, 1.18]) }]
+  }))
+  const globeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(globeRise.value, [0, 0.04, 1], [ONBOARDING_WORLD_GLOBE_INITIAL_OPACITY, 1, 1]),
+    transform: [
+      {
+        translateY: interpolate(globeRise.value, [0, 1], [
+          ONBOARDING_GLOBE_SIZE * ONBOARDING_WORLD_GLOBE_ENTRY_OFFSET_MULTIPLIER,
+          0
+        ])
+      },
+      { translateY: interpolate(globeImpact.value, [0, 0.42, 1], [0, -10, 0]) },
+      { scale: interpolate(globeRise.value, [0, 1], [0.86, 1]) },
+      { scale: interpolate(globeImpact.value, [0, 0.42, 1], [1, 1.025, 1]) }
+    ]
+  }))
+  // The texture scrolls one full width per turn; the runners' crown mask
+  // scrolls the same texture in step.
+  const textureStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(rotation.value, [0, 1], [0, -ONBOARDING_TEXTURE_WIDTH]) }]
+  }))
+  const crownTextureStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(rotation.value, [0, 1], [0, -ONBOARDING_TEXTURE_WIDTH]) }]
+  }))
+  const heroPairStyle = useAnimatedStyle(() => ({
+    opacity: arrivalAssetsEnabled
+      ? globeLaunching
+        ? heroOpacity(populationReveal.value)
+        : impactPhase
+          ? interpolate(globeImpact.value, [0, 0.08, 0.18], [1, 0.42, 0], Extrapolation.CLAMP)
+          : 0
+      : heroOpacity(populationReveal.value)
+  }))
+  const maleFlightStyle = useAnimatedStyle(() => {
+    if (arrivalAssetsEnabled) return { transform: [] }
+    const flight = avatarFlight.value
+    return {
+      transform: [
+        { translateY: interpolate(globeImpact.value, [0, 0.44, 1], [0, -12, -6]) },
+        { translateY: interpolate(flight, FLIGHT_INPUT, FLIGHT.male.translateY) },
+        { translateY: interpolate(landingReaction.value, [0, 1], [-10, 0]) },
+        { translateX: interpolate(flight, FLIGHT_INPUT, FLIGHT.male.translateX) },
+        { scale: interpolate(flight, FLIGHT_INPUT, FLIGHT.male.scale) },
+        { rotate: `${interpolate(flight, FLIGHT_INPUT, FLIGHT.male.rotate)}deg` }
+      ]
+    }
+  })
+  const femaleFlightStyle = useAnimatedStyle(() => {
+    if (arrivalAssetsEnabled) return { transform: [] }
+    const flight = avatarFlight.value
+    return {
+      transform: [
+        { translateY: interpolate(globeImpact.value, [0, 0.44, 1], [0, -14, -7]) },
+        { translateY: interpolate(flight, FLIGHT_INPUT, FLIGHT.female.translateY) },
+        { translateY: interpolate(landingReaction.value, [0, 1], [-12, 0]) },
+        { translateX: interpolate(flight, FLIGHT_INPUT, FLIGHT.female.translateX) },
+        { scale: interpolate(flight, FLIGHT_INPUT, FLIGHT.female.scale) },
+        { rotate: `${interpolate(flight, FLIGHT_INPUT, FLIGHT.female.rotate)}deg` }
+      ]
+    }
+  })
+  const runnersStyle = useAnimatedStyle(() => ({
+    opacity: unifiedActorOpacityHeld !== null
+      ? unifiedActorOpacityHeld
+      : counting
+        ? interpolate(populationReveal.value, [0, 0.04, 0.1], [0, 0.55, 1], Extrapolation.CLAMP)
+        : showRunners ? 1 : 0
+  }))
+  const crownMaskStyle = useAnimatedStyle(() => ({
+    opacity: counting
+      ? interpolate(populationReveal.value, [0, 0.2, 0.45, 1], [0, 0, 1, 1])
+      : 1
+  }))
 
   return (
     <View style={styles.worldComposition}>
@@ -208,11 +267,8 @@ export function OnboardingWorldHero({
         style={[
           styles.populationStat,
           compact ? styles.populationStatCompact : null,
-          {
-            top: layout.statTop,
-            opacity: populationOpacity,
-            transform: [{ translateY: populationLift }]
-          }
+          { top: layout.statTop },
+          populationStyle
         ]}
       >
         <Text maxFontSizeMultiplier={1.2} style={styles.populationLead}>
@@ -235,102 +291,18 @@ export function OnboardingWorldHero({
           {
             top: "50%",
             marginTop: ONBOARDING_SHARED_CHARACTER_STAGE_OFFSET,
-            transformOrigin: "top center",
-            transform: [
-              {
-                translateY: compositionLift
-              },
-              { scale: stageScale }
-            ]
-          }
+            transformOrigin: "top center"
+          },
+          stageStyle
         ]}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.worldAura,
-            {
-              opacity: globeRise.interpolate({
-                inputRange: [0, 0.35, 1],
-                outputRange: [0, 0.12, 1]
-              }),
-              transform: [{
-                scale: globeRise.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.72, 1]
-                })
-              }]
-            }
-          ]}
-        />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.impactRing,
-            {
-              opacity: globeImpact.interpolate({
-                inputRange: [0, 0.18, 0.62, 1],
-                outputRange: [0, 0.58, 0.18, 0]
-              }),
-              transform: [{
-                scale: globeImpact.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.76, 1.18]
-                })
-              }]
-            }
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.globeWrap,
-            {
-              opacity: globeRise.interpolate({
-                inputRange: [0, 0.04, 1],
-                outputRange: [ONBOARDING_WORLD_GLOBE_INITIAL_OPACITY, 1, 1]
-              }),
-              transform: [
-                {
-                  translateY: globeRise.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [
-                      ONBOARDING_GLOBE_SIZE *
-                        ONBOARDING_WORLD_GLOBE_ENTRY_OFFSET_MULTIPLIER,
-                      0
-                    ]
-                  })
-                },
-                {
-                  translateY: globeImpact.interpolate({
-                    inputRange: [0, 0.42, 1],
-                    outputRange: [0, -10, 0]
-                  })
-                },
-                {
-                  scale: globeRise.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.86, 1]
-                  })
-                },
-                {
-                  scale: globeImpact.interpolate({
-                    inputRange: [0, 0.42, 1],
-                    outputRange: [1, 1.025, 1]
-                  })
-                }
-              ]
-            }
-          ]}
-        >
+        <Animated.View pointerEvents="none" style={[styles.worldAura, auraStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.impactRing, impactRingStyle]} />
+        <Animated.View style={[styles.globeWrap, globeStyle]}>
           <View style={styles.globeClip}>
-            <Animated.View
-              style={[
-                styles.textureTrack,
-                { transform: [{ translateX: textureTranslateX }] }
-              ]}
-            >
-              <Animated.Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.texture} />
-              <Animated.Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.texture} />
+            <Animated.View style={[styles.textureTrack, textureStyle]}>
+              <Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.texture} />
+              <Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.texture} />
             </Animated.View>
             <View pointerEvents="none" style={styles.globeHighlight} />
             <View pointerEvents="none" style={styles.globeShade} />
@@ -345,59 +317,14 @@ export function OnboardingWorldHero({
             style={[
               styles.heroPair,
               {
-                opacity: pairOpacity,
                 width: HERO_PAIR_WIDTH,
                 height: HERO_PAIR_HEIGHT,
                 bottom: ONBOARDING_WORLD_HERO_BOTTOM_IN_STAGE
-              }
+              },
+              heroPairStyle
             ]}
           >
-            <Animated.View
-              style={[
-                styles.heroCharacter,
-                styles.heroMale,
-                {
-                  transform: arrivalAssetsEnabled ? [] : [
-                    {
-                      translateY: globeImpact.interpolate({
-                        inputRange: [0, 0.44, 1],
-                        outputRange: [0, -12, -6]
-                      })
-                    },
-                    {
-                      translateY: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.male.translateY]
-                      })
-                    },
-                    {
-                      translateY: landingReaction.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-10, 0]
-                      })
-                    },
-                    {
-                      translateX: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.male.translateX]
-                      })
-                    },
-                    {
-                      scale: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.male.scale]
-                      })
-                    },
-                    {
-                      rotate: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.male.rotate]
-                      })
-                    }
-                  ]
-                }
-              ]}
-            >
+            <Animated.View style={[styles.heroCharacter, styles.heroMale, maleFlightStyle]}>
               <OnboardingArrivalCharacter
                 enabled={arrivalAssetsEnabled}
                 fallbackSource={ONBOARDING_MALE_HERO_FRAME}
@@ -408,52 +335,7 @@ export function OnboardingWorldHero({
                 frameWidth={ONBOARDING_SHARED_CHARACTER_WIDTH}
               />
             </Animated.View>
-            <Animated.View
-              style={[
-                styles.heroCharacter,
-                styles.heroFemale,
-                {
-                  transform: arrivalAssetsEnabled ? [] : [
-                    {
-                      translateY: globeImpact.interpolate({
-                        inputRange: [0, 0.44, 1],
-                        outputRange: [0, -14, -7]
-                      })
-                    },
-                    {
-                      translateY: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.female.translateY]
-                      })
-                    },
-                    {
-                      translateY: landingReaction.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-12, 0]
-                      })
-                    },
-                    {
-                      translateX: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.female.translateX]
-                      })
-                    },
-                    {
-                      scale: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.female.scale]
-                      })
-                    },
-                    {
-                      rotate: avatarFlight.interpolate({
-                        inputRange: [...flight.inputRange],
-                        outputRange: [...flight.female.rotate]
-                      })
-                    }
-                  ]
-                }
-              ]}
-            >
+            <Animated.View style={[styles.heroCharacter, styles.heroFemale, femaleFlightStyle]}>
               <OnboardingArrivalCharacter
                 enabled={arrivalAssetsEnabled}
                 fallbackSource={ONBOARDING_HERO_FRAME}
@@ -469,7 +351,7 @@ export function OnboardingWorldHero({
           <Animated.View
             importantForAccessibility="no-hide-descendants"
             pointerEvents="none"
-            style={[styles.runners, { opacity: unifiedActorOpacity }]}
+            style={[styles.runners, runnersStyle]}
           >
             <OnboardingRunner
               arrivalEnabled={arrivalAssetsEnabled}
@@ -508,15 +390,10 @@ export function OnboardingWorldHero({
             {showRunnerCrownMask ? (
               <Animated.View
                 pointerEvents="none"
-                style={[styles.runnerCrownMask, { opacity: crownMaskOpacity }]}
+                style={[styles.runnerCrownMask, crownMaskStyle]}
               >
                 <View style={styles.runnerCrownCircle}>
-                  <Animated.View
-                    style={[
-                      styles.runnerCrownTextureTrack,
-                      { transform: [{ translateX: textureTranslateX }] }
-                    ]}
-                  >
+                  <Animated.View style={[styles.runnerCrownTextureTrack, crownTextureStyle]}>
                     <Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.runnerCrownTexture} />
                     <Image source={WORLD_TEXTURE} resizeMode="cover" style={styles.runnerCrownTexture} />
                   </Animated.View>
