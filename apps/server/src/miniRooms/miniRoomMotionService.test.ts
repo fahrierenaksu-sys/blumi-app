@@ -69,6 +69,11 @@ test("a seat move is relayed with its hotspot even where the seat overhangs the 
   assert.equal(events[0].payload.avatar.hotspotId, "chair:front_edge")
   await service.move("ca", "a", { miniRoomId: "room", sequence: 2, x: .4, y: .93 })
   assert.equal(events.length, 1, "a plain walk target must still be on the floor")
+  // A claimed seat far from the floor (a wall, a corner) is refused, whatever its id.
+  for (const [sequence, point] of [[3, { x: .02, y: .02 }], [4, { x: .5, y: .2 }], [5, { x: .98, y: .98 }]] as const) {
+    await service.move("ca", "a", { miniRoomId: "room", sequence, ...point, hotspotId: "invented:seat" })
+  }
+  assert.equal(events.length, 1)
 })
 
 test("motion reaches only the sockets that entered the scene, never every device of both users", async () => {

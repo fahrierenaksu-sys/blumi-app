@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { miniRoomMoveSchema, type MiniRoomAvatarMotion, type MiniRoomMove, type ServerEvent } from "@blumi/contracts"
-import { MINI_ROOM_FLOOR, pointInRoomWorldPolygon } from "@blumi/domain"
+import { MINI_ROOM_FLOOR, pointInRoomWorldPolygon, projectRoomWorldPointToPolygon } from "@blumi/domain"
 import type { MiniRoomRecord } from "./miniRoomRepository"
 
 /**
@@ -27,6 +27,22 @@ interface MotionRoom {
   /** Set when an accept or join just verified the room (active, unblocked). */
   verifiedAt?: number
   idleSince?: number
+}
+
+/**
+ * How far a seat target may lie outside the shared floor (room units). A seat
+ * sits on furniture and may overhang the floor edge (a chair at the front
+ * edge seats at y≈0.93 against a floor edge of 0.9), but never far from it.
+ * The server has no layout of the room's furniture, so this bounds a seat
+ * claim to the floor's neighbourhood instead of trusting any point in the
+ * unit square (2026-10-02: a modified client could stand on a wall).
+ */
+export const MINI_ROOM_SEAT_FLOOR_TOLERANCE = 0.12
+
+function isSeatTargetNearFloor(point: { x: number; y: number }): boolean {
+  if (pointInRoomWorldPolygon(point, MINI_ROOM_FLOOR)) return true
+  const nearest = projectRoomWorldPointToPolygon(point, MINI_ROOM_FLOOR)
+  return Math.hypot(nearest.x - point.x, nearest.y - point.y) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
 }
 
 const REVALIDATE_AFTER_MS = 10_000
@@ -273,8 +289,9 @@ export function createMiniRoomMotionService(options: {
       if (!parsed.success) return
       const move = parsed.data
       // A walk target must be on the shared floor. A seat target may overhang it
-      // (the seat sits on furniture); receivers resolve the seat from hotspotId.
-      if (!move.hotspotId && !pointInRoomWorldPolygon(move, MINI_ROOM_FLOOR)) return
+      // (the seat sits on furniture), within MINI_ROOM_SEAT_FLOOR_TOLERANCE;
+      // receivers resolve the seat from hotspotId.
+      if (move.hotspotId ? !isSeatTargetNearFloor(move) : !pointInRoomWorldPolygon(move, MINI_ROOM_FLOOR)) return
       const entered = rooms.get(move.miniRoomId)?.connections.get(connectionId)
       if (!entered || entered.userId !== userId) return
       const room = await authorize(move.miniRoomId, userId)
