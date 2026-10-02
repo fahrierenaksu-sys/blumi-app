@@ -132,6 +132,7 @@ const app = createServer({
   purchaseEnvironment: config.purchaseEnvironment,
   avatarService: services.avatarService,
   notificationService: services.notificationService,
+  notificationPortraits: services.notificationPortraits,
   referralService: services.referralService,
   miniRoomService: services.miniRoomService,
   connectionService: services.connectionService,

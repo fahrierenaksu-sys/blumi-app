@@ -63,6 +63,18 @@ runRepositoryContract<ChatRepository>({
       )
     },
 
+    "findMessage returns one message of its own thread only": async (backend) => {
+      const chat = thread(backend, "find", "2026-09-30T10:00:00.000Z")
+      const other = thread(backend, "find_other", "2026-09-30T10:00:00.000Z")
+      await backend.repository.saveThread(chat)
+      await backend.repository.saveThread(other)
+      const created = await backend.repository.createMessage(message(chat, "m1", "2026-09-30T10:01:00.000Z", "hi there"))
+      const found = await backend.repository.findMessage(chat.threadId, created.message.messageId)
+      assert.deepEqual([found?.senderUserId, found?.body, found?.threadId], [chat.participantUserIds[0], "hi there", chat.threadId])
+      assert.equal(await backend.repository.findMessage(other.threadId, created.message.messageId), null)
+      assert.equal(await backend.repository.findMessage(chat.threadId, `${chat.threadId}_absent`), null)
+    },
+
     "createMessage is idempotent per thread, sender and client message ID": async (backend) => {
       const chat = thread(backend, "idem", "2026-09-30T10:00:00.000Z")
       await backend.repository.saveThread(chat)

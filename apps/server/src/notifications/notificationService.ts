@@ -22,7 +22,8 @@ import {
   isPushExpired,
   resolvePushCopy,
   toOutgoingPushNotification,
-  type PushLocale
+  type PushLocale,
+  type PushSender
 } from "./pushMessagePolicy"
 import { createPushBadgeResolver, withPushBadge } from "./pushBadge"
 import { logPushFailure, resolveTicketFailure, safePushErrorCode } from "./pushFailurePolicy"
@@ -41,6 +42,7 @@ const DELIVERY_CLAIM_SIZE = 30
 const DEFAULT_DISPATCH_CONCURRENCY = 3
 const MIN_PUSHES_PER_HOUR = 1
 const MAX_PUSHES_PER_HOUR = 20
+const SENDER_LOOKUP_TIMEOUT_MS = 2_000
 
 export interface PushQueueResult {
   outcome: NotificationPolicyReason | "no_device"
@@ -102,6 +104,15 @@ export interface CreateNotificationServiceOptions {
    * within this time, and `isDeliveryCurrent` then drops the push.
    */
   chatMessagePushHoldMs?: number
+  /**
+   * Who a chat message or room invite push is from (name, picture, message
+   * text), read right before the send so the outbox never stores it. A failure
+   * or no answer sends the neutral copy.
+   */
+  resolvePushSender?: (
+    delivery: { userId: string; notification: PushNotification },
+    now: Date
+  ) => Promise<PushSender | undefined>
 }
 
 export interface SafePushFailure {
@@ -157,6 +168,33 @@ export function createNotificationService(
       return (await options.resolveRecipientLocale(userId)) === "tr" ? "tr" : "en"
     } catch {
       return "en"
+    }
+  }
+
+  const resolveSenderPresentation = async (
+    delivery: PushDelivery,
+    dispatchAt: Date
+  ): Promise<{ sender?: PushSender; locale?: PushLocale }> => {
+    const type = delivery.notification.data?.type
+    if (!options.resolvePushSender || (type !== "chat.message" && type !== "chat.room_invite")) return {}
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      // Like the badge, a slow lookup must not hold the push back.
+      const [sender, locale] = await Promise.race([
+        Promise.all([
+          options.resolvePushSender({ userId: delivery.userId, notification: delivery.notification }, dispatchAt),
+          resolveLocale(delivery.userId, type)
+        ]),
+        new Promise<[undefined, undefined]>((resolve) => {
+          timer = setTimeout(() => resolve([undefined, undefined]), SENDER_LOOKUP_TIMEOUT_MS)
+        })
+      ])
+      return sender ? { sender, locale } : {}
+    } catch {
+      // The neutral copy still tells the recipient something arrived.
+      return {}
+    } finally {
+      clearTimeout(timer)
     }
   }
 
@@ -321,9 +359,13 @@ export function createNotificationService(
         }
       }
       // Read before the authorized send, which holds a database connection.
+      const [badge, presentation] = await Promise.all([
+        resolveBadge(delivery.userId),
+        resolveSenderPresentation(delivery, dispatchAt)
+      ])
       const outgoing = withPushBadge(
-        toOutgoingPushNotification({ userId: delivery.userId, notification: delivery.notification }),
-        await resolveBadge(delivery.userId)
+        toOutgoingPushNotification({ userId: delivery.userId, notification: delivery.notification, ...presentation }),
+        badge
       )
       const controller = new AbortController()
       let timer: ReturnType<typeof setTimeout> | undefined

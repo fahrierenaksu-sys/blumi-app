@@ -66,9 +66,39 @@ export function resolvePushCopy(type: string | undefined, locale: PushLocale): P
   return isPushRoutedType(type) ? { ...PUSH_COPY[locale][type] } : null
 }
 
+/**
+ * Who a chat push is from, read at send time (never stored in the outbox).
+ * By the owner's decision (2026-10-02) a chat message push shows the sender's
+ * name, picture and the message text, like a messaging app; iOS "Show
+ * Previews" still lets a user hide it on the lock screen.
+ */
+export interface PushSender {
+  displayName?: string
+  /** Signed link to the sender's chibi picture (notificationPortraitLinks). */
+  imageUrl?: string
+  /** chat.message only: the stored message body. */
+  messageText?: string
+}
+
+/** iOS notification categories the app registers (the actions live on the phone). */
+export const PUSH_CATEGORY_IDS = {
+  "chat.message": "CHAT_MESSAGE",
+  "chat.room_invite": "ROOM_INVITE"
+} as const
+
+const MAX_SENDER_NAME_LENGTH = 40
+export const MAX_PUSH_MESSAGE_PREVIEW_LENGTH = 140
+
+const SENDER_COPY: Record<PushLocale, { message: string; invite: (name: string) => string }> = {
+  en: { message: "sent you a message", invite: (name) => `${name} invited you to their room` },
+  tr: { message: "Sana bir mesaj gönderdi", invite: (name) => `${name} seni odasına davet etti` }
+}
+
 export function toOutgoingPushNotification(input: {
   userId: string
   notification: PushNotification
+  sender?: PushSender
+  locale?: PushLocale
 }): PushNotification {
   const data = input.notification.data
   const type = data?.type
@@ -77,11 +107,68 @@ export function toOutgoingPushNotification(input: {
       .filter((key) => typeof data?.[key] === "string" && data[key].length > 0)
       .map((key) => [key, data![key]!]))
     : {}
+  const chatType = type === "chat.message" || type === "chat.room_invite" ? type : undefined
+  const name = chatType ? normalizeSenderName(input.sender?.displayName) : undefined
+  const imageUrl = chatType ? normalizeImageUrl(input.sender?.imageUrl) : undefined
+  const copy = SENDER_COPY[input.locale ?? "en"]
+  let title = input.notification.title
+  let body = input.notification.body
+  if (name && chatType === "chat.message") {
+    title = name
+    body = normalizeMessagePreview(input.sender?.messageText) ?? copy.message
+  } else if (name && chatType === "chat.room_invite") {
+    title = name
+    body = copy.invite(name)
+  }
+  const delivery = resolvePushDeliveryOptions(data)
   return {
-    title: input.notification.title,
-    body: input.notification.body,
-    data: { ...(type ? { type } : {}), ...routing, recipientUserId: input.userId },
-    delivery: resolvePushDeliveryOptions(data)
+    title,
+    body,
+    data: {
+      ...(type ? { type } : {}),
+      ...routing,
+      ...(imageUrl ? { senderImage: imageUrl } : {}),
+      recipientUserId: input.userId
+    },
+    delivery: chatType
+      ? {
+          ...delivery,
+          categoryId: PUSH_CATEGORY_IDS[chatType],
+          // Lets the iOS notification service extension attach the picture.
+          ...(imageUrl ? { mutableContent: true, imageUrl } : {})
+        }
+      : delivery
+  }
+}
+
+/** Bidirectional and control characters could disguise a name on the lock screen. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_NAME_CHARACTERS = /[\u0000-\u001F\u007F-\u009F​-‏‪-‮⁦-⁩﻿]/g
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/g
+
+function normalizeSenderName(value: string | undefined): string | undefined {
+  const normalized = value?.normalize("NFC").replace(UNSAFE_NAME_CHARACTERS, "").replace(/\s+/g, " ").trim()
+  if (!normalized) return undefined
+  return Array.from(normalized).slice(0, MAX_SENDER_NAME_LENGTH).join("").trim()
+}
+
+/** One paragraph of at most 140 characters, ending in an ellipsis when cut. */
+export function normalizeMessagePreview(value: string | undefined): string | undefined {
+  const normalized = value?.normalize("NFC").replace(CONTROL_CHARACTERS, " ").replace(/\s+/g, " ").trim()
+  if (!normalized) return undefined
+  const characters = Array.from(normalized)
+  if (characters.length <= MAX_PUSH_MESSAGE_PREVIEW_LENGTH) return normalized
+  return `${characters.slice(0, MAX_PUSH_MESSAGE_PREVIEW_LENGTH - 1).join("").trimEnd()}…`
+}
+
+function normalizeImageUrl(value: string | undefined): string | undefined {
+  if (!value || value.length > 2048) return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" || (url.protocol === "http:" && url.hostname === "localhost") ? url.toString() : undefined
+  } catch {
+    return undefined
   }
 }
 

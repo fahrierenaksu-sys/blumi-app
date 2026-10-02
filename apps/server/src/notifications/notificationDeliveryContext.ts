@@ -1,5 +1,7 @@
+import { isAcceptedAvatarLoadout } from "@blumi/contracts"
 import type { PushNotification } from "./pushProvider"
-import type { PushLocale } from "./pushMessagePolicy"
+import type { PushLocale, PushSender } from "./pushMessagePolicy"
+import type { NotificationPortraitService } from "./notificationPortraitService"
 
 /**
  * The recipient's app language as recorded with their terms acceptance at
@@ -42,30 +44,86 @@ export interface NotificationRelevanceDependencies {
  */
 export const CHAT_MESSAGE_PUSH_HOLD_MS = 1_500
 
+export interface PushSenderDependencies {
+  findMessage(threadId: string, messageId: string): Promise<{ senderUserId: string; body: string } | null>
+  findRoomInvite(inviteId: string): Promise<{ senderUserId: string; recipientUserId: string } | null>
+  findAccount(userId: string): Promise<{
+    profile: { displayName?: string; avatar?: { loadout?: unknown } }
+  } | null>
+  portraits?: Pick<NotificationPortraitService, "urlFor">
+}
+
+/**
+ * Who a chat message or room invite push is from: the sender's current name,
+ * chibi picture link and (for a message) the stored text, read at send time.
+ * Undefined when the event no longer names a sender other than the recipient.
+ */
+export function createPushSenderResolver(
+  dependencies: PushSenderDependencies
+): (delivery: { userId: string; notification: PushNotification }, now: Date) => Promise<PushSender | undefined> {
+  return async ({ userId, notification }, now) => {
+    const data = notification.data ?? {}
+    let senderUserId: string | undefined
+    let messageText: string | undefined
+    if (data.type === "chat.message" && data.threadId && data.messageId) {
+      const message = await dependencies.findMessage(data.threadId, data.messageId)
+      senderUserId = message?.senderUserId
+      messageText = message?.body
+    } else if (data.type === "chat.room_invite" && data.inviteId) {
+      const invite = await dependencies.findRoomInvite(data.inviteId)
+      senderUserId = invite?.recipientUserId === userId ? invite.senderUserId : undefined
+    }
+    if (!senderUserId || senderUserId === userId) return undefined
+    const account = await dependencies.findAccount(senderUserId)
+    if (!account) return undefined
+    const loadout = account.profile.avatar?.loadout
+    const imageUrl = isAcceptedAvatarLoadout(loadout)
+      ? dependencies.portraits?.urlFor({ userId: senderUserId, loadout }, now)
+      : undefined
+    return {
+      ...(account.profile.displayName ? { displayName: account.profile.displayName } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(messageText !== undefined ? { messageText } : {})
+    }
+  }
+}
+
 /**
  * Production wiring for the notification service. `services` is read lazily
  * because the notification service is created before the services it asks.
  */
 export function createNotificationDeliveryHooks(services: () => {
   authService: {
-    repository: Parameters<typeof createRecipientLocaleResolver>[0]
+    repository: {
+      findAccountByUserId(userId: string): Promise<{
+        acceptedTerms?: { locale: PushLocale }
+        profile: { displayName?: string; avatar?: { loadout?: unknown } }
+      } | null>
+    }
     isRealtimeUserAllowed(userId: string, now?: Date): Promise<boolean>
   }
   chatService: {
-    repository: Pick<NotificationRelevanceDependencies, "findThread"> & {
+    repository: Pick<NotificationRelevanceDependencies, "findThread"> & Pick<PushSenderDependencies, "findMessage"> & {
       countUnreadMessagesBySender(userId: string): Promise<Array<{ senderUserId: string; unreadCount: number }>>
     }
     countUnreadMessages(userId: string): Promise<number>
   }
   safetyService: Pick<NotificationRelevanceDependencies, "hasBlockBetween">
   miniRoomService: { repository: { findInvite: NotificationRelevanceDependencies["findRoomInvite"] } }
-}): {
+}, portraits?: Pick<NotificationPortraitService, "urlFor">): {
   resolveRecipientLocale: (userId: string) => Promise<PushLocale | undefined>
   resolveRecipientBadge: (userId: string) => Promise<number>
   isDeliveryCurrent: ReturnType<typeof createNotificationRelevanceCheck>
+  resolvePushSender: ReturnType<typeof createPushSenderResolver>
   chatMessagePushHoldMs: number
 } {
   return {
+    resolvePushSender: createPushSenderResolver({
+      findMessage: (threadId, messageId) => services().chatService.repository.findMessage(threadId, messageId),
+      findRoomInvite: (inviteId) => services().miniRoomService.repository.findInvite(inviteId),
+      findAccount: (userId) => services().authService.repository.findAccountByUserId(userId),
+      portraits
+    }),
     chatMessagePushHoldMs: CHAT_MESSAGE_PUSH_HOLD_MS,
     resolveRecipientLocale: (userId) => createRecipientLocaleResolver(services().authService.repository)(userId),
     resolveRecipientBadge: (userId) => services().chatService.countUnreadMessages(userId),

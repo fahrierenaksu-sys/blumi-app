@@ -85,3 +85,76 @@ test("delivery options group per conversation, stay within APNs limits and follo
   assert.equal(resolvePushDeliveryOptions({ type: "chat.room_invite", threadId: "t", inviteId: "i", expiresAt: "not-a-date" }).expiration, undefined)
   assert.deepEqual(resolvePushDeliveryOptions(undefined), { channelId: "default" })
 })
+
+test("a chat message push reads like a messaging app: sender name, sender picture and the message text", () => {
+  const imageUrl = "https://api.example.test/v1/notification-portraits/sealed"
+  const message = toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Blumi", body: "Yeni bir mesajın var.", data: { type: "chat.message", threadId: "thread_1", messageId: "message_1" } },
+    sender: { displayName: "  Ada‮  Lovelace ", imageUrl, messageText: "Hello\n\nthere   friend" },
+    locale: "tr"
+  })
+  assert.equal(message.title, "Ada Lovelace")
+  assert.equal(message.body, "Hello there friend")
+  assert.equal(message.data?.senderImage, imageUrl)
+  assert.equal(message.delivery?.categoryId, "CHAT_MESSAGE")
+  assert.equal(message.delivery?.mutableContent, true)
+  assert.equal(message.delivery?.imageUrl, imageUrl)
+  assert.ok(message.delivery?.collapseId, "grouping and dedupe options are kept")
+  for (const id of ["thread_1", "message_1", "user_recipient"]) {
+    assert.ok(!`${message.title} ${message.body}`.includes(id), "no ids in visible text")
+  }
+
+  const long = toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Blumi", body: "x", data: { type: "chat.message", threadId: "t", messageId: "m" } },
+    sender: { displayName: "Ada", messageText: "ç".repeat(500) }
+  })
+  assert.equal(Array.from(long.body).length, 140)
+  assert.ok(long.body.endsWith("…"))
+  assert.equal(long.data?.senderImage, undefined)
+  assert.equal(long.delivery?.mutableContent, undefined, "no picture, no extension run")
+
+  const empty = (locale: "en" | "tr") => toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Blumi", body: "x", data: { type: "chat.message", threadId: "t", messageId: "m" } },
+    sender: { displayName: "Ada", messageText: "  " },
+    locale
+  }).body
+  assert.equal(empty("tr"), "Sana bir mesaj gönderdi")
+  assert.equal(empty("en"), "sent you a message")
+})
+
+test("a room invite push names the sender in the recipient's language and carries the invite category", () => {
+  const invite = (locale: "en" | "tr") => toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Blumi", body: "neutral", data: { type: "chat.room_invite", threadId: "t1", inviteId: "i1", expiresAt: "2026-09-30T10:10:00.000Z" } },
+    sender: { displayName: "Ada", imageUrl: "https://api.example.test/p", messageText: "never shown" },
+    locale
+  })
+  assert.deepEqual([invite("tr").title, invite("tr").body], ["Ada", "Ada seni odasına davet etti"])
+  assert.deepEqual([invite("en").title, invite("en").body], ["Ada", "Ada invited you to their room"])
+  assert.equal(invite("en").delivery?.categoryId, "ROOM_INVITE")
+  assert.equal(invite("en").delivery?.mutableContent, true)
+  assert.equal(invite("en").data?.inviteId, "i1", "routing data is unchanged")
+})
+
+test("without a known sender the neutral copy is sent, and other types never take sender details", () => {
+  const neutral = toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Blumi", body: "You have a new message.", data: { type: "chat.message", threadId: "t", messageId: "m" } },
+    sender: { imageUrl: "javascript:alert(1)", messageText: "secret" }
+  })
+  assert.deepEqual([neutral.title, neutral.body], ["Blumi", "You have a new message."])
+  assert.equal(neutral.data?.senderImage, undefined)
+  assert.equal(neutral.delivery?.categoryId, "CHAT_MESSAGE")
+
+  const like = toOutgoingPushNotification({
+    userId: "user_recipient",
+    notification: { title: "Someone likes your vibe", body: "Open Blumi", data: { type: "discovery.like" } },
+    sender: { displayName: "Ada", imageUrl: "https://api.example.test/p", messageText: "secret" }
+  })
+  assert.deepEqual([like.title, like.body], ["Someone likes your vibe", "Open Blumi"])
+  assert.equal(like.data?.senderImage, undefined)
+  assert.equal(like.delivery?.categoryId, undefined)
+})

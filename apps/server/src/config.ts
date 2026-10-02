@@ -96,6 +96,11 @@ import {
   type NotificationService
 } from "./notifications/notificationService"
 import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
+import { resolvePublicApiOrigin } from "./notifications/notificationPortraitLinks"
+import {
+  createNotificationPortraitService,
+  type NotificationPortraitService
+} from "./notifications/notificationPortraitService"
 import { createReactionService, type ReactionService } from "./reactions/reactionService"
 import { createRoomService, type RoomService } from "./rooms/roomService"
 import {
@@ -140,6 +145,13 @@ export interface ServerConfig {
   /** Optional session-capable URL for realtime LISTEN (BLUMI_DB_LISTEN_URL). */
   databaseListenUrl?: string
   otpHmacSecret?: string
+  /**
+   * Seals push picture links (BLUMI_NOTIFICATION_IMAGE_SECRET, at least 32
+   * characters). Unset: derived from BLUMI_OTP_HMAC_SECRET under its own key label.
+   */
+  notificationImageSecret?: string
+  /** Origin phones fetch push pictures from (BLUMI_PUBLIC_API_ORIGIN, else Railway's RAILWAY_PUBLIC_DOMAIN). */
+  publicApiOrigin?: string
   livekitUrl?: string
   livekitApiKey?: string
   livekitApiSecret?: string
@@ -204,6 +216,8 @@ export interface ConfiguredServerServices {
   connectionService: ConnectionService
   reactionService: ReactionService
   notificationService: NotificationService
+  /** Push sender pictures; the route serving them must use this same instance. */
+  notificationPortraits: NotificationPortraitService
   realtimeTicketStore: RealtimeTicketStore
   realtimeFanout?: RealtimeFanout
   referralService: ReferralService
@@ -261,6 +275,13 @@ export function resolveServerConfig(
   const databasePool = resolveDatabasePoolSettings(env)
   const databaseListenUrl = resolveDatabaseListenUrl(env)
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
+  const explicitNotificationImageSecret = env.BLUMI_NOTIFICATION_IMAGE_SECRET?.trim()
+  if (explicitNotificationImageSecret && explicitNotificationImageSecret.length < 32) {
+    throw new Error("BLUMI_NOTIFICATION_IMAGE_SECRET must contain at least 32 characters.")
+  }
+  const notificationImageSecret = explicitNotificationImageSecret ||
+    (otpHmacSecret && otpHmacSecret.length >= 32 ? otpHmacSecret : undefined)
+  const publicApiOrigin = resolvePublicApiOrigin(env)
   const voiceFlag = env.BLUMI_VOICE_ENABLED?.trim()
   if (voiceFlag !== undefined && voiceFlag !== "0" && voiceFlag !== "1") {
     throw new Error("BLUMI_VOICE_ENABLED must be 0 or 1.")
@@ -443,6 +464,8 @@ export function resolveServerConfig(
     databasePool,
     databaseListenUrl,
     otpHmacSecret,
+    ...(notificationImageSecret ? { notificationImageSecret } : {}),
+    ...(publicApiOrigin ? { publicApiOrigin } : {}),
     livekitUrl,
     livekitApiKey,
     livekitApiSecret,
@@ -515,6 +538,10 @@ export function createConfiguredServerServices(
   const smsProvider = createConfiguredSmsProvider(config)
   const codeFactory = createConfiguredCodeFactory(config)
   const pushProvider = createConfiguredPushProvider(config)
+  const notificationPortraits = createNotificationPortraitService({
+    secret: config.notificationImageSecret,
+    publicOrigin: config.publicApiOrigin
+  })
   const livekitTokenService = createLivekitTokenService({
     livekitUrl: config.livekitUrl,
     apiKey: config.livekitApiKey,
@@ -529,7 +556,7 @@ export function createConfiguredServerServices(
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
       pushProvider,
-      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }))
+      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
     })
     const authService = createAuthService({
       repository: createPostgresAuthRepository(pool),
@@ -630,6 +657,7 @@ export function createConfiguredServerServices(
         repository: createPostgresReactionRepository(pool)
       }),
       notificationService,
+      notificationPortraits,
       mediaRevocationService: config.livekitUrl && config.livekitApiKey && config.livekitApiSecret
         ? createPostgresMediaRevocationService(pool, createLivekitRevocationProvider({
             livekitUrl: config.livekitUrl, apiKey: config.livekitApiKey, apiSecret: config.livekitApiSecret
@@ -669,7 +697,7 @@ export function createConfiguredServerServices(
 
   const notificationService = createNotificationService({
     pushProvider,
-    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }))
+    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
   })
   const authService = createAuthService({
     smsProvider,
@@ -754,6 +782,7 @@ export function createConfiguredServerServices(
     connectionService: createConnectionService({ miniRoomService, safetyService, economyService }),
     reactionService: createReactionService(),
     notificationService,
+    notificationPortraits,
     realtimeTicketStore: createInMemoryRealtimeTicketStore(),
     referralService,
     accountRecoveryService,

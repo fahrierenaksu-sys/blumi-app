@@ -226,6 +226,18 @@ export function createPostgresChatRepository(
       return result.rows[0] ? mapMessage(result.rows[0]) : null
     },
 
+    async findMessage(threadId, messageId) {
+      const result = await pool.query(
+        `SELECT message_id, thread_id, sender_user_id, body, sent_at,
+                delivered_at, read_at, edited_at
+           FROM blumi_chat_messages
+          WHERE thread_id = $1 AND message_id = $2
+          LIMIT 1`,
+        [threadId, messageId]
+      )
+      return result.rows[0] ? mapMessage(result.rows[0]) : null
+    },
+
     async createMessage(message, clientMessageId) {
       const inserted = await pool.query(
         `WITH saved AS (INSERT INTO blumi_chat_messages (

@@ -70,6 +70,25 @@ test("expo push provider maps delivery options onto the Expo message fields", as
   assert.deepEqual(bodies[1], { to: "ExponentPushToken[device]", sound: "default", title: "Blumi", body: "Update", ttl: 86400 })
 })
 
+test("expo push provider asks iOS for the notification category and the picture extension", async () => {
+  const bodies: Array<Record<string, unknown>> = []
+  const provider = createExpoPushProvider({
+    fetcher: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return new Response(JSON.stringify({ data: { status: "ok", id: "ticket_1" } }), { status: 200 })
+    }
+  })
+  await provider.sendPush("ExponentPushToken[device]", {
+    title: "Ada",
+    body: "Ada invited you to their room",
+    data: { type: "chat.room_invite", senderImage: "https://api.example.test/p" },
+    delivery: { categoryId: "ROOM_INVITE", mutableContent: true, imageUrl: "https://api.example.test/p" }
+  })
+  assert.equal(bodies[0]?.categoryId, "ROOM_INVITE")
+  assert.equal(bodies[0]?.mutableContent, true)
+  assert.deepEqual(bodies[0]?.richContent, { image: "https://api.example.test/p" })
+})
+
 test("receipt lookup forwards cancellation and reads only requested ticket", async () => {
   const controller = new AbortController()
   const provider = createExpoPushProvider({ fetcher: async (url, init) => {

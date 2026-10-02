@@ -25,6 +25,12 @@ export interface PushDeliveryOptions {
   ttlSeconds?: number
   /** iOS app icon badge: the recipient's unread message total at dispatch. */
   badge?: number
+  /** iOS notification category (its action buttons are registered by the app). */
+  categoryId?: string
+  /** iOS: run the app's notification service extension before showing it. */
+  mutableContent?: boolean
+  /** A picture for the notification (Expo `richContent.image`; also in data for the extension). */
+  imageUrl?: string
 }
 
 export interface PushProvider {
@@ -134,7 +140,7 @@ export function createExpoPushProvider({
   }
 }
 
-function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record<string, string | number> {
+function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record<string, unknown> {
   if (!delivery) return {}
   return {
     ...(delivery.priority ? { priority: delivery.priority } : {}),
@@ -144,7 +150,10 @@ function toExpoDeliveryFields(delivery: PushDeliveryOptions | undefined): Record
     ...(delivery.channelId ? { channelId: delivery.channelId } : {}),
     ...(delivery.ttlSeconds !== undefined ? { ttl: delivery.ttlSeconds } : {}),
     ...(delivery.expiration !== undefined ? { expiration: delivery.expiration } : {}),
-    ...(Number.isSafeInteger(delivery.badge) && delivery.badge! >= 0 ? { badge: delivery.badge! } : {})
+    ...(Number.isSafeInteger(delivery.badge) && delivery.badge! >= 0 ? { badge: delivery.badge! } : {}),
+    ...(delivery.categoryId ? { categoryId: delivery.categoryId } : {}),
+    ...(delivery.mutableContent ? { mutableContent: true } : {}),
+    ...(delivery.imageUrl ? { richContent: { image: delivery.imageUrl } } : {})
   }
 }
 

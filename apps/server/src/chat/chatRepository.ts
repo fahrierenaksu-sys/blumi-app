@@ -142,6 +142,8 @@ export interface ChatRepository {
     senderUserId: string,
     clientMessageId: string
   ): Promise<ChatMessage | null>
+  /** One stored message of a thread (a push reads its sender and text at send time). */
+  findMessage(threadId: string, messageId: string): Promise<ChatMessage | null>
   createMessage(
     message: ChatMessage,
     clientMessageId?: string
@@ -350,6 +352,10 @@ export function createInMemoryChatRepository(
     async findMessageByClientMessageId(threadId, senderUserId, clientMessageId) {
       const key = messageIdempotencyKey(threadId, senderUserId, clientMessageId)
       const message = store.messagesByClientMessageId.get(key)
+      return message ? { ...message } : null
+    },
+    async findMessage(threadId, messageId) {
+      const message = store.messagesByThread.get(threadId)?.find((entry) => entry.messageId === messageId)
       return message ? { ...message } : null
     },
     async createMessage(message, clientMessageId) {
