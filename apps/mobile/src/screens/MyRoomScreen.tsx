@@ -29,7 +29,6 @@ import {
   ROOM_V2_SHELL_CATALOG
 } from "../features/roomV2/roomV2Catalog"
 import {
-  insertRoomV2RenderItemSorted,
   resolveRoomV2Scene
 } from "../features/roomV2/roomV2Selectors"
 import { resolveRoomV2MyRoomCamera } from "../features/roomV2/roomV2Camera"
@@ -78,7 +77,8 @@ import {
 } from "../features/roomWorld/myRoomInteractionModel"
 import {
   createMyRoomAvatarDepthNeighbours,
-  createMyRoomWalkTimeline
+  createMyRoomWalkTimeline,
+  getMyRoomAvatarDepthIndex
 } from "../features/roomWorld/myRoomAvatarWalkModel"
 import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
 import {
@@ -309,10 +309,18 @@ export function MyRoomScreen({
     usesWideStageCamera
   ])
 
-  const renderItems = useMemo(
-    () => insertRoomV2RenderItemSorted(baseRoomScene.renderItems, roomAvatar),
-    [baseRoomScene.renderItems, roomAvatar]
-  )
+  // The avatar's place in the draw order: by its feet against each
+  // footprint's front edge (the same rule the UI thread uses while walking).
+  const renderItems = useMemo(() => {
+    const index = seatedHotspot?.renderDepth === undefined
+      ? getMyRoomAvatarDepthIndex(avatarDepthNeighbours, roomAvatar.depth, roomAvatar.x, roomAvatar.y)
+      : getMyRoomAvatarDepthIndex(avatarDepthNeighbours, roomAvatar.depth)
+    return [
+      ...baseRoomScene.renderItems.slice(0, index),
+      roomAvatar,
+      ...baseRoomScene.renderItems.slice(index)
+    ]
+  }, [avatarDepthNeighbours, baseRoomScene.renderItems, roomAvatar, seatedHotspot?.renderDepth])
 
   useEffect(() => {
     avatarPoseRef.current = avatarPose

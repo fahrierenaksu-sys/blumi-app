@@ -114,12 +114,17 @@ export function AvatarLayer(props: AvatarLayerProps) {
   // Draw order follows the live depth, but React hears only when an avatar
   // passes another avatar or a piece of furniture (not every frame).
   const [depthOrder, setDepthOrder] = useState(() => resolveMiniRoomDepthOrder(neighbours,
-    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y }))))
+    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y, foot: { x: avatar.x, y: avatar.y } }))))
   useAnimatedReaction(
-    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => ({
-      id,
-      depth: resolveMiniRoomAvatarSortDepth(avatarPositions[id]!.y.value, pinnedDepths[id])
-    }))),
+    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => {
+      const position = avatarPositions[id]!
+      const pinned = pinnedDepths[id]
+      return {
+        id,
+        depth: resolveMiniRoomAvatarSortDepth(position.y.value, pinned),
+        foot: pinned === undefined ? { x: position.x.value, y: position.y.value } : undefined
+      }
+    })),
     (order, previous) => {
       if (order !== previous) scheduleOnRN(setDepthOrder, order)
     },

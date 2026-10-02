@@ -60,7 +60,9 @@ export function useMyRoomAvatarWalk(input: {
   const path = useDerivedValue((): readonly RoomWorldPoint[] => [origin.value, ...timeline.value])
 
   useAnimatedReaction(
-    () => getMyRoomAvatarDepthIndex(depthNeighbours, fixedDepth ?? y.value),
+    () => fixedDepth === undefined
+      ? getMyRoomAvatarDepthIndex(depthNeighbours, y.value, x.value, y.value)
+      : getMyRoomAvatarDepthIndex(depthNeighbours, fixedDepth),
     (index, previous) => {
       if (previous !== null && index !== previous) scheduleOnRN(onDepthIndexChange, x.value, y.value)
     },
