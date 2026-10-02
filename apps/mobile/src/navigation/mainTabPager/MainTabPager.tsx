@@ -176,7 +176,12 @@ function scheduleAfterNextFrame(work: () => void): () => void {
  * swiped-to page is interactive the moment it lands.
  * Every frame of a drag or settle runs on the UI thread with shared values.
  */
-export function MainTabPager({ navigation: rawNavigation, route, renderPage, bottomBar }: MainTabPagerProps) {
+export const MainTabPager = memo(function MainTabPager({
+  navigation: rawNavigation,
+  route,
+  renderPage,
+  bottomBar
+}: MainTabPagerProps) {
   const navigation = rawNavigation as SlotNavigation
   const selectedIndex = Math.max(0, getMainTabPageIndex(route.name))
   const selectedPage = MAIN_TAB_PAGES[selectedIndex]!
@@ -705,7 +710,7 @@ export function MainTabPager({ navigation: rawNavigation, route, renderPage, bot
       {bottomBar}
     </View>
   )
-}
+})
 
 interface MainTabPagerPageProps {
   index: number
