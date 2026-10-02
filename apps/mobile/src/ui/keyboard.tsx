@@ -13,7 +13,7 @@
  * on an Android device.
  */
 import { forwardRef, type ReactNode } from "react"
-import { Platform, ScrollView, View, type ScrollViewProps, type ViewProps } from "react-native"
+import { Platform, ScrollView, StyleSheet, View, type ScrollViewProps, type ViewProps } from "react-native"
 import {
   KeyboardChatScrollView,
   KeyboardProvider,
@@ -25,6 +25,7 @@ import Animated, {
   useSharedValue,
   type SharedValue
 } from "react-native-reanimated"
+import { getGluedFooterLift } from "./keyboardGlueModel"
 
 export const KEYBOARD_GLUE_ENABLED = Platform.OS === "ios"
 
@@ -33,22 +34,29 @@ export function AppKeyboardProvider({ children }: { children: ReactNode }) {
   return <KeyboardProvider>{children}</KeyboardProvider>
 }
 
-function useGluedKeyboardHeightIos(): SharedValue<number> {
+export interface GluedKeyboard {
+  /** The keyboard's height on screen: negative while open, 0 when closed. */
+  height: SharedValue<number>
+  /** How far open it is: 0 closed, 1 open. */
+  progress: SharedValue<number>
+}
+
+function useGluedKeyboardIos(): GluedKeyboard {
   // The library reports the open keyboard as a negative translation.
-  return useReanimatedKeyboardAnimation().height
+  const { height, progress } = useReanimatedKeyboardAnimation()
+  return { height, progress }
 }
 
-function useGluedKeyboardHeightOff(): SharedValue<number> {
-  return useSharedValue(0)
+function useGluedKeyboardOff(): GluedKeyboard {
+  const height = useSharedValue(0)
+  const progress = useSharedValue(0)
+  return { height, progress }
 }
 
-/**
- * The keyboard's current height (negative while open, 0 when closed) on the
- * UI thread. Always 0 where the glue is off.
- */
-export const useGluedKeyboardHeight = KEYBOARD_GLUE_ENABLED
-  ? useGluedKeyboardHeightIos
-  : useGluedKeyboardHeightOff
+/** The keyboard on the UI thread. Always closed where the glue is off. */
+export const useGluedKeyboard = KEYBOARD_GLUE_ENABLED
+  ? useGluedKeyboardIos
+  : useGluedKeyboardOff
 
 /**
  * A footer that rides the keyboard. `bottomInset` is the safe-area padding the
@@ -100,6 +108,54 @@ function KeyboardCenteredViewIos({
   }))
   return <Animated.View style={[style, lift]} {...rest}>{children}</Animated.View>
 }
+
+/**
+ * Content that ends where a glued footer starts. The chat list keeps its full
+ * layout height while the keyboard is open (its scroll view lifts the newest
+ * messages with a content inset), so without a clip a row scrolled toward the
+ * keyboard shows through the composer. The clip window rises with the footer
+ * while the content stays put: two opposite translations, transform only, on
+ * the UI thread. Touches pass through the window itself. Plain view where the
+ * glue is off.
+ */
+export function KeyboardClippedView({
+  bottomInset,
+  style,
+  children,
+  ...rest
+}: ViewProps & { bottomInset: number }) {
+  if (!KEYBOARD_GLUE_ENABLED) {
+    return <View style={style} {...rest}>{children}</View>
+  }
+  return <KeyboardClippedViewIos bottomInset={bottomInset} style={style} {...rest}>{children}</KeyboardClippedViewIos>
+}
+
+function KeyboardClippedViewIos({
+  bottomInset,
+  style,
+  children,
+  ...rest
+}: ViewProps & { bottomInset: number }) {
+  const { height, progress } = useReanimatedKeyboardAnimation()
+  const clipWindow = useAnimatedStyle(() => ({
+    transform: [{ translateY: -getGluedFooterLift(height.value, progress.value, bottomInset) }]
+  }))
+  const clipContent = useAnimatedStyle(() => ({
+    transform: [{ translateY: getGluedFooterLift(height.value, progress.value, bottomInset) }]
+  }))
+  return (
+    <Animated.View pointerEvents="box-none" style={[style, clipStyles.window, clipWindow]} {...rest}>
+      <Animated.View pointerEvents="box-none" style={[clipStyles.content, clipContent]}>
+        {children}
+      </Animated.View>
+    </Animated.View>
+  )
+}
+
+const clipStyles = StyleSheet.create({
+  window: { overflow: "hidden" },
+  content: { flex: 1 }
+})
 
 export type ChatKeyboardScrollViewProps = ScrollViewProps & {
   /** Height between the list's bottom edge and the screen's bottom edge. */

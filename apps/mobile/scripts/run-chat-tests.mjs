@@ -65,6 +65,9 @@ const sourceFiles = [
   "src/features/chat/typing/chatTypingStore.ts",
   "src/features/chat/typing/chatTypingStore.test.ts",
   "src/features/chat/typing/chatTypingCopy.ts",
+  "src/ui/keyboardGlueModel.ts",
+  "src/features/chat/thread/chatComposerDraftModel.ts",
+  "src/features/chat/thread/chatComposerDraftModel.test.ts",
   "src/features/chat/thread/chatScrollToLatestModel.ts",
   "src/features/chat/thread/chatScrollToLatestModel.test.ts"
 ]
@@ -129,6 +132,7 @@ try {
       join(outputDirectory, "features/chat/typing/chatTypingModel.test.js"),
       join(outputDirectory, "features/chat/typing/chatTypingStore.test.js"),
       join(outputDirectory, "features/chat/thread/chatScrollToLatestModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatComposerDraftModel.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],
@@ -155,7 +159,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/typing/typingMorph.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/thread/chatArrivalHaptic.test.ts", "src/features/chat/thread/chatRowEntranceMotion.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

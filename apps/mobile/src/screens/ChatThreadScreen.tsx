@@ -1,15 +1,16 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   type ListRenderItem,
   type ScrollViewProps,
+  StyleSheet,
   Text,
   useWindowDimensions,
   View
 } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { getMessageRenderKey, useChatThreadStore } from "../features/chat/chatStore"
@@ -22,6 +23,7 @@ import { uiTheme } from "../ui/theme"
 import {
   ChatKeyboardScrollView,
   KeyboardCenteredView,
+  KeyboardClippedView,
   KeyboardGluedFooter
 } from "../ui/keyboard"
 import type { SessionActor } from "../features/session/sessionModel"
@@ -42,7 +44,6 @@ import {
 } from "../features/chat/thread/chatThreadCopy"
 import {
   isChatTimelineRowInviteBusy,
-  normalizeOutgoingChatBody,
   selectChatPartnerSummary
 } from "../features/chat/thread/chatThreadModel"
 import { ChatScrollToLatestPill } from "../features/chat/thread/ChatScrollToLatestPill"
@@ -52,7 +53,7 @@ import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
 import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
 import { ChatThreadSkeleton } from "../features/chat/thread/ChatThreadSkeleton"
-import { CROSSFADE_ENTERING } from "../ui/motion"
+import { animateTo, CROSSFADE_ENTERING, useMotion } from "../ui/motion"
 import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
 import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
 import { styles } from "../features/chat/thread/chatThreadStyles"
@@ -65,7 +66,6 @@ import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
-import { getChatSendFlightChannel, launchChatSendFlight } from "../features/chat/thread/chatSendFlight"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
 import { ChatNotificationPermissionCard, type ChatPushRegistration } from "../features/notifications/ChatNotificationPermissionCard"
@@ -83,6 +83,7 @@ type ChatThreadScreenProps = NativeStackScreenProps<
 }
 
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
+const EMPTY_TIMELINE: readonly ChatTimelineItem[] = []
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
@@ -150,6 +151,19 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const [historySkeletonShown, setHistorySkeletonShown] = useState(showsHistorySkeleton)
   if (showsHistorySkeleton && !historySkeletonShown) setHistorySkeletonShown(true)
   const timelineEntering = historySkeletonShown ? CROSSFADE_ENTERING : undefined
+  const isListPresented = !showsTimelineEmptyState
+  // The always-mounted list crossfades in where it used to mount with
+  // CROSSFADE_ENTERING: after the skeleton; otherwise it simply shows.
+  const motion = useMotion()
+  const listOpacity = useSharedValue(isListPresented ? 1 : 0)
+  const listRevealStyle = useAnimatedStyle(() => ({ opacity: listOpacity.value }))
+  useEffect(() => {
+    if (!isListPresented) {
+      listOpacity.value = 0
+      return
+    }
+    listOpacity.value = historySkeletonShown ? animateTo(1, motion.crossfade) : 1
+  }, [historySkeletonShown, isListPresented, listOpacity, motion])
 
   const {
     isCreatingPendingThread,
@@ -264,26 +278,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     currentUserId,
     bottomOffset: composerBottomInset
   })
-  const { scrollToLatest, isAway: isScrolledAway } = scrollToLatestState
-  const sendFlightChannel = getChatSendFlightChannel(resolvedThreadId)
-  const composerSurfaceRef = useRef<View>(null)
-  // CHT-05: my own message is always shown, even when I had scrolled up.
-  // The send is published first; the flight (composer → new bubble) only
-  // decorates it, and is skipped while the list scrolls back from history.
-  const handleSend = useCallback((draft: string): boolean => {
-    const accepted = sendMessage(draft)
-    if (!accepted) return false
-    if (!isScrolledAway) {
-      launchChatSendFlight({
-        composerSurface: composerSurfaceRef.current,
-        channel: sendFlightChannel,
-        match: normalizeOutgoingChatBody(draft),
-        text: draft.trim()
-      })
-    }
-    scrollToLatest()
-    return true
-  }, [isScrolledAway, scrollToLatest, sendFlightChannel, sendMessage])
+  const { scrollToLatest } = scrollToLatestState
+  // CHT-05: my own message is always shown, even when I had scrolled up:
+  // useChatScrollToLatest follows it once its row is in the list, where it
+  // enters like every new row (no flight from the composer).
 
   const rowModels = useChatTimelineRowModels({
     timeline,
@@ -314,8 +312,6 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           you={inviteYou}
           partner={invitePartner}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
-          isArrival={arrivedRowKeys.has(getChatTimelineItemKey(item))}
-          sendFlightChannel={sendFlightChannel}
           isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
           onRoomInviteAction={handleRoomInviteAction}
           onRetry={handleRetry}
@@ -331,8 +327,6 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
       inviteYou,
       invitePartner,
       enteringRowKeys,
-      arrivedRowKeys,
-      sendFlightChannel,
       activeRoomInviteAction,
       handleRoomInviteAction,
       handleRetry
@@ -348,7 +342,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   if (!thread && !pendingPartnerId) {
     return (
       <View style={styles.root}>
-        <SoftBlobBackground variant="lobby" />
+        <SoftBlobBackground variant="lobby" animated={false} />
         <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right", "bottom"]}>
           <TopBar
             title={chatCopy.chat}
@@ -371,7 +365,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
 
   return (
     <View style={styles.root}>
-      <SoftBlobBackground variant="lobby" />
+      {/* Still: a drifting background commits every frame while the reader
+          types and scrolls, competing with the keyboard and the list. */}
+      <SoftBlobBackground variant="lobby" animated={false} />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
         <ChatThreadHeader
           chatCopy={chatCopy}
@@ -404,31 +400,23 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           <ChatNotificationPermissionCard key={currentUserId} userId={currentUserId}
             mode={sessionActor.session.mode} isFocused={isFocused} locale={chatLocale}
             registration={props.pushRegistration} />
-          {showsHistorySkeleton ? (
-            <ChatThreadSkeleton label={chatCopy.openingChat} />
-          ) : showsTimelineEmptyState ? (
-            <Animated.View entering={timelineEntering} style={styles.flex}>
-            <KeyboardCenteredView bottomInset={composerBottomInset} style={styles.flex}>
-            <ChatThreadEmptyState
-              chatCopy={chatCopy}
-              isPendingThread={isPendingThread}
-              pendingThreadCreationFailed={pendingThreadCreationFailed}
-              isCreatingPendingThread={isCreatingPendingThread}
-              onRetryOpenChat={() => { void openPendingMatchedThread() }}
-              messageListState={messageListState}
-              onRetryMessages={handleRetryMessages}
-              partnerName={partnerName}
-              partnerUserId={partnerUserId}
-              partnerAvatar={partnerAvatar}
-            />
-            </KeyboardCenteredView>
-            </Animated.View>
-          ) : (
-            <Animated.View entering={timelineEntering} style={styles.flex}>
+          <View style={styles.flex}>
+            {/* The list stays mounted (empty while the skeleton or the empty
+                state shows) so its keyboard inset has seen every keyboard
+                event: a list mounted while the keyboard is already open, as
+                when the first message of a new chat is sent, would start
+                without one and put that message under the composer. */}
+            <Animated.View
+              pointerEvents={isListPresented ? "auto" : "none"}
+              accessibilityElementsHidden={!isListPresented}
+              importantForAccessibility={isListPresented ? "auto" : "no-hide-descendants"}
+              style={[styles.flex, listRevealStyle]}
+            >
+            <KeyboardClippedView bottomInset={composerBottomInset} style={styles.flex}>
             <Animated.FlatList
               ref={scrollToLatestState.listRef}
               renderScrollComponent={renderMessageScroll}
-              data={newestFirstTimeline}
+              data={isListPresented ? newestFirstTimeline : EMPTY_TIMELINE}
               inverted
               onScroll={scrollToLatestState.scrollHandler}
               scrollEventThrottle={16}
@@ -439,9 +427,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               showsVerticalScrollIndicator={false}
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
-              maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
+              // No autoscrollToTopThreshold: React Native's autoscroll goes
+              // to offset 0, under the keyboard inset. Following the newest
+              // message is useChatScrollToLatest's job.
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
               ListFooterComponent={
-                sessionActor.session.mode === "production" && messages.length > 0 ? (
+                isListPresented && sessionActor.session.mode === "production" && messages.length > 0 ? (
                   <ChatLoadEarlierButton
                     chatCopy={chatCopy}
                     isLoadingEarlier={isLoadingEarlier}
@@ -451,8 +442,32 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               }
               renderItem={renderTimelineRow}
             />
+            </KeyboardClippedView>
             </Animated.View>
-          )}
+            {/* Always mounted, so the skeleton's own exit still plays. */}
+            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+            {showsHistorySkeleton ? (
+              <ChatThreadSkeleton label={chatCopy.openingChat} />
+            ) : showsTimelineEmptyState ? (
+              <Animated.View entering={timelineEntering} style={styles.flex}>
+              <KeyboardCenteredView bottomInset={composerBottomInset} style={styles.flex}>
+              <ChatThreadEmptyState
+                chatCopy={chatCopy}
+                isPendingThread={isPendingThread}
+                pendingThreadCreationFailed={pendingThreadCreationFailed}
+                isCreatingPendingThread={isCreatingPendingThread}
+                onRetryOpenChat={() => { void openPendingMatchedThread() }}
+                messageListState={messageListState}
+                onRetryMessages={handleRetryMessages}
+                partnerName={partnerName}
+                partnerUserId={partnerUserId}
+                partnerAvatar={partnerAvatar}
+              />
+              </KeyboardCenteredView>
+              </Animated.View>
+            ) : null}
+            </View>
+          </View>
 
           <KeyboardGluedFooter bottomInset={composerBottomInset}>
           {showsTimelineEmptyState ? null : (
@@ -478,8 +493,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             isCreatingRoomInvite={isCreatingRoomInvite}
             roomInviteDisabledReason={roomInviteDisabledReason}
             onRoomInvitePress={handleRoomInvitePress}
-            onSend={handleSend}
-            surfaceRef={composerSurfaceRef}
+            onSend={sendMessage}
           />
           </KeyboardGluedFooter>
         </View>

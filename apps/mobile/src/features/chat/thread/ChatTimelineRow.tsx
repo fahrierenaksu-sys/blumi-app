@@ -1,5 +1,5 @@
-import { memo, useState, type ReactNode } from "react"
-import { Text, View, type StyleProp, type ViewStyle } from "react-native"
+import { memo } from "react"
+import { Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import { ChatRoomInviteCard } from "../ChatRoomInviteCard"
 import type { RoomInviteSceneParticipant } from "../ChatRoomInviteScene"
@@ -13,21 +13,17 @@ import { getChatBubbleAccessibilityLabel } from "./chatBubbleAccessibility"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { formatMessageTime, type ChatTimelineRowModel } from "./chatThreadModel"
 import { bubbleGroupStyles, bubbleStyles } from "./chatThreadStyles"
-import { CHAT_INCOMING_ROW_ENTERING, CHAT_OWN_ROW_ENTERING } from "./useChatTimelineEntrances"
-import { claimFlight, FlightTargetView } from "../../../ui/flight/FlightLayer"
+import { CHAT_ROW_ENTERING } from "./chatRowEntering"
 import { PressableScale } from "../../../ui/PressableScale"
-import { claimTypingMorph } from "../typing/typingMorphFlight"
 
 /**
  * One timeline row: an optional day separator, then either a room invitation
  * card or a text bubble with its delivery state and retry affordance.
  *
- * A row that just appeared at the newest edge (`isEntering`) plays a short
- * UI-thread entrance on mount; history, pagination and Reduce Motion never do.
- * My just-sent message (`isArrival`) instead claims its send flight when one
- * is in the air: the bubble stays hidden until the flying words land on it.
- * The partner's arriving message grows out of their typing dots the same way
- * when the dots were on screen.
+ * A row that just appeared at the newest edge (`isEntering`) plays the one
+ * calm entrance every new row shares, mine or the partner's: a short fade
+ * while it rises a few points, never a grow or a pop (chatRowEntranceMotion).
+ * History, pagination and Reduce Motion never animate.
  * The bubble's words, time and delivery state are one accessibility element;
  * the retry button stays separately focusable.
  */
@@ -41,8 +37,6 @@ function ChatTimelineRow({
   you,
   partner,
   isEntering,
-  isArrival,
-  sendFlightChannel,
   isInviteBusy,
   onRoomInviteAction,
   onRetry
@@ -56,9 +50,6 @@ function ChatTimelineRow({
   you: RoomInviteSceneParticipant
   partner: RoomInviteSceneParticipant
   isEntering: boolean
-  /** Arrived at the newest edge on this render (also under Reduce Motion). */
-  isArrival: boolean
-  sendFlightChannel: string
   /** Only an invitation row whose action is running is busy; other rows keep equal props. */
   isInviteBusy: boolean
   onRoomInviteAction:
@@ -67,16 +58,7 @@ function ChatTimelineRow({
   onRetry: (messageId: string) => void
 }) {
   const { isMe, deliveryState, groupPosition, closesGroup, dateLabel } = row
-  // Decided once, at mount: a claimed row is the flight's landing spot.
-  const [sendFlightId] = useState(() => {
-    if (!isArrival || item.kind !== "message") return null
-    return isMe
-      ? claimFlight(sendFlightChannel, item.message.body)
-      : claimTypingMorph(sendFlightChannel, item.message.messageId)
-  })
-  const entering = isEntering && sendFlightId === null
-    ? isMe ? CHAT_OWN_ROW_ENTERING : CHAT_INCOMING_ROW_ENTERING
-    : undefined
+  const entering = isEntering ? CHAT_ROW_ENTERING : undefined
   const messageTime = item.kind === "message" ? formatMessageTime(item.message.sentAt) : ""
   const bubbleAccessibilityLabel = item.kind === "message"
     ? getChatBubbleAccessibilityLabel({
@@ -116,8 +98,7 @@ function ChatTimelineRow({
           onAction={onRoomInviteAction}
         />
       ) : (
-        <BubbleFrame
-          flightId={sendFlightId}
+        <View
           style={[
             bubbleStyles.bubble,
             isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem,
@@ -174,26 +155,11 @@ function ChatTimelineRow({
               </Text>
             </PressableScale>
           ) : null}
-        </BubbleFrame>
+        </View>
       )}
       </View>
     </Animated.View>
   )
-}
-
-/** The bubble's box; the landing spot of a claimed send flight. */
-function BubbleFrame({
-  flightId,
-  style,
-  children
-}: {
-  flightId: string | null
-  style: StyleProp<ViewStyle>
-  children: ReactNode
-}) {
-  return flightId === null
-    ? <View style={style}>{children}</View>
-    : <FlightTargetView flightId={flightId} style={style}>{children}</FlightTargetView>
 }
 
 /**

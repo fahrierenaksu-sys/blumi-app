@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useState, type RefObject } from "react"
+import { useRef, useState } from "react"
 import { Pressable, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
@@ -10,16 +10,14 @@ import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
+import { reconcileComposerTextAfterSend } from "./chatComposerDraftModel"
 import { styles } from "./chatThreadStyles"
 import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 
-/** Scale the send button springs back from after a send (MOTION_PLAN §D.4). */
-const SEND_POP_SCALE = 0.8
+/** Scale the send button springs back from after a send: a subtle pop (MOTION_PLAN §D.4). */
+const SEND_POP_SCALE = 0.9
 
-/**
- * Owns the draft text so typing never re-renders the timeline owner. The
- * input surface (`surfaceRef`) is where a send flight starts.
- */
+/** Owns the draft text so typing never re-renders the timeline owner. */
 export function ChatComposer({
   chatCopy,
   partnerName,
@@ -31,8 +29,7 @@ export function ChatComposer({
   roomInviteDisabledReason,
   onRoomInvitePress,
   onSend,
-  draftTyping,
-  surfaceRef
+  draftTyping
 }: {
   chatCopy: ChatThreadCopy
   partnerName: string
@@ -46,10 +43,14 @@ export function ChatComposer({
   onSend: (body: string) => boolean
   /** Typing signal for the partner (chat_typing); never sees programmatic text. */
   draftTyping?: ChatDraftTyping
-  /** The input's surface, measured as the start of the send flight. */
-  surfaceRef?: RefObject<View | null>
 }) {
   const [inputText, setInputText] = useState("")
+  const inputRef = useRef<TextInput>(null)
+  // The draft of the last send while a late keystroke may still bring it
+  // back (chatComposerDraftModel); null otherwise.
+  const sentDraftRef = useRef<string | null>(null)
+  // What the input shows, also between a send and the next render.
+  const shownTextRef = useRef("")
   const motion = useMotion()
   // The press itself is PressableScale's (the shared `press` token); this
   // outer scale only carries the post-send pop, so the two never fight.
@@ -61,8 +62,23 @@ export function ChatComposer({
     const body = inputText.trim()
     if (!body || isPendingThread) return false
     if (!onSend(body)) return false
+    sentDraftRef.current = inputText
+    shownTextRef.current = ""
+    // The native clear empties the field in this frame; the state follows.
+    inputRef.current?.clear()
     setInputText("")
     return true
+  }
+
+  const handleChangeText = (next: string) => {
+    const reconciled = reconcileComposerTextAfterSend({
+      next,
+      current: shownTextRef.current,
+      sentDraft: sentDraftRef.current
+    })
+    sentDraftRef.current = reconciled.sentDraft
+    shownTextRef.current = reconciled.text
+    setInputText(reconciled.text)
   }
 
   // An accepted send answers with a small pop back to rest; Reduce Motion
@@ -96,12 +112,13 @@ export function ChatComposer({
         >
           <RoomInviteComposerIcon ready={roomInviteReady} />
         </Pressable>
-        <View ref={surfaceRef} style={styles.inputWrap}>
+        <View style={styles.inputWrap}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
             style={styles.input}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleChangeText}
             onChange={draftTyping ? (event) => draftTyping.noteDraft(event.nativeEvent.text) : undefined}
             onBlur={draftTyping?.endDraft}
             placeholder={chatCopy.messagePlaceholder}

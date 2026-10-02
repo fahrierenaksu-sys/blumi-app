@@ -3,6 +3,7 @@ import test from "node:test"
 import { createFakeReactRuntime, createInertModule, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as model from "./flightModel"
 import { createFlightStore, type FlightRequest } from "./flightStore"
+import { createLiveFlightSources } from "./flightSources"
 import * as entranceModel from "../../features/chat/thread/chatTimelineEntranceModel"
 
 // The FlightLayer decorates actions and must never cost one: a target is
@@ -166,60 +167,39 @@ test("a carried hero keeps its proportions and stays centred in every frame", ()
   assert.deepEqual(model.flightCarriedContentTransform(source, source), { scale: 1, translateX: 0, translateY: 0 })
 })
 
-/* ── Chat send ─────────────────────────────────────────────── */
+/* ── Live sources (the invitation card's door) ─────────────── */
 
-function loadChatSendFlight() {
-  const store = createFlightStore()
-  const launched: FlightRequest[] = []
-  const runtime = createFakeReactRuntime()
-  const chatSendFlight = loadSourceWithFakeReact<{
-    getChatSendFlightChannel: (threadId: string | undefined) => string
-    launchChatSendFlight: (input: Record<string, unknown>) => boolean
-  }>("features/chat/thread/chatSendFlight.tsx", runtime, {
-    modules: {
-      "react-native": {
-        StyleSheet: { create: <T>(styles: T) => styles, flatten: (style: unknown) => style ?? {} },
-        Text: "Text",
-        View: "View"
-      },
-      "../../../ui/flight/FlightLayer": {
-        launchFlight: (next: FlightRequest) => {
-          if (!model.isFlightFrameUsable(next.source)) return null
-          launched.push(next)
-          return store.launch(next)
-        }
-      },
-      "../../../ui/theme": createInertModule("theme"),
-      "./chatThreadStyles": {
-        bubbleStyles: { bubble: { borderRadius: 17 }, bubbleMe: { backgroundColor: "#F6E7EB", borderColor: "#E8D7DD" } },
-        styles: { input: { paddingHorizontal: 16, paddingVertical: 8 } }
-      }
-    }
-  })
-  return { store, launched, ...chatSendFlight }
-}
+const card = { x: 16, y: 640, width: 280, height: 120 }
 
-test("a send flies from the composer and the new row claims it by its body", () => {
-  const { store, launched, getChatSendFlightChannel, launchChatSendFlight } = loadChatSendFlight()
-  const channel = getChatSendFlightChannel("thread-a")
-  const composer = { measureInWindow: (callback: (...frame: number[]) => void) => callback(12, 700, 300, 44) }
-  assert.equal(launchChatSendFlight({ composerSurface: composer, channel, match: "hello there", text: "hello   there" }), true)
-  assert.deepEqual(launched[0]!.source, { x: 12, y: 700, width: 300, height: 44 })
-  assert.equal(launched[0]!.targetSurface.backgroundColor, "#F6E7EB")
-  assert.notEqual(store.claim(channel, "hello there"), null)
-  assert.notEqual(getChatSendFlightChannel("thread-a"), getChatSendFlightChannel("thread-b"))
+test("a source on screen is measured when the flight starts", () => {
+  const sources = createLiveFlightSources(1_200)
+  const detach = sources.attach("door:a", () => card)
+  assert.deepEqual(sources.take("door:a"), card)
+  assert.equal(sources.take("door:b"), null, "another key has no source")
+  detach()
 })
 
-test("a composer that cannot be measured at once sends without a flight", () => {
-  const { launched, launchChatSendFlight } = loadChatSendFlight()
-  let later: (() => void) | undefined
-  const asyncComposer = { measureInWindow: (callback: (...frame: number[]) => void) => { later = () => callback(0, 0, 300, 44) } }
-  assert.equal(launchChatSendFlight({ composerSurface: asyncComposer, channel: "c", match: "m", text: "m" }), false)
-  later?.()
-  assert.equal(launched.length, 0, "a late measurement never starts an orphan clone")
-  assert.equal(launchChatSendFlight({ composerSurface: null, channel: "c", match: "m", text: "m" }), false)
-  const hidden = { measureInWindow: (callback: (...frame: number[]) => void) => callback(0, 0, 0, 0) }
-  assert.equal(launchChatSendFlight({ composerSurface: hidden, channel: "c", match: "m", text: "m" }), false)
+test("a source that left a moment ago still counts once; an older one does not", () => {
+  const sources = createLiveFlightSources(1_200)
+  let now = 1_000
+  sources.attach("door:a", () => card, () => now)()
+  assert.deepEqual(sources.take("door:a", now + 300), card)
+  assert.equal(sources.take("door:a", now + 400), null, "one flight per source")
+  now = 5_000
+  sources.attach("door:a", () => card, () => now)()
+  assert.equal(sources.take("door:a", now + 1_201), null)
+})
+
+test("an unmeasurable source starts no flight, and a replaced one keeps the newest", () => {
+  const sources = createLiveFlightSources(1_200)
+  const detachHidden = sources.attach("door:a", () => null)
+  assert.equal(sources.take("door:a"), null)
+  detachHidden()
+  assert.equal(sources.take("door:a"), null)
+  const first = sources.attach("door:b", () => ({ ...card, y: 1 }))
+  sources.attach("door:b", () => card)
+  first()
+  assert.deepEqual(sources.take("door:b"), card, "the old view leaving does not unhook the new one")
 })
 
 test("my sent row arrives under Reduce Motion too, without the entrance animation", () => {
