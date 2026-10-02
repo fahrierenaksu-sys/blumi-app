@@ -2,13 +2,13 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { performance } from "node:perf_hooks"
 import { Pool } from "pg"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createAdminAnalyticsService } from "./adminAnalyticsService"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
-test("analytics uses the migrated PostgreSQL schema, exact rolling buckets and a five-minute heavy cache", {
-  skip: !databaseUrl
-}, async () => {
+test("analytics uses the migrated PostgreSQL schema, exact rolling buckets and a five-minute heavy cache", disposablePostgresSkip(), async () => {
+  assertDisposablePostgresDatabase(databaseUrl)
   const pool = new Pool({ connectionString: databaseUrl, max: 4 })
   let clock = new Date("2026-09-28T10:00:00.000Z")
   try {

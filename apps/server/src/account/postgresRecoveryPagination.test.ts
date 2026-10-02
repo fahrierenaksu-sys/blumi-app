@@ -4,8 +4,10 @@ import { Pool } from "pg"
 import { createAccountRecoveryService } from "./accountRecoveryService"
 import { createPostgresAccountRecoveryRepository } from "../db/postgresAccountRecoveryRepository"
 import { createAuthService } from "../auth/authService"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 
-test("PostgreSQL recovery cursor preserves tied timestamp requests across pages", { skip: !process.env.DATABASE_URL }, async () => {
+test("PostgreSQL recovery cursor preserves tied timestamp requests across pages", disposablePostgresSkip(), async () => {
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   try {
     const repository = createPostgresAccountRecoveryRepository(pool)
