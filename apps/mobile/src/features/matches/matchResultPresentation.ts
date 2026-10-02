@@ -198,10 +198,11 @@ export function getMatchCelebrationMotion(reduceMotion: boolean): MatchCelebrati
 
 /**
  * The Discover MatchResult route (DSC-2): the hero card settles from the same
- * 0.92 + fade as the modal (it used to scale from 0), the success tap lands
- * as the card appears (it used to fire 200 ms before), and the actions dock
- * follows within 250 ms (was 600 ms). Reduce Motion keeps the tap and a
- * crossfade, without scale or delays.
+ * 0.92 + fade as the modal (it used to scale from 0), the two chibis start
+ * meeting as it appears (the success tap is their contact, see
+ * matchMeetingModel), and the actions dock follows within 250 ms (was
+ * 600 ms). Reduce Motion keeps the tap and a crossfade, without scale or
+ * delays.
  */
 export interface MatchResultRouteTimeline {
   heroFromScale: number
@@ -209,7 +210,8 @@ export interface MatchResultRouteTimeline {
   heroOpacityDurationMs: number
   heroSpring: boolean
   heroDelayMs: number
-  hapticDelayMs: number
+  /** When the chibis start arriving; the success tap follows their contact. */
+  meetingDelayMs: number
   dockDelayMs: number
 }
 
@@ -225,7 +227,7 @@ export function getMatchResultRouteTimeline(reduceMotion: boolean): MatchResultR
     heroOpacityDurationMs: motion.entranceOpacityDurationMs,
     heroSpring: motion.entranceSpring,
     heroDelayMs,
-    hapticDelayMs: heroDelayMs,
+    meetingDelayMs: heroDelayMs,
     dockDelayMs: reduceMotion ? 0 : ROUTE_DOCK_DELAY_MS
   }
 }

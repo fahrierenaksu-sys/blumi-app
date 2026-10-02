@@ -63,6 +63,7 @@ import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLif
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
+import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
 import { getChatSendFlightChannel, launchChatSendFlight } from "../features/chat/thread/chatSendFlight"
 import { useChatTimelineRowModels } from "../features/chat/thread/useChatTimelineRowModels"
 import { usePendingMatchedThread } from "../features/chat/thread/usePendingMatchedThread"
@@ -286,6 +287,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     timeline,
     isListPresented: !showsTimelineEmptyState
   })
+  useIncomingArrivalHaptic({ timeline, arrivedKeys: arrivedRowKeys, currentUserId, screenFocused: isFocused })
 
   const renderTimelineRow = useCallback<ListRenderItem<ChatTimelineItem>>(
     ({ item }) => {

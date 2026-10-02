@@ -73,6 +73,8 @@ import {
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
 import { FlightLayer } from "../ui/flight/FlightLayer"
+import { OnboardingDoneMoment } from "../features/session/OnboardingDoneMoment"
+import { useOnboardingDoneMoment } from "../features/session/useOnboardingDoneMoment"
 import { ToastContainer, showToast } from "../ui/toast"
 import { getDailyRewardToastCopy } from "../features/inventory/dailyRewardCopy"
 import { getAppLocale } from "../features/session/appLocale"
@@ -362,6 +364,7 @@ export function RootNavigator() {
     sessionActor
   })
   const onboardingEntryRoute = getOnboardingEntryRoute(sessionEntryRoute)
+  const onboardingDone = useOnboardingDoneMoment(sessionEntryRoute, sessionActor)
   const isAccountRestricted =
     sessionEntryRoute === "Main" &&
     sessionActor !== null &&
@@ -1121,6 +1124,9 @@ export function RootNavigator() {
         onBottomNavPress={handleBottomNavPress}
       />
       <FlightLayer />
+      {onboardingDone.celebratingName !== null ? (
+        <OnboardingDoneMoment displayName={onboardingDone.celebratingName} onDone={onboardingDone.finish} />
+      ) : null}
       <ToastContainer />
     </View>
     </DiscoveryStartupBoundary>

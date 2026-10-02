@@ -26,6 +26,30 @@ export interface FlightRequest<Content = unknown> {
   readonly targetSurface: FlightSurface
   /** Drawn at the source frame and carried along (for example, the sent text). */
   readonly content?: Content
+  /**
+   * "fade" (default): the content keeps its size and fades as the target
+   * surface takes over (the sent words). "carry": the content itself is the
+   * hero (a chibi): it scales with the frame, keeping its aspect ratio, and
+   * stays fully visible until the target is revealed under it.
+   */
+  readonly contentMode?: "fade" | "carry"
+  /**
+   * The FlightLayer that draws it (default "root", the app root). A native
+   * modal sits above the root layer, so it mounts its own named layer.
+   */
+  readonly layer?: string
+  /**
+   * Called once: `true` in the frame the clone lands on its target (the
+   * contact moment, for a haptic), `false` when the flight ends without
+   * landing (no target, off screen, unmounted). Never delays anything.
+   */
+  readonly onSettled?: (landed: boolean) => void
+  /**
+   * A fixed landing frame instead of a claiming view (for example the whole
+   * window, as the next route takes over). Nothing is hidden or revealed:
+   * the clone lands there and fades.
+   */
+  readonly targetFrame?: FlightFrame
 }
 
 export interface FlightTarget<Handle = unknown> {
@@ -43,6 +67,7 @@ interface FlightEntry {
   flight: Flight
   target: FlightTarget | null
   listeners: Set<() => void>
+  settled: boolean
 }
 
 export interface FlightStore {
@@ -53,6 +78,8 @@ export interface FlightStore {
   /** The target left the screen before landing: the flight is abandoned. */
   detachTarget(id: string): void
   getTarget(id: string): FlightTarget | null
+  /** The clone touched its target: reports the contact once (see `onSettled`). */
+  land(id: string): void
   /** Ends a flight and reveals its target. Safe to call more than once. */
   finish(id: string): void
   getFlights(): readonly Flight[]
@@ -69,6 +96,11 @@ export function createFlightStore(createId: () => string = createDefaultIdFactor
     flights = Object.freeze([...entries.values()].map((entry) => entry.flight))
     for (const listener of [...listeners]) listener()
   }
+  const settle = (entry: FlightEntry, landed: boolean) => {
+    if (entry.settled) return
+    entry.settled = true
+    entry.flight.onSettled?.(landed)
+  }
   const notifyFlight = (entry: FlightEntry) => {
     for (const listener of [...entry.listeners]) listener()
   }
@@ -79,7 +111,8 @@ export function createFlightStore(createId: () => string = createDefaultIdFactor
       entries.set(id, {
         flight: Object.freeze({ ...request, id, claimed: false }),
         target: null,
-        listeners: new Set()
+        listeners: new Set(),
+        settled: false
       })
       publish()
       return id
@@ -112,9 +145,14 @@ export function createFlightStore(createId: () => string = createDefaultIdFactor
     getTarget(id) {
       return entries.get(id)?.target ?? null
     },
+    land(id) {
+      const entry = entries.get(id)
+      if (entry) settle(entry, true)
+    },
     finish(id) {
       const entry = entries.get(id)
       if (!entry) return
+      settle(entry, false)
       entries.delete(id)
       entry.target?.reveal()
       entry.target = null

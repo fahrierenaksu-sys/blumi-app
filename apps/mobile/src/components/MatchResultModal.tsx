@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import type { AvatarSelection } from "@blumi/contracts"
-import { useEffect, useRef, useState, type ComponentProps } from "react"
+import { useEffect, useEffectEvent, useRef, useState, type ComponentProps } from "react"
 import {
   Modal,
   Pressable,
@@ -29,6 +29,12 @@ import {
 import { PrimaryButton, SecondaryButton } from "../ui/primitives"
 import { useReducedMotion } from "../ui/animations"
 import { hapticSuccess } from "../ui/haptics"
+import { FlightLayer, FlightTargetView } from "../ui/flight/FlightLayer"
+import { isFlightFrameUsable } from "../ui/flight/flightModel"
+import { matchFlightSources } from "../features/matches/matchFlightSource"
+import { launchMatchChibiFlight } from "../features/matches/matchChibiFlight"
+import { MATCH_CONFETTI_PIECES, planMatchMeeting } from "../features/matches/matchMeetingModel"
+import { useMatchMeeting } from "../features/matches/useMatchMeeting"
 import {
   getMatchCelebrationMotion,
   getMatchResultPresentation,
@@ -52,7 +58,8 @@ interface MatchResultModalProps {
 }
 
 // ── Confetti particle config ─────────────────────────────────
-const PARTICLE_COUNT = 12
+// A light celebration: a few pieces, burst on the chibis' contact.
+const PARTICLE_COUNT = MATCH_CONFETTI_PIECES
 const PARTICLE_COLORS = [
   "#FF6B9D", "#C084FC", "#FF9A76", "#FACC15",
   "#4ADE80", "#60A5FA", "#F472B6", "#A78BFA",
@@ -163,14 +170,10 @@ const HEART_BEAT_HALF_MS = 500
 function runMatchEntrance(input: {
   cardScale: SharedValue<number>
   cardOpacity: SharedValue<number>
-  avatarsReveal: SharedValue<number>
-  heartPulse: SharedValue<number>
   fromScale: number
   fromOpacity: number
   opacityDurationMs: number
   spring: { duration: number; dampingRatio: number } | null
-  contentStaggerMs: number
-  heartPulseIterations: number
 }): void {
   const never = ReduceMotion.Never
   input.cardOpacity.value = withSequence(
@@ -178,35 +181,33 @@ function runMatchEntrance(input: {
     withTiming(1, { duration: input.opacityDurationMs, easing: ENTRANCE_EASING, reduceMotion: never })
   )
   if (!input.spring) {
-    // Reduce Motion: a short crossfade only; no scale, stagger, or pulse.
+    // Reduce Motion: a short crossfade only; no scale.
     input.cardScale.value = 1
-    input.avatarsReveal.value = 1
-    input.heartPulse.value = 1
     return
   }
   input.cardScale.value = withSequence(
     withTiming(input.fromScale, { duration: 0, reduceMotion: never }),
     withSpring(1, { ...input.spring, reduceMotion: never })
   )
-  input.avatarsReveal.value = withSequence(
-    withTiming(0, { duration: 0, reduceMotion: never }),
-    withDelay(
-      input.contentStaggerMs,
-      withTiming(1, { duration: input.opacityDurationMs, easing: ENTRANCE_EASING, reduceMotion: never }),
-      never
-    )
-  )
-  // A bounded heartbeat after the card settles; the heart then rests at full size.
+}
+
+/** A bounded heartbeat after the contact; the heart then rests at full size. */
+function runHeartBeat(heartPulse: SharedValue<number>, iterations: number): void {
+  if (iterations <= 0) return
+  const never = ReduceMotion.Never
   const half = { duration: HEART_BEAT_HALF_MS, easing: Easing.inOut(Easing.ease), reduceMotion: never }
-  input.heartPulse.value = withSequence(
+  heartPulse.value = withSequence(
     withTiming(1, { duration: 0, reduceMotion: never }),
     withDelay(
-      input.opacityDurationMs,
-      withRepeat(withSequence(withTiming(HEART_BEAT_PEAK, half), withTiming(1, half)), input.heartPulseIterations),
+      HEART_BEAT_HALF_MS / 2,
+      withRepeat(withSequence(withTiming(HEART_BEAT_PEAK, half), withTiming(1, half)), iterations),
       never
     )
   )
 }
+
+/** The modal is its own native window, above the root FlightLayer. */
+const MATCH_MODAL_FLIGHT_LAYER = "match-modal"
 
 // ── Main modal ──────────────────────────────────────────────
 
@@ -227,9 +228,11 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const motion = getMatchCelebrationMotion(reduceMotion)
   const cardScale = useSharedValue(motion.entranceFromScale)
   const cardOpacity = useSharedValue(motion.entranceFromOpacity)
-  const avatarsReveal = useSharedValue(0)
   const heartPulse = useSharedValue(1)
   const previousVisibleRef = useRef(false)
+  const meeting = useMatchMeeting()
+  const [partnerFlightId, setPartnerFlightId] = useState<string | null>(null)
+  const [confettiPlaying, setConfettiPlaying] = useState(false)
   const [locale] = useState(getAppLocale)
   const presentation = getMatchResultPresentation({
     entry: "connection_modal",
@@ -258,48 +261,63 @@ export function MatchResultModal(props: MatchResultModalProps) {
     heartPulseIterations
   } = motion
 
-  useEffect(() => {
-    if (!visible) return
-    // Every value is reset and restarted on the UI thread; assigning a new
-    // animation interrupts any entrance still running.
+  // Each time the modal opens: the card enters, and the two chibis meet in
+  // it. The partner flies from the liked card when Discover just left one
+  // (the modal is its own window, so the flight uses the modal's layer),
+  // otherwise it slides in. Their contact plays the one success tap and the
+  // light confetti; Reduce Motion crossfades and keeps the tap.
+  const openMoment = useEffectEvent(() => {
     runMatchEntrance({
       cardScale,
       cardOpacity,
-      avatarsReveal,
-      heartPulse,
       fromScale: entranceFromScale,
       fromOpacity: entranceFromOpacity,
       opacityDurationMs: entranceOpacityDurationMs,
-      spring: entranceSpringConfig,
-      contentStaggerMs,
-      heartPulseIterations
+      spring: entranceSpringConfig
     })
-  }, [
-    avatarsReveal,
-    cardOpacity,
-    cardScale,
-    contentStaggerMs,
-    entranceFromOpacity,
-    entranceFromScale,
-    entranceOpacityDurationMs,
-    entranceSpringConfig,
-    heartPulse,
-    heartPulseIterations,
-    visible
-  ])
+    const source = matchedUserId ? matchFlightSources.take(matchedUserId) : null
+    const plan = planMatchMeeting({ reduceMotion, hasFlightSource: isFlightFrameUsable(source) })
+    let contactPlayed = false
+    meeting.start({
+      plan,
+      delayMs: contentStaggerMs,
+      onContact: () => {
+        if (contactPlayed) return
+        contactPlayed = true
+        // Haptics are not motion, so Reduce Motion keeps this one success tap.
+        hapticSuccess()
+        setConfettiPlaying(true)
+        runHeartBeat(heartPulse, heartPulseIterations)
+      }
+    })
+    if (plan.partnerArrival === "flight" && source && matchedUserId) {
+      const flightId = launchMatchChibiFlight({
+        partnerUserId: matchedUserId,
+        source,
+        snapshot: resolvedMatchedAvatarSnapshot,
+        layer: MATCH_MODAL_FLIGHT_LAYER,
+        onSettled: meeting.partnerArrived
+      })
+      if (flightId) setPartnerFlightId(flightId)
+      else meeting.partnerArrived()
+    }
+  })
+  useEffect(() => {
+    const opened = shouldPlayMatchHaptic(previousVisibleRef.current, visible)
+    previousVisibleRef.current = visible
+    if (!visible) {
+      setPartnerFlightId(null)
+      setConfettiPlaying(false)
+      return
+    }
+    if (opened) openMoment()
+  }, [visible])
 
   const cardMotionStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
     transform: [{ scale: cardScale.value }]
   }))
-  const avatarsMotionStyle = useAnimatedStyle(() => ({ opacity: avatarsReveal.value }))
   const heartMotionStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartPulse.value }] }))
-
-  useEffect(() => {
-    // Haptics are not motion, so Reduce Motion keeps this one success tap.
-    if (shouldPlayMatchHaptic(previousVisibleRef.current, visible)) hapticSuccess()
-    previousVisibleRef.current = visible
-  }, [visible])
 
   return (
     <Modal visible={visible} transparent animationType={motion.modalAnimationType} onRequestClose={onClose}>
@@ -311,7 +329,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
           onPress={onClose}
         />
         <Animated.View style={[styles.modalCard, cardMotionStyle]}>
-          <ConfettiOverlay playing={visible && motion.confetti} />
+          <ConfettiOverlay playing={visible && confettiPlaying && motion.confetti} />
 
           <PressableScale
             accessibilityRole="button"
@@ -330,8 +348,8 @@ export function MatchResultModal(props: MatchResultModalProps) {
             <Text style={styles.confirmedText}>{presentation.badgeLabel}</Text>
           </View>
 
-          <Animated.View style={[styles.connectionRow, avatarsMotionStyle]}>
-            <View style={styles.avatarColumn}>
+          <View style={styles.connectionRow}>
+            <Animated.View style={[styles.avatarColumn, meeting.meStyle]}>
               <MyAvatar
                 name={currentUserName}
                 seed={currentUserName}
@@ -339,30 +357,42 @@ export function MatchResultModal(props: MatchResultModalProps) {
                 ring="strong"
               />
               <Text style={styles.avatarName}>{currentUserName}</Text>
-            </View>
+            </Animated.View>
 
             <View style={styles.heartConnector}>
-              <View style={styles.connectorLine} />
-              <Animated.View style={[styles.heartBadge, heartMotionStyle]}>
-                <Ionicons
-                  accessible={false}
-                  name="heart"
-                  size={20}
-                  color={uiTheme.colors.primary}
-                />
+              {/* Drawn outwards from the heart once both chibis are in. */}
+              <Animated.View style={[styles.connectorLine, meeting.lineStyle]} />
+              <Animated.View style={meeting.heartStyle}>
+                <Animated.View style={[styles.heartBadge, heartMotionStyle]}>
+                  <Ionicons
+                    accessible={false}
+                    name="heart"
+                    size={20}
+                    color={uiTheme.colors.primary}
+                  />
+                </Animated.View>
               </Animated.View>
-              <View style={styles.connectorLine} />
             </View>
 
-            <View style={styles.avatarColumn}>
-              <CandidateAvatarPreview
-                snapshot={resolvedMatchedAvatarSnapshot}
-                size={96}
-                stage="match"
-              />
+            <Animated.View style={[styles.avatarColumn, meeting.partnerStyle]}>
+              {partnerFlightId ? (
+                <FlightTargetView flightId={partnerFlightId}>
+                  <CandidateAvatarPreview
+                    snapshot={resolvedMatchedAvatarSnapshot}
+                    size={96}
+                    stage="match"
+                  />
+                </FlightTargetView>
+              ) : (
+                <CandidateAvatarPreview
+                  snapshot={resolvedMatchedAvatarSnapshot}
+                  size={96}
+                  stage="match"
+                />
+              )}
               <Text style={styles.avatarName}>{matchedUserName}</Text>
-            </View>
-          </Animated.View>
+            </Animated.View>
+          </View>
 
           <View style={styles.actions}>
             <PrimaryButton
@@ -375,6 +405,7 @@ export function MatchResultModal(props: MatchResultModalProps) {
             />
           </View>
         </Animated.View>
+        <FlightLayer layer={MATCH_MODAL_FLIGHT_LAYER} />
       </View>
     </Modal>
   )
@@ -473,11 +504,14 @@ const styles = StyleSheet.create({
   heartConnector: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     flex: 1,
     marginHorizontal: uiTheme.spacing.xs,
   },
   connectorLine: {
-    flex: 1,
+    position: "absolute",
+    left: 0,
+    right: 0,
     height: 1.5,
     backgroundColor: "#F1D7E6",
   },

@@ -81,6 +81,22 @@ test("the layer re-renders only when flights start or end", () => {
   assert.equal(renders, 2)
 })
 
+test("a flight reports its contact once: landed, or not when it ends without a target", () => {
+  const store = createFlightStore()
+  const settled: boolean[] = []
+  const landing = store.launch({ ...request("hi"), onSettled: (landed) => settled.push(landed) })
+  store.attachTarget(landing, fakeTarget([], "bubble"))
+  store.land(landing)
+  store.land(landing)
+  store.finish(landing)
+  assert.deepEqual(settled, [true], "the fade after the landing is not a second contact")
+
+  const lost = store.launch({ ...request("hey"), onSettled: (landed) => settled.push(landed) })
+  store.finish(lost)
+  store.land(lost)
+  assert.deepEqual(settled, [true, false])
+})
+
 /* ── Frame math ────────────────────────────────────────────── */
 
 test("flights need a usable frame on screen at both ends", () => {
@@ -118,6 +134,16 @@ test("the target surface takes over and the carried words fade only as they land
     assert.ok(value <= previous)
     previous = value
   }
+})
+
+test("a carried hero keeps its proportions and stays centred in every frame", () => {
+  const source = { x: 40, y: 200, width: 200, height: 200 }
+  // A tall landing spot: the chibi scales to fit, never stretches.
+  const fit = model.flightCarriedContentTransform({ x: 0, y: 0, width: 100, height: 160 }, source)
+  assert.equal(fit.scale, 0.5)
+  assert.equal(fit.translateX, 0)
+  assert.equal(fit.translateY, 30)
+  assert.deepEqual(model.flightCarriedContentTransform(source, source), { scale: 1, translateX: 0, translateY: 0 })
 })
 
 /* ── Chat send ─────────────────────────────────────────────── */

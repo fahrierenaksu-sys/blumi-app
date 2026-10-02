@@ -87,7 +87,7 @@ All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useM
 7. Every animation is interruptible.
 8. Never a spinner where a skeleton fits; skeleton → content is a crossfade.
 
-Shared-element moments use the root `FlightLayer` (`src/ui/flight`): `launchFlight` from a measured source frame, and the landing view claims it with `claimFlight` + `FlightTargetView`. A flight only decorates an action that already happened: it never delays it, skips itself when either end cannot be measured or is off screen, always reveals its target, and crossfades in place under Reduce Motion. Chat send is the first user (`features/chat/thread/chatSendFlight.tsx`).
+Shared-element moments use the root `FlightLayer` (`src/ui/flight`): `launchFlight` from a measured source frame, and the landing view claims it with `claimFlight` + `FlightTargetView`. A flight only decorates an action that already happened: it never delays it, skips itself when either end cannot be measured or is off screen, always reveals its target, and crossfades in place under Reduce Motion. Users: chat send (`features/chat/thread/chatSendFlight.tsx`), typing dots → incoming bubble (`features/chat/typing/typingMorphFlight.tsx`), the match chibi (`features/matches/matchChibiFlight.tsx`, `contentMode: "carry"`) and the invitation card's door (`features/chat/roomDoorFlight.tsx`, a fixed `targetFrame`). A native modal draws its flights in its own `<FlightLayer layer=… />`, and `onSettled` reports the contact frame once (for a haptic).
 
 ## Server facts
 

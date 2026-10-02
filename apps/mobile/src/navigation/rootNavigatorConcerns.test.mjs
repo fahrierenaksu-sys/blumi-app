@@ -225,9 +225,16 @@ function openReadyMiniRoomFor(navigationRef, currentActor = actor) {
   const handledReadyMiniRoomIdsRef = { current: new Set() }
   const announcedReadyMiniRoomIdsRef = { current: new Set() }
   const announced = []
+  const doorFlights = []
   const bindings = {
     latestSessionActorRef: { current: currentActor },
     navigationRef,
+    // The chat card's "door opens" flight decorates the entry, before the room route opens.
+    reduceMotion: false,
+    launchRoomDoorFlight: (input) => {
+      doorFlights.push({ ...input, routesOpenedBefore: navigationRef.calls.length })
+      return true
+    },
     // The screen beneath any native sheet (navigation/nativeSheets).
     getRootRouteBeneathSheets: () => navigationRef.getCurrentRoute(),
     handledReadyMiniRoomIdsRef,
@@ -239,19 +246,22 @@ function openReadyMiniRoomFor(navigationRef, currentActor = actor) {
   }
   const enterReadyMiniRoom = evaluate(findInitializer(OWNER.roomInvites, "enterReadyMiniRoom"), bindings)
   const open = evaluate(findInitializer(OWNER.roomInvites, "openReadyMiniRoom"), { ...bindings, enterReadyMiniRoom })
-  return { open, handledReadyMiniRoomIdsRef, announced }
+  return { open, handledReadyMiniRoomIdsRef, announced, doorFlights }
 }
 
 test("a ready MiniRoom stays in its chat, then enters only through explicit entry", () => {
   const navigationRef = createNavigationRef({ routeName: "ChatThread", params: { threadId: "thread-1" } })
-  const { open, handledReadyMiniRoomIdsRef, announced } = openReadyMiniRoomFor(navigationRef)
+  const { open, handledReadyMiniRoomIdsRef, announced, doorFlights } = openReadyMiniRoomFor(navigationRef)
   const payload = readyPayload()
 
   open(payload)
   assert.equal(navigationRef.calls.length, 0)
   assert.equal(handledReadyMiniRoomIdsRef.current.size, 0)
+  assert.deepEqual(doorFlights, [], "a room that stays closed opens no door")
   open(payload, { allowReopen: true })
   assert.equal(navigationRef.calls.length, 1)
+  assert.deepEqual(doorFlights, [{ sourceThreadId: "thread-1", reduceMotion: false, routesOpenedBefore: 0 }],
+    "the invitation card's door opens for this conversation as the room opens")
   const [kind, route, params] = navigationRef.calls[0]
   assert.equal(kind, "navigate")
   assert.equal(route, "MiniRoom")
@@ -797,16 +807,20 @@ test("ending a session forgets presented and reconciling matches and closes the 
   const reconcilingMatchIdsRef = { current: new Set(["match-2"]) }
   const modalUpdates = []
   let discoveryDeliveryResets = 0
+  let flightSourceClears = 0
   evaluate(findInitializer(OWNER.matchModal, "resetMatchModal"), {
     handledMatchIdsRef,
     reconcilingMatchIdsRef,
     // Parked and route-shown Discover matches belong to the ended account too.
     discoveryMatchDelivery: { reset: () => { discoveryDeliveryResets += 1 } },
+    // So does the card it last liked (the match moment's flight source).
+    matchFlightSources: { clear: () => { flightSourceClears += 1 } },
     setGlobalMatch: (value) => modalUpdates.push(value)
   })()
   assert.equal(handledMatchIdsRef.current.size, 0)
   assert.equal(reconcilingMatchIdsRef.current.size, 0)
   assert.equal(discoveryDeliveryResets, 1)
+  assert.equal(flightSourceClears, 1)
   assert.deepEqual(modalUpdates, [null])
 })
 

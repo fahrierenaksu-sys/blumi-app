@@ -72,3 +72,21 @@ export function flightTargetSurfaceOpacity(progress: number): number {
   "worklet"
   return Math.min(1, Math.max(0, progress * 1.6))
 }
+
+/**
+ * A carried hero (contentMode "carry") laid out at the source size: the
+ * uniform scale and offset that fit it, centred, into `frame`, so a chibi
+ * never stretches when the two ends have different aspect ratios.
+ */
+export function flightCarriedContentTransform(
+  frame: FlightFrame,
+  source: { width: number; height: number }
+): { scale: number; translateX: number; translateY: number } {
+  "worklet"
+  const scale = Math.min(frame.width / Math.max(1, source.width), frame.height / Math.max(1, source.height))
+  return {
+    scale,
+    translateX: (frame.width - source.width * scale) / 2,
+    translateY: (frame.height - source.height * scale) / 2
+  }
+}

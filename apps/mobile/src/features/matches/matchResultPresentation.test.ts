@@ -140,17 +140,17 @@ test("presentations are fresh values so callers cannot mutate shared copy", () =
   assert.equal(second.actions[0].label, originalLabel)
 })
 
-test("the Discover match screen card settles from just below size, never from 0, with the haptic as it appears (DSC-2)", () => {
+test("the Discover match screen card settles from just below size, never from 0, and the chibis meet as it appears (DSC-2)", () => {
   const timeline = getMatchResultRouteTimeline(false)
   assert.ok(timeline.heroFromScale > 0 && timeline.heroFromScale < 1)
   assert.equal(timeline.heroFromOpacity, 0)
-  assert.equal(timeline.heroDelayMs, timeline.hapticDelayMs, "the success tap lands with the card, not before it")
+  assert.equal(timeline.heroDelayMs, timeline.meetingDelayMs, "the meeting (and its contact tap) never starts before the card")
   assert.ok(timeline.dockDelayMs <= 250, `the actions arrive within 250 ms (${timeline.dockDelayMs})`)
   assert.equal(timeline.heroSpring, true)
 
   const reduced = getMatchResultRouteTimeline(true)
   assert.equal(reduced.heroFromScale, 1, "Reduce Motion: a crossfade, no scale")
   assert.equal(reduced.heroSpring, false)
-  assert.equal(reduced.heroDelayMs, reduced.hapticDelayMs, "haptics are not motion: the tap stays")
+  assert.equal(reduced.heroDelayMs, reduced.meetingDelayMs)
   assert.equal(reduced.dockDelayMs, 0)
 })
