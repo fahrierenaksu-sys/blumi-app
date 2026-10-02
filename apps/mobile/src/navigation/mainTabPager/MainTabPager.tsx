@@ -135,32 +135,28 @@ function scheduleIdle(work: () => void): () => void {
   }
 }
 
-/** Runs `work` after the next frame, in an idle slot. Returns a cancel. */
+/** About one frame: the commit render reaches the screen before focus work. */
+const AFTER_FRAME_MS = 16
+
+/** Runs `work` after about one frame, in an idle slot. Returns a cancel. */
 function scheduleAfterNextFrame(work: () => void): () => void {
   let cancelled = false
-  let frameId: number | null = null
   let idleId: number | null = null
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   const run = () => {
     if (!cancelled) work()
   }
-  const afterFrame = () => {
-    frameId = null
+  timeoutId = setTimeout(() => {
+    timeoutId = null
     if (cancelled) return
     if (typeof globalThis.requestIdleCallback === "function") {
       idleId = globalThis.requestIdleCallback(run, { timeout: 120 })
     } else {
       timeoutId = setTimeout(run, 0)
     }
-  }
-  if (typeof globalThis.requestAnimationFrame === "function") {
-    frameId = globalThis.requestAnimationFrame(afterFrame)
-  } else {
-    timeoutId = setTimeout(afterFrame, 16)
-  }
+  }, AFTER_FRAME_MS)
   return () => {
     cancelled = true
-    if (frameId !== null && typeof globalThis.cancelAnimationFrame === "function") globalThis.cancelAnimationFrame(frameId)
     if (idleId !== null && typeof globalThis.cancelIdleCallback === "function") globalThis.cancelIdleCallback(idleId)
     if (timeoutId !== null) clearTimeout(timeoutId)
   }
