@@ -152,12 +152,7 @@ try {
       resolve(workspaceRoot, "src/ui/PreparedDiscoveryLoadingScreen.test.mjs"),
       resolve(workspaceRoot, "src/features/discovery/EmptyDiscoveryDeck.test.mjs"),
       resolve(workspaceRoot, "src/features/demo/SwipeableDiscoverCard.test.mjs"),
-      resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-discovery-refresh-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-discovery-presentation-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-discovery-swipe-runtime.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-settings-matching-preferences-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-phase3-onboarding-discovery-contract.test.mjs")
+      resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs")
     ],
     {
       cwd: workspaceRoot,

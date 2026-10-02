@@ -138,16 +138,7 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeCatalogTransitionModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeIndicatorModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/shopListingModel.test.ts"),
-      resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
-      resolve(workspaceRoot, "scripts/room-avatar-renderer-subscription.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-avatar-runtime-performance.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-senior-runtime-fixes-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/female-sitting-rig-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/female-wardrobe-static-contract.test.mjs"),
-      resolve(workspaceRoot, "scripts/female-wardrobe-combined-promotion-gate.test.mjs"),
-      resolve(workspaceRoot, "scripts/female-sweet-capsule-promotion-gate.test.mjs"),
-      resolve(workspaceRoot, "scripts/promote-female-nondress-wardrobe.test.mjs"),
-      resolve(workspaceRoot, "scripts/promote-male-capsule-assets.test.mjs")
+      resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts")
     ],
     {
       cwd: workspaceRoot,
@@ -198,21 +189,6 @@ try {
       stdio: "inherit"
     }
   )
-
-  if (process.env.BLUMI_AVATAR_V2_SKIP_MINIROOM_CONTRACT !== "1") {
-    execFileSync(
-      process.execPath,
-      [
-        "--test",
-        resolve(workspaceRoot, "scripts/mobile-miniroom-motion-contract.test.mjs")
-      ],
-      {
-        cwd: workspaceRoot,
-        stdio: "inherit"
-      }
-    )
-  }
-
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

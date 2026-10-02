@@ -90,7 +90,6 @@ Avatar and room (current state, not a mandate):
 - Prior research is input, not a decision. `docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md` measured why room motion feels artificial. Its backlog items are VIS-01..13 in the session inventory.
 - Art sources, masters and QA renders live outside the repo in the Workbench, `/Users/evrenevren/BlumiArtWorkbench/`, on the owner's Mac. The cloud container has only a stub.
   - EAS and the cloud have no Workbench, so an app import from it breaks the build. Only runtime files the app actually uses go into the repo.
-  - Tests that need Workbench fixtures run with `BLUMI_WORKBENCH_ROOT=… npm --workspace @blumi/mobile run test:workbench`.
 - Preview and production builds fail on any import from a `*candidate/` path (`scripts/mobile-release-assets.cjs`), and quarantined item IDs are filtered out of the room catalog. Published shop items are hash-locked: `shopReleaseCatalog.test.ts` fails if their runtime bytes or `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md` change.
 
 Engineering guards that fail tests are listed in `docs/quality/ENGINEERING_RULES.md`. Read it before a large mobile change so a ratchet doesn't surprise you.
