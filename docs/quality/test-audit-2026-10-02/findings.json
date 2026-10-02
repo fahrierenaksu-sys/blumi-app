@@ -1,5 +1,5 @@
 {
-"status": "Verified chunks: 12/17",
+"status": "Verified chunks: 15/17",
 "runIds": [
 "wf_2665c6c0-354",
 "wf_3206769a-6b2",
@@ -10911,6 +10911,855 @@
 "apps/mobile/src/features/roomStudio/roomStudioPresentation.ts: only its test imports it."
 ],
 "notes": "The chunk has 49 files, and each appears exactly once. I checked all the cited commits; they exist. Changes from the classifier: (1) miniRoomCopy TRIM now also drops the exact roomTitle/placeholder pins. Their only 'user-approved' basis is a comment in model-authored commit 71350df, and copy is not an owner-locked item. Keep key parity, tr≠en and the tone guard from the owner's report. (2) roomStudioProductionIsolation REWRITE keeps the candidate-string guard on the bindings file. It also adds a check that metro.config.js actually routes '@blumi/home-studio-qa' to the stub in production, because homeStudioQaModuleRouting.test.mjs tests only the routing function, not the metro wiring. (3) The miniRoomNoticeModel TRIM gains an optional behavior replacement if first-name-only is meant as a privacy rule. Other verdicts are confirmed: I grepped the dead-code REMOVEs, confirmed the v0.4 anchors have no approval (their Workbench parity sibling was already retired in 030b73d), and spot-checked the KEEP_* files for readFileSync and pixel or constant pins. Only sharedRoomDecor, roomStudioProductionIsolation and useInRoomChat.reconnect read source, and the last only to execute the hook in a vm. Wiring: the REMOVE files need edits only to run-realtime-tests.mjs (livekitRoomLifecycle, roomDebriefCopy) and run-match-room-tests.mjs (roomStudioPlacement, roomStudioPresentation), in both the tsc/sourceFiles lists and the node --test lists. No package.json edit is needed. No helper or fixture file is used only by removed tests."
+},
+"packages-scripts-tools": {
+"items": [
+{
+"file": ".railway/railway.test.ts",
+"verdict": "TRIM",
+"reason": "Release and secret safety: no DATABASE_URL in the IaC file, BLUMI_TRUST_PROXY set, RevenueCat sandbox/production split, deploys gated on CI and /ready, draining longer than graceful shutdown, and one patched Node version across .nvmrc, engines, CI, OTA and Railpack. Only the exact drainingSeconds literal is redundant, because the relational check on the next line already keeps the guarantee.",
+"evidence": "d270ae4 fix: give Railway a draining window above the shutdown deadline; d18708c fix: trust Railway's internal proxy range; efca2d1 build: pin Node 22.23.3",
+"casesToRemove": [
+"line 24: assert.equal(api.deploy.drainingSeconds, 35). Keep line 25 (drainingSeconds*1000 > GRACEFUL_SHUTDOWN_TIMEOUT_MS)"
+],
+"wiring": "root package.json verify:release-infra, part of npm run verify",
+"verifierNote": "Confirmed. railway.ts is not applied to the live service, so the config cases guard dormant IaC, but they are cheap and protect secrets and the proxy gate if it is ever applied. The Node-pin case protects the live toolchain."
+},
+{
+"file": "packages/contracts/src/chat/ChatThreadSchemas.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Wire-contract parse behavior; typing commands never carry draft text (privacy)."
+},
+{
+"file": "packages/contracts/src/discovery/PublicProfileCard.test.ts",
+"verdict": "TRIM",
+"reason": "parsePublicProfileCard and resolveSelectedPublicPrompt have no non-test caller. The only runtime use is publicProfileCardSchema.shape.roomHeadline in apps/server/src/routes/roomSnapshotRoutes.ts:75. Keep the headline normalization and validation cases and the reportUserRequestSchema safety-report case.",
+"casesToRemove": [
+"relationship intent is not part of the exact public card contract (dead parser)",
+"selected public prompt resolves only when that answer exists on the profile (dead resolveSelectedPublicPrompt)"
+],
+"rewritePlan": "Point the remaining headline cases (whitespace normalization, empty to null, 31-char and emoji rejection) at publicProfileCardSchema.shape.roomHeadline.safeParse. Drop the badge and prompt-ID cases that only go through the dead parser. Keep the fake_or_bot report schema case.",
+"wiring": "packages/contracts/package.json \"test\" (tsx --test list)",
+"verifierNote": "Grep over apps/ and packages/ found no non-test, non-dist references to parsePublicProfileCard or resolveSelectedPublicPrompt. Dead code is confirmed."
+},
+{
+"file": "packages/contracts/src/realtime/ServerEventSchemas.test.ts",
+"verdict": "TRIM",
+"reason": "Per-event parse behavior, forward compatibility, prototype-key safety and no payload echo in errors are worth keeping. The hard-coded type count is an exact-count pin, and the deepEqual on the line above already forces a fixture for every type.",
+"casesToRemove": [
+"line 252: assert.equal(SERVER_EVENT_TYPES.length, 25)"
+],
+"wiring": "packages/contracts/package.json \"test\"",
+"verifierNote": "Read lines 245-256. The count assertion sits directly after the fixture/type deepEqual and adds only a pin."
+},
+{
+"file": "packages/domain/src/avatar/avatarLoadoutRules.test.ts",
+"verdict": "TRIM",
+"reason": "Most of the file is server-authoritative ownership and loadout validation, which is money and ownership safety. Two cases restate literals: the Coral Wave titles and prices, and the male starter IDs.",
+"evidence": "263cd8a feat: add Coral Wave outfit to wardrobe runtime",
+"casesToRemove": [
+"Coral Wave products are independent paid female loadout items (line 136): pins exact titles and prices 80/440/450 from one wardrobe wave. The generic 'every economy avatar entitlement and grant has loadout metadata' case, the validation cases and the shopReleaseCatalog hash locks (Coral Wave is in blumiR1ReleaseCatalog.json) already cover them",
+"the canonical male starter uses the motion-ready fitted basics (line 257): the constant only equals its own literal IDs. Validity is covered by 'female and male starter loadouts are valid immutable selections'"
+],
+"wiring": "packages/domain/package.json \"test\" (dist/avatar/avatarLoadoutRules.test.js)",
+"verifierNote": "Read the Coral Wave case. Its price and title literals are not in the receipt JSON (no price fields there), so they are not a receipt guarantee. Ownership and publication of the items are protected elsewhere."
+},
+{
+"file": "packages/domain/src/chat/chatReceiptCursor.test.ts",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Pure receipt-cursor ordering logic."
+},
+{
+"file": "packages/domain/src/economy/universalCoreRoomEconomy.test.ts",
+"verdict": "TRIM",
+"reason": "Keep the money and release-safety cases: the unpromoted wave stays out of the live ECONOMY_CATALOG, promotion fails closed, the digest is reproducible, and promoted copies are immutable. The price ladder encodes pricing taste, and the literal 45 and the price-range checks are pins.",
+"casesToRemove": [
+"the home price ladder preserves believable product value tiers (line 68, whole test)",
+"in the line-34 test: the literal 45 length checks, priceCoins % 10 === 0 and the 100..650 range (keep uniqueness, candidate/ID alignment, type room, non-empty title, integer price, not ownedByDefault)"
+],
+"rewritePlan": "In 'one complete shared promotion record unlocks exactly 45...', compare against UNIVERSAL_CORE_ROOM_ITEM_IDS.length instead of 45.",
+"wiring": "packages/domain/package.json \"test\" (dist/economy/universalCoreRoomEconomy.test.js)",
+"verifierNote": "Checked the test list. The fail-closed and live-catalog cases (lines 98, 174, 183) are the safety core and stay. The price-ladder case has no safety link."
+},
+{
+"file": "packages/realtime-client/src/realtimeClient.adversarial.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Mocked-socket behavior tests for reconnect storms, leaked retries, never giving up, and backoff that grows under accept-then-close flapping.",
+"evidence": "247835c jitter on reconnect backoff; 5aac73f never give up reconnecting; 072b4ec reconnect on foreground; d07fc6d dead-socket detection and spreading",
+"wiring": "packages/realtime-client/package.json \"test\""
+},
+{
+"file": "packages/realtime-client/src/realtimeClient.lifecycle.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "iOS background/foreground socket lifecycle, fresh tickets, no doubled sockets, connect timeout and heartbeat liveness. These are repeated device-only reconnect bugs.",
+"evidence": "072b4ec; d07fc6d; 5aac73f",
+"wiring": "packages/realtime-client/package.json \"test\""
+},
+{
+"file": "packages/realtime-client/src/realtimeClient.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Reconnect state machine (backoff, 1008 never retried, only a 401 clears the session, stale sockets suppressed). It also covers privacy: no token in WebSocket protocols and no message bodies or phone numbers in diagnostics.",
+"evidence": "247835c; 5aac73f; 072b4ec; d07fc6d; 63b29da",
+"wiring": "packages/realtime-client/package.json \"test\""
+},
+{
+"file": "packages/realtime-client/src/reconnectTransitionTracker.test.ts",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "Drives refetch after reconnect. Stale state after missed events is a repeated bug.",
+"evidence": "8e9ccb8 refetch cached conversations changed while socket was down (CHAT-RT-09); 8e00798 re-send lost delivery acks",
+"wiring": "packages/realtime-client/package.json \"test\""
+},
+{
+"file": "scripts/automation/local-backup.test.mjs",
+"verdict": "KEEP_SAFETY",
+"reason": "Data safety for the only database: the backup script refuses other projects, hosts and databases, requires a password and TLS, and forces read-only.",
+"wiring": "NOT WIRED: grep finds no script or runner referencing it. It should be added to a root verify script (root package.json is not in the mobile fingerprint).",
+"verifierNote": "Grep confirmed that only the test file and audit notes reference local-backup. Keep it and wire it."
+},
+{
+"file": "scripts/security/audit-policy.test.mjs",
+"verdict": "KEEP_SAFETY",
+"reason": "The vulnerability allowlist accepts only exact, unexpired advisories.",
+"wiring": "root package.json verify"
+},
+{
+"file": "scripts/security/legal-preflight.test.mjs",
+"verdict": "TRIM",
+"reason": "Release safety: packaging runs the legal preflight, and the real preflight passes for production and preview. The stale-evidence case duplicates a wired unit test.",
+"casesToRemove": [
+"production still rejects stale publication evidence (line 22): same input and assertion as apps/mobile/src/features/legal/legalPolicyMetadata.test.ts:74 'legal release guard blocks stale hosted product copy', which is wired in apps/server/scripts/run-server-tests.mjs:47"
+],
+"wiring": "root package.json verify:source-hygiene",
+"verifierNote": "Compared both cases. Both call assertLegalReleaseReady with production and hostedCopyAlignment 'update-required' and expect it to block. This is a real duplicate."
+},
+{
+"file": "scripts/security/navigation-dependency.test.mjs",
+"verdict": "TRIM",
+"reason": "The behavior test (real getStateFromPath keeps params and stays bounded on malformed escapes) guards the forced query-string override. The exact lockfile equality on decode-uri-component 0.5.0 fails on a harmless upgrade, and the audit gate already covers vulnerable versions.",
+"evidence": "08f9e6e test: give the navigation parser child process a cold-start timeout",
+"casesToRemove": [
+"line 10 exact equality pkg.version === '0.5.0'; replace with a semver floor (>= the patched release) if a floor is wanted"
+],
+"wiring": "root package.json verify:source-hygiene",
+"verifierNote": "Read lines 8-10. It is an exact-equality pin across every lock entry. A floor keeps the safety."
+},
+{
+"file": "scripts/security/source-hygiene.test.mjs",
+"verdict": "KEEP_SAFETY",
+"reason": "Tree-wide hygiene: .env secrets ignored, no stale emitted .js next to sources, no stray mobile lockfile, and one TypeScript version.",
+"evidence": "c90bc62 build: compile every workspace with the declared TypeScript 6.0.3",
+"wiring": "root package.json verify:source-hygiene"
+},
+{
+"file": "tools/operations-center/build.test.mjs",
+"verdict": "TRIM",
+"reason": "Keep the core: the ledger parse (row count and date), no network calls in the page script, no secret-file references, CSP/nosniff, 404/405 and loopback only. Drop the pins on doc headings, copy, ids and CSS.",
+"casesToRemove": [
+"lines 33-37: exact link text and Turkish headings in docs",
+"lines 41-44: rows.length >= 10 and specific Turkish area names",
+"lines 53-61: exact element ids, the @media 700px query, the .nav-icon rule, aria-live and prefers-reduced-motion strings",
+"line 63: exactly one inline script",
+"lines 114-115: exact Turkish UI copy"
+],
+"rewritePlan": "Replace line 62 `node.textContent = text` with a tree-wide XSS rule over the template script: doesNotMatch /innerHTML|outerHTML|insertAdjacentHTML|document\\.write/. Replace the line-123 exact listen regex with an assertion that serve.mjs binds to 127.0.0.1, ideally from server.address() at runtime.",
+"wiring": "root package.json verify:operations-center",
+"verifierNote": "Read lines 55-70 and 118-126. These confirm the CSS, id and copy pins and the single-file listen regex."
+},
+{
+"file": "tools/workbench/archive-from-manifest.test.mjs",
+"verdict": "TRIM",
+"reason": "Never-lose-work tooling (hash-verified copies, no deletes or overwrites, traversal rejection, receipts). One assertion restates a constant.",
+"casesToRemove": [
+"line 44: assert.equal(DEFAULT_DESTINATION, '/Users/evrenevren/...') (the constant only equals itself)"
+],
+"wiring": "root package.json verify:workbench-tools"
+},
+{
+"file": "tools/workbench/remove-archived-from-manifest.test.mjs",
+"verdict": "KEEP_SAFETY",
+"reason": "Never-lose-work: the tool deletes only with --apply, only verified unchanged archived files, and refuses bad receipts and paths outside the repo.",
+"wiring": "root package.json verify:workbench-tools"
+}
+],
+"deadCode": [
+"packages/contracts/src/discovery/PublicProfileCard.ts: parsePublicProfileCard (only referenced by its test and dist)",
+"packages/contracts/src/discovery/PublicProfileCard.ts: resolveSelectedPublicPrompt (only referenced by its test and dist)",
+"packages/contracts/src/discovery/PublicProfileCard.ts: badge/selectedPromptId/showRoomShowcase parts of publicProfileCardSchema; only .shape.roomHeadline is used at runtime (apps/server/src/routes/roomSnapshotRoutes.ts:75)"
+],
+"notes": "The verifier agrees with the classifier on every item. All 19 files from the chunk list are present, each once.\n\nWhat I checked:\n- **Dead code:** grep confirmed that the PublicProfileCard helpers have no runtime callers.\n- **Legal duplicate:** the legal-preflight stale-evidence case duplicates legalPolicyMetadata.test.ts:74, which is wired through run-server-tests.mjs:47.\n- **Coral Wave prices:** they are not in the receipt JSON, and the items are protected by the shopReleaseCatalog hash locks.\n- **Exact pins:** I read the ServerEventSchemas count, the decode-uri-component equality and the operations-center id, CSS and copy pins.\n- **local-backup.test.mjs:** grep confirmed no script runs it. It should be wired, not removed.\n\nNo REMOVE verdicts. No helper files become unused. I made no edits."
+},
+"mobile/scripts#2": {
+"items": [
+{
+"file": "apps/mobile/scripts/mobile-onboarding-world-intro-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Unwired. One case already fails because it reads gitignored native iOS files. The rest pins component and hook names, timeline constants, copy and asset byte sizes.",
+"wiring": "Not wired. scripts/build_onboarding_runner_frames.py is referenced only by this test.",
+"verifierNote": "Confirmed with grep: build_onboarding_runner_frames is referenced only by this test, and no runner or script lists the test."
+},
+{
+"file": "apps/mobile/scripts/mobile-package-name.test.mjs",
+"verdict": "REMOVE",
+"reason": "A one-off rename check. A wrong workspace name already breaks the root npm --workspace scripts loudly.",
+"wiring": "apps/mobile/package.json test:launch-config (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/mobile-page-container-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins the import alias, JSX props and shell names per screen. That is layout structure with no recurring safe-area bug behind it, and pageContainerLayout.test.ts covers the behaviour.",
+"wiring": "apps/mobile/package.json test:layout (first command; fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/mobile-phase3-onboarding-discovery-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Copy strings, testIDs, style numbers and exact hitSlop counts. Behaviour is covered by the discovery model and analytics tests.",
+"wiring": "apps/mobile/scripts/run-discovery-tests.mjs line 160."
+},
+{
+"file": "apps/mobile/scripts/mobile-product-analytics.test.mjs",
+"verdict": "TRIM",
+"reason": "Keep the PostHog privacy flags (privacy rule). Drop the Settings JSX and copy pins and the funnel call-site pins, which behaviour tests already cover.",
+"casesToRemove": [
+"PARTIAL in 'product analytics is explicit-consent, minimal, and replay-free': keep defaultOptIn:false, captureAppLifecycleEvents:false, enableSessionReplay:false, no identify(, the sanitize call, SENSITIVE_PROPERTY_KEY, and optOut()/reset() on consent withdrawal. Drop the Settings, copy, linking and union-type pins.",
+"critical product funnels emit only named analytics events",
+"match_created comes only from server-confirmed matches, never from MatchResult replays"
+],
+"wiring": "apps/mobile/scripts/run-product-analytics-tests.mjs.",
+"verifierNote": "Confirmed that src/analytics/productAnalyticsPolicy.test.ts and src/features/matches/discoveryMatchCreatedReporter.test.ts exist."
+},
+{
+"file": "apps/mobile/scripts/mobile-release-channels.test.mjs",
+"verdict": "TRIM",
+"reason": "Release safety: the main workflow runs by hand only, develop goes OTA to preview only, and the fingerprint env matches the build profile (this broke repeatedly). Only the expo-updates ~57 version pin goes.",
+"evidence": "7bcc02b, fdf471a, 26db8d0, 569457c, ec16625 and 8d46d08 are repeated release-infra fixes.",
+"casesToRemove": [
+"PARTIAL in 'the app ships expo-updates with a fingerprint runtime and the project's update URL': drop only the assert.match(expo-updates, /^~57\\./) version pin (line 35). Keep the fingerprint runtime and update URL asserts."
+],
+"wiring": "Editing the file itself needs no package.json change.",
+"verifierNote": "Changed from KEEP_SAFETY to TRIM. Line 35 is a pure version pin with no safety reason; the classifier had already flagged it. Every other case is release safety."
+},
+{
+"file": "apps/mobile/scripts/mobile-release-config.test.mjs",
+"verdict": "TRIM",
+"reason": "Keep about 18 safety cases: the no-media guards, voice and paid coins off, fail-closed release env, EAS linkage, the candidate-asset guard, Sentry PII flags, telemetry validation, conditional Sentry plugins, and the bundle id and push identity. Drop the implementation pins, retired-code checks and duplicates.",
+"casesToRemove": [
+"iOS Debug builds do not require Sentry upload credentials",
+"user-approved onboarding and profile artwork resolves from approved runtime paths",
+"PARTIAL in 'release crash reporting uses the official Sentry integration without PII': keep sendDefaultPii/attachScreenshot/attachViewHierarchy false, drop the getSentryExpoConfig, app.json plugin and App.tsx ordering pins",
+"managed project stays aligned with the Expo SDK 57 platform contract",
+"release bundle imports only the fonts and icon family used by the app",
+"Blumi Room keeps text chat and declares no live audio or camera permission",
+"privacy copy accurately describes first-release text rooms and deferred audio",
+"Metro defers heavy screen modules until first use",
+"infinite UI animations stop when their surface is hidden",
+"room runtime ships only the production shell and layered avatar",
+"shop cards show product cutouts while selection updates the live avatar preview",
+"shop exit discards previews and cannot interrupt an active transaction",
+"production UI and session runtime hide and reject demo entry",
+"MiniRoom rig preview is Debug-only and has no server or media side effects",
+"legacy Universal Core gallery is removed in favor of the current My Room QA flow",
+"legacy local Shared Match Room cannot ship beside the server-backed Mini Room flow",
+"unreachable Saved Connections UI and its orphan profile context are removed",
+"production MiniRoom carries and renders the partner avatar instead of a demo stand-in",
+"MiniRoom ships no unused room props or reference sheets (2026-10-01)",
+"store UI is honest, globally usable, and consistently branded",
+"production profile and chat actions never fall back to local demo behavior",
+"Room sync alerts are actionable without raw backend diagnostics",
+"shared session errors redact native diagnostics before they reach user-visible screens",
+"navigation links and offline status remain wired to native runtime",
+"PARTIAL in 'the public mobile brand is Blumi while stable runtime identifiers remain unchanged': keep the name, slug, scheme, bundle ids, icon path and brand colours; drop the legacy brand scans, the svg check, the PNG size and the brandMark checks",
+"native and hydrated loading surfaces share the Blumi liquid-glass identity",
+"production economy has one wallet and never grants local-only rewards",
+"the complete server avatar persists and drives exact remote cards"
+],
+"rewritePlan": "Delete the listed cases and any helpers left without users (DISCOVER_SCREEN_SOURCE_PATHS, legacyBrand, readPngSize).",
+"wiring": "apps/mobile/package.json test:release-config. Editing the file needs no package.json change.",
+"verifierNote": "Checked the economy case (lines 1156-1170): it only checks that names are absent in 2 files plus one server regex. That is weak; the server economy tests carry the real guarantee. Checked the demo-fallback cases (lines 833-975): they are file-specific regex pins (TypingIndicator, setTimeout 700, prop types), not a tree-wide rule. Confirmed the removals."
+},
+{
+"file": "apps/mobile/scripts/mobile-senior-runtime-fixes-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Regex pins of AvatarV2Provider, scene store and AvatarLayer internals. The behaviour tests cover each guarantee.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs line 144.",
+"verifierNote": "Confirmed that avatarEquipLifecycle.test.ts and miniRoomSceneStoreLifecycle.test.ts exist."
+},
+{
+"file": "apps/mobile/scripts/mobile-settings-matching-preferences-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Settings JSX and copy pins. Account-scoped persistence is tested behaviourally in discoveryFiltersModel.test.ts.",
+"wiring": "apps/mobile/scripts/run-discovery-tests.mjs line 159."
+},
+{
+"file": "apps/mobile/scripts/mobile-shop-presentation-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Style values, testIDs, crossfade constants and copy. The paid-coin gate is enforced by the env resolver and by the server.",
+"wiring": "apps/mobile/package.json test:shop-preview-assets (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/mobile-theme-scope.test.mjs",
+"verdict": "TRIM",
+"reason": "Keep the owner-approved palette token values (brand style). Drop the per-file theme import pins and the bio line count.",
+"casesToRemove": [
+"PARTIAL in 'entry and onboarding surfaces use their scoped Blumi palette': keep the blumiEntryTheme export and the primary and primaryDeep values; drop the per-file import, variant and inline colour pins",
+"Discovery deck keeps biography concise inside the swipe card"
+],
+"wiring": "apps/mobile/package.json test:theme."
+},
+{
+"file": "apps/mobile/scripts/mobile-trust-icon-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "An icon polish preference (no emoji, an Ionicons import, a literal icon name). No safety reason and no bug history.",
+"wiring": "apps/mobile/package.json test:theme (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/mobile-ui-thread-motion-contract.test.mjs",
+"verdict": "REWRITE",
+"reason": "A real recurring jank and Reduce Motion bug class, but the test pins exact code in about 12 files.",
+"evidence": "73a8e40, 985e9d8, bdac79e, 515bc67, c205dd9, ffa04f3; git log of this file shows 985e9d8 and 73a8e40.",
+"rewritePlan": "Add tree-wide rules to mobile-engineering-rules.test.mjs: ban useNativeDriver: false (0 hits today); use an AST check to ban scheduleOnRN and runOnJS inside useFrameCallback and Gesture onUpdate/onChange worklets; add a PanResponder allowlist that may only shrink. Add a behaviour test that springPressScale under Reduce Motion sets the value immediately. Delete this file in the same commit, together with room-avatar-renderer-subscription and room-setup-long-press-contract.",
+"wiring": "apps/mobile/package.json test:theme (fingerprint; empty the body or change it with a native build).",
+"verifierNote": "Confirmed that useNativeDriver: false has 0 hits in src and that the history includes the UI-thread and Reduce Motion fixes."
+},
+{
+"file": "apps/mobile/scripts/mobile-worklet-closure.test.mjs",
+"verdict": "KEEP_FREQUENT_BUG",
+"reason": "A tree-wide, renderer-neutral check for worklet closures with the real Babel transform. These bugs crash only on device.",
+"evidence": "c7565cd 'fix: stop the tab pager crashing on the UI thread at page edges', de0b53e.",
+"verifierNote": "Confirmed that c7565cd exists and that de0b53e is in this file's history."
+},
+{
+"file": "apps/mobile/scripts/nativeUiDiskGuard.test.mjs",
+"verdict": "REMOVE",
+"reason": "A helper of the dead native-UI harness. Its runner is in no script and has no XCUITest target.",
+"wiring": "apps/mobile/package.json test:launch-config (fingerprint). Helper nativeUiDiskGuard.mjs.",
+"verifierNote": "Confirmed with grep: run-native-ui-tests.mjs is referenced only by its own test."
+},
+{
+"file": "apps/mobile/scripts/nativeUiScreenshotDirectory.test.mjs",
+"verdict": "REMOVE",
+"reason": "A helper of the same dead native-UI harness.",
+"wiring": "apps/mobile/package.json test:launch-config (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/nativeUiTemporaryData.test.mjs",
+"verdict": "REMOVE",
+"reason": "A helper of the same dead native-UI harness.",
+"wiring": "apps/mobile/package.json test:launch-config (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/nativeUiTestSelection.test.mjs",
+"verdict": "REMOVE",
+"reason": "Selector parsing for the dead harness and its retired RoomVNext selectors.",
+"wiring": "apps/mobile/package.json test:launch-config (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/normalize-room-v3-shell-candidate.test.mjs",
+"verdict": "REMOVE",
+"reason": "A one-off art tool from a retired wave, imported only by this test.",
+"wiring": "apps/mobile/scripts/run-match-room-tests.mjs line 295.",
+"verifierNote": "Confirmed with grep: referenced only by this test and the runner."
+},
+{
+"file": "apps/mobile/scripts/onboarding-male-run-source-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Exact frame counts, frame order and a baseline array from one past asset version.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/onboarding-male-run-v11-remodeled-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pixel geometry from a past promotion, plus animation constant pins.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/onboarding-runner-geometry-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Checks the v8 asset folder, which no runtime code requires, and pins frame durations and counts.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint).",
+"verifierNote": "Confirmed with grep: v8 is referenced only by package scripts, the v9 manifest metadata and this test. No .ts or .tsx require exists."
+},
+{
+"file": "apps/mobile/scripts/onboarding-welcome-home-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "JSX and interpolate pins in OnboardingBrandPrelude.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/promote-female-nondress-wardrobe.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests a finished one-off promotion pipeline (18 slugs, 108 states). The app build does not run it.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs line 149. Keep the script itself: two Workbench tools import it.",
+"verifierNote": "Confirmed with grep: create_female_nondress_promotion_approval.mjs and generate_female_nondress_promotion_evidence.mjs import the script."
+},
+{
+"file": "apps/mobile/scripts/promote-male-capsule-assets.test.mjs",
+"verdict": "REMOVE",
+"reason": "A one-off promotion script, imported only by this test.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs line 150.",
+"verifierNote": "Confirmed with grep: only this test and the runner reference it."
+},
+{
+"file": "apps/mobile/scripts/register-character-hero-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Entrance delays, component order, Reduce Motion match counts and style names. The Reduce Motion intent moves to the tree-wide rewrite.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/register-create-card-boundary-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Layout and JSX pins.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/register-keyboard-layout-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Prop, padding and style name pins.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/register-world-hero-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Asset dimensions of one PNG and animation API pins. The timer ban is already tree-wide.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/room-avatar-renderer-subscription.test.mjs",
+"verdict": "REWRITE",
+"reason": "The intent is real (no React render per frame), but the test pins RoomAvatarRenderer2D code, and the renderer is open to redesign.",
+"evidence": "bdac79e 'perf: select room avatar frames on the UI thread', afe2ab8.",
+"rewritePlan": "Fold it into the tree-wide frame-callback and gesture rule from the ui-thread-motion rewrite. Keep roomAvatarLayerRenderModel.test.ts. Delete this file in the same commit.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs line 142."
+},
+{
+"file": "apps/mobile/scripts/room-setup-long-press-contract.test.mjs",
+"verdict": "REWRITE",
+"reason": "The UI-thread drag intent is real, but the test pins handler names, copy, delays and haptic order.",
+"evidence": "ffa04f3 'perf: drag the first-room bed on the UI thread and save it once'.",
+"rewritePlan": "Covered by the tree-wide gesture rule. Optionally extract the release-save decision of useRoomSetupBedDrag into a pure model and unit-test it in an existing runner. Delete this file.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/room-setup-room-first-layout-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Copy, props and style name pins.",
+"wiring": "apps/mobile/package.json test:onboarding-navigation (fingerprint)."
+},
+{
+"file": "apps/mobile/scripts/room-v3-runtime-alpha.test.mjs",
+"verdict": "REMOVE",
+"reason": "A one-off despill art helper, imported only by this test.",
+"wiring": "apps/mobile/scripts/run-match-room-tests.mjs line 294.",
+"verifierNote": "Confirmed with grep: only this test and the runner reference it."
+},
+{
+"file": "apps/mobile/scripts/roomPerspectiveNativeUiContract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Unwired. It reads an unversioned Swift file and pins names and counts from retired QA.",
+"wiring": "Not wired."
+},
+{
+"file": "apps/mobile/scripts/run-match-room-tests.test.mjs",
+"verdict": "REMOVE",
+"reason": "A regex over the runner's own coverage-flag code.",
+"wiring": "apps/mobile/scripts/run-match-room-tests.mjs line 292."
+},
+{
+"file": "apps/mobile/scripts/run-native-ui-tests.test.mjs",
+"verdict": "REMOVE",
+"reason": "Unwired test of the dead native-UI harness. It fails without a prebuilt ios/ folder.",
+"wiring": "Not wired. Remove it together with run-native-ui-tests.mjs and the nativeUi*.mjs helpers."
+},
+{
+"file": "apps/mobile/scripts/run-workbench-fixture-tests.test.mjs",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Behaviour of the live test:workbench runner.",
+"verifierNote": "If other chunks remove Workbench-fixture tests, update the WORKBENCH_FIXTURE_TESTS map in run-workbench-fixture-tests.mjs. This test hard-codes the 'male-wardrobe-redesign' and 'female-fit-zones' entries."
+},
+{
+"file": "apps/mobile/scripts/sentry-debug-plugin.test.mjs",
+"verdict": "KEEP_BEHAVIOR",
+"reason": "Behaviour of the Sentry debug config plugin."
+}
+],
+"deadCode": [
+"apps/mobile/scripts/run-native-ui-tests.mjs plus its helpers nativeUiDiskGuard.mjs, nativeUiScreenshotDirectory.mjs, nativeUiTemporaryData.mjs, nativeUiTestSelection.mjs and nativeUiProjectContract.mjs (tooling; no script runs it)",
+"apps/mobile/scripts/normalize-room-v3-shell-candidate.mjs (referenced only by its test)",
+"apps/mobile/scripts/room-v3-runtime-alpha.mjs (referenced only by its test)",
+"apps/mobile/scripts/promote-male-capsule-assets.mjs (referenced only by its test)",
+"apps/mobile/scripts/build_onboarding_runner_frames.py (referenced only by an unwired test)",
+"apps/mobile/src/features/session/assets/onboarding-runners-v8-fluid-runtime/ (no runtime require; only package scripts and v9 manifest metadata mention it)",
+"Other unreferenced onboarding runner asset folders (v4, v5, v6, v7, v9, v11-remodeled-source and register-world-hero-v1-source). Check each one against an archive manifest before removing it."
+],
+"notes": "I confirmed that all 38 chunk files appear exactly once and accepted the classifier's result with one change. mobile-release-channels goes from KEEP_SAFETY to TRIM, dropping only the expo-updates ~57 version pin.\n\nGrep confirmed the dead-tooling claims: room-v3-runtime-alpha, normalize-room-v3-shell-candidate, promote-male-capsule-assets, the native-UI harness and the v8 asset folder. The behaviour tests cited as replacements all exist. Grep also confirmed that the worklet-closure test guards a real device crash (c7565cd).\n\nIn mobile-release-config, I re-checked the cases that touch the economy and demo fallback. They pin specific files, not tree-wide safety rules, and the server or the behaviour tests carry the real guarantees, so I agree with removing them.\n\nThe three REWRITE items must land in one commit together with the new tree-wide UI-thread rules in mobile-engineering-rules.test.mjs. Most removals are wired through apps/mobile/package.json fingerprint scripts, so batch them with the next native build."
+},
+"mobile/scripts#1": {
+"items": [
+{
+"file": "apps/mobile/scripts/create_female_nondress_promotion_approval.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests a one-off July-2026 art promotion tool that the app build does not use. It pins exact counts (18 items, 3 evidence files, 6 sources), needs Workbench-only fixtures and has never run in CI. Published item bytes are already SHA-256-locked by shopReleaseCatalog.test.ts.",
+"evidence": "The tool is referenced only by this test, the workbench runner and the doc. It was imported in 922fe89 and never touched since.",
+"wiring": "run-workbench-fixture-tests.mjs WORKBENCH_FIXTURE_TESTS map (apps/mobile package.json test:workbench). Also listed in docs/quality/WORKBENCH_FIXTURE_TESTS_2026-09-30.md.",
+"verifierNote": "Confirmed. test:workbench is not part of root verify or verify:workbench-tools, which runs only tools/workbench/*.test.mjs. Helper used only by this test: apps/mobile/scripts/create_female_nondress_promotion_approval.mjs."
+},
+{
+"file": "apps/mobile/scripts/female-accessory-occlusion-staging.test.mjs",
+"verdict": "REMOVE",
+"reason": "Checks Workbench staging output from the 2026-07-15 wave: manifest verdict strings, hard-coded pixel envelopes and contact-sheet sizes. Its runtime byte check is covered by the shopReleaseCatalog SHA-256 lock. It is Workbench-only and has never run.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed. The test is not wired into any CI or verify script."
+},
+{
+"file": "apps/mobile/scripts/female-dress-capsule.test.mjs",
+"verdict": "REMOVE",
+"reason": "One-off four-dress capsule gate. It pins slugs, layerOrder and pixel envelopes of the current 256x384 rig, the same class of art pixel gate the owner removed on 2026-09-30. It is Workbench-only and has never run. Motion coverage is enforced by avatarRoomCatalogMotionCoverage.test.ts.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed that avatarRoomCatalogMotionCoverage.test.ts exists and covers walking and sitting frames for every visible layer."
+},
+{
+"file": "apps/mobile/scripts/female-fresh-bottom-shoe-motion.test.mjs",
+"verdict": "REMOVE",
+"reason": "Evidence check for the past 2026-07-16 wave. It pins an exact count (8), rig and fit IDs and 120ms, and shells out to a wave-specific Python producer. It is Workbench-only and duplicates the runtime motion-coverage test.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench). Also named in docs/quality/cleanup-manifest-2026-09-29.json.",
+"verifierNote": "Confirmed. Wave tool: apps/mobile/scripts/produce_female_fresh_bottom_shoe_capsule.py."
+},
+{
+"file": "apps/mobile/scripts/female-fresh-bottom-shoe-static.test.mjs",
+"verdict": "REMOVE",
+"reason": "Reads a Workbench static manifest from a finished wave and checks numbers the manifest records about itself. It is Workbench-only and does not check app runtime.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/female-new-tops-jackets-capsule.test.mjs",
+"verdict": "REMOVE",
+"reason": "One-off seven-item capsule gate. It pins slugs, counts, contact-sheet sizes, a waist-seam scan window, an alpha IoU threshold and file-mtime ordering of the current rig. It is Workbench-only and has never run.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench). Named in cleanup-manifest-2026-09-29.json.",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/female-nondress-promotion-evidence.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests an evidence generator for the finished July nondress promotion. It pins itemCount 18, assetCount 108 and 120ms, and needs Workbench fixtures.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed. Helper used only by this test: generate_female_nondress_promotion_evidence.mjs."
+},
+{
+"file": "apps/mobile/scripts/female-sitting-rig-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Regex-parses catalog source and asserts exact per-category counts {top:6,bottom:7,shoes:5,accessory:12}, so any new female item breaks it. Its real guarantee, that every visible room layer has a sitting frame, is behaviour-tested against the runtime catalog by avatarRoomCatalogMotionCoverage.test.ts.",
+"evidence": "Line 50: assert.deepEqual(counts, { top: 6, bottom: 7, shoes: 5, accessory: 12 }). avatarRoomCatalogMotionCoverage.test.ts:34 checks sitting frames for every visible layer.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs tsx --test list.",
+"verifierNote": "Confirmed the exact count pin and the covering behaviour test."
+},
+{
+"file": "apps/mobile/scripts/female-sweet-capsule-promotion-gate.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins July sweet-capsule slug lists, the literal FEMALE_SWEET_CAPSULE_LAYERS and literal require lines in runtime source, and runs pixel contact-density checks of the current rig. Shipping Coral Wave forced edits to it. Its guarantees are covered by the motion-coverage, quarantine and shopReleaseCatalog behaviour tests.",
+"evidence": "263cd8a and 3135205.",
+"wiring": "run-avatar-v2-tests.mjs tsx --test list.",
+"verifierNote": "Confirmed. The evidence commits show the gate blocking a new outfit."
+},
+{
+"file": "apps/mobile/scripts/female-wardrobe-combined-promotion-gate.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests a July promotion tool with a hard-coded catalog. Its assertCatalogMatchesRuntimeSource cases fail CI whenever a new female wearable is added. It hard-codes 120ms, 4W+1S, a 256x384 canvas and pixel zones. The quarantine assertion duplicates avatarRoomCatalogRuntime.test.ts.",
+"evidence": "263cd8a and 3135205.",
+"wiring": "run-avatar-v2-tests.mjs tsx --test list.",
+"verifierNote": "Confirmed. Keep src/features/avatarV2/room/femaleWardrobePromotionContract.json, which the runtime reads. After removal, female-wardrobe-combined-promotion-gate.mjs is used only by the test-only evidence generator."
+},
+{
+"file": "apps/mobile/scripts/female-wardrobe-static-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Art pixel gate pinned to today's rig: exact file lists, torso coverage zones, sole baselines, a hair centroid and alpha bounds. This is the same kind of gate the owner removed on 2026-09-30. Published bytes stay locked by shopReleaseCatalog.",
+"evidence": "docs/quality/ART_GATE_DECISIONS_2026-09-30.md.",
+"wiring": "run-avatar-v2-tests.mjs tsx --test list.",
+"verifierNote": "Confirmed. Do not delete docs/avatar-motion-pipeline/female-fit-zones.json, which generate_bottom_reference_layers.py still reads."
+},
+{
+"file": "apps/mobile/scripts/homeStudioQaModuleRouting.test.mjs",
+"verdict": "KEEP_SAFETY",
+"reason": "Behaviour test of the Metro resolver used by metro.config.js. Production and preview builds always resolve the QA Home Studio, which loads candidate art, to a no-op stub. This keeps QA and candidate assets out of release builds.",
+"wiring": "run-match-room-tests.mjs",
+"verifierNote": "Confirmed that metro.config.js:6 requires ./scripts/homeStudioQaModuleRouting.cjs and that the test exercises resolver behaviour, not source text."
+},
+{
+"file": "apps/mobile/scripts/male-premium-capsule-motion-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Workbench-only gate for the finished 2026-07-16 premium capsule. It pins exact counts and staged candidates. Live frames are covered by avatarRoomCatalogMotionCoverage.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/male-premium-capsule-static-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Workbench-only manifest check from a past wave with exact item counts. Retired-asset absence is handled by RETIRED_AVATAR_ITEM_IDS and retiredWardrobe.test.ts.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/male-wardrobe-fit-profile.test.mjs",
+"verdict": "REMOVE",
+"reason": "Reads the Workbench review JSON of the finished 66-item male wave and asserts its own recorded counts and verdicts. Its runtime canvas-size check is trivial.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/male-wardrobe-motion-fit.test.mjs",
+"verdict": "REMOVE",
+"reason": "Asserts properties of Workbench promotion-evidence JSON from a finished wave and never reads app runtime files. Motion coverage is enforced by the runtime behaviour test.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/male-wardrobe-production-gate.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pixel-exact derivative check against Workbench candidates (66 items, 396 files). It cannot run in CI. The real release guard, receipts plus SHA-256 binding in shopReleaseCatalog.test.ts, runs in CI.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed. The money and receipt safety lives in shopReleaseCatalog and blumiR1ReleaseCatalog.json, not here."
+},
+{
+"file": "apps/mobile/scripts/male-wardrobe-redesign-status.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests an audit tool of the finished 2026-07-27 male redesign wave. It pins inventory counts and candidate path conventions and needs Workbench manifests. Shipping approval is enforced by release receipts.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed. male-wardrobe-redesign-status.mjs then has only past-wave Python callers."
+},
+{
+"file": "apps/mobile/scripts/male-young-drop-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Workbench-only contract for the past 2026-07-18 wave. It pins an exact item list and pixel envelopes. Its resurrection check is covered by RETIRED_AVATAR_ITEM_IDS and retiredWardrobe.test.ts.",
+"wiring": "run-workbench-fixture-tests.mjs (test:workbench).",
+"verifierNote": "Confirmed."
+},
+{
+"file": "apps/mobile/scripts/mobile-accessibility-baseline.test.mjs",
+"verdict": "REWRITE",
+"reason": "The AST label/role rule is a cheap guard against a very common error, but it runs over a hand-kept file list. The other 13 cases pin copy, testIDs, layout thresholds, component names and reduce-motion code shape that is already behaviour-tested.",
+"evidence": "25 commits, mostly refactor-only edits (2a78ae0, 2531d76, 6f2163b, d34cca5, 8770a75, b53a19f). A tree-wide scan found only 4 misses.",
+"casesToRemove": [
+"registration exposes one progressive primary action",
+"registration distributes its primary sections across the viewport",
+"country calling code picker is searchable and modal-accessible",
+"onboarding explains the full account-to-room journey",
+"profile setup is one page by default with an accessible overflow fallback",
+"avatar setup is a no-scroll direct-manipulation stylist",
+"field validation errors are announced",
+"critical continuous motion honors the operating system Reduce Motion preference",
+"connection banner stays compact without covering safe-area content",
+"profile editing exposes radio semantics and announces validation and save status",
+"settings phone change reuses the country-aware phone contract",
+"room starter choices stay reachable on narrow screens and larger text",
+"account recovery remains keyboard-safe and scrollable on short screens"
+],
+"rewritePlan": "Keep only the AST rule and run it over every non-test .tsx under apps/mobile/src: a Pressable needs accessibilityRole and accessibilityLabel, a TextInput/FieldInput needs accessibilityLabel, and an element with a JSX spread counts as compliant. Fix the 4 misses or put them in a shrink-only allowlist with the reason. Reduce Motion stays covered by reducedMotionStore.test.ts and the model tests.",
+"wiring": "apps/mobile/package.json test:accessibility inline list. Changing the file contents needs no script edit.",
+"verifierNote": "Confirmed that src/ui/reducedMotionStore.test.ts exists. Agree with the REWRITE."
+},
+{
+"file": "apps/mobile/scripts/mobile-avatar-runtime-performance.test.mjs",
+"verdict": "REWRITE",
+"reason": "The guarantee is real and recurring: avatar frames and walking stay on the UI thread, with no React render per frame. Every assertion, though, is a regex over specific renderer files, memo names and transform math, so any Skia, Rive or 3D redesign breaks it.",
+"evidence": "bdac79e, 515bc67, c205dd9, c607202, e183f91 and 08d6a18, a repeated JS-thread jank bug class.",
+"rewritePlan": "1) Keep the tree-wide no-rAF/setInterval guard in mobile-engineering-rules. 2) Add a tree-wide AST rule: inside useFrameCallback or a gesture onUpdate/onChange worklet, a scheduleOnRN/runOnJS call that targets a React state setter fails unless it is guarded by a comparison with a previous value. 3) Optionally add a React.Profiler render-count test with the Reanimated mock: N frames give 0 commits, and a pose or depth flip gives 1. Delete the file-specific regexes. Apply the same plan to room-avatar-renderer-subscription.test.mjs.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs tsx --test list.",
+"verifierNote": "Confirmed from the history of this test: c607202, 08d6a18 and 64cb885 changed it along with the code, and the UI-thread work recurs."
+},
+{
+"file": "apps/mobile/scripts/mobile-bundle-size.test.mjs",
+"verdict": "REMOVE",
+"reason": "Tests measure-mobile-bundle.mjs, a dead tool. Its only caller, run-mobile-bundle-size.mjs, is referenced nowhere, and the baseline file does not exist. It also measures bytes, not the 1,000-asset OTA limit.",
+"evidence": "grep finds measure-mobile-bundle only in run-mobile-bundle-size.mjs and this test. docs/quality/mobile-bundle-baseline.json is missing.",
+"wiring": "apps/mobile/package.json 'test:bundle-size' plus its entry in the 'test' chain (fingerprint: unwire only with a planned native build).",
+"verifierNote": "Confirmed with grep and ls: the baseline file is missing and run-mobile-bundle-size has no referrer. Dev tools used only by this test: measure-mobile-bundle.mjs and run-mobile-bundle-size.mjs."
+},
+{
+"file": "apps/mobile/scripts/mobile-celebration-icon-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins the Ionicons import and specific icon names, which is a design choice, not safety and not owner-locked. Half of it checks the dead RoomDebriefScreen.tsx.",
+"wiring": "apps/mobile/package.json test:theme inline list (fingerprint).",
+"verifierNote": "Confirmed with grep: RoomDebriefScreen appears only in its own file in src, with no importer outside tests."
+},
+{
+"file": "apps/mobile/scripts/mobile-core-flow-presentation-contract.test.mjs",
+"verdict": "REWRITE",
+"reason": "About 25 regex cases pin copy, hex colours, component names, JSX order and constants. Leave, exit, invite and match behaviour is covered by model tests. The one uncovered real guarantee is that the MiniRoom composer keeps refused text and restores a failed message. That is the lost-message bug class, fixed in 96998ca.",
+"evidence": "30 refactor and copy commits (2a78ae0, 12aaf15, 6f2163b, b6d431e). 96998ca 'fix(miniRoom): track in-room messages by client id and keep refused composer text'.",
+"casesToRemove": [
+"production match flow leads from Discover to chat without a room promise",
+"chat opens a conversation first and renders room invitations as explicit timeline cards",
+"chat keeps the room invitation entry visible and explains unavailable states",
+"loading earlier messages preserves the current chat scroll position",
+"chat composer places the guarded room button before the text input",
+"chat preserves its canonical header and muted bubbles while invitations use the shared theme",
+"chat localizes core empty, history, composer, and accessibility copy for Turkish",
+"production discovery preferences use the authoritative profile path",
+"profile decisions use the production API directly and never fall through to legacy invites",
+"empty inbox and onboarding direct people toward Discover and chat",
+"inbox does not present unverified partner presence",
+"onboarding profile review returns to the originating setup step",
+"deep-linked profile failures stay truthful and recoverable",
+"Phase 1 copy no longer promises a room outside technical compatibility fields",
+"room setup exposes only the free starter bed and shop does not claim unplaced furniture is placed",
+"shop keeps status and mode controls outside the oversized screen",
+"profile copy does not promise post-match room experiences",
+"You keeps one profile action and does not duplicate bottom navigation",
+"production navigation excludes the unreachable Saved Connections screen",
+"legacy avatar fallback stays honest and monogram-based",
+"room exit returns to chat without a debrief or a repeated match decision",
+"chat surfaces render a canonical participant avatar and keep monograms for missing legacy data",
+"MiniRoom uses durable speech bubbles without the legacy reaction UI",
+"a confirmed MiniRoom leave never keeps the person in the room (2026-10-01)",
+"leaving the MiniRoom always asks first, from the arrow, the menu or Android back (ROOM-08)",
+"the MiniRoom composer keeps refused text and restores a failed message for retry"
+],
+"rewritePlan": "Delete the file. Extract the composer submit and restore decisions from MiniRoomScene.tsx into pure helpers in src/features/miniRoom, for example resolveRoomComposerSubmit and resolveComposerRestore. Add a node test: a refused send keeps the text, an accepted send clears it, and a failed message comes back only into an empty composer with the same clientMessageId. Leave, exit and guard behaviour stays covered by miniRoomLeaveModel.test.ts and miniRoomLeaveFlow.test.ts.",
+"wiring": "apps/mobile/scripts/run-navigation-tests.mjs.",
+"verifierNote": "Confirmed that miniRoomLeaveModel.test.ts, miniRoomLeaveFlow.test.ts and useInRoomChat.reconnect.test.ts exist. git log -S found fix 96998ca, which supports keeping the composer guarantee as a behaviour test."
+},
+{
+"file": "apps/mobile/scripts/mobile-core-icon-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Makes Ionicons mandatory in hand-picked files and pins JSX icon names and ui/avatar.tsx internals. This is an icon-system preference that blocks alternatives such as SF Symbols, with no bug history.",
+"evidence": "UX_MOTION_AUDIT_2026-09-30.md:170. History is only refactor edits (a84ae9e, 12aaf15, 8770a75, 7ec258d).",
+"wiring": "apps/mobile/package.json test:theme inline list (fingerprint).",
+"verifierNote": "Confirmed. No glyph-regression bug was found in the history."
+},
+{
+"file": "apps/mobile/scripts/mobile-dev-bundle-host.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins the exact Swift text of the generated, gitignored AppDelegate.swift. It is skipped in CI and the container, and it has already flipped its meaning once.",
+"evidence": "4d016d2, 2a55475 and .gitignore /apps/mobile/ios.",
+"wiring": "apps/mobile/package.json test:launch-config inline list (fingerprint).",
+"verifierNote": "Confirmed. The single test targets generated Expo template output."
+},
+{
+"file": "apps/mobile/scripts/mobile-discovery-presentation-contract.test.mjs",
+"verdict": "REWRITE",
+"reason": "About 20 regex cases pin Discover styling, constants, copy and server route shape, and the behaviour is covered by discovery model tests and the server discoverySnapshot test. The remaining real guarantee is account isolation and stale-state: filters from another account or an older hydration generation must never be marked ready.",
+"casesToRemove": [
+"production Discover reuses the approved demo deck presentation",
+"production Discover reserves the shared responsive bottom navigation inset",
+"returning to Discover keeps same-account filters ready while refreshing them",
+"approved swipe card accepts real candidate avatar and private distance data",
+"discover bio is concise and stays inside the existing profile summary",
+"card back is a bounded, accessible 3D face with a calm fallback",
+"discovery actions stay on the front face while the card back is open",
+"deck transition resets the outgoing swipe before the next card paints",
+"production decisions advance optimistically without locking the next profile",
+"quota exhaustion is separate from candidate supply and never promises an unconfigured reward",
+"discovery action buttons use the same animated swipe path as gestures",
+"Discover ambient glass shares one shadowless light system",
+"the active discovery card rests straight and only back cards form the stack",
+"Discovery card geometry consumes continuous numeric layout metrics",
+"global Discovery pagination prefetches without replacing the deck",
+"production cards use real discovery signals without synthetic fit metadata",
+"server discovery overlaps stable pagination with display quota and preserves safety/error boundaries",
+"profile edit separates identity, discovery preferences, and avatar body routing",
+"low-supply Vibe Card is server-backed, expiring, and cancellable",
+"production and demo share the approved end-of-deck screen",
+"production discovery keeps loading distinct from a genuinely exhausted deck",
+"production Discover error surfaces stay actionable without raw diagnostics",
+"production discovery waits for account-scoped persisted filters"
+],
+"rewritePlan": "Delete the file. Extract the hydration guard (generation ref plus filtersReadyForUserId) from useDiscoveryFilters.ts into a pure helper in discoveryFiltersModel.ts. In discoveryFiltersModel.test.ts, assert that an older generation or another userId never sets ready, and that a save bumps the generation so a late load cannot overwrite it.",
+"wiring": "apps/mobile/scripts/run-discovery-tests.mjs.",
+"verifierNote": "Confirmed that discoveryFiltersModel.ts exists as the target for the extraction. Agree with REWRITE, because account isolation is a safety rule."
+},
+{
+"file": "apps/mobile/scripts/mobile-discovery-refresh-contract.test.mjs",
+"verdict": "REWRITE",
+"reason": "The guarantee is real: the refresh spinner always clears and failures stay visible, which is the stuck-busy and hang class. But it is enforced by AST checks bound to callback names and a regex over a legacy signature. runDiscoveryRefresh is already behaviour-tested, except that pending must clear after a rethrown limit error.",
+"evidence": "1fdd561 (room invite send, accept and cancel could stay busy forever).",
+"casesToRemove": [
+"Lobby refresh awaits the refresh operation and never uses a cosmetic timer",
+"Lobby refresh clears pending state in finally and exposes a visible failure path",
+"realtime lobby refresh exposes an awaitable callback contract"
+],
+"rewritePlan": "Move the pending lifecycle into discoveryRefreshModel: runDiscoveryRefresh(refresh, { onPendingChange }) clears pending in finally and ignores a second call while one is in flight. In discoveryRefreshModel.test.ts, assert that pending clears after success, after an error and after a rethrown DiscoveryRefreshLimitError, and that overlapping calls run refresh once. Delete this file.",
+"wiring": "apps/mobile/scripts/run-discovery-tests.mjs.",
+"verifierNote": "Confirmed that discoveryRefreshModel.test.ts exists and that 1fdd561 is a stuck-busy fix."
+},
+{
+"file": "apps/mobile/scripts/mobile-discovery-swipe-runtime.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins swipe tuning constants, Gesture Handler API choices, easing, perspective and exact animated-style text. The swipe rules are behaviour-tested in discoverySwipeModel.test.ts, and the UI-thread requirement is covered by the tree-wide frame-loop guard.",
+"evidence": "Rewritten with 77312fb and 23e3608.",
+"wiring": "apps/mobile/scripts/run-discovery-tests.mjs.",
+"verifierNote": "Confirmed that discoverySwipeModel.test.ts exists."
+},
+{
+"file": "apps/mobile/scripts/mobile-engineering-rules.test.mjs",
+"verdict": "TRIM",
+"reason": "The tree-wide guards are backed by repeated real bugs: no raw fetch and fetchers only inside requestJson (1fdd561), no rAF/setInterval loops (bdac79e, 515bc67, c205dd9), worklet default parameters (c7565cd device-only crash), exhaustive-deps (8d15c24, fd4253a) and the reduce-motion/transparency single source (f34d52c). The 800-line file-size cap with its shrink-only debt is a maintainability preference with no bug evidence.",
+"evidence": "Test names confirmed at lines 29, 42, 56, 68, 80, 107, 120 and 137. 1fdd561 appears in this file's history.",
+"casesToRemove": [
+"production files stay small; oversized debt may only shrink"
+],
+"wiring": "apps/mobile/package.json test:theme (the file stays wired, so no script change). Drop the File size row in docs/quality/ENGINEERING_RULES.md.",
+"verifierNote": "Confirmed the case list and that the kept cases are tree-wide. No bug commit is linked to the size cap."
+},
+{
+"file": "apps/mobile/scripts/mobile-env-gate-characterization.test.mjs",
+"verdict": "REMOVE",
+"reason": "A refactor characterization matrix in which all 7 cases expect the same constant ('approved-run'/'approved'), because the promotion record approves everything. It spawns 7 processes to assert a constant. The gate logic, including QA flag and build profile, is behaviour-tested in onboardingRunAssetGate.test.ts and profileCharacterReactionAssetGate.test.ts. Candidate imports are blocked at build time by apps/mobile/scripts/mobile-release-assets.cjs, which app.config.js requires.",
+"wiring": "apps/mobile/package.json test:launch-config inline list (fingerprint).",
+"verifierNote": "Read the file: there is one EXPECTED constant for every case. Confirmed that onboardingRunAssetGate.test.ts exists and that app.config.js uses mobile-release-assets.cjs."
+},
+{
+"file": "apps/mobile/scripts/mobile-import-boundaries.test.mjs",
+"verdict": "TRIM",
+"reason": "Keep the two tree-wide layering rules (config never imports features, screens or navigation; ui never imports screens or navigation), which prevent require cycles and init-order crashes. Remove the shrink-only ui→features baseline. It is a preference with no bug, and it would block a shared avatar renderer used from ui.",
+"evidence": "bcc8a6c added the ratchet as a preference.",
+"casesToRemove": [
+"src/ui -> src/features imports only shrink against the recorded baseline"
+],
+"wiring": "apps/mobile/package.json test:theme (the file stays wired). Update docs/quality/ENGINEERING_RULES.md.",
+"verifierNote": "Confirmed the test names at lines 69, 76 and 109 and the history (bcc8a6c, with no bug link)."
+},
+{
+"file": "apps/mobile/scripts/mobile-launch-config.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins dev launch-script flags and exact Expo, React Native and React versions with no safety reason. SDK alignment is checked by `npm run doctor` (expo-doctor) in root verify.",
+"evidence": "dbb1c13. Root package.json verify ends with npm run doctor.",
+"wiring": "apps/mobile/package.json test:launch-config inline list (fingerprint).",
+"verifierNote": "Confirmed that its 3 tests are launch flags, launch modes and SDK 57 alignment, and that doctor is in the root verify chain."
+},
+{
+"file": "apps/mobile/scripts/mobile-lobby-invite-fail-closed.test.mjs",
+"verdict": "REMOVE",
+"reason": "One regex over the legacy realtime-invite branch of useDiscoveryDecisions.ts. That branch runs only when session.mode !== 'production', that is demo mode or the retired lobby. The fail-closed send boundary is behaviour-tested in lobbyInviteAttempt.test.ts.",
+"wiring": "apps/mobile/scripts/run-navigation-tests.mjs.",
+"verifierNote": "Confirmed that isProductionDiscovery = session.mode === 'production' (LobbyScreen.tsx:103) and that the branch is gated by !isProductionDiscovery. lobbyInviteAttempt.test.ts exists. History: 922fe89, a84ae9e and 12aaf15 only, with no repeated bug."
+},
+{
+"file": "apps/mobile/scripts/mobile-miniroom-motion-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Regex pins over the MiniRoom and room renderers: call shapes, ReduceMotion.Never, scale literals and slices of AvatarLayer.tsx. This is the renderer and animation system the owner opened. The observable parts are behaviour-tested in miniRoomAvatarMotion.test.ts, roomWorldRuntime.test.ts and myRoomAvatarWalkModel.test.ts.",
+"wiring": "apps/mobile/scripts/run-avatar-v2-tests.mjs final execFileSync block guarded by BLUMI_AVATAR_V2_SKIP_MINIROOM_CONTRACT (line 202). Remove that block and the env var.",
+"verifierNote": "Confirmed the wiring at run-avatar-v2-tests.mjs:202."
+},
+{
+"file": "apps/mobile/scripts/mobile-motion-polish-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "Pins theme motion token numbers, default-parameter text, testIDs, hook usage and borderCurve on named styles. These are design-system choices. Reduce-motion behaviour is tested in reducedMotionStore.test.ts and by the tree-wide rule.",
+"wiring": "apps/mobile/package.json test:accessibility inline list (fingerprint).",
+"verifierNote": "Confirmed that reducedMotionStore.test.ts exists."
+},
+{
+"file": "apps/mobile/scripts/mobile-onboarding-motion-v2-contract.test.mjs",
+"verdict": "REMOVE",
+"reason": "About 17 cases pin onboarding cinematic constants, outputRange literals, style names and copy keys. Its one release-safety point, no candidate asset folders, is enforced at build time for every preview and production build by apps/mobile/scripts/mobile-release-assets.cjs, which app.config.js loads.",
+"evidence": "Edited by many unrelated commits (b1bc60a, ac1d764, b6d431e, aeb968a, 6b1ac89, d34afe1).",
+"wiring": "apps/mobile/package.json test:onboarding-navigation inline list (fingerprint).",
+"verifierNote": "Confirmed the build-time CANDIDATE_IMPORT guard in apps/mobile/scripts/mobile-release-assets.cjs and that it is loaded from app.config.js. The classifier gave the wrong path (scripts/ at the root)."
+}
+],
+"deadCode": [
+"apps/mobile/src/screens/RoomDebriefScreen.tsx: no production import (grep over src finds only its own file); referenced only by test scripts.",
+"apps/mobile/scripts/measure-mobile-bundle.mjs and apps/mobile/scripts/run-mobile-bundle-size.mjs: unwired dev tooling, and the baseline docs/quality/mobile-bundle-baseline.json is missing (tooling, not app runtime)."
+],
+"notes": "The verifier confirmed all 37 files. Each appears exactly once and matches the chunk list. No verdict changed: 1 KEEP_SAFETY, 2 TRIM, 5 REWRITE, 29 REMOVE.\n\nChecks run:\n- grep for dead tools: the bundle-size tool and RoomDebriefScreen are dead.\n- The root verify chain includes doctor. It does not include test:workbench. verify:workbench-tools covers only tools/workbench.\n- The env-gate test expects one constant for every case.\n- The legacy invite branch runs only outside production mode.\n- metro.config.js wires the homeStudio resolver.\n- app.config.js loads apps/mobile/scripts/mobile-release-assets.cjs. The classifier cited the wrong path, scripts/ at the root.\n- 96998ca backs the composer REWRITE. 1fdd561 backs the refresh REWRITE.\n- All covering model tests named by the classifier exist.\n\nWiring and helper notes from the classifier still apply. Fingerprint caution: removals wired through package.json inline lists must wait for a planned native build."
 }
 }
 }
