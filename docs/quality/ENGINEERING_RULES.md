@@ -86,6 +86,8 @@ All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useM
 7. Every animation is interruptible.
 8. Never a spinner where a skeleton fits; skeleton → content is a crossfade.
 
+Shared-element moments use the root `FlightLayer` (`src/ui/flight`): `launchFlight` from a measured source frame, and the landing view claims it with `claimFlight` + `FlightTargetView`. A flight only decorates an action that already happened: it never delays it, skips itself when either end cannot be measured or is off screen, always reveals its target, and crossfades in place under Reduce Motion. Chat send is the first user (`features/chat/thread/chatSendFlight.tsx`).
+
 ## Server facts
 
 - Every authenticated route resolves the session with `resolveBearerSession`, which runs the ban and suspension check, and enforces its declared request schema. Three profile routes once skipped the check, and a schema was once attached but ignored.

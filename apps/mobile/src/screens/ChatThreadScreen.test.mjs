@@ -82,7 +82,7 @@ function sendBindings(events, sendChatMessage) {
     sessionActor: { session: { mode: "production" } },
     sessionMode: "production",
     captureProductEvent: () => events.push(["analytics"]),
-    hapticLight: () => events.push(["haptic"]),
+    hapticSelection: () => events.push(["haptic"]),
     // Module binding for chatThreadModel.normalizeOutgoingChatBody (node-tested there).
     normalizeOutgoingChatBody: (body) => body.trim().replace(/\s+/g, " ")
   }

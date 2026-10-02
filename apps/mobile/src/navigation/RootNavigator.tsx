@@ -72,6 +72,7 @@ import {
 } from "./rootNavigationModel"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
+import { FlightLayer } from "../ui/flight/FlightLayer"
 import { ToastContainer, showToast } from "../ui/toast"
 import { getDailyRewardToastCopy } from "../features/inventory/dailyRewardCopy"
 import { getAppLocale } from "../features/session/appLocale"
@@ -1124,6 +1125,7 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
         isFullShopCatalogQaPreview={IS_FULL_SHOP_CATALOG_QA_PREVIEW}
         onBottomNavPress={handleBottomNavPress}
       />
+      <FlightLayer />
       <ToastContainer />
     </View>
     </DiscoveryStartupBoundary>
