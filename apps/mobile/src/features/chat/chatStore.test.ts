@@ -872,3 +872,29 @@ test("a server hide drops cached messages up to the hide point and keeps newer o
     resetChatStore()
   }
 })
+
+test("reading the threads is cheap between list changes: unread and active-thread updates reuse the snapshot", () => {
+  resetChatStore()
+  try {
+    const thread = { threadId: "snapshot", miniRoomId: "room", participantUserIds: ["a", "b"] as [string, string],
+      participants: [{ userId: "a" }, { userId: "b" }] as [{ userId: string }, { userId: string }], createdAt: "2026-09-05T00:00:00Z",
+      unreadCount: 2, lastMessage: { messageId: "m1", threadId: "snapshot", senderUserId: "a", body: "hi", sentAt: "2026-09-05T10:00:00Z" } }
+    applyChatThreadListed({ userId: "b", threads: [thread] })
+    const first = getThreads()
+    assert.equal(getThreads(), first, "a second read without a change returns the same snapshot")
+    // Opening a chat (active thread, unread cleared) and a loading flag do not touch the list.
+    setActiveThread("snapshot")
+    applyChatMessageListLoading("snapshot")
+    assert.equal(getThreads(), first)
+    assert.equal(getThreadUnreadCount("snapshot"), 0, "the unread count still changes on its own")
+    setActiveThread(null)
+    // A new message moves the list: the next read is a fresh snapshot with it.
+    applyChatMessageReceived({ messageId: "m2", threadId: "snapshot", senderUserId: "a", body: "new", sentAt: "2026-09-05T10:01:00Z" }, { localUserId: "b" })
+    const next = getThreads()
+    assert.notEqual(next, first)
+    assert.equal(next[0]?.lastMessage?.messageId, "m2")
+    assert.equal(first[0]?.lastMessage?.messageId, "m1", "an earlier snapshot is never changed under its reader")
+  } finally {
+    resetChatStore()
+  }
+})

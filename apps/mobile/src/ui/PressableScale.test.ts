@@ -90,3 +90,17 @@ test("caller press handlers, accessibility and a pressed-state style function ke
   assert.equal(style().borderWidth, 1)
   assert.deepEqual(seen, ["in", "out"])
 })
+
+test("a tap reaches the caller's onPress untouched: no press delay, and a press-in re-renders nothing", async () => {
+  const onPress = () => undefined
+  const { runtime, element } = await mount(false, { onPress })
+  const props = element().props
+  // RN Pressable calls onPress on touch up; PressableScale must not wrap or delay it.
+  assert.equal(props.onPress, onPress)
+  assert.equal(props.unstable_pressDelay, undefined)
+  assert.equal(props.delayPressIn, undefined)
+  const rendersBefore = runtime.renderCount
+  props.onPressIn(pressEvent)
+  props.onPressOut(pressEvent)
+  assert.equal(runtime.renderCount, rendersBefore, "the press feel runs on the UI thread, not through React state")
+})
