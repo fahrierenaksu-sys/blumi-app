@@ -14,8 +14,8 @@ import { reconcileComposerTextAfterSend } from "./chatComposerDraftModel"
 import { styles } from "./chatThreadStyles"
 import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 
-/** Scale the send button springs back from after a send (MOTION_PLAN §D.4). */
-const SEND_POP_SCALE = 0.8
+/** Scale the send button springs back from after a send: a subtle pop (MOTION_PLAN §D.4). */
+const SEND_POP_SCALE = 0.9
 
 /** Owns the draft text so typing never re-renders the timeline owner. */
 export function ChatComposer({
