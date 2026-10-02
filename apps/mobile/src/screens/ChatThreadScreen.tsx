@@ -64,6 +64,7 @@ import { useRequestedRoomInvite } from "../features/chat/thread/useRequestedRoom
 import { useRequestedRoomInviteAccept } from "../features/chat/thread/useRequestedRoomInviteAccept"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
+import { useAfterPushTransition } from "../features/chat/thread/useAfterPushTransition"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
 import { useChatTimelineEntrances } from "../features/chat/thread/useChatTimelineEntrances"
 import { useIncomingArrivalHaptic } from "../features/chat/thread/useIncomingArrivalHaptic"
@@ -204,7 +205,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     [currentUserId, sessionActor.session.mode, thread]
   )
 
+  // Refreshes that would only re-render what is already drawn wait for the
+  // push to settle, so they never compete with its first frames.
+  const whenPushSettled = useAfterPushTransition(navigation)
   const { handleRetryMessages } = useChatThreadSync({
+    historyReady,
+    whenSettled: whenPushSettled,
     resolvedThreadId,
     currentUserId,
     isFocused,
