@@ -104,3 +104,28 @@ test("PostgreSQL cancels old-account retry and guards already claimed ownership 
     await pool.end()
   }
 })
+
+test("PostgreSQL parallel outbox claims never hand one delivery to two workers", {
+  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !databaseUrl
+}, async () => {
+  const workers = 8
+  const pool = new Pool({ connectionString: databaseUrl, max: workers })
+  const repository = createPostgresNotificationRepository(pool)
+  const now = new Date("2026-09-06T10:00:00Z")
+  const deliveryIds = Array.from({ length: 20 }, (_, index) => `parallel_claim_${index}`)
+  try {
+    for (const deliveryId of deliveryIds) {
+      await repository.enqueueDelivery({ deliveryId, userId: "parallel_claim_user", pushToken: "parallel_claim_token",
+        notification: { title: "Blumi", body: "Update" }, attemptCount: 0,
+        availableAt: now.toISOString(), createdAt: now.toISOString() })
+    }
+    const claims = await Promise.all(Array.from({ length: workers }, () =>
+      repository.claimDueDeliveries({ now, limit: 5, leaseMs: 60_000 })))
+    const claimed = claims.flat().map((delivery) => delivery.deliveryId)
+    assert.equal(new Set(claimed).size, claimed.length, "a delivery was claimed by two workers")
+    assert.deepEqual([...claimed].sort(), [...deliveryIds].sort())
+    assert.deepEqual(await repository.claimDueDeliveries({ now, limit: 5, leaseMs: 60_000 }), [], "leased rows are not due")
+  } finally {
+    await pool.end()
+  }
+})
