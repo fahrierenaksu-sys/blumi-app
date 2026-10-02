@@ -12,6 +12,7 @@ import Animated, {
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets"
 import { animateTo, useMotion } from "../motion"
 import {
+  flightCarriedContentTransform,
   flightContentOpacity,
   flightLayerScale,
   flightTargetSurfaceOpacity,
@@ -100,9 +101,14 @@ export function FlightTargetView({
   )
 }
 
-/** Mount once at the app root, above the navigator and below toasts. */
-export function FlightLayer() {
-  const flights = useSyncExternalStore(flightStore.subscribe, flightStore.getFlights, flightStore.getFlights)
+/**
+ * Mount once at the app root, above the navigator and below toasts. A native
+ * modal (its own window, above the root) mounts a named layer as its last
+ * child and launches its flights with that `layer`.
+ */
+export function FlightLayer({ layer = ROOT_FLIGHT_LAYER }: { layer?: string }) {
+  const allFlights = useSyncExternalStore(flightStore.subscribe, flightStore.getFlights, flightStore.getFlights)
+  const flights = allFlights.filter((flight) => (flight.layer ?? ROOT_FLIGHT_LAYER) === layer)
   if (flights.length === 0) return null
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -113,14 +119,20 @@ export function FlightLayer() {
   )
 }
 
+const ROOT_FLIGHT_LAYER = "root"
+
 const finishFlight = (id: string) => {
   flightStore.finish(id)
+}
+const landFlight = (id: string) => {
+  flightStore.land(id)
 }
 
 function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
   const motion = useMotion()
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions()
   const { id, source, sourceSurface, targetSurface, content } = flight
+  const carriesContent = flight.contentMode === "carry"
 
   const subscribe = useCallback(
     (listener: () => void) => flightStore.subscribeToFlight(id, listener),
@@ -180,6 +192,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       targetOpacity.value = animateTo(1, motion.crossfade)
       cloneOpacity.value = animateTo(0, motion.crossfade, () => {
         "worklet"
+        scheduleOnRN(landFlight, id)
         scheduleOnRN(finishFlight, id)
       })
       return
@@ -189,6 +202,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       "worklet"
       // Revealed in the clone's last frame, so nothing blinks.
       targetOpacity.value = 1
+      scheduleOnRN(landFlight, id)
       cloneOpacity.value = animateTo(0, fadeOut, () => {
         "worklet"
         scheduleOnRN(finishFlight, id)
@@ -228,9 +242,15 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       transform: [{ scaleX: scale.scaleX }, { scaleY: scale.scaleY }]
     }
   })
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: flightContentOpacity(progress.value)
-  }))
+  const contentStyle = useAnimatedStyle(() => {
+    if (!carriesContent) return { opacity: flightContentOpacity(progress.value) }
+    // The hero rides at full opacity; the clone's own fade hands it over.
+    const fit = flightCarriedContentTransform(frame.value, source)
+    return {
+      opacity: 1,
+      transform: [{ translateX: fit.translateX }, { translateY: fit.translateY }, { scale: fit.scale }]
+    }
+  })
 
   return (
     <Animated.View style={[styles.clone, containerStyle]}>

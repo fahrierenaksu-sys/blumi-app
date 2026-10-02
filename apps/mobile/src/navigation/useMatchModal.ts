@@ -16,6 +16,7 @@ import {
   type ConnectionMatchedPayload
 } from "../features/connections/globalMatchReconciliation"
 import { discoveryMatchDelivery, parseDiscoveryMatchId } from "../features/matches/discoveryMatchDelivery"
+import { matchFlightSources } from "../features/matches/matchFlightSource"
 import { getMatchCreatedProperties } from "../features/matches/matchResultPresentation"
 import { claimForegroundAlert } from "../features/notifications/foregroundNotificationState"
 import {
@@ -225,6 +226,7 @@ export function useMatchModal({
     handledMatchIdsRef.current = new Set()
     reconcilingMatchIdsRef.current = new Set()
     discoveryMatchDelivery.reset()
+    matchFlightSources.clear()
     setGlobalMatch(null)
   }, [])
 

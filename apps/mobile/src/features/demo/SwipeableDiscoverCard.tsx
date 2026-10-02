@@ -11,7 +11,8 @@
  * - Age + bio display for richer profile cards
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { matchFlightSources } from "../matches/matchFlightSource"
 import type { AvatarSelection, UserProfilePrompt } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
@@ -149,8 +150,24 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const [showcaseAuthorization, setShowcaseAuthorization] = useState<ShowcaseAuthorization | null>(null)
   const queryClient = useQueryClient()
   const { width: screenWidth } = useWindowDimensions()
+  // Where the chibi stands when the like is committed: a match moment that
+  // follows flies it from here (features/matches/matchFlightSource).
+  const chibiRef = useRef<View>(null)
+  const rememberLikedChibi = useCallback((userId: string) => {
+    chibiRef.current?.measureInWindow((x, y, width, height) => {
+      matchFlightSources.remember(userId, { x, y, width, height })
+    })
+  }, [])
+  const handleSwipeRight = useCallback((userId: string) => {
+    rememberLikedChibi(userId)
+    onSwipeRight(userId)
+  }, [onSwipeRight, rememberLikedChibi])
+  const exitDirection = props.exitRequest?.direction
+  useEffect(() => {
+    if (exitDirection === "right") rememberLikedChibi(profile.userId)
+  }, [exitDirection, profile.userId, rememberLikedChibi])
   const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle, onCardLayout } = useDiscoverCardSwipe({
-    swipe: swipeAnim, cardId: profile.userId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight, onSwipeLeft,
+    swipe: swipeAnim, cardId: profile.userId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight: handleSwipeRight, onSwipeLeft,
     leaving: props.leaving, exitRequest: props.exitRequest, onExitEnd: props.onExitEnd
   })
   const copy = getDiscoverySurfaceCopy(getAppLocale())
@@ -396,14 +413,14 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
             style={[styles.avatarContainer, { marginBottom: avatarBottomInset }]}
             pointerEvents="none"
           >
-            {!props.deferFrontAvatar ? <CandidateAvatarPreview
+            {!props.deferFrontAvatar ? <View ref={chibiRef} collapsable={false}><CandidateAvatarPreview
               snapshot={avatarSnapshot}
               size={avatarSize}
               stage="discover"
               imagePriority={imagePriority}
               onDisplay={props.onFrontDisplay ? handleFrontAvatarDisplay : undefined}
               onImageError={props.onFrontImageError}
-            /> : null}
+            /></View> : null}
           </View>
           <View
             style={[

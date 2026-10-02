@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   ScrollView,
   StyleSheet,
@@ -50,6 +50,13 @@ import { useEntranceAnimation, useReducedMotion, usePulse } from "../ui/animatio
 import { hapticSuccess } from "../ui/haptics"
 import { AvatarFrame, type AvatarFrameVariant } from "../ui/AvatarFrame"
 import { ReportModal } from "../components/ReportModal"
+import { createCandidateAvatarSnapshot } from "../components/DiscoverCard"
+import { FlightTargetView } from "../ui/flight/FlightLayer"
+import { isFlightFrameUsable } from "../ui/flight/flightModel"
+import { matchFlightSources } from "../features/matches/matchFlightSource"
+import { launchMatchChibiFlight } from "../features/matches/matchChibiFlight"
+import { planMatchMeeting } from "../features/matches/matchMeetingModel"
+import { useMatchMeeting } from "../features/matches/useMatchMeeting"
 
 type MatchResultScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -104,6 +111,8 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const dockAnim = useEntranceAnimation({ delay: timeline.dockDelayMs, translateY: 40 })
   const matchHapticPlayedRef = useRef(false)
   const shouldCelebrate = shouldCelebrateMatchResult(route.params)
+  const meeting = useMatchMeeting()
+  const [partnerFlightId, setPartnerFlightId] = useState<string | null>(null)
   const entranceSpring = celebrationMotion.entranceSpringConfig
 
   useEffect(() => {
@@ -119,17 +128,41 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
       : 1
   }, [entranceSpring, heroOpacity, heroScale, timeline.heroDelayMs, timeline.heroOpacityDurationMs])
 
+  // The two chibis meet as the card appears. A fresh Discover like flies the
+  // card's chibi in (ui/flight); otherwise the partner slides in. Their
+  // contact plays the one success tap of a fresh match (haptic map: match →
+  // success); a match re-opened from chat meets silently. Reduce Motion
+  // crossfades and keeps the tap.
+  const startMeeting = useEffectEvent(() => {
+    const partnerUserId = match.matchedUser.userId
+    const source = shouldCelebrate ? matchFlightSources.take(partnerUserId) : null
+    const plan = planMatchMeeting({ reduceMotion, hasFlightSource: isFlightFrameUsable(source) })
+    meeting.start({
+      plan,
+      delayMs: timeline.meetingDelayMs,
+      onContact: () => {
+        if (!shouldPlayMatchHaptic(matchHapticPlayedRef.current, shouldCelebrate)) return
+        matchHapticPlayedRef.current = true
+        hapticSuccess()
+      }
+    })
+    if (plan.partnerArrival !== "flight" || !source) return
+    const flightId = launchMatchChibiFlight({
+      partnerUserId,
+      source,
+      snapshot: createCandidateAvatarSnapshot({
+        userId: partnerUserId,
+        displayName: match.matchedUser.displayName,
+        avatarSelection: match.matchedUser.avatarSelection
+      }),
+      onSettled: meeting.partnerArrived
+    })
+    if (flightId) setPartnerFlightId(flightId)
+    else meeting.partnerArrived()
+  })
   useEffect(() => {
-    // One success tap per fresh match (haptic map: match → success), as the
-    // card appears; Reduce Motion keeps it.
-    if (!shouldPlayMatchHaptic(matchHapticPlayedRef.current, shouldCelebrate)) return
-    const timer = setTimeout(() => {
-      if (matchHapticPlayedRef.current) return
-      matchHapticPlayedRef.current = true
-      hapticSuccess()
-    }, timeline.hapticDelayMs)
-    return () => clearTimeout(timer)
-  }, [shouldCelebrate, timeline.hapticDelayMs])
+    startMeeting()
+  }, [])
 
   const handleStartChat = (): void => {
     if (!sendMessageAction.enabled || openingChatRef.current) return
@@ -200,26 +233,35 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
               <Text style={styles.heroTitle}>{presentation.title}</Text>
               <Text style={styles.heroBody}>{presentation.body}</Text>
               <View style={styles.avatarRow}>
-                <AvatarSpotlight
-                  label={sessionActor.profile.displayName}
-                  avatar={currentAvatar}
-                  frameVariant="rose-quartz"
-                  rotation="-3deg"
-                />
-                <GlassPill tone="dark" style={styles.connectionPill}>
-                  <Ionicons
-                    accessible={false}
-                    name="heart"
-                    size={20}
-                    color={uiTheme.colors.textInverted}
+                {/* Drawn outwards from the heart once both chibis are in. */}
+                <Reanimated.View pointerEvents="none" style={[styles.heartLine, meeting.lineStyle]} />
+                <Reanimated.View style={[styles.avatarSpotlightSlot, meeting.meStyle]}>
+                  <AvatarSpotlight
+                    label={sessionActor.profile.displayName}
+                    avatar={currentAvatar}
+                    frameVariant="rose-quartz"
+                    rotation="-3deg"
                   />
-                </GlassPill>
-                <AvatarSpotlight
-                  label={match.matchedUser.displayName}
-                  avatar={matchedAvatar}
-                  frameVariant="champagne-gold"
-                  rotation="4deg"
-                />
+                </Reanimated.View>
+                <Reanimated.View style={meeting.heartStyle}>
+                  <GlassPill tone="dark" style={styles.connectionPill}>
+                    <Ionicons
+                      accessible={false}
+                      name="heart"
+                      size={20}
+                      color={uiTheme.colors.textInverted}
+                    />
+                  </GlassPill>
+                </Reanimated.View>
+                <Reanimated.View style={[styles.avatarSpotlightSlot, meeting.partnerStyle]}>
+                  <AvatarSpotlight
+                    label={match.matchedUser.displayName}
+                    avatar={matchedAvatar}
+                    frameVariant="champagne-gold"
+                    rotation="4deg"
+                    landingFlightId={partnerFlightId}
+                  />
+                </Reanimated.View>
               </View>
             </GlassCard>
           </Reanimated.View>
@@ -259,17 +301,24 @@ function AvatarSpotlight(props: {
   avatar: Parameters<typeof AvatarPreview2D>[0]["avatar"]
   frameVariant?: AvatarFrameVariant
   rotation?: string
+  /** The flown chibi lands here: the slot shows once it touches down. */
+  landingFlightId?: string | null
 }) {
+  const preview: ReactNode = (
+    <AvatarPreview2D
+      avatar={props.avatar}
+      size={112}
+      stageHeight={168}
+      metaTone="light"
+      label={props.label}
+    />
+  )
   return (
     <View style={[styles.avatarSpotlight, { transform: [{ rotate: props.rotation || "0deg" }] }]}>
       <AvatarFrame variant={props.frameVariant || "rose-quartz"}>
-        <AvatarPreview2D
-          avatar={props.avatar}
-          size={112}
-          stageHeight={168}
-          metaTone="light"
-          label={props.label}
-        />
+        {props.landingFlightId ? (
+          <FlightTargetView flightId={props.landingFlightId}>{preview}</FlightTargetView>
+        ) : preview}
       </AvatarFrame>
     </View>
   )
@@ -321,9 +370,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: uiTheme.spacing.sm
   },
+  avatarSpotlightSlot: {
+    flex: 1,
+    minWidth: 0
+  },
   avatarSpotlight: {
     flex: 1,
     minWidth: 0
+  },
+  heartLine: {
+    position: "absolute",
+    left: "18%",
+    right: "18%",
+    top: "50%",
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "rgba(255, 79, 152, 0.32)"
   },
   connectionPill: {
     width: 48,
