@@ -1,6 +1,6 @@
 import type { ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
+import { useIsFocused } from "@react-navigation/native"
 import { useMiniRoomMotion } from "../features/miniRoom/useMiniRoomMotion"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
@@ -60,7 +60,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor } = props
   const { readyMiniRoom, participants } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
-  const isFocused = useIsFocusedBeneathSheets()
+  const isFocused = useIsFocused()
   useMessageAlertSuppression(isFocused)
   const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,
     localUserId: sessionActor.profile.userId, partnerUserId: participants.partner.userId,
