@@ -202,10 +202,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     // A session or account changed while the back face was open. Hide its old
     // result immediately, then authorize this viewer with a fresh request.
     setShowcaseAuthorization(nextShowcaseAuthorizationOnFlip({
-      nextVisible: true,
-      request: showcaseRequest,
-      candidateUserId: profile.userId,
-      nextId: ++nextShowcaseAuthorizationId
+      nextVisible: true, request: showcaseRequest, candidateUserId: profile.userId, nextId: ++nextShowcaseAuthorizationId
     }))
   }, [
     authorizationMatches,
@@ -248,10 +245,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
       setShowcaseAuthorization(null)
     } else if (showcaseRequest) {
       setShowcaseAuthorization(nextShowcaseAuthorizationOnFlip({
-        nextVisible,
-        request: showcaseRequest,
-        candidateUserId: profile.userId,
-        nextId: ++nextShowcaseAuthorizationId
+        nextVisible, request: showcaseRequest, candidateUserId: profile.userId, nextId: ++nextShowcaseAuthorizationId
       }))
     }
     setIsBackVisible(nextVisible)
