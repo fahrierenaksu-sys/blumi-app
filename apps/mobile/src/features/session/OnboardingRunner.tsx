@@ -1,8 +1,10 @@
-import {
-  Animated,
-  StyleSheet,
-  type ImageSourcePropType
-} from "react-native"
+import { StyleSheet, type ImageSourcePropType } from "react-native"
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
 import { ONBOARDING_RUN_ASSET_MODE } from "./onboardingRunAssetGate"
 import {
   ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS,
@@ -28,23 +30,22 @@ import {
   getOnboardingWorldSurfaceY
 } from "./onboardingWorldCompositionModel"
 
-type MotionProgress = Animated.Value | Animated.AnimatedInterpolation<number>
-
 interface OnboardingRunnerProps {
   role: OnboardingRunnerRole
   phase: OnboardingIntroPhase
-  chaseProgress: Animated.Value
-  catchProgress: Animated.Value
-  orbitProgress: Animated.Value
-  sharedFrameClock: Animated.Value
+  chaseProgress: SharedValue<number>
+  catchProgress: SharedValue<number>
+  orbitProgress: SharedValue<number>
+  /** The run cycle clock both runners share: 0 → frame count, looping. */
+  sharedFrameClock: SharedValue<number>
   motionEnabled: boolean
   size: number
   anchorBottom: number
   anchorX: number
   arrivalEnabled?: boolean
   arrivalFallbackSource?: ImageSourcePropType
-  arrivalProgress?: MotionProgress
-  arrivalRevealProgress?: MotionProgress | Animated.AnimatedInterpolation<string | number> | number
+  arrivalProgress?: SharedValue<number>
+  arrivalRevealProgress?: SharedValue<number> | number
   arrivalVisible?: boolean
 }
 
@@ -76,13 +77,13 @@ const AUTHORED_FRAME_BASELINE_OFFSETS = {
   chaser: [13, 13, 22, 22, 16, 16, 5, 5, 17, 17, 15, 15]
 } as const
 
-function getFrameOpacity(
-  frameClock: Animated.Value,
+/** Opacity keyframes of one run frame on the shared frame clock. */
+function getFrameOpacityTrack(
   frameIndex: number,
   frameClockPositions: readonly number[]
-) {
+): { inputRange: number[]; outputRange: number[] } | null {
   const frameCount = frameClockPositions.length - 1
-  if (frameCount <= 1) return 1
+  if (frameCount <= 1) return null
   const frameStart = frameClockPositions[frameIndex]
   const frameEnd = frameClockPositions[frameIndex + 1]
   const clockEnd = frameClockPositions[frameCount]
@@ -90,14 +91,13 @@ function getFrameOpacity(
     throw new Error(`Missing onboarding frame clock position for frame ${frameIndex}`)
   }
   if (frameIndex === 0) {
-    return frameClock.interpolate({
+    return {
       inputRange: [0, frameEnd - FRAME_CROSSFADE, frameEnd, clockEnd - FRAME_CROSSFADE, clockEnd],
-      outputRange: [1, 1, 0, 0, 1],
-      extrapolate: "clamp"
-    })
+      outputRange: [1, 1, 0, 0, 1]
+    }
   }
   if (frameIndex === frameCount - 1) {
-    return frameClock.interpolate({
+    return {
       inputRange: [
         0,
         frameStart - FRAME_CROSSFADE,
@@ -105,11 +105,10 @@ function getFrameOpacity(
         clockEnd - FRAME_CROSSFADE,
         clockEnd
       ],
-      outputRange: [0, 0, 1, 1, 0],
-      extrapolate: "clamp"
-    })
+      outputRange: [0, 0, 1, 1, 0]
+    }
   }
-  return frameClock.interpolate({
+  return {
     inputRange: [
       0,
       frameStart - FRAME_CROSSFADE,
@@ -118,9 +117,44 @@ function getFrameOpacity(
       frameEnd,
       clockEnd
     ],
-    outputRange: [0, 0, 1, 1, 0, 0],
-    extrapolate: "clamp"
-  })
+    outputRange: [0, 0, 1, 1, 0, 0]
+  }
+}
+
+function RunnerFrame({
+  frameClock,
+  height,
+  opacityTrack,
+  source,
+  staticOpacity,
+  translateY,
+  width
+}: {
+  frameClock: SharedValue<number>
+  height: number
+  opacityTrack: { inputRange: number[]; outputRange: number[] } | null
+  source: ImageSourcePropType
+  /** A held pose: this frame's fixed opacity instead of the clock. */
+  staticOpacity: number | null
+  translateY: number
+  width: number
+}) {
+  const clockStyle = useAnimatedStyle(() => ({
+    opacity: staticOpacity !== null
+      ? staticOpacity
+      : opacityTrack === null
+        ? 1
+        : interpolate(frameClock.value, opacityTrack.inputRange, opacityTrack.outputRange, Extrapolation.CLAMP)
+  }))
+  return (
+    <Animated.Image
+      accessibilityIgnoresInvertColors
+      fadeDuration={0}
+      resizeMode="contain"
+      source={source}
+      style={[styles.frame, { width, height, transform: [{ translateY }] }, clockStyle]}
+    />
+  )
 }
 
 function getSourceBaselineOffset(
@@ -170,7 +204,7 @@ export function OnboardingRunner({
       ? handoffFrameIndex
       : 0
   const catchLift = role === "leader" ? -7 : 0
-  const catchTilt = role === "leader" ? "-3deg" : "0deg"
+  const catchTiltDeg = role === "leader" ? -3 : 0
   const frameSet = pose.animationState === "orbit-chase"
     ? AUTHORED_JOG_FRAMES[role]
     : ONBOARDING_RUNNER_FRAMES[role]
@@ -178,23 +212,31 @@ export function OnboardingRunner({
     size * (ONBOARDING_SHARED_CHARACTER_HEIGHT / ONBOARDING_SHARED_CHARACTER_WIDTH)
   )
   // This handoff deliberately depends on arrivalProgress, which is derived
-  // from the uninterrupted native impact clock. It must not wait for the
+  // from the uninterrupted UI-thread impact clock. It must not wait for the
   // later JS phase transition: that was the visible freeze after landing.
-  const arrivalLayerOpacity = arrivalVisible && arrivalProgress
-    ? arrivalProgress.interpolate({
-        inputRange: [0, RUN_HANDOFF_START_PROGRESS, RUN_HANDOFF_COMPLETE_PROGRESS, 1],
-        outputRange: [1, 1, 0, 0],
-        extrapolate: "clamp"
-      })
-    : 0
-  const runLayerOpacity = arrivalVisible && arrivalProgress
-    ? arrivalProgress.interpolate({
-        inputRange: [0, RUN_HANDOFF_START_PROGRESS, RUN_HANDOFF_COMPLETE_PROGRESS, 1],
-        outputRange: [0, 0, 1, 1],
-        extrapolate: "clamp"
-      })
-    : 1
+  const arrivalHandoff = arrivalVisible && arrivalProgress ? arrivalProgress : null
+  const arrivalLayerStyle = useAnimatedStyle(() => ({
+    opacity: arrivalHandoff
+      ? interpolate(
+          arrivalHandoff.value,
+          [0, RUN_HANDOFF_START_PROGRESS, RUN_HANDOFF_COMPLETE_PROGRESS, 1],
+          [1, 1, 0, 0],
+          Extrapolation.CLAMP
+        )
+      : 0
+  }))
+  const runLayerStyle = useAnimatedStyle(() => ({
+    opacity: arrivalHandoff
+      ? interpolate(
+          arrivalHandoff.value,
+          [0, RUN_HANDOFF_START_PROGRESS, RUN_HANDOFF_COMPLETE_PROGRESS, 1],
+          [0, 0, 1, 1],
+          Extrapolation.CLAMP
+        )
+      : 1
+  }))
   const readyPlacement = getOnboardingWorldRunnerPlacement(role, 1)
+  const chaseInput = [...ONBOARDING_WORLD_RUNNER_PROGRESS]
   const chasePlacements = ONBOARDING_WORLD_RUNNER_PROGRESS.map((progress) =>
     getOnboardingWorldRunnerPlacement(role, progress)
   )
@@ -204,10 +246,62 @@ export function OnboardingRunner({
   const chaseTranslateY = chasePlacements.map(
     (placement) => placement.surfaceY - readyPlacement.surfaceY
   )
-  const orbitTranslateY = orbitTrack.translateX.map((translateX) =>
-    getOnboardingWorldSurfaceY(readyPlacement.footX + translateX) -
-    readyPlacement.surfaceY
-  )
+  const isOrbiting = pose.animationState === "orbit-chase"
+  const orbitInput = [...orbitTrack.inputRange]
+  const orbitTranslateX = isOrbiting ? [...orbitTrack.translateX] : [0, 0, 0, 0, 0]
+  const orbitTranslateY = isOrbiting
+    ? orbitTrack.translateX.map((translateX) =>
+        getOnboardingWorldSurfaceY(readyPlacement.footX + translateX) -
+        readyPlacement.surfaceY
+      )
+    : [0, 0, 0, 0, 0]
+  const orbitScale = isOrbiting ? [...orbitTrack.scale] : [1, 1, 1, 1, 1]
+  const orbitRotate = isOrbiting ? [...orbitTrack.rotate] : [0, 0, 0, 0, 0]
+  const trackInput = [...track.inputRange]
+  const trackScale = [...track.scale]
+  const trackRotate = [...track.rotate]
+  const catchInput = [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1]
+  const catchX = [0, ONBOARDING_RUNNER_CATCH_X_OFFSETS[role], 0]
+  const catchY = [0, catchLift, 0]
+  const catchScale = [1, role === "leader" ? 1.03 : 1, 1]
+  const catchRotate = [0, catchTiltDeg, 0]
+  const shadowCatchScaleX = role === "leader" ? [1, 0.78, 1] : [1, 1, 1]
+  const shadowOrbitScaleX = isOrbiting
+    ? role === "leader"
+      ? [1, 0.92, 0.8, 0.88, 1]
+      : [0.92, 0.8, 0.66, 0.78, 0.92]
+    : [1, 1, 1, 1, 1]
+
+  const rootStyle = useAnimatedStyle(() => {
+    const chase = chaseProgress.value
+    const caught = catchProgress.value
+    const orbit = orbitProgress.value
+    return {
+      transform: [
+        { translateX: anchorX },
+        { translateX: interpolate(chase, chaseInput, chaseTranslateX) },
+        { translateY: interpolate(chase, chaseInput, chaseTranslateY) },
+        { translateX: interpolate(caught, catchInput, catchX) },
+        { translateY: interpolate(caught, catchInput, catchY) },
+        { scale: interpolate(chase, trackInput, trackScale) },
+        { scale: interpolate(caught, catchInput, catchScale) },
+        { rotate: `${interpolate(chase, trackInput, trackRotate)}deg` },
+        { rotate: `${interpolate(caught, catchInput, catchRotate)}deg` },
+        { translateX: interpolate(orbit, orbitInput, orbitTranslateX) },
+        { translateY: interpolate(orbit, orbitInput, orbitTranslateY) },
+        { scale: interpolate(orbit, orbitInput, orbitScale) },
+        { rotate: `${interpolate(orbit, orbitInput, orbitRotate)}deg` }
+      ]
+    }
+  })
+  const shadowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(catchProgress.value, catchInput, [0.07, 0.045, 0.07]),
+    transform: [
+      { scaleX: interpolate(catchProgress.value, catchInput, shadowCatchScaleX) },
+      { scaleX: interpolate(orbitProgress.value, orbitInput, shadowOrbitScaleX) }
+    ]
+  }))
+
   const runFrames = frameSet.map((_source, frameIndex) => {
     // Both characters are driven by one clock. Role-specific source rotation
     // preserves the authored landing handoff without creating a second timer.
@@ -217,26 +311,16 @@ export function OnboardingRunner({
     const frameBaselineOffset = Math.round(
       sourceBaselineOffset * (frameHeight / 384)
     )
-    const frameClockPositions = LEADER_RUNNER_FRAME_CLOCK_POSITIONS
-
     return (
-      <Animated.Image
-        accessibilityIgnoresInvertColors
-        fadeDuration={0}
+      <RunnerFrame
+        frameClock={sharedFrameClock}
+        height={frameHeight}
         key={`${role}-${sourceFrameIndex}`}
-        resizeMode="contain"
+        opacityTrack={getFrameOpacityTrack(frameIndex, LEADER_RUNNER_FRAME_CLOCK_POSITIONS)}
         source={sourceFrame}
-        style={[
-          styles.frame,
-          {
-            width: size,
-            height: frameHeight,
-            opacity: staticFrameIndex === null
-              ? getFrameOpacity(sharedFrameClock, frameIndex, frameClockPositions)
-              : sourceFrameIndex === staticFrameIndex ? 1 : 0,
-            transform: [{ translateY: frameBaselineOffset }]
-          }
-        ]}
+        staticOpacity={staticFrameIndex === null ? null : sourceFrameIndex === staticFrameIndex ? 1 : 0}
+        translateY={frameBaselineOffset}
+        width={size}
       />
     )
   })
@@ -250,125 +334,22 @@ export function OnboardingRunner({
           width: Math.round(size * 1.06),
           height: Math.round(size * 1.48),
           bottom: anchorBottom,
-          marginLeft: -Math.round(size * 0.53),
-          transform: [
-            { translateX: anchorX },
-            {
-              translateX: chaseProgress.interpolate({
-                inputRange: [...ONBOARDING_WORLD_RUNNER_PROGRESS],
-                outputRange: chaseTranslateX
-              })
-            },
-            {
-              translateY: chaseProgress.interpolate({
-                inputRange: [...ONBOARDING_WORLD_RUNNER_PROGRESS],
-                outputRange: chaseTranslateY
-              })
-            },
-            {
-              translateX: catchProgress.interpolate({
-                inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                outputRange: [0, ONBOARDING_RUNNER_CATCH_X_OFFSETS[role], 0]
-              })
-            },
-            {
-              translateY: catchProgress.interpolate({
-                inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                outputRange: [0, catchLift, 0]
-              })
-            },
-            {
-              scale: chaseProgress.interpolate({
-                inputRange: [...track.inputRange],
-                outputRange: [...track.scale]
-              })
-            },
-            {
-              scale: catchProgress.interpolate({
-                inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                outputRange: [1, role === "leader" ? 1.03 : 1, 1]
-              })
-            },
-            {
-              rotate: chaseProgress.interpolate({
-                inputRange: [...track.inputRange],
-                outputRange: track.rotate.map((degrees) => `${degrees}deg`)
-              })
-            },
-            {
-              rotate: catchProgress.interpolate({
-                inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                outputRange: ["0deg", catchTilt, "0deg"]
-              })
-            },
-            {
-              translateX: orbitProgress.interpolate({
-                inputRange: [...orbitTrack.inputRange],
-                outputRange: pose.animationState === "orbit-chase"
-                  ? [...orbitTrack.translateX]
-                  : [0, 0, 0, 0, 0]
-              })
-            },
-            {
-              translateY: orbitProgress.interpolate({
-                inputRange: [...orbitTrack.inputRange],
-                outputRange: pose.animationState === "orbit-chase"
-                  ? orbitTranslateY
-                  : [0, 0, 0, 0, 0]
-              })
-            },
-            {
-              scale: orbitProgress.interpolate({
-                inputRange: [...orbitTrack.inputRange],
-                outputRange: pose.animationState === "orbit-chase"
-                  ? [...orbitTrack.scale]
-                  : [1, 1, 1, 1, 1]
-              })
-            },
-            {
-              rotate: orbitProgress.interpolate({
-                inputRange: [...orbitTrack.inputRange],
-                outputRange: pose.animationState === "orbit-chase"
-                  ? orbitTrack.rotate.map((degrees) => `${degrees}deg`)
-                  : ["0deg", "0deg", "0deg", "0deg", "0deg"]
-              })
-            }
-          ]
+          marginLeft: -Math.round(size * 0.53)
         },
+        rootStyle,
         role === "chaser" ? styles.chaserDepth : null
       ]}
     >
       {pose.showGroundShadow ? (
         <Animated.View
-              style={[
-                styles.groundShadow,
-                {
-                  width: Math.round(size * 0.48),
-                  height: Math.max(7, Math.round(size * 0.08)),
-                  borderRadius: Math.round(size * 0.24),
-              opacity: catchProgress.interpolate({
-                inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                outputRange: [0.07, 0.045, 0.07]
-              }),
-              transform: [
-                {
-                  scaleX: catchProgress.interpolate({
-                    inputRange: [0, ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 1],
-                    outputRange: role === "leader" ? [1, 0.78, 1] : [1, 1, 1]
-                  })
-                },
-                    {
-                  scaleX: orbitProgress.interpolate({
-                    inputRange: [...orbitTrack.inputRange],
-                        outputRange: pose.animationState === "orbit-chase"
-                          ? role === "leader"
-                            ? [1, 0.92, 0.8, 0.88, 1]
-                            : [0.92, 0.8, 0.66, 0.78, 0.92]
-                          : [1, 1, 1, 1, 1]
-                      })
-                    }
-              ]
-            }
+          style={[
+            styles.groundShadow,
+            {
+              width: Math.round(size * 0.48),
+              height: Math.max(7, Math.round(size * 0.08)),
+              borderRadius: Math.round(size * 0.24)
+            },
+            shadowStyle
           ]}
         />
       ) : null}
@@ -376,7 +357,7 @@ export function OnboardingRunner({
         {arrivalEnabled && arrivalProgress ? (
           <Animated.View
             pointerEvents="none"
-            style={[styles.arrivalLayer, { opacity: arrivalLayerOpacity }]}
+            style={[styles.arrivalLayer, arrivalLayerStyle]}
           >
             <OnboardingArrivalCharacter
               enabled
@@ -391,7 +372,7 @@ export function OnboardingRunner({
         ) : null}
         <Animated.View
           pointerEvents="none"
-          style={[styles.runLayer, { opacity: runLayerOpacity }]}
+          style={[styles.runLayer, runLayerStyle]}
         >
           {runFrames}
         </Animated.View>

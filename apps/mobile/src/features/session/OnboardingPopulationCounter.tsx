@@ -1,11 +1,17 @@
-import { Fragment } from "react"
-import { Animated, Text, View } from "react-native"
+import { Fragment, type ReactNode } from "react"
+import { Text, View } from "react-native"
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
 import { getOnboardingPopulationOdometerColumns } from "./onboardingPopulationCounterModel"
 import { onboardingWorldSceneStyles as styles } from "./onboardingWorldSceneStyles"
 
 interface OnboardingPopulationCounterProps {
   compact: boolean
-  progress: Animated.Value
+  progress: SharedValue<number>
   value: string
 }
 
@@ -40,20 +46,10 @@ export function OnboardingPopulationCounter({
               styles.populationDigitColumn,
               compact ? styles.populationDigitColumnCompact : null
             ]}>
-              <Animated.View
-                style={[
-                  styles.populationDigitStrip,
-                  {
-                    height: (column.steps + 1) * lineHeight,
-                    transform: [{
-                      translateY: progress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -column.steps * lineHeight],
-                        extrapolate: "clamp"
-                      })
-                    }]
-                  }
-                ]}
+              <DigitStrip
+                distance={column.steps * lineHeight}
+                height={(column.steps + 1) * lineHeight}
+                progress={progress}
               >
                 {column.cells.map((cell) => (
                   <View
@@ -71,7 +67,7 @@ export function OnboardingPopulationCounter({
                     </Text>
                   </View>
                 ))}
-              </Animated.View>
+              </DigitStrip>
             </View>
             {SEPARATOR_AFTER_COLUMN.has(index) ? (
               <Text
@@ -95,5 +91,29 @@ export function OnboardingPopulationCounter({
         </Text>
       </View>
     </View>
+  )
+}
+
+/** One odometer wheel: rolls its full distance on the shared reveal clock. */
+function DigitStrip({
+  children,
+  distance,
+  height,
+  progress
+}: {
+  children: ReactNode
+  distance: number
+  height: number
+  progress: SharedValue<number>
+}) {
+  const rollStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateY: interpolate(progress.value, [0, 1], [0, -distance], Extrapolation.CLAMP)
+    }]
+  }))
+  return (
+    <Animated.View style={[styles.populationDigitStrip, { height }, rollStyle]}>
+      {children}
+    </Animated.View>
   )
 }

@@ -1,4 +1,10 @@
-import { Animated, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { ONBOARDING_SCAN_FRAMES } from "./OnboardingGreetingPair"
 
@@ -10,8 +16,8 @@ const SCAN_LASER = require(
 )
 
 interface OnboardingScanStageProps {
-  scanRows: Animated.Value
-  scanSweep: Animated.Value
+  scanRows: SharedValue<number>
+  scanSweep: SharedValue<number>
   onAssetLoad?: (id: number) => void
   onAssetError?: () => void
 }
@@ -22,84 +28,38 @@ export function OnboardingScanStage({
   onAssetLoad,
   onAssetError
 }: OnboardingScanStageProps) {
-  const scanLineTranslateY = scanSweep.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-142, 150]
-  })
+  const beamStyle = useAnimatedStyle(() => ({
+    // The beam eases in and out instead of appearing and vanishing at the edges.
+    opacity: interpolate(scanSweep.value, [0, 0.08, 0.9, 1], [0, 1, 1, 0], Extrapolation.CLAMP),
+    transform: [{ translateY: interpolate(scanSweep.value, [0, 1], [-142, 150]) }]
+  }))
   // A small irregular pulse sells the optical energy without introducing a
   // separate JS timer or an aggressive repeating flash.
-  const laserPulse = scanSweep.interpolate({
-    inputRange: [0, 0.18, 0.42, 0.7, 1],
-    outputRange: [0.66, 0.88, 0.74, 0.94, 0.78],
-    extrapolate: "clamp"
-  })
-  // The beam eases in and out instead of appearing and vanishing at the edges.
-  const beamPresence = scanSweep.interpolate({
-    inputRange: [0, 0.08, 0.9, 1],
-    outputRange: [0, 1, 1, 0],
-    extrapolate: "clamp"
-  })
+  const laserStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scanSweep.value,
+      [0, 0.18, 0.42, 0.7, 1],
+      [0.66, 0.88, 0.74, 0.94, 0.78],
+      Extrapolation.CLAMP
+    )
+  }))
 
   return (
     <View pointerEvents="none" style={styles.scanLayer} testID="onboarding-scan-stage">
       <View style={styles.scanGrid}>
-        {ONBOARDING_SCAN_FRAMES.map((source, index) => {
-          const row = Math.floor(index / 3)
-          const column = index % 3
-          const pass = ROW_PASS_PROGRESS[row] ?? 1
-          const cellPresence = scanRows.interpolate({
-            inputRange: [row * 0.22, Math.min(1, row * 0.22 + 0.42)],
-            outputRange: [0, 1],
-            extrapolate: "clamp"
-          })
-          const scanColor = scanSweep.interpolate({
-            inputRange: [Math.max(0, row * 0.34), Math.min(1, row * 0.34 + 0.36)],
-            outputRange: [0.2, 0.88],
-            extrapolate: "clamp"
-          })
-          const cellOpacity = Animated.multiply(cellPresence, scanColor)
-          // Each character rises a little as it appears, then gets a soft
-          // "hello" bounce when the beam passes its row (outer columns a beat
-          // later so the row reads as a wave, not a block).
-          const lift = cellPresence.interpolate({
-            inputRange: [0, 1],
-            outputRange: [12, 0]
-          })
-          const offset = column === 1 ? 0 : 0.025
-          const bounce = scanSweep.interpolate({
-            inputRange: [pass - 0.1 + offset, pass + offset, pass + 0.14 + offset],
-            outputRange: [1, 1.07, 1],
-            extrapolate: "clamp"
-          })
-          const cellGlow = scanSweep.interpolate({
-            inputRange: [pass - 0.08, pass, pass + 0.16],
-            outputRange: [0, 1, 0],
-            extrapolate: "clamp"
-          })
-          return (
-            <View key={index} style={styles.scanCell}>
-              <Animated.View pointerEvents="none" style={[styles.scanCellGlow, { opacity: cellGlow }]} />
-              <Animated.View style={{ transform: [{ translateY: lift }, { scale: bounce }] }}>
-                <Animated.Image
-                  onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
-                  onError={onAssetError}
-                  accessibilityIgnoresInvertColors
-                  fadeDuration={0}
-                  resizeMode="contain"
-                  source={source}
-                  style={[styles.scanCharacter, { opacity: cellOpacity }]}
-                />
-              </Animated.View>
-            </View>
-          )
-        })}
+        {ONBOARDING_SCAN_FRAMES.map((source, index) => (
+          <ScanCell
+            key={index}
+            index={index}
+            onAssetError={onAssetError}
+            onAssetLoad={onAssetLoad}
+            scanRows={scanRows}
+            scanSweep={scanSweep}
+            source={source}
+          />
+        ))}
       </View>
-      <Animated.View
-        style={[
-          styles.scanLine,
-          { opacity: beamPresence, transform: [{ translateY: scanLineTranslateY }] }
-        ]}
-      >
+      <Animated.View style={[styles.scanLine, beamStyle]}>
         <View style={styles.scanTrail} />
         <Animated.Image
           onLoad={onAssetLoad ? () => onAssetLoad(ONBOARDING_SCAN_FRAMES.length) : undefined}
@@ -107,13 +67,76 @@ export function OnboardingScanStage({
           accessibilityIgnoresInvertColors
           resizeMode="stretch"
           source={SCAN_LASER}
-          style={[styles.scanLaserImage, { opacity: laserPulse }]}
+          style={[styles.scanLaserImage, laserStyle]}
         />
         <View style={styles.scanGlow} />
         <View style={styles.scanCore} />
         <View style={styles.scanSpecular} />
         <View style={styles.scanEdgeLeft} />
         <View style={styles.scanEdgeRight} />
+      </Animated.View>
+    </View>
+  )
+}
+
+function ScanCell({
+  index,
+  onAssetError,
+  onAssetLoad,
+  scanRows,
+  scanSweep,
+  source
+}: {
+  index: number
+  onAssetError?: () => void
+  onAssetLoad?: (id: number) => void
+  scanRows: SharedValue<number>
+  scanSweep: SharedValue<number>
+  source: (typeof ONBOARDING_SCAN_FRAMES)[number]
+}) {
+  const row = Math.floor(index / 3)
+  const column = index % 3
+  const pass = ROW_PASS_PROGRESS[row] ?? 1
+  const presenceRange = [row * 0.22, Math.min(1, row * 0.22 + 0.42)]
+  const colorRange = [Math.max(0, row * 0.34), Math.min(1, row * 0.34 + 0.36)]
+  // Outer columns bounce a beat later so the row reads as a wave, not a block.
+  const offset = column === 1 ? 0 : 0.025
+  const bounceRange = [pass - 0.1 + offset, pass + offset, pass + 0.14 + offset]
+  const glowRange = [pass - 0.08, pass, pass + 0.16]
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scanSweep.value, glowRange, [0, 1, 0], Extrapolation.CLAMP)
+  }))
+  // Each character rises a little as it appears, then gets a soft "hello"
+  // bounce when the beam passes its row.
+  const liftStyle = useAnimatedStyle(() => {
+    const presence = interpolate(scanRows.value, presenceRange, [0, 1], Extrapolation.CLAMP)
+    return {
+      transform: [
+        { translateY: interpolate(presence, [0, 1], [12, 0]) },
+        { scale: interpolate(scanSweep.value, bounceRange, [1, 1.07, 1], Extrapolation.CLAMP) }
+      ]
+    }
+  })
+  const characterStyle = useAnimatedStyle(() => ({
+    opacity:
+      interpolate(scanRows.value, presenceRange, [0, 1], Extrapolation.CLAMP) *
+      interpolate(scanSweep.value, colorRange, [0.2, 0.88], Extrapolation.CLAMP)
+  }))
+
+  return (
+    <View style={styles.scanCell}>
+      <Animated.View pointerEvents="none" style={[styles.scanCellGlow, glowStyle]} />
+      <Animated.View style={liftStyle}>
+        <Animated.Image
+          onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
+          onError={onAssetError}
+          accessibilityIgnoresInvertColors
+          fadeDuration={0}
+          resizeMode="contain"
+          source={source}
+          style={[styles.scanCharacter, characterStyle]}
+        />
       </Animated.View>
     </View>
   )

@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from "react"
-import { Animated, Easing, Image, StyleSheet, View } from "react-native"
+import { Image, StyleSheet, View, type ImageSourcePropType } from "react-native"
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
+import { animateSegment, animateSequence, repeatForever } from "../../ui/motion"
 import { ONBOARDING_RUN_ASSET_MODE } from "./onboardingRunAssetGate"
 import { ONBOARDING_BRAND_PRELUDE_TIMELINE_MS } from "./onboardingBrandPreludeModel"
 import { APPROVED_ONBOARDING_RUN_ASSETS } from "./onboardingRunApprovedAssetCatalog"
@@ -13,8 +25,8 @@ import {
 interface OnboardingGreetingPairProps {
   ambientOnly?: boolean
   entranceVariant?: "default" | "doorway"
-  entranceProgress?: Animated.Value | Animated.AnimatedInterpolation<number>
-  interactionProgress?: Animated.Value | Animated.AnimatedInterpolation<number>
+  /** Entrance clock, 0 → 1. Settled (1) when omitted. */
+  entranceProgress?: SharedValue<number>
   greetingActive: boolean
   motionEnabled: boolean
   motionPreferenceResolved: boolean
@@ -44,242 +56,163 @@ export const ONBOARDING_SCAN_FRAMES = [
   FEMALE_WAVE_FRAMES[5]
 ] as const
 
-function scheduleAmbientSpriteLoop(input: {
-  initialDelayMs: number
-  repeatDelayMs: number
-  showFrame: (assetFrame: number) => void
-}): () => void {
-  const timers = new Set<ReturnType<typeof setTimeout>>()
-  const cycleDurationMs = ONBOARDING_GREETING_WAVE_SEQUENCE.length * WAVE_FRAME_DURATION_MS
-  let cancelled = false
+const LAST_FEMALE_FRAME = FEMALE_WAVE_FRAMES.length - 1
+const LAST_MALE_FRAME = MALE_WAVE_FRAMES.length - 1
+const LAST_WAVE_POSITION = ONBOARDING_GREETING_WAVE_SEQUENCE.length - 1
+/** The greeting wave clock ends once both characters have held their last frame. */
+const GREETING_WAVE_END_MS = Math.max(
+  getOnboardingWaveFrameTimestampMs({
+    frameIndex: LAST_WAVE_POSITION,
+    frameDurationMs: WAVE_FRAME_DURATION_MS
+  }),
+  getOnboardingWaveFrameTimestampMs({
+    frameIndex: LAST_WAVE_POSITION,
+    frameDurationMs: WAVE_FRAME_DURATION_MS,
+    startOffsetMs: MALE_WAVE_OFFSET_MS
+  })
+) + WAVE_FRAME_DURATION_MS
+const AMBIENT_WAVE_MS = ONBOARDING_GREETING_WAVE_SEQUENCE.length * WAVE_FRAME_DURATION_MS
+/** An ambient clock below zero rests on the last (idle) frame. */
+const AMBIENT_RESTING = -1
+const FEMALE_AMBIENT = { initialDelayMs: 2_600, repeatDelayMs: 7_100 } as const
+const MALE_AMBIENT = { initialDelayMs: 4_300, repeatDelayMs: 8_300 } as const
 
-  const schedule = (callback: () => void, delayMs: number) => {
-    const timer = setTimeout(() => {
-      timers.delete(timer)
-      if (!cancelled) callback()
-    }, delayMs)
-    timers.add(timer)
-  }
-
-  const play = () => {
-    ONBOARDING_GREETING_WAVE_SEQUENCE.forEach((assetFrame, sequencePosition) => {
-      schedule(
-        () => input.showFrame(assetFrame),
-        sequencePosition * WAVE_FRAME_DURATION_MS
-      )
-    })
-    schedule(play, cycleDurationMs + input.repeatDelayMs)
-  }
-
-  schedule(play, input.initialDelayMs)
-  return () => {
-    cancelled = true
-    timers.forEach(clearTimeout)
-    timers.clear()
-  }
+/**
+ * An idle wave every so often: rest on the idle frame for `initialDelayMs`,
+ * then play the wave and rest `repeatDelayMs`, forever. One UI-thread clock
+ * per character replaces the per-frame JS timers (ONBV-03).
+ */
+function playAmbientWave(
+  clock: SharedValue<number>,
+  timing: { initialDelayMs: number; repeatDelayMs: number }
+): void {
+  const cycleMs = AMBIENT_WAVE_MS + timing.repeatDelayMs
+  clock.value = AMBIENT_RESTING
+  clock.value = animateSequence(
+    animateSegment(AMBIENT_RESTING, { durationMs: timing.initialDelayMs }),
+    repeatForever(animateSequence(
+      animateSegment(0, { durationMs: 0 }),
+      animateSegment(cycleMs, { durationMs: cycleMs })
+    ))
+  )
 }
+
+/** Breathing: up and down on a sine, after `delayMs`, forever. */
+function playBreath(value: SharedValue<number>, delayMs: number): void {
+  const easing = Easing.inOut(Easing.sin)
+  value.value = 0
+  value.value = repeatForever(animateSequence(
+    animateSegment(1, { delayMs, durationMs: ONBOARDING_IDLE_BREATH_DURATION_MS / 2, easing }),
+    animateSegment(0, { durationMs: ONBOARDING_IDLE_BREATH_DURATION_MS / 2, easing })
+  ))
+}
+
+/** A slow weight shift onto one foot and back, after `delayMs`, forever. */
+function playWeightShift(value: SharedValue<number>, delayMs: number): void {
+  const easing = Easing.inOut(Easing.cubic)
+  value.value = 0
+  value.value = repeatForever(animateSequence(
+    animateSegment(1, { delayMs, durationMs: ONBOARDING_IDLE_WEIGHT_DURATION_MS * 0.32, easing }),
+    animateSegment(0, { delayMs: 620, durationMs: ONBOARDING_IDLE_WEIGHT_DURATION_MS * 0.28, easing }),
+    animateSegment(0, { durationMs: 1_100 })
+  ))
+}
+
+type FrameMode = "static" | "wave" | "ambient"
 
 export function OnboardingGreetingPair({
   ambientOnly = false,
   entranceVariant = "default",
   entranceProgress,
-  interactionProgress,
   greetingActive,
   motionEnabled,
   motionPreferenceResolved,
   reduceMotion,
   onFinished
 }: OnboardingGreetingPairProps) {
-  const [femaleWaveFrame, setFemaleWaveFrame] = useState(
-    reduceMotion || ambientOnly ? FEMALE_WAVE_FRAMES.length - 1 : 0
-  )
-  const [maleWaveFrame, setMaleWaveFrame] = useState(
-    reduceMotion || ambientOnly ? MALE_WAVE_FRAMES.length - 1 : 0
-  )
   const [isIdle, setIsIdle] = useState(reduceMotion || ambientOnly)
-  const femaleIdle = useRef(new Animated.Value(0)).current
-  const maleIdle = useRef(new Animated.Value(0)).current
-  const femaleWeightShift = useRef(new Animated.Value(0)).current
-  const maleWeightShift = useRef(new Animated.Value(0)).current
-  const settledEntrance = useRef(new Animated.Value(1)).current
-  const settledInteraction = useRef(new Animated.Value(0)).current
-  const femaleWaveFrameRef = useRef(femaleWaveFrame)
-  const maleWaveFrameRef = useRef(maleWaveFrame)
+  const femaleIdle = useSharedValue(0)
+  const maleIdle = useSharedValue(0)
+  const femaleWeightShift = useSharedValue(0)
+  const maleWeightShift = useSharedValue(0)
+  // Milliseconds into the greeting wave; both characters read it (the male
+  // a beat later), so their frames can never drift apart.
+  const waveClock = useSharedValue(0)
+  const femaleAmbient = useSharedValue(AMBIENT_RESTING)
+  const maleAmbient = useSharedValue(AMBIENT_RESTING)
   const waveElapsedMsRef = useRef(0)
   const previousGreetingActive = useRef(greetingActive)
-
-  const showFemaleFrame = (index: number) => {
-    femaleWaveFrameRef.current = index
-    setFemaleWaveFrame(index)
-  }
-  const showMaleFrame = (index: number) => {
-    maleWaveFrameRef.current = index
-    setMaleWaveFrame(index)
-  }
+  const frameMode: FrameMode = reduceMotion || ambientOnly
+    ? "static"
+    : isIdle ? "ambient" : "wave"
 
   useEffect(() => {
     const greetingJustOpened = greetingActive && !previousGreetingActive.current
     previousGreetingActive.current = greetingActive
     if (!greetingJustOpened || reduceMotion || ambientOnly) return
     waveElapsedMsRef.current = 0
-    showFemaleFrame(0)
-    showMaleFrame(0)
+    cancelAnimation(waveClock)
+    waveClock.value = 0
     setIsIdle(false)
-  }, [ambientOnly, greetingActive, reduceMotion])
+  }, [ambientOnly, greetingActive, reduceMotion, waveClock])
 
   useEffect(() => {
     if (!motionPreferenceResolved) return undefined
     if (reduceMotion || ambientOnly) {
-      showFemaleFrame(FEMALE_WAVE_FRAMES.length - 1)
-      showMaleFrame(MALE_WAVE_FRAMES.length - 1)
       setIsIdle(true)
       const finishedId = setTimeout(onFinished, 0)
       return () => clearTimeout(finishedId)
     }
     if (!motionEnabled) return undefined
 
-    const timers: ReturnType<typeof setTimeout>[] = []
     const startedAt = Date.now()
-    const elapsedMs = waveElapsedMsRef.current
-    const femaleElapsedFrame = getOnboardingWaveAssetFrameAtElapsed({
-      elapsedMs,
-      frameDurationMs: WAVE_FRAME_DURATION_MS
-    })
-    const maleElapsedFrame = getOnboardingWaveAssetFrameAtElapsed({
-      elapsedMs,
-      frameDurationMs: WAVE_FRAME_DURATION_MS,
-      startOffsetMs: MALE_WAVE_OFFSET_MS
-    })
-    if (femaleElapsedFrame !== femaleWaveFrameRef.current) {
-      showFemaleFrame(femaleElapsedFrame)
-    }
-    if (maleElapsedFrame !== maleWaveFrameRef.current) {
-      showMaleFrame(maleElapsedFrame)
-    }
-
-    ONBOARDING_GREETING_WAVE_SEQUENCE.forEach((assetFrame, sequencePosition) => {
-      if (sequencePosition === 0) return
-      const cueAtMs = getOnboardingWaveFrameTimestampMs({
-        frameIndex: sequencePosition,
-        frameDurationMs: WAVE_FRAME_DURATION_MS
-      })
-      if (cueAtMs <= elapsedMs) return
-      timers.push(setTimeout(
-        () => showFemaleFrame(assetFrame),
-        cueAtMs - elapsedMs
-      ))
-    })
-    ONBOARDING_GREETING_WAVE_SEQUENCE.forEach((assetFrame, sequencePosition) => {
-      if (sequencePosition === 0) return
-      const cueAtMs = getOnboardingWaveFrameTimestampMs({
-        frameIndex: sequencePosition,
-        frameDurationMs: WAVE_FRAME_DURATION_MS,
-        startOffsetMs: MALE_WAVE_OFFSET_MS
-      })
-      if (cueAtMs <= elapsedMs) return
-      timers.push(setTimeout(
-        () => showMaleFrame(assetFrame),
-        cueAtMs - elapsedMs
-      ))
-    })
-    const femaleRemaining = getOnboardingWaveFrameTimestampMs({
-      frameIndex: ONBOARDING_GREETING_WAVE_SEQUENCE.length - 1,
-      frameDurationMs: WAVE_FRAME_DURATION_MS
-    })
-    const maleRemaining = getOnboardingWaveFrameTimestampMs({
-      frameIndex: ONBOARDING_GREETING_WAVE_SEQUENCE.length - 1,
-      frameDurationMs: WAVE_FRAME_DURATION_MS,
-      startOffsetMs: MALE_WAVE_OFFSET_MS
-    })
-    timers.push(setTimeout(() => {
+    const elapsedMs = Math.min(GREETING_WAVE_END_MS, waveElapsedMsRef.current)
+    const finishWave = () => {
       setIsIdle(true)
       onFinished()
-    }, Math.max(0, Math.max(femaleRemaining, maleRemaining) + WAVE_FRAME_DURATION_MS - elapsedMs)))
+    }
+    waveClock.value = elapsedMs
+    waveClock.value = animateSegment(
+      GREETING_WAVE_END_MS,
+      { durationMs: GREETING_WAVE_END_MS - elapsedMs },
+      (finished) => {
+        "worklet"
+        if (finished) scheduleOnRN(finishWave)
+      }
+    )
     return () => {
       waveElapsedMsRef.current += Date.now() - startedAt
-      timers.forEach(clearTimeout)
+      cancelAnimation(waveClock)
     }
-  }, [ambientOnly, greetingActive, motionEnabled, motionPreferenceResolved, onFinished, reduceMotion])
+  }, [ambientOnly, greetingActive, motionEnabled, motionPreferenceResolved, onFinished, reduceMotion, waveClock])
 
   useEffect(() => {
     if (ambientOnly || !motionEnabled || reduceMotion || !isIdle) return undefined
-    const stopFemaleAmbient = scheduleAmbientSpriteLoop({
-      initialDelayMs: 2_600,
-      repeatDelayMs: 7_100,
-      showFrame: showFemaleFrame
-    })
-    const stopMaleAmbient = scheduleAmbientSpriteLoop({
-      initialDelayMs: 4_300,
-      repeatDelayMs: 8_300,
-      showFrame: showMaleFrame
-    })
+    playAmbientWave(femaleAmbient, FEMALE_AMBIENT)
+    playAmbientWave(maleAmbient, MALE_AMBIENT)
     return () => {
-      stopFemaleAmbient()
-      stopMaleAmbient()
+      cancelAnimation(femaleAmbient)
+      cancelAnimation(maleAmbient)
     }
-  }, [ambientOnly, isIdle, motionEnabled, reduceMotion])
+  }, [ambientOnly, femaleAmbient, isIdle, maleAmbient, motionEnabled, reduceMotion])
 
   useEffect(() => {
     if (!motionEnabled || reduceMotion || !isIdle) {
-      femaleIdle.stopAnimation()
-      maleIdle.stopAnimation()
-      femaleWeightShift.stopAnimation()
-      maleWeightShift.stopAnimation()
+      cancelAnimation(femaleIdle)
+      cancelAnimation(maleIdle)
+      cancelAnimation(femaleWeightShift)
+      cancelAnimation(maleWeightShift)
       return undefined
     }
-    const breath = (value: Animated.Value, delay: number) => Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(value, {
-          toValue: 1,
-          duration: ONBOARDING_IDLE_BREATH_DURATION_MS / 2,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        }),
-        Animated.timing(value, {
-          toValue: 0,
-          duration: ONBOARDING_IDLE_BREATH_DURATION_MS / 2,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          isInteraction: false
-        })
-      ])
-    )
-    const femaleLoop = breath(femaleIdle, 0)
-    const maleLoop = breath(maleIdle, ONBOARDING_IDLE_PHASE_OFFSET_MS)
-    const weightShift = (value: Animated.Value, delay: number) => Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(value, {
-          toValue: 1,
-          duration: ONBOARDING_IDLE_WEIGHT_DURATION_MS * 0.32,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-          isInteraction: false
-        }),
-        Animated.delay(620),
-        Animated.timing(value, {
-          toValue: 0,
-          duration: ONBOARDING_IDLE_WEIGHT_DURATION_MS * 0.28,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-          isInteraction: false
-        }),
-        Animated.delay(1_100)
-      ])
-    )
-    const femaleWeightLoop = weightShift(femaleWeightShift, 540)
-    const maleWeightLoop = weightShift(maleWeightShift, 1_180)
-    femaleLoop.start()
-    maleLoop.start()
-    femaleWeightLoop.start()
-    maleWeightLoop.start()
+    playBreath(femaleIdle, 0)
+    playBreath(maleIdle, ONBOARDING_IDLE_PHASE_OFFSET_MS)
+    playWeightShift(femaleWeightShift, 540)
+    playWeightShift(maleWeightShift, 1_180)
     return () => {
-      femaleLoop.stop()
-      maleLoop.stop()
-      femaleWeightLoop.stop()
-      maleWeightLoop.stop()
+      cancelAnimation(femaleIdle)
+      cancelAnimation(maleIdle)
+      cancelAnimation(femaleWeightShift)
+      cancelAnimation(maleWeightShift)
     }
   }, [
     femaleIdle,
@@ -291,20 +224,102 @@ export function OnboardingGreetingPair({
     reduceMotion
   ])
 
-  const femaleSource = FEMALE_WAVE_FRAMES[femaleWaveFrame]
-  const maleSource = MALE_WAVE_FRAMES[maleWaveFrame]
-  const entrance = entranceProgress ?? settledEntrance
-  const interaction = interactionProgress ?? settledInteraction
-  const useDoorwayEntrance = entranceVariant === "doorway"
-  const femaleEntrance = entrance.interpolate({
-    inputRange: [0, 0.12, 1],
-    outputRange: [0, 0, 1],
-    extrapolate: "clamp"
+  const femaleFrame = useDerivedValue(() => {
+    if (frameMode === "static") return LAST_FEMALE_FRAME
+    if (frameMode === "wave") {
+      return getOnboardingWaveAssetFrameAtElapsed({
+        elapsedMs: waveClock.value,
+        frameDurationMs: WAVE_FRAME_DURATION_MS
+      })
+    }
+    const ambient = femaleAmbient.value
+    return ambient < 0
+      ? LAST_FEMALE_FRAME
+      : getOnboardingWaveAssetFrameAtElapsed({ elapsedMs: ambient, frameDurationMs: WAVE_FRAME_DURATION_MS })
   })
-  const maleEntrance = entrance.interpolate({
-    inputRange: [0, 0.3, 1],
-    outputRange: [0, 0, 1],
-    extrapolate: "clamp"
+  const maleFrame = useDerivedValue(() => {
+    if (frameMode === "static") return LAST_MALE_FRAME
+    if (frameMode === "wave") {
+      return getOnboardingWaveAssetFrameAtElapsed({
+        elapsedMs: waveClock.value,
+        frameDurationMs: WAVE_FRAME_DURATION_MS,
+        startOffsetMs: MALE_WAVE_OFFSET_MS
+      })
+    }
+    const ambient = maleAmbient.value
+    return ambient < 0
+      ? LAST_MALE_FRAME
+      : getOnboardingWaveAssetFrameAtElapsed({ elapsedMs: ambient, frameDurationMs: WAVE_FRAME_DURATION_MS })
+  })
+
+  const doorway = entranceVariant === "doorway"
+  const maleStyle = useAnimatedStyle(() => {
+    const entrance = interpolate(entranceProgress ? entranceProgress.value : 1, [0, 0.3, 1], [0, 0, 1], Extrapolation.CLAMP)
+    const idle = maleIdle.value
+    const weight = maleWeightShift.value
+    return {
+      opacity: entrance,
+      transform: [
+        {
+          translateX: doorway
+            ? interpolate(entrance, [0, 0.38, 0.74, 1], [18, -12, -3, 0])
+            : interpolate(entrance, [0, 0.68, 1], [48, -4, 0])
+        },
+        { translateX: interpolate(weight, [0, 1], [0, -1.8]) },
+        {
+          translateY: doorway
+            ? interpolate(entrance, [0, 0.4, 0.76, 1], [18, -12, -2, 0])
+            : interpolate(entrance, [0, 0.62, 0.82, 1], [34, -6, 2, 0])
+        },
+        {
+          scale: doorway
+            ? interpolate(entrance, [0, 0.4, 0.76, 1], [0.72, 1.045, 1.01, 1])
+            : interpolate(entrance, [0, 0.62, 0.82, 1], [0.76, 1.035, 0.992, 1])
+        },
+        { translateY: interpolate(idle, [0, 1], [0, -3.2]) },
+        {
+          rotate: `${doorway
+            ? interpolate(entrance, [0, 0.36, 0.78, 1], [5, -2.2, -0.4, 0])
+            : interpolate(entrance, [0, 0.72, 1], [-4, 0.8, 0])}deg`
+        },
+        { rotate: `${interpolate(idle, [0, 1], [0, -0.7])}deg` },
+        { rotate: `${interpolate(weight, [0, 1], [0, -1.15])}deg` }
+      ]
+    }
+  })
+  const femaleStyle = useAnimatedStyle(() => {
+    const entrance = interpolate(entranceProgress ? entranceProgress.value : 1, [0, 0.12, 1], [0, 0, 1], Extrapolation.CLAMP)
+    const idle = femaleIdle.value
+    const weight = femaleWeightShift.value
+    return {
+      opacity: entrance,
+      transform: [
+        {
+          translateX: doorway
+            ? interpolate(entrance, [0, 0.32, 0.7, 1], [-14, 14, 4, 0])
+            : interpolate(entrance, [0, 0.68, 1], [-48, 4, 0])
+        },
+        { translateX: interpolate(weight, [0, 1], [0, 1.7]) },
+        {
+          translateY: doorway
+            ? interpolate(entrance, [0, 0.34, 0.72, 1], [20, -11, -2, 0])
+            : interpolate(entrance, [0, 0.62, 0.82, 1], [34, -6, 2, 0])
+        },
+        {
+          scale: doorway
+            ? interpolate(entrance, [0, 0.34, 0.72, 1], [0.7, 1.052, 1.012, 1])
+            : interpolate(entrance, [0, 0.62, 0.82, 1], [0.76, 1.035, 0.992, 1])
+        },
+        { translateY: interpolate(idle, [0, 1], [0, -3.6]) },
+        {
+          rotate: `${doorway
+            ? interpolate(entrance, [0, 0.34, 0.7, 1], [-5, 2.6, 0.4, 0])
+            : interpolate(entrance, [0, 0.72, 1], [4, -0.8, 0])}deg`
+        },
+        { rotate: `${interpolate(idle, [0, 1], [0, 0.75])}deg` },
+        { rotate: `${interpolate(weight, [0, 1], [0, 1.1])}deg` }
+      ]
+    }
   })
 
   return (
@@ -312,86 +327,89 @@ export function OnboardingGreetingPair({
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
       style={styles.pair}
+      testID="onboarding-greeting-pair"
     >
-      {/* Every wave frame decodes up front at its drawn size (a 1-pt, near-
-          transparent clip), so a frame swap never shows an empty frame on
-          the first wave (ONB-04). */}
-      <View style={styles.framePreload}>
-        {[...FEMALE_WAVE_FRAMES, ...MALE_WAVE_FRAMES].map((source, index) => (
-          <Image key={index} fadeDuration={0} resizeMode="contain" source={source} style={styles.framePreloadImage} />
-        ))}
-      </View>
-      <Animated.View style={{ opacity: maleEntrance, transform: [
-        {
-          translateX: maleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.38, 0.74, 1] : [0, 0.68, 1],
-            outputRange: useDoorwayEntrance ? [18, -12, -3, 0] : [48, -4, 0]
-          })
-        },
-        { translateX: maleWeightShift.interpolate({ inputRange: [0, 1], outputRange: [0, -1.8] }) },
-        { translateX: interaction.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) },
-        {
-          translateY: maleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.4, 0.76, 1] : [0, 0.62, 0.82, 1],
-            outputRange: useDoorwayEntrance ? [18, -12, -2, 0] : [34, -6, 2, 0]
-          })
-        },
-        {
-          scale: maleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.4, 0.76, 1] : [0, 0.62, 0.82, 1],
-            outputRange: useDoorwayEntrance ? [0.72, 1.045, 1.01, 1] : [0.76, 1.035, 0.992, 1]
-          })
-        },
-        { translateY: maleIdle.interpolate({ inputRange: [0, 1], outputRange: [0, -3.2] }) },
-        { translateY: interaction.interpolate({ inputRange: [0, 0.72, 1], outputRange: [0, 5, 4] }) },
-        {
-          rotate: maleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.36, 0.78, 1] : [0, 0.72, 1],
-            outputRange: useDoorwayEntrance ? ["5deg", "-2.2deg", "-0.4deg", "0deg"] : ["-4deg", "0.8deg", "0deg"]
-          })
-        },
-        { rotate: maleIdle.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "-0.7deg"] }) },
-        { rotate: maleWeightShift.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "-1.15deg"] }) }
-        ,{ rotate: interaction.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "2deg"] }) }
-      ] }}>
-        <Image accessibilityIgnoresInvertColors fadeDuration={0} resizeMode="contain" source={maleSource} style={[styles.character, styles.male]} />
+      <Animated.View style={maleStyle}>
+        <WaveSprite
+          frame={maleFrame}
+          frames={MALE_WAVE_FRAMES}
+          stacked={frameMode !== "static"}
+          style={styles.male}
+          testID="onboarding-greeting-male"
+        />
       </Animated.View>
-      <Animated.View style={{ opacity: femaleEntrance, transform: [
-        {
-          translateX: femaleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.32, 0.7, 1] : [0, 0.68, 1],
-            outputRange: useDoorwayEntrance ? [-14, 14, 4, 0] : [-48, 4, 0]
-          })
-        },
-        { translateX: femaleWeightShift.interpolate({ inputRange: [0, 1], outputRange: [0, 1.7] }) },
-        { translateX: interaction.interpolate({ inputRange: [0, 1], outputRange: [0, 10] }) },
-        {
-          translateY: femaleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.34, 0.72, 1] : [0, 0.62, 0.82, 1],
-            outputRange: useDoorwayEntrance ? [20, -11, -2, 0] : [34, -6, 2, 0]
-          })
-        },
-        {
-          scale: femaleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.34, 0.72, 1] : [0, 0.62, 0.82, 1],
-            outputRange: useDoorwayEntrance ? [0.7, 1.052, 1.012, 1] : [0.76, 1.035, 0.992, 1]
-          })
-        },
-        { translateY: femaleIdle.interpolate({ inputRange: [0, 1], outputRange: [0, -3.6] }) },
-        { translateY: interaction.interpolate({ inputRange: [0, 0.72, 1], outputRange: [0, 5, 4] }) },
-        {
-          rotate: femaleEntrance.interpolate({
-            inputRange: useDoorwayEntrance ? [0, 0.34, 0.7, 1] : [0, 0.72, 1],
-            outputRange: useDoorwayEntrance ? ["-5deg", "2.6deg", "0.4deg", "0deg"] : ["4deg", "-0.8deg", "0deg"]
-          })
-        },
-        { rotate: femaleIdle.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "0.75deg"] }) },
-        { rotate: femaleWeightShift.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "1.1deg"] }) }
-        ,{ rotate: interaction.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "-2deg"] }) }
-      ] }}>
-        <Image accessibilityIgnoresInvertColors fadeDuration={0} resizeMode="contain" source={femaleSource} style={[styles.character, styles.female]} />
+      <Animated.View style={femaleStyle}>
+        <WaveSprite
+          frame={femaleFrame}
+          frames={FEMALE_WAVE_FRAMES}
+          stacked={frameMode !== "static"}
+          style={styles.female}
+          testID="onboarding-greeting-female"
+        />
       </Animated.View>
     </View>
+  )
+}
+
+/**
+ * One character's wave. While it can move, every frame is mounted and
+ * decoded at its drawn size and the UI thread shows one by opacity, so a
+ * frame swap never waits on React or shows an empty frame (ONB-04). A
+ * character that cannot move (Reduce Motion, ambient-only) mounts only its
+ * idle frame.
+ */
+function WaveSprite({
+  frame,
+  frames,
+  stacked,
+  style,
+  testID
+}: {
+  frame: SharedValue<number>
+  frames: readonly ImageSourcePropType[]
+  stacked: boolean
+  style: { marginLeft?: number; marginRight?: number }
+  testID: string
+}) {
+  if (!stacked) {
+    return (
+      <Image
+        accessibilityIgnoresInvertColors
+        fadeDuration={0}
+        resizeMode="contain"
+        source={frames[frames.length - 1]}
+        style={[styles.character, style]}
+        testID={testID}
+      />
+    )
+  }
+  return (
+    <View style={[styles.character, style]} testID={testID}>
+      {frames.map((source, index) => (
+        <WaveFrame frame={frame} index={index} key={index} source={source} />
+      ))}
+    </View>
+  )
+}
+
+function WaveFrame({
+  frame,
+  index,
+  source
+}: {
+  frame: SharedValue<number>
+  index: number
+  source: ImageSourcePropType
+}) {
+  const visibility = useAnimatedStyle(() => ({ opacity: frame.value === index ? 1 : 0 }))
+  return (
+    <Animated.Image
+      accessibilityIgnoresInvertColors
+      fadeDuration={0}
+      resizeMode="contain"
+      source={source}
+      style={[styles.frame, visibility]}
+    />
   )
 }
 
@@ -406,8 +424,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   character: { width: 108, height: 178 },
-  framePreload: { position: "absolute", left: 0, top: 0, width: 1, height: 1, overflow: "hidden", opacity: 0.01 },
-  framePreloadImage: { position: "absolute", width: 108, height: 178 },
+  frame: { position: "absolute", left: 0, top: 0, width: 108, height: 178 },
   male: { marginRight: -8 },
   female: { marginLeft: -8 }
 })

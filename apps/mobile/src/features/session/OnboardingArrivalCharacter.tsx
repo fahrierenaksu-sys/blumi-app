@@ -1,4 +1,10 @@
-import { Animated, Image, StyleSheet, type ImageSourcePropType } from "react-native"
+import { Image, StyleSheet, type ImageSourcePropType } from "react-native"
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue
+} from "react-native-reanimated"
 import {
   ONBOARDING_ARRIVAL_ATLAS_ASSETS,
   ONBOARDING_ARRIVAL_ATLAS_GRID
@@ -11,27 +17,24 @@ import {
   type OnboardingArrivalRole
 } from "./onboardingArrivalMotionModel"
 
-type MotionProgress =
-  | Animated.Value
-  | Animated.AnimatedInterpolation<number>
-
-type RevealProgress =
-  | Animated.Value
-  | Animated.AnimatedInterpolation<number>
-  | Animated.AnimatedInterpolation<string | number>
-  | number
-
 interface OnboardingArrivalCharacterProps {
   enabled: boolean
   fallbackSource: ImageSourcePropType
-  progress: MotionProgress
-  revealProgress?: RevealProgress
+  /** The arrival clock, 0 → 1 (derived from the impact timeline). */
+  progress: SharedValue<number>
+  /** Extra opacity for the arrival rig: a fade-in while the globe rises. */
+  revealProgress?: SharedValue<number> | number
   role: OnboardingArrivalRole
   frameWidth?: number
   frameHeight?: number
 }
 
 const FRAME_CUT_WINDOW = 0.0005
+const VISIBILITY_RANGE = [
+  0,
+  ONBOARDING_ARRIVAL_FRAME_VISIBILITY_START_PROGRESS - FRAME_CUT_WINDOW,
+  ONBOARDING_ARRIVAL_FRAME_VISIBILITY_START_PROGRESS
+]
 
 function buildAtlasOffsetTrack(
   cellSize: number,
@@ -69,7 +72,6 @@ export function OnboardingArrivalCharacter({
   frameWidth = 88,
   frameHeight = 138
 }: OnboardingArrivalCharacterProps) {
-  const track = getOnboardingArrivalTrack(role)
   const frameSize = { width: frameWidth, height: frameHeight }
   const atlasCellHeight = Math.min(
     frameHeight,
@@ -91,36 +93,77 @@ export function OnboardingArrivalCharacter({
     )
   }
 
-  const visibilityGate = progress.interpolate({
-    inputRange: [
-      0,
-      ONBOARDING_ARRIVAL_FRAME_VISIBILITY_START_PROGRESS - FRAME_CUT_WINDOW,
-      ONBOARDING_ARRIVAL_FRAME_VISIBILITY_START_PROGRESS
-    ],
-    outputRange: [0, 0, 1],
-    extrapolate: "clamp"
-  })
-  const arrivalOpacity = revealProgress !== undefined
-    ? typeof revealProgress === "number"
-      ? visibilityGate.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, revealProgress],
-        extrapolate: "clamp"
-      })
-      : Animated.multiply(revealProgress, visibilityGate)
-    : visibilityGate
-  const fallbackOpacity = visibilityGate.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-    extrapolate: "clamp"
-  })
-  const displayProgress = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [getOnboardingArrivalImpactStartProgress(role), 1],
-    extrapolate: "clamp"
-  })
+  return (
+    <ArrivalRig
+      atlasCellHeight={atlasCellHeight}
+      fallbackSource={fallbackSource}
+      frameHeight={frameHeight}
+      frameWidth={frameWidth}
+      progress={progress}
+      revealProgress={revealProgress}
+      role={role}
+    />
+  )
+}
+
+function ArrivalRig({
+  atlasCellHeight,
+  fallbackSource,
+  frameHeight,
+  frameWidth,
+  progress,
+  revealProgress,
+  role
+}: {
+  atlasCellHeight: number
+  fallbackSource: ImageSourcePropType
+  frameHeight: number
+  frameWidth: number
+  progress: SharedValue<number>
+  revealProgress?: SharedValue<number> | number
+  role: OnboardingArrivalRole
+}) {
+  const frameSize = { width: frameWidth, height: frameHeight }
+  const track = getOnboardingArrivalTrack(role)
+  const inputRange = track.inputRange
+  const translateX = track.translateX
+  const translateY = track.translateY
+  const scale = track.scale
+  const rotate = track.rotate.map((degrees) => Number.parseFloat(degrees))
+  const impactStart = getOnboardingArrivalImpactStartProgress(role)
   const atlasX = buildAtlasOffsetTrack(frameWidth, "column")
   const atlasY = buildAtlasOffsetTrack(atlasCellHeight, "row")
+
+  const fallbackStyle = useAnimatedStyle(() => ({
+    opacity: 1 - interpolate(progress.value, VISIBILITY_RANGE, [0, 0, 1], Extrapolation.CLAMP)
+  }))
+  const rigStyle = useAnimatedStyle(() => {
+    const gate = interpolate(progress.value, VISIBILITY_RANGE, [0, 0, 1], Extrapolation.CLAMP)
+    const reveal = revealProgress === undefined
+      ? 1
+      : typeof revealProgress === "number"
+        ? revealProgress
+        : revealProgress.value
+    const display = interpolate(progress.value, [0, 1], [impactStart, 1], Extrapolation.CLAMP)
+    return {
+      opacity: gate * reveal,
+      transform: [
+        { translateX: interpolate(display, inputRange, translateX) },
+        { translateY: interpolate(display, inputRange, translateY) },
+        { scale: interpolate(display, inputRange, scale) },
+        { rotate: `${interpolate(display, inputRange, rotate)}deg` }
+      ]
+    }
+  })
+  const atlasStyle = useAnimatedStyle(() => {
+    const display = interpolate(progress.value, [0, 1], [impactStart, 1], Extrapolation.CLAMP)
+    return {
+      transform: [
+        { translateX: interpolate(display, atlasX.inputRange, atlasX.outputRange) },
+        { translateY: interpolate(display, atlasY.inputRange, atlasY.outputRange) }
+      ]
+    }
+  })
 
   return (
     <Animated.View style={[styles.stage, frameSize]}>
@@ -129,23 +172,9 @@ export function OnboardingArrivalCharacter({
         fadeDuration={0}
         resizeMode="contain"
         source={fallbackSource}
-        style={[styles.frame, frameSize, { opacity: fallbackOpacity }]}
+        style={[styles.frame, frameSize, fallbackStyle]}
       />
-      <Animated.View
-        style={[
-          styles.rig,
-          frameSize,
-          {
-            opacity: arrivalOpacity,
-            transform: [
-              { translateX: displayProgress.interpolate({ inputRange: track.inputRange, outputRange: track.translateX }) },
-              { translateY: displayProgress.interpolate({ inputRange: track.inputRange, outputRange: track.translateY }) },
-              { scale: displayProgress.interpolate({ inputRange: track.inputRange, outputRange: track.scale }) },
-              { rotate: displayProgress.interpolate({ inputRange: track.inputRange, outputRange: track.rotate }) }
-            ]
-          }
-        ]}
-      >
+      <Animated.View style={[styles.rig, frameSize, rigStyle]}>
         <Animated.View
           style={[
             styles.viewport,
@@ -165,12 +194,9 @@ export function OnboardingArrivalCharacter({
               styles.atlas,
               {
                 width: frameWidth * ONBOARDING_ARRIVAL_ATLAS_GRID.columns,
-                height: atlasCellHeight * ONBOARDING_ARRIVAL_ATLAS_GRID.rows,
-                transform: [
-                  { translateX: displayProgress.interpolate(atlasX) },
-                  { translateY: displayProgress.interpolate(atlasY) }
-                ]
-              }
+                height: atlasCellHeight * ONBOARDING_ARRIVAL_ATLAS_GRID.rows
+              },
+              atlasStyle
             ]}
           />
         </Animated.View>

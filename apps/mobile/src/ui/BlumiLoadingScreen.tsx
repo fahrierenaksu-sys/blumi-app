@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { Animated, Easing, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { OnboardingScanStage } from "../features/session/OnboardingScanStage"
 import { ONBOARDING_SCAN_FRAMES } from "../features/session/OnboardingGreetingPair"
 import {
@@ -21,10 +29,52 @@ import {
 } from "../features/session/nativeOnboardingBootBridge"
 import { SoftBlobBackground } from "./backgrounds"
 import { useReducedMotionPreference } from "./animations"
+import { animateSegment, animateSequence } from "./motion"
 import { getLoadingScreenCopy } from "./loadingScreenCopy"
 import { resolveUiLocale } from "./uiLocale"
 
 const timeline = ONBOARDING_BRAND_PRELUDE_TIMELINE_MS
+
+/**
+ * Plays the boot scan (rows, then the sweep) on the UI thread from
+ * `startElapsedMs` of the shared prelude clock. `holdMs` keeps the sweep
+ * resting after both finish; `onComplete` runs once the whole scan has
+ * played naturally (never when it is cancelled).
+ */
+function playScan(
+  scanRows: SharedValue<number>,
+  scanSweep: SharedValue<number>,
+  startElapsedMs: number,
+  options: { holdMs?: number; onComplete?: () => void } = {}
+): void {
+  const rowsMs = Math.max(1, timeline.scanRowsComplete - startElapsedMs)
+  const sweepDelayMs = Math.max(0, timeline.scanSweepStart - startElapsedMs)
+  const sweepMs = Math.max(
+    1,
+    timeline.scanSweepComplete - Math.max(timeline.scanSweepStart, startElapsedMs)
+  )
+  scanRows.value = animateSegment(1, { durationMs: rowsMs, easing: Easing.out(Easing.cubic) })
+  const sweep = animateSegment(1, {
+    delayMs: sweepDelayMs,
+    durationMs: sweepMs,
+    easing: Easing.inOut(Easing.cubic)
+  })
+  const onComplete = options.onComplete
+  if (!onComplete) {
+    scanSweep.value = sweep
+    return
+  }
+  // The rows and the sweep run side by side; the scan is done when the later
+  // of the two has finished and the hold has passed.
+  const restMs = Math.max(0, rowsMs - (sweepDelayMs + sweepMs)) + (options.holdMs ?? 0)
+  scanSweep.value = animateSequence(
+    sweep,
+    animateSegment(1, { durationMs: restMs }, (finished) => {
+      "worklet"
+      if (finished) scheduleOnRN(onComplete)
+    })
+  )
+}
 
 interface BlumiLoadingScreenProps {
   /**
@@ -55,9 +105,10 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
     initialElapsedMs: 0
   })
   const bootInitializedRef = useRef(false)
-  const scanRows = useRef(new Animated.Value(0)).current
-  const scanSweep = useRef(new Animated.Value(0)).current
-  const scanOpacity = useRef(new Animated.Value(1)).current
+  const scanRows = useSharedValue(0)
+  const scanSweep = useSharedValue(0)
+  const scanOpacity = useSharedValue(1)
+  const scanStageStyle = useAnimatedStyle(() => ({ opacity: scanOpacity.value }))
   const initialElapsedMs = bootTiming.initialElapsedMs
 
   useLayoutEffect(() => markOnboardingBootSurfaceVisible(), [])
@@ -73,8 +124,8 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
       startedAtMs
     )
     const initialProgress = getOnboardingBrandPreludeProgressAtElapsed(elapsedMs)
-    scanRows.setValue(shouldReduceMotion ? 1 : initialProgress.scanRows)
-    scanSweep.setValue(shouldReduceMotion ? 1 : initialProgress.scanSweep)
+    scanRows.value = shouldReduceMotion ? 1 : initialProgress.scanRows
+    scanSweep.value = shouldReduceMotion ? 1 : initialProgress.scanSweep
     setBootTiming({ initialized: true, initialElapsedMs: elapsedMs })
   }, [scanRows, scanSweep, shouldReduceMotion])
 
@@ -82,7 +133,7 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
     if (!onPreludeReady) {
       // No prelude takes over (splash, Discover, linking fallback): the scan
       // stays on screen for as long as this surface does.
-      scanOpacity.setValue(1)
+      scanOpacity.value = 1
       return undefined
     }
     if (!bootTiming.initialized) return undefined
@@ -99,62 +150,34 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
       return undefined
     }
     const dissolve = getOnboardingBootDissolvePlan(gateElapsedMs)
-    const animation = Animated.sequence([
-      Animated.delay(dissolve.delayMs),
-      Animated.timing(scanOpacity, {
-        toValue: 0,
-        duration: dissolve.durationMs,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-        isInteraction: false
-      })
-    ])
-    animation.start()
+    scanOpacity.value = animateSegment(0, {
+      delayMs: dissolve.delayMs,
+      durationMs: dissolve.durationMs,
+      easing: Easing.out(Easing.cubic)
+    })
+    // The handoff itself is a React state change, so it stays on the JS clock.
     const readyTimer = setTimeout(onPreludeReady, remainingMs)
     return () => {
       clearTimeout(readyTimer)
-      animation.stop()
+      cancelAnimation(scanOpacity)
     }
   }, [bootMotionPreferenceResolved, bootTiming.initialized, onPreludeReady, scanOpacity, shouldReduceMotion])
 
   useEffect(() => {
     if (!bootTiming.initialized) return undefined
     if (shouldReduceMotion) {
-      scanRows.stopAnimation()
-      scanSweep.stopAnimation()
-      scanRows.setValue(1)
-      scanSweep.setValue(1)
+      cancelAnimation(scanRows)
+      cancelAnimation(scanSweep)
+      scanRows.value = 1
+      scanSweep.value = 1
       return undefined
     }
 
-    const animation = Animated.parallel([
-      Animated.timing(scanRows, {
-        toValue: 1,
-        duration: Math.max(1, timeline.scanRowsComplete - initialElapsedMs),
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-        isInteraction: false
-      }),
-      Animated.sequence([
-        Animated.delay(Math.max(0, timeline.scanSweepStart - initialElapsedMs)),
-        Animated.timing(scanSweep, {
-          toValue: 1,
-          duration: Math.max(
-            1,
-            timeline.scanSweepComplete - Math.max(
-              timeline.scanSweepStart,
-              initialElapsedMs
-            )
-          ),
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-          isInteraction: false
-        })
-      ])
-    ])
-
-    animation.start()
-    return () => animation.stop()
+    playScan(scanRows, scanSweep, initialElapsedMs)
+    return () => {
+      cancelAnimation(scanRows)
+      cancelAnimation(scanSweep)
+    }
   }, [bootTiming.initialized, initialElapsedMs, scanRows, scanSweep, shouldReduceMotion])
 
   return (
@@ -163,7 +186,7 @@ export function BlumiLoadingScreen({ onPreludeReady }: BlumiLoadingScreenProps =
       <Animated.View
         accessibilityLabel={getLoadingScreenCopy(resolveUiLocale()).preparing}
         accessibilityRole="progressbar"
-        style={[styles.scanStage, { opacity: scanOpacity }]}
+        style={[styles.scanStage, scanStageStyle]}
       >
         <OnboardingScanStage scanRows={scanRows} scanSweep={scanSweep} />
       </Animated.View>
@@ -194,8 +217,8 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   const requiredAssetCount = ONBOARDING_SCAN_FRAMES.length + 1
   const assetsReady = resume.resumesBootScan || loadedAssets.length === requiredAssetCount
   const startProgress = getOnboardingBrandPreludeProgressAtElapsed(startMs)
-  const scanRows = useRef(new Animated.Value(startProgress.scanRows)).current
-  const scanSweep = useRef(new Animated.Value(startProgress.scanSweep)).current
+  const scanRows = useSharedValue(startProgress.scanRows)
+  const scanSweep = useSharedValue(startProgress.scanSweep)
   const completed = useRef(false)
   const onAssetLoad = useCallback((id: number) => {
     if (!Number.isInteger(id) || id < 0 || id >= requiredAssetCount) return
@@ -205,38 +228,26 @@ export function PreparedDiscoveryLoadingScreen({ onFinished, onError }: {
   useEffect(() => {
     if (!assetsReady || !motionResolved || completed.current) return
     if (reduced || startMs >= timeline.scanDissolveComplete) {
-      scanRows.setValue(1)
-      scanSweep.setValue(1)
+      scanRows.value = 1
+      scanSweep.value = 1
       completed.current = true
       onFinished()
       return
     }
     let active = true
-    const animation = Animated.sequence([
-      Animated.parallel([
-        Animated.timing(scanRows, {
-          toValue: 1, duration: Math.max(1, timeline.scanRowsComplete - startMs),
-          easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false
-        }),
-        Animated.sequence([
-          Animated.delay(Math.max(0, timeline.scanSweepStart - startMs)),
-          Animated.timing(scanSweep, {
-            toValue: 1,
-            duration: Math.max(1, timeline.scanSweepComplete - Math.max(timeline.scanSweepStart, startMs)),
-            easing: Easing.inOut(Easing.cubic), useNativeDriver: true, isInteraction: false
-          })
-        ])
-      ]),
-      Animated.delay(Math.max(0, timeline.scanDissolveComplete - Math.max(timeline.scanSweepComplete, startMs)))
-    ])
-    animation.start(({ finished }) => {
-      if (!active || !finished || completed.current) return
+    const finish = () => {
+      if (!active || completed.current) return
       completed.current = true
       onFinished()
+    }
+    playScan(scanRows, scanSweep, startMs, {
+      holdMs: Math.max(0, timeline.scanDissolveComplete - Math.max(timeline.scanSweepComplete, startMs)),
+      onComplete: finish
     })
     return () => {
       active = false
-      animation.stop()
+      cancelAnimation(scanRows)
+      cancelAnimation(scanSweep)
     }
   }, [assetsReady, motionResolved, reduced, onFinished, scanRows, scanSweep, startMs])
 
