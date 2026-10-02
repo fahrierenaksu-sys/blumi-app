@@ -1,3 +1,13 @@
+import {
+  isRoomWorldPointNearBlockerExact,
+  isRoomWorldPointWalkableExact,
+  isRoomWorldSegmentClearExact,
+  resolveRoomWorldNavigationPath,
+  type RoomWorldFloorLattice,
+  type RoomWorldMetric
+} from "./roomFloorNavigation"
+import type { RoomFloorGrid } from "./roomFloorGrid"
+
 export type RoomWorldFacing = "front" | "back" | "left" | "right"
 
 export const ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON = 0.002
@@ -32,6 +42,47 @@ export interface RoomWorldBlocker {
 export interface RoomWorldGeometry {
   walkableAreas: RoomWorldWalkableArea[]
   blockers?: RoomWorldBlocker[]
+  /** The walk lattice (a measured floor grid); derived from the walkable bounds when absent. */
+  floor?: RoomWorldFloorLattice
+  /** Per-axis distance scale (the canvas proportions); 1:1 when absent. */
+  metric?: RoomWorldMetric
+  /** Distance kept from the walkable area's edge, in metric units; 0 when absent. */
+  edgeMargin?: number
+}
+
+/**
+ * Distance the avatar's feet keep from the drawn floor's edge on a measured
+ * floor, in canvas widths (about 15 px on the 1254 px canvas): feet never
+ * stand on the floor's lip.
+ */
+export const ROOM_WORLD_FLOOR_EDGE_MARGIN = 0.012
+
+/** Walk lattice nodes per placement cell along each axis. */
+export const ROOM_WORLD_WALK_NODES_PER_CELL = 2
+
+/**
+ * The walkable floor of a shell with a measured floor grid: the drawn floor
+ * outline, the half-tile lattice for paths and the canvas proportions for
+ * distances. One model for My Room, MiniRoom and the server.
+ */
+export function createRoomWorldFloorGeometry(
+  grid: RoomFloorGrid,
+  canvas: { width: number; height: number }
+): Required<Pick<RoomWorldGeometry, "walkableAreas" | "floor" | "metric" | "edgeMargin">> {
+  return {
+    walkableAreas: [{
+      id: grid.id,
+      points: grid.outline.map((point) => ({ x: point.x, y: point.y }))
+    }],
+    floor: {
+      corners: grid.latticeCorners,
+      // Two walk nodes per placement cell (quarter tiles): a gap between two
+      // pieces of furniture narrower than a half tile is still found.
+      divisions: grid.latticeSpan * grid.cellsPerTile * ROOM_WORLD_WALK_NODES_PER_CELL
+    },
+    metric: { x: 1, y: canvas.height / canvas.width },
+    edgeMargin: ROOM_WORLD_FLOOR_EDGE_MARGIN
+  }
 }
 
 export type RoomWorldHotspotKind = "seat" | "stand" | "activity"
@@ -67,8 +118,6 @@ export interface RoomWorldClearanceOptions {
 }
 
 const DEFAULT_BLOCKER_ANCHOR: RoomWorldAnchor = { x: 0.5, y: 1 }
-const DEFAULT_SEGMENT_STEPS = 12
-const DEFAULT_PATH_MARGIN = 0.035
 
 export function pointInRoomWorldPolygon(
   point: RoomWorldPoint,
@@ -160,23 +209,9 @@ export function isRoomWorldPointInsideBlocker(
   blocker: RoomWorldBlocker,
   options?: RoomWorldClearanceOptions
 ): boolean {
-  if (blocker.blocksMovement === false) return false
-  if (blocker.polygon && blocker.polygon.length >= 3) {
-    // The calibrated polygon is the authoritative contact shape. A small
-    // clearance still uses the legacy bounds as a conservative path margin;
-    // without clearance this avoids reintroducing rectangular false reds.
-    if (!options?.clearance) {
-      return pointInRoomWorldPolygon(point, blocker.polygon)
-    }
-  }
-  const bounds = getRoomWorldBlockerBounds(blocker)
-  const clearance = getRoomWorldClearance(options)
-  return (
-    point.x >= bounds.minX - clearance &&
-    point.x <= bounds.maxX + clearance &&
-    point.y >= bounds.minY - clearance &&
-    point.y <= bounds.maxY + clearance
-  )
+  // The calibrated polygon (else the bounds) is the contact shape; clearance
+  // is an exact distance from it, never its inflated bounding box.
+  return isRoomWorldPointNearBlockerExact(point, blocker, getRoomWorldClearance(options))
 }
 
 /** Returns true when two calibrated convex/concave world polygons overlap. */
@@ -247,14 +282,7 @@ export function isRoomWorldPointWalkable(
   point: RoomWorldPoint,
   options?: RoomWorldClearanceOptions
 ): boolean {
-  const insideWalkableArea = geometry.walkableAreas.some((area) =>
-    pointInRoomWorldPolygon(point, area.points)
-  )
-  if (!insideWalkableArea) return false
-
-  return !(geometry.blockers ?? []).some((blocker) =>
-    isRoomWorldPointInsideBlocker(point, blocker, options)
-  )
+  return isRoomWorldPointWalkableExact(geometry, point, getRoomWorldClearance(options))
 }
 
 export function omitRoomWorldBlockers(
@@ -271,64 +299,35 @@ export function omitRoomWorldBlockers(
   }
 }
 
+/** Whether every point of the segment is walkable (exact, not sampled). */
 export function isRoomWorldSegmentClear(input: {
   geometry: RoomWorldGeometry
   from: RoomWorldPoint
   to: RoomWorldPoint
+  /** Ignored: kept for callers of the sampled check this replaced. */
   steps?: number
   clearance?: number
 }): boolean {
-  const steps = Math.max(1, input.steps ?? DEFAULT_SEGMENT_STEPS)
-  for (let index = 0; index <= steps; index += 1) {
-    const progress = index / steps
-    const point = {
-      x: input.from.x + (input.to.x - input.from.x) * progress,
-      y: input.from.y + (input.to.y - input.from.y) * progress
-    }
-    if (
-      !isRoomWorldPointWalkable(input.geometry, point, {
-        clearance: input.clearance
-      })
-    ) {
-      return false
-    }
-  }
-  return true
+  return isRoomWorldSegmentClearExact(input.geometry, input.from, input.to, getRoomWorldClearance(input))
 }
 
+/**
+ * The points to walk through after `from`, ending exactly at `to`; null when
+ * `to` is not walkable or not reachable. A* over the floor lattice with
+ * string pulling (roomFloorNavigation): deterministic, so both phones of a
+ * shared room plan the same walk.
+ */
 export function resolveRoomWorldPath(input: {
   geometry: RoomWorldGeometry
   from: RoomWorldPoint
   to: RoomWorldPoint
   clearance?: number
 }): RoomWorldPath | null {
-  const clearance = getRoomWorldClearance(input)
-  if (!isRoomWorldPointWalkable(input.geometry, input.to, { clearance })) return null
-  if (
-    isRoomWorldSegmentClear({
-      geometry: input.geometry,
-      from: input.from,
-      to: input.to,
-      clearance
-    })
-  ) {
-    return [input.to]
-  }
-
-  const candidates = getRoomWorldPathCandidates(input.geometry, { clearance })
-  const directWaypoint = findShortestClearPath({
-    ...input,
-    candidates,
-    waypointCount: 1,
-    clearance
-  })
-  if (directWaypoint) return directWaypoint
-
-  return findShortestClearPath({
-    ...input,
-    candidates,
-    waypointCount: 2,
-    clearance
+  return resolveRoomWorldNavigationPath({
+    geometry: input.geometry,
+    from: input.from,
+    to: input.to,
+    clearance: getRoomWorldClearance(input)
   })
 }
 
@@ -344,33 +343,8 @@ export function deriveRoomWorldFacing(
   return dy >= 0 ? "front" : "back"
 }
 
-function getRoomWorldPathCandidates(
-  geometry: RoomWorldGeometry,
-  options?: RoomWorldClearanceOptions
-): RoomWorldPoint[] {
-  const clearance = getRoomWorldClearance(options)
-  const candidates = (geometry.blockers ?? [])
-    .filter((blocker) => blocker.blocksMovement !== false)
-    .flatMap((blocker) => getBlockerCornerCandidates(blocker, { clearance }))
-    .filter((candidate) =>
-      isRoomWorldPointWalkable(geometry, candidate, { clearance })
-    )
-
-  return uniqueRoomWorldPoints(candidates)
-}
-
-function getBlockerCornerCandidates(
-  blocker: RoomWorldBlocker,
-  options?: RoomWorldClearanceOptions
-): RoomWorldPoint[] {
-  const bounds = getRoomWorldBlockerBounds(blocker)
-  const margin = DEFAULT_PATH_MARGIN + getRoomWorldClearance(options)
-  return [
-    { x: bounds.minX - margin, y: bounds.minY - margin },
-    { x: bounds.maxX + margin, y: bounds.minY - margin },
-    { x: bounds.minX - margin, y: bounds.maxY + margin },
-    { x: bounds.maxX + margin, y: bounds.maxY + margin }
-  ]
+function getRoomWorldClearance(options?: RoomWorldClearanceOptions): number {
+  return Math.max(0, options?.clearance ?? 0)
 }
 
 function getNearestPointOnRoomWorldSegment(
@@ -399,108 +373,4 @@ function getRoomWorldPointDistanceSquared(
   const dx = a.x - b.x
   const dy = a.y - b.y
   return dx * dx + dy * dy
-}
-
-function findShortestClearPath(input: {
-  geometry: RoomWorldGeometry
-  from: RoomWorldPoint
-  to: RoomWorldPoint
-  candidates: RoomWorldPoint[]
-  waypointCount: 1 | 2
-  clearance: number
-}): RoomWorldPath | null {
-  let shortestPath: RoomWorldPath | null = null
-  let shortestDistance = Number.POSITIVE_INFINITY
-
-  if (input.waypointCount === 1) {
-    input.candidates.forEach((candidate) => {
-      const path = [candidate, input.to]
-      const distance = getRoomWorldPathDistance(input.from, path)
-      if (distance >= shortestDistance) return
-      if (
-        !isRoomWorldPathClear(input.geometry, input.from, path, {
-          clearance: input.clearance
-        })
-      ) {
-        return
-      }
-      shortestPath = path
-      shortestDistance = distance
-    })
-    return shortestPath
-  }
-
-  input.candidates.forEach((first) => {
-    input.candidates.forEach((second) => {
-      if (pointsEqual(first, second)) return
-      const path = [first, second, input.to]
-      const distance = getRoomWorldPathDistance(input.from, path)
-      if (distance >= shortestDistance) return
-      if (
-        !isRoomWorldPathClear(input.geometry, input.from, path, {
-          clearance: input.clearance
-        })
-      ) {
-        return
-      }
-      shortestPath = path
-      shortestDistance = distance
-    })
-  })
-
-  return shortestPath
-}
-
-function isRoomWorldPathClear(
-  geometry: RoomWorldGeometry,
-  from: RoomWorldPoint,
-  path: RoomWorldPath,
-  options?: RoomWorldClearanceOptions
-): boolean {
-  let start = from
-  for (const target of path) {
-    if (
-      !isRoomWorldSegmentClear({
-        geometry,
-        from: start,
-        to: target,
-        clearance: options?.clearance
-      })
-    ) {
-      return false
-    }
-    start = target
-  }
-  return true
-}
-
-function getRoomWorldPathDistance(
-  from: RoomWorldPoint,
-  path: RoomWorldPath
-): number {
-  let distance = 0
-  let start = from
-  path.forEach((target) => {
-    distance += Math.hypot(target.x - start.x, target.y - start.y)
-    start = target
-  })
-  return distance
-}
-
-function uniqueRoomWorldPoints(points: RoomWorldPoint[]): RoomWorldPoint[] {
-  const seen = new Set<string>()
-  return points.filter((point) => {
-    const key = `${point.x.toFixed(3)}:${point.y.toFixed(3)}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-}
-
-function pointsEqual(first: RoomWorldPoint, second: RoomWorldPoint): boolean {
-  return first.x === second.x && first.y === second.y
-}
-
-function getRoomWorldClearance(options?: RoomWorldClearanceOptions): number {
-  return Math.max(0, options?.clearance ?? 0)
 }

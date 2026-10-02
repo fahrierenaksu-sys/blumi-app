@@ -1,5 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import {
+  createRoomWorldFloorGeometry,
+  getRoomWorldWalkableNodes,
+  MINI_ROOM_FLOOR,
+  ROOM_BLUMI_WORLD_CANVAS,
+  ROOM_BLUMI_WORLD_FLOOR_GRID
+} from "@blumi/domain"
 import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS, MINI_ROOM_MOTION_REVALIDATE_AFTER_MS } from "./miniRoomMotionService"
 
 test("room motion relays immediately, snapshots recover positions, and disconnect is per connection", async () => {
@@ -74,6 +81,26 @@ test("a seat move is relayed with its hotspot even where the seat overhangs the 
     await service.move("ca", "a", { miniRoomId: "room", sequence, ...point, hotspotId: "invented:seat" })
   }
   assert.equal(events.length, 1)
+})
+
+test("every point a phone may walk to on the drawn floor is relayed; older clients' targets still are", async () => {
+  // Phones walk the measured Blumi Home floor (its corners and front bay lie
+  // outside the old walk polygon). A target the client accepts must never be
+  // dropped here, or the partner's phone would never see the walk.
+  const events: any[] = []
+  const room = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const service = createMiniRoomMotionService({ findRoom: async () => room as any,
+    hasBlockBetween: async () => false, emit: (_, event) => events.push(event) })
+  await service.enter("ca", "a", "room")
+  events.length = 0
+  const floor = createRoomWorldFloorGeometry(ROOM_BLUMI_WORLD_FLOOR_GRID, ROOM_BLUMI_WORLD_CANVAS)
+  const nodes = getRoomWorldWalkableNodes(floor, 0.012)
+  const points = [{ x: .1, y: .665 }, { x: .9, y: .665 }, { x: .49, y: .91 }, ...MINI_ROOM_FLOOR, ...nodes]
+  let sequence = 0
+  for (const point of points) {
+    await service.move("ca", "a", { miniRoomId: "room", sequence: ++sequence, ...point })
+  }
+  assert.equal(events.length, points.length)
 })
 
 test("motion reaches only the sockets that entered the scene, never every device of both users", async () => {

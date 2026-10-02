@@ -3,6 +3,7 @@ import {
   isRoomWorldPointWalkable,
   omitRoomWorldBlockers,
   projectRoomWorldPointToPolygon,
+  resolveRoomWorldNearestWalkablePoint,
   resolveRoomWorldPath,
   type RoomWorldFacing,
   type RoomWorldGeometry,
@@ -74,6 +75,14 @@ export function resolveRoomWorldSeatApproachPoint(input: {
     .filter((candidate): candidate is RoomWorldPoint => Boolean(candidate))
     .flatMap((candidate) => [
       candidate,
+      // The free spot right next to an approach that furniture or the
+      // floor's edge covers (a chair at the front lip).
+      ...optionalPoint(resolveRoomWorldNearestWalkablePoint({
+        geometry: input.geometry,
+        target: candidate,
+        clearance: input.clearance ?? 0,
+        from: input.from
+      })),
       ...getRoomWorldWalkableProjectionCandidates(input.geometry, candidate)
     ])
 
@@ -368,7 +377,12 @@ export function createRoomWorldSeatExitMovementPlan(input: {
     [input.seatedFurnitureRenderId]
   )
 
-  return [input.exit, ...getRoomWorldSeatExitFallbacks(input)]
+  const nearestExit = resolveRoomWorldNearestWalkablePoint({
+    geometry: input.geometry,
+    target: input.exit,
+    clearance: input.clearance ?? ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
+  })
+  return [input.exit, ...getRoomWorldSeatExitFallbacks(input), ...optionalPoint(nearestExit)]
     .map((exit): RoomWorldMovementPlan | null => {
       const exitPlan = createRoomWorldMovementPlan({
         geometry: unobstructedGeometry,
@@ -467,6 +481,8 @@ export function resolveRoomWorldUnoccupiedTarget(input: {
   movingOccupantId?: string
   clearance?: number
   radius?: number
+  /** Only a point reachable from here qualifies. */
+  from?: RoomWorldPoint
 }): RoomWorldPoint | null {
   const clearance = input.clearance ?? ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
   const radius = input.radius ?? ROOM_WORLD_AVATAR_PERSONAL_SPACE_RADIUS
@@ -476,36 +492,21 @@ export function resolveRoomWorldUnoccupiedTarget(input: {
     movingOccupantId: input.movingOccupantId,
     radius
   })
-
-  if (
-    resolveRoomWorldPath({
-      geometry: occupantGeometry,
-      from: input.target,
-      to: input.target,
-      clearance
-    })
-  ) {
-    return input.target
-  }
-
-  const candidates = createRoomWorldTargetRing(input.target, radius + clearance)
-  const validCandidates = candidates
-    .filter((candidate) =>
-      resolveRoomWorldPath({
-        geometry: occupantGeometry,
-        from: candidate,
-        to: candidate,
-        clearance
-      })
-    )
-    .sort((a, b) =>
-      Math.hypot(a.x - input.target.x, a.y - input.target.y) -
-      Math.hypot(b.x - input.target.x, b.y - input.target.y)
-    )
-
-  return validCandidates[0] ?? null
+  // Next to the other avatar, never through it: the nearest free point.
+  return resolveRoomWorldNearestWalkablePoint({
+    geometry: occupantGeometry,
+    target: input.target,
+    clearance,
+    from: input.from
+  })
 }
 
+/**
+ * Where a tap or a walk request ends: the tapped point itself when the avatar
+ * can stand there, else the nearest walkable point next to it (beside the
+ * footprint it hit, just inside the floor edge), then nudged off another
+ * avatar. With `from`, only a point the avatar can reach from there.
+ */
 export function resolveRoomWorldInteractiveTarget(input: {
   geometry: RoomWorldGeometry
   target: RoomWorldPoint
@@ -513,12 +514,14 @@ export function resolveRoomWorldInteractiveTarget(input: {
   movingOccupantId?: string
   clearance?: number
   radius?: number
+  from?: RoomWorldPoint
 }): RoomWorldPoint | null {
   const clearance = input.clearance ?? ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
-  const walkableTarget = resolveRoomWorldNearestWalkableTarget({
+  const walkableTarget = resolveRoomWorldNearestWalkablePoint({
     geometry: input.geometry,
     target: input.target,
-    clearance
+    clearance,
+    from: input.from
   })
   if (!walkableTarget) return null
 
@@ -598,40 +601,8 @@ export function getRoomWorldMovementFramePose(input: {
   }
 }
 
-function resolveRoomWorldNearestWalkableTarget(input: {
-  geometry: RoomWorldGeometry
-  target: RoomWorldPoint
-  clearance: number
-}): RoomWorldPoint | null {
-  if (
-    isRoomWorldPointWalkable(input.geometry, input.target, {
-      clearance: input.clearance
-    })
-  ) {
-    return input.target
-  }
-
-  const projectedCandidates = input.geometry.walkableAreas.flatMap((area) => {
-    const projected = projectRoomWorldPointToPolygon(input.target, area.points)
-    return [
-      projected,
-      ...createRoomWorldTargetRing(projected, input.clearance + 0.025),
-      ...createRoomWorldTargetRing(projected, input.clearance + 0.05)
-    ]
-  })
-
-  const validCandidates = uniqueRoomWorldRuntimePoints(projectedCandidates)
-    .filter((candidate) =>
-      isRoomWorldPointWalkable(input.geometry, candidate, {
-        clearance: input.clearance
-      })
-    )
-    .sort((a, b) =>
-      Math.hypot(a.x - input.target.x, a.y - input.target.y) -
-      Math.hypot(b.x - input.target.x, b.y - input.target.y)
-    )
-
-  return validCandidates[0] ?? null
+function optionalPoint(point: RoomWorldPoint | null): RoomWorldPoint[] {
+  return point ? [point] : []
 }
 
 function getRoomWorldDistance(
@@ -674,33 +645,4 @@ function addRoomWorldOccupantBlockers(input: {
       ...occupantBlockers
     ]
   }
-}
-
-function createRoomWorldTargetRing(
-  target: RoomWorldPoint,
-  radius: number
-): RoomWorldPoint[] {
-  return [
-    { x: target.x + radius, y: target.y },
-    { x: target.x - radius, y: target.y },
-    { x: target.x, y: target.y + radius },
-    { x: target.x, y: target.y - radius },
-    { x: target.x + radius * 0.72, y: target.y + radius * 0.72 },
-    { x: target.x - radius * 0.72, y: target.y + radius * 0.72 },
-    { x: target.x + radius * 0.72, y: target.y - radius * 0.72 },
-    { x: target.x - radius * 0.72, y: target.y - radius * 0.72 }
-  ].map((point) => ({
-    x: Math.max(0, Math.min(1, point.x)),
-    y: Math.max(0, Math.min(1, point.y))
-  }))
-}
-
-function uniqueRoomWorldRuntimePoints(points: RoomWorldPoint[]): RoomWorldPoint[] {
-  const seen = new Set<string>()
-  return points.filter((point) => {
-    const key = `${point.x.toFixed(3)}:${point.y.toFixed(3)}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
 }

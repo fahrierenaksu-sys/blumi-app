@@ -1,31 +1,20 @@
+import {
+  createRoomFloorHomography,
+  ROOM_BLUMI_WORLD_FLOOR_GRID,
+  type RoomFloorGrid
+} from "@blumi/domain"
 import type { RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
 
 /**
  * The placement floor of a fixed-angle room shell, measured on the drawn art.
- *
- * The shell's floor is a slightly perspective (not perfectly isometric)
- * quadrilateral, so one affine grid cannot follow its tiles. A projective map
- * (homography) from tile coordinates to the canvas does: tile (i, j) has its
- * grout crossings at whole numbers, `i` running along the back-right wall and
- * `j` along the back-left wall. Placement cells are a finer lattice of that
- * same grid, so every cell lines up with the drawn tiles.
+ * The data and the homography live in @blumi/domain (roomFloorGrid), the one
+ * floor model avatar walking and the server use too; this module adds the
+ * editor's cell lattice and the UI-thread (worklet) projections.
  *
  * Everything is normalized to the shell canvas (x / width, y / height), which
  * is also the stage coordinate system the renderer and the editor use.
  */
-export interface RoomV2FloorGrid {
-  id: string
-  /**
-   * Drawn grout crossings at tile (0, 0), (span, 0), (span, span), (0, span).
-   * Measured, not authored: see roomV2FloorGrid.test.ts for the overlay proof.
-   */
-  latticeCorners: readonly [RoomWorldPoint, RoomWorldPoint, RoomWorldPoint, RoomWorldPoint]
-  latticeSpan: number
-  /** Placement cells per drawn tile along each axis. */
-  cellsPerTile: number
-  /** The drawn floor's top surface, including the front bay. Convex. */
-  outline: readonly RoomWorldPoint[]
-}
+export type RoomV2FloorGrid = RoomFloorGrid
 
 /**
  * Plain-number form of a floor grid for the UI thread: forward and inverse
@@ -67,45 +56,15 @@ export interface RoomV2FloorGridCellShape {
   alongJ: RoomWorldPoint
 }
 
-/**
- * Blumi Home (room_v2_shell_blumi_world_v1, 1254x714), measured on the
- * shipped runtime webp. The lattice is a least-squares fit to 49 detected
- * grout crossings (largest residual 2.6 px on the 1254 px canvas); the
- * outline follows the floor's top edges: back corner (600, 271), right
- * (1209, 475), the front bay (767, 640) (617, 668) (468, 632) and left
- * (36, 474) px. Half-tile cells step about 13 x 5 pt on a phone: fine enough
- * to place precisely, coarse enough to snap.
- */
-export const ROOM_V2_BLUMI_WORLD_FLOOR_GRID: RoomV2FloorGrid = {
-  id: "room_v2_shell_blumi_world_v1.floor_grid.v1",
-  latticeCorners: [
-    { x: 0.47681, y: 0.42531 },
-    { x: 0.8654, y: 0.67378 },
-    { x: 0.47998, y: 0.92499 },
-    { x: 0.09429, y: 0.67463 }
-  ],
-  latticeSpan: 7,
-  cellsPerTile: 2,
-  outline: [
-    { x: 0.47847, y: 0.37955 },
-    { x: 0.96411, y: 0.66527 },
-    { x: 0.61164, y: 0.89636 },
-    { x: 0.49203, y: 0.93557 },
-    { x: 0.3732, y: 0.88515 },
-    { x: 0.02871, y: 0.66387 }
-  ]
-}
+/** Blumi Home (room_v2_shell_blumi_world_v1, 1254x714): see ROOM_BLUMI_WORLD_FLOOR_GRID. */
+export const ROOM_V2_BLUMI_WORLD_FLOOR_GRID: RoomV2FloorGrid = ROOM_BLUMI_WORLD_FLOOR_GRID
 
 export function createRoomV2FloorGridProjection(grid: RoomV2FloorGrid): RoomV2FloorGridProjection {
-  const forward = getSquareToQuadCoefficients(grid.latticeCorners)
+  const { forward, inverse } = createRoomFloorHomography(grid.latticeCorners)
   const { cellsPerTile } = grid
   const base = {
     forward,
-    inverse: invert3x3([
-      forward[0], forward[1], forward[2],
-      forward[3], forward[4], forward[5],
-      forward[6], forward[7], 1
-    ]),
+    inverse,
     span: grid.latticeSpan,
     cellsPerTile
   }
@@ -409,38 +368,4 @@ function clipSegmentToConvexPolygon(
     from: { x: from.x + direction.x * enter, y: from.y + direction.y * enter },
     to: { x: from.x + direction.x * exit, y: from.y + direction.y * exit }
   }
-}
-
-/** Heckbert's unit-square to quadrilateral map: (0,0), (1,0), (1,1), (0,1) -> corners. */
-function getSquareToQuadCoefficients(
-  corners: readonly [RoomWorldPoint, RoomWorldPoint, RoomWorldPoint, RoomWorldPoint]
-): number[] {
-  const [p0, p1, p2, p3] = corners
-  const sx = p0.x - p1.x + p2.x - p3.x
-  const sy = p0.y - p1.y + p2.y - p3.y
-  const dx1 = p1.x - p2.x
-  const dx2 = p3.x - p2.x
-  const dy1 = p1.y - p2.y
-  const dy2 = p3.y - p2.y
-  const denominator = dx1 * dy2 - dx2 * dy1
-  const g = (sx * dy2 - dx2 * sy) / denominator
-  const h = (dx1 * sy - sx * dy1) / denominator
-  return [
-    p1.x - p0.x + g * p1.x, p3.x - p0.x + h * p3.x, p0.x,
-    p1.y - p0.y + g * p1.y, p3.y - p0.y + h * p3.y, p0.y,
-    g, h
-  ]
-}
-
-function invert3x3(m: number[]): number[] {
-  const [a, b, c, d, e, f, g, h, k] = m
-  const A = e * k - f * h
-  const B = -(d * k - f * g)
-  const C = d * h - e * g
-  const determinant = a * A + b * B + c * C
-  return [
-    A / determinant, -(b * k - c * h) / determinant, (b * f - c * e) / determinant,
-    B / determinant, (a * k - c * g) / determinant, -(a * f - c * d) / determinant,
-    C / determinant, -(a * h - b * g) / determinant, (a * e - b * d) / determinant
-  ]
 }
