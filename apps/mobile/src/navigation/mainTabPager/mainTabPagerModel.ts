@@ -429,8 +429,8 @@ export function getMainTabPageNeighbours(index: number): number[] {
  * Pages to keep mounted. A page mounts on its first selection and stays
  * mounted (its own focus-aware effects pause while it is not selected).
  * Never-visited swipe neighbours are added only when `includeNeighbours` is
- * set, which the pager does after the selected page settled and idled, or
- * when a drag starts before that happened.
+ * set, which the pager does when a drag starts before the idle warm-up
+ * (resolveMainTabPagerNextIdleMount) reached them.
  */
 export function resolveMainTabPagerMountedPages(input: {
   mounted: readonly boolean[]
@@ -443,6 +443,26 @@ export function resolveMainTabPagerMountedPages(input: {
     for (const neighbour of getMainTabPageNeighbours(input.selectedIndex)) next[neighbour] = true
   }
   return next
+}
+
+/**
+ * The page to warm in the next idle slot after launch: the never-mounted
+ * page closest to the selected one (the left one first on a tie), or -1
+ * once every page is mounted. Pages warm one per slot, so no slot renders
+ * more than one page.
+ */
+export function resolveMainTabPagerNextIdleMount(mounted: readonly boolean[], selectedIndex: number): number {
+  let best = -1
+  for (let index = 0; index < MAIN_TAB_PAGES.length; index += 1) {
+    if (mounted[index] === true) continue
+    if (best < 0 || Math.abs(index - selectedIndex) < Math.abs(best - selectedIndex)) best = index
+  }
+  return best
+}
+
+/** Mounted pages plus `index`. */
+export function withMainTabPageMounted(mounted: readonly boolean[], index: number): boolean[] {
+  return MAIN_TAB_PAGES.map((_, page) => mounted[page] === true || page === index)
 }
 
 export function areMainTabPagerMountedPagesEqual(a: readonly boolean[], b: readonly boolean[]): boolean {

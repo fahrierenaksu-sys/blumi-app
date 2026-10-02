@@ -178,6 +178,14 @@ function mountPager(initialRoute: string) {
         for (const timer of due) timer.run()
       }
     },
+    /** Runs the timers queued right now (one idle slot), not the ones they queue. */
+    idleSlot() {
+      const due = timers
+      timers = []
+      for (const timer of due) timer.run()
+    },
+    pan: () => gesture.pan(),
+    mountedPages: () => pageProps().filter((props) => props.mounted === true).map((props) => props.routeName),
     /** Navigation answers the pager's commit (the slot route changes). */
     navigate(name: string) {
       route = { key: "slot", name }
@@ -293,4 +301,31 @@ test("a tap that catches a settle mid-way lets it finish on the same page, which
   assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["MyRoom"], "one commit")
   pager.navigate("MyRoom")
   assert.equal(pager.selectedPage(), "MyRoom")
+})
+
+test("after launch the other pages mount one per idle slot, nearest first", () => {
+  const pager = mountPager("Inbox")
+  assert.deepEqual(pager.mountedPages(), ["Inbox"], "only the shown page renders at launch")
+  const seen: string[][] = []
+  for (let slot = 0; slot < 6; slot += 1) {
+    pager.idleSlot()
+    seen.push(pager.mountedPages() as string[])
+  }
+  assert.deepEqual(seen.slice(0, 3), [
+    ["Lobby", "Inbox"],
+    ["Lobby", "Inbox", "MyRoom"],
+    ["Lobby", "Inbox", "MyRoom", "CosmeticShop"]
+  ], "one page per slot")
+  assert.deepEqual(seen[5], ["Lobby", "Inbox", "MyRoom", "CosmeticShop"], "then nothing more is scheduled")
+})
+
+test("a drag over warm neighbours mounts nothing and renders nothing", () => {
+  const pager = mountPager("Inbox")
+  pager.advance(1000)
+  const renders = pager.runtime.renderCount
+  const pan = pager.pan()
+  pan.onBegin!()
+  pan.onStart!({ translationX: 0 })
+  pan.onUpdate!({ translationX: -0.3 * W })
+  assert.equal(pager.runtime.renderCount, renders)
 })

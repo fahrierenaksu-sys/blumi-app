@@ -30,10 +30,12 @@ import {
   resolveMainTabPagerCommitRoute,
   resolveMainTabPagerDragPosition,
   resolveMainTabPagerMountedPages,
+  resolveMainTabPagerNextIdleMount,
   resolveMainTabPagerSettleIndex,
   resolveMainTabPagerSettleVelocity,
   resolveMainTabPagerSpringEnergyThreshold,
   shouldMainTabPagerTouchCatchSettle,
+  withMainTabPageMounted,
   type MainTabPagerUiState
 } from "./mainTabPagerModel"
 
@@ -689,6 +691,18 @@ test("pages mount lazily; visited pages stay; neighbours only when asked", () =>
   assert.deepEqual(getMainTabPageNeighbours(CHATS), [DISCOVER, MYROOM])
   assert.deepEqual(getMainTabPageNeighbours(MYROOM), [CHATS, SHOP])
   assert.deepEqual(getMainTabPageNeighbours(SHOP), [MYROOM])
+})
+
+test("idle warm-up picks the nearest never-mounted page, one at a time, until all are mounted", () => {
+  let mounted = [false, false, true, false]
+  const order: number[] = []
+  for (let page = resolveMainTabPagerNextIdleMount(mounted, MYROOM); page >= 0; page = resolveMainTabPagerNextIdleMount(mounted, MYROOM)) {
+    order.push(page)
+    mounted = withMainTabPageMounted(mounted, page)
+  }
+  assert.deepEqual(order, [CHATS, SHOP, DISCOVER], "neighbours first (left on a tie), then the far page")
+  assert.deepEqual(mounted, [true, true, true, true])
+  assert.equal(resolveMainTabPagerNextIdleMount([true, true, true, true], DISCOVER), -1)
 })
 
 test("the bottom bar lists the main pages in pager order", () => {
