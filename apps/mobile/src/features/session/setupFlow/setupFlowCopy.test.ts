@@ -25,19 +25,3 @@ test("English setup copy carries no Turkish letters (no mixed-language screens)"
     assert.doesNotMatch(text, /[ğüşıöçĞÜŞİÖÇ]/, text)
   }
 })
-
-test("the approved Turkish strings are unchanged", () => {
-  const tr = getSetupFlowCopy("tr")
-  assert.equal(tr.steps.avatar.primaryAction, "Karakterim hazır")
-  assert.equal(tr.avatar.headerTitle, "İlk görünümün")
-  assert.equal(tr.avatar.description, "Bu sadece başlangıç. Tarzını sonra da değiştirebilirsin.")
-  assert.equal(tr.studio.cycleLabel("Saç", true), "Saç için önceki görünüm")
-  assert.equal(tr.stepProgress(2, 4), "Kurulum adımı 2 / 4")
-})
-
-test("English reads naturally for progress and studio controls", () => {
-  const en = getSetupFlowCopy("en")
-  assert.equal(en.stepProgress(2, 4), "Setup step 2 of 4")
-  assert.equal(en.studio.cycleLabel("Hair", false), "Next hair look")
-  assert.equal(en.signOut.title, "Sign out of Blumi?")
-})

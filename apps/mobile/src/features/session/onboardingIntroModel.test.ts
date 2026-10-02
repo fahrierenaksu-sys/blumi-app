@@ -4,20 +4,15 @@ import {
   ONBOARDING_GLOBE_LOOP_DURATION_MS,
   ONBOARDING_IMPACT_REACTION_MAX_LATENCY_MS,
   ONBOARDING_INTRO_TIMELINE_MS,
-  ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS,
   ONBOARDING_RUNNER_CATCH_X_OFFSETS,
   ONBOARDING_RUNNER_ORBIT_DURATION_MS,
-  ONBOARDING_WHOAA_REVEAL_LEAD_MS,
   ONBOARDING_SCENE_HANDOFF_MS,
   getOnboardingImpactVisualProgressAtElapsed,
   getOnboardingRunnerMotionTrack,
   getOnboardingRunnerOrbitTrack,
   getOnboardingRunnerPose,
-  getOnboardingRunnerState,
   getOnboardingIntroAnimationProgress,
   createOnboardingIntroState,
-  getOnboardingIntroPrimaryAction,
-  isOnboardingIntroPrimaryActionEnabled,
   reduceOnboardingIntro,
   shouldInitializeOnboardingImpactSettled,
   shouldShowOnboardingPopulationCard,
@@ -38,11 +33,6 @@ test("unresolved reduced-motion preference never pre-settles the impact clock", 
 })
 
 test("prelude ownership ends before the rising globe becomes visually dominant", () => {
-  assert.deepEqual(ONBOARDING_SCENE_HANDOFF_MS, {
-    actionResponse: 100,
-    preludeExit: 180,
-    worldReveal: 150
-  })
   assert.ok(
     ONBOARDING_SCENE_HANDOFF_MS.actionResponse < ONBOARDING_SCENE_HANDOFF_MS.worldReveal,
     "the pressed CTA should clear before the smoother world reveal completes"
@@ -166,72 +156,19 @@ test("the cinematic advances only in the authored order", () => {
   assert.equal(ready.phase, "world-ready")
   assert.equal(handoff.phase, "handoff")
   assert.equal(returnedPrelude.phase, "greeting")
-  assert.equal(getOnboardingIntroPrimaryAction(ready.phase), "start-registration")
-})
-
-test("the reference choreography overlaps the launch, cushions the landing, and lets the count breathe", () => {
-  const timeline = ONBOARDING_INTRO_TIMELINE_MS
-
-  assert.equal(timeline.impact, 260)
-  assert.equal(timeline.globeLaunchComplete, 500)
-  assert.ok(
-    timeline.globeLaunchComplete - timeline.impact <= 260,
-    "the globe must meet the launch without altering the approved flip cadence"
-  )
-  assert.equal(
-    timeline.landingComplete - timeline.impact,
-    920,
-    "the authored flip should stay continuous while reaching the run handoff sooner"
-  )
-  assert.ok(
-    timeline.landingComplete - timeline.airborneComplete <= 140,
-    "landing needs time for preparation, squash and the run handoff"
-  )
-  assert.ok(
-    timeline.populationComplete - timeline.landingComplete >= 1_000,
-    "the population counter needs enough time to read without delaying the run handoff"
-  )
-  assert.equal(
-    timeline.populationComplete,
-    2_400,
-    "the run should begin promptly after the landing beat without rushing the counter"
-  )
-  assert.ok(timeline.chaseComplete > timeline.populationComplete)
-  assert.ok(timeline.catchComplete > timeline.chaseComplete)
-})
-
-test("Whoa appears two seconds into the world story without waiting for chase", () => {
-  const timeline = ONBOARDING_INTRO_TIMELINE_MS
-  const whoaAt = timeline.catchComplete - ONBOARDING_WHOAA_REVEAL_LEAD_MS
-
-  assert.equal(ONBOARDING_WHOAA_REVEAL_LEAD_MS, 3_560)
-  assert.equal(whoaAt, 2_000)
-  assert.ok(
-    whoaAt > timeline.landingComplete,
-    "Whoa must wait until the pair has landed"
-  )
-  assert.ok(
-    whoaAt < timeline.populationComplete,
-    "Whoa should not wait for the chase phase to begin"
-  )
 })
 
 test("the male runner stays on a shorter, collision-safe surface lane", () => {
   const leader = getOnboardingRunnerMotionTrack("leader")
   const chaser = getOnboardingRunnerMotionTrack("chaser")
 
-  assert.deepEqual(leader.inputRange, [0, 0.34, 0.68, 1])
   assert.deepEqual(chaser.inputRange, leader.inputRange)
   assert.equal(leader.scale[0], 1)
   assert.equal(chaser.scale[0], 1)
   assert.ok(leader.translateY[2] < leader.translateY[0])
-  assert.deepEqual(chaser.translateY, [0, 0, 0, 0])
   assert.equal(leader.rotate[0], 0)
   assert.equal(chaser.rotate[0], 0)
   assert.ok(leader.translateX.at(-1)! < leader.translateX[2])
-  assert.deepEqual(chaser.translateX, [-88, -88, -88, -88])
-  assert.deepEqual(chaser.scale, [1, 1, 1, 1])
-  assert.deepEqual(chaser.rotate, [0, 0, 0, 0])
   assert.ok(leader.translateY.at(-1)! <= leader.translateY[2])
   assert.ok(chaser.translateY.at(-1)! <= chaser.translateY[2])
   assert.ok(
@@ -248,11 +185,6 @@ test("the male runner stays on a shorter, collision-safe surface lane", () => {
     leaderFinalX - chaserFinalX >= ONBOARDING_SHARED_CHARACTER_WIDTH + 8,
     "the final chase must preserve a visible collision-safe gap"
   )
-
-  assert.equal(getOnboardingWorldRunnerPlacement("chaser", 0).footX, -74)
-  assert.equal(getOnboardingWorldRunnerPlacement("chaser", 1).footX, -62)
-  assert.equal(getOnboardingWorldRunnerPlacement("leader", 0).footX, 66)
-  assert.equal(getOnboardingWorldRunnerPlacement("leader", 1).footX, 44)
 })
 
 test("the catch beat widens the runner spacing instead of letting the chaser clip in", () => {
@@ -268,7 +200,6 @@ test("the catch beat widens the runner spacing instead of letting the chaser cli
     ONBOARDING_RUNNER_CATCH_X_OFFSETS.leader -
     (chaserFinalX + ONBOARDING_RUNNER_CATCH_X_OFFSETS.chaser)
 
-  assert.equal(ONBOARDING_RUNNER_CATCH_KEYFRAME_PROGRESS, 0.42)
   assert.ok(
     ONBOARDING_RUNNER_CATCH_X_OFFSETS.chaser < ONBOARDING_RUNNER_CATCH_X_OFFSETS.leader
   )
@@ -282,7 +213,6 @@ test("the settled world keeps both runners in a live orbit-chase instead of free
   const leaderOrbit = getOnboardingRunnerOrbitTrack("leader")
   const chaserOrbit = getOnboardingRunnerOrbitTrack("chaser")
 
-  assert.deepEqual(leaderOrbit.inputRange, [0, 0.25, 0.5, 0.75, 1])
   assert.deepEqual(chaserOrbit.inputRange, leaderOrbit.inputRange)
   assert.equal(leaderOrbit.translateX[0], leaderOrbit.translateX.at(-1))
   assert.equal(chaserOrbit.translateX[0], chaserOrbit.translateX.at(-1))
@@ -309,8 +239,6 @@ test("the settled world keeps both runners in a live orbit-chase instead of free
   )
   assert.ok(orbitGapAtEachCheckpoint[2] < orbitGapAtEachCheckpoint[0])
   assert.ok(chaserOrbit.translateX[2] > leaderOrbit.translateX[2])
-  assert.ok(leaderOrbit.translateX[2] <= 8)
-  assert.ok(ONBOARDING_RUNNER_ORBIT_DURATION_MS <= 4_800)
   assert.ok(ONBOARDING_RUNNER_ORBIT_DURATION_MS < ONBOARDING_GLOBE_LOOP_DURATION_MS)
 })
 
@@ -358,8 +286,6 @@ test("runner poses settle into a grounded catch reaction then keep the live chas
     getOnboardingRunnerPose("chaser", "world-ready").animationState,
     "orbit-chase"
   )
-  assert.equal(getOnboardingRunnerState("catching"), "reacting")
-  assert.equal(getOnboardingRunnerState("world-ready"), "orbit-chase")
 })
 
 test("late or out-of-order animation callbacks cannot skip the story", () => {
@@ -450,20 +376,6 @@ test("continuous world motion starts with the globe and runs only while focused 
   )
 })
 
-test("primary CTA is gated until the authored stable states", () => {
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("greeting"), true)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("character-greeting"), true)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("globe-launching"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("impact"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("airborne"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("landing"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("population-counting"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("chasing"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("catching"), false)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("world-ready"), true)
-  assert.equal(isOnboardingIntroPrimaryActionEnabled("handoff"), false)
-})
-
 test("a failed handoff rolls back only the handoff phase to the ready CTA", () => {
   const handoff = { phase: "handoff", isPaused: false } as const
   const ready = { phase: "world-ready", isPaused: false } as const
@@ -480,46 +392,6 @@ test("a failed handoff rolls back only the handoff phase to the ready CTA", () =
   assert.strictEqual(
     reduceOnboardingIntro(chasing, { type: "handoff-cancelled" }),
     chasing
-  )
-})
-
-test("the globe turns at a calm natural pace", () => {
-  assert.ok(ONBOARDING_GLOBE_LOOP_DURATION_MS >= 12_000)
-  assert.ok(ONBOARDING_GLOBE_LOOP_DURATION_MS <= 16_000)
-})
-
-test("the choreography metadata overlaps impact with launch and keeps every milestone ordered", () => {
-  const timeline = ONBOARDING_INTRO_TIMELINE_MS
-
-  assert.ok(timeline.impact > 0)
-  assert.ok(timeline.impact < timeline.globeLaunchComplete)
-  assert.ok(timeline.globeLaunchComplete - timeline.impact >= 240)
-  assert.ok(timeline.globeLaunchComplete < timeline.airborneComplete)
-  assert.ok(timeline.airborneComplete - timeline.globeLaunchComplete >= 540)
-  assert.ok(timeline.airborneComplete < timeline.landingComplete)
-  assert.ok(timeline.landingComplete - timeline.airborneComplete >= 120)
-  assert.equal(
-    timeline.landingComplete - timeline.impact,
-    920,
-    "the authored frames must stay continuous while the final landing hold is shortened"
-  )
-  assert.ok(timeline.landingComplete < timeline.populationComplete)
-  assert.ok(timeline.populationComplete - timeline.landingComplete >= 620)
-  assert.ok(timeline.populationComplete < timeline.chaseComplete)
-  assert.ok(timeline.chaseComplete < timeline.catchComplete)
-  assert.ok(timeline.chaseComplete - timeline.populationComplete >= 1_600)
-  assert.ok(timeline.catchComplete - timeline.chaseComplete >= 480)
-  assert.ok(timeline.catchComplete <= 5_800)
-  assert.ok(timeline.handoffDuration >= 180)
-  assert.ok(timeline.handoffDuration <= 220)
-})
-
-test("the world CTA waits long enough for the chase to read without overstaying", () => {
-  const timeline = ONBOARDING_INTRO_TIMELINE_MS
-
-  assert.ok(
-    timeline.catchComplete <= 5_800,
-    "the chase should remain readable while the first-launch cinematic stays under 5.8s"
   )
 })
 

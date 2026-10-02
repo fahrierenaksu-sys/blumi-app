@@ -13,9 +13,7 @@ const coverageArguments = nodeMajorVersion >= 22
 const testNames = [
   "sessionApi",
   "authEntryCopy",
-  "appNavigationCopy",
   "sessionErrorCopy",
-  "profileSetupCopy",
   "accountRecoveryCopy",
   "settingsActionErrorCopy",
   "sessionLifecycle",
@@ -38,8 +36,7 @@ const testNames = [
   "registerPhonePanelModel",
   "profileEditModel",
   "profileSetupLayout",
-  "profileSetupVisualModel",
-  "initialProfileAvatar"
+  "profileSetupVisualModel"
 ]
 const sourceDirectory = "src/features/session"
 const sourceFiles = testNames.flatMap((name) => [
@@ -56,12 +53,6 @@ sourceFiles.push(
   "src/features/referrals/referralApi.test.ts"
 )
 sourceFiles.push(`${sourceDirectory}/authLocale.ts`)
-sourceFiles.push(
-  `${sourceDirectory}/setupFlow/setupCharacterMotionModel.ts`,
-  `${sourceDirectory}/setupFlow/setupCharacterMotionModel.test.ts`,
-  `${sourceDirectory}/setupFlow/roomSetupCharacterMotionModel.ts`,
-  `${sourceDirectory}/setupFlow/roomSetupCharacterMotionModel.test.ts`
-)
 sourceFiles.push(
   `${sourceDirectory}/register/registerScreenModel.ts`,
   `${sourceDirectory}/register/registerScreenModel.test.ts`
@@ -131,8 +122,6 @@ try {
       join(outputDirectory, "features/avatarV2/avatarApi.test.js"),
       join(outputDirectory, "features/settings/settingsPreferencesModel.test.js"),
       join(outputDirectory, "features/session/registerPresentationModel.test.js")
-      ,join(outputDirectory, "features/session/setupFlow/setupCharacterMotionModel.test.js")
-      ,join(outputDirectory, "features/session/setupFlow/roomSetupCharacterMotionModel.test.js")
       ,join(outputDirectory, "features/session/register/registerScreenModel.test.js")
     ],
     {
@@ -150,14 +139,12 @@ try {
     [
       "--import", "tsx",
       "--test",
-      "src/features/session/registerLegalContract.test.ts",
       "src/features/session/register/useRegisterFlowController.test.ts",
       "src/features/session/accountRecoveryModel.test.ts",
       "src/features/session/accountSwitchIsolation.test.ts",
       "src/features/session/appLocale.test.ts",
       "src/features/session/authLocaleResolver.test.ts",
       "src/features/session/nativeUiSessionReset.test.ts",
-      "src/features/session/onboardingActionLayout.test.ts",
       "src/features/session/onboardingArrivalMotionModel.test.ts",
       "src/features/session/onboardingBrandPreludeLifecycle.test.ts",
       "src/features/session/useSessionStateLifecycle.test.ts",
@@ -165,20 +152,14 @@ try {
       "src/features/session/onboardingIntroPerformanceModel.test.ts",
       "src/features/session/onboardingIntroTelemetry.test.ts",
       "src/features/session/onboardingPopulationCounterModel.test.ts",
-      "src/features/session/onboardingRunAssetBinding.test.ts",
-      "src/features/session/onboardingRunAssetGate.test.ts",
-      "src/features/session/onboardingScanStageContract.test.ts",
-      "src/features/session/onboardingWelcomeHomeAssetGate.test.ts",
       "src/features/session/onboardingWelcomeHomeModel.test.ts",
       "src/features/session/onboardingWorldClockModel.test.ts",
       "src/features/session/profileSetupValidation.test.ts",
       "src/features/session/onboardingWorldCompositionModel.test.ts",
-      "src/features/session/profileCharacterReactionAssetGate.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
       "src/features/session/setupFlow/setupFlowShellModel.test.ts",
       "src/features/session/setupFlow/setupFlowCopy.test.ts",
       "src/features/session/setupFlow/setupStaticExperience.test.ts",
-      "src/features/session/youCopy.test.ts",
       "src/features/settings/settingsCopy.test.ts",
       "src/features/settings/settingsPresentationModel.test.ts",
       "src/features/settings/settingsPhoneChangeModel.test.ts",

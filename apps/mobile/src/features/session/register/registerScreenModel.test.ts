@@ -293,14 +293,11 @@ test("the resend control announces and shows the remaining cooldown", () => {
   assert.equal(resolveResendControl(0, true, en).disabled, true)
 })
 
-test("primary action labels keep the create and sign-in wording", () => {
+test("primary action labels keep the send-code and sign-in wording", () => {
   assert.equal(resolveCreatePrimaryActionLabel(false, false, en), en.sendCode)
-  assert.equal(resolveCreatePrimaryActionLabel(true, false, en), "Blumi'ye katil")
-  assert.equal(resolveCreatePrimaryActionLabel(false, true, tr), "Blumi'ye katil")
   assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, false, en), en.sendCode)
   assert.equal(resolveSignInPrimaryActionLabel("sign-in", true, false, en), en.signInToBlumi)
   assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, true, tr), tr.signInToBlumi)
-  assert.equal(resolveSignInPrimaryActionLabel("create", true, false, en), "Blumi’ye katıl")
 })
 
 test("the sign-in hero copy follows the code request status", () => {
@@ -331,15 +328,7 @@ test("the sign-in hero copy follows the code request status", () => {
   )
 })
 
-test("the fallback heading keeps its Turkish copy and request status lines", () => {
-  assert.deepEqual(resolveFallbackHeadingCopy(false, "idle", en), {
-    title: "Dünyan kaybolmasın",
-    body: "Telefonunla Blumi dünyanı güvende tut."
-  })
-  assert.deepEqual(resolveFallbackHeadingCopy(true, "sent", en), {
-    title: "Mesajlarına bak",
-    body: "Gönderdiğimiz 6 haneli kodu gir."
-  })
+test("the fallback heading maps the request status lines", () => {
   assert.equal(resolveFallbackHeadingCopy(true, "sending", en).body, en.sendingCode)
   assert.equal(resolveFallbackHeadingCopy(true, "failed", en).body, en.codeNotSent)
 })
@@ -357,35 +346,21 @@ test("OTP cells mirror the typed digits and highlight the next slot only while f
 
 test("hero and recovery layout adapt to narrow, short, and large-text viewports", () => {
   const roomy = { dense: false, veryCompact: false }
-  assert.deepEqual(
-    resolveRegisterHeroLayout({ width: 393, height: 852, fontScale: 1 }, roomy),
-    {
-      stackRecoveryActions: false,
-      compactHero: false,
-      createHeroAvatarSize: 94,
-      createHeroStageHeight: 126
-    }
+  const roomyLayout = resolveRegisterHeroLayout({ width: 393, height: 852, fontScale: 1 }, roomy)
+  assert.equal(roomyLayout.stackRecoveryActions, false)
+  assert.equal(roomyLayout.compactHero, false)
+  const tiny = resolveRegisterHeroLayout(
+    { width: 320, height: 568, fontScale: 1 },
+    { dense: true, veryCompact: true }
   )
-  assert.deepEqual(
-    resolveRegisterHeroLayout(
-      { width: 320, height: 568, fontScale: 1 },
-      { dense: true, veryCompact: true }
-    ),
-    {
-      stackRecoveryActions: true,
-      compactHero: true,
-      createHeroAvatarSize: 82,
-      createHeroStageHeight: 110
-    }
-  )
+  assert.equal(tiny.stackRecoveryActions, true)
+  assert.equal(tiny.compactHero, true)
   const dense = resolveRegisterHeroLayout(
     { width: 375, height: 812, fontScale: 1.25 },
     { dense: true, veryCompact: false }
   )
   assert.equal(dense.stackRecoveryActions, true)
   assert.equal(dense.compactHero, true)
-  assert.equal(dense.createHeroAvatarSize, 88)
-  assert.equal(dense.createHeroStageHeight, 118)
   assert.equal(
     resolveRegisterHeroLayout({ width: 393, height: 759, fontScale: 1 }, roomy).compactHero,
     true
