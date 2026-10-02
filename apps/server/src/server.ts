@@ -89,6 +89,11 @@ import {
   type RoomSnapshotService
 } from "./rooms/roomSnapshotService"
 import { registerRoomSnapshotRoutes } from "./routes/roomSnapshotRoutes"
+import { registerNotificationPortraitRoutes } from "./routes/notificationPortraitRoutes"
+import {
+  createNotificationPortraitService,
+  type NotificationPortraitService
+} from "./notifications/notificationPortraitService"
 import {
   createOpenApiDocument,
   OPENAPI_DOCUMENT_PATH,
@@ -135,6 +140,8 @@ interface CreateServerOptions {
   referralService?: ReferralService
   personalRoomDecorService?: PersonalRoomDecorService
   roomSnapshotService?: RoomSnapshotService
+  /** Push sender pictures; must be the instance the notification service links to. */
+  notificationPortraits?: NotificationPortraitService
   capabilityService?: CapabilityService
   /** Side effects that responses do not wait for; drained when the app closes. */
   afterResponseTasks?: AfterResponseTasks
@@ -327,6 +334,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
     await registerRoomSnapshotRoutes(instance, routeServices)
+    await registerNotificationPortraitRoutes(instance, {
+      notificationPortraits: options.notificationPortraits ?? createNotificationPortraitService({})
+    })
     await registerCapabilityRoutes(instance, routeServices)
   })
 

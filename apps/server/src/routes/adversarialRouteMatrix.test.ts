@@ -49,6 +49,7 @@ const ROUTE_MATRIX: Record<string, RouteEntry> = {
   "GET /admin/reports.css": { auth: "static", ids: "-", crossAccount: "n/a" },
   "GET /v1/commerce/coin-packs": { auth: "public", ids: "-", crossAccount: "n/a (catalog)" },
   "GET /v1/room-showcase/:assetKey": { auth: "public", ids: "path assetKey", crossAccount: "private or unknown showcase -> 404 (asserted)" },
+  "GET /v1/notification-portraits/*": { auth: "public", ids: "path token (sealed, names no user)", crossAccount: "forged, altered or expired token -> 404 (asserted)" },
   "POST /v1/auth/firebase/complete": { auth: "public", ids: "body idToken (uid, phone)", crossAccount: "uid bound to another account -> 409 (adversarialAuthFlows)" },
   "POST /v1/auth/send-code": { auth: "public", ids: "body phoneNumber", crossAccount: "retired: 410 (firebaseAuthRoutes.test)" },
   "POST /v1/auth/verify": { auth: "public", ids: "body phoneNumber", crossAccount: "retired: 410 (firebaseAuthRoutes.test)" },
@@ -253,6 +254,7 @@ test("cross-account ids are refused on every id-bearing member route and the vic
     results.push(["POST /v1/discover/:userId/like (self)", selfLike.statusCode])
     assert.ok(selfLike.statusCode >= 400 && selfLike.statusCode < 500, `self like: ${selfLike.statusCode}`)
     await expectRefused("GET /v1/room-showcase/:assetKey", `/v1/room-showcase/${"a".repeat(64)}`, [404])
+    await expectRefused("GET /v1/notification-portraits/*", `/v1/notification-portraits/${"A".repeat(120)}`, [404])
 
     // Actor-scoped writes succeed but only ever touch the caller's own records.
     await expectRefused("DELETE /v1/safety/blocks/:blockedUserId", `/v1/safety/blocks/${blockedStranger.userId}`, [204])

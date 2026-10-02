@@ -9,7 +9,7 @@
     "dev": "tsx src/index.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "admin:mint-token": "node --env-file-if-exists=../../.env.local --import tsx scripts/mint-admin-token.ts",
-    "build": "tsc && node --import tsx scripts/build-legal-pages.mjs",
+    "build": "tsc && node --import tsx scripts/build-legal-pages.mjs && node scripts/build-avatar-portrait-layers.mjs",
     "test:e2e:api": "npm run build && node --test dist/e2e/criticalAuthFlow.test.js",
     "test:e2e:api:postgres": "npm run build && node --test dist/e2e/criticalPostgresAuthFlow.test.js",
     "test:e2e:social": "node --import tsx --test src/e2e/socialLoop.e2e.test.ts src/e2e/socialLoopLoad.e2e.test.ts",
@@ -37,6 +37,7 @@
     "@types/node": "^24.10.1",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   }

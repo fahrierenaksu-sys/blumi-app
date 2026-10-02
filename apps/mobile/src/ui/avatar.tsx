@@ -1,5 +1,8 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native"
 import { uiTheme } from "./theme"
+import { pickAvatarSwatch } from "./avatarSwatch"
+
+export { pickAvatarSwatch }
 
 interface AvatarProps {
   name: string
@@ -9,14 +12,6 @@ interface AvatarProps {
   style?: StyleProp<ViewStyle>
   /** Optional cosmetic frame ring color override */
   frameColor?: string
-}
-
-function hashSeed(value: string): number {
-  let hash = 0
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0
-  }
-  return Math.abs(hash)
 }
 
 function deriveInitials(name: string): string {
@@ -29,11 +24,6 @@ function deriveInitials(name: string): string {
     return parts[0][0].toUpperCase()
   }
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-export function pickAvatarSwatch(seed: string): { bg: string; fg: string } {
-  const palette = uiTheme.palette.avatar
-  return palette[hashSeed(seed) % palette.length]
 }
 
 export function Avatar(props: AvatarProps) {

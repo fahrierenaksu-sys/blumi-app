@@ -2,11 +2,8 @@ import type { AvatarSelection } from "@blumi/contracts"
 import { useMemo } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { getCanonicalChatParticipantAvatar } from "../features/chat/chatParticipantAvatar"
-import { loadoutToUserAvatar } from "../features/avatarV2/avatarSelectionModel"
-import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoomCatalog"
-import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
+import { resolveAvatarPortraitRenderLayers } from "../features/avatarV2/room/avatarPortraitLayers"
 import { RoomAvatarRenderer2D } from "../features/avatarV2/room/components/RoomAvatarRenderer2D"
-import { getRoomAvatarRenderLayers } from "../features/avatarV2/room/avatarRoomSelectors"
 import { Avatar, pickAvatarSwatch } from "./avatar"
 
 interface ParticipantAvatarProps {
@@ -48,17 +45,7 @@ function CanonicalParticipantAvatar(props: {
   style?: StyleProp<ViewStyle>
 }) {
   const { avatar, seed, size, ring, style } = props
-  const layers = useMemo(() => {
-    const { appearance } = projectAvatarV2ToRoomAvatarAppearance({
-      avatar: loadoutToUserAvatar(avatar.loadout)
-    })
-    return getRoomAvatarRenderLayers({
-      appearance,
-      catalog: ROOM_AVATAR_CATALOG,
-      state: "idle",
-      direction: "front"
-    })
-  }, [avatar])
+  const layers = useMemo(() => resolveAvatarPortraitRenderLayers(avatar.loadout), [avatar])
   const swatch = pickAvatarSwatch(seed)
   const ringWidth = ring === "strong" ? 3 : ring === "soft" ? 1.5 : 0
   const ringColor = ring === "strong" ? "#FFFFFF" : "rgba(255,255,255,0.7)"
