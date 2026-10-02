@@ -332,7 +332,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   if (!thread && !pendingPartnerId) {
     return (
       <View style={styles.root}>
-        <SoftBlobBackground variant="lobby" />
+        <SoftBlobBackground variant="lobby" animated={false} />
         <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right", "bottom"]}>
           <TopBar
             title={chatCopy.chat}
@@ -355,7 +355,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
 
   return (
     <View style={styles.root}>
-      <SoftBlobBackground variant="lobby" />
+      {/* Still: a drifting background commits every frame while the reader
+          types and scrolls, competing with the keyboard and the list. */}
+      <SoftBlobBackground variant="lobby" animated={false} />
       <SafeAreaView contentGutter={false} style={styles.safe} edges={["top", "left", "right"]}>
         <ChatThreadHeader
           chatCopy={chatCopy}
