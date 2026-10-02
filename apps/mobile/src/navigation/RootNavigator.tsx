@@ -270,12 +270,7 @@ function scheduleDeferredPreload(work: () => void): () => void {
   }
 }
 
-interface RootNavigatorProps {
-  fontsReady?: boolean
-}
-
-export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
-  void fontsReady
+export function RootNavigator() {
   const reduceMotion = useReducedMotion()
   const reducedMotionScreenOptions = getReducedMotionScreenOptions(reduceMotion)
   const detailScreenOptions = getDetailScreenOptions(reduceMotion)

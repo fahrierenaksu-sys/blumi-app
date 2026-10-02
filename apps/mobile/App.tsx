@@ -7,12 +7,6 @@ import {
   initialWindowMetrics
 } from "react-native-safe-area-context"
 import { useFonts } from "expo-font"
-import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular"
-import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium"
-import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold"
-import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold"
-import { Inter_800ExtraBold } from "@expo-google-fonts/inter/800ExtraBold"
-import { Inter_900Black } from "@expo-google-fonts/inter/900Black"
 import { RootNavigator } from "./src/navigation/RootNavigator"
 import { useOtaUpdates } from "./src/features/appUpdates/useOtaUpdates"
 import { ErrorBoundary } from "./src/ui/errorBoundary"
@@ -62,14 +56,11 @@ function App() {
       task.cancel()
     }
   }, [])
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-    Inter_900Black
-  })
+  // Native builds embed these fonts at build time (expo-font plugin in
+  // app.json), so useFonts finds them already registered and does nothing.
+  // It still loads them at runtime where nothing is embedded: Expo Go, web,
+  // and a dev client built before the fonts were embedded.
+  useFonts(RUNTIME_FONT_FALLBACK)
 
   return (
     <ErrorBoundary>
@@ -77,12 +68,22 @@ function App() {
       <GestureHandlerRootView style={styles.gestureRoot}>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <QueryClientProvider client={queryClient}>
-            <RootNavigator fontsReady={fontsLoaded} />
+            <RootNavigator />
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   )
+}
+
+// Same files as the embedded fonts, under the same names.
+const RUNTIME_FONT_FALLBACK = {
+  Inter_400Regular: require("./assets/fonts/Inter_400Regular.ttf"),
+  Inter_500Medium: require("./assets/fonts/Inter_500Medium.ttf"),
+  Inter_600SemiBold: require("./assets/fonts/Inter_600SemiBold.ttf"),
+  Inter_700Bold: require("./assets/fonts/Inter_700Bold.ttf"),
+  Inter_800ExtraBold: require("./assets/fonts/Inter_800ExtraBold.ttf"),
+  Inter_900Black: require("./assets/fonts/Inter_900Black.ttf")
 }
 
 const styles = StyleSheet.create({

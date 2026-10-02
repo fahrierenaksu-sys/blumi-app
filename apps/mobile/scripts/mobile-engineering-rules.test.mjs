@@ -303,3 +303,52 @@ test("gesture frame callbacks never call React state setters directly", () => {
   }
   assert.deepEqual(offenders, [], "reach JS from a gesture frame only through scheduleOnRN")
 })
+
+// FONT-1: fonts are embedded at build time by the expo-font config plugin, so
+// text never renders in the system font first. A fontFamily that is not
+// embedded silently falls back to the system font on a release build. iOS
+// resolves an embedded font by its own family or PostScript name and Android
+// by its file name, so each embedded file must carry its file name as both
+// (scripts/embed_inter_fonts.py) and must be the only face in its family.
+function readTrueTypeNames(buffer) {
+  const tableCount = buffer.readUInt16BE(4)
+  for (let index = 0; index < tableCount; index += 1) {
+    const record = 12 + index * 16
+    if (buffer.toString("latin1", record, record + 4) !== "name") continue
+    const table = buffer.readUInt32BE(record + 8)
+    const count = buffer.readUInt16BE(table + 2)
+    const strings = table + buffer.readUInt16BE(table + 4)
+    const names = new Map()
+    for (let entry = 0; entry < count; entry += 1) {
+      const at = table + 6 + entry * 12
+      if (buffer.readUInt16BE(at) !== 3) continue
+      const nameId = buffer.readUInt16BE(at + 6)
+      const length = buffer.readUInt16BE(at + 8)
+      const offset = strings + buffer.readUInt16BE(at + 10)
+      names.set(nameId, Buffer.from(buffer.subarray(offset, offset + length)).swap16().toString("utf16le"))
+    }
+    return names
+  }
+  return new Map()
+}
+
+test("every app font is embedded at build time under the name the styles use", () => {
+  const appJson = JSON.parse(readFileSync(join(mobileRoot, "app.json"), "utf8"))
+  const fontPlugin = appJson.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-font")
+  assert.ok(fontPlugin?.[1]?.fonts?.length, "configure expo-font with the fonts option")
+  const embedded = new Set()
+  for (const fontPath of fontPlugin[1].fonts) {
+    const family = fontPath.split("/").pop().replace(/\.(?:ttf|otf)$/, "")
+    const names = readTrueTypeNames(readFileSync(join(mobileRoot, fontPath)))
+    assert.equal(names.get(1), family, `${fontPath}: family name must equal the file name`)
+    assert.equal(names.get(6), family, `${fontPath}: PostScript name must equal the file name`)
+    assert.equal(names.has(16), false, `${fontPath}: a typographic family would regroup the weights on iOS`)
+    embedded.add(family)
+  }
+  const used = new Set()
+  for (const { text } of sources) {
+    for (const match of text.matchAll(/fontFamily:\s*["']([^"']+)["']/g)) used.add(match[1])
+  }
+  const missing = [...used].filter((family) => !embedded.has(family))
+  assert.deepEqual(missing, [], "embed the font with the expo-font plugin in app.json before using it")
+})
