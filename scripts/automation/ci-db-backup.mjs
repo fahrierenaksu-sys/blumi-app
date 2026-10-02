@@ -103,9 +103,21 @@ export function encryptFile(source, target, passphrase) {
     "--output", target, source], { input: passphrase, label: "gpg encrypt" })
 }
 
+/**
+ * Decrypts a symmetric archive. gpg --decrypt also accepts an unencrypted
+ * OpenPGP message and exits 0, so the status lines must prove a passphrase
+ * decryption with an intact integrity check; otherwise anyone who can upload
+ * an artifact with the same name could have it restored.
+ */
 export function decryptFile(source, target, passphrase) {
   if (!passphrase) throw new SafeError("Decryption refused: no passphrase.")
-  run("gpg", [...gpgArgs("0"), "--decrypt", "--output", target, source], { input: passphrase, label: "gpg decrypt" })
+  const status = run("gpg", [...gpgArgs("0"), "--status-fd", "1", "--decrypt", "--output", target, source],
+    { input: passphrase, label: "gpg decrypt" })
+  const lines = new Set(status.split("\n").map((line) => line.split(" ").slice(0, 2).join(" ")))
+  if (!["[GNUPG:] NEED_PASSPHRASE_SYM", "[GNUPG:] DECRYPTION_OKAY", "[GNUPG:] GOODMDC"].every((line) => lines.has(line))) {
+    rmSync(target, { force: true })
+    throw new SafeError("Decryption refused: the archive was not encrypted with the backup passphrase.")
+  }
 }
 
 function summary(lines) {

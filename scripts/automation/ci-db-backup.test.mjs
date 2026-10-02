@@ -181,6 +181,12 @@ test("archives are encrypted with the passphrase and refuse a wrong one", { skip
     assert.throws(() => decryptFile(sealed, opened, "wrong horse battery staple 1234"), /gpg decrypt failed/)
     decryptFile(sealed, opened, key)
     assert.equal(readFileSync(opened, "utf8"), "PGDMP private payload")
+    // An unencrypted OpenPGP message also "decrypts" with exit 0; it must be refused.
+    const forged = join(directory, "forged"); const forgedOut = join(directory, "forged-out")
+    writeFileSync(plain, "PGDMP attacker payload")
+    assert.equal(spawnSync("gpg", ["--batch", "--yes", "--quiet", "--store", "--output", forged, plain], { env: { ...process.env } }).status, 0)
+    assert.throws(() => decryptFile(forged, forgedOut, key), /not encrypted with the backup passphrase/)
+    assert.throws(() => readFileSync(forgedOut))
   } finally {
     delete process.env.GNUPGHOME
     rmSync(directory, { recursive: true, force: true })
