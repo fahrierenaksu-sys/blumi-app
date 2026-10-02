@@ -202,6 +202,11 @@ function AvatarAnchor(props: {
   stageWidth: SharedValue<number>
   stageHeight: SharedValue<number>
   zIndex: number
+  /**
+   * Only interactive children (speech bubbles) take touches; the rest of the
+   * anchor's box is floor, so a tap beside an avatar walks there.
+   */
+  pointerEvents: "none" | "box-none"
   children: ReactNode
 }) {
   const { avatar, position, stageWidth, stageHeight, zIndex, children } = props
@@ -234,7 +239,7 @@ function AvatarAnchor(props: {
     }
   })
   return (
-    <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
+    <Reanimated.View pointerEvents={props.pointerEvents} style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
       {children}
     </Reanimated.View>
   )
@@ -321,7 +326,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   }))
 
   return (
-    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}>
+    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}
+      pointerEvents="none">
       {showJoinPulse ? (
         <Reanimated.View style={[styles.joinPulse, ringStyle]} pointerEvents="none" />
       ) : null}
@@ -386,7 +392,7 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
   } = props
   return (
     <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight}
-      zIndex={OVERLAY_Z_INDEX}>
+      zIndex={OVERLAY_Z_INDEX} pointerEvents="box-none">
       <RoomSpeechBubbleStack
         bubbles={bubbles}
         placement={bubblePlacement}
@@ -397,7 +403,7 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
       />
       {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
       {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
-      <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
+      <View pointerEvents="none" style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
           {isLocal ? localUserLabel : avatar.displayName}
         </Text>

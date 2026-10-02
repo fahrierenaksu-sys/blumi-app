@@ -336,7 +336,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         target: point,
         occupants: options?.authoritative ? [] : occupants,
         movingOccupantId: userId,
-        clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
+        clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+        // A tap on this phone ends where the avatar can get to; a record is
+        // walked to exactly as the sender's phone resolved it.
+        from: options?.authoritative ? undefined : localAvatar
       })
       if (!target) return false
       const exitPlan = !seatPlan && currentSeatExit

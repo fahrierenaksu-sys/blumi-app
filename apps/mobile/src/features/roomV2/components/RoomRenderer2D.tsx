@@ -1,6 +1,5 @@
 import { Image as ExpoImage } from "expo-image"
 import {
-  type GestureResponderEvent,
   type AccessibilityValue,
   type LayoutChangeEvent,
   Pressable,
@@ -13,6 +12,7 @@ import {
 import { memo, useCallback, useRef, useState, type ReactNode } from "react"
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
+import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
@@ -137,14 +137,6 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     const { width, height } = event.nativeEvent.layout
     setLayoutSize({ width, height })
   }, [])
-  const handleStagePress = useCallback((event: GestureResponderEvent): void => {
-    if (!onStagePress || layoutSize.width <= 0 || layoutSize.height <= 0) return
-    const { locationX, locationY } = event.nativeEvent
-    onStagePress({
-      x: Math.max(0, Math.min(1, locationX / layoutSize.width)),
-      y: Math.max(0, Math.min(1, locationY / layoutSize.height))
-    })
-  }, [layoutSize.height, layoutSize.width, onStagePress])
 
   if (!shell) {
     return <View testID={testID} style={style} />
@@ -179,12 +171,11 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
       ) : null}
       {floorUnderlay}
       {onStagePress ? (
-        <Pressable
-          accessibilityRole="button"
+        <RoomFloorTapLayer
           accessibilityLabel={accessibilityLabel ?? getRoomV2StageAccessibilityLabel(getAppLocale())}
           accessibilityValue={accessibilityValue}
-          onPress={handleStagePress}
-          style={StyleSheet.absoluteFill}
+          onTap={onStagePress}
+          testID={testID ? `${testID}-floor` : undefined}
         />
       ) : null}
       {showPlacementGuides ? (
@@ -210,7 +201,11 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             item={item}
             isSelected={selectedInstanceId === item.renderId}
             placementState={placementStateByRenderId?.[item.renderId]}
-            onItemTap={shouldRoomV2ItemReceiveTap({ kind: item.kind, mode: itemInteractionMode }) ? onItemTap : undefined}
+            onItemTap={shouldRoomV2ItemReceiveTap({
+              kind: item.kind,
+              mode: itemInteractionMode,
+              interactionType: item.kind === "furniture" ? item.interactionType : undefined
+            }) ? onItemTap : undefined}
             onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
             onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
             onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}

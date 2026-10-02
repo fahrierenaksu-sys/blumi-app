@@ -477,10 +477,12 @@ export function MyRoomScreen({
       showMovementFeedback(copy.makeRoom)
       return
     }
+    // The floor point under the finger, or the reachable spot right next to it.
     const resolvedTarget = seatPlan?.target ?? resolveRoomWorldInteractiveTarget({
       geometry: movementGeometry,
       target,
-      clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
+      clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+      from: start
     })
     if (!resolvedTarget) {
       setStageMarker(undefined)
