@@ -1,13 +1,11 @@
 import { useState } from "react"
 import { StyleSheet, View } from "react-native"
-import { FadeIn } from "react-native-reanimated"
+import { CROSSFADE_ENTERING } from "../../../ui/motion"
 import type { AppLocale } from "../../session/appLocale"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
 import { shopScreenStyles } from "./shopScreenStyles"
 
-/** Crossfade from the skeleton into the real shelf (SHOP-5). */
-export const SHOP_CONTENT_CROSSFADE_MS = 160
 const SKELETON_RAIL_CHIPS = 4
 const SKELETON_CARDS = 4
 
@@ -58,14 +56,16 @@ export function ShopShelfSkeleton(props: { layoutMetrics: ShopLayoutMetrics; loc
  * The content fades in only when it replaces a skeleton the user saw, never
  * on a normal open, and never under Reduce Motion.
  */
+/**
+ * Content that replaced the skeleton crossfades in (SHOP-5), with the shared
+ * crossfade token; it stays under Reduce Motion because it is only opacity.
+ */
 export function useShopContentEntrance(input: {
   showSkeleton: boolean
-  reduceMotion: boolean
-}): ReturnType<typeof FadeIn.duration> | undefined {
+}): typeof CROSSFADE_ENTERING | undefined {
   const [skeletonShown, setSkeletonShown] = useState(input.showSkeleton)
   if (input.showSkeleton && !skeletonShown) setSkeletonShown(true)
-  if (!skeletonShown || input.reduceMotion) return undefined
-  return FadeIn.duration(SHOP_CONTENT_CROSSFADE_MS)
+  return skeletonShown ? CROSSFADE_ENTERING : undefined
 }
 
 const styles = StyleSheet.create({

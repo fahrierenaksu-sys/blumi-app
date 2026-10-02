@@ -40,7 +40,11 @@ import { resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetri
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import { getMyRoomCopy, getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
 import { getMyRoomStageAccessibilityValue } from "../features/roomV2/myRoomStageModel"
-import { MyRoomStageLoadingStatus, MyRoomStageVeil } from "../features/roomV2/components/MyRoomStageVeil"
+import {
+  MyRoomStageLoadingStatus,
+  MyRoomStageVeil,
+  useMyRoomStageCover
+} from "../features/roomV2/components/MyRoomStageVeil"
 import { formatRoomOwnerLabel } from "../features/roomV2/roomOwnerLabel"
 import { getAppLocale } from "../features/session/authLocale"
 import {
@@ -130,6 +134,8 @@ export function MyRoomScreen({
   const copy = getMyRoomCopy(getAppLocale())
   const roomOwnerLabel = formatRoomOwnerLabel(sessionActor.profile.displayName, getAppLocale())
   const { userRoomDecor, persistenceState } = useRoomV2()
+  const { covered: stageCovered, markPainted: handleShellDisplay } =
+    useMyRoomStageCover(persistenceState === "loading")
   const { avatar, catalog } = useAvatarV2()
   const displayedAvatar = useMemo(() => resolveMyRoomAvatarSource(
     avatar,
@@ -781,8 +787,9 @@ export function MyRoomScreen({
               onStagePress={moveAvatarToPoint}
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
+              onShellDisplay={handleShellDisplay}
             /></Animated.View>}
-            <MyRoomStageVeil isLoading={persistenceState === "loading"} />
+            <MyRoomStageVeil covered={stageCovered} />
             {roomOwnerLabel ? (
               <View style={styles.stageHud} pointerEvents="none">
                 <Ionicons name="heart" size={13} color="#D92A79" />
