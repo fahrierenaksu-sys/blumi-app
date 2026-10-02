@@ -30,8 +30,8 @@ export interface MainTabPageConfig {
  * contiguous swipeable range (owner decision 2026-09-30: Chats swipes right
  * to Discover). A drag that starts on the Discover card stays a like/pass
  * swipe because the card's pan blocks the pager (useDiscoverCardSwipe); a
- * drag anywhere else on Discover moves the page. Discover and Shop
- * rubber-band at the outer edges.
+ * drag anywhere else on Discover moves the page. Discover and Shop stop
+ * at the outer edges without exposing an empty background.
  */
 export const MAIN_TAB_PAGES: readonly MainTabPageConfig[] = Object.freeze([
   Object.freeze({ key: "discover", routeName: "Lobby", swipeable: true }),
@@ -89,9 +89,6 @@ export const MAIN_TAB_PAGER_SPRING = Object.freeze({
   mass: 1,
   damping: 2 * Math.sqrt(380)
 })
-
-/** iOS-like rubber band resistance at the first and last swipeable page. */
-export const MAIN_TAB_PAGER_RUBBER_BAND_COEFFICIENT = 0.55
 
 /**
  * A never-visited swipe neighbour is mounted only after the selected page has

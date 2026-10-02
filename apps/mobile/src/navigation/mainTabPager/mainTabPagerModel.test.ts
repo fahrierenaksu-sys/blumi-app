@@ -12,6 +12,7 @@ import {
 } from "./mainTabPagerConfig"
 import {
   createMainTabPagerUiState,
+  clampMainTabPagerPosition,
   getMainTabPageAccessibility,
   getMainTabPageIndex,
   getMainTabPageNeighbours,
@@ -31,7 +32,6 @@ import {
   resolveMainTabPagerSettleIndex,
   resolveMainTabPagerSettleVelocity,
   resolveMainTabPagerSpringEnergyThreshold,
-  rubberBand,
   shouldMainTabPagerTouchCatchSettle,
   type MainTabPagerUiState
 } from "./mainTabPagerModel"
@@ -68,7 +68,7 @@ test("pages follow the bottom bar order and all four pages form one swipeable ra
   assert.equal(MAIN_TAB_SWIPE_MIN_INDEX, DISCOVER)
 })
 
-// ── Finger follow and rubber band ─────────────────────────────────────
+// ── Finger follow and edge limits ─────────────────────────────────────
 
 test("the drag follows the finger 1:1 within one page of its base", () => {
   for (const moved of [-W, -200, -1, 0, 1, 120, W]) {
@@ -90,22 +90,31 @@ test("a drag meets a hard stop one page away from its base", () => {
   )
 })
 
-test("the first and last swipeable pages rubber-band with growing resistance", () => {
-  let previous = 0
-  // A finger can travel at most about one screen width past the edge.
-  for (const overscroll of [10, 50, 150, 300, W]) {
+test("pulling beyond Discover or Shop never reveals empty space", () => {
+  for (const overscroll of [10, 50, 150, 300, W, 10 * W]) {
     const beforeDiscover = resolveMainTabPagerDragPosition({ rawPosition: DISCOVER * W - overscroll, width: W, baseIndex: DISCOVER })
     const afterShop = resolveMainTabPagerDragPosition({ rawPosition: SHOP * W + overscroll, width: W, baseIndex: SHOP })
-    const shown = DISCOVER * W - beforeDiscover
-    assert.ok(shown > previous, "more pull still moves further")
-    assert.ok(shown < overscroll, "but less than the finger")
-    assert.ok(shown < W * 0.4, "and never close to a page")
-    assert.ok(Math.abs(afterShop - SHOP * W - shown) < 1e-9, "both edges resist the same way")
-    previous = shown
+    assert.equal(beforeDiscover, DISCOVER * W)
+    assert.equal(afterShop, SHOP * W)
   }
-  assert.equal(rubberBand(0, W), 0)
-  assert.equal(rubberBand(-40, W), -rubberBand(40, W))
-  assert.equal(rubberBand(40, 0), 0)
+  for (const moved of [1, 50, W / 2, W]) {
+    assert.equal(resolveMainTabPagerDragPosition({ rawPosition: DISCOVER * W + moved, width: W, baseIndex: DISCOVER }), DISCOVER * W + moved)
+    assert.equal(resolveMainTabPagerDragPosition({ rawPosition: SHOP * W - moved, width: W, baseIndex: SHOP }), SHOP * W - moved)
+  }
+})
+
+test("rendered positions hide spring overshoot at either outer edge and preserve interior motion", () => {
+  for (const width of [320, 390, 402, 430]) {
+    for (const overshoot of [0.1, 1, 20, width]) {
+      assert.equal(clampMainTabPagerPosition(DISCOVER * width - overshoot, width), DISCOVER * width)
+      assert.equal(clampMainTabPagerPosition(SHOP * width + overshoot, width), SHOP * width)
+    }
+    for (let position = 0; position <= SHOP * width; position += 0.25 * width) {
+      assert.equal(clampMainTabPagerPosition(position, width), position)
+    }
+  }
+  assert.equal(clampMainTabPagerPosition(Number.NaN, W), 0)
+  assert.equal(clampMainTabPagerPosition(100, 0), 0)
 })
 
 // ── Release decision ──────────────────────────────────────────────────
@@ -159,7 +168,7 @@ test("Chats swipes right to Discover and Discover swipes left to Chats", () => {
   assert.equal(settle(CHATS, -80, -60), CHATS, "a short slow drag toward Discover returns")
 })
 
-test("a release in the rubber band returns to the edge page", () => {
+test("an outward release stays on the edge page even at high velocity", () => {
   const discoverOverscroll = resolveMainTabPagerDragPosition({ rawPosition: DISCOVER * W - 300, width: W, baseIndex: DISCOVER })
   assert.equal(resolveMainTabPagerSettleIndex({ position: discoverOverscroll, velocity: -1500, width: W, baseIndex: DISCOVER }), DISCOVER)
   const shopOverscroll = resolveMainTabPagerDragPosition({ rawPosition: SHOP * W + 300, width: W, baseIndex: SHOP })

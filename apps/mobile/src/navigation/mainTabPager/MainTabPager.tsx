@@ -53,6 +53,7 @@ import {
 } from "./mainTabPageFocus"
 import {
   areMainTabPagerMountedPagesEqual,
+  clampMainTabPagerPosition,
   createMainTabPagerUiState,
   getMainTabPageAccessibility,
   getMainTabPageIndex,
@@ -582,7 +583,7 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
   const accessibility = getMainTabPageAccessibility(isSelected)
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: getMainTabPageOpacity(index, ui.value.committedIndex),
-    transform: [{ translateX: index * width.value - position.value }]
+    transform: [{ translateX: index * width.value - clampMainTabPagerPosition(position.value, width.value) }]
   }))
 
   return (
