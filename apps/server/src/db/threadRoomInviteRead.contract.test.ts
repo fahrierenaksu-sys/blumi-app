@@ -227,6 +227,29 @@ runRepositoryContract<Repositories>({
       const warned = await matchedPair(backend, { partnerModeration: { status: "warned" } })
       assert.equal((await read(backend, warned.threadId, warned.caller)).status, "ok")
     },
+    "an accepted invite carries its room only while the room is live": async (backend) => {
+      const { caller, partner, threadId } = await matchedPair(backend)
+      const pending = invite(backend, threadId, partner, caller, "accepted", "pending", minutes(-10), minutes(10))
+      await backend.repository.miniRooms.saveInvite(pending)
+      const miniRoomId = backend.id("live_room")
+      assert.equal(await backend.repository.miniRooms.acceptPendingInvite({
+        inviteId: pending.inviteId,
+        decidedAt: minutes(-9),
+        miniRoom: {
+          miniRoomId, lobbyRoomId: "thread", sourceThreadId: threadId,
+          participantUserIds: [partner, caller], livekitRoomName: miniRoomId, startedAt: minutes(-9)
+        }
+      }), "accepted")
+
+      const live = await read(backend, threadId, caller)
+      assert.ok(live.status === "ok")
+      assert.deepEqual(live.invites.map((entry) => [entry.status, entry.roomSessionId]), [["accepted", miniRoomId]])
+
+      assert.ok(await backend.repository.miniRooms.endMiniRoom(miniRoomId, partner, minutes(-1)))
+      const ended = await read(backend, threadId, caller)
+      assert.ok(ended.status === "ok")
+      assert.deepEqual(ended.invites.map((entry) => [entry.status, entry.roomSessionId]), [["accepted", undefined]])
+    },
     "the read says when the partner is a seeded test persona": async (backend) => {
       const { caller, partner, threadId } = await matchedPair(backend)
       await backend.repository.markTestPersona(partner)

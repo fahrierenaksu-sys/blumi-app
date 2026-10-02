@@ -15,6 +15,7 @@ import { scheduleOnRN } from "react-native-worklets"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
 import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
+import { getRoomFurnitureTapTarget, isRoomFurnitureTapOnSeat } from "./roomFurnitureTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
 import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
@@ -83,7 +84,11 @@ interface RoomRenderer2DProps {
   onItemTap?: (item: RoomV2RenderItem) => void
   onItemLongPress?: (item: RoomV2RenderItem) => void
   onItemLongPressMove?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
-  onItemLongPressRelease?: (item: RoomV2RenderItem, point: RoomWorldPoint) => void
+  /**
+   * Release of a long-press drag, in window coordinates like the move. The
+   * touched image may be mirrored, so its local coordinates are not a room point.
+   */
+  onItemLongPressRelease?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
   itemInteractionMode?: "edit" | "interact"
   onStagePress?: (point: RoomWorldPoint) => void
   /** Explicit QA-only switch; omitted callers stay on the legacy renderer. */
@@ -215,6 +220,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
             onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
             onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}
+            onStagePress={item.kind === "furniture" ? onStagePress : undefined}
             itemInteractionMode={itemInteractionMode}
             debugPlacement={debugPlacement}
             reduceMotion={reduceMotion || !motionEnabled}
@@ -512,7 +518,13 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   onItemTap?: (item: RoomV2RenderItem) => void
   onItemLongPress?: (item: RoomV2RenderItem) => void
   onItemLongPressMove?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
-  onItemLongPressRelease?: (item: RoomV2RenderItem, point: RoomWorldPoint) => void
+  /**
+   * Release of a long-press drag, in window coordinates like the move. The
+   * touched image may be mirrored, so its local coordinates are not a room point.
+   */
+  onItemLongPressRelease?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
+  /** A tap beside a seat's drawn piece, inside its box, is a floor tap. */
+  onStagePress?: (point: RoomWorldPoint) => void
   itemInteractionMode: "edit" | "interact"
   debugPlacement: boolean
   reduceMotion: boolean
@@ -531,6 +543,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     onItemLongPress,
     onItemLongPressMove,
     onItemLongPressRelease,
+    onStagePress,
     itemInteractionMode,
     debugPlacement,
     reduceMotion,
@@ -594,8 +607,22 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
 
   // A walking avatar keeps its UI-thread frame; its tap target sits inside the
   // frame (ROOM-01), so wrapping it in a Pressable never breaks the live walk.
-  const Wrapper = liveAvatarPosition ? RoomRendererLiveAvatarFrame : isTouchInteractive ? Pressable : View
+  // A seat that is only tapped (My Room) takes taps on its drawn piece alone:
+  // its box is the whole image canvas, mostly empty, and taps there walk.
+  const seatTapTarget = item.kind === "furniture" && onItemTap && !onItemLongPress && !onItemLongPressMove
+    ? getRoomFurnitureTapTarget({
+      assetKey: item.asset.key,
+      boxWidthPx: renderedWidth * stageWidthPx,
+      boxHeightPx: renderedHeight * stageHeightPx,
+      fit: getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain",
+      mirrored: item.usesMirroredRotation
+    })
+    : null
   const tapsInsideLiveFrame = Boolean(liveAvatarPosition && onItemTap)
+  const tapsInsideTarget = tapsInsideLiveFrame || Boolean(seatTapTarget)
+  const Wrapper = liveAvatarPosition
+    ? RoomRendererLiveAvatarFrame
+    : isTouchInteractive && !seatTapTarget ? Pressable : View
   const itemAccessibility = getRoomV2ItemAccessibility({
     kind: item.kind,
     name: item.name,
@@ -622,19 +649,14 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     stageHeightPx
   }
 
-  const resolvePressPoint = useCallback((locationX: number, locationY: number) => ({
-    x: Math.max(0, Math.min(1, left + locationX / Math.max(1, stageWidthPx))),
-    y: Math.max(0, Math.min(1, top + locationY / Math.max(1, stageHeightPx)))
-  }), [left, stageHeightPx, stageWidthPx, top])
-
   return (
     <RoomRendererLiveAvatarLayoutContext.Provider value={liveAvatarLayout}>
       <Wrapper
-        accessible={tapsInsideLiveFrame ? false : isTouchInteractive || item.kind === "avatar" ? true : undefined}
-        accessibilityRole={isTouchInteractive && !tapsInsideLiveFrame ? "button" : undefined}
-        accessibilityLabel={tapsInsideLiveFrame || (!isTouchInteractive && item.kind !== "avatar") ? undefined : itemAccessibility.label}
-        accessibilityHint={tapsInsideLiveFrame ? undefined : itemAccessibility.hint}
-        accessibilityValue={tapsInsideLiveFrame ? undefined : avatarAccessibilityValue}
+        accessible={tapsInsideTarget ? false : isTouchInteractive || item.kind === "avatar" ? true : undefined}
+        accessibilityRole={isTouchInteractive && !tapsInsideTarget ? "button" : undefined}
+        accessibilityLabel={tapsInsideTarget || (!isTouchInteractive && item.kind !== "avatar") ? undefined : itemAccessibility.label}
+        accessibilityHint={tapsInsideTarget ? undefined : itemAccessibility.hint}
+        accessibilityValue={tapsInsideTarget ? undefined : avatarAccessibilityValue}
         delayLongPress={onItemLongPressMove ? 0 : 360}
         onLongPress={() => {
           longPressActiveRef.current = true
@@ -652,10 +674,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
           if (!longPressActiveRef.current) return
           longPressActiveRef.current = false
           suppressPressRef.current = true
-          onItemLongPressRelease?.(
-            item,
-            resolvePressPoint(event.nativeEvent.locationX, event.nativeEvent.locationY)
-          )
+          onItemLongPressRelease?.(item, {
+            pageX: event.nativeEvent.pageX,
+            pageY: event.nativeEvent.pageY
+          })
         }}
         onResponderMove={(event) => {
           if (!longPressActiveRef.current || !onItemLongPressMove) return
@@ -668,7 +690,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
         onMoveShouldSetResponder={() => Boolean(onItemLongPressMove)}
         onResponderTerminationRequest={() => !onItemLongPressMove}
         testID={testID}
-        pointerEvents={tapsInsideLiveFrame ? "box-none" : pointerEvents}
+        pointerEvents={tapsInsideTarget ? "box-none" : pointerEvents}
         style={[
           styles.item,
           {
@@ -767,7 +789,34 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
               accessibilityHint={itemAccessibility.hint}
               accessibilityValue={avatarAccessibilityValue}
               onPress={(event) => { event.stopPropagation(); onItemTap?.(item) }}
-              style={[styles.avatarTapTarget, avatarTapTarget]}
+              style={[styles.innerTapTarget, avatarTapTarget]}
+            />
+          ) : null}
+          {seatTapTarget ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={itemAccessibility.label}
+              accessibilityHint={itemAccessibility.hint}
+              onPress={(event) => {
+                event.stopPropagation()
+                // Childless, so the location is inside this target.
+                const boxX = seatTapTarget.left + event.nativeEvent.locationX
+                const boxY = seatTapTarget.top + event.nativeEvent.locationY
+                if (isRoomFurnitureTapOnSeat(seatTapTarget, boxX, boxY)) {
+                  onItemTap?.(item)
+                  return
+                }
+                onStagePress?.({
+                  x: left + boxX / Math.max(1, stageWidthPx),
+                  y: top + boxY / Math.max(1, stageHeightPx)
+                })
+              }}
+              style={[styles.innerTapTarget, {
+                left: seatTapTarget.left,
+                top: seatTapTarget.top,
+                width: seatTapTarget.width,
+                height: seatTapTarget.height
+              }]}
             />
           ) : null}
         </View>
@@ -782,6 +831,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.onItemLongPress === next.onItemLongPress &&
   previous.onItemLongPressMove === next.onItemLongPressMove &&
   previous.onItemLongPressRelease === next.onItemLongPressRelease &&
+  previous.onStagePress === next.onStagePress &&
   previous.debugPlacement === next.debugPlacement &&
   previous.reduceMotion === next.reduceMotion &&
   previous.motionPaused === next.motionPaused &&
@@ -831,7 +881,7 @@ function getPlacementGuideStyle(
 }
 
 const styles = StyleSheet.create({
-  avatarTapTarget: {
+  innerTapTarget: {
     position: "absolute"
   },
   root: {

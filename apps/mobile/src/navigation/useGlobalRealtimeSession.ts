@@ -67,6 +67,7 @@ interface GlobalRealtimeSessionInput {
   refreshProductionThreads: () => Promise<void>
   resynchronizeMessages: RootChatSync["resynchronizeMessages"]
   upsertRoomInvite: RootChatSync["upsertRoomInvite"]
+  closeEndedRoom: RootChatSync["closeEndedRoom"]
   applyRealtimeThreadList: (list: ChatThreadList) => void
   applyNewThread: (thread: ChatThread) => void
   openReadyMiniRoom: ReturnType<typeof useRoomInviteRouting>["openReadyMiniRoom"]
@@ -101,6 +102,7 @@ export function useGlobalRealtimeSession({
   refreshProductionThreads,
   resynchronizeMessages,
   upsertRoomInvite,
+  closeEndedRoom,
   applyRealtimeThreadList,
   applyNewThread,
   openReadyMiniRoom,
@@ -204,6 +206,7 @@ export function useGlobalRealtimeSession({
       getMatchDeduplicationState,
       normalizeRoomInviteRecord,
       upsertRoomInvite,
+      closeEndedRoom,
       applyChatThreadListed: applyRealtimeThreadList,
       applyChatThreadRead,
       requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
@@ -236,7 +239,8 @@ export function useGlobalRealtimeSession({
       refreshProductionThreads,
       openReadyMiniRoom,
       sessionActor?.profile.userId,
-      upsertRoomInvite
+      upsertRoomInvite,
+      closeEndedRoom
     ]
   )
 

@@ -437,8 +437,11 @@ export async function registerThreadRoutes(
       // A synthetic test partner can initiate a real, persisted chat invitation
       // when the user opens the conversation. Reopening it is idempotent, and
       // normal accounts never enter this branch (the read already knows).
+      // An accepted invite whose room has ended carries no room any more, so
+      // the persona invites again instead of leaving a dead conversation.
       if (read.partnerIsTestPersona &&
-        !invites.some((invite) => invite.status === "pending" || invite.status === "accepted")) {
+        !invites.some((invite) => invite.status === "pending" ||
+          (invite.status === "accepted" && Boolean(invite.roomSessionId)))) {
         // The deployment policy still decides: production never acts for a persona.
         const [persona, partnerAccount] = await Promise.all([
           chatService.repository.findTestPersona(read.partnerUserId),

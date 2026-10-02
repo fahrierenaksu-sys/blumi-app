@@ -143,6 +143,24 @@ function createDependencies(
   return dependencies
 }
 
+test("an ended room closes its chat invite's entry", () => {
+  const closed: string[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    closeEndedRoom: (roomSessionId) => { closed.push(roomSessionId) }
+  }))
+  handler({
+    type: "mini_room.ended",
+    payload: {
+      miniRoomId: "room_ended",
+      lobbyRoomId: "thread",
+      participantUserIds: ["ada", "bora"],
+      endedByUserId: "bora",
+      endedAt: message.sentAt
+    }
+  })
+  assert.deepEqual(closed, ["room_ended"])
+})
+
 test("routes chat list and ready-room events to their coordinator dependencies", () => {
   const dependencies = createDependencies()
   const handler = createGlobalRealtimeEventHandler(dependencies)

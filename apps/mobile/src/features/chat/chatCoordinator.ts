@@ -8,9 +8,10 @@ import type {
   MarkThreadReadOptions,
   SendThreadMessageOptions
 } from "./chatApi"
-import type {
-  ChatRoomInviteAction,
-  ChatRoomInviteTimelineItem
+import {
+  withoutEndedRoom,
+  type ChatRoomInviteAction,
+  type ChatRoomInviteTimelineItem
 } from "./chatRoomInviteModel"
 import {
   RoomInviteApiError,
@@ -132,6 +133,11 @@ export interface ChatCoordinator {
     nextInvites: readonly ChatRoomInviteTimelineItem[]
   ) => void
   upsertRoomInvite: (invite: ChatRoomInviteTimelineItem) => void
+  /**
+   * `mini_room.ended`: the server ended this room. Its invite stops offering
+   * entry, now and in any invite response that was already in flight.
+   */
+  closeEndedRoom: (roomSessionId: string) => void
 }
 
 export function createChatCoordinator(
@@ -152,6 +158,9 @@ export function createChatCoordinator(
     promise: Promise<void>
   }>()
   const handledRoomInviteRefreshFailures = new WeakSet<Promise<void>>()
+  // Room ids are never reused, so an ended room stays ended for this session.
+  const endedRoomSessionIds = new Set<string>()
+  const isRoomEnded = (roomSessionId: string): boolean => endedRoomSessionIds.has(roomSessionId)
 
   const getRoomInviteRevision = (threadId: string): number =>
     roomInviteRevisions.get(threadId) ?? 0
@@ -176,7 +185,7 @@ export function createChatCoordinator(
     const preserveNewerUpdates = getRoomInviteRevision(threadId) > refreshStartedAt
     dependencies.setRoomInvites((current) => [
       ...current.filter((invite) => invite.threadId !== threadId),
-      ...nextInvites.map((invite) => {
+      ...nextInvites.map((nextInvite) => withoutEndedRoom(nextInvite, isRoomEnded)).map((invite) => {
         const currentInvite = current.find((entry) => entry.inviteId === invite.inviteId)
         const currentRevision = roomInviteMutationRevisions.get(invite.inviteId) ?? 0
         return preserveNewerUpdates && currentInvite && currentRevision > refreshStartedAt
@@ -198,8 +207,16 @@ export function createChatCoordinator(
     bumpRoomInviteRevision(invite.threadId, invite.inviteId)
     dependencies.setRoomInvites((current) => [
       ...current.filter((entry) => entry.inviteId !== invite.inviteId),
-      invite
+      withoutEndedRoom(invite, isRoomEnded)
     ])
+  }
+
+  const closeEndedRoom = (roomSessionId: string): void => {
+    if (endedRoomSessionIds.has(roomSessionId)) return
+    endedRoomSessionIds.add(roomSessionId)
+    dependencies.setRoomInvites((current) =>
+      current.map((invite) => withoutEndedRoom(invite, isRoomEnded))
+    )
   }
 
   const refreshThreadRoomInvites = (threadId: string): Promise<void> => {
@@ -523,6 +540,7 @@ export function createChatCoordinator(
     closeMyActiveRoom,
     markChatThreadRead,
     replaceThreadRoomInvites,
-    upsertRoomInvite
+    upsertRoomInvite,
+    closeEndedRoom
   }
 }

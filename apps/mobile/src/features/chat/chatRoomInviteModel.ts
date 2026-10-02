@@ -155,6 +155,20 @@ export function getChatMessageGroupPosition(
   return "single"
 }
 
+/**
+ * An ended room can no longer be entered: drop it from the invite that opened
+ * it, so the invite keeps its accepted history but offers no door. Invites
+ * that do not carry an ended room are returned unchanged (same reference).
+ */
+export function withoutEndedRoom(
+  invite: ChatRoomInviteTimelineItem,
+  isRoomEnded: (roomSessionId: string) => boolean
+): ChatRoomInviteTimelineItem {
+  if (!invite.roomSessionId || !isRoomEnded(invite.roomSessionId)) return invite
+  const { roomSessionId: _endedRoomSessionId, ...rest } = invite
+  return rest
+}
+
 export function getRoomInviteActions(
   invite: ChatRoomInviteTimelineItem,
   currentUserId: string

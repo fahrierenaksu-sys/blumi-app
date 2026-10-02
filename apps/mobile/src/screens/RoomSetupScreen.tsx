@@ -337,15 +337,17 @@ export function RoomSetupScreen({
     showGhostAt(point.pageX, point.pageY)
   }, [liftGhostAt, showGhostAt])
 
+  // The bed lands where the finger (and the ghost) is, in window
+  // coordinates: the same mapping as a drop from the drawer.
   const handlePlacedBedLongPressRelease = useCallback((
     item: RoomV2RenderItem,
-    point: { x: number; y: number }
+    point: { pageX: number; pageY: number }
   ): void => {
     if (item.kind !== "furniture" || item.itemId !== STARTER_ROOM_BED_ITEM_ID) return
     placedBedMovingRef.current = false
     releaseGhost()
-    placeBedAtPoint(point)
-  }, [placeBedAtPoint, releaseGhost])
+    placeBedAtWindowPoint(point.pageX, point.pageY)
+  }, [placeBedAtWindowPoint, releaseGhost])
 
   const bedGhostSource = starterBed
     ? starterBed.visualContract?.directions.front.thumbnailAsset?.source ?? starterBed.asset.source

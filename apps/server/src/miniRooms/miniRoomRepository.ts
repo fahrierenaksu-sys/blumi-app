@@ -328,8 +328,10 @@ function hydrateInviteWithRoom(
   store: InMemoryMiniRoomStore,
   invite: MiniRoomInviteRecord
 ): MiniRoomInviteRecord {
+  // Only a live room is linked: an ended room can no longer be entered.
   const roomSessionId = [...store.roomInviteIds.entries()].find(
-    ([, inviteId]) => inviteId === invite.inviteId
+    ([miniRoomId, inviteId]) =>
+      inviteId === invite.inviteId && !store.miniRooms.get(miniRoomId)?.endedAt
   )?.[0]
   return {
     ...cloneInvite(invite),

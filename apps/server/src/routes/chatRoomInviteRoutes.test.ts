@@ -406,6 +406,49 @@ test("opening a matched chat with a test persona creates one incoming room invit
     assert.equal(repeated.statusCode, 200)
     assert.equal(repeated.json().invites.length, 1)
     assert.equal(repeated.json().invites[0].inviteId, first.json().invites[0].inviteId)
+
+    const inviteId = first.json().invites[0].inviteId as string
+    const accepted = await app.inject({
+      method: "POST",
+      url: `/v1/room-invites/${inviteId}/decision`,
+      headers: { authorization: `Bearer ${user.sessionToken}` },
+      payload: { status: "accepted" }
+    })
+    assert.equal(accepted.statusCode, 200)
+    const roomId = accepted.json().miniRoom.miniRoomId as string
+    const whileLive = await app.inject({
+      method: "GET",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${user.sessionToken}` }
+    })
+    assert.deepEqual(
+      whileLive.json().invites.map((entry: { status: string; roomSessionId?: string }) => [entry.status, entry.roomSessionId]),
+      [["accepted", roomId]],
+      "a live room's invite stays the only one"
+    )
+
+    const left = await app.inject({
+      method: "POST",
+      url: `/v1/room-sessions/${roomId}/leave`,
+      headers: { authorization: `Bearer ${user.sessionToken}` },
+      payload: {}
+    })
+    assert.equal(left.json().ended, true)
+    const afterEnd = await app.inject({
+      method: "GET",
+      url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${user.sessionToken}` }
+    })
+    assert.equal(afterEnd.statusCode, 200)
+    const afterEndInvites = afterEnd.json().invites as Array<{
+      inviteId: string; status: string; senderUserId: string; roomSessionId?: string
+    }>
+    assert.equal(afterEndInvites.length, 2, "the persona invites again once its room has ended")
+    assert.equal(afterEndInvites[0]?.inviteId, inviteId)
+    assert.equal(afterEndInvites[0]?.status, "accepted")
+    assert.equal(afterEndInvites[0]?.roomSessionId, undefined, "an ended room is not offered for entry")
+    assert.equal(afterEndInvites[1]?.status, "pending")
+    assert.equal(afterEndInvites[1]?.senderUserId, persona.userId)
   } finally {
     await app.close()
   }

@@ -82,7 +82,9 @@ export function createPostgresThreadRoomInviteReader(pool: QueryExecutor): Threa
                            'room_session_id', mini_room.mini_room_id
                          ) ORDER BY invite.created_at ASC, invite.invite_id ASC), '[]'::json)
                     FROM blumi_mini_room_invites AS invite
+                    -- An ended room is no longer enterable: only a live room links.
                     LEFT JOIN blumi_mini_rooms AS mini_room ON mini_room.invite_id = invite.invite_id
+                                                           AND mini_room.ended_at IS NULL
                    WHERE invite.source_thread_id = $1
                 ) END AS invites
            FROM facts`,

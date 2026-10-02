@@ -3,7 +3,7 @@ import test from "node:test"
 import { RoomInviteApiError } from "./chatRoomInviteApi"
 import type { ChatMessage, ChatMessageList } from "@blumi/contracts"
 import type { SessionActor } from "../session/sessionModel"
-import type { ChatRoomInviteTimelineItem } from "./chatRoomInviteModel"
+import { getRoomInviteActions, type ChatRoomInviteTimelineItem } from "./chatRoomInviteModel"
 import type { RoomSessionJoinResult } from "./chatRoomInviteApi"
 import {
   createChatCoordinator,
@@ -661,6 +661,38 @@ test("keeps a newer realtime invite update when hydration resolves with stale da
   await history
 
   assert.deepEqual(dependencies.roomInvites, [acceptedInvite])
+})
+
+test("an ended room stops offering entry, even from an invite response already in flight", async () => {
+  let resolveInvites: ((invites: ChatRoomInviteTimelineItem[]) => void) | undefined
+  const inFlight = new Promise<ChatRoomInviteTimelineItem[]>((resolve) => {
+    resolveInvites = resolve
+  })
+  const dependencies = createDependencies({ fetchThreadRoomInvites: async () => inFlight })
+  const coordinator = createChatCoordinator(dependencies)
+  const accepted = { ...invite, status: "accepted" as const, roomSessionId: "room-session-ended" }
+  const otherThread = { ...accepted, inviteId: "invite_2", threadId: "thread_2", roomSessionId: "room-session-live" }
+  coordinator.upsertRoomInvite(accepted)
+  coordinator.upsertRoomInvite(otherThread)
+  assert.equal(getRoomInviteActions(dependencies.roomInvites[0]!, "ada")[0]?.type, "open_room")
+
+  const refresh = coordinator.refreshThreadRoomInvites("thread_1")
+  coordinator.closeEndedRoom("room-session-ended")
+  const [closed, untouched] = dependencies.roomInvites
+  assert.equal(closed?.status, "accepted", "the invite keeps its history")
+  assert.equal(closed?.roomSessionId, undefined)
+  assert.deepEqual(getRoomInviteActions(closed!, "ada"), [], "the door to the ended room is closed")
+  assert.equal(untouched?.roomSessionId, "room-session-live", "another room stays enterable")
+
+  resolveInvites?.([accepted])
+  await refresh
+  const refreshed = dependencies.roomInvites.find((entry) => entry.inviteId === accepted.inviteId)
+  assert.equal(refreshed?.roomSessionId, undefined, "a response read before the end cannot reopen the room")
+  coordinator.upsertRoomInvite(accepted)
+  assert.equal(
+    dependencies.roomInvites.find((entry) => entry.inviteId === accepted.inviteId)?.roomSessionId,
+    undefined
+  )
 })
 
 test("surfaces room-invite hydration failures without failing message loading", async () => {

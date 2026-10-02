@@ -134,6 +134,27 @@ runRepositoryContract<MiniRoomRepository>({
       assert.equal(await backend.repository.findActiveMiniRoomForUser(bora), null)
       await openRoom(backend, "after_end", bora, ada)
     },
+    "an invite links its room only until the room ends": async (backend) => {
+      const [ada, bora] = [backend.id("ada"), backend.id("bora")]
+      await backend.ensureUsers(ada, bora)
+      const miniRoom = await openRoom(backend, "unlink", ada, bora)
+      const inviteId = backend.id("invite_unlink")
+      const threadId = backend.id("thread_unlink")
+      assert.equal((await backend.repository.findInvite(inviteId))?.roomSessionId, miniRoom.miniRoomId)
+      assert.deepEqual(
+        (await backend.repository.listInvitesForThread(threadId, new Date(LATER))).map((entry) => entry.roomSessionId),
+        [miniRoom.miniRoomId]
+      )
+
+      await backend.repository.endMiniRoom(miniRoom.miniRoomId, bora, LATER)
+      const ended = await backend.repository.findInvite(inviteId)
+      assert.equal(ended?.status, "accepted")
+      assert.equal(ended?.roomSessionId, undefined)
+      assert.deepEqual(
+        (await backend.repository.listInvitesForThread(threadId, new Date(LATER))).map((entry) => [entry.status, entry.roomSessionId]),
+        [["accepted", undefined]]
+      )
+    },
     "the completion reward day is anchored once, only by a participant of a live room": async (backend) => {
       const [ada, bora, cara] = [backend.id("ada"), backend.id("bora"), backend.id("cara")]
       await backend.ensureUsers(ada, bora, cara)
