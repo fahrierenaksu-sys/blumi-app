@@ -679,6 +679,9 @@ export async function registerUserRoutes(
     if (!phone || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Enter a valid new phone number." })
     }
+    // Firebase verifies phones; this server sends no SMS, so a stored code
+    // could never arrive. Refuse before writing a challenge row for any number.
+    if (services.firebaseAuthVerifier) return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
     try {
       const challenge = await authService.requestRecoveryPhoneVerification(phone.e164)
       return reply.code(202).send({ ok: true, expiresAt: challenge.expiresAt })

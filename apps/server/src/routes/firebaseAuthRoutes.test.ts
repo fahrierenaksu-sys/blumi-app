@@ -58,8 +58,15 @@ test("Firebase phone completion fails closed when the verifier is not configured
 })
 
 test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a code was sent", async () => {
+  const authService = createAuthService()
+  let recoveryChallenges = 0
+  const requestRecovery = authService.requestRecoveryPhoneVerification.bind(authService)
+  authService.requestRecoveryPhoneVerification = async (phone) => {
+    recoveryChallenges += 1
+    return requestRecovery(phone)
+  }
   const app = createServer({
-    authService: createAuthService(),
+    authService,
     firebaseAuthVerifier: { async verifyIdToken() {
       return { uid: "firebase-user-1", phoneNumber: PHONE, authTime: Math.floor(Date.now() / 1000) }
     } }
@@ -68,12 +75,15 @@ test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a 
     for (const [url, payload] of [
       ["/v1/auth/send-code", { phoneNumber: PHONE }],
       ["/v1/auth/verify", { phoneNumber: PHONE, verificationCode: "123456" }],
-      ["/v1/accounts/register", { phoneNumber: PHONE, verificationCode: "123456", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }]
+      ["/v1/accounts/register", { phoneNumber: PHONE, verificationCode: "123456", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }],
+      ["/v1/account/recovery/challenge", { phoneNumber: PHONE }]
     ] as const) {
       const response = await app.inject({ method: "POST", url, payload })
       assert.equal(response.statusCode, 410, url)
       assert.equal(response.json().code, "FIREBASE_PHONE_AUTH_REQUIRED")
     }
+    // No challenge row is written for a number nobody proved.
+    assert.equal(recoveryChallenges, 0)
   } finally { await app.close() }
 })
 
