@@ -67,6 +67,25 @@ test("a target that leaves mid-flight ends the flight", () => {
   assert.ok(flightChanges >= 1)
 })
 
+test("a flight settles exactly once: on landing, or when it ends any other way", () => {
+  const store = createFlightStore()
+  const settled: string[] = []
+  const landed = store.launch({ ...request("a"), onSettle: () => settled.push("landed") })
+  store.settle(landed)
+  store.settle(landed)
+  store.finish(landed)
+  assert.deepEqual(settled, ["landed"], "landing, then the fade-out end, is one settle")
+
+  const abandoned = store.launch({ ...request("b"), onSettle: () => settled.push("abandoned") })
+  store.finish(abandoned)
+  const left = store.launch({ ...request("c"), onSettle: () => settled.push("left") })
+  store.claim("chat-send:thread-a", "c")
+  store.attachTarget(left, fakeTarget([], "row"))
+  store.detachTarget(left)
+  assert.deepEqual(settled, ["landed", "abandoned", "left"], "no ending loses the settle")
+  store.settle("unknown")
+})
+
 test("the layer re-renders only when flights start or end", () => {
   const store = createFlightStore()
   let renders = 0

@@ -39,6 +39,11 @@ export interface ShopPurchaseCoordinatorInput {
   navigateToRoom: (placementItemId: string) => void
   hapticError: () => void
   hapticSuccess: () => void
+  /**
+   * Runs only after the server confirmed an avatar unlock: the purchase
+   * flight. When given, it owns the success haptic (it plays on landing).
+   */
+  celebrateAvatarUnlock?: (product: ShopCatalogItem) => void
   showToast: (toast: ShopToast) => void
   captureProductEvent: (
     event: ShopPurchaseEventName,
@@ -84,7 +89,8 @@ export async function runShopPrimaryAction(
     }
 
     reportUnlockSuccess(input, "avatar", selectedProduct.priceCoins)
-    input.hapticSuccess()
+    if (input.celebrateAvatarUnlock) input.celebrateAvatarUnlock(selectedProduct)
+    else input.hapticSuccess()
     input.showToast({
       title: `${selectedProduct.title} is yours`,
       body: "Wear it from Avatar Studio whenever you want.",

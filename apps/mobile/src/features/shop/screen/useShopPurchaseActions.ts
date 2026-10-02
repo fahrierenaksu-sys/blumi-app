@@ -56,6 +56,8 @@ export function useShopPurchaseActions(input: {
   shopMode: ShopMode
   multiItemApplyEnabled: boolean
   selectedProduct: ShopCatalogItem | undefined
+  /** After a server-confirmed unlock: the purchase flight (owns the success haptic). */
+  celebrateAvatarUnlock?: (product: ShopCatalogItem) => void
 }) {
   const {
     navigation,
@@ -72,7 +74,8 @@ export function useShopPurchaseActions(input: {
     canPerformShopActions,
     shopMode,
     multiItemApplyEnabled,
-    selectedProduct
+    selectedProduct,
+    celebrateAvatarUnlock
   } = input
   // Both are the provider's stable useCallback arrows, so calling them
   // unbound is identical to calling them through avatarV2.
@@ -195,6 +198,7 @@ export function useShopPurchaseActions(input: {
       }),
       hapticError,
       hapticSuccess,
+      celebrateAvatarUnlock,
       showToast,
       captureProductEvent
     })
@@ -212,6 +216,7 @@ export function useShopPurchaseActions(input: {
     equipAndSaveItem,
     avatarV2.avatar,
     avatarV2.catalog,
+    celebrateAvatarUnlock,
     combinationStateRef,
     copy.offline.title,
     copy.offline.actionUnavailable,

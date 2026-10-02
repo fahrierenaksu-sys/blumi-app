@@ -110,6 +110,25 @@ test("avatar unlock uses the session-appropriate inventory path and confirms suc
   assert.deepEqual(demo.calls.haptics, ["success"])
 })
 
+test("the purchase flight starts only after a server-confirmed unlock and owns the success haptic", async () => {
+  const celebrated: string[] = []
+  const confirmed = createHarness({ mode: "production" })
+  await runShopPrimaryAction({
+    ...confirmed.input,
+    celebrateAvatarUnlock: (product) => { celebrated.push(product.sourceItemId) }
+  })
+  assert.deepEqual(celebrated, ["avatar_v2_top_cherry_heart_milkmaid_blouse"])
+  assert.deepEqual(confirmed.calls.haptics, [], "the landing plays the success haptic, not the coordinator")
+
+  const rejected = createHarness({ mode: "production", unlockResult: { success: false, reason: "not_enough_coins" } })
+  await runShopPrimaryAction({
+    ...rejected.input,
+    celebrateAvatarUnlock: (product) => { celebrated.push(`rejected:${product.sourceItemId}`) }
+  })
+  assert.deepEqual(celebrated, ["avatar_v2_top_cherry_heart_milkmaid_blouse"], "a rejected purchase never flies")
+  assert.deepEqual(rejected.calls.haptics, ["error"])
+})
+
 test("production room unlock records failure without navigation", async () => {
   const production = createHarness({
     mode: "production",

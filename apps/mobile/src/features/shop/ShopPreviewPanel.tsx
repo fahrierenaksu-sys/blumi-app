@@ -12,6 +12,7 @@ import type { UserAvatar } from "../avatarV2/avatarV2.types"
 import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { RoomAvatarRenderer2D } from "../avatarV2/room/components/RoomAvatarRenderer2D"
 import { AvatarTryOnTransition } from "../avatarV2/components/AvatarTryOnTransition"
+import { FlightTargetView } from "../../ui/flight/FlightLayer"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import { RoomRenderer2D } from "../roomV2/components/RoomRenderer2D"
@@ -36,6 +37,8 @@ export function ShopPreviewPanel(props: {
   mode: ShopMode
   product: ShopCatalogItem | undefined
   previewAvatar: UserAvatar
+  /** Purchase flights landing on the avatar (useShopPurchaseFlight). */
+  purchaseLandingFlightIds?: readonly string[]
   roomPreviewScene: ReturnType<typeof resolveRoomV2Scene>
   layoutMetrics: ShopLayoutMetrics
   isPurchasing: boolean
@@ -67,6 +70,7 @@ export function ShopPreviewPanel(props: {
     canRemovePreview = false,
     onRemovePreview,
     previewAvatar,
+    purchaseLandingFlightIds,
     roomPreviewScene,
     onPrimaryAction
   } = props
@@ -107,7 +111,11 @@ export function ShopPreviewPanel(props: {
         style={[styles.previewCard, { padding: layoutMetrics.preview.cardPadding }]}
       >
         <View style={[styles.previewStage, styles.previewStageAvatar, { height: layoutMetrics.preview.avatarStageHeight, minHeight: layoutMetrics.preview.avatarStageHeight }]}>
-          <ShopAvatarLivePreview avatar={previewAvatar} avatarWidth={layoutMetrics.preview.avatarWidth} />
+          <ShopAvatarLivePreview
+            avatar={previewAvatar}
+            avatarWidth={layoutMetrics.preview.avatarWidth}
+            landingFlightIds={purchaseLandingFlightIds}
+          />
           <View style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
             left: undefined,
             right: layoutMetrics.preview.overlayInset,
@@ -189,6 +197,7 @@ export function ShopPreviewPanel(props: {
             <ShopAvatarLivePreview
               avatar={previewAvatar}
               avatarWidth={layoutMetrics.preview.avatarWidth}
+              landingFlightIds={purchaseLandingFlightIds}
             />
           ) : (
             <ShopRoomItemPreview item={product.roomItem} scene={roomPreviewScene} locale={locale} />
@@ -356,7 +365,11 @@ function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombin
   )
 }
 
-function ShopAvatarLivePreview(props: { avatar: UserAvatar; avatarWidth: number }) {
+function ShopAvatarLivePreview(props: {
+  avatar: UserAvatar
+  avatarWidth: number
+  landingFlightIds?: readonly string[]
+}) {
   const roomAvatarLayers = useMemo(() => {
     const { appearance } = projectAvatarV2ToRoomAvatarAppearance({
       avatar: props.avatar,
@@ -381,12 +394,23 @@ function ShopAvatarLivePreview(props: { avatar: UserAvatar; avatarWidth: number 
           style={tryOnFill}
           render={renderShopAvatarLayers}
         />
+        {props.landingFlightIds?.map((flightId) => (
+          <FlightTargetView key={flightId} flightId={flightId} style={purchaseLandingSpot} />
+        ))}
       </View>
     </View>
   )
 }
 
 const tryOnFill = { width: "100%", height: "100%" } as const
+/** Where a bought piece lands: the chest of the shop avatar. */
+const purchaseLandingSpot = {
+  position: "absolute",
+  left: "30%",
+  width: "40%",
+  top: "34%",
+  height: "26%"
+} as const
 
 function renderShopAvatarLayers(layers: ReturnType<typeof getRoomAvatarRenderLayers>) {
   return <RoomAvatarRenderer2D layers={layers} />

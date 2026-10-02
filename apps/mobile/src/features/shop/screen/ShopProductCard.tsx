@@ -47,6 +47,8 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   /** Shows the corner X (see shopCardRemoveModel); omitted or "none" hides it. */
   removeAction?: ShopCardRemoveAction
   onRemoveProduct?: (product: ShopCatalogItem) => void
+  /** Registers the thumbnail as a purchase flight's starting point. */
+  registerThumbnail?: (sourceItemId: string, view: View | null) => void
 }) {
   const {
     product,
@@ -62,7 +64,8 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     locale,
     onSelectProduct,
     removeAction,
-    onRemoveProduct
+    onRemoveProduct,
+    registerThumbnail
   } = props
   const copy = getShopCopy(locale)
   const presentation = getShopProductPresentation(product, locale)
@@ -101,6 +104,10 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   const handlePress = useCallback(() => {
     onSelectProduct(product)
   }, [onSelectProduct, product])
+  const sourceItemId = product.sourceItemId
+  const thumbnailRef = useCallback((view: View | null) => {
+    registerThumbnail?.(sourceItemId, view)
+  }, [registerThumbnail, sourceItemId])
   const canRemove = removeAction !== undefined && removeAction !== "none" && onRemoveProduct !== undefined
   const removeLabel = canRemove ? copy.removeFromAvatar(product.title) : undefined
   const handleRemove = useCallback(() => {
@@ -127,7 +134,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
         selected ? styles.productCardSelected : null
       ]}
     >
-      <View style={[styles.productThumb, { height: thumbHeight }]}>
+      <View ref={thumbnailRef} collapsable={false} style={[styles.productThumb, { height: thumbHeight }]}>
         {product.previewType === "avatar" && product.avatarItem ? (
           <AvatarProductThumbnail
             item={product.avatarItem}

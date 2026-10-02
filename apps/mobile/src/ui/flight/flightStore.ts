@@ -26,6 +26,14 @@ export interface FlightRequest<Content = unknown> {
   readonly targetSurface: FlightSurface
   /** Drawn at the source frame and carried along (for example, the sent text). */
   readonly content?: Content
+  /** Scale the carried content with the frame (a thumbnail), instead of keeping its size (text). */
+  readonly scaleContent?: boolean
+  /**
+   * Called exactly once: when the clone lands, or when the flight ends
+   * without landing (no target, target gone, abandoned). The landing haptic
+   * goes here so it is never lost.
+   */
+  readonly onSettle?: () => void
 }
 
 export interface FlightTarget<Handle = unknown> {
@@ -43,6 +51,7 @@ interface FlightEntry {
   flight: Flight
   target: FlightTarget | null
   listeners: Set<() => void>
+  settled: boolean
 }
 
 export interface FlightStore {
@@ -53,7 +62,9 @@ export interface FlightStore {
   /** The target left the screen before landing: the flight is abandoned. */
   detachTarget(id: string): void
   getTarget(id: string): FlightTarget | null
-  /** Ends a flight and reveals its target. Safe to call more than once. */
+  /** The clone touched down: runs the flight's `onSettle` (once). */
+  settle(id: string): void
+  /** Ends a flight and reveals its target (settling it first). Safe to call more than once. */
   finish(id: string): void
   getFlights(): readonly Flight[]
   subscribe(listener: () => void): () => void
@@ -79,7 +90,8 @@ export function createFlightStore(createId: () => string = createDefaultIdFactor
       entries.set(id, {
         flight: Object.freeze({ ...request, id, claimed: false }),
         target: null,
-        listeners: new Set()
+        listeners: new Set(),
+        settled: false
       })
       publish()
       return id
@@ -112,9 +124,16 @@ export function createFlightStore(createId: () => string = createDefaultIdFactor
     getTarget(id) {
       return entries.get(id)?.target ?? null
     },
+    settle(id) {
+      const entry = entries.get(id)
+      if (!entry || entry.settled) return
+      entry.settled = true
+      entry.flight.onSettle?.()
+    },
     finish(id) {
       const entry = entries.get(id)
       if (!entry) return
+      store.settle(id)
       entries.delete(id)
       entry.target?.reveal()
       entry.target = null

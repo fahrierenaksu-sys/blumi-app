@@ -117,6 +117,10 @@ const finishFlight = (id: string) => {
   flightStore.finish(id)
 }
 
+const settleFlight = (id: string) => {
+  flightStore.settle(id)
+}
+
 function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
   const motion = useMotion()
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions()
@@ -187,6 +191,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
     const fadeOut = motion.fadeOut
     progress.value = animateTo(1, motion.snappy, () => {
       "worklet"
+      scheduleOnRN(settleFlight, id)
       // Revealed in the clone's last frame, so nothing blinks.
       targetOpacity.value = 1
       cloneOpacity.value = animateTo(0, fadeOut, () => {
@@ -228,9 +233,15 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       transform: [{ scaleX: scale.scaleX }, { scaleY: scale.scaleY }]
     }
   })
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: flightContentOpacity(progress.value)
-  }))
+  const scaleContent = flight.scaleContent === true
+  const contentStyle = useAnimatedStyle(() => {
+    if (!scaleContent) return { opacity: flightContentOpacity(progress.value) }
+    const scale = flightLayerScale(frame.value, source)
+    return {
+      opacity: flightContentOpacity(progress.value),
+      transform: [{ scaleX: scale.scaleX }, { scaleY: scale.scaleY }]
+    }
+  })
 
   return (
     <Animated.View style={[styles.clone, containerStyle]}>
