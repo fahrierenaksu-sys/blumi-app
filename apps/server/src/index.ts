@@ -36,7 +36,7 @@ const firebaseDeletionWorker = startPeriodicWorker({
     deleteUser: (uid) => firebaseAuthVerifier.deleteUser(uid)
   }),
   intervalMs: 30_000,
-  reportError: () => console.error("Firebase user deletion worker failed")
+  reportError: (error) => console.error("Firebase user deletion worker failed", safeOperationalErrorKind(error))
 })
 const mediaRevocationWorker = config.livekitUrl && config.livekitApiKey && config.livekitApiSecret
   ? startPeriodicWorker({
