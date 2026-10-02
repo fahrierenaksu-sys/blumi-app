@@ -94,6 +94,29 @@ export interface RoomV2AssetRef {
   source: ImageSourcePropType
   /** Build-time binding to the reviewed runtime file bytes. */
   integritySha256?: string
+  /** Present when `source` is a sprite atlas: the frame is this crop of it. */
+  crop?: RoomV2AssetCrop
+}
+
+/**
+ * A frame packed into a sprite atlas. The frame was drawn on a transparent
+ * `canvasWidth` x `canvasHeight` canvas; its pixels at (x, y, width, height)
+ * are stored at (atlasX, atlasY) in an `atlasWidth` x `atlasHeight` image and
+ * the rest of the canvas is fully transparent.
+ */
+export interface RoomV2AssetCrop {
+  /** The original frame file the crop reproduces exactly, without `.png`. */
+  sourceName: string
+  canvasWidth: number
+  canvasHeight: number
+  x: number
+  y: number
+  width: number
+  height: number
+  atlasX: number
+  atlasY: number
+  atlasWidth: number
+  atlasHeight: number
 }
 
 /**
