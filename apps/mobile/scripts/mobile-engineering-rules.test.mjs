@@ -144,3 +144,69 @@ test("react-hooks/exhaustive-deps suppressions do not grow", () => {
     `${count} suppressions > ${MAX_EXHAUSTIVE_DEPS_SUPPRESSIONS}; fix the dependency list instead`
   )
 })
+
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1")
+}
+
+// PanResponder handlers spread onto a Pressable never fire on a device (the
+// room editor and room setup drags shipped dead twice). Drags use Gesture
+// Handler. Comments that mention the old implementation are fine.
+test("no production source uses PanResponder; drags use Gesture Handler", () => {
+  const offenders = sources
+    .filter(({ text }) => /\b(?:PanResponder|panHandlers|GestureResponderHandlers)\b/.test(stripComments(text)))
+    .map(({ path }) => path)
+  assert.deepEqual(offenders, [], "use a Gesture Handler gesture with GestureDetector")
+})
+
+// A bare `beforeRemove` listener that calls preventDefault lets the iOS swipe
+// pop the native page while JS keeps the route (2026-09-30, room editor).
+// Unsaved-exit guards use usePreventRemove, which native-stack forwards as
+// preventNativeDismiss. Listed files are known debt and may only shrink.
+const BEFORE_REMOVE_PREVENT_DEFAULT_DEBT = new Set([
+  // Blocks leaving the Shop while a combination is not in its editing phase.
+  // Same desync class; move it to usePreventRemove.
+  "features/shop/screen/useShopCombinationSession.ts"
+])
+
+test("exit guards use usePreventRemove, not beforeRemove + preventDefault", () => {
+  const offenders = sources
+    .filter(({ text }) => {
+      const code = stripComments(text)
+      return /addListener\(\s*["']beforeRemove["']/.test(code) && /\.preventDefault\(\)/.test(code)
+    })
+    .map(({ path }) => path)
+    .filter((path) => !BEFORE_REMOVE_PREVENT_DEFAULT_DEBT.has(path))
+  assert.deepEqual(offenders, [], "use usePreventRemove for unsaved-exit guards")
+})
+
+function extractCallArgument(text, openParenIndex) {
+  let depth = 0
+  for (let index = openParenIndex; index < text.length; index += 1) {
+    const character = text[index]
+    if (character === "(") depth += 1
+    else if (character === ")") {
+      depth -= 1
+      if (depth === 0) return text.slice(openParenIndex + 1, index)
+    }
+  }
+  return text.slice(openParenIndex + 1)
+}
+
+// Gesture frames run on the UI thread. A React state setter called from an
+// onUpdate/onChange body renders React per frame (drag jank); JS hears about
+// frames only through scheduleOnRN (cell changes, release).
+test("gesture frame callbacks never call React state setters directly", () => {
+  const offenders = []
+  for (const { path, text } of sources) {
+    const code = stripComments(text)
+    for (const match of code.matchAll(/\.(?:onUpdate|onChange)\(\s*(?=\(|function\b|\w+\s*=>)/g)) {
+      const body = extractCallArgument(code, match.index + match[0].indexOf("("))
+      const withoutScheduled = body.replace(/scheduleOnRN\([^)]*\)/g, "")
+      if (/(?<![\w.$])set[A-Z]\w*\(/.test(withoutScheduled)) {
+        offenders.push(`${path}:${code.slice(0, match.index).split("\n").length}`)
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], "reach JS from a gesture frame only through scheduleOnRN")
+})
