@@ -38,8 +38,9 @@ test("the composers report user edits, blur and send; the screens mount one bubb
   assert.match(composer, /onBlur=\{draftTyping\?\.endDraft\}/)
   assert.match(roomComposer, /draftTyping\?\.noteDraft\(text\)/)
   assert.match(roomComposer, /onBlur=\{draftTyping\?\.endDraft\}/)
-  // A spoken line wins over the dots; the chibi art is never replaced.
-  assert.match(avatarLayer, /\{typing && !bubble \? <RoomTypingBubble \/> : null\}/)
+  // A spoken line wins over the dots (behavior test in
+  // miniRoom/scene/roomSpeechBubbleStack.test.ts); the chibi art is never replaced.
+  assert.match(avatarLayer, /<RoomTypingBubble \/>/)
 })
 
 test("typing dots animate on the UI thread and hold still under Reduce Motion", () => {

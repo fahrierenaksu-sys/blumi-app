@@ -46,7 +46,9 @@ test("reduced-motion policy is wired to decorative avatar motion", () => {
   ]) {
     assert.match(layer, new RegExp(`motionPolicy\\.${field}`))
   }
-  assert.match(layer, /bubblePopRef\.setValue\(1\)/)
+  // Speech bubbles (2026-10-02) are Reanimated layout animations; their
+  // non-moving Reduce Motion path is a behavior test in
+  // src/features/miniRoom/scene/roomSpeechBubbleStack.test.ts.
   assert.match(layer, /joinPulseRef\.setValue\(1\)/)
 })
 

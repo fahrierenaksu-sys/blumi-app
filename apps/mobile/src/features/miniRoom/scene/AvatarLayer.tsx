@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
+import { Animated, Easing, Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
   useAnimatedReaction,
   useAnimatedStyle,
@@ -26,7 +26,11 @@ import type {
   AvatarState,
   SpeechBubble
 } from "./miniRoomSceneTypes"
+import { groupMiniRoomSpeechBySpeaker } from "./miniRoomSpeechStack"
+import { RoomSpeechBubbleStack, type RoomSpeechBubblePlacement } from "./RoomSpeechBubbleStack"
 import { RoomTypingBubble } from "./RoomTypingBubble"
+
+const NO_BUBBLES: readonly SpeechBubble[] = []
 
 interface AvatarLayerProps {
   avatars: Record<string, AvatarState>
@@ -42,7 +46,7 @@ interface AvatarLayerProps {
   typingUserId?: string
 }
 
-type BubblePlacement = "center" | "left" | "right"
+type BubblePlacement = RoomSpeechBubblePlacement
 
 export function AvatarLayer(props: AvatarLayerProps) {
   const {
@@ -58,9 +62,9 @@ export function AvatarLayer(props: AvatarLayerProps) {
     typingUserId
   } = props
   const sortedAvatars = Object.values(avatars).sort((a, b) => a.y - b.y)
-  const avatarsWithBubbles = sortedAvatars.filter((avatar) =>
-    bubbles.some((entry) => entry.speakerUserId === avatar.userId)
-  )
+  // Stable per bubble list, so a figure re-renders only when its lines change.
+  const bubblesBySpeaker = useMemo(() => groupMiniRoomSpeechBySpeaker(bubbles), [bubbles])
+  const avatarsWithBubbles = sortedAvatars.filter((avatar) => bubblesBySpeaker[avatar.userId])
   const bubblesAreClose =
     avatarsWithBubbles.length > 1 &&
     Math.hypot(
@@ -97,7 +101,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={handleLayout}>
       {sortedAvatars.map((avatar) => {
-        const bubble = bubbles.find((entry) => entry.speakerUserId === avatar.userId)
+        const avatarBubbles = bubblesBySpeaker[avatar.userId] ?? NO_BUBBLES
         const isLocal = avatar.userId === localUserId
         const showJoinPulse = !isLocal && partnerJustJoined
         let bubblePlacement: BubblePlacement = "center"
@@ -121,7 +125,7 @@ export function AvatarLayer(props: AvatarLayerProps) {
             stageWidth={stageWidth}
             stageHeight={stageHeight}
             zIndex={getMiniRoomAvatarZIndex(depthOrder, avatar.userId)}
-            bubble={bubble}
+            bubbles={avatarBubbles}
             bubblePlacement={bubblePlacement}
             bubbleRaised={bubbleRaised}
             onDismissBubble={onDismissBubble}
@@ -145,7 +149,8 @@ interface AvatarFigureProps {
   stageHeight: SharedValue<number>
   /** Changes only when the depth order flips. */
   zIndex: number
-  bubble: SpeechBubble | undefined
+  /** This avatar's lines, oldest first. */
+  bubbles: readonly SpeechBubble[]
   bubblePlacement: BubblePlacement
   bubbleRaised: boolean
   onDismissBubble: (bubbleId: string) => void
@@ -164,7 +169,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     stageWidth,
     stageHeight,
     zIndex,
-    bubble,
+    bubbles,
     bubblePlacement,
     bubbleRaised,
     onDismissBubble,
@@ -177,7 +182,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   } = props
   const breatheRef = useRef(new Animated.Value(0)).current
   const walkBobRef = useRef(new Animated.Value(0)).current
-  const bubblePopRef = useRef(new Animated.Value(0)).current
   const joinPulseRef = useRef(new Animated.Value(0)).current
   const speakingRef = useRef(new Animated.Value(0)).current
   const roomAvatarLayers = useMemo(
@@ -283,30 +287,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     walkBobRef
   ])
 
-  // Keyed on the bubble id: a re-created bubble object must not replay the pop.
-  const bubbleId = bubble?.id
-  useEffect(() => {
-    if (bubbleId === undefined) {
-      bubblePopRef.stopAnimation()
-      bubblePopRef.setValue(0)
-      return
-    }
-    if (!motionPolicy.animateBubble) {
-      bubblePopRef.stopAnimation()
-      bubblePopRef.setValue(1)
-      return
-    }
-    bubblePopRef.setValue(0)
-    const animation = Animated.spring(bubblePopRef, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 5,
-      tension: 140
-    })
-    animation.start()
-    return () => animation.stop()
-  }, [bubbleId, bubblePopRef, motionPolicy.animateBubble])
-
   useEffect(() => {
     if (!motionPolicy.animateSpeaking || avatar.motion !== "speaking") {
       speakingRef.stopAnimation()
@@ -381,14 +361,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     outputRange: ["0deg", "2deg"]
   })
   const leanRotate = `${facingLean * (avatar.facing === "right" ? 2 : -2)}deg`
-  const bubbleScale = bubblePopRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1]
-  })
-  const bubbleOpacity = bubblePopRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1]
-  })
   const pulseScale = joinPulseRef.interpolate({
     inputRange: [0, 1],
     outputRange: [0.8, 1.9]
@@ -430,46 +402,16 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
         />
       ) : null}
 
-      {bubble ? (
-        <Animated.View
-          style={[
-            styles.bubbleAnchor,
-            bubblePlacement === "left" ? styles.bubbleLeft : null,
-            bubblePlacement === "right" ? styles.bubbleRight : null,
-            bubbleRaised ? styles.bubbleRaised : null,
-            {
-              opacity: bubbleOpacity,
-              transform: [{ scale: bubbleScale }]
-            }
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dismissBubbleLabel}
-            onPress={() => onDismissBubble(bubble.id)}
-            hitSlop={8}
-            style={styles.bubbleWrap}
-          >
-            <Text
-              style={styles.bubbleText}
-              numberOfLines={3}
-              ellipsizeMode="tail"
-            >
-              {bubble.body}
-            </Text>
-            <View
-              pointerEvents="none"
-              style={[
-                styles.bubbleTail,
-                bubblePlacement === "left" ? styles.bubbleTailLeft : null,
-                bubblePlacement === "right" ? styles.bubbleTailRight : null,
-              ]}
-            />
-          </Pressable>
-        </Animated.View>
-      ) : null}
+      <RoomSpeechBubbleStack
+        bubbles={bubbles}
+        placement={bubblePlacement}
+        raised={bubbleRaised}
+        animate={motionPolicy.animateBubble}
+        onDismissBubble={onDismissBubble}
+        dismissBubbleLabel={dismissBubbleLabel}
+      />
       {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
-      {typing && !bubble ? <RoomTypingBubble /> : null}
+      {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
 
       {/* Depth scale (from the live y) wraps the same box so it scales about the same centre. */}
       <Reanimated.View
@@ -586,61 +528,5 @@ const styles = StyleSheet.create({
     color: "#3A2430",
     fontSize: 10,
     fontWeight: "800"
-  },
-  bubbleAnchor: {
-    position: "absolute",
-    left: "50%",
-    bottom: 130,
-    width: 174,
-    marginLeft: -87,
-  },
-  bubbleWrap: {
-    width: "100%",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 201, 224, 0.9)",
-    shadowColor: "#5B263B",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3
-  },
-  bubbleLeft: {
-    marginLeft: -140
-  },
-  bubbleRight: {
-    marginLeft: -34
-  },
-  bubbleRaised: {
-    bottom: 168
-  },
-  bubbleText: {
-    color: "#3A2430",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
-    textAlign: "center"
-  },
-  bubbleTail: {
-    position: "absolute",
-    left: "50%",
-    bottom: -5,
-    width: 10,
-    height: 10,
-    marginLeft: -5,
-    transform: [{ rotate: "45deg" }],
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "rgba(255, 201, 224, 0.9)"
-  },
-  bubbleTailLeft: {
-    left: "76%"
-  },
-  bubbleTailRight: {
-    left: "24%"
   },
 })
