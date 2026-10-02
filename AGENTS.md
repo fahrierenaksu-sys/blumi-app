@@ -57,7 +57,8 @@ These rules protect the data:
 
 - The server alone decides coins, purchases, inventory, ownership, loadouts, room state and access. Client, cache, realtime or visual state never proves ownership.
 - Secrets live only in environment variables. Never print secret values, read them into output, or commit them, `.env*` files or credentials.
-- Keep phone numbers, tokens, message bodies and user or room IDs out of logs, analytics, crash reports, notifications, error responses, docs, commits, test fixtures, snapshots and chat replies. Use counts or redacted values.
+- Keep phone numbers, tokens and user or room IDs out of logs, analytics, crash reports, notifications, error responses, docs, commits, test fixtures, snapshots and chat replies. Keep message bodies out of all of those except notifications. Use counts or redacted values.
+  - By the owner's decision (2026-10-02), a chat message push may show the sender's name, chibi picture and the message text, read at send time and never stored in the push outbox. iOS "Show Previews" lets users hide it.
 - Admin and operator tools use an identity separate from app accounts, least privilege, short-lived access and an audit log, and start read-only.
 - Never claim an approval the owner did not give. Paid shop items become publishable only through owner-approved receipts in `packages/domain/src/release/blumiR1ReleaseCatalog.json`. Never add or reissue a receipt without the owner.
 
