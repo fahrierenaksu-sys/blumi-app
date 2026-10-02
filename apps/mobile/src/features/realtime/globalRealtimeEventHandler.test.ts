@@ -76,6 +76,17 @@ test("receipt updates reach the chat store with the current account", () => {
   assert.deepEqual(applied, [{ userId: "bora", localUserId: "ada" }])
 })
 
+test("a partner's saved name reaches the chat store without creating a chat or an alert", () => {
+  const applied: unknown[] = []
+  const dependencies = createDependencies({ applyChatParticipantUpdated: (participant) => { applied.push(participant) } })
+  const handler = createGlobalRealtimeEventHandler(dependencies)
+  handler({ type: "chat.participant_updated", payload: { participant: { userId: "bora", displayName: "Irmak" } } })
+  handler({ type: "chat.participant_updated", payload: { participant: { userId: "ada", displayName: "Me" } } })
+  assert.deepEqual(applied, [{ userId: "bora", displayName: "Irmak" }], "this account's own identity comes from its session")
+  assert.deepEqual(dependencies.createdThreadEvents, [])
+  assert.deepEqual(dependencies.notedMessages, [])
+})
+
 test("delivery is acknowledged whether or not the conversation is open", () => {
   const acknowledged: string[] = []
   const handler = createGlobalRealtimeEventHandler(createDependencies({

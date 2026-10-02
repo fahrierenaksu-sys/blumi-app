@@ -15,6 +15,7 @@ import {
   containsControlCharacters
 } from "../safety/publicTextFilter"
 import { normalizeThreadPage, type ChatThreadPageOptions } from "./chatThreadPagination"
+import type { ChatParticipantProfileSource } from "./chatParticipantIdentity"
 
 const MAX_MESSAGE_LENGTH = 500
 const DEFAULT_MESSAGE_PAGE_LIMIT = 50
@@ -28,6 +29,8 @@ export interface ChatService {
   repository: ChatRepository
   listThreads(userId: string): Promise<ChatThread[]>
   listThreadsPage(userId: string, options?: ChatThreadPageOptions): Promise<ChatThreadPage>
+  /** Everyone `userId` has a chat they can see with: no block in either direction. */
+  listVisibleChatPartnerUserIds(userId: string): Promise<string[]>
   listMessages(
     userId: string,
     threadId: string,
@@ -195,13 +198,18 @@ export interface CreateChatServiceOptions {
   repository?: ChatRepository
   idFactory?: () => string
   blockPolicy?: ChatBlockPolicy
+  /** In-memory repository only: where participants' current names and outfits come from. */
+  profileSource?: ChatParticipantProfileSource
 }
 
 export function createChatService(
   options: CreateChatServiceOptions = {}
 ): ChatService {
   const blockPolicy = options.blockPolicy
-  const repository = options.repository ?? createInMemoryChatRepository(undefined, { blockSource: blockPolicy })
+  const repository = options.repository ?? createInMemoryChatRepository(undefined, {
+    blockSource: blockPolicy,
+    ...(options.profileSource ? { profileSource: options.profileSource } : {})
+  })
   const idFactory = options.idFactory ?? createMessageId
 
   const getVisibleThread = async (userId: string, threadId: string): Promise<ChatThread> => {
@@ -242,6 +250,12 @@ export function createChatService(
       return blockPolicy ? withoutBlockedPartners(blockPolicy, userId, threads) : threads
     },
     async listThreadsPage(userId, options) { return listVisibleThreadsPage(userId, options) },
+    async listVisibleChatPartnerUserIds(userId) {
+      const partnerUserIds = await repository.listChatPartnerUserIds(userId)
+      if (!blockPolicy || partnerUserIds.length === 0) return partnerUserIds
+      const blocked = new Set(await blockPolicy.listBlockedUserIdsBetween(userId, partnerUserIds))
+      return partnerUserIds.filter((partnerUserId) => !blocked.has(partnerUserId))
+    },
     async listMessages(userId, threadId, options = {}) {
       const thread = await getVisibleThread(userId, threadId)
       return repository.listMessages(thread.threadId, { ...normalizePageOptions(options), viewerUserId: userId })

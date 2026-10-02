@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatMessageList,
+  ChatParticipantUpdated,
   ChatReceiptUpdated,
   ChatThreadList,
   ChatThreadRead,
@@ -43,6 +44,8 @@ export interface GlobalRealtimeEventHandlerDependencies {
     payload: ChatReceiptUpdated,
     options: { localUserId?: string }
   ) => void
+  /** `chat.participant_updated`: a partner saved a new name or outfit. */
+  applyChatParticipantUpdated?: (participant: ChatParticipantUpdated["participant"]) => void
   /** `chat.typing_updated`: the partner started or stopped typing (transient). */
   applyChatTypingUpdated?: (payload: ChatTypingUpdated) => void
   /** A message arrived: its sender's typing indicator in that thread ends. */
@@ -114,6 +117,14 @@ export function createGlobalRealtimeEventHandler(
       dependencies.applyChatReceiptUpdated?.(event.payload, {
         localUserId: dependencies.currentUserId
       })
+      return
+    }
+
+    if (event.type === "chat.participant_updated") {
+      // Only someone else's identity; this account's own comes from its session.
+      if (event.payload.participant.userId !== dependencies.currentUserId) {
+        dependencies.applyChatParticipantUpdated?.(event.payload.participant)
+      }
       return
     }
 

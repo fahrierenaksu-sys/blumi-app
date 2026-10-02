@@ -92,8 +92,11 @@ export function createPostgresChatRepository(
       )
       const rows = result.rows.slice(0, limit)
       if (rows.length === 0) return { threads: [], nextCursor: null }
+      // The account's current name; the copy stored with the chat is only a
+      // fallback for an account that is gone or has no name.
       const participantRows = await pool.query(
-        `SELECT participant.thread_id, participant.user_id, participant.display_name,
+        `SELECT participant.thread_id, participant.user_id,
+                COALESCE(NULLIF(account.display_name, ''), participant.display_name) AS display_name,
                 account.avatar_preset_id, account.avatar_selection, account.avatar_revision
            FROM blumi_chat_thread_participants AS participant
            LEFT JOIN blumi_accounts AS account ON account.user_id = participant.user_id
@@ -164,6 +167,18 @@ export function createPostgresChatRepository(
         [threadIds]
       )
       return new Set(result.rows.map((row) => String(row.thread_id)))
+    },
+
+    async listChatPartnerUserIds(userId) {
+      const result = await pool.query(
+        `SELECT DISTINCT partner.user_id
+           FROM blumi_chat_thread_participants AS mine
+           JOIN blumi_chat_thread_participants AS partner
+             ON partner.thread_id = mine.thread_id AND partner.user_id <> mine.user_id
+          WHERE mine.user_id = $1`,
+        [userId]
+      )
+      return result.rows.map((row) => String(row.user_id))
     },
 
     async saveThread(thread) {
@@ -673,7 +688,8 @@ async function loadParticipants(
   threadId: string
 ): Promise<ChatThread["participants"]> {
   const result = await pool.query(
-    `SELECT participant.user_id, participant.display_name,
+    `SELECT participant.user_id,
+            COALESCE(NULLIF(account.display_name, ''), participant.display_name) AS display_name,
             account.avatar_preset_id, account.avatar_selection, account.avatar_revision
        FROM blumi_chat_thread_participants AS participant
        LEFT JOIN blumi_accounts AS account

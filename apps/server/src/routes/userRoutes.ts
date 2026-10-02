@@ -37,6 +37,11 @@ import { isAuthError } from "../auth/authErrors"
 import { readProfileUpdateBody } from "./profileUpdateBody"
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import {
+  announceChatParticipantUpdate,
+  type ChatParticipantAnnouncementServices
+} from "../chat/chatParticipantAnnouncement"
+import type { AfterResponseTasks } from "../operations/afterResponseTasks"
 
 export interface UserRouteServices {
   authService: AuthService
@@ -44,6 +49,10 @@ export interface UserRouteServices {
   capabilityService: CapabilityService
   accountRecoveryService?: AccountRecoveryService
   firebaseAuthVerifier?: FirebaseAuthVerifier
+  /** With these, a saved rename or outfit reaches open chats (`chat.participant_updated`). */
+  chatService?: ChatParticipantAnnouncementServices["chatService"]
+  connectionManager?: ChatParticipantAnnouncementServices["connectionManager"]
+  afterResponseTasks?: AfterResponseTasks
 }
 
 const accountChallengeRouteSchema = {
@@ -75,6 +84,13 @@ export async function registerUserRoutes(
   services: UserRouteServices
 ): Promise<void> {
   const { authService, avatarService, capabilityService } = services
+  /** After the response: partners with an open chat see the saved identity. */
+  const announceChatIdentity = (userId: string): void => {
+    const { chatService, connectionManager, afterResponseTasks } = services
+    if (!chatService || !connectionManager || !afterResponseTasks) return
+    afterResponseTasks.run("chat_participant_update", () =>
+      announceChatParticipantUpdate({ authService, chatService, connectionManager }, userId))
+  }
 
   app.post("/v1/account/firebase/challenge", {
     attachValidation: true,
@@ -279,6 +295,9 @@ export async function registerUserRoutes(
       if (!profile) {
         return reply.code(401).send({ error: "Sign in again to continue." })
       }
+      if (update.displayName !== undefined || update.avatarPresetId !== undefined) {
+        announceChatIdentity(profile.userId)
+      }
 
       return { profile }
     } catch (error) {
@@ -349,6 +368,7 @@ export async function registerUserRoutes(
         )
       })
     }
+    announceChatIdentity(resolvedSession.account.userId)
     return {
       avatar: projectAvatarSelectionForRead(
         result.selection,

@@ -13,6 +13,7 @@
 import type {
   ChatMessage,
   ChatMessageList,
+  ChatParticipantSummary,
   ChatPartnerReceipts,
   ChatReceiptUpdated,
   ChatThread,
@@ -102,6 +103,10 @@ let learnedSequenceByThreadId: Map<string, number> = new Map()
 let removedSequenceByThreadId: Map<string, number> = new Map()
 let pendingRealtimeListRequestSequence: number | null = null
 let lastAppliedListRequestSequence = 0
+// `chat.participant_updated`: a partner's current name and outfit. A list
+// reply whose request was issued before the update must not bring back the
+// old name; a list requested after it already carries the new one.
+let participantUpdatesByUserId: Map<string, { sequence: number; participant: ChatParticipantSummary }> = new Map()
 
 /** Marks the issue time of a list request whose reply is applied explicitly. */
 export function beginChatThreadListRequest(): number {
@@ -197,7 +202,10 @@ export function applyChatThreadListed(
       !message.messageId.startsWith("__local_") && (!thread.lastMessage || compareMessageOrder(message, thread.lastMessage) > 0))
     const latestMessage = newerMessages.reduce<ChatMessage | undefined>((latest, message) =>
       !latest || compareMessageOrder(message, latest) > 0 ? message : latest, thread.lastMessage)
-    merged.set(thread.threadId, cloneThread({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }))
+    merged.set(thread.threadId, withParticipantUpdates(
+      cloneThread({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }),
+      listRequestSequence
+    ))
     setPartnerReceipts(thread.threadId, applyReceiptSnapshot(getPartnerReceipts(thread.threadId), thread.partnerReceipts))
     const currentReadAt = readAtByThread.get(thread.threadId)
     if (thread.lastReadAt && (!currentReadAt || Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt))) readAtByThread.set(thread.threadId, thread.lastReadAt)
@@ -210,7 +218,11 @@ export function applyChatThreadListed(
       unreadCounts.set(thread.threadId, activeThreadId === thread.threadId ? 0 : (listReadHere ? 0 : thread.unreadCount) + newlyReceivedUnread)
     }
   }
-  if (!payload.append) unreadCounts = new Map([...unreadCounts].filter(([threadId]) => merged.has(threadId)))
+  if (!payload.append) {
+    unreadCounts = new Map([...unreadCounts].filter(([threadId]) => merged.has(threadId)))
+    participantUpdatesByUserId = new Map([...participantUpdatesByUserId]
+      .filter(([, update]) => update.sequence > lastAppliedListRequestSequence))
+  }
   threadCache = [...merged.values()].sort(
     (a, b) => (b.lastMessage?.sentAt ? Date.parse(b.lastMessage.sentAt) : 0) -
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
@@ -218,6 +230,25 @@ export function applyChatThreadListed(
   threadListState = { status: "ready" }
   threadListVersion += 1
   notify()
+}
+
+/**
+ * `chat.participant_updated`: a partner saved a new name or outfit. Every
+ * conversation with them shows it at once (list row, open chat header); the
+ * conversation itself, its order and unread state stay as they are.
+ */
+export function applyChatParticipantUpdated(participant: ChatParticipantSummary): void {
+  chatEventSequence += 1
+  participantUpdatesByUserId = new Map(participantUpdatesByUserId)
+  participantUpdatesByUserId.set(participant.userId, { sequence: chatEventSequence, participant: cloneParticipant(participant) })
+  let changed = false
+  threadCache = threadCache.map((thread) => {
+    if (!thread.participantUserIds.includes(participant.userId)) return thread
+    const updated = withParticipantUpdates(thread, 0)
+    if (updated !== thread) changed = true
+    return updated
+  })
+  if (changed) notify()
 }
 
 export function applyChatThreadRead(payload: { userId: string; threadId: string; readAt: string }): void {
@@ -300,6 +331,7 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
   forgetPartnerReceipts(removed)
   forgetReadHere(removed)
+  participantUpdatesByUserId = new Map([...participantUpdatesByUserId].filter(([userId]) => userId !== partnerUserId))
   if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
   notify()
   return removedIds
@@ -560,6 +592,7 @@ export function resetChatStore(): void {
   removedSequenceByThreadId = new Map()
   pendingRealtimeListRequestSequence = null
   lastAppliedListRequestSequence = 0
+  participantUpdatesByUserId = new Map()
   notify()
 }
 
@@ -740,6 +773,29 @@ function cloneParticipant(
         }
       : {})
   }
+}
+
+/**
+ * `thread` with the participant updates that are newer than `sequence` laid
+ * over it (the same object when nothing changes). A missing field in an
+ * update keeps what the thread already shows.
+ */
+function withParticipantUpdates(thread: ChatThread, sequence: number): ChatThread {
+  let changed = false
+  const participants = thread.participants.map((participant) => {
+    const update = participantUpdatesByUserId.get(participant.userId)
+    if (!update || update.sequence <= sequence) return participant
+    const displayName = update.participant.displayName ?? participant.displayName
+    const avatar = update.participant.avatar ?? participant.avatar
+    if (displayName === participant.displayName && avatar === participant.avatar) return participant
+    changed = true
+    return cloneParticipant({
+      ...participant,
+      ...(displayName !== undefined ? { displayName } : {}),
+      ...(avatar ? { avatar } : {})
+    })
+  }) as ChatThread["participants"]
+  return changed ? { ...thread, participants } : thread
 }
 
 /** Find a thread for a given partner userId, if the server created one. */

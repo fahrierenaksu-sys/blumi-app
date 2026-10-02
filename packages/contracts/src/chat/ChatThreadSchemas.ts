@@ -217,6 +217,11 @@ export const chatTypingUpdatedSchema = z.object({
   }
 })
 
+/** `chat.participant_updated`: one person's current chat identity. */
+export const chatParticipantUpdatedSchema = z.object({
+  participant: chatParticipantSummarySchema
+})
+
 export const chatPreferencesSchema = z.object({
   readReceiptsEnabled: z.boolean()
 })

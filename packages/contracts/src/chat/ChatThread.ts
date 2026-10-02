@@ -131,6 +131,16 @@ export interface ChatTypingUpdated {
   expiresInMs: number
 }
 
+/**
+ * `chat.participant_updated` (2026-10-02): `participant` saved a new name or
+ * outfit. Sent to the people they have a visible chat with (never across a
+ * block); the next thread read returns the same current identity. Clients
+ * that predate it ignore it and catch up on their next thread list.
+ */
+export interface ChatParticipantUpdated {
+  participant: ChatParticipantSummary;
+}
+
 /** Per-account chat privacy settings. Read receipts are off by default. */
 export interface ChatPreferences {
   readReceiptsEnabled: boolean;

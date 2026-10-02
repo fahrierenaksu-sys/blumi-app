@@ -8,6 +8,7 @@ import { normalizeRoomInviteRecord } from "../features/chat/chatRoomInviteApi"
 import {
   applyChatMessageListed,
   applyChatMessageReceived,
+  applyChatParticipantUpdated,
   applyChatReceiptUpdated,
   applyChatThreadListed,
   applyChatThreadRead,
@@ -212,6 +213,7 @@ export function useGlobalRealtimeSession({
       applyChatMessageReceived,
       acknowledgeDelivery: (message) => deliveryAcks.note(message),
       applyChatReceiptUpdated,
+      applyChatParticipantUpdated,
       applyChatTypingUpdated: chatTypingStore.applyUpdate,
       clearChatTypingForMessage: chatTypingStore.noteMessage,
       openReadyMiniRoom,
