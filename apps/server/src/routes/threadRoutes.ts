@@ -5,10 +5,12 @@ import {
   chatMessageEnvelopeSchema,
   chatMessageListSchema,
   chatThreadEnvelopeSchema,
+  chatThreadHiddenSchema,
   chatThreadListSchema,
   chatThreadReadSchema,
   coreApiJsonSchemas,
   createThreadRequestSchema,
+  hideChatThreadRequestSchema,
   listChatMessagesQuerySchema,
   markThreadReadRequestSchema,
   roomInviteDecisionRequestSchema,
@@ -29,6 +31,8 @@ import {
 import type { AuthService } from "../auth/authService"
 import type { CapabilityService } from "../capabilities/capabilityService"
 import {
+  ChatHideCursorError,
+  ChatHideUnavailableError,
   ChatMessageIdempotencyConflictError,
   ChatReadCursorError,
   type ChatService,
@@ -900,6 +904,59 @@ export async function registerThreadRoutes(
       return reply.code(404).send({
         error: error.message
       })
+    }
+  })
+
+  // "Delete chat for me" (2026-10-02, migration 071). The thread leaves the
+  // caller's list until a newer message arrives, and their history then starts
+  // after the hide point; the partner's view never changes. Before 071 the
+  // answer is 409 CHAT_HIDE_UNAVAILABLE and the app keeps its on-device hide.
+  app.post("/v1/threads/:threadId/hide", {
+    attachValidation: true,
+    config: { requestValidation: "enforced" },
+    schema: { ...threadIdRouteSchema, body: coreApiJsonSchemas.hideChatThread },
+    preValidation: async (request) => {
+      if (request.body === undefined) request.body = {}
+    }
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+
+    const threadId = readParam(request, "threadId")
+    if (!threadId || schemaValidationFailed(request, "params")) {
+      return reply.code(400).send({ error: "Choose a conversation first." })
+    }
+    const parsed = hideChatThreadRequestSchema.safeParse(request.body)
+    if (!parsed.success || schemaValidationFailed(request, "body")) {
+      return reply.code(400).send({ error: "Choose a message to delete through." })
+    }
+
+    const userId = resolved.account.userId
+    try {
+      const hidden = await chatService.hideThreadForMe(
+        userId,
+        threadId,
+        parsed.data.throughMessageId ? { throughMessageId: parsed.data.throughMessageId } : {}
+      )
+      // Hidden messages are read: the caller's devices update their unread counts.
+      services.connectionManager.sendToUser(userId, {
+        type: "chat.thread_read", payload: { userId, threadId, readAt: hidden.readAt }
+      })
+      return parseChatResponse(chatThreadHiddenSchema, {
+        userId,
+        threadId,
+        hiddenThrough: hidden.hiddenThrough,
+        readAt: hidden.readAt
+      })
+    } catch (error) {
+      if (!isPublicRequestError(error)) throw error
+      if (error instanceof ChatHideUnavailableError) {
+        return reply.code(409).send({ code: error.code, error: error.message })
+      }
+      if (error instanceof ChatHideCursorError) {
+        return reply.code(400).send({ code: error.code, error: error.message })
+      }
+      return reply.code(404).send({ error: error.message })
     }
   })
 }

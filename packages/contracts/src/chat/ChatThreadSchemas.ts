@@ -230,6 +230,14 @@ export const chatThreadReadSchema = z.object({
   readAt: isoDateSchema
 })
 
+/** Response of `POST /v1/threads/:threadId/hide`: hidden for `userId` only. */
+export const chatThreadHiddenSchema = z.object({
+  userId: z.string().min(1),
+  threadId: z.string().min(1),
+  hiddenThrough: isoDateSchema,
+  readAt: isoDateSchema
+})
+
 export const chatThreadEnvelopeSchema = z.object({
   thread: chatThreadSchema
 })

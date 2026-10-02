@@ -64,6 +64,9 @@ export interface ChatThreadList {
 
 export interface ChatThreadRead { userId: string; threadId: string; readAt: string; }
 
+/** "Delete chat for me": messages at or before `hiddenThrough` are hidden from `userId` only. */
+export interface ChatThreadHidden { userId: string; threadId: string; hiddenThrough: string; readAt: string; }
+
 export interface ChatMessageList {
   userId: string;
   threadId: string;

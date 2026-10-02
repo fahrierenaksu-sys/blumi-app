@@ -93,6 +93,23 @@ export interface ChatService {
     now?: Date,
     options?: { upToMessageId?: string }
   ): Promise<ChatMarkReadResult>
+  /**
+   * "Delete chat for me" (migration 071): hides the thread from `userId`
+   * through `throughMessageId` (a message of this thread) or its newest
+   * message. Throws ChatHideUnavailableError before 071, so the app keeps
+   * its on-device hide.
+   */
+  hideThreadForMe(
+    userId: string,
+    threadId: string,
+    options?: { throughMessageId?: string }
+  ): Promise<ChatHideForMeResult>
+}
+
+export interface ChatHideForMeResult {
+  hiddenThrough: string
+  /** The reader's unread cursor afterwards (what `chat.thread_read` reports). */
+  readAt: string
 }
 
 export type ChatCheckedSend =
@@ -139,6 +156,26 @@ export class ChatReadCursorError extends PublicRequestError {
   constructor() {
     super("That message is not available.")
     this.name = "ChatReadCursorError"
+  }
+}
+
+/** Migration 071 is not applied yet: the app hides the chat on the device only. */
+export class ChatHideUnavailableError extends PublicRequestError {
+  readonly code = "CHAT_HIDE_UNAVAILABLE"
+
+  constructor() {
+    super("Deleting a chat for you is not available yet.")
+    this.name = "ChatHideUnavailableError"
+  }
+}
+
+/** A hide point must name a message of this thread. */
+export class ChatHideCursorError extends PublicRequestError {
+  readonly code = "CHAT_HIDE_CURSOR_INVALID"
+
+  constructor() {
+    super("That message is not available.")
+    this.name = "ChatHideCursorError"
   }
 }
 
@@ -207,7 +244,7 @@ export function createChatService(
     async listThreadsPage(userId, options) { return listVisibleThreadsPage(userId, options) },
     async listMessages(userId, threadId, options = {}) {
       const thread = await getVisibleThread(userId, threadId)
-      return repository.listMessages(thread.threadId, normalizePageOptions(options))
+      return repository.listMessages(thread.threadId, { ...normalizePageOptions(options), viewerUserId: userId })
     },
     async findIdempotentMessage(userId, threadId, body, clientMessageId) {
       const thread = await getParticipantThread(repository, userId, threadId)
@@ -310,6 +347,21 @@ export function createChatService(
         ...(advanced.readUpTo ? { readUpTo: advanced.readUpTo } : {}),
         participantUserIds: [...thread.participantUserIds] as [string, string]
       }
+    },
+    async hideThreadForMe(userId, threadId, options = {}) {
+      const thread = await getVisibleThread(userId, threadId)
+      if (!await repository.supportsHide()) throw new ChatHideUnavailableError()
+      const throughMessageId = options.throughMessageId?.trim()
+      const hidden = await repository.hideThreadForParticipant({
+        threadId: thread.threadId,
+        userId,
+        ...(throughMessageId ? { throughMessageId } : {})
+      })
+      if (!hidden) {
+        if (throughMessageId) throw new ChatHideCursorError()
+        throw new PublicRequestError(CONVERSATION_NOT_AVAILABLE)
+      }
+      return hidden
     }
   }
 }

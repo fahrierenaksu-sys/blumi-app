@@ -177,6 +177,10 @@ const BODYLESS = new Set([
   // to now, the route's normal effect. Its body contract is pinned in
   // chatReceiptRoutes.test.ts.
   "POST /v1/threads/:threadId/read",
+  // Optional body (2026-10-02): absent or stripped of unknown keys it hides
+  // through the newest message, the route's normal effect. Its body contract
+  // is pinned in chatHideRoutes.test.ts.
+  "POST /v1/threads/:threadId/hide",
   "POST /v1/threads/:threadId/room-invites",
   "POST /v1/economy/rewards/daily",
   "POST /v1/referrals/invite",

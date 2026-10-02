@@ -80,6 +80,15 @@ export const markThreadReadRequestSchema = z.object({
   upToMessageId: nonEmptyString.max(256).optional()
 }).strict()
 
+/**
+ * Optional body of `POST /v1/threads/:threadId/hide` ("delete chat for me",
+ * 2026-10-02, migration 071). `throughMessageId` is the newest message the
+ * device showed; without it the server hides through the newest message.
+ */
+export const hideChatThreadRequestSchema = z.object({
+  throughMessageId: nonEmptyString.max(256).optional()
+}).strict()
+
 export const chatPreferencesUpdateRequestSchema = z.object({
   readReceiptsEnabled: z.boolean()
 }).strict()
@@ -303,6 +312,13 @@ export const coreApiJsonSchemas = {
     },
     additionalProperties: false
   },
+  hideChatThread: {
+    type: "object",
+    properties: {
+      throughMessageId: { ...trimmedStringJsonSchema, maxLength: 256 }
+    },
+    additionalProperties: false
+  },
   chatPreferences: {
     type: "object",
     required: ["readReceiptsEnabled"],
@@ -476,6 +492,7 @@ export type PersonalRoomDecorSaveRequest = z.infer<typeof personalRoomDecorSaveR
 export type CreateThreadRequest = z.infer<typeof createThreadRequestSchema>
 export type SendChatMessageRequest = z.infer<typeof sendChatMessageRequestSchema>
 export type MarkThreadReadRequest = z.infer<typeof markThreadReadRequestSchema>
+export type HideChatThreadRequest = z.infer<typeof hideChatThreadRequestSchema>
 export type ChatPreferencesUpdateRequest = z.infer<typeof chatPreferencesUpdateRequestSchema>
 export type RoomInviteDecisionRequest = z.infer<typeof roomInviteDecisionRequestSchema>
 export type OnboardingStepRequest = z.infer<typeof onboardingStepRequestSchema>
