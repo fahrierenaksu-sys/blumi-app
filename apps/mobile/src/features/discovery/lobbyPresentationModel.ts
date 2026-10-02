@@ -7,17 +7,8 @@ import {
   type DiscoveryCandidate
 } from "./discoveryCandidateModel"
 
-export function areDiscoverVibesEqual(
-  left: readonly string[],
-  right: readonly string[]
-): boolean {
-  if (left.length !== right.length) return false
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) return false
-  }
-  return true
-}
-
+// Counts only what the filters sheet shows. Saved vibes are neither shown nor
+// used by the server to narrow the deck, so they never count.
 export function countActiveDiscoverFilters(filters: DiscoveryFilters): number {
   let count = 0
   if (
@@ -27,9 +18,6 @@ export function countActiveDiscoverFilters(filters: DiscoveryFilters): number {
     count += 1
   }
   if (filters.genders.length > 0) count += 1
-  if (!areDiscoverVibesEqual(filters.vibes, DEFAULT_DISCOVERY_FILTERS.vibes)) {
-    count += 1
-  }
   return count
 }
 

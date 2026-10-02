@@ -19,12 +19,13 @@ test("discovery filter count only reports changed filter groups", () => {
     }),
     2
   )
+  // Saved vibes are not shown in the sheet and do not filter, so no badge.
   assert.equal(
     countActiveDiscoverFilters({
       ...DEFAULT_DISCOVERY_FILTERS,
       vibes: ["Bookish"]
     }),
-    1
+    0
   )
 })
 
