@@ -117,20 +117,31 @@ const fakeAvatarPositions = {
     position.x.value = point.x
     position.y.value = point.y
   },
-  createMiniRoomSegmentAnimator: (position: FakePosition) => {
+  createMiniRoomPathAnimator: (position: FakePosition) => {
     let timer: ReturnType<typeof setTimeout> | undefined
     return {
-      animate(segment: { from: { x: number; y: number }; to: { x: number; y: number }; durationMs: number }, onComplete: () => void) {
+      animate(
+        segments: readonly { from: { x: number; y: number }; to: { x: number; y: number }; durationMs: number }[],
+        onSegmentEnd: (index: number) => void
+      ) {
         if (timer) clearTimeout(timer)
-        const durationMs = segment.durationMs * WALK_TIME_SCALE
-        position.walk = { from: segment.from, to: segment.to, startedAt: Date.now(), durationMs }
-        timer = setTimeout(() => {
-          timer = undefined
-          position.walk = undefined
-          position.x.value = segment.to.x
-          position.y.value = segment.to.y
-          onComplete()
-        }, durationMs)
+        // As the UI thread: each segment follows the last at once, and JS
+        // only hears about it afterwards.
+        const walk = (index: number) => {
+          const segment = segments[index]
+          if (!segment) return
+          const durationMs = segment.durationMs * WALK_TIME_SCALE
+          position.walk = { from: segment.from, to: segment.to, startedAt: Date.now(), durationMs }
+          timer = setTimeout(() => {
+            timer = undefined
+            position.walk = undefined
+            position.x.value = segment.to.x
+            position.y.value = segment.to.y
+            walk(index + 1)
+            onSegmentEnd(index)
+          }, durationMs)
+        }
+        walk(0)
       },
       cancel() {
         if (timer) clearTimeout(timer)

@@ -29,7 +29,7 @@ import { withMiniRoomPresence } from "./miniRoomPresentation"
 import type { RoomShellEntry } from "../../roomV2/roomV2.types"
 import {
   createMiniRoomAvatarPosition,
-  createMiniRoomSegmentAnimator,
+  createMiniRoomPathAnimator,
   readMiniRoomAvatarPosition,
   snapMiniRoomAvatarPosition,
   type MiniRoomAvatarPosition
@@ -42,7 +42,7 @@ import {
 import {
   startMiniRoomMovementRun,
   type MiniRoomMovementRun,
-  type MiniRoomSegmentAnimator
+  type MiniRoomPathAnimator
 } from "./miniRoomMovementRun"
 import {
   EMPTY_MINI_ROOM_SPEECH_STACK,
@@ -89,7 +89,7 @@ function cancelMiniRoomMovementRun(run: MiniRoomMovementRun): void {
 
 interface MiniRoomAvatarMotionDriver {
   position: MiniRoomAvatarPosition
-  animator: MiniRoomSegmentAnimator
+  animator: MiniRoomPathAnimator
 }
 
 interface MoveOptions {
@@ -160,7 +160,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const existing = motionDrivers.get(avatar.userId)
     if (existing) return existing
     const position = createMiniRoomAvatarPosition(avatar)
-    const driver = { position, animator: createMiniRoomSegmentAnimator(position) }
+    const driver = { position, animator: createMiniRoomPathAnimator(position) }
     motionDrivers.set(avatar.userId, driver)
     return driver
   }, [motionDrivers])
