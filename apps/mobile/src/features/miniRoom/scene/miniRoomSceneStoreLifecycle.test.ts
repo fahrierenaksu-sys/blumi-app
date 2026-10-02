@@ -14,6 +14,7 @@ function mount() {
   const cancelledDrivers: unknown[] = []
   const timers = new Map<number, { run: () => void; delay: number }>()
   let timerId = 0
+  const clock = { now: 1_000 }
   const { cozyPinkBedroomScene } = loadSourceWithFakeReact<{ cozyPinkBedroomScene: unknown }>(
     "features/miniRoom/scene/roomMaps.ts",
     runtime,
@@ -45,7 +46,7 @@ function mount() {
         "../../roomWorld/roomWorldRuntime",
         "./miniRoomMovementLifecycle",
         "./miniRoomMovementRun",
-        "./miniRoomSpeechQueue",
+        "./miniRoomSpeechStack",
         "./miniRoomSeatRefusalModel"
       ],
       globals: {
@@ -54,7 +55,8 @@ function mount() {
           timers.set(timerId, { run, delay })
           return timerId
         },
-        clearTimeout: (id: number) => { timers.delete(id) }
+        clearTimeout: (id: number) => { timers.delete(id) },
+        Date: { now: () => clock.now }
       }
     }
   )
@@ -72,7 +74,7 @@ function mount() {
     return runtime.render(() => useMiniRoomSceneStore({ ...input }))
   }
   const store = () => runtime.output as MiniRoomStore
-  return { runtime, timers, render, store, cancelledDrivers }
+  return { runtime, timers, render, store, cancelledDrivers, clock }
 }
 
 test("both avatars walk concurrently; retargeting one cancels only its own UI-thread driver", () => {
@@ -235,28 +237,57 @@ test("speech uses the current bubble lifetime", () => {
   assert.equal(bubble.expiresAt - bubble.createdAt, 9000)
 })
 
-test("a burst shows the newest bubble immediately without accumulating timers", () => {
+/** Fires the one pending bubble-expiry timer (the one armed with the bubble lifetime or less). */
+function fireBubbleTimer(f: ReturnType<typeof mount>, at: number) {
+  f.clock.now = at
+  const pending = [...f.timers.entries()].filter(([, timer]) => timer.delay !== 1200)
+  assert.equal(pending.length, 1, "one timer serves every bubble")
+  const [id, timer] = pending[0]!
+  f.timers.delete(id)
+  timer.run()
+}
+
+test("a second line before the first ends stacks under it, and each leaves on its own timer", () => {
   const f = mount()
   f.render()
+  f.clock.now = 10_000
   f.store().sayPhrase("partner", "First")
-  f.store().sayPhrase("local", "Second")
-  const firstId = f.store().bubbles[0].id
-  f.store().sayPhrase("partner", "Third")
-  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Third"])
-  assert.equal(f.timers.size, 2)
-  f.store().dismissSpeechBubble(firstId)
-  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Third"])
+  f.clock.now = 11_500
+  f.store().sayPhrase("partner", "Second")
+  // Oldest first: drawn top to bottom, so the newest sits next to the chibi.
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["First", "Second"])
+  assert.deepEqual(f.store().bubbles.map(({ expiresAt }) => expiresAt), [14_000, 15_500])
+  const second = f.store().bubbles[1]
+
+  fireBubbleTimer(f, 14_000)
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Second"])
+  assert.equal(f.store().bubbles[0], second, "the line that stays keeps its identity (no replayed pop)")
+  fireBubbleTimer(f, 15_500)
+  assert.deepEqual(f.store().bubbles, [])
+  assert.equal([...f.timers.values()].filter(({ delay }) => delay !== 1200).length, 0)
   f.runtime.unmount()
   assert.equal(f.timers.size, 0)
 })
 
-test("a replaced speaker leaves speaking state and the new speaker starts immediately", () => {
+test("both partners speaking at the same moment keep both bubbles and both speak", () => {
   const f = mount()
   f.render()
-  f.store().sayPhrase("partner", "First")
-  f.store().sayPhrase("local", "Second")
-  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Second"])
-  assert.equal(f.store().avatars.partner.motion, "idle")
+  f.store().sayPhrase("local", "Mine")
+  f.store().sayPhrase("partner", "Theirs")
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Mine", "Theirs"])
   assert.equal(f.store().avatars.local.motion, "speaking")
+  assert.equal(f.store().avatars.partner.motion, "speaking")
+  // Bubble expiry plus one speech-motion timer per speaker: nothing accumulates.
+  assert.equal(f.timers.size, 3)
+  f.store().sayPhrase("partner", "Again")
+  assert.equal(f.timers.size, 3)
+
+  const mine = f.store().bubbles[0]!
+  f.store().dismissSpeechBubble(mine.id)
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Theirs", "Again"])
+  assert.equal(f.store().avatars.local.motion, "idle", "a speaker whose last line left stops speaking")
+  f.store().dismissSpeechBubble(mine.id)
+  assert.deepEqual(f.store().bubbles.map(({ body }) => body), ["Theirs", "Again"], "a stale dismiss is ignored")
   f.runtime.unmount()
+  assert.equal(f.timers.size, 0)
 })

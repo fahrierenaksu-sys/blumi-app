@@ -42,10 +42,15 @@ import {
   type MiniRoomSegmentAnimator
 } from "./miniRoomMovementRun"
 import {
-  createMiniRoomSpeechQueue,
+  EMPTY_MINI_ROOM_SPEECH_STACK,
   dismissMiniRoomSpeech,
-  enqueueMiniRoomSpeech
-} from "./miniRoomSpeechQueue"
+  expireMiniRoomSpeech,
+  hasMiniRoomSpeechFrom,
+  nextMiniRoomSpeechExpiry,
+  pushMiniRoomSpeech,
+  type MiniRoomSpeech,
+  type MiniRoomSpeechStack
+} from "./miniRoomSpeechStack"
 import type {
   AvatarFacing,
   AvatarState,
@@ -166,10 +171,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   }, [])
   const movementCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bubbleCounterRef = useRef(0)
-  const speechQueueRef = useRef(createMiniRoomSpeechQueue())
-  const activeBubbleRef = useRef<SpeechBubble | null>(null)
+  // Every visible line (per-speaker stacks); one timer ends the next line.
+  const speechRef = useRef<MiniRoomSpeechStack>(EMPTY_MINI_ROOM_SPEECH_STACK)
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const showNextSpeechBubbleRef = useRef<() => void>(() => undefined)
+  const publishSpeechRef = useRef<(next: MiniRoomSpeechStack) => void>(() => undefined)
   const speechMotionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   useEffect(() => {
@@ -194,8 +199,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     setSceneEpoch((epoch) => epoch + 1)
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     bubbleTimerRef.current = null
-    speechQueueRef.current = createMiniRoomSpeechQueue()
-    activeBubbleRef.current = null
+    speechRef.current = EMPTY_MINI_ROOM_SPEECH_STACK
     setBubbles([])
     for (const timer of speechMotionTimersRef.current.values()) clearTimeout(timer)
     speechMotionTimersRef.current.clear()
@@ -230,8 +234,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       speechMotionTimers.clear()
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
       bubbleTimerRef.current = null
-      speechQueueRef.current = createMiniRoomSpeechQueue()
-      activeBubbleRef.current = null
+      speechRef.current = EMPTY_MINI_ROOM_SPEECH_STACK
     }
   }, [])
 
@@ -561,96 +564,63 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     })
   }, [])
 
-  const finishActiveSpeechBubble = useCallback((): void => {
-    const activeBubble = activeBubbleRef.current
-    if (!activeBubble) return
+  /**
+   * Shows `next` and arms one timer for the line that ends first. A speaker
+   * whose last line left stops speaking.
+   */
+  const publishSpeech = useCallback((next: MiniRoomSpeechStack): void => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
     bubbleTimerRef.current = null
-    activeBubbleRef.current = null
-    speechQueueRef.current = dismissMiniRoomSpeech(
-      speechQueueRef.current,
-      activeBubble.id,
-      Date.now()
-    )
-    setBubbles([])
-    returnAvatarToIdle(activeBubble.speakerUserId)
-    showNextSpeechBubbleRef.current()
+    const previous = speechRef.current
+    speechRef.current = next
+    if (next !== previous) {
+      setBubbles(next.map(toSpeechBubble))
+      for (const speakerUserId of new Set(previous.map((line) => line.speakerUserId))) {
+        if (!hasMiniRoomSpeechFrom(next, speakerUserId)) returnAvatarToIdle(speakerUserId)
+      }
+    }
+    const expiry = nextMiniRoomSpeechExpiry(next)
+    if (expiry === undefined) return
+    bubbleTimerRef.current = setTimeout(() => {
+      bubbleTimerRef.current = null
+      publishSpeechRef.current(expireMiniRoomSpeech(speechRef.current, Date.now()))
+    }, Math.max(0, expiry - Date.now()))
   }, [returnAvatarToIdle])
-
-  const showNextSpeechBubble = useCallback((): void => {
-    const next = speechQueueRef.current.active
-    if (!next) return
-    const previous = activeBubbleRef.current
-    if (previous?.id === next.key) return
-    if (previous) {
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
-      returnAvatarToIdle(previous.speakerUserId)
-    }
-    const bubble: SpeechBubble = {
-      id: next.key,
-      speakerUserId: next.speakerUserId,
-      body: next.body,
-      tone: "chat",
-      createdAt: next.startedAt,
-      expiresAt: next.expiresAt
-    }
-    activeBubbleRef.current = bubble
-    setBubbles([bubble])
-
-    setAvatars((current) => {
-      const avatar = current[next.speakerUserId]
-      if (!avatar) return current
-      if (avatar.motion === "sitting") return current
-      return {
-        ...current,
-        [next.speakerUserId]: { ...avatar, motion: "speaking" }
-      }
-    })
-
-    const previousTimer = speechMotionTimersRef.current.get(next.speakerUserId)
-    if (previousTimer) clearTimeout(previousTimer)
-
-    const timer = setTimeout(() => {
-      if (speechMotionTimersRef.current.get(next.speakerUserId) === timer) {
-        speechMotionTimersRef.current.delete(next.speakerUserId)
-      }
-      setAvatars((current) => {
-        const avatar = current[next.speakerUserId]
-        if (!avatar || avatar.motion !== "speaking") return current
-        return {
-          ...current,
-          [next.speakerUserId]: { ...avatar, motion: "idle" }
-        }
-      })
-    }, 1200)
-    speechMotionTimersRef.current.set(next.speakerUserId, timer)
-
-    bubbleTimerRef.current = setTimeout(
-      () => { if (activeBubbleRef.current?.id === bubble.id) finishActiveSpeechBubble() },
-      Math.max(0, next.expiresAt - Date.now())
-    )
-  }, [finishActiveSpeechBubble, returnAvatarToIdle])
-  // finishActiveSpeechBubble reaches this callback through the ref; it is set
-  // at commit, before any effect or timer can finish a bubble.
+  // The expiry timer reaches the latest callback through the ref; it is set at
+  // commit, before any timer can fire.
   useLayoutEffect(() => {
-    showNextSpeechBubbleRef.current = showNextSpeechBubble
-  }, [showNextSpeechBubble])
+    publishSpeechRef.current = publishSpeech
+  }, [publishSpeech])
 
   const addSpeechBubble = useCallback<MiniRoomStore["addSpeechBubble"]>((bubble) => {
     const now = Date.now()
-    const key = `bubble_${++bubbleCounterRef.current}_${now}`
-    speechQueueRef.current = enqueueMiniRoomSpeech(
-      speechQueueRef.current,
-      {
-        key,
-        speakerUserId: bubble.speakerUserId,
-        body: bubble.body,
-        lifetimeMs: bubbleLifetimeMs
-      },
-      now
-    )
-    showNextSpeechBubbleRef.current()
-  }, [bubbleLifetimeMs])
+    const speakerUserId = bubble.speakerUserId
+    publishSpeech(pushMiniRoomSpeech(speechRef.current, {
+      key: `bubble_${++bubbleCounterRef.current}_${now}`,
+      speakerUserId,
+      body: bubble.body,
+      lifetimeMs: bubbleLifetimeMs
+    }, now))
+
+    setAvatars((current) => {
+      const avatar = current[speakerUserId]
+      if (!avatar || avatar.motion === "sitting") return current
+      return { ...current, [speakerUserId]: { ...avatar, motion: "speaking" } }
+    })
+    const previousTimer = speechMotionTimersRef.current.get(speakerUserId)
+    if (previousTimer) clearTimeout(previousTimer)
+    const timer = setTimeout(() => {
+      if (speechMotionTimersRef.current.get(speakerUserId) === timer) {
+        speechMotionTimersRef.current.delete(speakerUserId)
+      }
+      setAvatars((current) => {
+        const avatar = current[speakerUserId]
+        if (!avatar || avatar.motion !== "speaking") return current
+        return { ...current, [speakerUserId]: { ...avatar, motion: "idle" } }
+      })
+    }, 1200)
+    speechMotionTimersRef.current.set(speakerUserId, timer)
+  }, [bubbleLifetimeMs, publishSpeech])
 
   const sayPhrase = useCallback<MiniRoomStore["sayPhrase"]>(
     (userId, body, tone = "chat") => {
@@ -661,10 +631,9 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
 
   const dismissSpeechBubble = useCallback<MiniRoomStore["dismissSpeechBubble"]>(
     (bubbleId) => {
-      if (activeBubbleRef.current?.id !== bubbleId) return
-      finishActiveSpeechBubble()
+      publishSpeech(dismissMiniRoomSpeech(speechRef.current, bubbleId))
     },
-    [finishActiveSpeechBubble]
+    [publishSpeech]
   )
 
   useEffect(() => {
@@ -729,6 +698,25 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     sayPhrase,
     dismissSpeechBubble
   }
+}
+
+/** One bubble object per line, so a line that stays keeps its identity. */
+const speechBubbles = new WeakMap<MiniRoomSpeech, SpeechBubble>()
+
+function toSpeechBubble(line: MiniRoomSpeech): SpeechBubble {
+  let bubble = speechBubbles.get(line)
+  if (!bubble) {
+    bubble = {
+      id: line.key,
+      speakerUserId: line.speakerUserId,
+      body: line.body,
+      tone: "chat",
+      createdAt: line.startedAt,
+      expiresAt: line.expiresAt
+    }
+    speechBubbles.set(line, bubble)
+  }
+  return bubble
 }
 
 function createMiniRoomOccupants(

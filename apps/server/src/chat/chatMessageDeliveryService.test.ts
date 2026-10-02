@@ -449,6 +449,91 @@ test("a slow dispatch of one message never lets the sender's next message overta
   assert.deepEqual(delivered, ["first", "second"])
 })
 
+test("partners sending at the same moment both reach the sockets at once, without waiting on each other's push or outbox work", async () => {
+  // Owner report 2026-10-02: in a shared room, when both typed together the
+  // second bubble reached the other phone late. Its fan-out waited in the
+  // thread's outbox chain behind the first message's push enqueue and outbox
+  // completion (several database round trips).
+  const store = createInMemoryChatStore()
+  const repository = createInMemoryChatRepository(store)
+  let releaseCompletion!: () => void
+  const completionGate = new Promise<void>((resolve) => { releaseCompletion = resolve })
+  const completeDelivery = repository.completeDelivery.bind(repository)
+  repository.completeDelivery = async (...args) => {
+    await completionGate
+    await completeDelivery(...args)
+  }
+  let nextMessageId = 0
+  const chatService = createChatService({ repository, idFactory: () => `message_${++nextMessageId}` })
+  await createThread(chatService)
+  let releasePush!: () => void
+  const pushGate = new Promise<void>((resolve) => { releasePush = resolve })
+  const delivered: string[] = []
+  const pushes: string[] = []
+  const connectionManager = {
+    async sendToUsersDurably(_userIds: readonly string[], event: ServerEvent) {
+      if (event.type === "chat.message_received") delivered.push(event.payload.body)
+    },
+    hasUserConnections: () => true
+  } as unknown as ConnectionManager
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService: createSafetyService(),
+    connectionManager,
+    notificationService: {
+      async sendPushToUser(userId: string) {
+        await pushGate
+        pushes.push(userId)
+      }
+    } as unknown as NotificationService
+  })
+
+  await Promise.all([
+    delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "from a" }),
+    delivery.sendMessage({ senderUserId: "user_b", threadId: "thread_one", body: "from b" })
+  ])
+  await waitFor(() => delivered.length === 2)
+  assert.deepEqual(delivered, ["from a", "from b"], "live order is persist order")
+  assert.deepEqual(pushes, [], "neither fan-out waited for a push enqueue")
+
+  releasePush()
+  releaseCompletion()
+  // Durability is unchanged: both are pushed once and their outbox jobs settle,
+  // and the outbox dispatch does not fan out a second time.
+  await waitFor(() => store.deliveryJobs.get("message_1")?.completed === true &&
+    store.deliveryJobs.get("message_2")?.completed === true)
+  assert.deepEqual(pushes.sort(), ["user_a", "user_b"])
+  assert.equal(delivered.length, 2)
+})
+
+test("a live fan-out that fails leaves the outbox job to be retried", async () => {
+  const store = createInMemoryChatStore()
+  const chatService = createChatService({
+    repository: createInMemoryChatRepository(store),
+    idFactory: () => "message_live_failed"
+  })
+  await createThread(chatService)
+  let attempts = 0
+  const delivery = createChatMessageDeliveryService({
+    chatService,
+    safetyService: createSafetyService(),
+    connectionManager: {
+      async sendToUsersDurably() {
+        attempts += 1
+        if (attempts === 1) throw new Error("fanout unavailable")
+      },
+      hasUserConnections: () => true
+    } as unknown as ConnectionManager,
+    notificationService: { async sendPushToUser() {} } as unknown as NotificationService
+  })
+  await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "hello" })
+  await waitFor(() => store.deliveryJobs.get("message_live_failed")?.leaseToken === undefined)
+  assert.equal(store.deliveryJobs.get("message_live_failed")?.completed, undefined)
+  await delivery.dispatchDue(new Date(Date.now() + 60_000))
+  assert.equal(attempts, 2)
+  assert.equal(store.deliveryJobs.get("message_live_failed")?.completed, true)
+})
+
 test("the recovery worker delivers a thread's messages in message order and never waits on a slow thread", async () => {
   // After a restart or a lost lease the worker recovers the outbox. A claim
   // takes only a thread's oldest undelivered message, so a retried first
@@ -527,7 +612,7 @@ test("input the one-statement send refuses keeps its answers behind the conversa
   assert.deepEqual(await chatService.repository.listMessages("thread_one"), [])
 })
 
-test("a leased dispatch that waited renews its lease, and one whose lease the worker took is delivered once, by the worker", async () => {
+test("a leased dispatch that waited renews its lease, and one whose lease the worker took is delivered by the worker, never again inline", async () => {
   const store = createInMemoryChatStore()
   const repository = createInMemoryChatRepository(store)
   const renewals: boolean[] = []
@@ -580,11 +665,14 @@ test("a leased dispatch that waited renews its lease, and one whose lease the wo
   // Message 3 was sent behind the undelivered message 2, so it was not
   // leased: the worker's tick drains the thread in order.
   await worker.dispatchDue(new Date())
-  assert.deepEqual(delivered, ["message_1", "worker:message_2", "worker:message_3"])
+  // Each send reached the sockets live, at once; the worker cannot know that
+  // and delivers again (at least once: phones deduplicate by message ID).
+  const expected = ["message_1", "message_2", "message_3", "worker:message_2", "worker:message_3"]
+  assert.deepEqual(delivered, expected)
   await new Promise<void>((resolve) => setTimeout(resolve, 300))
   releaseFirst()
   await new Promise<void>((resolve) => setTimeout(resolve, 50))
-  assert.deepEqual(delivered, ["message_1", "worker:message_2", "worker:message_3"], "nothing is delivered again inline")
+  assert.deepEqual(delivered, expected, "nothing is delivered again inline")
   assert.deepEqual(renewals, [false], "the waiting job renews first; the lost lease is not used")
   assert.equal(store.deliveryJobs.get("message_3")?.completed, true)
 })
@@ -625,12 +713,14 @@ test("a leased dispatch that waited behind its thread renews its lease and deliv
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "first" })
   await waitFor(() => store.deliveryJobs.get("message_1")?.completed === true)
   await delivery.sendMessage({ senderUserId: "user_a", threadId: "thread_one", body: "second" })
-  await new Promise<void>((resolve) => setTimeout(resolve, 300))
-  releaseFirst()
+  // The live fan-out does not wait for the busy chain; the outbox job does.
   await waitFor(() => delivered.length === 2)
+  await new Promise<void>((resolve) => setTimeout(resolve, 300))
+  assert.equal(store.deliveryJobs.get("message_2")?.completed, undefined)
+  releaseFirst()
+  await waitFor(() => store.deliveryJobs.get("message_2")?.completed === true)
   assert.deepEqual(delivered, ["message_1", "message_2"])
   assert.deepEqual(renewals, [true])
-  await waitFor(() => store.deliveryJobs.get("message_2")?.completed === true)
 })
 
 async function createThread(chatService: ReturnType<typeof createChatService>) {

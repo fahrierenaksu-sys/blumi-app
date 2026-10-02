@@ -214,7 +214,7 @@ function createPhone(input: {
       "../../roomWorld/roomWorldRuntime",
       "./miniRoomMovementLifecycle",
       "./miniRoomMovementRun",
-      "./miniRoomSpeechQueue",
+      "./miniRoomSpeechStack",
       "./miniRoomSeatRefusalModel"
     ]
   })

@@ -23,6 +23,7 @@ async function fixture(poisonMessageId: string) {
     ]
   })
   const delivered: string[] = []
+  const pushed: string[] = []
   const deadLetters: ChatDeliveryDeadLetter[] = []
   let failures = 0
   const delivery = createChatMessageDeliveryService({
@@ -38,11 +39,13 @@ async function fixture(poisonMessageId: string) {
       },
       hasUserConnections: () => false
     } as unknown as ConnectionManager,
-    notificationService: { async sendPushToUser() {} } as unknown as NotificationService,
+    notificationService: {
+      async sendPushToUser(_userId: string, push: { data: { messageId: string } }) { pushed.push(push.data.messageId) }
+    } as unknown as NotificationService,
     reportError: () => {},
     reportDeadLetter: (event) => { deadLetters.push(event) }
   })
-  return { chatService, delivery, delivered, deadLetters, failures: () => failures }
+  return { chatService, delivery, delivered, pushed, deadLetters, failures: () => failures }
 }
 
 async function settle() {
@@ -50,20 +53,26 @@ async function settle() {
 }
 
 test("a message that keeps failing is dead-lettered and stops holding its thread back", async () => {
-  const { delivery, delivered, deadLetters, failures } = await fixture("message_poison")
+  const { delivery, delivered, pushed, deadLetters, failures } = await fixture("message_poison")
   await delivery.sendMessage({ senderUserId: "user_sender", threadId: "thread_private", body: "private body secret words" })
   await delivery.sendMessage({ senderUserId: "user_sender", threadId: "thread_private", body: "the next one" })
   await settle()
-  assert.equal(delivered.length, 0, "the later message waits behind the failing one")
+  // The live fan-out goes ahead of the outbox, so open sockets already have
+  // the later message; its outbox job (push) waits behind the failing one.
+  assert.deepEqual(delivered, ["message_after"])
+  assert.equal(pushed.length, 0, "the later outbox job waits behind the failing one")
 
   let clock = Date.now()
-  for (let round = 0; round < MAX_CHAT_DELIVERY_ATTEMPTS + 3 && !delivered.includes("message_after"); round += 1) {
+  for (let round = 0; round < MAX_CHAT_DELIVERY_ATTEMPTS + 3 && !pushed.includes("message_after"); round += 1) {
     clock += 61_000
     await delivery.dispatchDue(new Date(clock))
     await settle()
   }
   assert.equal(failures(), MAX_CHAT_DELIVERY_ATTEMPTS)
-  assert.deepEqual(delivered, ["message_after"])
+  // The outbox worker fans the later message out again when its own job runs
+  // after the dead letter; clients merge by message ID, so that is harmless.
+  assert.deepEqual([...new Set(delivered)], ["message_after"], "the poison message never reaches a socket")
+  assert.deepEqual(pushed, ["message_after"])
   assert.deepEqual(deadLetters, [{ reason: "attempts_exhausted", attempts: MAX_CHAT_DELIVERY_ATTEMPTS, errorKind: "TypeError", count: 1 }])
 
   // Terminal: never claimed again.
