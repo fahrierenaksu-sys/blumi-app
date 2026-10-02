@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useState, type RefObject } from "react"
+import { useRef, useState, type RefObject } from "react"
 import { Pressable, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
@@ -10,6 +10,7 @@ import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
 import type { ChatThreadCopy } from "./chatThreadCopy"
+import { reconcileComposerTextAfterSend } from "./chatComposerDraftModel"
 import { styles } from "./chatThreadStyles"
 import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 
@@ -50,6 +51,12 @@ export function ChatComposer({
   surfaceRef?: RefObject<View | null>
 }) {
   const [inputText, setInputText] = useState("")
+  const inputRef = useRef<TextInput>(null)
+  // The draft of the last send while a late keystroke may still bring it
+  // back (chatComposerDraftModel); null otherwise.
+  const sentDraftRef = useRef<string | null>(null)
+  // What the input shows, also between a send and the next render.
+  const shownTextRef = useRef("")
   const motion = useMotion()
   // The press itself is PressableScale's (the shared `press` token); this
   // outer scale only carries the post-send pop, so the two never fight.
@@ -61,8 +68,23 @@ export function ChatComposer({
     const body = inputText.trim()
     if (!body || isPendingThread) return false
     if (!onSend(body)) return false
+    sentDraftRef.current = inputText
+    shownTextRef.current = ""
+    // The native clear empties the field in this frame; the state follows.
+    inputRef.current?.clear()
     setInputText("")
     return true
+  }
+
+  const handleChangeText = (next: string) => {
+    const reconciled = reconcileComposerTextAfterSend({
+      next,
+      current: shownTextRef.current,
+      sentDraft: sentDraftRef.current
+    })
+    sentDraftRef.current = reconciled.sentDraft
+    shownTextRef.current = reconciled.text
+    setInputText(reconciled.text)
   }
 
   // An accepted send answers with a small pop back to rest; Reduce Motion
@@ -98,10 +120,11 @@ export function ChatComposer({
         </Pressable>
         <View ref={surfaceRef} style={styles.inputWrap}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel={chatCopy.messageAccessibilityLabel(partnerName)}
             style={styles.input}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleChangeText}
             onChange={draftTyping ? (event) => draftTyping.noteDraft(event.nativeEvent.text) : undefined}
             onBlur={draftTyping?.endDraft}
             placeholder={chatCopy.messagePlaceholder}

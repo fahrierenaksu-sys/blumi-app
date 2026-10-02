@@ -262,19 +262,30 @@ test("load earlier ignores taps while loading, without history, or without a thr
   }
 })
 
-test("composer clears only accepted sends and submits trimmed text", () => {
+test("composer clears only accepted sends, at once on the native input, and submits trimmed text", () => {
   for (const accepted of [false, true]) {
     const submitted = []
     const stateWrites = []
+    let nativeClears = 0
+    const sentDraftRef = { current: null }
+    const shownTextRef = { current: "  hello  " }
     const send = composerExpression("handleSend", {
       inputText: "  hello  ",
       isPendingThread: false,
       onSend: (body) => { submitted.push(body); return accepted },
-      setInputText: (value) => stateWrites.push(value)
+      setInputText: (value) => stateWrites.push(value),
+      inputRef: { current: { clear: () => { nativeClears += 1 } } },
+      sentDraftRef,
+      shownTextRef
     })
     send()
     assert.deepEqual(submitted, ["hello"])
     assert.deepEqual(stateWrites, accepted ? [""] : [])
+    assert.equal(nativeClears, accepted ? 1 : 0)
+    // An accepted send remembers its draft, so a keystroke racing the clear
+    // cannot bring the old text back (chatComposerDraftModel).
+    assert.equal(sentDraftRef.current, accepted ? "  hello  " : null)
+    assert.equal(shownTextRef.current, accepted ? "" : "  hello  ")
   }
 })
 
