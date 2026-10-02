@@ -154,7 +154,8 @@ function loadControls(osReduceMotion: boolean, options: { hold?: boolean } = {})
   const { MiniRoomHud } = loadSourceWithFakeReact<typeof HudModule>("features/miniRoom/scene/MiniRoomHud.tsx", runtime,
     { modules, real })
   const { RoomChatComposer } = loadSourceWithFakeReact<typeof ComposerModule>(
-    "features/miniRoom/scene/RoomChatComposer.tsx", runtime, { modules, real, globals: { setTimeout, clearTimeout } })
+    "features/miniRoom/scene/RoomChatComposer.tsx", runtime,
+    { modules, real: [...real, "../roomComposerModel"], globals: { setTimeout, clearTimeout } })
   const { MiniRoomChatPanel } = loadSourceWithFakeReact<typeof ChatPanelModule>(
     "features/miniRoom/scene/MiniRoomChatPanel.tsx", runtime, { modules, real })
   const { MiniRoomChatHistory } = loadSourceWithFakeReact<typeof HistoryModule>(

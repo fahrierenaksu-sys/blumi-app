@@ -27,7 +27,7 @@ function renderInput(disabled: boolean) {
       "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
       "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
     },
-    real: ["./miniRoomLayout"],
+    real: ["./miniRoomLayout", "../roomComposerModel"],
     inertUnknown: true,
     globals: { setTimeout, clearTimeout }
   })
@@ -48,6 +48,77 @@ function renderInput(disabled: boolean) {
 test("a disabled composer never focuses; an enabled one does", () => {
   assert.equal(renderInput(true).input.props.editable, false)
   assert.equal(renderInput(false).input.props.editable, true)
+})
+
+/** The composer inside a parent that owns the draft, as MiniRoomScene does. */
+function mountDraft(accept: () => boolean) {
+  const runtime = createFakeReactRuntime()
+  const { RoomChatComposer } = loadSourceWithFakeReact<typeof Composer>("features/miniRoom/scene/RoomChatComposer.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
+      "@expo/vector-icons/Ionicons": { __esModule: true, default: createInertModule("Ionicons") }
+    },
+    real: ["./miniRoomLayout", "../roomComposerModel"],
+    inertUnknown: true,
+    globals: { setTimeout, clearTimeout }
+  })
+  const render = RoomChatComposer as unknown as (props: Composer.RoomChatComposerProps) => unknown
+  let draft = ""
+  const sent: string[] = []
+  const show = () => runtime.render(() => render({
+    copy: getMiniRoomCopy("en"), value: draft, suggestionsEnabled: false, disabled: false, mode: "typing",
+    maxInputHeight: 92, inputHeight: 44,
+    onChangeText: (text) => { draft = text },
+    onSubmit: () => {
+      if (!accept()) return false
+      sent.push(draft)
+      draft = ""
+      return true
+    },
+    onToggleHistory: () => undefined, onContentHeightChange: () => undefined
+  }))
+  show()
+  const input = () => findInput(runtime.output)!
+  const type = (text: string) => { (input().props.onChangeText as (text: string) => void)(text); show() }
+  const pressReturn = () => { (input().props.onSubmitEditing as () => void)(); show() }
+  const pressSend = () => {
+    const button = findAll(runtime.output, (element) => element.props?.accessibilityLabel === getMiniRoomCopy("en").sendRoomMessage)
+    ;(button[0]!.props.onPress as () => void)()
+    show()
+  }
+  return { runtime, type, pressReturn, pressSend, draft: () => draft, sent }
+}
+
+test("a letter typed in the same instant as a send starts the next message, without the sent text", () => {
+  for (const send of ["pressReturn", "pressSend"] as const) {
+    const composer = mountDraft(() => true)
+    try {
+      composer.type("Selam")
+      composer[send]()
+      assert.deepEqual(composer.sent, ["Selam"])
+      assert.equal(composer.draft(), "")
+      // The native field still reported the old text plus the new key.
+      composer.type("Selamn")
+      assert.equal(composer.draft(), "n", `${send}: only the new letter stays`)
+      // After that, the person's own text is never trimmed, even if it repeats.
+      composer.type("nSelam")
+      assert.equal(composer.draft(), "nSelam")
+    } finally {
+      composer.runtime.unmount()
+    }
+  }
+})
+
+test("a refused send keeps the draft exactly as typed", () => {
+  const composer = mountDraft(() => false)
+  try {
+    composer.type("Selam")
+    composer.pressReturn()
+    composer.type("Selamn")
+    assert.equal(composer.draft(), "Selamn")
+  } finally {
+    composer.runtime.unmount()
+  }
 })
 
 function findAll(node: unknown, match: (element: Element) => boolean, found: Element[] = []): Element[] {
