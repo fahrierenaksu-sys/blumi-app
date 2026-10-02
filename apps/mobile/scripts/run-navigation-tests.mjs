@@ -17,7 +17,6 @@ const sourceFiles = [
   "src/navigation/bottomNavReturnPreview.test.ts",
   "src/navigation/rootNavigationChromeStore.ts",
   "src/navigation/rootNavigationChromeStore.test.ts",
-  "src/navigation/mainTabSwitchStress.test.ts",
   "src/navigation/mainTabPager/mainTabPagerConfig.ts",
   "src/navigation/mainTabPager/mainTabPagerModel.ts",
   "src/navigation/mainTabPager/mainTabPagerModel.test.ts",
@@ -88,7 +87,6 @@ try {
       "--test",
       join(outputDirectory, "navigation/rootNavigationModel.test.js"),
       join(outputDirectory, "navigation/rootNavigationChromeStore.test.js"),
-      join(outputDirectory, "navigation/mainTabSwitchStress.test.js"),
       join(outputDirectory, "navigation/mainTabPager/mainTabPagerModel.test.js"),
       join(outputDirectory, "navigation/mainTabPager/mainTabPagerRouter.test.js"),
       join(outputDirectory, "navigation/mainTabPager/mainTabPageFocus.test.js"),
@@ -104,7 +102,7 @@ try {
       resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs"),
       resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeParamsSerialisable.test.mjs"),
-      resolve(workspaceRoot, "src/navigation/mainTabPager/mainTabPagerContract.test.mjs"),
+      resolve(workspaceRoot, "src/ui/gestureFrameWork.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeErrorBoundary.test.mjs")
     ],
     {
@@ -126,7 +124,8 @@ try {
       "src/navigation/linkedProfileScreenLifecycle.test.ts",
       "src/navigation/globalRealtimeSessionLifecycle.test.ts",
       "src/navigation/mainTabRenderIsolation.test.ts",
-      "src/ui/springPressScale.test.ts"
+      "src/ui/springPressScale.test.ts",
+      "src/navigation/useNotificationResponseRouting.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

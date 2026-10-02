@@ -1,45 +1,56 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import test from "node:test"
 import { getShopCopy } from "./shopCopy"
 
-test("shop copy covers release languages and offline restrictions", () => {
-  const english = getShopCopy("en")
-  const turkish = getShopCopy("tr")
+// Shop copy is complete in both release languages (Turkish text missing or
+// left in English has been a frequent bug). The wording itself stays free.
 
-  assert.match(english.offline.body, /purchases and saved changes/i)
-  assert.match(turkish.offline.body, /satın alma/i)
-  assert.equal(english.categories.dress, "Dresses")
-  assert.equal(turkish.categories.dress, "Elbiseler")
-  assert.equal(english.categories.face, "Face")
-  assert.equal(turkish.categories.face, "Yüz")
-  assert.equal(english.categories.featured, undefined)
-  assert.equal(turkish.categories.featured, undefined)
-  assert.equal(english.combination.applyLook, "Apply look")
-  assert.equal(turkish.combination.applyLook, "Kombini uygula")
-  assert.equal(english.checkout.confirm("120"), "Buy · 120")
-  assert.equal(turkish.checkout.confirm("120"), "Satın al · 120")
-  assert.match(english.checkout.partial(1, 3), /1 of 3 pieces are yours\. Nothing else was charged\./)
-  assert.match(turkish.checkout.partial(1, 3), /3 parçadan 1 tanesi artık senin/)
-  assert.match(english.checkout.lineAccessibility("Blossom top", "120", "Yours"), /120 coins/)
-  assert.match(turkish.checkout.lineAccessibility("Çiçekli üst", "120", "Senin"), /120 jeton/)
-  assert.equal(english.ownedCompact, "Owned")
-  assert.equal(turkish.ownedCompact, "Sende")
-  assert.equal(english.combination.purchaseFailure("not_enough_coins"), "Not enough coins")
-  assert.equal(turkish.combination.purchaseFailure("not_enough_coins"), "Yeterli jetonun yok")
+const SAMPLE_ARGUMENTS = [7, 3, "Ada"] as const
+// Labels that are legitimately identical in both languages: brand and loan
+// words (optionally followed by a number) and number-only labels.
+const SAME_IN_BOTH_LOCALES = /^(Blumi|Avatar)?[\d\s.,·/+:%-]*$/
+
+function collectLeaves(value: unknown, path = "", leaves = new Map<string, string>()): Map<string, string> {
+  if (typeof value === "string") {
+    leaves.set(path, value)
+  } else if (typeof value === "function") {
+    const result = (value as (...args: unknown[]) => unknown)(...SAMPLE_ARGUMENTS)
+    if (typeof result === "string") leaves.set(`${path}()`, result)
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => collectLeaves(item, `${path}[${index}]`, leaves))
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) collectLeaves(item, path ? `${path}.${key}` : key, leaves)
+  }
+  return leaves
+}
+
+test("shop copy is complete and translated in Turkish and English", () => {
+  const english = collectLeaves(getShopCopy("en"))
+  const turkish = collectLeaves(getShopCopy("tr"))
+
+  assert.deepEqual([...turkish.keys()].sort(), [...english.keys()].sort())
+  const untranslated: string[] = []
+  for (const [key, value] of english) {
+    assert.ok(value.trim().length > 0, `${key} (en) is empty`)
+    const translated = turkish.get(key) ?? ""
+    assert.ok(translated.trim().length > 0, `${key} (tr) is empty`)
+    if (translated === value && !SAME_IN_BOTH_LOCALES.test(value)) untranslated.push(`${key}: ${value}`)
+  }
+  assert.deepEqual(untranslated, [])
 })
 
-test("shop combination messages come from the localized copy contract", () => {
-  const source = readFileSync(join(process.cwd(), "src/screens/CosmeticShopScreen.tsx"), "utf8")
-  // "Buy the look" confirms once in the checkout sheet (SHOP-1), not N system alerts.
-  const confirmationSource = readFileSync(join(process.cwd(), "src/features/shop/screen/ShopCheckoutSheet.tsx"), "utf8")
+test("checkout copy carries the amounts it is given in both locales", () => {
+  for (const locale of ["tr", "en"] as const) {
+    const { checkout } = getShopCopy(locale)
+    assert.ok(checkout.confirm("120").includes("120"))
+    const partial = checkout.partial(1, 3)
+    assert.ok(partial.includes("1") && partial.includes("3"))
+    assert.ok(checkout.lineAccessibility("Blossom top", "120", "Yours").includes("120"))
+  }
+})
 
-  assert.match(source, /copy\.combination\.applyLook/)
-  assert.match(confirmationSource, /text\.confirm\(totalLabel\)/)
-  assert.doesNotMatch(confirmationSource, /Alert\.alert/)
-  for (const shopSource of [source, confirmationSource]) {
-    assert.doesNotMatch(shopSource, /locale === "tr" \? "Kombini uygula"/)
-    assert.doesNotMatch(shopSource, /locale === "tr" \? "Ürünü satın al"/)
+test("shop categories never include the featured pseudo-category", () => {
+  for (const locale of ["tr", "en"] as const) {
+    assert.equal((getShopCopy(locale).categories as Record<string, unknown>).featured, undefined)
   }
 })

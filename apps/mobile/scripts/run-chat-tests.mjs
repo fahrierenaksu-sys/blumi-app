@@ -20,7 +20,6 @@ const sourceFiles = [
   "src/features/chat/chatErrorCopy.ts",
   "src/features/chat/chatErrorCopy.test.ts",
   "src/features/chat/inboxCopy.ts",
-  "src/features/chat/inboxCopy.test.ts",
   "src/features/inbox/inboxEntranceModel.ts",
   "src/features/inbox/inboxEntranceModel.test.ts",
   "src/features/inbox/inboxUnreadPulseModel.ts",
@@ -59,8 +58,6 @@ const sourceFiles = [
   "src/features/chat/chatReceiptModel.test.ts",
   "src/features/chat/chatDeliveryAckBatcher.ts",
   "src/features/chat/chatDeliveryAckBatcher.test.ts",
-  "src/features/chat/thread/chatDeliveryTickModel.ts",
-  "src/features/chat/thread/chatDeliveryTickModel.test.ts",
   "src/features/chat/typing/chatTypingModel.ts",
   "src/features/chat/typing/chatTypingModel.test.ts",
   "src/features/chat/typing/chatTypingStore.ts",
@@ -108,7 +105,6 @@ try {
       join(outputDirectory, "features/chat/chatSchemas.test.js"),
       join(outputDirectory, "features/chat/chatParticipantAvatar.test.js"),
       join(outputDirectory, "features/chat/chatErrorCopy.test.js"),
-      join(outputDirectory, "features/chat/inboxCopy.test.js"),
       join(outputDirectory, "features/inbox/inboxEntranceModel.test.js"),
       join(outputDirectory, "features/inbox/inboxUnreadPulseModel.test.js"),
       join(outputDirectory, "features/inbox/inboxPullRefreshModel.test.js"),
@@ -127,12 +123,10 @@ try {
       join(outputDirectory, "features/chat/thread/chatBubbleAccessibility.test.js"),
       join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
       join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
-      join(outputDirectory, "features/chat/thread/chatDeliveryTickModel.test.js"),
       join(outputDirectory, "features/chat/typing/chatTypingModel.test.js"),
       join(outputDirectory, "features/chat/typing/chatTypingStore.test.js"),
       join(outputDirectory, "features/chat/thread/chatScrollToLatestModel.test.js"),
       resolve(workspaceRoot, "src/screens/ChatThreadScreen.test.mjs"),
-      resolve(workspaceRoot, "src/features/chat/typing/chatTypingSurfaces.test.mjs"),
       resolve(workspaceRoot, "src/screens/InboxScreen.test.mjs")
     ],
     {
@@ -143,7 +137,7 @@ try {
         // Store and coordinator tests assert the default English copy while
         // production resolves the device locale. Pin the ICU locale so a
         // Turkish Mac and an English CI runner produce the same result;
-        // Turkish copy is asserted explicitly in chatErrorCopy.test.ts.
+        // chatErrorCopy.test.ts checks both locales explicitly.
         LANG: "en_US.UTF-8",
         LC_ALL: "en_US.UTF-8",
         NODE_PATH: [

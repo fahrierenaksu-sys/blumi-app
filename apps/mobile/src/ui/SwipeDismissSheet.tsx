@@ -28,10 +28,10 @@ import {
   SHEET_RETURN_SPRING,
   getSheetBackdropOpacity,
   getSheetExitOffset,
-  getSheetExitVelocity,
   resolveSheetDismissClaim,
   resolveSheetDismissRelease,
-  resolveSheetDragOffset
+  resolveSheetDragOffset,
+  resolveSheetExit
 } from "./sheetDismissModel"
 
 interface SheetScrollOwnership {
@@ -173,18 +173,23 @@ export function SwipeDismissSheet({
         ? resolveSheetDismissRelease({ offset: offset.value, velocityY: event.velocityY, sheetHeight: sheetHeight.value })
         : "return"
       if (release === "dismiss") {
+        const exit = resolveSheetExit({
+          reduceMotion: reduceMotionValue.value,
+          sheetHeight: sheetHeight.value,
+          velocityY: event.velocityY
+        })
         // Reduce Motion: sheet and backdrop leave at once, before the Modal closes.
-        if (reduceMotionValue.value) {
-          offset.value = getSheetExitOffset(sheetHeight.value)
+        if (!exit.animate) {
+          offset.value = exit.offset
           scheduleOnRN(dismiss)
           return
         }
         // The exit carries the flick's speed and never overshoots (SYS-5).
         offset.value = withSpring(
-          getSheetExitOffset(sheetHeight.value),
+          exit.offset,
           {
             ...SHEET_EXIT_SPRING,
-            velocity: getSheetExitVelocity(event.velocityY),
+            velocity: exit.velocity,
             reduceMotion: ReduceMotion.Never
           },
           (finished) => {
@@ -246,14 +251,15 @@ export function SwipeDismissSheet({
       closingRef.current = false
       callback()
     }
-    if (reduceMotionValue.value) {
-      offset.value = getSheetExitOffset(sheetHeight.value)
+    const exit = resolveSheetExit({ reduceMotion: reduceMotionValue.value, sheetHeight: sheetHeight.value })
+    if (!exit.animate) {
+      offset.value = exit.offset
       finish()
       return
     }
     cancelAnimation(offset)
     offset.value = withSpring(
-      getSheetExitOffset(sheetHeight.value),
+      exit.offset,
       { ...SHEET_EXIT_SPRING, reduceMotion: ReduceMotion.Never },
       (finished) => {
         "worklet"

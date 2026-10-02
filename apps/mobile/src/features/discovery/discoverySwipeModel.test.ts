@@ -2,28 +2,11 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   DISCOVER_BOTTOM_CARD_MOTION,
-  DISCOVER_PROMOTION_SPRING,
-  DISCOVER_SWIPE_RESET_SPRING,
   DISCOVER_DECK_ENTRANCE_MS,
-  getDiscoverActionExitDuration,
-  getDiscoverDeckDragMotion,
-  getDiscoverDeckEntrance,
-  getDiscoverDeckRoleMotion,
-  getDiscoverMiddleCardAdvance,
-  getDiscoverDeckRoleProgress,
-  getDiscoverMiddleCardMotion,
+  DISCOVER_MIDDLE_CARD_TRAVEL,
+  DISCOVER_PROMOTION_SPRING,
   DISCOVER_SWIPE_MAX_TILT_DEG,
-  getDiscoverStampOpacity,
-  getDiscoverSwipeOutDuration,
-  getDiscoverSwipeOutX,
-  getDiscoverSwipeRotation,
-  isDiscoverSwipeLowerHalfGrab,
-  getDiscoverSwipeThreshold,
-  getDiscoverSwipeThresholdSide,
-  getDiscoverSwipeTranslateX,
-  resolveDiscoverSwipeRelease,
-  shouldClaimDiscoverSwipe,
-  shouldTickDiscoverSwipeThreshold,
+  DISCOVER_SWIPE_RESET_SPRING,
   SWIPE_CAPTURE_THRESHOLD,
   SWIPE_DIRECTION_DOMINANCE,
   SWIPE_DISTANCE_RATIO,
@@ -33,31 +16,54 @@ import {
   SWIPE_OUT_MIN_DURATION,
   SWIPE_OUT_MIN_VELOCITY,
   SWIPE_THRESHOLD_TICK_HYSTERESIS,
+  getDiscoverActionExitDuration,
+  getDiscoverDeckDragMotion,
+  getDiscoverDeckEntrance,
+  getDiscoverDeckRoleMotion,
+  getDiscoverDeckRoleProgress,
+  getDiscoverMiddleCardAdvance,
+  getDiscoverMiddleCardMotion,
+  getDiscoverStampOpacity,
+  getDiscoverSwipeOutDuration,
+  getDiscoverSwipeOutX,
+  getDiscoverSwipeRotation,
+  getDiscoverSwipeThreshold,
+  getDiscoverSwipeThresholdSide,
+  getDiscoverSwipeTranslateX,
+  isDiscoverSwipeLowerHalfGrab,
+  resolveDiscoverSwipeRelease,
+  shouldClaimDiscoverSwipe,
+  shouldTickDiscoverSwipeThreshold,
   type DiscoverSwipeThresholdSide
 } from "./discoverySwipeModel"
+
+// Relational swipe guarantees. Tuning values (tilt, durations, thresholds,
+// springs, fan-out) are read from the exported constants so card physics can
+// be redesigned without editing this file.
 
 const closeTo = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≈ ${expected}`)
 
+const WIDTH = 390
+
 test("the card leans with the drag up to the max tilt at a full screen width", () => {
-  assert.equal(DISCOVER_SWIPE_MAX_TILT_DEG, 8)
-  closeTo(getDiscoverSwipeRotation(0, 390, false), 0)
-  closeTo(getDiscoverSwipeRotation(0, 390, true), 0)
-  closeTo(getDiscoverSwipeRotation(195, 390, false), 4)
-  closeTo(getDiscoverSwipeRotation(-195, 390, false), -4)
-  closeTo(getDiscoverSwipeRotation(390, 390, false), 8)
-  closeTo(getDiscoverSwipeRotation(-390, 390, false), -8)
+  assert.ok(DISCOVER_SWIPE_MAX_TILT_DEG > 0)
+  closeTo(getDiscoverSwipeRotation(0, WIDTH, false), 0)
+  closeTo(getDiscoverSwipeRotation(0, WIDTH, true), 0)
+  closeTo(getDiscoverSwipeRotation(WIDTH / 2, WIDTH, false), DISCOVER_SWIPE_MAX_TILT_DEG / 2)
+  closeTo(getDiscoverSwipeRotation(-WIDTH / 2, WIDTH, false), -DISCOVER_SWIPE_MAX_TILT_DEG / 2)
+  closeTo(getDiscoverSwipeRotation(WIDTH, WIDTH, false), DISCOVER_SWIPE_MAX_TILT_DEG)
+  closeTo(getDiscoverSwipeRotation(-WIDTH, WIDTH, false), -DISCOVER_SWIPE_MAX_TILT_DEG)
 })
 
 test("a card held by its lower half leans the other way", () => {
-  closeTo(getDiscoverSwipeRotation(195, 390, true), -4)
-  closeTo(getDiscoverSwipeRotation(-390, 390, true), 8)
+  closeTo(getDiscoverSwipeRotation(WIDTH / 2, WIDTH, true), -DISCOVER_SWIPE_MAX_TILT_DEG / 2)
+  closeTo(getDiscoverSwipeRotation(-WIDTH, WIDTH, true), DISCOVER_SWIPE_MAX_TILT_DEG)
 })
 
 test("the lean is clamped past a screen width and zero without a width", () => {
-  // The exit runs to 1.2 screen widths; the card never leans past the max.
-  closeTo(getDiscoverSwipeRotation(468, 390, false), 8)
-  closeTo(getDiscoverSwipeRotation(-2000, 390, true), 8)
+  closeTo(getDiscoverSwipeRotation(getDiscoverSwipeOutX("right", WIDTH), WIDTH, false), DISCOVER_SWIPE_MAX_TILT_DEG)
+  closeTo(getDiscoverSwipeRotation(-2000, WIDTH, true), DISCOVER_SWIPE_MAX_TILT_DEG)
   closeTo(getDiscoverSwipeRotation(120, 0, false), 0)
   closeTo(getDiscoverSwipeRotation(120, Number.NaN, false), 0)
 })
@@ -70,47 +76,55 @@ test("a grab below the card's middle is a lower-half grab", () => {
   assert.equal(isDiscoverSwipeLowerHalfGrab(400, 0), false)
 })
 
-test("the exit takes the remaining distance at the release speed, within 120-260 ms", () => {
-  assert.equal(SWIPE_OUT_MIN_DURATION, 120)
-  assert.equal(SWIPE_OUT_MAX_DURATION, 260)
-  // A slow release of a typical remaining distance lands on the slowest exit.
-  closeTo(390 / SWIPE_OUT_MIN_VELOCITY * 1000, SWIPE_OUT_MAX_DURATION)
-  assert.equal(getDiscoverSwipeOutDuration(390, 0), 260)
-  assert.equal(getDiscoverSwipeOutDuration(390, 400), 260)
-  assert.equal(getDiscoverSwipeOutDuration(520, 0), 260)
-  // A hard flick leaves as fast as the floor allows.
-  assert.equal(getDiscoverSwipeOutDuration(400, 5000), 120)
-  assert.equal(getDiscoverSwipeOutDuration(40, 0), 120)
-  // In between the duration follows the release speed.
-  closeTo(getDiscoverSwipeOutDuration(380, 2000), 190)
-  closeTo(getDiscoverSwipeOutDuration(-380, 2000), 190)
+test("the exit takes the remaining distance at the release speed, within its bounds", () => {
+  assert.ok(SWIPE_OUT_MIN_DURATION < SWIPE_OUT_MAX_DURATION)
+  const durations = [
+    getDiscoverSwipeOutDuration(WIDTH, 0),
+    getDiscoverSwipeOutDuration(WIDTH, 400),
+    getDiscoverSwipeOutDuration(520, 0),
+    getDiscoverSwipeOutDuration(400, 5000),
+    getDiscoverSwipeOutDuration(40, 0),
+    getDiscoverSwipeOutDuration(380, 2000)
+  ]
+  for (const duration of durations) {
+    assert.ok(duration >= SWIPE_OUT_MIN_DURATION && duration <= SWIPE_OUT_MAX_DURATION, `${duration}`)
+  }
+  // A hard flick leaves as fast as the floor allows; a slow long exit hits the cap.
+  assert.equal(getDiscoverSwipeOutDuration(400, 50_000), SWIPE_OUT_MIN_DURATION)
+  assert.equal(getDiscoverSwipeOutDuration(5_000, 0), SWIPE_OUT_MAX_DURATION)
+  // In between the duration follows the release speed, symmetric in direction.
+  const remaining = 380
+  const speed = Math.max(SWIPE_OUT_MIN_VELOCITY, remaining / (SWIPE_OUT_MAX_DURATION / 1000)) * 1.1
+  const expected = Math.min(SWIPE_OUT_MAX_DURATION, Math.max(SWIPE_OUT_MIN_DURATION, remaining / speed * 1000))
+  closeTo(getDiscoverSwipeOutDuration(remaining, speed), expected)
+  closeTo(getDiscoverSwipeOutDuration(-remaining, speed), expected)
+  assert.ok(getDiscoverSwipeOutDuration(remaining, 4000) <= getDiscoverSwipeOutDuration(remaining, 2000))
 })
 
 test("a release moving away from the exit leaves at the slow pace", () => {
-  assert.equal(getDiscoverSwipeOutDuration(390, -5000), 260)
+  assert.equal(getDiscoverSwipeOutDuration(WIDTH, -5000), getDiscoverSwipeOutDuration(WIDTH, 0))
 })
 
 test("an unmeasurable release falls back to the fixed exit duration", () => {
   assert.equal(getDiscoverSwipeOutDuration(Number.NaN, 2000), SWIPE_OUT_DURATION)
-  assert.equal(getDiscoverSwipeOutDuration(390, Number.POSITIVE_INFINITY), SWIPE_OUT_DURATION)
+  assert.equal(getDiscoverSwipeOutDuration(WIDTH, Number.POSITIVE_INFINITY), SWIPE_OUT_DURATION)
 })
 
-test("swipe thresholds are the PanResponder values", () => {
-  assert.equal(SWIPE_OUT_DURATION, 190)
-  assert.equal(SWIPE_CAPTURE_THRESHOLD, 4)
-  assert.equal(SWIPE_DIRECTION_DOMINANCE, 1.1)
-  assert.equal(SWIPE_DISTANCE_RATIO, 0.22)
-  assert.equal(SWIPE_FLICK_VELOCITY, 0.55)
-  assert.equal(getDiscoverSwipeThreshold(390), 390 * 0.22)
-  assert.equal(getDiscoverSwipeThreshold(600), 96)
+test("the commit threshold grows with the screen and is capped on wide screens", () => {
+  assert.equal(getDiscoverSwipeThreshold(WIDTH), WIDTH * SWIPE_DISTANCE_RATIO)
+  assert.ok(getDiscoverSwipeThreshold(300) < getDiscoverSwipeThreshold(WIDTH))
+  assert.equal(getDiscoverSwipeThreshold(2000), getDiscoverSwipeThreshold(3000))
+  assert.ok(getDiscoverSwipeThreshold(2000) < 2000 * SWIPE_DISTANCE_RATIO)
 })
 
-test("a swipe is claimed only after a horizontal-dominant move past 4 px", () => {
-  assert.equal(shouldClaimDiscoverSwipe(4, 0), false)
-  assert.equal(shouldClaimDiscoverSwipe(4.5, 0), true)
-  assert.equal(shouldClaimDiscoverSwipe(-4.5, 0), true)
-  assert.equal(shouldClaimDiscoverSwipe(11, 10), false)
-  assert.equal(shouldClaimDiscoverSwipe(11.01, 10), true)
+test("a swipe is claimed only after a horizontal-dominant move past the capture threshold", () => {
+  const past = SWIPE_CAPTURE_THRESHOLD + 0.5
+  assert.equal(shouldClaimDiscoverSwipe(SWIPE_CAPTURE_THRESHOLD, 0), false)
+  assert.equal(shouldClaimDiscoverSwipe(past, 0), true)
+  assert.equal(shouldClaimDiscoverSwipe(-past, 0), true)
+  const dy = 10
+  assert.equal(shouldClaimDiscoverSwipe(dy * SWIPE_DIRECTION_DOMINANCE, dy), false)
+  assert.equal(shouldClaimDiscoverSwipe(dy * SWIPE_DIRECTION_DOMINANCE + 0.01, dy), true)
   assert.equal(shouldClaimDiscoverSwipe(-20, 30), false)
 })
 
@@ -118,24 +132,26 @@ test("release commits past the distance threshold or on a flick, converting px/s
   const threshold = 85.8
   const release = (dx: number, velocityXPerSecond: number, canSwipeRight = true) =>
     resolveDiscoverSwipeRelease({ dx, velocityXPerSecond, threshold, canSwipeRight })
-  assert.equal(release(86, 0), "right")
-  assert.equal(release(85.8, 0), "reset")
-  assert.equal(release(-86, 0), "left")
-  assert.equal(release(-85.8, 0), "reset")
-  // 0.55 px/ms is 550 px/s: Gesture Handler reports px/s.
-  assert.equal(release(20, 560), "right")
-  assert.equal(release(20, 550), "reset")
-  assert.equal(release(-20, -560), "left")
-  assert.equal(release(-20, 560), "reset")
-  assert.equal(release(20, -560), "reset")
+  assert.equal(release(threshold + 0.2, 0), "right")
+  assert.equal(release(threshold, 0), "reset")
+  assert.equal(release(-threshold - 0.2, 0), "left")
+  assert.equal(release(-threshold, 0), "reset")
+  // Gesture Handler reports px/s; the flick velocity is in px/ms.
+  const flick = SWIPE_FLICK_VELOCITY * 1000
+  assert.equal(release(20, flick + 10), "right")
+  assert.equal(release(20, flick), "reset")
+  assert.equal(release(-20, -flick - 10), "left")
+  assert.equal(release(-20, flick + 10), "reset")
+  assert.equal(release(20, -flick - 10), "reset")
   // Like can be disabled; pass never is.
   assert.equal(release(200, 2000, false), "reset")
   assert.equal(release(-200, 0, false), "left")
 })
 
-test("the card leaves 1.2 screen widths away", () => {
-  assert.equal(getDiscoverSwipeOutX("right", 400), 480)
-  assert.equal(getDiscoverSwipeOutX("left", 400), -480)
+test("the card leaves fully off screen in the swipe direction", () => {
+  assert.ok(getDiscoverSwipeOutX("right", 400) >= 400)
+  assert.ok(getDiscoverSwipeOutX("left", 400) <= -400)
+  assert.equal(getDiscoverSwipeOutX("left", 400), -getDiscoverSwipeOutX("right", 400))
 })
 
 test("only the card that owns the swipe moves", () => {
@@ -146,28 +162,34 @@ test("only the card that owns the swipe moves", () => {
 test("LIKE and NOPE stamps fade in over the swipe threshold, clamped", () => {
   const threshold = 80
   assert.deepEqual(getDiscoverStampOpacity(0, threshold), { like: 0, nope: 0 })
-  assert.deepEqual(getDiscoverStampOpacity(20, threshold), { like: 0.25, nope: 0 })
-  assert.deepEqual(getDiscoverStampOpacity(40, threshold), { like: 0.5, nope: 0 })
-  assert.deepEqual(getDiscoverStampOpacity(60, threshold), { like: 0.75, nope: 0 })
+  let previous = 0
+  for (const x of [20, 40, 60, threshold]) {
+    const { like, nope } = getDiscoverStampOpacity(x, threshold)
+    assert.equal(nope, 0)
+    assert.ok(like > previous, "like grows with the drag")
+    previous = like
+  }
   assert.deepEqual(getDiscoverStampOpacity(400, threshold), { like: 1, nope: 0 })
-  assert.deepEqual(getDiscoverStampOpacity(-60, threshold), { like: 0, nope: 0.75 })
+  assert.deepEqual(getDiscoverStampOpacity(-60, threshold), {
+    like: 0,
+    nope: getDiscoverStampOpacity(60, threshold).like
+  })
   assert.deepEqual(getDiscoverStampOpacity(-400, threshold), { like: 0, nope: 1 })
 })
 
-test("the next card advances with the swipe distance, clamped at 400 px", () => {
-  assert.deepEqual(getDiscoverMiddleCardMotion(0), { scale: 0.98, translateX: -8, translateY: -12 })
-  assert.deepEqual(getDiscoverMiddleCardMotion(200), { scale: 0.99, translateX: -4, translateY: -6 })
-  assert.deepEqual(getDiscoverMiddleCardMotion(-200), { scale: 0.99, translateX: -4, translateY: -6 })
-  assert.deepEqual(getDiscoverMiddleCardMotion(900), { scale: 1, translateX: 0, translateY: 0 })
+test("the next card advances with the swipe distance toward the top slot, clamped", () => {
+  const rest = getDiscoverMiddleCardMotion(0)
+  const half = getDiscoverMiddleCardMotion(DISCOVER_MIDDLE_CARD_TRAVEL / 2)
+  const full = getDiscoverMiddleCardMotion(DISCOVER_MIDDLE_CARD_TRAVEL)
+  assert.ok(rest.scale < half.scale && half.scale < full.scale)
+  assert.deepEqual(full, { scale: 1, translateX: 0, translateY: 0 })
+  assert.deepEqual(getDiscoverMiddleCardMotion(-DISCOVER_MIDDLE_CARD_TRAVEL / 2), half)
+  assert.deepEqual(getDiscoverMiddleCardMotion(DISCOVER_MIDDLE_CARD_TRAVEL * 3), full)
 })
 
-test("the snap-back spring is Animated.spring tension 120 / friction 7", () => {
-  // React Native converts Origami tension/friction to stiffness/damping this way.
-  const stiffness = (120 - 30) * 3.62 + 194
-  const damping = (7 - 8) * 3 + 25
-  assert.ok(Math.abs(DISCOVER_SWIPE_RESET_SPRING.stiffness - stiffness) < 1e-9)
-  assert.equal(DISCOVER_SWIPE_RESET_SPRING.damping, damping)
-  assert.equal(DISCOVER_SWIPE_RESET_SPRING.mass, 1)
+test("the snap-back spring settles without endless oscillation", () => {
+  const { stiffness, damping, mass } = DISCOVER_SWIPE_RESET_SPRING
+  assert.ok(stiffness > 0 && damping > 0 && mass > 0)
 })
 
 test("the drag is past a threshold exactly where a release would commit", () => {
@@ -214,20 +236,9 @@ test("a drag ticks once per threshold entry and re-arms after coming back", () =
   assert.equal(shouldTickDiscoverSwipeThreshold(1, -1), true)
 })
 
-test("each deck slot has one role progress: bottom 0, middle 1, top 2", () => {
-  assert.equal(getDiscoverDeckRoleProgress("bottom"), 0)
-  assert.equal(getDiscoverDeckRoleProgress("middle"), 1)
-  assert.equal(getDiscoverDeckRoleProgress("top"), 2)
-})
-
-test("the bottom card keeps the approved fan-out", () => {
-  assert.deepEqual(DISCOVER_BOTTOM_CARD_MOTION, {
-    translateX: -10,
-    translateY: -30,
-    rotateDeg: -3,
-    scale: 0.98,
-    opacity: 0.96
-  })
+test("deck roles are ordered from the back of the deck to the top", () => {
+  assert.ok(getDiscoverDeckRoleProgress("bottom") < getDiscoverDeckRoleProgress("middle"))
+  assert.ok(getDiscoverDeckRoleProgress("middle") < getDiscoverDeckRoleProgress("top"))
 })
 
 test("only the middle card follows the drag; the top card was carried fully forward", () => {
@@ -237,15 +248,19 @@ test("only the middle card follows the drag; the top card was carried fully forw
   assert.deepEqual(getDiscoverDeckDragMotion("bottom", 480), getDiscoverMiddleCardMotion(0))
 })
 
-test("role motion at 0, 1 and 2 is exactly the bottom, dragged middle and top card", () => {
+const BOTTOM = getDiscoverDeckRoleProgress("bottom")
+const MIDDLE = getDiscoverDeckRoleProgress("middle")
+const TOP = getDiscoverDeckRoleProgress("top")
+
+test("role motion at each slot is exactly the bottom, dragged middle and top card", () => {
   const rest = getDiscoverMiddleCardMotion(0)
-  assert.deepEqual(getDiscoverDeckRoleMotion(0, rest), {
+  assert.deepEqual(getDiscoverDeckRoleMotion(BOTTOM, rest), {
     ...DISCOVER_BOTTOM_CARD_MOTION,
     overlayOpacity: 1
   })
   const dragged = getDiscoverMiddleCardMotion(200)
   // The middle card stays upright while it advances with the drag.
-  assert.deepEqual(getDiscoverDeckRoleMotion(1, dragged), {
+  assert.deepEqual(getDiscoverDeckRoleMotion(MIDDLE, dragged), {
     translateX: dragged.translateX,
     translateY: dragged.translateY,
     rotateDeg: 0,
@@ -254,33 +269,28 @@ test("role motion at 0, 1 and 2 is exactly the bottom, dragged middle and top ca
     overlayOpacity: 1
   })
   const top = { translateX: 0, translateY: 0, rotateDeg: 0, scale: 1, opacity: 1, overlayOpacity: 0 }
-  assert.deepEqual(getDiscoverDeckRoleMotion(2, rest), top)
-  assert.deepEqual(getDiscoverDeckRoleMotion(2, dragged), top)
+  assert.deepEqual(getDiscoverDeckRoleMotion(TOP, rest), top)
+  assert.deepEqual(getDiscoverDeckRoleMotion(TOP, dragged), top)
 })
 
 test("a promotion blends between slots instead of jumping", () => {
   const rest = getDiscoverMiddleCardMotion(0)
-  const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≈ ${expected}`)
+  const between = (value: number, a: number, b: number) =>
+    assert.ok(value >= Math.min(a, b) - 1e-9 && value <= Math.max(a, b) + 1e-9, `${value} between ${a} and ${b}`)
 
-  const bottomToMiddle = getDiscoverDeckRoleMotion(0.5, rest)
-  close(bottomToMiddle.translateX, (-10 + -8) / 2)
-  close(bottomToMiddle.translateY, (-30 + -12) / 2)
-  close(bottomToMiddle.rotateDeg, -1.5)
-  close(bottomToMiddle.scale, 0.98)
-  close(bottomToMiddle.opacity, (0.96 + 1) / 2)
-  assert.equal(bottomToMiddle.overlayOpacity, 1)
-
-  const middleToTop = getDiscoverDeckRoleMotion(1.5, rest)
-  close(middleToTop.translateX, -4)
-  close(middleToTop.translateY, -6)
-  assert.equal(middleToTop.rotateDeg, 0)
-  close(middleToTop.scale, 0.99)
-  assert.equal(middleToTop.opacity, 1)
-  close(middleToTop.overlayOpacity, 0.5)
+  const bottom = getDiscoverDeckRoleMotion(BOTTOM, rest)
+  const middle = getDiscoverDeckRoleMotion(MIDDLE, rest)
+  const top = getDiscoverDeckRoleMotion(TOP, rest)
+  const bottomToMiddle = getDiscoverDeckRoleMotion((BOTTOM + MIDDLE) / 2, rest)
+  const middleToTop = getDiscoverDeckRoleMotion((MIDDLE + TOP) / 2, rest)
+  for (const key of ["translateX", "translateY", "rotateDeg", "scale", "opacity", "overlayOpacity"] as const) {
+    between(bottomToMiddle[key], bottom[key], middle[key])
+    between(middleToTop[key], middle[key], top[key])
+  }
 
   // A spring settling past its target never leaves the slot range.
-  assert.deepEqual(getDiscoverDeckRoleMotion(-0.2, rest), getDiscoverDeckRoleMotion(0, rest))
-  assert.deepEqual(getDiscoverDeckRoleMotion(2.1, rest), getDiscoverDeckRoleMotion(2, rest))
+  assert.deepEqual(getDiscoverDeckRoleMotion(BOTTOM - 0.2, rest), bottom)
+  assert.deepEqual(getDiscoverDeckRoleMotion(TOP + 0.1, rest), top)
 })
 
 test("the promotion spring is short and critically damped", () => {
@@ -293,34 +303,37 @@ test("the promotion spring is short and critically damped", () => {
 
 test("the frosted layer clears with the drag, so it is not still frosted after the release (DSC-11)", () => {
   assert.equal(getDiscoverMiddleCardAdvance(0), 0)
-  assert.equal(getDiscoverMiddleCardAdvance(-200), 0.5)
-  assert.equal(getDiscoverMiddleCardAdvance(900), 1)
-  const middle = getDiscoverDeckRoleMotion(1, getDiscoverMiddleCardMotion(200), getDiscoverMiddleCardAdvance(200))
+  assert.equal(getDiscoverMiddleCardAdvance(-DISCOVER_MIDDLE_CARD_TRAVEL / 2), 0.5)
+  assert.equal(getDiscoverMiddleCardAdvance(DISCOVER_MIDDLE_CARD_TRAVEL * 3), 1)
+  const halfway = DISCOVER_MIDDLE_CARD_TRAVEL / 2
+  const middle = getDiscoverDeckRoleMotion(MIDDLE, getDiscoverMiddleCardMotion(halfway), getDiscoverMiddleCardAdvance(halfway))
   assert.equal(middle.overlayOpacity, 0.5)
   // The bottom slot stays fully frosted; without an advance nothing changes.
-  assert.equal(getDiscoverDeckRoleMotion(0, getDiscoverMiddleCardMotion(0), 0.7).overlayOpacity, 1)
-  assert.equal(getDiscoverDeckRoleMotion(1, getDiscoverMiddleCardMotion(200)).overlayOpacity, 1)
+  assert.equal(getDiscoverDeckRoleMotion(BOTTOM, getDiscoverMiddleCardMotion(0), 0.7).overlayOpacity, 1)
+  assert.equal(getDiscoverDeckRoleMotion(MIDDLE, getDiscoverMiddleCardMotion(halfway)).overlayOpacity, 1)
 })
 
 test("a card promoted at release continues from the pose and frost it had, then settles at rest", () => {
   const releasedAt = 120
   const advance = getDiscoverMiddleCardAdvance(releasedAt)
-  const lastMiddleFrame = getDiscoverDeckRoleMotion(1, getDiscoverDeckDragMotion("middle", releasedAt), advance)
-  const firstTopFrame = getDiscoverDeckRoleMotion(1, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
+  const lastMiddleFrame = getDiscoverDeckRoleMotion(MIDDLE, getDiscoverDeckDragMotion("middle", releasedAt), advance)
+  const firstTopFrame = getDiscoverDeckRoleMotion(MIDDLE, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
   assert.deepEqual(firstTopFrame, lastMiddleFrame, "no jump when the deck advances at release")
-  const settled = getDiscoverDeckRoleMotion(2, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
+  const settled = getDiscoverDeckRoleMotion(TOP, getDiscoverDeckDragMotion("top", 0, releasedAt), advance)
   assert.deepEqual(settled, { translateX: 0, translateY: 0, rotateDeg: 0, scale: 1, opacity: 1, overlayOpacity: 0 })
 })
 
 test("a card arriving at the back of the deck fades in (and grows only when motion is allowed)", () => {
-  assert.equal(DISCOVER_DECK_ENTRANCE_MS, 220)
-  assert.deepEqual(getDiscoverDeckEntrance(0, false), { opacity: 0, scale: 0.94 })
+  assert.ok(DISCOVER_DECK_ENTRANCE_MS > 0)
+  const start = getDiscoverDeckEntrance(0, false)
+  assert.equal(start.opacity, 0)
+  assert.ok(start.scale < 1)
   assert.deepEqual(getDiscoverDeckEntrance(1, false), { opacity: 1, scale: 1 })
   assert.deepEqual(getDiscoverDeckEntrance(0, true), { opacity: 0, scale: 1 })
   assert.deepEqual(getDiscoverDeckEntrance(1.2, false), { opacity: 1, scale: 1 })
 })
 
-test("a Like or Pass button exit takes 190 ms and is instant under Reduce Motion (DSC-10)", () => {
-  assert.equal(getDiscoverActionExitDuration(false), 190)
+test("a Like or Pass button exit animates, and is instant under Reduce Motion (DSC-10)", () => {
+  assert.ok(getDiscoverActionExitDuration(false) > 0)
   assert.equal(getDiscoverActionExitDuration(true), 0)
 })

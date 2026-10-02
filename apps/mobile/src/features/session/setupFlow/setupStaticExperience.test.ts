@@ -1,301 +1,310 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
 import test from "node:test"
-import { fileURLToPath, URL } from "node:url"
+import {
+  createFakeReactRuntime,
+  createReactNativeStub,
+  loadSourceWithFakeReact,
+  type FakeReactRuntime
+} from "../../../testing/hookHarness"
+import * as onboardingFlowModel from "../onboardingFlowModel"
+import * as setupFlowShellModel from "./setupFlowShellModel"
 
-const SCREEN_ROOT = new URL("../../../screens/", import.meta.url)
-const NAVIGATION_ROOT = new URL("../../../navigation/", import.meta.url)
+// First-frame guarantees for the setup flow. Each test renders the real
+// component or hook with passive effects disabled: what it shows then is
+// what the first painted frame shows, so anything set up in a post-paint
+// effect would fail here (the one-frame blank or wrong-step flash class).
 
-const REGISTER_ROOT = new URL("../register/", import.meta.url)
+type Element = { type: unknown; props: Record<string, any> }
 
-function readScreen(name: string): string {
-  return readFileSync(fileURLToPath(new URL(name, SCREEN_ROOT)), "utf8")
+function createFirstFrameRuntime(): FakeReactRuntime {
+  const runtime = createFakeReactRuntime()
+  runtime.react.useEffect = () => undefined
+  return runtime
 }
 
-function readRegister(name: string): string {
-  return readFileSync(fileURLToPath(new URL(name, REGISTER_ROOT)), "utf8")
+function findElements(node: unknown, matches: (element: Element) => boolean, found: Element[] = []): Element[] {
+  if (Array.isArray(node)) {
+    for (const child of node) findElements(child, matches, found)
+    return found
+  }
+  if (!node || typeof node !== "object" || !("props" in node)) return found
+  const element = node as Element
+  if (matches(element)) found.push(element)
+  findElements(element.props?.children, matches, found)
+  return found
 }
 
-test("setup screens keep character motion inside their dedicated stages", () => {
-  const profileSource = readScreen("ProfileSetupScreen.tsx")
-  assert.match(profileSource, /ProfileCharacterReactionStage/)
-  assert.doesNotMatch(profileSource, /SetupAnimatedAvatarPreview/)
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) return Object.assign({}, ...style.map(flattenStyle))
+  return style && typeof style === "object" ? style as Record<string, unknown> : {}
+}
 
-  const reactionStageSource = readFileSync(
-    fileURLToPath(new URL("../ProfileCharacterReactionStage.tsx", import.meta.url)),
-    "utf8"
-  )
-  assert.match(reactionStageSource, /AvatarPreview2D/)
-  assert.match(reactionStageSource, /animationState="idle_front"/)
-  assert.doesNotMatch(reactionStageSource, /animationState="wave_front"|animationState="walk_front"/)
+function createReanimatedStub(runtime: FakeReactRuntime) {
+  const useRef = runtime.react.useRef as <T>(initial: T) => { current: T }
+  const timings: unknown[] = []
+  const easing = () => (value: number) => value
+  return {
+    timings,
+    module: {
+      __esModule: true,
+      default: { View: "Animated.View" },
+      Easing: { out: easing, in: easing, inOut: easing, cubic: (value: number) => value },
+      useSharedValue: <T>(initial: T) => {
+        const ref = useRef<{ value: T } | null>(null)
+        if (!ref.current) ref.current = { value: initial }
+        return ref.current
+      },
+      useAnimatedStyle: (worklet: () => unknown) => worklet(),
+      withTiming: (value: unknown) => { timings.push(value); return value },
+      withSpring: (value: unknown) => value
+    }
+  }
+}
 
-  const avatarSource = readScreen("AvatarSetupScreen.tsx")
-  assert.doesNotMatch(avatarSource, /SetupAnimatedAvatarPreview/)
-  assert.match(avatarSource, /AvatarSetupStudioStage/)
-  const avatarStageSource = readFileSync(
-    fileURLToPath(
-      new URL("../../avatarV2/components/AvatarSetupStudioStage.tsx", import.meta.url)
-    ),
-    "utf8"
-  )
-  assert.doesNotMatch(avatarStageSource, /SetupAnimatedAvatarPreview/)
-  assert.match(avatarStageSource, /AvatarPreview2D/)
-  assert.match(avatarStageSource, /animationState="idle_front"/)
+function reducedMotionModules(reduceMotion: boolean) {
+  const snapshot = { reduceMotion, isResolved: true }
+  return {
+    "./reducedMotionStore": {
+      createReducedMotionStore: () => ({ subscribe: () => () => undefined, getSnapshot: () => snapshot })
+    },
+    "./theme": { uiTheme: { animation: { durationEntrance: 320, staggerMs: 40 } } }
+  }
+}
 
-  const registerSource = readScreen("RegisterScreen.tsx")
-  const registerSignInSource = readRegister("RegisterSignInView.tsx")
-  assert.doesNotMatch(registerSource, /SetupAnimatedAvatarPreview/)
-  assert.doesNotMatch(registerSignInSource, /SetupAnimatedAvatarPreview/)
-  assert.doesNotMatch(readRegister("RegisterCreateView.tsx"), /SetupAnimatedAvatarPreview/)
-  assert.match(registerSignInSource, /AvatarPreview2D/)
-  assert.match(registerSignInSource, /animationState="idle_front"/)
+for (const reduceMotion of [true, false]) {
+  test(`shared onboarding entrances establish their initial frame before paint (reduce motion ${reduceMotion})`, () => {
+    const runtime = createFirstFrameRuntime()
+    const reactNative = createReactNativeStub()
+    const { useEntranceAnimation } = loadSourceWithFakeReact<{
+      useEntranceAnimation: () => { opacity: { value: number } }
+    }>("ui/animations.ts", runtime, {
+      modules: { "react-native": reactNative.module, ...reducedMotionModules(reduceMotion) },
+      inertUnknown: true
+    })
 
-  const roomSource = readScreen("RoomSetupScreen.tsx")
-  assert.doesNotMatch(roomSource, /RoomSetupCharacterPhase/)
-  assert.doesNotMatch(roomSource, /setInterval\(/)
-  assert.match(roomSource, /motionEnabled=\{false\}/)
-  assert.match(roomSource, /const avatarState = "idle"/)
-})
+    const style = runtime.render(() => useEntranceAnimation())
+    if (reduceMotion) {
+      assert.equal(style.opacity.value, 1, "Reduce Motion shows the settled entrance on the first frame")
+    } else {
+      assert.ok(
+        reactNative.animatedCalls.some((call) => call.kind === "timing.start"),
+        "the entrance animation starts before paint, not one frame later"
+      )
+    }
+  })
+}
 
-test("the four setup surfaces use the same header, progress and action dock system", () => {
-  for (const screen of [
-    "ProfileSetupScreen.tsx",
-    "AvatarSetupScreen.tsx",
-    "RoomSetupScreen.tsx"
-  ]) {
-    const source = readScreen(screen)
-    assert.match(source, /BlumiSetupShell/)
+test("the shared progress rail has the correct fill before its width is measured", () => {
+  const runtime = createFirstFrameRuntime()
+  const reanimated = createReanimatedStub(runtime)
+  const { SetupFlowProgress } = loadSourceWithFakeReact<{
+    SetupFlowProgress: (props: { current: 1 | 2 | 3 | 4; reduceMotion: boolean }) => Element
+  }>("features/session/setupFlow/SetupFlowProgress.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": reanimated.module,
+      "./setupFlowLocale": { getCurrentSetupFlowCopy: () => ({ stepProgress: () => "progress" }) }
+    },
+    inertUnknown: true
+  })
+  const fill = () => {
+    const [element] = findElements(runtime.output, (element) => element.type === "Animated.View")
+    return flattenStyle(element?.props.style)
   }
 
-  // RegisterScreen renders the create-account step through RegisterCreateView.
-  assert.match(readScreen("RegisterScreen.tsx"), /<RegisterCreateView/)
-  const registerSource = readRegister("RegisterCreateView.tsx")
-  assert.match(registerSource, /BlumiSetupShell/)
-  assert.match(registerSource, /step=\{isCodeStep \? "otp" : "phone"\}/)
+  let current: 1 | 2 | 3 | 4 = 2
+  const rail = runtime.render(() => SetupFlowProgress({ current, reduceMotion: false }))
+  assert.equal(fill().width, "50%", "unmeasured rail still shows the right fill")
+
+  rail.props.onLayout({ nativeEvent: { layout: { width: 200 } } })
+  runtime.rerender()
+  assert.equal(fill().width, 100)
+
+  current = 3
+  runtime.rerender()
+  // The animated style follows the shared value its layout effect just set.
+  runtime.rerender()
+  assert.equal(fill().width, 150)
 })
 
-test("the phone to OTP handoff commits before the next frame", () => {
-  // The Register flow controller owns the stage report; RegisterScreen calls it.
-  assert.match(readScreen("RegisterScreen.tsx"), /useRegisterFlowController\(\{[\s\S]*onCreateFlowStageChange[\s\S]*\}\)/)
-  const registerSource = readRegister("useRegisterFlowController.ts")
+test("deferred auth destinations render the real screen on their first frame", () => {
+  const runtime = createFirstFrameRuntime()
+  const { createDeferredScreen } = loadSourceWithFakeReact<{
+    createDeferredScreen: (loader: () => unknown) => { DeferredScreen: (props: unknown) => Element; preload: () => unknown }
+  }>("navigation/deferredScreenBundles.tsx", runtime, {
+    modules: { "../screens/MyRoomScreen": {} },
+    inertUnknown: true
+  })
+  let loads = 0
+  const RealScreen = () => null
+  const bundle = createDeferredScreen(() => { loads += 1; return RealScreen })
 
-  assert.match(registerSource, /import \{[\s\S]*useLayoutEffect[\s\S]*\} from "react"/)
-  assert.match(
-    registerSource,
-    /useLayoutEffect\(\(\) => \{[\s\S]*?onCreateFlowStageChange\?\./
-  )
+  const first = runtime.render(() => bundle.DeferredScreen({ step: "profile" }))
+  assert.equal(first.type, RealScreen)
+  assert.equal(first.props.step, "profile")
+  runtime.rerender()
+  assert.equal(bundle.preload(), RealScreen)
+  assert.equal(loads, 1, "the screen module loads once and is reused")
 })
 
-test("pre-auth CTA commits the visible step before draft persistence can resolve", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
-  const visibleStepCommit = coordinatorSource.indexOf("setStep(nextStep)")
-  const draftPersistence = coordinatorSource.indexOf("await persistDraftInOrder(nextDraft, nextStep)")
-
-  assert.ok(visibleStepCommit >= 0)
-  assert.ok(draftPersistence >= 0)
-  assert.ok(
-    visibleStepCommit < draftPersistence,
-    "the CTA must not wait on storage before showing the next setup step"
-  )
-  assert.match(coordinatorSource, /optimisticDraft/)
-})
-
-test("pre-auth back navigation keeps the optimistic draft during an in-flight save", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
-
-  assert.match(
-    coordinatorSource,
-    /const moveTo = useCallback\(async \([\s\S]*?nextDraft = renderedDraft/
-  )
-})
+function loadShell(runtime: FakeReactRuntime) {
+  return loadSourceWithFakeReact<{
+    BlumiSetupShell: (props: Record<string, unknown>) => Element
+  }>("features/session/setupFlow/BlumiSetupShell.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub({
+        Keyboard: { addListener: () => ({ remove: () => undefined }) },
+        KeyboardAvoidingView: "KeyboardAvoidingView"
+      }).module,
+      "../../../ui/animations": { useReducedMotion: () => false },
+      "./setupFlowShellModel": setupFlowShellModel,
+      "./setupFlowLocale": {
+        getCurrentSetupFlowCopy: () => ({
+          steps: new Proxy({}, { get: () => ({ title: "", description: "", primaryAction: "" }) })
+        })
+      }
+    },
+    inertUnknown: true
+  })
+}
 
 test("reactivated setup layers reset their scroll position before paint", () => {
-  const shellSource = readFileSync(
-    fileURLToPath(new URL("BlumiSetupShell.tsx", import.meta.url)),
-    "utf8"
-  )
+  const runtime = createFirstFrameRuntime()
+  const { BlumiSetupShell } = loadShell(runtime)
+  const scrolls: unknown[] = []
+  let motionActive = false
+  const props = () => ({ step: "avatar", onBack: () => undefined, onPrimaryAction: () => undefined, motionActive })
 
-  assert.match(
-    shellSource,
-    /useLayoutEffect\(\(\) => \{[\s\S]*?if \(!motionActive\) return[\s\S]*?scrollRef\.current\?\.scrollTo\(\{ y: 0, animated: false \}\)/
-  )
+  runtime.render(() => BlumiSetupShell(props()))
+  const [scrollView] = findElements(runtime.output, (element) => element.type === "ScrollView")
+  assert.ok(scrollView, "the shell renders a scroll view")
+  scrollView.props.ref.current = { scrollTo: (options: unknown) => { scrolls.push(options) } }
+  assert.deepEqual(scrolls, [])
+
+  motionActive = true
+  runtime.rerender()
+  assert.deepEqual(scrolls, [{ y: 0, animated: false }])
 })
 
-test("a newly visible setup CTA is not blocked by the previous step's debounce window", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
+function loadPreAuthFlow(runtime: FakeReactRuntime) {
+  const reanimated = createReanimatedStub(runtime)
+  const exports = loadSourceWithFakeReact<{
+    PreAuthSetupFlowScreen: (props: Record<string, unknown>) => Element
+    PersistentStepLayer: (props: Record<string, unknown>) => Element
+  }>("screens/PreAuthSetupFlowScreen.tsx", runtime, {
+    modules: {
+      "@react-navigation/native": { usePreventRemove: () => undefined },
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": reanimated.module,
+      "../features/session/onboardingFlowModel": onboardingFlowModel,
+      "../analytics/productAnalytics": { captureProductEvent: () => undefined },
+      "../features/session/setupFlow/setupFlowLocale": {
+        getCurrentSetupFlowCopy: () => ({ room: { continueAction: "Continue" } })
+      },
+      "../ui/animations": { useReducedMotionPreference: () => ({ reduceMotion: false, isResolved: true }) },
+      "../ui/theme": { uiTheme: { animation: { springSnappy: {} } } },
+      "./AvatarSetupScreen": { AvatarSetupScreen: "AvatarSetupScreen" },
+      "./ProfileSetupScreen": { ProfileSetupScreen: "ProfileSetupScreen" },
+      "./RegisterScreen": { RegisterScreen: "RegisterScreen" },
+      "./RoomSetupScreen": { RoomSetupScreen: "RoomSetupScreen" }
+    }
+  })
+  return { ...exports, reanimated }
+}
 
-  assert.doesNotMatch(
-    coordinatorSource,
-    /transitionUnlockTimerRef|transitionLockedRef\.current = setTimeout/
+function activeScreen(runtime: FakeReactRuntime): string | undefined {
+  const active = findElements(
+    runtime.output,
+    (element) => typeof element.type === "string" && element.type.endsWith("Screen") && element.props.motionActive === true
   )
-  assert.match(
-    coordinatorSource,
-    /transitionLockedStepRef\.current === step/
-  )
-})
+  assert.ok(active.length <= 1, "only one setup step is active at a time")
+  return active[0]?.type as string | undefined
+}
 
-test("heavy setup steps mount only after their first activation and then stay mounted", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
+test("pre-auth CTA shows the next setup step before draft persistence resolves", async () => {
+  const runtime = createFirstFrameRuntime()
+  const { PreAuthSetupFlowScreen } = loadPreAuthFlow(runtime)
+  let releasePersistence!: () => void
+  const persisted: string[] = []
+  runtime.render(() => PreAuthSetupFlowScreen({
+    navigation: { navigate: () => undefined, dispatch: () => undefined },
+    initialStep: "profile",
+    draft: {},
+    isSubmitting: false,
+    errorMessage: null,
+    onPersistDraft: (_draft: unknown, step: string) => new Promise<void>((resolve) => {
+      persisted.push(step)
+      releasePersistence = resolve
+    }),
+    onClearDraft: async () => undefined,
+    onRequestVerificationCode: async () => undefined,
+    onRegister: async () => undefined,
+    onClearError: () => undefined
+  }))
+  assert.equal(activeScreen(runtime), "ProfileSetupScreen")
 
-  assert.match(
-    coordinatorSource,
-    /const \[mountedSteps, setMountedSteps\] = useState<ReadonlySet<PreAuthSetupStep>>/
-  )
-  assert.match(
-    coordinatorSource,
-    /new Set\(\[initialStep\]\)/,
-    "the resumed entry step must mount immediately"
-  )
-  assert.match(
-    coordinatorSource,
-    /setMountedSteps\(\(currentSteps\)[\s\S]*currentSteps\.has\(step\)[\s\S]*new Set\(\[\.\.\.currentSteps, step\]\)/,
-    "activating a step must add it immutably without removing visited steps"
-  )
+  const [profile] = findElements(runtime.output, (element) => element.type === "ProfileSetupScreen")
+  const completion = profile.props.onComplete({ displayName: "Ada" })
+  assert.equal(activeScreen(runtime), "AvatarSetupScreen", "the next step is visible while storage is pending")
+  const [avatar] = findElements(runtime.output, (element) => element.type === "AvatarSetupScreen")
+  assert.equal(avatar.props.displayName, "Ada", "the optimistic draft feeds the next step")
 
-  for (const [step, screen] of [
-    ["avatar", "AvatarSetupScreen"],
-    ["room", "RoomSetupScreen"],
-    ["phone", "RegisterScreen"]
-  ] as const) {
-    assert.match(
-      coordinatorSource,
-      new RegExp(`mountedSteps\\.has\\("${step}"\\)[\\s\\S]*?<${screen}`),
-      `${screen} must not mount before ${step} is activated`
-    )
-  }
-})
-
-test("the authored world handoff is not composited with a second native fade", () => {
-  const navigatorSource = readFileSync(
-    fileURLToPath(new URL("RootNavigator.tsx", NAVIGATION_ROOT)),
-    "utf8"
-  )
-  const preAuthRoute = navigatorSource.match(
-    /<Stack\.Screen\s+name="PreAuthSetup"[\s\S]*?<Stack\.Screen\s+name="Register"/
-  )?.[0] ?? ""
-
-  assert.match(preAuthRoute, /animation: "none"/)
-  assert.doesNotMatch(preAuthRoute, /animation: "fade"/)
+  await Promise.resolve()
+  assert.deepEqual(persisted, ["avatar"])
+  releasePersistence()
+  await completion
+  assert.equal(activeScreen(runtime), "AvatarSetupScreen")
 })
 
 test("a repeated Whoa entry applies the requested setup step before paint", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
+  const runtime = createFirstFrameRuntime()
+  const { PreAuthSetupFlowScreen } = loadPreAuthFlow(runtime)
+  let initialStep = "room"
+  const render = () => runtime.render(() => PreAuthSetupFlowScreen({
+    navigation: { navigate: () => undefined, dispatch: () => undefined },
+    initialStep,
+    draft: {},
+    isSubmitting: false,
+    errorMessage: null,
+    onPersistDraft: async () => undefined,
+    onClearDraft: async () => undefined,
+    onRequestVerificationCode: async () => undefined,
+    onRegister: async () => undefined,
+    onClearError: () => undefined
+  }))
 
-  assert.match(coordinatorSource, /useLayoutEffect\(\(\) => \{[\s\S]*setStep/)
-  assert.doesNotMatch(
-    coordinatorSource,
-    /useEffect\(\(\) => \{[\s\S]*?setStep\(\(currentStep\)[\s\S]*?\}, \[initialStep\]\)/,
-    "route-param reconciliation must not leave the previous setup UI visible for one frame"
-  )
+  render()
+  assert.equal(activeScreen(runtime), "RoomSetupScreen")
+  initialStep = "profile"
+  render()
+  assert.equal(activeScreen(runtime), "ProfileSetupScreen")
 })
 
 test("persistent setup layers do not animate from an empty first frame", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
+  const layerStyle = (props: Record<string, unknown>) => {
+    const runtime = createFirstFrameRuntime()
+    const { PersistentStepLayer, reanimated } = loadPreAuthFlow(runtime)
+    const first = runtime.render(() => PersistentStepLayer({ children: null, ...props }))
+    // A second render reads the shared values the layout phase left behind.
+    const output = runtime.rerender() as Element
+    return {
+      first: flattenStyle(first.props.style),
+      style: flattenStyle(output.props.style),
+      timings: reanimated.timings
+    }
+  }
 
-  assert.match(coordinatorSource, /useSharedValue\(active && !animateOnMount \? 1 : 0\)/)
-  assert.match(coordinatorSource, /useSharedValue\(reduceMotion \? 0 : direction \* 8\)/)
-  assert.match(
-    coordinatorSource,
-    /useLayoutEffect\(\(\) => \{[\s\S]*?if \(!didMountRef\.current\)[\s\S]*?didMountRef\.current = true/
-  )
-  assert.match(
-    coordinatorSource,
-    /if \(active && animateOnMount && !reduceMotion\)[\s\S]*opacity\.value = 0[\s\S]*withTiming\(1/
-  )
-})
+  const resumed = layerStyle({ direction: 0 })
+  assert.equal(resumed.first.opacity, 1, "an already active layer is opaque on its first frame")
+  assert.equal(resumed.style.opacity, 1)
+  assert.deepEqual(resumed.timings, [])
 
-test("Whoa handoff enters the profile flow with one bounded native bridge", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
-  const authSource = readScreen("AuthEntryScreen.tsx")
+  const hidden = layerStyle({ direction: 1 })
+  assert.equal(hidden.style.opacity, 0)
 
-  assert.match(coordinatorSource, /entryMotion === "world-handoff" \? 0 : 1/)
-  assert.match(coordinatorSource, /if \(!motionPreferenceResolved\) \{[\s\S]*entryProgress\.value = 0/)
-  assert.match(coordinatorSource, /if \(reduceMotion\) \{[\s\S]*entryProgress\.value = 1/)
-  assert.match(coordinatorSource, /duration: 240/)
-  assert.match(coordinatorSource, /translateY: 12 \* \(1 - entryProgress\.value\)/)
-  assert.match(authSource, /entryMotion: "world-handoff"/)
-})
+  const entering = layerStyle({ direction: 0, animateOnMount: true })
+  assert.deepEqual(entering.timings, [1], "a newly activated layer fades in from its first frame")
 
-test("deferred auth destinations resolve before their first visible frame", () => {
-  const bundlesSource = readFileSync(
-    fileURLToPath(new URL("../../../navigation/deferredScreenBundles.tsx", import.meta.url)),
-    "utf8"
-  )
-
-  assert.match(bundlesSource, /const Component = preload\(\)/)
-  assert.doesNotMatch(
-    bundlesSource,
-    /if \(!Component\) return <DeferredRouteFallback \/>/,
-    "a fallback frame lets the destination paint incorrectly before the real setup screen mounts"
-  )
-})
-
-test("shared onboarding entrances establish their initial frame before paint", () => {
-  const animationsSource = readFileSync(
-    fileURLToPath(new URL("../../../ui/animations.ts", import.meta.url)),
-    "utf8"
-  )
-  const entranceSource = animationsSource.slice(
-    animationsSource.indexOf("export function useEntranceAnimation"),
-    animationsSource.indexOf("/* ── Staggered List Entrance")
-  )
-
-  assert.match(entranceSource, /useLayoutEffect\(\(\) => \{[\s\S]*progress\.setValue\(1\)/)
-  assert.doesNotMatch(
-    entranceSource,
-    /useEffect\(\(\) => \{[\s\S]*progress\.setValue\(1\)/,
-    "post-paint entrance setup can expose a one-frame blank or incorrect onboarding surface"
-  )
-})
-
-test("the shared progress rail has the correct fill before its width is measured", () => {
-  const progressSource = readFileSync(
-    fileURLToPath(new URL("SetupFlowProgress.tsx", import.meta.url)),
-    "utf8"
-  )
-
-  assert.match(progressSource, /useLayoutEffect/)
-  assert.match(progressSource, /railWidth\.value > 0/)
-  assert.match(progressSource, /progress\.value \* 100/)
-})
-
-test("authenticated onboarding warms deferred setup routes and uses one light native fade", () => {
-  const navigatorSource = readFileSync(
-    fileURLToPath(new URL("RootNavigator.tsx", NAVIGATION_ROOT)),
-    "utf8"
-  )
-  const authenticatedPreloadEffect = navigatorSource.match(
-    /useEffect\(\(\) => \{\s*if \(sessionEntryRoute === "AuthEntry"\)[\s\S]*?\}, \[onboardingEntryRoute, sessionEntryRoute\]\)/
-  )?.[0] ?? ""
-  const onboardingRoutes = navigatorSource.match(
-    /<Stack\.Screen\s+name="ProfileSetup"[\s\S]*?<Stack\.Screen\s+name="RoomSetup"[\s\S]*?\) : \(/
-  )?.[0] ?? ""
-
-  assert.match(authenticatedPreloadEffect, /if \(sessionEntryRoute === "AuthEntry"\)/)
-  assert.match(authenticatedPreloadEffect, /preloadDeferredAuthScreens\(\)/)
-  assert.match(authenticatedPreloadEffect, /if \(onboardingEntryRoute\)/)
-  assert.match(authenticatedPreloadEffect, /preloadDeferredAuthenticatedOnboardingScreens\(\)/)
-  assert.match(onboardingRoutes, /name="ProfileSetup"[\s\S]*animation: "fade"/)
-  assert.match(onboardingRoutes, /name="AvatarSetup"[\s\S]*animation: "fade"/)
-  assert.match(onboardingRoutes, /name="RoomSetup"[\s\S]*animation: "fade"/)
-})
-
-test("setup layers crossfade vertically without shifting mismatched sheets sideways", () => {
-  const coordinatorSource = readScreen("PreAuthSetupFlowScreen.tsx")
-
-  assert.match(coordinatorSource, /translateY: translateY\.value/)
-  assert.match(coordinatorSource, /direction \* 8/)
-  assert.doesNotMatch(coordinatorSource, /translateX: translateAnimation/)
-  assert.doesNotMatch(coordinatorSource, /scale: scaleAnimation/)
-})
-
-test("the shared setup shell keeps the same stage to heading to task-card order", () => {
-  const shellSource = readFileSync(
-    fileURLToPath(new URL("BlumiSetupShell.tsx", import.meta.url)),
-    "utf8"
-  )
-  assert.match(
-    shellSource,
-    /<SetupFlowMotionSwap[\s\S]*?<SetupFlowStage[\s\S]*?<\/SetupFlowMotionSwap>[\s\S]*?<SetupFlowMotionSwap[\s\S]*?styles\.headingBlock[\s\S]*?<\/SetupFlowMotionSwap>[\s\S]*?<SetupFlowMotionSwap[\s\S]*?SetupFlowTaskCard/s
-  )
+  const reduced = layerStyle({ direction: 1, reduceMotion: true })
+  assert.deepEqual(flattenStyle(reduced.style).transform, [{ translateY: 0 }])
 })

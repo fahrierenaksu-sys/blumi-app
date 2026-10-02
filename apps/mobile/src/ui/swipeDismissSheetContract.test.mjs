@@ -1,81 +1,22 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
+import { findPerFrameJsWork } from "../testing/gestureFrameWorkGuard.mjs"
 
-// Source contracts for swipe-down-to-dismiss. The release and claim rules
-// are covered by sheetDismissModel.test.ts; this pins the wiring.
-const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
+// The swipe-dismiss sheet's drag runs on the UI thread: no JS work on any
+// drag or scroll frame. The tree-wide form of this guard lives in
+// src/ui/gestureFrameWork.test.mjs; the release, backdrop and Reduce Motion
+// exit rules are behavior-tested in sheetDismissModel.test.ts.
+// This file stays because apps/mobile/package.json test:accessibility lists
+// it; delete it together with that entry at the next native build.
+const sourceRoot = fileURLToPath(new URL("..", import.meta.url))
 
-const sheet = read("./SwipeDismissSheet.tsx")
-const filters = read("../components/DiscoverFiltersBottomSheet.tsx")
-const report = read("../components/ReportModal.tsx")
-// The filters close label is localised; its English wording is unchanged.
-const filtersCopy = read("../features/discovery/discoveryHomeCopy.ts")
-
-test("every bottom sheet uses the one shared swipe-dismiss surface", () => {
-  for (const [name, source] of [["filters", filters], ["report", report]]) {
-    assert.match(source, /import \{ GestureHandlerRootView \} from "react-native-gesture-handler"/, `${name}: gestures work inside the Modal on Android`)
-    assert.match(source, /<Modal[\s\S]*?<GestureHandlerRootView style=\{styles\.overlay\}>[\s\S]*?<SwipeDismissSheet[\s\S]*?<\/SwipeDismissSheet>\s*<\/GestureHandlerRootView>\s*<\/Modal>/, name)
-    assert.doesNotMatch(source, /PanResponder/, `${name}: no second gesture mechanism`)
-  }
-  assert.match(filters, /<SwipeDismissSheet\s+onDismiss=\{onClose\}/)
-  assert.match(report, /<SwipeDismissSheet\s+onDismiss=\{handleClose\}\s+enabled=\{!isSubmitting && step !== "done"\}/, "never closes mid-submit")
-})
-
-test("the backdrop belongs to the sheet and fades with the drag, so nothing trails a swipe dismiss", () => {
-  // The Modal slides its whole content out after onDismiss. A backdrop tint
-  // outside the sheet stayed opaque while the sheet slid away and was then
-  // carried down by that slide: the ghost behind the sheet.
-  assert.match(sheet, /backdrop\?: SwipeDismissSheetBackdrop/)
-  assert.match(sheet, /const backdropStyle = useAnimatedStyle\(\(\) => \(\{\s*opacity: getSheetBackdropOpacity\(offset\.value, sheetHeight\.value\)/)
-  // Reduce Motion: the sheet and its backdrop leave at once before the Modal closes.
-  assert.match(sheet, /if \(reduceMotionValue\.value\) \{\s*offset\.value = getSheetExitOffset\(sheetHeight\.value\)\s*scheduleOnRN\(dismiss\)/)
-  for (const [name, source] of [["filters", filters], ["report", report]]) {
-    assert.match(source, /<SwipeDismissSheet[\s\S]*?backdrop=\{/, `${name}: backdrop is owned by the sheet`)
-    assert.doesNotMatch(source, /overlay: \{[^}]*backgroundColor/, `${name}: no static tint on the modal container`)
-  }
-  assert.doesNotMatch(filters, /<Pressable\s+accessibilityRole="button"\s+accessibilityLabel=(?:"Close discovery filters"|\{copy\.closeAccessibilityLabel\})\s+style=\{styles\.backdrop\}/, "filters: tap-to-close lives in the sheet backdrop")
-  assert.match(filters, /backdrop=\{\{\s*style: styles\.backdrop,\s*onPress: onClose,\s*accessibilityLabel: copy\.closeAccessibilityLabel\s*\}\}/)
-  assert.match(filtersCopy, /closeAccessibilityLabel: "Close discovery filters"/)
-  assert.match(filtersCopy, /closeAccessibilityLabel: "Discover filtrelerini kapat"/)
-  assert.match(report, /backdrop=\{\{\s*style: styles\.backdrop\s*\}\}/)
-})
-
-test("inner scroll content keeps its touch unless it is at the top", () => {
-  assert.match(filters, /<SwipeDismissSheetScrollView[\s\S]*?<\/SwipeDismissSheetScrollView>/)
-  assert.doesNotMatch(filters, /<ScrollView\b/)
-  assert.match(sheet, /startedAtTop\.value = scrollOffset\.value <= 0\.5/)
-  assert.match(sheet, /Gesture\.Native\(\)\.simultaneousWithExternalGesture\(panRef\)/)
-  assert.match(sheet, /bounces=\{false\}/)
-})
-
-test("the visible close buttons stay; VoiceOver escape also closes", () => {
-  // Backdrop tap (in the sheet's backdrop prop) and the visible close button.
-  assert.match(filters, /backdrop=\{\{[\s\S]*?onPress: onClose,\s*accessibilityLabel: copy\.closeAccessibilityLabel[\s\S]*?accessibilityLabel=\{copy\.closeAccessibilityLabel\}[\s\S]*?onPress=\{onClose\}/)
-  assert.match(sheet, /<Pressable\s+accessibilityRole="button"\s+accessibilityLabel=\{backdrop\.accessibilityLabel\}[\s\S]*?onPress=\{backdropPress\}/)
-  assert.match(report, /accessibilityLabel=\{copy\.closeAccessibilityLabel\}[\s\S]*?onPress=\{handleClose\}/)
-  assert.match(sheet, /onAccessibilityEscape=\{enabled \? dismiss : undefined\}/)
-})
-
-test("the drag runs on the UI thread and Reduce Motion comes from the shared store", () => {
-  assert.match(sheet, /import \{ useReducedMotion \} from "\.\/animations"/)
-  assert.doesNotMatch(sheet, /AccessibilityInfo/)
-  const onUpdate = sheet.slice(sheet.indexOf(".onUpdate("), sheet.indexOf(".onEnd("))
-  assert.match(onUpdate, /"worklet"/)
-  assert.doesNotMatch(onUpdate, /scheduleOnRN|runOnJS|set[A-Z]\w*\(/, "no JS work per frame")
-  // JS hears once, when the sheet closes (a swipe, or a backdrop/close button
-  // that plays the same exit first: SYS-4).
-  assert.deepEqual((sheet.match(/scheduleOnRN\((\w+)/g) ?? []).sort(), ["scheduleOnRN(dismiss", "scheduleOnRN(dismiss", "scheduleOnRN(finish"])
-  assert.match(sheet, /if \(reduceMotionValue\.value\) \{\s*offset\.value = getSheetExitOffset\(sheetHeight\.value\)\s*scheduleOnRN\(dismiss\)/)
-})
-
-test("every way out leaves like a swipe, with the release speed and no bounce (SYS-4, SYS-5)", () => {
-  assert.match(sheet, /\.\.\.SHEET_EXIT_SPRING,\s*velocity: getSheetExitVelocity\(event\.velocityY\)/)
-  assert.doesNotMatch(sheet, /withTiming\(/, "no fixed-duration exit")
-  // Backdrop tap and close buttons run the same exit before their callback.
-  assert.match(sheet, /onBackdropPress \? \(\) => closeWith\(onBackdropPress\)/)
-  assert.match(sheet, /export function useSwipeDismissSheetClose\(\)/)
-  // Opt-in self presentation: rises with a spring, backdrop fades with it.
-  assert.match(sheet, /presentation\?: "modal" \| "self"/)
-  assert.match(sheet, /offset\.value = withSpring\(0, \{ \.\.\.SHEET_ENTER_SPRING/)
+test("the bottom sheet drag never schedules JS work per frame", () => {
+  const files = [
+    "ui/SwipeDismissSheet.tsx",
+    "components/ReportModal.tsx",
+    "components/DiscoverFiltersBottomSheet.tsx",
+    "features/shop/screen/ShopCheckoutSheet.tsx"
+  ].map((path) => fileURLToPath(new URL(`../${path}`, import.meta.url)))
+  assert.deepEqual(findPerFrameJsWork(files, sourceRoot), [])
 })

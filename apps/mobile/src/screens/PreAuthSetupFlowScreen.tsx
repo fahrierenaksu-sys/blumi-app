@@ -75,7 +75,7 @@ export interface PreAuthSetupFlowScreenProps extends SetupNavigationProps {
 
 type PreAuthSetupDraft = PreAuthSetupFlowScreenProps["draft"]
 
-function PersistentStepLayer({
+export function PersistentStepLayer({
   direction,
   children,
   reduceMotion = false,

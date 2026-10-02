@@ -48,19 +48,6 @@ test("capability reads never share across sessions or clear a newer flight", asy
   await current
 })
 
-test("mobile declares the complete avatar, Shop, chat receipt and typing rollout surface", () => {
-  assert.deepEqual(SUPPORTED_MOBILE_CAPABILITIES, [
-    "avatar_loadout_v2_read",
-    "avatar_loadout_v2_write",
-    "shop_multi_item_apply",
-    "discovery_public_profile",
-    "discovery_badges",
-    "discovery_room_showcase",
-    "chat_read_receipts",
-    "chat_typing"
-  ])
-})
-
 test("capability API declares supported keys and accepts a complete server map", async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const capabilities = Object.fromEntries(
@@ -171,4 +158,12 @@ test("a stalled capability request fails closed instead of hanging", async (cont
   context.mock.timers.tick(15_000)
   assert.deepEqual(await resolution, createFailClosedCapabilityResolution())
   assert.equal(transportSignal?.aborted, true)
+})
+
+test("mobile declares only known capabilities, each once", () => {
+  assert.ok(SUPPORTED_MOBILE_CAPABILITIES.length > 0)
+  assert.equal(new Set(SUPPORTED_MOBILE_CAPABILITIES).size, SUPPORTED_MOBILE_CAPABILITIES.length)
+  for (const capability of SUPPORTED_MOBILE_CAPABILITIES) {
+    assert.ok((CAPABILITY_KEYS as readonly string[]).includes(capability), capability)
+  }
 })

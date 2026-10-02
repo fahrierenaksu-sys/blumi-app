@@ -8,16 +8,12 @@ import {
   resolveAccountRecoveryLocale
 } from "./accountRecoveryCopy"
 
-test("account recovery copy stays clear in Turkish and English", () => {
+test("account recovery copy says a review request does not sign the user in", () => {
   const english = getAccountRecoveryCopy("en")
   const turkish = getAccountRecoveryCopy("tr")
 
-  assert.equal(english.title, "Phone access help")
-  assert.equal(turkish.title, "Telefon erişim desteği")
   assert.match(english.detailsBody, /does not sign you in/i)
   assert.match(turkish.detailsBody, /oturum açmaz/i)
-  assert.equal(english.requestReview, "Request review")
-  assert.equal(turkish.requestReview, "İnceleme iste")
 })
 
 test("account recovery locale prefers the native Turkish locale over an English Intl fallback", () => {

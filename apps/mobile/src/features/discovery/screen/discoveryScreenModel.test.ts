@@ -88,6 +88,11 @@ test("placeholder state stays fail-closed until filters and the safety list are 
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, isProductionDiscovery: false, hasError: true }), "empty")
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, hasError: true }), "error")
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, safetyHydrationFailed: true, isSafetyListReady: false }), "error")
+  assert.equal(
+    resolveProductionDiscoveryPlaceholderState({ ...base, isSafetyListReady: false, safetyHydrationFailed: true, hasCachedProfiles: true }),
+    "error",
+    "a failed safety hydration shows an error without revealing cached cards"
+  )
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, isSafetyListReady: false, hasCachedProfiles: true }), "loading")
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, filtersReady: false }), "loading")
   assert.equal(resolveProductionDiscoveryPlaceholderState({ ...base, queryLoading: true }), "loading")

@@ -50,16 +50,7 @@ const eyes = product(avatarItem("avatar_v2_eyes_soft", "eyes"))
 const nose = product(avatarItem("avatar_v2_nose_soft", "nose"))
 const mouth = product(avatarItem("avatar_v2_mouth_soft", "mouth"))
 
-test("avatar categories follow the approved catalog order", () => {
-  assert.deepEqual(SHOP_AVATAR_CATEGORY_ORDER, [
-    "top",
-    "bottom",
-    "dress",
-    "outerwear",
-    "shoes",
-    "accessory",
-    "hair"
-  ])
+test("avatar categories never include the featured or owned pseudo-categories", () => {
   assert.ok(!SHOP_AVATAR_CATEGORY_ORDER.includes("featured" as never))
   assert.ok(!SHOP_AVATAR_CATEGORY_ORDER.includes("owned" as never))
 })

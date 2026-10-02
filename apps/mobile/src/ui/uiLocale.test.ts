@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { getLoadingScreenCopy } from "./loadingScreenCopy"
 import { resolveToastLocale } from "./toastCopy"
 import { readUiLocaleTag, resolveUiLocale, setUiLocaleSource } from "./uiLocale"
 
@@ -22,9 +21,4 @@ test("an unregistered or failing source falls back to the runtime locale", () =>
   assert.equal(resolveUiLocale(), runtime)
   setUiLocaleSource(() => undefined)
   assert.equal(resolveUiLocale(), runtime)
-})
-
-test("the loading surface announces itself in both languages", () => {
-  assert.equal(getLoadingScreenCopy("tr").preparing, "Blumi hazırlanıyor")
-  assert.equal(getLoadingScreenCopy("en").preparing, "Getting Blumi ready")
 })

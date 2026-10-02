@@ -62,14 +62,16 @@ try {
     ],
     {
       cwd: workspaceRoot,
-      stdio: "inherit"
+      stdio: "inherit",
+      // reportModalCopy.test.ts reads REPORT_REASONS from @blumi/contracts.
+      env: { ...process.env, NODE_PATH: resolve(workspaceRoot, "../../node_modules") }
     }
   )
 
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/safety/useBlockStore.test.ts"],
+    ["--import", "tsx", "--test", "src/features/safety/useBlockStore.test.ts", "src/features/safety/partnerBlockedWiring.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {

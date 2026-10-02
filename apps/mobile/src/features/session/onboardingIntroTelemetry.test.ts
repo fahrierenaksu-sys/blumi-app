@@ -5,8 +5,7 @@ import {
   createOnboardingIntroTelemetry,
   getOnboardingIntroBeatEvent,
   getOnboardingIntroPerformanceEvent,
-  recordOnboardingFrameGaps,
-  recordOnboardingFrameSample
+  recordOnboardingFrameGaps
 } from "./onboardingIntroTelemetry"
 
 test("intro beat events are idempotent per beat and stay analytics-safe", () => {
@@ -42,12 +41,10 @@ test("intro beat events are idempotent per beat and stay analytics-safe", () => 
   )
 })
 
-test("frame samples produce a bounded performance payload for intro completion", () => {
+test("UI-thread frame gaps produce a bounded performance payload for intro completion", () => {
   const telemetry = createOnboardingIntroTelemetry(1_000, 1_180)
 
-  recordOnboardingFrameSample(telemetry, 1_016)
-  recordOnboardingFrameSample(telemetry, 1_033)
-  recordOnboardingFrameSample(telemetry, 1_086)
+  recordOnboardingFrameGaps(telemetry, [17, 53])
 
   assert.deepEqual(
     getOnboardingIntroPerformanceEvent(telemetry, {

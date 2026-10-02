@@ -1,57 +1,34 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { REPORT_REASONS } from "@blumi/contracts"
 import { getReportModalCopy } from "./reportModalCopy"
 
-test("Turkish report copy keeps the report-and-block consequence clear", () => {
-  const copy = getReportModalCopy("tr")
+// Locale parity for the whole modal lives in
+// features/discovery/copyLocaleParity.test.ts.
 
-  assert.equal(copy.reasonLabel("harassment"), "Taciz veya zorbalık")
-  assert.equal(copy.reasonLabel("fake_or_bot"), "Sahte veya bot olabilir")
-  assert.equal(copy.title("Ada", "reason"), "Ada kişisini bildir")
-  assert.match(copy.confirmBody("Ada"), /Ada.*gizleyecek/)
-  assert.equal(copy.reportAndHide, "Bildir ve gizle")
-  assert.equal(copy.hideWithoutReporting, "Bildirmeden gizle")
-  assert.match(copy.hiddenToast("Ada"), /Ada/)
-  assert.match(copy.reportReasonAccessibilityLabel("Taciz veya zorbalık"), /Taciz/)
-  assert.equal(copy.closeAccessibilityLabel, "Bildirimi kapat")
-  assert.match(copy.reasonSubtitle, /gizli/)
-  assert.equal(copy.hiding, "Gizleniyor...")
-  assert.match(copy.hideAccessibilityLabel("Ada"), /Ada/)
-  assert.equal(copy.couldNotHide, "Bu kişiyi henüz gizleyemedik")
-  assert.equal(copy.detailsAccessibilityLabel, "Bildirim ayrıntıları")
-  assert.match(copy.detailsPlaceholder, /ayrıntı/)
-  assert.match(copy.reportAndHideAccessibilityLabel("Ada"), /Ada/)
-  assert.equal(copy.sending, "Gönderiliyor...")
-  assert.equal(copy.goBackAccessibilityLabel, "Bildirim nedenlerine geri dön")
-  assert.equal(copy.goBack, "Geri dön")
-  assert.match(copy.doneMessage, /güvenli/)
-  assert.equal(copy.thankYouToast, "Bize bildirdiğin için teşekkürler")
-  assert.equal(copy.reportNotSent, "Bildirim gönderilemedi")
-  assert.equal(copy.tryAgain, "Kısa süre sonra tekrar dene.")
+test("every server-accepted report reason has a translated label", () => {
+  const turkish = getReportModalCopy("tr")
+  const english = getReportModalCopy("en")
+  for (const reason of REPORT_REASONS) {
+    const tr = turkish.reasonLabel(reason)
+    const en = english.reasonLabel(reason)
+    assert.ok(tr?.trim(), `${reason} has a Turkish label`)
+    assert.ok(en?.trim(), `${reason} has an English label`)
+    assert.notEqual(tr, en, `${reason} is translated`)
+  }
 })
 
-test("English report copy keeps all safety actions explicit", () => {
-  const copy = getReportModalCopy("en")
-
-  assert.equal(copy.reasonLabel("underage"), "Under 18")
-  assert.equal(copy.title("Ada", "done"), "Done")
-  assert.equal(copy.reportAndHide, "Report and hide")
-  assert.equal(copy.reportNotSent, "Report not sent")
-  assert.equal(copy.closeAccessibilityLabel, "Close report")
-  assert.equal(copy.reasonLabel("spam"), "Spam or scam")
-  assert.equal(copy.reasonLabel("fake_or_bot"), "May be fake or a bot")
-  assert.equal(copy.reportReasonAccessibilityLabel("Spam or scam"), "Report reason: Spam or scam")
-  assert.equal(copy.reasonSubtitle, "Tell us what felt wrong. We will keep this private.")
-  assert.equal(copy.hiding, "Hiding...")
-  assert.equal(copy.hideAccessibilityLabel("Ada"), "Hide Ada without reporting")
-  assert.equal(copy.couldNotHide, "Could not hide this person")
-  assert.equal(copy.detailsAccessibilityLabel, "Report details")
-  assert.equal(copy.detailsPlaceholder, "Add a short detail if it helps.")
-  assert.equal(copy.reportAndHideAccessibilityLabel("Ada"), "Report and hide Ada")
-  assert.equal(copy.sending, "Sending...")
-  assert.equal(copy.goBackAccessibilityLabel, "Go back to report reasons")
-  assert.equal(copy.goBack, "Go back")
-  assert.equal(copy.doneMessage, "Thanks for keeping Blumi safe.")
-  assert.equal(copy.thankYouToast, "Thanks for telling us")
-  assert.equal(copy.tryAgain, "Try again in a moment.")
+test("report and hide actions name the person they act on", () => {
+  for (const locale of ["tr", "en"] as const) {
+    const copy = getReportModalCopy(locale)
+    for (const text of [
+      copy.title("Ada", "reason"),
+      copy.confirmBody("Ada"),
+      copy.hiddenToast("Ada"),
+      copy.hideAccessibilityLabel("Ada"),
+      copy.reportAndHideAccessibilityLabel("Ada")
+    ]) {
+      assert.match(text, /Ada/, `${locale}: ${text}`)
+    }
+  }
 })

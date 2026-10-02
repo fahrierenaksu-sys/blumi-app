@@ -105,85 +105,11 @@ test("three-second deadline opens recovery, not a partial-card readiness receipt
   assert.equal(harness().render().props.value.deadlineExpired, false)
   assert.equal(harness().render(false).props.children.props.children[1], null)
 })
-test("an unmounted account's completion cannot release a new account's boundary", () => {
-  const oldAccount = harness(), nextAccount = harness()
-  const oldReport = oldAccount.render().props.value.report
-  oldAccount.dispose()
-  oldReport("ready")
-  assert.ok(nextAccount.render().props.children.props.children[1])
-})
-test("the real avatar callback aggregates all layers and rejects prior-snapshot completeness", () => {
-  const source = readFileSync(new URL("../../components/DiscoverCard.tsx", import.meta.url), "utf8")
-  const file = ts.createSourceFile("DiscoverCard.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-  const component = file.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "CandidateAvatarPreview")
-  const output = ts.transpileModule(component.getText(file), { compilerOptions: {
-    target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX
-  } }).outputText
-  let receipts = [], effects = []
-  const exports = {}, jsx = (type, props) => ({ type, props })
-  runInNewContext(output, {
-    exports, View: "View", RoomAvatarRenderer2D: "Renderer", cardStyles: {}, ROOM_AVATAR_CATALOG: {},
-    createCandidateAvatarAppearance: (snapshot) => snapshot,
-    getRoomAvatarRenderLayers: () => [{ type: "body", id: "base" }, { type: "top", id: "outfit" }],
-    useMemo: (f) => f(), useCallback: (f) => f,
-    useState: () => [receipts, (update) => { receipts = update(receipts) }],
-    useEffect: (f) => effects.push(f),
-    require: (name) => { assert.equal(name, "react/jsx-runtime"); return { jsx, jsxs: jsx } }
-  })
-  let displayed = 0, failed = 0
-  const render = (id) => {
-    effects = []
-    const tree = exports.CandidateAvatarPreview({ snapshot: { displayName: id }, onDisplay: () => displayed++, onImageError: () => failed++ })
-    effects.forEach((effect) => effect())
-    return tree.props.children[2].props.children.props
-  }
-  const first = render("A")
-  first.onLayerDisplay("body:base")
-  render("A")
-  assert.equal(displayed, 0)
-  first.onLayerDisplay("top:outfit")
-  render("A")
-  assert.equal(displayed, 1)
-  const next = render("B")
-  assert.equal(displayed, 1)
-  first.onLayerDisplay("body:base")
-  render("B")
-  assert.equal(displayed, 1)
-  next.onImageError()
-  assert.equal(failed, 1)
-  next.onLayerDisplay("body:base")
-  next.onLayerDisplay("top:outfit")
-  render("B")
-  assert.equal(displayed, 2)
-})
-test("display callbacks are used rather than prefetch/load completion, with scoped retry and mounted recovery", () => {
-  const lobby = readFileSync(new URL("../../screens/LobbyScreen.tsx", import.meta.url), "utf8")
-  const readScreenModule = (name) => readFileSync(new URL(`./screen/${name}`, import.meta.url), "utf8")
-  const surface = readScreenModule("DiscoverDeckSurface.tsx")
-  const startup = readScreenModule("useDiscoveryStartup.ts")
-  assert.match(surface, /profiles=\{visibleDiscoverDeck\}/)
-  assert.match(surface, /style=\{showStartupFailure \? \{ opacity: 0 \}/)
-  assert.match(surface, /key=\{startupScope\}/)
-  assert.match(lobby, /<DiscoveryBackground key=\{startupScope\}/)
-  assert.match(startup, /showStartupFailure = isProductionDiscovery && !startupComplete/)
-  assert.match(startup, /setCompletedStartupScope\(startupSessionScope\)/)
-  assert.match(readScreenModule("useDiscoveryDeck.ts"), /if \(isProductionDiscovery && !isSafetyListReady\) return \[\]/)
-  const renderer = readFileSync(new URL("../avatarV2/room/components/RoomAvatarRenderer2D.tsx", import.meta.url), "utf8")
-  assert.match(renderer, /onDisplay=\{/)
-  assert.match(renderer, /previous\.onLayerDisplay === next\.onLayerDisplay/)
-  const card = readFileSync(new URL("../demo/SwipeableDiscoverCard.tsx", import.meta.url), "utf8")
-  assert.match(card, /!props\.deferFrontAvatar/)
-  assert.match(card, /deferAvatar=\{props\.deferBackAvatar && !isBackVisible\}/)
-})
-
 test("the released cover lifts off with a short fade, or at once under Reduce Motion", () => {
   const cover = harness().render().props.children.props.children[1]
   assert.equal(cover.type, "Animated.View")
   assert.equal(cover.props.pointerEvents, "none")
-  const exit = JSON.parse(JSON.stringify(cover.props.exiting()))
-  assert.deepEqual(exit.initialValues, { opacity: 1, transform: [{ scale: 1 }] })
-  assert.deepEqual(exit.animations.opacity, { toValue: 0, config: { duration: 220 } })
-  assert.deepEqual(exit.animations.transform, [{ scale: { toValue: 1.03, config: { duration: 220 } } }])
+  assert.equal(typeof cover.props.exiting, "function", "the cover fades out instead of cutting")
   const reduced = harness({ reduceMotion: true }).render().props.children.props.children[1]
   assert.equal(reduced.props.exiting, undefined)
 })

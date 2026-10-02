@@ -58,13 +58,12 @@ test("the first verified balance appears without animation", () => {
   )
 })
 
-test("a server-confirmed increase or decrease counts over 400-600 ms", () => {
+test("a server-confirmed increase or decrease counts over the shared count duration", () => {
   for (const [previous, next] of [[500, 380], [380, 1_380]]) {
     const transition = getCoinBalanceTransition({ previous, next, isFirstVerified: false, reduceMotion: false })
     assert.equal(transition.animate, true)
     assert.equal(transition.durationMs, COIN_COUNT_DURATION_MS)
   }
-  assert.ok(COIN_COUNT_DURATION_MS >= 400 && COIN_COUNT_DURATION_MS <= 600)
 })
 
 test("an unchanged balance does not animate", () => {

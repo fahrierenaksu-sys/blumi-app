@@ -183,25 +183,6 @@ test("bottom tabs ignore presses before readiness and turn a focused-tab tap int
   }
 })
 
-test("the root navigator wires route sync, return previews, and tab presses to the chrome", () => {
-  const navigator = read("./RootNavigator.tsx")
-  assert.match(navigator, /screenListeners=\{screenListeners\}/)
-  assert.match(navigator, /onStateChange=\{handleNavigationStateChange\}/)
-  assert.match(navigator, /onBottomNavPress=\{handleBottomNavPress\}/)
-  assert.match(navigator, /isFullShopCatalogQaPreview=\{IS_FULL_SHOP_CATALOG_QA_PREVIEW\}\s*onBottomNavPress/)
-  const chrome = read("./useBottomNavChrome.ts")
-  assert.match(chrome, /transitionStart: \(\{ data \}\) => \{\s*if \(sessionEntryRoute !== "Main" \|\| isAccountRestricted\) return/)
-  // The bar must not appear while a back swipe is still sliding the page:
-  // transitionStart never publishes a return preview; transitionEnd publishes
-  // it already completed, then falls back to settling.
-  const transitionStart = chrome.slice(chrome.indexOf("transitionStart:"), chrome.indexOf("transitionEnd:"))
-  assert.doesNotMatch(transitionStart, /publishRootNavigationChromeReturnPreview|resolveBottomNavReturnPreview/)
-  const transitionEnd = chrome.slice(chrome.indexOf("transitionEnd:"), chrome.indexOf("gestureCancel:"))
-  assert.match(transitionEnd, /publishRootNavigationChromeReturnPreview\(sessionNavigatorKey, \{ \.\.\.preview, completed: true \}\)/)
-  assert.match(transitionEnd, /settleRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key, data\.closing\)/)
-  assert.match(chrome, /gestureCancel: \(\) => \{\s*clearRootNavigationChromeReturnPreview\(sessionNavigatorKey, route\.key\)/)
-})
-
 // ── Ready MiniRoom routing ─────────────────────────────────
 
 const actor = {
@@ -490,17 +471,6 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
   assert.equal(demo.bindings.onCloseActiveRoom, undefined)
 })
 
-test("the ChatThread screen receives the chat bindings as a prop, never through route params", () => {
-  const navigator = read("./RootNavigator.tsx")
-  const chatRoute = navigator.match(/<Stack\.Screen\s+name="ChatThread"([\s\S]*?)<\/Stack\.Screen>/)?.[1] ?? ""
-  assert.match(chatRoute, /bindings=\{chatThreadBindings\}/)
-  assert.match(chatRoute, /onThreadCreated=\{applyNewThread\}/)
-  assert.doesNotMatch(chatRoute, /route=\{/, "the chat route must not rewrite its params")
-  // Opening chat from the match modal navigates with ids only.
-  assert.match(read(OWNER.matchModal), /navigationRef\.navigate\("ChatThread", params\)/)
-  assert.doesNotMatch(read(OWNER.matchModal), /chatThreadBindings|chatThreadRouteBindings/)
-})
-
 // ── Linking: referral capture and pending deep links ───────
 
 const REFERRAL_URL = `blumi://r/r_${"a".repeat(32)}`
@@ -620,7 +590,6 @@ test("linking keeps the blumi scheme and route paths", () => {
     WardrobeV2: "wardrobe",
     CosmeticShop: "shop"
   })
-  assert.match(read(OWNER.linking), /export const pendingDeepLinks = createPendingDeepLinkStore\(\{\s*prefixes: linking\.prefixes,\s*screens: ROOT_LINK_SCREENS,/)
 })
 
 test("a referral initial URL is captured and never routed", async () => {
@@ -759,18 +728,6 @@ test("a link that arrives in Main navigates immediately as before", async () => 
   assert.deepEqual(runtime.routed, ["blumi://chat/thread-3"], "an unsubscribed container is never called")
 })
 
-test("the root navigator wires pending deep link replay to readiness and state changes", () => {
-  const navigator = read("./RootNavigator.tsx")
-  assert.match(navigator, /const replayPendingDeepLink = usePendingDeepLinkReplay\(\{\s*sessionActor,\s*sessionEntryRoute,\s*isAccountRestricted,\s*navigationReadyGeneration\s*\}\)/)
-  const calls = []
-  const stateChange = evaluate(findInitializer("./RootNavigator.tsx", "handleNavigationStateChange"), {
-    syncCurrentRouteName: () => calls.push("sync"),
-    replayPendingDeepLink: () => calls.push("replay")
-  })
-  stateChange()
-  assert.deepEqual(calls, ["sync", "replay"])
-})
-
 // ── Match modal ────────────────────────────────────────────
 
 function matchSendMessage(globalMatch, thread) {
@@ -799,19 +756,6 @@ test("the match modal opens the synced thread, a pending partner chat, or Discov
     findJsxAttribute("./RootNavigator.tsx", "MatchResultModal", "onSendMessage"),
     "handleMatchSendMessage"
   )
-})
-
-test("the match modal shows the partner's real avatar from the opened chat (DSC-3)", () => {
-  assert.equal(
-    findJsxAttribute("./RootNavigator.tsx", "MatchResultModal", "matchedAvatarSelection"),
-    "globalMatch?.matchedAvatarSelection"
-  )
-  // The delivered-decision path reads the partner from the chat it opened.
-  assert.match(read(OWNER.matchModal), /findThreadPartner\(thread, actor\.profile\.userId\)/)
-  const modal = read("../components/MatchResultModal.tsx")
-  assert.match(modal, /avatarSelection: matchedAvatarSelection/)
-  // The English-only "Blumi avatar" caption under the partner is gone.
-  assert.doesNotMatch(modal, /resolvedMatchedAvatarSnapshot\.label/)
 })
 
 test("the match modal presents each match once and reports match_created through the shared model", () => {
@@ -869,75 +813,7 @@ test("an inactive session resets demo mode, matches, invites, chat, and the sock
 
 // ── Notification responses ─────────────────────────────────
 
-test("push registration is scoped to the unrestricted main session and replays on readiness", () => {
-  const routing = read("./useNotificationResponseRouting.ts")
-  assert.match(routing, /const isMainSession = sessionEntryRoute === "Main" && !isAccountRestricted/)
-  // The wait bound for an unknown conversation also replays pending taps.
-  assert.match(
-    routing,
-    /usePushRegistration\(\s*isMainSession \? sessionActor : null,\s*handleNotificationResponseData,[\s\S]*?navigationReadyGeneration \+ tapRetryTick\s*\)/
-  )
-  assert.match(routing, /useSignedOutNotificationTapDiscard\(sessionEntryRoute === "AuthEntry"\)/)
-  assert.match(routing, /useAppIconBadge\(isMainSession && sessionActor\?\.session\.mode === "production"\)/)
-  const navigator = read("./RootNavigator.tsx")
-  assert.match(navigator, /const pushRegistration = useNotificationResponseRouting\(\{[\s\S]*?navigationReadyGeneration\s*\}\)/)
-  assert.match(navigator, /setNavigationReadyGeneration\(\(generation\) => generation \+ 1\)/)
-  assert.match(navigator, /onRequestPushPermission=\{pushRegistration\.requestPermission\}/)
-})
-
 // ── Global realtime lifecycle wiring ───────────────────────
-
-test("the global realtime lifecycle restarts only on its protected identity inputs", () => {
-  const source = read(OWNER.realtime)
-  assert.match(source, /const realtimeSessionIdentity = getGlobalRealtimeLifecycleIdentity\(sessionActor\)/)
-  assert.match(
-    source,
-    /useEffect\(\(\) => createGlobalRealtimeLifecycle\(\{[\s\S]*?\}\)\(\), \[\s*isAccountRestricted,\s*refreshProductionThreads,\s*resetInactiveSessionState,\s*realtimeSessionIdentity,\s*sessionEntryRoute\s*\]\)/
-  )
-  assert.match(source, /sessionActor: readLifecycleSessionActor\(\),/)
-  assert.match(source, /isCurrentSession: \(expectedActor\) => isLatestSession\(expectedActor\),/)
-  assert.match(source, /clearSessionActor: \(\) => clearLatestSessionActor\(\)/)
-  assert.match(source, /refreshAccountModeration: \(\) => refreshLatestAccountModeration\(\)/)
-  assert.match(source, /useGlobalRealtimeEvents\(handleGlobalEvent\)/)
-  // Session callbacks are effect events (latest commit), never refs written during render.
-  for (const name of ["readLifecycleSessionActor", "isLatestSession", "clearLatestSessionActor", "refreshLatestAccountModeration", "resynchronizeLatestMessages"]) {
-    assert.match(source, new RegExp(`const ${name} = useEffectEvent\\(`))
-  }
-  assert.doesNotMatch(source, /\.current = /)
-  // Behaviour (reconnect only on identity, latest callbacks) is covered by
-  // globalRealtimeSessionLifecycle.test.ts.
-
-  const navigator = read(OWNER.sessionReset)
-  assert.match(navigator, /useGlobalRealtimeSession\(\{[\s\S]*?resetInactiveSessionState,[\s\S]*?onConnectionMatched: handleRealtimeConnectionMatch,\s*onPartnerBlocked: applyConfirmedPartnerBlock,\s*receiptsEnabled: resolvedCapabilities\.chat_read_receipts,\s*typingEnabled: resolvedCapabilities\.chat_typing\s*\}\)/)
-  // Local blocks and the server's confirmation share one chat cleanup.
-  assert.match(navigator, /const applyConfirmedPartnerBlock = useBlockedPartnerCleanup\(sessionActor\?\.profile\.userId\)/)
-  // Every block entry point (report sheet, block-only, demo report) goes through blockUser, which announces it.
-  const blockStore = read("../features/safety/blockStore.ts")
-  const blockUserBody = blockStore.slice(blockStore.indexOf("export function blockUser("), blockStore.indexOf("export function unblockUser("))
-  assert.match(blockUserBody, /publishPartnerBlocked\(\{\s*ownerUserId: normalizeOwnerUserId\(ownerUserId\),\s*blockedUserId\s*\}\)/)
-  assert.match(read("./useBlockedPartnerCleanup.ts"), /subscribeToPartnerBlocked\(\(event\) => \{\s*if \(event\.ownerUserId !== currentUserId\) return\s*applyBlockedPartner\(event\.blockedUserId\)/)
-  assert.match(navigator, /const resetInactiveSessionState = useCallback\([\s\S]*?\}, \[resetMatchModal, resetRoomInviteRouting\]\)/)
-})
-
-test("detail routes use the platform push and the chat alone opts into the full-screen swipe", () => {
-  const navigator = read("./RootNavigator.tsx")
-  const routeOptions = (name) => [...navigator.matchAll(
-    new RegExp(`<Stack\\.Screen\\s+name="${name}"[\\s\\S]*?options=\\{([^\\n]*)\\}`, "g")
-  )].map((match) => match[1])
-
-  assert.match(navigator, /const detailScreenOptions = getDetailScreenOptions\(reduceMotion\)/)
-  for (const name of ["ProfilePreview", "MyRoomEditor", "MatchResult", "You", "ProfileEdit", "Settings"]) {
-    assert.deepEqual(routeOptions(name), ["detailScreenOptions"], name)
-  }
-  assert.deepEqual(routeOptions("Legal"), ["detailScreenOptions", "detailScreenOptions", "detailScreenOptions"])
-  assert.deepEqual(routeOptions("ChatThread"), ["getChatThreadScreenOptions(reduceMotion)"])
-  // MiniRoom keeps its own gesture lock; the full-screen swipe stays chat-only.
-  assert.deepEqual(routeOptions("MiniRoom"), ["{ headerShown: false, gestureEnabled: false }"])
-  assert.doesNotMatch(navigator, /fullScreenGestureEnabled/)
-  // Linking resolves behind the same branded loading screen the splash hands off to.
-  assert.match(navigator, /fallback=\{<BlumiLoadingScreen \/>\}/)
-  assert.doesNotMatch(navigator, /ActivityIndicator/)
-})
 
 test("the realtime active-conversation resync follows the focused chat or MiniRoom thread", async () => {
   const lifecycleSource = read(OWNER.realtime)

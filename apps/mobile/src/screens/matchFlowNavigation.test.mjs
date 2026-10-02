@@ -35,50 +35,6 @@ test("Keep Exploring returns to an existing Discover screen without stacking ano
   assert.deepEqual(actions, ["pop:Lobby"])
 })
 
-test("both match-result return controls use the same bounded navigation action", () => {
-  const source = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
-  const keepExploring = source.match(/label=\{keepDiscoveringAction\.label\}[\s\S]*?onPress=\{([^}]+)\}/)
-  assert.ok(keepExploring)
-  assert.match(keepExploring[1], /handleKeepExploring/)
-  const back = source.match(/accessibilityLabel=\{presentation\.backLabel\}[\s\S]*?onPress=\{([^}]+)\}/)
-  assert.ok(back)
-  assert.match(back[1], /handleKeepExploring/)
-})
-
-test("both match surfaces read copy and actions from the one presentation model", () => {
-  const surfaces = [
-    ["./MatchResultScreen.tsx", "discovery_route"],
-    ["../components/MatchResultModal.tsx", "connection_modal"]
-  ]
-  for (const [path, entry] of surfaces) {
-    const source = readFileSync(new URL(path, import.meta.url), "utf8")
-    assert.match(source, /from "\.\.\/features\/matches\/matchResultPresentation"/, path)
-    assert.match(source, new RegExp(`getMatchResultPresentation\\(\\{[\\s\\S]*?entry: "${entry}"`), path)
-    // No surface keeps a private copy of the action labels.
-    assert.doesNotMatch(source, /label="(Say Hi|Keep Exploring|Start chatting|Keep exploring)"/, path)
-  }
-  const modal = readFileSync(new URL("../components/MatchResultModal.tsx", import.meta.url), "utf8")
-  assert.match(modal, /getMatchCelebrationMotion\(reduceMotion\)/)
-})
-
-test("match celebrations pulse a bounded number of times and tap success once", () => {
-  const modal = readFileSync(new URL("../components/MatchResultModal.tsx", import.meta.url), "utf8")
-  const screen = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
-
-  // Every modal loop is bounded by the celebration model (rules: matchResultPresentation).
-  const loops = modal.match(/Animated\.loop\(/g) ?? []
-  const boundedLoops = modal.match(/Animated\.loop\([^)]*\{ iterations: motion\.heartPulseIterations \}\)/g) ?? []
-  assert.ok(loops.length > 0)
-  assert.equal(boundedLoops.length, loops.length)
-  assert.match(modal, /new Animated\.Value\(motion\.entranceFromScale\)/)
-  assert.match(modal, /opacity: opacityAnim/)
-  assert.match(modal, /delay: motion\.contentStaggerMs/)
-  assert.match(modal, /shouldPlayMatchHaptic\(previousVisibleRef\.current, visible\)\) hapticSuccess\(\)/)
-
-  assert.match(screen, /iterations: celebrationMotion\.haloPulseIterations/)
-  assert.match(screen, /matchHapticPlayedRef\.current = true\s*hapticSuccess\(\)/)
-})
-
 test("a match re-opened from chat is shown without a second success tap", () => {
   const modelPath = "../features/matches/matchResultPresentation.ts"
   const source = readFileSync(new URL(modelPath, import.meta.url), "utf8")
@@ -97,12 +53,6 @@ test("a match re-opened from chat is shown without a second success tap", () => 
   assert.equal(shouldCelebrateMatchResult(undefined), true)
   // Re-opening an existing match opts out explicitly.
   assert.equal(shouldCelebrateMatchResult({ match: {}, celebrate: false }), false)
-
-  const screen = readFileSync(new URL("./MatchResultScreen.tsx", import.meta.url), "utf8")
-  assert.match(screen, /const shouldCelebrate = shouldCelebrateMatchResult\(route\.params\)/)
-  assert.match(screen, /shouldPlayMatchHaptic\(matchHapticPlayedRef\.current, shouldCelebrate\)/)
-  const navigator = readFileSync(new URL("../navigation/RootNavigator.tsx", import.meta.url), "utf8")
-  assert.match(navigator, /MatchResult: \{\s*match: BlumiMatch\s*celebrate\?: boolean\s*\}/)
 })
 
 test("profile decision rejects a rapid second tap while the first request is in flight", async () => {

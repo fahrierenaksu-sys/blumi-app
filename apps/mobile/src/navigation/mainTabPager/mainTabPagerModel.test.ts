@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { getBottomNavKeyForRoute } from "../rootNavigationModel"
+import { BOTTOM_NAV_KEY_ORDER } from "../../ui/layout/bottomNavIndicatorModel"
 import {
   MAIN_TAB_PAGER_SETTLE,
   MAIN_TAB_PAGER_SPRING,
@@ -520,4 +521,8 @@ test("pages mount lazily; visited pages stay; neighbours only when asked", () =>
   assert.deepEqual(getMainTabPageNeighbours(CHATS), [DISCOVER, MYROOM])
   assert.deepEqual(getMainTabPageNeighbours(MYROOM), [CHATS, SHOP])
   assert.deepEqual(getMainTabPageNeighbours(SHOP), [MYROOM])
+})
+
+test("the bottom bar lists the main pages in pager order", () => {
+  assert.deepEqual(MAIN_TAB_PAGES.map((page) => page.key), [...BOTTOM_NAV_KEY_ORDER])
 })

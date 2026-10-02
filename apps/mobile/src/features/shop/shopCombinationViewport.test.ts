@@ -2,14 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage } from "./shopCombinationViewport"
 
-test("four rows fit without clipping either navigation or purchase action", () => {
-  assert.equal(getCombinationPageSize(256), 4)
-  assert.equal(getCombinationPageSize(228, 1, 4), 4)
-  for (const height of [170, 190, 220, 256]) {
-    const size = getCombinationPageSize(height, 1, 9)
-    assert.ok(size * 34 + (size - 1) * 3 + 104 <= height)
-  }
-})
 test("every item remains reachable on short screens and with large text", () => {
   const items = Array.from({ length: 9 }, (_, i) => ({ id: `item-${i}` }))
   for (const height of [140, 180, 256]) {

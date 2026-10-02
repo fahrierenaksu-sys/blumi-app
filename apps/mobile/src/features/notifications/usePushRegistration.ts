@@ -25,7 +25,8 @@ type NotificationsPermissionStatus =
 let notificationsModulePromise: Promise<NotificationsModule> | null = null
 let hasInstalledNotificationHandler = false
 const observedResponseOwners = new Map<string, { userId: string; delivered: boolean }>()
-const MAX_OBSERVED_RESPONSE_OWNERS = 256
+/** FIFO bound for remembered and pending notification responses. */
+export const MAX_OBSERVED_RESPONSE_OWNERS = 256
 
 function rememberObservedResponseOwner(identifier: string, userId: string): void {
   if (observedResponseOwners.has(identifier)) return

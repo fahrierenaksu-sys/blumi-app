@@ -12,7 +12,6 @@ import {
   resolveShopProductFocus,
   createRoomPreviewDecor,
   filterProductsByCategory,
-  getAvatarIcon,
   getAvatarPurchaseFailureTitle,
   getCompactCategoryLabel,
   getDefaultFurnitureRotation,
@@ -84,6 +83,22 @@ test("surface policy keeps the production catalog visible but closed until a con
     getShopSurfacePolicy({ ...base, isConnected: false, isReady: true, hydrationStatus: "ready", state: "offline" }),
     { showShopContent: true, inventoryVerified: true, canPerformShopActions: false }
   )
+  // Loading, failed and offline-before-first-snapshot keep the catalog shell
+  // but never prove ownership or open actions.
+  for (const state of ["loading", "error", "offline"] as const) {
+    assert.deepEqual(
+      getShopSurfacePolicy({
+        ...base,
+        isConnected: state !== "offline",
+        isReady: false,
+        hydrationStatus: state === "error" ? "failed" : "loading",
+        state,
+        productCount: 24
+      }),
+      { showShopContent: true, inventoryVerified: false, canPerformShopActions: false },
+      state
+    )
+  }
   // A ready flag without a ready hydration is not an ownership proof.
   assert.equal(
     getShopSurfacePolicy({ ...base, isReady: true, hydrationStatus: "failed", state: "error" }).inventoryVerified,
@@ -144,23 +159,6 @@ test("default categories and compact rail labels are locale-stable", () => {
   assert.equal(getCompactCategoryLabel({ ...shoes, id: "top", label: "Üstler" }, "tr"), "Üstler")
 })
 
-test("avatar placeholder icons cover every wearable type", () => {
-  const expected = {
-    eyes: "eye",
-    nose: "ellipse",
-    mouth: "chatbubble-ellipses",
-    hair: "sparkles",
-    top: "shirt",
-    bottom: "layers",
-    shoes: "walk",
-    accessory: "glasses",
-    body: "person"
-  } as const
-  for (const [type, icon] of Object.entries(expected)) {
-    assert.equal(getAvatarIcon(type as Parameters<typeof getAvatarIcon>[0]), icon, type)
-  }
-})
-
 test("purchase failure titles come from the localized copy", () => {
   assert.equal(getAvatarPurchaseFailureTitle("not_enough_coins", "en"), "Not enough coins")
   assert.equal(getAvatarPurchaseFailureTitle(undefined, "en"), "The purchase could not be completed")
@@ -176,15 +174,18 @@ test("avatar categories follow the Shop order, drop empty ones and count outfits
     avatarProduct("hair-1", "hair")
   ]
   assert.deepEqual(
-    buildShopCategoryOptions("avatar", products, "en").map(({ id, label, count, icon }) => ({ id, label, count, icon })),
+    buildShopCategoryOptions("avatar", products, "en").map(({ id, count }) => ({ id, count })),
     [
-      { id: "top", label: "Tops", count: 2, icon: "shirt" },
-      { id: "dress", label: "Dresses", count: 1, icon: "sparkles" },
-      { id: "shoes", label: "Shoes", count: 1, icon: "walk" },
-      { id: "hair", label: "Hair", count: 1, icon: "color-wand" }
+      { id: "top", count: 2 },
+      { id: "dress", count: 1 },
+      { id: "shoes", count: 1 },
+      { id: "hair", count: 1 }
     ]
   )
-  assert.equal(buildShopCategoryOptions("avatar", products, "tr")[0].label, "Üstler")
+  const english = buildShopCategoryOptions("avatar", products, "en")
+  const turkish = buildShopCategoryOptions("avatar", products, "tr")
+  assert.ok(english.every((option) => option.label.trim().length > 0))
+  assert.notEqual(turkish[0].label, english[0].label)
 })
 
 test("home categories lead with All and Owned and include only populated furniture groups", () => {
@@ -194,13 +195,13 @@ test("home categories lead with All and Owned and include only populated furnitu
     roomProduct("poster", "wallDecor")
   ]
   assert.deepEqual(
-    buildShopCategoryOptions("home", products, "en").map(({ id, count, icon }) => ({ id, count, icon })),
+    buildShopCategoryOptions("home", products, "en").map(({ id, count }) => ({ id, count })),
     [
-      { id: "all", count: 3, icon: "grid" },
-      { id: "owned", count: 1, icon: "checkmark-circle" },
-      { id: "seating", count: 1, icon: "bed" },
-      { id: "lighting", count: 1, icon: "bulb" },
-      { id: "wallDecor", count: 1, icon: "image" }
+      { id: "all", count: 3 },
+      { id: "owned", count: 1 },
+      { id: "seating", count: 1 },
+      { id: "lighting", count: 1 },
+      { id: "wallDecor", count: 1 }
     ]
   )
   assert.deepEqual(buildShopCategoryOptions("home", [], "en"), [])
@@ -248,19 +249,20 @@ test("room preview decor replaces the previous preview item and keeps the base d
   } as unknown as UserRoomDecor
   const lamp = { id: "lamp", category: "lighting" } as FurnitureItem
   const decor = createRoomPreviewDecor(lamp, baseDecor, "default-shell")
-  assert.deepEqual(decor, {
-    roomShellId: "default-shell",
-    placedItems: [
-      baseDecor.placedItems[0],
-      { instanceId: "shop-preview-item", itemId: "lamp", x: 0.54, y: 0.76, rotation: "front" }
-    ]
-  })
+  assert.equal(decor.roomShellId, "default-shell")
+  assert.equal(decor.placedItems.length, 2)
+  assert.equal(decor.placedItems[0], baseDecor.placedItems[0])
+  const preview = decor.placedItems[1]
+  assert.equal(preview.instanceId, "shop-preview-item")
+  assert.equal(preview.itemId, "lamp")
+  assert.equal(preview.rotation, "front")
+  assert.ok(preview.x >= 0 && preview.x <= 1 && preview.y >= 0 && preview.y <= 1)
   const poster = { id: "poster", category: "wallDecor", assetsByRotation: { left: {}, right: {} } } as unknown as FurnitureItem
   const wallDecor = createRoomPreviewDecor(poster, { roomShellId: "shell-a", placedItems: [] }, "default-shell")
-  assert.deepEqual(wallDecor, {
-    roomShellId: "shell-a",
-    placedItems: [{ instanceId: "shop-preview-item", itemId: "poster", x: 0.28, y: 0.5, rotation: "left" }]
-  })
+  assert.equal(wallDecor.roomShellId, "shell-a")
+  assert.equal(wallDecor.placedItems.length, 1)
+  assert.equal(wallDecor.placedItems[0].itemId, "poster")
+  assert.equal(wallDecor.placedItems[0].rotation, "left", "a wall item uses its first authored rotation")
 })
 
 test("default furniture rotation prefers front, then the first authored rotation", () => {

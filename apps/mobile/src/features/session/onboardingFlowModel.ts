@@ -247,3 +247,54 @@ export function getSessionNavigatorKey(
   if (route in routeSteps) return `onboarding:${userId ?? "no-session"}`
   return "auth"
 }
+
+export type ProfileReviewReturnTarget = "AvatarSetup" | "RoomSetup"
+
+/**
+ * Starts the durable profile save, then moves on without waiting for the
+ * network: first completion goes to avatar setup with the chosen gender, a
+ * review returns to the step that opened it. The returned promise settles
+ * with the save so the screen keeps its submitting state and surfaces any
+ * error through the shared feedback.
+ */
+export async function completeProfileStepAndNavigate<
+  TInput extends { readonly gender?: string }
+>(options: {
+  readonly input: TInput
+  readonly mode: OnboardingScreenMode
+  readonly reviewReturnTarget: ProfileReviewReturnTarget
+  readonly save: (input: TInput) => Promise<unknown>
+  readonly replace: (
+    route: ProfileReviewReturnTarget,
+    params?: { initialGender?: string }
+  ) => void
+}): Promise<void> {
+  const profileSave = options.save(options.input)
+  const nextRoute = options.mode === "review"
+    ? options.reviewReturnTarget
+    : "AvatarSetup"
+  if (nextRoute === "AvatarSetup") {
+    options.replace("AvatarSetup", { initialGender: options.input.gender })
+  } else {
+    options.replace(nextRoute)
+  }
+  await profileSave
+}
+
+/** Avatar setup persists the avatar before it enters room setup. */
+export async function completeAvatarStepAndNavigate<TAvatar>(options: {
+  readonly avatar: TAvatar
+  readonly save: (avatar: TAvatar) => Promise<unknown>
+  readonly replace: (route: "RoomSetup") => void
+}): Promise<void> {
+  await options.save(options.avatar)
+  options.replace("RoomSetup")
+}
+
+/** The avatar stage's first frame prefers the just-chosen gender. */
+export function resolveAvatarSetupInitialGender(
+  routeInitialGender: string | undefined,
+  savedProfileGender: string | undefined
+): string | undefined {
+  return routeInitialGender ?? savedProfileGender
+}

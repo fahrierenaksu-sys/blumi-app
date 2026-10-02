@@ -157,7 +157,7 @@ were in the unwired set):
 | File | Why it fails | Decision |
 |---|---|---|
 | `scripts/mobile-onboarding-world-intro-contract.test.mjs` (8 pass, 1 fail) | Reads `apps/mobile/ios/BlumiMobile/SplashScreen.storyboard`; `ios/` is prebuild output and git-ignored, and `BlumiMobile` is an old target name (the project is `Blumi`) | Needs a native owner decision: move the native assertion to a config-plugin/prebuild check or drop it. Unchanged. |
-| `src/features/session/nativeOnboardingBootOverlayContract.test.ts` (6 pass, 2 fail) | Asserts that `ios/Blumi/NativeOnboardingBootOverlay.swift` etc. are versioned; they are not, because `ios/` is ignored | Same |
+| `src/features/session/nativeOnboardingBootOverlayContract.test.ts` (6 pass, 2 fail) | Asserts that `ios/Blumi/NativeOnboardingBootOverlay.swift` etc. are versioned; they are not, because `ios/` is ignored | **Deleted** in the 2026-10-02 test audit; its Reduce Motion fail-closed intent stays behavior-tested in `onboardingBrandPreludeModel.test.ts` |
 | `scripts/run-native-ui-tests.test.mjs` (7 pass, 2 fail) | Needs `ios/Blumi.xcodeproj/xcshareddata/xcschemes/Blumi.xcscheme` | Same; passes only after `expo prebuild` |
 | `scripts/roomPerspectiveNativeUiContract.test.mjs` | Needs `ios/BlumiMobileUITests/BlumiMobileUITests.swift` (old target name); partly checks Room VNext full-wave native routes | Same; probably retire with native UI test cleanup |
 | `female-walk-rig-contract`, `female-legacy-milk-tea-repair`, `male-basic-tshirt-static-contract`, `male-basic-tshirt-rig-fit-qa` | Fail on the shipped art | See `ART_GATE_DECISIONS_2026-09-30.md` |

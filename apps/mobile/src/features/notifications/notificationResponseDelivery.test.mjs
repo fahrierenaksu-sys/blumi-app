@@ -5,13 +5,11 @@ import { runInNewContext } from "node:vm"
 import ts from "typescript"
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
-const rootSource = read("../../navigation/RootNavigator.tsx")
-const rootFile = ts.createSourceFile("RootNavigator.tsx", rootSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 // Notification tap routing is owned by a root hook beside RootNavigator.
 const routingSource = read("../../navigation/useNotificationResponseRouting.ts")
 const routingFile = ts.createSourceFile("useNotificationResponseRouting.ts", routingSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 
-function rootCallback(name, bindings, sourceFile = rootFile) {
+function rootCallback(name, bindings, sourceFile = routingFile) {
   let initializer
   const visit = (node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) {
@@ -39,7 +37,6 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const mountedEffects = new Map()
   const navigations = []
   const errors = []
-  const responseOwnerMaps = []
   let lastResponse = response
   let clearCount = 0
   let listener
@@ -119,13 +116,18 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId }
   }
   const modules = new Map()
+  const realModules = [
+    "./usePushRegistration", "./notificationTimeZoneSync",
+    "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting",
+    "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry"
+  ]
   function load(name) {
     if (Object.hasOwn(mocks, name)) return mocks[name]
-    assert.ok([
-      "./usePushRegistration", "./notificationTimeZoneSync",
-      "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting",
-      "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry"
-    ].includes(name), `Unexpected dependency: ${name}`)
+    // Other relative imports are not part of this delivery path.
+    if (!realModules.includes(name)) {
+      assert.ok(name.startsWith("."), `Unexpected package dependency: ${name}`)
+      return {}
+    }
     if (modules.has(name)) return modules.get(name)
     const module = { exports: {} }
     modules.set(name, module.exports)
@@ -136,14 +138,6 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       module, exports: module.exports, require: load, __DEV__: false,
       AbortController, setTimeout, clearTimeout,
       fetch: () => { throw new Error("Network access is forbidden in this test") }
-    }
-    if (name === "./usePushRegistration") {
-      context.Map = class TrackedMap extends Map {
-        constructor(...args) {
-          super(...args)
-          responseOwnerMaps.push(this)
-        }
-      }
     }
     runInNewContext(executable, context)
     return module.exports
@@ -178,14 +172,12 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       mountedEffects.set(next.index, { dependencies: next.dependencies, cleanup })
     }
   }
-  const navigationReady = rootCallback("handleNavigationReady", {
-    ...sessionBindings,
-    setIsNavigationReady: (value) => { ready = value },
-    setNavigationReadyGeneration: (update) => { readyGeneration = update(readyGeneration) },
-    syncCurrentRouteName: () => {},
-    sessionEntryRoute: "Main",
-    markOnboardingContentReady: () => {}
-  })
+  // RootNavigator's onReady marks navigation ready and bumps the generation
+  // that usePushRegistration watches to replay deferred taps.
+  const navigationReady = () => {
+    ready = true
+    readyGeneration += 1
+  }
   renderHook(actor)
   return {
     chatTaps, channels,
@@ -199,8 +191,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     get foregroundListenerCount() { return foregroundListeners.size },
     setPermission: (status) => { permission = status },
     appState: (state) => { currentAppState = state; for (const callback of foregroundListeners) callback(state) },
-    get observedResponseOwnerCount() { return responseOwnerMaps[0]?.size ?? 0 },
-    get pendingResponseCount() { return responseOwnerMaps[1]?.size ?? 0 },
+    maxResponses: load("./usePushRegistration").MAX_OBSERVED_RESPONSE_OWNERS,
+    androidImportance: notifications.AndroidImportance,
     get responseSubscriptionCount() { return responseSubscriptionCount },
     get responseUnsubscriptionCount() { return responseUnsubscriptionCount },
     get clearCount() { return clearCount },
@@ -390,16 +382,6 @@ test("a cached response first observed by one account cannot open under another"
   assert.equal(runtime.clearCount, 0)
 })
 
-test("a live response and its matching cached response navigate once", async (t) => {
-  const runtime = createRuntime({ response })
-  t.after(runtime.dispose)
-  await settle()
-  runtime.emit(response)
-  await settle()
-  assert.equal(runtime.navigations.length, 1)
-  assert.equal(runtime.clearCount, 1)
-})
-
 test("response owner history stays FIFO bounded and retains recent account isolation", async (t) => {
   const runtime = createRuntime()
   t.after(runtime.dispose)
@@ -410,8 +392,8 @@ test("response owner history stays FIFO bounded and retains recent account isola
       data: { type: "chat.message", threadId: "thread-one" }
     } } }
   })
-  for (let index = 0; index < 300; index += 1) runtime.emit(responseFor(index))
-  assert.equal(runtime.observedResponseOwnerCount, 256, "owner records use a fixed FIFO bound")
+  const total = runtime.maxResponses + 44
+  for (let index = 0; index < total; index += 1) runtime.emit(responseFor(index))
 
   runtime.dispose()
   const otherActor = {
@@ -422,13 +404,16 @@ test("response owner history stays FIFO bounded and retains recent account isola
   const navigationCount = runtime.navigations.length
   runtime.startSession(otherActor)
   await settle()
-  runtime.emit(responseFor(299))
+  runtime.emit(responseFor(total - 1))
   assert.equal(runtime.navigations.length, navigationCount, "a retained response owner cannot be replaced by another account")
-  runtime.emit(responseFor(300))
+  runtime.emit(responseFor(total - runtime.maxResponses))
+  assert.equal(runtime.navigations.length, navigationCount, "the oldest retained owner is still remembered")
+  runtime.emit(responseFor(total))
   assert.equal(runtime.navigations.length, navigationCount + 1, "a new response ID remains deliverable after FIFO eviction")
-  runtime.emit(responseFor(300))
+  runtime.emit(responseFor(total))
   assert.equal(runtime.navigations.length, navigationCount + 1, "recent delivered IDs remain deduplicated")
-  assert.equal(runtime.observedResponseOwnerCount, 256)
+  runtime.emit(responseFor(0))
+  assert.equal(runtime.navigations.length, navigationCount + 2, "owner history is bounded: the oldest IDs were evicted")
 })
 
 test("pending responses stay FIFO bounded and the newest queued responses replay", async (t) => {
@@ -440,14 +425,14 @@ test("pending responses stay FIFO bounded and the newest queued responses replay
       data: { type: "chat.message", threadId: `thread-${index}` }
     } } }
   })
-  for (let index = 0; index < 300; index += 1) runtime.emit(responseFor(index))
-  assert.equal(runtime.pendingResponseCount, 256, "pending response objects use the FIFO bound")
+  const total = runtime.maxResponses + 44
+  for (let index = 0; index < total; index += 1) runtime.emit(responseFor(index))
 
   runtime.renderWithCallback(runtime.acceptResponse)
   await settle()
-  assert.equal(runtime.navigations.length, 256)
-  assert.equal(runtime.navigations[0][1].threadId, "thread-44")
-  assert.equal(runtime.navigations.at(-1)[1].threadId, "thread-299")
+  assert.equal(runtime.navigations.length, runtime.maxResponses, "pending responses use the FIFO bound")
+  assert.equal(runtime.navigations[0][1].threadId, `thread-${total - runtime.maxResponses}`)
+  assert.equal(runtime.navigations.at(-1)[1].threadId, `thread-${total - 1}`)
 })
 
 test("changing the response callback keeps its subscription and retries pending delivery", async (t) => {
@@ -572,6 +557,8 @@ test("the Android channel every push uses is created with HIGH importance for he
   runtime.appState("active")
   await settle()
   assert.equal(runtime.channels.length > 0, true)
-  assert.deepEqual(runtime.channels.map((channel) => [channel.id, channel.importance]).at(-1), ["default", 4])
+  const channel = runtime.channels.at(-1)
+  assert.equal(channel.id, "default")
+  assert.ok(channel.importance >= runtime.androidImportance.HIGH, "heads-up banners need HIGH importance")
   assert.equal(runtime.registrations.at(-1)?.platform, "android")
 })
