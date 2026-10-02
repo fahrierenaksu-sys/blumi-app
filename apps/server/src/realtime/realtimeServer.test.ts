@@ -1106,14 +1106,14 @@ test("a burst of delivery acks for many threads reaches every partner, and the l
     const b = await harness.createSession("+905551110134", "Burst B")
     const threadIds = Array.from({ length: 6 }, (_, index) => `burst-thread-${index}`)
     const newest = new Map<string, string>()
-    const sentAt = Date.now()
+    const sentAt = Date.parse("2026-10-01T12:00:00.000Z")
     for (const threadId of threadIds) {
       await harness.chatService.createThread({ threadId, miniRoomId: `${threadId}-room`,
         participantUserIds: [a.userId, b.userId], participants: [{ userId: a.userId }, { userId: b.userId }] })
       newest.set(threadId, (await harness.chatService.sendMessage(a.userId, threadId, "hello", new Date(sentAt))).messageId)
     }
-    // Same-millisecond sends are ordered by UUID, not call order. Keep the
-    // receipt cursors strictly increasing so this test always asks to advance.
+    // Receipt cursors order equal timestamps by random message ID. Make the
+    // intended older/newest fixture order explicit instead of clock-dependent.
     const first = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "older", new Date(sentAt + 1))
     const last = await harness.chatService.sendMessage(a.userId, threadIds[0]!, "newest", new Date(sentAt + 2))
     const sa = await harness.connect(a.sessionToken), sb = await harness.connect(b.sessionToken)
