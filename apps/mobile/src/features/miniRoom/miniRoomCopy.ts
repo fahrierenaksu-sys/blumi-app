@@ -1,4 +1,5 @@
 import type { AccountRecoveryLocale } from "../session/accountRecoveryCopy"
+import { formatRoomChatHistoryDay } from "./roomChatHistoryModel"
 
 export interface MiniRoomCopy {
   roomTitle: string
@@ -29,7 +30,8 @@ export interface MiniRoomCopy {
   hideChatHistory: string
   returnToRoom: string
   historyHeading: string
-  today: string
+  /** The day of the newest history message: today, yesterday or a short date; null without a time. */
+  historyDay: (newestSentAt: string | undefined, now?: Date) => string | null
   roomPairCaption: string
   roomPairTitle: (partnerName: string) => string
   closeKeyboard: string
@@ -99,7 +101,8 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     hideChatHistory: "Hide chat history",
     returnToRoom: "Close the keyboard and return to the conversation",
     historyHeading: "Your conversation",
-    today: "Today",
+    historyDay: (newestSentAt, now) => formatRoomChatHistoryDay(newestSentAt,
+      { today: "Today", yesterday: "Yesterday", dateLocale: "en-US" }, now),
     roomPairCaption: "Just the two of you.",
     roomPairTitle: (partnerName) => `You and ${partnerName}`,
     closeKeyboard: "Close keyboard",
@@ -160,7 +163,8 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     hideChatHistory: "Sohbet geçmişini gizle",
     returnToRoom: "Klavyeyi kapat ve sohbete dön",
     historyHeading: "Sohbetiniz",
-    today: "Bugün",
+    historyDay: (newestSentAt, now) => formatRoomChatHistoryDay(newestSentAt,
+      { today: "Bugün", yesterday: "Dün", dateLocale: "tr-TR" }, now),
     roomPairCaption: "Sadece ikiniz.",
     roomPairTitle: (partnerName) => `Sen ve ${partnerName}`,
     closeKeyboard: "Klavyeyi kapat",

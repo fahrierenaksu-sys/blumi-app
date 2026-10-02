@@ -62,6 +62,31 @@ export function formatRoomChatTime(sentAt?: string): string | null {
   return `${String(timestamp.getHours()).padStart(2, "0")}:${String(timestamp.getMinutes()).padStart(2, "0")}`
 }
 
+/**
+ * The day label above the history, from the newest message's own time
+ * (device-local): bubbles show only HH:MM, so this keeps an older
+ * conversation from reading as today's.
+ */
+export function formatRoomChatHistoryDay(
+  newestSentAt: string | undefined,
+  labels: { today: string; yesterday: string; dateLocale: string },
+  now: Date = new Date()
+): string | null {
+  if (!newestSentAt) return null
+  const sent = new Date(newestSentAt)
+  if (!Number.isFinite(sent.getTime())) return null
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  if (sameDay(sent, now)) return labels.today
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (sameDay(sent, yesterday)) return labels.yesterday
+  return new Intl.DateTimeFormat(labels.dateLocale, {
+    month: "short",
+    day: "numeric",
+    ...(sent.getFullYear() === now.getFullYear() ? {} : { year: "numeric" })
+  }).format(sent)
+}
+
 export function resolveRoomChatHistoryStatus(input: {
   hasThread: boolean
   listStatus: RoomChatListStatus

@@ -29,6 +29,7 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
   const { copy, mode, transition, windowWidth, historyHeight, composerHeight, historyItems, historyStatus, partnerName,
     recentMessage, onRecentHeightChange, onRecentRowsHeightChange, onCloseKeyboard, scrollToLatestRequest, children } = props
   const typing = mode === "typing"
+  const historyDay = copy.historyDay(historyItems[0]?.sentAt)
   const textWidths = resolveMiniRoomTextWidths(windowWidth)
   // Switch once at the confirmed mode, rather than wrapping the draft at every
   // animated width. Endpoint sizing/padding stays identical to the chosen design.
@@ -73,7 +74,7 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
           importantForAccessibility={typing ? "no-hide-descendants" : "auto"}>
           <View style={styles.heading}>
             <Text maxFontSizeMultiplier={1.35} style={styles.headingText}>{copy.historyHeading}</Text>
-            <Text maxFontSizeMultiplier={1.35} style={styles.dayText}>{copy.today}</Text>
+            {historyDay ? <Text maxFontSizeMultiplier={1.35} style={styles.dayText}>{historyDay}</Text> : null}
           </View>
           <MiniRoomChatHistory copy={copy} items={historyItems} status={historyStatus}
             partnerName={partnerName} height={historyHeight}

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatMessage } from "@blumi/contracts"
+import { getMiniRoomCopy } from "./miniRoomCopy"
 import {
+  formatRoomChatHistoryDay,
   formatRoomChatTime,
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
@@ -106,4 +108,26 @@ test("history status distinguishes no thread, loading, failure and an empty conv
   // Cached messages stay visible while a refresh loads or fails.
   assert.equal(resolveRoomChatHistoryStatus({ hasThread: true, listStatus: "failed", itemCount: 3 }), "ready")
   assert.equal(resolveRoomChatHistoryStatus({ hasThread: true, listStatus: "loading", itemCount: 3 }), "ready")
+})
+
+test("the history day comes from the newest message, not the day the room is opened", () => {
+  const labels = { today: "Today", yesterday: "Yesterday", dateLocale: "en-US" }
+  const now = new Date(2026, 9, 2, 0, 5)
+  assert.equal(formatRoomChatHistoryDay(new Date(2026, 9, 2, 0, 1).toISOString(), labels, now), "Today")
+  assert.equal(formatRoomChatHistoryDay(new Date(2026, 9, 1, 23, 59).toISOString(), labels, now), "Yesterday")
+  const older = new Date(2026, 8, 14, 12, 0)
+  assert.equal(formatRoomChatHistoryDay(older.toISOString(), labels, now),
+    new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(older))
+  const lastYear = new Date(2025, 11, 31, 12, 0)
+  assert.match(formatRoomChatHistoryDay(lastYear.toISOString(), labels, now) ?? "", /2025/)
+  // A missing or broken time shows no day rather than an invented one.
+  assert.equal(formatRoomChatHistoryDay(undefined, labels, now), null)
+  assert.equal(formatRoomChatHistoryDay("not-a-date", labels, now), null)
+})
+
+test("both languages label the newest message's day", () => {
+  const now = new Date(2026, 9, 2, 12, 0)
+  const yesterday = new Date(2026, 9, 1, 9, 0).toISOString()
+  assert.notEqual(getMiniRoomCopy("tr").historyDay(yesterday, now), getMiniRoomCopy("tr").historyDay(now.toISOString(), now))
+  assert.notEqual(getMiniRoomCopy("en").historyDay(yesterday, now), getMiniRoomCopy("en").historyDay(now.toISOString(), now))
 })
