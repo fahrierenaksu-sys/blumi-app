@@ -7,6 +7,8 @@ import {
   getRoomAvatarLayerAnimationState,
   getRoomAvatarLayerFrameAsset,
   getRoomAvatarLayerFrameSlot,
+  getRoomAvatarReadyFrameSlot,
+  retainRoomAvatarFrameSlots,
   getRoomAvatarLayerFrameSlots,
   shouldRerenderRoomAvatarLayer
 } from "./roomAvatarLayerRenderModel"
@@ -149,4 +151,35 @@ test("frame slots mount each distinct image once and pick the ticker's asset for
   const still = getRoomAvatarLayerFrameSlots(layer(firstSource))
   assert.deepEqual(still.assets, [layer(firstSource).asset])
   assert.deepEqual(still.slotByFrame, [0])
+})
+
+test("a frame that has not displayed keeps the previous loaded pose visible", () => {
+  const slots = [0, 1, 2, 3]
+  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, []), 0)
+  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 1]), 0)
+  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 2]), 2)
+  // The caller can hold its selected pose, or defer the change with a sentinel.
+  assert.equal(getRoomAvatarReadyFrameSlot([0], 3, []), 0)
+  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 1], 1), 1)
+  assert.equal(getRoomAvatarReadyFrameSlot([4], 0, [0, 1], -1), -1)
+  assert.equal(getRoomAvatarReadyFrameSlot([4], 0, [0, 1, 4], -1), 4)
+})
+
+test("idle and walking keep the same mounted image identities across stop and restart", () => {
+  const idle = layer(firstSource).asset
+  const walking = animatedLayer("top", ["w1", "w2", "w3", "w4"]).animation!.frames
+  const initial = retainRoomAvatarFrameSlots([], [idle])
+  const walk = retainRoomAvatarFrameSlots(initial.assets, walking)
+  assert.equal(walk.assets[0], idle)
+  assert.deepEqual(walk.slotByFrame, [1, 2, 3, 4])
+  assert.deepEqual(initial.assets, [idle])
+  const stopped = retainRoomAvatarFrameSlots(walk.assets, [idle])
+  assert.equal(stopped.assets, walk.assets)
+  assert.deepEqual(stopped.slotByFrame, [0])
+  const restarted = retainRoomAvatarFrameSlots(stopped.assets, walking)
+  assert.equal(restarted.assets, stopped.assets)
+  assert.deepEqual(restarted.slotByFrame, walk.slotByFrame)
+  const repeated = retainRoomAvatarFrameSlots(restarted.assets, [walking[0]!, walking[0]!])
+  assert.equal(repeated.assets, restarted.assets)
+  assert.deepEqual(repeated.slotByFrame, [1, 1])
 })
