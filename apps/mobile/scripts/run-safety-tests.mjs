@@ -71,7 +71,7 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/safety/useBlockStore.test.ts"],
+    ["--import", "tsx", "--test", "src/features/safety/useBlockStore.test.ts", "src/features/safety/partnerBlockedWiring.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
 } finally {
