@@ -349,7 +349,11 @@ function DeckCardContainer(props: {
       ]}
       pointerEvents={role === "top" && !leaving ? "auto" : "none"}
     >
-      {props.children}
+      {/* A card behind the top one is static: iOS keeps its content as one
+          bitmap (the motion and frost around it do not invalidate it). */}
+      <View style={styles.cardContent} shouldRasterizeIOS={role !== "top" && !leaving}>
+        {props.children}
+      </View>
       <GlassDeckOverlay style={overlayStyle} />
     </Animated.View>
   )
@@ -416,6 +420,9 @@ const styles = StyleSheet.create({
   bottomCardContainer: {
     ...StyleSheet.absoluteFill,
     zIndex: 0
+  },
+  cardContent: {
+    flex: 1
   },
   glassOverlay: {
     ...StyleSheet.absoluteFill,

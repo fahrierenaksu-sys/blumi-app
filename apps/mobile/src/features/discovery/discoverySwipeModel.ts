@@ -213,7 +213,9 @@ export const DISCOVER_BOTTOM_CARD_MOTION = {
   translateY: -30,
   rotateDeg: -3,
   scale: 0.98,
-  opacity: 0.96
+  // Fully opaque: under its frost the 4% difference does not show, and an
+  // opacity below 1 makes iOS render the whole card subtree offscreen.
+  opacity: 1
 } as const
 
 /**
