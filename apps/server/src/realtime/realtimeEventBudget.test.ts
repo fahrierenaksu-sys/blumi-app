@@ -42,12 +42,20 @@ test("events are classified so each kind of traffic has its own budget", () => {
   }
 })
 
-test("the MiniRoom motion quota is unchanged: 60 per user window, then dropped", () => {
+// The mobile client sends at most one MiniRoom retarget per 200 ms
+// (RETARGET_INTERVAL_MS in apps/mobile/src/features/miniRoom/miniRoomMotionSession.ts).
+const CLIENT_RETARGET_INTERVAL_MS = 200
+
+test("motion admits a client retargeting at the app cadence and drops beyond its window", () => {
+  const { userWindow } = REALTIME_EVENT_LIMITS.motion
+  assert.ok(
+    userWindow >= REALTIME_EVENT_WINDOW_MS / CLIENT_RETARGET_INTERVAL_MS,
+    "the motion budget must never drop a well-behaved client's movement"
+  )
   const budget = createRealtimeEventBudget()
-  const results = admitMany(budget, "motion", 61)
-  assert.equal(results.filter((result) => result.kind === "admit").length, 60)
+  const results = admitMany(budget, "motion", userWindow + 1)
+  assert.equal(results.filter((result) => result.kind === "admit").length, userWindow)
   assert.equal(results.at(-1)?.kind, "drop")
-  assert.deepEqual(REALTIME_EVENT_LIMITS.motion, { userWindow: 60, connectionInFlight: 2, userInFlight: 4 })
 })
 
 test("motion beyond two in flight per socket is dropped, never closing the socket", () => {

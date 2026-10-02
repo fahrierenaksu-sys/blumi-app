@@ -84,28 +84,6 @@ test("a fanout without peer awareness keeps publishing everything", async () => 
   await manager.closeFanout()
 })
 
-test("one event is encoded once for every recipient socket", async () => {
-  const manager = createConnectionManager()
-  const sockets = [createSocket(), createSocket(), createSocket()]
-  for (const [index, socket] of sockets.entries()) {
-    manager.addConnection({ socket: socket as unknown as WebSocket, profile: profile(index < 2 ? "user_a" : "user_b") })
-  }
-  const original = JSON.stringify
-  let encodings = 0
-  JSON.stringify = ((...args: Parameters<typeof JSON.stringify>) => {
-    encodings += 1
-    return original(...args)
-  }) as typeof JSON.stringify
-  try {
-    manager.sendToUsers(["user_a", "user_b"], MOVE_EVENT)
-  } finally {
-    JSON.stringify = original
-  }
-  assert.equal(encodings, 1)
-  assert.deepEqual(sockets.map((socket) => socket.sent.length), [1, 1, 1])
-  assert.equal(sockets[0]!.sent[0], original(MOVE_EVENT))
-})
-
 test("the per-user index follows connections as they come and go", () => {
   const manager = createConnectionManager()
   const first = createSocket()

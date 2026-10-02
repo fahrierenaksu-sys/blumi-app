@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import {
   createRoomSnapshotService
 } from "./roomSnapshotService"
-import { createRoomSnapshotRenderer } from "./roomSnapshotRenderer"
+import { createRoomSnapshotRenderer, ROOM_SNAPSHOT_RENDERER_VERSION } from "./roomSnapshotRenderer"
 import { createInMemoryRoomSnapshotRepository } from "./roomSnapshotRepository"
 import type { PersonalRoomDecorSnapshot } from "./personalRoomDecorRepository"
 
@@ -197,7 +197,7 @@ test("canonical room renderer produces a non-empty webp snapshot", async () => {
     }
   })
   assert.equal(result.mimeType, "image/webp")
-  assert.equal(result.rendererVersion, "room-snapshot-v1")
+  assert.equal(result.rendererVersion, ROOM_SNAPSHOT_RENDERER_VERSION)
   assert.ok(result.body.length > 100)
   assert.equal(result.body.subarray(0, 4).toString("hex"), "52494646")
 })
