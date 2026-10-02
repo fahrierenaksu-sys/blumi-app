@@ -17,6 +17,25 @@ export interface ChatDeliveryJob {
 export interface ChatMessagePageOptions {
   beforeMessageId?: string
   limit: number
+  /**
+   * The reader. After migration 071, messages at or before the reader's
+   * "delete chat for me" point (`hidden_through`) are left out.
+   */
+  viewerUserId?: string
+}
+
+export interface ChatHideTarget {
+  threadId: string
+  userId: string
+  /** A message of this thread (either sender); default: the newest one. */
+  throughMessageId?: string
+}
+
+export interface ChatHideResult {
+  /** The stored hide point afterwards (never moves back). */
+  hiddenThrough: string
+  /** The stored unread cursor afterwards: hidden messages are never unread. */
+  readAt: string
 }
 
 export interface ChatMessageCreateResult {
@@ -176,6 +195,25 @@ export interface ChatRepository {
    */
   countUnreadMessagesBySender(userId: string): Promise<Array<{ senderUserId: string; unreadCount: number }>>
   saveChatPreferences(userId: string, preferences: ChatPreferences, now: Date): Promise<ChatPreferences>
+  /**
+   * False until migration 071 is applied. Before that no query names
+   * `hidden_through`: thread lists carry no `hiddenThrough`, history shows
+   * everything, and
+   * `hideThreadForParticipant` must not be called.
+   */
+  supportsHide(): Promise<boolean>
+  /**
+   * "Delete chat for me": hides the thread from `userId` through the target
+   * message's time (default: its newest message, or its creation when it has
+   * none) and moves the unread cursor there. Both only move forward. The
+   * thread stays in `userId`'s list with `hiddenThrough`, so links, room
+   * invites and room chat still find it, and the app hides the row until a
+   * later message arrives; their history starts after the hide point. The
+   * partner sees no change.
+   * Null when `userId` is not a participant or the message is not in this
+   * thread. Throws before migration 071.
+   */
+  hideThreadForParticipant(input: ChatHideTarget): Promise<ChatHideResult | null>
 }
 
 interface InMemoryParticipantCursors {
@@ -187,6 +225,8 @@ interface InMemoryParticipantCursors {
    */
   readUpTo?: { sentAt: string; messageId: string }
   deliveredUpTo?: ChatReceiptCursor
+  /** "Delete chat for me" point (hidden_through, migration 071). */
+  hiddenThrough?: string
 }
 
 export interface InMemoryChatStore {
@@ -211,9 +251,10 @@ export function createInMemoryChatStore(): InMemoryChatStore {
 
 export function createInMemoryChatRepository(
   store: InMemoryChatStore = createInMemoryChatStore(),
-  options: { receiptsSupported?: boolean; blockSource?: ChatRepositoryBlockSource } = {}
+  options: { receiptsSupported?: boolean; hideSupported?: boolean; blockSource?: ChatRepositoryBlockSource } = {}
 ): ChatRepository {
   const receiptsSupported = options.receiptsSupported ?? true
+  const hideSupported = options.hideSupported ?? true
   const blockSource = options.blockSource
   const cursorKey = (threadId: string, userId: string) => `${threadId}\0${userId}`
   const cursorsOf = (threadId: string, userId: string): InMemoryParticipantCursors =>
@@ -239,6 +280,12 @@ export function createInMemoryChatRepository(
     }
     store.deliveryJobs.set(message.messageId, { message: { ...message }, ...job })
   }
+  /** Whether `message` is after `userId`'s hide point (always, before 071). */
+  const isShownTo = (userId: string | undefined, message: Pick<ChatMessage, "threadId" | "sentAt">) => {
+    if (!hideSupported || userId === undefined) return true
+    const hiddenThrough = cursorsOf(message.threadId, userId).hiddenThrough
+    return hiddenThrough === undefined || Date.parse(message.sentAt) > Date.parse(hiddenThrough)
+  }
   const findPartnerMessage = (threadId: string, userId: string, messageId: string) =>
     (store.messagesByThread.get(threadId) ?? []).find((message) =>
       message.messageId === messageId && message.senderUserId !== userId)
@@ -256,10 +303,15 @@ export function createInMemoryChatRepository(
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
       const threads = candidates.slice(0, limit).map((thread) => {
-          const lastReadAt = cursorsOf(thread.threadId, userId).readAt
+          const { readAt: lastReadAt, hiddenThrough } = cursorsOf(thread.threadId, userId)
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
             .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
-          return { ...cloneThread(thread), unreadCount, ...(lastReadAt ? { lastReadAt } : {}) }
+          return {
+            ...cloneThread(thread),
+            unreadCount,
+            ...(lastReadAt ? { lastReadAt } : {}),
+            ...(hideSupported && hiddenThrough ? { hiddenThrough } : {})
+          }
         })
       const last = threads.at(-1)
       return { threads, nextCursor: candidates.length > limit && last ? encodeThreadCursor({ userId, createdAt: last.createdAt, threadId: last.threadId }) : null }
@@ -280,12 +332,12 @@ export function createInMemoryChatRepository(
       const beforeMessage = options?.beforeMessageId
         ? sorted.find((message) => message.messageId === options.beforeMessageId)
         : undefined
-      const filtered = beforeMessage
+      const filtered = (beforeMessage
         ? sorted.filter(
             (message) =>
               compareChatMessagesAscending(message, beforeMessage) < 0
           )
-        : sorted
+        : sorted).filter((message) => isShownTo(options?.viewerUserId, message))
       const limited = options ? filtered.slice(-options.limit) : filtered
       return limited.map((message) => ({ ...message }))
     },
@@ -479,8 +531,35 @@ export function createInMemoryChatRepository(
       const saved = { readReceiptsEnabled: preferences.readReceiptsEnabled }
       store.preferencesByUser.set(userId, saved)
       return { ...saved }
+    },
+    async supportsHide() {
+      return hideSupported
+    },
+    async hideThreadForParticipant({ threadId, userId, throughMessageId }) {
+      if (!hideSupported) throw new Error("Hiding a chat needs migration 071.")
+      const thread = store.threads.get(threadId)
+      if (!thread || !thread.participantUserIds.includes(userId)) return null
+      const messages = store.messagesByThread.get(threadId) ?? []
+      const through = throughMessageId === undefined
+        ? latestTime(messages.map((message) => message.sentAt)) ?? thread.createdAt
+        : messages.find((message) => message.messageId === throughMessageId)?.sentAt
+      if (through === undefined) return null
+      const current = cursorsOf(threadId, userId)
+      const hiddenThrough = latestTime([current.hiddenThrough, through])!
+      const readAt = latestTime([current.readAt, through])!
+      store.cursorsByParticipant.set(cursorKey(threadId, userId), { ...current, hiddenThrough, readAt })
+      return { hiddenThrough, readAt }
     }
   }
+}
+
+/** The latest of the given instants (PostgreSQL GREATEST: missing values are ignored). */
+function latestTime(values: ReadonlyArray<string | undefined>): string | undefined {
+  let latest: string | undefined
+  for (const value of values) {
+    if (value !== undefined && (latest === undefined || Date.parse(value) > Date.parse(latest))) latest = value
+  }
+  return latest
 }
 
 function compareChatMessagesAscending(a: ChatMessage, b: ChatMessage): number {

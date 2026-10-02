@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import { createInMemoryChatRepository, type ChatRepository } from "../chat/chatRepository"
 import { createChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
+import { createChatHideSchemaProbe } from "../chat/chatHideSchema"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 import { runRepositoryContract, type RepositoryContractBackend } from "./repositoryContract"
 
@@ -30,8 +31,11 @@ runRepositoryContract<ChatRepository>({
   databaseUrl: process.env.DATABASE_URL,
   factories: {
     inMemory: () => createInMemoryChatRepository(),
-    // The gate database has every migration, so the ledger probe finds 070.
-    postgres: (pool) => createPostgresChatRepository(pool, { receiptSchema: createChatReceiptSchemaProbe(pool) })
+    // The gate database has every migration, so the ledger probes find 070 and 071.
+    postgres: (pool) => createPostgresChatRepository(pool, {
+      receiptSchema: createChatReceiptSchemaProbe(pool),
+      hideSchema: createChatHideSchemaProbe(pool)
+    })
   },
   cases: {
     "saveThread is create-only: a repeated save never changes the thread or its participants": async (backend) => {
@@ -438,6 +442,74 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(next.map((job) => job.message.messageId), [after.messageId])
       await backend.repository.completeDelivery(after.messageId, next[0]!.leaseToken, new Date())
       assert.deepEqual(await claim(600_000), [], "the dead-lettered job is never claimed again")
+    },
+    "delete chat for me hides the thread and history from one participant until a newer message": async (backend) => {
+      const chat = thread(backend, "hide", "2026-10-02T09:00:00.000Z")
+      const [ada, bora] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      const one = message(chat, "h1", "2026-10-02T09:01:00.000Z", "one", ada)
+      const two = message(chat, "h2", "2026-10-02T09:02:00.000Z", "two", bora)
+      for (const value of [one, two]) await backend.repository.createMessage(value)
+      const listed = async (userId: string) =>
+        (await backend.repository.listThreadsPage(userId, { limit: 50 })).threads.filter((item) => item.threadId === chat.threadId)
+      const history = async (userId: string, beforeMessageId?: string) =>
+        (await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: userId, ...(beforeMessageId ? { beforeMessageId } : {}) }))
+          .map((item) => item.body)
+      assert.equal(await backend.repository.supportsHide(), true)
+      assert.equal((await listed(bora))[0]?.unreadCount, 1)
+
+      const hidden = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: bora })
+      assert.deepEqual(hidden, { hiddenThrough: two.sentAt, readAt: two.sentAt })
+      const marked = await listed(bora)
+      assert.equal(marked.length, 1, "still listed, so links, invites and room chat find it")
+      assert.equal(marked[0]?.hiddenThrough, two.sentAt, "the app hides the row through this point")
+      assert.equal(marked[0]?.unreadCount, 0)
+      assert.deepEqual(await history(bora), [])
+      assert.deepEqual(await history(bora, two.messageId), [], "older pages stay hidden too")
+      assert.deepEqual(await history(ada), ["one", "two"], "the partner sees no change")
+      assert.equal((await listed(ada))[0]?.hiddenThrough, undefined, "the partner's thread is never marked")
+      assert.equal((await backend.repository.countUnreadMessagesBySender(bora))
+        .find((entry) => entry.senderUserId === ada)?.unreadCount, undefined, "hidden messages are not unread")
+
+      const three = message(chat, "h3", "2026-10-02T09:03:00.000Z", "three", ada)
+      await backend.repository.createMessage(three)
+      const back = await listed(bora)
+      assert.equal(back[0]?.lastMessage?.messageId, three.messageId)
+      assert.equal(back[0]?.unreadCount, 1)
+      assert.deepEqual(await history(bora), ["three"])
+      assert.deepEqual(await history(ada), ["one", "two", "three"])
+    },
+    "the hide point names a message of this thread, defaults to creation when empty and never moves back": async (backend) => {
+      const chat = thread(backend, "hide_point", "2026-10-02T10:00:00.000Z")
+      const other = thread(backend, "hide_other", "2026-10-02T10:00:00.000Z")
+      const [ada, bora] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      await backend.repository.saveThread(other)
+      const empty = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada })
+      assert.equal(empty?.hiddenThrough, chat.createdAt, "an empty thread hides through its creation")
+      assert.equal((await backend.repository.listThreadsPage(ada, { limit: 50 })).threads
+        .find((item) => item.threadId === chat.threadId)?.hiddenThrough, chat.createdAt)
+
+      const one = message(chat, "p1", "2026-10-02T10:01:00.000Z", "one", bora)
+      const two = message(chat, "p2", "2026-10-02T10:02:00.000Z", "two", bora)
+      const elsewhere = message(other, "p3", "2026-10-02T10:03:00.000Z", "elsewhere", bora)
+      for (const value of [one, two, elsewhere]) await backend.repository.createMessage(value)
+      assert.equal(await backend.repository.hideThreadForParticipant({
+        threadId: chat.threadId, userId: ada, throughMessageId: elsewhere.messageId
+      }), null, "a message of another thread is refused")
+      assert.equal(await backend.repository.hideThreadForParticipant({
+        threadId: chat.threadId, userId: backend.id("stranger")
+      }), null, "a non-participant is refused")
+
+      const throughOne = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: one.messageId })
+      assert.equal(throughOne?.hiddenThrough, one.sentAt)
+      assert.deepEqual((await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: ada })).map((item) => item.body), ["two"])
+      await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: two.messageId })
+      const back = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: one.messageId })
+      assert.deepEqual(back, { hiddenThrough: two.sentAt, readAt: two.sentAt }, "neither cursor moves back")
+      assert.deepEqual(await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: ada }), [])
+      assert.deepEqual((await backend.repository.listMessages(other.threadId, { limit: 50, viewerUserId: ada })).map((item) => item.body),
+        ["elsewhere"], "a hide is per thread")
     }
   }
 })

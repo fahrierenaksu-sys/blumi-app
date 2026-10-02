@@ -31,8 +31,11 @@ test("an optional additive migration may be absent but never applied with anothe
   await assert.rejects(check(), /migration/i)
 })
 
-test("the chat receipts migration is the only optional readiness migration", () => {
-  assert.deepEqual([...OPTIONAL_READINESS_MIGRATIONS], ["070_chat_delivery_receipts.sql"])
+test("only the chat receipts and chat hide migrations are optional for readiness", () => {
+  assert.deepEqual([...OPTIONAL_READINESS_MIGRATIONS], [
+    "070_chat_delivery_receipts.sql",
+    "071_chat_hide_for_me_and_advisor_fixes.sql"
+  ])
 })
 
 test("schema readiness rejects absent runtime tables even when migration metadata exists", async () => {

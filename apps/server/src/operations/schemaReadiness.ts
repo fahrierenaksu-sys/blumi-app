@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { CHAT_HIDE_MIGRATION_ID } from "../chat/chatHideSchema"
 import { CHAT_RECEIPTS_MIGRATION_ID } from "../chat/chatReceiptSchema"
 
 interface MigrationIdentity { id: string; checksum: string }
@@ -15,7 +16,8 @@ interface SchemaQueryExecutor {
  * match the packaged file. Add an id here only together with such a probe.
  */
 export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
-  CHAT_RECEIPTS_MIGRATION_ID
+  CHAT_RECEIPTS_MIGRATION_ID,
+  CHAT_HIDE_MIGRATION_ID
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */

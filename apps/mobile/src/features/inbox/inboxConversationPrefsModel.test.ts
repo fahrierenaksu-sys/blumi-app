@@ -96,3 +96,18 @@ test("stored entries stay bounded, keeping the newest", () => {
   assert.equal(isConversationPinned(prefs, "t0"), false)
   assert.equal(isConversationPinned(prefs, `t${MAX_INBOX_PREF_ENTRIES + 4}`), true)
 })
+
+test("a chat deleted on another device stays hidden here until a newer message arrives", () => {
+  const prefs = EMPTY_INBOX_CONVERSATION_PREFS
+  const hiddenEverywhere = { ...thread("t_server", "2026-10-02T10:00:00.000Z"), hiddenThrough: "2026-10-02T10:00:00.000Z" }
+  const empty = { ...thread("t_empty"), hiddenThrough: "2026-10-01T08:00:00.000Z" }
+  assert.equal(isConversationDeletedForMe(prefs, hiddenEverywhere), true)
+  assert.equal(isConversationDeletedForMe(prefs, empty), true, "an empty chat is hidden through its creation")
+  assert.deepEqual(arrangeInboxThreads([hiddenEverywhere, empty, thread("t_open", "2026-10-02T09:00:00.000Z")], prefs)
+    .map((entry) => entry.threadId), ["t_open"])
+  const newer = { ...hiddenEverywhere, lastMessage: { sentAt: "2026-10-02T10:05:00.000Z" } }
+  assert.equal(isConversationDeletedForMe(prefs, newer), false)
+  // The later of this phone's and the server's points wins.
+  const { hiddenThrough: _serverPoint, ...seenHere } = newer
+  assert.equal(isConversationDeletedForMe(deleteConversationForMe(prefs, seenHere), newer), true)
+})

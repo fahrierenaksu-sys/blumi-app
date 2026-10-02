@@ -8,6 +8,7 @@ import {
   chatMessageEnvelopeSchema,
   chatMessageListSchema,
   chatThreadEnvelopeSchema,
+  chatThreadHiddenSchema,
   chatThreadListSchema,
   chatThreadReadSchema
 } from "./chatSchemas"
@@ -224,6 +225,49 @@ export async function markThreadRead(
   ) {
     throw new Error("Blumi could not confirm that chat was read.")
   }
+}
+
+/**
+ * "Delete chat for me" on the server (2026-10-02, migration 071).
+ * `hidden: false` means the server cannot do it (migration 071 not applied:
+ * 409 CHAT_HIDE_UNAVAILABLE; an older server without the route: 404) and the
+ * on-device hide is the only one. Other failures throw; the on-device hide
+ * still applies.
+ */
+export type HideThreadForMeResult =
+  | { hidden: true; hiddenThrough: string; readAt: string }
+  | { hidden: false }
+
+export async function hideThreadForMe(
+  baseHttpUrl: string,
+  sessionToken: string,
+  threadId: string,
+  options: { throughMessageId?: string; expectedUserId?: string } = {},
+  fetcher: typeof fetch = fetch
+): Promise<HideThreadForMeResult> {
+  const { response, payload } = await requestJson(
+    baseHttpUrl,
+    `/v1/threads/${encodeURIComponent(threadId)}/hide`,
+    {
+      method: "POST",
+      headers: createAuthenticatedHeaders(sessionToken, { json: true }),
+      body: JSON.stringify(options.throughMessageId ? { throughMessageId: options.throughMessageId } : {})
+    },
+    fetcher
+  )
+  if (response.status === 404 || response.status === 409) return { hidden: false }
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload, "We could not delete that chat yet."))
+  }
+  const parsed = chatThreadHiddenSchema.safeParse(payload)
+  if (
+    !parsed.success ||
+    parsed.data.threadId !== threadId ||
+    (options.expectedUserId !== undefined && parsed.data.userId !== options.expectedUserId)
+  ) {
+    throw new Error("Blumi could not confirm that chat was deleted.")
+  }
+  return { hidden: true, hiddenThrough: parsed.data.hiddenThrough, readAt: parsed.data.readAt }
 }
 
 export function normalizeThreadListPayload(payload: unknown): ChatThreadList {

@@ -580,6 +580,24 @@ export function setActiveThread(threadId: string | null): void {
 /** Only a focused, foreground ChatThread screen registers itself as active. */
 export function getActiveChatThreadId(): string | null { return activeThreadId }
 
+/**
+ * The server hid the conversation for this account through `hiddenThrough`
+ * ("delete chat for me", migration 071). Cached messages at or before it are
+ * dropped so a conversation brought back by a newer message shows only what
+ * came after, as the server's history does. Unsent bubbles stay.
+ */
+export function applyChatThreadHiddenForMe(threadId: string, hiddenThrough: string): void {
+  const through = Date.parse(hiddenThrough)
+  if (!Number.isFinite(through)) return
+  const cached = messageCache.get(threadId)
+  if (!cached) return
+  const kept = cached.filter((message) => pendingLocalIds.has(message.messageId) || Date.parse(message.sentAt) > through)
+  if (kept.length === cached.length) return
+  messageCache = new Map(messageCache)
+  messageCache.set(threadId, kept)
+  notify()
+}
+
 /** Clear unread count for a specific thread. */
 export function markThreadRead(threadId: string): void {
   noteReadOnThisDevice(threadId)

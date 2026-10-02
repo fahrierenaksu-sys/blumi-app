@@ -32,6 +32,7 @@ import {
   beginChatThreadListRequest,
   removeChatThreadsWithPartner,
   applyChatReceiptUpdated,
+  applyChatThreadHiddenForMe,
   getPartnerReceipts,
   getMessageRenderKey
 } from "./chatStore"
@@ -786,4 +787,29 @@ test("blocking the partner or switching accounts forgets their receipts", () => 
   assert.ok(getPartnerReceipts("t_keep"))
   resetChatStore()
   assert.equal(getPartnerReceipts("t_keep"), undefined)
+})
+
+test("a server hide drops cached messages up to the hide point and keeps newer ones and unsent bubbles", () => {
+  resetChatStore()
+  try {
+    const at = (minute: number) => `2026-10-02T10:0${minute}:00.000Z`
+    applyChatMessageListed({
+      userId: "user_one",
+      threadId: "thread_hide",
+      messages: [1, 2, 3].map((minute) => ({
+        messageId: `m${minute}`, threadId: "thread_hide", senderUserId: "user_two", body: `b${minute}`, sentAt: at(minute)
+      }))
+    })
+    const pending = addOptimisticMessage({
+      threadId: "thread_hide", senderUserId: "user_one", body: "unsent", clientMessageId: "client-message-hide-001"
+    })
+    markOptimisticMessageFailed(pending.clientMessageId)
+    applyChatThreadHiddenForMe("thread_hide", at(2))
+    assert.deepEqual(getMessages("thread_hide").map((entry) => entry.messageId).sort(), ["m3", pending.localMessageId].sort())
+    // A later history page cannot bring hidden messages back unless the server sends them.
+    applyChatMessageListed({ userId: "user_one", threadId: "thread_hide", messages: [] })
+    assert.equal(getMessages("thread_hide").some((entry) => entry.messageId === "m1"), false)
+  } finally {
+    resetChatStore()
+  }
 })

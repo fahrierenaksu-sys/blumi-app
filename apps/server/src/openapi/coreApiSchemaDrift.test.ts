@@ -19,6 +19,7 @@ import {
   discoverProfileParamsSchema,
   listChatMessagesQuerySchema,
   markThreadReadRequestSchema,
+  hideChatThreadRequestSchema,
   notificationPreferencesPatchSchema,
   onboardingStepRequestSchema,
   personalRoomDecorSaveRequestSchema,
@@ -93,6 +94,7 @@ const PAIRS: SchemaPair[] = [
   { json: "sendChatMessage", zod: sendChatMessageRequestSchema, part: "body", valid: { body: "Hello", clientMessageId: "c1" } },
   { json: "listChatMessagesQuery", zod: listChatMessagesQuerySchema, part: "querystring", valid: { before: "m1", limit: "30" } },
   { json: "markThreadRead", zod: markThreadReadRequestSchema, part: "body", valid: { upToMessageId: "message_1" } },
+  { json: "hideChatThread", zod: hideChatThreadRequestSchema, part: "body", valid: { throughMessageId: "message_1" } },
   { json: "chatPreferences", zod: chatPreferencesUpdateRequestSchema, part: "body", valid: { readReceiptsEnabled: true } },
   { json: "roomInviteDecision", zod: roomInviteDecisionRequestSchema, part: "body", valid: { status: "accepted" } },
   {

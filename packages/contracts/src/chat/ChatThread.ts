@@ -53,6 +53,12 @@ export interface ChatThread {
   unreadCount?: number;
   lastReadAt?: string;
   partnerReceipts?: ChatPartnerReceipts;
+  /**
+   * The viewer's "delete chat for me" point (migration 071). The thread stays
+   * listed so links, room invites and room chat still find it; the app hides
+   * the row until its newest message is later than this.
+   */
+  hiddenThrough?: string;
 }
 
 export interface ChatThreadList {
@@ -63,6 +69,9 @@ export interface ChatThreadList {
 }
 
 export interface ChatThreadRead { userId: string; threadId: string; readAt: string; }
+
+/** "Delete chat for me": messages at or before `hiddenThrough` are hidden from `userId` only. */
+export interface ChatThreadHidden { userId: string; threadId: string; hiddenThrough: string; readAt: string; }
 
 export interface ChatMessageList {
   userId: string;

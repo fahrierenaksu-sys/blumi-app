@@ -4,6 +4,7 @@ import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import {
   fetchChatThreads,
   fetchThreadMessages,
+  hideThreadForMe,
   markThreadRead,
   sendThreadMessage,
   type FetchThreadMessagesOptions
@@ -29,6 +30,7 @@ import {
   applyChatThreadCreated,
   applyChatThreadListed,
   applyChatThreadListFailed,
+  applyChatThreadHiddenForMe,
   applyChatThreadListLoading,
   beginChatThreadListRequest,
   confirmOptimisticMessage,
@@ -212,6 +214,21 @@ export function useRootChatSync({
     return requestMessages(threadId, {}, { purpose: "prefetch" }).catch(() => undefined)
   }, [latestSessionActorRef, requestMessages])
 
+  // "Delete chat for me": the Inbox hides the conversation on this phone at
+  // once; this also hides it on the server (every device, and history after
+  // a newer message brings it back) when the server supports it (071).
+  // Otherwise, or on failure, the on-device hide is the whole effect.
+  const hideThreadForMeOnServer = useCallback((threadId: string, throughMessageId?: string): void => {
+    const actor = latestSessionActorRef.current
+    if (actor?.session.mode !== "production") return
+    void hideThreadForMe(MOBILE_HTTP_BASE_URL, actor.session.sessionToken, threadId, {
+      ...(throughMessageId ? { throughMessageId } : {}),
+      expectedUserId: actor.profile.userId
+    }).then((result) => {
+      if (result.hidden && isCurrentSession(actor)) applyChatThreadHiddenForMe(threadId, result.hiddenThrough)
+    }).catch(() => { /* The on-device hide already applies. */ })
+  }, [isCurrentSession, latestSessionActorRef])
+
   // Handed to the ChatThread screen as a prop; route params carry ids only.
   const chatThreadBindings = useMemo((): ChatThreadBindings => ({
     sendChatMessage: sendChatMessageForRoute,
@@ -248,6 +265,7 @@ export function useRootChatSync({
     resynchronizeMessages,
     upsertRoomInvite,
     warmThreadMessagesForInbox,
+    hideThreadForMeOnServer,
     chatThreadBindings
   }
 }

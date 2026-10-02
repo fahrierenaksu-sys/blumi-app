@@ -50,6 +50,7 @@ import {
   createStaticChatReceiptSchema,
   type ChatReceiptSchemaProbe
 } from "./chat/chatReceiptSchema"
+import { createChatHideSchemaProbe } from "./chat/chatHideSchema"
 import {
   createCapabilityService,
   parseCapabilityManifest,
@@ -550,7 +551,7 @@ export function createConfiguredServerServices(
     safetyService.subscribeRealtimeAccessRevocations((revocation) => authService.invalidateCachedSessions?.(revocation))
     const chatService = createChatService({
       repository: applyTestPersonaPolicy(
-        createPostgresChatRepository(pool, { receiptSchema: chatReceiptSchema }),
+        createPostgresChatRepository(pool, { receiptSchema: chatReceiptSchema, hideSchema: createChatHideSchemaProbe(pool) }),
         config.deployEnvironment
       ),
       blockPolicy: safetyService

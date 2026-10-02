@@ -64,6 +64,11 @@ type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
   onWarmThread: (threadId: string) => Promise<void>
   /** Marks a conversation read up to a partner message (delete for me clears its unread). */
   onMarkThreadRead?: (threadId: string, upToMessageId?: string) => void
+  /**
+   * Delete for me on the server too (every device; history after a newer
+   * message). Best effort: the on-device hide below applies either way.
+   */
+  onHideThreadForMe?: (threadId: string, throughMessageId?: string) => void
 }
 
 const CONVERSATION_ROW_GAP = uiTheme.spacing.sm + 2
@@ -242,7 +247,7 @@ export function InboxScreen(props: InboxScreenProps) {
       : pinConversation(prefs, threadId, new Date()))
     setActionsThreadId(null)
   }, [updateConversationPrefs])
-  const { onMarkThreadRead } = props
+  const { onMarkThreadRead, onHideThreadForMe } = props
   const deleteConversation = useCallback((threadId: string) => {
     const thread = storeThreads.find((candidate) => candidate.threadId === threadId)
     setActionsThreadId(null)
@@ -253,7 +258,9 @@ export function InboxScreen(props: InboxScreenProps) {
       onMarkThreadRead?.(threadId, last.messageId)
     }
     updateConversationPrefs((prefs) => deleteConversationForMe(prefs, thread))
-  }, [currentUserId, getThreadUnreadCount, onMarkThreadRead, storeThreads, updateConversationPrefs])
+    // Through the newest message this list showed, never one it did not.
+    onHideThreadForMe?.(threadId, last?.messageId)
+  }, [currentUserId, getThreadUnreadCount, onHideThreadForMe, onMarkThreadRead, storeThreads, updateConversationPrefs])
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
   }, [navigation])

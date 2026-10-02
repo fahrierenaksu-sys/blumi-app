@@ -94,6 +94,7 @@ const ROUTE_MATRIX: Record<string, RouteEntry> = {
   "POST /v1/threads": { auth: "bearer", ids: "body participantUserIds", crossAccount: "pair without caller -> 400, unmatched -> 403 (asserted)" },
   "GET /v1/threads/:threadId/messages": { auth: "bearer", ids: "path threadId", crossAccount: "non-participant -> 404 (asserted)" },
   "POST /v1/threads/:threadId/messages": { auth: "bearer", ids: "path threadId", crossAccount: "non-participant refused, nothing stored (asserted)" },
+  "POST /v1/threads/:threadId/hide": { auth: "bearer", ids: "path threadId, body throughMessageId", crossAccount: "non-participant -> 404 (asserted); a message of another thread -> 400 (chatHideRoutes.test)" },
   "POST /v1/threads/:threadId/read": { auth: "bearer", ids: "path threadId, body upToMessageId", crossAccount: "non-participant -> 404 (asserted); a message the caller did not receive -> 400 (chatReceiptRoutes.test)" },
   "GET /v1/threads/:threadId/room-invites": { auth: "bearer", ids: "path threadId", crossAccount: "non-participant -> 403 (asserted)" },
   "POST /v1/threads/:threadId/room-invites": { auth: "bearer", ids: "path threadId", crossAccount: "non-participant -> 403 (asserted)" },
@@ -228,6 +229,7 @@ test("cross-account ids are refused on every id-bearing member route and the vic
     await expectRefused("GET /v1/threads/:threadId/messages", `/v1/threads/${abThread}/messages`, [404])
     await expectRefused("POST /v1/threads/:threadId/messages", `/v1/threads/${abThread}/messages`, [403, 404], { payload: { body: "intrusion" } })
     await expectRefused("POST /v1/threads/:threadId/read", `/v1/threads/${abThread}/read`, [404], { payload: {} })
+    await expectRefused("POST /v1/threads/:threadId/hide", `/v1/threads/${abThread}/hide`, [404], { payload: {} })
     await expectRefused("GET /v1/threads/:threadId/room-invites", `/v1/threads/${pqThread}/room-invites`, [403, 404])
     await expectRefused("POST /v1/threads/:threadId/room-invites", `/v1/threads/${pqThread}/room-invites`, [403, 404], { payload: {} })
     await expectRefused("POST /v1/room-invites/:inviteId/decision", `/v1/room-invites/${pendingInviteId}/decision`, [403, 404], { payload: { status: "accepted" } })
