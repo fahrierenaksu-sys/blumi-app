@@ -125,3 +125,32 @@ test("before migration 071 the hide answers 409 and nothing changes", async () =
     await server.app.close()
   }
 })
+
+test("only a participant can hide a thread, and only through a message of that same thread", async () => {
+  const { server, ada, bora, threadId } = await createPair()
+  try {
+    const carol = await server.createAccount("carol")
+    const otherThreadId = await server.matchAndThread(bora, carol, `hide_other_${Math.random().toString(36).slice(2, 8)}`)
+    await send(server, ada, threadId, "one")
+    const elsewhere = await send(server, carol, otherThreadId, "later, in another thread")
+
+    // An outsider learns nothing: the same answer as a thread that does not exist.
+    const outsider = await server.call("POST", `/v1/threads/${threadId}/hide`, { token: carol.sessionToken, payload: {} })
+    const missing = await server.call("POST", "/v1/threads/thread_does_not_exist/hide", { token: carol.sessionToken, payload: {} })
+    assert.equal(outsider.statusCode, 404)
+    assert.deepEqual(outsider.json(), missing.json())
+    assert.deepEqual(await bodiesOf(server, ada, threadId), ["one"])
+    assert.deepEqual(await bodiesOf(server, bora, threadId), ["one"])
+
+    // A newer message the caller can read in another thread cannot move this thread's hide point.
+    const crossed = await server.call("POST", `/v1/threads/${threadId}/hide`, {
+      token: bora.sessionToken, payload: { throughMessageId: elsewhere.messageId }
+    })
+    assert.equal(crossed.statusCode, 400)
+    assert.equal(crossed.json().code, "CHAT_HIDE_CURSOR_INVALID")
+    assert.deepEqual(await bodiesOf(server, bora, threadId), ["one"])
+    assert.equal((await threadsOf(server, bora)).find((thread) => thread.threadId === threadId)?.unreadCount, 1)
+  } finally {
+    await server.app.close()
+  }
+})
