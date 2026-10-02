@@ -696,3 +696,19 @@ test("close and retry failures alert, and an unmounted screen stays silent", asy
   await settle()
   assert.equal(switchedUser.alerts.length, 1)
 })
+
+test("an invite requested from the partner's profile reuses the composer's invite action", () => {
+  const screenSource = component("ChatThreadScreen").getText(file)
+  assert.match(
+    screenSource,
+    /useRequestedRoomInvite\(\{\s*request: route\.params\.roomInviteRequest,\s*isFocused,\s*onInvite: handleRoomInvitePress,\s*clearRequest: \(\) => navigation\.setParams\(\{ roomInviteRequest: undefined \}\)/
+  )
+  assert.ok(
+    screenSource.indexOf("useRequestedRoomInvite(") > screenSource.indexOf("useChatRoomInviteActions("),
+    "the request runs the invite action the screen already owns"
+  )
+  assert.ok(
+    screenSource.indexOf("useRequestedRoomInvite(") < screenSource.indexOf("if (!thread && !pendingPartnerId)"),
+    "the hook runs before the missing-thread early return"
+  )
+})

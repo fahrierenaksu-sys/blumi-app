@@ -26,7 +26,6 @@ import { getProfilePreviewCopy } from "../features/discovery/profilePreviewCopy"
 import { getAppLocale } from "../features/session/appLocale"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
-import { MyAvatar } from "../ui/myAvatar"
 import {
   ActionButtonCircle,
   CardWrapper,
@@ -37,10 +36,17 @@ import { springPressScale, useReducedMotion } from "../ui/animations"
 import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { captureProductEvent } from "../analytics/productAnalytics"
+import type { UserProfilePrompt } from "@blumi/contracts"
+import type { AppLocale } from "../features/session/appLocale"
 import {
-  USER_PROFILE_PROMPT_OPTIONS,
-  type UserProfilePrompt
-} from "@blumi/contracts"
+  resolvePreviewTags,
+  resolveMatchedChatNavigation,
+  resolveProfilePreviewActions,
+  resolveProfilePreviewContext,
+  shouldShowProfileSafety,
+  toProfilePromptViews
+} from "../features/profile/profileViewModel"
+import { ProfileMatchedActions } from "../features/profile/ProfileMatchedActions"
 
 export interface ProfilePrompt {
   id: string
@@ -49,35 +55,20 @@ export interface ProfilePrompt {
 }
 
 export function toProfilePreviewPrompts(
-  prompts: readonly UserProfilePrompt[] | undefined
+  prompts: readonly UserProfilePrompt[] | undefined,
+  locale: AppLocale = "en"
 ): ProfilePrompt[] {
-  return (prompts ?? []).flatMap((prompt) => {
-    const option = USER_PROFILE_PROMPT_OPTIONS.find(
-      (candidate) => candidate.promptId === prompt.promptId
-    )
-    return option
-      ? [{ id: prompt.promptId, question: option.question, answer: prompt.answer }]
-      : []
-  })
+  return toProfilePromptViews(prompts, locale)
 }
 
-export interface ProfileCue {
-  id: string
-  label: string
-  value: string
-  detail: string
-}
-
+/** Text only: never a phone number. The user id is used for actions, never shown. */
 export interface ProfilePreviewData {
   userId: string
   displayName: string
   age?: number
   avatarSnapshot?: CandidateAvatarSnapshot
-  headline: string
-  vibeLine: string
   tags: string[]
   bio: string
-  cues: ProfileCue[]
   prompts: ProfilePrompt[]
   decisionCapability: DiscoveryDecisionCapability
   blocked: boolean
@@ -92,12 +83,6 @@ type ProfilePreviewScreenProps = NativeStackScreenProps<
 > & {
   profileOverride?: ProfilePreviewData
   sessionActor: SessionActor
-}
-
-const CUE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  live_overlap: "pulse-outline",
-  proximity: "location-outline",
-  room_readiness: "sparkles-outline",
 }
 
 export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
@@ -147,12 +132,41 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   })
 
   const promptCards = profile.prompts.slice(0, 2)
-  const likeDisabled =
-    profile.isSelf ||
-    profile.blocked ||
-    profile.decisionCapability === "unavailable" ||
-    profile.decisionCapability === "view-only"
-  const decisionDisabled = likeDisabled || serverDeniedDecision
+  const tags = resolvePreviewTags(profile.tags)
+  const stackRoutes = navigation.getState().routes
+  const routeIndex = stackRoutes.findIndex((candidate) => candidate.key === route.key)
+  const previousRoute = routeIndex > 0 ? stackRoutes[routeIndex - 1] : undefined
+  const context = resolveProfilePreviewContext({
+    requested: route.params.context,
+    isSelf: profile.isSelf || profile.userId === props.sessionActor.profile.userId,
+    previousRouteName: previousRoute?.name
+  })
+  const isSelfView = context === "self"
+  const actions = resolveProfilePreviewActions({
+    context,
+    blocked: profile.blocked,
+    decisionCapability: profile.decisionCapability,
+    serverDeniedDecision,
+    productionDiscovery: isProductionDiscovery
+  })
+  const decisionDisabled = actions.kind !== "decide" || !actions.likeEnabled
+
+  const openChat = (inviteRequest?: string): void => {
+    const target = resolveMatchedChatNavigation({
+      previousRoute,
+      partner: { userId: profile.userId, displayName: profile.displayName },
+      inviteRequest
+    })
+    if (target.kind === "back") {
+      navigation.goBack()
+      return
+    }
+    if (target.kind === "popTo") {
+      navigation.popTo("ChatThread", target.params)
+      return
+    }
+    navigation.navigate("ChatThread", target.params)
+  }
 
   const returnToLobby = (
     completedProductionDecision: {
@@ -238,7 +252,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   }
 
   const passAndReturn = (): void => {
-    if (profile.isSelf) {
+    if (isSelfView) {
       goBackToDiscovery()
       return
     }
@@ -294,7 +308,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
               >
                 <Ionicons name="chevron-back" size={22} color={uiTheme.colors.textPrimary} />
               </ActionButtonCircle>
-              {!profile.isSelf ? (
+              {shouldShowProfileSafety(context) ? (
                 <ActionButtonCircle
                   accessibilityLabel={copy.safetyOptions(profile.displayName)}
                   onPress={() => setReportVisible(true)}
@@ -310,20 +324,11 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
 
             {/* Giant Avatar */}
             <View style={styles.avatarContainer} pointerEvents="none">
-              {profile.isSelf ? (
-                <MyAvatar
-                  name={profile.displayName}
-                  seed={profile.userId}
-                  size={260}
-                  ring="strong"
-                />
-              ) : (
-                <CandidateAvatarPreview
-                  snapshot={avatarSnapshot}
-                  size={280}
-                  stage="profile"
-                />
-              )}
+              <CandidateAvatarPreview
+                snapshot={avatarSnapshot}
+                size={280}
+                stage="profile"
+              />
             </View>
 
             {/* Info Overlay (Gradient at bottom of hero) */}
@@ -338,11 +343,13 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                 <View style={styles.stagePill}>
                   <View style={styles.stageDot} />
                   <Text style={styles.stagePillText}>
-                    {profile.isSelf
+                    {isSelfView
                       ? copy.yourProfile
-                      : profile.decisionCapability === "live-invite"
-                        ? copy.availableNow
-                        : copy.discoverProfile}
+                      : context === "matched"
+                        ? copy.yourMatch
+                        : profile.decisionCapability === "live-invite"
+                          ? copy.availableNow
+                          : copy.discoverProfile}
                   </Text>
                 </View>
 
@@ -352,7 +359,9 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                     {typeof profile.age === "number" ? `, ${profile.age}` : ""}
                   </Text>
                 </View>
-                <Text style={styles.subtitleText}>{profile.distanceLabel}</Text>
+                {profile.distanceLabel ? (
+                  <Text style={styles.subtitleText}>{profile.distanceLabel}</Text>
+                ) : null}
               </View>
             </View>
           </View>
@@ -367,46 +376,13 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
               </View>
             ) : null}
 
-            {profile.tags.length > 0 ? (
+            {tags.length > 0 ? (
               <View style={styles.tagsRow}>
-                {profile.tags.map((tag) => (
+                {tags.map((tag) => (
                   <TagChip key={tag} label={tag} />
                 ))}
               </View>
             ) : null}
-
-            {profile.headline || profile.vibeLine ? (
-              <View style={styles.identityBlock}>
-                {profile.headline ? (
-                  <Text style={styles.headlineText}>{profile.headline}</Text>
-                ) : null}
-                {profile.vibeLine ? (
-                  <Text style={styles.vibeText}>{profile.vibeLine}</Text>
-                ) : null}
-              </View>
-            ) : null}
-
-            <View style={styles.contextGrid}>
-              {profile.cues.map((cue) => (
-                <View key={cue.id} style={styles.contextCard}>
-                  <View style={styles.contextHeader}>
-                    <View style={styles.contextIconCircle}>
-                      <Ionicons
-                        accessible={false}
-                        name={CUE_ICONS[cue.id] ?? "ellipse-outline"}
-                        size={16}
-                        color={uiTheme.colors.primaryDeep}
-                      />
-                    </View>
-                    <View style={styles.contextTextStack}>
-                      <Text style={styles.contextLabel}>{cue.label}</Text>
-                      <Text style={styles.contextValue}>{cue.value}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.contextDetail}>{cue.detail}</Text>
-                </View>
-              ))}
-            </View>
 
             {promptCards.length > 0 ? promptCards.map((prompt) => (
               <CardWrapper key={prompt.id} style={styles.promptCard}>
@@ -416,59 +392,72 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
             )) : null}
 
             <SafeAreaView contentGutter={false} edges={["bottom"]}>
-              <View style={styles.actionRow}>
-                <ActionButtonCircle
-                  accessibilityLabel={copy.passProfile}
-                  onPress={passAndReturn}
-                  disabled={isProductionDiscovery && (decisionDisabled || isDeciding)}
-                  accessibilityState={{
-                    disabled: isProductionDiscovery && decisionDisabled,
-                    busy: isProductionDiscovery && isDeciding
-                  }}
-                  size={62}
-                >
-                  <Ionicons name="close" size={28} color={uiTheme.colors.textPrimary} />
-                </ActionButtonCircle>
-                <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={copy.likeProfile(profile.displayName)}
-                    accessibilityState={{ disabled: decisionDisabled, busy: isDeciding }}
-                    disabled={decisionDisabled || isDeciding}
-                    onPress={sendInviteAndReturn}
-                    onPressIn={handleLikePressIn}
-                    onPressOut={handleLikePressOut}
-                    style={[
-                      styles.likeButton,
-                        decisionDisabled || isDeciding ? styles.likeButtonDisabled : null,
-                    ]}
+              {actions.kind === "matched" ? (
+                <ProfileMatchedActions
+                  displayName={profile.displayName}
+                  canInvite={actions.canInvite}
+                  onBackToChat={() => openChat()}
+                  onInviteToRoom={() => openChat(`${Date.now()}`)}
+                />
+              ) : null}
+              {actions.kind === "none" ? (
+                <Text style={styles.decisionUnavailable}>{copy.selfPreviewNote}</Text>
+              ) : null}
+              {actions.kind === "decide" ? (
+                <View style={styles.actionRow}>
+                  <ActionButtonCircle
+                    accessibilityLabel={copy.passProfile}
+                    onPress={passAndReturn}
+                    disabled={isProductionDiscovery && (decisionDisabled || isDeciding)}
+                    accessibilityState={{
+                      disabled: isProductionDiscovery && decisionDisabled,
+                      busy: isProductionDiscovery && isDeciding
+                    }}
+                    size={62}
                   >
-                    <LinearGradient
-                      colors={
-                        decisionDisabled || isDeciding
-                          ? [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
-                          : uiTheme.gradients.primary as [string, string]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.likeButtonGradient}
+                    <Ionicons name="close" size={28} color={uiTheme.colors.textPrimary} />
+                  </ActionButtonCircle>
+                  <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={copy.likeProfile(profile.displayName)}
+                      accessibilityState={{ disabled: decisionDisabled, busy: isDeciding }}
+                      disabled={decisionDisabled || isDeciding}
+                      onPress={sendInviteAndReturn}
+                      onPressIn={handleLikePressIn}
+                      onPressOut={handleLikePressOut}
+                      style={[
+                        styles.likeButton,
+                          decisionDisabled || isDeciding ? styles.likeButtonDisabled : null,
+                      ]}
                     >
-                      <View style={styles.likeButtonContent}>
-                        <Ionicons name="heart" size={18} color="#FFFFFF" />
-                        <Text style={styles.likeButtonText}>
-                          {isDeciding ? copy.saving : copy.sayHi}
-                        </Text>
-                      </View>
-                    </LinearGradient>
-                  </Pressable>
-                </Animated.View>
-              </View>
+                      <LinearGradient
+                        colors={
+                          decisionDisabled || isDeciding
+                            ? [uiTheme.colors.primaryDisabled, uiTheme.colors.primaryDisabled]
+                            : uiTheme.gradients.primary as [string, string]
+                        }
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.likeButtonGradient}
+                      >
+                        <View style={styles.likeButtonContent}>
+                          <Ionicons name="heart" size={18} color="#FFFFFF" />
+                          <Text style={styles.likeButtonText}>
+                            {isDeciding ? copy.saving : copy.sayHi}
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  </Animated.View>
+                </View>
+              ) : null}
               {decisionError ? (
                 <Text accessibilityRole="alert" style={styles.decisionError}>
                   {decisionError}
                 </Text>
               ) : null}
-              {isProductionDiscovery && decisionDisabled && !profile.isSelf && !decisionError ? (
+              {actions.kind === "decide" && actions.showViewOnlyNotice && !decisionError ? (
                 <Text style={styles.decisionUnavailable}>
                   {copy.viewOnlyExplanation}
                 </Text>
@@ -477,7 +466,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
           </View>
         </Animated.View>
       </Reanimated.ScrollView>
-      {!profile.isSelf ? (
+      {shouldShowProfileSafety(context) ? (
         <ReportModal
           visible={reportVisible}
           targetUserId={profile.userId}
@@ -618,19 +607,6 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.md,
     gap: uiTheme.spacing.md,
   },
-  identityBlock: {
-    gap: uiTheme.spacing.xxs,
-    paddingHorizontal: 4,
-  },
-  headlineText: {
-    ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.primaryDeep,
-  },
-  vibeText: {
-    ...uiTheme.font.bodySmall,
-    color: uiTheme.colors.textSecondary,
-    fontWeight: "600",
-  },
   tagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -652,52 +628,6 @@ const styles = StyleSheet.create({
   bioText: {
     ...uiTheme.font.body,
     color: uiTheme.colors.textSecondary,
-  },
-  contextGrid: {
-    gap: uiTheme.spacing.sm,
-  },
-  contextCard: {
-    borderRadius: uiTheme.radius.xl,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    backgroundColor: uiTheme.colors.surface,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingVertical: uiTheme.spacing.md,
-    gap: uiTheme.spacing.xs,
-    ...uiTheme.shadow.soft,
-  },
-  contextHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.sm,
-  },
-  contextIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: uiTheme.colors.chipBackground,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  contextTextStack: {
-    flex: 1,
-    gap: 1,
-  },
-  contextLabel: {
-    ...uiTheme.font.overline,
-    color: uiTheme.colors.textMuted,
-    fontSize: 10,
-  },
-  contextValue: {
-    ...uiTheme.font.bodyBold,
-    fontSize: 14,
-    color: uiTheme.colors.textPrimary,
-  },
-  contextDetail: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textSecondary,
-    lineHeight: 17,
-    paddingLeft: 48,
   },
   promptCard: {
     gap: uiTheme.spacing.sm,

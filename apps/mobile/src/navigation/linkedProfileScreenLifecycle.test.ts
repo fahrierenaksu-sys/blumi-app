@@ -26,7 +26,7 @@ function createReanimatedStub(runtime: ReturnType<typeof createFakeReactRuntime>
   }
 }
 
-function mount(options: { demoMode?: boolean; directProfile?: Record<string, unknown>; reduceMotion?: boolean } = {}) {
+function mount(options: { demoMode?: boolean; directProfile?: Record<string, unknown>; reduceMotion?: boolean; userId?: string } = {}) {
   const runtime = createFakeReactRuntime()
   const reanimated = createReanimatedStub(runtime)
   let locale = "en"
@@ -43,7 +43,9 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
         "react-native": createReactNativeStub().module,
         "react-native-reanimated": reanimated.module,
         "../ui/animations": { useReducedMotion: () => options.reduceMotion === true },
-        "../features/avatarV2/candidateAvatarSnapshot": { createCandidateAvatarSnapshot: () => ({}) },
+        "../features/avatarV2/candidateAvatarSnapshot": {
+          createCandidateAvatarSnapshot: (input: { userId: string }) => ({ snapshotFor: input.userId })
+        },
         "../features/demo/dummyProfiles": {
           DUMMY_PROFILES: [{ userId: "demo-1", displayName: "Demo", age: 24, bio: "Hello" }]
         },
@@ -57,14 +59,13 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
           getProfilePreviewCopy: (current: string) => ({
             discoverProfile: `discover:${current}`,
             availableNow: `available:${current}`,
-            deepLinkHeadline: `headline:${current}`,
             loading: `loading:${current}`
           })
         },
         "../config/env": { MOBILE_HTTP_BASE_URL: "https://fixture.invalid" },
         "../screens/ProfilePreviewScreen": {
           ProfilePreviewScreen: "ProfilePreviewScreen",
-          toProfilePreviewPrompts: () => []
+          toProfilePreviewPrompts: (prompts: unknown[] | undefined) => (prompts ?? []).map(() => "prompt")
         },
         "../features/session/appLocale": { getAppLocale: () => locale },
         "../ui/theme": { uiTheme: { colors: {}, spacing: {}, font: {}, radius: {} } }
@@ -72,12 +73,22 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
       real: ["./linkedProfileResolutionModel"]
     }
   )
-  let userId = options.demoMode ? "demo-1" : "remote-1"
+  let userId = options.userId ?? (options.demoMode ? "demo-1" : "remote-1")
   const render = () => runtime.render(() => LinkedProfileScreen({
     demoMode: options.demoMode === true,
     navigation: { navigate: () => undefined },
     route: { params: options.directProfile ? { profile: options.directProfile } : { userId } },
-    sessionActor: {},
+    sessionActor: {
+      profile: {
+        userId: "viewer-1",
+        displayName: "Viewer",
+        age: 27,
+        bio: "Hello from me",
+        interests: ["Tea"],
+        prompts: [{ promptId: "small_joy", answer: "Rain" }],
+        avatar: {}
+      }
+    },
     sessionToken: "token"
   }))
   return {
@@ -120,8 +131,9 @@ test("a demo profile resolves with the current locale's labels", () => {
   assert.equal((output.type as { name?: string }).name, "LinkedProfileReveal")
   const content = output.props.children as Element
   assert.equal(content.type, "ProfilePreviewScreen")
-  assert.equal(content.props.profileOverride.headline, "discover:tr")
   assert.equal(content.props.profileOverride.distanceLabel, "available:tr")
+  assert.equal("headline" in content.props.profileOverride, false)
+  assert.equal("vibeLine" in content.props.profileOverride, false)
   assert.equal(f.requests.length, 0)
 })
 
@@ -130,6 +142,23 @@ test("a direct profile renders at once, without the loading reveal", () => {
   const output = f.render() as Element
   assert.equal(output.type, "ProfilePreviewScreen")
   assert.equal(output.props.profileOverride.userId, "direct-1")
+  assert.equal(f.requests.length, 0)
+})
+
+test("the viewer's own profile renders from the session at once, without a request", () => {
+  const f = mount({ userId: "viewer-1" })
+  const output = f.render() as Element
+  assert.equal(output.type, "ProfilePreviewScreen")
+  const profile = output.props.profileOverride
+  assert.equal(profile.isSelf, true)
+  assert.equal(profile.decisionCapability, "unavailable")
+  assert.equal(profile.bio, "Hello from me")
+  assert.deepEqual(profile.tags, ["Tea"])
+  assert.deepEqual(profile.prompts, ["prompt"])
+  assert.equal(profile.distanceLabel, "")
+  assert.deepEqual(profile.avatarSnapshot, { snapshotFor: "viewer-1" })
+  // Re-renders rebuild the profile but never start a request.
+  f.render()
   assert.equal(f.requests.length, 0)
 })
 

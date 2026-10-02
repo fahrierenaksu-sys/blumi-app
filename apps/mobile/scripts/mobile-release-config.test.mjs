@@ -955,9 +955,12 @@ test("production profile and chat actions never fall back to local demo behavior
   const discoverCard = read("src/components/DiscoverCard.tsx")
   const navigator = read("src/navigation/RootNavigator.tsx")
 
+  // The preview's actions come from the profile view model, which refuses a
+  // decision for an unavailable or view-only capability.
+  assert.match(profilePreview, /resolveProfilePreviewActions\(\{[\s\S]*?decisionCapability: profile\.decisionCapability/)
   assert.match(
-    profilePreview,
-    /profile\.decisionCapability === "unavailable"/
+    read("src/features/profile/profileViewModel.ts"),
+    /input\.decisionCapability !== "unavailable" &&\s*input\.decisionCapability !== "view-only"/
   )
   assert.doesNotMatch(profilePreview, /\bprofile\.canInvite\b/)
   assert.doesNotMatch(chatThread, /createLocalDemoMatch/)

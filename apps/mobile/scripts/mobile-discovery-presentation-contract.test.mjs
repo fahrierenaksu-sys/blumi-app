@@ -383,8 +383,11 @@ test("production cards use real discovery signals without synthetic fit metadata
   assert.doesNotMatch(lobbySource, /Open to a mutual match/)
   assert.match(
     previewSource,
-    /\{profile\.bio \?[\s\S]*?\{profile\.tags\.length > 0 \?/
+    /\{profile\.bio \?[\s\S]*?\{tags\.length > 0 \?/
   )
+  // Tags render once: the former vibe line repeated them and the filler headline is gone.
+  assert.match(previewSource, /const tags = resolvePreviewTags\(profile\.tags\)/)
+  assert.doesNotMatch(previewSource, /vibeLine|headline|profile\.cues/)
   assert.match(
     previewSource,
     /import \{ getDiscoveryDecisionErrorMessageForDisplay \} from "\.\.\/features\/discovery\/discoveryErrorCopy"/
