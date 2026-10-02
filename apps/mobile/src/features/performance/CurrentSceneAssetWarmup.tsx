@@ -43,6 +43,14 @@ const SELECTED_PREVIEW_BUDGET = { maxAssets: 4, maxDecodedBytes: 8 * 1024 * 1024
 const CURRENT_SCENE_BUDGET = { maxAssets: 15, maxDecodedBytes: 24 * 1024 * 1024 }
 const SESSION_BUDGET = { maxAssets: 32, maxDecodedBytes: 48 * 1024 * 1024 }
 
+/**
+ * The first-viewport warm-ups (room shell, Shop) start this long after the
+ * route changes, then in an idle slot. A main-page route changes when a swipe
+ * has settled; this keeps image decoding out of that commit's render and the
+ * page focus work right after it, still well before the one-second batch.
+ */
+export const SCENE_WARMUP_AFTER_ROUTE_MS = 300
+
 export function scheduleSceneAssetWarmup(
   runWarmup: () => void,
   enabled: boolean,
@@ -193,7 +201,7 @@ export function CurrentSceneAssetWarmup({
       )?.asset.source
       if (roomShellSource === undefined) return
       void warmSources([roomShellSource], CURRENT_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
-    }, true, 0)
+    }, true, SCENE_WARMUP_AFTER_ROUTE_MS)
     const cancelScheduled = scheduleSceneAssetWarmup(() => {
       if (!current) return
       const sources = getIdleAvatarLayerAssets(avatar).map((asset) => asset.source)
@@ -298,7 +306,7 @@ export function CurrentSceneAssetWarmup({
           .filter((source): source is ImageSourcePropType => source !== undefined))
       }
       void warmSources(sources, SHOP_BUDGET, () => current && enabledRef.current, completed, inFlight, sourceDimensions, prefetchLane)
-    }, true, 0)
+    }, true, SCENE_WARMUP_AFTER_ROUTE_MS)
     return () => {
       current = false
       cancelScheduled()
