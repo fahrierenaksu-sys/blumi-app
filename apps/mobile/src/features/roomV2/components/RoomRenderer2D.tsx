@@ -523,8 +523,6 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     : undefined
   const liveAvatarLayout = liveAvatarPosition && {
     live: liveAvatarPosition,
-    baseX: item.x,
-    baseY: item.y,
     width: item.width * mobileFurnitureScale,
     height: item.height * mobileFurnitureScale,
     anchorX: item.anchor.x,
@@ -621,9 +619,6 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
                 footprintStyle
               ]}
             />
-          ) : null}
-          {item.kind === "avatar" && !item.seatRig ? (
-            <View pointerEvents="none" style={[styles.avatarGroundShadow, { top: `${item.anchor.y * 100}%` }, avatarMotion.state === "walking" ? styles.avatarGroundShadowWalking : null]} />
           ) : null}
           {item.kind === "avatar" ? (
             <Animated.View
@@ -876,23 +871,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     zIndex: 2
-  },
-  // ROOM-11: a soft contact shadow at the feet (the item's anchor), the same
-  // tone as MiniRoom's; narrower while walking, none when seated.
-  avatarGroundShadow: {
-    position: "absolute",
-    left: "30%",
-    width: "40%",
-    height: "5%",
-    marginTop: "-2.5%",
-    borderRadius: 999,
-    backgroundColor: "rgba(52, 31, 17, 0.2)",
-    zIndex: 1
-  },
-  avatarGroundShadowWalking: {
-    left: "36%",
-    width: "28%",
-    opacity: 0.7
   },
   interactionAura: {
     position: "absolute",

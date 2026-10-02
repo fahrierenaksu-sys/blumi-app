@@ -1,5 +1,6 @@
 import { ROOM_LAYER_ORDER, type RoomLayer, type RoomV2RenderItem } from "../roomV2/roomV2.types"
 import type { RoomWorldMovementPlan } from "./roomWorldRuntime"
+import type { RoomWorldPoint } from "./roomWorldGeometry"
 
 /**
  * One UI-thread timing step: animate to `x`/`y` over `durationMs` with the
@@ -22,6 +23,25 @@ export function createMyRoomWalkTimeline(plan: RoomWorldMovementPlan): MyRoomWal
     rampIn: segment.rampIn ?? 0,
     rampOut: segment.rampOut ?? 0
   }))
+}
+
+/** Both coordinates come from the same segment progress, including at turns. */
+export function getMyRoomWalkPoint(
+  origin: RoomWorldPoint,
+  steps: readonly MyRoomWalkStep[],
+  progress: number
+): RoomWorldPoint {
+  "worklet"
+  if (steps.length === 0 || progress <= 0) return origin
+  const index = Math.min(Math.floor(progress), steps.length - 1)
+  const from = index === 0 ? origin : steps[index - 1]!
+  const to = steps[index]!
+  const fraction = Math.min(1, progress - index)
+  if (fraction === 1) return { x: to.x, y: to.y }
+  return {
+    x: from.x + (to.x - from.x) * fraction,
+    y: from.y + (to.y - from.y) * fraction
+  }
 }
 
 /**
