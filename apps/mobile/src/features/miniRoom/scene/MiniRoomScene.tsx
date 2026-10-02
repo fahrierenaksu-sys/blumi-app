@@ -417,6 +417,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         onToggleMic={onToggleMic}
         suggestionsEnabled={keyboardPreference.suggestionsEnabled}
         onToggleSuggestions={keyboardPreference.toggle}
+        onCloseKeyboard={handleCloseKeyboard}
       />
     </View>
   )

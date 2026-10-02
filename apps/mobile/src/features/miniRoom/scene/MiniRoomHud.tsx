@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { SymbolView } from "expo-symbols"
 import { useCallback, useState, type ComponentProps } from "react"
-import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native"
+import { Pressable, StyleSheet, Text, View } from "react-native"
 import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
 import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
 import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniRoomMediaState"
@@ -28,6 +28,8 @@ interface MiniRoomHudProps {
   onToggleMic: () => void
   suggestionsEnabled: boolean
   onToggleSuggestions: () => void
+  /** The scene's close: starts the dock's return before UIKit dismisses the keyboard. */
+  onCloseKeyboard: () => void
 }
 
 /** Small glass header: leave on the left, microphone and room menu on the right. */
@@ -48,7 +50,8 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     onRetryConnect,
     onToggleMic,
     suggestionsEnabled,
-    onToggleSuggestions
+    onToggleSuggestions,
+    onCloseKeyboard
   } = props
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -112,7 +115,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
             accessibilityLabel={copy.roomOptions}
             expanded={menuOpen}
             onPress={() => {
-              Keyboard.dismiss()
+              onCloseKeyboard()
               setMenuOpen((open) => !open)
             }}
           />
