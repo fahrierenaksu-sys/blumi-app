@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native"
+import { MOTION_PRESS_SCALE } from "../../../ui/motionTokens"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import { REGISTER_PHONE_PANEL_LAYOUT as phonePanel } from "../registerPhonePanelModel"
 
@@ -458,7 +459,7 @@ export const registerStyles = StyleSheet.create({
     shadowOpacity: 0
   },
   submitPressed: {
-    transform: [{ scale: uiTheme.animation.scalePress }]
+    transform: [{ scale: MOTION_PRESS_SCALE }]
   },
   controlPressed: {
     opacity: 0.7

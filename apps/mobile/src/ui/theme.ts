@@ -187,17 +187,6 @@ export const uiTheme = {
       elevation: 6
     },
   },
-  animation: {
-    spring: { damping: 20, stiffness: 300, mass: 1 },
-    springBouncy: { damping: 12, stiffness: 200, mass: 0.8 },
-    springGentle: { damping: 26, stiffness: 180, mass: 1 },
-    durationFast: 150,
-    durationNormal: 250,
-    durationSlow: 400,
-    durationEntrance: 350,
-    scalePress: 0.965,
-    scalePop: 1.05,
-  },
   opacity: {
     disabled: 0.5,
   },

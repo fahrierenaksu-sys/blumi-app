@@ -50,7 +50,7 @@ The allowlists in that file are the tolerated debt and may only shrink (exceptio
 
 `src/ui/gestureFrameWork.test.mjs` (`run-navigation-tests.mjs`): drag and scroll frame callbacks never call JS work unless a threshold check guards it, and the app root mounts the Gesture Handler root view.
 
-Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts` and `src/ui/motion.test.ts` (token resolution).
+Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts`, `src/ui/motion.test.ts` (token resolution), `src/ui/animations.test.ts` (entrances crossfade without moving) and `src/ui/PressableScale.test.ts` (a pressed control dims and does not move).
 
 Elsewhere (mobile paths are relative to `apps/mobile`):
 
