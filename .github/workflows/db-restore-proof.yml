@@ -100,18 +100,20 @@ jobs:
           sudo apt-get install -y -qq postgresql-17
           "$BLUMI_PG17_BIN/pg_restore" --version
 
-      - name: Verify, decrypt, restore and count
-        if: steps.configured.outputs.enabled == 'true'
-        env:
-          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
-        run: node scripts/automation/ci-db-backup.mjs restore-proof "$RUNNER_TEMP/blumi-backup" "$RUNNER_TEMP/blumi-restore"
-
+      # Before decryption, so no dependency install script runs while the
+      # plaintext archive is on disk.
       - name: Install dependencies for the upgrade rehearsal
         if: steps.configured.outputs.enabled == 'true' && inputs.upgrade_rehearsal
         run: |
           set -euo pipefail
           npm ci
           npm run build:packages
+
+      - name: Verify, decrypt, restore and count
+        if: steps.configured.outputs.enabled == 'true'
+        env:
+          BLUMI_BACKUP_ENCRYPTION_KEY: ${{ secrets.BLUMI_BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/automation/ci-db-backup.mjs restore-proof "$RUNNER_TEMP/blumi-backup" "$RUNNER_TEMP/blumi-restore"
 
       - name: Rehearse pending migrations on the restored archive
         if: steps.configured.outputs.enabled == 'true' && inputs.upgrade_rehearsal
