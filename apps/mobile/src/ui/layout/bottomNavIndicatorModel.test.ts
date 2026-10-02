@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   BOTTOM_NAV_LIQUID_MAX_STRETCH,
+  createBottomNavLiquidSample,
+  easeBottomNavLiquidStretch,
   getBottomNavIndicatorSpeed,
   getBottomNavItemEmphasis,
   getBottomNavLiquidStretch,
@@ -10,6 +12,8 @@ import {
   resolveBottomNavIndicatorIndex,
   resolveMainTabPagerIndicatorSample,
   shouldAnimateBottomNavSelectionFromJs,
+  stepBottomNavLiquidSample,
+  type BottomNavLiquidSample,
   type MainTabPagerIndicatorValues
 } from "./bottomNavIndicatorModel"
 
@@ -76,6 +80,34 @@ test("indicator speed comes from two frames, and frames too close give none", ()
   assert.equal(getBottomNavIndicatorSpeed(0.1, 0), null)
   assert.equal(getBottomNavIndicatorSpeed(0.1, -16), null)
   assert.equal(getBottomNavIndicatorSpeed(Number.NaN, 16), null)
+})
+
+test("the pill's speed follows frame timestamps, so a frame with two changes is no spike", () => {
+  // A steady 2 tabs/s swipe sampled at 120 Hz frames.
+  const frameMs = 1000 / 120
+  let sample: BottomNavLiquidSample = createBottomNavLiquidSample(1)
+  const step = (index: number, time: number) => {
+    const result = stepBottomNavLiquidSample(sample, index, time)
+    sample = result.next
+    return result.speed
+  }
+  assert.equal(step(1, 1000), null, "the first sample has no speed")
+  for (let frame = 1; frame <= 6; frame += 1) {
+    // Reactions run at uneven moments inside a frame; only the frame time counts.
+    const time = 1000 + frame * frameMs
+    const index = 1 + (2 * frame * frameMs) / 1000
+    // Two changes in one frame: the frame's final speed is still the steady one.
+    if (frame === 3) step(index - 0.008, time)
+    const speed = step(index, time)
+    assert.ok(speed !== null && Math.abs(speed - 2) < 1e-6, `frame ${frame}: steady speed, got ${speed}`)
+  }
+})
+
+test("the pill eases toward the speed's stretch and starts from its shape at rest", () => {
+  const fast = easeBottomNavLiquidStretch(1, 4)
+  assert.ok(fast > 1 && fast < getBottomNavLiquidStretch(4), "eases, never jumps to full stretch")
+  assert.ok(easeBottomNavLiquidStretch(fast, 4) > fast, "keeps stretching while the speed holds")
+  assert.equal(easeBottomNavLiquidStretch(Number.NaN, 0), 1)
 })
 
 test("the indicator stays on the bar through edge rubber bands", () => {

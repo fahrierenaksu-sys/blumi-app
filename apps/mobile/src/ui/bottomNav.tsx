@@ -10,25 +10,25 @@ import Reanimated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withSpring,
   withTiming,
-  ReduceMotion,
   type SharedValue
 } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useReducedMotion } from "./animations"
-import { animateTo, useMotion } from "./motion"
+import { animateTo, animateToAfter, useMotion } from "./motion"
 import { PressableScale } from "./PressableScale"
 import {
   BOTTOM_NAV_KEY_ORDER,
-  getBottomNavIndicatorSpeed,
+  createBottomNavLiquidSample,
+  easeBottomNavLiquidStretch,
   getBottomNavItemEmphasis,
-  getBottomNavLiquidStretch,
   readMainTabPagerIndicatorProgress,
+  readUiFrameTimestamp,
   resolveBottomNavIndicatorIndex,
-  shouldAnimateBottomNavSelectionFromJs
+  shouldAnimateBottomNavSelectionFromJs,
+  stepBottomNavLiquidSample
 } from "./layout/bottomNavIndicatorModel"
 import { mainTabPagerIndicator } from "./mainTabPagerIndicator"
 import { usePublishToastBottomBarInset } from "./usePublishToastBottomBarInset"
@@ -58,8 +58,6 @@ import {
 
 export type BottomNavKey = "discover" | "chats" | "myroom" | "shop"
 
-/** Share of the gap to the speed's stretch the pill closes per frame. */
-const LIQUID_EASE = 0.45
 /** After the last movement frame, the pill springs back to its shape. */
 const LIQUID_RELEASE_DELAY_MS = 60
 
@@ -320,21 +318,19 @@ export function BottomNav(props: BottomNavProps) {
   // Liquid pill: it stretches with the speed it moves at (pager drag, settle
   // or a tap's spring) and springs back once it stops. All on the UI thread.
   const stretch = useSharedValue(1)
-  const lastIndicatorSample = useSharedValue({ index: activeIndex, time: 0 })
+  const lastIndicatorSample = useSharedValue(createBottomNavLiquidSample(activeIndex))
   useAnimatedReaction(
     () => indicator.value,
     (index) => {
-      const now = Date.now()
-      const last = lastIndicatorSample.value
-      lastIndicatorSample.value = { index, time: now }
       if (reduceMotion) return
-      const speed = getBottomNavIndicatorSpeed(index - last.index, now - last.time)
+      // Speed from UI frame timestamps (Date.now() jittered with frame pacing).
+      const { next, speed } = stepBottomNavLiquidSample(lastIndicatorSample.value, index, readUiFrameTimestamp())
+      lastIndicatorSample.value = next
       if (speed === null) return
-      const eased = stretch.value + (getBottomNavLiquidStretch(speed) - stretch.value) * LIQUID_EASE
-      stretch.value = withSequence(
-        withTiming(eased, { duration: 0, reduceMotion: ReduceMotion.Never }),
-        withDelay(LIQUID_RELEASE_DELAY_MS, animateTo(1, snappy), ReduceMotion.Never)
-      )
+      // This frame's stretch lands in this frame (no zero-length animation a
+      // frame late); the spring back to 1 starts once, after the last change.
+      stretch.value = easeBottomNavLiquidStretch(stretch.value, speed)
+      stretch.value = animateToAfter(LIQUID_RELEASE_DELAY_MS, 1, snappy)
     },
     [reduceMotion, snappy]
   )
