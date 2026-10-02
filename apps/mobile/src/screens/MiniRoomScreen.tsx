@@ -1,4 +1,4 @@
-import type { ServerEvent } from "@blumi/contracts"
+import type { ChatParticipantSummary, ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocused } from "@react-navigation/native"
 import { useMiniRoomMotion } from "../features/miniRoom/useMiniRoomMotion"
@@ -39,6 +39,11 @@ import { getMiniRoomExitDestination } from "../features/miniRoom/miniRoomLeaveMo
 import { mergeMiniRoomReconnectSnapshot } from "../features/miniRoom/reconnectRoomSnapshot"
 import { createMiniRoomPartnerAvatarSnapshot } from "../features/miniRoom/partnerAvatarSnapshot"
 import { createCurrentUserAvatarSnapshot } from "../features/miniRoom/currentUserAvatarSnapshot"
+import {
+  resolveMiniRoomPartnerIdentity,
+  selectMiniRoomLivePartner
+} from "../features/miniRoom/miniRoomPartnerIdentity"
+import { useChatThreadStore } from "../features/chat/chatStore"
 import type {
   MiniRoomParticipantAvatarSnapshots
 } from "../features/miniRoom/scene/miniRoomSceneTypes"
@@ -58,8 +63,20 @@ type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"
 
 export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor } = props
-  const { readyMiniRoom, participants } = route.params
+  const { readyMiniRoom, participants: participantParams } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
+  // The partner's current name and outfit come from the room's conversation in
+  // the chat store (chat.participant_updated renames them live); the
+  // navigation params are only the fallback. Keyed by value: a new message
+  // (a new thread object) must not rebuild the chibi or restart the scene.
+  const { thread: sourceThread } = useChatThreadStore(miniRoom.sourceThreadId, participantParams.partner.userId)
+  const livePartnerKey = JSON.stringify(selectMiniRoomLivePartner(sourceThread, sessionActor.profile.userId,
+    participantParams.partner.userId))
+  const participants = useMemo(() => ({
+    ...participantParams,
+    partner: resolveMiniRoomPartnerIdentity(participantParams.partner,
+      JSON.parse(livePartnerKey) as ChatParticipantSummary | null)
+  }), [livePartnerKey, participantParams])
   const isFocused = useIsFocused()
   useMessageAlertSuppression(isFocused)
   const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,

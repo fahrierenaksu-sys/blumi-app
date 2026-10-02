@@ -7,7 +7,7 @@ import {
 } from "../../roomWorld/roomWorldRuntime"
 import {
   startMiniRoomMovementRun,
-  type MiniRoomSegmentAnimator
+  type MiniRoomPathAnimator
 } from "./miniRoomMovementRun"
 
 const SEGMENTS: RoomWorldMovementSegment[] = [
@@ -15,18 +15,21 @@ const SEGMENTS: RoomWorldMovementSegment[] = [
   { from: { x: 0.3, y: 0.7 }, to: { x: 0.3, y: 0.55 }, facing: "back", distance: 0.15, durationMs: 285, isFinal: true }
 ]
 
+/** The UI thread: it holds the whole path and reports each finished segment. */
 function createFakeAnimator() {
-  const pending: { segment: RoomWorldMovementSegment; complete: () => void }[] = []
+  const paths: { segments: readonly RoomWorldMovementSegment[]; report: (index: number) => void }[] = []
+  let finished = 0
   let cancelled = 0
-  const animator: MiniRoomSegmentAnimator = {
-    animate: (segment, complete) => { pending.push({ segment, complete }) },
+  const animator: MiniRoomPathAnimator = {
+    animate: (segments, report) => { paths.push({ segments, report }); finished = 0 },
     cancel: () => { cancelled += 1 }
   }
   return {
     animator,
-    pending,
+    paths,
     cancelledCount: () => cancelled,
-    finishNext: () => pending.shift()?.complete()
+    /** One segment ends on the UI thread; JS hears about it afterwards. */
+    finishNext: () => { const path = paths.at(-1); if (path) path.report(finished++) }
   }
 }
 
@@ -50,14 +53,14 @@ test("a movement commits React state only at segment starts and ends, never per 
     onArrival: () => commits.push(["arrival", null])
   })
 
-  // The first segment is handed to the UI thread with its exact from, to and duration.
-  assert.equal(fake.pending.length, 1)
-  assert.equal(fake.pending[0]?.segment, SEGMENTS[0])
+  // The whole path is handed to the UI thread at once, with every segment's exact from, to and duration.
+  assert.equal(fake.paths.length, 1)
+  assert.equal(fake.paths[0]?.segments, SEGMENTS)
   assert.deepEqual(commits, [["start", { x: 0.1, y: 0.7, facing: "right", motion: "walking" }]])
 
   fake.finishNext()
-  assert.equal(fake.pending[0]?.segment, SEGMENTS[1], "the next segment starts when the previous one ends")
   fake.finishNext()
+  assert.equal(fake.paths.length, 1, "a corner never hands the UI thread a new animation")
 
   assert.deepEqual(commits, [
     ["start", { x: 0.1, y: 0.7, facing: "right", motion: "walking" }],
@@ -87,7 +90,7 @@ test("a cancelled movement stops the UI animation and ignores a late segment com
   assert.equal(fake.cancelledCount(), 1)
   fake.finishNext()
   assert.deepEqual(commits, ["start"], "nothing is committed after cancellation")
-  assert.equal(fake.pending.length, 0, "no further segment starts")
+  assert.equal(fake.paths.length, 1, "no further animation starts")
 })
 
 test("arrival is reported once and cancelling after arrival does not touch the animator", () => {
@@ -105,4 +108,33 @@ test("arrival is reported once and cancelling after arrival does not touch the a
   run.cancel()
   assert.equal(arrivals, 1)
   assert.equal(fake.cancelledCount(), 0)
+})
+
+test("the walk turns each corner without waiting for JS; poses catch up in order", () => {
+  const fake = createFakeAnimator()
+  const commits: [string, string][] = []
+  const path: RoomWorldMovementSegment[] = [
+    SEGMENTS[0]!,
+    { ...SEGMENTS[1]!, isFinal: false },
+    { from: { x: 0.3, y: 0.55 }, to: { x: 0.2, y: 0.55 }, facing: "left", distance: 0.1, durationMs: 190, isFinal: true }
+  ]
+  startMiniRoomMovementRun({
+    segments: path,
+    arrival: { facing: "front", motion: "idle" },
+    animator: fake.animator,
+    onSegmentStart: (pose) => commits.push(["start", pose.facing]),
+    onSegmentEnd: (pose) => commits.push(["end", pose.facing]),
+    onArrival: () => commits.push(["arrival", ""])
+  })
+  // The JS thread was busy while the UI thread walked the first two
+  // segments: the reports arrive late, but the walk itself never paused.
+  fake.paths[0]!.report(1)
+  assert.deepEqual(commits, [
+    ["start", "right"], ["end", "right"], ["start", "back"], ["end", "back"], ["start", "left"]
+  ], "a late report still commits every corner's direction, in order")
+  fake.paths[0]!.report(1)
+  assert.equal(commits.length, 5, "a repeated report commits nothing new")
+  fake.paths[0]!.report(2)
+  assert.deepEqual(commits.slice(5), [["end", "front"], ["arrival", ""]])
+  assert.equal(fake.paths.length, 1, "one animation for the whole path")
 })

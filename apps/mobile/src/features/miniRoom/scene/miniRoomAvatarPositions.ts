@@ -2,6 +2,7 @@ import {
   cancelAnimation,
   makeMutable,
   ReduceMotion,
+  withSequence,
   withTiming,
   type SharedValue
 } from "react-native-reanimated"
@@ -10,7 +11,7 @@ import {
   easeRoomWorldMovement,
   type RoomWorldMovementSegment
 } from "../../roomWorld/roomWorldRuntime"
-import type { MiniRoomSegmentAnimator } from "./miniRoomMovementRun"
+import type { MiniRoomPathAnimator } from "./miniRoomMovementRun"
 import type { RoomPoint } from "./miniRoomSceneTypes"
 
 /** An avatar's live room position (0..1 room units), animated on the UI thread. */
@@ -52,31 +53,57 @@ export function readMiniRoomAvatarPosition(position: MiniRoomAvatarPosition): Ro
 }
 
 /**
- * Animates one segment with withTiming on the UI thread. Walking is
- * state-essential spatial feedback, so it ignores the system Reduce Motion
- * setting exactly as the former JS loop did (miniRoomReducedMotion.ts).
+ * The end-of-segment callback for one step of the path: it reports the step
+ * to the JS thread and returns at once, so the sequence goes straight on to
+ * the next segment. Declared before the animator whose worklets capture it.
  */
-export function createMiniRoomSegmentAnimator(position: MiniRoomAvatarPosition): MiniRoomSegmentAnimator {
+function createMiniRoomSegmentEndCallback(
+  report: (index: number) => void,
+  index: number
+): (finished?: boolean) => void {
+  return (finished?: boolean) => {
+    "worklet"
+    if (finished) scheduleOnRN(report, index)
+  }
+}
+
+function createMiniRoomSegmentTimingConfig(segment: RoomWorldMovementSegment) {
+  return {
+    duration: segment.durationMs,
+    easing: createMiniRoomMovementEasing(segment),
+    reduceMotion: ReduceMotion.Never
+  }
+}
+
+/**
+ * Animates a whole path as one withSequence per axis on the UI thread: a
+ * corner is just the next step of the sequence, never a round trip through
+ * JS. Each finished segment is reported to JS (facing, pose) without the
+ * walk waiting for it. Walking is state-essential spatial feedback, so it
+ * ignores the system Reduce Motion setting exactly as the former JS loop did
+ * (miniRoomReducedMotion.ts).
+ */
+export function createMiniRoomPathAnimator(position: MiniRoomAvatarPosition): MiniRoomPathAnimator {
   let generation = 0
   return {
-    animate(segment, onComplete) {
+    animate(segments, onSegmentEnd) {
       generation += 1
       const token = generation
-      const finish = (): void => {
-        if (token === generation) onComplete()
+      const first = segments[0]
+      if (!first) return
+      // A replaced or cancelled path never reports again.
+      const report = (index: number): void => {
+        if (token === generation) onSegmentEnd(index)
       }
-      const config = {
-        duration: segment.durationMs,
-        easing: createMiniRoomMovementEasing(segment),
-        reduceMotion: ReduceMotion.Never
-      }
-      position.x.value = segment.from.x
-      position.y.value = segment.from.y
-      position.x.value = withTiming(segment.to.x, config, (finished) => {
-        "worklet"
-        if (finished) scheduleOnRN(finish)
-      })
-      position.y.value = withTiming(segment.to.y, config)
+      const xSteps = segments.map((segment, index) =>
+        withTiming(segment.to.x, createMiniRoomSegmentTimingConfig(segment),
+          createMiniRoomSegmentEndCallback(report, index)))
+      const ySteps = segments.map((segment) =>
+        withTiming(segment.to.y, createMiniRoomSegmentTimingConfig(segment)))
+      position.x.value = first.from.x
+      position.y.value = first.from.y
+      position.x.value = withSequence(ReduceMotion.Never, ...xSteps)
+      position.y.value = withSequence(ReduceMotion.Never, ...ySteps)
     },
     cancel() {
       generation += 1

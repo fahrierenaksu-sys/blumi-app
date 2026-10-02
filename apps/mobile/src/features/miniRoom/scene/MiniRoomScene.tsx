@@ -42,6 +42,7 @@ import {
 import { useMiniRoomKeyboard } from "./useMiniRoomKeyboard"
 import { useMiniRoomCameraTransform } from "./useMiniRoomCameraTransform"
 import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
+import { useMiniRoomScrollToLatest } from "./useMiniRoomScrollToLatest"
 import { useMiniRoomKeyboardPreference } from "../useMiniRoomKeyboardPreference"
 import type { MiniRoomPoseInput } from "./miniRoomTransitionModel"
 
@@ -130,13 +131,14 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     width: ROOM_STAGE_CAMERA_FALLBACK_WIDTH,
     height: ROOM_STAGE_CAMERA_FALLBACK_HEIGHT
   })
-  const [scrollToLatestRequest, setScrollToLatestRequest] = useState(0)
   const [recentMessageHeight, setRecentMessageHeight] = useState(39)
   const [recentHistoryRowsHeight, setRecentHistoryRowsHeight] = useState(0)
   const [composerLines, setComposerLines] = useState(1)
   const keyboardPreference = useMiniRoomKeyboardPreference()
   // ROOM-15: the keyboard's own progress drives the whole scene on the UI thread.
   const keyboard = useMiniRoomKeyboard(reduceMotion)
+  const scrollToLatest = useMiniRoomScrollToLatest(keyboard.visible)
+  const { noteMessageSent, requestScrollToLatest } = scrollToLatest
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
@@ -251,8 +253,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     // The keyboard stays up for the next message; the input returns to one line.
     setComposerText("")
     setComposerLines(1)
+    // Once the keyboard is down, the transcript shows this message.
+    noteMessageSent()
     return true
-  }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
+  }, [composerText, localUser.userId, noteMessageSent, onSendRoomMessage, sayPhrase])
 
   // An unacknowledged message comes back into an empty composer: sending the
   // same text again retries it with the same client id. The hook publishes a
@@ -269,8 +273,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   const handleToggleHistory = useCallback((): void => {
     handleCloseKeyboard()
-    setScrollToLatestRequest((request) => request + 1)
-  }, [handleCloseKeyboard])
+    requestScrollToLatest()
+  }, [handleCloseKeyboard, requestScrollToLatest])
 
   const handleComposerContentSize = useCallback((contentHeight: number): void => {
     const lines = resolveComposerLineCount({ contentHeight, fontScale: viewport.fontScale })
@@ -387,7 +391,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         onRecentHeightChange={setRecentMessageHeight}
         onRecentRowsHeightChange={setRecentHistoryRowsHeight}
         onCloseKeyboard={handleCloseKeyboard}
-        scrollToLatestRequest={scrollToLatestRequest}
+        scrollToLatestRequest={scrollToLatest.request}
       >
         <RoomChatComposer
           value={composerText}

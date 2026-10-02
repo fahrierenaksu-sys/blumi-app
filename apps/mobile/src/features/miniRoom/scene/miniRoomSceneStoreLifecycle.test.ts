@@ -14,7 +14,7 @@ function mount() {
   const runtime = createFakeReactRuntime()
   const cancelledDrivers: unknown[] = []
   // Segment completions waiting on the (fake) UI-thread animator, oldest first.
-  const pendingSegments: (() => void)[] = []
+  const pendingSegments: { position: unknown; finish: () => void }[] = []
   const timers = new Map<number, { run: () => void; delay: number }>()
   let timerId = 0
   const clock = { now: 1_000 }
@@ -32,15 +32,30 @@ function mount() {
         "../miniRoomAvatarMotion": { canMiniRoomAvatarUseMotion: () => true },
         "./miniRoomAvatarPositions": {
           createMiniRoomAvatarPosition: (point: { x: number; y: number }) => ({ x: { value: point.x }, y: { value: point.y } }),
-          createMiniRoomSegmentAnimator: (position: { x: { value: number }; y: { value: number } }) => ({
-            animate: (segment: { from: { x: number; y: number }; to: { x: number; y: number } }, onComplete: () => void) => {
-              // As the UI-thread animator: each segment starts from its own first point.
-              position.x.value = segment.from.x
-              position.y.value = segment.from.y
-              pendingSegments.push(() => { position.x.value = segment.to.x; position.y.value = segment.to.y; onComplete() })
-            },
-            cancel: () => { cancelledDrivers.push(position) }
-          }),
+          createMiniRoomPathAnimator: (position: { x: { value: number }; y: { value: number } }) => {
+            const drop = () => {
+              for (let index = pendingSegments.length - 1; index >= 0; index -= 1) {
+                if (pendingSegments[index]!.position === position) pendingSegments.splice(index, 1)
+              }
+            }
+            return {
+              animate: (
+                segments: readonly { from: { x: number; y: number }; to: { x: number; y: number } }[],
+                onSegmentEnd: (index: number) => void
+              ) => {
+                // As the UI-thread animator: the whole path is queued at once,
+                // starting from its first point, and replaces any earlier one.
+                drop()
+                position.x.value = segments[0]!.from.x
+                position.y.value = segments[0]!.from.y
+                segments.forEach((segment, index) => pendingSegments.push({
+                  position,
+                  finish: () => { position.x.value = segment.to.x; position.y.value = segment.to.y; onSegmentEnd(index) }
+                }))
+              },
+              cancel: () => { drop(); cancelledDrivers.push(position) }
+            }
+          },
           readMiniRoomAvatarPosition: (position: { x: { value: number }; y: { value: number } }) =>
             ({ x: position.x.value, y: position.y.value }),
           snapMiniRoomAvatarPosition: (position: { x: { value: number }; y: { value: number } }, point: { x: number; y: number }) => {
@@ -88,8 +103,8 @@ function mount() {
   }
   const store = () => runtime.output as MiniRoomStore
   /** Lets the oldest running segment finish on the UI thread. */
-  const finishSegment = () => pendingSegments.shift()?.()
-  return { runtime, timers, render, store, cancelledDrivers, clock, finishSegment }
+  const finishSegment = () => pendingSegments.shift()?.finish()
+  return { runtime, timers, render, store, cancelledDrivers, clock, finishSegment, pendingSegments }
 }
 
 test("both avatars walk concurrently; retargeting one cancels only its own UI-thread driver", () => {
@@ -215,6 +230,32 @@ test("sitting down keeps the seat's draw depth until seated; nothing about it is
   assert.equal(local.seatedHotspotId, "sofa_corner")
   assert.equal(local.depthSeatHotspotId, undefined, "seated: the seat itself now holds the depth")
   assert.equal(sent.length, 1, "one authoritative step; the draw depth is local presentation")
+  f.runtime.unmount()
+})
+
+test("a walk with corners is handed to the UI thread whole; the partner is sent its one target", () => {
+  const sent: { x: number; y: number }[] = []
+  const f = mount()
+  f.render({ onLocalMove: (point: { x: number; y: number }) => { sent.push(point); return true } } as Partial<StoreInput>)
+  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), true)
+  for (let guard = 0; guard < 20 && f.store().avatars.local.motion === "walking"; guard += 1) f.finishSegment()
+  assert.equal(f.store().avatars.local.seatedHotspotId, "sofa_corner")
+  sent.length = 0
+  // Standing up and walking away: off the seat through its exit, then on.
+  assert.equal(f.store().moveLocalAvatar({ x: 0.7, y: 0.8 }), true)
+  const queued = f.pendingSegments.length
+  assert.ok(queued > 1, "the walk has corners, all queued before the first one ends")
+  const target = { x: f.store().avatars.local.targetX, y: f.store().avatars.local.targetY }
+  const facings: string[] = []
+  for (let guard = 0; guard < 20 && f.store().avatars.local.motion === "walking"; guard += 1) {
+    facings.push(f.store().avatars.local.facing)
+    f.finishSegment()
+    assert.ok(f.pendingSegments.length < queued, "a corner never queues a new animation")
+  }
+  assert.equal(facings.length, queued, "React follows every segment the UI thread walked")
+  assert.equal(f.store().avatars.local.motion, "idle")
+  assert.deepEqual({ x: f.store().avatars.local.x, y: f.store().avatars.local.y }, target, "it lands on the target it sent")
+  assert.deepEqual(sent, [target], "one record with the final target, whatever the corners")
   f.runtime.unmount()
 })
 
