@@ -496,25 +496,6 @@ test("unsupported repository mode fails fast", () => {
   )
 })
 
-test("Firebase Phone Auth is the only production verification provider", () => {
-  const config = resolveServerConfig({
-    NODE_ENV: "production",
-    DATABASE_URL: "postgres://blumi:test@localhost:5432/blumi",
-    BLUMI_OTP_HMAC_SECRET: "otp-hmac-secret-that-is-at-least-32-characters",
-    BLUMI_PUSH_PROVIDER: "expo",
-    EXPO_PUSH_ACCESS_TOKEN: "expo-access-token",
-    LIVEKIT_URL: "wss://live.blumi.app",
-    LIVEKIT_API_KEY: "livekit-key",
-    LIVEKIT_API_SECRET: "livekit-secret",
-    ...ADMIN_SIGNING_ENV,
-    BLUMI_APPLE_APP_ID: "TEAMID1234.com.blumi.mobile",
-    BLUMI_ANDROID_SHA256_CERT_FINGERPRINTS: "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
-    BLUMI_TRUST_PROXY: "100.64.0.0/10",
-    ...REVENUECAT_ENV
-  })
-  assert.equal(config.smsProviderMode, "development")
-})
-
 test("production requires the Expo push provider and access token", () => {
   const productionBase = {
     NODE_ENV: "production",

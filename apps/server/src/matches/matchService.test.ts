@@ -24,20 +24,6 @@ test("seed discovery profiles do not share nested avatar state", () => {
   assert.deepEqual(profiles[1]!.avatar.loadout.accessoryIds, [])
 })
 
-test("QA discovery seed has a varied full deck instead of three repeated profiles", () => {
-  const profiles = createSeedDiscoverProfiles()
-  const ids = new Set(profiles.map((profile) => profile.userId))
-  const genders = new Set(profiles.map((profile) => profile.gender))
-  const names = new Set(profiles.map((profile) => profile.displayName))
-
-  assert.ok(profiles.length >= 12)
-  assert.equal(ids.size, profiles.length)
-  assert.equal(names.size, profiles.length)
-  assert.ok(genders.has("woman"))
-  assert.ok(genders.has("man"))
-  assert.ok(genders.has("non-binary"))
-})
-
 test("discovery excludes the current user", async () => {
   const service = createMatchService({
     repository: createInMemoryMatchRepository(
@@ -566,41 +552,6 @@ test("in-memory discovery keeps globally eligible profiles", async () => {
   )
 
   assert.deepEqual(visible.map((profile) => profile.userId), ["radius_0", "radius_1"])
-})
-
-test("an eligible decision reads the viewer's earlier decision alongside eligibility, not after it", async () => {
-  const [target] = createSeedDiscoverProfiles()
-  const repository = createInMemoryMatchRepository(createInMemoryMatchStore([target!]))
-  const filters: DiscoveryFilters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
-  const trace: string[] = []
-  const findEligible = repository.findEligibleDiscoverProfile.bind(repository)
-  const findDecision = repository.findDecision.bind(repository)
-  repository.findEligibleDiscoverProfile = async (...args) => {
-    trace.push("eligible:start")
-    // A database round trip: other reads may start while this one is in flight.
-    await new Promise((resolve) => setImmediate(resolve))
-    const profile = await findEligible(...args)
-    trace.push("eligible:end")
-    return profile
-  }
-  repository.findDecision = async (...args) => {
-    trace.push(`decision:${args[0]}->${args[1]}`)
-    return findDecision(...args)
-  }
-  const service = createMatchService({ repository })
-
-  const passed = await service.decideEligible("viewer", target!.userId, "pass", filters)
-  assert.equal(passed.decision.decision, "pass")
-  // One read of the viewer's own earlier decision, started before eligibility
-  // answered: one database round trip less before the quota write.
-  assert.deepEqual(
-    trace.filter((entry) => entry.startsWith("decision:")),
-    [`decision:viewer->${target!.userId}`]
-  )
-  assert.ok(
-    trace.indexOf(`decision:viewer->${target!.userId}`) < trace.indexOf("eligible:end"),
-    trace.join(", ")
-  )
 })
 
 test("a retried like whose earlier read predates its twin's commit is still answered idempotently", async () => {

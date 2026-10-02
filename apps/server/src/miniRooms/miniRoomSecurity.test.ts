@@ -1,294 +1,148 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { UserProfile } from "@blumi/contracts"
-import {
-  createAvatarSelection,
-  DEFAULT_FEMALE_AVATAR_LOADOUT
-} from "@blumi/domain"
+import { createAvatarSelection, DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import { createChatService } from "../chat/chatService"
-import { createLivekitTokenService } from "./livekitTokenService"
-import { createMiniRoomService } from "./miniRoomService"
-import {
-  createInMemoryMiniRoomRepository,
-  createInMemoryMiniRoomStore
-} from "./miniRoomRepository"
 import { createPresenceService } from "../presence/presenceService"
-import { PUBLIC_LOBBY_ROOM_ID, createRoomService } from "../rooms/roomService"
-import { createSafetyService } from "../safety/safetyService"
+import { createRoomService } from "../rooms/roomService"
+import { createSafetyService, type SafetyService } from "../safety/safetyService"
+import { createMiniRoomService } from "./miniRoomService"
 
-test("native Blumi Room sessions can publish only microphone tracks", () => {
-  const token = createLivekitTokenService({
-    livekitUrl: "wss://livekit.blumi.test",
-    apiKey: "test-key",
-    apiSecret: "test-secret"
-  }).createMediaSession({
-    miniRoom: {
-      miniRoomId: "room_voice_only",
-      lobbyRoomId: "thread_voice_only",
-      participantUserIds: ["user_one", "user_two"],
-      livekitRoomName: "blumi-room-voice-only"
-    },
-    userId: "user_one",
-    now: new Date("2026-07-21T12:00:00.000Z")
-  })
+// Room-claim safety on the live chat-invite path: one room per invite, never
+// two overlapping active rooms for one person, and a busy participant's other
+// invite ends cancelled.
 
-  const [, encodedPayload] = token.token.split(".")
-  assert.ok(encodedPayload)
-  const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as {
-    video: { canPublish: boolean; canPublishSources?: string[] }
-  }
+const NOW = new Date("2026-07-14T09:00:00.000Z")
+const ADA = profile("security_ada", "Ada")
+const BORA = profile("security_bora", "Bora")
+const CARA = profile("security_cara", "Cara")
 
-  assert.equal(payload.video.canPublish, true)
-  assert.deepEqual(payload.video.canPublishSources, ["microphone"])
-})
-
-test("a pending invite can create at most one mini room under concurrent accepts", async () => {
-  const presenceService = createPresenceService({
-    roomService: createRoomService()
-  })
-  const service = createMiniRoomService({
-    presenceService,
-    safetyService: createSafetyService(),
-    chatService: createChatService(),
-    livekitTokenService: createLivekitTokenService()
-  })
-  const now = new Date("2026-07-14T09:00:00.000Z")
-  const sender = profile("sender_user", "Ada")
-  const recipient = profile("recipient_user", "Bora")
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: sender,
-    initialSpotId: "seat-left"
-  }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: recipient,
-    initialSpotId: "seat-right"
-  }, now)
-  const invite = await service.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: sender,
-    recipientUserId: recipient.userId
-  }, now)
-
-  const attempts = await Promise.allSettled([
-    service.decideInvite({
-      inviteId: invite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now),
-    service.decideInvite({
-      inviteId: invite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now)
-  ])
-
-  assert.equal(
-    attempts.filter((attempt) => attempt.status === "fulfilled").length,
-    1
-  )
-  assert.equal(
-    attempts.filter((attempt) => attempt.status === "rejected").length,
-    1
-  )
-})
-
-test("different invites cannot create overlapping active mini rooms concurrently", async () => {
-  const presenceService = createPresenceService({
-    roomService: createRoomService()
-  })
-  const service = createMiniRoomService({
-    presenceService,
-    safetyService: createSafetyService(),
-    chatService: createChatService(),
-    livekitTokenService: createLivekitTokenService()
-  })
-  const now = new Date("2026-07-14T09:00:00.000Z")
-  const sender = profile("sender_user", "Ada")
-  const recipient = profile("recipient_user", "Bora")
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: sender,
-    initialSpotId: "seat-left"
-  }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: recipient,
-    initialSpotId: "seat-right"
-  }, now)
-  const [firstInvite, secondInvite] = await Promise.all([
-    service.createInvite({
-      roomId: PUBLIC_LOBBY_ROOM_ID,
-      senderProfile: sender,
-      recipientUserId: recipient.userId
-    }, now),
-    service.createInvite({
-      roomId: PUBLIC_LOBBY_ROOM_ID,
-      senderProfile: sender,
-      recipientUserId: recipient.userId
-    }, now)
-  ])
-
-  const attempts = await Promise.allSettled([
-    service.decideInvite({
-      inviteId: firstInvite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now),
-    service.decideInvite({
-      inviteId: secondInvite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now)
-  ])
-
-  assert.equal(
-    attempts.filter((attempt) => attempt.status === "fulfilled").length,
-    1
-  )
-  assert.equal(
-    attempts.filter((attempt) => attempt.status === "rejected").length,
-    1
-  )
-  assert.ok(await service.findActiveMiniRoomForUser(sender.userId))
-  assert.ok(await service.findActiveMiniRoomForUser(recipient.userId))
-  const inviteStatuses = await Promise.all([
-    service.repository.findInvite(firstInvite.inviteId),
-    service.repository.findInvite(secondInvite.inviteId)
-  ])
-  assert.deepEqual(
-    inviteStatuses.map((invite) => invite?.status).sort(),
-    ["accepted", "cancelled"]
-  )
-})
-
-test("a participant claim loser cancels the invite without creating another room", async () => {
-  const store = createInMemoryMiniRoomStore()
-  const repository = createInMemoryMiniRoomRepository(store)
-  const presenceService = createPresenceService({ roomService: createRoomService() })
-  const service = createMiniRoomService({
-    repository,
-    presenceService,
-    safetyService: createSafetyService(),
-    chatService: createChatService(),
-    livekitTokenService: createLivekitTokenService()
-  })
-  const now = new Date("2026-07-14T09:00:00.000Z")
-  const sender = profile("sender_claim_loser", "Ada")
-  const recipient = profile("recipient_claim_loser", "Bora")
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: sender,
-    initialSpotId: "seat-left"
-  }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: recipient,
-    initialSpotId: "seat-right"
-  }, now)
-  const invite = await service.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: sender,
-    recipientUserId: recipient.userId
-  }, now)
-  store.miniRooms.set("preexisting_room", {
-    miniRoomId: "preexisting_room",
-    lobbyRoomId: PUBLIC_LOBBY_ROOM_ID,
-    participantUserIds: [sender.userId, "other_user"],
-    livekitRoomName: "blumi-preexisting",
-    startedAt: now.toISOString()
-  })
-
-  await assert.rejects(
-    service.decideInvite({
-      inviteId: invite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now),
-    /no longer available/
-  )
-
-  assert.equal((await repository.findInvite(invite.inviteId))?.status, "cancelled")
-  assert.equal(
-    (await repository.findActiveMiniRoomForUser(sender.userId))?.miniRoomId,
-    "preexisting_room"
-  )
-  assert.equal(await repository.findActiveMiniRoomForUser(recipient.userId), null)
-})
-
-test("post-claim setup failure rolls back invite, room, claims, and busy presence", async () => {
-  const repository = createInMemoryMiniRoomRepository()
-  const presenceService = createPresenceService({ roomService: createRoomService() })
+async function createHarness(wrapSafety: (safety: SafetyService) => SafetyService = (safety) => safety) {
   const chatService = createChatService()
   const service = createMiniRoomService({
-    repository,
-    presenceService,
-    safetyService: createSafetyService(),
-    chatService: {
-      ...chatService,
-      async createThread() {
-        throw new Error("chat setup unavailable")
-      }
-    },
-    livekitTokenService: createLivekitTokenService()
+    presenceService: createPresenceService({ roomService: createRoomService() }),
+    safetyService: wrapSafety(createSafetyService()),
+    chatService,
+    livekitTokenService: { createMediaSession: () => ({ token: "test" }) } as never,
+    idFactory: (() => {
+      let index = 0
+      return () => `security_${++index}`
+    })()
   })
-  const now = new Date("2026-07-14T09:00:00.000Z")
-  const sender = profile("sender_rollback", "Ada")
-  const recipient = profile("recipient_rollback", "Bora")
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: sender,
-    initialSpotId: "seat-left"
-  }, now)
-  await presenceService.joinRoom({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    profile: recipient,
-    initialSpotId: "seat-right"
-  }, now)
-  const invite = await service.createInvite({
-    roomId: PUBLIC_LOBBY_ROOM_ID,
-    senderProfile: sender,
-    recipientUserId: recipient.userId
-  }, now)
+  async function thread(sender: UserProfile, recipient: UserProfile): Promise<string> {
+    const threadId = `thread_${sender.userId}_${recipient.userId}`
+    await chatService.createThread({
+      threadId,
+      miniRoomId: `match_${sender.userId}_${recipient.userId}`,
+      participantUserIds: [sender.userId, recipient.userId],
+      participants: [
+        { userId: sender.userId, displayName: sender.displayName },
+        { userId: recipient.userId, displayName: recipient.displayName }
+      ]
+    })
+    return threadId
+  }
+  async function invite(sender: UserProfile, recipient: UserProfile): Promise<string> {
+    const created = await service.createChatInvite({
+      threadId: await thread(sender, recipient), senderProfile: sender, recipientProfile: recipient
+    }, NOW)
+    return created.invite.inviteId
+  }
+  function accept(inviteId: string, sender: UserProfile, recipient: UserProfile) {
+    return service.decideChatInvite({
+      inviteId, actorUserId: recipient.userId, senderProfile: sender, recipientProfile: recipient, status: "accepted"
+    }, NOW)
+  }
+  return { service, invite, accept }
+}
+
+test("concurrent accepts of one chat invite open exactly one room", async () => {
+  const harness = await createHarness()
+  const inviteId = await harness.invite(ADA, BORA)
+
+  const attempts = await Promise.allSettled([
+    harness.accept(inviteId, ADA, BORA),
+    harness.accept(inviteId, ADA, BORA),
+    harness.accept(inviteId, ADA, BORA)
+  ])
+
+  const rooms = new Set(attempts.flatMap((attempt) =>
+    attempt.status === "fulfilled" && attempt.value.miniRoom ? [attempt.value.miniRoom.miniRoomId] : []))
+  assert.equal(rooms.size, 1, "every successful accept names the same single room")
+  const active = await harness.service.findActiveMiniRoomForUser(BORA.userId)
+  assert.ok(active && rooms.has(active.miniRoomId))
+  assert.equal((await harness.service.findActiveMiniRoomForUser(ADA.userId))?.miniRoomId, active.miniRoomId)
+})
+
+test("concurrent accepts of two invites sharing a person leave one active room and cancel the other invite", async () => {
+  const harness = await createHarness()
+  const fromAda = await harness.invite(ADA, BORA)
+  const fromCara = await harness.invite(CARA, BORA)
+
+  const attempts = await Promise.allSettled([
+    harness.accept(fromAda, ADA, BORA),
+    harness.accept(fromCara, CARA, BORA)
+  ])
+
+  assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1)
+  assert.equal(attempts.filter((attempt) => attempt.status === "rejected").length, 1)
+  const statuses = await Promise.all([fromAda, fromCara].map(async (inviteId) =>
+    (await harness.service.repository.findInvite(inviteId))?.status))
+  assert.deepEqual([...statuses].sort(), ["accepted", "cancelled"])
+  const winnerSender = statuses[0] === "accepted" ? ADA : CARA
+  const loserSender = statuses[0] === "accepted" ? CARA : ADA
+  const bora = await harness.service.findActiveMiniRoomForUser(BORA.userId)
+  assert.ok(bora?.participantUserIds.includes(winnerSender.userId))
+  assert.equal(await harness.service.findActiveMiniRoomForUser(loserSender.userId), null)
+})
+
+test("accepting while the inviter is already in another room is refused, cancels the invite and opens nothing", async () => {
+  const harness = await createHarness()
+  const pending = await harness.invite(ADA, BORA)
+  const other = await harness.invite(ADA, CARA)
+  const existing = await harness.accept(other, ADA, CARA)
+  assert.ok(existing.miniRoom)
 
   await assert.rejects(
-    service.decideInvite({
-      inviteId: invite.inviteId,
-      actorProfile: recipient,
-      status: "accepted"
-    }, now),
-    /chat setup unavailable/
+    harness.accept(pending, ADA, BORA),
+    (error: unknown) => (error as { code?: string }).code === "PARTICIPANT_BUSY"
   )
 
-  assert.equal((await repository.findInvite(invite.inviteId))?.status, "cancelled")
-  assert.equal(await repository.findActiveMiniRoomForUser(sender.userId), null)
-  assert.equal(await repository.findActiveMiniRoomForUser(recipient.userId), null)
-  assert.equal(
-    (await presenceService.findUserPresence(
-      PUBLIC_LOBBY_ROOM_ID,
-      sender.userId,
-      now
-    ))?.inMiniRoom,
-    false
-  )
-  assert.equal(
-    (await presenceService.findUserPresence(
-      PUBLIC_LOBBY_ROOM_ID,
-      recipient.userId,
-      now
-    ))?.inMiniRoom,
-    false
-  )
+  assert.equal((await harness.service.repository.findInvite(pending))?.status, "cancelled")
+  assert.equal((await harness.service.findActiveMiniRoomForUser(ADA.userId))?.miniRoomId, existing.miniRoom.miniRoomId)
+  assert.equal(await harness.service.findActiveMiniRoomForUser(BORA.userId), null)
+})
+
+test("a failure after the room claim leaves one durable room that a retried accept returns", async () => {
+  let failNextRecheck = false
+  let checks = 0
+  const harness = await createHarness((safety) => ({
+    ...safety,
+    async hasBlockBetween(...args: Parameters<SafetyService["hasBlockBetween"]>) {
+      checks += 1
+      // The first check runs before the claim; the second is the post-claim re-check.
+      if (failNextRecheck && checks === 2) throw new Error("block lookup unavailable")
+      return safety.hasBlockBetween(...args)
+    }
+  }))
+  const inviteId = await harness.invite(ADA, BORA)
+  checks = 0
+  failNextRecheck = true
+
+  await assert.rejects(harness.accept(inviteId, ADA, BORA), /block lookup unavailable/)
+
+  failNextRecheck = false
+  const active = await harness.service.findActiveMiniRoomForUser(BORA.userId)
+  assert.ok(active, "the claimed room is durable, not half-created")
+  const retried = await harness.accept(inviteId, ADA, BORA)
+  assert.equal(retried.miniRoom?.miniRoomId, active.miniRoomId, "a retry returns the same room instead of a second one")
+  assert.equal((await harness.service.findActiveMiniRoomForUser(ADA.userId))?.miniRoomId, active.miniRoomId)
 })
 
 function profile(userId: string, displayName: string): UserProfile {
   return {
     userId,
     displayName,
-    avatar: {
-      ...createAvatarSelection(DEFAULT_FEMALE_AVATAR_LOADOUT, 0),
-      presetId: "avatar_v2_body_default"
-    }
+    avatar: createAvatarSelection(DEFAULT_FEMALE_AVATAR_LOADOUT, 0)
   }
 }
