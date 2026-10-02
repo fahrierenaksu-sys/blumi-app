@@ -8,6 +8,7 @@ import {
 } from "react-native-safe-area-context"
 import { useFonts } from "expo-font"
 import { RootNavigator } from "./src/navigation/RootNavigator"
+import { AppKeyboardProvider } from "./src/ui/keyboard"
 import { useOtaUpdates } from "./src/features/appUpdates/useOtaUpdates"
 import { ErrorBoundary } from "./src/ui/errorBoundary"
 import {
@@ -67,9 +68,11 @@ function App() {
       {/* Required for Gesture Handler gestures (the main-page pager). */}
       <GestureHandlerRootView style={styles.gestureRoot}>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <QueryClientProvider client={queryClient}>
-            <RootNavigator />
-          </QueryClientProvider>
+          <AppKeyboardProvider>
+            <QueryClientProvider client={queryClient}>
+              <RootNavigator />
+            </QueryClientProvider>
+          </AppKeyboardProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

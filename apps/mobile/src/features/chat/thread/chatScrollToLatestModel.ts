@@ -7,9 +7,26 @@ import { getChatTimelineItemKey, type ChatTimelineItem } from "../chatRoomInvite
  */
 export const CHAT_SCROLL_TO_LATEST_THRESHOLD = 200
 
-export function isChatScrolledAwayFromLatest(offsetY: number): boolean {
+/**
+ * While the keyboard is open, the chat scroll view lifts the newest message
+ * above it with a content inset at the newest edge, so the newest message
+ * sits at offset `-inset` instead of 0. `keyboardHeight` is the keyboard's
+ * height on screen (sign ignored); `bottomOffset` is the space below the list
+ * that the keyboard covers anyway (the composer's safe-area padding).
+ */
+export function getChatNewestEdgeInset(keyboardHeight: number, bottomOffset: number): number {
   "worklet"
-  return offsetY > CHAT_SCROLL_TO_LATEST_THRESHOLD
+  return Math.max(0, Math.abs(keyboardHeight) - Math.max(0, bottomOffset))
+}
+
+export function isChatScrolledAwayFromLatest(offsetY: number, newestEdgeInset = 0): boolean {
+  "worklet"
+  return offsetY + newestEdgeInset > CHAT_SCROLL_TO_LATEST_THRESHOLD
+}
+
+/** The scroll offset that shows the newest message above the keyboard. */
+export function getChatLatestScrollOffset(newestEdgeInset: number): number {
+  return newestEdgeInset > 0 ? -newestEdgeInset : 0
 }
 
 /**

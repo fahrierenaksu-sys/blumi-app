@@ -7,9 +7,12 @@ import {
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { useReducedMotion } from "../../../ui/animations"
+import { useGluedKeyboardHeight } from "../../../ui/keyboard"
 import { getChatTimelineItemKey, type ChatTimelineItem } from "../chatRoomInviteModel"
 import {
   countNewIncomingAtNewestEdge,
+  getChatLatestScrollOffset,
+  getChatNewestEdgeInset,
   isChatScrolledAwayFromLatest
 } from "./chatScrollToLatestModel"
 
@@ -17,18 +20,22 @@ import {
  * The "↓" pill of the conversation (CHT-05). The scroll offset lives on the
  * UI thread; JS hears only when the reader crosses the threshold, never per
  * scroll frame. While away, new partner messages are counted; returning to
- * the newest message clears the count.
+ * the newest message clears the count. While the keyboard is open the newest
+ * edge is lifted above it (`bottomOffset`: see getChatNewestEdgeInset).
  */
 export function useChatScrollToLatest({
   newestFirstTimeline,
-  currentUserId
+  currentUserId,
+  bottomOffset
 }: {
   newestFirstTimeline: readonly ChatTimelineItem[]
   currentUserId: string
+  bottomOffset: number
 }) {
   const reduceMotion = useReducedMotion()
   const listRef = useRef<FlatList<ChatTimelineItem>>(null)
   const offset = useSharedValue(0)
+  const keyboardHeight = useGluedKeyboardHeight()
   const [isAway, setIsAway] = useState(false)
   const [unseenCount, setUnseenCount] = useState(0)
   const newestKeyRef = useRef<string | null>(null)
@@ -40,7 +47,7 @@ export function useChatScrollToLatest({
   })
 
   useAnimatedReaction(
-    () => isChatScrolledAwayFromLatest(offset.value),
+    () => isChatScrolledAwayFromLatest(offset.value, getChatNewestEdgeInset(keyboardHeight.value, bottomOffset)),
     (away, previous) => {
       if (away !== previous) scheduleOnRN(setIsAway, away)
     }
@@ -60,8 +67,9 @@ export function useChatScrollToLatest({
   }, [isAway])
 
   const scrollToLatest = useCallback(() => {
-    listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
-  }, [reduceMotion])
+    const inset = getChatNewestEdgeInset(keyboardHeight.get(), bottomOffset)
+    listRef.current?.scrollToOffset({ offset: getChatLatestScrollOffset(inset), animated: !reduceMotion })
+  }, [bottomOffset, keyboardHeight, reduceMotion])
 
   return { listRef, scrollHandler, isAway, unseenCount, scrollToLatest }
 }
