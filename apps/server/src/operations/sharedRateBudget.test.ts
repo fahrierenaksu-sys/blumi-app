@@ -133,8 +133,13 @@ test("an authenticated request reads its bearer session once for the budget and 
     assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers })).statusCode, 200)
     assert.equal(sessionReads, 1, "the reuse never outlives its request")
     sessionReads = 0
-    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers: { authorization: "Bearer revoked" } })).statusCode, 401)
+    // A session-shaped but unknown token is read once; an invented one never.
+    const unknown = "dv_00000000-0000-4000-8000-000000000000_00000000-0000-4000-8000-000000000000"
+    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers: { authorization: `Bearer ${unknown}` } })).statusCode, 401)
     assert.equal(sessionReads, 1)
+    sessionReads = 0
+    assert.equal((await app.inject({ method: "GET", url: "/v1/users/me", headers: { authorization: "Bearer revoked" } })).statusCode, 401)
+    assert.equal(sessionReads, 0)
   } finally { await app.close() }
 })
 
