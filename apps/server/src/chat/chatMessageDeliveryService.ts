@@ -5,6 +5,7 @@ import type { ConnectionManager } from "../realtime/connectionManager"
 import type { SafetyService } from "../safety/safetyService"
 import { PublicRequestError } from "../errors/publicRequestError"
 import type { ChatDeliveryJob, ChatThreadMembers, TestPersona } from "./chatRepository"
+import { classifyDatabaseError } from "../operations/databaseErrorStatus"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { createChatLatencyDiagnostics, type ChatPhaseMeasure } from "./chatLatencyDiagnostics"
 
@@ -341,6 +342,18 @@ export function createChatMessageDeliveryService(options: {
       await chatService.repository.completeDelivery(message.messageId, leaseToken, now)
     } catch (error) {
       options.reportError?.(error)
+      // A transient infrastructure failure (2026-10-02: a pooler refusal
+      // during a deploy, a busy pool) is retried without counting, so a
+      // five-minute outage no longer dead-letters every message in it. Past
+      // TRANSIENT_RETRY_HORIZON_MS it counts again, so nothing retries forever.
+      const ageMs = now.getTime() - Date.parse(message.sentAt)
+      const transient = classifyDatabaseError(error)?.statusCode === 503 &&
+        Number.isFinite(ageMs) && ageMs < TRANSIENT_RETRY_HORIZON_MS
+      if (transient) {
+        const backoffMs = Math.min(60_000, Math.max(1_000, Math.floor(ageMs / 4)))
+        await chatService.repository.retryDelivery(message.messageId, leaseToken, new Date(now.getTime() + backoffMs), { refundAttempt: true })
+        return
+      }
       // A message that keeps failing would hold every later message of its
       // thread back forever (a thread delivers in order): give up on it.
       if (job.attempt >= MAX_CHAT_DELIVERY_ATTEMPTS) {
@@ -358,6 +371,14 @@ export function createChatMessageDeliveryService(options: {
  * backoff capped at 60 s, ten attempts span about five minutes.
  */
 export const MAX_CHAT_DELIVERY_ATTEMPTS = 10
+
+/**
+ * How long transient failures (classifyDatabaseError: 503) are retried
+ * without counting toward MAX_CHAT_DELIVERY_ATTEMPTS, measured from the
+ * message's sentAt. A later push is worth little, and a thread must not wait
+ * behind one message forever.
+ */
+export const TRANSIENT_RETRY_HORIZON_MS = 60 * 60 * 1000
 
 export interface ChatDeliveryDeadLetter {
   reason: "attempts_exhausted" | "lease_exhausted"

@@ -6,6 +6,7 @@ import { createSafetyService } from "../safety/safetyService"
 import {
   createChatMessageDeliveryService,
   MAX_CHAT_DELIVERY_ATTEMPTS,
+  TRANSIENT_RETRY_HORIZON_MS,
   type ChatDeliveryDeadLetter
 } from "./chatMessageDeliveryService"
 import { createChatService } from "./chatService"
@@ -126,4 +127,64 @@ test("the default dead-letter log line carries no IDs or message text", async (t
   for (const secret of ["message_poison", "thread_private", "user_sender", "user_recipient", "private body"]) {
     assert.equal(lines.join("\n").includes(secret), false, secret)
   }
+})
+
+async function outageFixture() {
+  const ids = ["message_in_outage"]
+  const chatService = createChatService({ idFactory: () => ids.shift()! })
+  await chatService.createThread({
+    threadId: "thread_private", miniRoomId: "room_private",
+    participantUserIds: ["user_sender", "user_recipient"],
+    participants: [{ userId: "user_sender", displayName: "Ada" }, { userId: "user_recipient", displayName: "Bora" }]
+  })
+  await chatService.sendMessage("user_sender", "thread_private", "sent during an outage")
+  const state = { outage: true, failures: 0, pushed: [] as string[], deadLetters: [] as ChatDeliveryDeadLetter[] }
+  const delivery = createChatMessageDeliveryService({
+    chatService, safetyService: createSafetyService(),
+    connectionManager: {
+      async sendToUsersDurably() {
+        if (!state.outage) return
+        state.failures += 1
+        // node-postgres when the pool cannot hand out a connection in time.
+        throw new Error("timeout exceeded when trying to connect")
+      },
+      hasUserConnections: () => false
+    } as unknown as ConnectionManager,
+    notificationService: {
+      async sendPushToUser(_userId: string, push: { data: { messageId: string } }) { state.pushed.push(push.data.messageId) }
+    } as unknown as NotificationService,
+    reportError: () => {},
+    reportDeadLetter: (event) => { state.deadLetters.push(event) }
+  })
+  return { delivery, state }
+}
+
+test("a transient outage longer than the attempt budget does not dead-letter its messages", async () => {
+  const { delivery, state } = await outageFixture()
+  let clock = Date.now()
+  for (let round = 0; round < MAX_CHAT_DELIVERY_ATTEMPTS * 2; round += 1) {
+    clock += 61_000
+    await delivery.dispatchDue(new Date(clock))
+    await settle()
+  }
+  assert.ok(state.failures > MAX_CHAT_DELIVERY_ATTEMPTS)
+  assert.deepEqual(state.deadLetters, [])
+  state.outage = false
+  clock += 61_000
+  await delivery.dispatchDue(new Date(clock))
+  await settle()
+  assert.deepEqual(state.pushed, ["message_in_outage"])
+})
+
+test("transient failures count again past the retry horizon, so nothing retries forever", async () => {
+  const { delivery, state } = await outageFixture()
+  let clock = Date.now() + TRANSIENT_RETRY_HORIZON_MS
+  for (let round = 0; round < MAX_CHAT_DELIVERY_ATTEMPTS + 1; round += 1) {
+    clock += 61_000
+    await delivery.dispatchDue(new Date(clock))
+    await settle()
+  }
+  assert.equal(state.failures, MAX_CHAT_DELIVERY_ATTEMPTS)
+  assert.deepEqual(state.deadLetters, [{ reason: "attempts_exhausted", attempts: MAX_CHAT_DELIVERY_ATTEMPTS, errorKind: "Error", count: 1 }])
+  assert.deepEqual(state.pushed, [])
 })
