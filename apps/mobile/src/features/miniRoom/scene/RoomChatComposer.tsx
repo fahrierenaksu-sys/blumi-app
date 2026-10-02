@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { memo, useEffect, useRef } from "react"
 import { StyleSheet, TextInput, View } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { PressableScale } from "../../../ui/PressableScale"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
@@ -14,6 +16,8 @@ import {
 
 export const MAX_ROOM_MESSAGE_LENGTH = 140
 const TOGGLE_INK = "#806780"
+/** Scale the send button springs back from after a send (as in the chat composer). */
+const SEND_POP_SCALE = 0.8
 
 /** The MiniRoom composer row: history toggle, message field and send. */
 export interface RoomChatComposerProps {
@@ -61,10 +65,23 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     const timer = setTimeout(() => inputRef.current?.focus(), 0)
     return () => clearTimeout(timer)
   }, [suggestionsEnabled])
-  // One send, one haptic (ui/haptics: a chat message sent → selection), from
-  // the send button or the keyboard's return key alike.
+  const motion = useMotion()
+  // The press itself is PressableScale's (the shared `press` token); this
+  // outer scale only carries the post-send pop, so the two never fight
+  // (the chat composer's pattern, MOTION_PLAN §D.4).
+  const sendPop = useSharedValue(1)
+  const sendPopStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendPop.value }] }))
+  // One send, one haptic (ui/haptics: a chat message sent → selection) and one
+  // pop, from the send button or the keyboard's return key alike. Reduce
+  // Motion keeps the button still; the haptic stays.
   const submit = () => {
-    if (onSubmit()) hapticSelection()
+    if (onSubmit()) {
+      hapticSelection()
+      if (!motion.reduceMotion) {
+        sendPop.value = SEND_POP_SCALE
+        sendPop.value = animateTo(1, motion.snappy)
+      }
+    }
     draftTyping?.endDraft()
   }
   const sendDisabled = disabled || value.trim().length === 0
@@ -123,17 +140,19 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
         keyboardAppearance="light"
       />
       </View>
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel={copy.sendRoomMessage}
-        accessibilityState={{ disabled: sendDisabled }}
-        disabled={sendDisabled}
-        hitSlop={4}
-        onPress={submit}
-        style={[styles.composerSend, sendDisabled ? styles.composerSendDisabled : null]}
-      >
-        <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-      </PressableScale>
+      <Animated.View style={sendPopStyle}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={copy.sendRoomMessage}
+          accessibilityState={{ disabled: sendDisabled }}
+          disabled={sendDisabled}
+          hitSlop={4}
+          onPress={submit}
+          style={[styles.composerSend, sendDisabled ? styles.composerSendDisabled : null]}
+        >
+          <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+        </PressableScale>
+      </Animated.View>
     </View>
   )
 })

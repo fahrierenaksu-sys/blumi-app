@@ -50,6 +50,19 @@ export function resolveMiniRoomContentOpacity(progress: number): { history: numb
   }
 }
 
+/**
+ * The history ↔ recent handoff: while a text layer is not fully shown it
+ * drifts a few points off its rest (history settles down as it leaves, the
+ * recent strip rises into place), so the switch reads as one motion. A shown
+ * layer sits exactly at rest; Reduce Motion keeps both still (only the fade).
+ */
+export function resolveMiniRoomContentDrift(progress: number, reduceMotion: boolean): { history: number; recent: number } {
+  "worklet"
+  if (reduceMotion) return { history: 0, recent: 0 }
+  const opacity = resolveMiniRoomContentOpacity(progress)
+  return { history: 6 * (1 - opacity.history), recent: 4 * (1 - opacity.recent) }
+}
+
 /** Lift the persistent composer ahead of the rising keyboard, then settle softly.
  * The whole pose uses this clock so the dock never catches the room floor.
  */

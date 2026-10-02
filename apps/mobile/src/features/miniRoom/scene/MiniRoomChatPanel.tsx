@@ -1,14 +1,20 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import type { ReactNode } from "react"
+import { useEffect, useRef, type ReactNode } from "react"
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
-import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
+import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
+import { animateToAfter, useMotion } from "../../../ui/motion"
 import { PressableScale } from "../../../ui/PressableScale"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import { MiniRoomChatHistory } from "./MiniRoomChatHistory"
 import type { MiniRoomPanelMode } from "./miniRoomLayout"
-import { resolveMiniRoomContentOpacity, resolveMiniRoomTextWidths, type MiniRoomTransitionFrame } from "./miniRoomTransitionModel"
+import {
+  resolveMiniRoomContentDrift, resolveMiniRoomContentOpacity, resolveMiniRoomTextWidths, type MiniRoomTransitionFrame
+} from "./miniRoomTransitionModel"
+
+/** How far the recent strip's items rise on its first appearance (points). */
+const RECENT_ENTER_RISE = 6
 
 interface MiniRoomChatPanelProps {
   copy: MiniRoomCopy
@@ -44,11 +50,39 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
       borderTopLeftRadius: 26 - 4 * pose.progress, borderTopRightRadius: 26 - 4 * pose.progress,
       borderBottomLeftRadius: 26 * (1 - pose.progress), borderBottomRightRadius: 26 * (1 - pose.progress) }
   })
+  const motion = useMotion()
+  const { reduceMotion } = motion
+  // The handoff: each layer fades (the owner's quiet midpoint) and drifts a
+  // few points while it is not fully shown; Reduce Motion keeps only the fade.
   const historyStyle = useAnimatedStyle(() => ({
-    opacity: resolveMiniRoomContentOpacity(contentProgress.value).history
+    opacity: resolveMiniRoomContentOpacity(contentProgress.value).history,
+    transform: [{ translateY: resolveMiniRoomContentDrift(contentProgress.value, reduceMotion).history }]
   }))
   const recentStyle = useAnimatedStyle(() => ({
-    opacity: resolveMiniRoomContentOpacity(contentProgress.value).recent
+    opacity: resolveMiniRoomContentOpacity(contentProgress.value).recent,
+    transform: [{ translateY: resolveMiniRoomContentDrift(contentProgress.value, reduceMotion).recent }]
+  }))
+  // The recent strip's first appearance: name, line and close rise in on the
+  // `stagger` token (once per room visit); afterwards it only crossfades.
+  const enterName = useSharedValue(0)
+  const enterText = useSharedValue(0)
+  const enterClose = useSharedValue(0)
+  const recentEntered = useRef(false)
+  useEffect(() => {
+    if (!typing || recentEntered.current) return
+    recentEntered.current = true
+    ;[enterName, enterText, enterClose].forEach((value, index) => {
+      value.value = animateToAfter(motion.staggerDelay(index), 1, motion.smooth)
+    })
+  }, [enterClose, enterName, enterText, motion, typing])
+  const enterNameStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reduceMotion ? 0 : (1 - enterName.value) * RECENT_ENTER_RISE }]
+  }))
+  const enterTextStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reduceMotion ? 0 : (1 - enterText.value) * RECENT_ENTER_RISE }]
+  }))
+  const enterCloseStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reduceMotion ? 0 : (1 - enterClose.value) * RECENT_ENTER_RISE }]
   }))
   const composerStyle = useAnimatedStyle(() => ({
     bottom: 9 - transition.value.progress,
@@ -62,19 +96,22 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
         <Animated.View style={[styles.recent, { width: textWidths.recent }, recentStyle]} onLayout={measureRecent}
           pointerEvents={typing ? "auto" : "none"} accessibilityElementsHidden={!typing}
           importantForAccessibility={typing ? "auto" : "no-hide-descendants"}>
-          <Text numberOfLines={1} maxFontSizeMultiplier={1.35} style={styles.recentName}>
+          <Animated.Text numberOfLines={1} maxFontSizeMultiplier={1.35} style={[styles.recentName, enterNameStyle]}>
             {recentMessage?.mine ? copy.youLabel : partnerName}
-          </Text>
-          <Text numberOfLines={2} ellipsizeMode="tail" maxFontSizeMultiplier={1.35} style={styles.recentText}>
+          </Animated.Text>
+          <Animated.Text numberOfLines={2} ellipsizeMode="tail" maxFontSizeMultiplier={1.35}
+            style={[styles.recentText, enterTextStyle]}>
             {recentMessage?.body ?? copy.historyEmpty}
-          </Text>
-          <PressableScale accessibilityRole="button" accessibilityLabel={copy.closeKeyboard} hitSlop={6}
-            onPress={() => {
-              hapticSelection()
-              onCloseKeyboard()
-            }} style={styles.closeKeyboard}>
-            <Ionicons name="chevron-down" size={18} color="#70596E" />
-          </PressableScale>
+          </Animated.Text>
+          <Animated.View style={enterCloseStyle}>
+            <PressableScale accessibilityRole="button" accessibilityLabel={copy.closeKeyboard} hitSlop={6}
+              onPress={() => {
+                hapticSelection()
+                onCloseKeyboard()
+              }} style={styles.closeKeyboard}>
+              <Ionicons name="chevron-down" size={18} color="#70596E" />
+            </PressableScale>
+          </Animated.View>
         </Animated.View>
         <Animated.View style={[styles.historyContent, { width: textWidths.history, bottom: composerHeight + 18 }, historyStyle]}
           pointerEvents={typing ? "none" : "auto"} accessibilityElementsHidden={typing}

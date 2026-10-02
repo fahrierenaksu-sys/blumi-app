@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { resolveMiniRoomLayout, resolveMiniRoomRestCamera, type MiniRoomLayoutInput } from "./miniRoomLayout"
 import {
-  resolveMiniRoomContentOpacity, resolveMiniRoomMorphFrame, resolveMiniRoomOpeningProgress, resolveMiniRoomSettlingProgress, resolveMiniRoomTextWidths, resolveMiniRoomTransitionDuration, resolveMiniRoomTransitionTarget, shouldDeferMiniRoomLayout,
+  resolveMiniRoomContentDrift, resolveMiniRoomContentOpacity, resolveMiniRoomMorphFrame, resolveMiniRoomOpeningProgress, resolveMiniRoomSettlingProgress, resolveMiniRoomTextWidths, resolveMiniRoomTransitionDuration, resolveMiniRoomTransitionTarget, shouldDeferMiniRoomLayout,
   type MiniRoomTransitionFrame
 } from "./miniRoomTransitionModel"
 
@@ -52,6 +52,26 @@ test("history and recent text never have simultaneous readable opacity; context 
   assert.deepEqual(resolveMiniRoomContentOpacity(0), { history: 1, recent: 0, context: 1 })
   assert.deepEqual(resolveMiniRoomContentOpacity(1), { history: 0, recent: 1, context: 0 })
   assert.equal(resolveMiniRoomContentOpacity(0.4).context, 0)
+})
+
+test("the history and recent layers drift only while they fade, and never under Reduce Motion", () => {
+  // A readable layer sits exactly at rest: the drift never moves the owner's layout.
+  assert.equal(resolveMiniRoomContentDrift(0, false).history, 0)
+  assert.equal(resolveMiniRoomContentDrift(1, false).recent, 0)
+  let previous = resolveMiniRoomContentDrift(0, false)
+  for (let i = 1; i <= 100; i++) {
+    const drift = resolveMiniRoomContentDrift(i / 100, false)
+    const opacity = resolveMiniRoomContentOpacity(i / 100)
+    if (opacity.history === 1) assert.equal(drift.history, 0)
+    if (opacity.recent === 1) assert.equal(drift.recent, 0)
+    assert.ok(drift.history >= previous.history, "history keeps settling away as it leaves")
+    assert.ok(drift.recent <= previous.recent, "recent keeps rising into place as it arrives")
+    previous = drift
+  }
+  assert.ok(resolveMiniRoomContentDrift(0.5, false).history > 0, "the handoff moves at all")
+  for (let i = 0; i <= 10; i++) {
+    assert.deepEqual(resolveMiniRoomContentDrift(i / 10, true), { history: 0, recent: 0 })
+  }
 })
 
 test("opening catches up to UIKit, closing preserves the system duration, Reduce Motion is immediate", () => {

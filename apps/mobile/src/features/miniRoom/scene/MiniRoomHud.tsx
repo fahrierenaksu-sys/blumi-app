@@ -1,8 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { SymbolView } from "expo-symbols"
-import { useCallback, useState, type ComponentProps } from "react"
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { hapticLight, hapticSelection } from "../../../ui/haptics"
+import { animateTo, useMotion } from "../../../ui/motion"
 import { PressableScale } from "../../../ui/PressableScale"
 import { WardrobeGlass } from "../../avatarV2/wardrobe/WardrobeGlass"
 import { wardrobeTheme } from "../../avatarV2/wardrobe/wardrobeV2Styles"
@@ -61,8 +64,37 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     onToggleSuggestions,
     onCloseKeyboard
   } = props
+  const motion = useMotion()
   const [menuOpen, setMenuOpen] = useState(false)
+  // The menu stays mounted through its exit; it stops taking touches at once.
+  const [menuPresent, setMenuPresent] = useState(false)
+  const menuOpenRef = useRef(false)
+  const menuOpacity = useSharedValue(0)
+  const menuScale = useSharedValue(MENU_CLOSED_SCALE)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const unmountClosedMenu = useCallback(() => {
+    if (!menuOpenRef.current) setMenuPresent(false)
+  }, [])
+  // Opens from its anchor (the options button) on the `smooth` spring while it
+  // fades in; closes faster (snappy scale, fadeOut). Reduce Motion: the scale
+  // lands at once and only the fade remains.
+  useEffect(() => {
+    menuOpenRef.current = menuOpen
+    if (menuOpen) {
+      menuOpacity.value = animateTo(1, motion.fadeIn)
+      menuScale.value = motion.reduceMotion ? 1 : animateTo(1, motion.smooth)
+      return
+    }
+    menuScale.value = motion.reduceMotion ? 1 : animateTo(MENU_CLOSED_SCALE, motion.snappy)
+    menuOpacity.value = animateTo(0, motion.fadeOut, (finished) => {
+      "worklet"
+      if (finished) scheduleOnRN(unmountClosedMenu)
+    })
+  }, [menuOpacity, menuOpen, menuScale, motion, unmountClosedMenu])
+  const menuStyle = useAnimatedStyle(() => ({
+    opacity: menuOpacity.value,
+    transform: [{ scale: menuScale.value }]
+  }))
   const statusNotice = resolveMiniRoomStatusNotice(connectionStatus)
   const statusText = statusNotice === "connecting"
     ? copy.connecting
@@ -98,23 +130,11 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
           {copy.roomTitle}
         </Text>
         <View style={[styles.side, styles.sideEnd]} pointerEvents="box-none">
-          <PressableScale
-            accessibilityRole="switch"
-            accessibilityLabel={copy.keyboardSuggestions}
-            accessibilityHint={copy.keyboardSuggestionsHint}
-            accessibilityState={{ checked: suggestionsEnabled }}
-            accessibilityValue={{ text: suggestionsEnabled ? copy.keyboardSuggestionsOn : copy.keyboardSuggestionsOff }}
-            hitSlop={3}
-            onPress={() => {
-              hapticSelection()
-              onToggleSuggestions()
-            }}
-          >
-            <View style={[styles.headerControl, styles.center, suggestionsEnabled ? styles.suggestionsSelected : null]}>
-              <SymbolView name={{ ios: "keyboard", android: "keyboard", web: "keyboard" }} size={28} tintColor={suggestionsEnabled ? MIC_SELECTED_INK : "#645269"} />
-              <View pointerEvents="none" style={[styles.suggestionsMark, { backgroundColor: suggestionsEnabled ? MIC_SELECTED_INK : "#B8A9BD" }]} />
-            </View>
-          </PressableScale>
+          <KeyboardSuggestionsSwitch
+            copy={copy}
+            suggestionsEnabled={suggestionsEnabled}
+            onToggleSuggestions={onToggleSuggestions}
+          />
           {voiceAvailable ? <MicrophoneButton
             copy={copy}
             micEnabled={localMedia.micEnabled}
@@ -131,6 +151,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
               hapticSelection()
               onCloseKeyboard()
               setMenuOpen((open) => !open)
+              setMenuPresent(true)
             }}
           />
         </View>
@@ -157,15 +178,21 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
         </View>
       ) : null}
 
-      {menuOpen ? (
-        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+      {menuPresent ? (
+        <View
+          style={StyleSheet.absoluteFill}
+          pointerEvents={menuOpen ? "auto" : "none"}
+          accessibilityViewIsModal={menuOpen}
+          accessibilityElementsHidden={!menuOpen}
+          importantForAccessibility={menuOpen ? "auto" : "no-hide-descendants"}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={copy.closeRoomOptions}
             onPress={closeMenu}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.menu, { top: headerBottom + 6, right: horizontalInset }]}>
+          <Animated.View style={[styles.menu, { top: headerBottom + 6, right: horizontalInset }, menuStyle]}>
             <MenuItem
               icon="shield-checkmark-outline"
               label={copy.safetyOptions}
@@ -187,10 +214,62 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
                 onLeave()
               }}
             />
-          </View>
+          </Animated.View>
         </View>
       ) : null}
     </View>
+  )
+}
+
+/**
+ * The keyboard-suggestions switch. A flip answers on contact: the keyboard
+ * glyph tilts and its state dot swells, then both spring back to rest on the
+ * `snappy` token, so the resting look is exactly the design's. Reduce Motion
+ * keeps them still (the press dims, the haptic stays).
+ */
+function KeyboardSuggestionsSwitch(props: {
+  copy: MiniRoomCopy
+  suggestionsEnabled: boolean
+  onToggleSuggestions: () => void
+}) {
+  const { copy, suggestionsEnabled, onToggleSuggestions } = props
+  const motion = useMotion()
+  const flip = useSharedValue(0)
+  // Turning on tilts one way and off the other; fixed at the press, so the
+  // re-render that follows never reverses a running tilt.
+  const direction = useSharedValue(1)
+  const glyphStyle = useAnimatedStyle(() => ({
+    transform: [
+      { rotate: `${direction.value * SUGGESTIONS_FLIP_TILT_DEG * flip.value}deg` },
+      { scale: 1 + SUGGESTIONS_FLIP_GROW * flip.value }
+    ]
+  }))
+  const markStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + SUGGESTIONS_MARK_SWELL * flip.value }] }))
+  return (
+    <PressableScale
+      accessibilityRole="switch"
+      accessibilityLabel={copy.keyboardSuggestions}
+      accessibilityHint={copy.keyboardSuggestionsHint}
+      accessibilityState={{ checked: suggestionsEnabled }}
+      accessibilityValue={{ text: suggestionsEnabled ? copy.keyboardSuggestionsOn : copy.keyboardSuggestionsOff }}
+      hitSlop={3}
+      onPress={() => {
+        hapticSelection()
+        if (!motion.reduceMotion) {
+          direction.value = suggestionsEnabled ? 1 : -1
+          flip.value = 1
+          flip.value = animateTo(0, motion.snappy)
+        }
+        onToggleSuggestions()
+      }}
+    >
+      <View style={[styles.headerControl, styles.center, suggestionsEnabled ? styles.suggestionsSelected : null]}>
+        <Animated.View style={glyphStyle}>
+          <SymbolView name={{ ios: "keyboard", android: "keyboard", web: "keyboard" }} size={28} tintColor={suggestionsEnabled ? MIC_SELECTED_INK : "#645269"} />
+        </Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.suggestionsMark, { backgroundColor: suggestionsEnabled ? MIC_SELECTED_INK : "#B8A9BD" }, markStyle]} />
+      </View>
+    </PressableScale>
   )
 }
 
@@ -312,6 +391,11 @@ function MenuItem(props: {
 }
 
 const MIC_SELECTED_INK = "#9E365B"
+/** The room menu's scale before it opens (from its anchor, the top right). */
+const MENU_CLOSED_SCALE = 0.92
+const SUGGESTIONS_FLIP_TILT_DEG = 12
+const SUGGESTIONS_FLIP_GROW = 0.1
+const SUGGESTIONS_MARK_SWELL = 0.8
 const NOTICE_INK = "#806780"
 const MENU_ICON = "#7D677C"
 
@@ -404,6 +488,7 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: "absolute",
+    transformOrigin: "top right",
     minWidth: 196,
     padding: 8,
     borderRadius: 20,
