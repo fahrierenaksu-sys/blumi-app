@@ -124,8 +124,36 @@ export function getRoomAvatarLayerFrameSlots(layer: RoomV2AvatarRenderLayer): {
   return { assets, slotByFrame }
 }
 
+/** Keep decoded idle and motion images mounted for the lifetime of this layer. */
+export function retainRoomAvatarFrameSlots(
+  retained: RoomV2AssetRef[],
+  frames: readonly RoomV2AssetRef[]
+): { assets: RoomV2AssetRef[]; slotByFrame: number[] } {
+  let assets = retained
+  const slotByFrame = frames.map((frame) => {
+    const existing = assets.findIndex((asset) => isSameRoomAvatarAsset(asset, frame))
+    if (existing >= 0) return existing
+    if (assets === retained) assets = [...retained]
+    assets.push(frame)
+    return assets.length - 1
+  })
+  return { assets, slotByFrame }
+}
+
 /** The image slot a layer shows at an avatar frame index (`getRoomAvatarLayerFrameAsset` order). */
 export function getRoomAvatarLayerFrameSlot(slotByFrame: readonly number[], frameIndex: number): number {
   "worklet"
   return slotByFrame[frameIndex % slotByFrame.length] ?? 0
+}
+
+/** Hold the visible pose until the requested image has actually displayed. */
+export function getRoomAvatarReadyFrameSlot(
+  slotByFrame: readonly number[],
+  frameIndex: number,
+  displayedSlots: readonly number[],
+  previousSlot = 0
+): number {
+  "worklet"
+  const slot = getRoomAvatarLayerFrameSlot(slotByFrame, frameIndex)
+  return displayedSlots.includes(slot) ? slot : previousSlot
 }

@@ -5,7 +5,8 @@ import { insertRoomV2RenderItemSorted } from "../roomV2/roomV2Selectors"
 import {
   createMyRoomAvatarDepthNeighbours,
   createMyRoomWalkTimeline,
-  getMyRoomAvatarDepthIndex
+  getMyRoomAvatarDepthIndex,
+  getMyRoomWalkPoint
 } from "./myRoomAvatarWalkModel"
 import {
   easeRoomWorldMovement,
@@ -64,4 +65,21 @@ test("the UI-thread depth index matches the React render sort at every depth", (
       `depth ${depth}`
     )
   }
+})
+
+test("one walk clock keeps both axes together at turns, including repeated coordinates", () => {
+  const origin = { x: 0.2, y: 0.5 }
+  const steps = [
+    { x: 0.8, y: 0.5, durationMs: 600, rampIn: 0, rampOut: 0 },
+    { x: 0.8, y: 0.8, durationMs: 300, rampIn: 0, rampOut: 0 },
+    { x: 0.3, y: 0.8, durationMs: 500, rampIn: 0, rampOut: 0 }
+  ]
+  assert.deepEqual(getMyRoomWalkPoint(origin, steps, 1), { x: 0.8, y: 0.5 })
+  assert.deepEqual(getMyRoomWalkPoint(origin, steps, 1.5), { x: 0.8, y: 0.65 })
+  assert.deepEqual(getMyRoomWalkPoint(origin, steps, 2), { x: 0.8, y: 0.8 })
+  assert.deepEqual(getMyRoomWalkPoint(origin, steps, 3), { x: 0.3, y: 0.8 })
+  const interrupted = getMyRoomWalkPoint(origin, steps, 0.25)
+  const redirected = [{ ...steps[0]!, x: 0.1, y: 0.9 }]
+  assert.deepEqual(getMyRoomWalkPoint(interrupted, redirected, 0), interrupted)
+  assert.deepEqual(getMyRoomWalkPoint(interrupted, [], 0), interrupted)
 })

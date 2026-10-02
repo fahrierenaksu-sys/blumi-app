@@ -5,6 +5,7 @@ import {
   getRoomV2FurnitureMobileRenderScale,
   getRoomV2FurnitureImageResizeMode,
   getRoomV2LiveAvatarOffset,
+  getRoomV2LiveAvatarFrame,
   getRoomV2SeatedFurnitureRenderIds,
   ROOM_V2_FURNITURE_MOBILE_RENDER_SCALE,
   shouldShowRoomV2FurnitureGroundShadow
@@ -89,6 +90,19 @@ test("front-seat occlusion is limited to furniture hosting a seated avatar", () 
   ])
 
   assert.deepEqual([...seatedFurnitureRenderIds], ["loveseat-1"])
+})
+
+test("live avatar placement stays anchored to the floor across React pose commits", () => {
+  const input = { liveX: 0.63, liveY: 0.72, width: 0.2, height: 0.34,
+    anchorX: 0.5, anchorY: 0.92, stageWidthPx: 390, stageHeightPx: 292 }
+  // A step/depth/arrival commit must not change the box's origin underneath
+  // an already-applied live transform, even when the two commits are apart.
+  for (const base of [{ baseX: 0.4, baseY: 0.5 }, { baseX: 0.63, baseY: 0.72 }]) {
+    const frame = getRoomV2LiveAvatarFrame({ ...input, ...base })
+    assert.ok(Math.abs(frame.translateX + frame.width * input.anchorX - input.liveX * 390) < 1e-9)
+    assert.ok(Math.abs(frame.translateY + frame.height * input.anchorY - input.liveY * 292) < 1e-9)
+    assert.deepEqual(frame, getRoomV2LiveAvatarFrame(input))
+  }
 })
 
 test("a live avatar offset moves the base-laid-out box onto the box the renderer lays out at the live point", () => {

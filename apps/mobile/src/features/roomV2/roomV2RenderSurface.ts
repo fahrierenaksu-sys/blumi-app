@@ -22,6 +22,30 @@ export function getRoomV2DepthPerspectiveScale(y: number): number {
   return 1
 }
 
+/** Stable origin: React step/depth commits cannot move the box beneath its transform. */
+export function getRoomV2LiveAvatarFrame(input: {
+  liveX: number
+  liveY: number
+  width: number
+  height: number
+  anchorX: number
+  anchorY: number
+  stageWidthPx: number
+  stageHeightPx: number
+}): { width: number; height: number; translateX: number; translateY: number; scale: number } {
+  "worklet"
+  const scale = getRoomV2DepthPerspectiveScale(input.liveY)
+  const width = input.width * input.stageWidthPx
+  const height = input.height * input.stageHeightPx
+  return {
+    width,
+    height,
+    translateX: input.liveX * input.stageWidthPx - width * input.anchorX + width * (scale - 1) * (0.5 - input.anchorX),
+    translateY: input.liveY * input.stageHeightPx - height * input.anchorY + height * (scale - 1) * (0.5 - input.anchorY),
+    scale
+  }
+}
+
 /**
  * The transform that moves an avatar laid out at its React (base) point onto
  * the box the renderer would lay out at its live UI-thread point, so a walk
