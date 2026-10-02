@@ -20,10 +20,3 @@ export function getRoomRendererAvatarLoops(input: {
     gesture: active && !input.reduceMotion && input.usesRuntimeGesture
   }
 }
-
-export function shouldRunRoomRendererMarkerPulse(input: {
-  reduceMotion: boolean
-  paused: boolean
-}): boolean {
-  return !input.reduceMotion && !input.paused
-}

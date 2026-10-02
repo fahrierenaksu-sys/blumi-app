@@ -81,13 +81,17 @@ export function createMiniRoomDepthScene(scene: ResolvedRoomV2Scene | undefined)
  */
 export function resolveMiniRoomDepthOrder(
   neighbours: readonly MyRoomAvatarDepthNeighbour[],
-  avatars: readonly { id: string; depth: number }[]
+  avatars: readonly { id: string; depth: number; foot?: { x: number; y: number } }[]
 ): string {
   "worklet"
+  // Feet on the floor compare with each footprint's front edge, exactly as
+  // in My Room; a seated avatar keeps its seat's depth.
   const placed = avatars.map((avatar) => ({
     id: avatar.id,
     depth: avatar.depth,
-    slot: getMyRoomAvatarDepthIndex(neighbours, avatar.depth)
+    slot: avatar.foot
+      ? getMyRoomAvatarDepthIndex(neighbours, avatar.depth, avatar.foot.x, avatar.foot.y)
+      : getMyRoomAvatarDepthIndex(neighbours, avatar.depth)
   }))
   placed.sort((a, b) => a.slot !== b.slot ? a.slot - b.slot
     : a.depth !== b.depth ? a.depth - b.depth

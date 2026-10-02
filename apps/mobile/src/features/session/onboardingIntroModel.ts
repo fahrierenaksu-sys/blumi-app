@@ -188,7 +188,6 @@ export interface OnboardingRunnerOrbitTrack {
 
 export interface OnboardingRunnerPose {
   animationState: "running" | "reacting" | "orbit-chase" | "settled"
-  showGroundShadow: boolean
 }
 
 const CINEMATIC_PHASES: ReadonlySet<OnboardingIntroPhase> = new Set([
@@ -288,13 +287,7 @@ export function getOnboardingRunnerPose(
         ? role === "chaser" ? "running" : "reacting"
         : phase === "world-ready" || phase === "handoff"
           ? "orbit-chase"
-          : "settled",
-    showGroundShadow:
-      phase === "population-counting" ||
-      phase === "chasing" ||
-      phase === "catching" ||
-      phase === "world-ready" ||
-      phase === "handoff"
+          : "settled"
   }
 }
 

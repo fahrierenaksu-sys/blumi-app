@@ -38,8 +38,14 @@ test("room avatar accessibility reports non-seated motion without inventing furn
 test("ROOM-01: the avatar takes taps in an interactive room (wave chain), never in the editor", () => {
   assert.equal(shouldRoomV2ItemReceiveTap({ kind: "avatar", mode: "interact" }), true)
   assert.equal(shouldRoomV2ItemReceiveTap({ kind: "avatar", mode: "edit" }), false)
-  assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "interact" }), true)
+  assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "interact", interactionType: "seat" }), true)
   assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "edit" }), true)
+})
+
+test("a lived-in room's table or plant never swallows a tap on the floor around it", () => {
+  assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "interact", interactionType: "none" }), false)
+  assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "interact" }), false)
+  assert.equal(shouldRoomV2ItemReceiveTap({ kind: "furniture", mode: "edit", interactionType: "none" }), true)
 })
 
 test("ROOM-14: room VoiceOver text follows the app language", () => {

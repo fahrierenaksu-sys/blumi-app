@@ -3,7 +3,7 @@ import type { RoomV2AvatarMotionState } from "../roomV2.types"
 // Procedural body motion for the room avatar on top of the existing frames
 // (VIS-02, VIS-03 in docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md):
 // a sit/stand transition instead of a 0 ms swap, walk frames locked to the
-// distance travelled instead of a clock, a stride bob and a contact shadow.
+// distance travelled instead of a clock, and a stride bob.
 // No new art: only translate/scale on the frames the avatar already has.
 // Every function here is a worklet so the UI thread drives it per frame.
 
@@ -188,11 +188,4 @@ export function getRoomAvatarStrideFrameIndex(phase: number, frameCount: number)
 export function getRoomAvatarStrideBob(phase: number): number {
   "worklet"
   return (1 - Math.cos(phase * Math.PI * 4)) / 2
-}
-
-/** The contact shadow tightens and fades a touch as the body lifts. */
-export function getRoomAvatarContactShadow(bob: number): { scale: number; opacity: number } {
-  "worklet"
-  const lift = clamp01(bob)
-  return { scale: 1 - 0.08 * lift, opacity: 1 - 0.2 * lift }
 }

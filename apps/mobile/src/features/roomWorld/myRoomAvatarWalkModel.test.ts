@@ -79,6 +79,55 @@ test("the UI-thread depth index matches the React render sort at every depth", (
   }
 })
 
+// ── Depth by feet against the footprint's front edge (2026-10-02 report) ──
+
+/** A coffee table whose calibrated footprint reaches 0.04 in front of its pivot. */
+function coffeeTable(): RoomV2RenderItem {
+  return {
+    renderId: "coffee_table",
+    kind: "furniture",
+    layer: "furniture",
+    x: 0.5,
+    y: 0.7,
+    depth: 0.7,
+    width: 0.2,
+    height: 0.14,
+    anchor: { x: 0.5, y: 0.5 },
+    blocksMovement: true,
+    placementSurface: "floor",
+    footprint: { width: 0.16, height: 0.08 },
+    collisionPolygon: [{ x: 0.42, y: 0.66 }, { x: 0.58, y: 0.66 }, { x: 0.58, y: 0.74 }, { x: 0.42, y: 0.74 }]
+  } as unknown as RoomV2RenderItem
+}
+
+test("an avatar beside a table is behind it until its feet pass the table's front edge", () => {
+  const items = [renderItem("bookcase", "furniture", 0.5), coffeeTable(), renderItem("plant", "furniture", 0.9)]
+  const neighbours = createMyRoomAvatarDepthNeighbours(items, { layer: "furniture", renderId: "my_room_owner_avatar" })
+  const slot = (x: number, y: number) => getMyRoomAvatarDepthIndex(neighbours, y, x, y)
+  // Beside the table, feet past its pivot but not its front edge: still behind it.
+  assert.equal(slot(0.64, 0.72), 1)
+  assert.equal(slot(0.36, 0.73), 1)
+  // Feet in front of the front edge: drawn over the table.
+  assert.equal(slot(0.64, 0.75), 2)
+  assert.equal(slot(0.5, 0.76), 2)
+  // Right behind it: behind.
+  assert.equal(slot(0.5, 0.64), 1)
+  // Depth-only items (no footprint) keep the depth rule.
+  assert.equal(slot(0.2, 0.95), 3)
+  // A seated avatar keeps its pinned seat depth.
+  assert.equal(getMyRoomAvatarDepthIndex(neighbours, 0.7 + 0.002), 2)
+})
+
+test("My Room and MiniRoom order an avatar against furniture the same way", async () => {
+  const { resolveMiniRoomDepthOrder } = await import("../miniRoom/scene/miniRoomDepthModel")
+  const items = [coffeeTable()]
+  const neighbours = createMyRoomAvatarDepthNeighbours(items, { layer: "furniture", renderId: "mini_room_avatar" })
+  for (const [x, y] of [[0.64, 0.72], [0.64, 0.75], [0.5, 0.64], [0.5, 0.8]] as const) {
+    const order = resolveMiniRoomDepthOrder(neighbours, [{ id: "me", depth: y, foot: { x, y } }])
+    assert.equal(order, `me@${getMyRoomAvatarDepthIndex(neighbours, y, x, y)}`)
+  }
+})
+
 test("one walk clock keeps both axes together at turns, including repeated coordinates", () => {
   const origin = { x: 0.2, y: 0.5 }
   const steps = [

@@ -8,7 +8,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/avatar/avatarLoadoutRules.test.js dist/economy/universalCoreRoomEconomy.test.js dist/chat/chatReceiptCursor.test.js",
+    "test": "npm run build && node --test dist/avatar/avatarLoadoutRules.test.js dist/economy/universalCoreRoomEconomy.test.js dist/chat/chatReceiptCursor.test.js dist/roomWorld/roomFloorNavigation.test.js",
     "typecheck": "tsc --noEmit"
   },
   "author": "Blumi",

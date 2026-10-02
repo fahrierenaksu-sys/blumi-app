@@ -12,4 +12,6 @@ export * from "./avatar/avatarLoadoutRules";
 export * from "./avatar/retiredAvatarItems";
 export * from "./roomWorld/roomWorldGeometry";
 export * from "./roomWorld/miniRoomFloor";
+export * from "./roomWorld/roomFloorGrid";
+export * from "./roomWorld/roomFloorNavigation";
 export * from "./chat/chatReceiptCursor";

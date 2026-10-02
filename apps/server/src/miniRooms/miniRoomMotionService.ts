@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { miniRoomMoveSchema, type MiniRoomAvatarMotion, type MiniRoomMove, type ServerEvent } from "@blumi/contracts"
-import { MINI_ROOM_FLOOR, pointInRoomWorldPolygon, projectRoomWorldPointToPolygon } from "@blumi/domain"
+import { getMiniRoomFloorDistance, isPointOnMiniRoomFloor } from "@blumi/domain"
 import type { MiniRoomRecord } from "./miniRoomRepository"
 
 /**
@@ -40,9 +40,7 @@ interface MotionRoom {
 export const MINI_ROOM_SEAT_FLOOR_TOLERANCE = 0.12
 
 function isSeatTargetNearFloor(point: { x: number; y: number }): boolean {
-  if (pointInRoomWorldPolygon(point, MINI_ROOM_FLOOR)) return true
-  const nearest = projectRoomWorldPointToPolygon(point, MINI_ROOM_FLOOR)
-  return Math.hypot(nearest.x - point.x, nearest.y - point.y) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
+  return getMiniRoomFloorDistance(point) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
 }
 
 /**
@@ -294,10 +292,12 @@ export function createMiniRoomMotionService(options: {
       const parsed = miniRoomMoveSchema.safeParse(input)
       if (!parsed.success) return
       const move = parsed.data
-      // A walk target must be on the shared floor. A seat target may overhang it
+      // A walk target must be on the shared floor: the drawn floor clients walk
+      // (the same measured outline, @blumi/domain) or the legacy polygon older
+      // clients still walk. A seat target may overhang it
       // (the seat sits on furniture), within MINI_ROOM_SEAT_FLOOR_TOLERANCE;
       // receivers resolve the seat from hotspotId.
-      if (move.hotspotId ? !isSeatTargetNearFloor(move) : !pointInRoomWorldPolygon(move, MINI_ROOM_FLOOR)) return
+      if (move.hotspotId ? !isSeatTargetNearFloor(move) : !isPointOnMiniRoomFloor(move)) return
       const entered = rooms.get(move.miniRoomId)?.connections.get(connectionId)
       if (!entered || entered.userId !== userId) return
       const room = await authorize(move.miniRoomId, userId)

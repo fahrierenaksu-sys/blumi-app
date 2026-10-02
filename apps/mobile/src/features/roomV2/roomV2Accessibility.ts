@@ -50,8 +50,19 @@ export function getRoomV2AvatarAccessibilityValue(input: {
  * select in the editor); the avatar is in an interactive room, where a tap
  * runs the wave → dance → walk chain (ROOM-01), and never in the editor.
  */
-export function shouldRoomV2ItemReceiveTap(input: { kind: "avatar" | "furniture"; mode: "edit" | "interact" }): boolean {
-  return input.kind === "furniture" || input.mode === "interact"
+/**
+ * Which room items take a tap. In the editor every piece of furniture does
+ * (select, move). In a lived-in room only the avatar and seats do: a table's
+ * or a plant's box (transparent margins included) must not swallow a tap on
+ * the floor around it, which left the avatar standing still.
+ */
+export function shouldRoomV2ItemReceiveTap(input: {
+  kind: "avatar" | "furniture"
+  mode: "edit" | "interact"
+  interactionType?: string
+}): boolean {
+  if (input.kind === "avatar") return input.mode === "interact"
+  return input.mode === "edit" || input.interactionType === "seat"
 }
 
 export function getRoomV2ItemAccessibility(input: {

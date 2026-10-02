@@ -1,4 +1,4 @@
-import type { GestureResponderEvent, LayoutChangeEvent } from "react-native"
+import type { LayoutChangeEvent } from "react-native"
 import {
   Keyboard,
   Pressable,
@@ -16,6 +16,7 @@ import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { resolveComposerRestore, resolveRoomComposerSubmit } from "../roomComposerModel"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticSoft } from "../../../ui/haptics"
+import { RoomFloorTapLayer } from "../../roomV2/components/RoomFloorTapLayer"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
 import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
@@ -44,7 +45,6 @@ import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
 import { useMiniRoomKeyboardPreference } from "../useMiniRoomKeyboardPreference"
 import type { MiniRoomPoseInput } from "./miniRoomTransitionModel"
 
-const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable)
 interface MiniRoomSceneProps {
   roomMotion?: ReturnType<typeof import("../useMiniRoomMotion").useMiniRoomMotion>
   copy: MiniRoomCopy
@@ -226,20 +226,17 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     }
   }, [consumeInRoomMessage, inRoomMessages, sayPhrase])
 
-  const handleRoomPress = useCallback(
-    (event: GestureResponderEvent): void => {
-      const { locationX, locationY } = event.nativeEvent
-      const target = {
-        x: Math.max(0, Math.min(1, locationX / stageSize.width)),
-        y: Math.max(0, Math.min(1, locationY / stageSize.height))
-      }
+  // The floor point under the finger (RoomFloorTapLayer measures the stage
+  // on the UI thread at the tap, through the camera's zoom and pan).
+  const handleRoomTap = useCallback(
+    (target: { x: number; y: number }): void => {
       // The avatar starts at once; the keyboard (if any) eases down with the
       // scene; the room pans only if the target would leave the safe frame.
       moveLocalAvatar(target)
-      followTo(target.x)
+      followTo(Math.max(0, Math.min(1, target.x)))
       handleCloseKeyboard()
     },
-    [followTo, handleCloseKeyboard, moveLocalAvatar, stageSize.height, stageSize.width]
+    [followTo, handleCloseKeyboard, moveLocalAvatar]
   )
 
   const handleHotspotSelect = useCallback((hotspotId: string): void => {
@@ -311,6 +308,14 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       disabled={connectionStatus !== "connected"}
     />
   )
+  const floorTapLayer = (
+    <RoomFloorTapLayer
+      accessibilityLabel={copy.moveAvatar}
+      accessibilityHint={copy.moveAvatarHint}
+      onTap={handleRoomTap}
+      testID="mini-room-floor"
+    />
+  )
   const avatarLayer = (
     <AvatarLayer
       avatars={store.avatars}
@@ -339,14 +344,12 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       ) : null}
       <View pointerEvents="box-none" style={styles.roomStageFrame}>
         {roomDecorScene?.shell ? (
-          <AnimatedPressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.moveAvatar}
-            accessibilityHint={copy.moveAvatarHint}
+          <Reanimated.View
+            pointerEvents="box-none"
             style={[styles.roomWorldCamera, restCamera, cameraStyle]}
             onLayout={handleStageLayout}
-            onPress={handleRoomPress}
           >
+            {floorTapLayer}
             <StableMiniRoomRoomDecorLayer
               scene={roomDecorScene}
               interaction={store.interaction}
@@ -354,20 +357,18 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             />
             {hotspotLayer}
             {avatarLayer}
-          </AnimatedPressable>
+          </Reanimated.View>
         ) : (
-          <AnimatedPressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.moveAvatar}
-            accessibilityHint={copy.moveAvatarHint}
+          <Reanimated.View
+            pointerEvents="box-none"
             style={[styles.legacyRoomStage, { top: restCamera.top }, cameraStyle]}
             onLayout={handleStageLayout}
-            onPress={handleRoomPress}
           >
+            {floorTapLayer}
             <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
             {hotspotLayer}
             {avatarLayer}
-          </AnimatedPressable>
+          </Reanimated.View>
         )}
       </View>
 

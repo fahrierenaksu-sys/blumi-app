@@ -1,9 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import {
-  getRoomRendererAvatarLoops,
-  shouldRunRoomRendererMarkerPulse
-} from "./roomRendererLoopModel"
+import { getRoomRendererAvatarLoops } from "./roomRendererLoopModel"
 
 const idle = {
   isAvatar: true,
@@ -35,7 +32,4 @@ test("an unfocused room runs no idle loop", () => {
   ]) {
     assert.deepEqual(getRoomRendererAvatarLoops({ ...input, paused: true }), { breathe: false, walk: false, gesture: false })
   }
-  assert.equal(shouldRunRoomRendererMarkerPulse({ reduceMotion: false, paused: false }), true)
-  assert.equal(shouldRunRoomRendererMarkerPulse({ reduceMotion: true, paused: false }), false)
-  assert.equal(shouldRunRoomRendererMarkerPulse({ reduceMotion: false, paused: true }), false)
 })

@@ -9,15 +9,25 @@ import type {
   RoomWorldPoint,
   RoomWorldWalkableArea
 } from "./roomWorldGeometry"
-import { ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON } from "./roomWorldGeometry"
+import {
+  createRoomWorldFloorGeometry,
+  ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON
+} from "./roomWorldGeometry"
 
 export function createRoomWorldGeometryFromRoomV2Scene(
   scene: ResolvedRoomV2Scene
 ): RoomWorldGeometry {
+  // A shell with a measured floor walks the drawn floor itself (the outline,
+  // its lattice and canvas proportions), the same floor the editor places on.
+  const floor = scene.shell?.floorGrid
+    ? createRoomWorldFloorGeometry(scene.shell.floorGrid, scene.shell.canvasSize)
+    : undefined
   return {
-    walkableAreas: scene.shell?.placeableArea
-      ? [createWalkableAreaFromRoomShell(scene.shell)]
-      : [],
+    ...(floor ?? {
+      walkableAreas: scene.shell?.placeableArea
+        ? [createWalkableAreaFromRoomShell(scene.shell)]
+        : []
+    }),
     blockers: scene.renderItems
       .filter(isBlockingFurnitureRenderItem)
       .map((item) => {

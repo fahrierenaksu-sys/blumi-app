@@ -259,16 +259,13 @@ test("runner orbit starts only after the catch so no hidden progress can telepor
 
 test("runner poses settle into a grounded catch reaction then keep the live chase orbit running", () => {
   assert.deepEqual(getOnboardingRunnerPose("chaser", "landing"), {
-    animationState: "settled",
-    showGroundShadow: false
+    animationState: "settled"
   })
   assert.deepEqual(getOnboardingRunnerPose("leader", "population-counting"), {
-    animationState: "running",
-    showGroundShadow: true
+    animationState: "running"
   })
   assert.deepEqual(getOnboardingRunnerPose("chaser", "chasing"), {
-    animationState: "running",
-    showGroundShadow: true
+    animationState: "running"
   })
   assert.equal(
     getOnboardingRunnerPose("leader", "catching").animationState,

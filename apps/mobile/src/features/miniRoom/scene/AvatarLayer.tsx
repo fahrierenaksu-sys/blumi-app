@@ -114,12 +114,17 @@ export function AvatarLayer(props: AvatarLayerProps) {
   // Draw order follows the live depth, but React hears only when an avatar
   // passes another avatar or a piece of furniture (not every frame).
   const [depthOrder, setDepthOrder] = useState(() => resolveMiniRoomDepthOrder(neighbours,
-    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y }))))
+    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y, foot: { x: avatar.x, y: avatar.y } }))))
   useAnimatedReaction(
-    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => ({
-      id,
-      depth: resolveMiniRoomAvatarSortDepth(avatarPositions[id]!.y.value, pinnedDepths[id])
-    }))),
+    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => {
+      const position = avatarPositions[id]!
+      const pinned = pinnedDepths[id]
+      return {
+        id,
+        depth: resolveMiniRoomAvatarSortDepth(position.y.value, pinned),
+        foot: pinned === undefined ? { x: position.x.value, y: position.y.value } : undefined
+      }
+    })),
     (order, previous) => {
       if (order !== previous) scheduleOnRN(setDepthOrder, order)
     },
@@ -202,6 +207,11 @@ function AvatarAnchor(props: {
   stageWidth: SharedValue<number>
   stageHeight: SharedValue<number>
   zIndex: number
+  /**
+   * Only interactive children (speech bubbles) take touches; the rest of the
+   * anchor's box is floor, so a tap beside an avatar walks there.
+   */
+  pointerEvents: "none" | "box-none"
   children: ReactNode
 }) {
   const { avatar, position, stageWidth, stageHeight, zIndex, children } = props
@@ -234,7 +244,7 @@ function AvatarAnchor(props: {
     }
   })
   return (
-    <Reanimated.View style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
+    <Reanimated.View pointerEvents={props.pointerEvents} style={[styles.avatarAnchor, { zIndex }, anchorStyle]}>
       {children}
     </Reanimated.View>
   )
@@ -321,7 +331,8 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   }))
 
   return (
-    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}>
+    <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}
+      pointerEvents="none">
       {showJoinPulse ? (
         <Reanimated.View style={[styles.joinPulse, ringStyle]} pointerEvents="none" />
       ) : null}
@@ -386,7 +397,7 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
   } = props
   return (
     <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight}
-      zIndex={OVERLAY_Z_INDEX}>
+      zIndex={OVERLAY_Z_INDEX} pointerEvents="box-none">
       <RoomSpeechBubbleStack
         bubbles={bubbles}
         placement={bubblePlacement}
@@ -397,7 +408,7 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
       />
       {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
       {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
-      <View style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
+      <View pointerEvents="none" style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
           {isLocal ? localUserLabel : avatar.displayName}
         </Text>

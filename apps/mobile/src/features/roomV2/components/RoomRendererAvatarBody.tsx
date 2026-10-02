@@ -14,7 +14,6 @@ import type { RoomV2AvatarMotionState, RoomV2AvatarRenderLayer } from "../roomV2
 import type { RoomRendererLiveAvatarPosition } from "./RoomRendererLiveAvatarFrame"
 import {
   advanceRoomAvatarStridePhase,
-  getRoomAvatarContactShadow,
   getRoomAvatarPoseTransitionDurationMs,
   getRoomAvatarPoseTransitionKind,
   getRoomAvatarPoseTransitionPose,
@@ -36,8 +35,8 @@ const POSE_STAND = 2
  * The room avatar's body: frames from RoomAvatarRenderer2D plus procedural
  * motion on the UI thread (VIS-02/03). A sit or stand plays a short
  * anticipation → drop/rise → settle instead of a frame swap; walk frames
- * follow the distance the live avatar covers, with a stride bob and a
- * contact shadow that answers it. Reduce Motion keeps the avatar still and
+ * follow the distance the live avatar covers, with a stride bob. No shadow
+ * is drawn under the character (owner decision, 2026-10-02). Reduce Motion keeps the avatar still and
  * crossfades a pose change. Nothing here renders React per frame.
  */
 export function RoomRendererAvatarBody(props: {
@@ -135,16 +134,9 @@ export function RoomRendererAvatarBody(props: {
       ]
     }
   })
-  const shadowStyle = useAnimatedStyle(() => {
-    const shadow = getRoomAvatarContactShadow(strideWalking ? getRoomAvatarStrideBob(strideProgress.value) : 0)
-    return { opacity: shadow.opacity, transform: [{ scale: shadow.scale }] }
-  })
 
   return (
     <View pointerEvents="none" style={styles.root}>
-      {state === "sitting" ? null : (
-        <Reanimated.View pointerEvents="none" style={[styles.contactShadow, shadowStyle]} />
-      )}
       <Reanimated.View style={[styles.body, bodyStyle]}>
         <Reanimated.View style={[styles.fill, props.motionStyle]}>
           <RoomAvatarRenderer2D
@@ -172,14 +164,5 @@ const styles = StyleSheet.create({
   fill: {
     width: "100%",
     height: "100%"
-  },
-  contactShadow: {
-    position: "absolute",
-    left: "32%",
-    width: "36%",
-    top: "86.5%",
-    height: "4.5%",
-    borderRadius: 999,
-    backgroundColor: "rgba(32, 22, 42, 0.16)"
   }
 })

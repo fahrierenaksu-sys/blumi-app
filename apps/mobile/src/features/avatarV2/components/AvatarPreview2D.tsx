@@ -148,14 +148,6 @@ const styles = StyleSheet.create({
     height: 156,
     borderRadius: 98
   },
-  floorShadow: {
-    position: "absolute",
-    bottom: 14,
-    width: 132,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: "rgba(20, 8, 24, 0.36)"
-  },
   avatar: {
     marginBottom: -2
   },
