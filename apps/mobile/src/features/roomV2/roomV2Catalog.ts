@@ -1,6 +1,7 @@
 import { MINI_ROOM_FLOOR } from "@blumi/domain"
 import { roomV2ProductionAssets as roomV2Assets } from "./roomV2ProductionAssets"
 import { ROOM_V2_APPROVED_MY_ROOM_CAMERA } from "./roomV2Camera"
+import { ROOM_V2_BLUMI_WORLD_FLOOR_GRID } from "./roomV2FloorGrid"
 import type {
   FurnitureItem,
   RoomV2AssetRef,
@@ -114,6 +115,7 @@ const BASE_ROOM_V2_SHELL_CATALOG: RoomShell[] = [
       wall: [{ minX: 0.33, maxX: 0.43, minY: 0.2, maxY: 0.46 }]
     },
     walkablePolygon: MINI_ROOM_FLOOR,
+    floorGrid: ROOM_V2_BLUMI_WORLD_FLOOR_GRID,
     placementLanes: [
       {
         id: "room_v2_world_lane_wall",

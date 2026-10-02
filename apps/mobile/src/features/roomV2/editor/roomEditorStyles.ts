@@ -33,6 +33,14 @@ export const ROOM_EDITOR_STAGE_MIN_HEIGHT = 230
 const CONTROL_SURFACE = "rgba(255,255,255,0.72)"
 const SOFT_ROSE = "#F8EAF0"
 
+/** Floor placement tints: the renderer's valid mint and invalid rose, over warm tiles. */
+export const roomEditorFloorColors = {
+  valid: { fill: "rgba(111,255,193,0.34)", edge: "rgba(46,184,128,0.95)" },
+  invalid: { fill: "rgba(255,95,122,0.34)", edge: "rgba(214,48,82,0.95)" },
+  neutral: { fill: "rgba(255,255,255,0.24)", edge: "rgba(255,255,255,0.75)" },
+  gridLine: "rgba(255,255,255,0.6)"
+} as const
+
 export const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -201,6 +209,20 @@ export const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 16
+  },
+  floorOverlay: {
+    ...StyleSheet.absoluteFill,
+    overflow: "hidden"
+  },
+  floorLine: {
+    position: "absolute",
+    height: 1,
+    backgroundColor: roomEditorFloorColors.gridLine
+  },
+  floorShape: {
+    position: "absolute",
+    borderWidth: 2,
+    borderRadius: 4
   },
   dragGhostAnchor: {
     position: "absolute",

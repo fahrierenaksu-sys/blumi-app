@@ -11,7 +11,7 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useRef, useState } from "react"
+import { memo, useCallback, useRef, useState, type ReactNode } from "react"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
@@ -88,6 +88,8 @@ interface RoomRenderer2DProps {
   showDepthWash?: boolean
   /** Moves the matching avatar on the UI thread from shared values. */
   liveAvatarPosition?: RoomRendererLiveAvatarPosition
+  /** Drawn on the floor, under every item (the editor's placement grid). */
+  floorUnderlay?: ReactNode
 }
 
 export function RoomRenderer2D(props: RoomRenderer2DProps) {
@@ -114,7 +116,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     accessibilityValue,
     motionEnabled = true,
     showDepthWash = true,
-    liveAvatarPosition
+    liveAvatarPosition,
+    floorUnderlay
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
@@ -147,13 +150,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     <Root
       testID={testID}
       onLayout={handleLayout}
-      style={[
-        styles.root,
-        {
-          aspectRatio
-        },
-        style
-      ]}
+      style={[styles.root, { aspectRatio }, style]}
     >
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <ExpoImage
@@ -168,6 +165,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
       {showDepthWash ? (
         <View pointerEvents="none" style={styles.floorDepthWash} />
       ) : null}
+      {floorUnderlay}
       {onStagePress ? (
         <Pressable
           accessibilityRole="button"

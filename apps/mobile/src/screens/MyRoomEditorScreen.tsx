@@ -22,6 +22,7 @@ import {
   type MyRoomEditorScreenProps
 } from "../features/roomV2/editor/roomEditorCatalog"
 import { EDIT_ROOM_AVATAR_SPAWN } from "../features/roomV2/editor/roomEditorPlacementModel"
+import { createRoomEditorFloorOverlay } from "../features/roomV2/editor/roomEditorFloorGridModel"
 import {
   getEditRoomWorldStatus,
   getRoomEditorPlacementStateByRenderId
@@ -126,6 +127,15 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   const placementStateByRenderId = useMemo(
     () => getRoomEditorPlacementStateByRenderId(placementPreview),
     [placementPreview]
+  )
+  // Recomputed once per snapped cell (the preview), never per drag frame.
+  const floorOverlay = useMemo(
+    () => createRoomEditorFloorOverlay({
+      shell: scene.shell,
+      preview: placementPreview,
+      stage: stage.roomLayout
+    }),
+    [placementPreview, scene.shell, stage.roomLayout]
   )
   const roomWorldGeometry = useMemo(
     () => createRoomWorldGeometryFromRoomV2Scene(scene),
@@ -293,6 +303,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 copy={copy}
                 frame={stageFrame}
                 stageRef={stage.stageRef}
+                stageAnimatedRef={drag.stageAnimatedRef}
                 selectedInstanceId={selectedInstanceId}
                 onLayout={stage.handleRoomLayout}
                 onPress={gestures.handleFloorTap}
@@ -300,6 +311,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 shell={scene.shell}
                 renderItems={displayRenderItems}
                 placementStateByRenderId={placementStateByRenderId}
+                floorOverlay={floorOverlay}
                 onItemTap={gestures.handleItemTap}
               />
               <RoomEditorStageNotice

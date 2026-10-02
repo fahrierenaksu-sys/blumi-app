@@ -1,11 +1,21 @@
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import {
   createRoomV2FurniturePlacementPreview,
+  isRoomV2FurnitureFootprintOnFloor,
   resolvePlacedFurnitureRenderItem,
   upsertRoomV2RenderItemSorted,
   validateRoomV2FurniturePlacement,
   type resolveRoomV2Scene
 } from "../roomV2Selectors"
+import {
+  getRoomV2FloorGridCellPoint,
+  getRoomV2FloorGridCellsNear,
+  getRoomV2FloorGridProjection,
+  getRoomV2ShellFloorPlacementPolygon,
+  roundRoomV2FloorGridPoint,
+  snapRoomV2FloorGridCell,
+  type RoomV2FloorGridCell
+} from "../roomV2FloorGrid"
 import { getRoomV2PlacedItemPersistenceMetadata } from "../roomV2EditorSave"
 import { getRoomV2FurniturePlacementSurface } from "../roomV2PlacementSurface"
 import { clampRoomV2FloorFootprintToPolygon } from "../roomV2FloorPlacement"
@@ -103,12 +113,22 @@ export function createValidDraftPlacement(input: {
   const rotation = input.rotationOverride ?? getDefaultRoomV2FurnitureRotation(input.item)
   const candidates = getRoomV2DraftPlacementCandidates(input.item, input.scene)
 
+  const usesFloorGrid = isFloorGridPlacement(input.item, input.scene.shell)
   for (const candidate of candidates) {
+    // On a measured floor the default spots snap to the drawn tiles too.
+    const floorCell = usesFloorGrid ? getRoomV2FloorGridCellForPoint(input.scene.shell, candidate) : undefined
+    const point = floorCell && input.scene.shell?.floorGrid
+      ? roundRoomV2FloorGridPoint(getRoomV2FloorGridCellPoint(
+        getRoomV2FloorGridProjection(input.scene.shell.floorGrid),
+        floorCell.column,
+        floorCell.row
+      ))
+      : candidate
     const placedItem: PlacedRoomItem = {
       instanceId,
       itemId: input.itemId,
-      x: candidate.x,
-      y: candidate.y,
+      x: point.x,
+      y: point.y,
       rotation
     }
     const renderItem = resolvePlacedFurnitureRenderItem(placedItem, input.item)
@@ -307,7 +327,7 @@ export function clampRoomV2PlacementPointForItem(
   const surface = getRoomV2FurniturePlacementSurface(item)
   if (surface === "floor") {
     const floorPoint = clampRoomV2PlacementPointToFloor(point, shell)
-    const polygon = shell?.walkablePolygon
+    const polygon = getRoomV2ShellFloorPlacementPolygon(shell)
     if (!polygon?.length) return floorPoint
     return clampRoomV2FloorFootprintToPolygon({
       point: floorPoint,
@@ -352,7 +372,7 @@ export function clampRoomV2PlacementPointToFloor(
   point: { x: number; y: number },
   shell: RoomShell | null | undefined
 ): { x: number; y: number } {
-  const walkablePolygon = shell?.walkablePolygon
+  const walkablePolygon = getRoomV2ShellFloorPlacementPolygon(shell)
   const placeableArea = shell?.placeableArea
   const normalized = {
     x: Math.max(0, Math.min(1, point.x)),
@@ -402,15 +422,88 @@ export function snapRoomV2PlacementValue(value: number): number {
     ROOM_V2_PLACEMENT_SNAP_STEP
 }
 
+/** How far (in half-tile cells) a floor piece may be nudged to keep its footprint on the floor. */
+export const ROOM_V2_FLOOR_GRID_FIT_RINGS = 6
+
+type FurnitureRenderItem = Extract<RoomV2RenderItem, { kind: "furniture" }>
+
+/**
+ * Floor pieces on a shell with a measured floor grid sit on grid cells. The
+ * piece goes to `cell` (the cell under the finger or tap) or, when its
+ * footprint would hang past the drawn floor there, to the nearest cell where
+ * it does not. Blockers are not avoided: overlapping furniture stays where
+ * the user put it and shows red. The candidate is built at exactly the
+ * returned cell, so a preview, a ghost on that cell and the commit agree.
+ */
+export function fitRoomV2FloorGridPlacement(input: {
+  shell: RoomShell | null | undefined
+  cell: RoomV2FloorGridCell
+  createCandidate: (point: { x: number; y: number }) => FurnitureRenderItem | null
+}): { cell: RoomV2FloorGridCell; candidate: FurnitureRenderItem } | null {
+  const grid = input.shell?.floorGrid
+  if (!grid) return null
+  const projection = getRoomV2FloorGridProjection(grid)
+  const polygon = [...grid.outline]
+  let first: { cell: RoomV2FloorGridCell; candidate: FurnitureRenderItem } | null = null
+  for (const cell of getRoomV2FloorGridCellsNear(projection, input.cell, ROOM_V2_FLOOR_GRID_FIT_RINGS)) {
+    const point = roundRoomV2FloorGridPoint(getRoomV2FloorGridCellPoint(projection, cell.column, cell.row))
+    const candidate = input.createCandidate(point)
+    if (!candidate) return null
+    first ??= { cell, candidate }
+    if (isRoomV2FurnitureFootprintOnFloor(candidate, polygon)) return { cell, candidate }
+  }
+  return first
+}
+
+/** The floor-grid cell nearest a stage point, or undefined when the shell has no grid. */
+export function getRoomV2FloorGridCellForPoint(
+  shell: RoomShell | null | undefined,
+  point: { x: number; y: number }
+): RoomV2FloorGridCell | undefined {
+  if (!shell?.floorGrid) return undefined
+  return snapRoomV2FloorGridCell(getRoomV2FloorGridProjection(shell.floorGrid), point.x, point.y)
+}
+
+function isFloorGridPlacement(
+  item: Pick<FurnitureItem, "placementSurface"> | FurnitureRenderItem,
+  shell: RoomShell | null | undefined
+): boolean {
+  return Boolean(shell?.floorGrid) && getRoomV2FurniturePlacementSurface(item) === "floor"
+}
+
+function createRoomV2CandidatePreview(input: {
+  copy: MyRoomEditorCopy
+  scene: ResolvedRoomV2Scene
+  candidate: RoomV2RenderItem
+}): PlacementPreview {
+  const validation = validateRoomV2FurniturePlacement({
+    scene: input.scene,
+    candidate: input.candidate
+  })
+  return createRoomV2PlacementPreviewResult({
+    copy: input.copy,
+    scene: input.scene,
+    candidate: input.candidate,
+    placementIsValid: validation.isValid,
+    placementFeedback: validation.isValid
+      ? undefined
+      : getRoomPlacementFeedback(validation.issueIds[0], input.copy),
+    blockingRenderIds: validation.blockingRenderIds,
+    supportingRenderIds: validation.supportingRenderIds
+  })
+}
+
 /**
  * Stage drag/tap preview for the selected placed item at a normalized stage
  * point. Returns undefined when the selection is not a furniture render item.
+ * On a floor grid, `floorCell` (from a drag) wins over `point`.
  */
 export function createRoomEditorStagePlacementPreview(input: {
   copy: MyRoomEditorCopy
   scene: ResolvedRoomV2Scene
   selectedInstanceId: string
   point: { x: number; y: number }
+  floorCell?: RoomV2FloorGridCell
 }): PlacementPreview | undefined {
   const { copy, scene, selectedInstanceId } = input
   const eventPoint = input.point
@@ -418,6 +511,22 @@ export function createRoomEditorStagePlacementPreview(input: {
     item.renderId === selectedInstanceId
   )
   if (!selectedItem || selectedItem.kind !== "furniture") return undefined
+
+  const floorCell = isFloorGridPlacement(selectedItem, scene.shell)
+    ? input.floorCell ?? getRoomV2FloorGridCellForPoint(scene.shell, eventPoint)
+    : undefined
+  if (floorCell) {
+    const fitted = fitRoomV2FloorGridPlacement({
+      shell: scene.shell,
+      cell: floorCell,
+      createCandidate: (point) => {
+        const candidate = createRoomV2FurniturePlacementPreview({ item: selectedItem, x: point.x, y: point.y })
+        return candidate.kind === "furniture" ? candidate : null
+      }
+    })
+    if (!fitted) return undefined
+    return createRoomV2CandidatePreview({ copy, scene, candidate: fitted.candidate })
+  }
 
   const normalizedPoint = clampRoomV2PlacementPointForItem({
     x: eventPoint.x,
@@ -460,6 +569,7 @@ export function createRoomEditorTrayPlacementPreview(input: {
   rotation: PlacedRoomItem["rotation"]
   pageX: number
   pageY: number
+  floorCell?: RoomV2FloorGridCell
 }): PlacementPreview | undefined {
   const { copy, scene, stageWindowBounds } = input
   if (
@@ -479,6 +589,28 @@ export function createRoomEditorTrayPlacementPreview(input: {
 
   if (!isInsideStage) {
     return undefined
+  }
+
+  const floorCell = isFloorGridPlacement(input.item, scene.shell)
+    ? input.floorCell ?? getRoomV2FloorGridCellForPoint(scene.shell, {
+      x: localX / stageWindowBounds.width,
+      y: localY / stageWindowBounds.height
+    })
+    : undefined
+  if (floorCell) {
+    const fitted = fitRoomV2FloorGridPlacement({
+      shell: scene.shell,
+      cell: floorCell,
+      createCandidate: (point) => resolvePlacedFurnitureRenderItem({
+        instanceId: input.instanceId,
+        itemId: input.item.id,
+        x: point.x,
+        y: point.y,
+        rotation: input.rotation
+      }, input.item)
+    })
+    if (!fitted) return undefined
+    return createRoomV2CandidatePreview({ copy, scene, candidate: fitted.candidate })
   }
 
   const normalizedPoint = clampRoomV2PlacementPointForItem({

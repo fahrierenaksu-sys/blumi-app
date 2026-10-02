@@ -3,10 +3,18 @@ import {
   getRoomV2DepthPerspectiveScale,
   getRoomV2FurnitureMobileRenderScale
 } from "../roomV2RenderSurface"
+import {
+  getRoomV2FloorGridCellPoint,
+  getRoomV2FloorGridProjection,
+  snapRoomV2FloorGridCell,
+  type RoomV2FloorGridProjection
+} from "../roomV2FloorGrid"
+import { getRoomV2FurniturePlacementSurface } from "../roomV2PlacementSurface"
 import type {
   FurnitureItem,
   PlacedRoomItem,
   ResolvedRoomV2Scene,
+  RoomShell,
   RoomV2RenderItem
 } from "../roomV2.types"
 import {
@@ -21,12 +29,24 @@ import {
  * on the UI thread inside the Gesture Handler pans (hit test, finger to stage
  * point, snapped cell); the rest run on JS when the cell changes or the piece
  * is dropped, and reuse the tap placement rules in roomEditorPlacementModel.
+ *
+ * Floor pieces on a shell with a measured floor grid snap to that grid's
+ * cells (half a drawn tile), so the piece lines up with the drawn tiles and
+ * the ghost, the preview and the drop all use one cell. Wall, ceiling and
+ * tabletop pieces keep the plain stage grid.
  */
 
 /** Hold before a drag lifts the piece; moving 10 pt earlier leaves the touch to taps, scroll and edge back. */
 export const ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS = 220
-/** Normalized stage grid a drag snaps to; JS recomputes validity only when the cell changes. */
+/** Normalized stage grid non-floor drags snap to; JS recomputes validity only when the cell changes. */
 export const ROOM_EDITOR_DRAG_CELL_STEP = 0.02
+/**
+ * A tray drag holds the piece's floor contact this far above the fingertip
+ * (pt), so the spot it will land on is never under the finger.
+ */
+export const ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT = 36
+/** The ghost glides into a newly snapped cell instead of teleporting. */
+export const ROOM_EDITOR_DRAG_SNAP_MS = 70
 /** Cell index used while a tray drag is off the stage. */
 export const ROOM_EDITOR_DRAG_OUTSIDE_CELL = -100000
 export const ROOM_EDITOR_DRAG_LIFT_SCALE = 1.06
@@ -48,6 +68,8 @@ export interface RoomEditorDragHitRect {
   bottom: number
   anchorX: number
   anchorY: number
+  /** Floor piece on a floor grid: the drag snaps to grid cells. */
+  usesFloorGrid: boolean
 }
 
 export interface RoomEditorDragPoint {
@@ -73,9 +95,19 @@ function getRenderedSize(item: Pick<RoomV2RenderItem, "kind" | "width" | "height
   return { width: item.width * scale, height: item.height * scale }
 }
 
+/** The floor grid a drag of `item` snaps to on `shell`, or null for the plain stage grid. */
+export function getRoomEditorDragFloorGrid(
+  item: Pick<FurnitureItem, "placementSurface"> | Extract<RoomV2RenderItem, { kind: "furniture" }>,
+  shell: RoomShell | null | undefined
+): RoomV2FloorGridProjection | null {
+  if (!shell?.floorGrid || getRoomV2FurniturePlacementSurface(item) !== "floor") return null
+  return getRoomV2FloorGridProjection(shell.floorGrid)
+}
+
 /** Hit boxes for the draggable furniture, in render order (last is drawn on top), as RoomRenderer2D lays them out. */
 export function createRoomEditorDragHitRects(
-  renderItems: readonly RoomV2RenderItem[]
+  renderItems: readonly RoomV2RenderItem[],
+  shell?: RoomShell | null
 ): RoomEditorDragHitRect[] {
   return renderItems.flatMap((item) => {
     if (item.kind !== "furniture") return []
@@ -89,7 +121,8 @@ export function createRoomEditorDragHitRects(
       right: left + size.width,
       bottom: top + size.height,
       anchorX: item.x,
-      anchorY: item.y
+      anchorY: item.y,
+      usesFloorGrid: getRoomEditorDragFloorGrid(item, shell) !== null
     }]
   })
 }
@@ -126,28 +159,56 @@ export function getRoomEditorStageDragPoint(input: {
   }
 }
 
-/** A tray drag's window point on the measured stage; off the stage is `inside: false`. */
+/**
+ * A tray drag's point on the measured stage: the held piece's floor contact,
+ * `lift` pt above the fingertip. Off the stage is `inside: false`.
+ */
 export function getRoomEditorTrayDragPoint(input: {
   absoluteX: number
   absoluteY: number
+  lift: number
   bounds: StageWindowBounds | undefined
 }): RoomEditorDragPoint {
   "worklet"
   const bounds = input.bounds
   if (!bounds || bounds.width <= 0 || bounds.height <= 0) return { x: 0, y: 0, inside: false }
   const x = (input.absoluteX - bounds.x) / bounds.width
-  const y = (input.absoluteY - bounds.y) / bounds.height
+  const y = (input.absoluteY - input.lift - bounds.y) / bounds.height
   return { x, y, inside: x >= 0 && x <= 1 && y >= 0 && y <= 1 }
 }
 
-export function getRoomEditorDragCell(point: RoomEditorDragPoint): RoomEditorDragCell {
+/** The cell under a drag point: a floor-grid cell, or a plain stage cell when `floor` is null. */
+export function getRoomEditorDragCell(
+  point: RoomEditorDragPoint,
+  floor: RoomV2FloorGridProjection | null
+): RoomEditorDragCell {
   "worklet"
   if (!point.inside) {
     return { column: ROOM_EDITOR_DRAG_OUTSIDE_CELL, row: ROOM_EDITOR_DRAG_OUTSIDE_CELL }
   }
+  if (floor) return snapRoomV2FloorGridCell(floor, point.x, point.y)
   return {
     column: Math.round(point.x / ROOM_EDITOR_DRAG_CELL_STEP),
     row: Math.round(point.y / ROOM_EDITOR_DRAG_CELL_STEP)
+  }
+}
+
+/**
+ * Where a floor-grid drag shows the piece: its cell's centre in window
+ * coordinates on the stage rectangle. Plain-grid and off-stage drags follow
+ * the finger instead.
+ */
+export function getRoomEditorDragCellWindowPoint(input: {
+  floor: RoomV2FloorGridProjection
+  column: number
+  row: number
+  stage: StageWindowBounds
+}): { x: number; y: number } {
+  "worklet"
+  const point = getRoomV2FloorGridCellPoint(input.floor, input.column, input.row)
+  return {
+    x: input.stage.x + point.x * input.stage.width,
+    y: input.stage.y + point.y * input.stage.height
   }
 }
 
@@ -170,11 +231,22 @@ function isOutsideCell(column: number, row: number): boolean {
   return column === ROOM_EDITOR_DRAG_OUTSIDE_CELL || row === ROOM_EDITOR_DRAG_OUTSIDE_CELL
 }
 
+/** Stage point of a drag cell (floor-grid cell centre, or plain stage cell). */
+export function getRoomEditorDragCellStagePoint(
+  floor: RoomV2FloorGridProjection | null,
+  column: number,
+  row: number
+): { x: number; y: number } {
+  if (floor) return getRoomV2FloorGridCellPoint(floor, column, row)
+  return { x: getRoomEditorDragCellValue(column), y: getRoomEditorDragCellValue(row) }
+}
+
 /** Preview for moving a placed piece to a cell, with the tap placement rules. */
 export function createRoomEditorStageDragPreview(input: {
   copy: MyRoomEditorCopy
   scene: ResolvedRoomV2Scene
   renderId: string
+  floor: RoomV2FloorGridProjection | null
   column: number
   row: number
 }): PlacementPreview | undefined {
@@ -183,10 +255,8 @@ export function createRoomEditorStageDragPreview(input: {
     copy: input.copy,
     scene: input.scene,
     selectedInstanceId: input.renderId,
-    point: {
-      x: getRoomEditorDragCellValue(input.column),
-      y: getRoomEditorDragCellValue(input.row)
-    }
+    point: getRoomEditorDragCellStagePoint(input.floor, input.column, input.row),
+    floorCell: input.floor ? { column: input.column, row: input.row } : undefined
   })
 }
 
@@ -198,11 +268,13 @@ export function createRoomEditorTrayDragPreview(input: {
   item: FurnitureItem
   instanceId: string
   rotation: PlacedRoomItem["rotation"]
+  floor: RoomV2FloorGridProjection | null
   column: number
   row: number
 }): PlacementPreview | undefined {
   const bounds = input.stageWindowBounds
   if (!bounds || isOutsideCell(input.column, input.row)) return undefined
+  const point = getRoomEditorDragCellStagePoint(input.floor, input.column, input.row)
   return createRoomEditorTrayPlacementPreview({
     copy: input.copy,
     scene: input.scene,
@@ -210,8 +282,10 @@ export function createRoomEditorTrayDragPreview(input: {
     item: input.item,
     instanceId: input.instanceId,
     rotation: input.rotation,
-    pageX: bounds.x + getRoomEditorDragCellValue(input.column) * bounds.width,
-    pageY: bounds.y + getRoomEditorDragCellValue(input.row) * bounds.height
+    // The page point only has to land on the stage; a floor cell decides the spot.
+    pageX: bounds.x + Math.max(0, Math.min(1, point.x)) * bounds.width,
+    pageY: bounds.y + Math.max(0, Math.min(1, point.y)) * bounds.height,
+    floorCell: input.floor ? { column: input.column, row: input.row } : undefined
   })
 }
 
