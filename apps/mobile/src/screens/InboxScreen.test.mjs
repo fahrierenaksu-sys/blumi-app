@@ -44,8 +44,13 @@ function hooks() {
 function cardHarness() {
   const hook = hooks()
   const haptics = []
+  let timers = []
+  let nextTimer = 1
   const context = {
     ...hook, React, memo: (render, equal) => ({ render, equal }), useEffect: () => {},
+    INBOX_ROW_WARM_DELAY_MS: 140,
+    setTimeout: (run, delay) => { const id = nextTimer++; timers.push({ id, run, delay }); return id },
+    clearTimeout: (id) => { timers = timers.filter((timer) => timer.id !== id) },
     // The press feel itself is PressableScale's (tested in ui/PressableScale.test.ts).
     PressableScale: "PressableScale", UnreadGlow: "UnreadGlow", View: "View", Text: "Text", LinearGradient: "Gradient",
     ParticipantAvatar: "Avatar", Ionicons: "Icon", cardStyles: {}, hapticMedium: () => haptics.push("medium"),
@@ -53,7 +58,17 @@ function cardHarness() {
     areChatParticipantAvatarsEquivalent: (a, b) => a === b
   }
   const card = evaluate(initializer("ConversationCard"), context)
-  return { ...card, haptics, render(props) { hook.reset(); return card.render(props).props } }
+  return {
+    ...card,
+    haptics,
+    render(props) { hook.reset(); return card.render(props).props },
+    /** Time passes: timers due within `ms` run. */
+    elapse(ms) {
+      const due = timers.filter((timer) => timer.delay <= ms)
+      timers = timers.filter((timer) => timer.delay > ms)
+      for (const timer of due) timer.run()
+    }
+  }
 }
 function props(overrides = {}) {
   return {
@@ -100,24 +115,41 @@ test("memo and bound press handlers observe changed callbacks and thread identit
   const stable = card.render({ ...first, lastBody: "Updated" })
   assert.equal(a.onPress, stable.onPress)
   assert.equal(a.onPressIn, stable.onPressIn)
-  a.onPress(); a.onPressIn()
+  a.onPress(); a.onPressIn(); card.elapse(1000)
   const next = { ...first, onPress: (id) => calls.push(`new-press:${id}`), onWarm: (id) => calls.push(`new-warm:${id}`) }
   assert.equal(card.equal(first, next), false)
   assert.equal(card.equal(first, { ...first, onPress: next.onPress }), false)
   assert.equal(card.equal(first, { ...first, onWarm: next.onWarm }), false)
   assert.equal(card.equal(first, { ...first, threadId: "thread-b" }), false)
   const b = card.render({ ...next, threadId: "thread-b" })
-  b.onPress(); b.onPressIn()
+  b.onPress(); b.onPressIn(); card.elapse(1000)
   assert.deepEqual(calls, ["old-press:thread-a", "old-warm:thread-a", "new-press:thread-b", "new-warm:thread-b"])
 })
 
-test("touching a row warms its thread once, whatever the motion preference", () => {
+test("a touch that stays on a row warms its thread once", () => {
   const card = cardHarness()
   const calls = []
   const handlers = card.render(props({ onWarm: (id) => calls.push(id) }))
   handlers.onPressIn()
+  assert.deepEqual(calls, [], "not on the first contact")
+  card.elapse(140)
   assert.deepEqual(calls, ["thread-a"])
-  assert.equal(handlers.onPressOut, undefined, "release does no work of its own")
+  handlers.onPressOut()
+  card.elapse(1000)
+  assert.deepEqual(calls, ["thread-a"], "once")
+})
+
+test("a touch that turns into a main-page swipe never warms a thread", () => {
+  // Tab swipe jank (2026-10-03): a swipe that started on a row fetched that
+  // row's thread in the middle of the swipe. The pager's pan releases the
+  // row (press out) as soon as it takes the finger.
+  const card = cardHarness()
+  const calls = []
+  const handlers = card.render(props({ onWarm: (id) => calls.push(id) }))
+  handlers.onPressIn()
+  handlers.onPressOut()
+  card.elapse(1000)
+  assert.deepEqual(calls, [])
 })
 
 test("shared warm callback follows current session mode and provider", () => {
