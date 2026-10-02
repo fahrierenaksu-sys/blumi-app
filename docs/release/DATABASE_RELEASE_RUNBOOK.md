@@ -121,6 +121,11 @@ above. A separate staging Supabase project is recommended and still open
    on any checksum, integrity, grant or `/ready` failure; restore to a **new**
    database or use a reviewed forward repair rather than assuming SQL rollback
    is safe.
+3. After a migration is applied to the release target, append the file and
+   its SHA-256 to `apps/server/db/migrations.applied.json`. The migration
+   ledger test (`apps/server/src/db/migrationLedger.test.ts`) then fails if
+   that file ever changes, and holds every file not yet listed to the
+   additive, RLS-and-revoke policy.
 
 Until staging exists, rehearse each migration on the fresh dump instead: run
 `node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`
