@@ -17,6 +17,10 @@ module.exports = defineConfig([
       'react-hooks/preserve-manual-memoization': 'off',
       'react-hooks/immutability': 'off',
       'react-hooks/purity': 'off',
+      // Style-only rules: a missing display name is a debugging preference, and
+      // unescaped-entities is a web-HTML rule that misfires on Turkish apostrophes in <Text>.
+      'react/display-name': 'off',
+      'react/no-unescaped-entities': 'off',
     },
   },
 ]);
