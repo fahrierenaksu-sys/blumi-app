@@ -198,7 +198,7 @@ export function HomeStudioScreen({ navigation, sessionActor }: HomeStudioScreenP
         <Text style={styles.blockedBody}>
           Enable the isolated Home Studio QA flag in a development or native-ui-test build.
         </Text>
-        <Pressable style={styles.backButton} onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}>
+        <Pressable accessibilityLabel="Back" accessibilityRole="button" style={styles.backButton} onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
       </SafeAreaView>
@@ -218,7 +218,7 @@ export function HomeStudioScreen({ navigation, sessionActor }: HomeStudioScreenP
     <SafeAreaView contentGutter={false} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable accessibilityLabel="Geri" onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))} style={styles.iconButton}>
+          <Pressable accessibilityLabel="Geri" accessibilityRole="button" onPress={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))} style={styles.iconButton}>
             <Text style={styles.iconText}>‹</Text>
           </Pressable>
           <View style={styles.headerCopy}>

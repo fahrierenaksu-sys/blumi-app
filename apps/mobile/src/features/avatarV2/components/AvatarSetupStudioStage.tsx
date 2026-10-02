@@ -283,6 +283,7 @@ function GenderButton({
 }) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ disabled, selected: active }}
       disabled={disabled}
@@ -345,6 +346,7 @@ function OrbitPod({
       />
       <Pressable
         accessibilityHint={copy.chooseCategoryHint(category.label)}
+        accessibilityLabel={category.label}
         accessibilityRole="tab"
         accessibilityState={{ disabled, selected: active }}
         disabled={disabled}
