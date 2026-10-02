@@ -1,187 +1,106 @@
-# Blumi Project Instructions
+# Blumi
 
-This file is the repository-wide operating contract for AI coding agents (Claude Code, Codex, or any other). `CLAUDE.md` imports it. Follow the current user request first, then this file, then any narrower `AGENTS.md` closer to the files being changed.
+## How to work
+
+The owner trusts your judgement and wants your best work, not cautious work. Act as the lead engineer and product designer: find and build the best current architecture, technology, design and workflow for the owner's goals, including root-level rewrites when they are worth it. Choose your own process, tools, tests and subagents.
+
+The avatar and home (room) system is explicitly open. Its renderer, rig, animation, room model, interaction design and tooling may be redesigned or replaced (Skia, Spine, Rive, 3D, a new runtime, or something better) if the result is better. Prototype on a branch or behind a flag and bring bold proposals with trade-offs, costs and a migration path; ideas and builds need no permission. The owner is needed only at ship time: for a visible change to the characters' drawn look, and for new receipts when a published item's runtime files change.
+
+Only the **Strict** sections are hard limits. Everything else here is information you could not find on your own.
 
 ## Product
 
-Blumi is a React Native and Expo social application with a premium, soft 2.5D chibi avatar and room experience. Use **Blumi** publicly; keep DateVibe names only where technical compatibility requires them.
+Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars and their rooms.
 
-The approved social loop is:
+- Loop: mutual match → text chat → optional room invitation sent from the chat → shared room (MiniRoom) with durable text chat.
+- The first release is text-only. Voice is off in code (the server refuses `BLUMI_VOICE_ENABLED=1`; `useMiniRoomMedia` returns `voiceAvailable: false`), and the deployed environment sets `BLUMI_PAYMENTS_ENABLED=0`.
+- `apps/mobile/app.config.js` refuses to build if camera, audio, WebRTC or LiveKit packages are installed (`scripts/mobile-no-media.cjs`). Profile photos, photo sharing, GIFs, video, calls and voice messages are out of scope unless the owner changes that.
+- The owner approved the characters' drawn look (face, proportions, outline, palette). How they are rendered, rigged, animated and placed in rooms is yours to improve.
 
-`mutual match -> text chat -> optional chat-initiated room invitation -> shared room`
+## Strict: never lose work
 
-Shared-room text is durable. Live voice is optional and starts muted/off. Profile photos, photo sharing, GIFs, video, camera flows, video calls, and voice messages are outside scope unless the user explicitly changes it. The room and avatar must feel native to the mobile application, not like a separate fullscreen game.
+- Never delete, rewrite or force-push commits that exist anywhere but your own unpushed branch. That means no `push --force`, no amend or rebase of pushed commits, and no deleting other people's branches. Fix mistakes with new commits.
+- Never discard work you did not create. Run `git status` first, because the tree may hold the owner's or another agent's changes. No `git reset --hard`, `git clean`, `git checkout -- .`, `git restore .` or `git stash drop` over them.
+- Stage an explicit file list, never `git add .` or `-A` (`.claude/worktrees/` is ignored only by a local exclude). Read `git diff --cached` before you commit.
+- Resolve merge conflicts hunk by hunk, with a three-way view.
+  - Never take a whole file from one side (`--ours`, `--theirs`, `git checkout <branch> -- <file>`).
+  - Never let a merge or a "restore" delete files the other side added. Check who added them with `git log --diff-filter=A -- <path>`.
+  - Afterwards, diff the result against both parents and run typecheck plus the affected tests before you commit the merge.
+- Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on a freshly fetched `origin/develop` and confirm it (`git merge-base --is-ancestor origin/develop HEAD`). Worktrees have silently started from `main` before.
+- Commit finished work early and often to a work branch. Save results before you start or relaunch long background jobs, because the cloud container restarts and kills them. Local commits, pushes of your own work branch, and merging into and pushing `develop` (never with force) need no approval.
 
-## Decision order
+## Strict: production, money and data
 
-When requirements compete:
+Get an explicit yes from the owner in the current conversation before any of these:
 
-1. Follow the user's latest explicit instruction.
-2. Preserve the recognizable Blumi chibi identity and approved product behavior.
-3. Preserve user inventory, purchases, rooms, loadouts, persisted data, and stable IDs.
-4. Keep ownership, economy, and persistence server-authoritative.
-5. Prefer a small verified change and reversible migration over a broad rewrite.
-6. Protect native quality, accessibility, performance, security, and privacy.
+- pushing or merging to `main` (the release branch; CI and Railway build from it, and TestFlight builds from it when started by hand);
+- a Railway deploy, redeploy or variable change, an EAS build or submit, a TestFlight upload, an OTA publish or an App Store submission;
+- `npm run db:migrate` or any SQL write or DDL against a real database (`.env.local` can point at production);
+- buying anything (plans, or licences such as Spine Pro) or changing third-party account state;
+- shipping a visible change to the characters' drawn look. Show visuals first.
 
-Never redesign the character, change the product loop, or add a new runtime merely because it is easier to implement.
+These rules protect the data:
 
-## Repository truth
+- One live backend and one database exist: Railway environment `production` (service `blumi-app`, test traffic, `NODE_ENV=production`, `BLUMI_DEPLOY_ENV=staging`) on Supabase Free (PostgreSQL 17, no PITR, no staging database).
+  - Live Railway variables are set in the dashboard. `.railway/railway.ts` (service `blumi-api`, staging and production) is not applied and does not match the live service, so never apply it without reconciling first.
+  - The server refuses to start under `NODE_ENV=production` unless `BLUMI_TRUST_PROXY` is set (`100.64.0.0/10` on Railway).
+  - Simulator and QA sessions hit this database. Run locally with `BLUMI_AUTH_REPOSITORY=memory`. Against the live database use the owner's existing test accounts, and never seed, bulk-create or delete data there.
+- Before a schema change on it, take a PostgreSQL 17 dump and prove it restores. Migrations are additive and backward compatible. Migrate first, then deploy, unless the migration is listed in `OPTIONAL_READINESS_MIGRATIONS`. The procedure is in `docs/release/DATABASE_RELEASE_RUNBOOK.md`.
+- Applied migrations in `apps/server/db/migrations` are immutable because their checksums gate `/ready`. Never edit, rename or renumber them. Two files share prefix `032` and there is no `044`. A new migration takes the number after the highest existing file (`071` next). Never fill the `044` gap or reuse a prefix.
+- Preserve user data and stable IDs.
+  - Each cosmetic or furniture item keeps one canonical ID through Shop → Purchase → Inventory → Wardrobe → Avatar → Room → MiniRoom → remote participant.
+  - Never rename, reuse or fork an ID or entitlement when art or runtime changes. Hide an item with `RETIRED_AVATAR_ITEM_IDS` instead of deleting it.
+  - A new avatar or room system must migrate existing inventories, rooms and loadouts without loss.
 
-Inspect the active checkout before planning or editing. Current code, installed packages, native configuration, tests, runtime behavior, and the user's latest decisions outrank folder names, old reports, screenshots, memory, or remote history.
+## Strict: security and privacy
 
-- `apps/mobile`: Expo and React Native client. Features live in `apps/mobile/src/features/`.
-- `apps/server`: backend services.
-- `packages/contracts`: shared boundary contracts.
-- `packages/domain`: shared domain rules.
-- `packages/realtime-client`: realtime client behavior.
-- `docs/`: `release/` (release workflow, launch control, App Store gate, database runbook), `quality/` (engineering audits), `avatar-motion-pipeline/` (avatar fit data). Check a document's date against current code before trusting it.
+- The server alone decides coins, purchases, inventory, ownership, loadouts, room state and access. Client, cache, realtime or visual state never proves ownership.
+- Secrets live only in environment variables. Never print secret values, read them into output, or commit them, `.env*` files or credentials.
+- Keep phone numbers, tokens, message bodies and user or room IDs out of logs, analytics, crash reports, notifications, error responses, docs, commits, test fixtures, snapshots and chat replies. Use counts or redacted values.
+- Admin and operator tools use an identity separate from app accounts, least privilege, short-lived access and an audit log, and start read-only.
+- Never claim an approval the owner did not give. Paid shop items become publishable only through owner-approved receipts in `packages/domain/src/release/blumiR1ReleaseCatalog.json`. Never add or reissue a receipt without the owner.
 
-Avatar and room features:
+## Strict: conventions
 
-- `avatarV2`: current production avatar runtime.
-- `roomWorld`: walkable geometry, interaction model, MiniRoom projection.
-- `roomV2`: My Room UI.
-- `roomStudio`: room asset manifest and QA studio.
-- `miniRoom`: in-room chat and voice lifecycle.
+- Use conventional commits (`<type>: <description>`), one purpose per commit, ending with the attribution footer your harness supplies.
+- `apps/mobile/package.json` scripts are part of the native fingerprint (`runtimeVersion.policy: fingerprint`), so editing one blocks OTA updates until a new native build exists. Put a new mobile test in an existing `apps/mobile/scripts/run-*.mjs` runner (its group need not match; add the file to the runner's tsc list where it has one). Change the scripts, including the inline test groups, only together with a planned native build.
+- Never delete, skip or weaken a test, or grow a ratchet allowlist, just to get a green gate. If an exception is really justified, change the allowlist in the same commit and give the reason.
+  - Source-text contract tests (regexes over source files) pin today's implementation, not requirements. When you replace that code, replace those tests in the same commit with tests that keep their intent (UI-thread frames, a non-moving Reduce Motion path, no React render per frame). That is not weakening a test.
+- The owner is non-technical and writes in Turkish. Reply in Turkish, in plain words. When the owner has to run something, give one command, wait for its output, then give the next. Never combine a check with a write that depends on its result.
+- Report status honestly with these labels: Implemented, Tested, Native verified, User approved, Production ready, Open. The release ledger also uses External verified, Blocked and Waiting on user. Passing tests are not native verification, and a push is not a release.
 
-Do not infer the Expo SDK from this checkout's directory name (`blumi-sdk54`). Read `apps/mobile/package.json`. For Expo, React Native, React, Reanimated, Worklets, or another fast-moving dependency, verify the installed version and consult matching official documentation.
+## Facts you cannot infer
 
-Before editing, read the relevant implementation and tests, inspect `git status`, locate the real runtime resolver and persistence boundary, and preserve unrelated dirty or untracked work.
+Branches and release:
 
-## Current status
+- `develop` is the integration branch that every agent merges into, and `main` is the release branch.
+  - CI (`verify.yml`) runs on pushes to `main` and on PRs.
+  - Railway builds the API from `main` but has not reliably auto-deployed, so check which commit is actually live.
+  - TestFlight (`apps/mobile/.eas/workflows/testflight.yml`) starts by hand only.
+- Codex works on the owner's Mac (`codex/*` branches; it has the iOS Simulator and the art Workbench). Claude works in a Linux cloud container (`claude/*` and `worktree-*` branches) with no Simulator. Native visual checks happen on the Mac or the owner's phone. Until then, report them as Open.
+- Develop OTA updates are paused. The iOS bundle has about 1,220 assets, mostly avatar room motion PNGs, and EAS Update accepts at most 1,000. A new native module (for example Skia) needs a new TestFlight build. See `docs/release/OTA_AND_TESTFLIGHT.md`.
+- Status and backlog: `docs/release/LAUNCH_CONTROL.md` is the release ledger, and the operations-center gate parses its table, so keep the column layout. `docs/quality/SESSION_INVENTORY_2026-10-01.md` is the newest full backlog. Dated docs are snapshots, and current code wins.
 
-A snapshot, not a promise. Re-verify against the code before relying on it, and update it when a status changes.
+Avatar and room (current state, not a mandate):
 
-- **Implemented:** Avatar V2 layered-PNG runtime with existing motion contracts, RoomWorld geometry and interaction model, My Room and MiniRoom surfaces. Stack: Expo SDK 57, React Native 0.86, React 19, Reanimated 4, Worklets.
-- **Planned, not present:** Avatar V3 (no code yet; `docs/avatar-motion-pipeline/` holds fit data only), Spine runtime, React Native Skia (neither is a dependency). Do not describe them as implemented or import them without the gates in this file.
-- **Retired:** the legacy public lobby is retired server-side (deny-all realtime presence policy) and in mobile production sessions, which never send `room.join` and ignore lobby events (`docs/quality/ENGINEERING_AUDIT_2026-09-30.md` F-08). It is live only after an authorised deploy.
-- **Promoted:** the candidate onboarding/profile imports were promoted to `*-runtime` paths with bytes unchanged (F-09); the app has 0 candidate-path imports. The release candidate-import gate stays in place.
-- **Open:** native, physical-device, and performance evidence for the current build.
-- **Evidence log:** `docs/quality/ENGINEERING_AUDIT_2026-09-30.md` is the current evidence log; check it before relying on older reports.
+- The production avatar is `avatarV2`: layered PNGs with the fit baked in, drawn on every surface by one renderer, `RoomAvatarRenderer2D`. Room code lives in `roomWorld`, `roomV2`, `roomStudio` and `miniRoom`. `lobby` is the retired public lobby.
+- No Skia, Spine, GL or 3D dependency is installed, and nothing forbids one. Adding a dependency, native or not, is your call. Only the EAS/TestFlight build that ships a native one, or a paid licence, needs the owner's yes.
+- Prior research is input, not a decision. `git show 1627800:docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md` measured why room motion feels artificial (commit `d34afe1` deleted it from `develop`). Its backlog items are VIS-01..13 in the session inventory.
+- Art sources, masters and QA renders live outside the repo in the Workbench, `/Users/evrenevren/BlumiArtWorkbench/`, on the owner's Mac. The cloud container has only a stub.
+  - EAS and the cloud have no Workbench, so an app import from it breaks the build. Only runtime files the app actually uses go into the repo.
+  - Tests that need Workbench fixtures run with `BLUMI_WORKBENCH_ROOT=… npm --workspace @blumi/mobile run test:workbench`.
+- Preview and production builds fail on any import from a `*candidate/` path (`scripts/mobile-release-assets.cjs`), and quarantined item IDs are filtered out of the room catalog. Published shop items are hash-locked: `shopReleaseCatalog.test.ts` fails if their runtime bytes or `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md` change.
 
-## Product and architecture invariants
+Engineering guards that fail tests are listed in `docs/quality/ENGINEERING_RULES.md`. Read it before a large mobile change so a ratchet doesn't surprise you.
 
-The backend is authoritative for inventory, purchases, coins, cosmetic and furniture ownership, persisted avatar loadout, persisted room state, and access decisions. Never treat UI, cache, realtime presence, or visual state as proof of ownership. Validate external input, keep secrets out of code, and avoid private content in logs, analytics, errors, snapshots, and notifications.
+## Commands
 
-One semantic cosmetic ID must flow through:
+Scripts are in the root and workspace `package.json` files, and `npm run verify` is the full release gate. The PostgreSQL gate (`verify:postgres`) builds a throwaway cluster, never uses `DATABASE_URL`, and refuses to run `initdb` as root.
 
-`Shop -> Purchase -> Inventory -> Wardrobe -> Avatar -> Room -> MiniRoom -> Remote Participant`
+## Skills
 
-Use compatibility adapters during migration; do not create permanent parallel identities for the same item.
+Project skills go in `.agents/skills/<name>/SKILL.md`, which Codex reads. Claude Code discovers only `.claude/skills/<name>/`, so expose each skill there too, with a symlink or a copy. Keep every skill under 150 lines and add one only for a repeated, project-specific workflow.
 
-The current production avatar uses layered PNG assets and existing motion contracts. Maintain it for live fixes without expanding frame-by-frame PNG animation as the long-term architecture. Avatar V3 is an additive premium 2.5D skeletal direction based on Spine Professional, reusable animation, canonical views, explicit mirror safety, and weighted clothing deformation where it adds visible value. Preserve the existing chibi design and canonical IDs.
+## Keeping this file useful
 
-Do not introduce Rive, Unity, Unreal, Cocos, Defold, Filament, or another primary runtime without an explicit user decision supported by a verified blocker and migration evidence. Do not remove V2 until the replacement passes native, compatibility, persistence, migration, and performance gates.
-
-Evolve RoomWorld concepts such as walkable geometry, footprints, blockers, seating, approach and exit points, sockets, depth, and persistence. Prefer data-driven interaction rigs over furniture-ID conditionals. Add React Native Skia only in measured, incremental slices. Do not drive animation through React state or the JS/native bridge every frame. Preserve Reduce Motion.
-
-## Character and cosmetic production
-
-The original sweet chibi identity is locked. Every hair, garment, hand treatment, and shoe must be designed for the current canonical base so the character reads as one drawing. A code test cannot approve visual quality.
-
-For any character, hair, wardrobe, cosmetic-fit, animation, or rig task, follow the repository skill at `.agents/skills/blumi-character-asset-production/SKILL.md`. If the runtime does not load it automatically, read it directly. It covers the external Workbench, frozen production briefs, source locks, anatomy and fit gates, native evidence, promotion, and stop conditions. Use the current active model unless the user explicitly requests delegation; do not make a named model a standing blocker.
-
-The non-negotiable storage boundary:
-
-- Production sources, prompts, editable masters, experiments, rejected candidates, QA renders, temporary scripts, and provenance stay under `/Users/evrenevren/BlumiArtWorkbench/`.
-- This repository receives only user-approved optimized runtime assets, required production wiring, runtime metadata actually consumed by the app, and meaningful integration tests.
-- Deleting `BlumiArtWorkbench` must never break an application build or Store release.
-
-Candidate and quarantine assets must not resolve in production. Preserve product IDs and entitlements when artwork changes.
-
-## Implementation workflow
-
-Work autonomously through the requested scope. Ask only when an unresolved choice would materially change product behavior, migrate or destroy data, incur meaningful cost, contradict a locked requirement, or create a difficult-to-reverse architecture decision.
-
-Be solution-oriented. Once the root cause is known, turn evidence into a concrete fix, carry it through its relevant checks, and present a reviewable result. When the first approach fails, identify why and choose a materially better method instead of polishing the same failure.
-
-Compare viable methods by expected visual or product gain, implementation cost, reversibility, runtime risk, and proof quality, and prefer the simplest that meets every acceptance gate. Prototype uncertain ideas in a bounded, disposable form, keep experiments out of production paths, and promote only the proven result.
-
-For code changes:
-
-1. Find the root cause and smallest coherent boundary.
-2. Add a failing regression test first when executable behavior changes and a meaningful test is feasible.
-3. Implement the narrow fix without rewriting unrelated code.
-4. Run focused tests plus relevant TypeScript and lint checks.
-5. Inspect the final diff and verify the real runtime surface when visuals or interaction changed.
-6. Report the change, evidence, and open gates precisely.
-
-Keep momentum proportional to uncertainty: investigate broadly only until the decision is clear, then execute narrowly. Reuse verified measurements, manifests, utilities, and prior lessons. Do not repeat searches, generations, full test suites, or approval questions without new evidence or a changed condition.
-
-**Engineering rules are binding:** read `docs/quality/ENGINEERING_RULES.md` before adding or changing code. It defines where new code goes (screen → feature hooks, views and pure models), the network, realtime, server, database, performance, motion and privacy rules, and the known debt not to copy. `apps/mobile/scripts/mobile-engineering-rules.test.mjs` ratchets the measurable ones (no raw `fetch`, no new JS frame loops, shared Reduce Motion source, file-size caps, `exhaustive-deps` suppression count); its allowlists may only shrink unless a commit justifies the exception.
-
-Prefer immutable state/domain updates, explicit errors, validated boundaries, stable IDs, and existing project patterns. Do not manufacture tests for trivial constants or raster pixels. The 80% coverage target applies to changed executable logic where coverage is meaningful.
-
-### Commands
-
-- `npm run typecheck`, `npm run lint`, `npm test`: focused checks.
-- `npm run verify`: full release gate (source hygiene, operations center, workbench tools, audit policy, release infrastructure, package build, typecheck, lint, tests, PostgreSQL gate, release audit, Expo Doctor).
-- `npm run doctor`: Expo dependency health check.
-- `npm run dev:mobile` / `npm run dev:server`: start Metro or the backend. `npm run server:qa` starts the backend with QA env files.
-- `npm run db:migrate`: data-affecting; confirm the target first.
-- `npm run audit:release`, `npm run verify:source-hygiene`, `npm run verify:release-infra`, `npm run verify:postgres`, `npm run verify:operations-center`, `npm run verify:workbench-tools`: individual gates. `npm run verify` includes `verify:workbench-tools`.
-- The PostgreSQL gate (`npm run verify:postgres`) needs PostgreSQL binaries and refuses to run `initdb` as root.
-- `npm run clean-clone:verify`: `npm ci` then `npm run verify`; slow, final gate only.
-
-### Repository notes
-
-- Migrations in `apps/server/db/migrations` are checksummed and applied: two files share prefix 032 and 044 is missing. Never rename or renumber them.
-- Railway staging requires `BLUMI_TRUST_PROXY=100.64.0.0/10` (set in `.railway/railway.ts`).
-- Cleanup of archived production sources follows `docs/quality/CLEANUP_MANIFEST_2026-09-29.md` and, for the retired room QA art, `docs/quality/CLEANUP_MANIFEST_2026-09-30.md` (pass `--manifest`): archive on the owner's Mac first, then run `tools/workbench/remove-archived-from-manifest.mjs`.
-- Avatar tests whose fixtures live only in the Workbench run with `BLUMI_WORKBENCH_ROOT=… npm --workspace @blumi/mobile run test:workbench` (`docs/quality/WORKBENCH_FIXTURE_TESTS_2026-09-30.md`).
-
-Choose checks by risk. Run the broad gate at the appropriate phase, not repeatedly without new evidence. For release, TestFlight, or App Store readiness work, follow `docs/release/RELEASE_CAPTAIN_WORKFLOW.md`.
-
-### Skills and plugins
-
-Skills and plugins are aids; this file wins on any conflict. Use them when they fit the task, not by default.
-
-- Debugging, verification, code review, and TDD skills (for example `systematic-debugging`, `verification-before-completion`, `test-driven-development`, `requesting-code-review`): recommended for behavior changes.
-- Expo skills (`expo-*`, `eas-*`): use for Expo, Router, EAS, and upgrade questions, then confirm against the installed SDK.
-- UI/UX and design skills: use for screen structure, hierarchy, and accessibility only. They never override the locked chibi identity or the existing design language.
-- Planning or brainstorming skills: use for new features or architecture choices, not for small fixes.
-- No skill may create worktrees, commit, push, merge, or publish without user authorization (see Git and delivery).
-
-## Native evidence
-
-iOS Simulator at supported phone dimensions is the primary truth for changed mobile UI. Code review, TypeScript, snapshots, contact sheets, web previews, bundle checks, and successful compilation do not prove native visual or interaction acceptance.
-
-Verify the real route and state from the current Metro-served checkout. Check relevant primary, loading, empty, error, disabled, offline, large-text, and Reduce Motion states. For avatar assets, verify Shop, Wardrobe, Room, MiniRoom, supported motion states, relevant combinations, scale, anchors, clipping, and transitions. Report unavailable physical-device and performance evidence as open.
-
-## Git and delivery
-
-Assume the worktree contains valuable unrelated work.
-
-- Never use `git add .`, `git add -A`, broad restore, reset, clean, or checkout over unrelated files.
-- Stage an explicit reviewed file allowlist.
-- Before commit, inspect `git diff --cached --name-status`, `git diff --cached --check`, and the staged diff.
-- Use conventional commits: `<type>: <description>`.
-- Do not commit, push, open a PR, publish, deploy, merge, purchase, or modify third-party state without user authorization.
-- Once authorized, complete and verify the action without requesting repeated confirmation.
-- Keep Workbench files, credentials, caches, build output, generated evidence, and experimental assets out of commits.
-
-An approved asset push contains only final runtime assets and the minimum integration and validation files required by the application. A clean commit does not imply a clean worktree.
-
-## Status and completion
-
-Use these labels accurately:
-
-- **Implemented:** present in the current checkout.
-- **Tested:** named automated checks passed.
-- **Native verified:** inspected in the current Simulator or device flow.
-- **User approved:** explicitly accepted by the user.
-- **Production ready:** all required product, security, migration, native, performance, release, and external gates passed.
-- **Blocked/Open:** named evidence is missing or a gate failed.
-
-Never collapse these states. "Tested" is not visual approval; "pushed" is not a Store release.
-
-## Guiding principle
-
-- **ONE CHARACTER RIG**
-- **ONE CANONICAL COSMETIC ID**
-- **ONE WORLD MODEL**
-- **MANY OUTFITS**
-- **MANY ANIMATIONS**
-- **MANY INTERACTIONS**
-
-Make the existing Blumi chibi artwork feel alive inside a polished social application. Preserve the identity; replace the technical limits.
+Keep this file under 150 lines. Add an instruction only if the model cannot know it or keeps repeating the same mistake without it, and delete instructions that stop being true.
