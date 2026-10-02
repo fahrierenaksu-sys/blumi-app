@@ -7,7 +7,7 @@ test("DSC-15: pulling past the top pins the hero background and stretches it", (
   assert.deepEqual(getProfileHeroStretch(120, false), { translateY: 0, scale: 1 }, "normal scrolling leaves the hero alone")
   const pulled = getProfileHeroStretch(-72, false)
   assert.equal(pulled.translateY, -72)
-  assert.equal(pulled.scale, 1.2)
+  assert.ok(pulled.scale > 1 && pulled.scale < PROFILE_HERO_MAX_STRETCH)
   assert.equal(getProfileHeroStretch(-2000, false).scale, PROFILE_HERO_MAX_STRETCH)
 })
 

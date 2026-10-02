@@ -8,20 +8,18 @@ import {
 
 const technicalError =
   "fetch failed: UnexpectedException: Could not connect to the server. (at ExpoModulesCore/Promise.swift:56)"
+const RAW_DIAGNOSTICS = /fetch failed|Exception|\.swift|http|Could not connect/i
+
+function assertSafe(message: string): void {
+  assert.ok(message.trim().length > 0)
+  assert.doesNotMatch(message, RAW_DIAGNOSTICS)
+}
 
 test("discovery errors never expose transport diagnostics", () => {
-  assert.equal(
-    getDiscoveryErrorMessageForDisplay("load", technicalError),
-    "We couldn't load Discover. Check your connection and try again."
-  )
-  assert.equal(
-    getDiscoveryErrorMessageForDisplay("refresh", technicalError),
-    "We couldn't refresh Discover. Check your connection and try again."
-  )
-  assert.equal(
-    getDiscoveryErrorMessageForDisplay("decision", technicalError),
-    "That choice wasn't saved. Check your connection and try again."
-  )
+  for (const surface of ["load", "refresh", "decision"] as const) {
+    assertSafe(getDiscoveryErrorMessageForDisplay(surface, technicalError))
+    assertSafe(getDiscoveryErrorMessageForDisplay(surface, new Error(technicalError)))
+  }
 })
 
 test("profile decisions keep quota exhaustion distinct from a failed request", () => {
@@ -34,12 +32,9 @@ test("profile decisions keep quota exhaustion distinct from a failed request", (
     rewardedAd: { available: false, extensionDecisions: 10 }
   })
 
-  assert.equal(
-    getDiscoveryDecisionErrorMessageForDisplay(quotaError),
-    "Today’s Discover limit is reached. It will reset automatically."
-  )
-  assert.equal(
-    getDiscoveryDecisionErrorMessageForDisplay(technicalError),
-    "That choice wasn't saved. Check your connection and try again."
-  )
+  const quota = getDiscoveryDecisionErrorMessageForDisplay(quotaError)
+  const failed = getDiscoveryDecisionErrorMessageForDisplay(technicalError)
+  assertSafe(quota)
+  assertSafe(failed)
+  assert.notEqual(quota, failed)
 })

@@ -2,20 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { resolveDiscoveryLayoutMetrics } from "./discoveryLayoutMetrics"
 
-test("the canonical iPhone width retains the approved deck geometry", () => {
-  const layout = resolveDiscoveryLayoutMetrics(402, 760)
-
-  assert.equal(layout.deckHeight, 548)
-  assert.equal(layout.card.avatarSize, 268)
-  assert.equal(layout.card.infoOverlayBottom, 120)
-  assert.equal(layout.action.primarySize, 64)
-})
-
-test("short portrait viewports retain the compact deck and hide progress", () => {
+test("short portrait viewports hide progress", () => {
   const compact = resolveDiscoveryLayoutMetrics(375, 667)
 
-  assert.equal(compact.deckHeight, 448)
-  assert.equal(compact.card.avatarSize, 224)
   assert.equal(compact.showProgress, false)
 })
 

@@ -62,7 +62,9 @@ try {
     ],
     {
       cwd: workspaceRoot,
-      stdio: "inherit"
+      stdio: "inherit",
+      // reportModalCopy.test.ts reads REPORT_REASONS from @blumi/contracts.
+      env: { ...process.env, NODE_PATH: resolve(workspaceRoot, "../../node_modules") }
     }
   )
 

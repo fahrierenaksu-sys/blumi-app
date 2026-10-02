@@ -6,8 +6,6 @@ import {
 
 export type ProductionDiscoveryPlaceholderState = "error" | "loading" | "empty"
 
-// Kept as a self-contained function declaration: EmptyDiscoveryDeck.test.mjs
-// transpiles this declaration on its own to characterize the policy.
 export function resolveProductionDiscoveryPlaceholderState(input: {
   isProductionDiscovery: boolean
   filtersReady: boolean

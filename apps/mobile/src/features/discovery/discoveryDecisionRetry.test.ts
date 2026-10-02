@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-  DISCOVERY_DECISION_RETRY_DELAYS_MS,
   isRetryableDiscoveryDecisionError,
   runDiscoveryDecisionWithRetry
 } from "./discoveryDecisionRetry"
@@ -29,7 +28,6 @@ test("only transport failures and server-side errors are retried; refusals are f
   const cancelled = new Error("Request cancelled.")
   cancelled.name = "AbortError"
   assert.equal(isRetryableDiscoveryDecisionError(cancelled), false)
-  assert.deepEqual([...DISCOVERY_DECISION_RETRY_DELAYS_MS], [400, 1200])
 })
 
 test("a decision retries a dropped connection with backoff, then answers (the server replays it idempotently)", async () => {

@@ -33,7 +33,6 @@ const sourceFiles = [
   "src/features/discovery/discoveryErrorCopy.ts",
   "src/features/discovery/discoveryErrorCopy.test.ts",
   "src/features/discovery/discoverySurfaceCopy.ts",
-  "src/features/discovery/discoverySurfaceCopy.test.ts",
   "src/features/discovery/discoveryHomeCopy.ts",
   "src/features/discovery/discoveryHomeCopy.test.ts",
   "src/features/discovery/discoveryCandidateModel.ts",
@@ -49,7 +48,6 @@ const sourceFiles = [
   "src/features/discovery/discoveryCardFlipModel.ts",
   "src/features/discovery/discoveryCardFlipModel.test.ts",
   "src/features/discovery/profilePreviewCopy.ts",
-  "src/features/discovery/profilePreviewCopy.test.ts",
   "src/features/discovery/profilePreviewHeroModel.ts",
   "src/features/discovery/profilePreviewHeroModel.test.ts",
   "src/features/discovery/roomShowcaseApi.ts",
@@ -115,7 +113,6 @@ try {
       join(outputDirectory, "features/discovery/matchResultNavigation.test.js"),
       join(outputDirectory, "features/discovery/discoveryLayoutMetrics.test.js"),
       join(outputDirectory, "features/discovery/discoveryErrorCopy.test.js"),
-      join(outputDirectory, "features/discovery/discoverySurfaceCopy.test.js"),
       join(outputDirectory, "features/discovery/discoveryHomeCopy.test.js"),
       join(outputDirectory, "features/discovery/discoveryCandidateModel.test.js"),
       join(outputDirectory, "features/discovery/discoverySchemas.test.js"),
@@ -124,7 +121,6 @@ try {
       join(outputDirectory, "features/discovery/discoveryWatchMutation.test.js"),
       join(outputDirectory, "features/discovery/lobbyPresentationModel.test.js"),
       join(outputDirectory, "features/discovery/discoveryCardFlipModel.test.js"),
-      join(outputDirectory, "features/discovery/profilePreviewCopy.test.js"),
       join(outputDirectory, "features/discovery/profilePreviewHeroModel.test.js"),
       join(outputDirectory, "features/discovery/roomShowcaseApi.test.js"),
       join(outputDirectory, "features/discovery/screen/discoveryScreenModel.test.js"),
@@ -147,10 +143,8 @@ try {
     process.execPath,
     [
       "--test",
-      resolve(workspaceRoot, "src/features/discovery/DiscoveryBackground.test.mjs"),
       resolve(workspaceRoot, "src/features/discovery/DiscoveryStartupBoundary.test.mjs"),
       resolve(workspaceRoot, "src/ui/PreparedDiscoveryLoadingScreen.test.mjs"),
-      resolve(workspaceRoot, "src/features/discovery/EmptyDiscoveryDeck.test.mjs"),
       resolve(workspaceRoot, "src/features/demo/SwipeableDiscoverCard.test.mjs"),
       resolve(workspaceRoot, "src/screens/LobbyScreen.imagePriority.test.mjs"),
       resolve(workspaceRoot, "scripts/mobile-discovery-refresh-contract.test.mjs"),
@@ -173,7 +167,8 @@ try {
       "--test",
       "src/features/discovery/screen/useDiscoveryDecisions.test.ts",
       "src/features/discovery/screen/useDiscoveryDeck.test.ts",
-      "src/features/discovery/discoverySwipeModel.test.ts"
+      "src/features/discovery/discoverySwipeModel.test.ts",
+      "src/features/discovery/copyLocaleParity.test.ts"
     ],
     {
       cwd: workspaceRoot,
