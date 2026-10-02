@@ -1,9 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Pool } from "pg"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createSchemaReadinessCheck, OPTIONAL_READINESS_MIGRATIONS } from "./schemaReadiness"
 
-test("real PostgreSQL readiness rejects incomplete migrations and missing runtime schema", { skip: !process.env.DATABASE_URL }, async () => {
+test("real PostgreSQL readiness rejects incomplete migrations and missing runtime schema", disposablePostgresSkip(), async () => {
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const client = await pool.connect()
   try {
