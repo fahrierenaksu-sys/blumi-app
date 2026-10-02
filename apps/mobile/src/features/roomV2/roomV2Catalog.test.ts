@@ -104,6 +104,48 @@ test("active Room V2 seating declares complete seatSpec routing metadata", () =>
   }
 })
 
+test("every seat's art has a measured tap outline that covers all of its drawn pixels", () => {
+  // A seat takes taps only on its drawn piece (roomFurnitureTapTargetModel);
+  // new or changed seat art without a fresh outline would leave part of the
+  // seat untappable, or fall back to its whole, mostly empty canvas.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const { resolveRoomV2Scene } = require("./roomV2Selectors") as typeof import("./roomV2Selectors")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const tapModel = require("./components/roomFurnitureTapTargetModel") as
+    typeof import("./components/roomFurnitureTapTargetModel")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- pngjs has no type declarations here.
+  const { PNG } = require("pngjs") as {
+    PNG: { sync: { read(buffer: Buffer): { width: number; height: number; data: Buffer } } }
+  }
+  const seats = ROOM_V2_FURNITURE_CATALOG.filter((item) => item.interactionType === "seat")
+  assert.ok(seats.length > 0)
+  const checked = new Set<string>()
+  for (const seat of seats) {
+    for (const rotation of ["front", "right", "back", "left"] as const) {
+      const scene = resolveRoomV2Scene({ roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
+        decor: { roomShellId: DEFAULT_ROOM_V2_SHELL_ID, placedItems: [
+          { instanceId: "seat-under-test", itemId: seat.id, x: 0.5, y: 0.7, rotation }] },
+        defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID })
+      const item = scene.renderItems.find((entry) => entry.kind === "furniture")
+      assert.ok(item && item.kind === "furniture", `${seat.id} ${rotation}`)
+      if (checked.has(item.asset.key)) continue
+      checked.add(item.asset.key)
+      const outline = tapModel.ROOM_FURNITURE_DRAWN_OUTLINES[item.asset.key]
+      assert.ok(outline, `${seat.id} ${rotation}: no tap outline for ${item.asset.key}`)
+      const image = PNG.sync.read(readFileSync(String(item.asset.source)))
+      assert.ok(Math.abs(outline.aspect - image.width / image.height) < 0.001, `${item.asset.key}: aspect`)
+      let uncovered = 0
+      for (let y = 0; y < image.height; y++) {
+        for (let x = 0; x < image.width; x++) {
+          if (image.data[(y * image.width + x) * 4 + 3]! < 32) continue
+          if (!tapModel.isPointInOutline(outline.points, (x + 0.5) / image.width, (y + 0.5) / image.height)) uncovered++
+        }
+      }
+      assert.equal(uncovered, 0, `${item.asset.key}: drawn pixels outside its tap outline`)
+    }
+  }
+})
+
 test("the starter bed's seat is reachable at its rendered size in every rotation, with unchanged art", () => {
   // Loaded after the asset hooks above, like the catalog itself.
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.

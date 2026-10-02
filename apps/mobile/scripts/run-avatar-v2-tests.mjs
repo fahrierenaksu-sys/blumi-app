@@ -131,6 +131,7 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarBodyMotionModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarTapTargetModel.test.ts"),
+      resolve(workspaceRoot, "src/features/roomV2/components/roomFurnitureTapTargetModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/components/avatarTryOnTransitionModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/screen/shopPurchaseFlightModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarMotionAtlas.test.ts"),
