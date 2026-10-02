@@ -36,6 +36,11 @@ import {
 } from "../chat/chatService"
 import type { ChatReceiptService } from "../chat/chatReceiptService"
 import {
+  createComposedThreadRoomInviteReader,
+  type ThreadRoomInviteReader,
+  type ThreadRoomInviteSources
+} from "../miniRooms/threadRoomInviteRead"
+import {
   ChatDeliveryBlockedError,
   createChatMessageDeliveryService
 } from "../chat/chatMessageDeliveryService"
@@ -71,6 +76,24 @@ export interface ThreadRouteServices {
   miniRoomService?: MiniRoomService
   capabilityService: CapabilityService
   chatReceiptService: ChatReceiptService
+  /** One-statement read for GET room-invites (PostgreSQL); composed from the services otherwise. */
+  threadRoomInviteReader?: ThreadRoomInviteReader
+}
+
+function threadRoomInviteSourcesFromServices(
+  services: ThreadRouteServices,
+  miniRoomService: MiniRoomService
+): ThreadRoomInviteSources {
+  return {
+    findThread: (threadId) => services.chatService.repository.findThread(threadId),
+    hasBlockBetween: (userAId, userBId) => services.safetyService.hasBlockBetween(userAId, userBId),
+    findMatchBetween: (userAId, userBId) => services.matchService.repository.findMatchBetween(userAId, userBId),
+    findConnectionBetween: async (userAId, userBId) =>
+      (await services.connectionService?.repository.findMatchBetween(userAId, userBId)) ?? null,
+    isUserAllowed: (userId, now) => services.authService.isRealtimeUserAllowed(userId, now),
+    isTestPersona: async (userId) => Boolean(await services.chatService.repository.findTestPersona(userId)),
+    listInvitesForThread: (threadId, now) => miniRoomService.repository.listInvitesForThread(threadId, now)
+  }
 }
 
 const threadIdRouteSchema = {
@@ -397,29 +420,31 @@ export async function registerThreadRoutes(
     if (!miniRoomService) {
       return reply.code(503).send({ error: "Room invites are temporarily unavailable." })
     }
-    const context = await resolveMutualChatInviteContext({
-      services,
-      threadId,
-      userId: resolved.account.userId
-    })
-    if (!context || context === "hidden") {
-      return sendUnavailableInviteContext(context, reply, "That room invite is not available.")
-    }
+    const reader = services.threadRoomInviteReader ?? createComposedThreadRoomInviteReader(
+      threadRoomInviteSourcesFromServices(services, miniRoomService)
+    )
     try {
-      let invites = await miniRoomService.listChatInvites(
-        resolved.account.userId,
-        threadId
-      )
+      const read = await reader.readThreadRoomInvites({ threadId, userId: resolved.account.userId })
+      if (read.status !== "ok") {
+        return sendUnavailableInviteContext(read.status === "hidden" ? "hidden" : null, reply,
+          "That room invite is not available.")
+      }
+      let invites = read.invites
       // A synthetic test partner can initiate a real, persisted chat invitation
       // when the user opens the conversation. Reopening it is idempotent, and
-      // normal accounts never enter this branch.
-      if (!invites.some((invite) => invite.status === "pending" || invite.status === "accepted")) {
-        const persona = await chatService.repository.findTestPersona(context.partnerAccount.userId)
-        if (persona) {
+      // normal accounts never enter this branch (the read already knows).
+      if (read.partnerIsTestPersona &&
+        !invites.some((invite) => invite.status === "pending" || invite.status === "accepted")) {
+        // The deployment policy still decides: production never acts for a persona.
+        const [persona, partnerAccount] = await Promise.all([
+          chatService.repository.findTestPersona(read.partnerUserId),
+          authService.repository.findAccountByUserId(read.partnerUserId)
+        ])
+        if (persona && partnerAccount) {
           try {
             const result = await miniRoomService.createChatInvite({
               threadId,
-              senderProfile: context.partnerAccount.profile,
+              senderProfile: partnerAccount.profile,
               recipientProfile: resolved.account.profile
             })
             if (result.created) {

@@ -396,7 +396,7 @@ function isParticipantClaimViolation(error: unknown): boolean {
   )
 }
 
-function mapInvite(row: QueryResultRow): MiniRoomInviteRecord {
+export function mapInvite(row: QueryResultRow): MiniRoomInviteRecord {
   return {
     inviteId: String(row.invite_id),
     senderUserId: String(row.sender_user_id),

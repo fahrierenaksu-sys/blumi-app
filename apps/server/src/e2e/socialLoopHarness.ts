@@ -283,6 +283,7 @@ export async function startSocialLoop(options: { storage?: SocialLoopStorage } =
   const app = createServer({
     discoverySnapshots: services.discoverySnapshots,
     sharedRateLimiter: services.sharedRateLimiter,
+    threadRoomInviteReader: services.threadRoomInviteReader,
     authService: services.authService,
     capabilityService: services.capabilityService,
     firebaseAuthVerifier,

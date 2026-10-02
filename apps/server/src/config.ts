@@ -37,6 +37,7 @@ import { createMatchService, type MatchService } from "./matches/matchService"
 import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { createDiscoverySnapshotService, createInMemoryDiscoverySnapshots, type DiscoverySnapshotService } from "./matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./db/postgresDiscoverySnapshots"
+import { createPostgresThreadRoomInviteReader } from "./db/postgresThreadRoomInviteRead"
 import { createPostgresAuthRepository } from "./db/postgresAuthRepository"
 import { createPostgresAccountDataExporter } from "./account/accountDataExporter"
 import { createAccountRecoveryService, type AccountRecoveryService } from "./account/accountRecoveryService"
@@ -180,6 +181,8 @@ export interface ConfiguredServerServices {
   chatReceiptSchema: ChatReceiptSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
+  /** One-statement GET room-invites read (PostgreSQL only; composed from services otherwise). */
+  threadRoomInviteReader?: import("./miniRooms/threadRoomInviteRead").ThreadRoomInviteReader
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
   /** Bounded deletes of finished work and audit rows past their window (db/postgresRetention.ts). */
   retentionService: { purgeExpired(): Promise<unknown> }
@@ -656,6 +659,7 @@ export function createConfiguredServerServices(
       },
       sharedRateLimiter: config.rateBudgetStore === "postgres" ? createPostgresRateBudget(pool) : createInMemoryRateBudget(),
       discoverySnapshots: createDiscoverySnapshotService(createPostgresDiscoverySnapshots(pool)),
+      threadRoomInviteReader: createPostgresThreadRoomInviteReader(pool),
       async close() {
         await Promise.all([pool.end(), listenPool?.end()])
       }

@@ -117,6 +117,7 @@ interface CreateServerOptions {
   avatarService?: AvatarService
   notificationService?: NotificationService
   miniRoomService?: MiniRoomService
+  threadRoomInviteReader?: import("./miniRooms/threadRoomInviteRead").ThreadRoomInviteReader
   logger?: boolean
   /** Test seam: where JSON log lines go instead of stdout. */
   logDestination?: { write(line: string): void }
@@ -280,6 +281,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     connectionManager,
     connectionService: options.connectionService,
     miniRoomService: options.miniRoomService,
+    threadRoomInviteReader: options.threadRoomInviteReader,
     afterResponseTasks
   }
   // A closing app finishes the side effects its answered requests started.
