@@ -265,12 +265,6 @@ export function OnboardingRunner({
   const catchY = [0, catchLift, 0]
   const catchScale = [1, role === "leader" ? 1.03 : 1, 1]
   const catchRotate = [0, catchTiltDeg, 0]
-  const shadowCatchScaleX = role === "leader" ? [1, 0.78, 1] : [1, 1, 1]
-  const shadowOrbitScaleX = isOrbiting
-    ? role === "leader"
-      ? [1, 0.92, 0.8, 0.88, 1]
-      : [0.92, 0.8, 0.66, 0.78, 0.92]
-    : [1, 1, 1, 1, 1]
 
   const rootStyle = useAnimatedStyle(() => {
     const chase = chaseProgress.value
@@ -294,13 +288,6 @@ export function OnboardingRunner({
       ]
     }
   })
-  const shadowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(catchProgress.value, catchInput, [0.07, 0.045, 0.07]),
-    transform: [
-      { scaleX: interpolate(catchProgress.value, catchInput, shadowCatchScaleX) },
-      { scaleX: interpolate(orbitProgress.value, orbitInput, shadowOrbitScaleX) }
-    ]
-  }))
 
   const runFrames = frameSet.map((_source, frameIndex) => {
     // Both characters are driven by one clock. Role-specific source rotation
@@ -340,19 +327,6 @@ export function OnboardingRunner({
         role === "chaser" ? styles.chaserDepth : null
       ]}
     >
-      {pose.showGroundShadow ? (
-        <Animated.View
-          style={[
-            styles.groundShadow,
-            {
-              width: Math.round(size * 0.48),
-              height: Math.max(7, Math.round(size * 0.08)),
-              borderRadius: Math.round(size * 0.24)
-            },
-            shadowStyle
-          ]}
-        />
-      ) : null}
       <Animated.View style={{ width: size, height: frameHeight }}>
         {arrivalEnabled && arrivalProgress ? (
           <Animated.View
@@ -393,14 +367,5 @@ const styles = StyleSheet.create({
   chaserDepth: { opacity: 0.98 },
   frame: { position: "absolute", left: 0, bottom: 0 },
   arrivalLayer: { position: "absolute", inset: 0 },
-  runLayer: { position: "absolute", inset: 0 },
-  groundShadow: {
-    position: "absolute",
-    bottom: 3,
-    backgroundColor: "rgba(31,96,115,0.16)",
-    shadowColor: "#2F8CAA",
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }
-  }
+  runLayer: { position: "absolute", inset: 0 }
 })

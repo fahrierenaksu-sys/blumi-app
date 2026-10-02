@@ -89,11 +89,6 @@ export const ProfileChibi = forwardRef<ProfileChibiHandle, { width: number }>(
         { translateY: -bob.value * PROFILE_CHIBI_BOB_PT - hop.value * PROFILE_CHIBI_HOP_PT }
       ]
     }))
-    // The floor shadow narrows as the character rises, so the hop reads as height.
-    const shadowStyle = useAnimatedStyle(() => ({
-      opacity: 0.5 - hop.value * 0.22 - bob.value * 0.06,
-      transform: [{ scaleX: 1 - hop.value * 0.24 - bob.value * 0.04 }]
-    }))
     const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }))
 
     return (
@@ -103,13 +98,6 @@ export const ProfileChibi = forwardRef<ProfileChibiHandle, { width: number }>(
             styles.cheerGlow,
             { width: width * 1.1, height: width * 1.1, borderRadius: width * 0.55, top: height * 0.12 },
             glowStyle
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.floorShadow,
-            { width: width * 0.62, height: 16, borderRadius: 8, left: width * 0.19 },
-            shadowStyle
           ]}
         />
         <Animated.View style={[{ width, height }, bodyStyle]}>
@@ -124,11 +112,6 @@ const styles = StyleSheet.create({
   stage: {
     alignItems: "center",
     justifyContent: "flex-start"
-  },
-  floorShadow: {
-    position: "absolute",
-    bottom: 6,
-    backgroundColor: "rgba(120, 48, 96, 0.32)"
   },
   cheerGlow: {
     position: "absolute",

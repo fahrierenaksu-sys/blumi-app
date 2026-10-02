@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   advanceRoomAvatarStridePhase,
-  getRoomAvatarContactShadow,
   getRoomAvatarPoseTransitionDurationMs,
   getRoomAvatarPoseTransitionKind,
   getRoomAvatarPoseTransitionPose,
@@ -106,13 +105,9 @@ test("stride phase wraps and survives odd inputs", () => {
   assert.equal(getRoomAvatarStrideFrameIndex(0.5, 1), 0)
 })
 
-test("the body bobs twice per cycle, grounded when a foot plants, and the shadow answers", () => {
+test("the body bobs twice per cycle, grounded when a foot plants", () => {
   assert.equal(getRoomAvatarStrideBob(0), 0)
   assert.ok(getRoomAvatarStrideBob(0.5) < 1e-9)
   assert.ok(Math.abs(getRoomAvatarStrideBob(0.25) - 1) < 1e-9)
   assert.ok(Math.abs(getRoomAvatarStrideBob(0.75) - 1) < 1e-9)
-  const grounded = getRoomAvatarContactShadow(0)
-  const lifted = getRoomAvatarContactShadow(1)
-  assert.deepEqual(grounded, { scale: 1, opacity: 1 })
-  assert.ok(lifted.scale < 1 && lifted.opacity < 1)
 })
