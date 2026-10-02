@@ -1,12 +1,15 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
-import {
-  FlatList,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent
-} from "react-native"
+import { type FlatList, Text, View } from "react-native"
 import type { PanGesture } from "react-native-gesture-handler"
+import Reanimated, {
+  interpolateColor,
+  useAnimatedReaction,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue
+} from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { hapticError } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
@@ -16,18 +19,35 @@ import {
   getRoomEditorDockCardWidth,
   getRoomEditorDockColumns,
   getRoomEditorDockPageCount,
-  getRoomEditorDockPageIndex,
+  getRoomEditorDockPageDotPresence,
+  getRoomEditorDockPagePosition,
   getRoomEditorDockRowCount
 } from "./roomEditorDockModel"
 import { getDefaultRoomV2FurnitureRotation } from "./roomEditorPlacementModel"
 import type { RoomEditorInventoryEntry } from "./roomEditorPresentationModel"
 import type { RoomEditorInventoryState } from "./useRoomEditorInventory"
-import { ROOM_EDITOR_DOCK_GRID_GAP, styles } from "./roomEditorStyles"
+import { ROOM_EDITOR_DOCK_GRID_GAP, roomEditorTheme, styles } from "./roomEditorStyles"
 import { PressableScale } from "../../../ui/PressableScale"
 
 type TrayColumn = RoomEditorInventoryEntry[]
 
 const keyExtractor = (column: TrayColumn): string => column[0].item.id
+
+const PAGE_DOT_SIZE = 6
+const PAGE_DOT_ACTIVE_WIDTH = 16
+
+/** One tray page dot that follows the live swipe on the UI thread. */
+function TrayPageDot(props: { index: number; position: SharedValue<number> }) {
+  const { index, position } = props
+  const dotStyle = useAnimatedStyle(() => {
+    const presence = getRoomEditorDockPageDotPresence(position.value, index)
+    return {
+      width: PAGE_DOT_SIZE + (PAGE_DOT_ACTIVE_WIDTH - PAGE_DOT_SIZE) * presence,
+      backgroundColor: interpolateColor(presence, [0, 1], [roomEditorTheme.hairline, roomEditorTheme.accent])
+    }
+  })
+  return <Reanimated.View style={[styles.inventoryPageDot, dotStyle]} />
+}
 
 /**
  * The owned-furniture tray: three cards across, paging sideways with dots
@@ -81,6 +101,8 @@ export function RoomEditorInventoryList(props: {
   }, [copy.feedback.alreadyPlaced, copy.feedback.lockedInShop, onTrayFeedback])
   const [listWidth, setListWidth] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
+  /** Written on the UI thread: the tray position in pages, for the dots. */
+  const pagePosition = useSharedValue(0)
   const cardWidth = getRoomEditorDockCardWidth(listWidth, ROOM_EDITOR_DOCK_GRID_GAP)
   const pageWidth = (cardWidth + ROOM_EDITOR_DOCK_GRID_GAP) * ROOM_EDITOR_DOCK_COLUMNS
   const entries = useMemo(
@@ -136,12 +158,23 @@ export function RoomEditorInventoryList(props: {
     if (shownLayoutKeyRef.current === layoutKey) return
     shownLayoutKeyRef.current = layoutKey
     rowRef.current?.scrollToOffset({ offset: 0, animated: false })
+    pagePosition.value = 0
     setPageIndex(0)
-  }, [filterKey, rowCount])
+  }, [filterKey, pagePosition, rowCount])
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setPageIndex(getRoomEditorDockPageIndex(event.nativeEvent.contentOffset.x, pageWidth, pageCount))
+  // The dots follow the live offset on the UI thread; React hears only page
+  // changes (for the VoiceOver page label), never every frame.
+  const handleScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      pagePosition.value = getRoomEditorDockPagePosition(event.contentOffset.x, pageWidth, pageCount)
+    }
   }, [pageCount, pageWidth])
+  useAnimatedReaction(
+    () => Math.round(pagePosition.value),
+    (index, previous) => {
+      if (previous !== null && index !== previous) scheduleOnRN(setPageIndex, index)
+    }
+  )
 
   const emptyComponent = inventoryViewState.isLoading ? (
     <View
@@ -185,7 +218,7 @@ export function RoomEditorInventoryList(props: {
     <View onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}>
       {isMeasured ? (
         <>
-          <FlatList
+          <Reanimated.FlatList
             ref={rowRef}
             data={columns}
             renderItem={renderInventoryColumn}
@@ -199,7 +232,8 @@ export function RoomEditorInventoryList(props: {
             initialNumToRender={6}
             maxToRenderPerBatch={6}
             windowSize={5}
-            onMomentumScrollEnd={handleScroll}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             ListEmptyComponent={emptyComponent}
           />
           {/* The dot row keeps its height so the dock never changes size. */}
@@ -211,13 +245,7 @@ export function RoomEditorInventoryList(props: {
           >
             {hasPages
               ? Array.from({ length: pageCount }, (_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.inventoryPageDot,
-                    index === activePage ? styles.inventoryPageDotActive : null
-                  ]}
-                />
+                <TrayPageDot key={index} index={index} position={pagePosition} />
               ))
               : null}
           </View>

@@ -465,10 +465,6 @@ export const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: roomEditorTheme.hairline
   },
-  inventoryPageDotActive: {
-    width: 16,
-    backgroundColor: roomEditorTheme.accent
-  },
   inventoryLoadingRow: {
     flexDirection: "row",
     gap: ROOM_EDITOR_DOCK_GRID_GAP

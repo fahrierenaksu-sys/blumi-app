@@ -133,13 +133,34 @@ export function getRoomEditorDockColumns<Entry>(
   return columns
 }
 
+/** The tray's live scroll position in pages (fractional mid-swipe). UI thread. */
+export function getRoomEditorDockPagePosition(
+  offsetX: number,
+  pageWidth: number,
+  pageCount: number
+): number {
+  "worklet"
+  if (pageWidth <= 0 || pageCount <= 1 || !Number.isFinite(offsetX)) return 0
+  return Math.max(0, Math.min(pageCount - 1, offsetX / pageWidth))
+}
+
 export function getRoomEditorDockPageIndex(
   offsetX: number,
   pageWidth: number,
   pageCount: number
 ): number {
-  if (pageWidth <= 0 || pageCount <= 1) return 0
-  return Math.max(0, Math.min(pageCount - 1, Math.round(offsetX / pageWidth)))
+  "worklet"
+  return Math.round(getRoomEditorDockPagePosition(offsetX, pageWidth, pageCount))
+}
+
+/**
+ * How much page dot `index` is the active one (1 on its page, 0 a page or
+ * more away), so the dots follow the finger instead of the momentum end.
+ */
+export function getRoomEditorDockPageDotPresence(position: number, index: number): number {
+  "worklet"
+  const distance = Math.abs((Number.isFinite(position) ? position : 0) - index)
+  return Math.max(0, 1 - distance)
 }
 
 export type RoomEditorCapsuleMode = "hidden" | "placed" | "tray"
