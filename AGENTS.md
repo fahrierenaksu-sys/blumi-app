@@ -4,7 +4,7 @@
 
 The owner trusts your judgement and wants your best work, not cautious work. Act as the lead engineer and product designer: find and build the best current architecture, technology, design and workflow for the owner's goals, including root-level rewrites when they are worth it. Choose your own process, tools, tests and subagents.
 
-The avatar and home (room) system is explicitly open. Its renderer, rig, animation, room model, interaction design and tooling may be redesigned or replaced (Skia, Spine, Rive, 3D, a new runtime, or something better) if the result is better. Prototype on a branch or behind a flag and bring bold proposals with trade-offs, costs and a migration path; ideas and builds need no permission. The owner is needed only at ship time: for a visible change to the characters' drawn look, and for new receipts when a published item's runtime files change.
+The avatar and home (room) system is explicitly open. Its renderer, rig, animation, room model, interaction design and tooling may be redesigned or replaced (Skia, Spine, Rive, 3D, a new runtime, or something better) if the result is better. One exception: the room's fixed camera angle and shell geometry are the owner's chosen direction (see Facts); build on them instead of replacing them. Prototype on a branch or behind a flag and bring bold proposals with trade-offs, costs and a migration path; ideas and builds need no permission. The owner is needed only at ship time: for a visible change to the characters' drawn look, and for new receipts when a published item's runtime files change.
 
 Only the **Strict** sections are hard limits. Everything else here is information you could not find on your own.
 
@@ -13,8 +13,8 @@ Only the **Strict** sections are hard limits. Everything else here is informatio
 Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars and their rooms.
 
 - Loop: mutual match → text chat → optional room invitation sent from the chat → shared room (MiniRoom) with durable text chat.
-- The first release is text-only. Voice is off in code (the server refuses `BLUMI_VOICE_ENABLED=1`; `useMiniRoomMedia` returns `voiceAvailable: false`), and the deployed environment sets `BLUMI_PAYMENTS_ENABLED=0`.
-- `apps/mobile/app.config.js` refuses to build if camera, audio, WebRTC or LiveKit packages are installed (`scripts/mobile-no-media.cjs`). Profile photos, photo sharing, GIFs, video, calls and voice messages are out of scope unless the owner changes that.
+- The first release is text-only. There is no voice infrastructure, and voice is off in code (the server refuses `BLUMI_VOICE_ENABLED=1`; `useMiniRoomMedia` returns `voiceAvailable: false`), and the deployed environment sets `BLUMI_PAYMENTS_ENABLED=0`.
+- `apps/mobile/app.config.js` refuses to build if camera, audio, WebRTC or LiveKit packages are installed (`scripts/mobile-no-media.cjs`). Profile photos, photo sharing, GIFs, video, calls, voice messages and any app sound (room music, footsteps) are out of scope. Do not propose them.
 - The owner approved the characters' drawn look (face, proportions, outline, palette). How they are rendered, rigged, animated and placed in rooms is yours to improve.
 
 ## Strict: never lose work
@@ -27,7 +27,8 @@ Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars
   - Never let a merge or a "restore" delete files the other side added. Check who added them with `git log --diff-filter=A -- <path>`.
   - Afterwards, diff the result against both parents and run typecheck plus the affected tests before you commit the merge.
 - Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on a freshly fetched `origin/develop` and confirm it (`git merge-base --is-ancestor origin/develop HEAD`). Worktrees have silently started from `main` before.
-- Commit finished work early and often to a work branch. Save results before you start or relaunch long background jobs, because the cloud container restarts and kills them. Local commits, pushes of your own work branch, and merging into and pushing `develop` (never with force) need no approval.
+- Commit finished work early and often, without asking, especially before long background jobs or when you are low on budget, because the cloud container restarts and kills them.
+- Push only when the owner says so in the current conversation ("push at"), to any branch, `develop` and your own work branch included. If unpushed work is at risk, say so and ask.
 
 ## Strict: production, money and data
 
@@ -84,6 +85,7 @@ Branches and release:
 Avatar and room (current state, not a mandate):
 
 - The production avatar is `avatarV2`: layered PNGs with the fit baked in, drawn on every surface by one renderer, `RoomAvatarRenderer2D`. Room code lives in `roomWorld`, `roomV2`, `roomStudio` and `miniRoom`. `lobby` is the retired public lobby.
+- The room's fixed camera angle and shell geometry (`room_v2_shell_blumi_world_v1`, 1254×714, `roomV3ShellProductionContract.ts`) are the owner's chosen look, but they do not fully work yet: furniture placement, avatar depth and movement inside that angle. Develop the room system specifically for this angle.
 - No Skia, Spine, GL or 3D dependency is installed, and nothing forbids one. Adding a dependency, native or not, is your call. Only the EAS/TestFlight build that ships a native one, or a paid licence, needs the owner's yes.
 - Prior research is input, not a decision. `docs/quality/ROOM_AVATAR_VISUAL_DIRECTION_2026-10-01.md` measured why room motion feels artificial. Its backlog items are VIS-01..13 in the session inventory.
 - Art sources, masters and QA renders live outside the repo in the Workbench, `/Users/evrenevren/BlumiArtWorkbench/`, on the owner's Mac. The cloud container has only a stub.
