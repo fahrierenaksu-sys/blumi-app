@@ -192,6 +192,11 @@ function findClosureCalls(code) {
 }
 
 const files = listCandidateFiles(srcRoot)
+// Metro tells babel-preset-expo to run the React Compiler before the worklets
+// plugin when app.json turns it on; compile the same way here, because the
+// compiler rewrites the components that hold worklets.
+const supportsReactCompiler =
+  JSON.parse(readFileSync(join(mobileRoot, "app.json"), "utf8")).expo.experiments?.reactCompiler === true
 
 test("worklet code shipped to the UI thread has every name it uses", () => {
   assert.ok(files.length > 5, `expected to find the app's animation files, found ${files.length}`)
@@ -203,7 +208,7 @@ test("worklet code shipped to the UI thread has every name it uses", () => {
     const compiled = babel.transformFileSync(file, {
       cwd: mobileRoot,
       configFile: join(mobileRoot, "babel.config.js"),
-      caller: { name: "metro", bundler: "metro", platform: "ios" },
+      caller: { name: "metro", bundler: "metro", platform: "ios", supportsReactCompiler },
       sourceMaps: false
     }).code
     for (const code of extractWorkletCodes(compiled)) {

@@ -93,6 +93,9 @@
       "package": "com.blumi.mobile",
       "versionCode": 1
     },
+    "experiments": {
+      "reactCompiler": true
+    },
     "extra": {
       "buildProfile": "development",
       "enableDemo": true,
