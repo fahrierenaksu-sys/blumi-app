@@ -1,5 +1,77 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { readFileSync } from "node:fs"
+import { runInNewContext } from "node:vm"
+import ts from "typescript"
+import { getShopThumbnailLayout } from "../../shop/shopThumbnailLayout"
+import { getWardrobeThumbnailPresentation } from "../wardrobeThumbnailPresentation"
+
+test("female and male previews centre visible pixels inside narrow and wide cards on first render", () => {
+  const cardSource = readFileSync(new URL("./WardrobeCatalogCard.tsx", import.meta.url), "utf8")
+  const boundsById = JSON.parse(readFileSync(new URL("../../shop/shopThumbnailBounds.json", import.meta.url), "utf8"))
+  const samples = [
+    ["avatar_v2_hair_male_espresso_crop", "hair"],
+    ["avatar_v2_hair_male_cocoa_textured_quiff", "hair"],
+    ["avatar_v2_top_male_cream_basic_tee", "top"],
+    ["avatar_v2_bottom_male_navy_straight_pants", "bottom"],
+    ["avatar_v2_shoes_male_cloud_white_trainers", "shoes"],
+    ["avatar_v2_hair_ink_pageboy_star", "hair"],
+    ["avatar_v2_eyes_mocha_doe", "eyes"],
+    ["avatar_v2_nose_soft_button", "nose"],
+    ["avatar_v2_mouth_peach_whisper_smile", "mouth"],
+    ["avatar_v2_face_warm_peach_foundation", "face"]
+  ]
+  const jsx = (type: unknown, props: any) => ({ type, props })
+  const flatten = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean))
+  const module = { exports: {} as any }
+  runInNewContext(ts.transpileModule(cardSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 }
+  }).outputText, {
+    module, exports: module.exports,
+    require: () => ({
+      jsx, jsxs: jsx, memo: (component: unknown) => component,
+      Image: "Image", View: "View", Pressable: "Pressable", Text: "Text",
+      getShopProductThumbnailBounds: (id: string) => boundsById[id],
+      getShopThumbnailLayout, getWardrobeThumbnailPresentation,
+      getGarmentThumbnailOverride: () => undefined,
+      getStarterLayerThumbnail: () => undefined,
+      getAvatarItemPreviewImageStyle: () => ({ width: 100, height: 100 }),
+      getMaleRigLayerThumbnailPresentation: () => ({ top: 44.5, scale: 3.2 }),
+      MALE_CAPSULE_PREVIEW_SOURCES: Object.fromEntries(samples.filter(([id]) => id.includes("_male_")).map(([id]) => [id, 1])),
+      WARDROBE_SQUARE_THUMBNAIL_SOURCES: {},
+      getAvatarAutomationSlug: (id: string) => id,
+      WARDROBE_ART_ASPECT: 0.82, WARDROBE_THUMB_BOX: { width: 100, height: 68 },
+      CATEGORY_ICONS: {}, wardrobeTheme: {},
+      wardrobeV2Styles: {
+        itemPreviewRigLayer: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%" },
+        itemPreviewFeaturePortrait: { position: "absolute", top: 0, width: 116, height: 116 },
+        itemPreviewSquare: { width: "100%", height: "100%" }
+      }
+    })
+  })
+  for (const width of [80, 110, 145]) {
+    for (const [id, type] of samples) {
+      const tree = module.exports.WardrobeCatalogCard({
+        item: { id, type, name: type }, width, previewSource: 1,
+        equipped: false, locked: false, previewing: false
+      })
+      const box = tree.props.children[0].props.children[0]
+      assert.equal(box.type, "View", `${id} must have a fitted viewport`)
+      const viewport = flatten(box.props.style)
+      const image = flatten(box.props.children.props.style)
+      assert.equal(image.transform, undefined, `${id} must not apply a second scale/offset`)
+      assert.ok(viewport.width <= width - 3)
+      assert.ok(viewport.height <= Math.round(width * 0.82) - 3)
+      const [canvasWidth, , x, y, visibleWidth, visibleHeight] = boundsById[id]
+      const scale = image.width / canvasWidth
+      const left = image.left + x * scale
+      const top = image.top + y * scale
+      assert.ok(left >= 6 - 1e-6 && top >= 6 - 1e-6, `${id} must not clip`)
+      assert.ok(Math.abs(left + visibleWidth * scale / 2 - viewport.width / 2) < 1e-6)
+      assert.ok(Math.abs(top + visibleHeight * scale / 2 - viewport.height / 2) < 1e-6)
+    }
+  }
+})
 
 for (const extension of [".png", ".webp", ".jpg", ".jpeg"]) {
   require.extensions[extension] = (module, filename) => {

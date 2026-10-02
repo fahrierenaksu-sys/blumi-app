@@ -49,10 +49,20 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   const starterThumbnail = thumbnailPresentation.frame === "legacy"
     ? getStarterLayerThumbnail(item.id)
     : undefined
-  const thumbnailBounds = thumbnailPresentation.frame === "square"
+  // Shop bounds describe these exact preview sources, including male room
+  // layers. Fit their visible pixels rather than offsetting a scaled canvas.
+  const thumbnailBounds = thumbnailPresentation.frame !== "legacy" ||
+    item.type === "hair" || item.type === "accessory"
     ? getShopProductThumbnailBounds(item.id)
     : starterThumbnail?.bounds
-  const thumbnailBox = starterThumbnail?.box ?? WARDROBE_THUMB_BOX
+  const preferredBox = thumbnailPresentation.frame === "portrait" || item.type === "hair"
+    ? { width, height: Math.round(width * WARDROBE_ART_ASPECT) }
+    : starterThumbnail?.box ?? WARDROBE_THUMB_BOX
+  // The artwork viewport includes a 1.5px border on each side.
+  const thumbnailBox = {
+    width: Math.min(preferredBox.width, width - 3),
+    height: Math.min(preferredBox.height, Math.round(width * WARDROBE_ART_ASPECT) - 3)
+  }
   const thumbnailLayout = thumbnailBounds
     ? getShopThumbnailLayout(thumbnailBounds, thumbnailBox.width, thumbnailBox.height)
     : undefined
@@ -74,7 +84,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
               ? styles.itemPreviewSquare
               : styles.itemPreviewImage,
         thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
-        rigLayerPresentation
+        rigLayerPresentation && !thumbnailLayout
           ? {
               top: rigLayerPresentation.top,
               transform: [{ scale: rigLayerPresentation.scale }]
