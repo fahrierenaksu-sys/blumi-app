@@ -66,14 +66,14 @@ test("no new requestAnimationFrame or setInterval loops in production code", () 
 
 // Only the shared reduced-motion source may talk to AccessibilityInfo for
 // reduce-motion; everything else uses the shared store/hook.
-const REDUCE_MOTION_SOURCES = new Set(["ui/animations.ts"])
+const REDUCE_MOTION_SOURCES = new Set(["ui/motion.ts"])
 
 test("reduce-motion is read from the shared store only", () => {
   const offenders = sources
     .filter(({ text }) => /AccessibilityInfo\.(?:isReduceMotionEnabled|addEventListener\(\s*["']reduceMotionChanged)/.test(text))
     .map(({ path }) => path)
     .filter((path) => !REDUCE_MOTION_SOURCES.has(path))
-  assert.deepEqual(offenders, [], "use the shared reduced-motion hook from ui/animations")
+  assert.deepEqual(offenders, [], "use the shared reduced-motion hook from ui/motion (useMotion / useReducedMotion)")
 })
 
 // Only the shared reduce-transparency source may name the OS query or event;
