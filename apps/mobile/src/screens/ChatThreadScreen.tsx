@@ -51,6 +51,8 @@ import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindi
 import { ChatComposer } from "../features/chat/thread/ChatComposer"
 import { ChatLoadEarlierButton } from "../features/chat/thread/ChatLoadEarlierButton"
 import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptyState"
+import { ChatThreadSkeleton } from "../features/chat/thread/ChatThreadSkeleton"
+import { CROSSFADE_ENTERING } from "../ui/motion"
 import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
 import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
 import { styles } from "../features/chat/thread/chatThreadStyles"
@@ -137,6 +139,15 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const awaitingInitialHistory = sessionActor.session.mode === "production" &&
     !historyReady
   const showsTimelineEmptyState = timeline.length === 0 || isPendingThread || awaitingInitialHistory
+  // UXO-03: while the first history page loads, a skeleton stands in for the
+  // timeline; whatever replaces it (messages or the empty state) crossfades in.
+  const showsHistorySkeleton = showsTimelineEmptyState &&
+    !isPendingThread &&
+    messageListState.status !== "failed" &&
+    (awaitingInitialHistory || messageListState.status !== "ready")
+  const [historySkeletonShown, setHistorySkeletonShown] = useState(showsHistorySkeleton)
+  if (showsHistorySkeleton && !historySkeletonShown) setHistorySkeletonShown(true)
+  const timelineEntering = historySkeletonShown ? CROSSFADE_ENTERING : undefined
 
   const {
     isCreatingPendingThread,
@@ -381,7 +392,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           <ChatNotificationPermissionCard key={currentUserId} userId={currentUserId}
             mode={sessionActor.session.mode} isFocused={isFocused} locale={chatLocale}
             registration={props.pushRegistration} />
-          {showsTimelineEmptyState ? (
+          {showsHistorySkeleton ? (
+            <ChatThreadSkeleton label={chatCopy.openingChat} />
+          ) : showsTimelineEmptyState ? (
+            <Animated.View entering={timelineEntering} style={styles.flex}>
             <KeyboardCenteredView bottomInset={composerBottomInset} style={styles.flex}>
             <ChatThreadEmptyState
               chatCopy={chatCopy}
@@ -396,8 +410,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               partnerAvatar={partnerAvatar}
             />
             </KeyboardCenteredView>
+            </Animated.View>
           ) : (
-            <View style={styles.flex}>
+            <Animated.View entering={timelineEntering} style={styles.flex}>
             <Animated.FlatList
               ref={scrollToLatestState.listRef}
               renderScrollComponent={renderMessageScroll}
@@ -424,7 +439,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               }
               renderItem={renderTimelineRow}
             />
-            </View>
+            </Animated.View>
           )}
 
           <KeyboardGluedFooter bottomInset={composerBottomInset}>

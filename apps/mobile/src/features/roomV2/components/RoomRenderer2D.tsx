@@ -90,6 +90,8 @@ interface RoomRenderer2DProps {
   liveAvatarPosition?: RoomRendererLiveAvatarPosition
   /** Drawn on the floor, under every item (the editor's placement grid). */
   floorUnderlay?: ReactNode
+  /** The shell image's first paint (or its load failure): the stage is drawn. */
+  onShellDisplay?: () => void
 }
 
 export function RoomRenderer2D(props: RoomRenderer2DProps) {
@@ -117,7 +119,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     motionEnabled = true,
     showDepthWash = true,
     liveAvatarPosition,
-    floorUnderlay
+    floorUnderlay,
+    onShellDisplay
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
@@ -159,6 +162,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={0}
+          onDisplay={onShellDisplay}
+          onError={onShellDisplay}
           style={styles.shell}
         />
       </View>
