@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import type { RoomV2AvatarRenderLayer } from "../../roomV2/roomV2.types"
+import type { RoomV2AssetCrop, RoomV2AvatarRenderLayer } from "../../roomV2/roomV2.types"
 import {
+  getRoomAvatarAtlasCropLayout,
   getRoomAvatarFrameIndex,
   getRoomAvatarFrameTick,
   getRoomAvatarLayerAnimationState,
@@ -182,4 +183,43 @@ test("idle and walking keep the same mounted image identities across stop and re
   const repeated = retainRoomAvatarFrameSlots(restarted.assets, [walking[0]!, walking[0]!])
   assert.equal(repeated.assets, restarted.assets)
   assert.deepEqual(repeated.slotByFrame, [1, 1])
+})
+
+test("an atlas crop lands where contentFit contain would draw the whole frame", () => {
+  const crop: RoomV2AssetCrop = {
+    sourceName: "frame",
+    canvasWidth: 256,
+    canvasHeight: 384,
+    x: 70,
+    y: 205,
+    width: 112,
+    height: 140,
+    atlasX: 336,
+    atlasY: 96,
+    atlasWidth: 1012,
+    atlasHeight: 608
+  }
+  // Tall, wide and exact-ratio boxes, with iOS-like 1/3 pt rounding.
+  const roundToPixel = (value: number) => Math.round(value * 3) / 3
+  for (const box of [{ width: 120, height: 300 }, { width: 300, height: 180 }, { width: 128, height: 192 }]) {
+    const layout = getRoomAvatarAtlasCropLayout(crop, box, roundToPixel)
+    assert.ok(layout)
+    const scale = Math.min(box.width / 256, box.height / 384)
+    const containLeft = (box.width - 256 * scale) / 2
+    const containTop = (box.height - 384 * scale) / 2
+    // The crop's top-left canvas pixel is where contain puts it.
+    assert.ok(Math.abs(layout.crop.left - (containLeft + crop.x * scale)) < 1e-9)
+    assert.ok(Math.abs(layout.crop.top - (containTop + crop.y * scale)) < 1e-9)
+    assert.ok(Math.abs(layout.crop.width - crop.width * scale) < 1e-9)
+    assert.ok(Math.abs(layout.crop.height - crop.height * scale) < 1e-9)
+    // The atlas pixel at (atlasX, atlasY) meets the clip's corner exactly,
+    // and the atlas is drawn at the frame's scale within half a device pixel.
+    const atlasScaleX = layout.atlas.width / crop.atlasWidth
+    const atlasScaleY = layout.atlas.height / crop.atlasHeight
+    assert.ok(Math.abs(layout.atlas.left + crop.atlasX * atlasScaleX) < 1e-9)
+    assert.ok(Math.abs(layout.atlas.top + crop.atlasY * atlasScaleY) < 1e-9)
+    assert.ok(Math.abs(layout.atlas.width - crop.atlasWidth * scale) <= 1 / 6 + 1e-9)
+    assert.ok(Math.abs(layout.atlas.height - crop.atlasHeight * scale) <= 1 / 6 + 1e-9)
+  }
+  assert.equal(getRoomAvatarAtlasCropLayout(crop, { width: 0, height: 300 }), null)
 })

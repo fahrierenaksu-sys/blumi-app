@@ -196,13 +196,14 @@ test("female Cream Basic Tee binds its stable ID to the approved v17 static and 
   )
 
   const motionAssets = roomAvatarMotionLayerAssets.topFemaleCreamBasicTeeV2
-  const motionSources = [
-    ...motionAssets.walkingFront.frames.map((frame) => frame.source),
-    motionAssets.sittingFront.source
-  ]
+  const motionFrames = [...motionAssets.walkingFront.frames, motionAssets.sittingFront]
   assert.ok(motionAssets.walkingFront.frames.length > 0)
-  for (const source of motionSources) {
-    const fileName = String(source).split("/").at(-1) ?? ""
+  for (const frame of motionFrames) {
+    // A packed frame is an atlas crop that reproduces its original file
+    // pixel for pixel (roomAvatarMotionAtlas.test.ts).
+    const fileName = frame.crop
+      ? `${frame.crop.sourceName}.png`
+      : String(frame.source).split("/").at(-1) ?? ""
     assert.ok(fileName.startsWith(productId), fileName)
     assert.ok(fileName.endsWith("_art_v17.png"), `${fileName} is part of the approved v17 set`)
   }
