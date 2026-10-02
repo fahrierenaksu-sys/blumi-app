@@ -30,6 +30,7 @@ import { getShopThumbnailLayout } from "./shopThumbnailLayout"
 import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage } from "./shopCombinationViewport"
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
+import { PressableScale } from "../../ui/PressableScale"
 
 export function ShopPreviewPanel(props: {
   mode: ShopMode
@@ -208,11 +209,11 @@ export function ShopPreviewPanel(props: {
             {showCombination ? (
               <>
                 <View style={[styles.combinationPager, { height: page.pageCount === 1 ? Math.ceil(16 * Math.max(1, fontScale)) : Math.max(44, Math.ceil(16 * fontScale)) }]}>
-                  {page.pageCount > 1 ? <Pressable style={styles.combinationPageButton} disabled={page.page === 0} accessibilityRole="button" accessibilityLabel={copy.combination.previousPieces} accessibilityState={{ disabled: page.page === 0 }} onPress={() => navigateCombinationPage(page.page - 1)}><Ionicons name="chevron-back" size={17} color={page.page === 0 ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></Pressable> : null}
+                  {page.pageCount > 1 ? <PressableScale style={styles.combinationPageButton} disabled={page.page === 0} accessibilityRole="button" accessibilityLabel={copy.combination.previousPieces} accessibilityState={{ disabled: page.page === 0 }} onPress={() => navigateCombinationPage(page.page - 1)}><Ionicons name="chevron-back" size={17} color={page.page === 0 ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></PressableScale> : null}
                   <Text style={[styles.combinationHeading, styles.combinationPageLabel]} accessibilityLiveRegion="polite">
                     {page.pageCount > 1 ? `${page.start + 1}–${page.end} / ${combinationItems.length}` : copy.combination.lookTitle(combinationItems.length)}
                   </Text>
-                  {page.pageCount > 1 ? <Pressable style={styles.combinationPageButton} disabled={page.page + 1 === page.pageCount} accessibilityRole="button" accessibilityLabel={copy.combination.nextPieces} accessibilityState={{ disabled: page.page + 1 === page.pageCount }} onPress={() => navigateCombinationPage(page.page + 1)}><Ionicons name="chevron-forward" size={17} color={page.page + 1 === page.pageCount ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></Pressable> : null}
+                  {page.pageCount > 1 ? <PressableScale style={styles.combinationPageButton} disabled={page.page + 1 === page.pageCount} accessibilityRole="button" accessibilityLabel={copy.combination.nextPieces} accessibilityState={{ disabled: page.page + 1 === page.pageCount }} onPress={() => navigateCombinationPage(page.page + 1)}><Ionicons name="chevron-forward" size={17} color={page.page + 1 === page.pageCount ? uiTheme.colors.textSecondary : uiTheme.colors.primary} /></PressableScale> : null}
                 </View>
                 <View style={styles.combinationRows}>
                   {page.items.map((item) => <CombinationRow key={item.id} item={item} locale={locale} selected={item.id === product.sourceItemId} onSelect={onSelectCombinationItem} />)}
@@ -337,7 +338,7 @@ function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombin
   const bounds = getShopProductThumbnailBounds(item.id)
   const frame = getShopThumbnailLayout(bounds, 34, 34)
   return (
-      <Pressable
+      <PressableScale
         style={[styles.combinationRow, selected ? styles.combinationRowSelected : null]}
         onPress={() => onSelect?.(item.id)}
         accessibilityRole="button"
@@ -351,7 +352,7 @@ function CombinationRow({ item, locale, selected, onSelect }: { item: ShopCombin
           <Text style={styles.combinationItemTitle} numberOfLines={1}>{item.title ?? copy.combination.itemUnavailable}</Text>
           <Text style={styles.combinationItemPrice} numberOfLines={1}>{item.owned ? `✓ ${copy.owned}` : item.price === null ? "—" : `◇ ${formatCoins(item.price, locale)}`}</Text>
         </View>
-      </Pressable>
+      </PressableScale>
   )
 }
 

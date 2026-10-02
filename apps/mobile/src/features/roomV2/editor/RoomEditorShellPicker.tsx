@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { RoomShell } from "../roomV2.types"
 import { styles } from "./roomEditorStyles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 /** Room style chooser, shown only when more than one production shell exists. */
 export function RoomEditorShellPicker(props: {
@@ -18,7 +19,7 @@ export function RoomEditorShellPicker(props: {
         {shells.map((shell) => {
           const selected = selectedRoomShellId === shell.id
           return (
-            <Pressable
+            <PressableScale
               key={shell.id}
               accessibilityRole="button"
               accessibilityLabel={copy.chooseShell(shell.name)}
@@ -38,7 +39,7 @@ export function RoomEditorShellPicker(props: {
               >
                 {shell.name}
               </Text>
-            </Pressable>
+            </PressableScale>
           )
         })}
       </View>

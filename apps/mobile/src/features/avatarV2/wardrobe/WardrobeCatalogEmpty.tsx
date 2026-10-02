@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { Pressable, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+import { PressableScale } from "../../../ui/PressableScale"
 
 export function WardrobeCatalogEmpty(props: {
   copy: WardrobeStudioCopy
@@ -15,14 +16,14 @@ export function WardrobeCatalogEmpty(props: {
         <Text style={styles.catalogEmptyTitle}>{copy.emptyTitle}</Text>
         <Text style={styles.catalogEmptyBody}>{copy.emptyBody}</Text>
       </View>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={copy.exploreShop}
         onPress={onExploreShop}
         style={styles.catalogEmptyAction}
       >
         <Text style={styles.catalogEmptyActionText}>{copy.exploreShop}</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   )
 }
