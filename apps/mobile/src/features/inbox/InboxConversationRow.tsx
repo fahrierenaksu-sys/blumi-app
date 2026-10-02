@@ -4,9 +4,11 @@ import { memo, useCallback, useEffect, useRef } from "react"
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
 import { areChatParticipantAvatarsEquivalent } from "../chat/chatParticipantAvatar"
 import type { InboxCopy } from "../chat/inboxCopy"
+import { hapticMedium } from "../../ui/haptics"
 import { LinearGradient } from "../../ui/linearGradient"
 import { ParticipantAvatar } from "../../ui/participantAvatar"
 import { uiTheme } from "../../ui/theme"
+import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
 
 /** Height of a row with a one-line preview; the skeleton uses it. Rows are measured, not assumed. */
 export const INBOX_ROW_ESTIMATED_HEIGHT = 88
@@ -26,6 +28,11 @@ export interface ConversationCardProps {
   unreadPulseAnim: Animated.Value
   onPress: (threadId: string) => void
   onWarm: (threadId: string) => void
+  /** Pinned rows stay above the others and show a pin. */
+  isPinned: boolean
+  actionsCopy: InboxConversationActionsCopy
+  /** Touch and hold (or the VoiceOver action): pin, unpin or delete. */
+  onLongPress: (threadId: string) => void
 }
 
 /**
@@ -38,6 +45,14 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
   const { threadId, onPress: pressThread, onWarm: warmThread, reduceMotion } = props
   const onPress = useCallback(() => pressThread(threadId), [pressThread, threadId])
   const onWarm = useCallback(() => warmThread(threadId), [warmThread, threadId])
+  const { onLongPress: openActions } = props
+  const onLongPress = useCallback(() => {
+    hapticMedium()
+    openActions(threadId)
+  }, [openActions, threadId])
+  const onAccessibilityAction = useCallback((event: { nativeEvent: { actionName: string } }) => {
+    if (event.nativeEvent.actionName === "longpress") openActions(threadId)
+  }, [openActions, threadId])
   const hasUnread = props.unreadBadge !== null
 
   const handlePressIn = useCallback(() => {
@@ -72,8 +87,11 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
         accessibilityRole="button"
         accessibilityLabel={props.accessibilityLabel}
         accessibilityHint={props.copy.openChatHint}
+        accessibilityActions={[{ name: "longpress", label: props.actionsCopy.actions }]}
+        onAccessibilityAction={onAccessibilityAction}
         style={cardStyles.card}
         onPress={onPress}
+        onLongPress={onLongPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
@@ -100,6 +118,9 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
             <Text style={[cardStyles.name, hasUnread ? cardStyles.nameUnread : null]} numberOfLines={1}>
               {props.partnerName}
             </Text>
+            {props.isPinned ? (
+              <Ionicons name="pin" size={14} color={uiTheme.colors.primaryDeep} style={cardStyles.pin} />
+            ) : null}
             {props.lastTime ? (
               <Text style={[cardStyles.time, hasUnread ? cardStyles.timeUnread : null]} numberOfLines={1}>
                 {props.lastTime}
@@ -152,7 +173,10 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
   previous.reduceMotion === next.reduceMotion &&
   previous.unreadPulseAnim === next.unreadPulseAnim &&
   previous.onWarm === next.onWarm &&
-  previous.onPress === next.onPress
+  previous.onPress === next.onPress &&
+  previous.isPinned === next.isPinned &&
+  previous.actionsCopy === next.actionsCopy &&
+  previous.onLongPress === next.onLongPress
 )
 
 const cardStyles = StyleSheet.create({
@@ -202,6 +226,9 @@ const cardStyles = StyleSheet.create({
   nameUnread: {
     fontFamily: "Inter_800ExtraBold",
     fontWeight: "800"
+  },
+  pin: {
+    marginLeft: -2
   },
   // textSecondary keeps the small time label above 4.5:1 on the white card.
   time: {

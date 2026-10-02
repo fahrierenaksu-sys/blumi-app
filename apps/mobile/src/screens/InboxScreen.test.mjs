@@ -44,6 +44,7 @@ function hooks() {
 function cardHarness() {
   const hook = hooks()
   const springs = []
+  const haptics = []
   class Value {
     constructor(value) { this.value = value }
     stopAnimation() {}
@@ -53,18 +54,19 @@ function cardHarness() {
     ...hook, React, memo: (render, equal) => ({ render, equal }), useEffect: () => {},
     Animated: { Value, View: "AnimatedView", spring: (_value, config) => ({ start: () => springs.push(config.toValue) }) },
     Pressable: "Pressable", View: "View", Text: "Text", LinearGradient: "Gradient",
-    ParticipantAvatar: "Avatar", Ionicons: "Icon", cardStyles: {},
+    ParticipantAvatar: "Avatar", Ionicons: "Icon", cardStyles: {}, hapticMedium: () => haptics.push("medium"),
     uiTheme: { gradients: { primary: [] }, colors: {} },
     areChatParticipantAvatarsEquivalent: (a, b) => a === b
   }
   const card = evaluate(initializer("ConversationCard"), context)
-  return { ...card, springs, render(props) { hook.reset(); return card.render(props).props.children[0].props } }
+  return { ...card, springs, haptics, render(props) { hook.reset(); return card.render(props).props.children[0].props } }
 }
 function props(overrides = {}) {
   return {
     threadId: "thread-a", copy: { openChatHint: "Opens", startWithSpark: "Start" },
     partnerName: "Partner", partnerUserId: "partner", previewPrefix: undefined, lastBody: "Hello", lastTime: "1m",
-    unreadBadge: null, accessibilityLabel: "Partner, Hello, 1m", reduceMotion: false, unreadPulseAnim: {}, onPress: () => {}, onWarm: () => {}, ...overrides
+    unreadBadge: null, accessibilityLabel: "Partner, Hello, 1m", reduceMotion: false, unreadPulseAnim: {}, onPress: () => {}, onWarm: () => {},
+    isPinned: false, actionsCopy: { actions: "Chat options" }, onLongPress: () => {}, ...overrides
   }
 }
 
@@ -75,6 +77,7 @@ test("unaffected row renders keep shared callbacks and memo equality", () => {
   const context = {
     React, useCallback: (fn) => fn, Animated: { View: "AnimatedView" }, ConversationCard: "Card",
     copy: shared.copy, getItemAnim: () => ({}), onWarmThread: warmThread, warmThread, openThread,
+    actionsCopy: shared.actionsCopy, openConversationActions: shared.onLongPress,
     reduceMotion: false, sessionActor: { session: { mode: "production" } }, unreadPulseAnim: shared.unreadPulseAnim
   }
   const render = evaluate(initializer("renderThreadRow"), context)
@@ -237,4 +240,18 @@ test("CHT-09: rows read their unread count, preview and live time", () => {
   assert.match(source, /formatInboxTimestamp\(thread\.lastMessage\?\.sentAt, now, copy, timeFormatter\)/)
   assert.match(rowSource, /accessibilityHint=\{props\.copy\.openChatHint\}/)
   assert.match(rowSource, /hasUnread \? cardStyles\.nameUnread : null/)
+})
+
+test("touch and hold (or the VoiceOver action) opens one conversation's options with one haptic", () => {
+  const card = cardHarness()
+  const opened = []
+  const handlers = card.render(props({ onLongPress: (id) => opened.push(id) }))
+  assert.equal(JSON.stringify(handlers.accessibilityActions), JSON.stringify([{ name: "longpress", label: "Chat options" }]))
+  handlers.onLongPress()
+  handlers.onAccessibilityAction({ nativeEvent: { actionName: "longpress" } })
+  handlers.onAccessibilityAction({ nativeEvent: { actionName: "activate" } })
+  assert.deepEqual(opened, ["thread-a", "thread-a"])
+  assert.deepEqual(card.haptics, ["medium"], "only the physical long press plays a haptic")
+  assert.equal(card.equal(props(), props({ isPinned: true })), false, "a pin change re-renders the row")
+  assert.equal(card.equal(props(), props({ onLongPress: () => {} })), false)
 })

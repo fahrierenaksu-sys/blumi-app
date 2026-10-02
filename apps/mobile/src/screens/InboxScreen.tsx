@@ -1,6 +1,6 @@
 import { useIsFocused } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Animated,
   type FlatList,
@@ -43,12 +43,24 @@ import { getInboxUnreadPulse } from "../features/inbox/inboxUnreadPulseModel"
 import { useInboxPullToRefresh } from "../features/inbox/useInboxPullToRefresh"
 import { useMainTabReselect } from "../ui/layout/useMainTabReselect"
 import { useMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
+import { InboxConversationActionsSheet } from "../features/inbox/InboxConversationActionsSheet"
+import { getInboxConversationActionsCopy } from "../features/inbox/inboxConversationActionsCopy"
+import {
+  arrangeInboxThreads,
+  deleteConversationForMe,
+  isConversationPinned,
+  pinConversation,
+  unpinConversation
+} from "../features/inbox/inboxConversationPrefsModel"
+import { useInboxConversationPrefs } from "../features/inbox/inboxConversationPrefsStore"
 import type { SessionActor } from "../features/session/sessionModel"
 
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
   sessionActor: SessionActor
   onRetryThreads: () => Promise<void>
   onWarmThread: (threadId: string) => Promise<void>
+  /** Marks a conversation read up to a partner message (delete for me clears its unread). */
+  onMarkThreadRead?: (threadId: string, upToMessageId?: string) => void
 }
 
 const CONVERSATION_ROW_GAP = uiTheme.spacing.sm + 2
@@ -59,8 +71,14 @@ const ItemSpacer = () => <View style={styles.itemSpacer} />
 export function InboxScreen(props: InboxScreenProps) {
   const { navigation, sessionActor } = props
   const { onWarmThread, onRetryThreads } = props
-  const { threads, threadListState, getThreadUnreadCount } = useChatStore()
+  const { threads: storeThreads, threadListState, getThreadUnreadCount } = useChatStore()
   const currentUserId = sessionActor.profile.userId
+  // Pinned first, deleted-for-me hidden; kept per account on this phone.
+  const { prefs: conversationPrefs, update: updateConversationPrefs } = useInboxConversationPrefs(currentUserId)
+  const threads = useMemo(
+    () => arrangeInboxThreads(storeThreads, conversationPrefs),
+    [conversationPrefs, storeThreads]
+  )
   const lastFocusRefreshAtRef = useRef(0)
   // The list shows each new message in its row: no message banner on top.
   const isFocused = useIsFocused()
@@ -87,6 +105,7 @@ export function InboxScreen(props: InboxScreenProps) {
     []
   )
   const copy = useMemo(() => getInboxCopy(locale), [locale])
+  const actionsCopy = useMemo(() => getInboxConversationActionsCopy(locale), [locale])
   const timeFormatter = useMemo(
     () => createInboxTimeFormatter(resolveInboxDateLocale(locale, Intl.DateTimeFormat().resolvedOptions().locale)),
     [locale]
@@ -112,6 +131,10 @@ export function InboxScreen(props: InboxScreenProps) {
       const preview = buildInboxRowPreview({ lastMessage: thread.lastMessage, currentUserId, copy })
       const time = formatInboxTimestamp(thread.lastMessage?.sentAt, now, copy, timeFormatter)
       const unreadCount = getThreadUnreadCount(thread.threadId)
+      const isPinned = isConversationPinned(conversationPrefs, thread.threadId)
+      const rowLabel = buildInboxRowAccessibilityLabel(copy, {
+        partnerName, unreadCount, preview, timeSpoken: time.spoken
+      })
       return {
         thread,
         partnerName,
@@ -121,13 +144,12 @@ export function InboxScreen(props: InboxScreenProps) {
         lastBody: preview.body,
         lastTime: time.label,
         unreadBadge: formatInboxUnreadBadge(unreadCount),
-        accessibilityLabel: buildInboxRowAccessibilityLabel(copy, {
-          partnerName, unreadCount, preview, timeSpoken: time.spoken
-        }),
-        hasUnread: unreadCount > 0
+        accessibilityLabel: isPinned ? `${actionsCopy.pinned}, ${rowLabel}` : rowLabel,
+        hasUnread: unreadCount > 0,
+        isPinned
       }
     })
-  }, [copy, currentUserId, getThreadUnreadCount, now, threads, timeFormatter])
+  }, [actionsCopy, conversationPrefs, copy, currentUserId, getThreadUnreadCount, now, threads, timeFormatter])
   const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
   const scrollToTop = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
@@ -208,6 +230,39 @@ export function InboxScreen(props: InboxScreenProps) {
   const warmThread = useCallback((threadId: string) => {
     if (sessionActor.session.mode === "production") void onWarmThread(threadId)
   }, [onWarmThread, sessionActor.session.mode])
+  const [actionsThreadId, setActionsThreadId] = useState<string | null>(null)
+  const openConversationActions = useCallback((threadId: string) => {
+    setActionsThreadId(threadId)
+  }, [])
+  const closeConversationActions = useCallback(() => setActionsThreadId(null), [])
+  const actionsTarget = useMemo(() => {
+    const row = actionsThreadId ? threadRows.find((candidate) => candidate.thread.threadId === actionsThreadId) : undefined
+    return row ? {
+      threadId: row.thread.threadId,
+      partnerName: row.partnerName,
+      partnerUserId: row.partnerUserId,
+      partnerAvatar: row.partnerAvatar,
+      isPinned: row.isPinned
+    } : null
+  }, [actionsThreadId, threadRows])
+  const togglePinnedConversation = useCallback((threadId: string) => {
+    updateConversationPrefs((prefs) => isConversationPinned(prefs, threadId)
+      ? unpinConversation(prefs, threadId)
+      : pinConversation(prefs, threadId, new Date()))
+    setActionsThreadId(null)
+  }, [updateConversationPrefs])
+  const { onMarkThreadRead } = props
+  const deleteConversation = useCallback((threadId: string) => {
+    const thread = storeThreads.find((candidate) => candidate.threadId === threadId)
+    setActionsThreadId(null)
+    if (!thread) return
+    // A deleted chat must not keep counting in the tab and app-icon badges.
+    const last = thread.lastMessage
+    if (getThreadUnreadCount(threadId) > 0 && last && last.senderUserId !== currentUserId) {
+      onMarkThreadRead?.(threadId, last.messageId)
+    }
+    updateConversationPrefs((prefs) => deleteConversationForMe(prefs, thread))
+  }, [currentUserId, getThreadUnreadCount, onMarkThreadRead, storeThreads, updateConversationPrefs])
   const handleGoBack = useCallback(() => {
     goBackFromInbox(navigation)
   }, [navigation])
@@ -233,9 +288,12 @@ export function InboxScreen(props: InboxScreenProps) {
         unreadPulseAnim={unreadPulseAnim}
         onPress={openThread}
         onWarm={warmThread}
+        isPinned={item.isPinned}
+        actionsCopy={actionsCopy}
+        onLongPress={openConversationActions}
       />
     </Animated.View>
-  ), [copy, getItemAnim, openThread, reduceMotion, unreadPulseAnim, warmThread])
+  ), [actionsCopy, copy, getItemAnim, openConversationActions, openThread, reduceMotion, unreadPulseAnim, warmThread])
 
   return (
     <View style={styles.root}>
@@ -324,6 +382,13 @@ export function InboxScreen(props: InboxScreenProps) {
           />
         </View>
       </SafeAreaView>
+      <InboxConversationActionsSheet
+        target={actionsTarget}
+        copy={actionsCopy}
+        onTogglePin={togglePinnedConversation}
+        onDelete={deleteConversation}
+        onClose={closeConversationActions}
+      />
     </View>
   )
 }
