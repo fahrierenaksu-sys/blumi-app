@@ -3,191 +3,198 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Expo-SDK_57-49334F?style=flat-square&amp;logo=expo&amp;logoColor=white" alt="Expo SDK 57" />
-  <img src="https://img.shields.io/badge/React_Native-Mobile-8064B1?style=flat-square&amp;logo=react&amp;logoColor=white" alt="React Native" />
-  <img src="https://img.shields.io/badge/TypeScript-Full_Stack-527BA8?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/PostgreSQL-Persistence-577F8E?style=flat-square&amp;logo=postgresql&amp;logoColor=white" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/Stage-Closed_Test_Prep-C66693?style=flat-square" alt="Closed test preparation" />
+  <strong>An avatar-first social app. A conversation that becomes a shared space.</strong>
 </p>
 
-<h1 align="center">Meet through personality. Connect through conversation.</h1>
+<p align="center">
+  <img src="https://img.shields.io/badge/Expo-SDK_57-49334F?style=flat-square&amp;logo=expo&amp;logoColor=white" alt="Expo SDK 57" />
+  <img src="https://img.shields.io/badge/React_Native-0.86-8064B1?style=flat-square&amp;logo=react&amp;logoColor=white" alt="React Native 0.86" />
+  <img src="https://img.shields.io/badge/TypeScript-Full_Stack-527BA8?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-Persistence-577F8E?style=flat-square&amp;logo=postgresql&amp;logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Status-In_Development-C66693?style=flat-square" alt="In development" />
+</p>
 
-Blumi is an avatar-first social mobile app combining discovery, mutual matching, messaging, and shared virtual rooms. People can express themselves through a character and a personal space, then connect at their own pace.
+<p align="center">
+  <a href="#the-experience">The experience</a> ·
+  <a href="#inside-blumi">Inside Blumi</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="#verification">Verification</a> ·
+  <a href="#project-status">Project status</a>
+</p>
 
-This repository contains the React Native application, backend API, real-time services, and shared TypeScript packages. **Status: active development and closed-test preparation; not publicly released.**
+---
 
-[Product experience](#product-experience) · [Engineering highlights](#engineering-highlights) · [Release status](#release-status) · [Explore the code](#explore-the-code) · [Run locally](#run-locally)
+## The experience
 
-<br />
+Blumi is an anonymous-first mobile social app built around personality, text conversations, and sweet 2.5D chibi characters. An avatar and a personal room give people a way to express themselves before deciding how they want to connect.
+
+**Discover → Mutual match → Text chat → Optional room invitation → Shared room**
 
 <table>
   <tr>
     <td align="center" width="33%">
       <br />
-      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f04.png" width="160" alt="Blumi's smiling female avatar waving hello" />
-      <br /><strong>A little personality.</strong><br />
-      <sub>Your style. Your character.</sub><br /><br />
+      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_female_f04.png" width="140" alt="Blumi female character waving hello" />
+      <br /><strong>Make it yours.</strong><br />
+      <sub>Your character. Your style. Your room.</sub><br /><br />
     </td>
     <td align="center" width="34%">
-      <img src="apps/mobile/assets/brand/blumi-app-icon-1024.png" width="80" alt="Blumi app icon" />
-      <br /><br /><strong>Good connections<br />start with a hello.</strong><br /><br />
-      <sub>Express yourself.<br />Meet someone.<br />Make room for a connection.</sub>
+      <img src="apps/mobile/assets/brand/blumi-app-icon-1024.png" width="72" alt="Blumi app icon" />
+      <br /><br /><strong>Start with a hello.</strong><br />
+      <sub>Find a mutual connection.<br />Let the conversation grow.</sub><br /><br />
     </td>
     <td align="center" width="33%">
       <br />
-      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f04.png" width="160" alt="Blumi's smiling male avatar waving hello" />
-      <br /><strong>A new possibility.</strong><br />
-      <sub>A conversation worth starting.</sub><br /><br />
+      <img src="apps/mobile/src/features/session/assets/onboarding-wave-v3-runtime/blumi_intro_wave_male_f04.png" width="140" alt="Blumi male character waving hello" />
+      <br /><strong>Make room for someone.</strong><br />
+      <sub>A shared space, at your own pace.</sub><br /><br />
     </td>
   </tr>
 </table>
 
-<p align="center"><sub>Characters from Blumi's onboarding artwork.</sub></p>
+- **Express yourself:** customize a character with clothing and accessories, and decorate a personal room.
+- **Connect through conversation:** discover people and start messaging after a mutual match.
+- **Share a space:** invite someone from chat into a room based on the host's decor. Shared-room text is durable.
+- **Keep control:** manage notification preferences, block or report accounts, and request account export or deletion.
 
-<a id="product-experience"></a>
+The first release is text-only. Voice, photos, GIFs, video, camera flows, calls, voice messages, and app sound are outside its scope.
 
-## ✦ Product experience
+## Inside Blumi
 
-**Create an avatar → Discover people → Match → Start a conversation → Meet in a shared room**
+This monorepo contains the mobile app, backend, real-time client, and shared business rules.
 
-| 🌷 Make it yours | 💬 Find a connection | 🏡 Share a space |
-| :--- | :--- | :--- |
-| Build an avatar with clothing and accessories. Decorate a room that expresses your style. | Discover profiles and interests. Start a text conversation after a mutual match. | Send a room invitation from chat. Meet in a shared copy of the host's decor, with optional live voice. |
+| Layer | Technology | Location |
+| --- | --- | --- |
+| Mobile app | Expo SDK 57, React Native 0.86, React 19, Reanimated 4 | [apps/mobile](apps/mobile) |
+| API and real-time services | Node.js, Fastify, WebSocket | [apps/server](apps/server) |
+| Persistence | PostgreSQL and versioned SQL migrations | [Database migrations](apps/server/db/migrations) |
+| Boundary contracts | Shared TypeScript request, response, and event types | [packages/contracts](packages/contracts) |
+| Domain rules | Business rules, catalogs, and stable product IDs | [packages/domain](packages/domain) |
+| Real-time client | Shared connection and event handling | [packages/realtime-client](packages/realtime-client) |
 
-**Your pace, your boundaries.** Notification preferences, blocking, reporting, account export, and deletion give users control over their experience.
+### Built for continuity
 
-The product centers on avatars, text, and optional live voice. Photos, video calls, and voice messages are outside the current product scope.
+The backend owns inventory, purchases, balances, avatar loadouts, room persistence, and access decisions. Mobile previews and real-time presence do not establish ownership.
 
-<a id="engineering-highlights"></a>
+Durable messaging uses PostgreSQL transactions, an outbox, retries, and message-ID deduplication. Session-generation guards protect account changes from delayed responses. Shared-room invitations preserve the host's decor for both participants.
 
-## ◈ Engineering highlights
-
-The implementation focuses on keeping user-visible behavior consistent when requests overlap, connections drop, or background jobs retry.
-
-| Area | Implementation approach |
-| --- | --- |
-| Account isolation | Session-generation guards prevent delayed responses from a previous account from overwriting the current session. |
-| Durable messaging | PostgreSQL transactions and an outbox coordinate message persistence and delivery jobs, with retries and message-ID deduplication. |
-| Stable discovery | Server-side candidate snapshots support pagination while decisions and eligibility change; current access checks still apply to each page. |
-| Shared room state | Accepted invitations preserve the host's decor so both participants receive the same room data. |
-| Service lifecycle | Readiness checks, bounded requests, and graceful shutdown coordinate active work with database closure. |
-| Privacy | Generic chat push bodies, telemetry filtering, and streamed account exports reduce unnecessary exposure and memory usage. |
-
-## ⚙ Technology
-
-| Layer | Stack |
-| --- | --- |
-| Mobile | Expo SDK 57, React Native, TypeScript |
-| Backend | Node.js, Fastify, WebSocket |
-| Persistence | PostgreSQL, versioned SQL migrations |
-| Shared code | TypeScript contracts, domain rules, real-time client |
-| Workspace | npm workspaces with a single root lockfile |
-
-<a id="explore-the-code"></a>
-
-## ↗ Explore the code
-
-| Directory | Responsibility |
-| --- | --- |
-| [apps/mobile](apps/mobile) | Screens, onboarding, avatars, room rendering, and mobile state |
-| [apps/server](apps/server) | Authentication, API routes, real-time services, workers, and data access |
-| [packages/contracts](packages/contracts) | Shared request, response, and event contracts |
-| [packages/domain](packages/domain) | Shared business rules and catalogs |
-| [packages/realtime-client](packages/realtime-client) | Real-time client package |
-| [scripts/security](scripts/security) | Dependency checks, source hygiene, and isolated PostgreSQL verification |
-
-For a closer look at behavior under failure and concurrency:
-
-- [Account deletion and notification dispatch races](apps/server/src/db/postgresDiscoveryWatchAtomicity.postgres.test.ts)
-- [Durable chat delivery and rollback](apps/server/src/db/postgresChatRepository.postgres.test.ts)
-- [Discovery pagination across changing eligibility](apps/server/src/matches/postgresDiscoverySnapshots.test.ts)
-- [Streaming a 100,000-message account export](apps/server/src/account/accountDataExport.postgres.test.ts)
-
-## Run locally
+Characters use one layered-PNG renderer across room surfaces. Movement and animation frames run on the UI thread; canonical cosmetic IDs stay consistent across Shop, Inventory, Wardrobe, rooms, and remote participants.
 
 <details>
-<summary><strong>Developer setup — requirements, installation, and local commands</strong></summary>
+<summary><strong>Explore the failure and concurrency checks</strong></summary>
+
+- [Account deletion and notification dispatch races](apps/server/src/db/postgresDiscoveryWatchAtomicity.postgres.test.ts)
+- [Durable chat delivery and transaction rollback](apps/server/src/db/postgresChatRepository.postgres.test.ts)
+- [Discovery pagination as eligibility changes](apps/server/src/matches/postgresDiscoverySnapshots.test.ts)
+- [Streaming large account exports](apps/server/src/account/accountDataExport.postgres.test.ts)
+
+</details>
+
+## Getting started
 
 ### Requirements
 
-- Node.js 22.23.3 (`nvm use`, from `.nvmrc`) and npm 10+
-- PostgreSQL tools (`initdb`, `pg_ctl`) on `PATH` for full verification
-- Xcode and CocoaPods for native iOS development
+- **Node.js 22.23.3** — pinned in [.nvmrc](.nvmrc).
+- **npm 10+** — install dependencies from the repository root using the shared lockfile.
+- **Xcode and CocoaPods** — required for local native iOS builds.
+- **PostgreSQL tools** — `initdb` and `pg_ctl` on `PATH` for the full verification gate; the initial in-memory server does not need PostgreSQL.
 
-### Install
+### 1. Install and configure
+
+From the repository root:
 
 ```bash
+nvm use
 npm ci
-cp .env.example .env.local
+npm run build:packages
 ```
 
-Use the root workspace and lockfile for installation. Do not create separate lockfiles inside workspaces. Local environment files are ignored by Git; use the example files to configure each environment.
+For a new checkout, create the ignored local environment files:
 
-The default local server uses in-memory storage and development providers. Configure persistent storage and external integrations separately. Keep real credentials in ignored environment files or a deployment secret manager.
+```bash
+cp .env.example .env.local
+cp apps/mobile/.env.example apps/mobile/.env.local
+```
 
-### Start the application
+The server template uses in-memory storage and development providers. The mobile template points to the local HTTP API on port `4000` and WebSocket service on port `4100`. See the [server setup](apps/server/README.md) for persistent storage and provider configuration.
 
-Start the API and real-time server:
+### 2. Start the server
 
 ```bash
 npm run dev:server
 ```
 
-In a second terminal, start Expo:
+### 3. Start the mobile app
+
+In a second terminal:
 
 ```bash
-npm start
+npm run dev:mobile
 ```
 
-This starts Metro from `apps/mobile` on LAN port `8081` for the native Blumi development client. Install the development build on the phone or Simulator first. The device must be able to reach the development machine and its configured API address.
-
-For a clean Metro cache:
-
-```bash
-npm --workspace @blumi/mobile run start:clear
-```
-
-To start the development client explicitly:
-
-```bash
-npm --workspace @blumi/mobile run start:dev-client
-```
-
-For Expo Go demos that do not require the native integrations:
-
-```bash
-npm --workspace @blumi/mobile run start:go
-```
-
-To build the native iOS app locally:
+Metro starts on LAN port `8081` for the Blumi native development client. A development build must be installed on the phone or Simulator. For the first local iOS build:
 
 ```bash
 cd apps/mobile
 SENTRY_DISABLE_AUTO_UPLOAD=true npm run ios
 ```
 
+For a physical phone, set the local server's `HOST` to `0.0.0.0` and configure the mobile API and WebSocket addresses with the development machine's reachable LAN address. `127.0.0.1` on the phone refers to the phone itself.
+
+<details>
+<summary><strong>Useful development commands</strong></summary>
+
+Run these from the repository root:
+
+| Command | Purpose |
+| --- | --- |
+| `npm start` | Alias for the mobile development server |
+| `npm --workspace @blumi/mobile run start:clear` | Start Metro with a cleared cache |
+| `npm --workspace @blumi/mobile run start:dev-client` | Explicitly start the native development client |
+| `npm --workspace @blumi/mobile run start:go` | Start Expo Go demos; native integrations need a development build |
+| `npm run build:server` | Build shared packages and the backend |
+| `npm run doctor` | Check Expo dependency health |
+
 </details>
 
-## ✓ Verification
+## Verification
+
+For focused development checks:
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+For the full repository and release validation gate:
 
 ```bash
 npm run verify
 ```
 
-The pipeline is a multi-step release gate; the authoritative list of steps is in the Commands section of [AGENTS.md](AGENTS.md).
+The gate covers source hygiene, operational tooling, package builds, TypeScript, lint, automated tests, isolated PostgreSQL verification, dependency auditing, and Expo Doctor. The exact sequence lives in [package.json](package.json).
 
-The PostgreSQL gate creates a temporary cluster accessible through a local Unix socket. It does not use an existing `DATABASE_URL`. Migrations are tested from an empty database and on a repeated run; missing tools or skipped database tests fail the gate. The cluster is stopped and its generated data removed afterward, while diagnostic logs are retained. Set `BLUMI_PG_KEEP_TEST_DATA=1` only when retaining a test database for investigation.
+PostgreSQL verification creates a disposable local cluster and does not use an existing `DATABASE_URL`. It checks migration application and repeatability. Automated checks support native testing; they do not prove physical-device behavior, a live deployment, or release readiness.
 
-Installation applies a version-specific React Navigation compatibility patch for the updated `query-string` dependency. Source checks and deep-link regression tests cover this patch.
+## Project status
 
-Automated source checks complement device testing. Real-device audio, push delivery, purchase-provider flows, and file sharing require separate integration validation. Production packaging checks legal configuration before native preparation; preview configuration does not establish production readiness.
+**Blumi is in active development and is not publicly released.**
 
-<a id="release-status"></a>
+`develop` is the integration branch; `main` is the release branch. Shipping to `main`, deployments, live database migrations, and store submissions require the owner's authorization.
 
-## Release status
+Release status is tracked separately from implementation. Native-device, performance, legal, provider, and App Store evidence must be verified for the build being shipped.
 
-**Current as of 2026-09-30: not ready for public release.** The latest full `npm run verify` passed on 2026-09-30 on the integration branch `claude/busy-cray-dl5wvr` (not merged to `main`), including package builds, type checks, lint, workspace tests, isolated PostgreSQL migration checks, the release dependency audit, and Expo Doctor (21/21); see the [2026-09-30 engineering audit](docs/quality/ENGINEERING_AUDIT_2026-09-30.md). These checks validate the repository and disposable test database; they do not prove a live deployment or native-device release.
+| Reference | What it covers |
+| --- | --- |
+| [Launch Control](docs/release/LAUNCH_CONTROL.md) | Dated readiness evidence and open release gates |
+| [OTA and TestFlight](docs/release/OTA_AND_TESTFLIGHT.md) | Mobile distribution and build constraints |
+| [Database release runbook](docs/release/DATABASE_RELEASE_RUNBOOK.md) | Migration, backup, and restore procedures |
+| [Engineering rules](docs/quality/ENGINEERING_RULES.md) | Code boundaries, performance, motion, and privacy requirements |
+| [Project instructions](AGENTS.md) | Product facts, collaboration rules, and protected operations |
 
-The earlier candidate-import build block is resolved: the owner-approved artwork was promoted to runtime paths and the release candidate-import gate remains in place. Railway and external provider setup, EAS/TestFlight distribution, real-device OTP/push/voice/purchase flows, production backup/restore, and continuous monitoring still need verification. The protected Supabase test database was last inspected read-only on 2026-09-28: 18 accounts, 65 applied migration checksums matching source, and integrity migration 066 not live (this supersedes the earlier 2026-09-27 note that migrations 062–063 were not applied; see [Launch Control](docs/release/LAUNCH_CONTROL.md) and the [database release runbook](docs/release/DATABASE_RELEASE_RUNBOOK.md)).
+---
 
-See [Launch Control](docs/release/LAUNCH_CONTROL.md) for the dated readiness snapshot and [the staging and production guide](docs/release/railway-supabase-launch.md) for the deployment sequence and evidence requirements. Provider and account statuses can change, so recheck those documents before taking release action.
+<p align="center">
+  <strong>Start with a conversation. Build a shared world.</strong>
+</p>
