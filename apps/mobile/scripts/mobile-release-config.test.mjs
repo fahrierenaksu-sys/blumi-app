@@ -426,6 +426,19 @@ test("candidate asset release guard catches static imports and ignores ordinary 
   assert.doesNotThrow(() => assertNoCandidateAssetImportsInSourceRoot(resolve(mobileRoot, "src")))
 })
 
+test("candidate asset release guard also catches a plural candidates directory", () => {
+  const references = findCandidateAssetImports([
+    {
+      filePath: "MaleHairPreview.tsx",
+      content: 'import hair from "../assets/male-hair-v2/candidates/front.png"'
+    }
+  ])
+  assert.deepEqual(references, [{
+    filePath: "MaleHairPreview.tsx",
+    assetPath: "../assets/male-hair-v2/candidates/front.png"
+  }])
+})
+
 test("candidate asset release guard still rejects a source root that imports a candidate asset", () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "blumi-candidate-guard-"))
   try {
