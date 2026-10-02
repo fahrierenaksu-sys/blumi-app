@@ -670,6 +670,7 @@ export async function registerUserRoutes(
       body: coreApiJsonSchemas.phoneNumber,
       response: {
         202: successResponseJsonSchema,
+        410: successResponseJsonSchema,
         ...authenticatedErrorResponses
       }
     }
