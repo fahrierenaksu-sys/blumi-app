@@ -32,7 +32,7 @@ import {
   TagChip,
 } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
+import { useReducedMotion } from "../ui/animations"
 import { PressableScale } from "../ui/PressableScale"
 import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
@@ -90,8 +90,6 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const { navigation, route } = props
   const copy = getProfilePreviewCopy(getAppLocale())
   const profile = props.profileOverride ?? ("profile" in route.params ? route.params.profile : undefined)
-  // The content rises in on the UI thread; Reduce Motion only fades it in.
-  const contentEntrance = useEntranceAnimation({ translateY: 20 })
   const reduceMotion = useReducedMotion()
   const [reportVisible, setReportVisible] = useState(false)
   const [isDeciding, setIsDeciding] = useState(false)
@@ -266,7 +264,10 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        <Reanimated.View style={contentEntrance}>
+        {/* No entrance of its own: the push slides the page in fully drawn,
+            and a profile that replaces the loading skeleton crossfades in
+            LinkedProfileScreen. */}
+        <View>
           {/* Full-bleed Hero Section */}
           <View style={styles.heroBlock}>
             {/* Background Glows */}
@@ -437,7 +438,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
               ) : null}
             </SafeAreaView>
           </View>
-        </Reanimated.View>
+        </View>
       </Reanimated.ScrollView>
       {shouldShowProfileSafety(context) ? (
         <ReportModal
