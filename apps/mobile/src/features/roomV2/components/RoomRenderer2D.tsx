@@ -13,6 +13,7 @@ import {
 import { memo, useCallback, useRef, useState, type ReactNode } from "react"
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
+import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
 import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
@@ -582,6 +583,11 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   const avatarAccessibilityValue = item.kind === "avatar"
     ? { text: getRoomV2AvatarAccessibilityValue({ state: item.state, direction: item.direction, seatedFurnitureName }, getAppLocale()) }
     : undefined
+  // Only the drawn figure takes the avatar's taps; the rest of its box is
+  // floor, so a tap right beside it walks there.
+  const avatarTapTarget = tapsInsideLiveFrame
+    ? getRoomAvatarTapTarget(item.width * mobileFurnitureScale * stageWidthPx, item.height * mobileFurnitureScale * stageHeightPx)
+    : undefined
   const liveAvatarLayout = liveAvatarPosition && {
     live: liveAvatarPosition,
     width: item.width * mobileFurnitureScale,
@@ -737,7 +743,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
               accessibilityHint={itemAccessibility.hint}
               accessibilityValue={avatarAccessibilityValue}
               onPress={(event) => { event.stopPropagation(); onItemTap?.(item) }}
-              style={StyleSheet.absoluteFill}
+              style={[styles.avatarTapTarget, avatarTapTarget]}
             />
           ) : null}
         </View>
@@ -801,6 +807,9 @@ function getPlacementGuideStyle(
 }
 
 const styles = StyleSheet.create({
+  avatarTapTarget: {
+    position: "absolute"
+  },
   root: {
     width: "100%",
     position: "relative",
