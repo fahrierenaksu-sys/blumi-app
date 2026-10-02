@@ -79,11 +79,9 @@ test("the realtime handler routes typing and a message from the typist clears it
     applyChatMessageReceived: () => undefined,
     applyChatTypingUpdated: store.applyUpdate,
     clearChatTypingForMessage: store.noteMessage,
-    getThreads: () => [],
     openReadyMiniRoom: () => undefined,
     onConnectionMatched: () => undefined,
-    showIncomingMessageToast: () => undefined,
-    shouldShowIncomingMessageAlert: () => false
+    noteIncomingMessage: () => undefined
   })
   handle({ type: "chat.typing_updated", payload: START })
   assert.equal("t1" in store.getSnapshot().entries, true)

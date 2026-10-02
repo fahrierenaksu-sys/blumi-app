@@ -10,7 +10,8 @@ import { styles } from "./chatThreadStyles"
 
 /**
  * Static conversation header: back, partner avatar and name, the optional
- * persisted-match replay link, and the safety menu entry.
+ * persisted-match replay link, and the safety menu entry. The avatar (and
+ * the name beside it) opens the partner's profile when one can be shown.
  */
 export function ChatThreadHeader({
   chatCopy,
@@ -20,7 +21,8 @@ export function ChatThreadHeader({
   partnerAvatar,
   onBack,
   onViewMatch,
-  onOpenSafety
+  onOpenSafety,
+  onOpenProfile
 }: {
   chatCopy: ChatThreadCopy
   chatLocale: ChatLocale
@@ -31,21 +33,42 @@ export function ChatThreadHeader({
   /** Null when this conversation has no persisted match to replay. */
   onViewMatch: (() => void) | null
   onOpenSafety: () => void
+  /** Null while the partner is not known yet (no profile to open). */
+  onOpenProfile: (() => void) | null
 }) {
   return (
     <View style={styles.chatHeader}>
       <ActionButtonCircle accessibilityLabel={chatCopy.back} onPress={onBack} size={40}>
         <Ionicons name="arrow-back" size={20} color={uiTheme.colors.textPrimary} />
       </ActionButtonCircle>
-      <ParticipantAvatar
-        name={partnerName}
-        seed={partnerUserId || partnerName}
-        avatar={partnerAvatar}
-        size={44}
-        ring="soft"
-      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={chatCopy.openProfileAccessibilityLabel(partnerName)}
+        accessibilityHint={chatCopy.openProfileHint}
+        accessibilityState={{ disabled: !onOpenProfile }}
+        disabled={!onOpenProfile}
+        onPress={onOpenProfile ?? undefined}
+        hitSlop={4}
+        style={({ pressed }) => [styles.chatHeaderAvatarButton, pressed ? styles.chatHeaderPressed : null]}
+      >
+        <ParticipantAvatar
+          name={partnerName}
+          seed={partnerUserId || partnerName}
+          avatar={partnerAvatar}
+          size={44}
+          ring="soft"
+        />
+      </Pressable>
       <View style={styles.chatHeaderCopy}>
-        <Text numberOfLines={1} style={styles.chatHeaderName}>{partnerName}</Text>
+        {/* A larger touch target for the same action; VoiceOver uses the avatar button. */}
+        <Text
+          accessible={false}
+          numberOfLines={1}
+          onPress={onOpenProfile ?? undefined}
+          style={styles.chatHeaderName}
+        >
+          {partnerName}
+        </Text>
         {onViewMatch ? (
           <Pressable
             accessibilityRole="button"

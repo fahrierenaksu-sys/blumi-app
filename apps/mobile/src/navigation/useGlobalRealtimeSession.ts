@@ -15,11 +15,10 @@ import {
   hasMessageHistory,
   noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
-import { getInboxCopy } from "../features/chat/inboxCopy"
 import type { ConnectionMatchedPayload } from "../features/connections/globalMatchReconciliation"
 import { isDemoMode, setDemoMode } from "../features/demo/demoStore"
 import { createGlobalRealtimeEventHandler } from "../features/realtime/globalRealtimeEventHandler"
-import { shouldShowIncomingMessageAlert } from "../features/notifications/foregroundNotificationState"
+import { noteIncomingMessage } from "../features/notifications/foregroundNotificationState"
 import {
   createGlobalRealtimeLifecycle,
   getGlobalRealtimeLifecycleIdentity
@@ -35,8 +34,6 @@ import {
 } from "../features/realtime/globalRealtimeProvider"
 import { isRealtimeAuthInvalidClose } from "@blumi/realtime-client"
 import { hydrateBlockedUsersFromServer } from "../features/safety/blockStore"
-import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
-import { getNativeAppLocale } from "../features/session/authLocale"
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
@@ -217,24 +214,15 @@ export function useGlobalRealtimeSession({
       applyChatReceiptUpdated,
       applyChatTypingUpdated: chatTypingStore.applyUpdate,
       clearChatTypingForMessage: chatTypingStore.noteMessage,
-      getThreads,
       openReadyMiniRoom,
       onConnectionMatched,
       onPartnerBlocked: (blockedUserId) => {
         chatTypingStore.clearUser(blockedUserId)
         onPartnerBlocked(blockedUserId)
       },
-      showIncomingMessageToast: (toast) => {
-        showToast({ ...toast, type: "info" })
-      },
-      shouldShowIncomingMessageAlert,
-      openConversation: (threadId) => {
-        if (navigationRef.isReady()) navigationRef.navigate("ChatThread", { threadId })
-      },
-      unknownSenderName: getInboxCopy(resolveAccountRecoveryLocale(
-        getNativeAppLocale(),
-        Intl.DateTimeFormat().resolvedOptions().locale
-      )).unknownPartner
+      // No in-app message toast (owner decision 2026-10-02): the OS banner
+      // is the only message alert, and only for a conversation not on screen.
+      noteIncomingMessage
     }),
     [
       onConnectionMatched,

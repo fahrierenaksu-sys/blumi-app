@@ -574,15 +574,19 @@ export function RootNavigator({ fontsReady = true }: RootNavigatorProps = {}) {
     }),
     [sessionDisplayName, updateSessionProfile]
   )
+  // Stable: the chat coordinator's mark-read, not the whole bindings object.
+  const markThreadReadFromInbox = chatThreadBindings.markThreadRead
   const mainTabPageDependencies = useMemo<MainTabPageDependencies>(() => ({
     onResetSession: clearSessionActor,
     onUpdateDiscoveryPreferences: updateDiscoveryPreferences,
     onRetryThreads: refreshProductionThreads,
     onWarmThread: warmThreadMessagesForInbox,
+    onMarkThreadRead: markThreadReadFromInbox,
     resolvedCapabilities,
     isFullShopCatalogQaPreview: IS_FULL_SHOP_CATALOG_QA_PREVIEW
   }), [
     clearSessionActor,
+    markThreadReadFromInbox,
     refreshProductionThreads,
     resolvedCapabilities,
     updateDiscoveryPreferences,

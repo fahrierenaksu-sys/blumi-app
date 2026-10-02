@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  claimVisibleIncomingMessage,
   createForegroundAlertLedger,
   foregroundAlertKey,
-  resolveForegroundNotificationPresentation,
-  shouldShowInAppMessageAlert
+  isConversationNotificationData,
+  resolveForegroundNotificationPresentation
 } from "./notificationPresentationModel"
 
 function presentation(data: unknown, options: {
@@ -53,12 +54,31 @@ test("a delayed message push is hidden after the message was already displayed",
   assert.equal(presentation(data, { appActive: false }).shouldShowBanner, true)
 })
 
-test("a message already shown by the in-app toast is not shown again by the push", () => {
+test("a message already presented is not shown again by a repeated push", () => {
   const data = { type: "chat.message", threadId: "thread_a", messageId: "m1" }
   assert.equal(presentation(data, { presented: ["message:m1"] }).shouldShowBanner, false)
   const first = presentation(data)
   assert.equal(first.shouldShowBanner, true)
-  assert.equal(first.ledger.claim("message:m1"), false, "the push claims the alert so a late toast stays quiet")
+  assert.equal(first.ledger.claim("message:m1"), false, "the banner claims the alert")
+})
+
+test("the open-conversation rule holds in active and inactive states for X; Y still banners", () => {
+  // appActive is true for iOS "active" and "inactive" (Notification Center,
+  // Control Center, an incoming call sheet over the open chat).
+  for (const type of ["chat.message", "chat.room_invite"]) {
+    const fromX = { type, threadId: "thread_x", messageId: "mx", inviteId: "ix" }
+    const fromY = { type, threadId: "thread_y", messageId: "my", inviteId: "iy" }
+    assert.equal(presentation(fromX, { focused: ["thread_x"] }).shouldShowBanner, false)
+    assert.equal(presentation(fromX, { focused: ["thread_x"] }).shouldShowList, false)
+    assert.equal(presentation(fromY, { focused: ["thread_x"] }).shouldShowBanner, true)
+  }
+})
+
+test("the Chats list suppresses message banners only; invites and matches still banner", () => {
+  const options = { suppressMessageAlerts: true }
+  assert.equal(presentation({ type: "chat.message", threadId: "thread_y", messageId: "m" }, options).shouldShowBanner, false)
+  assert.equal(presentation({ type: "chat.room_invite", threadId: "thread_y", inviteId: "i" }, options).shouldShowBanner, true)
+  assert.equal(presentation({ type: "discovery.match", matchId: "x" }, options).shouldShowBanner, true)
 })
 
 test("the match someone is already looking at does not banner again", () => {
@@ -90,12 +110,21 @@ test("alert keys use only routing ids", () => {
   assert.equal(foregroundAlertKey({ type: "discovery.like" }), null)
 })
 
-test("the in-app message toast yields to an open conversation and to a banner already shown", () => {
+test("a socket message claims its alert only when visible, so the push banner stays the one alert", () => {
   const ledger = createForegroundAlertLedger()
-  const focused = (threadId: string) => threadId === "thread_open"
-  assert.equal(shouldShowInAppMessageAlert({ threadId: "thread_open", messageId: "m1" }, focused, ledger.claim), false)
-  assert.equal(shouldShowInAppMessageAlert({ threadId: "thread_other", messageId: "m2" }, focused, ledger.claim), true)
-  assert.equal(shouldShowInAppMessageAlert({ threadId: "thread_other", messageId: "m2" }, focused, ledger.claim), false)
+  const visible = (threadId: string) => threadId === "thread_open"
+  assert.equal(claimVisibleIncomingMessage({ threadId: "thread_open", messageId: "m1" }, visible, ledger.claim), true)
+  assert.equal(claimVisibleIncomingMessage({ threadId: "thread_other", messageId: "m2" }, visible, ledger.claim), false)
+  assert.equal(ledger.claim("message:m1"), false, "a late push for the seen message stays quiet")
+  assert.equal(ledger.claim("message:m2"), true, "the unseen message is left to its push banner")
+})
+
+test("delivered notifications of one conversation are recognised for clearing", () => {
+  assert.equal(isConversationNotificationData({ type: "chat.message", threadId: "t1", messageId: "m" }, "t1"), true)
+  assert.equal(isConversationNotificationData({ type: "chat.room_invite", threadId: "t1", inviteId: "i" }, "t1"), true)
+  assert.equal(isConversationNotificationData({ type: "chat.message", threadId: "t2" }, "t1"), false)
+  assert.equal(isConversationNotificationData({ type: "discovery.match", threadId: "t1" }, "t1"), false)
+  assert.equal(isConversationNotificationData(null, "t1"), false)
 })
 
 test("the alert ledger forgets old entries and stays bounded", () => {

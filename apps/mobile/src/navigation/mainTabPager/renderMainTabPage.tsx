@@ -29,6 +29,7 @@ export interface MainTabPageDependencies {
   onUpdateDiscoveryPreferences: NonNullable<LobbyProps["onUpdateDiscoveryPreferences"]>
   onRetryThreads: InboxProps["onRetryThreads"]
   onWarmThread: InboxProps["onWarmThread"]
+  onMarkThreadRead: InboxProps["onMarkThreadRead"]
   resolvedCapabilities: MyRoomProps["resolvedCapabilities"]
   isFullShopCatalogQaPreview: boolean
 }
@@ -59,6 +60,7 @@ export function renderMainTabPage(
         sessionActor={actor}
         onRetryThreads={dependencies.onRetryThreads}
         onWarmThread={dependencies.onWarmThread}
+        onMarkThreadRead={dependencies.onMarkThreadRead}
       />
     )
   }

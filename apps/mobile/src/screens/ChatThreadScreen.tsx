@@ -316,6 +316,9 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             ? () => navigation.navigate("MatchResult", { match: persistedMatch, celebrate: false })
             : null}
           onOpenSafety={() => setReportVisible(true)}
+          onOpenProfile={partnerUserId
+            ? () => navigation.navigate("ProfilePreview", { userId: partnerUserId })
+            : null}
         />
 
         <ReportModal

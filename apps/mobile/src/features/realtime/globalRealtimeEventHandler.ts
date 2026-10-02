@@ -2,7 +2,6 @@ import type {
   ChatMessage,
   ChatMessageList,
   ChatReceiptUpdated,
-  ChatThread,
   ChatThreadList,
   ChatThreadRead,
   ChatTypingUpdated,
@@ -19,14 +18,6 @@ export type ConnectionMatchedPayload = Extract<
   ServerEvent,
   { type: "connection.matched" }
 >["payload"]
-
-export interface IncomingMessageToast {
-  title: string
-  body: string
-  durationMs: number
-  /** Opens the message's conversation. */
-  onPress?: () => void
-}
 
 export interface GlobalRealtimeEventHandlerDependencies {
   currentUserId?: string
@@ -56,20 +47,16 @@ export interface GlobalRealtimeEventHandlerDependencies {
   applyChatTypingUpdated?: (payload: ChatTypingUpdated) => void
   /** A message arrived: its sender's typing indicator in that thread ends. */
   clearChatTypingForMessage?: (message: { threadId: string; senderUserId: string }) => void
-  getThreads: () => readonly ChatThread[]
   openReadyMiniRoom: (payload: ReadyMiniRoomPayload) => void
   onConnectionMatched: (payload: ConnectionMatchedPayload) => void
   /** `safety.user_blocked`: the server confirmed a block by this user. */
   onPartnerBlocked?: (blockedUserId: string) => void
-  showIncomingMessageToast: (toast: IncomingMessageToast) => void
   /**
-   * False while the conversation is on screen (chat or shared room) or when
-   * the push for this message already showed a banner: one alert per message.
+   * A partner message arrived. There is no in-app message toast (owner
+   * decision 2026-10-02); this only records a message already on screen so a
+   * late push for it never banners.
    */
-  shouldShowIncomingMessageAlert?: (message: { threadId: string; messageId: string }) => boolean
-  openConversation?: (threadId: string) => void
-  /** Localized title for a sender whose name is not known yet. */
-  unknownSenderName?: string
+  noteIncomingMessage?: (message: { threadId: string; messageId: string }) => void
 }
 
 export type GlobalRealtimeEventHandler = (event: ServerEvent) => void
@@ -146,32 +133,14 @@ export function createGlobalRealtimeEventHandler(
 
       const fromPartner = Boolean(dependencies.currentUserId) &&
         event.payload.senderUserId !== dependencies.currentUserId
-      // Delivery is acknowledged for every partner message, whether or not an
-      // alert is shown: an open conversation is exactly when it is delivered.
+      // Delivery is acknowledged for every partner message: an open
+      // conversation is exactly when it is delivered.
       if (fromPartner) dependencies.acknowledgeDelivery?.(message)
 
-      if (
-        fromPartner &&
-        dependencies.shouldShowIncomingMessageAlert?.({
+      if (fromPartner) {
+        dependencies.noteIncomingMessage?.({
           threadId: event.payload.threadId,
           messageId: event.payload.messageId
-        }) !== false
-      ) {
-        const { threadId } = event.payload
-        const senderThread = dependencies.getThreads().find(
-          (thread) => thread.threadId === threadId
-        )
-        const senderName = senderThread?.participants.find(
-          (participant) => participant.userId === event.payload.senderUserId
-        )?.displayName ?? dependencies.unknownSenderName ?? "Someone"
-        const openConversation = dependencies.openConversation
-        dependencies.showIncomingMessageToast({
-          title: senderName,
-          body: event.payload.body.length > 60
-            ? `${event.payload.body.slice(0, 57)}…`
-            : event.payload.body,
-          durationMs: 2500,
-          ...(openConversation ? { onPress: () => openConversation(threadId) } : {})
         })
       }
       return

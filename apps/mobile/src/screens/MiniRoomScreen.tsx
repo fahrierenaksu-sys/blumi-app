@@ -47,7 +47,7 @@ import { resolveAccountRecoveryLocale } from "../features/session/accountRecover
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { hapticLight } from "../ui/haptics"
 import { showToast } from "../ui/toast"
-import { useFocusedConversation, useRoomMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
+import { useFocusedConversation, useMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
 import { getChatTypingCopy } from "../features/chat/typing/chatTypingCopy"
 import { useChatDraftTyping } from "../features/chat/typing/useChatDraftTyping"
 import { usePartnerTyping } from "../features/chat/typing/usePartnerTyping"
@@ -61,7 +61,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
   const { readyMiniRoom, participants } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
   const isFocused = useIsFocused()
-  useRoomMessageAlertSuppression(isFocused)
+  useMessageAlertSuppression(isFocused)
   const roomMotion = useMiniRoomMotion({ miniRoomId: miniRoom.miniRoomId,
     localUserId: sessionActor.profile.userId, partnerUserId: participants.partner.userId,
     enabled: sessionActor.session.mode === "production", isFocused })

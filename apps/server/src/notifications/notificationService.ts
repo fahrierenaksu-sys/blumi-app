@@ -96,6 +96,12 @@ export interface CreateNotificationServiceOptions {
     delivery: { userId: string; notification: PushNotification },
     now: Date
   ) => Promise<boolean>
+  /**
+   * How long a chat message push waits in the outbox before its first send
+   * (default 0). A recipient who has the conversation open reads the message
+   * within this time, and `isDeliveryCurrent` then drops the push.
+   */
+  chatMessagePushHoldMs?: number
 }
 
 export interface SafePushFailure {
@@ -128,6 +134,10 @@ export function createNotificationService(
     } catch { /* Diagnostics must not change durable delivery state. */ }
   }
   const resolveBadge = createPushBadgeResolver(options.resolveRecipientBadge)
+  const chatMessagePushHoldMs = options.chatMessagePushHoldMs ?? 0
+  if (!Number.isSafeInteger(chatMessagePushHoldMs) || chatMessagePushHoldMs < 0 || chatMessagePushHoldMs > MAX_CHAT_MESSAGE_PUSH_HOLD_MS) {
+    throw new Error("Chat message push hold must be between 0 and 10 seconds.")
+  }
   const dispatchConcurrency = options.dispatchConcurrency ?? DEFAULT_DISPATCH_CONCURRENCY
   if (!Number.isSafeInteger(dispatchConcurrency) || dispatchConcurrency < 1) {
     throw new Error("Push dispatch concurrency must be a positive integer.")
@@ -213,6 +223,8 @@ export function createNotificationService(
         await resolveLocale(normalizedUserId, notification.data?.type)
       )
       const queuedAt = now()
+      const availableAt = new Date(queuedAt.getTime() +
+        (normalizedNotification.data?.type === "chat.message" ? chatMessagePushHoldMs : 0))
       const deliveries = devices.map((device) => ({
         deliveryId: normalizeDeliveryId(deliveryIdFactory()),
         userId: normalizedUserId,
@@ -220,7 +232,7 @@ export function createNotificationService(
         registrationId: device.registrationId,
         notification: normalizedNotification,
         attemptCount: 0,
-        availableAt: queuedAt.toISOString(),
+        availableAt: availableAt.toISOString(),
         createdAt: queuedAt.toISOString(),
         ...(discoveryWatch ? { discoveryWatch: { generation: discoveryWatch.generation, authorization: discoveryWatch.authorization } } : {})
       }))
@@ -648,6 +660,8 @@ function normalizeDeliveryId(value: string): string {
   }
   return value
 }
+
+const MAX_CHAT_MESSAGE_PUSH_HOLD_MS = 10_000
 
 function retryDelayMs(attempt: number): number {
   return Math.min(60_000, 1_000 * 2 ** Math.max(0, attempt - 1))

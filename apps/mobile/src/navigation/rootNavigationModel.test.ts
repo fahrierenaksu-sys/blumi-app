@@ -10,33 +10,12 @@ import {
   getOnboardingEntryRoute,
   getChatThreadScreenOptions,
   getDetailScreenOptions,
-  goBackFromInbox,
   CHAT_THREAD_SCREEN_OPTIONS,
   DETAIL_SCREEN_OPTIONS,
   MAIN_TAB_SCREEN_OPTIONS,
   shouldDispatchMainTabNavigation,
   ROOT_STACK_SCREEN_OPTIONS
 } from "./rootNavigationModel"
-
-test("Inbox opened as the root returns to discovery without dispatching GO_BACK", () => {
-  const actions: string[] = []
-  goBackFromInbox({
-    canGoBack: () => false,
-    goBack: () => actions.push("GO_BACK"),
-    replace: (route) => actions.push(`REPLACE:${route}`)
-  })
-  assert.deepEqual(actions, ["REPLACE:Lobby"])
-})
-
-test("Inbox preserves real navigation history when going back", () => {
-  const actions: string[] = []
-  goBackFromInbox({
-    canGoBack: () => true,
-    goBack: () => actions.push("GO_BACK"),
-    replace: (route) => actions.push(`REPLACE:${route}`)
-  })
-  assert.deepEqual(actions, ["GO_BACK"])
-})
 
 test("opening a match chat leaves Inbox under the conversation, not the match screen", () => {
   assert.deepEqual(createPostMatchChatNavigationState({ threadId: "thread_1" }), {

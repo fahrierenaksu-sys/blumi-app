@@ -8,13 +8,13 @@ test("room message alert suppression follows focus and unmount without waiting f
   let suppressed = false
   const hook = loadSourceWithFakeReact<typeof Hook>("features/notifications/useFocusedConversation.ts", runtime, {
     modules: { "./foregroundNotificationState": {
-      registerRoomMessageAlertSuppression: () => {
+      registerMessageAlertSuppression: () => {
         suppressed = true
         return () => { suppressed = false }
       }
     } }
   })
-  const render = (focused: boolean) => runtime.render(() => hook.useRoomMessageAlertSuppression(focused))
+  const render = (focused: boolean) => runtime.render(() => hook.useMessageAlertSuppression(focused))
   render(true)
   assert.equal(suppressed, true)
   render(false)
