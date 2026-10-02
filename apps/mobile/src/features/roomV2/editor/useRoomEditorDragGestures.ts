@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AppState } from "react-native"
+import type Animated from "react-native-reanimated"
 import { Gesture } from "react-native-gesture-handler"
 import {
   cancelAnimation,
+  measure,
   ReduceMotion,
+  useAnimatedRef,
   useSharedValue,
   withSpring,
   withTiming,
@@ -13,6 +16,7 @@ import { scheduleOnRN, scheduleOnUI } from "react-native-worklets"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticError, hapticLight, hapticSelection } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
+import type { RoomV2FloorGridProjection } from "../roomV2FloorGrid"
 import { resolvePlacedFurnitureRenderItem } from "../roomV2Selectors"
 import type {
   FurnitureItem,
@@ -29,12 +33,16 @@ import {
   ROOM_EDITOR_DRAG_LIFT_SCALE,
   ROOM_EDITOR_DRAG_OUTSIDE_CELL,
   ROOM_EDITOR_DRAG_RETURN_SPRING,
+  ROOM_EDITOR_DRAG_SNAP_MS,
+  ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT,
   createRoomEditorDragHitRects,
   createRoomEditorStageDragPreview,
   createRoomEditorTrayDragPreview,
   findRoomEditorDragHitRect,
   getRoomEditorDragCell,
+  getRoomEditorDragCellWindowPoint,
   getRoomEditorDragFeedback,
+  getRoomEditorDragFloorGrid,
   getRoomEditorDragGhostFrame,
   getRoomEditorStageDragPoint,
   getRoomEditorTrayDragPoint,
@@ -43,6 +51,7 @@ import {
   type RoomEditorDragGhostFrame,
   type RoomEditorDragHitRect
 } from "./roomEditorDragModel"
+import { getRoomEditorDragGhostPlate, type RoomEditorFloorShape } from "./roomEditorFloorGridModel"
 import {
   getRoomPlacementSurfaceDropFeedback,
   type PlacementPreview,
@@ -58,6 +67,8 @@ export interface RoomEditorDragGhostContent {
   source: FurnitureItem["asset"]["source"]
   mirrored: boolean
   frame: RoomEditorDragGhostFrame
+  /** Floor-grid drags: the footprint plate tinted by `tone`. */
+  plate?: RoomEditorFloorShape
 }
 
 /** Ghost anchor in window coordinates plus the overlay's window origin. */
@@ -67,13 +78,19 @@ export interface RoomEditorDragGhostValues {
   scale: SharedValue<number>
   opacity: SharedValue<number>
   overlayOrigin: SharedValue<{ x: number; y: number }>
+  /** 0 no verdict yet (or off the stage), 1 valid spot, 2 invalid spot. Editor drags only. */
+  tone?: SharedValue<number>
 }
+
+/** Ghost tone values (a shared value, so the plate recolours without a render). */
+export const ROOM_EDITOR_GHOST_TONE = { none: 0, valid: 1, invalid: 2 } as const
 
 type ActiveDrag =
   | {
     session: number
     source: "stage"
     renderId: string
+    floor: RoomV2FloorGridProjection | null
     startColumn: number
     startRow: number
   }
@@ -83,6 +100,7 @@ type ActiveDrag =
     item: FurnitureItem
     instanceId: string
     rotation: PlacedRoomItem["rotation"]
+    floor: RoomV2FloorGridProjection | null
     startColumn: number
     startRow: number
   }
@@ -92,13 +110,19 @@ const EMPTY_STAGE_BOUNDS: StageWindowBounds = { x: 0, y: 0, width: 0, height: 0 
 /**
  * Drag-to-move for the editor, on Gesture Handler pans. A touch-and-hold
  * (ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS) on a placed piece, or on an owned
- * tray card, lifts a ghost that follows the finger on the UI thread. JS hears
- * only when the snapped cell changes (to show validity with the tap placement
- * rules) and on release, which commits through `commitTrayPlacementPreview`,
- * the confirm control's path. Invalid drops spring back; interrupted gestures
- * and backgrounding restore the piece. Taps stay on the Pressables: the pan
- * fails when the finger moves before the hold ends or, on the stage, when the
- * touch starts off a piece, so page scroll and iOS edge back keep the touch.
+ * tray card, lifts a ghost that follows the finger on the UI thread. A floor
+ * piece's ghost snaps onto the floor-grid cell under it (a tray piece is held
+ * ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT above the fingertip so that cell is in
+ * view). JS hears only when the snapped cell changes (to show validity with
+ * the tap placement rules, and to nudge the ghost when the footprint had to
+ * be fitted onto the floor) and on release, which commits that same preview
+ * through `commitTrayPlacementPreview`, the confirm control's path. Invalid
+ * drops spring back; interrupted gestures and backgrounding restore the
+ * piece. Taps stay on the Pressables: the pan fails when the finger moves
+ * before the hold ends or, on the stage, when the touch starts off a piece, so
+ * page scroll and iOS edge back keep the touch. The stage is measured on the
+ * UI thread when a tray drag starts, so a scrolled page or a dock that changed
+ * the stage's position never offsets the drop.
  */
 export function useRoomEditorDragGestures(input: {
   copy: MyRoomEditorCopy
@@ -120,9 +144,14 @@ export function useRoomEditorDragGestures(input: {
   const activeDragRef = useRef<ActiveDrag | null>(null)
   const lastDragPreviewRef = useRef<PlacementPreview | undefined>(undefined)
 
+  const stageAnimatedRef = useAnimatedRef<Animated.View>()
   const hitRects = useSharedValue<RoomEditorDragHitRect[]>([])
   const stageSize = useSharedValue({ width: 0, height: 0 })
   const stageBounds = useSharedValue<StageWindowBounds>(EMPTY_STAGE_BOUNDS)
+  const sceneFloor = useSharedValue<RoomV2FloorGridProjection | null>(null)
+  // The active drag's grid and its stage rectangle in window coordinates.
+  const dragFloor = useSharedValue<RoomV2FloorGridProjection | null>(null)
+  const dragStage = useSharedValue<StageWindowBounds>(EMPTY_STAGE_BOUNDS)
   const dragSession = useSharedValue(0)
   const grabRenderId = useSharedValue("")
   const grabOffsetX = useSharedValue(0)
@@ -135,11 +164,17 @@ export function useRoomEditorDragGestures(input: {
   const ghostOriginY = useSharedValue(0)
   const ghostScale = useSharedValue(1)
   const ghostOpacity = useSharedValue(0)
+  const ghostTone = useSharedValue<number>(ROOM_EDITOR_GHOST_TONE.none)
   const overlayOrigin = useSharedValue({ x: 0, y: 0 })
 
   useEffect(() => {
-    hitRects.value = createRoomEditorDragHitRects(scene.renderItems)
-  }, [hitRects, scene.renderItems])
+    hitRects.value = createRoomEditorDragHitRects(scene.renderItems, scene.shell)
+  }, [hitRects, scene.renderItems, scene.shell])
+  useEffect(() => {
+    sceneFloor.value = scene.shell?.floorGrid
+      ? getRoomEditorDragFloorGrid({ placementSurface: "floor" }, scene.shell)
+      : null
+  }, [sceneFloor, scene.shell])
   useEffect(() => {
     stageSize.value = { width: roomLayout.width, height: roomLayout.height }
   }, [roomLayout.height, roomLayout.width, stageSize])
@@ -165,7 +200,45 @@ export function useRoomEditorDragGestures(input: {
       reduceMotion: ReduceMotion.Never
     })
     ghostOpacity.value = ROOM_EDITOR_DRAG_GHOST_OPACITY
-  }, [ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostX, ghostY, reduceMotion])
+    ghostTone.value = ROOM_EDITOR_GHOST_TONE.none
+  }, [ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostTone, ghostX, ghostY, reduceMotion])
+
+  // A floor drag shows the piece on its snapped cell: a short glide, or a
+  // jump under Reduce Motion. Only window coordinates change; no render.
+  const moveGhostToWindowPoint = useCallback((x: number, y: number) => {
+    "worklet"
+    if (reduceMotion) {
+      ghostX.value = x
+      ghostY.value = y
+      return
+    }
+    const timing = { duration: ROOM_EDITOR_DRAG_SNAP_MS, reduceMotion: ReduceMotion.Never }
+    ghostX.value = withTiming(x, timing)
+    ghostY.value = withTiming(y, timing)
+  }, [ghostX, ghostY, reduceMotion])
+
+  const moveGhostToCell = useCallback((column: number, row: number) => {
+    "worklet"
+    const floor = dragFloor.value
+    if (!floor) return
+    const target = getRoomEditorDragCellWindowPoint({ floor, column, row, stage: dragStage.value })
+    moveGhostToWindowPoint(target.x, target.y)
+  }, [dragFloor, dragStage, moveGhostToWindowPoint])
+
+  // JS fitted the footprint onto the floor at another cell than the one under
+  // the finger: move the ghost there too, unless the finger has moved on.
+  const placeGhostAtFittedPoint = useCallback((
+    session: number,
+    column: number,
+    row: number,
+    x: number,
+    y: number
+  ) => {
+    "worklet"
+    if (session !== dragSession.value || column !== lastColumn.value || row !== lastRow.value) return
+    const stage = dragStage.value
+    moveGhostToWindowPoint(stage.x + x * stage.width, stage.y + y * stage.height)
+  }, [dragSession, dragStage, lastColumn, lastRow, moveGhostToWindowPoint])
 
   const springGhostBack = useCallback((session: number) => {
     "worklet"
@@ -209,8 +282,9 @@ export function useRoomEditorDragGestures(input: {
   const hideGhost = useCallback((session: number) => {
     ghostOpacity.value = 0
     ghostScale.value = 1
+    ghostTone.value = ROOM_EDITOR_GHOST_TONE.none
     clearGhost(session)
-  }, [clearGhost, ghostOpacity, ghostScale])
+  }, [clearGhost, ghostOpacity, ghostScale, ghostTone])
 
   // Drag callbacks reach JS through scheduleOnRN; they read the latest render
   // through this ref so the gestures (and every tray card) keep one identity.
@@ -221,6 +295,7 @@ export function useRoomEditorDragGestures(input: {
           copy: input.copy,
           scene,
           renderId: drag.renderId,
+          floor: drag.floor,
           column,
           row
         })
@@ -228,10 +303,12 @@ export function useRoomEditorDragGestures(input: {
       return createRoomEditorTrayDragPreview({
         copy: input.copy,
         scene,
-        stageWindowBounds,
+        // The UI thread measured the stage when this drag started.
+        stageWindowBounds: dragStage.value.width > 0 ? dragStage.value : stageWindowBounds,
         item: drag.item,
         instanceId: drag.instanceId,
         rotation: drag.rotation,
+        floor: drag.floor,
         column,
         row
       })
@@ -243,7 +320,8 @@ export function useRoomEditorDragGestures(input: {
         return
       }
       const placedItem = input.placedItems.find((entry) => entry.instanceId === renderId)
-      activeDragRef.current = { session, source: "stage", renderId, startColumn: column, startRow: row }
+      const floor = getRoomEditorDragFloorGrid(item, scene.shell)
+      activeDragRef.current = { session, source: "stage", renderId, floor, startColumn: column, startRow: row }
       hapticLight()
       input.selection.setPlacementFeedback(undefined)
       input.selection.setPlacementPreview(undefined)
@@ -254,7 +332,8 @@ export function useRoomEditorDragGestures(input: {
         session,
         source: item.asset.source,
         mirrored: item.usesMirroredRotation,
-        frame: getRoomEditorDragGhostFrame(item, roomLayout)
+        frame: getRoomEditorDragGhostFrame(item, roomLayout),
+        plate: floor ? getRoomEditorDragGhostPlate(item, roomLayout) : undefined
       })
     },
     beginTrayDrag(
@@ -271,11 +350,13 @@ export function useRoomEditorDragGestures(input: {
         hideGhost(session)
         return
       }
-      // The page may have scrolled since the stage was last measured.
+      // Keep the JS copy of the stage position fresh for taps too.
       input.stage.measureStageWindow()
       const instanceId = `${item.id}_${Date.now()}`
-      activeDragRef.current = { session, source: "tray", item, instanceId, rotation, startColumn: column, startRow: row }
+      const floor = getRoomEditorDragFloorGrid(item, scene.shell)
+      activeDragRef.current = { session, source: "tray", item, instanceId, rotation, floor, startColumn: column, startRow: row }
       const renderItem = resolvePlacedFurnitureRenderItem({ instanceId, itemId, x: 0.5, y: 0.5, rotation }, item)
+      const stage = dragStage.value.width > 0 ? dragStage.value : stageWindowBounds ?? roomLayout
       hapticLight()
       input.selection.setSelectedInstanceId(instanceId)
       input.selection.updatePlacementPreview(undefined)
@@ -285,7 +366,8 @@ export function useRoomEditorDragGestures(input: {
           session,
           source: renderItem.asset.source,
           mirrored: renderItem.usesMirroredRotation,
-          frame: getRoomEditorDragGhostFrame(renderItem, stageWindowBounds ?? roomLayout)
+          frame: getRoomEditorDragGhostFrame(renderItem, stage),
+          plate: floor ? getRoomEditorDragGhostPlate(renderItem, stage) : undefined
         })
       }
     },
@@ -295,6 +377,12 @@ export function useRoomEditorDragGestures(input: {
       const preview = handlers.computePreview(drag, column, row)
       if (shouldTickRoomEditorDragValidity(lastDragPreviewRef.current, preview)) hapticSelection()
       lastDragPreviewRef.current = preview
+      ghostTone.value = !preview
+        ? ROOM_EDITOR_GHOST_TONE.none
+        : preview.isValid ? ROOM_EDITOR_GHOST_TONE.valid : ROOM_EDITOR_GHOST_TONE.invalid
+      if (drag.floor && preview) {
+        scheduleOnUI(placeGhostAtFittedPoint, session, column, row, preview.item.x, preview.item.y)
+      }
       input.selection.updatePlacementPreview(preview)
       input.selection.updatePlacementFeedback(
         drag.source === "tray" && column === ROOM_EDITOR_DRAG_OUTSIDE_CELL
@@ -408,12 +496,20 @@ export function useRoomEditorDragGestures(input: {
       grabRenderId.value = rects[index].renderId
       grabOffsetX.value = x - rects[index].anchorX
       grabOffsetY.value = y - rects[index].anchorY
+      dragFloor.value = rects[index].usesFloorGrid ? sceneFloor.value : null
     })
     .onStart((event) => {
       "worklet"
       const session = dragSession.value + 1
       dragSession.value = session
       const size = stageSize.value
+      // The pan's own view is the stage, so its window origin is exact.
+      dragStage.value = {
+        x: event.absoluteX - event.x,
+        y: event.absoluteY - event.y,
+        width: size.width,
+        height: size.height
+      }
       const cell = getRoomEditorDragCell(getRoomEditorStageDragPoint({
         localX: event.x,
         localY: event.y,
@@ -421,7 +517,7 @@ export function useRoomEditorDragGestures(input: {
         stageHeight: size.height,
         grabOffsetX: grabOffsetX.value,
         grabOffsetY: grabOffsetY.value
-      }))
+      }), dragFloor.value)
       lastColumn.value = cell.column
       lastRow.value = cell.row
       liftGhost(
@@ -433,8 +529,12 @@ export function useRoomEditorDragGestures(input: {
     .onUpdate((event) => {
       "worklet"
       const size = stageSize.value
-      ghostX.value = event.absoluteX - grabOffsetX.value * size.width
-      ghostY.value = event.absoluteY - grabOffsetY.value * size.height
+      const floor = dragFloor.value
+      // Plain-grid pieces follow the finger; floor pieces sit on their cell.
+      if (!floor) {
+        ghostX.value = event.absoluteX - grabOffsetX.value * size.width
+        ghostY.value = event.absoluteY - grabOffsetY.value * size.height
+      }
       const cell = getRoomEditorDragCell(getRoomEditorStageDragPoint({
         localX: event.x,
         localY: event.y,
@@ -442,10 +542,11 @@ export function useRoomEditorDragGestures(input: {
         stageHeight: size.height,
         grabOffsetX: grabOffsetX.value,
         grabOffsetY: grabOffsetY.value
-      }))
+      }), floor)
       if (hasRoomEditorDragCellChanged(lastColumn.value, lastRow.value, cell.column, cell.row)) {
         lastColumn.value = cell.column
         lastRow.value = cell.row
+        if (floor) moveGhostToCell(cell.column, cell.row)
         scheduleOnRN(moveDrag, dragSession.value, cell.column, cell.row)
       }
     })
@@ -459,7 +560,9 @@ export function useRoomEditorDragGestures(input: {
     }), [
     beginStageDrag,
     cancelDrag,
+    dragFloor,
     dragSession,
+    dragStage,
     ghostX,
     ghostY,
     grabOffsetX,
@@ -470,7 +573,9 @@ export function useRoomEditorDragGestures(input: {
     lastRow,
     liftGhost,
     moveDrag,
+    moveGhostToCell,
     releaseDrag,
+    sceneFloor,
     stageSize
   ])
 
@@ -481,6 +586,8 @@ export function useRoomEditorDragGestures(input: {
     rotation: PlacedRoomItem["rotation"]
   ) => {
     const itemId = item.id
+    const trayFloor = getRoomEditorDragFloorGrid(item, scene.shell)
+    const lift = ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT
     return Gesture.Pan()
       .enabled(owned && !placed)
       .activateAfterLongPress(ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS)
@@ -490,28 +597,45 @@ export function useRoomEditorDragGestures(input: {
         "worklet"
         const session = dragSession.value + 1
         dragSession.value = session
-        const cell = getRoomEditorDragCell(getRoomEditorTrayDragPoint({
+        // Measure where the stage is now (scroll, dock height), on this thread.
+        const measured = measure(stageAnimatedRef)
+        dragStage.value = measured && measured.width > 0
+          ? { x: measured.pageX, y: measured.pageY, width: measured.width, height: measured.height }
+          : stageBounds.value
+        dragFloor.value = trayFloor
+        const point = getRoomEditorTrayDragPoint({
           absoluteX: event.absoluteX,
           absoluteY: event.absoluteY,
-          bounds: stageBounds.value
-        }))
+          lift,
+          bounds: dragStage.value
+        })
+        const cell = getRoomEditorDragCell(point, trayFloor)
         lastColumn.value = cell.column
         lastRow.value = cell.row
-        liftGhost(event.absoluteX, event.absoluteY)
+        liftGhost(event.absoluteX, event.absoluteY - lift)
+        if (trayFloor && point.inside) moveGhostToCell(cell.column, cell.row)
         scheduleOnRN(beginTrayDrag, session, itemId, rotation, cell.column, cell.row)
       })
       .onUpdate((event) => {
         "worklet"
-        ghostX.value = event.absoluteX
-        ghostY.value = event.absoluteY
-        const cell = getRoomEditorDragCell(getRoomEditorTrayDragPoint({
+        const point = getRoomEditorTrayDragPoint({
           absoluteX: event.absoluteX,
           absoluteY: event.absoluteY,
-          bounds: stageBounds.value
-        }))
+          lift,
+          bounds: dragStage.value
+        })
+        // Over the floor a floor piece sits on its cell; elsewhere it is held
+        // just above the fingertip.
+        const snapsToFloor = trayFloor !== null && point.inside
+        if (!snapsToFloor) {
+          ghostX.value = event.absoluteX
+          ghostY.value = event.absoluteY - lift
+        }
+        const cell = getRoomEditorDragCell(point, trayFloor)
         if (hasRoomEditorDragCellChanged(lastColumn.value, lastRow.value, cell.column, cell.row)) {
           lastColumn.value = cell.column
           lastRow.value = cell.row
+          if (snapsToFloor) moveGhostToCell(cell.column, cell.row)
           scheduleOnRN(moveDrag, dragSession.value, cell.column, cell.row)
         }
       })
@@ -526,14 +650,19 @@ export function useRoomEditorDragGestures(input: {
   }, [
     beginTrayDrag,
     cancelDrag,
+    dragFloor,
     dragSession,
+    dragStage,
     ghostX,
     ghostY,
     lastColumn,
     lastRow,
     liftGhost,
     moveDrag,
+    moveGhostToCell,
     releaseDrag,
+    scene.shell,
+    stageAnimatedRef,
     stageBounds
   ])
 
@@ -542,10 +671,12 @@ export function useRoomEditorDragGestures(input: {
     y: ghostY,
     scale: ghostScale,
     opacity: ghostOpacity,
-    overlayOrigin
-  }), [ghostOpacity, ghostScale, ghostX, ghostY, overlayOrigin])
+    overlayOrigin,
+    tone: ghostTone
+  }), [ghostOpacity, ghostScale, ghostTone, ghostX, ghostY, overlayOrigin])
 
   return {
+    stageAnimatedRef,
     stageDragGesture,
     createTrayDragGesture,
     cancelActiveDrag,

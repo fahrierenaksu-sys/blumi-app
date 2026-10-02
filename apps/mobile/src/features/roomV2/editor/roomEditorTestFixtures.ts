@@ -1,3 +1,4 @@
+import { ROOM_V2_BLUMI_WORLD_FLOOR_GRID } from "../roomV2FloorGrid"
 import type {
   FurnitureItem,
   PlacedRoomItem,
@@ -27,6 +28,13 @@ export const TEST_EDITOR_SHELL: RoomShell = {
     { x: 0.17, y: 0.72 },
     { x: 0.2, y: 0.55 }
   ]
+}
+
+/** The same shell with the live shell's measured floor grid (drawn-floor placement). */
+export const TEST_FLOOR_GRID_SHELL: RoomShell = {
+  ...TEST_EDITOR_SHELL,
+  id: "editor-test-floor-grid-shell",
+  floorGrid: ROOM_V2_BLUMI_WORLD_FLOOR_GRID
 }
 
 export function createTestFurniture(overrides: Partial<FurnitureItem> = {}): FurnitureItem {

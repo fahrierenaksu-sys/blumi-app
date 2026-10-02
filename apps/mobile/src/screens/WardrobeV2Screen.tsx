@@ -2,13 +2,14 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useMemo, useState } from "react"
 import { getWardrobePageCount } from "../features/avatarV2/wardrobe/wardrobeStageLayout"
 import { Text, View } from "react-native"
-import { useSharedValue } from "react-native-reanimated"
+import Animated, { useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { hapticSelection } from "../ui/haptics"
 import { useReducedMotion } from "../ui/animations"
+import { getBottomPanelEntering } from "../ui/bottomPanelEntrance"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   findAvatarStudioTab,
@@ -180,49 +181,52 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
           ) : null}
         </View>
 
-        <WardrobeGlass tone="panel" radius={30} style={styles.panelShell} contentStyle={styles.panelContent}>
-          <WardrobeSectionSwitcher
-            activeSection={activeSection}
-            copy={studioCopy}
-            onSelectSection={handleSelectSection}
-          />
-          <WardrobeCategoryTabs
-            tabs={studioTabs}
-            activeCategory={activeCategory}
-            copy={studioCopy}
-            onSelectCategory={handleSelectCategory}
-          />
-          {activeTab ? (
-            <WardrobeCatalogHeader
-              tab={activeTab}
+        {/* The panel rises softly into place, like the room editor's dock. */}
+        <Animated.View entering={getBottomPanelEntering(reduceMotion)}>
+          <WardrobeGlass tone="panel" radius={30} style={styles.panelShell} contentStyle={styles.panelContent}>
+            <WardrobeSectionSwitcher
+              activeSection={activeSection}
+              copy={studioCopy}
+              onSelectSection={handleSelectSection}
+            />
+            <WardrobeCategoryTabs
+              tabs={studioTabs}
               activeCategory={activeCategory}
               copy={studioCopy}
-              optionCount={visibleWardrobeCards.length}
-              pageCount={getWardrobePageCount(visibleWardrobeCards.length)}
-              activePage={catalogPage}
-              pagePosition={catalogPagePosition}
               onSelectCategory={handleSelectCategory}
             />
-          ) : null}
-          {activeCategory === "body" ? (
-            <Text accessibilityRole="text" style={styles.bodySwitchHint}>
-              {studioCopy.bodySwitchHint}
-            </Text>
-          ) : null}
-          <WardrobeCatalogList
-            activeCategory={catalogTransition.shownCategory}
-            cards={catalogTransition.cards}
-            catalogStyle={catalogTransition.style}
-            switching={catalogTransition.switching}
-            copy={studioCopy}
-            reduceMotion={reduceMotion}
-            onEquip={handleEquipOwned}
-            onPreviewLocked={previewLockedItem}
-            onPageChange={setCatalogPage}
-            pagePosition={catalogPagePosition}
-            onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
-          />
-        </WardrobeGlass>
+            {activeTab ? (
+              <WardrobeCatalogHeader
+                tab={activeTab}
+                activeCategory={activeCategory}
+                copy={studioCopy}
+                optionCount={visibleWardrobeCards.length}
+                pageCount={getWardrobePageCount(visibleWardrobeCards.length)}
+                activePage={catalogPage}
+                pagePosition={catalogPagePosition}
+                onSelectCategory={handleSelectCategory}
+              />
+            ) : null}
+            {activeCategory === "body" ? (
+              <Text accessibilityRole="text" style={styles.bodySwitchHint}>
+                {studioCopy.bodySwitchHint}
+              </Text>
+            ) : null}
+            <WardrobeCatalogList
+              activeCategory={catalogTransition.shownCategory}
+              cards={catalogTransition.cards}
+              catalogStyle={catalogTransition.style}
+              switching={catalogTransition.switching}
+              copy={studioCopy}
+              reduceMotion={reduceMotion}
+              onEquip={handleEquipOwned}
+              onPreviewLocked={previewLockedItem}
+              onPageChange={setCatalogPage}
+              pagePosition={catalogPagePosition}
+              onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
+            />
+          </WardrobeGlass>
+        </Animated.View>
       </SafeAreaView>
     </View>
   )

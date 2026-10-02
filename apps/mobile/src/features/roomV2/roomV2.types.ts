@@ -1,4 +1,5 @@
 import type { DimensionValue, ImageSourcePropType } from "react-native"
+import type { RoomV2FloorGrid } from "./roomV2FloorGrid"
 
 export type RoomLayer =
   | "background"
@@ -255,6 +256,11 @@ export interface RoomShell {
   /** Normalized keep-out regions such as baked windows or wall openings. */
   surfacePlacementExclusions?: Partial<Record<RoomPlacementSurface, RoomBounds[]>>
   walkablePolygon?: RoomWalkablePolygonPoint[]
+  /**
+   * The drawn floor measured on the shell art. When present it, not the
+   * avatar walk polygon, bounds floor furniture and drives the editor grid.
+   */
+  floorGrid?: RoomV2FloorGrid
   placementLanes?: RoomPlacementLane[]
 }
 

@@ -110,7 +110,8 @@ export function useRoomEditorSave(input: {
     const draftValidation = validateRoomV2DraftPlacements({
       scene: sceneToSave,
       decor: decorToSave,
-      furnitureCatalog: ACTIVE_ROOM_FURNITURE_CATALOG
+      furnitureCatalog: ACTIVE_ROOM_FURNITURE_CATALOG,
+      untouchedFrom: editorSessionRef.current?.baselineDecor
     })
     const invalidDraftItem = draftValidation.invalidItems[0]
     if (invalidDraftItem) {
@@ -166,6 +167,7 @@ export function useRoomEditorSave(input: {
   }, [
     draftDecor,
     copy,
+    editorSessionRef,
     isRoomDraftReady,
     navigation,
     placementPreview,

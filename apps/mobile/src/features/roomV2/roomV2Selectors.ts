@@ -32,6 +32,7 @@ import {
 import { getRoomVNextDirectionalVisual } from "./roomVNextContracts"
 import { validateRoomV2FurnitureSurfacePlacement } from "./roomV2PlacementSurface"
 import { getRoomV2FurnitureMobileRenderScale } from "./roomV2RenderSurface"
+import { getRoomV2ShellFloorPlacementPolygon } from "./roomV2FloorGrid"
 
 /**
  * Returns the stable search key used by the room inventory and editor.
@@ -483,23 +484,15 @@ export function validateRoomV2FurniturePlacement(input: {
   const candidateCollisionBlocker = createRoomV2FurniturePlacementBlocker(input.candidate)
   const candidatePlacementBlocker = createRoomV2FurniturePlacementClearanceBlocker(input.candidate)
   const candidateBounds = getRoomWorldBlockerBounds(candidatePlacementBlocker)
-  const walkablePolygon = input.scene.shell?.walkablePolygon
+  const floorPolygon = getRoomV2ShellFloorPlacementPolygon(input.scene.shell)
   const placeableArea = input.scene.shell?.placeableArea
 
   const placementSurface = input.candidate.placementSurface ?? "floor"
   if (placementSurface !== "floor") {
     // Wall, ceiling, and tabletop items are validated against their own
     // surface contract above, not against the floor polygon.
-  } else if (walkablePolygon?.length) {
-    const floorCheckPoints = getRoomV2PlacementFloorCheckPoints(
-      input.candidate,
-      candidatePlacementBlocker,
-      candidateBounds
-    )
-    const insideWalkableFloor = floorCheckPoints.every((point) =>
-      pointInRoomWorldPolygon(point, walkablePolygon)
-    )
-    if (!insideWalkableFloor) {
+  } else if (floorPolygon?.length) {
+    if (!isRoomV2FurnitureFootprintOnFloor(input.candidate, floorPolygon)) {
       issueIds.push("outside_placeable_area")
     }
   } else if (placeableArea) {
@@ -557,8 +550,20 @@ export function validateRoomV2DraftPlacements(input: {
   scene: ResolvedRoomV2Scene
   decor: UserRoomDecor
   furnitureCatalog: FurnitureItem[]
+  /**
+   * The layout the editor opened with. A piece the user did not move keeps
+   * its spot even if it sits past the drawn floor edge: rooms saved against
+   * the older, looser floor polygon must stay savable without being touched.
+   */
+  untouchedFrom?: UserRoomDecor
 }): RoomV2DraftPlacementValidationResult {
   const invalidItems: RoomV2DraftPlacementInvalidItem[] = []
+  const untouchedItems = new Map(
+    (input.untouchedFrom?.roomShellId === input.decor.roomShellId
+      ? input.untouchedFrom.placedItems
+      : []
+    ).map((item) => [item.instanceId, item])
+  )
   for (const placedItem of input.decor.placedItems) {
     const furnitureItem = input.furnitureCatalog.find(
       (item) => item.id === placedItem.itemId
@@ -587,6 +592,12 @@ export function validateRoomV2DraftPlacements(input: {
       candidate: renderItem
     })
     if (validation.isValid) continue
+    if (
+      isSameRoomV2Placement(untouchedItems.get(placedItem.instanceId), placedItem) &&
+      validation.issueIds.every((issueId) => issueId === "outside_placeable_area")
+    ) {
+      continue
+    }
 
     invalidItems.push({
       placedItem,
@@ -600,6 +611,20 @@ export function validateRoomV2DraftPlacements(input: {
     isValid: invalidItems.length === 0,
     invalidItems
   }
+}
+
+function isSameRoomV2Placement(
+  before: UserRoomDecor["placedItems"][number] | undefined,
+  after: UserRoomDecor["placedItems"][number]
+): boolean {
+  return Boolean(
+    before &&
+    before.itemId === after.itemId &&
+    before.x === after.x &&
+    before.y === after.y &&
+    before.rotation === after.rotation &&
+    before.supportInstanceId === after.supportInstanceId
+  )
 }
 
 export function createRoomV2FurniturePlacementPreview(input: {
@@ -679,6 +704,32 @@ function createRoomV2FurniturePlacementClearanceBlocker(
         ? { polygon: item.collisionPolygon.map((point) => ({ ...point })) }
         : {}),
     blocksMovement: item.blocksMovement
+  }
+}
+
+/** Whether a floor piece's footprint (the points validation checks) is inside `polygon`. */
+export function isRoomV2FurnitureFootprintOnFloor(
+  candidate: Extract<RoomV2RenderItem, { kind: "furniture" }>,
+  polygon: RoomWorldPoint[]
+): boolean {
+  const blocker = createRoomV2FurniturePlacementClearanceBlocker(candidate)
+  return getRoomV2PlacementFloorCheckPoints(candidate, blocker, getRoomWorldBlockerBounds(blocker))
+    .every((point) => pointInRoomWorldPolygon(point, polygon))
+}
+
+/** The footprint shape collision uses, as a point test plus its bounds (editor highlights). */
+export function getRoomV2FurnitureFootprintTest(
+  candidate: Extract<RoomV2RenderItem, { kind: "furniture" }>
+): { bounds: RoomWorldBounds; contains: (point: RoomWorldPoint) => boolean } {
+  const blocker = createRoomV2FurniturePlacementBlocker(candidate)
+  const bounds = getRoomWorldBlockerBounds(blocker)
+  const polygon = blocker.polygon
+  return {
+    bounds,
+    contains: polygon && polygon.length >= 3
+      ? (point) => pointInRoomWorldPolygon(point, polygon)
+      : (point) => point.x >= bounds.minX && point.x <= bounds.maxX &&
+        point.y >= bounds.minY && point.y <= bounds.maxY
   }
 }
 

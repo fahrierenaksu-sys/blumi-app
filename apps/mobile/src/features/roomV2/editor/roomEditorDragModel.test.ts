@@ -6,6 +6,7 @@ import type { ResolvedRoomV2Scene } from "../roomV2.types"
 import {
   ROOM_EDITOR_DRAG_CELL_STEP,
   ROOM_EDITOR_DRAG_OUTSIDE_CELL,
+  ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT,
   createRoomEditorDragHitRects,
   createRoomEditorStageDragPreview,
   createRoomEditorTrayDragPreview,
@@ -66,18 +67,18 @@ function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} !== ${expected}`)
 }
 
-test("drag frames snap to a fixed cell grid", () => {
+test("off the floor grid, drag frames snap to a fixed stage cell grid", () => {
   const step = ROOM_EDITOR_DRAG_CELL_STEP
   assert.ok(step > 0 && step < 0.1)
-  const cell = getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: true })
+  const cell = getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: true }, null)
   near(getRoomEditorDragCellValue(cell.column), 0.5)
   near(getRoomEditorDragCellValue(cell.row), 0.7)
   // Less than half a cell stays put; more than half a cell moves one cell.
-  const nudged = getRoomEditorDragCell({ x: 0.5 + step * 0.4, y: 0.7 + step * 0.6, inside: true })
+  const nudged = getRoomEditorDragCell({ x: 0.5 + step * 0.4, y: 0.7 + step * 0.6, inside: true }, null)
   assert.deepEqual(nudged, { column: cell.column, row: cell.row + 1 })
   near(getRoomEditorDragCellValue(nudged.row), Math.round((0.7 + step) * 10000) / 10000)
   assert.deepEqual(
-    getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: false }),
+    getRoomEditorDragCell({ x: 0.5, y: 0.7, inside: false }, null),
     { column: ROOM_EDITOR_DRAG_OUTSIDE_CELL, row: ROOM_EDITOR_DRAG_OUTSIDE_CELL }
   )
   assert.equal(hasRoomEditorDragCellChanged(25, 35, 25, 35), false)
@@ -129,38 +130,58 @@ test("stage drag keeps the grab offset so the piece does not jump to the finger"
 })
 
 test("tray drag maps a window point onto the measured stage, and off-stage is outside", () => {
-  const inside = getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 259.6, bounds: stageBounds })
+  const inside = getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 259.6, lift: 0, bounds: stageBounds })
   near(inside.x, 0.5)
   near(inside.y, 0.7)
   assert.equal(inside.inside, true)
-  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 400, bounds: stageBounds }).inside, false)
-  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 5, absoluteY: 150, bounds: stageBounds }).inside, false)
-  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 150, bounds: undefined }).inside, false)
+  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 400, lift: 0, bounds: stageBounds }).inside, false)
+  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 5, absoluteY: 150, lift: 0, bounds: stageBounds }).inside, false)
+  assert.equal(getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 150, lift: 0, bounds: undefined }).inside, false)
   assert.equal(
-    getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 150, bounds: { ...stageBounds, height: 0 } }).inside,
+    getRoomEditorTrayDragPoint({ absoluteX: 210, absoluteY: 150, lift: 0, bounds: { ...stageBounds, height: 0 } }).inside,
     false
   )
 })
 
+test("a tray drag holds the piece's contact point above the fingertip", () => {
+  assert.ok(ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT >= 24, "the landing spot must clear a fingertip")
+  const lifted = getRoomEditorTrayDragPoint({
+    absoluteX: 210,
+    absoluteY: 259.6 + ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT,
+    lift: ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT,
+    bounds: stageBounds
+  })
+  near(lifted.x, 0.5)
+  near(lifted.y, 0.7)
+  // A finger just below the room already holds the piece over the front row.
+  const belowStage = getRoomEditorTrayDragPoint({
+    absoluteX: 210,
+    absoluteY: stageBounds.y + stageBounds.height + 10,
+    lift: ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT,
+    bounds: stageBounds
+  })
+  assert.equal(belowStage.inside, true)
+})
+
 test("stage drag previews use the existing placement rules at the snapped cell", () => {
   const scene = createScene()
-  const moved = createRoomEditorStageDragPreview({ copy: en, scene, renderId: "chair_1", column: 18, row: 31 })
+  const moved = createRoomEditorStageDragPreview({ copy: en, scene, renderId: "chair_1", floor: null, column: 18, row: 31 })
   assert.ok(moved)
   assert.equal(moved.isValid, true)
   assert.equal(moved.item.renderId, "chair_1")
   near(moved.item.x, 0.36)
   near(moved.item.y, 0.62)
-  const blocked = createRoomEditorStageDragPreview({ copy: en, scene, renderId: "chair_1", column: 33, row: 31 })
+  const blocked = createRoomEditorStageDragPreview({ copy: en, scene, renderId: "chair_1", floor: null, column: 33, row: 31 })
   assert.equal(blocked?.isValid, false)
   assert.equal(
-    createRoomEditorStageDragPreview({ copy: en, scene, renderId: "missing", column: 18, row: 31 }),
+    createRoomEditorStageDragPreview({ copy: en, scene, renderId: "missing", floor: null, column: 18, row: 31 }),
     undefined
   )
 })
 
 test("tray drag previews place a new instance at the drop cell and ignore off-stage cells", () => {
   const scene = createScene()
-  const base = { copy: en, scene, stageWindowBounds: stageBounds, item: chair, instanceId: "chair_2", rotation: "front" as const }
+  const base = { copy: en, scene, stageWindowBounds: stageBounds, item: chair, instanceId: "chair_2", rotation: "front" as const, floor: null }
   const dropped = createRoomEditorTrayDragPreview({ ...base, column: 25, row: 35 })
   assert.ok(dropped)
   assert.equal(dropped.isValid, true)
