@@ -1,5 +1,5 @@
 import { Image as ExpoImage } from "expo-image"
-import { StyleSheet, View, type ImageStyle } from "react-native"
+import { PixelRatio, StyleSheet, View, type ImageStyle, type LayoutChangeEvent } from "react-native"
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import Animated, {
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
   type SharedValue
 } from "react-native-reanimated"
 import type {
+  RoomV2AssetCrop,
   RoomV2AssetRef,
   RoomV2AvatarRenderLayer
 } from "../../../roomV2/roomV2.types"
@@ -19,6 +20,7 @@ import type {
 } from "../avatarRoom.types"
 import { useReducedMotion } from "../../../../ui/animations"
 import {
+  getRoomAvatarAtlasCropLayout,
   getRoomAvatarFrameIndex,
   getRoomAvatarFrameTick,
   getRoomAvatarLayerAnimationState,
@@ -43,6 +45,12 @@ interface RoomAvatarFrameState {
 }
 
 const STATIC_FRAME_STATE: RoomAvatarFrameState = { signature: "static", index: 0 }
+
+/** The renderer's laid-out size; atlas frames need it to place their crop. */
+interface RoomAvatarBoxSize {
+  width: number
+  height: number
+}
 
 /**
  * Layered avatar with frame-by-frame motion. Frame selection runs on the UI
@@ -89,8 +97,17 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
     if (!hasAnimation) frameState.value = STATIC_FRAME_STATE
   }, [frameState, hasAnimation])
 
+  // Atlas frames are placed from the laid-out size. Layout events arrive only
+  // when the box changes size (avatars move with transforms), never per frame.
+  const [boxSize, setBoxSize] = useState<RoomAvatarBoxSize | null>(null)
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout
+    setBoxSize((previous) =>
+      previous && previous.width === width && previous.height === height ? previous : { width, height })
+  }, [])
+
   return (
-    <View pointerEvents="none" style={styles.root}>
+    <View pointerEvents="none" style={styles.root} onLayout={onLayout}>
       {layers.map((layer) => (
         <RoomAvatarLayer
           key={`${layer.type}:${layer.id}`}
@@ -98,6 +115,7 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
           animated={hasAnimation}
           signature={signature}
           frameState={frameState}
+          boxSize={boxSize}
           imagePriority={imagePriority}
           onLayerDisplay={props.onLayerDisplay}
           onImageError={props.onImageError}
@@ -112,6 +130,7 @@ interface RoomAvatarLayerProps {
   animated: boolean
   signature: string
   frameState: SharedValue<RoomAvatarFrameState>
+  boxSize: RoomAvatarBoxSize | null
   imagePriority: "low" | "normal" | "high"
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
@@ -124,7 +143,7 @@ interface RoomAvatarLayerProps {
  */
 const RoomAvatarLayer = memo(
   function RoomAvatarLayer(props: RoomAvatarLayerProps) {
-    const { layer, animated, signature, frameState, imagePriority } = props
+    const { layer, animated, signature, frameState, boxSize, imagePriority } = props
     const displayedSlots = useSharedValue<number[]>([])
     const selectedSlot = useSharedValue(0)
     const current = useMemo(
@@ -162,6 +181,7 @@ const RoomAvatarLayer = memo(
             asset={asset}
             layer={layer}
             slot={slot}
+            boxSize={boxSize}
             displayedSlots={displayedSlots}
             selectedSlot={selectedSlot}
             imagePriority={imagePriority}
@@ -176,6 +196,7 @@ const RoomAvatarLayer = memo(
     previous.animated === next.animated &&
     (!next.animated || previous.signature === next.signature) &&
     previous.frameState === next.frameState &&
+    previous.boxSize === next.boxSize &&
     previous.imagePriority === next.imagePriority &&
     previous.onLayerDisplay === next.onLayerDisplay &&
     previous.onImageError === next.onImageError &&
@@ -189,14 +210,45 @@ function RoomAvatarLayerImage(props: {
   asset: RoomV2AssetRef
   layer: RoomV2AvatarRenderLayer
   slot: number
+  boxSize: RoomAvatarBoxSize | null
   displayedSlots: SharedValue<number[]>
   selectedSlot: SharedValue<number>
   imagePriority: "low" | "normal" | "high"
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
 }) {
-  const { asset, layer, slot, selectedSlot, imagePriority, displayedSlots } = props
+  const { asset, layer, slot, selectedSlot, imagePriority, displayedSlots, boxSize } = props
   const visibility = useAnimatedStyle(() => ({ opacity: selectedSlot.value === slot ? 1 : 0 }))
+  const onDisplay = () => {
+    displayedSlots.modify((slots) => {
+      "worklet"
+      return slots.includes(slot) ? slots : [...slots, slot]
+    })
+    props.onLayerDisplay?.(`${layer.type}:${layer.id}`)
+  }
+  if (asset.crop) {
+    const placement = boxSize ? getRoomAvatarAtlasCropPlacement(asset.crop, boxSize) : null
+    return (
+      <Animated.View pointerEvents="none" style={[styles.layer, visibility]}>
+        <View pointerEvents="none" style={[styles.layer, getLayerFitStyle(layer)]}>
+          {placement ? (
+            <View pointerEvents="none" style={[styles.atlasCrop, placement.crop]}>
+              <ExpoImage
+                source={asset.source}
+                contentFit="fill"
+                cachePolicy="memory-disk"
+                priority={imagePriority}
+                transition={0}
+                onDisplay={onDisplay}
+                onError={props.onImageError}
+                style={[styles.atlasImage, placement.atlas]}
+              />
+            </View>
+          ) : null}
+        </View>
+      </Animated.View>
+    )
+  }
   return (
     <Animated.View pointerEvents="none" style={[styles.layer, visibility]}>
       <ExpoImage
@@ -205,13 +257,7 @@ function RoomAvatarLayerImage(props: {
         cachePolicy="memory-disk"
         priority={imagePriority}
         transition={0}
-        onDisplay={() => {
-          displayedSlots.modify((slots) => {
-            "worklet"
-            return slots.includes(slot) ? slots : [...slots, slot]
-          })
-          props.onLayerDisplay?.(`${layer.type}:${layer.id}`)
-        }}
+        onDisplay={onDisplay}
         onError={props.onImageError}
         style={[
           styles.layer,
@@ -220,6 +266,30 @@ function RoomAvatarLayerImage(props: {
       />
     </Animated.View>
   )
+}
+
+/**
+ * Draws one atlas crop exactly where the whole frame would land with
+ * contentFit "contain" (see getRoomAvatarAtlasCropLayout). Offsets are
+ * transforms, so they keep sub-pixel precision instead of snapping to the
+ * layout pixel grid; only the clip edges snap, and those sit in the frame's
+ * transparent padding.
+ */
+function getRoomAvatarAtlasCropPlacement(crop: RoomV2AssetCrop, box: RoomAvatarBoxSize) {
+  const layout = getRoomAvatarAtlasCropLayout(crop, box, PixelRatio.roundToNearestPixel)
+  if (!layout) return null
+  return {
+    crop: {
+      width: layout.crop.width,
+      height: layout.crop.height,
+      transform: [{ translateX: layout.crop.left }, { translateY: layout.crop.top }]
+    },
+    atlas: {
+      width: layout.atlas.width,
+      height: layout.atlas.height,
+      transform: [{ translateX: layout.atlas.left }, { translateY: layout.atlas.top }]
+    }
+  }
 }
 
 const ROOM_AVATAR_LAYER_FIT: Record<
@@ -285,5 +355,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     width: "100%",
     height: "100%"
+  },
+  atlasCrop: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    overflow: "hidden"
+  },
+  atlasImage: {
+    position: "absolute",
+    left: 0,
+    top: 0
   }
 })

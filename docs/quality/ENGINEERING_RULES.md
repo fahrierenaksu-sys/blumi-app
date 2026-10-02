@@ -61,6 +61,7 @@ Elsewhere (mobile paths are relative to `apps/mobile`):
 - `src/features/shop/shopReleaseCatalog.test.ts` (`test:shop-preview-assets`): every published item's runtime files are SHA-256 bound to its receipt.
   - Changing a published item's art bytes, or the resolvers that point at them, fails until the owner approves a new receipt.
   - `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md` is hash-locked too.
+- `apps/mobile/scripts/mobile-ota-asset-budget.test.mjs` (`run-avatar-v2-tests.mjs`): the distinct image and font files app code requires, plus a package allowance, must stay 50 below EAS Update's 1,000-asset limit. New room motion frames go through `scripts/build-room-motion-atlases.mjs`, and `roomAvatarMotionAtlas.test.ts` proves each packed frame equals its original PNG.
 - `apps/mobile/app.config.js` runs build-time guards:
   - Every build fails if a camera, audio, WebRTC or LiveKit package appears in the dependencies or the lockfile.
   - Preview and production builds also fail on imports from a `*candidate/` or `*candidates/` path.

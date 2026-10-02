@@ -1,4 +1,5 @@
 import type {
+  RoomV2AssetCrop,
   RoomV2AssetRef,
   RoomV2AvatarRenderLayer
 } from "../../roomV2/roomV2.types"
@@ -156,4 +157,47 @@ export function getRoomAvatarReadyFrameSlot(
   "worklet"
   const slot = getRoomAvatarLayerFrameSlot(slotByFrame, frameIndex)
   return displayedSlots.includes(slot) ? slot : previousSlot
+}
+
+export interface RoomAvatarAtlasCropLayout {
+  /** The clip view: its size, and where its top-left sits in the box. */
+  crop: { left: number; top: number; width: number; height: number }
+  /** The atlas image inside the clip view: its size and offset. */
+  atlas: { left: number; top: number; width: number; height: number }
+}
+
+/**
+ * Where an atlas crop goes so its pixels land exactly where the whole frame
+ * would with contentFit "contain" in `box`: the frame's canvas is scaled by
+ * min(box / canvas) and centred, the clip view covers the crop's rect on that
+ * canvas, and the atlas is shifted so the crop's corner meets the clip's.
+ * `roundSize` is the platform's pixel rounding of the atlas view size; the
+ * shift uses the rounded scale so the crop's corner stays exact.
+ */
+export function getRoomAvatarAtlasCropLayout(
+  crop: RoomV2AssetCrop,
+  box: { width: number; height: number },
+  roundSize: (value: number) => number = (value) => value
+): RoomAvatarAtlasCropLayout | null {
+  const scale = Math.min(box.width / crop.canvasWidth, box.height / crop.canvasHeight)
+  if (!(scale > 0) || !Number.isFinite(scale)) return null
+  const canvasLeft = (box.width - crop.canvasWidth * scale) / 2
+  const canvasTop = (box.height - crop.canvasHeight * scale) / 2
+  const atlasWidth = roundSize(crop.atlasWidth * scale)
+  const atlasHeight = roundSize(crop.atlasHeight * scale)
+  if (!(atlasWidth > 0) || !(atlasHeight > 0)) return null
+  return {
+    crop: {
+      left: canvasLeft + crop.x * scale,
+      top: canvasTop + crop.y * scale,
+      width: crop.width * scale,
+      height: crop.height * scale
+    },
+    atlas: {
+      left: -crop.atlasX * (atlasWidth / crop.atlasWidth),
+      top: -crop.atlasY * (atlasHeight / crop.atlasHeight),
+      width: atlasWidth,
+      height: atlasHeight
+    }
+  }
 }

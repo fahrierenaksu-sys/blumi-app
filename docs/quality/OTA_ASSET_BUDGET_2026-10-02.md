@@ -32,4 +32,14 @@ Published items keep their individual PNGs, so every receipt stays valid.
 
 The remaining candidates were checked and left alone: the onboarding runner sets in `src/features/session/assets` are all still reachable from `onboardingRunAssetCatalog.ts`, and the idle room layers double as Shop preview sources (`shopAssets.ts`), so they are not provably unused.
 
-The result after the atlas change is recorded in the section below.
+## After the atlas change
+
+**888 iOS assets** (same export, same environment): 1,210 − 336 frames + 14 atlases. Room motion is now 374 individual receipt-bound frames plus 14 atlases in `src/features/avatarV2/assets/room/motion-atlas`. Headroom under the EAS limit: 112.
+
+- Generator: `node apps/mobile/scripts/build-room-motion-atlases.mjs` (sharp, from the repo PNGs only; rerunning it reproduces the same bytes). After promoting new room motion art, add its `require()` lines as usual and run it with `--rewrite-requires`: frames that no receipt binds are packed and their requires become `roomAvatarMotionAtlasFrame("<name>")`.
+- Renderer: `RoomAvatarRenderer2D` clips each packed frame out of its atlas at the exact place `contentFit="contain"` would draw the 256×384 frame; frame timing, slots, readiness, layering and mirroring are unchanged.
+- Proof: `roomAvatarMotionAtlas.test.ts` composites all 425 packed frames from their atlases and compares them with the original PNGs: byte-exact RGBA equality for every frame, and every crop edge is transparent. `scripts/mobile-ota-asset-budget.test.mjs` fails once the app's required assets plus a 60-asset package allowance come within 50 of 1,000 (today: 863 + 60 = 923, an upper bound of the real 888).
+
+Decoded memory (RGBA, before any expo-image downscale): the 14 atlases are 11.5 MB together; the largest is the male tops atlas, 1024×808 (3.2 MB), then female tops 1012×608 (2.3 MB) and female hair 956×444 (1.6 MB); the rest are under 1 MB. One untrimmed frame was 0.375 MB, so one walking layer used to hold 1.5 MB for its four frames per avatar. A fully packed female outfit now touches about 6.6 MB of atlases, shared by every avatar on screen, against about 13.5 MB per avatar before. A single male avatar wearing one packed top holds the whole 3.2 MB tops atlas instead of 1.5 MB.
+
+On device the frame's pixels are the same, but they are resampled from a different image, so sub-pixel anti-aliasing at the frame edges can differ by less than one device pixel. That is not visible in tests and needs a look on the phone.

@@ -1,0 +1,3909 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "apps/mobile/scripts/build-room-motion-atlases.mjs",
+  "canvas": {
+    "width": 256,
+    "height": 384
+  },
+  "sourceDirectory": "src/features/avatarV2/assets/room/motion",
+  "atlasDirectory": "src/features/avatarV2/assets/room/motion-atlas",
+  "atlases": [
+    {
+      "file": "room_motion_atlas_female_accessory_01.png",
+      "width": 584,
+      "height": 96
+    },
+    {
+      "file": "room_motion_atlas_female_base_01.png",
+      "width": 576,
+      "height": 136
+    },
+    {
+      "file": "room_motion_atlas_female_bottom_01.png",
+      "width": 964,
+      "height": 120
+    },
+    {
+      "file": "room_motion_atlas_female_eyes_01.png",
+      "width": 940,
+      "height": 156
+    },
+    {
+      "file": "room_motion_atlas_female_face_01.png",
+      "width": 944,
+      "height": 260
+    },
+    {
+      "file": "room_motion_atlas_female_hair_01.png",
+      "width": 956,
+      "height": 444
+    },
+    {
+      "file": "room_motion_atlas_female_mouth_01.png",
+      "width": 988,
+      "height": 52
+    },
+    {
+      "file": "room_motion_atlas_female_nose_01.png",
+      "width": 916,
+      "height": 28
+    },
+    {
+      "file": "room_motion_atlas_female_shoes_01.png",
+      "width": 584,
+      "height": 44
+    },
+    {
+      "file": "room_motion_atlas_female_top_01.png",
+      "width": 1012,
+      "height": 608
+    },
+    {
+      "file": "room_motion_atlas_male_base_01.png",
+      "width": 520,
+      "height": 136
+    },
+    {
+      "file": "room_motion_atlas_male_bottom_01.png",
+      "width": 1020,
+      "height": 252
+    },
+    {
+      "file": "room_motion_atlas_male_shoes_01.png",
+      "width": 980,
+      "height": 68
+    },
+    {
+      "file": "room_motion_atlas_male_top_01.png",
+      "width": 1024,
+      "height": 808
+    }
+  ],
+  "frames": {
+    "room_avatar_accessory_female_ivory_ribbon_beret_v2_sitting_front_f01": {
+      "atlas": 0,
+      "atlasX": 146,
+      "atlasY": 0,
+      "x": 56,
+      "y": 58,
+      "width": 144,
+      "height": 96
+    },
+    "room_avatar_accessory_female_ivory_ribbon_beret_v2_walking_front_f01": {
+      "atlas": 0,
+      "atlasX": 146,
+      "atlasY": 0,
+      "x": 56,
+      "y": 58,
+      "width": 144,
+      "height": 96
+    },
+    "room_avatar_accessory_female_ivory_ribbon_beret_v2_walking_front_f02": {
+      "atlas": 0,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 55,
+      "y": 57,
+      "width": 144,
+      "height": 96
+    },
+    "room_avatar_accessory_female_ivory_ribbon_beret_v2_walking_front_f03": {
+      "atlas": 0,
+      "atlasX": 438,
+      "atlasY": 0,
+      "x": 56,
+      "y": 57,
+      "width": 144,
+      "height": 96
+    },
+    "room_avatar_accessory_female_ivory_ribbon_beret_v2_walking_front_f04": {
+      "atlas": 0,
+      "atlasX": 292,
+      "atlasY": 0,
+      "x": 57,
+      "y": 57,
+      "width": 144,
+      "height": 96
+    },
+    "room_avatar_base_female_v2_sitting_front_f01": {
+      "atlas": 1,
+      "atlasX": 444,
+      "atlasY": 0,
+      "x": 62,
+      "y": 211,
+      "width": 130,
+      "height": 135
+    },
+    "room_avatar_base_female_v2_walking_front_f01": {
+      "atlas": 1,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 72,
+      "y": 211,
+      "width": 111,
+      "height": 136
+    },
+    "room_avatar_base_female_v2_walking_front_f02": {
+      "atlas": 1,
+      "atlasX": 113,
+      "atlasY": 0,
+      "x": 72,
+      "y": 211,
+      "width": 110,
+      "height": 136
+    },
+    "room_avatar_base_female_v2_walking_front_f03": {
+      "atlas": 1,
+      "atlasX": 336,
+      "atlasY": 0,
+      "x": 73,
+      "y": 211,
+      "width": 106,
+      "height": 136
+    },
+    "room_avatar_base_female_v2_walking_front_f04": {
+      "atlas": 1,
+      "atlasX": 225,
+      "atlasY": 0,
+      "x": 74,
+      "y": 211,
+      "width": 109,
+      "height": 136
+    },
+    "room_avatar_base_male_light_v1_sitting_front_f01": {
+      "atlas": 10,
+      "atlasX": 393,
+      "atlasY": 0,
+      "x": 66,
+      "y": 211,
+      "width": 124,
+      "height": 135
+    },
+    "room_avatar_base_male_light_v1_walking_front_f01": {
+      "atlas": 10,
+      "atlasX": 296,
+      "atlasY": 0,
+      "x": 80,
+      "y": 211,
+      "width": 95,
+      "height": 136
+    },
+    "room_avatar_base_male_light_v1_walking_front_f02": {
+      "atlas": 10,
+      "atlasX": 198,
+      "atlasY": 0,
+      "x": 80,
+      "y": 211,
+      "width": 96,
+      "height": 136
+    },
+    "room_avatar_base_male_light_v1_walking_front_f03": {
+      "atlas": 10,
+      "atlasX": 99,
+      "atlasY": 0,
+      "x": 79,
+      "y": 211,
+      "width": 97,
+      "height": 136
+    },
+    "room_avatar_base_male_light_v1_walking_front_f04": {
+      "atlas": 10,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 79,
+      "y": 211,
+      "width": 97,
+      "height": 136
+    },
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2_sitting_front_f01": {
+      "atlas": 2,
+      "atlasX": 92,
+      "atlasY": 0,
+      "x": 84,
+      "y": 276,
+      "width": 89,
+      "height": 66
+    },
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2_walking_front_f01": {
+      "atlas": 2,
+      "atlasX": 795,
+      "atlasY": 0,
+      "x": 88,
+      "y": 276,
+      "width": 81,
+      "height": 64
+    },
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2_walking_front_f02": {
+      "atlas": 2,
+      "atlasX": 273,
+      "atlasY": 0,
+      "x": 84,
+      "y": 276,
+      "width": 88,
+      "height": 64
+    },
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2_walking_front_f03": {
+      "atlas": 2,
+      "atlasX": 541,
+      "atlasY": 0,
+      "x": 86,
+      "y": 276,
+      "width": 84,
+      "height": 64
+    },
+    "room_avatar_bottom_female_buttercream_pearl_tailored_pants_v2_walking_front_f04": {
+      "atlas": 2,
+      "atlasX": 363,
+      "atlasY": 0,
+      "x": 86,
+      "y": 276,
+      "width": 87,
+      "height": 64
+    },
+    "room_avatar_bottom_female_denim_skort_shorts_v2_sitting_front_f01": {
+      "atlas": 2,
+      "atlasX": 0,
+      "atlasY": 68,
+      "x": 82,
+      "y": 275,
+      "width": 93,
+      "height": 52
+    },
+    "room_avatar_bottom_female_denim_skort_shorts_v2_walking_front_f01": {
+      "atlas": 2,
+      "atlasX": 263,
+      "atlasY": 68,
+      "x": 95,
+      "y": 284,
+      "width": 66,
+      "height": 46
+    },
+    "room_avatar_bottom_female_denim_skort_shorts_v2_walking_front_f02": {
+      "atlas": 2,
+      "atlasX": 331,
+      "atlasY": 68,
+      "x": 95,
+      "y": 281,
+      "width": 65,
+      "height": 46
+    },
+    "room_avatar_bottom_female_denim_skort_shorts_v2_walking_front_f03": {
+      "atlas": 2,
+      "atlasX": 464,
+      "atlasY": 68,
+      "x": 95,
+      "y": 281,
+      "width": 63,
+      "height": 46
+    },
+    "room_avatar_bottom_female_denim_skort_shorts_v2_walking_front_f04": {
+      "atlas": 2,
+      "atlasX": 398,
+      "atlasY": 68,
+      "x": 96,
+      "y": 281,
+      "width": 64,
+      "height": 46
+    },
+    "room_avatar_bottom_female_lavender_bow_twill_shorts_v2_sitting_front_f01": {
+      "atlas": 2,
+      "atlasX": 878,
+      "atlasY": 0,
+      "x": 86,
+      "y": 276,
+      "width": 84,
+      "height": 57
+    },
+    "room_avatar_bottom_female_lavender_bow_twill_shorts_v2_walking_front_f01": {
+      "atlas": 2,
+      "atlasX": 529,
+      "atlasY": 68,
+      "x": 89,
+      "y": 276,
+      "width": 78,
+      "height": 45
+    },
+    "room_avatar_bottom_female_lavender_bow_twill_shorts_v2_walking_front_f02": {
+      "atlas": 2,
+      "atlasX": 95,
+      "atlasY": 68,
+      "x": 87,
+      "y": 276,
+      "width": 82,
+      "height": 46
+    },
+    "room_avatar_bottom_female_lavender_bow_twill_shorts_v2_walking_front_f03": {
+      "atlas": 2,
+      "atlasX": 609,
+      "atlasY": 68,
+      "x": 89,
+      "y": 276,
+      "width": 78,
+      "height": 44
+    },
+    "room_avatar_bottom_female_lavender_bow_twill_shorts_v2_walking_front_f04": {
+      "atlas": 2,
+      "atlasX": 179,
+      "atlasY": 68,
+      "x": 87,
+      "y": 276,
+      "width": 82,
+      "height": 46
+    },
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2_sitting_front_f01": {
+      "atlas": 2,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 84,
+      "y": 276,
+      "width": 90,
+      "height": 66
+    },
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2_walking_front_f01": {
+      "atlas": 2,
+      "atlasX": 712,
+      "atlasY": 0,
+      "x": 87,
+      "y": 276,
+      "width": 81,
+      "height": 64
+    },
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2_walking_front_f02": {
+      "atlas": 2,
+      "atlasX": 183,
+      "atlasY": 0,
+      "x": 84,
+      "y": 276,
+      "width": 88,
+      "height": 64
+    },
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2_walking_front_f03": {
+      "atlas": 2,
+      "atlasX": 627,
+      "atlasY": 0,
+      "x": 86,
+      "y": 276,
+      "width": 83,
+      "height": 64
+    },
+    "room_avatar_bottom_female_midnight_ribbon_wide_leg_pants_v2_walking_front_f04": {
+      "atlas": 2,
+      "atlasX": 452,
+      "atlasY": 0,
+      "x": 85,
+      "y": 276,
+      "width": 87,
+      "height": 64
+    },
+    "room_avatar_bottom_male_charcoal_tapered_chinos_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 469,
+      "atlasY": 0,
+      "x": 84,
+      "y": 282,
+      "width": 86,
+      "height": 63
+    },
+    "room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 636,
+      "atlasY": 132,
+      "x": 96,
+      "y": 282,
+      "width": 64,
+      "height": 60
+    },
+    "room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 493,
+      "atlasY": 132,
+      "x": 97,
+      "y": 283,
+      "width": 64,
+      "height": 61
+    },
+    "room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 683,
+      "atlasY": 68,
+      "x": 98,
+      "y": 282,
+      "width": 63,
+      "height": 62
+    },
+    "room_avatar_bottom_male_charcoal_tapered_chinos_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 833,
+      "atlasY": 132,
+      "x": 97,
+      "y": 282,
+      "width": 63,
+      "height": 59
+    },
+    "room_avatar_bottom_male_contemporary_resort_street_bottom_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 0,
+      "atlasY": 68,
+      "x": 85,
+      "y": 282,
+      "width": 86,
+      "height": 62
+    },
+    "room_avatar_bottom_male_contemporary_resort_street_bottom_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 898,
+      "atlasY": 132,
+      "x": 92,
+      "y": 281,
+      "width": 72,
+      "height": 57
+    },
+    "room_avatar_bottom_male_contemporary_resort_street_bottom_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 88,
+      "atlasY": 0,
+      "x": 88,
+      "y": 282,
+      "width": 80,
+      "height": 64
+    },
+    "room_avatar_bottom_male_contemporary_resort_street_bottom_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 99,
+      "atlasY": 132,
+      "x": 88,
+      "y": 282,
+      "width": 80,
+      "height": 61
+    },
+    "room_avatar_bottom_male_contemporary_resort_street_bottom_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 557,
+      "atlasY": 0,
+      "x": 89,
+      "y": 282,
+      "width": 79,
+      "height": 63
+    },
+    "room_avatar_bottom_male_mid_blue_straight_jeans_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 934,
+      "atlasY": 0,
+      "x": 85,
+      "y": 282,
+      "width": 86,
+      "height": 62
+    },
+    "room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 702,
+      "atlasY": 132,
+      "x": 96,
+      "y": 282,
+      "width": 64,
+      "height": 60
+    },
+    "room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 617,
+      "atlasY": 68,
+      "x": 97,
+      "y": 283,
+      "width": 64,
+      "height": 62
+    },
+    "room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 869,
+      "atlasY": 0,
+      "x": 98,
+      "y": 282,
+      "width": 63,
+      "height": 63
+    },
+    "room_avatar_bottom_male_mid_blue_straight_jeans_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 768,
+      "atlasY": 132,
+      "x": 97,
+      "y": 282,
+      "width": 63,
+      "height": 59
+    },
+    "room_avatar_bottom_male_modern_track_luxury_bottom_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 256,
+      "atlasY": 68,
+      "x": 87,
+      "y": 282,
+      "width": 82,
+      "height": 62
+    },
+    "room_avatar_bottom_male_modern_track_luxury_bottom_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 222,
+      "atlasY": 195,
+      "x": 93,
+      "y": 282,
+      "width": 70,
+      "height": 56
+    },
+    "room_avatar_bottom_male_modern_track_luxury_bottom_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 248,
+      "atlasY": 0,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 64
+    },
+    "room_avatar_bottom_male_modern_track_luxury_bottom_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 181,
+      "atlasY": 132,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 61
+    },
+    "room_avatar_bottom_male_modern_track_luxury_bottom_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 792,
+      "atlasY": 0,
+      "x": 91,
+      "y": 282,
+      "width": 75,
+      "height": 63
+    },
+    "room_avatar_bottom_male_navy_straight_pants_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 85,
+      "y": 274,
+      "width": 86,
+      "height": 66
+    },
+    "room_avatar_bottom_male_navy_straight_pants_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 485,
+      "atlasY": 68,
+      "x": 97,
+      "y": 282,
+      "width": 64,
+      "height": 62
+    },
+    "room_avatar_bottom_male_navy_straight_pants_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 551,
+      "atlasY": 68,
+      "x": 97,
+      "y": 283,
+      "width": 64,
+      "height": 62
+    },
+    "room_avatar_bottom_male_navy_straight_pants_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 404,
+      "atlasY": 0,
+      "x": 98,
+      "y": 282,
+      "width": 63,
+      "height": 64
+    },
+    "room_avatar_bottom_male_navy_straight_pants_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 748,
+      "atlasY": 68,
+      "x": 97,
+      "y": 282,
+      "width": 63,
+      "height": 62
+    },
+    "room_avatar_bottom_male_sage_cuffed_shorts_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 417,
+      "atlasY": 68,
+      "x": 96,
+      "y": 283,
+      "width": 66,
+      "height": 62
+    },
+    "room_avatar_bottom_male_sage_cuffed_shorts_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 294,
+      "atlasY": 195,
+      "x": 93,
+      "y": 282,
+      "width": 71,
+      "height": 40
+    },
+    "room_avatar_bottom_male_sage_cuffed_shorts_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 875,
+      "atlasY": 68,
+      "x": 98,
+      "y": 283,
+      "width": 60,
+      "height": 62
+    },
+    "room_avatar_bottom_male_sage_cuffed_shorts_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 937,
+      "atlasY": 68,
+      "x": 99,
+      "y": 283,
+      "width": 59,
+      "height": 62
+    },
+    "room_avatar_bottom_male_sage_cuffed_shorts_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 813,
+      "atlasY": 68,
+      "x": 99,
+      "y": 283,
+      "width": 60,
+      "height": 62
+    },
+    "room_avatar_bottom_male_straight_utility_tailored_trousers_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 88,
+      "atlasY": 68,
+      "x": 87,
+      "y": 282,
+      "width": 82,
+      "height": 62
+    },
+    "room_avatar_bottom_male_straight_utility_tailored_trousers_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 150,
+      "atlasY": 195,
+      "x": 93,
+      "y": 282,
+      "width": 70,
+      "height": 56
+    },
+    "room_avatar_bottom_male_straight_utility_tailored_trousers_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 170,
+      "atlasY": 0,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 64
+    },
+    "room_avatar_bottom_male_straight_utility_tailored_trousers_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 415,
+      "atlasY": 132,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 61
+    },
+    "room_avatar_bottom_male_straight_utility_tailored_trousers_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 715,
+      "atlasY": 0,
+      "x": 91,
+      "y": 282,
+      "width": 75,
+      "height": 63
+    },
+    "room_avatar_bottom_male_warm_sand_deconstructed_trousers_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 172,
+      "atlasY": 68,
+      "x": 87,
+      "y": 282,
+      "width": 82,
+      "height": 62
+    },
+    "room_avatar_bottom_male_warm_sand_deconstructed_trousers_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 0,
+      "atlasY": 195,
+      "x": 93,
+      "y": 282,
+      "width": 70,
+      "height": 57
+    },
+    "room_avatar_bottom_male_warm_sand_deconstructed_trousers_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 326,
+      "atlasY": 0,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 64
+    },
+    "room_avatar_bottom_male_warm_sand_deconstructed_trousers_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 337,
+      "atlasY": 132,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 61
+    },
+    "room_avatar_bottom_male_warm_sand_deconstructed_trousers_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 638,
+      "atlasY": 0,
+      "x": 91,
+      "y": 282,
+      "width": 75,
+      "height": 63
+    },
+    "room_avatar_bottom_male_warm_sand_relaxed_pants_v1_sitting_front_f01": {
+      "atlas": 11,
+      "atlasX": 0,
+      "atlasY": 132,
+      "x": 80,
+      "y": 282,
+      "width": 97,
+      "height": 61
+    },
+    "room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f01": {
+      "atlas": 11,
+      "atlasX": 72,
+      "atlasY": 195,
+      "x": 90,
+      "y": 282,
+      "width": 76,
+      "height": 56
+    },
+    "room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f02": {
+      "atlas": 11,
+      "atlasX": 259,
+      "atlasY": 132,
+      "x": 91,
+      "y": 283,
+      "width": 76,
+      "height": 61
+    },
+    "room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f03": {
+      "atlas": 11,
+      "atlasX": 559,
+      "atlasY": 132,
+      "x": 92,
+      "y": 282,
+      "width": 75,
+      "height": 60
+    },
+    "room_avatar_bottom_male_warm_sand_relaxed_pants_v1_walking_front_f04": {
+      "atlas": 11,
+      "atlasX": 340,
+      "atlasY": 68,
+      "x": 92,
+      "y": 282,
+      "width": 75,
+      "height": 62
+    },
+    "room_avatar_eyes_female_chestnut_luminous_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 564,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_chestnut_luminous_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 564,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_chestnut_luminous_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 658,
+      "atlasY": 0,
+      "x": 82,
+      "y": 142,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_chestnut_luminous_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 376,
+      "atlasY": 0,
+      "x": 83,
+      "y": 141,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_chestnut_luminous_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 752,
+      "atlasY": 0,
+      "x": 84,
+      "y": 142,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_cocoa_puppy_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 752,
+      "atlasY": 81,
+      "x": 83,
+      "y": 145,
+      "width": 92,
+      "height": 34
+    },
+    "room_avatar_eyes_female_cocoa_puppy_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 752,
+      "atlasY": 81,
+      "x": 83,
+      "y": 145,
+      "width": 92,
+      "height": 34
+    },
+    "room_avatar_eyes_female_cocoa_puppy_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 0,
+      "atlasY": 119,
+      "x": 82,
+      "y": 144,
+      "width": 92,
+      "height": 34
+    },
+    "room_avatar_eyes_female_cocoa_puppy_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 94,
+      "atlasY": 119,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 34
+    },
+    "room_avatar_eyes_female_cocoa_puppy_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 846,
+      "atlasY": 81,
+      "x": 84,
+      "y": 144,
+      "width": 92,
+      "height": 34
+    },
+    "room_avatar_eyes_female_deep_brown_star_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 282,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_deep_brown_star_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 282,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_deep_brown_star_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 752,
+      "atlasY": 41,
+      "x": 82,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_deep_brown_star_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 94,
+      "atlasY": 81,
+      "x": 83,
+      "y": 142,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_deep_brown_star_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 376,
+      "atlasY": 81,
+      "x": 84,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_hazel_almond_doe_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 188,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_hazel_almond_doe_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 188,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_hazel_almond_doe_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 658,
+      "atlasY": 41,
+      "x": 82,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_hazel_almond_doe_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 470,
+      "atlasY": 41,
+      "x": 83,
+      "y": 142,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_hazel_almond_doe_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 282,
+      "atlasY": 41,
+      "x": 84,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_honey_amber_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 0,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_honey_amber_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 0,
+      "atlasY": 81,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_honey_amber_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 470,
+      "atlasY": 81,
+      "x": 82,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_honey_amber_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 564,
+      "atlasY": 41,
+      "x": 83,
+      "y": 142,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_honey_amber_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 846,
+      "atlasY": 41,
+      "x": 84,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_mocha_doe_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 282,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 39
+    },
+    "room_avatar_eyes_female_mocha_doe_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 282,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 39
+    },
+    "room_avatar_eyes_female_mocha_doe_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 82,
+      "y": 142,
+      "width": 92,
+      "height": 39
+    },
+    "room_avatar_eyes_female_mocha_doe_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 188,
+      "atlasY": 0,
+      "x": 83,
+      "y": 141,
+      "width": 92,
+      "height": 39
+    },
+    "room_avatar_eyes_female_mocha_doe_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 94,
+      "atlasY": 0,
+      "x": 84,
+      "y": 142,
+      "width": 92,
+      "height": 39
+    },
+    "room_avatar_eyes_female_sage_glass_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 188,
+      "atlasY": 41,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_sage_glass_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 188,
+      "atlasY": 41,
+      "x": 83,
+      "y": 144,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_sage_glass_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 658,
+      "atlasY": 81,
+      "x": 82,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_sage_glass_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 564,
+      "atlasY": 81,
+      "x": 83,
+      "y": 142,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_sage_glass_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 376,
+      "atlasY": 41,
+      "x": 84,
+      "y": 143,
+      "width": 92,
+      "height": 36
+    },
+    "room_avatar_eyes_female_twilight_plum_v2_sitting_front_f01": {
+      "atlas": 3,
+      "atlasX": 846,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_twilight_plum_v2_walking_front_f01": {
+      "atlas": 3,
+      "atlasX": 846,
+      "atlasY": 0,
+      "x": 83,
+      "y": 143,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_twilight_plum_v2_walking_front_f02": {
+      "atlas": 3,
+      "atlasX": 470,
+      "atlasY": 0,
+      "x": 82,
+      "y": 142,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_twilight_plum_v2_walking_front_f03": {
+      "atlas": 3,
+      "atlasX": 0,
+      "atlasY": 41,
+      "x": 83,
+      "y": 141,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_eyes_female_twilight_plum_v2_walking_front_f04": {
+      "atlas": 3,
+      "atlasX": 94,
+      "atlasY": 41,
+      "x": 84,
+      "y": 142,
+      "width": 92,
+      "height": 38
+    },
+    "room_avatar_face_female_rose_heart_foundation_v2_sitting_front_f01": {
+      "atlas": 4,
+      "atlasX": 590,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_rose_heart_foundation_v2_walking_front_f01": {
+      "atlas": 4,
+      "atlasX": 590,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_rose_heart_foundation_v2_walking_front_f02": {
+      "atlas": 4,
+      "atlasX": 472,
+      "atlasY": 0,
+      "x": 69,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_rose_heart_foundation_v2_walking_front_f03": {
+      "atlas": 4,
+      "atlasX": 708,
+      "atlasY": 0,
+      "x": 70,
+      "y": 97,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_rose_heart_foundation_v2_walking_front_f04": {
+      "atlas": 4,
+      "atlasX": 354,
+      "atlasY": 130,
+      "x": 71,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_soft_doll_foundation_v2_sitting_front_f01": {
+      "atlas": 4,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_soft_doll_foundation_v2_walking_front_f01": {
+      "atlas": 4,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_soft_doll_foundation_v2_walking_front_f02": {
+      "atlas": 4,
+      "atlasX": 118,
+      "atlasY": 130,
+      "x": 69,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_soft_doll_foundation_v2_walking_front_f03": {
+      "atlas": 4,
+      "atlasX": 826,
+      "atlasY": 0,
+      "x": 70,
+      "y": 97,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_soft_doll_foundation_v2_walking_front_f04": {
+      "atlas": 4,
+      "atlasX": 354,
+      "atlasY": 0,
+      "x": 71,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_warm_peach_foundation_v2_sitting_front_f01": {
+      "atlas": 4,
+      "atlasX": 236,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_warm_peach_foundation_v2_walking_front_f01": {
+      "atlas": 4,
+      "atlasX": 236,
+      "atlasY": 0,
+      "x": 70,
+      "y": 99,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_warm_peach_foundation_v2_walking_front_f02": {
+      "atlas": 4,
+      "atlasX": 236,
+      "atlasY": 130,
+      "x": 69,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_warm_peach_foundation_v2_walking_front_f03": {
+      "atlas": 4,
+      "atlasX": 118,
+      "atlasY": 0,
+      "x": 70,
+      "y": 97,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_face_female_warm_peach_foundation_v2_walking_front_f04": {
+      "atlas": 4,
+      "atlasX": 0,
+      "atlasY": 130,
+      "x": 71,
+      "y": 98,
+      "width": 116,
+      "height": 128
+    },
+    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 140,
+      "atlasY": 166,
+      "x": 58,
+      "y": 73,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 140,
+      "atlasY": 166,
+      "x": 58,
+      "y": 73,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 784,
+      "atlasY": 0,
+      "x": 57,
+      "y": 72,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 166,
+      "x": 58,
+      "y": 71,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_back_female_cocoa_cloud_ponytail_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 644,
+      "atlasY": 0,
+      "x": 59,
+      "y": 72,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 598,
+      "atlasY": 166,
+      "x": 75,
+      "y": 81,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 598,
+      "atlasY": 166,
+      "x": 75,
+      "y": 81,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 386,
+      "atlasY": 166,
+      "x": 74,
+      "y": 80,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 280,
+      "atlasY": 166,
+      "x": 75,
+      "y": 79,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_back_female_espresso_sleek_ribbon_pony_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 492,
+      "atlasY": 166,
+      "x": 76,
+      "y": 80,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_back_female_midnight_french_bob_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 704,
+      "atlasY": 166,
+      "x": 65,
+      "y": 90,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_back_female_midnight_french_bob_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 704,
+      "atlasY": 166,
+      "x": 65,
+      "y": 90,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_back_female_midnight_french_bob_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 126,
+      "atlasY": 330,
+      "x": 64,
+      "y": 89,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_back_female_midnight_french_bob_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 330,
+      "x": 65,
+      "y": 88,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_back_female_midnight_french_bob_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 830,
+      "atlasY": 166,
+      "x": 66,
+      "y": 89,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_back_female_mocha_ribbon_blowout_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 322,
+      "atlasY": 0,
+      "x": 49,
+      "y": 82,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_back_female_mocha_ribbon_blowout_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 322,
+      "atlasY": 0,
+      "x": 49,
+      "y": 82,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_back_female_mocha_ribbon_blowout_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 161,
+      "atlasY": 0,
+      "x": 48,
+      "y": 81,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_back_female_mocha_ribbon_blowout_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 483,
+      "atlasY": 0,
+      "x": 49,
+      "y": 80,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_back_female_mocha_ribbon_blowout_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 50,
+      "y": 81,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 140,
+      "atlasY": 166,
+      "x": 58,
+      "y": 73,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 140,
+      "atlasY": 166,
+      "x": 58,
+      "y": 73,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 784,
+      "atlasY": 0,
+      "x": 57,
+      "y": 72,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 166,
+      "x": 58,
+      "y": 71,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_front_female_cocoa_cloud_ponytail_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 644,
+      "atlasY": 0,
+      "x": 59,
+      "y": 72,
+      "width": 138,
+      "height": 162
+    },
+    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 598,
+      "atlasY": 166,
+      "x": 75,
+      "y": 81,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 598,
+      "atlasY": 166,
+      "x": 75,
+      "y": 81,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 386,
+      "atlasY": 166,
+      "x": 74,
+      "y": 80,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 280,
+      "atlasY": 166,
+      "x": 75,
+      "y": 79,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_front_female_espresso_sleek_ribbon_pony_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 492,
+      "atlasY": 166,
+      "x": 76,
+      "y": 80,
+      "width": 104,
+      "height": 154
+    },
+    "room_avatar_hair_front_female_midnight_french_bob_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 704,
+      "atlasY": 166,
+      "x": 65,
+      "y": 90,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_front_female_midnight_french_bob_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 704,
+      "atlasY": 166,
+      "x": 65,
+      "y": 90,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_front_female_midnight_french_bob_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 126,
+      "atlasY": 330,
+      "x": 64,
+      "y": 89,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_front_female_midnight_french_bob_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 330,
+      "x": 65,
+      "y": 88,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_front_female_midnight_french_bob_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 830,
+      "atlasY": 166,
+      "x": 66,
+      "y": 89,
+      "width": 124,
+      "height": 114
+    },
+    "room_avatar_hair_front_female_mocha_ribbon_blowout_v2_sitting_front_f01": {
+      "atlas": 5,
+      "atlasX": 322,
+      "atlasY": 0,
+      "x": 49,
+      "y": 82,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_front_female_mocha_ribbon_blowout_v2_walking_front_f01": {
+      "atlas": 5,
+      "atlasX": 322,
+      "atlasY": 0,
+      "x": 49,
+      "y": 82,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_front_female_mocha_ribbon_blowout_v2_walking_front_f02": {
+      "atlas": 5,
+      "atlasX": 161,
+      "atlasY": 0,
+      "x": 48,
+      "y": 81,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_front_female_mocha_ribbon_blowout_v2_walking_front_f03": {
+      "atlas": 5,
+      "atlasX": 483,
+      "atlasY": 0,
+      "x": 49,
+      "y": 80,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_hair_front_female_mocha_ribbon_blowout_v2_walking_front_f04": {
+      "atlas": 5,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 50,
+      "y": 81,
+      "width": 159,
+      "height": 164
+    },
+    "room_avatar_mouth_female_berry_soft_kiss_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 900,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_berry_soft_kiss_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 900,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_berry_soft_kiss_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 495,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_berry_soft_kiss_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 315,
+      "atlasY": 27,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_berry_soft_kiss_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 405,
+      "atlasY": 27,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_cherry_balm_smile_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 225,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_cherry_balm_smile_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 225,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_cherry_balm_smile_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 405,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_cherry_balm_smile_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 270,
+      "atlasY": 0,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_cherry_balm_smile_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 765,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_coral_bow_smile_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 450,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_coral_bow_smile_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 450,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_coral_bow_smile_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 315,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_coral_bow_smile_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 180,
+      "atlasY": 0,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_coral_bow_smile_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 630,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_nude_pink_whisper_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 0,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_nude_pink_whisper_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 0,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_nude_pink_whisper_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 855,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_nude_pink_whisper_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 135,
+      "atlasY": 27,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_nude_pink_whisper_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 720,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_peach_whisper_smile_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 135,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 25
+    },
+    "room_avatar_mouth_female_peach_whisper_smile_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 135,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 25
+    },
+    "room_avatar_mouth_female_peach_whisper_smile_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 45,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 25
+    },
+    "room_avatar_mouth_female_peach_whisper_smile_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 25
+    },
+    "room_avatar_mouth_female_peach_whisper_smile_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 90,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 25
+    },
+    "room_avatar_mouth_female_rose_gloss_smile_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 45,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rose_gloss_smile_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 45,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rose_gloss_smile_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 675,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rose_gloss_smile_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 180,
+      "atlasY": 27,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rose_gloss_smile_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 270,
+      "atlasY": 27,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rosewater_cupid_bow_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 90,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rosewater_cupid_bow_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 90,
+      "atlasY": 27,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rosewater_cupid_bow_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 585,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rosewater_cupid_bow_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 945,
+      "atlasY": 0,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_rosewater_cupid_bow_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 360,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_soft_mauve_smile_v2_sitting_front_f01": {
+      "atlas": 6,
+      "atlasX": 225,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_soft_mauve_smile_v2_walking_front_f01": {
+      "atlas": 6,
+      "atlasX": 225,
+      "atlasY": 0,
+      "x": 110,
+      "y": 184,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_soft_mauve_smile_v2_walking_front_f02": {
+      "atlas": 6,
+      "atlasX": 540,
+      "atlasY": 0,
+      "x": 109,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_soft_mauve_smile_v2_walking_front_f03": {
+      "atlas": 6,
+      "atlasX": 360,
+      "atlasY": 27,
+      "x": 110,
+      "y": 182,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_mouth_female_soft_mauve_smile_v2_walking_front_f04": {
+      "atlas": 6,
+      "atlasX": 810,
+      "atlasY": 0,
+      "x": 111,
+      "y": 183,
+      "width": 43,
+      "height": 24
+    },
+    "room_avatar_nose_female_gentle_bridge_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 700,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_gentle_bridge_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 700,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_gentle_bridge_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 430,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_gentle_bridge_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 349,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_gentle_bridge_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 673,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_heart_tip_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 268,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_heart_tip_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 268,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_heart_tip_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 538,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_heart_tip_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 835,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_heart_tip_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 565,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_narrow_button_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 781,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_narrow_button_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 781,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_narrow_button_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 511,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_narrow_button_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 754,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_narrow_button_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 322,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petal_curve_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 619,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petal_curve_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 619,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petal_curve_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 889,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petal_curve_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 727,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petal_curve_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 592,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petite_rounded_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 457,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petite_rounded_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 457,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petite_rounded_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 403,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petite_rounded_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 808,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_petite_rounded_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 862,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_sculpted_doll_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 646,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_sculpted_doll_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 646,
+      "atlasY": 0,
+      "x": 115,
+      "y": 174,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_sculpted_doll_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 295,
+      "atlasY": 0,
+      "x": 114,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_sculpted_doll_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 376,
+      "atlasY": 0,
+      "x": 115,
+      "y": 172,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_sculpted_doll_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 484,
+      "atlasY": 0,
+      "x": 116,
+      "y": 173,
+      "width": 25,
+      "height": 25
+    },
+    "room_avatar_nose_female_soft_button_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 110,
+      "y": 174,
+      "width": 36,
+      "height": 25
+    },
+    "room_avatar_nose_female_soft_button_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 110,
+      "y": 174,
+      "width": 36,
+      "height": 25
+    },
+    "room_avatar_nose_female_soft_button_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 76,
+      "atlasY": 0,
+      "x": 109,
+      "y": 173,
+      "width": 36,
+      "height": 25
+    },
+    "room_avatar_nose_female_soft_button_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 38,
+      "atlasY": 0,
+      "x": 110,
+      "y": 172,
+      "width": 36,
+      "height": 25
+    },
+    "room_avatar_nose_female_soft_button_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 114,
+      "atlasY": 0,
+      "x": 111,
+      "y": 173,
+      "width": 36,
+      "height": 25
+    },
+    "room_avatar_nose_female_tiny_upturned_v2_sitting_front_f01": {
+      "atlas": 7,
+      "atlasX": 210,
+      "atlasY": 0,
+      "x": 114,
+      "y": 174,
+      "width": 27,
+      "height": 25
+    },
+    "room_avatar_nose_female_tiny_upturned_v2_walking_front_f01": {
+      "atlas": 7,
+      "atlasX": 210,
+      "atlasY": 0,
+      "x": 114,
+      "y": 174,
+      "width": 27,
+      "height": 25
+    },
+    "room_avatar_nose_female_tiny_upturned_v2_walking_front_f02": {
+      "atlas": 7,
+      "atlasX": 239,
+      "atlasY": 0,
+      "x": 113,
+      "y": 173,
+      "width": 27,
+      "height": 25
+    },
+    "room_avatar_nose_female_tiny_upturned_v2_walking_front_f03": {
+      "atlas": 7,
+      "atlasX": 152,
+      "atlasY": 0,
+      "x": 114,
+      "y": 172,
+      "width": 27,
+      "height": 25
+    },
+    "room_avatar_nose_female_tiny_upturned_v2_walking_front_f04": {
+      "atlas": 7,
+      "atlasX": 181,
+      "atlasY": 0,
+      "x": 115,
+      "y": 173,
+      "width": 27,
+      "height": 25
+    },
+    "room_avatar_shoes_female_milk_tea_court_sneakers_v2_sitting_front_f01": {
+      "atlas": 8,
+      "atlasX": 506,
+      "atlasY": 0,
+      "x": 89,
+      "y": 318,
+      "width": 78,
+      "height": 32
+    },
+    "room_avatar_shoes_female_milk_tea_court_sneakers_v2_walking_front_f01": {
+      "atlas": 8,
+      "atlasX": 355,
+      "atlasY": 0,
+      "x": 94,
+      "y": 318,
+      "width": 68,
+      "height": 34
+    },
+    "room_avatar_shoes_female_milk_tea_court_sneakers_v2_walking_front_f02": {
+      "atlas": 8,
+      "atlasX": 116,
+      "atlasY": 0,
+      "x": 98,
+      "y": 309,
+      "width": 54,
+      "height": 43
+    },
+    "room_avatar_shoes_female_milk_tea_court_sneakers_v2_walking_front_f03": {
+      "atlas": 8,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 98,
+      "y": 309,
+      "width": 56,
+      "height": 43
+    },
+    "room_avatar_shoes_female_milk_tea_court_sneakers_v2_walking_front_f04": {
+      "atlas": 8,
+      "atlasX": 116,
+      "atlasY": 0,
+      "x": 98,
+      "y": 309,
+      "width": 54,
+      "height": 43
+    },
+    "room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_sitting_front_f01": {
+      "atlas": 8,
+      "atlasX": 425,
+      "atlasY": 0,
+      "x": 89,
+      "y": 318,
+      "width": 79,
+      "height": 32
+    },
+    "room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_walking_front_f01": {
+      "atlas": 8,
+      "atlasX": 283,
+      "atlasY": 0,
+      "x": 93,
+      "y": 314,
+      "width": 70,
+      "height": 38
+    },
+    "room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_walking_front_f02": {
+      "atlas": 8,
+      "atlasX": 228,
+      "atlasY": 0,
+      "x": 99,
+      "y": 309,
+      "width": 53,
+      "height": 43
+    },
+    "room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_walking_front_f03": {
+      "atlas": 8,
+      "atlasX": 58,
+      "atlasY": 0,
+      "x": 98,
+      "y": 309,
+      "width": 56,
+      "height": 43
+    },
+    "room_avatar_shoes_female_mint_ribbon_court_sneakers_v2_walking_front_f04": {
+      "atlas": 8,
+      "atlasX": 172,
+      "atlasY": 0,
+      "x": 102,
+      "y": 309,
+      "width": 54,
+      "height": 43
+    },
+    "room_avatar_shoes_male_cloud_white_trainers_v1_sitting_front_f01": {
+      "atlas": 12,
+      "atlasX": 0,
+      "atlasY": 40,
+      "x": 87,
+      "y": 325,
+      "width": 80,
+      "height": 25
+    },
+    "room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f01": {
+      "atlas": 12,
+      "atlasX": 918,
+      "atlasY": 0,
+      "x": 98,
+      "y": 319,
+      "width": 60,
+      "height": 36
+    },
+    "room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f02": {
+      "atlas": 12,
+      "atlasX": 248,
+      "atlasY": 0,
+      "x": 97,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f03": {
+      "atlas": 12,
+      "atlasX": 496,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cloud_white_trainers_v1_walking_front_f04": {
+      "atlas": 12,
+      "atlasX": 434,
+      "atlasY": 0,
+      "x": 97,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cocoa_penny_loafers_v1_sitting_front_f01": {
+      "atlas": 12,
+      "atlasX": 244,
+      "atlasY": 40,
+      "x": 89,
+      "y": 325,
+      "width": 78,
+      "height": 25
+    },
+    "room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f01": {
+      "atlas": 12,
+      "atlasX": 62,
+      "atlasY": 0,
+      "x": 98,
+      "y": 319,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f02": {
+      "atlas": 12,
+      "atlasX": 798,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f03": {
+      "atlas": 12,
+      "atlasX": 558,
+      "atlasY": 0,
+      "x": 99,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_shoes_male_cocoa_penny_loafers_v1_walking_front_f04": {
+      "atlas": 12,
+      "atlasX": 738,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_sitting_front_f01": {
+      "atlas": 12,
+      "atlasX": 82,
+      "atlasY": 40,
+      "x": 87,
+      "y": 325,
+      "width": 80,
+      "height": 25
+    },
+    "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f01": {
+      "atlas": 12,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 98,
+      "y": 318,
+      "width": 60,
+      "height": 38
+    },
+    "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f02": {
+      "atlas": 12,
+      "atlasX": 310,
+      "atlasY": 0,
+      "x": 97,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f03": {
+      "atlas": 12,
+      "atlasX": 124,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_dusty_blue_canvas_sneakers_v1_walking_front_f04": {
+      "atlas": 12,
+      "atlasX": 186,
+      "atlasY": 0,
+      "x": 97,
+      "y": 316,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_milk_tea_court_v1_sitting_front_f01": {
+      "atlas": 12,
+      "atlasX": 164,
+      "atlasY": 40,
+      "x": 89,
+      "y": 325,
+      "width": 78,
+      "height": 25
+    },
+    "room_avatar_shoes_male_milk_tea_court_v1_walking_front_f01": {
+      "atlas": 12,
+      "atlasX": 372,
+      "atlasY": 0,
+      "x": 98,
+      "y": 318,
+      "width": 60,
+      "height": 37
+    },
+    "room_avatar_shoes_male_milk_tea_court_v1_walking_front_f02": {
+      "atlas": 12,
+      "atlasX": 678,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_shoes_male_milk_tea_court_v1_walking_front_f03": {
+      "atlas": 12,
+      "atlasX": 858,
+      "atlasY": 0,
+      "x": 99,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_shoes_male_milk_tea_court_v1_walking_front_f04": {
+      "atlas": 12,
+      "atlasX": 618,
+      "atlasY": 0,
+      "x": 98,
+      "y": 316,
+      "width": 58,
+      "height": 37
+    },
+    "room_avatar_top_female_blush_lace_cardigan_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 858,
+      "atlasY": 120,
+      "x": 71,
+      "y": 206,
+      "width": 114,
+      "height": 100
+    },
+    "room_avatar_top_female_blush_lace_cardigan_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 858,
+      "atlasY": 120,
+      "x": 71,
+      "y": 206,
+      "width": 114,
+      "height": 100
+    },
+    "room_avatar_top_female_blush_lace_cardigan_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 742,
+      "atlasY": 120,
+      "x": 70,
+      "y": 206,
+      "width": 114,
+      "height": 100
+    },
+    "room_avatar_top_female_blush_lace_cardigan_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 223,
+      "x": 71,
+      "y": 207,
+      "width": 114,
+      "height": 100
+    },
+    "room_avatar_top_female_blush_lace_cardigan_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 626,
+      "atlasY": 120,
+      "x": 72,
+      "y": 206,
+      "width": 114,
+      "height": 100
+    },
+    "room_avatar_top_female_buttercream_bow_tee_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 830,
+      "atlasY": 325,
+      "x": 74,
+      "y": 201,
+      "width": 108,
+      "height": 97
+    },
+    "room_avatar_top_female_buttercream_bow_tee_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 342,
+      "atlasY": 223,
+      "x": 73,
+      "y": 201,
+      "width": 110,
+      "height": 100
+    },
+    "room_avatar_top_female_buttercream_bow_tee_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 230,
+      "atlasY": 223,
+      "x": 72,
+      "y": 201,
+      "width": 110,
+      "height": 100
+    },
+    "room_avatar_top_female_buttercream_bow_tee_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 116,
+      "atlasY": 223,
+      "x": 72,
+      "y": 201,
+      "width": 112,
+      "height": 100
+    },
+    "room_avatar_top_female_buttercream_bow_tee_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 454,
+      "atlasY": 223,
+      "x": 74,
+      "y": 201,
+      "width": 110,
+      "height": 100
+    },
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 114,
+      "atlasY": 426,
+      "x": 68,
+      "y": 208,
+      "width": 120,
+      "height": 92
+    },
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 114,
+      "atlasY": 426,
+      "x": 68,
+      "y": 208,
+      "width": 120,
+      "height": 92
+    },
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 358,
+      "atlasY": 426,
+      "x": 67,
+      "y": 208,
+      "width": 120,
+      "height": 92
+    },
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 236,
+      "atlasY": 426,
+      "x": 68,
+      "y": 209,
+      "width": 120,
+      "height": 92
+    },
+    "room_avatar_top_female_cherry_heart_milkmaid_blouse_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 480,
+      "atlasY": 426,
+      "x": 69,
+      "y": 208,
+      "width": 120,
+      "height": 92
+    },
+    "room_avatar_top_female_cherry_varsity_cardigan_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 522,
+      "atlasY": 0,
+      "x": 65,
+      "y": 200,
+      "width": 126,
+      "height": 115
+    },
+    "room_avatar_top_female_cherry_varsity_cardigan_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 262,
+      "atlasY": 0,
+      "x": 64,
+      "y": 200,
+      "width": 128,
+      "height": 118
+    },
+    "room_avatar_top_female_cherry_varsity_cardigan_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 132,
+      "atlasY": 0,
+      "x": 63,
+      "y": 200,
+      "width": 128,
+      "height": 118
+    },
+    "room_avatar_top_female_cherry_varsity_cardigan_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 63,
+      "y": 200,
+      "width": 130,
+      "height": 118
+    },
+    "room_avatar_top_female_cherry_varsity_cardigan_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 392,
+      "atlasY": 0,
+      "x": 65,
+      "y": 200,
+      "width": 128,
+      "height": 118
+    },
+    "room_avatar_top_female_cream_basic_tee_v2_sitting_front_f01_art_v17": {
+      "atlas": 9,
+      "atlasX": 792,
+      "atlasY": 426,
+      "x": 83,
+      "y": 218,
+      "width": 93,
+      "height": 84
+    },
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f01_art_v17": {
+      "atlas": 9,
+      "atlasX": 887,
+      "atlasY": 426,
+      "x": 83,
+      "y": 218,
+      "width": 93,
+      "height": 84
+    },
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f02_art_v17": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 524,
+      "x": 83,
+      "y": 218,
+      "width": 93,
+      "height": 84
+    },
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f03_art_v17": {
+      "atlas": 9,
+      "atlasX": 697,
+      "atlasY": 426,
+      "x": 83,
+      "y": 218,
+      "width": 93,
+      "height": 84
+    },
+    "room_avatar_top_female_cream_basic_tee_v2_walking_front_f04_art_v17": {
+      "atlas": 9,
+      "atlasX": 602,
+      "atlasY": 426,
+      "x": 83,
+      "y": 218,
+      "width": 93,
+      "height": 84
+    },
+    "room_avatar_top_female_ivory_tweed_crop_jacket_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 588,
+      "atlasY": 325,
+      "x": 70,
+      "y": 200,
+      "width": 116,
+      "height": 98
+    },
+    "room_avatar_top_female_ivory_tweed_crop_jacket_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 772,
+      "atlasY": 0,
+      "x": 69,
+      "y": 200,
+      "width": 118,
+      "height": 101
+    },
+    "room_avatar_top_female_ivory_tweed_crop_jacket_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 892,
+      "atlasY": 0,
+      "x": 68,
+      "y": 200,
+      "width": 118,
+      "height": 101
+    },
+    "room_avatar_top_female_ivory_tweed_crop_jacket_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 650,
+      "atlasY": 0,
+      "x": 68,
+      "y": 200,
+      "width": 120,
+      "height": 101
+    },
+    "room_avatar_top_female_ivory_tweed_crop_jacket_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 120,
+      "x": 70,
+      "y": 200,
+      "width": 118,
+      "height": 101
+    },
+    "room_avatar_top_female_lilac_cloud_wrap_top_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 426,
+      "x": 72,
+      "y": 201,
+      "width": 112,
+      "height": 96
+    },
+    "room_avatar_top_female_lilac_cloud_wrap_top_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 356,
+      "atlasY": 325,
+      "x": 71,
+      "y": 201,
+      "width": 114,
+      "height": 99
+    },
+    "room_avatar_top_female_lilac_cloud_wrap_top_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 240,
+      "atlasY": 325,
+      "x": 70,
+      "y": 201,
+      "width": 114,
+      "height": 99
+    },
+    "room_avatar_top_female_lilac_cloud_wrap_top_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 122,
+      "atlasY": 325,
+      "x": 70,
+      "y": 201,
+      "width": 116,
+      "height": 99
+    },
+    "room_avatar_top_female_lilac_cloud_wrap_top_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 472,
+      "atlasY": 325,
+      "x": 72,
+      "y": 201,
+      "width": 114,
+      "height": 99
+    },
+    "room_avatar_top_female_midnight_velvet_bolero_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 706,
+      "atlasY": 325,
+      "x": 67,
+      "y": 200,
+      "width": 122,
+      "height": 97
+    },
+    "room_avatar_top_female_midnight_velvet_bolero_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 500,
+      "atlasY": 120,
+      "x": 66,
+      "y": 200,
+      "width": 124,
+      "height": 100
+    },
+    "room_avatar_top_female_midnight_velvet_bolero_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 248,
+      "atlasY": 120,
+      "x": 65,
+      "y": 200,
+      "width": 124,
+      "height": 100
+    },
+    "room_avatar_top_female_midnight_velvet_bolero_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 120,
+      "atlasY": 120,
+      "x": 65,
+      "y": 200,
+      "width": 126,
+      "height": 100
+    },
+    "room_avatar_top_female_midnight_velvet_bolero_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 374,
+      "atlasY": 120,
+      "x": 67,
+      "y": 200,
+      "width": 124,
+      "height": 100
+    },
+    "room_avatar_top_female_noir_rose_heart_cardigan_v2_sitting_front_f01": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 325,
+      "x": 68,
+      "y": 205,
+      "width": 120,
+      "height": 99
+    },
+    "room_avatar_top_female_noir_rose_heart_cardigan_v2_walking_front_f01": {
+      "atlas": 9,
+      "atlasX": 0,
+      "atlasY": 325,
+      "x": 68,
+      "y": 205,
+      "width": 120,
+      "height": 99
+    },
+    "room_avatar_top_female_noir_rose_heart_cardigan_v2_walking_front_f02": {
+      "atlas": 9,
+      "atlasX": 566,
+      "atlasY": 223,
+      "x": 67,
+      "y": 205,
+      "width": 120,
+      "height": 99
+    },
+    "room_avatar_top_female_noir_rose_heart_cardigan_v2_walking_front_f03": {
+      "atlas": 9,
+      "atlasX": 810,
+      "atlasY": 223,
+      "x": 68,
+      "y": 206,
+      "width": 120,
+      "height": 99
+    },
+    "room_avatar_top_female_noir_rose_heart_cardigan_v2_walking_front_f04": {
+      "atlas": 9,
+      "atlasX": 688,
+      "atlasY": 223,
+      "x": 69,
+      "y": 205,
+      "width": 120,
+      "height": 99
+    },
+    "room_avatar_top_male_acid_washed_boxy_sweatshirt_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 412,
+      "atlasY": 96,
+      "x": 78,
+      "y": 212,
+      "width": 100,
+      "height": 90
+    },
+    "room_avatar_top_male_acid_washed_boxy_sweatshirt_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 307,
+      "atlasY": 188,
+      "x": 78,
+      "y": 212,
+      "width": 100,
+      "height": 88
+    },
+    "room_avatar_top_male_acid_washed_boxy_sweatshirt_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 496,
+      "atlasY": 279,
+      "x": 76,
+      "y": 213,
+      "width": 101,
+      "height": 87
+    },
+    "room_avatar_top_male_acid_washed_boxy_sweatshirt_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 393,
+      "atlasY": 279,
+      "x": 79,
+      "y": 213,
+      "width": 101,
+      "height": 87
+    },
+    "room_avatar_top_male_acid_washed_boxy_sweatshirt_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 290,
+      "atlasY": 279,
+      "x": 77,
+      "y": 213,
+      "width": 101,
+      "height": 87
+    },
+    "room_avatar_top_male_charcoal_leather_bomber_hybrid_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 205,
+      "atlasY": 188,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 89
+    },
+    "room_avatar_top_male_charcoal_leather_bomber_hybrid_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 547,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 86
+    },
+    "room_avatar_top_male_charcoal_leather_bomber_hybrid_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 286,
+      "atlasY": 458,
+      "x": 76,
+      "y": 214,
+      "width": 102,
+      "height": 86
+    },
+    "room_avatar_top_male_charcoal_leather_bomber_hybrid_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 182,
+      "atlasY": 458,
+      "x": 78,
+      "y": 214,
+      "width": 102,
+      "height": 86
+    },
+    "room_avatar_top_male_charcoal_leather_bomber_hybrid_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 699,
+      "atlasY": 458,
+      "x": 77,
+      "y": 214,
+      "width": 101,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_sage_canvas_shacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 930,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 87
+    },
+    "room_avatar_top_male_cocoa_sage_canvas_shacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 386,
+      "atlasY": 723,
+      "x": 84,
+      "y": 212,
+      "width": 87,
+      "height": 85
+    },
+    "room_avatar_top_male_cocoa_sage_canvas_shacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 635,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_sage_canvas_shacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 891,
+      "atlasY": 547,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_sage_canvas_shacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 891,
+      "atlasY": 547,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_varsity_jacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 187,
+      "atlasY": 279,
+      "x": 77,
+      "y": 214,
+      "width": 101,
+      "height": 87
+    },
+    "room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 194,
+      "atlasY": 723,
+      "x": 81,
+      "y": 214,
+      "width": 95,
+      "height": 85
+    },
+    "room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 598,
+      "atlasY": 547,
+      "x": 80,
+      "y": 214,
+      "width": 96,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 102,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_cocoa_varsity_jacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 102,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_colorblock_rugby_polo_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 615,
+      "atlasY": 0,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 92
+    },
+    "room_avatar_top_male_colorblock_rugby_polo_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 514,
+      "atlasY": 96,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 90
+    },
+    "room_avatar_top_male_colorblock_rugby_polo_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 818,
+      "atlasY": 0,
+      "x": 76,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_colorblock_rugby_polo_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 206,
+      "atlasY": 96,
+      "x": 79,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_colorblock_rugby_polo_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 96,
+      "x": 77,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_cream_basic_tee_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 801,
+      "atlasY": 188,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 88
+    },
+    "room_avatar_top_male_cream_basic_tee_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 182,
+      "atlasY": 635,
+      "x": 84,
+      "y": 212,
+      "width": 88,
+      "height": 86
+    },
+    "room_avatar_top_male_cream_basic_tee_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 746,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 87
+    },
+    "room_avatar_top_male_cream_basic_tee_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 902,
+      "atlasY": 279,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_cream_basic_tee_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 902,
+      "atlasY": 279,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_blue_weekend_crew_sweatshirt_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 279,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 88
+    },
+    "room_avatar_top_male_dusty_blue_weekend_crew_sweatshirt_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 362,
+      "atlasY": 635,
+      "x": 84,
+      "y": 212,
+      "width": 88,
+      "height": 86
+    },
+    "room_avatar_top_male_dusty_blue_weekend_crew_sweatshirt_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 654,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_blue_weekend_crew_sweatshirt_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 282,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_blue_weekend_crew_sweatshirt_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 282,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_navy_chore_jacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 701,
+      "atlasY": 279,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 97,
+      "atlasY": 723,
+      "x": 81,
+      "y": 214,
+      "width": 95,
+      "height": 85
+    },
+    "room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 500,
+      "atlasY": 547,
+      "x": 80,
+      "y": 214,
+      "width": 96,
+      "height": 86
+    },
+    "room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 202,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_dusty_navy_chore_jacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 202,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_dusty_navy_tee_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 707,
+      "atlasY": 188,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 88
+    },
+    "room_avatar_top_male_dusty_navy_tee_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 452,
+      "atlasY": 635,
+      "x": 84,
+      "y": 212,
+      "width": 88,
+      "height": 86
+    },
+    "room_avatar_top_male_dusty_navy_tee_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 562,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_navy_tee_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 188,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_dusty_navy_tee_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 188,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_midnight_relaxed_tailoring_jacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 409,
+      "atlasY": 188,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 88
+    },
+    "room_avatar_top_male_midnight_relaxed_tailoring_jacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 802,
+      "atlasY": 458,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 86
+    },
+    "room_avatar_top_male_midnight_relaxed_tailoring_jacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 734,
+      "atlasY": 635,
+      "x": 76,
+      "y": 215,
+      "width": 101,
+      "height": 85
+    },
+    "room_avatar_top_male_midnight_relaxed_tailoring_jacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 837,
+      "atlasY": 635,
+      "x": 79,
+      "y": 215,
+      "width": 101,
+      "height": 85
+    },
+    "room_avatar_top_male_midnight_relaxed_tailoring_jacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 631,
+      "atlasY": 635,
+      "x": 77,
+      "y": 215,
+      "width": 101,
+      "height": 85
+    },
+    "room_avatar_top_male_mist_blue_oxford_shirt_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 803,
+      "atlasY": 279,
+      "x": 80,
+      "y": 214,
+      "width": 97,
+      "height": 87
+    },
+    "room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 291,
+      "atlasY": 723,
+      "x": 82,
+      "y": 214,
+      "width": 93,
+      "height": 85
+    },
+    "room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 794,
+      "atlasY": 547,
+      "x": 81,
+      "y": 214,
+      "width": 95,
+      "height": 86
+    },
+    "room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 794,
+      "atlasY": 547,
+      "x": 81,
+      "y": 214,
+      "width": 95,
+      "height": 86
+    },
+    "room_avatar_top_male_mist_blue_oxford_shirt_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 696,
+      "atlasY": 547,
+      "x": 81,
+      "y": 214,
+      "width": 96,
+      "height": 86
+    },
+    "room_avatar_top_male_modern_track_luxury_top_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 613,
+      "atlasY": 188,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 88
+    },
+    "room_avatar_top_male_modern_track_luxury_top_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 272,
+      "atlasY": 635,
+      "x": 84,
+      "y": 212,
+      "width": 88,
+      "height": 86
+    },
+    "room_avatar_top_male_modern_track_luxury_top_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 838,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 90,
+      "height": 87
+    },
+    "room_avatar_top_male_modern_track_luxury_top_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_modern_track_luxury_top_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_powder_blue_crew_tee_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 94,
+      "atlasY": 279,
+      "x": 82,
+      "y": 212,
+      "width": 91,
+      "height": 88
+    },
+    "room_avatar_top_male_powder_blue_crew_tee_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 92,
+      "atlasY": 635,
+      "x": 84,
+      "y": 212,
+      "width": 88,
+      "height": 86
+    },
+    "room_avatar_top_male_powder_blue_crew_tee_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 91,
+      "atlasY": 458,
+      "x": 83,
+      "y": 212,
+      "width": 89,
+      "height": 87
+    },
+    "room_avatar_top_male_powder_blue_crew_tee_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 469,
+      "atlasY": 369,
+      "x": 82,
+      "y": 212,
+      "width": 91,
+      "height": 87
+    },
+    "room_avatar_top_male_powder_blue_crew_tee_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 376,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 91,
+      "height": 87
+    },
+    "room_avatar_top_male_sage_basic_tee_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 895,
+      "atlasY": 188,
+      "x": 83,
+      "y": 212,
+      "width": 92,
+      "height": 88
+    },
+    "room_avatar_top_male_sage_basic_tee_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 542,
+      "atlasY": 635,
+      "x": 85,
+      "y": 212,
+      "width": 87,
+      "height": 86
+    },
+    "room_avatar_top_male_sage_basic_tee_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 458,
+      "x": 84,
+      "y": 212,
+      "width": 89,
+      "height": 87
+    },
+    "room_avatar_top_male_sage_basic_tee_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 94,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_sage_basic_tee_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 94,
+      "atlasY": 369,
+      "x": 83,
+      "y": 212,
+      "width": 92,
+      "height": 87
+    },
+    "room_avatar_top_male_soft_panel_overshirt_bomber_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 411,
+      "atlasY": 0,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 92
+    },
+    "room_avatar_top_male_soft_panel_overshirt_bomber_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 616,
+      "atlasY": 96,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 90
+    },
+    "room_avatar_top_male_soft_panel_overshirt_bomber_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 921,
+      "atlasY": 0,
+      "x": 76,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_soft_panel_overshirt_bomber_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 103,
+      "atlasY": 96,
+      "x": 79,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_soft_panel_overshirt_bomber_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 309,
+      "atlasY": 96,
+      "x": 77,
+      "y": 214,
+      "width": 101,
+      "height": 90
+    },
+    "room_avatar_top_male_soft_sage_linen_shirt_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 599,
+      "atlasY": 279,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 87
+    },
+    "room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 723,
+      "x": 81,
+      "y": 214,
+      "width": 95,
+      "height": 85
+    },
+    "room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 402,
+      "atlasY": 547,
+      "x": 80,
+      "y": 214,
+      "width": 96,
+      "height": 86
+    },
+    "room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 302,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_soft_sage_linen_shirt_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 302,
+      "atlasY": 547,
+      "x": 79,
+      "y": 214,
+      "width": 98,
+      "height": 86
+    },
+    "room_avatar_top_male_soft_varsity_knit_jacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 0,
+      "x": 78,
+      "y": 213,
+      "width": 100,
+      "height": 94
+    },
+    "room_avatar_top_male_soft_varsity_knit_jacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 513,
+      "atlasY": 0,
+      "x": 78,
+      "y": 213,
+      "width": 100,
+      "height": 92
+    },
+    "room_avatar_top_male_soft_varsity_knit_jacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 102,
+      "atlasY": 0,
+      "x": 76,
+      "y": 213,
+      "width": 101,
+      "height": 92
+    },
+    "room_avatar_top_male_soft_varsity_knit_jacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 308,
+      "atlasY": 0,
+      "x": 79,
+      "y": 213,
+      "width": 101,
+      "height": 92
+    },
+    "room_avatar_top_male_soft_varsity_knit_jacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 205,
+      "atlasY": 0,
+      "x": 77,
+      "y": 213,
+      "width": 101,
+      "height": 92
+    },
+    "room_avatar_top_male_striped_chunky_cardigan_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 717,
+      "atlasY": 0,
+      "x": 79,
+      "y": 215,
+      "width": 99,
+      "height": 91
+    },
+    "room_avatar_top_male_striped_chunky_cardigan_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 103,
+      "atlasY": 188,
+      "x": 78,
+      "y": 215,
+      "width": 100,
+      "height": 89
+    },
+    "room_avatar_top_male_striped_chunky_cardigan_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 718,
+      "atlasY": 96,
+      "x": 76,
+      "y": 215,
+      "width": 101,
+      "height": 89
+    },
+    "room_avatar_top_male_striped_chunky_cardigan_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 821,
+      "atlasY": 96,
+      "x": 79,
+      "y": 215,
+      "width": 101,
+      "height": 89
+    },
+    "room_avatar_top_male_striped_chunky_cardigan_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 0,
+      "atlasY": 188,
+      "x": 77,
+      "y": 215,
+      "width": 101,
+      "height": 89
+    },
+    "room_avatar_top_male_warm_sand_deconstructed_jacket_v1_sitting_front_f01": {
+      "atlas": 13,
+      "atlasX": 511,
+      "atlasY": 188,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 88
+    },
+    "room_avatar_top_male_warm_sand_deconstructed_jacket_v1_walking_front_f01": {
+      "atlas": 13,
+      "atlasX": 904,
+      "atlasY": 458,
+      "x": 78,
+      "y": 214,
+      "width": 100,
+      "height": 86
+    },
+    "room_avatar_top_male_warm_sand_deconstructed_jacket_v1_walking_front_f02": {
+      "atlas": 13,
+      "atlasX": 390,
+      "atlasY": 458,
+      "x": 76,
+      "y": 214,
+      "width": 101,
+      "height": 86
+    },
+    "room_avatar_top_male_warm_sand_deconstructed_jacket_v1_walking_front_f03": {
+      "atlas": 13,
+      "atlasX": 493,
+      "atlasY": 458,
+      "x": 79,
+      "y": 214,
+      "width": 101,
+      "height": 86
+    },
+    "room_avatar_top_male_warm_sand_deconstructed_jacket_v1_walking_front_f04": {
+      "atlas": 13,
+      "atlasX": 596,
+      "atlasY": 458,
+      "x": 77,
+      "y": 214,
+      "width": 101,
+      "height": 86
+    }
+  }
+}
