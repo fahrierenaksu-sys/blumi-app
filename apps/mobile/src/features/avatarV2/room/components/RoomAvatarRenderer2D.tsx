@@ -1,8 +1,9 @@
 import { Image as ExpoImage } from "expo-image"
 import { StyleSheet, View, type ImageStyle } from "react-native"
-import { memo, useCallback, useEffect, useMemo } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import Animated, {
   useAnimatedStyle,
+  useAnimatedReaction,
   useFrameCallback,
   useSharedValue,
   type FrameInfo,
@@ -22,8 +23,9 @@ import {
   getRoomAvatarFrameTick,
   getRoomAvatarLayerAnimationState,
   getRoomAvatarLayerFrameAsset,
-  getRoomAvatarLayerFrameSlot,
+  getRoomAvatarReadyFrameSlot,
   getRoomAvatarLayerFrameSlots,
+  retainRoomAvatarFrameSlots,
   shouldRerenderRoomAvatarLayer
 } from "../roomAvatarLayerRenderModel"
 
@@ -116,18 +118,41 @@ interface RoomAvatarLayerProps {
 }
 
 /**
- * One layer: each distinct frame image mounts once (slot 0 is the frame the
- * layer shows first and is reused across motions, as the single image was);
- * a still layer is just slot 0.
+ * Retain each visited pose image until this semantic layer unmounts. Walking
+ * and idle exchange visibility on the UI thread without replacing sources or
+ * removing the currently visible native image during the React commit.
  */
 const RoomAvatarLayer = memo(
   function RoomAvatarLayer(props: RoomAvatarLayerProps) {
     const { layer, animated, signature, frameState, imagePriority } = props
-    const { assets, slotByFrame } = useMemo(
+    const displayedSlots = useSharedValue<number[]>([])
+    const selectedSlot = useSharedValue(0)
+    const current = useMemo(
       () => animated
         ? getRoomAvatarLayerFrameSlots(layer)
         : { assets: [getRoomAvatarLayerFrameAsset(layer, 0)], slotByFrame: [0] },
       [animated, layer]
+    )
+    const [retainedAssets, setRetainedAssets] = useState<RoomV2AssetRef[]>(current.assets)
+    const { assets, slotByFrame } = useMemo(
+      () => retainRoomAvatarFrameSlots(
+        retainedAssets, current.slotByFrame.map((slot) => current.assets[slot]!)
+      ),
+      [current, retainedAssets]
+    )
+    // A guarded render-time update commits the enlarged pool with this pose.
+    // This happens only when a new asset is visited, never on animation ticks.
+    if (assets !== retainedAssets) setRetainedAssets(assets)
+    useAnimatedReaction(
+      () => {
+        const state = frameState.value
+        const frameIndex = state.signature === signature ? state.index : 0
+        return getRoomAvatarReadyFrameSlot(slotByFrame, frameIndex, displayedSlots.value, -1)
+      },
+      (readySlot) => {
+        if (readySlot >= 0) selectedSlot.value = readySlot
+      },
+      [signature, slotByFrame]
     )
     return (
       <>
@@ -137,12 +162,10 @@ const RoomAvatarLayer = memo(
             asset={asset}
             layer={layer}
             slot={slot}
-            slotByFrame={slotByFrame}
-            signature={signature}
-            // A single image never changes, so it does not follow the clock.
-            frameState={assets.length > 1 ? frameState : undefined}
+            displayedSlots={displayedSlots}
+            selectedSlot={selectedSlot}
             imagePriority={imagePriority}
-            onLayerDisplay={slot === 0 ? props.onLayerDisplay : undefined}
+            onLayerDisplay={slot === slotByFrame[0] ? props.onLayerDisplay : undefined}
             onImageError={props.onImageError}
           />
         ))}
@@ -166,21 +189,14 @@ function RoomAvatarLayerImage(props: {
   asset: RoomV2AssetRef
   layer: RoomV2AvatarRenderLayer
   slot: number
-  slotByFrame: number[]
-  signature: string
-  frameState?: SharedValue<RoomAvatarFrameState>
+  displayedSlots: SharedValue<number[]>
+  selectedSlot: SharedValue<number>
   imagePriority: "low" | "normal" | "high"
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
 }) {
-  const { asset, layer, slot, slotByFrame, signature, frameState, imagePriority } = props
-  const visibility = useAnimatedStyle(() => {
-    if (!frameState) return { opacity: 1 }
-    const state = frameState.value
-    // Until the UI thread starts this motion, it is on frame 0.
-    const frameIndex = state.signature === signature ? state.index : 0
-    return { opacity: getRoomAvatarLayerFrameSlot(slotByFrame, frameIndex) === slot ? 1 : 0 }
-  })
+  const { asset, layer, slot, selectedSlot, imagePriority, displayedSlots } = props
+  const visibility = useAnimatedStyle(() => ({ opacity: selectedSlot.value === slot ? 1 : 0 }))
   return (
     <Animated.View pointerEvents="none" style={[styles.layer, visibility]}>
       <ExpoImage
@@ -189,7 +205,13 @@ function RoomAvatarLayerImage(props: {
         cachePolicy="memory-disk"
         priority={imagePriority}
         transition={0}
-        onDisplay={() => props.onLayerDisplay?.(`${layer.type}:${layer.id}`)}
+        onDisplay={() => {
+          displayedSlots.modify((slots) => {
+            "worklet"
+            return slots.includes(slot) ? slots : [...slots, slot]
+          })
+          props.onLayerDisplay?.(`${layer.type}:${layer.id}`)
+        }}
         onError={props.onImageError}
         style={[
           styles.layer,

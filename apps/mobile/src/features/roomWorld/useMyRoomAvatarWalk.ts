@@ -3,6 +3,7 @@ import {
   cancelAnimation,
   ReduceMotion,
   useAnimatedReaction,
+  useDerivedValue,
   useSharedValue,
   withSequence,
   withTiming,
@@ -12,6 +13,7 @@ import { runOnUISync, scheduleOnRN } from "react-native-worklets"
 import type { RoomWorldPoint } from "./roomWorldGeometry"
 import {
   getMyRoomAvatarDepthIndex,
+  getMyRoomWalkPoint,
   type MyRoomAvatarDepthNeighbour,
   type MyRoomWalkStep
 } from "./myRoomAvatarWalkModel"
@@ -47,8 +49,12 @@ export function useMyRoomAvatarWalk(input: {
   onDepthIndexChange: (x: number, y: number) => void
 }): MyRoomAvatarWalk {
   const { depthNeighbours, fixedDepth, onDepthIndexChange } = input
-  const x = useSharedValue(input.initial.x)
-  const y = useSharedValue(input.initial.y)
+  const origin = useSharedValue(input.initial)
+  const timeline = useSharedValue<readonly MyRoomWalkStep[]>([])
+  const progress = useSharedValue(0)
+  const point = useDerivedValue(() => getMyRoomWalkPoint(origin.value, timeline.value, progress.value))
+  const x = useDerivedValue(() => point.value.x)
+  const y = useDerivedValue(() => point.value.y)
 
   useAnimatedReaction(
     () => getMyRoomAvatarDepthIndex(depthNeighbours, fixedDepth ?? y.value),
@@ -60,42 +66,52 @@ export function useMyRoomAvatarWalk(input: {
 
   const start = useCallback((steps: readonly MyRoomWalkStep[], onStepEnd: (index: number) => void): void => {
     if (steps.length === 0) return
-    // One speed for the whole walk: linear steps, ramps only at the ends (ROOM-02).
-    const config = (step: MyRoomWalkStep) => {
-      const { rampIn, rampOut } = step
-      return {
-        duration: step.durationMs,
-        easing: (progress: number) => {
-          "worklet"
-          return easeRoomWorldMovement(progress, rampIn, rampOut)
-        },
-        reduceMotion: ReduceMotion.Never
+    runOnUISync(() => {
+      "worklet"
+      // Capture and cancel atomically; a retarget starts at the rendered point.
+      const current = getMyRoomWalkPoint(origin.value, timeline.value, progress.value)
+      cancelAnimation(progress)
+      origin.value = current
+      timeline.value = steps
+      progress.value = 0
+      // One clock for both axes, with ramps only at the walk's ends.
+      const config = (step: MyRoomWalkStep) => {
+        const { rampIn, rampOut } = step
+        return {
+          duration: step.durationMs,
+          easing: (fraction: number) => {
+            "worklet"
+            return easeRoomWorldMovement(fraction, rampIn, rampOut)
+          },
+          reduceMotion: ReduceMotion.Never
+        }
       }
-    }
-    x.value = withSequence(
-      ReduceMotion.Never,
-      ...steps.map((step) => withTiming(step.x, config(step)))
-    )
-    y.value = withSequence(
-      ReduceMotion.Never,
-      ...steps.map((step, index) => withTiming(step.y, config(step), (finished) => {
-        "worklet"
-        if (finished) scheduleOnRN(onStepEnd, index)
-      }))
-    )
-  }, [x, y])
+      progress.value = withSequence(
+        ReduceMotion.Never,
+        ...steps.map((step, index) => withTiming(index + 1, config(step), (finished) => {
+          "worklet"
+          if (finished) scheduleOnRN(onStepEnd, index)
+        }))
+      )
+    })
+  }, [origin, progress, timeline])
 
   const stop = useCallback((): RoomWorldPoint => runOnUISync(() => {
     "worklet"
-    cancelAnimation(x)
-    cancelAnimation(y)
-    return { x: x.value, y: y.value }
-  }), [x, y])
+    const current = getMyRoomWalkPoint(origin.value, timeline.value, progress.value)
+    cancelAnimation(progress)
+    return current
+  }), [origin, progress, timeline])
 
   const place = useCallback((point: RoomWorldPoint): void => {
-    x.value = point.x
-    y.value = point.y
-  }, [x, y])
+    runOnUISync(() => {
+      "worklet"
+      cancelAnimation(progress)
+      origin.value = point
+      timeline.value = []
+      progress.value = 0
+    })
+  }, [origin, progress, timeline])
 
   return useMemo(() => ({ x, y, start, stop, place }), [place, start, stop, x, y])
 }

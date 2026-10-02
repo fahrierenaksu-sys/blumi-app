@@ -23,7 +23,7 @@ const miniRoomSceneSource = read(
 // room-avatar-renderer-subscription.test.mjs); these pin the same guarantees
 // on the new implementation.
 test("room avatar animation starts at frame 0 without a post-paint state update", () => {
-  assert.doesNotMatch(rendererSource, /useState\(/)
+  assert.match(rendererSource, /if \(assets !== retainedAssets\) setRetainedAssets\(assets\)/)
   assert.match(rendererSource, /if \(current\.signature !== signature\) \{[\s\S]*?baseTick\.value = tick[\s\S]*?index: 0/)
   assert.match(rendererSource, /const frameIndex = state\.signature === signature \? state\.index : 0/)
 })
