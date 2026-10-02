@@ -26,7 +26,15 @@ if (testFiles.length === 0) {
   throw new Error("No server test files found in dist.")
 }
 
-execFileSync(process.execPath, ["--test", ...testFiles], {
+// A measured load test must not compete with hundreds of functional test
+// processes for CPU. Keep its existing latency assertions, run it in isolation.
+const loadTestFile = join(distDirectory, "e2e/socialLoopLoad.e2e.test.js")
+execFileSync(process.execPath, ["--test", ...testFiles.filter((file) => file !== loadTestFile)], {
+  cwd: workspaceRoot,
+  stdio: "inherit"
+})
+
+execFileSync(process.execPath, ["--test", loadTestFile], {
   cwd: workspaceRoot,
   stdio: "inherit"
 })
