@@ -180,6 +180,21 @@ export function createRealtimeServer(
     void current.then(clear, clear)
     return current
   }
+  /**
+   * In-room chat sends of one socket and thread run one at a time, in arrival
+   * order (2026-10-02). The chat budget admits several in flight, and each
+   * stamps sent_at when it starts but reaches the partner when its persist
+   * finishes, so on a slow database two quick messages could arrive live in
+   * the reverse of their stored order.
+   */
+  const chatSendChains = new Map<string, Promise<void>>()
+  function serializeChatSend(key: string, send: () => Promise<void>): Promise<void> {
+    const current = (chatSendChains.get(key) ?? Promise.resolve()).then(send)
+    const tail = current.catch(() => undefined)
+    chatSendChains.set(key, tail)
+    void tail.then(() => { if (chatSendChains.get(key) === tail) chatSendChains.delete(key) })
+    return current
+  }
   function trackConnectionRoomJoin(
     connectionId: string,
     operation: () => Promise<void>
@@ -638,6 +653,9 @@ export function createRealtimeServer(
           if (!connectionManager.getConnection(connection.connectionId)) return Promise.resolve()
           return router.handleClientEvent(connection, event)
         })
+      } else if (event.type === "chat.send_message") {
+        const threadId = typeof event.payload?.threadId === "string" ? event.payload.threadId : ""
+        await serializeChatSend(`${connection.connectionId}\u0000${threadId}`, () => router.handleClientEvent(connection, event))
       } else {
         await router.handleClientEvent(connection, event)
       }
