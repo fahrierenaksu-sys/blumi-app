@@ -59,9 +59,10 @@ import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel
 import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewSelection"
 import { useShopProductFocus } from "../features/shop/screen/useShopProductFocus"
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
+import { useShopCheckoutFlight, useShopPurchaseFlight } from "../features/shop/screen/useShopPurchaseFlight"
 import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { hapticSelection } from "../ui/haptics"
+import { hapticSelection, hapticSuccess } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle } from "../ui/primitives"
@@ -308,6 +309,14 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     void inventoryStore.hydrateFromServer(sessionActor.session.sessionToken)
   }, [inventoryStore, requiresServerInventory, sessionActor.session])
 
+  // Only after the server confirms: the bought piece flies onto the avatar
+  // and the success haptic plays as it lands.
+  const purchaseFlight = useShopPurchaseFlight({ avatarProducts })
+  const { flyPurchasedPieces } = purchaseFlight
+  const celebrateAvatarUnlock = useCallback((product: { sourceItemId: string }) => {
+    flyPurchasedPieces([product.sourceItemId], hapticSuccess)
+  }, [flyPurchasedPieces])
+
   const {
     isPurchasing,
     handlePrimaryAction,
@@ -316,6 +325,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     closeCheckout,
     retryCheckout
   } = useShopPurchaseActions({
+    celebrateAvatarUnlock,
     navigation,
     sessionActor,
     inventoryStore,
@@ -332,6 +342,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     multiItemApplyEnabled,
     selectedProduct
   })
+  useShopCheckoutFlight(checkout, flyPurchasedPieces)
 
   const { removeActionById, onRemoveProduct, isRemoving } = useShopCardRemoval({
     products: filteredProducts,
@@ -455,6 +466,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   mode={shopMode}
                   product={presentationProduct}
                   previewAvatar={previewAvatar}
+                  purchaseLandingFlightIds={purchaseFlight.landingFlightIds}
                   roomPreviewScene={roomPreviewScene}
                   layoutMetrics={shopLayoutMetrics}
                   isPurchasing={
@@ -521,6 +533,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 revealRequest={shelfRevealRequest}
                 removeActionById={removeActionById}
                 onRemoveProduct={onRemoveProduct}
+                registerThumbnail={purchaseFlight.registerThumbnail}
               />
             </Reanimated.View>
           ) : showSkeleton ? (

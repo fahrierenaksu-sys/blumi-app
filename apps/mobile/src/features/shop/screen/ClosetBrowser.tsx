@@ -43,6 +43,8 @@ export function ClosetBrowser(props: {
   /** Cards that show the corner X, by product id (see shopCardRemoveModel). */
   removeActionById?: ReadonlyMap<string, ShopCardRemoveAction>
   onRemoveProduct?: (product: ShopCatalogItem) => void
+  /** Thumbnails a purchase flight can start from. */
+  registerThumbnail?: (sourceItemId: string, view: View | null) => void
 }) {
   const reduceMotion = useReducedMotion()
   const copy = getShopCopy(props.locale)
@@ -181,13 +183,14 @@ export function ClosetBrowser(props: {
                 onSelectProduct={props.onSelectProduct}
                 removeAction={props.removeActionById?.get(product.id)}
                 onRemoveProduct={props.onRemoveProduct}
+                registerThumbnail={props.registerThumbnail}
               />
             ))}
           </View>
         ))}
       </View>
     ),
-    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onRemoveProduct, props.onSelectProduct, props.pendingInventoryLabel, props.removeActionById, props.selectedId]
+    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onRemoveProduct, props.onSelectProduct, props.pendingInventoryLabel, props.registerThumbnail, props.removeActionById, props.selectedId]
   )
 
   return (

@@ -12,7 +12,7 @@ import {
 } from "react-native"
 import { memo, useCallback, useRef, useState, type ReactNode } from "react"
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated"
-import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
+import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
 import { useReducedMotion } from "../../../ui/animations"
 import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
 import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
@@ -631,9 +631,17 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             />
           ) : null}
           {item.kind === "avatar" ? (
-            <Reanimated.View style={[styles.avatarImage, avatarMotionStyle]}>
-              <RoomAvatarRenderer2D layers={item.layers} />
-            </Reanimated.View>
+            <RoomRendererAvatarBody
+              layers={item.layers}
+              state={avatarMotion.state}
+              walksWithFrames={avatarMotion.usesAnimatedAssets}
+              reduceMotion={reduceMotion}
+              boxHeightPx={renderedHeight * stageHeightPx}
+              stageWidthPx={stageWidthPx}
+              stageHeightPx={stageHeightPx}
+              live={liveAvatarPosition}
+              motionStyle={avatarMotionStyle}
+            />
           ) : (
             <ExpoImage
               source={item.asset.source}
@@ -861,11 +869,6 @@ const styles = StyleSheet.create({
   furnitureFrontOcclusionImage: {
     width: "100%",
     height: "100%"
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    zIndex: 2
   },
   interactionAura: {
     position: "absolute",

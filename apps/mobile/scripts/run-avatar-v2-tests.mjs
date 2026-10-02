@@ -129,6 +129,9 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeIndicatorModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/shopListingModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
+      resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarBodyMotionModel.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/components/avatarTryOnTransitionModel.test.ts"),
+      resolve(workspaceRoot, "src/features/shop/screen/shopPurchaseFlightModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarMotionAtlas.test.ts"),
       resolve(workspaceRoot, "scripts/mobile-ota-asset-budget.test.mjs")
     ],

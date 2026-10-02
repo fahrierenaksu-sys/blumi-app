@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { captureProductEvent } from "../../../analytics/productAnalytics"
-import { hapticError, hapticLight, hapticSuccess } from "../../../ui/haptics"
+import { hapticError, hapticSelection, hapticSuccess } from "../../../ui/haptics"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import { equipAvatarV2Item, isAvatarV2ItemEquipped } from "../avatarV2Selectors"
 import {
@@ -179,7 +179,8 @@ export function useWardrobeTryOn(input: {
       activeTryOnRequestRef.current?.previewAvatar ?? avatar
     if (item.type !== "accessory" && isAvatarV2ItemEquipped(previewBase, item)) return
 
-    hapticLight()
+    // Trying a piece on is choosing among options: one selection tick.
+    hapticSelection()
     const previewAvatar = equipAvatarV2Item(previewBase, item)
     previewAvatarRef.current = previewAvatar
     const pending: WardrobeTryOnPending = {

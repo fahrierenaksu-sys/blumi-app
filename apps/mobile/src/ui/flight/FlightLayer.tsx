@@ -132,7 +132,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
   const motion = useMotion()
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions()
   const { id, source, sourceSurface, targetSurface, content, targetFrame } = flight
-  const carriesContent = flight.contentMode === "carry"
+  const contentMode = flight.contentMode ?? "fade"
 
   const subscribe = useCallback(
     (listener: () => void) => flightStore.subscribeToFlight(id, listener),
@@ -250,12 +250,20 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
     }
   })
   const contentStyle = useAnimatedStyle(() => {
-    if (!carriesContent) return { opacity: flightContentOpacity(progress.value) }
-    // The hero rides at full opacity; the clone's own fade hands it over.
-    const fit = flightCarriedContentTransform(frame.value, source)
+    if (contentMode === "carry") {
+      // The hero rides at full opacity; the clone's own fade hands it over.
+      const fit = flightCarriedContentTransform(frame.value, source)
+      return {
+        opacity: 1,
+        transform: [{ translateX: fit.translateX }, { translateY: fit.translateY }, { scale: fit.scale }]
+      }
+    }
+    if (contentMode !== "scale") return { opacity: flightContentOpacity(progress.value) }
+    // A thumbnail stretches with the frame and fades as the target takes over.
+    const scale = flightLayerScale(frame.value, source)
     return {
-      opacity: 1,
-      transform: [{ translateX: fit.translateX }, { translateY: fit.translateY }, { scale: fit.scale }]
+      opacity: flightContentOpacity(progress.value),
+      transform: [{ scaleX: scale.scaleX }, { scaleY: scale.scaleY }]
     }
   })
 

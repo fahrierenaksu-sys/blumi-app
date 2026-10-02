@@ -18,6 +18,9 @@ export interface FlightSurface {
   readonly radius: number
 }
 
+/** How a flight carries its content; see `FlightRequest.contentMode`. */
+export type FlightContentMode = "fade" | "scale" | "carry"
+
 export interface FlightRequest<Content = unknown> {
   readonly channel: string
   readonly match: string
@@ -28,11 +31,13 @@ export interface FlightRequest<Content = unknown> {
   readonly content?: Content
   /**
    * "fade" (default): the content keeps its size and fades as the target
-   * surface takes over (the sent words). "carry": the content itself is the
-   * hero (a chibi): it scales with the frame, keeping its aspect ratio, and
-   * stays fully visible until the target is revealed under it.
+   * surface takes over (the sent words). "scale": the content stretches with
+   * the frame and fades the same way (a thumbnail, the bought piece).
+   * "carry": the content itself is the hero (a chibi): it scales with the
+   * frame, keeping its aspect ratio, and stays fully visible until the
+   * target is revealed under it.
    */
-  readonly contentMode?: "fade" | "carry"
+  readonly contentMode?: FlightContentMode
   /**
    * The FlightLayer that draws it (default "root", the app root). A native
    * modal sits above the root layer, so it mounts its own named layer.
@@ -41,7 +46,9 @@ export interface FlightRequest<Content = unknown> {
   /**
    * Called once: `true` in the frame the clone lands on its target (the
    * contact moment, for a haptic), `false` when the flight ends without
-   * landing (no target, off screen, unmounted). Never delays anything.
+   * landing (no target, target gone, abandoned, unmounted). Every ending
+   * reports exactly once, so a haptic riding it is never lost or doubled.
+   * Never delays anything.
    */
   readonly onSettled?: (landed: boolean) => void
   /**

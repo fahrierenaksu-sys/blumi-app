@@ -10,7 +10,8 @@ import {
   getRoomEditorDockPageCount,
   getRoomEditorDockPageIndex,
   getRoomEditorHighlightedTrayItemId,
-  getRoomEditorStageFrame
+  getRoomEditorStageFrame,
+  getRoomEditorStageZoomFlip
 } from "./roomEditorDockModel"
 import type { RoomEditorInventoryEntry } from "./roomEditorPresentationModel"
 import { createTestFurniture } from "./roomEditorTestFixtures"
@@ -133,4 +134,23 @@ test("the tray direction control cycles only through supplied asset views", () =
   assert.equal(getNextRoomEditorTrayRotation([], "front"), undefined)
   assert.equal(getNextRoomEditorTrayRotation(["front", "right", "back"], "front"), "right")
   assert.equal(getNextRoomEditorTrayRotation(["front", "right", "back"], "back"), "front")
+})
+
+test("a zoom plays back from the old frame: the flip maps the new frame onto the old one", () => {
+  const area = { availableWidth: 390, availableHeight: 420, aspectRatio: ASPECT }
+  const fill = getRoomEditorStageFrame({ ...area, zoom: "fill" })
+  const fit = getRoomEditorStageFrame({ ...area, zoom: "fit" })
+  const flip = getRoomEditorStageZoomFlip(fill, fit)
+  // Transform about the centre: the new frame's corners land on the old ones.
+  const centreX = fit.left + fit.width / 2 + flip.translateX
+  const centreY = fit.top + fit.height / 2 + flip.translateY
+  assert.ok(Math.abs(centreX - (fit.width * flip.scale) / 2 - fill.left) < 1e-6)
+  assert.ok(Math.abs(centreY - (fit.height * flip.scale) / 2 - fill.top) < 1)
+  assert.ok(Math.abs(fit.width * flip.scale - fill.width) < 1e-6)
+  assert.deepEqual(getRoomEditorStageZoomFlip(fit, fit), { scale: 1, translateX: 0, translateY: 0 })
+  assert.deepEqual(
+    getRoomEditorStageZoomFlip({ left: 0, top: 0, width: 0, height: 0 }, fit),
+    { scale: 1, translateX: 0, translateY: 0 },
+    "the first layout does not animate"
+  )
 })

@@ -78,6 +78,34 @@ export function resolveBottomNavIndicatorIndex(progress: number, itemCount: numb
   return Math.min(itemCount - 1, Math.max(0, progress))
 }
 
+/** The liquid pill stretches at most this much (scaleX 1.26) at full speed. */
+export const BOTTOM_NAV_LIQUID_MAX_STRETCH = 0.26
+/** Stretch gained per tab per second of indicator speed. */
+export const BOTTOM_NAV_LIQUID_STRETCH_PER_SPEED = 0.05
+/** Frames closer together than this give no usable speed. */
+const BOTTOM_NAV_LIQUID_MIN_FRAME_MS = 4
+
+/**
+ * The indicator's speed in tabs per second between two samples, or null when
+ * the samples are too close (or out of order) to say.
+ */
+export function getBottomNavIndicatorSpeed(deltaTabs: number, deltaMs: number): number | null {
+  "worklet"
+  if (!Number.isFinite(deltaTabs) || !(deltaMs >= BOTTOM_NAV_LIQUID_MIN_FRAME_MS)) return null
+  return (deltaTabs / deltaMs) * 1000
+}
+
+/**
+ * "Liquid" pill: it stretches along the bar with the speed it moves at
+ * (either direction), 1 at rest, capped so it never covers a neighbour. The
+ * pill eases toward this each frame and springs back (snappy) when it stops.
+ */
+export function getBottomNavLiquidStretch(speedTabsPerSecond: number): number {
+  "worklet"
+  if (!Number.isFinite(speedTabsPerSecond)) return 1
+  return 1 + Math.min(BOTTOM_NAV_LIQUID_MAX_STRETCH, Math.abs(speedTabsPerSecond) * BOTTOM_NAV_LIQUID_STRETCH_PER_SPEED)
+}
+
 /** How strongly a tab shows its selected icon and label (0..1) for an indicator position. */
 export function getBottomNavItemEmphasis(itemIndex: number, indicatorIndex: number): number {
   "worklet"

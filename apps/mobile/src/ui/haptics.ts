@@ -22,6 +22,8 @@
  * - Report / block submitted                → hapticSuccess
  * - Failed action, rejected code, invalid drop → hapticError
  * - Long-press lift of a placed object       → hapticMedium
+ * - A dragged piece reaching a new grid cell → hapticRigid (a validity flip
+ *   plays hapticSelection instead)
  * - Physical intro beats (globe impact)      → hapticMedium / hapticLight
  *
  * One action plays one haptic: never pair a selection tick with an impact
@@ -56,6 +58,12 @@ export function hapticSoft(): void {
 export function hapticMedium(): void {
   if (Platform.OS === "web") return
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+}
+
+/** Short, hard tick: a dragged piece snapping onto the next grid cell */
+export function hapticRigid(): void {
+  if (Platform.OS === "web") return
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid)
 }
 
 /** Strong pulse for important actions — invite sent, save */

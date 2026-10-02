@@ -8,6 +8,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated"
 import { AvatarPreview2D } from "../components/AvatarPreview2D"
+import { AvatarTryOnTransition } from "../components/AvatarTryOnTransition"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 import { WardrobeGlass } from "./WardrobeGlass"
@@ -19,7 +20,8 @@ const ZOOM_DURATION_MS = 220
 
 /**
  * The canonical character, large and centred over a thin circle, with a zoom
- * control at the lower right. The renderer and layer order are unchanged.
+ * control at the lower right. The renderer and layer order are unchanged;
+ * a try-on crossfades the old look out and the body hops (AvatarTryOnTransition).
  */
 export function WardrobePreviewStage(props: {
   avatar: UserAvatar
@@ -84,13 +86,18 @@ export function WardrobePreviewStage(props: {
                   zoomStyle
                 ]}
               >
-                <AvatarPreview2D
-                  avatar={avatar}
-                  catalog={catalog}
-                  animationState="idle_front"
-                  showGlow={false}
-                  size={layout.avatarSize}
-                  stageHeight={layout.avatarHeight}
+                <AvatarTryOnTransition
+                  value={avatar}
+                  render={(look) => (
+                    <AvatarPreview2D
+                      avatar={look}
+                      catalog={catalog}
+                      animationState="idle_front"
+                      showGlow={false}
+                      size={layout.avatarSize}
+                      stageHeight={layout.avatarHeight}
+                    />
+                  )}
                 />
               </Animated.View>
             </View>
