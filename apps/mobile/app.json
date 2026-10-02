@@ -53,6 +53,7 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-notifications",
+      "./plugins/withIosNotificationServiceExtension",
       "@sentry/react-native",
       "./plugins/withSentryDebugSettings"
     ],

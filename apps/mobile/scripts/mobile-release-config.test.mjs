@@ -177,6 +177,30 @@ test("all app configurations remove microphone and camera permissions", () => {
   }
 })
 
+test("the notification service extension is declared for EAS, marks the app for communication notifications and links no media framework", async () => {
+  const withExtension = require("../plugins/withIosNotificationServiceExtension.js")
+  const configured = withExtension({
+    name: "Blumi",
+    version: "1.0.0",
+    ios: { bundleIdentifier: "com.blumi.mobile", buildNumber: "1" },
+    extra: { eas: { projectId: "project" } }
+  })
+  assert.deepEqual(configured.extra.eas.build.experimental.ios.appExtensions, [
+    { targetName: withExtension.TARGET_NAME, bundleIdentifier: "com.blumi.mobile.NotificationService", entitlements: {} }
+  ])
+  assert.equal(configured.extra.eas.projectId, "project")
+  const entitlements = await configured.mods.ios.entitlements({ ...configured, modResults: { "aps-environment": "production" } })
+  assert.deepEqual(entitlements.modResults, { "aps-environment": "production", [withExtension.COMMUNICATION_ENTITLEMENT]: true })
+  const infoPlist = await configured.mods.ios.infoPlist({ ...configured, modResults: { NSUserActivityTypes: ["Existing"] } })
+  assert.deepEqual(infoPlist.modResults.NSUserActivityTypes, ["Existing", "INSendMessageIntent"])
+  assert.ok(configured.mods.ios.xcodeproj, "the extension target is added to the Xcode project")
+
+  const swift = read("plugins/notificationServiceExtension/NotificationService.swift")
+  const imports = [...swift.matchAll(/^import (\w+)/gm)].map((match) => match[1]).sort()
+  assert.deepEqual(imports, ["Intents", "UserNotifications"], "no camera, audio or media framework")
+  assert.ok(JSON.parse(read("app.json")).expo.plugins.includes("./plugins/withIosNotificationServiceExtension"))
+})
+
 test("native no-media config plugin strips every camera and microphone declaration", async () => {
   const withNoMediaPermissions = require("../plugins/withNoMediaPermissions.js")
   const configured = withNoMediaPermissions({
