@@ -17,6 +17,18 @@
  *   No index serves this global time scan yet; at today's size a scan every
  *   ten minutes is cheap. The next migration should add
  *   (created_at) WHERE notification_type IN ('message', 'like').
+ * - blumi_sessions, 7 days after the family's absolute lifetime ends
+ *   (2026-10-02). Every refresh leaves its rotated row for reuse detection,
+ *   which only matters while the family can still be refreshed. Rows created
+ *   before migration 068 have no family lifetime: an unrotated one goes 7
+ *   days after its own expiry (refresh refuses an expired token); a rotated
+ *   one is kept, since its family may still be open. expires_at never exceeds
+ *   family_expires_at (capSessionExpiry), so the expires_at conjunct only lets
+ *   the purge use blumi_sessions_expires_at_idx.
+ * - blumi_media_revocations, unfinished rows 7 days after they became due.
+ *   Only the LiveKit worker completes and prunes them, and voice is off, so
+ *   the triggers of migration 053 added rows forever. A week-old revocation
+ *   outlived every media token it could revoke.
  */
 export const RETENTION_POLICIES = Object.freeze([
   { table: "blumi_chat_delivery_outbox", key: "message_id", expired: "completed_at < NOW() - INTERVAL '30 days'" },
@@ -27,6 +39,18 @@ export const RETENTION_POLICIES = Object.freeze([
     table: "blumi_notification_policy_events",
     key: "event_id",
     expired: "notification_type IN ('message', 'like') AND created_at < NOW() - INTERVAL '30 days'"
+  },
+  {
+    table: "blumi_sessions",
+    key: "session_token_hash",
+    expired: `expires_at < NOW() - INTERVAL '7 days' AND (
+      family_expires_at < NOW() - INTERVAL '7 days'
+      OR (family_expires_at IS NULL AND rotated_at IS NULL))`
+  },
+  {
+    table: "blumi_media_revocations",
+    key: "room_name, user_id",
+    expired: "completed_at IS NULL AND available_at < NOW() - INTERVAL '7 days'"
   }
 ] as const)
 
