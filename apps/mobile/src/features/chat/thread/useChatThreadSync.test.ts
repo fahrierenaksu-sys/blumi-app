@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import type * as Hook from "./useChatThreadSync"
-import { createPushSettleGate } from "./useAfterPushTransition"
-import type * as PushTransition from "./useAfterPushTransition"
+import { createPushSettleGate } from "../../../navigation/useAfterPushTransition"
+import type * as PushTransition from "../../../navigation/useAfterPushTransition"
 
 function mount(refreshParticipants?: () => Promise<void>, extra: Partial<Parameters<typeof Hook.useChatThreadSync>[0]> = {}) {
   const runtime = createFakeReactRuntime()
@@ -161,7 +161,7 @@ test("the push settles on its own transitionEnd, or after the fallback when none
     const timers = new Map<number, () => void>()
     let counter = 0
     const listeners = new Set<(event: { data?: { closing?: boolean } }) => void>()
-    const transition = loadSourceWithFakeReact<typeof PushTransition>("features/chat/thread/useAfterPushTransition.ts", runtime, {
+    const transition = loadSourceWithFakeReact<typeof PushTransition>("navigation/useAfterPushTransition.ts", runtime, {
       globals: { setTimeout: (fn: () => void) => { timers.set(++counter, fn); return counter },
         clearTimeout: (id: number) => timers.delete(id) }
     })

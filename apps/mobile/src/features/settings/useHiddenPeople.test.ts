@@ -17,7 +17,7 @@ const actor = (userId: string) => ({
   profile: { userId }
 }) as unknown as SessionActor
 
-function mount() {
+function mount(options: { whenSettled?: (task: () => void) => () => void } = {}) {
   const runtime = createFakeReactRuntime()
   const hydrations: { userId: string; request: ReturnType<typeof deferred> }[] = []
   const toasts: { body?: string }[] = []
@@ -48,9 +48,9 @@ function mount() {
   const unblockUser = () => undefined
   const render = (next: Partial<typeof props> = {}) => {
     props = { ...props, ...next }
-    return runtime.render(() => useHiddenPeople({ ...props, copy, unblockUser }))
+    return runtime.render(() => useHiddenPeople({ ...props, copy, unblockUser, whenSettled: options.whenSettled }))
   }
-  return { render, hydrations, toasts }
+  return { render, hydrations, toasts, unmount: () => runtime.unmount() }
 }
 
 test("hidden people refresh once per session actor; a locale change does not refetch", () => {
@@ -70,4 +70,44 @@ test("a refresh failure is reported in the locale shown when it fails", async ()
   f.hydrations[0].request.reject(new Error("offline"))
   await new Promise<void>((resolve) => setImmediate(resolve))
   assert.deepEqual(f.toasts.map(({ body }) => body), ["failed:tr"])
+})
+
+// Settings opens by a push: its server refresh waits for the push to settle,
+// so the page never re-renders mid-slide.
+function createGate() {
+  let settled = false
+  const queue = new Set<() => void>()
+  return {
+    whenSettled: (task: () => void) => {
+      if (settled) {
+        task()
+        return () => undefined
+      }
+      queue.add(task)
+      return () => { queue.delete(task) }
+    },
+    settle: () => {
+      settled = true
+      for (const task of [...queue]) task()
+      queue.clear()
+    }
+  }
+}
+
+test("the hidden-people refresh starts only after the push settles", () => {
+  const gate = createGate()
+  const f = mount({ whenSettled: gate.whenSettled })
+  f.render()
+  assert.equal(f.hydrations.length, 0)
+  gate.settle()
+  assert.deepEqual(f.hydrations.map(({ userId }) => userId), ["owner-a"])
+})
+
+test("leaving Settings before the push settles never starts the refresh", () => {
+  const gate = createGate()
+  const f = mount({ whenSettled: gate.whenSettled })
+  f.render()
+  f.unmount()
+  gate.settle()
+  assert.equal(f.hydrations.length, 0)
 })

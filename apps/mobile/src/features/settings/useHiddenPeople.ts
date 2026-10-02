@@ -5,9 +5,15 @@ import { showToast } from "../../ui/toast"
 import { hydrateBlockedUsersFromServer } from "../safety/blockStore"
 import { unblockSafetyUser } from "../safety/safetyApi"
 import type { AppLocale } from "../session/appLocale"
+import type { WhenPushSettled } from "../../navigation/useAfterPushTransition"
 import type { SessionActor } from "../session/sessionModel"
 import { getSettingsActionErrorMessageForDisplay } from "../session/settingsActionErrorCopy"
 import type { SettingsCopy } from "./settingsCopy"
+
+const runNow: WhenPushSettled = (task) => {
+  task()
+  return () => undefined
+}
 
 /**
  * Refreshes the hidden-people list from the server for production sessions and
@@ -19,8 +25,13 @@ export function useHiddenPeople(input: {
   copy: SettingsCopy
   locale: AppLocale
   unblockUser: (blockedUserId: string, options?: { persist?: boolean }) => void
+  /**
+   * Runs the first server refresh once the screen's push has settled, so
+   * it never re-renders the page mid-slide. Defaults to at once.
+   */
+  whenSettled?: WhenPushSettled
 }) {
-  const { copy, locale, sessionActor, unblockUser } = input
+  const { copy, locale, sessionActor, unblockUser, whenSettled = runNow } = input
 
   // Locale only formats the failure toast: it is read when the refresh fails
   // and must not trigger another server hydration.
@@ -34,12 +45,14 @@ export function useHiddenPeople(input: {
 
   useEffect(() => {
     if (sessionActor.session.mode !== "production") return
-    void hydrateBlockedUsersFromServer(
-      sessionActor.profile.userId,
-      sessionActor.session.sessionToken
-    )
-      .catch((error) => showRefreshFailure(error))
-  }, [sessionActor])
+    return whenSettled(() => {
+      void hydrateBlockedUsersFromServer(
+        sessionActor.profile.userId,
+        sessionActor.session.sessionToken
+      )
+        .catch((error) => showRefreshFailure(error))
+    })
+  }, [sessionActor, whenSettled])
 
   return useCallback(
     (userId: string) => {

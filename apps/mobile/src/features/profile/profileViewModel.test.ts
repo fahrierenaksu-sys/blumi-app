@@ -11,10 +11,7 @@ import {
   resolveProfilePreviewContext,
   shouldShowProfileSafety
 } from "./profileViewModel"
-import {
-  getProfileHeroParallax,
-  getProfileSectionEntranceDelay
-} from "./profileMotionModel"
+import { getProfileHeroParallax } from "./profileMotionModel"
 
 test("an empty profile shows an add affordance for every section and no blank cards", () => {
   const sections = resolveOwnProfileSections({ bio: "  ", interests: [" ", ""], prompts: [] }, "en")
@@ -177,15 +174,11 @@ test("invite to room returns to the chat with a one-shot request and keeps its t
   )
 })
 
-test("hero parallax and section entrances stand still under Reduce Motion", () => {
+test("the hero parallax stands still under Reduce Motion", () => {
   assert.deepEqual(getProfileHeroParallax(200, true), { translateY: 0, opacity: 1 })
   assert.deepEqual(getProfileHeroParallax(-40, false), { translateY: 0, opacity: 1 })
   const moving = getProfileHeroParallax(200, false)
   assert.ok(moving.translateY > 0 && moving.translateY < 200, "the chibi trails the scroll")
   assert.ok(moving.opacity < 1 && moving.opacity >= 0.5)
   assert.ok(getProfileHeroParallax(10_000, false).opacity >= 0.5)
-  assert.equal(getProfileSectionEntranceDelay(3, true), null)
-  const first = getProfileSectionEntranceDelay(0, false)
-  const second = getProfileSectionEntranceDelay(1, false)
-  assert.ok(first !== null && second !== null && second > first, "sections enter one after another")
 })

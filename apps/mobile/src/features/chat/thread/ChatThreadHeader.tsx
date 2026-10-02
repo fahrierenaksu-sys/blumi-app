@@ -23,7 +23,8 @@ export function ChatThreadHeader({
   onBack,
   onViewMatch,
   onOpenSafety,
-  onOpenProfile
+  onOpenProfile,
+  onWarmProfile
 }: {
   chatCopy: ChatThreadCopy
   chatLocale: ChatLocale
@@ -36,6 +37,8 @@ export function ChatThreadHeader({
   onOpenSafety: () => void
   /** Null while the partner is not known yet (no profile to open). */
   onOpenProfile: (() => void) | null
+  /** Starts loading the profile as the finger lands, so it opens on loaded data. */
+  onWarmProfile?: () => void
 }) {
   return (
     <View style={styles.chatHeader}>
@@ -49,6 +52,7 @@ export function ChatThreadHeader({
         accessibilityState={{ disabled: !onOpenProfile }}
         disabled={!onOpenProfile}
         onPress={onOpenProfile ?? undefined}
+        onPressIn={onOpenProfile ? onWarmProfile : undefined}
         hitSlop={4}
         style={({ pressed }) => [styles.chatHeaderAvatarButton, pressed ? styles.chatHeaderPressed : null]}
       >
@@ -66,6 +70,7 @@ export function ChatThreadHeader({
           accessible={false}
           numberOfLines={1}
           onPress={onOpenProfile ?? undefined}
+          onPressIn={onOpenProfile ? onWarmProfile : undefined}
           style={styles.chatHeaderName}
         >
           {partnerName}

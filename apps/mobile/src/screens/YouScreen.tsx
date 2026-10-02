@@ -17,7 +17,6 @@ import {
   ProfilePromptCards,
   ProfileSection
 } from "../features/profile/OwnProfileSections"
-import { ProfileReveal } from "../features/profile/ProfileReveal"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { uiTheme } from "../ui/theme"
@@ -50,9 +49,6 @@ export function YouScreen(props: YouScreenProps) {
   const openPreview = (): void =>
     navigation.navigate("ProfilePreview", { userId: profile.userId, context: "self" })
 
-  let revealIndex = 0
-  const nextReveal = (): number => revealIndex++
-
   return (
     <View style={styles.root}>
       <Reanimated.ScrollView
@@ -68,8 +64,10 @@ export function YouScreen(props: YouScreenProps) {
           onBack={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}
           onOpenSettings={openSettings}
         />
+        {/* Every section is drawn on the push's first frame; the push itself
+            is the page's entrance. */}
         <SafeAreaView contentGutter style={styles.body} edges={["left", "right", "bottom"]}>
-          <ProfileReveal index={nextReveal()} style={styles.identitySlot}>
+          <View style={styles.identitySlot}>
             <OwnProfileIdentity
               copy={copy}
               displayName={profile.displayName}
@@ -78,40 +76,30 @@ export function YouScreen(props: YouScreenProps) {
               vibeColor={vibePreset?.swatch ?? uiTheme.colors.primary}
               onEditProfile={openEdit}
             />
-          </ProfileReveal>
+          </View>
 
-          <ProfileReveal index={nextReveal()}>
-            <ProfileCompletenessCard copy={copy} completeness={sections.completeness} onPress={openEdit} />
-          </ProfileReveal>
+          <ProfileCompletenessCard copy={copy} completeness={sections.completeness} onPress={openEdit} />
 
-          <ProfileReveal index={nextReveal()}>
-            <ProfileSection title={copy.aboutTitle}>
-              {sections.bio
-                ? <ProfileBioCard bio={sections.bio} />
-                : <ProfileAddCard icon="create-outline" title={copy.addBio} hint={copy.addBioHint} onPress={openEdit} />}
-            </ProfileSection>
-          </ProfileReveal>
+          <ProfileSection title={copy.aboutTitle}>
+            {sections.bio
+              ? <ProfileBioCard bio={sections.bio} />
+              : <ProfileAddCard icon="create-outline" title={copy.addBio} hint={copy.addBioHint} onPress={openEdit} />}
+          </ProfileSection>
 
-          <ProfileReveal index={nextReveal()}>
-            <ProfileSection title={copy.interestsTitle}>
-              {sections.showAddInterests
-                ? <ProfileAddCard icon="pricetags-outline" title={copy.addInterests} hint={copy.addInterestsHint} onPress={openEdit} />
-                : <ProfileInterestChips interests={sections.interests} />}
-            </ProfileSection>
-          </ProfileReveal>
+          <ProfileSection title={copy.interestsTitle}>
+            {sections.showAddInterests
+              ? <ProfileAddCard icon="pricetags-outline" title={copy.addInterests} hint={copy.addInterestsHint} onPress={openEdit} />
+              : <ProfileInterestChips interests={sections.interests} />}
+          </ProfileSection>
 
-          <ProfileReveal index={nextReveal()}>
-            <ProfileSection title={copy.promptsTitle}>
-              {sections.prompts.length > 0 ? <ProfilePromptCards prompts={sections.prompts} /> : null}
-              {sections.showAddPrompt
-                ? <ProfileAddCard icon="chatbubbles-outline" title={copy.addPrompt} hint={copy.addPromptHint} onPress={openEdit} />
-                : null}
-            </ProfileSection>
-          </ProfileReveal>
+          <ProfileSection title={copy.promptsTitle}>
+            {sections.prompts.length > 0 ? <ProfilePromptCards prompts={sections.prompts} /> : null}
+            {sections.showAddPrompt
+              ? <ProfileAddCard icon="chatbubbles-outline" title={copy.addPrompt} hint={copy.addPromptHint} onPress={openEdit} />
+              : null}
+          </ProfileSection>
 
-          <ProfileReveal index={nextReveal()}>
-            <ProfilePreviewEntry copy={copy} onPress={openPreview} />
-          </ProfileReveal>
+          <ProfilePreviewEntry copy={copy} onPress={openPreview} />
         </SafeAreaView>
       </Reanimated.ScrollView>
     </View>
