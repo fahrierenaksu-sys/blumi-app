@@ -20,10 +20,12 @@ export interface PushRegistrationDependencies {
     platform: PushPlatform
     pushToken: string
   }): Promise<void>
+  /** True when this exact registration was already sent in this foreground. */
+  isAlreadyRegistered?(input: { platform: PushPlatform; pushToken: string }): boolean
 }
 
 export type PushRegistrationResult =
-  | { status: "registered"; pushToken: string }
+  | { status: "registered"; pushToken: string; unchanged?: true }
   | {
       status: "skipped"
       reason:
@@ -64,6 +66,9 @@ export async function syncPushRegistration(input: {
   }
 
   const pushToken = await dependencies.getExpoPushToken()
+  if (dependencies.isAlreadyRegistered?.({ platform: dependencies.platform, pushToken })) {
+    return { status: "registered", pushToken, unchanged: true }
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     input.signal?.throwIfAborted()
     try {

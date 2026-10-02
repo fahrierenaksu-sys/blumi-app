@@ -17,6 +17,7 @@ import {
   resetForegroundNotificationAlerts
 } from "./foregroundNotificationState"
 import { rememberRegisteredPushDevice, removeRegisteredPushDevice } from "./pushDeviceRegistry"
+import { createDebouncedRunner, createPushRegistrationGate, PUSH_TOKEN_EVENT_DEBOUNCE_MS } from "./pushRegistrationGate"
 
 type NotificationsModule = typeof import("expo-notifications")
 type NotificationsPermissionStatus =
@@ -105,6 +106,9 @@ export function usePushRegistration(
     let pushTokenSubscription: { remove(): void } | null = null
     let responseSubscription: { remove(): void } | null = null
     let notificationsForDelivery: NotificationsModule | null = null
+    // One registration per foreground; a token event caused by our own
+    // token fetch must not start another sync (the build 14 loop).
+    const registrationGate = createPushRegistrationGate()
     const pendingResponses = new Map<string, {
       response: import("expo-notifications").NotificationResponse
       cached: boolean
@@ -211,8 +215,13 @@ export function usePushRegistration(
               if (typeof projectId !== "string" || projectId.trim().length === 0) {
                 throw new Error("Expo project ID is unavailable for push registration.")
               }
-              return (await notifications.getExpoPushTokenAsync({ projectId })).data
+              // Fetch the device token first and remember it: iOS re-emits it
+              // to the token listener, which must recognise it as ours.
+              const devicePushToken = await notifications.getDevicePushTokenAsync()
+              registrationGate.noteDeviceToken(devicePushToken.data)
+              return (await notifications.getExpoPushTokenAsync({ projectId, devicePushToken })).data
             },
+            isAlreadyRegistered: (input) => !registrationGate.shouldRegister(input),
             registerDevice: async (input) => {
               await registerDevice(
                 MOBILE_HTTP_BASE_URL,
@@ -221,6 +230,7 @@ export function usePushRegistration(
                 fetch,
                 abortController.signal
               )
+              registrationGate.noteRegistered(input)
             }
           }
         })
@@ -252,8 +262,16 @@ export function usePushRegistration(
       return task
     }
 
+    const tokenEventSync = createDebouncedRunner(() => {
+      if (active) void sync(false).catch(() => undefined)
+    }, PUSH_TOKEN_EVENT_DEBOUNCE_MS)
+    let wasInBackground = false
     const foregroundSubscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void sync(false).catch(() => undefined)
+      if (state === "background") wasInBackground = true
+      if (state !== "active") return
+      if (wasInBackground) registrationGate.noteForeground()
+      wasInBackground = false
+      void sync(false).catch(() => undefined)
     })
 
     void loadNotificationsModule()
@@ -263,8 +281,8 @@ export function usePushRegistration(
         ensureNotificationHandler(notifications)
         requestSyncRef.current = () => sync(true)
         void sync(false).catch(() => undefined)
-        pushTokenSubscription = notifications.addPushTokenListener(() => {
-          void sync(false).catch(() => undefined)
+        pushTokenSubscription = notifications.addPushTokenListener((event) => {
+          if (registrationGate.acceptTokenEvent(event.data)) tokenEventSync.schedule()
         })
         responseSubscription =
           notifications.addNotificationResponseReceivedListener((response) => {
@@ -285,6 +303,7 @@ export function usePushRegistration(
       pendingResponses.clear()
       requestSyncRef.current = null
       abortController.abort()
+      tokenEventSync.cancel()
       foregroundSubscription.remove()
       pushTokenSubscription?.remove()
       responseSubscription?.remove()
