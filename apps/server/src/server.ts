@@ -193,7 +193,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const connectionManager = options.connectionManager ?? createConnectionManager()
   const chatReceiptService = createChatReceiptService({
     chatService,
-    blockPolicy: safetyService,
+    blockPolicy: { hasBlockBetween: (a, b) => safetyService.hasBlockBetweenCached(a, b) },
     isRolledOutFor: (userId) => isCapabilityRolledOut(capabilityService, userId, "chat_read_receipts"),
     emit: (userId, event) => connectionManager.sendToUser(userId, event)
   })

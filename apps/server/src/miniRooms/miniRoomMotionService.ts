@@ -45,7 +45,13 @@ function isSeatTargetNearFloor(point: { x: number; y: number }): boolean {
   return Math.hypot(nearest.x - point.x, nearest.y - point.y) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
 }
 
-const REVALIDATE_AFTER_MS = 10_000
+/**
+ * Background re-check age of an occupied room's access (room row plus block
+ * check). 30 s since 2026-10-02 (was 10 s, ~100 queries/s at 500 rooms):
+ * ending a room or blocking the pair invalidates it at once anyway.
+ */
+export const MINI_ROOM_MOTION_REVALIDATE_AFTER_MS = 30_000
+const REVALIDATE_AFTER_MS = MINI_ROOM_MOTION_REVALIDATE_AFTER_MS
 const MAX_STALE_MS = 60_000
 const IDLE_ROOM_RETENTION_MS = 60_000
 const MAX_IDLE_ROOMS = 128

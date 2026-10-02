@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS } from "./miniRoomMotionService"
+import { createMiniRoomMotionService, MINI_ROOM_MOTION_RESYNC_DELAY_MS, MINI_ROOM_MOTION_REVALIDATE_AFTER_MS } from "./miniRoomMotionService"
 
 test("room motion relays immediately, snapshots recover positions, and disconnect is per connection", async () => {
   const events: any[] = []
@@ -170,7 +170,7 @@ test("a due access re-check runs in the background while moves keep relaying, an
   events.length = 0
   lookups = 0
   gate = new Promise<void>(resolve => { release = resolve })
-  clock += 10_000
+  clock += MINI_ROOM_MOTION_REVALIDATE_AFTER_MS
   // The re-check is due but slow: the move is relayed without waiting for it.
   await service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
   assert.equal(events.length, 1)
@@ -227,7 +227,9 @@ test("occupied rooms are re-checked on a timer, so a move after a quiet minute d
     t.mock.timers.tick(5_000)
     await new Promise(resolve => setImmediate(resolve))
   }
-  assert.ok(lookups >= 6, "re-checked about every 10 s while occupied")
+  assert.ok(lookups >= Math.floor(70_000 / MINI_ROOM_MOTION_REVALIDATE_AFTER_MS),
+    "re-checked about every MINI_ROOM_MOTION_REVALIDATE_AFTER_MS while occupied")
+  assert.ok(lookups <= Math.ceil(70_000 / MINI_ROOM_MOTION_REVALIDATE_AFTER_MS), "and not more often")
   gate = new Promise<void>(() => undefined)
   events.length = 0
   void service.move("ca", "a", { miniRoomId: "room", sequence: 1, x: .5, y: .7 })
@@ -282,7 +284,7 @@ test("a room just verified by its acceptance is entered without another lookup; 
   assert.equal(lookups, 1, "an ended or blocked room is looked up again")
 
   service.prime(record)
-  clock += 10_000
+  clock += MINI_ROOM_MOTION_REVALIDATE_AFTER_MS
   await service.enter("ca", "a", "room")
   assert.equal(lookups, 2, "a stale verification is not reused")
   service.prime({ ...record, endedAt: new Date(0).toISOString() })
