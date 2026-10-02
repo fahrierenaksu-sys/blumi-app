@@ -17,6 +17,7 @@ import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniR
 import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
+import { resolveComposerRestore, resolveRoomComposerSubmit } from "../roomComposerModel"
 import { uiTheme } from "../../../ui/theme"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticLight } from "../../../ui/haptics"
@@ -278,13 +279,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   }, [moveLocalAvatarToHotspot])
 
   const handleSubmitComposer = useCallback((): void => {
-    const body = composerText.trim()
-    if (!body) {
-      return
-    }
-    const accepted = onSendRoomMessage(body)
-    if (!accepted) return
-    sayPhrase(localUser.userId, body, "chat")
+    const result = resolveRoomComposerSubmit(composerText, onSendRoomMessage)
+    if (result.kind !== "sent") return
+    sayPhrase(localUser.userId, result.body, "chat")
     // The keyboard stays up for the next message; the input returns to one line.
     setComposerText("")
   }, [composerText, localUser.userId, onSendRoomMessage, sayPhrase])
@@ -294,7 +291,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   // new object only per failure, so this runs once per failed message.
   useEffect(() => {
     if (!failedRoomMessage?.clientMessageId) return
-    setComposerText((current) => current || failedRoomMessage.body)
+    setComposerText((current) => resolveComposerRestore(current, failedRoomMessage))
   }, [failedRoomMessage])
 
   const handleComposerChange = useCallback((value: string): void => {

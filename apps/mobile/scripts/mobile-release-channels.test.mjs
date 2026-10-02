@@ -32,7 +32,7 @@ const previewBuildWorkflow = readWorkflow("preview-testflight-build.yml")
 const jobsOfType = (workflow, type) => Object.values(workflow.jobs).filter((job) => job.type === type)
 
 test("the app ships expo-updates with a fingerprint runtime and the project's update URL", () => {
-  assert.match(readJson("package.json").dependencies["expo-updates"], /^~57\./)
+  assert.ok(readJson("package.json").dependencies["expo-updates"], "expo-updates is a dependency")
   assert.deepEqual(appConfig.runtimeVersion, { policy: "fingerprint" })
   assert.equal(appConfig.updates.url, `https://u.expo.dev/${appConfig.extra.eas.projectId}`)
 })

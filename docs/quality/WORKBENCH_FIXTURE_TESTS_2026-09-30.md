@@ -1,5 +1,12 @@
 # Workbench-fixture tests — 2026-09-30
 
+> **Superseded 2026-10-02.** The test audit
+> (`docs/quality/test-audit-2026-10-02/findings.json`) removed all 14
+> `test:workbench` tests below, so the runner
+> `run-workbench-fixture-tests.mjs`, its test and the `test:workbench`
+> script were removed too. Published item bytes stay locked by
+> `shopReleaseCatalog.test.ts`. The rest of this page is a snapshot.
+
 Status: **Implemented, Tested** (runner and its tests). The 14 kept tests are
 **Open** until the owner runs `test:workbench` on the Mac: they cannot run in
 this container because the Workbench is not reachable here.

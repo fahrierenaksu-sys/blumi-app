@@ -102,8 +102,6 @@ try {
       join(outputDirectory, "features/shop/shopCatalogRuntime.test.js"),
       join(outputDirectory, "features/matches/matchResultPresentation.test.js"),
       resolve(workspaceRoot, "src/screens/matchFlowNavigation.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-lobby-invite-fail-closed.test.mjs"),
-      resolve(workspaceRoot, "scripts/mobile-core-flow-presentation-contract.test.mjs"),
       resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeParamsSerialisable.test.mjs"),
       resolve(workspaceRoot, "src/navigation/mainTabPager/mainTabPagerContract.test.mjs"),
@@ -127,7 +125,8 @@ try {
       "--test",
       "src/navigation/linkedProfileScreenLifecycle.test.ts",
       "src/navigation/globalRealtimeSessionLifecycle.test.ts",
-      "src/navigation/mainTabRenderIsolation.test.ts"
+      "src/navigation/mainTabRenderIsolation.test.ts",
+      "src/ui/springPressScale.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

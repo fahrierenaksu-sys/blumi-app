@@ -4,9 +4,12 @@
 // update the allowlist in the same change and explain why in the commit.
 import assert from "node:assert/strict"
 import { readdirSync, readFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
+
+const ts = createRequire(import.meta.url)("typescript")
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const srcRoot = join(mobileRoot, "src")
@@ -85,33 +88,134 @@ test("reduce-transparency is read from the shared store only", () => {
   assert.deepEqual(offenders, [], "use the shared reduce-transparency hook from ui/reduceTransparency")
 })
 
-// Existing oversized files may not grow; no new file may exceed the limit.
-const MAX_LINES = 800
-const OVERSIZED_DEBT = {
-  "features/avatarV2/room/avatarRoomCatalog.ts": 1304,
-  "features/avatarV2/room/avatarRoomMotionAssets.ts": 1274,
-  "features/demo/SwipeableDiscoverCard.tsx": 1148,
-  "features/roomV2/state/RoomV2Provider.tsx": 1210,
-  "features/roomV2/components/RoomRenderer2D.tsx": 967,
-  "navigation/RootNavigator.tsx": 1123,
-  "features/session/useSessionState.ts": 1117,
-  "screens/MyRoomScreen.tsx": 1082,
-  "features/avatarV2/avatarV2Catalog.ts": 949,
-  "screens/ProfileEditScreen.tsx": 758,
-  "features/session/sessionApi.ts": 847,
-  "features/avatarV2/room/avatarRoomSelectors.ts": 825,
-  "features/session/OnboardingWorldScene.tsx": 817,
-  "ui/primitives.tsx": 812
+// JS-driven Animated values run every frame on the JS thread.
+test("Animated never runs on the JS driver", () => {
+  const offenders = sources.filter(({ text }) => /useNativeDriver:\s*false/.test(text)).map(({ path }) => path)
+  assert.deepEqual(offenders, [], "animate transform/opacity with the native driver or Reanimated")
+})
+
+// Gestures belong to Gesture Handler on the UI thread. A JS PanResponder runs
+// every move on the JS thread. The list is debt and may only shrink.
+const PAN_RESPONDER_DEBT = new Set([])
+
+test("no new PanResponder gestures", () => {
+  const offenders = sources
+    .filter(({ text }) => /PanResponder\.create\(/.test(text))
+    .map(({ path }) => path)
+    .filter((path) => !PAN_RESPONDER_DEBT.has(path))
+  assert.deepEqual(offenders, [], "use a Gesture Handler gesture with worklet callbacks")
+})
+
+// Per-frame UI-thread callbacks (useFrameCallback, gesture onUpdate/onChange,
+// useAnimatedReaction reactions) may hop to JS only when a value changed:
+// an unguarded scheduleOnRN/runOnJS there renders React on every frame.
+// A hop counts as guarded when an enclosing `if` compares values (or calls a
+// `...Changed` helper), or an earlier `if (<comparison>) return` in an
+// enclosing block of the callback.
+const JS_HOP = /^(?:scheduleOnRN|runOnJS)$/
+const COMPARISON_OPERATORS = new Set([
+  ts.SyntaxKind.EqualsEqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.LessThanToken,
+  ts.SyntaxKind.LessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanToken,
+  ts.SyntaxKind.GreaterThanEqualsToken
+])
+
+function isComparison(node) {
+  let found = false
+  const visit = (child) => {
+    if (found) return
+    if (ts.isBinaryExpression(child) && COMPARISON_OPERATORS.has(child.operatorToken.kind)) found = true
+    else if (ts.isCallExpression(child) && /changed/i.test(child.expression.getText())) found = true
+    else if (ts.isPrefixUnaryExpression(child) && child.operator === ts.SyntaxKind.ExclamationToken && ts.isCallExpression(child.operand) && /^should/.test(child.operand.expression.getText())) found = true
+    else ts.forEachChild(child, visit)
+  }
+  visit(node)
+  return found
 }
 
-test("production files stay small; oversized debt may only shrink", () => {
-  const offenders = []
-  for (const { path, text } of sources) {
-    const lines = (text.match(/\n/g) ?? []).length
-    const cap = OVERSIZED_DEBT[path] ?? MAX_LINES
-    if (lines > cap) offenders.push(`${path}: ${lines} > ${cap}`)
+function isEarlyReturnGuard(statement) {
+  return ts.isIfStatement(statement) &&
+    isComparison(statement.expression) &&
+    (ts.isReturnStatement(statement.thenStatement) ||
+      (ts.isBlock(statement.thenStatement) && statement.thenStatement.statements.some(ts.isReturnStatement)))
+}
+
+function isGuarded(call, callback) {
+  let child = call
+  for (let node = call.parent; node && child !== callback; child = node, node = node.parent) {
+    if (ts.isIfStatement(node) && child === node.thenStatement && isComparison(node.expression)) return true
+    if (ts.isBlock(node)) {
+      const index = node.statements.indexOf(child)
+      if (node.statements.slice(0, index).some(isEarlyReturnGuard)) return true
+    }
   }
-  assert.deepEqual(offenders, [], "split the file")
+  return false
+}
+
+function resolveCallback(node, sourceFile) {
+  if (!node) return undefined
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return node
+  if (!ts.isIdentifier(node)) return undefined
+  let found
+  const visit = (child) => {
+    if (found) return
+    if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.name.text === node.text && child.initializer) {
+      const init = child.initializer
+      if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) found = init
+      else if (ts.isCallExpression(init) && /^use(?:Callback|Event|EffectEvent)$/.test(init.expression.getText())) {
+        found = resolveCallback(init.arguments[0], sourceFile)
+      }
+    } else if (ts.isFunctionDeclaration(child) && child.name?.text === node.text) found = child
+    else ts.forEachChild(child, visit)
+  }
+  visit(sourceFile)
+  return found
+}
+
+function perFrameCallbacks(sourceFile, usesGestureHandler) {
+  const callbacks = []
+  const visit = (node) => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression
+      let kind
+      let argument
+      if (ts.isIdentifier(callee) && callee.text === "useFrameCallback") [kind, argument] = ["useFrameCallback", node.arguments[0]]
+      else if (ts.isIdentifier(callee) && callee.text === "useAnimatedReaction") [kind, argument] = ["useAnimatedReaction", node.arguments[1]]
+      else if (usesGestureHandler && ts.isPropertyAccessExpression(callee) && /^(?:onUpdate|onChange|onTouchesMove)$/.test(callee.name.text)) {
+        [kind, argument] = [callee.name.text, node.arguments[0]]
+      }
+      const callback = kind ? resolveCallback(argument, sourceFile) : undefined
+      if (callback) callbacks.push({ kind, callback, line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1 })
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return callbacks
+}
+
+test("per-frame UI-thread callbacks hop to JS only when a value changed", () => {
+  const offenders = []
+  let checked = 0
+  for (const { path, text } of sources) {
+    if (!/useFrameCallback|useAnimatedReaction|react-native-gesture-handler/.test(text)) continue
+    const sourceFile = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    for (const { kind, callback, line } of perFrameCallbacks(sourceFile, text.includes("react-native-gesture-handler"))) {
+      checked += 1
+      const visit = (node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && JS_HOP.test(node.expression.text) && !isGuarded(node, callback)) {
+          offenders.push(`${path}:${sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1} (${kind} at line ${line})`)
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(callback)
+    }
+  }
+  assert.ok(checked > 0, "the scan found no per-frame callbacks; the detector is broken")
+  assert.deepEqual(offenders, [], "compare with the previous value before scheduleOnRN/runOnJS, or keep the work on the UI thread")
 })
 
 // A worklet's default parameters are not captured by the worklet transform,

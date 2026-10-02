@@ -5,7 +5,9 @@ import {
   DEFAULT_DISCOVERY_FILTERS,
   DISCOVERY_MAXIMUM_AGE,
   DISCOVERY_MINIMUM_AGE,
+  areDiscoveryFiltersReadyFor,
   clearLocalDiscoveryFiltersFallback,
+  createDiscoveryFiltersHydrationGate,
   formatDiscoveryFiltersSummary,
   getLoadedLocalDiscoveryFiltersFallback,
   getLocalDiscoveryFiltersFallbackStorageKey,
@@ -260,4 +262,36 @@ test("local filter writes replace an in-flight read and failed reads can retry",
   assert.equal(readCount, 3)
   resolveRead?.(null)
   assert.equal(await retry, null)
+})
+
+test("filters are ready only for the account they were hydrated for", () => {
+  assert.equal(areDiscoveryFiltersReadyFor(null, "account-1"), false)
+  assert.equal(areDiscoveryFiltersReadyFor("account-1", "account-1"), true)
+  assert.equal(areDiscoveryFiltersReadyFor("account-1", "account-2"), false)
+})
+
+test("a save supersedes loads that started before it", () => {
+  const gate = createDiscoveryFiltersHydrationGate()
+  const earlyLoad = gate.beginLoad()
+  assert.equal(gate.canApply(earlyLoad), true)
+
+  const save = gate.recordSave()
+  assert.equal(gate.canApply(earlyLoad), false, "a late load must not overwrite the saved filters")
+  assert.equal(gate.isLatestSave(save), true)
+
+  const laterLoad = gate.beginLoad()
+  assert.equal(gate.canApply(laterLoad), true)
+
+  const nextSave = gate.recordSave()
+  assert.equal(gate.isLatestSave(save), false, "an older save must not clear the newer fallback")
+  assert.equal(gate.isLatestSave(nextSave), true)
+  assert.equal(gate.canApply(laterLoad), false)
+})
+
+test("hydration gates are independent per hook instance", () => {
+  const first = createDiscoveryFiltersHydrationGate()
+  const second = createDiscoveryFiltersHydrationGate()
+  const load = second.beginLoad()
+  first.recordSave()
+  assert.equal(second.canApply(load), true)
 })

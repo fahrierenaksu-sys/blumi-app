@@ -13,7 +13,9 @@ This test runs in `npm --workspace @blumi/mobile run test:theme`, which is part 
 | No per-frame JS loops | Any `requestAnimationFrame(` or `setInterval(`, even when it isn't animation, outside `features/roomV2/editor/useRoomEditorStageLayout.ts`. Drive motion on the UI or native thread. A renderer that must own its loop can join the allowlist with frame-time evidence |
 | Reduce Motion from the shared store | An `AccessibilityInfo` reduce-motion query or listener outside `ui/animations.ts` |
 | Reduce Transparency from the shared store | `isReduceTransparencyEnabled` or `reduceTransparencyChanged` outside `ui/reduceTransparency.ts` and `ui/reduceTransparencyStore.ts` |
-| File size | More than 800 newlines in one file, unless the file is in the oversized allowlist, whose caps may only shrink. Generated catalogs and asset manifests count too: split them, move them to data files, or raise the cap with the reason in the commit |
+| JS-driver animation | Any `useNativeDriver: false`. Animate transform and opacity on the native driver or with Reanimated |
+| PanResponder | Any `PanResponder.create(`. Gestures use Gesture Handler with worklet callbacks; the allowlist is empty and may only shrink |
+| UI-thread hops per frame | A `scheduleOnRN` or `runOnJS` inside a `useFrameCallback` callback, a gesture `onUpdate`/`onChange`/`onTouchesMove` callback or a `useAnimatedReaction` reaction that is not guarded by a comparison with the previous value (an enclosing `if`, or an earlier `if (...) return`). An unguarded hop renders React on every frame |
 | Worklet default parameters | A `'worklet'` function whose default parameter names an identifier. Resolve the default in the body |
 | `react-hooks/exhaustive-deps` | Any suppression. The limit is 0. Fix the dependencies, or use `useEffectEvent` for values an effect reads but must not react to |
 
@@ -25,13 +27,13 @@ The allowlists in that file are the tolerated debt and may only shrink (exceptio
 
 - `mobile-import-boundaries.test.mjs`
   - `src/config` never imports `features`, `screens` or `navigation`, and `src/ui` never imports `screens` or `navigation`.
-  - `src/ui` → `src/features` imports are checked against a baseline. A new import fails, and so does a removed one until you delete its baseline line.
 - `mobile-worklet-closure.test.mjs` compiles worklets with the real Babel and Worklets plugin.
   - A worklet sees only the names it captures in its body or receives as parameters, which is why default parameters break.
   - It may call only other worklets or functions from packages in `UI_SAFE_PACKAGES` (today Reanimated, Worklets, Gesture Handler), and it reaches JS through `scheduleOnRN`. When you add a UI-thread library such as Skia, add it to that list in the same change.
   - Violations crash only on the device ("Property … doesn't exist"). Plain node tests can't see them.
-- `mobile-ui-thread-motion-contract.test.mjs` pins specific surfaces to UI-thread motion, each with a non-moving Reduce Motion path.
-- The theme-scope and icon-contract tests pin the approved palettes and require Ionicons instead of text glyphs.
+- `mobile-theme-scope.test.mjs` pins the approved palette tokens.
+
+Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts` and `src/ui/springPressScale.test.ts` (a pressed control does not move under Reduce Motion).
 
 Elsewhere (mobile paths are relative to `apps/mobile`):
 

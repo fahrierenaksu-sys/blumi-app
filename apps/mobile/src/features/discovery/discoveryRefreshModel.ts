@@ -17,3 +17,33 @@ export async function runDiscoveryRefresh(
     }
   }
 }
+
+export type DiscoveryRefreshRun = DiscoveryRefreshResult | { status: "skipped" }
+
+export interface DiscoveryRefreshController {
+  /**
+   * Runs one refresh. A call while another is in flight is skipped. Pending
+   * turns on before the refresh starts and always turns off when it settles,
+   * including when it rethrows a DiscoveryRefreshLimitError.
+   */
+  run(refresh: () => Promise<void>): Promise<DiscoveryRefreshRun>
+}
+
+export function createDiscoveryRefreshController(options: {
+  onPendingChange: (pending: boolean) => void
+}): DiscoveryRefreshController {
+  let inFlight = false
+  return {
+    async run(refresh) {
+      if (inFlight) return { status: "skipped" }
+      inFlight = true
+      options.onPendingChange(true)
+      try {
+        return await runDiscoveryRefresh(refresh)
+      } finally {
+        inFlight = false
+        options.onPendingChange(false)
+      }
+    }
+  }
+}

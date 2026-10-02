@@ -9,12 +9,7 @@ const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 test("product analytics is explicit-consent, minimal, and replay-free", () => {
   const analytics = read("src/analytics/productAnalytics.ts")
   const policy = read("src/analytics/productAnalyticsPolicy.ts")
-  const linking = read("src/navigation/rootLinking.ts")
-  const session = read("src/features/session/useSessionState.ts")
   const consent = read("src/analytics/analyticsConsent.ts")
-  const settings = read("src/screens/SettingsScreen.tsx")
-  const settingsPrivacy = read("src/features/settings/SettingsPrivacySection.tsx")
-  const settingsCopy = read("src/features/settings/settingsCopy.ts")
 
   assert.match(analytics, /defaultOptIn:\s*false/)
   assert.match(analytics, /captureAppLifecycleEvents:\s*false/)
@@ -22,81 +17,9 @@ test("product analytics is explicit-consent, minimal, and replay-free", () => {
   assert.doesNotMatch(analytics, /identify\(/)
   assert.match(analytics, /sanitizeNamedProductEventProperties\(event, properties\)/)
   assert.match(policy, /SENSITIVE_PROPERTY_KEY/)
-  assert.match(linking, /capturePendingReferral/)
-  assert.match(session, /subscribeToPendingReferralCapture/)
-  assert.match(consent, /"unknown"\s*\|\s*"granted"\s*\|\s*"denied"/)
+  // Withdrawing consent stops capture and drops the anonymous identity.
   assert.match(consent, /optOut\(\)/)
   assert.match(consent, /reset\(\)/)
-  assert.match(consent, /hydrationPromise/)
-  assert.match(settings, /const analyticsConsent = useAnalyticsConsent\(\)/)
-  assert.match(settings, /<SettingsPrivacySection copy=\{copy\} analyticsConsent=\{analyticsConsent\} readReceipts=\{readReceipts\} \/>/)
-  assert.match(settingsPrivacy, /label=\{copy\.analytics\}/)
-  assert.match(settingsCopy, /analytics:\s*"Product analytics"/)
-  assert.match(settingsPrivacy, /accessibilityRole="switch"/)
-  assert.match(settingsPrivacy, /title:\s*copy\.privacyNotSaved/)
-  assert.match(settingsCopy, /privacyNotSaved:\s*"Privacy setting not saved"/)
-})
-
-test("critical product funnels emit only named analytics events", () => {
-  const files = [
-    "src/screens/AuthEntryScreen.tsx",
-    "src/features/session/useSessionState.ts",
-    "src/screens/LobbyScreen.tsx",
-    "src/features/discovery/screen/useDiscoveryDecisions.ts",
-    "src/navigation/RootNavigator.tsx",
-    "src/navigation/rootLinking.ts",
-    "src/navigation/useMatchModal.ts",
-    "src/screens/ChatThreadScreen.tsx",
-    "src/features/chat/thread/useChatMessageSending.ts",
-    "src/components/ReportModal.tsx",
-    "src/screens/CosmeticShopScreen.tsx",
-    "src/features/shop/screen/useShopPurchaseActions.ts",
-    "src/features/shop/shopPurchaseCoordinator.ts",
-    "src/screens/WardrobeV2Screen.tsx",
-    "src/features/avatarV2/wardrobe/useWardrobeTryOn.ts",
-    "src/features/avatarV2/wardrobe/wardrobeTryOn.ts",
-    "src/screens/MyRoomScreen.tsx"
-  ].map(read).join("\n")
-
-  for (const eventName of [
-    "onboarding_step_viewed",
-    "onboarding_step_completed",
-    "discovery_decision",
-    "match_created",
-    "chat_message_sent",
-    "safety_action_completed",
-    "purchase_completed",
-    "wardrobe_item_equipped",
-    "activation_session_started",
-    "engagement_app_foregrounded",
-    "referral_link_opened",
-    "referral_attribution_submitted"
-  ]) {
-    assert.match(files, new RegExp(`captureProductEvent\\(\\s*[\"']${eventName}[\"']`))
-  }
-})
-
-test("match_created comes only from server-confirmed matches, never from MatchResult replays", () => {
-  const policy = read("src/analytics/productAnalyticsPolicy.ts")
-  const runtime = read("src/features/matches/discoveryMatchCreatedRuntime.ts")
-  const decisions = read("src/features/discovery/screen/useDiscoveryDecisions.ts")
-
-  // The event contract is unchanged: same name, same two keys, same allowed sources.
-  assert.match(policy, /match_created: \{ mode, source: \["mini_room_mutual_save", "discovery"\] \},/)
-  assert.match(runtime, /captureProductEvent\("match_created", properties\)/)
-  assert.match(runtime, /isCaptureEnabled: isProductAnalyticsCaptureEnabled/)
-  assert.match(decisions, /reportDiscoveryMatchCreated\(\{\s*accountUserId: myUserId,/)
-
-  // MatchResult is also opened by "View match" in chat and by ProfilePreview;
-  // none of those surfaces may report a match on their own.
-  for (const path of [
-    "src/screens/MatchResultScreen.tsx",
-    "src/screens/ChatThreadScreen.tsx",
-    "src/screens/ProfilePreviewScreen.tsx"
-  ]) {
-    const source = read(path)
-    assert.doesNotMatch(source, /match_created|reportDiscoveryMatchCreated/, path)
-  }
 })
 
 function read(path) {

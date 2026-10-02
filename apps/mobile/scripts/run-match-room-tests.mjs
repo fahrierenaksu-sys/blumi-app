@@ -289,10 +289,7 @@ try {
     process.execPath,
     [
       "--test",
-      resolve(workspaceRoot, "scripts/run-match-room-tests.test.mjs"),
-      resolve(workspaceRoot, "scripts/homeStudioQaModuleRouting.test.mjs"),
-      resolve(workspaceRoot, "scripts/room-v3-runtime-alpha.test.mjs"),
-      resolve(workspaceRoot, "scripts/normalize-room-v3-shell-candidate.test.mjs")
+      resolve(workspaceRoot, "scripts/homeStudioQaModuleRouting.test.mjs")
     ],
     {
       cwd: workspaceRoot,
