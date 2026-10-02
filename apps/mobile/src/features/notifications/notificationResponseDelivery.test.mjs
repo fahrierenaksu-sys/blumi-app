@@ -29,6 +29,8 @@ function rootCallback(name, bindings, sourceFile = routingFile) {
 // React scheduling, notification OS persistence, or native navigation rendering.
 function createRuntime({ ready = true, response = null, onResponse, physicalDevice = false, platform = "ios" } = {}) {
   let expoToken = "ExponentPushToken[test]"
+  let deviceToken = "device-token"
+  let deviceTokenFetches = 0
   let pushTokenListener
   const channels = []
   let hookIndex = 0
@@ -55,7 +57,17 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const notifications = {
     getPermissionsAsync: async () => ({ status: permission }),
     requestPermissionsAsync: async () => { permissionRequests++; return { status: "granted" } },
-    getExpoPushTokenAsync: async () => ({ data: expoToken }),
+    // Like iOS: every device token fetch re-emits the token to the listener.
+    getDevicePushTokenAsync: async () => {
+      deviceTokenFetches += 1
+      const token = { type: platform, data: deviceToken }
+      queueMicrotask(() => pushTokenListener?.(token))
+      return token
+    },
+    getExpoPushTokenAsync: async (options = {}) => {
+      if (!options.devicePushToken) await notifications.getDevicePushTokenAsync()
+      return { data: expoToken }
+    },
     AndroidImportance: { DEFAULT: 3, HIGH: 4 },
     setNotificationChannelAsync: async (id, channel) => { channels.push({ id, ...channel }) },
     setNotificationHandler: (handler) => { notificationHandler = handler },
@@ -119,7 +131,8 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const realModules = [
     "./usePushRegistration", "./notificationTimeZoneSync",
     "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting",
-    "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry"
+    "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry",
+    "./pushRegistrationGate"
   ]
   function load(name) {
     if (Object.hasOwn(mocks, name)) return mocks[name]
@@ -181,7 +194,12 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   renderHook(actor)
   return {
     chatTaps, channels,
-    rotatePushToken: (token) => { expoToken = token; pushTokenListener?.({ type: platform, data: "device-token" }) },
+    rotatePushToken: (token) => {
+      expoToken = token
+      deviceToken = `device-${token}`
+      pushTokenListener?.({ type: platform, data: deviceToken })
+    },
+    get deviceTokenFetches() { return deviceTokenFetches },
     navigations, errors,
     registrations, removals, presentedClears,
     modules,
@@ -220,6 +238,12 @@ const response = {
   } } }
 }
 const settle = async () => { await new Promise(setImmediate); await new Promise(setImmediate) }
+const settleTokenEvents = async (runtime) => {
+  await settle()
+  const { PUSH_TOKEN_EVENT_DEBOUNCE_MS } = runtime.modules.get("./pushRegistrationGate")
+  await new Promise((resolve) => setTimeout(resolve, PUSH_TOKEN_EVENT_DEBOUNCE_MS + 50))
+  await settle()
+}
 
 test("a cached response delivered after navigation readiness opens its thread and is consumed once", async (t) => {
   const runtime = createRuntime({ response })
@@ -544,7 +568,7 @@ test("a rotated push token re-registers and removes the stale token from the sam
   await settle()
   assert.equal(runtime.registrations.length, 1)
   runtime.rotatePushToken("ExponentPushToken[rotated]")
-  await settle()
+  await settleTokenEvents(runtime)
   assert.deepEqual(runtime.registrations.map((entry) => entry.pushToken), ["ExponentPushToken[test]", "ExponentPushToken[rotated]"])
   assert.deepEqual(runtime.removals, [{ token: "token-one", pushToken: "ExponentPushToken[test]" }])
   assert.equal(runtime.permissionRequests, 0, "token rotation never prompts")
@@ -561,4 +585,37 @@ test("the Android channel every push uses is created with HIGH importance for he
   assert.equal(channel.id, "default")
   assert.ok(channel.importance >= runtime.androidImportance.HIGH, "heads-up banners need HIGH importance")
   assert.equal(runtime.registrations.at(-1)?.platform, "android")
+})
+
+test("the token event a token fetch re-emits does not start another registration (build 14 loop)", async (t) => {
+  const runtime = createRuntime({ physicalDevice: true })
+  t.after(runtime.dispose)
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settleTokenEvents(runtime)
+  assert.equal(runtime.registrations.length, 1)
+  const fetches = runtime.deviceTokenFetches
+  // Several debounce windows: a loop would keep fetching and posting.
+  for (let round = 0; round < 3; round += 1) await settleTokenEvents(runtime)
+  assert.equal(runtime.deviceTokenFetches, fetches, "no self-sustaining token fetches")
+  assert.equal(runtime.registrations.length, 1, "an unchanged token is not registered again")
+})
+
+test("an unchanged token registers at most once per foreground, and again after a real return from background", async (t) => {
+  const runtime = createRuntime({ physicalDevice: true })
+  t.after(runtime.dispose)
+  runtime.setPermission("granted")
+  runtime.appState("active")
+  await settle()
+  assert.equal(runtime.registrations.length, 1)
+  // iOS fires inactive/active for Notification Center and permission sheets.
+  runtime.appState("inactive")
+  runtime.appState("active")
+  runtime.appState("active")
+  await settleTokenEvents(runtime)
+  assert.equal(runtime.registrations.length, 1)
+  runtime.appState("background")
+  runtime.appState("active")
+  await settleTokenEvents(runtime)
+  assert.equal(runtime.registrations.length, 2, "a new foreground refreshes the registration once")
 })

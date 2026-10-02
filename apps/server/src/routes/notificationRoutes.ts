@@ -76,6 +76,7 @@ export async function registerNotificationRoutes(
     schema: {
       body: coreApiJsonSchemas.deviceRegistration,
       response: {
+        200: successResponseJsonSchema,
         201: successResponseJsonSchema,
         ...authenticatedErrorResponses
       }
@@ -90,14 +91,15 @@ export async function registerNotificationRoutes(
     }
 
     try {
-      const device = await notificationService.registerDevice(
+      const { device, changed } = await notificationService.ensureDeviceRegistered(
         resolved.account.userId,
         {
           platform: parsed.data.platform,
           pushToken: parsed.data.pushToken
         }
       )
-      return reply.code(201).send({ device })
+      // 200: already registered to this account on this platform; nothing written.
+      return reply.code(changed ? 201 : 200).send({ device })
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
       return reply.code(400).send({

@@ -413,6 +413,31 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(sortedIds(next), [second.messageId])
       await backend.repository.completeDelivery(second.messageId, next[0]!.leaseToken, new Date())
       assert.deepEqual(sortedIds(await claim(65_000, third.messageId)), [third.messageId])
+    },
+    "a dead-lettered job is terminal and releases its thread; a stale lease cannot dead-letter": async (backend) => {
+      const chat = thread(backend, "dead_letter", "2026-09-30T10:00:00.000Z")
+      await backend.repository.saveThread(chat)
+      const poison = message(chat, "p1", "2026-09-30T10:01:00.000Z")
+      const after = message(chat, "p2", "2026-09-30T10:02:00.000Z")
+      for (const value of [poison, after]) await backend.repository.createMessage(value)
+      const ids = new Set([poison.messageId, after.messageId])
+      const startedAt = Date.now()
+      const claim = async (afterMs: number) =>
+        (await backend.repository.claimDeliveries({ now: new Date(startedAt + afterMs), limit: 50, leaseMs: 1000 }))
+          .filter((job) => ids.has(job.message.messageId))
+
+      const [stale] = await claim(1_000)
+      assert.equal(stale?.message.messageId, poison.messageId)
+      const [current] = await claim(3_000)
+      assert.equal(current?.message.messageId, poison.messageId, "the lease ran out and the job was claimed again")
+      await backend.repository.deadLetterDelivery(poison.messageId, stale!.leaseToken, new Date())
+      assert.deepEqual(await claim(3_500), [], "a stale lease changed nothing; the job is still leased")
+
+      await backend.repository.deadLetterDelivery(poison.messageId, current!.leaseToken, new Date())
+      const next = await claim(4_000)
+      assert.deepEqual(next.map((job) => job.message.messageId), [after.messageId])
+      await backend.repository.completeDelivery(after.messageId, next[0]!.leaseToken, new Date())
+      assert.deepEqual(await claim(600_000), [], "the dead-lettered job is never claimed again")
     }
   }
 })

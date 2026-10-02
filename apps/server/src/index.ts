@@ -36,7 +36,7 @@ const firebaseDeletionWorker = startPeriodicWorker({
     deleteUser: (uid) => firebaseAuthVerifier.deleteUser(uid)
   }),
   intervalMs: 30_000,
-  reportError: () => console.error("Firebase user deletion worker failed")
+  reportError: (error) => console.error("Firebase user deletion worker failed", safeOperationalErrorKind(error))
 })
 const mediaRevocationWorker = config.livekitUrl && config.livekitApiKey && config.livekitApiSecret
   ? startPeriodicWorker({
@@ -108,6 +108,7 @@ const app = createServer({
   legalPagesEnabled: process.env.BLUMI_LEGAL_PAGES_ENABLED === "1",
   discoverySnapshots: services.discoverySnapshots,
   sharedRateLimiter: services.sharedRateLimiter,
+  threadRoomInviteReader: services.threadRoomInviteReader,
   afterResponseTasks: services.afterResponseTasks,
   isAccepting: () => accepting,
   checkReadiness: async () => {

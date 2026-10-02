@@ -4,6 +4,7 @@ import type {
   ChatMessagePageOptions,
   ChatRepository
 } from "../chat/chatRepository"
+import { CHAT_DELIVERY_DEAD_LETTER } from "../chat/chatRepository"
 import { normalizeStoredAvatarSelection } from "../avatar/avatarSelectionPersistence"
 import { normalizeThreadPage, encodeThreadCursor } from "../chat/chatThreadPagination"
 import { createStaticChatReceiptSchema, type ChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
@@ -23,15 +24,19 @@ interface QueryExecutor {
  */
 export function createPostgresChatRepository(
   pool: QueryExecutor,
-  options: { receiptSchema?: ChatReceiptSchemaProbe } = {}
+  options: { receiptSchema?: ChatReceiptSchemaProbe; testPersonaCacheTtlMs?: number } = {}
 ): ChatRepository {
   const receipts = createPostgresChatReceipts(
     pool,
     options.receiptSchema ?? createStaticChatReceiptSchema(false)
   )
+  const testPersonaIds = createTestPersonaIdCache(pool, options.testPersonaCacheTtlMs ?? TEST_PERSONA_CACHE_TTL_MS)
   return {
     ...receipts,
     async findTestPersona(userId) {
+      // Almost every caller asks about a real account: answer from the
+      // cached persona set without a round trip.
+      if (!await testPersonaIds.mayContain(userId)) return null
       const result = await pool.query(
         `SELECT user_id, greeting, replies FROM blumi_test_personas WHERE user_id = $1`,
         [userId]
@@ -486,6 +491,12 @@ export function createPostgresChatRepository(
     async retryDelivery(messageId, leaseToken, availableAt) {
       await pool.query(`UPDATE blumi_chat_delivery_outbox SET available_at = $3, lease_token = NULL
         WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`, [messageId, leaseToken, availableAt])
+    },
+    async deadLetterDelivery(messageId, leaseToken, now) {
+      // Terminal like a completed job; the token records why (no schema change).
+      await pool.query(`UPDATE blumi_chat_delivery_outbox SET completed_at = $3, lease_token = $4
+        WHERE message_id = $1 AND lease_token = $2 AND completed_at IS NULL`,
+      [messageId, leaseToken, now, CHAT_DELIVERY_DEAD_LETTER])
     }
   }
 }
@@ -667,5 +678,37 @@ function optionalMessageMetadata(row: QueryResultRow): Pick<
     ...(row.edited_at
       ? { editedAt: new Date(row.edited_at).toISOString() }
       : {})
+  }
+}
+
+/**
+ * Seeded test personas (migration 060) change only when QA seeds staging,
+ * so the set of their user IDs is read at most once per TTL. A persona
+ * seeded meanwhile is recognised after the TTL; a failed refresh answers
+ * "maybe" so the caller falls back to the exact per-user query.
+ */
+export const TEST_PERSONA_CACHE_TTL_MS = 60_000
+
+function createTestPersonaIdCache(pool: QueryExecutor, ttlMs: number): { mayContain(userId: string): Promise<boolean> } {
+  let cached: { ids: ReadonlySet<string>; expiresAt: number } | null = null
+  let loading: Promise<ReadonlySet<string> | null> | null = null
+  const load = async (): Promise<ReadonlySet<string> | null> => {
+    try {
+      const result = await pool.query("SELECT user_id FROM blumi_test_personas")
+      const ids = new Set(result.rows.map((row) => String(row.user_id)))
+      cached = { ids, expiresAt: Date.now() + ttlMs }
+      return ids
+    } catch {
+      return null
+    } finally {
+      loading = null
+    }
+  }
+  return {
+    async mayContain(userId) {
+      if (ttlMs <= 0) return true
+      const ids = cached && cached.expiresAt > Date.now() ? cached.ids : await (loading ??= load())
+      return ids === null || ids.has(userId)
+    }
   }
 }

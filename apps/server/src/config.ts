@@ -11,6 +11,7 @@ import { createPostgresRetentionService } from "./db/postgresRetention"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
 import { createSchemaReadinessCheck } from "./operations/schemaReadiness"
 import { createAuthService, type AuthService } from "./auth/authService"
+import { SESSION_CACHE_TTL_MS } from "./auth/sessionCache"
 import { createAvatarService, type AvatarService } from "./avatar/avatarService"
 import { normalizeStoredAvatarSelection } from "./avatar/avatarSelectionPersistence"
 import { createSixDigitCode } from "./auth/authStore"
@@ -36,6 +37,7 @@ import { createMatchService, type MatchService } from "./matches/matchService"
 import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { createDiscoverySnapshotService, createInMemoryDiscoverySnapshots, type DiscoverySnapshotService } from "./matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./db/postgresDiscoverySnapshots"
+import { createPostgresThreadRoomInviteReader } from "./db/postgresThreadRoomInviteRead"
 import { createPostgresAuthRepository } from "./db/postgresAuthRepository"
 import { createPostgresAccountDataExporter } from "./account/accountDataExporter"
 import { createAccountRecoveryService, type AccountRecoveryService } from "./account/accountRecoveryService"
@@ -153,6 +155,19 @@ export interface ServerConfig {
   androidAppLinkSha256CertFingerprints: string[]
   corsOrigins: string[]
   trustedProxyAddresses: string[]
+  /**
+   * Bearer session cache TTL (BLUMI_SESSION_CACHE_TTL_MS, default 15 s, 0
+   * turns it off, at most 30 s). See auth/sessionCache.ts.
+   */
+  sessionCacheTtlMs: number
+  /**
+   * Where the per-user request budget is counted (BLUMI_RATE_BUDGET_STORE).
+   * "memory" (default): in this process, no database round trip per request;
+   * exact for one replica. With N replicas each counts its own share, so a
+   * person can reach up to N times the limit: set "postgres" before scaling
+   * out to keep one shared budget.
+   */
+  rateBudgetStore: "memory" | "postgres"
   qaAuth?: Readonly<{
     phoneNumber: string
     verificationCode: string
@@ -166,6 +181,8 @@ export interface ConfiguredServerServices {
   chatReceiptSchema: ChatReceiptSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
+  /** One-statement GET room-invites read (PostgreSQL only; composed from services otherwise). */
+  threadRoomInviteReader?: import("./miniRooms/threadRoomInviteRead").ThreadRoomInviteReader
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
   /** Bounded deletes of finished work and audit rows past their window (db/postgresRetention.ts). */
   retentionService: { purgeExpired(): Promise<unknown> }
@@ -238,6 +255,8 @@ export function resolveServerConfig(
     requestedPushProvider ?? "development"
   )
   const databaseUrl = env.DATABASE_URL?.trim()
+  const sessionCacheTtlMs = parseSessionCacheTtlMs(env.BLUMI_SESSION_CACHE_TTL_MS)
+  const rateBudgetStore = parseRateBudgetStore(env.BLUMI_RATE_BUDGET_STORE)
   const databasePool = resolveDatabasePoolSettings(env)
   const databaseListenUrl = resolveDatabaseListenUrl(env)
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
@@ -439,10 +458,30 @@ export function resolveServerConfig(
     androidAppLinkSha256CertFingerprints,
     corsOrigins,
     trustedProxyAddresses,
+    sessionCacheTtlMs,
+    rateBudgetStore,
     qaAuth: qaAuthEnabled && qaPhoneNumber && qaOtpCode
       ? { phoneNumber: qaPhoneNumber, verificationCode: qaOtpCode }
       : undefined
   }
+}
+
+const MAX_SESSION_CACHE_TTL_MS = 30_000
+
+export function parseSessionCacheTtlMs(value: string | undefined): number {
+  if (value === undefined || value.trim() === "") return SESSION_CACHE_TTL_MS
+  const parsed = Number(value.trim())
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > MAX_SESSION_CACHE_TTL_MS) {
+    throw new Error(`BLUMI_SESSION_CACHE_TTL_MS must be an integer from 0 to ${MAX_SESSION_CACHE_TTL_MS}.`)
+  }
+  return parsed
+}
+
+export function parseRateBudgetStore(value: string | undefined): "memory" | "postgres" {
+  const normalized = value?.trim().toLowerCase()
+  if (!normalized || normalized === "memory") return "memory"
+  if (normalized === "postgres") return "postgres"
+  throw new Error("BLUMI_RATE_BUDGET_STORE must be memory or postgres.")
 }
 
 export function parseAdminSigningKeys(value: string | undefined): readonly AdminSigningKey[] {
@@ -496,7 +535,8 @@ export function createConfiguredServerServices(
       accountDataExporter: createPostgresAccountDataExporter(pool),
       smsProvider,
       codeFactory,
-      otpHmacSecret: config.otpHmacSecret
+      otpHmacSecret: config.otpHmacSecret,
+      sessionCacheTtlMs: config.sessionCacheTtlMs
     })
     const accountRecoveryService = createAccountRecoveryService({
       authService,
@@ -506,6 +546,8 @@ export function createConfiguredServerServices(
       repository: createPostgresSafetyRepository(pool),
       isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
     })
+    // A ban or suspension drops the user's cached bearer sessions at once.
+    safetyService.subscribeRealtimeAccessRevocations((revocation) => authService.invalidateCachedSessions?.(revocation))
     const chatService = createChatService({
       repository: applyTestPersonaPolicy(
         createPostgresChatRepository(pool, { receiptSchema: chatReceiptSchema }),
@@ -615,8 +657,9 @@ export function createConfiguredServerServices(
       async checkReadiness() {
         await checkSchemaReadiness()
       },
-      sharedRateLimiter: createPostgresRateBudget(pool),
+      sharedRateLimiter: config.rateBudgetStore === "postgres" ? createPostgresRateBudget(pool) : createInMemoryRateBudget(),
       discoverySnapshots: createDiscoverySnapshotService(createPostgresDiscoverySnapshots(pool)),
+      threadRoomInviteReader: createPostgresThreadRoomInviteReader(pool),
       async close() {
         await Promise.all([pool.end(), listenPool?.end()])
       }
@@ -631,6 +674,7 @@ export function createConfiguredServerServices(
     smsProvider,
     codeFactory,
     otpHmacSecret: config.otpHmacSecret,
+    sessionCacheTtlMs: config.sessionCacheTtlMs,
     accountDeletionHandlers: [
       (account) => notificationService.repository.removeAllDevices(account.userId)
     ]
@@ -639,6 +683,7 @@ export function createConfiguredServerServices(
   const safetyService = createSafetyService({
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
   })
+  safetyService.subscribeRealtimeAccessRevocations((revocation) => authService.invalidateCachedSessions?.(revocation))
   const chatService = createChatService({ blockPolicy: safetyService })
   const economyService = createEconomyService()
   const commerceService = createCommerceService({ economyService })

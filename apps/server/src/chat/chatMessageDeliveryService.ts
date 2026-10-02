@@ -5,6 +5,7 @@ import type { ConnectionManager } from "../realtime/connectionManager"
 import type { SafetyService } from "../safety/safetyService"
 import { PublicRequestError } from "../errors/publicRequestError"
 import type { ChatDeliveryJob, ChatThreadMembers, TestPersona } from "./chatRepository"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { createChatLatencyDiagnostics, type ChatPhaseMeasure } from "./chatLatencyDiagnostics"
 
 export class ChatDeliveryBlockedError extends PublicRequestError {}
@@ -26,6 +27,8 @@ export function createChatMessageDeliveryService(options: {
   connectionManager: ConnectionManager
   notificationService: NotificationService
   reportError?: (error: unknown) => void
+  /** A job given up after MAX_CHAT_DELIVERY_ATTEMPTS; never carries IDs or bodies. */
+  reportDeadLetter?: (event: ChatDeliveryDeadLetter) => void
   measure?: ChatPhaseMeasure
   /** A send-leased dispatch that waited longer than this renews its lease first (tests shorten it). */
   leaseRenewAfterMs?: number
@@ -40,6 +43,7 @@ export function createChatMessageDeliveryService(options: {
   } = options
   const leaseRenewAfterMs = options.leaseRenewAfterMs ?? LEASE_RENEW_AFTER_MS
   const recoveryTickWaitMs = options.recoveryTickWaitMs ?? RECOVERY_TICK_WAIT_MS
+  const reportDeadLetter = options.reportDeadLetter ?? logChatDeliveryDeadLetter
   let recoveryInFlight = 0
   const measure = options.measure ?? createChatLatencyDiagnostics({
     nodeEnv: process.env.NODE_ENV ?? "unknown",
@@ -235,8 +239,21 @@ export function createChatMessageDeliveryService(options: {
     await dispatchJob({ message, leaseToken: lease.leaseToken, attempt: lease.attempt }, now, thread)
   }
 
+  async function deadLetter(job: ChatDeliveryJob, now: Date, reason: ChatDeliveryDeadLetter["reason"], errorKind: string) {
+    await chatService.repository.deadLetterDelivery(job.message.messageId, job.leaseToken, now)
+    try {
+      reportDeadLetter({ reason, attempts: job.attempt, errorKind, count: 1 })
+    } catch { /* Diagnostics must not change delivery state. */ }
+  }
+
   async function dispatchJob(job: ChatDeliveryJob, now: Date, knownThread?: ChatThreadMembers): Promise<void> {
     const { message, leaseToken } = job
+    // Claimed again after its lease ran out every time (a dispatch that
+    // never finishes, or a crash loop): stop holding the thread back.
+    if (job.attempt > MAX_CHAT_DELIVERY_ATTEMPTS) {
+      await deadLetter(job, now, "lease_exhausted", "LeaseExpired")
+      return
+    }
     try {
       const thread = knownThread?.threadId === message.threadId
         ? knownThread
@@ -259,10 +276,35 @@ export function createChatMessageDeliveryService(options: {
       await chatService.repository.completeDelivery(message.messageId, leaseToken, now)
     } catch (error) {
       options.reportError?.(error)
+      // A message that keeps failing would hold every later message of its
+      // thread back forever (a thread delivers in order): give up on it.
+      if (job.attempt >= MAX_CHAT_DELIVERY_ATTEMPTS) {
+        await deadLetter(job, now, "attempts_exhausted", safeOperationalErrorKind(error))
+        return
+      }
       const backoffMs = Math.min(60_000, 1000 * 2 ** Math.min(job.attempt - 1, 6))
       await chatService.repository.retryDelivery(message.messageId, leaseToken, new Date(now.getTime() + backoffMs))
     }
   }
+}
+
+/**
+ * Attempts before a chat delivery is dead-lettered. With the 1 s doubling
+ * backoff capped at 60 s, ten attempts span about five minutes.
+ */
+export const MAX_CHAT_DELIVERY_ATTEMPTS = 10
+
+export interface ChatDeliveryDeadLetter {
+  reason: "attempts_exhausted" | "lease_exhausted"
+  attempts: number
+  /** safeOperationalErrorKind: a class name, never a message. */
+  errorKind: string
+  count: 1
+}
+
+/** One structured line, no message, thread or user IDs and no body. */
+function logChatDeliveryDeadLetter(event: ChatDeliveryDeadLetter): void {
+  console.error(JSON.stringify({ metric: "chat_delivery_dead_letter", ...event }))
 }
 
 /** How long a claimed or send-leased outbox job belongs to its dispatcher. */

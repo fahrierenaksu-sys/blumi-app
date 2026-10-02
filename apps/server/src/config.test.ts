@@ -576,3 +576,14 @@ test("production requires a dedicated high-entropy OTP HMAC secret", () => {
     /BLUMI_OTP_HMAC_SECRET/
   )
 })
+
+test("the session cache and request budget default to in-process, with switches for scaling out", () => {
+  const defaults = resolveServerConfig({})
+  assert.equal(defaults.sessionCacheTtlMs, 15_000)
+  assert.equal(defaults.rateBudgetStore, "memory")
+  assert.equal(resolveServerConfig({ BLUMI_SESSION_CACHE_TTL_MS: "0" }).sessionCacheTtlMs, 0)
+  assert.equal(resolveServerConfig({ BLUMI_RATE_BUDGET_STORE: "postgres" }).rateBudgetStore, "postgres")
+  assert.throws(() => resolveServerConfig({ BLUMI_SESSION_CACHE_TTL_MS: "60000" }), /BLUMI_SESSION_CACHE_TTL_MS/)
+  assert.throws(() => resolveServerConfig({ BLUMI_SESSION_CACHE_TTL_MS: "-1" }), /BLUMI_SESSION_CACHE_TTL_MS/)
+  assert.throws(() => resolveServerConfig({ BLUMI_RATE_BUDGET_STORE: "redis" }), /BLUMI_RATE_BUDGET_STORE/)
+})
