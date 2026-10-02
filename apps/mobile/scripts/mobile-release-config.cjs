@@ -41,17 +41,11 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   const revenueCatAndroidApiKey =
     normalizeValue(environment.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY) || undefined
 
-  if (mediaMode !== "demo" && mediaMode !== "native") {
-    throw new Error("EXPO_PUBLIC_BLUMI_MEDIA_MODE must be demo or native.")
-  }
   if (enableDemo !== "0" && enableDemo !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_ENABLE_DEMO must be 0 or 1.")
   }
   if (paidCoinsEnabled !== "0" && paidCoinsEnabled !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED must be 0 or 1.")
-  }
-  if (voiceEnabled !== "0" && voiceEnabled !== "1") {
-    throw new Error("EXPO_PUBLIC_BLUMI_VOICE_ENABLED must be 0 or 1.")
   }
 
   if (isConnectedBuild) {
@@ -69,14 +63,8 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   }
 
   if (isExternalBuild) {
-    if (voiceEnabled !== "0") {
-      throw new Error("First-release live voice is deferred in preview and production builds.")
-    }
     if (paidCoinsEnabled !== "0") {
       throw new Error("First-release paid coin sales are deferred in preview and production builds.")
-    }
-    if (mediaMode !== "native") {
-      throw new Error("Preview and production builds require native media.")
     }
     if (sentryDsn) {
       requireProtocol(sentryDsn, "https:", "Release Sentry DSN must use HTTPS.")
