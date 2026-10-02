@@ -90,7 +90,8 @@ try {
   )
   execFileSync(process.execPath,
     ["--import", "tsx", "--test", "src/features/notifications/useChatNotificationPrompt.test.ts",
-      "src/features/notifications/foregroundNotificationState.test.ts"],
+      "src/features/notifications/foregroundNotificationState.test.ts",
+      "src/features/notifications/notificationActions.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" })
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })

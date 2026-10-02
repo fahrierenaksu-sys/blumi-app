@@ -1,10 +1,16 @@
 export type NotificationDestination =
-  | { route: "ChatThread"; params: { threadId: string } }
+  | { route: "ChatThread"; params: { threadId: string; roomInviteAccept?: string } }
   | { route: "Inbox" }
   | { route: "Lobby" }
 
+/**
+ * Where a notification response opens. `enter_room` is the room invite's
+ * "Enter room" button: the invite's chat opens and accepts that invite with
+ * the chat's own accept action (a one-shot `roomInviteAccept` param).
+ */
 export function resolveNotificationDestination(
-  data: unknown
+  data: unknown,
+  action?: "enter_room"
 ): NotificationDestination | null {
   if (!data || typeof data !== "object") return null
   const record = data as Record<string, unknown>
@@ -18,8 +24,9 @@ export function resolveNotificationDestination(
   }
   if (type === "chat.room_invite") {
     const threadId = normalizeIdentifier(record.threadId)
+    const inviteId = action === "enter_room" ? normalizeIdentifier(record.inviteId) : null
     return threadId
-      ? { route: "ChatThread", params: { threadId } }
+      ? { route: "ChatThread", params: inviteId ? { threadId, roomInviteAccept: inviteId } : { threadId } }
       : null
   }
   if (type === "connection.matched") return { route: "Inbox" }

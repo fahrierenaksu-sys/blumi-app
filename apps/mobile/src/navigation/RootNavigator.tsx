@@ -236,6 +236,8 @@ export type RootStackParamList = {
     partnerName?: string
     /** A one-shot "invite to room" request from the partner's profile. */
     roomInviteRequest?: string
+    /** A one-shot "accept this invite" from the invite notification's "Enter room" button. */
+    roomInviteAccept?: string
   }
   MatchResult: {
     match: BlumiMatch

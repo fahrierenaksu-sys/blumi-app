@@ -59,6 +59,7 @@ import { styles } from "../features/chat/thread/chatThreadStyles"
 import { useChatMessageSending } from "../features/chat/thread/useChatMessageSending"
 import { useChatRoomInviteActions } from "../features/chat/thread/useChatRoomInviteActions"
 import { useRequestedRoomInvite } from "../features/chat/thread/useRequestedRoomInvite"
+import { useRequestedRoomInviteAccept } from "../features/chat/thread/useRequestedRoomInviteAccept"
 import { useChatThreadLifecycle } from "../features/chat/thread/useChatThreadLifecycle"
 import { useChatThreadSync } from "../features/chat/thread/useChatThreadSync"
 import { useFocusedConversation } from "../features/notifications/useFocusedConversation"
@@ -238,6 +239,15 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     isFocused,
     onInvite: handleRoomInvitePress,
     clearRequest: () => navigation.setParams({ roomInviteRequest: undefined })
+  })
+  // "Enter room" on an invite notification accepts that invite here, once.
+  useRequestedRoomInviteAccept({
+    inviteId: route.params.roomInviteAccept,
+    isFocused,
+    invites: threadRoomInvites,
+    currentUserId,
+    onAction: handleRoomInviteAction,
+    clearRequest: () => navigation.setParams({ roomInviteAccept: undefined })
   })
 
   // The composer pads itself by the bottom safe area; while the keyboard is

@@ -18,6 +18,8 @@ import {
   subscribeToConversationFocus
 } from "./foregroundNotificationState"
 import { rememberRegisteredPushDevice, removeRegisteredPushDevice } from "./pushDeviceRegistry"
+import { getNotificationCategories, resolveNotificationResponseIntent } from "./notificationActions"
+import { getAppLocale } from "../session/appLocale"
 import { createDebouncedRunner, createPushRegistrationGate, PUSH_TOKEN_EVENT_DEBOUNCE_MS } from "./pushRegistrationGate"
 
 type NotificationsModule = typeof import("expo-notifications")
@@ -46,7 +48,8 @@ const SHOULD_INITIALIZE_NOTIFICATIONS = shouldInitializeNativeNotifications(
 
 export function usePushRegistration(
   sessionActor: SessionActor | null,
-  onNotificationResponseData?: (data: unknown, actor: SessionActor) => boolean,
+  /** `enter_room`: the room invite's "Enter room" button rather than a plain tap. */
+  onNotificationResponseData?: (data: unknown, actor: SessionActor, action?: "enter_room") => boolean,
   navigationReadyGeneration = 0
 ): {
   permissionStatus: "unknown" | "undetermined" | "granted" | "denied"
@@ -169,7 +172,12 @@ export function usePushRegistration(
         if (cached) consumeCachedResponse(notifications, identifier)
         return
       }
-      if (onNotificationResponseDataRef.current?.(data, currentActor) !== true) {
+      // "Later" (and a swipe-away) only closes the notification: never a route.
+      const intent = resolveNotificationResponseIntent(response.actionIdentifier)
+      if (
+        intent.kind !== "dismiss" &&
+        onNotificationResponseDataRef.current?.(data, currentActor, intent.kind === "enter_room" ? "enter_room" : undefined) !== true
+      ) {
         rememberPendingResponse(identifier, response, cached, currentActor.profile.userId)
         return
       }
@@ -282,6 +290,7 @@ export function usePushRegistration(
         if (!active) return
         notificationsForDelivery = notifications
         ensureNotificationHandler(notifications)
+        registerNotificationCategories(notifications)
         requestSyncRef.current = () => sync(true)
         void sync(false).catch(() => undefined)
         pushTokenSubscription = notifications.addPushTokenListener((event) => {
@@ -364,6 +373,16 @@ async function createAndroidNotificationChannel(): Promise<void> {
     importance: notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 180],
     lightColor: "#F26779"
+  })
+}
+
+/** The invite's "Enter room" / "Later" buttons and the hidden-preview placeholders, in the app's language. */
+function registerNotificationCategories(notifications: NotificationsModule): void {
+  const categories = getNotificationCategories(getAppLocale())
+  void Promise.all(categories.map((category) =>
+    notifications.setNotificationCategoryAsync(category.identifier, category.actions, category.options)
+  )).catch((error) => {
+    captureAppException(error, { feature: "push_category_setup" })
   })
 }
 

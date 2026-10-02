@@ -84,8 +84,12 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     dismissAllNotificationsAsync: async () => { presentedClears.push("dismiss") },
     getPresentedNotificationsAsync: async () => presented.map((data, index) => ({ request: { identifier: `presented-${index}`, content: { data } } })),
     dismissNotificationAsync: async (identifier) => { dismissed.push(identifier) },
-    setBadgeCountAsync: async (count) => { presentedClears.push(`badge:${count}`); return true }
+    setBadgeCountAsync: async (count) => { presentedClears.push(`badge:${count}`); return true },
+    setNotificationCategoryAsync: async (identifier, actions) => {
+      categories.set(identifier, Array.from(actions, (action) => action.identifier))
+    }
   }
+  const categories = new Map()
   const actor = {
     session: { mode: "production", userId: "user-one", sessionId: "session-one", sessionToken: "token-one" },
     profile: { userId: "user-one" }
@@ -129,14 +133,15 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       registerDevice: async (_base, token, input) => { registrations.push({ token, ...input }) },
       removeDevice: async (_base, token, pushToken) => { removals.push({ token, pushToken }) }
     },
-    "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId }
+    "../chat/chatStore": { getActiveChatThreadId: () => activeThreadId },
+    "../session/appLocale": { getAppLocale: () => "tr" }
   }
   const modules = new Map()
   const realModules = [
     "./usePushRegistration", "./notificationTimeZoneSync",
     "./notificationRuntimePolicy", "./pushRegistrationCoordinator", "./notificationRouting",
     "./notificationPresentationModel", "./foregroundNotificationState", "./pushDeviceRegistry",
-    "./pushRegistrationGate"
+    "./pushRegistrationGate", "./notificationActions"
   ]
   function load(name) {
     if (Object.hasOwn(mocks, name)) return mocks[name]
@@ -197,7 +202,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   }
   renderHook(actor)
   return {
-    chatTaps, channels,
+    chatTaps, channels, categories,
     rotatePushToken: (token) => {
       expoToken = token
       deviceToken = `device-${token}`
@@ -645,4 +650,42 @@ test("opening a conversation clears only its delivered banners, while signed in"
   await settle()
   assert.deepEqual(runtime.dismissed, ["presented-0", "presented-1"], "a signed-out runtime clears nothing")
   assert.deepEqual(runtime.errors, [])
+})
+
+const inviteResponse = (identifier, actionIdentifier) => ({
+  actionIdentifier,
+  notification: { request: { identifier, content: {
+    data: { type: "chat.room_invite", threadId: "thread-one", inviteId: "invite-one", recipientUserId: "user-one" }
+  } } }
+})
+
+test("the room invite category is registered and its buttons route: Enter room accepts in the chat, Later only closes", async (t) => {
+  const runtime = createRuntime()
+  t.after(runtime.dispose)
+  await settle()
+  assert.deepEqual(runtime.categories.get("ROOM_INVITE"), ["ROOM_INVITE_ENTER", "ROOM_INVITE_LATER"])
+  assert.deepEqual(runtime.categories.get("CHAT_MESSAGE"), [])
+
+  runtime.emit(inviteResponse("invite-later", "ROOM_INVITE_LATER"))
+  await settle()
+  assert.deepEqual(runtime.navigations, [], "Later never opens anything")
+
+  runtime.emit(inviteResponse("invite-enter", "ROOM_INVITE_ENTER"))
+  await settle()
+  assert.deepEqual(JSON.parse(JSON.stringify(runtime.navigations)), [["ChatThread", { threadId: "thread-one", roomInviteAccept: "invite-one" }]])
+
+  runtime.emit(inviteResponse("invite-tap", "expo.modules.notifications.actions.DEFAULT"))
+  await settle()
+  assert.deepEqual(JSON.parse(JSON.stringify(runtime.navigations.at(-1))), ["ChatThread", { threadId: "thread-one" }], "a plain tap only opens the chat")
+  assert.deepEqual(runtime.errors, [])
+})
+
+test("a cached Later response is consumed without routing, and is not replayed after navigation readiness", async (t) => {
+  const runtime = createRuntime({ ready: false, response: inviteResponse("cached-later", "ROOM_INVITE_LATER") })
+  t.after(runtime.dispose)
+  await settle()
+  assert.equal(runtime.clearCount, 1, "consumed at once")
+  runtime.navigationReady()
+  await settle()
+  assert.deepEqual(runtime.navigations, [])
 })

@@ -51,7 +51,7 @@ export function useNotificationResponseRouting({
     return decision
   }, [])
 
-  const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor): boolean => {
+  const handleNotificationResponseData = useCallback((data: unknown, expectedActor: SessionActor, action?: "enter_room"): boolean => {
     // A new thread list changes this callback, which retries pending taps.
     if (
       expectedActor.session.mode !== "production" ||
@@ -60,7 +60,7 @@ export function useNotificationResponseRouting({
       !isCurrentSession(expectedActor) ||
       !navigationRef.isReady()
     ) return false
-    const destination = resolveNotificationDestination(data)
+    const destination = resolveNotificationDestination(data, action)
     if (!destination) return false
     if (destination.route === "ChatThread") {
       const decision = decideChatTap(destination.params.threadId, chatListVersion)
