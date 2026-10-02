@@ -6,8 +6,7 @@ import {
   getMatchResultPresentation,
   getMatchResultRouteTimeline,
   MATCH_RESULT_ENTRY_POINTS,
-  shouldPlayMatchHaptic,
-  springFromOrigami
+  shouldPlayMatchHaptic
 } from "./matchResultPresentation"
 
 // Characterizes the two match surfaces: their actions, onboarding gate,
@@ -82,19 +81,18 @@ test("the celebration entrance settles from just below size", () => {
   assert.ok(motion.entranceFromScale > 0 && motion.entranceFromScale < 1)
 })
 
-test("the physical spring matches React Native's origami tension/friction conversion", () => {
-  // RN SpringConfig: stiffness = (tension - 30) * 3.62 + 194, damping = (friction - 8) * 3 + 25.
-  assert.deepEqual(springFromOrigami(40, 7), { tension: 40, friction: 7, damping: 22, stiffness: 230.2, mass: 1 })
+test("the celebration entrance uses the celebration spring, with a visible overshoot", () => {
   const spring = getMatchCelebrationMotion(false).entranceSpringConfig
   assert.ok(spring)
-  assert.deepEqual(springFromOrigami(spring.tension, spring.friction), spring)
+  assert.ok(spring.dampingRatio < 1, "a celebration overshoots a little")
+  assert.ok(spring.dampingRatio >= 0.6, "but never wobbles")
 })
 
 test("celebration pulses are bounded, never endless", () => {
   for (const reduceMotion of [false, true]) {
     const motion = getMatchCelebrationMotion(reduceMotion)
     for (const iterations of [motion.heartPulseIterations, motion.haloPulseIterations]) {
-      assert.ok(Number.isInteger(iterations), "a negative or fractional count would loop forever in RN Animated")
+      assert.ok(Number.isInteger(iterations), "a negative or fractional count would loop forever")
       assert.ok(iterations >= 0 && iterations <= 3)
     }
   }
@@ -129,7 +127,7 @@ test("the entrance spring keeps one frozen identity so hook dependencies stay st
   assert.equal(first, second)
   assert.ok(Object.isFrozen(first))
   assert.throws(() => {
-    ;(first as { tension: number }).tension = 1
+    ;(first as { duration: number }).duration = 1
   }, TypeError)
   assert.equal(getMatchCelebrationMotion(false).entranceSpringConfig, first)
 })

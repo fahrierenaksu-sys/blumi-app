@@ -2,9 +2,7 @@ import { useIsFocused } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Animated,
   type FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -15,7 +13,14 @@ import { useChatStore } from "../features/chat/chatStore"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
-import Reanimated from "react-native-reanimated"
+import Reanimated, {
+  Easing,
+  ReduceMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 import { ConversationCard, INBOX_ROW_ESTIMATED_HEIGHT } from "../features/inbox/InboxConversationRow"
 import { INBOX_ROW_LAYOUT } from "../features/inbox/inboxMotion"
 import {
@@ -33,6 +38,7 @@ import { LinearGradient } from "../ui/linearGradient"
 import { MyAvatar } from "../ui/myAvatar"
 import { uiTheme } from "../ui/theme"
 import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
+import { PressableScale } from "../ui/PressableScale"
 import { InboxLoadingSkeleton } from "../features/inbox/InboxLoadingSkeleton"
 import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
 import { useInboxRowEntrance } from "../features/inbox/useInboxRowEntrance"
@@ -110,7 +116,8 @@ export function InboxScreen(props: InboxScreenProps) {
   const now = useInboxClock(navigation)
 
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 16 })
-  const unreadPulseAnim = useRef(new Animated.Value(1)).current
+  // One UI-thread pulse shared by every unread row's glow.
+  const unreadPulse = useSharedValue(1)
   const reduceMotion = useReducedMotion()
   const threadKeys = useMemo(() => threads.map((thread) => thread.threadId), [threads])
   // Keyed by thread id and stable across renders: a new thread enters alone.
@@ -192,30 +199,17 @@ export function InboxScreen(props: InboxScreenProps) {
   )
 
   useEffect(() => {
-    if (!hasUnreadThread || reduceMotion) {
-      unreadPulseAnim.stopAnimation()
-      unreadPulseAnim.setValue(1)
-      return undefined
+    const pulse = getInboxUnreadPulse(reduceMotion)
+    if (!hasUnreadThread || pulse.iterations === 0) {
+      unreadPulse.value = 1
+      return
     }
-    const unreadPulse = getInboxUnreadPulse(reduceMotion)
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(unreadPulseAnim, {
-          toValue: unreadPulse.maxScale,
-          duration: 1000,
-          useNativeDriver: true
-        }),
-        Animated.timing(unreadPulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true
-        })
-      ]),
-      { iterations: unreadPulse.iterations }
+    const half = { duration: 1000, easing: Easing.inOut(Easing.ease), reduceMotion: ReduceMotion.Never }
+    unreadPulse.value = withRepeat(
+      withSequence(withTiming(pulse.maxScale, half), withTiming(1, half)),
+      pulse.iterations
     )
-    pulse.start()
-    return () => pulse.stop()
-  }, [hasUnreadThread, reduceMotion, unreadPulseAnim])
+  }, [hasUnreadThread, reduceMotion, unreadPulse])
 
   const openThread = useCallback(
     (threadId: string) => {
@@ -266,7 +260,7 @@ export function InboxScreen(props: InboxScreenProps) {
   const renderThreadRow = useCallback(({ item }: {
     item: (typeof threadRows)[number]
   }) => (
-    <Animated.View style={reduceMotion ? undefined : getItemAnim(item.thread.threadId)}>
+    <Reanimated.View entering={getItemAnim(item.thread.threadId)}>
       <ConversationCard
         threadId={item.thread.threadId}
         copy={copy}
@@ -278,16 +272,15 @@ export function InboxScreen(props: InboxScreenProps) {
         lastTime={item.lastTime}
         unreadBadge={item.unreadBadge}
         accessibilityLabel={item.accessibilityLabel}
-        reduceMotion={reduceMotion}
-        unreadPulseAnim={unreadPulseAnim}
+        unreadPulse={unreadPulse}
         onPress={openThread}
         onWarm={warmThread}
         isPinned={item.isPinned}
         actionsCopy={actionsCopy}
         onLongPress={openConversationActions}
       />
-    </Animated.View>
-  ), [actionsCopy, copy, getItemAnim, openConversationActions, openThread, reduceMotion, unreadPulseAnim, warmThread])
+    </Reanimated.View>
+  ), [actionsCopy, copy, getItemAnim, openConversationActions, openThread, unreadPulse, warmThread])
 
   return (
     <View style={styles.root}>
@@ -299,7 +292,7 @@ export function InboxScreen(props: InboxScreenProps) {
           <Text accessibilityRole="header" numberOfLines={1} style={styles.titleBarText}>{copy.title}</Text>
         </View>
 
-        <Animated.View style={[styles.header, headerAnim]}>
+        <Reanimated.View style={[styles.header, headerAnim]}>
           {/* The count has its own reserved slot, so the header keeps one
               height and one title before and after conversations arrive. */}
           <View style={styles.eyebrowRow}>
@@ -326,7 +319,7 @@ export function InboxScreen(props: InboxScreenProps) {
             end={{ x: 1, y: 0 }}
             style={styles.headerUnderline}
           />
-        </Animated.View>
+        </Reanimated.View>
 
         <View style={styles.listArea}>
           {/* Rows are 88–99 pt (one or two preview lines, Dynamic Type), so
@@ -396,10 +389,7 @@ interface EmptyInboxProps {
 }
 
 function EmptyInbox(props: EmptyInboxProps) {
-  const entranceStyle = useEntranceAnimation({
-    duration: uiTheme.animation.durationEntrance,
-    translateY: 24
-  })
+  const entranceStyle = useEntranceAnimation({ translateY: 24 })
 
   if (
     props.threadListState.status === "idle" ||
@@ -410,7 +400,7 @@ function EmptyInbox(props: EmptyInboxProps) {
   }
   if (props.threadListState.status === "failed") {
     return (
-      <Animated.View
+      <Reanimated.View
         accessibilityRole="alert"
         style={[
           emptyStyles.card,
@@ -422,16 +412,13 @@ function EmptyInbox(props: EmptyInboxProps) {
           {props.threadListState.errorMessage}
         </Text>
         {props.onRetryThreads ? (
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={props.copy.retryOpeningChats}
             onPress={() => {
               void props.onRetryThreads?.().catch(() => undefined)
             }}
-            style={({ pressed }) => [
-              emptyStyles.ctaOuter,
-              pressed ? { opacity: 0.85 } : null
-            ]}
+            style={emptyStyles.ctaOuter}
           >
             <LinearGradient
               colors={uiTheme.gradients.warm}
@@ -441,13 +428,13 @@ function EmptyInbox(props: EmptyInboxProps) {
             >
               <Text style={emptyStyles.ctaText}>{props.copy.tryAgain}</Text>
             </LinearGradient>
-          </Pressable>
+          </PressableScale>
         ) : null}
-      </Animated.View>
+      </Reanimated.View>
     )
   }
   return (
-    <Animated.View
+    <Reanimated.View
       style={[
         emptyStyles.card,
         entranceStyle
@@ -473,14 +460,11 @@ function EmptyInbox(props: EmptyInboxProps) {
         {props.copy.emptyBody}
       </Text>
       {props.onGoDiscover ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={props.copy.goToDiscover}
           onPress={props.onGoDiscover}
-          style={({ pressed }) => [
-            emptyStyles.ctaOuter,
-            pressed ? { opacity: 0.85 } : null
-          ]}
+          style={emptyStyles.ctaOuter}
         >
           <LinearGradient
             colors={uiTheme.gradients.warm}
@@ -490,9 +474,9 @@ function EmptyInbox(props: EmptyInboxProps) {
           >
             <Text style={emptyStyles.ctaText}>{props.copy.discoverPeople}</Text>
           </LinearGradient>
-        </Pressable>
+        </PressableScale>
       ) : null}
-    </Animated.View>
+    </Reanimated.View>
   )
 }
 

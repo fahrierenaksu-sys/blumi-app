@@ -1,8 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import {
-  Animated,
-  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -11,15 +9,17 @@ import {
 } from "react-native"
 import {
   useEntranceAnimation,
-  useReducedMotion,
   useReducedMotionPreference
 } from "../ui/animations"
-import { MOTION_SPRINGS } from "../ui/motion"
+import { PressableScale } from "../ui/PressableScale"
 import Reanimated, {
+  Easing,
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
-  withSpring
+  withTiming
 } from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { SoftBlobBackground } from "../ui/backgrounds"
@@ -87,26 +87,16 @@ function CinematicActionButton({
   testID
 }: CinematicActionButtonProps) {
   const entrance = useEntranceAnimation({ delay: 0, duration: 240, translateY: 10 })
-  const reduceMotion = useReducedMotion()
-  // The press spring runs on the UI thread; under Reduce Motion the pressed
-  // colour alone carries the feedback.
-  const pressScale = useSharedValue(1)
-  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: pressScale.value }] }))
-  const pressTo = (value: number) => {
-    if (reduceMotion) return
-    pressScale.value = withSpring(value, MOTION_SPRINGS.press)
-  }
+  // The press feel is the shared one (UI thread; Reduce Motion dims).
   return (
-    <Animated.View style={[styles.cinematicActionContainer, entrance]}>
-      <Reanimated.View style={pressStyle}>
-        <Pressable
+    <Reanimated.View style={[styles.cinematicActionContainer, entrance]}>
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={label}
           accessibilityState={{ disabled: disabled || locked }}
           disabled={disabled || locked}
           onPress={onPress}
-          onPressIn={() => pressTo(CTA_PRESSED_SCALE)}
-          onPressOut={() => pressTo(1)}
+          pressedScale={CTA_PRESSED_SCALE}
           testID={testID}
           style={({ pressed }) => [
             styles.cinematicAction,
@@ -124,9 +114,8 @@ function CinematicActionButton({
           >
             {label}
           </Text>
-        </Pressable>
-      </Reanimated.View>
-    </Animated.View>
+        </PressableScale>
+    </Reanimated.View>
   )
 }
 
@@ -141,7 +130,7 @@ function PreludeAccountLink({
 }) {
   const entrance = useEntranceAnimation({ delay: 120, duration: 240, translateY: 8 })
   return (
-    <Animated.View style={entrance}>
+    <Reanimated.View style={entrance}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -156,7 +145,7 @@ function PreludeAccountLink({
       >
         <Text maxFontSizeMultiplier={1.35} style={styles.accountLinkText}>{label}</Text>
       </Pressable>
-    </Animated.View>
+    </Reanimated.View>
   )
 }
 
@@ -194,7 +183,7 @@ export function AuthEntryScreen({
   const [isPreludeInteractive, setIsPreludeInteractive] = useState(false)
   const [isPreludeActionsExiting, setIsPreludeActionsExiting] = useState(false)
   const [isWhoaVisible, setIsWhoaVisible] = useState(false)
-  const preludeActionsExit = useRef(new Animated.Value(0)).current
+  const preludeActionsExit = useSharedValue(0)
   const didCaptureWorldBeat = useRef(false)
   const handlePreludeActionsVisible = useCallback(() => setArePreludeActionsVisible(true), [])
   const handlePreludeSecondaryVisible = useCallback(
@@ -226,20 +215,24 @@ export function AuthEntryScreen({
       setIsPreludeActionsExiting(false)
       return
     }
-    preludeActionsExit.setValue(0)
-    Animated.timing(preludeActionsExit, {
-      toValue: 1,
-      duration: ONBOARDING_SCENE_HANDOFF_MS.actionResponse,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-      isInteraction: false
-    }).start(({ finished }) => {
-      if (!finished) return
+    const finishExit = () => {
       dispatchIntro({ type: "reveal-world", reduceMotion })
       setIsPreludeActionsExiting(false)
-      preludeActionsExit.setValue(0)
+      preludeActionsExit.value = 0
+    }
+    preludeActionsExit.value = 0
+    preludeActionsExit.value = withTiming(1, {
+      duration: ONBOARDING_SCENE_HANDOFF_MS.actionResponse,
+      easing: Easing.out(Easing.cubic),
+      reduceMotion: ReduceMotion.Never
+    }, (finished) => {
+      if (finished) scheduleOnRN(finishExit)
     })
   }, [isPreludeActionsExiting, onClearError, preludeActionsExit, reduceMotion])
+  const preludeActionsExitStyle = useAnimatedStyle(() => ({
+    opacity: 1 - preludeActionsExit.value,
+    transform: [{ translateY: preludeActionsExit.value * 12 }]
+  }))
   const openCharacterGreeting = useCallback(() => {
     if (!isPreludeInteractive || isPreludeActionsExiting) return
     hapticLight()
@@ -382,24 +375,8 @@ export function AuthEntryScreen({
 
           <View style={styles.cinematicActionSlot}>
               {shouldRenderPreludeActions ? (
-                <Animated.View
-                  style={[
-                    styles.preludeActions,
-                    !reduceMotion
-                      ? {
-                          opacity: preludeActionsExit.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 0]
-                          }),
-                          transform: [{
-                            translateY: preludeActionsExit.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0, 12]
-                            })
-                          }]
-                        }
-                      : null
-                  ]}
+                <Reanimated.View
+                  style={[styles.preludeActions, reduceMotion ? null : preludeActionsExitStyle]}
                 >
                   {isGreeting && isPreludeSecondaryVisible && !isPreludeActionsExiting ? (
                     <PreludeAccountLink
@@ -434,7 +411,7 @@ export function AuthEntryScreen({
                   ) : (
                     <View style={styles.cinematicPrimaryPlaceholder} />
                   )}
-                </Animated.View>
+                </Reanimated.View>
               ) : shouldRenderWhoaAction ? (
                 <CinematicActionButton
                   compact={viewportLayout.compact}

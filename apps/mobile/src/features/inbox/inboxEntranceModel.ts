@@ -6,14 +6,16 @@
  * entrance of their own, and rows already on screen are never replayed.
  */
 
-export const INBOX_STAGGER_STEP_MS = 60
-export const INBOX_STAGGER_DURATION_MS = 400
-/** Rows past the first screenful share the last delay instead of queueing. */
-export const INBOX_STAGGER_MAX_STEPS = 7
-export const INBOX_LATE_ROW_DURATION_MS = 180
+import { MOTION_DURATIONS, MOTION_SPRINGS, MOTION_STAGGER } from "../../ui/motionTokens"
+
+export const INBOX_STAGGER_STEP_MS = MOTION_STAGGER.stepMs
+export const INBOX_STAGGER_DURATION_MS = MOTION_SPRINGS.smooth.duration
+/** Rows past the first six share the last delay instead of queueing. */
+export const INBOX_STAGGER_MAX_STEPS = MOTION_STAGGER.maxItems - 1
+export const INBOX_LATE_ROW_DURATION_MS = MOTION_DURATIONS.fadeIn
 export const INBOX_ENTRANCE_TRANSLATE_Y = 20
 export const INBOX_SKELETON_ROW_COUNT = 5
-export const INBOX_SKELETON_FADE_MS = 180
+export const INBOX_SKELETON_FADE_MS = MOTION_DURATIONS.crossfade
 export const INBOX_SKELETON_PULSE_HALF_MS = 800
 export const INBOX_SKELETON_PULSE_MIN_OPACITY = 0.55
 

@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect, useRef, useState } from "react"
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Reanimated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { getProfileHeroStretch } from "../features/discovery/profilePreviewHeroModel"
 import { hapticLight } from "../ui/haptics"
@@ -32,7 +32,8 @@ import {
   TagChip,
 } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { springPressScale, useReducedMotion } from "../ui/animations"
+import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
+import { PressableScale } from "../ui/PressableScale"
 import type { SessionActor } from "../features/session/sessionModel"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { captureProductEvent } from "../analytics/productAnalytics"
@@ -89,9 +90,9 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   const { navigation, route } = props
   const copy = getProfilePreviewCopy(getAppLocale())
   const profile = props.profileOverride ?? ("profile" in route.params ? route.params.profile : undefined)
-  const likeScaleAnim = useRef(new Animated.Value(1)).current
+  // The content rises in on the UI thread; Reduce Motion only fades it in.
+  const contentEntrance = useEntranceAnimation({ translateY: 20 })
   const reduceMotion = useReducedMotion()
-  const contentAnim = useRef(new Animated.Value(0)).current
   const [reportVisible, setReportVisible] = useState(false)
   const [isDeciding, setIsDeciding] = useState(false)
   const screenMountedRef = useRef(true)
@@ -106,14 +107,6 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     screenMountedRef.current = true
     return () => { screenMountedRef.current = false }
   }, [])
-
-  useEffect(() => {
-    Animated.spring(contentAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      ...uiTheme.animation.springGentle,
-    }).start()
-  }, [contentAnim])
 
   // DSC-15: the page bounces, and pulling past the top stretches the hero glow.
   const scrollY = useSharedValue(0)
@@ -264,9 +257,6 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     navigation.navigate("Lobby", { pendingPassUserId: profile.userId })
   }
 
-  const handleLikePressIn = () => springPressScale(likeScaleAnim, uiTheme.animation.scalePress, uiTheme.animation.spring, reduceMotion)
-  const handleLikePressOut = () => springPressScale(likeScaleAnim, 1, uiTheme.animation.springBouncy, reduceMotion)
-
   return (
     <View style={styles.root}>
       <SoftBlobBackground variant="lobby" />
@@ -276,20 +266,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        <Animated.View
-          style={{
-            opacity: contentAnim,
-            // Reduce Motion: the content fades in without sliding.
-            transform: reduceMotion ? [] : [
-              {
-                translateY: contentAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [20, 0],
-                })
-              }
-            ]
-          }}
-        >
+        <Reanimated.View style={contentEntrance}>
           {/* Full-bleed Hero Section */}
           <View style={styles.heroBlock}>
             {/* Background Glows */}
@@ -417,15 +394,12 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                   >
                     <Ionicons name="close" size={28} color={uiTheme.colors.textPrimary} />
                   </ActionButtonCircle>
-                  <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
-                    <Pressable
+                    <PressableScale
                       accessibilityRole="button"
                       accessibilityLabel={copy.likeProfile(profile.displayName)}
                       accessibilityState={{ disabled: decisionDisabled, busy: isDeciding }}
                       disabled={decisionDisabled || isDeciding}
                       onPress={sendInviteAndReturn}
-                      onPressIn={handleLikePressIn}
-                      onPressOut={handleLikePressOut}
                       style={[
                         styles.likeButton,
                           decisionDisabled || isDeciding ? styles.likeButtonDisabled : null,
@@ -448,8 +422,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                           </Text>
                         </View>
                       </LinearGradient>
-                    </Pressable>
-                  </Animated.View>
+                    </PressableScale>
                 </View>
               ) : null}
               {decisionError ? (
@@ -464,7 +437,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
               ) : null}
             </SafeAreaView>
           </View>
-        </Animated.View>
+        </Reanimated.View>
       </Reanimated.ScrollView>
       {shouldShowProfileSafety(context) ? (
         <ReportModal
