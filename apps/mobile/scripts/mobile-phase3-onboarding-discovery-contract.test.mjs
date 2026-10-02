@@ -106,11 +106,15 @@ test("phase 3 control targets stay at or above 44 points", () => {
   const filters = read("src/components/DiscoverFiltersBottomSheet.tsx")
   assert.match(filters, /closeButton:\s*\{[\s\S]*?width:\s*44,[\s\S]*?height:\s*44/)
   assert.match(filters, /segment:\s*\{[\s\S]*?minHeight:\s*44/)
-  // DSC-13: 32 pt stepper art with a 6 pt slop is a 44 pt target; each stepper is one VoiceOver adjustable.
-  assert.equal((filters.match(/style=\{styles\.stepperButton\}\s*hitSlop=\{6\}/g) ?? []).length, 4)
-  assert.equal((filters.match(/accessibilityRole="adjustable"/g) ?? []).length, 2)
+  assert.match(filters, /resetButton:\s*\{[\s\S]*?minHeight:\s*44,[\s\S]*?minWidth:\s*44/)
+  assert.match(filters, /audienceRow:\s*\{[\s\S]*?minHeight:\s*48/)
+  // DSC-13: a two-thumb age slider; each thumb is a 44 pt target and one VoiceOver adjustable.
+  const slider = read("src/components/DiscoverAgeRangeSlider.tsx")
+  assert.match(slider, /const THUMB_TARGET = 44/)
+  assert.match(slider, /thumbTarget:\s*\{[\s\S]*?width: THUMB_TARGET,\s*height: THUMB_TARGET/)
+  assert.equal((slider.match(/accessibilityRole="adjustable"/g) ?? []).length, 2)
   assert.doesNotMatch(filters, /marginBottom: Math\.max\(insets\.bottom/, "the footer no longer adds a second safe-area inset")
-  assert.match(filters, /<View style=\{styles\.grabber\}/)
+  assert.match(filters, /<SwipeDismissSheet[\s\S]*?\bgrabber\b/)
 })
 
 test("activation milestones are captured as explicit product events", () => {

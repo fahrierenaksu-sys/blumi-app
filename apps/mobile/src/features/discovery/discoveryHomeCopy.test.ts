@@ -1,9 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import {
-  DISCOVERY_VIBE_OPTIONS,
-  getDiscoveryHomeCopy
-} from "./discoveryHomeCopy"
+import { getDiscoveryHomeCopy } from "./discoveryHomeCopy"
 
 test("Discover header and filters read in Turkish on a Turkish device", () => {
   const copy = getDiscoveryHomeCopy("tr")
@@ -16,11 +13,14 @@ test("Discover header and filters read in Turkish on a Turkish device", () => {
   assert.equal(copy.filters.everyone, "Herkes")
   assert.equal(copy.filters.genders.woman.label, "Kadınlar")
   assert.equal(copy.filters.genders.man.accessibilityLabel, "Erkekleri göster")
-  assert.equal(copy.filters.decreaseMinimumAge(24), "En düşük yaşı azalt, şu an 24")
-  assert.equal(copy.filters.increaseMaximumAge(40), "En yüksek yaşı artır, şu an 40")
-  assert.equal(copy.filters.vibeLabels["Night owl"], "Gece kuşu")
-  assert.equal(copy.filters.vibeAccessibilityLabel("Gece kuşu"), "Gece kuşu vibe'ı")
+  assert.equal(copy.filters.title, "Vibe'ını belirle")
+  assert.equal(copy.filters.subtitle, "Discover'da kimleri göreceğini seç.")
+  assert.equal(copy.filters.ageRange, "Yaş aralığı")
+  assert.equal(copy.filters.ageRangeAccessibilityLabel(24, 40), "Yaş aralığı, 24 ile 40 arası")
+  assert.equal(copy.filters.minimumAge, "En düşük yaş")
+  assert.equal(copy.filters.maximumAge, "En yüksek yaş")
   assert.equal(copy.filters.reset, "Sıfırla")
+  assert.equal(copy.filters.resetAccessibilityLabel, "Filtreleri sıfırla")
   assert.equal(copy.filters.apply, "Eşleşmeleri göster")
 })
 
@@ -31,35 +31,25 @@ test("Discover header and filters keep the approved English wording", () => {
   assert.equal(copy.header.profileMeta, "Edit your vibe")
   assert.equal(copy.header.filtersAccessibilityLabel, "Open discover filters")
   assert.equal(copy.filters.closeAccessibilityLabel, "Close discovery filters")
-  assert.equal(copy.filters.eyebrow, "DISCOVERY")
   assert.equal(copy.filters.title, "Set your vibe")
+  assert.equal(copy.filters.subtitle, "Choose who shows up in Discover.")
   assert.equal(copy.filters.showEveryoneAccessibilityLabel, "Show everyone")
   assert.equal(copy.filters.genders.woman.accessibilityLabel, "Show women")
   assert.equal(copy.filters.genders.man.label, "Men")
-  assert.equal(copy.filters.decreaseMinimumAge(24), "Decrease minimum age, currently 24")
-  assert.equal(copy.filters.increaseMaximumAge(40), "Increase maximum age, currently 40")
-  assert.equal(copy.filters.vibeAccessibilityLabel("Night owl"), "Night owl vibe")
+  assert.equal(copy.filters.ageRange, "Age range")
+  assert.equal(copy.filters.ageRangeAccessibilityLabel(24, 40), "Age range, 24 to 40")
+  assert.equal(copy.filters.minimumAge, "Minimum age")
+  assert.equal(copy.filters.maximumAge, "Maximum age")
   assert.equal(copy.filters.reset, "Reset")
+  assert.equal(copy.filters.resetAccessibilityLabel, "Reset filters")
   assert.equal(copy.filters.apply, "Show matches")
 })
 
-test("vibe filter values stay canonical while every locale labels each one", () => {
-  // The server matches vibes by value, so only the label is localised.
-  assert.deepEqual(DISCOVERY_VIBE_OPTIONS, [
-    "Coffee dates",
-    "Slow burn",
-    "Bookish",
-    "Outdoors",
-    "Creative",
-    "Fitness",
-    "Night owl",
-    "Pets"
-  ])
+test("the filters sheet no longer offers liked-vibe pills", () => {
+  // Stored vibes stay on the account; the sheet just does not show or edit them.
   for (const locale of ["tr", "en"] as const) {
-    const { vibeLabels } = getDiscoveryHomeCopy(locale).filters
-    for (const vibe of DISCOVERY_VIBE_OPTIONS) {
-      assert.ok(vibeLabels[vibe].trim().length > 0, `${locale}: ${vibe}`)
-    }
+    const filters = getDiscoveryHomeCopy(locale).filters as unknown as Record<string, unknown>
+    assert.equal("vibesTitle" in filters, false, locale)
+    assert.equal("vibeLabels" in filters, false, locale)
   }
-  assert.equal(getDiscoveryHomeCopy("en").filters.vibeLabels["Coffee dates"], "Coffee dates")
 })

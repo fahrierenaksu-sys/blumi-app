@@ -1,39 +1,38 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Modal,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import type {
-  DiscoveryFilters,
-  DiscoveryGender
-} from "@blumi/contracts"
+import type { DiscoveryFilters } from "@blumi/contracts"
+import { DEFAULT_DISCOVERY_FILTERS } from "../features/discovery/discoveryFiltersModel"
 import {
-  DEFAULT_DISCOVERY_FILTERS,
-  DISCOVERY_MAXIMUM_AGE,
-  DISCOVERY_MINIMUM_AGE
-} from "../features/discovery/discoveryFiltersModel"
-import {
-  DISCOVERY_VIBE_OPTIONS,
-  getDiscoveryHomeCopy
-} from "../features/discovery/discoveryHomeCopy"
+  DISCOVERY_AUDIENCE_OPTIONS,
+  formatDiscoveryAgeRange,
+  getDiscoveryAudience,
+  hasVisibleDiscoveryFilterChanges,
+  resetVisibleDiscoveryFilters,
+  shouldStackDiscoveryAudience,
+  withDiscoveryAgeEdge,
+  withDiscoveryAudience,
+  type DiscoveryAgeEdge,
+  type DiscoveryAudience
+} from "../features/discovery/discoveryFiltersSheetModel"
+import { getDiscoveryHomeCopy } from "../features/discovery/discoveryHomeCopy"
 import { getAppLocale } from "../features/session/appLocale"
-import { PrimaryButton, SecondaryButton } from "../ui/primitives"
+import { PrimaryButton } from "../ui/primitives"
 import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../ui/SwipeDismissSheet"
 import { hapticSelection } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
+import { DiscoverAgeRangeSlider } from "./DiscoverAgeRangeSlider"
 
 export type DiscoverFilters = DiscoveryFilters
-
-const AGE_LONG_PRESS_STEP = 5
-const AGE_ADJUST_ACTIONS = [{ name: "increment" }, { name: "decrement" }]
-
-const GENDER_OPTIONS: readonly DiscoveryGender[] = ["woman", "man"]
 
 export const DEFAULT_DISCOVER_FILTERS: DiscoverFilters = DEFAULT_DISCOVERY_FILTERS
 
@@ -44,34 +43,16 @@ interface DiscoverFiltersBottomSheetProps {
   onApply: (filters: DiscoverFilters) => void
 }
 
-function clampAge(value: number): number {
-  return Math.max(
-    DISCOVERY_MINIMUM_AGE,
-    Math.min(DISCOVERY_MAXIMUM_AGE, value)
-  )
-}
-
-function toggleVibe(selectedVibes: string[], vibe: string): string[] {
-  if (selectedVibes.includes(vibe)) {
-    return selectedVibes.filter((current) => current !== vibe)
-  }
-  return [...selectedVibes, vibe]
-}
-
-function toggleGender(
-  selectedGenders: DiscoveryGender[],
-  gender: DiscoveryGender
-): DiscoveryGender[] {
-  if (selectedGenders.includes(gender)) {
-    return selectedGenders.filter((current) => current !== gender)
-  }
-  return [...selectedGenders, gender]
-}
-
+/**
+ * Discover preferences: who you see and their age range. Fields the sheet
+ * does not show (legacy vibes) pass through every edit, Reset and Apply
+ * unchanged (discoveryFiltersSheetModel).
+ */
 export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProps) {
   const { visible, initialFilters, onClose, onApply } = props
   const [draftFilters, setDraftFilters] = useState<DiscoverFilters>(initialFilters)
   const insets = useSafeAreaInsets()
+  const { width: windowWidth, fontScale } = useWindowDimensions()
   const copy = getDiscoveryHomeCopy(getAppLocale()).filters
 
   useEffect(() => {
@@ -80,35 +61,29 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
     }
   }, [initialFilters, visible])
 
-  const ageSummary = useMemo(
-    () => `${draftFilters.ageMin} - ${draftFilters.ageMax}`,
-    [draftFilters.ageMax, draftFilters.ageMin]
-  )
-
-  const updateAgeMin = (step: number) => {
-    setDraftFilters((previous) => {
-      const nextMin = clampAge(previous.ageMin + step)
-      return {
-        ...previous,
-        ageMin: Math.min(nextMin, previous.ageMax)
-      }
-    })
+  const audience = getDiscoveryAudience(draftFilters.genders)
+  const canReset = hasVisibleDiscoveryFilterChanges(draftFilters)
+  const audienceLabels: Record<DiscoveryAudience, { label: string; accessibilityLabel: string }> = {
+    everyone: { label: copy.everyone, accessibilityLabel: copy.showEveryoneAccessibilityLabel },
+    woman: copy.genders.woman,
+    man: copy.genders.man
   }
+  const stackAudience = shouldStackDiscoveryAudience({
+    windowWidth,
+    fontScale,
+    longestLabelLength: Math.max(...DISCOVERY_AUDIENCE_OPTIONS.map((option) => audienceLabels[option].label.length))
+  })
 
-  // DSC-13: every step ticks; a long press jumps five years.
-  const stepAge = (update: (step: number) => void, step: number) => {
+  const selectAudience = (next: DiscoveryAudience) => {
+    if (next === audience) return
     hapticSelection()
-    update(step)
+    setDraftFilters((previous) => withDiscoveryAudience(previous, next))
   }
 
-  const updateAgeMax = (step: number) => {
-    setDraftFilters((previous) => {
-      const nextMax = clampAge(previous.ageMax + step)
-      return {
-        ...previous,
-        ageMax: Math.max(nextMax, previous.ageMin)
-      }
-    })
+  // DSC-13: every whole-year change ticks once.
+  const changeAge = (edge: DiscoveryAgeEdge, age: number) => {
+    hapticSelection()
+    setDraftFilters((previous) => withDiscoveryAgeEdge(previous, edge, age))
   }
 
   return (
@@ -121,23 +96,34 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             onPress: onClose,
             accessibilityLabel: copy.closeAccessibilityLabel
           }}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          grabber
+          accessibilityViewIsModal
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }]}
         >
-          <View style={styles.grabber} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no" />
-          <View style={styles.sheetGlowTop} pointerEvents="none" />
-          <View style={styles.sheetGlowBottom} pointerEvents="none" />
-          <View style={styles.headerRow}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.headerEyebrow}>{copy.eyebrow}</Text>
-              <Text style={styles.headerTitle}>{copy.title}</Text>
-            </View>
+          <View style={styles.sheetGlow} pointerEvents="none" />
+          <View style={styles.toolbar}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={copy.closeAccessibilityLabel}
-              style={styles.closeButton}
+              style={({ pressed }) => [styles.closeButton, pressed ? styles.closeButtonPressed : null]}
               onPress={onClose}
             >
-              <Ionicons accessible={false} name="close" size={20} color={uiTheme.colors.secondaryText} />
+              <Ionicons accessible={false} name="close" size={22} color={uiTheme.colors.secondaryText} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.resetAccessibilityLabel}
+              accessibilityState={{ disabled: !canReset }}
+              disabled={!canReset}
+              style={({ pressed }) => [styles.resetButton, pressed ? styles.resetButtonPressed : null]}
+              onPress={() => {
+                hapticSelection()
+                setDraftFilters(resetVisibleDiscoveryFilters)
+              }}
+            >
+              <Text style={[styles.resetText, canReset ? null : styles.resetTextDisabled]}>
+                {copy.reset}
+              </Text>
             </Pressable>
           </View>
 
@@ -146,194 +132,82 @@ export function DiscoverFiltersBottomSheet(props: DiscoverFiltersBottomSheetProp
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{copy.showMe}</Text>
-              <View style={styles.segmentRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.showEveryoneAccessibilityLabel}
-                  accessibilityState={{ selected: draftFilters.genders.length === 0 }}
-                  style={[
-                    styles.segment,
-                    draftFilters.genders.length === 0 ? styles.segmentActive : null
-                  ]}
-                  onPress={() => {
-                    setDraftFilters((previous) => ({ ...previous, genders: [] }))
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      draftFilters.genders.length === 0
-                        ? styles.segmentTextActive
-                        : null
-                    ]}
-                  >
-                    {copy.everyone}
-                  </Text>
-                </Pressable>
-                {GENDER_OPTIONS.map((gender) => {
-                  const active = draftFilters.genders.includes(gender)
-                  const genderCopy = copy.genders[gender]
-                  return (
-                    <Pressable
-                      key={gender}
-                      accessibilityRole="button"
-                      accessibilityLabel={genderCopy.accessibilityLabel}
-                      accessibilityState={{ selected: active }}
-                      style={[styles.segment, active ? styles.segmentActive : null]}
-                      onPress={() => {
-                        setDraftFilters((previous) => ({
-                          ...previous,
-                          genders: toggleGender(previous.genders, gender)
-                        }))
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          active ? styles.segmentTextActive : null
-                        ]}
-                      >
-                        {genderCopy.label}
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </View>
+            <View style={styles.titleBlock}>
+              <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
+              <Text style={styles.subtitle}>{copy.subtitle}</Text>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{copy.ageWindow}</Text>
-              <View style={styles.ageCard}>
-                <Text style={styles.ageValue}>{ageSummary}</Text>
-                <View style={styles.ageControls}>
-                  <View style={styles.ageControlGroup}>
-                    <Text style={styles.ageLabel}>{copy.minimum}</Text>
-                    <View
-                      style={styles.ageStepper}
-                      accessible
-                      accessibilityRole="adjustable"
-                      accessibilityLabel={copy.minimum}
-                      accessibilityValue={{ text: String(draftFilters.ageMin) }}
-                      accessibilityActions={AGE_ADJUST_ACTIONS}
-                      onAccessibilityAction={(event) => stepAge(updateAgeMin, event.nativeEvent.actionName === "increment" ? 1 : -1)}
-                    >
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={copy.decreaseMinimumAge(draftFilters.ageMin)}
-                        style={styles.stepperButton}
-                        hitSlop={6}
-                        onPress={() => stepAge(updateAgeMin, -1)}
-                        onLongPress={() => stepAge(updateAgeMin, -AGE_LONG_PRESS_STEP)}
-                      >
-                        <Text style={styles.stepperText}>−</Text>
-                      </Pressable>
-                      <Text style={styles.stepperValue}>{draftFilters.ageMin}</Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={copy.increaseMinimumAge(draftFilters.ageMin)}
-                        style={styles.stepperButton}
-                        hitSlop={6}
-                        onPress={() => stepAge(updateAgeMin, 1)}
-                        onLongPress={() => stepAge(updateAgeMin, AGE_LONG_PRESS_STEP)}
-                      >
-                        <Text style={styles.stepperText}>+</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  <View style={styles.ageControlGroup}>
-                    <Text style={styles.ageLabel}>{copy.maximum}</Text>
-                    <View
-                      style={styles.ageStepper}
-                      accessible
-                      accessibilityRole="adjustable"
-                      accessibilityLabel={copy.maximum}
-                      accessibilityValue={{ text: String(draftFilters.ageMax) }}
-                      accessibilityActions={AGE_ADJUST_ACTIONS}
-                      onAccessibilityAction={(event) => stepAge(updateAgeMax, event.nativeEvent.actionName === "increment" ? 1 : -1)}
-                    >
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={copy.decreaseMaximumAge(draftFilters.ageMax)}
-                        style={styles.stepperButton}
-                        hitSlop={6}
-                        onPress={() => stepAge(updateAgeMax, -1)}
-                        onLongPress={() => stepAge(updateAgeMax, -AGE_LONG_PRESS_STEP)}
-                      >
-                        <Text style={styles.stepperText}>−</Text>
-                      </Pressable>
-                      <Text style={styles.stepperValue}>{draftFilters.ageMax}</Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={copy.increaseMaximumAge(draftFilters.ageMax)}
-                        style={styles.stepperButton}
-                        hitSlop={6}
-                        onPress={() => stepAge(updateAgeMax, 1)}
-                        onLongPress={() => stepAge(updateAgeMax, AGE_LONG_PRESS_STEP)}
-                      >
-                        <Text style={styles.stepperText}>+</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{copy.vibesTitle}</Text>
-              <View style={styles.tagsWrap}>
-                {DISCOVERY_VIBE_OPTIONS.map((vibe) => {
-                  const selected = draftFilters.vibes.includes(vibe)
-                  const vibeLabel = copy.vibeLabels[vibe]
+            <View style={styles.sectionCard}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.showMe}</Text>
+              <View style={stackAudience ? styles.audienceList : styles.segmentTrack}>
+                {DISCOVERY_AUDIENCE_OPTIONS.map((option) => {
+                  const selected = option === audience
+                  const optionCopy = audienceLabels[option]
                   return (
                     <Pressable
-                      key={vibe}
+                      key={option}
                       accessibilityRole="button"
-                      accessibilityLabel={copy.vibeAccessibilityLabel(vibeLabel)}
+                      accessibilityLabel={optionCopy.accessibilityLabel}
                       accessibilityState={{ selected }}
-                      style={[styles.vibeChip, selected ? styles.vibeChipSelected : null]}
-                      onPress={() => {
-                        setDraftFilters((previous) => ({
-                          ...previous,
-                          vibes: toggleVibe(previous.vibes, vibe)
-                        }))
-                      }}
+                      style={({ pressed }) => stackAudience
+                        ? [
+                            styles.audienceRow,
+                            selected ? styles.audienceRowSelected : null,
+                            pressed && !selected ? styles.audienceRowPressed : null
+                          ]
+                        : [
+                            styles.segment,
+                            selected ? styles.segmentSelected : null,
+                            pressed && !selected ? styles.segmentPressed : null
+                          ]}
+                      onPress={() => selectAudience(option)}
                     >
                       <Text
                         style={[
-                          styles.vibeChipText,
-                          selected ? styles.vibeChipTextSelected : null
+                          stackAudience ? styles.audienceRowText : styles.segmentText,
+                          selected ? styles.optionTextSelected : null
                         ]}
                       >
-                        {vibeLabel}
+                        {optionCopy.label}
                       </Text>
+                      {stackAudience && selected ? (
+                        <Ionicons accessible={false} name="checkmark" size={22} color={uiTheme.colors.primaryDeep} />
+                      ) : null}
                     </Pressable>
                   )
                 })}
               </View>
             </View>
 
+            <View style={styles.sectionCard}>
+              <View
+                style={styles.sectionHeader}
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={copy.ageRangeAccessibilityLabel(draftFilters.ageMin, draftFilters.ageMax)}
+              >
+                <Text style={styles.sectionTitle}>{copy.ageRange}</Text>
+                <Text style={styles.sectionValue}>
+                  {formatDiscoveryAgeRange(draftFilters.ageMin, draftFilters.ageMax)}
+                </Text>
+              </View>
+              <DiscoverAgeRangeSlider
+                ageMin={draftFilters.ageMin}
+                ageMax={draftFilters.ageMax}
+                minimumAccessibilityLabel={copy.minimumAge}
+                maximumAccessibilityLabel={copy.maximumAge}
+                onChange={changeAge}
+              />
+            </View>
           </SwipeDismissSheetScrollView>
 
           <View style={styles.footer}>
-            <View style={styles.footerButton}>
-              <SecondaryButton
-                label={copy.reset}
-                onPress={() => {
-                  setDraftFilters(DEFAULT_DISCOVER_FILTERS)
-                }}
-              />
-            </View>
-            <View style={styles.footerButton}>
-              <PrimaryButton
-                label={copy.apply}
-                onPress={() => {
-                  onApply(draftFilters)
-                }}
-              />
-            </View>
+            <PrimaryButton
+              label={copy.apply}
+              onPress={() => {
+                onApply(draftFilters)
+              }}
+            />
           </View>
         </SwipeDismissSheet>
       </GestureHandlerRootView>
@@ -348,77 +222,34 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(35, 18, 42, 0.16)",
+    backgroundColor: uiTheme.colors.overlaySoft,
   },
-  grabber: {
-    position: "absolute",
-    top: 8,
-    alignSelf: "center",
-    width: 36,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "rgba(32, 22, 42, 0.18)",
-    zIndex: 2,
-  },
+  // Opaque on purpose: the deck behind never shows through the controls, so
+  // Reduce Transparency needs no separate surface.
   sheet: {
-    maxHeight: "86%",
-    borderTopLeftRadius: uiTheme.radius.xxl,
-    borderTopRightRadius: uiTheme.radius.xxl,
-    backgroundColor: "rgba(255, 250, 253, 0.76)",
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.88)",
-    paddingTop: uiTheme.spacing.lg,
+    maxHeight: "90%",
+    borderTopLeftRadius: uiTheme.radius.xl,
+    borderTopRightRadius: uiTheme.radius.xl,
+    backgroundColor: uiTheme.colors.background,
     overflow: "hidden",
     ...uiTheme.shadow.deep,
   },
-  sheetSheen: {
+  sheetGlow: {
     position: "absolute",
-    left: -40,
-    right: -40,
-    top: 72,
-    height: 104,
-    borderRadius: 999,
-    backgroundColor: "rgba(255, 255, 255, 0.26)",
-    transform: [{ rotate: "-7deg" }],
-  },
-  sheetGlowTop: {
-    position: "absolute",
-    top: -132,
-    left: -96,
-    width: 390,
-    height: 276,
+    top: -160,
+    left: -80,
+    width: 360,
+    height: 260,
     borderRadius: 180,
-    backgroundColor: "rgba(255, 124, 183, 0.18)",
+    backgroundColor: uiTheme.colors.accentGlow,
+    opacity: 0.6,
   },
-  sheetGlowBottom: {
-    position: "absolute",
-    right: -120,
-    bottom: -130,
-    width: 420,
-    height: 320,
-    borderRadius: 210,
-    backgroundColor: "rgba(191, 166, 255, 0.20)",
-  },
-  headerRow: {
+  toolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.md,
-  },
-  headerCopy: {
-    gap: 3,
-  },
-  headerEyebrow: {
-    ...uiTheme.font.overline,
-    color: uiTheme.colors.primary,
-    letterSpacing: 1.2,
-  },
-  headerTitle: {
-    ...uiTheme.font.heading,
-    color: uiTheme.colors.textPrimary,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingTop: uiTheme.spacing.xxs,
   },
   closeButton: {
     width: 44,
@@ -426,150 +257,136 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.52)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
+  },
+  closeButtonPressed: {
+    backgroundColor: uiTheme.colors.secondary,
+  },
+  resetButton: {
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resetButtonPressed: {
+    backgroundColor: uiTheme.colors.secondary,
+  },
+  resetText: {
+    ...uiTheme.font.bodyMedium,
+    color: uiTheme.colors.primaryDeep,
+  },
+  resetTextDisabled: {
+    color: uiTheme.colors.textMuted,
   },
   content: {
-    maxHeight: 520,
+    flexGrow: 0,
+    flexShrink: 1,
   },
   contentContainer: {
     paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.md,
+    paddingBottom: uiTheme.spacing.lg,
     gap: uiTheme.spacing.md,
   },
-  section: {
-    gap: uiTheme.spacing.xs,
+  titleBlock: {
+    gap: uiTheme.spacing.xxs,
+    paddingBottom: uiTheme.spacing.xxs,
+  },
+  title: {
+    ...uiTheme.font.heading,
+    color: uiTheme.colors.textPrimary,
+  },
+  subtitle: {
+    ...uiTheme.font.bodySmall,
+    color: uiTheme.colors.textSecondary,
+  },
+  sectionCard: {
+    borderRadius: uiTheme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: uiTheme.colors.border,
+    backgroundColor: uiTheme.colors.surface,
+    padding: uiTheme.spacing.md,
+    gap: uiTheme.spacing.sm,
+    ...uiTheme.shadow.soft,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: uiTheme.spacing.sm,
   },
   sectionTitle: {
-    ...uiTheme.font.overline,
-    color: uiTheme.colors.primary,
+    ...uiTheme.font.bodyBold,
+    color: uiTheme.colors.textPrimary,
   },
-  segmentRow: {
+  sectionValue: {
+    ...uiTheme.font.bodyBold,
+    color: uiTheme.colors.primaryDeep,
+    fontVariant: ["tabular-nums"],
+  },
+  // iOS-style segmented control: one track, the selected segment raised.
+  segmentTrack: {
     flexDirection: "row",
-    gap: uiTheme.spacing.xs,
+    padding: 3,
+    gap: 3,
+    borderRadius: uiTheme.radius.full,
+    backgroundColor: uiTheme.colors.secondary,
   },
   segment: {
     flex: 1,
     minHeight: 44,
+    paddingHorizontal: uiTheme.spacing.xs,
     borderRadius: uiTheme.radius.full,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(255, 255, 255, 0.34)",
     alignItems: "center",
     justifyContent: "center",
   },
-  segmentActive: {
-    borderColor: "rgba(255, 79, 152, 0.72)",
-    backgroundColor: "rgba(255, 229, 244, 0.62)",
+  segmentSelected: {
+    backgroundColor: uiTheme.colors.surface,
     ...uiTheme.shadow.soft,
+  },
+  segmentPressed: {
+    backgroundColor: uiTheme.colors.secondaryPressed,
   },
   segmentText: {
-    ...uiTheme.font.bodySmall,
+    ...uiTheme.font.label,
     color: uiTheme.colors.textSecondary,
-    fontWeight: "600",
+    textAlign: "center",
   },
-  segmentTextActive: {
-    color: uiTheme.colors.chipText,
-    fontWeight: "700",
+  optionTextSelected: {
+    color: uiTheme.colors.primaryDeep,
   },
-  ageCard: {
-    borderRadius: uiTheme.radius.xl,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    backgroundColor: "rgba(255, 255, 255, 0.30)",
-    padding: uiTheme.spacing.md,
-    gap: uiTheme.spacing.md,
-    ...uiTheme.shadow.soft,
+  // Large text or a narrow phone: the same choices as a checked list.
+  audienceList: {
+    gap: uiTheme.spacing.xxs,
   },
-  ageValue: {
-    ...uiTheme.font.title,
-    color: uiTheme.colors.textPrimary,
-    fontSize: 22,
-  },
-  ageControls: {
-    flexDirection: "row",
-    gap: uiTheme.spacing.md,
-  },
-  ageControlGroup: {
-    flex: 1,
-    gap: uiTheme.spacing.xs,
-  },
-  ageLabel: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.textMuted,
-  },
-  ageStepper: {
-    minHeight: 44,
-    borderRadius: uiTheme.radius.full,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    backgroundColor: "rgba(255, 255, 255, 0.38)",
+  audienceRow: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: uiTheme.spacing.xs,
-  },
-  stepperButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 13,
+    gap: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.sm,
     borderCurve: "continuous",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 232, 244, 0.82)",
   },
-  stepperText: {
-    color: uiTheme.colors.primary,
-    fontSize: 18,
-    fontWeight: "800",
+  audienceRowSelected: {
+    backgroundColor: uiTheme.colors.surfaceSoft,
   },
-  stepperValue: {
-    ...uiTheme.font.bodyBold,
+  audienceRowPressed: {
+    backgroundColor: uiTheme.colors.surfaceMuted,
+  },
+  audienceRowText: {
+    ...uiTheme.font.body,
     color: uiTheme.colors.textPrimary,
-  },
-  tagsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: uiTheme.spacing.xs,
-  },
-  vibeChip: {
-    borderRadius: uiTheme.radius.full,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.78)",
-    backgroundColor: "rgba(255, 255, 255, 0.36)",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  vibeChipSelected: {
-    borderColor: "rgba(255, 79, 152, 0.82)",
-    backgroundColor: "rgba(255, 229, 244, 0.64)",
-    ...uiTheme.shadow.soft,
-  },
-  vibeChipText: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textSecondary,
-    fontWeight: "600",
-  },
-  vibeChipTextSelected: {
-    color: uiTheme.colors.chipText,
-    fontWeight: "700",
+    flexShrink: 1,
   },
   footer: {
-    marginHorizontal: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.md,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    borderRadius: 28,
-    borderCurve: "continuous",
-    padding: 8,
-    flexDirection: "row",
-    gap: uiTheme.spacing.sm,
-    backgroundColor: "rgba(255, 255, 255, 0.34)",
-    ...uiTheme.shadow.soft,
-  },
-  footerButton: {
-    flex: 1,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: uiTheme.colors.borderStrong,
   },
 })

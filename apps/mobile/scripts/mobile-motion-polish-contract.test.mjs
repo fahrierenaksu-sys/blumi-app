@@ -128,7 +128,7 @@ test("cards, sheets and bubbles use continuous (squircle) corners; circles stay 
       "avatarHeroTopPanel",
       "avatarHeroAction"
     ],
-    "src/components/DiscoverFiltersBottomSheet.tsx": ["ageCard", "stepperButton", "footer"],
+    "src/components/DiscoverFiltersBottomSheet.tsx": ["sectionCard", "audienceRow"],
     "src/components/ReportModal.tsx": ["reasonCard"]
   }
   for (const [file, styles] of Object.entries(rounded)) {

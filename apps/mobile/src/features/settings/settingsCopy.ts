@@ -115,7 +115,7 @@ export interface SettingsCopy {
 const COPY: Record<AppLocale, SettingsCopy> = {
   en: {
     title: "Settings", back: "Go back", matching: "MATCHING", discoveryPreferences: "Discovery preferences",
-    discoveryNote: "Choose the ages, genders, and shared vibes you want to see.",
+    discoveryNote: "Choose who you want to see and their age range.",
     notifications: "NOTIFICATIONS", notificationsLoading: "Loading notification settings…",
     notificationsUnavailable: "Notification settings unavailable", notificationsRetry: "Retry",
     enableNotifications: "Get useful Blumi updates", openNotificationSettings: "Open device notification access",
@@ -161,7 +161,7 @@ const COPY: Record<AppLocale, SettingsCopy> = {
   },
   tr: {
     title: "Ayarlar", back: "Geri dön", matching: "EŞLEŞME", discoveryPreferences: "Keşfet tercihleri",
-    discoveryNote: "Görmek istediğin yaşları, cinsiyetleri ve ortak havaları seç.",
+    discoveryNote: "Kimleri görmek istediğini ve yaş aralığını seç.",
     notifications: "BİLDİRİMLER", notificationsLoading: "Bildirim ayarları yükleniyor…",
     notificationsUnavailable: "Bildirim ayarları kullanılamıyor", notificationsRetry: "Tekrar dene",
     enableNotifications: "Yararlı Blumi güncellemelerini al", openNotificationSettings: "Cihaz bildirim erişimini aç",
