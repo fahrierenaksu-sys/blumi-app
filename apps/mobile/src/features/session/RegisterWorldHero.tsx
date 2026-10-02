@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import {
-  Animated,
   AppState,
   type AppStateStatus,
-  Easing,
   StyleSheet,
   View
 } from "react-native"
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated"
 import { useReducedMotionPreference } from "../../ui/animations"
 
 const WORLD_HERO = require(
@@ -20,8 +27,7 @@ interface RegisterWorldHeroProps {
 export function RegisterWorldHero({ active = true }: RegisterWorldHeroProps) {
   const { isResolved, reduceMotion } = useReducedMotionPreference()
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState)
-  const floatProgress = useRef(new Animated.Value(0)).current
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null)
+  const floatProgress = useSharedValue(0)
   const canAnimate = active && isResolved && !reduceMotion && appState === "active"
 
   useEffect(() => {
@@ -30,57 +36,25 @@ export function RegisterWorldHero({ active = true }: RegisterWorldHeroProps) {
   }, [])
 
   useEffect(() => {
-    animationRef.current?.stop()
-    animationRef.current = null
-    floatProgress.setValue(0)
+    floatProgress.value = 0
     if (!canAnimate) return
-
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatProgress, {
-          duration: 2_400,
-          easing: Easing.inOut(Easing.sin),
-          toValue: 1,
-          useNativeDriver: true
-        }),
-        Animated.timing(floatProgress, {
-          duration: 2_400,
-          easing: Easing.inOut(Easing.sin),
-          toValue: 0,
-          useNativeDriver: true
-        })
-      ]),
-      { resetBeforeIteration: false }
-    )
-    animationRef.current = animation
-    animation.start()
-
-    return () => {
-      animation.stop()
-      if (animationRef.current === animation) animationRef.current = null
-    }
+    // A slow float on the UI thread while visible and in the foreground.
+    const half = { duration: 2_400, easing: Easing.inOut(Easing.sin), reduceMotion: ReduceMotion.Never }
+    floatProgress.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
+    return () => { floatProgress.value = 0 }
   }, [canAnimate, floatProgress])
 
-  const translateY = floatProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, -4]
-  })
-  const translateX = floatProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-1.5, 1.5]
-  })
-  const rotate = floatProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["-0.35deg", "0.35deg"]
-  })
-  const shadowOpacity = floatProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.17, 0.1]
-  })
-  const shadowScaleX = floatProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.93]
-  })
+  const shadowStyle = useAnimatedStyle(() => ({
+    opacity: 0.17 - 0.07 * floatProgress.value,
+    transform: [{ scaleX: 1 - 0.07 * floatProgress.value }]
+  }))
+  const heroStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: -1.5 + 3 * floatProgress.value },
+      { translateY: 2 - 6 * floatProgress.value },
+      { rotate: `${-0.35 + 0.7 * floatProgress.value}deg` }
+    ]
+  }))
 
   return (
     <View
@@ -89,22 +63,14 @@ export function RegisterWorldHero({ active = true }: RegisterWorldHeroProps) {
       style={styles.stage}
       testID="register-world-hero"
     >
-      <Animated.View
-        style={[
-          styles.shadow,
-          { opacity: shadowOpacity, transform: [{ scaleX: shadowScaleX }] }
-        ]}
-      />
+      <Animated.View style={[styles.shadow, shadowStyle]} />
       <Animated.Image
         accessibilityIgnoresInvertColors
         accessible={false}
         fadeDuration={0}
         resizeMode="contain"
         source={WORLD_HERO}
-        style={[
-          styles.image,
-          { transform: [{ translateX }, { translateY }, { rotate }] }
-        ]}
+        style={[styles.image, heroStyle]}
       />
     </View>
   )
