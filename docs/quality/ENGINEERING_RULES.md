@@ -55,6 +55,7 @@ Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.tes
 Elsewhere (mobile paths are relative to `apps/mobile`):
 
 - Route params carry serialisable data only, never functions or class instances (`src/navigation/routeParamsSerialisable.test.mjs`).
+- Bottom sheets open through `useNativeSheet` (`src/navigation/nativeSheets`): an iOS `formSheet` route whose params are ids only, while props and callbacks stay in memory with the opener; Android keeps `ui/ModalBottomSheet`. Sheet content closes itself with `useSheetPresentation().close(afterDismiss)`, so navigation after a sheet runs once it is gone. Root code that asks "which screen is the user on" reads `getRootRouteBeneathSheets()`, and screens use `useIsFocusedBeneathSheets()`, so a sheet never counts as leaving its screen.
 - `src/features/session/accountSwitchIsolation.test.ts`: module-level stores and caches are keyed by account and reset on account switch. Cached data once leaked between accounts.
 - The `crashPrivacy` and analytics allowlist tests: crash reports carry only the allowlisted route-name tag, and analytics carry no IDs or personal data.
 - `src/features/shop/shopReleaseCatalog.test.ts` (`test:shop-preview-assets`): every published item's runtime files are SHA-256 bound to its receipt.

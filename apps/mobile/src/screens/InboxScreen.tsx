@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native"
+import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -78,7 +78,7 @@ export function InboxScreen(props: InboxScreenProps) {
   )
   const lastFocusRefreshAtRef = useRef(0)
   // The list shows each new message in its row: no message banner on top.
-  const isFocused = useIsFocused()
+  const isFocused = useIsFocusedBeneathSheets()
   useMessageAlertSuppression(isFocused)
 
   useEffect(() => {

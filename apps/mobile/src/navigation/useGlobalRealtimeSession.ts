@@ -36,7 +36,7 @@ import { isRealtimeAuthInvalidClose } from "@blumi/realtime-client"
 import { hydrateBlockedUsersFromServer } from "../features/safety/blockStore"
 import type { SessionActor } from "../features/session/sessionModel"
 import { showToast } from "../ui/toast"
-import { navigationRef } from "./rootNavigationRef"
+import { getRootRouteBeneathSheets } from "./nativeSheets/rootRouteBeneathSheets"
 import type { RootStackParamList } from "./RootNavigator"
 import type { useMatchModal } from "./useMatchModal"
 import type { useRootChatSync } from "./useRootChatSync"
@@ -46,7 +46,7 @@ type RootChatSync = ReturnType<typeof useRootChatSync>
 
 /** The conversation on screen (a chat thread, or the thread behind a MiniRoom). */
 function readActiveConversationThreadId(): string | undefined {
-  const route = navigationRef.getCurrentRoute()
+  const route = getRootRouteBeneathSheets()
   return route?.name === "ChatThread"
     ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
     : route?.name === "MiniRoom"
@@ -135,7 +135,7 @@ export function useGlobalRealtimeSession({
     resetInactiveSessionState,
     refreshProductionThreads,
     resynchronizeActiveConversation: () => {
-      const route = navigationRef.getCurrentRoute()
+      const route = getRootRouteBeneathSheets()
       const threadId = route?.name === "ChatThread"
         ? (route.params as RootStackParamList["ChatThread"] | undefined)?.threadId
         : route?.name === "MiniRoom"

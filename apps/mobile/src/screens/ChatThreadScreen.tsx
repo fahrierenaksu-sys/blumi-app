@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useIsFocused } from "@react-navigation/native"
+import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useState } from "react"
 import {
@@ -75,7 +75,7 @@ const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
 
 export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
-  const isFocused = useIsFocused()
+  const isFocused = useIsFocusedBeneathSheets()
   const { height: windowHeight } = useWindowDimensions()
   const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
   const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
