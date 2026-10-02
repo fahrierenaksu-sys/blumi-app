@@ -46,15 +46,58 @@ export function createChatMessageDeliveryService(options: {
     enabled: process.env.BLUMI_CHAT_LATENCY_DIAGNOSTICS === "1"
   })
 
+  /**
+   * Live fan-out outcomes of messages this service persisted, until their
+   * outbox dispatch reads them (by message ID).
+   */
+  const liveFanouts = new Map<string, Promise<LiveFanoutOutcome>>()
+
+  /**
+   * Sends a just-persisted message to the participants' sockets at once,
+   * outside the thread's outbox chain (2026-10-02). That chain also waits on
+   * push enqueue and outbox completion, several database round trips per
+   * message, so when both partners sent at the same moment the second
+   * message reached the other phone only after the first one's push work.
+   * Live order is still kept: a message's sockets are written only after the
+   * thread's previous live fan-out, while its own block check already runs.
+   * The outbox dispatch reuses the outcome instead of repeating the block
+   * check and the fan-out; the recovery worker (after a restart) fans out
+   * itself.
+   */
+  const startLiveFanout = (message: ChatMessage, thread: ChatThreadMembers): void => {
+    const recipients = thread.participantUserIds.filter((id) => id !== message.senderUserId)
+    // Started now, in parallel with any earlier message's fan-out.
+    const blockCheck = Promise.all(recipients.map((id) => safetyService.hasBlockBetween(message.senderUserId, id)))
+    // Settled through the chain below; never an unhandled rejection meanwhile.
+    blockCheck.catch(() => undefined)
+    const outcome = enqueueLiveFanout(chatService, thread.threadId, async (): Promise<LiveFanoutOutcome> => {
+      try {
+        // Kept after the send statement's own check: it guards a block that
+        // lands while the message is being persisted.
+        if ((await blockCheck).some(Boolean)) return { kind: "blocked" }
+        await measure("fanout", () => connectionManager.sendToUsersDurably(
+          thread.participantUserIds,
+          { type: "chat.message_received", payload: message }
+        ))
+        return { kind: "delivered" }
+      } catch (error) {
+        return { kind: "failed", error }
+      }
+    })
+    liveFanouts.set(message.messageId, outcome)
+  }
+
   const dispatchPostPersistEffects = async (
     message: ChatMessage,
     thread: ChatThreadMembers,
     recipientUserIds: string[],
     leased?: { job: { leaseToken: string; attempt: number }; leaseUntil: number; recipientPersonas: TestPersona[] }
   ): Promise<void> => {
+    const live = liveFanouts.get(message.messageId)
+    liveFanouts.delete(message.messageId)
     try {
-      if (leased) await dispatchLeased(message, thread, leased.job, leased.leaseUntil)
-      else await dispatchClaimedInChain(new Date(), message.messageId, thread)
+      if (leased) await dispatchLeased(message, thread, leased.job, leased.leaseUntil, live)
+      else await dispatchClaimedInChain(new Date(), message.messageId, thread, live)
     } catch (error) {
       options.reportError?.(error)
     }
@@ -101,6 +144,8 @@ export function createChatMessageDeliveryService(options: {
       if (checked.kind === "answered") return { message: checked.message, created: false }
       const { message, members } = checked
       const recipientUserIds = members.participantUserIds.filter((userId) => userId !== input.senderUserId)
+      // A retry is delivered by its outbox job only, so it never fans out twice.
+      if (checked.created) startLiveFanout(message, members)
       // The persisted message plus durable outbox row is the send ACK; the
       // dispatch below is serialized per thread, as in the stepwise path.
       void enqueueThreadDispatch(chatService, members.threadId, () => dispatchPostPersistEffects(
@@ -163,7 +208,9 @@ export function createChatMessageDeliveryService(options: {
     // fanout and synthetic test-persona replies must not delay that confirmation.
     // The periodic worker recovers the outbox if this process exits mid-dispatch.
     // Serialized per thread, in persist order, so a slower dispatch of an
-    // earlier message is never overtaken by the next one (live order).
+    // earlier message is never overtaken by the next one (live order). The
+    // live fan-out goes ahead of that chain (see startLiveFanout).
+    if (delivery.created) startLiveFanout(delivery.message, thread)
     void enqueueThreadDispatch(chatService, thread.threadId, () => dispatchPostPersistEffects(
       delivery.message,
       thread,
@@ -208,9 +255,14 @@ export function createChatMessageDeliveryService(options: {
    * chain (the inline path already holds the chain, so it must not queue
    * behind itself).
    */
-  async function dispatchClaimedInChain(now: Date, messageId: string, thread: ChatThreadMembers): Promise<void> {
+  async function dispatchClaimedInChain(
+    now: Date,
+    messageId: string,
+    thread: ChatThreadMembers,
+    live?: Promise<LiveFanoutOutcome>
+  ): Promise<void> {
     const jobs = await chatService.repository.claimDeliveries({ now, limit: 50, leaseMs: DELIVERY_LEASE_MS, messageId })
-    for (const job of jobs) await dispatchJob(job, now, thread)
+    for (const job of jobs) await dispatchJob(job, now, thread, job.message.messageId === messageId ? live : undefined)
   }
 
   /**
@@ -224,7 +276,8 @@ export function createChatMessageDeliveryService(options: {
     message: ChatMessage,
     thread: ChatThreadMembers,
     lease: { leaseToken: string; attempt: number },
-    leaseUntil: number
+    leaseUntil: number,
+    live?: Promise<LiveFanoutOutcome>
   ): Promise<void> {
     const now = new Date()
     if (leaseUntil - now.getTime() < DELIVERY_LEASE_MS - leaseRenewAfterMs) {
@@ -232,10 +285,15 @@ export function createChatMessageDeliveryService(options: {
         message.messageId, lease.leaseToken, new Date(now.getTime() + DELIVERY_LEASE_MS))
       if (!renewed) return
     }
-    await dispatchJob({ message, leaseToken: lease.leaseToken, attempt: lease.attempt }, now, thread)
+    await dispatchJob({ message, leaseToken: lease.leaseToken, attempt: lease.attempt }, now, thread, live)
   }
 
-  async function dispatchJob(job: ChatDeliveryJob, now: Date, knownThread?: ChatThreadMembers): Promise<void> {
+  async function dispatchJob(
+    job: ChatDeliveryJob,
+    now: Date,
+    knownThread?: ChatThreadMembers,
+    live?: Promise<LiveFanoutOutcome>
+  ): Promise<void> {
     const { message, leaseToken } = job
     try {
       const thread = knownThread?.threadId === message.threadId
@@ -246,9 +304,16 @@ export function createChatMessageDeliveryService(options: {
         return
       }
       const recipients = thread.participantUserIds.filter((id) => id !== message.senderUserId)
-      const blocked = await Promise.all(recipients.map((id) => safetyService.hasBlockBetween(message.senderUserId, id)))
-      if (!blocked.some(Boolean)) {
-        await measure("fanout", () => connectionManager.sendToUsersDurably(thread.participantUserIds, { type: "chat.message_received", payload: message }))
+      const liveOutcome = live ? await live : undefined
+      // A failed live fan-out fails this attempt: the job is retried with backoff.
+      if (liveOutcome?.kind === "failed") throw liveOutcome.error
+      const allowed = liveOutcome
+        ? liveOutcome.kind === "delivered"
+        : !(await Promise.all(recipients.map((id) => safetyService.hasBlockBetween(message.senderUserId, id)))).some(Boolean)
+      if (allowed) {
+        if (!liveOutcome) {
+          await measure("fanout", () => connectionManager.sendToUsersDurably(thread.participantUserIds, { type: "chat.message_received", payload: message }))
+        }
         await Promise.all(recipients.map(async (userId) => {
           await measure("push_enqueue", () => notificationService.sendPushToUser(userId, {
             title: "Blumi", body: "You have a new message.",
@@ -299,6 +364,32 @@ function settleWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
  * lease).
  */
 const threadDispatchChains = new WeakMap<ChatService, Map<string, Promise<void>>>()
+
+/** What a live fan-out did; the outbox dispatch of the same message reuses it. */
+type LiveFanoutOutcome = { kind: "delivered" } | { kind: "blocked" } | { kind: "failed"; error: unknown }
+
+/**
+ * Live fan-out order per chat service and thread (shared by the HTTP route
+ * and the realtime router, like the dispatch chains). Each link waits only on
+ * the previous message's socket writes, never on push or outbox work.
+ */
+const liveFanoutChains = new WeakMap<ChatService, Map<string, Promise<unknown>>>()
+
+function enqueueLiveFanout<T>(chatService: ChatService, threadId: string, fanout: () => Promise<T>): Promise<T> {
+  let chains = liveFanoutChains.get(chatService)
+  if (!chains) {
+    chains = new Map()
+    liveFanoutChains.set(chatService, chains)
+  }
+  const threadChains = chains
+  const current = (threadChains.get(threadId) ?? Promise.resolve()).then(fanout)
+  const tail = current.catch(() => undefined)
+  threadChains.set(threadId, tail)
+  void tail.then(() => {
+    if (threadChains.get(threadId) === tail) threadChains.delete(threadId)
+  })
+  return current
+}
 
 function enqueueThreadDispatch(chatService: ChatService, threadId: string, dispatch: () => Promise<void>): Promise<void> {
   let chains = threadDispatchChains.get(chatService)
