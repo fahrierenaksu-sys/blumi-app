@@ -475,7 +475,7 @@ test("the partner's avatar at the top left opens their profile; it waits while t
   const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) }
   const styles = new Proxy({}, { get: (_target, key) => String(key) })
   const Header = runInNewContext(code, {
-    React, styles, View: "View", Text: "Text", Pressable: "Pressable", ParticipantAvatar: "Avatar",
+    React, styles, View: "View", Text: "Text", Pressable: "Pressable", PressableScale: "PressableScale", ParticipantAvatar: "Avatar",
     ActionButtonCircle: "Circle", Ionicons: "Icon", uiTheme: { colors: {} }
   })
   const copy = {

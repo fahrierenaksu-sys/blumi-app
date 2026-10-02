@@ -19,6 +19,7 @@ import { captureProductEvent } from "../analytics/productAnalytics"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getReportModalCopy } from "../features/safety/reportModalCopy"
+import { PressableScale } from "../ui/PressableScale"
 
 interface ReportModalProps {
   visible: boolean
@@ -220,7 +221,7 @@ export function ReportModal(props: ReportModalProps) {
             <Text style={styles.title}>
               {copy.title(targetDisplayName, step)}
             </Text>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={copy.closeAccessibilityLabel}
               accessibilityState={{ disabled: isSubmitting }}
@@ -229,7 +230,7 @@ export function ReportModal(props: ReportModalProps) {
               hitSlop={8}
             >
               <Ionicons name="close" size={22} color={uiTheme.colors.textMuted} />
-            </Pressable>
+            </PressableScale>
           </View>
 
           {step === "reason" ? (
@@ -323,7 +324,7 @@ export function ReportModal(props: ReportModalProps) {
                   {isSubmitting ? copy.sending : copy.reportAndHide}
                 </Text>
               </Pressable>
-              <Pressable
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={copy.goBackAccessibilityLabel}
                 accessibilityState={{ disabled: isSubmitting }}
@@ -335,7 +336,7 @@ export function ReportModal(props: ReportModalProps) {
                   <Ionicons name="arrow-back" size={16} color={uiTheme.colors.textMuted} />
                   <Text style={styles.backLink}>{copy.goBack}</Text>
                 </View>
-              </Pressable>
+              </PressableScale>
             </View>
           ) : (
             <View style={styles.body}>

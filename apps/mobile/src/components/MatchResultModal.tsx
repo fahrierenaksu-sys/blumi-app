@@ -36,6 +36,7 @@ import {
 } from "../features/matches/matchResultPresentation"
 import { getAppLocale } from "../features/session/appLocale"
 import { uiTheme } from "../ui/theme"
+import { PressableScale } from "../ui/PressableScale"
 
 interface MatchResultModalProps {
   visible: boolean
@@ -312,14 +313,14 @@ export function MatchResultModal(props: MatchResultModalProps) {
         <Animated.View style={[styles.modalCard, cardMotionStyle]}>
           <ConfettiOverlay playing={visible && motion.confetti} />
 
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel={presentation.closeLabel}
             style={styles.closeButton}
             onPress={onClose}
           >
             <Ionicons accessible={false} name="close" size={20} color={uiTheme.colors.secondaryText} />
-          </Pressable>
+          </PressableScale>
 
           <Text style={styles.headline}>{presentation.headline}</Text>
           <Text style={styles.supportText}>{presentation.body}</Text>

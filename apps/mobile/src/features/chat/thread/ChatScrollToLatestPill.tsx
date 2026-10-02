@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated"
 import { useReducedMotion } from "../../../ui/animations"
 import { uiTheme } from "../../../ui/theme"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { formatScrollToLatestCount } from "./chatScrollToLatestModel"
+import { PressableScale } from "../../../ui/PressableScale"
 
 const PILL_ENTERING = FadeIn.duration(160).reduceMotion(ReduceMotion.Never)
 const PILL_EXITING = FadeOut.duration(140).reduceMotion(ReduceMotion.Never)
@@ -33,7 +34,7 @@ export function ChatScrollToLatestPill({
       entering={reduceMotion ? undefined : PILL_ENTERING}
       exiting={reduceMotion ? undefined : PILL_EXITING}
     >
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={chatCopy.scrollToLatestLabel(count)}
         hitSlop={8}
@@ -46,7 +47,7 @@ export function ChatScrollToLatestPill({
             <Text style={styles.badgeText}>{formatScrollToLatestCount(count)}</Text>
           </View>
         ) : null}
-      </Pressable>
+      </PressableScale>
     </Animated.View>
   )
 }
