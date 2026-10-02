@@ -20,6 +20,7 @@ This test runs in `npm --workspace @blumi/mobile run test:theme`, which is part 
 | Mobile HTTP only through `requestJson` (deadline, abort, error mapping) | Any raw `fetch(` |
 | Injected fetchers run inside `requestJson` | `await fetcher(` outside `features/network/apiClient.ts` and `features/inventory/economyApi.ts`. A direct call once left room invites busy forever |
 | No per-frame JS loops | Any `requestAnimationFrame(` or `setInterval(`, even when it isn't animation, outside `features/roomV2/editor/useRoomEditorStageLayout.ts`. Drive motion on the UI or native thread. A renderer that must own its loop can join the allowlist with frame-time evidence |
+| No `LayoutAnimation` | Any `LayoutAnimation` outside `screens/InboxScreen.tsx`. It re-lays out a whole subtree, so keyboard and panel motion jumped and could not be interrupted |
 | Reduce Motion from the shared store | An `AccessibilityInfo` reduce-motion query or listener outside `ui/motion.ts` |
 | Reduce Transparency from the shared store | `isReduceTransparencyEnabled` or `reduceTransparencyChanged` outside `ui/reduceTransparency.ts` and `ui/reduceTransparencyStore.ts` |
 | JS-driver animation | Any `useNativeDriver: false`. Animate transform and opacity on the native driver or with Reanimated |

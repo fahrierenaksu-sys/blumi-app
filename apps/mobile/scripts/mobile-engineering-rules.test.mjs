@@ -64,6 +64,21 @@ test("no new requestAnimationFrame or setInterval loops in production code", () 
   assert.deepEqual(offenders, [], "run motion on the UI or native thread, not JS timers")
 })
 
+// LayoutAnimation re-lays out a whole subtree on the JS side, so keyboard and
+// panel motion jumped and could not be interrupted. Motion animates transform
+// and opacity on the UI thread. Existing entries are known debt.
+const LAYOUT_ANIMATION_DEBT = new Set([
+  "screens/InboxScreen.tsx"
+])
+
+test("no new LayoutAnimation in production code", () => {
+  const offenders = sources
+    .filter(({ text }) => /\bLayoutAnimation\b/.test(text))
+    .map(({ path }) => path)
+    .filter((path) => !LAYOUT_ANIMATION_DEBT.has(path))
+  assert.deepEqual(offenders, [], "animate transform/opacity with Reanimated instead of LayoutAnimation")
+})
+
 // Only the shared reduced-motion source may talk to AccessibilityInfo for
 // reduce-motion; everything else uses the shared store/hook.
 const REDUCE_MOTION_SOURCES = new Set(["ui/motion.ts"])
