@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import {
   Keyboard,
+  LayoutAnimation,
   Platform,
   useWindowDimensions,
   type KeyboardEvent
@@ -19,15 +20,15 @@ const HIDDEN: MiniRoomKeyboardState = { visible: false, inset: 0, durationMs: 0 
 
 /**
  * The system keyboard's measured frame, updated once per keyboard event (show,
- * hide, suggestion bar or layout change) — never per frame. The chat panel
- * follows with a UI-thread layout transition of the keyboard's duration
- * (MiniRoomChatPanel); the room camera does not re-lay out at all (it moves
+ * hide, suggestion bar or layout change) — never per frame. The chat panel's
+ * small layout change rides the keyboard's own native animation curve unless
+ * Reduce Motion is on; the room camera does not re-lay out at all (it moves
  * by UI-thread transform, useMiniRoomCameraTransform).
  *
  * iOS reports the end frame, so the overlap is exact for every keyboard size.
  * Android keeps its window-resize behaviour: the flag changes, no inset is added.
  */
-export function useMiniRoomKeyboard(): MiniRoomKeyboardState {
+export function useMiniRoomKeyboard(reduceMotion: boolean): MiniRoomKeyboardState {
   const { height: windowHeight } = useWindowDimensions()
   const [state, setState] = useState<MiniRoomKeyboardState>(HIDDEN)
   const lastRef = useRef<MiniRoomKeyboardState>(HIDDEN)
@@ -38,6 +39,12 @@ export function useMiniRoomKeyboard(): MiniRoomKeyboardState {
       if (last.visible === frame.visible && last.inset === frame.inset) return
       const next = { ...frame, durationMs: event && event.duration > 0 ? event.duration : 0 }
       lastRef.current = next
+      if (!reduceMotion && event && event.duration > 0) {
+        LayoutAnimation.configureNext({
+          duration: event.duration,
+          update: { duration: event.duration, type: LayoutAnimation.Types.keyboard }
+        })
+      }
       setState(next)
     }
 
@@ -63,7 +70,7 @@ export function useMiniRoomKeyboard(): MiniRoomKeyboardState {
       showSubscription.remove()
       hideSubscription.remove()
     }
-  }, [windowHeight])
+  }, [reduceMotion, windowHeight])
 
   return state
 }
