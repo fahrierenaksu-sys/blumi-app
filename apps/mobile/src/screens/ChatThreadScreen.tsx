@@ -3,14 +3,14 @@ import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocus
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useCallback, useMemo, useRef, useState } from "react"
 import {
-  KeyboardAvoidingView,
   type ListRenderItem,
-  Platform,
+  type ScrollViewProps,
   Text,
   useWindowDimensions,
   View
 } from "react-native"
 import Animated from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { getMessageRenderKey, useChatThreadStore } from "../features/chat/chatStore"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -19,6 +19,11 @@ import { ReportModal } from "../components/ReportModal"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle, TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
+import {
+  ChatKeyboardScrollView,
+  KeyboardCenteredView,
+  KeyboardGluedFooter
+} from "../ui/keyboard"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { ChatThread } from "@blumi/contracts"
 import { createMatchFromPersistedThread } from "../features/matches/matchRoomModel"
@@ -223,7 +228,20 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     clearRequest: () => navigation.setParams({ roomInviteRequest: undefined })
   })
 
-  const scrollToLatestState = useChatScrollToLatest({ newestFirstTimeline, currentUserId })
+  // The composer pads itself by the bottom safe area; while the keyboard is
+  // open that padding rests on the keyboard instead of leaving a gap (CHT-03).
+  const composerBottomInset = useSafeAreaInsets().bottom
+  const renderMessageScroll = useCallback(
+    (scrollProps: ScrollViewProps) => (
+      <ChatKeyboardScrollView {...scrollProps} bottomOffset={composerBottomInset} />
+    ),
+    [composerBottomInset]
+  )
+  const scrollToLatestState = useChatScrollToLatest({
+    newestFirstTimeline,
+    currentUserId,
+    bottomOffset: composerBottomInset
+  })
   const { scrollToLatest, isAway: isScrolledAway } = scrollToLatestState
   const sendFlightChannel = getChatSendFlightChannel(resolvedThreadId)
   const composerSurfaceRef = useRef<View>(null)
@@ -356,15 +374,15 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           onClose={() => setReportVisible(false)}
         />
 
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={0}
-        >
+        {/* iOS: the list and the footer follow the keyboard frame on the UI
+            thread, including an interactive drag-to-dismiss. Android keeps
+            its window resize (ui/keyboard.tsx). */}
+        <View style={styles.flex}>
           <ChatNotificationPermissionCard key={currentUserId} userId={currentUserId}
             mode={sessionActor.session.mode} isFocused={isFocused} locale={chatLocale}
             registration={props.pushRegistration} />
           {showsTimelineEmptyState ? (
+            <KeyboardCenteredView bottomInset={composerBottomInset} style={styles.flex}>
             <ChatThreadEmptyState
               chatCopy={chatCopy}
               isPendingThread={isPendingThread}
@@ -377,10 +395,12 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               partnerUserId={partnerUserId}
               partnerAvatar={partnerAvatar}
             />
+            </KeyboardCenteredView>
           ) : (
             <View style={styles.flex}>
             <Animated.FlatList
               ref={scrollToLatestState.listRef}
+              renderScrollComponent={renderMessageScroll}
               data={newestFirstTimeline}
               inverted
               onScroll={scrollToLatestState.scrollHandler}
@@ -404,15 +424,21 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               }
               renderItem={renderTimelineRow}
             />
-            <ChatScrollToLatestPill
-              visible={scrollToLatestState.isAway}
-              count={scrollToLatestState.unseenCount}
-              chatCopy={chatCopy}
-              onPress={scrollToLatest}
-            />
             </View>
           )}
 
+          <KeyboardGluedFooter bottomInset={composerBottomInset}>
+          {showsTimelineEmptyState ? null : (
+            // Rides with the composer so it never hides under the keyboard.
+            <View pointerEvents="box-none" style={styles.scrollToLatestAnchor}>
+              <ChatScrollToLatestPill
+                visible={scrollToLatestState.isAway}
+                count={scrollToLatestState.unseenCount}
+                chatCopy={chatCopy}
+                onPress={scrollToLatest}
+              />
+            </View>
+          )}
           <ChatTypingBubble threadId={resolvedThreadId} partnerUserId={partnerUserId} partnerName={partnerName} locale={chatLocale} />
           <ChatComposer
             draftTyping={draftTyping}
@@ -428,7 +454,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             onSend={handleSend}
             surfaceRef={composerSurfaceRef}
           />
-        </KeyboardAvoidingView>
+          </KeyboardGluedFooter>
+        </View>
       </SafeAreaView>
     </View>
   )

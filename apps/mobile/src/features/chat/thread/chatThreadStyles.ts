@@ -56,6 +56,13 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "transparent"
   },
+  scrollToLatestAnchor: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: "100%",
+    height: 72,
+  },
   messageListContainer: {
     flex: 1,
   },
