@@ -52,6 +52,7 @@ import { uiTheme } from "../../ui/theme"
 import { formatDiscoveryCardBio } from "../discovery/discoveryCandidateModel"
 import {
   DISCOVERY_CARD_FLIP_DURATION,
+  getDiscoveryCardFlipLift,
   normalizeDiscoveryCardBack
 } from "../discovery/discoveryCardFlipModel"
 import type { DiscoveryCardLayoutMetrics } from "../discovery/discoveryLayoutMetrics"
@@ -246,11 +247,25 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   // Both faces stay mounted while the card turns so no blank swap frame can
   // appear. Reduce Motion crossfades the faces in place instead of turning.
   const frontFaceStyle = useAnimatedStyle(() => reduceMotion
-    ? { opacity: 1 - flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }] }
-    : { opacity: 1, transform: [{ perspective: 1000 }, { rotateY: `${Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` }] })
+    ? { opacity: 1 - flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }, { scale: 1 }] }
+    : {
+      opacity: 1,
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` },
+        { scale: getDiscoveryCardFlipLift(flipProgress.value) }
+      ]
+    })
   const backFaceStyle = useAnimatedStyle(() => reduceMotion
-    ? { opacity: flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }] }
-    : { opacity: 1, transform: [{ perspective: 1000 }, { rotateY: `${180 + Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` }] })
+    ? { opacity: flipProgress.value, transform: [{ perspective: 1000 }, { rotateY: "0deg" }, { scale: 1 }] }
+    : {
+      opacity: 1,
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${180 + Math.min(1, Math.max(0, flipProgress.value)) * 180}deg` },
+        { scale: getDiscoveryCardFlipLift(flipProgress.value) }
+      ]
+    })
   const sheenStyle = useAnimatedStyle(() => ({
     opacity: reduceMotion
       ? 0

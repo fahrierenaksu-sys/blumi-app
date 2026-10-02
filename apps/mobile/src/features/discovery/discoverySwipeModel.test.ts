@@ -25,6 +25,8 @@ import {
   getDiscoverMiddleCardMotion,
   getDiscoverStampOpacity,
   getDiscoverSwipeOutDuration,
+  getDiscoverThrowArcY,
+  DISCOVER_BUTTON_THROW_VELOCITY,
   getDiscoverSwipeOutX,
   getDiscoverSwipeRotation,
   getDiscoverSwipeThreshold,
@@ -293,12 +295,13 @@ test("a promotion blends between slots instead of jumping", () => {
   assert.deepEqual(getDiscoverDeckRoleMotion(TOP + 0.1, rest), top)
 })
 
-test("the promotion spring is short and critically damped", () => {
-  const { stiffness, damping, mass } = DISCOVER_PROMOTION_SPRING
-  assert.ok(Math.abs(damping - 2 * Math.sqrt(stiffness * mass)) < 1e-9, "critical damping: no overshoot")
-  // A critically damped spring is within 1% after about 6.64 / ω seconds.
-  const settleSeconds = 6.64 / Math.sqrt(stiffness / mass)
-  assert.ok(settleSeconds <= 0.4, `settles in ${settleSeconds.toFixed(3)} s`)
+test("the promotion spring is short and barely overshoots, and the slot clamps what it does", () => {
+  const { duration, dampingRatio } = DISCOVER_PROMOTION_SPRING
+  assert.ok(duration <= 400, `settles in ${duration} ms`)
+  assert.ok(dampingRatio >= 0.8 && dampingRatio <= 1, "no visible wobble")
+  // Whatever the spring overshoots, the card never leaves its new slot's pose.
+  const rest = getDiscoverDeckDragMotion("top", 0)
+  assert.deepEqual(getDiscoverDeckRoleMotion(TOP + 0.08, rest), getDiscoverDeckRoleMotion(TOP, rest))
 })
 
 test("the frosted layer clears with the drag, so it is not still frosted after the release (DSC-11)", () => {
@@ -333,7 +336,24 @@ test("a card arriving at the back of the deck fades in (and grows only when moti
   assert.deepEqual(getDiscoverDeckEntrance(1.2, false), { opacity: 1, scale: 1 })
 })
 
-test("a Like or Pass button exit animates, and is instant under Reduce Motion (DSC-10)", () => {
-  assert.ok(getDiscoverActionExitDuration(false) > 0)
-  assert.equal(getDiscoverActionExitDuration(true), 0)
+test("a Like or Pass button throws the card like a brisk swipe, and is instant under Reduce Motion (DSC-10)", () => {
+  const width = 390
+  const thrown = getDiscoverActionExitDuration(false, width)
+  // The same velocity model as a released swipe: a brisk release from rest.
+  assert.equal(thrown, getDiscoverSwipeOutDuration(getDiscoverSwipeOutX("right", width), DISCOVER_BUTTON_THROW_VELOCITY))
+  assert.ok(thrown > 0 && thrown <= 260)
+  assert.equal(getDiscoverActionExitDuration(true, width), 0)
+})
+
+test("a thrown card rises on an arc as it leaves and levels off at the edge", () => {
+  const width = 390
+  const outX = getDiscoverSwipeOutX("right", width)
+  assert.equal(getDiscoverThrowArcY(0, width), 0)
+  const quarter = getDiscoverThrowArcY(outX / 4, width)
+  const half = getDiscoverThrowArcY(-outX / 2, width)
+  const end = getDiscoverThrowArcY(outX, width)
+  assert.ok(quarter < 0 && half < quarter && end < half, "it keeps rising, whichever side it leaves by")
+  assert.ok(end - half > half - quarter, "and levels off near the edge")
+  assert.equal(getDiscoverThrowArcY(outX * 2, width), end)
+  assert.equal(getDiscoverThrowArcY(100, 0), 0)
 })

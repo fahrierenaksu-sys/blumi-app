@@ -7,6 +7,20 @@ export const DISCOVERY_CARD_FLIP_EASING = "easeInOut" as const
  */
 export const DISCOVERY_ACTION_ROW_FADE_DURATION = 150
 
+/** How much the card lifts toward the viewer at the middle of its turn. */
+export const DISCOVERY_CARD_FLIP_LIFT = 0.04
+
+/**
+ * The real 3D turn (perspective + rotateY) lifts the card a little toward the
+ * viewer at its edge-on midpoint and sets it down again, so it reads as a
+ * card turned over in the hand rather than a flat swap.
+ */
+export function getDiscoveryCardFlipLift(progress: number): number {
+  "worklet"
+  const clamped = Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : 0))
+  return 1 + DISCOVERY_CARD_FLIP_LIFT * Math.sin(Math.PI * clamped)
+}
+
 export interface DiscoveryCardFlipState {
   readonly frontRotation: `${number}deg`
   readonly backRotation: `${number}deg`

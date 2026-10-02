@@ -24,6 +24,7 @@ import {
   getDiscoverSwipeThreshold,
   getDiscoverSwipeThresholdSide,
   getDiscoverSwipeTranslateX,
+  getDiscoverThrowArcY,
   isDiscoverSwipeLowerHalfGrab,
   resolveDiscoverSwipeRelease,
   shouldClaimDiscoverSwipe,
@@ -67,6 +68,8 @@ const STAMP_POP_SETTLE = { ...MOTION_SPRINGS.snappy, reduceMotion: ReduceMotion.
 export interface DiscoverCardExitRequest {
   direction: DiscoverSwipeDirection
   durationMs: number
+  /** A Like/Pass press: the card is thrown on an arc (see getDiscoverThrowArcY). */
+  thrown?: boolean
 }
 
 export function useDiscoverCardSwipe(input: {
@@ -97,6 +100,7 @@ export function useDiscoverCardSwipe(input: {
   // The leaving card's own position, so the shared drag is free at release.
   const exitX = useSharedValue(0)
   const exiting = useSharedValue(false)
+  const exitThrown = useSharedValue(false)
   const pagerGestureRef = useMainTabPagerGestureRef()
   const swipeThreshold = getDiscoverSwipeThreshold(screenWidth)
 
@@ -112,11 +116,12 @@ export function useDiscoverCardSwipe(input: {
     onExitEnd?.(cardId)
   }, [cardId, onExitEnd])
 
-  const forceSwipe = useCallback((direction: DiscoverSwipeDirection, durationMs: number): void => {
+  const forceSwipe = useCallback((direction: DiscoverSwipeDirection, durationMs: number, thrown: boolean): void => {
     "worklet"
     // Leaves from where it is on its own value; the shared drag keeps its
     // release value until the deck hands it to the next card.
     exitX.value = getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
+    exitThrown.value = thrown
     exiting.value = true
     exitX.value = withTiming(getDiscoverSwipeOutX(direction, screenWidth), {
       duration: durationMs,
@@ -126,11 +131,11 @@ export function useDiscoverCardSwipe(input: {
       "worklet"
       if (finished) scheduleOnRN(finishExit)
     })
-  }, [cardId, exitX, exiting, finishExit, ownerId, screenWidth, x])
+  }, [cardId, exitThrown, exitX, exiting, finishExit, ownerId, screenWidth, x])
 
   // A button exit (Like/Pass): the deck already committed the decision.
   useEffect(() => {
-    if (exitRequest) forceSwipe(exitRequest.direction, exitRequest.durationMs)
+    if (exitRequest) forceSwipe(exitRequest.direction, exitRequest.durationMs, exitRequest.thrown === true)
   }, [exitRequest, forceSwipe])
 
   // A card that comes back (a refused decision) follows the shared drag again.
@@ -226,7 +231,7 @@ export function useDiscoverCardSwipe(input: {
       // The commit haptic and the decision belong to the release, not to the
       // end of the exit animation (DSC-10).
       scheduleOnRN(hapticLight)
-      forceSwipe(release, reduceMotion ? 0 : getDiscoverSwipeOutDuration(remaining, velocityTowardExit))
+      forceSwipe(release, reduceMotion ? 0 : getDiscoverSwipeOutDuration(remaining, velocityTowardExit), false)
       scheduleOnRN(commitSwipe, release)
     }), [
     canSwipeRight,
@@ -252,9 +257,11 @@ export function useDiscoverCardSwipe(input: {
 
   const cardSwipeStyle = useAnimatedStyle(() => {
     const translateX = exiting.value ? exitX.value : getDiscoverSwipeTranslateX(ownerId.value, cardId, x.value)
+    const translateY = exiting.value && exitThrown.value && !reduceMotion ? getDiscoverThrowArcY(translateX, screenWidth) : 0
     return {
       transform: [
         { translateX },
+        { translateY },
         { rotate: `${reduceMotion ? 0 : getDiscoverSwipeRotation(translateX, screenWidth, grabbedLowerHalf.value)}deg` }
       ]
     }

@@ -9,9 +9,9 @@ import Animated, {
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming
 } from "react-native-reanimated"
+import { animateTo, type ResolvedMotion } from "../../ui/motion"
 import { SwipeableDiscoverCard, type SwipeableDiscoverProfile } from "../demo/SwipeableDiscoverCard"
 import type { DiscoverCardExitRequest } from "../demo/useDiscoverCardSwipe"
 import { useReducedMotion } from "../../ui/animations"
@@ -132,11 +132,12 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
       setExitRequest({
         userId: featured.userId,
         direction,
-        durationMs: getDiscoverActionExitDuration(reduceMotion)
+        durationMs: getDiscoverActionExitDuration(reduceMotion, screenWidth),
+        thrown: true
       })
       commitTopSwipe(direction, featured.userId)
     },
-    [actionsDisabled, commitTopSwipe, featured, likeDisabled, reduceMotion]
+    [actionsDisabled, commitTopSwipe, featured, likeDisabled, reduceMotion, screenWidth]
   )
 
   useLayoutEffect(() => {
@@ -303,9 +304,9 @@ function DeckCardContainer(props: {
   }, [featuredUserId, promotedDragX, role, swipeOwnerId, swipeX])
   useEffect(() => {
     const target = getDiscoverDeckRoleProgress(role)
-    roleProgress.value = reduceMotion
-      ? target
-      : withSpring(target, { ...DISCOVER_PROMOTION_SPRING, reduceMotion: ReduceMotion.Never })
+    // Snappy promotion; Reduce Motion takes the slot at once (the card's own
+    // opacity and frost still crossfade with it).
+    roleProgress.value = reduceMotion ? target : animateTo(target, PROMOTION_MOTION)
   }, [reduceMotion, role, roleProgress])
   useEffect(() => {
     entrance.value = withTiming(1, { duration: DISCOVER_DECK_ENTRANCE_MS, reduceMotion: ReduceMotion.Never })
@@ -380,6 +381,12 @@ function isProfile(
 
 
 function noopSwipe(_userId: string): void {}
+
+const PROMOTION_MOTION: ResolvedMotion = Object.freeze({
+  kind: "spring",
+  duration: DISCOVER_PROMOTION_SPRING.duration,
+  dampingRatio: DISCOVER_PROMOTION_SPRING.dampingRatio
+})
 
 const styles = StyleSheet.create({
   container: {

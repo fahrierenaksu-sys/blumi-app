@@ -1,3 +1,5 @@
+import { MOTION_SPRINGS } from "../../ui/motionTokens"
+
 /**
  * Discover card swipe rules, shared by the Gesture Handler pan (UI thread)
  * and the deck. The values are the ones the PanResponder implementation used.
@@ -219,11 +221,12 @@ export const DISCOVER_BOTTOM_CARD_MOTION = {
  * back. Short and critically damped (damping = 2 * sqrt(stiffness * mass)),
  * so the card settles without overshooting its slot.
  */
-export const DISCOVER_PROMOTION_SPRING = {
-  stiffness: 400,
-  damping: 40,
-  mass: 1
-} as const
+/**
+ * A card taking the next slot moves on the shared `snappy` token (MOTION_PLAN
+ * §C.2); the role motion clamps any settle past the slot, so the small
+ * overshoot never shows as a wobble.
+ */
+export const DISCOVER_PROMOTION_SPRING = MOTION_SPRINGS.snappy
 
 /** A slot as one number the deck can spring between: bottom 0, middle 1, top 2. */
 export function getDiscoverDeckRoleProgress(role: DiscoverDeckRole): number {
@@ -317,9 +320,31 @@ export function getDiscoverDeckEntrance(
   return { opacity: clamped, scale: reduceMotion ? 1 : mix(0.94, 1, clamped) }
 }
 
-const DISCOVER_ACTION_EXIT_MS = 190
+/** px/s. A Like or Pass press throws the card as a brisk release would. */
+export const DISCOVER_BUTTON_THROW_VELOCITY = 2000
 
-/** A Like or Pass button exit; instant under Reduce Motion (DSC-10). */
-export function getDiscoverActionExitDuration(reduceMotion: boolean): number {
-  return reduceMotion ? 0 : DISCOVER_ACTION_EXIT_MS
+/**
+ * A Like or Pass button exit on the swipe's own velocity model: the time a
+ * release at DISCOVER_BUTTON_THROW_VELOCITY needs to carry the card from rest
+ * to its exit point. Instant under Reduce Motion (DSC-10).
+ */
+export function getDiscoverActionExitDuration(reduceMotion: boolean, screenWidth: number): number {
+  if (reduceMotion) return 0
+  return getDiscoverSwipeOutDuration(getDiscoverSwipeOutX("right", screenWidth), DISCOVER_BUTTON_THROW_VELOCITY)
+}
+
+/** How high a thrown card rises over its exit. */
+export const DISCOVER_THROW_ARC_PX = 36
+
+/**
+ * A button-thrown card travels on an arc: it rises quickly as it leaves and
+ * levels off near the edge, while it leans with its travel as a dragged card
+ * does. `x` is the card's exit translation.
+ */
+export function getDiscoverThrowArcY(x: number, screenWidth: number): number {
+  "worklet"
+  const outX = Math.abs(getDiscoverSwipeOutX("right", screenWidth))
+  if (!(outX > 0) || !Number.isFinite(x)) return 0
+  const t = Math.min(1, Math.abs(x) / outX)
+  return 0 - DISCOVER_THROW_ARC_PX * t * (2 - t)
 }
