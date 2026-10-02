@@ -3,16 +3,17 @@ import type { MiniRoomCopy } from "../miniRoomCopy"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
-import { resolveMiniRoomContentOpacity, type MiniRoomTransitionFrame } from "./miniRoomTransitionModel"
+import { resolveMiniRoomContentOpacity } from "./miniRoomTransitionModel"
 
 /** Reuses the participants' existing room presentation; never changes their loadout. */
-export function MiniRoomContext({ copy, top, partnerName, snapshots, transition, visible }: {
+export function MiniRoomContext({ copy, top, partnerName, snapshots, contentProgress, visible }: {
   copy: MiniRoomCopy; top: number; partnerName: string; snapshots: MiniRoomParticipantAvatarSnapshots
-  transition: SharedValue<MiniRoomTransitionFrame>
+  /** The dock's content progress (crossfades alone under Reduce Motion). */
+  contentProgress: SharedValue<number>
   visible: boolean
 }) {
   const contextStyle = useAnimatedStyle(() => ({
-    opacity: resolveMiniRoomContentOpacity(transition.value.progress).context
+    opacity: resolveMiniRoomContentOpacity(contentProgress.value).context
   }))
   return (
     <Animated.View pointerEvents="none" accessibilityElementsHidden={!visible}

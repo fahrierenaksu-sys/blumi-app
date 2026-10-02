@@ -12,6 +12,8 @@ interface MiniRoomChatPanelProps {
   copy: MiniRoomCopy
   mode: MiniRoomPanelMode
   transition: SharedValue<MiniRoomTransitionFrame>
+  /** What the content opacities follow (crossfades alone under Reduce Motion). */
+  contentProgress: SharedValue<number>
   windowWidth: number
   historyHeight: number
   composerHeight: number
@@ -26,7 +28,7 @@ interface MiniRoomChatPanelProps {
   children: ReactNode
 }
 export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
-  const { copy, mode, transition, windowWidth, historyHeight, composerHeight, historyItems, historyStatus, partnerName,
+  const { copy, mode, transition, contentProgress, windowWidth, historyHeight, composerHeight, historyItems, historyStatus, partnerName,
     recentMessage, onRecentHeightChange, onRecentRowsHeightChange, onCloseKeyboard, scrollToLatestRequest, children } = props
   const typing = mode === "typing"
   const historyDay = copy.historyDay(historyItems[0]?.sentAt)
@@ -41,10 +43,10 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
       borderBottomLeftRadius: 26 * (1 - pose.progress), borderBottomRightRadius: 26 * (1 - pose.progress) }
   })
   const historyStyle = useAnimatedStyle(() => ({
-    opacity: resolveMiniRoomContentOpacity(transition.value.progress).history
+    opacity: resolveMiniRoomContentOpacity(contentProgress.value).history
   }))
   const recentStyle = useAnimatedStyle(() => ({
-    opacity: resolveMiniRoomContentOpacity(transition.value.progress).recent
+    opacity: resolveMiniRoomContentOpacity(contentProgress.value).recent
   }))
   const composerStyle = useAnimatedStyle(() => ({
     bottom: 9 - transition.value.progress,

@@ -1,5 +1,6 @@
 import { resolveMiniRoomCameraTransform, type MiniRoomCameraFrame } from "./miniRoomAvatarStageModel"
 import type { MiniRoomLayout } from "./miniRoomLayout"
+import { MINI_ROOM_DOCK_STEP_MS } from "./miniRoomReducedMotion"
 
 /** One numeric pose: every edge and the room share the same animation clock. */
 export type MiniRoomTransitionFrame = {
@@ -104,7 +105,7 @@ export function resolveMiniRoomTransitionDuration(input: {
   keyboardChanged: boolean; keyboardDurationMs: number; reduceMotion: boolean; opening?: boolean
 }): number {
   if (input.reduceMotion) return 0
-  if (!input.keyboardChanged) return 180
+  if (!input.keyboardChanged) return MINI_ROOM_DOCK_STEP_MS
   const duration = Number.isFinite(input.keyboardDurationMs) && input.keyboardDurationMs > 0
     ? input.keyboardDurationMs : 280
   // The notification reaches JS after UIKit has started rising. Catch up on

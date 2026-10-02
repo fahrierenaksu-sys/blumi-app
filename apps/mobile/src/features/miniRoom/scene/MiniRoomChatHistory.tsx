@@ -9,9 +9,9 @@ import {
   type ListRenderItemInfo,
   type LayoutChangeEvent
 } from "react-native"
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
-import { useReducedMotion } from "../../../ui/animations"
-import { MINI_ROOM_DESIGN_EASING, MINI_ROOM_HISTORY_RESIZE_DURATION_MS } from "./miniRoomReducedMotion"
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
+import { useMotion } from "../../../ui/motion"
+import { MINI_ROOM_DESIGN_EASING, MINI_ROOM_DOCK_STEP_MS } from "./miniRoomReducedMotion"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import { formatRoomChatTime, type RoomChatHistoryItem, type RoomChatHistoryStatus } from "../roomChatHistoryModel"
 
@@ -31,11 +31,13 @@ interface MiniRoomChatHistoryProps {
  */
 export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
   const { copy, items, status, partnerName, height, onRecentRowsHeightChange, scrollToLatestRequest } = props
-  const reduceMotion = useReducedMotion()
+  const { reduceMotion } = useMotion()
   const animatedHeight = useSharedValue(height)
+  // The viewport rides the dock's step (MINI_ROOM_DOCK_STEP_MS), so the
+  // transcript and its dock resize together; Reduce Motion lands at once.
   useEffect(() => {
     animatedHeight.value = reduceMotion ? height : withTiming(height, {
-      duration: MINI_ROOM_HISTORY_RESIZE_DURATION_MS, easing: Easing.bezier(...MINI_ROOM_DESIGN_EASING)
+      duration: MINI_ROOM_DOCK_STEP_MS, easing: Easing.bezier(...MINI_ROOM_DESIGN_EASING), reduceMotion: ReduceMotion.Never
     })
   }, [animatedHeight, height, reduceMotion])
   const heightStyle = useAnimatedStyle(() => ({ height: animatedHeight.value }))

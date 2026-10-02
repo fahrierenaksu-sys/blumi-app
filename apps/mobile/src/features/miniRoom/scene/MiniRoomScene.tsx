@@ -165,7 +165,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     () => resolveMiniRoomRestCamera(layoutInput),
     [layoutInput]
   )
-  const { cameraStyle, transition, animateKeyboard, prepareKeyboardOpen } = useMiniRoomCameraTransform({
+  const { cameraStyle, transition, contentProgress, animateKeyboard, prepareKeyboardOpen } = useMiniRoomCameraTransform({
     rest: restCamera, layout, layoutInput, keyboardInset: keyboard.inset,
     keyboardDurationMs: keyboard.durationMs, reduceMotion
   })
@@ -360,6 +360,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         copy={copy}
         mode={layout.panelMode}
         transition={transition}
+        contentProgress={contentProgress}
         historyHeight={historyLayout.historyHeight}
         composerHeight={layout.composerInputHeight}
         historyItems={chatHistory}
@@ -388,7 +389,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         />
       </MiniRoomChatPanel>
 
-      <MiniRoomContext copy={copy} top={layout.contextTop} transition={transition}
+      <MiniRoomContext copy={copy} top={layout.contextTop} contentProgress={contentProgress}
         visible={layout.historyVisible} partnerName={partnerFirstName} snapshots={participantAvatarSnapshots} />
 
       <StableMiniRoomHud

@@ -8,9 +8,11 @@ import {
   withTiming
 } from "react-native-reanimated"
 import { scheduleOnUI } from "react-native-worklets"
+import { animateTo, resolveMotion } from "../../../ui/motion"
 import type { MiniRoomCameraFrame } from "./miniRoomAvatarStageModel"
 import { resolveMiniRoomLayout, type MiniRoomLayout, type MiniRoomLayoutInput, type MiniRoomPanelMode } from "./miniRoomLayout"
 import { resolveMiniRoomMorphFrame, resolveMiniRoomOpeningProgress, resolveMiniRoomSettlingProgress, resolveMiniRoomTransitionDuration, resolveMiniRoomTransitionTarget, shouldDeferMiniRoomLayout, type MiniRoomTransitionFrame } from "./miniRoomTransitionModel"
+import { MINI_ROOM_DOCK_STEP_MS } from "./miniRoomReducedMotion"
 import type { MiniRoomKeyboardState } from "./useMiniRoomKeyboard"
 
 /**
@@ -18,6 +20,9 @@ import type { MiniRoomKeyboardState } from "./useMiniRoomKeyboard"
  * and content morph share ONE UI-thread clock. The keyboard edge leads the
  * opening; camera and dock top settle together with guaranteed floor clearance.
  * Closing never expands the history at the still-raised keyboard position.
+ * The clock follows UIKit's keyboard duration on purpose (see
+ * MINI_ROOM_DOCK_STEP_MS); Reduce Motion lands the pose at once and
+ * crossfades the content with the ui/motion `crossfade` token.
  */
 export function useMiniRoomCameraTransform(input: {
   rest: MiniRoomCameraFrame
@@ -34,6 +39,10 @@ export function useMiniRoomCameraTransform(input: {
   const clock = useSharedValue(1)
   const timing = useSharedValue({ opening: false, keyboardFraction: 1 })
   const composerClearance = layout.composerInputHeight + 18
+  // Under Reduce Motion the pose lands at once, but the history and recent
+  // text still crossfade (house rule: movement snaps, opacity fades).
+  const contentFade = useSharedValue(target.progress)
+  const contentFadesAlone = useSharedValue(false)
   const transition = useDerivedValue(() => {
     const time = clock.value
     const opening = timing.value.opening
@@ -42,6 +51,9 @@ export function useMiniRoomCameraTransform(input: {
       ? resolveMiniRoomOpeningProgress(time / timing.value.keyboardFraction) : roomProgress
     return resolveMiniRoomMorphFrame(origin.value, destination.value, roomProgress, keyboardProgress, composerClearance)
   })
+  /** The progress the dock's content opacities follow. */
+  const contentProgress = useDerivedValue(() =>
+    contentFadesAlone.value ? contentFade.value : transition.value.progress)
   const previousKeyboard = useRef({ mode: layout.panelMode, inset: keyboardInset })
   const previousTarget = useRef(target)
   const actualTarget = useRef(target)
@@ -62,8 +74,14 @@ export function useMiniRoomCameraTransform(input: {
     previousTarget.current = next
     // Keep the input fast; let the room's last few points settle more slowly.
     const totalDurationMs = opening && durationMs > 0 ? Math.max(durationMs, 320) : durationMs
+    const crossfade = resolveMotion(true).crossfade
     scheduleOnUI((nextPose: MiniRoomTransitionFrame, duration: number, keyboardDuration: number, isOpening: boolean) => {
       "worklet"
+      if (duration === 0) {
+        contentFade.value = contentProgress.value
+        contentFade.value = animateTo(nextPose.progress, crossfade)
+      }
+      contentFadesAlone.value = duration === 0
       origin.value = transition.value
       destination.value = nextPose
       timing.value = { opening: isOpening, keyboardFraction: duration > 0 ? keyboardDuration / duration : 1 }
@@ -72,7 +90,7 @@ export function useMiniRoomCameraTransform(input: {
         duration, easing: Easing.linear, reduceMotion: ReduceMotion.Never
       })
     }, next, totalDurationMs, durationMs, opening)
-  }, [clock, destination, origin, timing, transition])
+  }, [clock, contentFade, contentFadesAlone, contentProgress, destination, origin, timing, transition])
 
   const animateKeyboard = useCallback((frame: MiniRoomKeyboardState, source: "native" | "intent" = "native") => {
     const nextLayout = resolveMiniRoomLayout({ ...layoutInput,
@@ -91,7 +109,7 @@ export function useMiniRoomCameraTransform(input: {
         focusFallback.current = setTimeout(() => {
           focusFallback.current = null
           keyboardIntent.current = null
-          animatePose(actualTarget.current, reduceMotion ? 0 : 180)
+          animatePose(actualTarget.current, reduceMotion ? 0 : MINI_ROOM_DOCK_STEP_MS)
         }, 450)
       }
     }
@@ -136,5 +154,5 @@ export function useMiniRoomCameraTransform(input: {
   const cameraStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: transition.value.cameraX }, { translateY: transition.value.cameraY }, { scale: transition.value.cameraScale }]
   }))
-  return { cameraStyle, transition, animateKeyboard, prepareKeyboardOpen }
+  return { cameraStyle, transition, contentProgress, animateKeyboard, prepareKeyboardOpen }
 }

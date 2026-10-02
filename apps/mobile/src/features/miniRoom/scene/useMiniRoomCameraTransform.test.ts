@@ -14,12 +14,17 @@ function mount(reduceMotion = false) {
   const reanimated = createReanimatedStub(runtime)
   const timers = new Map<number, () => void>()
   let timerId = 0
+  const fades: { target: number; duration: number }[] = []
   const hook = loadSourceWithFakeReact<typeof Hook>("features/miniRoom/scene/useMiniRoomCameraTransform.ts", runtime, {
     modules: {
       "react-native-reanimated": reanimated.module,
-      "react-native-worklets": { scheduleOnUI: (work: (...args: unknown[]) => void, ...args: unknown[]) => work(...args) }
+      "react-native-worklets": { scheduleOnUI: (work: (...args: unknown[]) => void, ...args: unknown[]) => work(...args) },
+      "../../../ui/motion": {
+        resolveMotion: () => ({ crossfade: { kind: "timing", duration: 200 } }),
+        animateTo: (target: number, motion: { duration: number }) => { fades.push({ target, duration: motion.duration }); return target }
+      }
     },
-    real: ["./miniRoomLayout", "./miniRoomTransitionModel"],
+    real: ["./miniRoomLayout", "./miniRoomTransitionModel", "./miniRoomReducedMotion"],
     globals: {
       setTimeout: (run: () => void) => { timerId += 1; timers.set(timerId, run); return timerId },
       clearTimeout: (id: number) => { timers.delete(id) }
@@ -40,7 +45,7 @@ function mount(reduceMotion = false) {
   const settledProgress = () => { runtime.rerender(); return api().transition.value.progress }
   const commit = (patch: Partial<MiniRoomLayoutInput>) => { layoutInput = { ...layoutInput, ...patch }; render() }
   const runTimers = () => { for (const [id, run] of [...timers]) { timers.delete(id); run() } }
-  return { runtime, api, settledProgress, commit, runTimers, timers }
+  return { runtime, api, settledProgress, commit, runTimers, timers, fades }
 }
 
 test("a touch-down that no keyboard confirms returns the room to rest after the fallback", () => {
@@ -84,6 +89,33 @@ test("a close tap wins over a late native frame from the opening keyboard", () =
     // The suggestion bar's frame arrives after the tap: it must not reopen the dock.
     api().animateKeyboard({ visible: true, inset: 380, durationMs: 0 })
     assert.equal(settledProgress(), 0)
+  } finally {
+    runtime.unmount()
+  }
+})
+
+test("Reduce Motion lands the pose at once and crossfades the dock's content", () => {
+  const { runtime, api, commit, fades } = mount(true)
+  try {
+    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
+    commit({ keyboardVisible: true, keyboardInset: 336 })
+    runtime.rerender()
+    assert.equal(api().transition.value.progress, 1, "the dock and camera do not travel")
+    assert.deepEqual(fades.at(-1), { target: 1, duration: 200 }, "the text still crossfades")
+    assert.equal(api().contentProgress.value, 1)
+  } finally {
+    runtime.unmount()
+  }
+})
+
+test("with motion on, the content follows the moving dock", () => {
+  const { runtime, api, commit, fades } = mount(false)
+  try {
+    api().animateKeyboard({ visible: true, inset: 336, durationMs: 250 })
+    commit({ keyboardVisible: true, keyboardInset: 336 })
+    runtime.rerender()
+    assert.equal(fades.length, 0)
+    assert.equal(api().contentProgress.value, api().transition.value.progress)
   } finally {
     runtime.unmount()
   }
