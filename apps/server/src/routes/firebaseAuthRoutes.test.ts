@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createAccountRecoveryService, createInMemoryAccountRecoveryRepository } from "../account/accountRecoveryService"
 import { createAuthService } from "../auth/authService"
+import { createFirebaseAuthVerifier, FirebaseVerifierUnavailableError } from "../auth/firebaseAuth"
 import { createServer } from "../server"
 
 const PHONE = "+905551112233"
@@ -85,6 +86,42 @@ test("Firebase-backed servers retire legacy SMS endpoints instead of claiming a 
     // No challenge row is written for a number nobody proved.
     assert.equal(recoveryChallenges, 0)
   } finally { await app.close() }
+})
+
+test("a Firebase provider or credential failure answers 503 and never counts as a failed sign-in", async () => {
+  let failure: unknown = new FirebaseVerifierUnavailableError()
+  const app = createServer({
+    authService: createAuthService(),
+    firebaseAuthVerifier: { async verifyIdToken() { throw failure } }
+  })
+  try {
+    const complete = () => app.inject({
+      method: "POST", url: "/v1/auth/firebase/complete", remoteAddress: "203.0.113.77",
+      payload: { idToken: "firebase-id-token", authIntent: "sign-in" }
+    })
+    for (const error of [
+      new FirebaseVerifierUnavailableError(),
+      Object.assign(new Error("credential"), { code: "app/invalid-credential" }),
+      Object.assign(new Error("internal"), { code: "auth/internal-error" }),
+      new Error("socket hang up")
+    ]) {
+      failure = error
+      const response = await complete()
+      assert.equal(response.statusCode, 503)
+      assert.equal(response.headers["retry-after"], "5")
+    }
+    // The failed-auth limiter counts 401 answers only, so none of these did.
+    failure = Object.assign(new Error("expired"), { code: "auth/id-token-expired" })
+    assert.equal((await complete()).statusCode, 401, "a rejected token is still the caller's failure")
+  } finally { await app.close() }
+})
+
+test("a malformed or, in production, missing Firebase credential fails at startup", () => {
+  assert.throws(() => createFirebaseAuthVerifier({ serviceAccountJson: "{not json" }), /valid JSON/)
+  assert.throws(() => createFirebaseAuthVerifier({ serviceAccountJson: JSON.stringify({ project_id: "p" }) }), /missing required fields/)
+  assert.throws(() => createFirebaseAuthVerifier({ requireCredential: true }), /required in production/)
+  assert.doesNotThrow(() => createFirebaseAuthVerifier({ requireCredential: true, applicationDefaultCredentialsPath: "/secrets/gcp.json" }))
+  assert.doesNotThrow(() => createFirebaseAuthVerifier({}))
 })
 
 test("a different Firebase uid for a bound phone is routed to manual account recovery", async () => {

@@ -28,7 +28,9 @@ const services = createConfiguredServerServices(config)
 const firebaseAuthVerifier = createFirebaseAuthVerifier({
   projectId: process.env.FIREBASE_PROJECT_ID ?? "blumi-mobile-eren",
   serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-  serviceAccountJsonBase64: process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
+  serviceAccountJsonBase64: process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64,
+  requireCredential: config.nodeEnv === "production",
+  applicationDefaultCredentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS
 })
 const firebaseDeletionWorker = startPeriodicWorker({
   run: createFirebaseUserDeletionDispatch({

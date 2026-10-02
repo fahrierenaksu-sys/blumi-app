@@ -40,7 +40,8 @@ export function firebaseIdToken(uid: string, phoneNumber: string, authTime = Mat
 const stubFirebaseVerifier: FirebaseAuthVerifier = {
   async verifyIdToken(idToken) {
     const [prefix, uid, phoneNumber, authTime] = idToken.split("|")
-    if (prefix !== "fb" || !uid || !phoneNumber || !authTime) throw new Error("invalid id token")
+    // Shaped like firebase-admin's rejection of a malformed token.
+    if (prefix !== "fb" || !uid || !phoneNumber || !authTime) throw Object.assign(new Error("invalid id token"), { code: "auth/argument-error" })
     return { uid, phoneNumber, authTime: Number(authTime) }
   }
 }
