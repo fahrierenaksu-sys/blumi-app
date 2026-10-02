@@ -59,14 +59,13 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     return () => clearTimeout(timer)
   }, [suggestionsEnabled])
   const sendDisabled = disabled || value.trim().length === 0
-  const historyOpen = mode === "history"
-  const toggleLabel = mode === "typing" ? copy.returnToRoom : copy.chatHistory
+  // Name what the button does: typing closes the keyboard; history jumps to the newest message.
+  const toggleLabel = mode === "typing" ? copy.returnToRoom : copy.goToLatestMessage
   return (
     <View style={styles.composerRow}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={toggleLabel}
-        accessibilityState={{ expanded: historyOpen }}
         hitSlop={6}
         onPress={onToggleHistory}
         style={({ pressed }) => [

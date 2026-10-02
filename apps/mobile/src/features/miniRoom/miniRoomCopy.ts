@@ -29,6 +29,8 @@ export interface MiniRoomCopy {
   openChatHistory: string
   hideChatHistory: string
   returnToRoom: string
+  /** The history-mode composer button: scrolls the transcript to its newest message. */
+  goToLatestMessage: string
   historyHeading: string
   /** The day of the newest history message: today, yesterday or a short date; null without a time. */
   historyDay: (newestSentAt: string | undefined, now?: Date) => string | null
@@ -100,6 +102,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     openChatHistory: "Show chat history",
     hideChatHistory: "Hide chat history",
     returnToRoom: "Close the keyboard and return to the conversation",
+    goToLatestMessage: "Go to latest message",
     historyHeading: "Your conversation",
     historyDay: (newestSentAt, now) => formatRoomChatHistoryDay(newestSentAt,
       { today: "Today", yesterday: "Yesterday", dateLocale: "en-US" }, now),
@@ -162,6 +165,7 @@ const MINI_ROOM_COPY: Record<AccountRecoveryLocale, MiniRoomCopy> = {
     openChatHistory: "Sohbet geçmişini aç",
     hideChatHistory: "Sohbet geçmişini gizle",
     returnToRoom: "Klavyeyi kapat ve sohbete dön",
+    goToLatestMessage: "En yeni mesaja git",
     historyHeading: "Sohbetiniz",
     historyDay: (newestSentAt, now) => formatRoomChatHistoryDay(newestSentAt,
       { today: "Bugün", yesterday: "Dün", dateLocale: "tr-TR" }, now),
