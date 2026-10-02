@@ -124,6 +124,7 @@ try {
       "src/navigation/linkedProfileScreenLifecycle.test.ts",
       "src/navigation/globalRealtimeSessionLifecycle.test.ts",
       "src/navigation/mainTabRenderIsolation.test.ts",
+      "src/navigation/mainTabPager/mainTabPagerInteractivity.test.ts",
       "src/ui/PressableScale.test.ts",
       "src/ui/animations.test.ts",
       "src/ui/motion.test.ts",
