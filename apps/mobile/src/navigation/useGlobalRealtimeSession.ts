@@ -12,7 +12,6 @@ import {
   applyChatThreadListed,
   applyChatThreadRead,
   getThreads,
-  hasChatThread,
   hasMessageHistory,
   noteRealtimeThreadListRequested
 } from "../features/chat/chatStore"
@@ -208,7 +207,6 @@ export function useGlobalRealtimeSession({
       applyChatThreadRead,
       requestThreadPage: (cursor) => sendGlobal({ type: "chat.list_threads", payload: { cursor } }),
       requestThreadRefresh: () => { void refreshProductionThreads().catch(() => { /* Refresh already published its visible error state. */ }) },
-      hasThread: hasChatThread,
       applyChatThreadCreated: applyNewThread,
       applyChatMessageListed,
       applyChatMessageReceived,

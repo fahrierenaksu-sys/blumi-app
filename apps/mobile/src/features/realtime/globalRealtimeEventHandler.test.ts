@@ -54,21 +54,6 @@ test("an arriving partner message is only noted for the alert ledger: there is n
   assert.equal("showIncomingMessageToast" in dependencies, false)
 })
 
-test("a message for a conversation missing from the list refreshes the list so it reappears", () => {
-  let refreshes = 0
-  const known = new Set(["thread_1"])
-  const dependencies = createDependencies({
-    hasThread: (threadId) => known.has(threadId),
-    requestThreadRefresh: () => { refreshes++ }
-  })
-  const handler = createGlobalRealtimeEventHandler(dependencies)
-  handler({ type: "chat.message_received", payload: message })
-  assert.equal(refreshes, 0, "a listed conversation needs no refresh")
-  handler({ type: "chat.message_received", payload: { ...message, messageId: "message_2", threadId: "thread_deleted" } })
-  assert.equal(refreshes, 1)
-  assert.deepEqual(dependencies.receivedMessages.map((value) => value.messageId), ["message_1", "message_2"])
-})
-
 test("a partner's arriving message is acknowledged as delivered; my own echo is not", () => {
   const acknowledged: string[] = []
   const handler = createGlobalRealtimeEventHandler(createDependencies({

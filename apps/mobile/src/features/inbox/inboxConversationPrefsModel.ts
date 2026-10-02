@@ -19,6 +19,8 @@ export interface InboxThreadLike {
   threadId: string
   createdAt: string
   lastMessage?: { sentAt: string } | null
+  /** The server's "delete chat for me" point for this account (every device, migration 071). */
+  hiddenThrough?: string
 }
 
 export const EMPTY_INBOX_CONVERSATION_PREFS: InboxConversationPrefs = Object.freeze({
@@ -60,9 +62,9 @@ export function deleteConversationForMe(prefs: InboxConversationPrefs, thread: I
 
 /** Hidden until something newer than the delete arrives. */
 export function isConversationDeletedForMe(prefs: InboxConversationPrefs, thread: InboxThreadLike): boolean {
-  const through = prefs.deletedThrough[thread.threadId]
-  if (through === undefined) return false
-  return timeOf(getConversationActivityAt(thread)) <= timeOf(through)
+  const activityAt = timeOf(getConversationActivityAt(thread))
+  return [prefs.deletedThrough[thread.threadId], thread.hiddenThrough]
+    .some((through) => through !== undefined && activityAt <= timeOf(through))
 }
 
 /**
