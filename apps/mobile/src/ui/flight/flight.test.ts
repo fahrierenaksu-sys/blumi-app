@@ -1,6 +1,14 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createInertModule, loadSourceWithFakeReact } from "../../testing/hookHarness"
+import {
+  createFakeReactRuntime,
+  createInertModule,
+  createReactNativeStub,
+  loadSourceWithFakeReact
+} from "../../testing/hookHarness"
+import { createClockedReanimatedStub, findElements, loadClockedMotion } from "../../testing/reanimatedClock"
+import { MOTION_DURATIONS, MOTION_SPRINGS } from "../motionTokens"
+import type * as FlightLayerModule from "./FlightLayer"
 import * as model from "./flightModel"
 import { createFlightStore, type FlightRequest } from "./flightStore"
 import { createLiveFlightSources } from "./flightSources"
@@ -231,4 +239,59 @@ test("my sent row arrives under Reduce Motion too, without the entrance animatio
     assert.equal(next.arrivedKeys.size, 1)
     assert.equal(next.enteringKeys.size, reduceMotion ? 0 : 1)
   }
+})
+
+/* -- The clone on a clock ------------------------------------ */
+
+// Reanimated calls a spring's completion only at rest, about 1.5x its
+// visible duration. A flight touches down (onSettled(true), the haptic, the
+// match meeting's partner arrival) when it visibly lands, not that later.
+test("a flight lands when it visibly arrives, reports it once, then fades out", async (t) => {
+  const runtime = createFakeReactRuntime()
+  const clock = createClockedReanimatedStub(runtime, { springRestFactor: 1.5 })
+  const reactNative = createReactNativeStub({
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => undefined })
+    }
+  }).module
+  const motion = loadClockedMotion(runtime, clock.module, reactNative) as { primeReducedMotionPreference: () => void }
+  motion.primeReducedMotionPreference()
+  await new Promise((resolve) => setImmediate(resolve))
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10_000 })
+  const layer = loadSourceWithFakeReact<typeof FlightLayerModule>("ui/flight/FlightLayer.tsx", runtime, {
+    modules: {
+      "react-native": reactNative,
+      "react-native-reanimated": { ...clock.module, measure: () => null, useAnimatedRef: () => ({ current: null }) },
+      "react-native-worklets": { ...clock.worklets, scheduleOnUI: (worklet: () => void) => worklet() },
+      "../motion": motion
+    },
+    real: ["./flightModel", "./flightStore"]
+  })
+  const settled: boolean[] = []
+  const id = layer.launchFlight({
+    ...request("landing", "fixed-frame"),
+    content: null,
+    targetFrame: { x: 40, y: 80, width: 200, height: 120 },
+    onSettled: (landed) => settled.push(landed)
+  })
+  assert.ok(id)
+  // The layer and its one clone render together, as the app nests them.
+  let flying = true
+  runtime.render(() => {
+    const tree = layer.FlightLayer({})
+    const clone = findElements(tree, (element) => element.props.flight !== undefined)[0]
+    flying = clone !== undefined
+    return clone ? (clone.type as (props: unknown) => unknown)(clone.props) : null
+  })
+  const tick = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 1) t.mock.timers.tick(1)
+  }
+  tick(MOTION_SPRINGS.snappy.duration - 1)
+  assert.deepEqual(settled, [], "still in the air")
+  tick(1)
+  assert.deepEqual(settled, [true], "contact when it visibly lands, not a spring's rest later")
+  tick(MOTION_DURATIONS.fadeOut)
+  assert.equal(flying, false, "the clone is gone after its fade")
+  assert.deepEqual(settled, [true], "reported exactly once")
 })

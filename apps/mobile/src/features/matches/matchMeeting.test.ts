@@ -1,8 +1,13 @@
 import assert from "node:assert/strict"
-import test from "node:test"
+import test, { type TestContext } from "node:test"
+import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../testing/hookHarness"
+import { createClockedReanimatedStub, loadClockedMotion } from "../../testing/reanimatedClock"
+import { MOTION_SPRINGS } from "../../ui/motionTokens"
+import type * as MeetingHook from "./useMatchMeeting"
 import { createMatchFlightSourceStore, MATCH_FLIGHT_SOURCE_MAX_AGE_MS } from "./matchFlightSource"
 import {
   createMatchArrivalGate,
+  MATCH_HEART_LINE_MS,
   matchHeartLine,
   matchMeetingArrival,
   planMatchMeeting
@@ -75,4 +80,91 @@ test("a liked chibi's frame is used once, for that partner, while it is fresh", 
   store.remember("partner-a", frame, 1_000)
   store.clear()
   assert.equal(store.take("partner-a", 1_100), null, "signing out forgets it")
+})
+
+/* -- The meeting on a clock ---------------------------------- */
+
+// Reanimated calls a spring's completion only at rest, about 1.5x its
+// visible duration. The heart line starts when both chibis have visibly
+// arrived (delay + token duration), never that long after.
+async function mountMeeting(t: TestContext) {
+  const runtime = createFakeReactRuntime()
+  const clock = createClockedReanimatedStub(runtime, { springRestFactor: 1.5 })
+  const reactNative = createReactNativeStub({
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => undefined })
+    }
+  }).module
+  const motion = loadClockedMotion(runtime, clock.module, reactNative) as { primeReducedMotionPreference: () => void }
+  motion.primeReducedMotionPreference()
+  await new Promise((resolve) => setImmediate(resolve))
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10_000 })
+  const { useMatchMeeting } = loadSourceWithFakeReact<typeof MeetingHook>("features/matches/useMatchMeeting.ts", runtime, {
+    modules: {
+      "react-native-reanimated": clock.module,
+      "react-native-worklets": clock.worklets,
+      "../../ui/motion": motion
+    },
+    real: ["./matchMeetingModel"]
+  })
+  let meeting: ReturnType<typeof useMatchMeeting> | undefined
+  runtime.render(() => {
+    meeting = useMatchMeeting()
+    return null
+  })
+  // One millisecond at a time: a callback that starts the next animation
+  // must see the clock at its own moment, not at the end of a long tick.
+  const tick = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 1) t.mock.timers.tick(1)
+  }
+  return { meeting: () => meeting!, tick }
+}
+
+const DELAY_MS = 120
+const ARRIVED_MS = DELAY_MS + MOTION_SPRINGS.smooth.duration
+
+test("the heart line starts as both chibis visibly arrive, and the contact follows the line", async (t) => {
+  const { meeting, tick } = await mountMeeting(t)
+  let contacts = 0
+  meeting().start({
+    plan: planMatchMeeting({ reduceMotion: false, hasFlightSource: false }),
+    delayMs: DELAY_MS,
+    onContact: () => { contacts += 1 }
+  })
+  tick(ARRIVED_MS + MATCH_HEART_LINE_MS - 1)
+  assert.equal(contacts, 0, "the line is still drawing")
+  tick(1)
+  assert.equal(contacts, 1, "contact at delay + slide + line, not a spring's rest later")
+  tick(2_000)
+  assert.equal(contacts, 1)
+})
+
+test("a flown-in partner meets the slide as soon as it lands", async (t) => {
+  const { meeting, tick } = await mountMeeting(t)
+  let contacts = 0
+  meeting().start({
+    plan: planMatchMeeting({ reduceMotion: false, hasFlightSource: true }),
+    delayMs: DELAY_MS,
+    onContact: () => { contacts += 1 }
+  })
+  tick(200)
+  meeting().partnerArrived()
+  tick(ARRIVED_MS - 200 + MATCH_HEART_LINE_MS)
+  assert.equal(contacts, 1)
+})
+
+test("a restarted meeting meets once, on its own timeline", async (t) => {
+  const { meeting, tick } = await mountMeeting(t)
+  const contacts: string[] = []
+  const plan = planMatchMeeting({ reduceMotion: false, hasFlightSource: false })
+  meeting().start({ plan, delayMs: DELAY_MS, onContact: () => contacts.push("first") })
+  tick(ARRIVED_MS - 50)
+  meeting().start({ plan, delayMs: DELAY_MS, onContact: () => contacts.push("second") })
+  tick(ARRIVED_MS + MATCH_HEART_LINE_MS - 1)
+  assert.deepEqual(contacts, [])
+  tick(1)
+  assert.deepEqual(contacts, ["second"])
+  tick(2_000)
+  assert.deepEqual(contacts, ["second"])
 })

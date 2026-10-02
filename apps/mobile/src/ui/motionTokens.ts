@@ -41,6 +41,26 @@ export const MOTION_PRESS_SCALE = 0.965
 /** Opacity of a pressed control when Reduce Motion replaces the scale. */
 export const MOTION_REDUCED_PRESS_OPACITY = 0.82
 
+/**
+ * Duration (ms) of an ease-out (cubic) exit over `distance` that starts at
+ * the release `velocity` (same units per second): a fast flick leaves sooner
+ * instead of being slowed down, a slow release takes `maxMs`. Never shorter
+ * than `minMs`. An ease-out cubic starts at 3 × distance / duration.
+ */
+export function getEaseOutExitDurationMs(
+  distance: number,
+  velocity: number,
+  maxMs: number,
+  minMs: number
+): number {
+  "worklet"
+  const travel = Number.isFinite(distance) ? Math.max(0, distance) : 0
+  const speed = Number.isFinite(velocity) ? Math.max(0, velocity) : 0
+  if (travel <= 0) return minMs
+  if (speed <= 0) return maxMs
+  return Math.max(minMs, Math.min(maxMs, (3 * travel * 1000) / speed))
+}
+
 /** Delay before list item `index` first appears (items past the sixth share the last slot). */
 export function staggerDelayMs(index: number): number {
   const slot = Math.max(0, Math.min(Math.floor(index), MOTION_STAGGER.maxItems - 1))

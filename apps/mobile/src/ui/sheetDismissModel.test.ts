@@ -1,5 +1,8 @@
 import assert from "node:assert/strict"
-import test from "node:test"
+import test, { type TestContext } from "node:test"
+import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../testing/hookHarness"
+import { createClockedReanimatedStub, findElements, styleValue } from "../testing/reanimatedClock"
+import type * as SheetModule from "./SwipeDismissSheet"
 import {
   SHEET_DISMISS,
   getSheetBackdropOpacity,
@@ -9,7 +12,6 @@ import {
   resolveSheetDismissRelease,
   resolveSheetDragOffset,
   getSheetExitVelocity,
-  SHEET_EXIT_SPRING,
   resolveSheetExit
 } from "./sheetDismissModel"
 
@@ -86,14 +88,32 @@ test("the backdrop fades in proportion to the drag and is gone when the sheet ha
   assert.equal(getSheetBackdropOpacity(Number.NaN, H), 1)
 })
 
-test("the exit spring carries a downward flick and never bounces back into view", () => {
+test("the exit carries a downward flick: a faster flick never leaves slower, and nothing takes longer than the exit time", () => {
   assert.equal(getSheetExitVelocity(1_400), 1_400)
   assert.equal(getSheetExitVelocity(-300), 0)
   assert.equal(getSheetExitVelocity(Number.NaN), 0)
-  assert.equal(SHEET_EXIT_SPRING.overshootClamping, true)
+  const exit = (velocityY: number, offset = 200) => {
+    const resolved = resolveSheetExit({ reduceMotion: false, sheetHeight: H, velocityY, offset })
+    assert.ok(resolved.animate)
+    return resolved.durationMs
+  }
+  assert.equal(exit(0, 0), SHEET_DISMISS.exitDurationMs, "a tap on the backdrop takes the full exit")
+  let previous = Infinity
+  for (const velocity of [0, 900, 2_000, 4_000, 8_000, 20_000]) {
+    const duration = exit(velocity)
+    assert.ok(duration <= previous, `${velocity} px/s is not slower than a gentler flick`)
+    assert.ok(duration <= SHEET_DISMISS.exitDurationMs && duration >= SHEET_DISMISS.minExitDurationMs)
+    previous = duration
+  }
+  // An ease-out starts at 3 x distance / duration: never below the finger's
+  // speed unless the shortest exit holds it back.
+  const remaining = getSheetExitOffset(H) - 400
+  const duration = exit(4_000, 400)
+  assert.ok(duration < SHEET_DISMISS.exitDurationMs, "a fast flick from far down leaves sooner")
+  assert.ok((3 * remaining * 1000) / duration >= 4_000 || duration === SHEET_DISMISS.minExitDurationMs)
 })
 
-test("Reduce Motion closes the sheet without movement; otherwise it springs out with the release speed", () => {
+test("Reduce Motion closes the sheet without movement; otherwise it eases out with the release speed", () => {
   for (const sheetHeight of [0, 420]) {
     assert.deepEqual(
       resolveSheetExit({ reduceMotion: true, sheetHeight, velocityY: 1_200 }),
@@ -106,4 +126,106 @@ test("Reduce Motion closes the sheet without movement; otherwise it springs out 
   assert.ok(animated.animate && animated.velocity === 1_200)
   const upward = resolveSheetExit({ reduceMotion: false, sheetHeight: 420, velocityY: -600 })
   assert.ok(upward.animate && upward.velocity === 0, "an exit never starts moving back up")
+})
+
+/* -- The sheet itself, on a clock ---------------------------- */
+
+// Reanimated calls a spring's completion only at rest, about 1.5x its
+// visible duration. The sheet must close (and give back the screen) when it
+// has visibly left, and a grab that catches the exit must not leave it stuck.
+const clockedTests = new WeakSet<TestContext>()
+
+function mountSheet(t: TestContext) {
+  if (!clockedTests.has(t)) {
+    clockedTests.add(t)
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10_000 })
+  }
+  const runtime = createFakeReactRuntime()
+  const clock = createClockedReanimatedStub(runtime, { springRestFactor: 1.5 })
+  const handlers: Record<string, (...args: never[]) => void> = {}
+  const chain = (): unknown => new Proxy({}, {
+    get: (_target, name) => (...args: unknown[]) => {
+      if (typeof args[0] === "function") handlers[String(name)] = args[0] as (...args: never[]) => void
+      return chain()
+    }
+  })
+  const sheet = loadSourceWithFakeReact<typeof SheetModule>("ui/SwipeDismissSheet.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": { ...clock.module, useAnimatedScrollHandler: () => () => undefined },
+      "react-native-worklets": clock.worklets,
+      "react-native-gesture-handler": {
+        Gesture: { Pan: chain, Native: chain },
+        GestureDetector: "GestureDetector",
+        State: { BEGAN: 2 }
+      },
+      "./animations": { useReducedMotion: () => false }
+    },
+    real: ["./sheetDismissModel"]
+  })
+  const dismissed: string[] = []
+  let tree: unknown
+  runtime.render(() => {
+    tree = sheet.SwipeDismissSheet({
+      onDismiss: () => dismissed.push("dismiss"),
+      backdrop: { onPress: () => dismissed.push("backdrop") },
+      children: null
+    })
+    return tree
+  })
+  const panel = () => findElements(tree, (element) => typeof element.props.onLayout === "function")[0]!
+  ;(panel().props.onLayout as (event: unknown) => void)({ nativeEvent: { layout: { height: H } } })
+  const offset = () => (styleValue(panel(), "transform") as { translateY: number }[])[0]!.translateY
+  const pan = (name: string, ...args: unknown[]) => (handlers[name] as unknown as (...args: unknown[]) => void)(...args)
+  return {
+    dismissed,
+    offset,
+    close: () => (tree as { props: { value: () => void } }).props.value(),
+    tapBackdrop: () => (findElements(tree, (element) => element.type === "Pressable")[0]!.props.onPress as () => void)(),
+    pan,
+    tick: (ms: number) => t.mock.timers.tick(ms)
+  }
+}
+
+test("the close button and the backdrop close the sheet the moment it has left the screen", (t) => {
+  const sheet = mountSheet(t)
+  sheet.close()
+  sheet.tick(SHEET_DISMISS.exitDurationMs - 1)
+  assert.deepEqual(sheet.dismissed, [], "still on its way out")
+  assert.ok(sheet.offset() > 0)
+  sheet.tick(1)
+  assert.equal(sheet.offset(), getSheetExitOffset(H))
+  assert.deepEqual(sheet.dismissed, ["dismiss"], "the Modal closes as the sheet leaves, not a spring's rest later")
+
+  const other = mountSheet(t)
+  other.tapBackdrop()
+  other.tick(SHEET_DISMISS.exitDurationMs)
+  assert.deepEqual(other.dismissed, ["backdrop"])
+})
+
+test("a swipe released past the distance closes the sheet when its exit ends", (t) => {
+  const sheet = mountSheet(t)
+  sheet.pan("onStart", { translationY: 0 })
+  sheet.pan("onUpdate", { translationY: 200 })
+  sheet.pan("onEnd", { translationY: 200, velocityY: 1_500 }, true)
+  const exit = resolveSheetExit({ reduceMotion: false, sheetHeight: H, velocityY: 1_500, offset: 200 })
+  assert.ok(exit.animate && exit.durationMs <= SHEET_DISMISS.exitDurationMs)
+  sheet.tick(exit.durationMs - 1)
+  assert.deepEqual(sheet.dismissed, [])
+  sheet.tick(1)
+  assert.deepEqual(sheet.dismissed, ["dismiss"])
+})
+
+test("a grab that catches a closing sheet keeps it open, and the close button works again afterwards", (t) => {
+  const sheet = mountSheet(t)
+  sheet.close()
+  sheet.tick(60)
+  sheet.pan("onStart", { translationY: 0 })
+  sheet.pan("onEnd", { translationY: 0, velocityY: 0 }, false)
+  sheet.tick(1_000)
+  assert.deepEqual(sheet.dismissed, [], "the caught sheet stays")
+  assert.equal(sheet.offset(), 0, "and returns to rest")
+  sheet.close()
+  sheet.tick(SHEET_DISMISS.exitDurationMs)
+  assert.deepEqual(sheet.dismissed, ["dismiss"], "closing is not stuck")
 })

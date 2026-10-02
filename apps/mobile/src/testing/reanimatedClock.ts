@@ -6,6 +6,9 @@
  * - `withTiming`, `withDelay`, `withSequence`, `withRepeat` (and `withSpring`
  *   as a timing of its `duration`) build plain descriptions; assigning one to
  *   a shared value starts it from the value's current position.
+ * - `springRestFactor` (default 1) models a real spring's late completion:
+ *   the value arrives at `duration`, but the completion callback fires at
+ *   `duration × springRestFactor` (about 1.5 on device), when it rests.
  * - Reading `.value` samples the running animation at `Date.now()`.
  * - Completion callbacks fire through `setTimeout` at their end time with
  *   `true`, and with `false` when the animation is cancelled or replaced.
@@ -207,7 +210,11 @@ export function clockInterpolate(
  * The clocked react-native-reanimated module plus a react-native-worklets
  * module whose `scheduleOnRN` calls straight through.
  */
-export function createClockedReanimatedStub(runtime: FakeReactRuntime) {
+export function createClockedReanimatedStub(
+  runtime: FakeReactRuntime,
+  options: { springRestFactor?: number } = {}
+) {
+  const springRestFactor = Math.max(1, options.springRestFactor ?? 1)
   const useRef = runtime.react.useRef as <T>(initial: T) => { current: T }
   const easing: (...args: unknown[]) => unknown = (first?: unknown) =>
     typeof first === "number" ? first : easing
@@ -256,8 +263,17 @@ export function createClockedReanimatedStub(runtime: FakeReactRuntime) {
     cancelAnimation: (shared: ClockSharedValue<unknown>) => shared.cancel(),
     withTiming: (to: number, config?: { duration?: number }, callback?: Callback) =>
       tag({ kind: "timing", to, duration: config?.duration ?? 300, callback }),
-    withSpring: (to: number, config?: { duration?: number }, callback?: Callback) =>
-      tag({ kind: "timing", to, duration: config?.duration ?? 300, callback }),
+    withSpring: (to: number, config?: { duration?: number }, callback?: Callback) => {
+      const duration = config?.duration ?? 300
+      if (springRestFactor === 1) return tag({ kind: "timing", to, duration, callback })
+      return tag({
+        kind: "sequence",
+        items: [
+          { kind: "timing", to, duration, callback: undefined },
+          { kind: "timing", to, duration: duration * (springRestFactor - 1), callback }
+        ]
+      })
+    },
     withDelay: (delay: number, inner: Tagged) => tag({ kind: "delay", delay, inner }),
     withSequence: (...args: unknown[]) => tag({ kind: "sequence", items: sequenceItems(args) }),
     withRepeat: (inner: Tagged, count = 2, _reverse = false, callback?: Callback) =>

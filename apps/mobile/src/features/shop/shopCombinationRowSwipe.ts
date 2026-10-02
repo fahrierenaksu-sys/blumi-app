@@ -6,6 +6,8 @@
  * the UI thread and tests run them in node.
  */
 
+import { getEaseOutExitDurationMs } from "../../ui/motionTokens"
+
 /** Movement (pt) before a touch on a row is judged as a swipe or not. */
 export const COMBINATION_ROW_SWIPE_SLOP = 10
 /** A swipe must be this much more horizontal than vertical to claim the touch. */
@@ -55,6 +57,32 @@ export function getCombinationRowRevealProgress(offset: number, threshold: numbe
   "worklet"
   if (!(threshold > 0) || !Number.isFinite(offset)) return 0
   return Math.max(0, Math.min(1, offset / threshold))
+}
+
+/** Longest and shortest slide-out (ms) of a removed row. */
+export const COMBINATION_ROW_LEAVE_MAX_MS = 200
+const COMBINATION_ROW_LEAVE_MIN_MS = 110
+/** Past the row's own width, so its shadow leaves too. */
+const COMBINATION_ROW_LEAVE_OVERSHOOT = 8
+
+/**
+ * How a removed row slides out from `offset`: to just past its right edge,
+ * as an ease-out that starts at the release speed (a fast flick leaves
+ * sooner). The piece is removed when this ends, the moment the row is gone.
+ */
+export function getCombinationRowLeave(input: {
+  offset: number
+  velocityX: number
+  rowWidth: number
+}): { to: number; durationMs: number } {
+  "worklet"
+  const width = Number.isFinite(input.rowWidth) && input.rowWidth > 0 ? input.rowWidth : 1
+  const to = width + COMBINATION_ROW_LEAVE_OVERSHOOT
+  const from = getCombinationRowSwipeOffset(input.offset)
+  return {
+    to,
+    durationMs: getEaseOutExitDurationMs(to - from, input.velocityX, COMBINATION_ROW_LEAVE_MAX_MS, COMBINATION_ROW_LEAVE_MIN_MS)
+  }
 }
 
 /** What a released row does: leave the outfit, or spring back. */

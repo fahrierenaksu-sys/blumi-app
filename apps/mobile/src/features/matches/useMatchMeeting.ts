@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react"
-import { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated"
+import { cancelAnimation, Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
-import { animateTo, animateToAfter, useMotion } from "../../ui/motion"
+import { animateTo, animateToAfter, arrivalClock, useMotion } from "../../ui/motion"
 import {
   createMatchArrivalGate,
   MATCH_HEART_LINE_MS,
@@ -18,11 +18,16 @@ const reset = () => withTiming(0, { duration: 0, reduceMotion: ReduceMotion.Neve
  * Drives one match meeting (see matchMeetingModel) on the UI thread. JS hears
  * only the two arrivals and the contact, never a frame. `start` restarts the
  * whole moment (every value is reassigned, so a running one is interrupted).
+ * A chibi has arrived when its slide visibly ends (delay + token duration),
+ * timed by its own clock: the slide's spring rests about half as long again
+ * later, and the heart line must not wait for that.
  */
 export function useMatchMeeting() {
   const motion = useMotion()
   const me = useSharedValue(0)
   const partner = useSharedValue(0)
+  const meArrival = useSharedValue(0)
+  const partnerArrival = useSharedValue(0)
   const line = useSharedValue(0)
   const heart = useSharedValue(0)
   const lineDrawn = useSharedValue(true)
@@ -65,22 +70,25 @@ export function useMatchMeeting() {
     line.value = 0
     heart.value = 0
     const meToken = plan.meArrival === "slide" ? motion.smooth : motion.crossfade
-    me.value = withSequence(reset(), animateToAfter(delayMs, 1, meToken, (finished) => {
+    me.value = withSequence(reset(), animateToAfter(delayMs, 1, meToken))
+    meArrival.value = arrivalClock(delayMs, meToken, (finished) => {
       "worklet"
       // An interrupted (restarted) meeting must not arrive in the new one.
       if (finished) scheduleOnRN(arrive, "me")
-    }))
+    })
     if (plan.partnerArrival === "flight") {
       // The FlightTargetView hides the slot until the chibi lands on it.
+      cancelAnimation(partnerArrival)
       partner.value = 1
       return
     }
     const partnerToken = plan.partnerArrival === "slide" ? motion.smooth : motion.crossfade
-    partner.value = withSequence(reset(), animateToAfter(delayMs, 1, partnerToken, (finished) => {
+    partner.value = withSequence(reset(), animateToAfter(delayMs, 1, partnerToken))
+    partnerArrival.value = arrivalClock(delayMs, partnerToken, (finished) => {
       "worklet"
       if (finished) scheduleOnRN(arrive, "partner")
-    }))
-  }, [arrive, contact, heart, line, lineDrawn, me, motion, partner])
+    })
+  }, [arrive, contact, heart, line, lineDrawn, me, meArrival, motion, partner, partnerArrival])
 
   /** The flown chibi landed (or its flight ended without landing). */
   const partnerArrived = useCallback(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type FlatList, Text, View } from "react-native"
 import Reanimated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 import { MainTabPagerEdgeHandoffScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
@@ -68,7 +68,9 @@ export function ClosetBrowser(props: {
   // page 1 for any other shelf, so a category change never shows a stale page.
   const shelfScope = getShopShelfScope(props.mode, props.activeCategoryId)
   const shelfPageTracker = useSharedValue(createShopShelfPageTracker(0, shelfScope))
-  useEffect(() => {
+  // Before paint (like WardrobeCatalogList), so a new category never shows
+  // one frame at the old shelf's offset.
+  useLayoutEffect(() => {
     shelfPageTracker.value = createShopShelfPageTracker(0, shelfScope)
     // A jump to an offset the shelf already has emits no scroll event.
     shelfScrollOffset.value = 0

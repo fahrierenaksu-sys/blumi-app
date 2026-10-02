@@ -10,7 +10,7 @@ import Animated, {
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets"
-import { animateTo, useMotion } from "../motion"
+import { animateTo, arrivalClock, useMotion } from "../motion"
 import {
   flightCarriedContentTransform,
   flightContentOpacity,
@@ -147,6 +147,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
 
   const [targetSize, setTargetSize] = useState<{ width: number; height: number } | null>(null)
   const progress = useSharedValue(0)
+  const touchdown = useSharedValue(0)
   const cloneOpacity = useSharedValue(1)
   const landing = useSharedValue<FlightFrame | null>(null)
 
@@ -205,9 +206,14 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
       return
     }
     const fadeOut = motion.fadeOut
-    progress.value = animateTo(1, motion.snappy, () => {
+    progress.value = animateTo(1, motion.snappy)
+    // Contact is when the flight visibly ends (the token's duration), not
+    // when its spring comes to rest about half as long again later: the
+    // target shows, `onSettled(true)` runs, and the clone fades while the
+    // spring settles the last fraction of a point under it.
+    touchdown.value = arrivalClock(0, motion.snappy, () => {
       "worklet"
-      // Revealed in the clone's last frame, so nothing blinks.
+      // Revealed under the clone as it touches down, so nothing blinks.
       if (targetOpacity) targetOpacity.value = 1
       scheduleOnRN(landFlight, id)
       cloneOpacity.value = animateTo(0, fadeOut, () => {
@@ -215,7 +221,7 @@ function FlightClone({ flight }: { flight: Flight<ReactNode> }) {
         scheduleOnRN(finishFlight, id)
       })
     })
-  }, [cloneOpacity, id, motion, progress, targetFrame, targetHandle, targetSize])
+  }, [cloneOpacity, id, motion, progress, targetFrame, targetHandle, targetSize, touchdown])
 
   const targetRef = targetHandle?.ref ?? null
   // The live frame: follows the target if its list moves during the flight.

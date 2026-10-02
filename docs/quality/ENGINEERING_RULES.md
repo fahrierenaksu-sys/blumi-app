@@ -89,6 +89,7 @@ All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useM
 6. Haptics fire on the contact or landing frame, one per action (`ui/haptics.ts`).
 7. Every animation is interruptible.
 8. Never a spinner where a skeleton fits; skeleton → content is a crossfade.
+9. Never gate input, unmounts or follow-up motion on a spring's completion callback (it fires at rest, about 1.5× the visible duration): an exit is a timing that starts at the release speed (`getEaseOutExitDurationMs`), a follow-up waits on `arrivalClock`.
 
 Owner-approved authored choreography (the onboarding intro and the boot scan) keeps its exact durations and curves: it plays through `animateSegment`, `animateSequence` and `repeatForever` in the same module, and its Reduce Motion path is decided by the caller. Sprite frames swap by opacity on a UI-thread clock, never by React state on timers. To test such motion by behaviour, load the component with `src/testing/reanimatedClock.ts`: animations play against `mock.timers`, so a test reads what is on screen at a given moment.
 
