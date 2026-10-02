@@ -280,20 +280,27 @@ test("shop keeps status and mode controls outside the oversized screen", () => {
   assert.match(controls, /export const ShopModeDock = memo/)
 })
 
-test("profile copy does not promise post-match room experiences", () => {
-  const you = read("src/screens/YouScreen.tsx")
+// The own profile is YouScreen plus the features/profile modules it composes.
+function readOwnProfileSurface() {
+  const featureFiles = readdirSync(resolve(mobileRoot, "src/features/profile"))
+    .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
+    .map((name) => `src/features/profile/${name}`)
+  return ["src/screens/YouScreen.tsx", ...featureFiles].map(read).join("\n")
+}
 
-  assert.doesNotMatch(you, /post-match rooms|room experiences/i)
+test("profile copy does not promise post-match room experiences", () => {
+  assert.doesNotMatch(readOwnProfileSurface(), /post-match rooms|room experiences/i)
 })
 
-test("You keeps one profile action and does not duplicate bottom navigation", () => {
+test("You routes every edit through one Edit profile action and does not duplicate bottom navigation", () => {
   const you = read("src/screens/YouScreen.tsx")
-  const profileRoutes = you.match(/navigation\.navigate\("ProfileEdit"\)/g) ?? []
-
-  assert.equal(profileRoutes.length, 1)
-  assert.doesNotMatch(you, /Avatar Identity|Open My Room|<BrandMark/)
-  assert.doesNotMatch(you, /👤|🏠|✏️|⚙️|>←</)
-  assert.match(you, /Ionicons/)
+  const surface = readOwnProfileSurface()
+  // One navigate call; the pill, the readiness card and each "add" card reuse it.
+  assert.equal((you.match(/navigation\.navigate\("ProfileEdit"\)/g) ?? []).length, 1)
+  assert.equal((surface.match(/navigate\("ProfileEdit"\)/g) ?? []).length, 1)
+  assert.doesNotMatch(surface, /Avatar Identity|Open My Room|<BrandMark|navigate\("MyRoom"\)|navigate\("Lobby"\)/)
+  assert.doesNotMatch(surface, /👤|🏠|✏️|⚙️|>←</)
+  assert.match(surface, /@expo\/vector-icons\/Ionicons/)
 })
 
 test("production navigation excludes the unreachable Saved Connections screen", () => {

@@ -74,3 +74,25 @@ test("press feedback and entrances have a non-moving Reduce Motion path from the
   assert.match(toast, /if \(reduceMotion\) slideAnim\.setValue\(0\)/)
   assert.match(toast, /\.\.\.\(reduceMotion \? \[\] : \[Animated\.spring\(slideAnim/)
 })
+
+test("the own profile's living chibi, backdrop and entrances run on the UI thread and stop under Reduce Motion", () => {
+  const chibi = read("src/features/profile/ProfileChibi.tsx")
+  const hero = read("src/features/profile/OwnProfileHero.tsx")
+  const reveal = read("src/features/profile/ProfileReveal.tsx")
+  const completeness = read("src/features/profile/ProfileCompletenessCard.tsx")
+  for (const source of [chibi, hero, reveal, completeness]) {
+    assert.match(source, /const reduceMotion = useReducedMotion\(\)/)
+    assert.doesNotMatch(source, /useNativeDriver:\s*false|Animated\.loop\(/)
+  }
+  // Idle bob and backdrop drift repeat on the UI thread and are cancelled and reset under Reduce Motion.
+  assert.match(chibi, /if \(reduceMotion\) \{\s*cancelAnimation\(bob\)\s*cancelAnimation\(hop\)\s*bob\.value = 0\s*hop\.value = 0/)
+  assert.match(chibi, /bob\.value = withRepeat\(/)
+  // A tap under Reduce Motion only fades the glow; the hop is skipped.
+  assert.match(chibi, /if \(reduceMotion\) return\s*hop\.value = withSequence\(/)
+  // The character is translated, never scaled: its drawn look stays as approved.
+  assert.doesNotMatch(chibi, /const bodyStyle = useAnimatedStyle\(\(\) => \(\{[^}]*scale/)
+  assert.match(hero, /if \(reduceMotion\) \{\s*cancelAnimation\(drift\)\s*drift\.value = 0/)
+  assert.match(hero, /getProfileHeroParallax\(scrollY\.value, reduceMotion\)/)
+  assert.match(reveal, /const entering = delay === null\s*\? undefined/)
+  assert.match(completeness, /fill\.value = reduceMotion\s*\? target/)
+})

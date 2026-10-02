@@ -79,7 +79,15 @@ const criticalFiles = [
   "src/ui/errorBoundary.tsx",
   "src/ui/primitives.tsx",
   "src/ui/toast.tsx",
-  "src/ui/vibeTilePicker.tsx"
+  "src/ui/vibeTilePicker.tsx",
+  // The own profile and its My Room entry (profile redesign).
+  "src/screens/YouScreen.tsx",
+  "src/features/profile/OwnProfileHero.tsx",
+  "src/features/profile/OwnProfileIdentity.tsx",
+  "src/features/profile/OwnProfileSections.tsx",
+  "src/features/profile/ProfileCompletenessCard.tsx",
+  "src/features/profile/ProfileMatchedActions.tsx",
+  "src/features/profile/MyRoomProfileButton.tsx"
 ]
 
 const registerDirectory = resolve(mobileRoot, "src/features/session/register")

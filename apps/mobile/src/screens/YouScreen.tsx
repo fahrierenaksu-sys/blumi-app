@@ -1,18 +1,26 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import Ionicons from "@expo/vector-icons/Ionicons"
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Reanimated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import type { SessionActor } from "../features/session/sessionApi"
 import { getAppLocale } from "../features/session/authLocale"
-import { getYouScreenCopy } from "../features/session/youScreenCopy"
+import { getOwnProfileCopy } from "../features/profile/profileCopy"
+import { resolveOwnProfileSections } from "../features/profile/profileViewModel"
+import { OwnProfileHero } from "../features/profile/OwnProfileHero"
+import { OwnProfileIdentity } from "../features/profile/OwnProfileIdentity"
+import { ProfileCompletenessCard } from "../features/profile/ProfileCompletenessCard"
+import {
+  ProfileAddCard,
+  ProfileBioCard,
+  ProfileInterestChips,
+  ProfilePreviewEntry,
+  ProfilePromptCards,
+  ProfileSection
+} from "../features/profile/OwnProfileSections"
+import { ProfileReveal } from "../features/profile/ProfileReveal"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
-import { MyAvatar } from "../ui/myAvatar"
-import { SoftBlobBackground } from "../ui/backgrounds"
-import { LinearGradient } from "../ui/linearGradient"
-import { TopBar } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
-import { BackButton } from "../ui/backButton"
 import { VIBE_PRESETS } from "../ui/vibeTilePicker"
 
 type YouScreenProps = NativeStackScreenProps<RootStackParamList, "You"> & {
@@ -21,100 +29,91 @@ type YouScreenProps = NativeStackScreenProps<RootStackParamList, "You"> & {
   onResetSession: () => void
 }
 
+/**
+ * The own profile, opened from My Room's profile button: a live chibi stage,
+ * the name card with the one "Edit profile" pill, a readiness card, then what
+ * the user wrote (bio, interests, prompts), each replaced by a gentle "add"
+ * card while empty, and "See how others see you". Settings is the gear.
+ */
 export function YouScreen(props: YouScreenProps) {
   const { navigation, sessionActor } = props
   const { profile } = sessionActor
-  const copy = getYouScreenCopy(getAppLocale())
+  const locale = getAppLocale()
+  const copy = getOwnProfileCopy(locale)
+  const sections = resolveOwnProfileSections(profile, locale)
+  const vibePreset = VIBE_PRESETS.find((preset) => preset.id === profile.avatar.presetId)
+  const scrollY = useSharedValue(0)
+  const handleScroll = useAnimatedScrollHandler((event) => { scrollY.value = event.contentOffset.y })
 
-  const vibePreset = VIBE_PRESETS.find((p) => p.id === profile.avatar.presetId)
-  const vibeLabel = vibePreset?.label ?? copy.customVibe
-  const vibeColor = vibePreset?.swatch ?? uiTheme.colors.primary
+  const openEdit = (): void => navigation.navigate("ProfileEdit")
+  const openSettings = (): void => navigation.navigate("Settings")
+  const openPreview = (): void =>
+    navigation.navigate("ProfilePreview", { userId: profile.userId, context: "self" })
+
+  let revealIndex = 0
+  const nextReveal = (): number => revealIndex++
+
   return (
     <View style={styles.root}>
-      <SoftBlobBackground variant="lobby" />
-      <SafeAreaView contentGutter style={styles.safe} edges={["top", "left", "right", "bottom"]}>
-        <TopBar
-          title={copy.title}
-          titleAlign="start"
-          leftSlot={
-            <BackButton accessibilityLabel={copy.back} onPress={() => goBackOrFallback(navigation, () => navigation.replace("Lobby"))} />
-          }
-          rightSlot={<View style={styles.topRightSpacer} />}
+      <Reanimated.ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        <OwnProfileHero
+          displayName={profile.displayName}
+          copy={copy}
+          scrollY={scrollY}
+          onBack={() => goBackOrFallback(navigation, () => navigation.replace("MyRoom"))}
+          onOpenSettings={openSettings}
         />
+        <SafeAreaView contentGutter style={styles.body} edges={["left", "right", "bottom"]}>
+          <ProfileReveal index={nextReveal()} style={styles.identitySlot}>
+            <OwnProfileIdentity
+              copy={copy}
+              displayName={profile.displayName}
+              age={profile.age}
+              vibeLabel={vibePreset?.label ?? copy.customVibe}
+              vibeColor={vibePreset?.swatch ?? uiTheme.colors.primary}
+              onEditProfile={openEdit}
+            />
+          </ProfileReveal>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Hero avatar card */}
-          <View style={styles.heroCardOuter}>
-            <LinearGradient
-              colors={["#E8DCF9", "#FBE3EF", "#FFEAEC"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroGlassWash} pointerEvents="none" />
-              <View style={styles.heroGlow} pointerEvents="none" />
-              <MyAvatar
-                name={profile.displayName}
-                seed={profile.userId}
-                size={160}
-                ring="strong"
-              />
-            </LinearGradient>
-          </View>
+          <ProfileReveal index={nextReveal()}>
+            <ProfileCompletenessCard copy={copy} completeness={sections.completeness} onPress={openEdit} />
+          </ProfileReveal>
 
-          {/* Identity */}
-          <View style={styles.identityBlock}>
-            <Text style={styles.nameText}>{profile.displayName}</Text>
-            {profile.age ? (
-              <Text style={styles.ageText}>{copy.age(profile.age)}</Text>
-            ) : null}
-            <View style={styles.vibeRow}>
-              <View style={[styles.vibeDot, { backgroundColor: vibeColor }]} />
-              <Text style={styles.vibeLabel}>{copy.vibe(vibeLabel)}</Text>
-            </View>
-          </View>
+          <ProfileReveal index={nextReveal()}>
+            <ProfileSection title={copy.aboutTitle}>
+              {sections.bio
+                ? <ProfileBioCard bio={sections.bio} />
+                : <ProfileAddCard icon="create-outline" title={copy.addBio} hint={copy.addBioHint} onPress={openEdit} />}
+            </ProfileSection>
+          </ProfileReveal>
 
-          {/* Actions */}
-          <View style={styles.actionGrid}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={copy.editProfile}
-              onPress={() => navigation.navigate("ProfileEdit")}
-              style={({ pressed }) => [
-                styles.glassActionCard,
-                styles.editActionCard,
-                pressed ? styles.glassActionCardPressed : null
-              ]}
-            >
-              <View style={styles.glassActionIconWrap}>
-                <Ionicons name="pencil-outline" size={22} color={uiTheme.colors.primaryDeep} />
-              </View>
-              <Text style={styles.glassActionTitle}>{copy.editProfile}</Text>
-              <Text style={styles.glassActionDesc}>{copy.editProfileDescription}</Text>
-            </Pressable>
+          <ProfileReveal index={nextReveal()}>
+            <ProfileSection title={copy.interestsTitle}>
+              {sections.showAddInterests
+                ? <ProfileAddCard icon="pricetags-outline" title={copy.addInterests} hint={copy.addInterestsHint} onPress={openEdit} />
+                : <ProfileInterestChips interests={sections.interests} />}
+            </ProfileSection>
+          </ProfileReveal>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={copy.settings}
-              onPress={() => navigation.navigate("Settings")}
-              style={({ pressed }) => [
-                styles.glassActionCard,
-                pressed ? styles.glassActionCardPressed : null
-              ]}
-            >
-              <View style={styles.glassActionIconWrap}>
-                <Ionicons name="settings-outline" size={22} color={uiTheme.colors.primaryDeep} />
-              </View>
-              <Text style={styles.glassActionTitle}>{copy.settings}</Text>
-              <Text style={styles.glassActionDesc}>{copy.settingsDescription}</Text>
-            </Pressable>
-          </View>
+          <ProfileReveal index={nextReveal()}>
+            <ProfileSection title={copy.promptsTitle}>
+              {sections.prompts.length > 0 ? <ProfilePromptCards prompts={sections.prompts} /> : null}
+              {sections.showAddPrompt
+                ? <ProfileAddCard icon="chatbubbles-outline" title={copy.addPrompt} hint={copy.addPromptHint} onPress={openEdit} />
+                : null}
+            </ProfileSection>
+          </ProfileReveal>
 
-        </ScrollView>
-      </SafeAreaView>
+          <ProfileReveal index={nextReveal()}>
+            <ProfilePreviewEntry copy={copy} onPress={openPreview} />
+          </ProfileReveal>
+        </SafeAreaView>
+      </Reanimated.ScrollView>
     </View>
   )
 }
@@ -124,141 +123,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: uiTheme.colors.background
   },
-  safe: {
-    flex: 1,
-    paddingTop: uiTheme.spacing.sm
-  },
-  topRightSpacer: {
-    width: 40
-  },
   scroll: {
-    gap: uiTheme.spacing.md,
     paddingBottom: uiTheme.spacing.xxl
   },
-
-  /* ── Hero ───────────────────────────────────── */
-  heroCardOuter: {
-    borderRadius: 34,
-    overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    ...uiTheme.shadow.float,
+  body: {
+    gap: uiTheme.spacing.xl
   },
-  heroCard: {
-    height: 280,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  heroGlassWash: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-  },
-  heroGlow: {
-    position: "absolute",
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(255, 137, 184, 0.22)",
-    top: -60,
-    left: -40,
-  },
-  nameplatePreview: {
-    position: "absolute",
-    bottom: uiTheme.spacing.md,
-    alignSelf: "center",
-    maxWidth: "84%",
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.xs,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.full,
-    borderWidth: 1
-  },
-  nameplatePreviewText: {
-    flexShrink: 1,
-    ...uiTheme.font.caption,
-    fontWeight: "900"
-  },
-  nameplatePreviewMeta: {
-    color: "rgba(32, 22, 42, 0.66)",
-    ...uiTheme.font.micro,
-    fontWeight: "900",
-    textTransform: "uppercase"
-  },
-
-  /* ── Identity ──────────────────────────────── */
-  identityBlock: {
-    gap: uiTheme.spacing.xxs,
-    paddingHorizontal: 2
-  },
-  nameText: {
-    color: uiTheme.colors.textPrimary,
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -0.6
-  },
-  ageText: {
-    color: uiTheme.colors.textSecondary,
-    ...uiTheme.font.body,
-    fontWeight: "600"
-  },
-  vibeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4
-  },
-  vibeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5
-  },
-  vibeLabel: {
-    color: uiTheme.colors.primaryDeep,
-    ...uiTheme.font.label,
-    fontWeight: "800"
-  },
-
-  actionGrid: {
-    flexDirection: "column",
-    gap: uiTheme.spacing.md,
-  },
-  glassActionCard: {
-    flex: 1,
-    padding: uiTheme.spacing.md,
-    borderRadius: 26,
-    backgroundColor: "rgba(255, 255, 255, 0.4)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.8)",
-    alignItems: "flex-start",
-    gap: 6,
-    ...uiTheme.shadow.soft,
-  },
-  editActionCard: {
-    backgroundColor: "rgba(255, 241, 248, 0.86)",
-    borderColor: "rgba(255, 79, 152, 0.28)"
-  },
-  glassActionCardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
-  },
-  glassActionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255, 255, 255, 0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  glassActionTitle: {
-    ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.textPrimary,
-  },
-  glassActionDesc: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textSecondary,
-  },
+  identitySlot: {
+    marginTop: -64
+  }
 })
