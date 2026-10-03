@@ -8,7 +8,6 @@ import {
   ReduceMotion,
   useAnimatedRef,
   useSharedValue,
-  withSequence,
   withTiming,
   type SharedValue
 } from "react-native-reanimated"
@@ -29,7 +28,6 @@ import {
   ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS,
   ROOM_EDITOR_DRAG_GHOST_OPACITY,
   getRoomEditorDragCellHaptic,
-  ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE,
   ROOM_EDITOR_DRAG_LIFT_SCALE,
   ROOM_EDITOR_DRAG_OUTSIDE_CELL,
   ROOM_EDITOR_DRAG_SNAP_MS,
@@ -63,7 +61,11 @@ import type { RoomEditorStageLayout } from "./useRoomEditorStageLayout"
 /** What the floating drag ghost shows; its position lives in shared values. */
 export interface RoomEditorDragGhostContent {
   session: number
-  /** The room piece replaced by this overlay; other users of the overlay omit it. */
+  /**
+   * The room piece this overlay stands in for while it is held (the room hides
+   * it). Cleared at a valid drop so the placed piece takes over at once while
+   * the overlay fades. Other users of the overlay omit it.
+   */
   renderId?: string
   source: FurnitureItem["asset"]["source"]
   mirrored: boolean
@@ -107,9 +109,6 @@ type ActiveDrag =
     startColumn: number
     startRow: number
   }
-
-/** Drop: the piece comes down and squashes over this long before it settles. */
-const ROOM_EDITOR_DRAG_DROP_MS = 80
 
 const EMPTY_STAGE_BOUNDS: StageWindowBounds = { x: 0, y: 0, width: 0, height: 0 }
 
@@ -194,7 +193,7 @@ export function useRoomEditorDragGestures(input: {
     setGhost((current) => current?.session === session ? undefined : current)
   }, [])
 
-  const { snappy } = motion
+  const { snappy, fadeOut } = motion
   const liftGhost = useCallback((anchorX: number, anchorY: number) => {
     "worklet"
     cancelAnimation(ghostX)
@@ -274,28 +273,34 @@ export function useRoomEditorDragGestures(input: {
     })
   }, [clearGhost, ghostLift, ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostX, ghostY, reduceMotion, snappy])
 
-  // The overlay is the only visible copy until settling finishes. Keep it
-  // opaque, then hand rendering back to the placed piece in one render.
-  const settleGhost = useCallback((session: number) => {
+  // A valid drop. The placed piece already draws itself at its committed spot
+  // and depth (the hold was released in the commit's render), so the overlay
+  // only retreats: it sets down onto that piece while it fades, on a fixed
+  // timing, and unmounts when the fade ends. Never on a spring's completion,
+  // which would leave the overlay above avatars and furniture for ~1.5x the
+  // visible motion (ENGINEERING_RULES motion rule 9).
+  const settleGhost = useCallback((session: number, itemX: number, itemY: number) => {
     "worklet"
+    const stage = dragStage.value
+    const x = stage.x + itemX * stage.width
+    const y = stage.y + itemY * stage.height
     if (reduceMotion) {
-      ghostOpacity.value = 1
+      ghostX.value = x
+      ghostY.value = y
       ghostScale.value = 1
       ghostLift.value = 0
-      scheduleOnRN(clearGhost, session)
-      return
+    } else {
+      ghostX.value = animateTo(x, fadeOut)
+      ghostY.value = animateTo(y, fadeOut)
+      ghostScale.value = animateTo(1, fadeOut)
+      ghostLift.value = animateTo(0, fadeOut)
     }
-    // Drop: down onto the floor, a small squash, then settle (snappy).
-    ghostOpacity.value = 1
-    ghostLift.value = withTiming(0, { duration: ROOM_EDITOR_DRAG_DROP_MS, reduceMotion: ReduceMotion.Never })
-    ghostScale.value = withSequence(
-      withTiming(ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE, { duration: ROOM_EDITOR_DRAG_DROP_MS, reduceMotion: ReduceMotion.Never }),
-      animateTo(1, snappy, (finished) => {
-        "worklet"
-        if (finished) scheduleOnRN(clearGhost, session)
-      })
-    )
-  }, [clearGhost, ghostLift, ghostOpacity, ghostScale, reduceMotion, snappy])
+    ghostOpacity.value = animateTo(0, fadeOut, (finished) => {
+      "worklet"
+      // A newer drag cancels this fade and owns the overlay.
+      if (finished) scheduleOnRN(clearGhost, session)
+    })
+  }, [clearGhost, dragStage, fadeOut, ghostLift, ghostOpacity, ghostScale, ghostX, ghostY, reduceMotion])
 
   const hideGhost = useCallback((session: number) => {
     ghostOpacity.value = 0
@@ -427,8 +432,14 @@ export function useRoomEditorDragGestures(input: {
       const release = resolveRoomEditorDragRelease({ source: drag.source, moved, inside, preview })
       lastDragPreviewRef.current = undefined
       if (release === "commit" && preview) {
-        input.commitTrayPlacementPreview(preview)
-        scheduleOnUI(settleGhost, session)
+        if (!input.commitTrayPlacementPreview(preview)) {
+          scheduleOnUI(springGhostBack, session)
+          return
+        }
+        // Batched with the commit: the placed piece reappears at its new spot
+        // and depth in the same render, while the overlay fades above it.
+        setGhost((current) => current?.session === session ? { ...current, renderId: undefined } : current)
+        scheduleOnUI(settleGhost, session, preview.item.x, preview.item.y)
         return
       }
       input.selection.updatePlacementPreview(undefined)

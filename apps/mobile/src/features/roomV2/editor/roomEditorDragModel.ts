@@ -50,14 +50,10 @@ export const ROOM_EDITOR_DRAG_SNAP_MS = 70
 /** Cell index used while a tray drag is off the stage. */
 export const ROOM_EDITOR_DRAG_OUTSIDE_CELL = -100000
 export const ROOM_EDITOR_DRAG_LIFT_SCALE = 1.04
-/** A valid drop lands with this squash before settling at 1. */
-export const ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE = 0.97
 /** How far the held piece floats above its shadow, in points. */
 export const ROOM_EDITOR_DRAG_LIFT_HEIGHT = 6
 /** The lifted piece stays fully opaque (ROOM-10); the lift scale shows it is held. */
 export const ROOM_EDITOR_DRAG_GHOST_OPACITY = 1
-/** After a valid drop the ghost settles onto the placed piece and fades. */
-export const ROOM_EDITOR_DRAG_SETTLE_FADE_MS = 140
 
 export type RoomEditorDragSource = "stage" | "tray"
 export type RoomEditorDragRelease = "commit" | "reject" | "cancel"

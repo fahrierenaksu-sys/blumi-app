@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
-import { createClockedReanimatedStub } from "../../../testing/reanimatedClock"
+import { createClockedReanimatedStub, loadClockedMotion } from "../../../testing/reanimatedClock"
+import { MOTION_DURATIONS } from "../../../ui/motionTokens"
 import { getMyRoomEditorCopy } from "../myRoomCopy"
 import { resolvePlacedFurnitureRenderItem, resolveRoomV2Scene } from "../roomV2Selectors"
 import * as dragModel from "./roomEditorDragModel"
@@ -30,7 +31,12 @@ class Pan {
 function mountDrag(reduceMotion: boolean) {
   const runtime = createFakeReactRuntime()
   const native = createReactNativeStub()
-  const clock = createClockedReanimatedStub(runtime)
+  // Springs report completion at rest, about 1.5x their visible duration.
+  const clock = createClockedReanimatedStub(runtime, { springRestFactor: 1.5 })
+  const motion = loadClockedMotion(runtime, clock.module, native.module) as {
+    resolveMotion: (reduce: boolean) => unknown
+    animateTo: unknown
+  }
   const bounds = { x: -40, y: 100, width: 472, height: 269 }
   const chair = createTestFurniture()
   const placed = createTestPlaced({ x: 0.5, y: 0.65 })
@@ -65,9 +71,8 @@ function mountDrag(reduceMotion: boolean) {
         "react-native-worklets": { ...clock.worklets, scheduleOnUI: clock.worklets.scheduleOnRN },
         "../../../ui/haptics": { hapticError() {}, hapticMedium() {}, hapticRigid() {}, hapticSelection() {} },
         "../../../ui/motion": {
-          useMotion: () => ({ reduceMotion, snappy: {} }),
-          animateTo: (value: number, _config: unknown, callback?: (finished: boolean) => void) =>
-            (clock.module.withTiming as (v: number, c: unknown, cb?: unknown) => unknown)(value, { duration: 100 }, callback)
+          useMotion: () => motion.resolveMotion(reduceMotion),
+          animateTo: motion.animateTo
         },
         "../roomV2Selectors": { resolvePlacedFurnitureRenderItem },
         "./roomEditorCatalog": { ACTIVE_ROOM_FURNITURE_CATALOG: [chair] },
@@ -98,34 +103,58 @@ function mountDrag(reduceMotion: boolean) {
   return { read, event, scene, bounds, native, runtime, commits, preview: () => preview, selected: () => selected, picked: () => picked }
 }
 
-test("a stage drag uses measured room coordinates and one visible piece through drop", (t) => {
-  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
-  const h = mountDrag(false)
+function dragChairAndDrop(h: ReturnType<typeof mountDrag>, t: { mock: { timers: { tick: (ms: number) => void } } }) {
   const pan = h.read().stageDragGesture as unknown as Pan
   const start = h.event(0.5, 0.63)
   let failed = false
   pan.down({ numberOfTouches: 1, changedTouches: [start] }, { fail: () => { failed = true } })
   assert.equal(failed, false, "the child-local point does not break the hit test")
   pan.start(start)
-  assert.equal(h.read().ghost?.renderId, "chair_1")
   assert.equal(h.read().ghostValues.x.value, h.bounds.x + 0.5 * h.bounds.width)
-  assert.deepEqual(getRoomEditorDisplayRenderItems(h.scene.renderItems, undefined, h.read().ghost?.renderId), [])
+  const held = () => getRoomEditorDisplayRenderItems(h.scene.renderItems, h.preview(), h.read().ghost?.renderId)
+  assert.deepEqual(held(), [], "while held, the overlay is the only visible copy")
   pan.update(h.event(0.6, 0.7))
   t.mock.timers.tick(70)
   const preview = h.preview()!
   assert.ok(preview.isValid)
-  assert.ok(Math.abs(h.read().ghostValues.x.value - (h.bounds.x + preview.item.x * h.bounds.width)) < 1e-8)
-  assert.ok(Math.abs(h.read().ghostValues.y.value - (h.bounds.y + preview.item.y * h.bounds.height)) < 1e-8)
-  assert.deepEqual(getRoomEditorDisplayRenderItems(h.scene.renderItems, preview, h.read().ghost?.renderId), [])
+  assert.deepEqual(held(), [], "a valid preview spot is still drawn only by the overlay")
   pan.end(h.event(0.6, 0.7), true)
   assert.equal(h.commits.length, 1)
-  t.mock.timers.tick(150)
-  assert.ok(h.read().ghost, "the overlay remains until its drop animation finishes")
-  assert.equal(h.read().ghostValues.opacity.value, 1, "the only visible copy must not fade out")
-  assert.deepEqual(getRoomEditorDisplayRenderItems(h.scene.renderItems, preview, h.read().ghost?.renderId), [])
-  t.mock.timers.tick(350)
+  // The test scene is static: the preview stands in for the committed piece.
+  const shown = () => getRoomEditorDisplayRenderItems(h.scene.renderItems, preview, h.read().ghost?.renderId)
+  const landing = { x: h.bounds.x + preview.item.x * h.bounds.width, y: h.bounds.y + preview.item.y * h.bounds.height }
+  return { shown, landing }
+}
+
+test("a valid drop shows the placed piece at once and the overlay fades out on a short fixed timing", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
+  const h = mountDrag(false)
+  const { shown, landing } = dragChairAndDrop(h, t)
+  assert.equal(shown().length, 1, "the placed piece draws at its own depth in the drop frame")
+  t.mock.timers.tick(MOTION_DURATIONS.fadeOut / 2)
+  assert.equal(shown().length, 1, "never a frame without the piece")
+  const fading = h.read().ghostValues.opacity.value
+  assert.ok(fading > 0 && fading < 1, "the overlay is already fading over the placed piece")
+  t.mock.timers.tick(MOTION_DURATIONS.fadeOut / 2)
+  assert.equal(h.read().ghostValues.opacity.value, 0)
+  assert.ok(Math.abs(h.read().ghostValues.x.value - landing.x) < 1e-8, "the overlay sets down on the placed piece")
+  assert.ok(Math.abs(h.read().ghostValues.y.value - landing.y) < 1e-8)
+  assert.equal(h.read().ghostValues.scale.value, 1)
+  assert.equal(h.read().ghost, undefined, "the overlay leaves when its fade ends, not when a spring rests")
+  assert.equal(shown().length, 1)
+  h.runtime.unmount()
+})
+
+test("under Reduce Motion a drop lands the overlay in place and only crossfades it", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
+  const h = mountDrag(true)
+  const { shown, landing } = dragChairAndDrop(h, t)
+  assert.equal(shown().length, 1)
+  assert.equal(h.read().ghostValues.x.value, landing.x, "no travel under Reduce Motion")
+  assert.equal(h.read().ghostValues.scale.value, 1)
+  t.mock.timers.tick(MOTION_DURATIONS.crossfade)
+  assert.equal(h.read().ghostValues.opacity.value, 0)
   assert.equal(h.read().ghost, undefined)
-  assert.equal(getRoomEditorDisplayRenderItems(h.scene.renderItems, preview, undefined).length, 1)
   h.runtime.unmount()
 })
 
