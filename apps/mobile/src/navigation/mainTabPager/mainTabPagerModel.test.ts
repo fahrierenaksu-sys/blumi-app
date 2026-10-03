@@ -12,6 +12,7 @@ import {
 } from "./mainTabPagerConfig"
 import {
   resolveMainTabPagerAxisDecision,
+  resolveMainTabPagerTouchMove,
   createMainTabPagerUiState,
   clampMainTabPagerPosition,
   getMainTabPageAccessibility,
@@ -734,4 +735,16 @@ test("small or still-ambiguous movement waits, and ambiguity ends as a scroll", 
   assert.equal(resolveMainTabPagerAxisDecision(26, 24), "undecided")
   assert.equal(resolveMainTabPagerAxisDecision(33, 30), "fail")
   assert.equal(resolveMainTabPagerAxisDecision(Number.NaN, 4), "undecided")
+})
+
+test("a swipe the pager has taken is never cancelled by later diagonal drift", () => {
+  const start = resolveMainTabPagerTouchMove({ isDecided: false, touchCount: 1, dx: 20, dy: 4 })
+  assert.equal(start, "activate")
+  // Thumb curls down mid-swipe: total movement is now vertical-dominant.
+  assert.equal(resolveMainTabPagerTouchMove({ isDecided: true, touchCount: 1, dx: 20, dy: 22 }), "undecided")
+  assert.equal(resolveMainTabPagerTouchMove({ isDecided: true, touchCount: 2, dx: 60, dy: 70 }), "undecided")
+})
+
+test("a second finger before the axis is decided lets the touch go", () => {
+  assert.equal(resolveMainTabPagerTouchMove({ isDecided: false, touchCount: 2, dx: 20, dy: 0 }), "fail")
 })

@@ -80,7 +80,7 @@ import {
   resolveMainTabPagerSpringEnergyThreshold,
   shouldMainTabPagerTouchCatchSettle,
   withMainTabPageMounted,
-  resolveMainTabPagerAxisDecision,
+  resolveMainTabPagerTouchMove,
   type MainTabPagerUiTransition
 } from "./mainTabPagerModel"
 import { createMainTabPagerSelectAction } from "./mainTabPagerRouter"
@@ -645,33 +645,37 @@ export const MainTabPager = memo(function MainTabPager({
   const pagerGestureRef = useRef<GestureType | undefined>(undefined)
   const touchStartX = useSharedValue(0)
   const touchStartY = useSharedValue(0)
+  const touchAxisDecided = useSharedValue(false)
   const pagerGesture = useMemo(() => Gesture.Pan()
     .withRef(pagerGestureRef)
     .enabled(swipeEnabled)
-    // The drag's direction decides activation (resolveMainTabPagerAxisDecision):
+    // The drag's direction decides activation (resolveMainTabPagerTouchMove):
     // per-axis offsets dropped fast flicks whose first move crossed both slops.
     .manualActivation(true)
     .onTouchesDown((event) => {
       "worklet"
+      // A second finger joins the current touch; only the first one starts it.
+      if (event.numberOfTouches !== 1) return
       const touch = event.allTouches[0]
       if (!touch) return
       touchStartX.value = touch.absoluteX
       touchStartY.value = touch.absoluteY
+      touchAxisDecided.value = false
     })
     .onTouchesMove((event, stateManager) => {
       "worklet"
-      if (event.numberOfTouches !== 1) {
-        stateManager.fail()
-        return
-      }
       const touch = event.allTouches[0]
       if (!touch) return
-      const decision = resolveMainTabPagerAxisDecision(
-        touch.absoluteX - touchStartX.value,
-        touch.absoluteY - touchStartY.value
-      )
+      const decision = resolveMainTabPagerTouchMove({
+        isDecided: touchAxisDecided.value,
+        touchCount: event.numberOfTouches,
+        dx: touch.absoluteX - touchStartX.value,
+        dy: touch.absoluteY - touchStartY.value
+      })
+      if (decision === "undecided") return
+      touchAxisDecided.value = true
       if (decision === "activate") stateManager.activate()
-      else if (decision === "fail") stateManager.fail()
+      else stateManager.fail()
     })
     .onBegin(() => {
       "worklet"
@@ -754,6 +758,7 @@ export const MainTabPager = memo(function MainTabPager({
     baseIndex,
     caught,
     commitSettledPage,
+    touchAxisDecided,
     touchStartX,
     touchStartY,
     dragging,

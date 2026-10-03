@@ -45,6 +45,24 @@ export function resolveMainTabPagerAxisDecision(dx: number, dy: number): MainTab
   return "undecided"
 }
 
+/**
+ * What one touch move asks of the pager gesture. The axis is decided once per
+ * touch: after the pager took the drag (or let it go), later drift, even a
+ * diagonal one, never re-decides it, so a page mid-swipe is never cancelled.
+ * A second finger before the decision is a pinch or a mistake, not a swipe.
+ */
+export function resolveMainTabPagerTouchMove(input: {
+  isDecided: boolean
+  touchCount: number
+  dx: number
+  dy: number
+}): MainTabPagerAxisDecision {
+  "worklet"
+  if (input.isDecided) return "undecided"
+  if (input.touchCount !== 1) return "fail"
+  return resolveMainTabPagerAxisDecision(input.dx, input.dy)
+}
+
 function clampIndex(index: number, minIndex: number, maxIndex: number): number {
   "worklet"
   return Math.min(maxIndex, Math.max(minIndex, index))
