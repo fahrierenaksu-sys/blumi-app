@@ -754,6 +754,8 @@ export const MainTabPager = memo(function MainTabPager({
     baseIndex,
     caught,
     commitSettledPage,
+    touchStartX,
+    touchStartY,
     dragging,
     dragMountGeneration,
     gestureEpoch,
