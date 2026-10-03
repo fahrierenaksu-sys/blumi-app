@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
 import { animateTo, useMotion } from "../../../ui/motion"
+import { GesturePressableScale } from "../../../ui/GesturePressableScale"
 import { PressableScale } from "../../../ui/PressableScale"
 import { reconcileComposerTextAfterSend } from "../../chat/thread/chatComposerDraftModel"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
@@ -74,8 +75,8 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     return () => clearTimeout(timer)
   }, [suggestionsEnabled])
   const motion = useMotion()
-  // The press itself is PressableScale's (the shared `press` token); this
-  // outer scale only carries the post-send pop, so the two never fight
+  // The press itself is GesturePressableScale's (the shared `press` token);
+  // this outer scale only carries the post-send pop, so the two never fight
   // (the chat composer's pattern, MOTION_PLAN §D.4).
   const sendPop = useSharedValue(1)
   const sendPopStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendPop.value }] }))
@@ -187,7 +188,10 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
       />
       </View>
       <Animated.View style={sendPopStyle}>
-        <PressableScale
+        {/* Gesture Handler: the composer rides the keyboard on Reanimated
+            transforms that RN Pressable's touch tracking cannot see, so its
+            first tap could be dropped (ui/GesturePressableScale). */}
+        <GesturePressableScale
           accessibilityRole="button"
           accessibilityLabel={copy.sendRoomMessage}
           accessibilityState={{ disabled: sendDisabled }}
@@ -197,7 +201,7 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
           style={[styles.composerSend, sendDisabled ? styles.composerSendDisabled : null]}
         >
           <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-        </PressableScale>
+        </GesturePressableScale>
       </Animated.View>
     </View>
   )

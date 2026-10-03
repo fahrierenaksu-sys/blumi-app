@@ -163,6 +163,7 @@ test("speech-only scene updates retain the chat child and panel inputs; bursts a
           "../../../ui/motion": { useMotion: () => ({ reduceMotion: true }) },
           "../../../ui/haptics": { hapticSelection: () => undefined },
           "../../../ui/PressableScale": { PressableScale: "Pressable" },
+          "../../../ui/GesturePressableScale": { GesturePressableScale: "Pressable" },
           "@expo/vector-icons/Ionicons": { __esModule: true, default: "Ionicons" }
         }, real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"], globals: { setTimeout, clearTimeout }
       })

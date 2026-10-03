@@ -131,12 +131,17 @@ function loadControls(osReduceMotion: boolean, options: { hold?: boolean } = {})
   const pressableScale = loadSourceWithFakeReact("ui/PressableScale.tsx", runtime, {
     modules: { ...base, "./motion": motion }
   })
+  // The send button rides the keyboard, so it presses through Gesture Handler.
+  const gesturePressableScale = loadSourceWithFakeReact("ui/GesturePressableScale.tsx", runtime, {
+    modules: { ...base, "react-native-gesture-handler": { Pressable: "Pressable" }, "./PressableScale": pressableScale }
+  })
   const haptics: string[] = []
   const record = (kind: string) => () => { haptics.push(kind) }
   const modules = {
     ...base,
     "../../../ui/motion": motion,
     "../../../ui/PressableScale": pressableScale,
+    "../../../ui/GesturePressableScale": gesturePressableScale,
     "../../../ui/haptics": {
       hapticSelection: record("selection"),
       hapticLight: record("light"),
@@ -201,11 +206,17 @@ function control(runtime: FakeReactRuntime, label: string): Element {
   return found[0]!
 }
 
+/** The drawn style of `label` (inside a Gesture Handler control's still hit box). */
+function drawnStyle(element: Element, pressed: boolean): Record<string, any> {
+  const { children, style } = element.props
+  return typeof children === "function" ? flatten(children({ pressed }).props.style) : flatten(style)
+}
+
 /** The style of `label` while pressed. */
 function pressedStyle(runtime: FakeReactRuntime, label: string): Record<string, any> {
   control(runtime, label).props.onPressIn(pressEvent)
   runtime.rerender()
-  const style = flatten(control(runtime, label).props.style)
+  const style = drawnStyle(control(runtime, label), true)
   control(runtime, label).props.onPressOut(pressEvent)
   runtime.rerender()
   return style

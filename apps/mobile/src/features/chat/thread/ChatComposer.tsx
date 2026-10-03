@@ -1,11 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useRef, useState } from "react"
 import { Pressable, TextInput, View } from "react-native"
-import { Pressable as GesturePressable } from "react-native-gesture-handler"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
+import { GesturePressableScale } from "../../../ui/GesturePressableScale"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
@@ -52,8 +52,9 @@ export function ChatComposer({
   // What the input shows, also between a send and the next render.
   const shownTextRef = useRef("")
   const motion = useMotion()
-  // The hit target stays still during the press. This outer scale carries
-  // only the post-send pop, after the message has been accepted.
+  // The press itself is GesturePressableScale's (the shared `press` token,
+  // with a still hit target); this outer scale carries only the post-send
+  // pop, after the message has been accepted, so the two never fight.
   const sendPop = useSharedValue(1)
   const sendPopStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendPop.value }] }))
   const isSendDisabled = inputText.trim().length === 0 || isPendingThread
@@ -131,9 +132,10 @@ export function ChatComposer({
           />
         </View>
         <Animated.View style={sendPopStyle}>
-          {/* Gesture Handler keeps touch detection aligned with the footer's
-              keyboard transform under synchronous Reanimated UI updates. */}
-          <GesturePressable
+          {/* Gesture Handler: the footer rides the keyboard on Reanimated
+              transforms that RN Pressable's touch tracking cannot see, so
+              its first tap could be dropped (ui/GesturePressableScale). */}
+          <GesturePressableScale
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
@@ -160,7 +162,7 @@ export function ChatComposer({
             >
               <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
-          </GesturePressable>
+          </GesturePressableScale>
         </Animated.View>
       </View>
     </SafeAreaView>

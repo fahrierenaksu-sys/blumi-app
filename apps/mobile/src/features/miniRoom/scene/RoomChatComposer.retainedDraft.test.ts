@@ -25,6 +25,7 @@ function mountComposer() {
       "../../../ui/motion": { useMotion: () => ({ reduceMotion: false, snappy: {} }), animateTo: (value: number) => value },
       "../../../ui/haptics": { hapticSelection: () => undefined },
       "../../../ui/PressableScale": { PressableScale: "Pressable" },
+      "../../../ui/GesturePressableScale": { GesturePressableScale: "Pressable" },
       "@expo/vector-icons/Ionicons": { __esModule: true, default: "Ionicons" }
     }, real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"], globals: { setTimeout, clearTimeout }
   })

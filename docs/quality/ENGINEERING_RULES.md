@@ -79,7 +79,7 @@ Elsewhere (mobile paths are relative to `apps/mobile`):
 
 ## Motion
 
-All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useMotion()` (or `resolveMotion`) and driven with `animateTo`, so Reduce Motion is handled in one place: movement lands at once and opacity crossfades (200 ms). Springs: `press` (press in/out, toggles), `snappy` (selection, pills, badges), `smooth` (sheets, panels, overlays), `bouncy` (celebrations only). Opacity: `fadeIn`, `fadeOut`, `crossfade`. `stagger`: first appearance of at most six list items. Taps use `ui/PressableScale`. Choreography (MOTION_PLAN §B):
+All motion uses the tokens in `apps/mobile/src/ui/motion.ts`, read through `useMotion()` (or `resolveMotion`) and driven with `animateTo`, so Reduce Motion is handled in one place: movement lands at once and opacity crossfades (200 ms). Springs: `press` (press in/out, toggles), `snappy` (selection, pills, badges), `smooth` (sheets, panels, overlays), `bouncy` (celebrations only). Opacity: `fadeIn`, `fadeOut`, `crossfade`. `stagger`: first appearance of at most six list items. Taps use `ui/PressableScale`; a control on a surface Reanimated moves with the keyboard (the chat and MiniRoom send buttons) uses `ui/GesturePressableScale`, the same press feel on Gesture Handler, because RN Pressable can drop its first tap there. Choreography (MOTION_PLAN §B):
 
 1. Whatever the finger touched moves first.
 2. A gesture hands off to a spring that inherits the release velocity, never a fixed-duration timing.

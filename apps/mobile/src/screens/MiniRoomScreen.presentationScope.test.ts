@@ -62,6 +62,7 @@ test("a reused room route resets recovered drafts on room/thread changes and ret
           "../../../ui/motion": { useMotion: () => ({ reduceMotion: true }) },
           "../../../ui/haptics": { hapticSelection: () => undefined },
           "../../../ui/PressableScale": { PressableScale: "Pressable" },
+          "../../../ui/GesturePressableScale": { GesturePressableScale: "Pressable" },
           "@expo/vector-icons/Ionicons": { __esModule: true, default: "Ionicons" } },
         real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"], globals: { setTimeout, clearTimeout }
       })
