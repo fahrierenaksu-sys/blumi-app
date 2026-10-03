@@ -5,13 +5,14 @@ import { AppState, Image as ReactNativeImage, type ImageSourcePropType } from "r
 import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import { getIdleAvatarLayerAssets } from "../avatarV2/room/avatarIdleAssets"
+import { loadoutToUserAvatar, normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
 import { useAvatarV2 } from "../avatarV2/state/AvatarV2Provider"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
   ROOM_V2_FURNITURE_CATALOG,
   ROOM_V2_SHELL_CATALOG
 } from "../roomV2/roomV2Catalog"
-import { resolveRoomV2Shell } from "../roomV2/roomV2Selectors"
+import { resolveRoomV2Scene, resolveRoomV2Shell } from "../roomV2/roomV2Selectors"
 import { useRoomV2 } from "../roomV2/state/RoomV2Provider"
 import { getAppLocale, getLocaleIdentifier } from "../session/appLocale"
 import {
@@ -31,7 +32,9 @@ import {
   selectBoundedWarmupUris,
   selectInitialShopRoomItemIds,
   selectInitialShopTopIds,
+  selectRoomSceneWarmupSources,
   settleWarmupUri,
+  subscribeToRoomEntryWarmup,
   subscribeToSelectedShopPreviewWarmup,
   type WarmupPriority,
   type WarmupSessionBudget
@@ -39,10 +42,16 @@ import {
 
 const shopBackgroundSource = require("../../../assets/ui/home-liquid-background-v2.png") as ImageSourcePropType
 // Nominal decoded RGBA request estimates, not compressed file size or native cache residency.
-const SHOP_BUDGET = { maxAssets: 5, maxDecodedBytes: 9 * 1024 * 1024 }
+// Shop: the backdrop plus the first cards of both shelves (220 px thumbnails, ~0.2 MB each).
+const SHOP_BUDGET = { maxAssets: 12, maxDecodedBytes: 9 * 1024 * 1024 }
 const SELECTED_PREVIEW_BUDGET = { maxAssets: 4, maxDecodedBytes: 8 * 1024 * 1024 }
 const CURRENT_SCENE_BUDGET = { maxAssets: 15, maxDecodedBytes: 24 * 1024 * 1024 }
-const SESSION_BUDGET = { maxAssets: 32, maxDecodedBytes: 48 * 1024 * 1024 }
+// My Room as saved: the shell and every placed piece, so the room opens whole.
+const ROOM_SCENE_BUDGET = { maxAssets: 12, maxDecodedBytes: 32 * 1024 * 1024 }
+// A shared room about to open: its shell and both idle avatars.
+const ROOM_ENTRY_BUDGET = { maxAssets: 36, maxDecodedBytes: 16 * 1024 * 1024 }
+// Every image above is one the next screen decodes anyway; this only moves it earlier.
+const SESSION_BUDGET = { maxAssets: 48, maxDecodedBytes: 72 * 1024 * 1024 }
 
 /**
  * The first-viewport warm-ups (room shell, Shop) start this long after the
@@ -178,7 +187,6 @@ export function CurrentSceneAssetWarmup({
 }) {
   const { avatar } = useAvatarV2()
   const { userRoomDecor } = useRoomV2()
-  const roomShellId = userRoomDecor.roomShellId
   const viewportMetrics = useAppViewportMetrics({ bottomNavVisible: true })
   const shopLayoutMetrics = useMemo(() => getShopLayoutMetrics({
     width: viewportMetrics.safeWidth,
@@ -240,17 +248,18 @@ export function CurrentSceneAssetWarmup({
   const startCommonWarmup = useCallback(() => {
     if (!enabledRef.current || cancelCommonRef.current) return
     let current = true
-    // One active shell is needed for the first MyRoom frame. Give it the next
-    // idle slot, without pulling the larger avatar batch onto navigation.
+    // My Room's first frame needs its shell and every placed piece (it draws
+    // no contact shadows). Give them the next idle slot, shell first, without
+    // pulling the larger avatar batch onto navigation.
     const cancelShellWarmup = scheduleSceneAssetWarmup(() => {
       if (!current) return
-      const roomShellSource = resolveRoomV2Shell(
-        ROOM_V2_SHELL_CATALOG,
-        roomShellId,
-        DEFAULT_ROOM_V2_SHELL_ID
-      )?.asset.source
-      if (roomShellSource === undefined) return
-      void warmSources([roomShellSource], CURRENT_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
+      const sources = selectRoomSceneWarmupSources(resolveRoomV2Scene({
+        roomShellCatalog: ROOM_V2_SHELL_CATALOG,
+        furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
+        decor: userRoomDecor,
+        defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
+      }), { includeContactShadows: false })
+      void warmSources(sources, ROOM_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
     }, true, SCENE_WARMUP_AFTER_ROUTE_MS, canStartBackgroundWarmup)
     const cancelScheduled = scheduleSceneAssetWarmup(() => {
       if (!current) return
@@ -262,7 +271,7 @@ export function CurrentSceneAssetWarmup({
       cancelShellWarmup()
       cancelScheduled()
     }
-  }, [avatar, completed, inFlight, prefetchLane, roomShellId, sourceDimensions])
+  }, [avatar, completed, inFlight, prefetchLane, sourceDimensions, userRoomDecor])
 
   useEffect(() => {
     if (!enabled) return
@@ -288,6 +297,42 @@ export function CurrentSceneAssetWarmup({
     }
   }, [completed, enabled, inFlight, prefetchLane, sourceDimensions])
 
+  // A room invitation can be opened from Chat, where the scene warmup is off:
+  // this listens on every route. The shared room's own furniture arrives with
+  // the room itself; its shell and both avatars are known now.
+  useEffect(() => {
+    let generation = 0
+    const unsubscribe = subscribeToRoomEntryWarmup((request) => {
+      generation = request.generation
+      const sources: ImageSourcePropType[] = []
+      const shellSource = resolveRoomV2Shell(ROOM_V2_SHELL_CATALOG, DEFAULT_ROOM_V2_SHELL_ID, DEFAULT_ROOM_V2_SHELL_ID)?.asset.source
+      if (shellSource !== undefined) sources.push(shellSource)
+      for (const value of request.avatars) {
+        const selection = normalizeCompleteAvatarSelection(value)
+        if (!selection) continue
+        try {
+          sources.push(...getIdleAvatarLayerAssets(loadoutToUserAvatar(selection.loadout)).map((asset) => asset.source))
+        } catch {
+          // An avatar that cannot be resolved simply is not warmed.
+        }
+      }
+      void warmSources(
+        sources,
+        ROOM_ENTRY_BUDGET,
+        () => generation === request.generation,
+        completed,
+        inFlight,
+        sourceDimensions,
+        prefetchLane,
+        { priority: "selected" }
+      )
+    })
+    return () => {
+      generation = -1
+      unsubscribe()
+    }
+  }, [completed, inFlight, prefetchLane, sourceDimensions])
+
   useEffect(() => {
     if (enabled) {
       startCommonWarmup()
@@ -311,8 +356,9 @@ export function CurrentSceneAssetWarmup({
     // cancel queued work; completed URI receipts survive repeat Shop visits.
     const cancelScheduled = scheduleSceneAssetWarmup(() => {
       if (!current || !enabledRef.current) return
-      const sources: ImageSourcePropType[] = [shopBackgroundSource]
-      if (shopMode === "home") {
+      // The open shelf's first cards first, then the other shelf's, so
+      // switching between Avatar and Home also opens on drawn cards.
+      const homeSources = (): ImageSourcePropType[] => {
         const shopCatalogRuntime = resolveShopCatalogRuntime({
           sessionMode,
           isRoomCatalogQaPreview: false,
@@ -336,10 +382,11 @@ export function CurrentSceneAssetWarmup({
           homeVisibleProductLimit
         )
         const roomItemsById = new Map(roomItems.map((item) => [item.id, item]))
-        sources.push(...firstRoomIds
+        return firstRoomIds
           .map((id) => getRoomProductThumbnailSource(id) ?? roomItemsById.get(id)?.asset.source)
-          .filter((source): source is ImageSourcePropType => source !== undefined))
-      } else {
+          .filter((source): source is ImageSourcePropType => source !== undefined)
+      }
+      const avatarSources = (): ImageSourcePropType[] => {
         const publishedCatalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG)
         const publishedIds = new Set(publishedCatalog.map((item) => item.itemId))
         const pricedIds = new Set(publishedCatalog.filter((item) => item.priceCoins !== null).map((item) => item.itemId))
@@ -351,10 +398,13 @@ export function CurrentSceneAssetWarmup({
           (id) => getShopProductThumbnailSource(id) !== undefined,
           getLocaleIdentifier(getAppLocale())
         )
-        sources.push(...topIds
+        return topIds
           .map((id) => getShopProductThumbnailSource(id))
-          .filter((source): source is ImageSourcePropType => source !== undefined))
+          .filter((source): source is ImageSourcePropType => source !== undefined)
       }
+      const sources: ImageSourcePropType[] = shopMode === "home"
+        ? [shopBackgroundSource, ...homeSources(), ...avatarSources()]
+        : [shopBackgroundSource, ...avatarSources(), ...homeSources()]
       void warmSources(sources, SHOP_BUDGET, () => current && enabledRef.current, completed, inFlight, sourceDimensions, prefetchLane)
     }, true, SCENE_WARMUP_AFTER_ROUTE_MS, canStartBackgroundWarmup)
     return () => {

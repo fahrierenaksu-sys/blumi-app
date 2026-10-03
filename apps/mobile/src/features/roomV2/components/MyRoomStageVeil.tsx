@@ -38,10 +38,15 @@ export function MyRoomStageLoadingStatus({ label }: MyRoomStageLoadingStatusProp
 
 /**
  * Whether the stage is still covered: while the room loads, and after that
- * until the renderer reports the shell's first paint (markPainted), with a
- * fallback so a paint that is never reported cannot keep the veil up.
+ * until the renderer reports the whole scene drawn (markPainted, wired to
+ * RoomRenderer2D's onSceneReady), with a fallback so a scene that never
+ * reports cannot keep the stage covered. My Room waits up to 1.2 s behind its
+ * veil; a stage that must never delay entry (MiniRoom) passes a shorter cap.
  */
-export function useMyRoomStageCover(isLoading: boolean): { covered: boolean; markPainted: () => void } {
+export function useMyRoomStageCover(
+  isLoading: boolean,
+  fallbackMs: number = MY_ROOM_STAGE_PAINT_FALLBACK_MS
+): { covered: boolean; markPainted: () => void } {
   const [painted, setPainted] = useState(false)
   const [fallbackElapsed, setFallbackElapsed] = useState(false)
   const [wasLoading, setWasLoading] = useState(isLoading)
@@ -55,9 +60,9 @@ export function useMyRoomStageCover(isLoading: boolean): { covered: boolean; mar
   }
   useEffect(() => {
     if (isLoading) return
-    const timer = setTimeout(() => setFallbackElapsed(true), MY_ROOM_STAGE_PAINT_FALLBACK_MS)
+    const timer = setTimeout(() => setFallbackElapsed(true), fallbackMs)
     return () => clearTimeout(timer)
-  }, [isLoading])
+  }, [fallbackMs, isLoading])
   const markPainted = useCallback(() => setPainted(true), [])
   return {
     covered: isMyRoomStageCovered({ isLoading, shellPainted: painted, paintFallbackElapsed: fallbackElapsed }),
@@ -70,12 +75,8 @@ interface MyRoomStageVeilProps {
   covered: boolean
 }
 
-/**
- * A shell-coloured placeholder over the stage. It covers the stage while the
- * saved room loads and until the room's first frame is painted, then
- * crossfades out on the UI thread. It never takes touches or focus.
- */
-export function MyRoomStageVeil({ covered }: MyRoomStageVeilProps) {
+/** The cover's opacity on the UI thread: 1 at once when covered, a crossfade to 0 when not. */
+function useStageCoverOpacity(covered: boolean) {
   const reduceMotion = useReducedMotion()
   const opacity = useSharedValue(covered ? 1 : 0)
 
@@ -85,7 +86,26 @@ export function MyRoomStageVeil({ covered }: MyRoomStageVeilProps) {
       ? withTiming(frame.opacity, { duration: frame.durationMs, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never })
       : frame.opacity
   }, [covered, opacity, reduceMotion])
+  return opacity
+}
 
+/**
+ * The stage itself fades in instead of lifting a veil: hidden while covered,
+ * then the same crossfade the veil uses. For stages drawn over a backdrop of
+ * their own (MiniRoom), where a shell-coloured veil would not match.
+ */
+export function useStageRevealStyle(covered: boolean) {
+  const opacity = useStageCoverOpacity(covered)
+  return useAnimatedStyle(() => ({ opacity: 1 - opacity.value }))
+}
+
+/**
+ * A shell-coloured placeholder over the stage. It covers the stage while the
+ * saved room loads and until the whole room is drawn, then crossfades out on
+ * the UI thread. It never takes touches or focus.
+ */
+export function MyRoomStageVeil({ covered }: MyRoomStageVeilProps) {
+  const opacity = useStageCoverOpacity(covered)
   const veilStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
   return (

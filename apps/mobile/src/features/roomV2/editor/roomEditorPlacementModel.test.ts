@@ -171,6 +171,33 @@ test("inventory preview source uses the chosen rotation view when it exists", ()
   assert.equal(resolveRoomV2InventoryPreviewSource(chair, "front"), chair.asset.source)
 })
 
+test("inventory preview uses an authored thumbnail instead of the full sprite where one exists", () => {
+  const frontThumbnail = { key: "bed/front-thumbnail", source: 31 as never }
+  const leftThumbnail = { key: "bed/left-thumbnail", source: 32 as never }
+  const direction = (thumbnailAsset?: typeof frontThumbnail) => ({
+    bodyAsset: { key: "bed/body", source: 9 as never },
+    ...(thumbnailAsset ? { thumbnailAsset } : {}),
+    normalizedRenderSize: { width: 1, height: 1 },
+    normalizedFloorPivot: { x: 0.5, y: 1 }
+  })
+  const right = { key: "bed/right", source: 8 as never }
+  const bed = createTestFurniture({
+    assetsByRotation: { right },
+    visualContract: {
+      directions: {
+        front: direction(frontThumbnail),
+        right: direction(frontThumbnail),
+        back: direction(),
+        left: direction(leftThumbnail)
+      }
+    } as never
+  })
+  assert.equal(resolveRoomV2InventoryPreviewSource(bed, "front"), 31)
+  assert.equal(resolveRoomV2InventoryPreviewSource(bed, "left"), 32)
+  assert.equal(resolveRoomV2InventoryPreviewSource(bed, "right"), 8, "a front-only thumbnail never stands in for another view")
+  assert.equal(resolveRoomV2InventoryPreviewSource(bed, "back"), bed.asset.source)
+})
+
 test("floor clamping projects into the walkable polygon, else the placeable diamond, else the unit square", () => {
   assert.deepEqual(
     clampRoomV2PlacementPointForItem({ x: 0.05, y: 0.99 }, chair, TEST_EDITOR_SHELL),

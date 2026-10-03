@@ -9,10 +9,12 @@ interface MiniRoomRoomDecorLayerProps {
   interaction: InteractionState
   /** Furniture the avatar layer draws among the avatars (miniRoomDepthModel). */
   occluderIds: ReadonlySet<string>
+  /** The shell and the furniture drawn here are on screen (RoomRenderer2D onSceneReady). */
+  onSceneReady?: () => void
 }
 
 export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
-  const { scene, interaction, occluderIds } = props
+  const { scene, interaction, occluderIds, onSceneReady } = props
 
   if (!scene.shell) {
     return null
@@ -24,6 +26,7 @@ export function MiniRoomRoomDecorLayer(props: MiniRoomRoomDecorLayerProps) {
         renderItems={scene.renderItems}
         showDepthWash={false}
         hiddenItemRenderIds={occluderIds}
+        onSceneReady={onSceneReady}
         testID="mini-room-saved-room-decor"
         style={styles.decorRenderer}
       />

@@ -11,7 +11,10 @@ import {
   selectBoundedWarmupUris,
   selectInitialShopTopIds,
   selectInitialShopRoomItemIds,
-  subscribeToSelectedShopPreviewWarmup
+  subscribeToSelectedShopPreviewWarmup,
+  publishRoomEntryWarmup,
+  selectRoomSceneWarmupSources,
+  subscribeToRoomEntryWarmup
 } from "./sceneAssetWarmupModel"
 
 function createManualTimers() {
@@ -668,4 +671,35 @@ test("an adopted current-generation prefetch failure is not immediately retried"
 
   assert.equal(calls, 1)
   assert.equal(inFlight.size, 0)
+})
+
+test("a saved room warms its shell, then its furniture back to front, each image once", () => {
+  const piece = (renderId: string, depth: number, source: number, shadow?: number) => ({
+    kind: "furniture", renderId, depth, asset: { key: renderId, source },
+    ...(shadow ? { contactShadowAsset: { key: `${renderId}-shadow`, source: shadow } } : {})
+  })
+  const scene = {
+    shell: { asset: { key: "shell", source: 1 } },
+    renderItems: [
+      piece("front-chair", 0.9, 30, 31),
+      { kind: "avatar", renderId: "avatar", depth: 0.5 },
+      piece("back-shelf", 0.1, 20),
+      piece("second-chair", 0.8, 30, 31)
+    ]
+  } as never
+  assert.deepEqual(selectRoomSceneWarmupSources(scene, { includeContactShadows: false }), [1, 20, 30])
+  assert.deepEqual(selectRoomSceneWarmupSources(scene, { includeContactShadows: true }), [1, 20, 30, 31])
+  assert.deepEqual(selectRoomSceneWarmupSources({ shell: null, renderItems: [] }, { includeContactShadows: true }), [])
+})
+
+test("an open room door asks every listener to warm the room, and a failing listener stops no one", () => {
+  const received: unknown[][] = []
+  const stopFailing = subscribeToRoomEntryWarmup(() => { throw new Error("warmup failed") })
+  const stop = subscribeToRoomEntryWarmup((request) => received.push([...request.avatars]))
+  const first = publishRoomEntryWarmup(["you", "partner"])
+  assert.deepEqual(received, [["you", "partner"]])
+  stop()
+  stopFailing()
+  assert.ok(publishRoomEntryWarmup(["later"]) > first)
+  assert.equal(received.length, 1, "an unsubscribed listener hears nothing more")
 })

@@ -6,12 +6,12 @@ import {
   getRoomAvatarFrameIndex,
   getRoomAvatarFrameTick,
   getRoomAvatarLayerAnimationState,
+  addRoomAvatarTableToPool,
+  getRoomAvatarFrameTable,
+  getRoomAvatarFrameToApply,
   getRoomAvatarLayerFrameAsset,
-  getRoomAvatarLayerFrameSlot,
-  getRoomAvatarReadyFrameSlot,
-  retainRoomAvatarFrameSlots,
-  getRoomAvatarLayerFrameSlots,
-  shouldRerenderRoomAvatarLayer
+  getRoomAvatarShownImages,
+  pruneRoomAvatarPool
 } from "./roomAvatarLayerRenderModel"
 import { ROOM_AVATAR_FRAME_DURATION_MS } from "./avatarRoomMotionContract"
 
@@ -27,46 +27,6 @@ function layer(source: number): RoomV2AvatarRenderLayer {
     fitProfileId: "blumi_female_room_avatar_v1"
   }
 }
-
-test("fresh layer objects with the same image do not reload on position updates", () => {
-  assert.equal(shouldRerenderRoomAvatarLayer(
-    { layer: layer(firstSource), frameIndex: 0 },
-    { layer: layer(firstSource), frameIndex: 0 }
-  ), false)
-})
-
-test("equipment and fit changes still update the visible layer", () => {
-  assert.equal(shouldRerenderRoomAvatarLayer(
-    { layer: layer(firstSource), frameIndex: 0 },
-    { layer: layer(secondSource), frameIndex: 0 }
-  ), true)
-  assert.equal(shouldRerenderRoomAvatarLayer(
-    { layer: layer(firstSource), frameIndex: 0 },
-    { layer: { ...layer(firstSource), fitProfileId: "blumi_male_room_avatar_v1" }, frameIndex: 0 }
-  ), true)
-})
-
-test("only a changed animation frame reloads an animated image", () => {
-  const animated: RoomV2AvatarRenderLayer = {
-    ...layer(firstSource),
-    animation: {
-      frames: [
-        { key: "walk-1", source: firstSource },
-        { key: "walk-2", source: secondSource }
-      ],
-      frameDurationMs: 120,
-      loop: true
-    }
-  }
-  assert.equal(shouldRerenderRoomAvatarLayer(
-    { layer: animated, frameIndex: 0 },
-    { layer: { ...animated }, frameIndex: 1 }
-  ), true)
-  assert.equal(shouldRerenderRoomAvatarLayer(
-    { layer: animated, frameIndex: 0 },
-    { layer: { ...animated }, frameIndex: 2 }
-  ), false)
-})
 
 function animatedLayer(id: string, keys: string[], frameDurationMs = 120, loop?: boolean): RoomV2AvatarRenderLayer {
   const frames = keys.map((key, index) => ({ key, source: 200 + index }))
@@ -138,51 +98,86 @@ test("the UI-thread clock advances one frame per frame duration, from frame 0", 
   assert.equal(getRoomAvatarFrameTick(10_080, frameDurationMs), 84)
 })
 
-test("frame slots mount each distinct image once and pick the ticker's asset for every frame", () => {
-  const animated = animatedLayer("hair", ["f1", "f2", "f1", "f3"])
-  animated.animation!.frames[2] = animated.animation!.frames[0]
-  const slots = getRoomAvatarLayerFrameSlots(animated)
-  assert.deepEqual(slots.assets.map((asset) => asset.key), ["f1", "f2", "f3"])
-  for (let frameIndex = 0; frameIndex < 12; frameIndex += 1) {
-    assert.equal(
-      slots.assets[getRoomAvatarLayerFrameSlot(slots.slotByFrame, frameIndex)],
-      getRoomAvatarLayerFrameAsset(animated, frameIndex)
-    )
+test("fresh layer objects with the same images keep the table; a new image or fit changes it", () => {
+  const table = getRoomAvatarFrameTable([layer(firstSource)], false, 1)
+  assert.equal(getRoomAvatarFrameTable([layer(firstSource)], false, 1).signature, table.signature)
+  assert.notEqual(getRoomAvatarFrameTable([layer(secondSource)], false, 1).signature, table.signature)
+  assert.notEqual(
+    getRoomAvatarFrameTable([{ ...layer(firstSource), id: "other-top" }], false, 1).signature,
+    table.signature
+  )
+})
+
+test("each frame names every layer's image, and a repeated image mounts once", () => {
+  const body = { ...layer(firstSource), id: "body", type: "base", layerOrder: 1 }
+  const hair = animatedLayer("hair", ["f1", "f2", "f1", "f3"])
+  hair.animation!.frames[2] = hair.animation!.frames[0]
+  const table = getRoomAvatarFrameTable([body, hair], true, 4)
+  assert.equal(table.frames.length, 4)
+  for (let index = 0; index < 4; index += 1) {
+    assert.equal(table.frames[index]!.length, 2, "every frame covers every layer")
+    assert.equal(table.frames[index]![0], table.frames[0]![0], "a still layer keeps one image")
+    assert.ok(table.frames[index]![1]!.includes(`|${getRoomAvatarLayerFrameAsset(hair, index).key}|`))
   }
-  const still = getRoomAvatarLayerFrameSlots(layer(firstSource))
-  assert.deepEqual(still.assets, [layer(firstSource).asset])
-  assert.deepEqual(still.slotByFrame, [0])
+  assert.equal(table.frames[2]![1], table.frames[0]![1])
+  assert.equal(table.images.length, 4, "body plus three distinct hair images")
 })
 
-test("a frame that has not displayed keeps the previous loaded pose visible", () => {
-  const slots = [0, 1, 2, 3]
-  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, []), 0)
-  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 1]), 0)
-  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 2]), 2)
-  // The caller can hold its selected pose, or defer the change with a sentinel.
-  assert.equal(getRoomAvatarReadyFrameSlot([0], 3, []), 0)
-  assert.equal(getRoomAvatarReadyFrameSlot(slots, 2, [0, 1], 1), 1)
-  assert.equal(getRoomAvatarReadyFrameSlot([4], 0, [0, 1], -1), -1)
-  assert.equal(getRoomAvatarReadyFrameSlot([4], 0, [0, 1, 4], -1), 4)
+test("a frame replaces the one on screen only once every layer's image for it has displayed", () => {
+  const body = animatedLayer("body", ["b1", "b2"])
+  const top = animatedLayer("top-layer", ["t1", "t2"])
+  const table = getRoomAvatarFrameTable([body, top], true, 2)
+  const [frame0, frame1] = table.frames as [string[], string[]]
+  const none = { signature: "", index: -1 }
+  const displayed: Record<string, boolean> = {}
+  assert.equal(getRoomAvatarFrameToApply(table, 0, displayed, none), -1, "nothing shows before it is complete")
+  displayed[frame0[0]!] = true
+  assert.equal(getRoomAvatarFrameToApply(table, 0, displayed, none), -1, "the body alone never shows")
+  displayed[frame0[1]!] = true
+  assert.equal(getRoomAvatarFrameToApply(table, 0, displayed, none), 0)
+  const shownFrame0 = { signature: table.signature, index: 0 }
+  assert.equal(getRoomAvatarFrameToApply(table, 0, displayed, shownFrame0), -1, "an applied frame is not re-applied")
+  displayed[frame1[0]!] = true
+  assert.equal(getRoomAvatarFrameToApply(table, 1, displayed, shownFrame0), -1,
+    "the body does not walk ahead of a top that has not drawn its frame")
+  displayed[frame1[1]!] = true
+  assert.equal(getRoomAvatarFrameToApply(table, 1, displayed, shownFrame0), 1)
+  assert.equal(getRoomAvatarFrameToApply(table, 3, displayed, shownFrame0), 1, "indexes wrap like the clock")
+  assert.deepEqual(getRoomAvatarShownImages(table.layerKeys, frame1), {
+    [table.layerKeys[0]!]: frame1[0], [table.layerKeys[1]!]: frame1[1]
+  })
 })
 
-test("idle and walking keep the same mounted image identities across stop and restart", () => {
-  const idle = layer(firstSource).asset
-  const walking = animatedLayer("top", ["w1", "w2", "w3", "w4"]).animation!.frames
-  const initial = retainRoomAvatarFrameSlots([], [idle])
-  const walk = retainRoomAvatarFrameSlots(initial.assets, walking)
-  assert.equal(walk.assets[0], idle)
-  assert.deepEqual(walk.slotByFrame, [1, 2, 3, 4])
-  assert.deepEqual(initial.assets, [idle])
-  const stopped = retainRoomAvatarFrameSlots(walk.assets, [idle])
-  assert.equal(stopped.assets, walk.assets)
-  assert.deepEqual(stopped.slotByFrame, [0])
-  const restarted = retainRoomAvatarFrameSlots(stopped.assets, walking)
-  assert.equal(restarted.assets, stopped.assets)
-  assert.deepEqual(restarted.slotByFrame, walk.slotByFrame)
-  const repeated = retainRoomAvatarFrameSlots(restarted.assets, [walking[0]!, walking[0]!])
-  assert.equal(repeated.assets, restarted.assets)
-  assert.deepEqual(repeated.slotByFrame, [1, 1])
+test("the image pool keeps the pose on screen until the next one shows, then only that pose and idle", () => {
+  const idleLayers = [layer(firstSource)]
+  const walkLayers = [animatedLayer("top", ["w1", "w2", "w3", "w4"])]
+  const sitLayers = [animatedLayer("top", ["s1", "s2"])]
+  const idle = getRoomAvatarFrameTable(idleLayers, false, 1)
+  const walk = getRoomAvatarFrameTable(walkLayers, true, 4)
+  const sit = getRoomAvatarFrameTable(sitLayers, true, 2)
+  const keys = (pool: ReturnType<typeof addRoomAvatarTableToPool>) =>
+    pool.flatMap((entry) => entry.images.map((image) => image.key))
+  const start = addRoomAvatarTableToPool([], idleLayers, idle)
+  assert.equal(addRoomAvatarTableToPool(start, [layer(firstSource)], idle), start, "same images: same pool")
+  const walking = addRoomAvatarTableToPool(start, walkLayers, walk)
+  assert.equal(keys(walking).length, 5, "idle stays mounted while the walk loads")
+  const toSit = addRoomAvatarTableToPool(walking, sitLayers, sit)
+  assert.equal(keys(toSit).length, 7, "the walk on screen stays mounted until the sit replaces it")
+  const keep = new Set([...sit.images, ...idle.images].map((image) => image.key))
+  const sitting = pruneRoomAvatarPool(toSit, keep)
+  assert.deepEqual(new Set(keys(sitting)), keep, "only the current motion and idle remain")
+  assert.equal(pruneRoomAvatarPool(sitting, keep), sitting)
+})
+
+test("an outfit change keeps the old layer mounted until the new look is shown", () => {
+  const oldTop = { ...layer(firstSource), id: "old-top" }
+  const newTop = { ...layer(secondSource), id: "new-top" }
+  const before = getRoomAvatarFrameTable([oldTop], false, 1)
+  const after = getRoomAvatarFrameTable([newTop], false, 1)
+  const pool = addRoomAvatarTableToPool(addRoomAvatarTableToPool([], [oldTop], before), [newTop], after)
+  assert.deepEqual(pool.map((entry) => entry.key), ["top:old-top", "top:new-top"])
+  const shown = pruneRoomAvatarPool(pool, new Set(after.images.map((image) => image.key)))
+  assert.deepEqual(shown.map((entry) => entry.key), ["top:new-top"])
 })
 
 test("an atlas crop lands where contentFit contain would draw the whole frame", () => {

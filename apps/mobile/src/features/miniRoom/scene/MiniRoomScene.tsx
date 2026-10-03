@@ -15,6 +15,7 @@ import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticSoft } from "../../../ui/haptics"
 import { RoomFloorTapLayer } from "../../roomV2/components/RoomFloorTapLayer"
+import { useMyRoomStageCover, useStageRevealStyle } from "../../roomV2/components/MyRoomStageVeil"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
 import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
@@ -83,6 +84,11 @@ interface MiniRoomSceneProps {
 }
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
+/**
+ * The room fades in once its shell and furniture are drawn, so it never
+ * assembles piece by piece; entry is never held longer than this.
+ */
+const MINI_ROOM_STAGE_READY_CAP_MS = 320
 const NO_HISTORY: readonly RoomChatHistoryItem[] = [], NO_NOTICES: readonly string[] = []
 const NO_FAILED_MESSAGES: readonly FailedRoomMessage[] = []
 const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer), StableRoomMapLayer = memo(RoomMapLayer)
@@ -146,6 +152,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const viewport = useWindowDimensions()
   const safeAreaInsets = useSafeAreaInsets()
   const roomShell = roomDecorScene?.shell
+  const { covered: stageCovered, markPainted: handleStageSceneReady } =
+    useMyRoomStageCover(!roomShell, MINI_ROOM_STAGE_READY_CAP_MS)
+  const stageRevealStyle = useStageRevealStyle(stageCovered)
   // VIS-04: upright furniture is drawn among the avatars by floor depth.
   const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
   // Everything the pose depends on except the keyboard (that is a progress).
@@ -335,7 +344,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         {roomDecorScene?.shell ? (
           <Reanimated.View
             pointerEvents="box-none"
-            style={[styles.roomWorldCamera, restCamera, cameraStyle]}
+            style={[styles.roomWorldCamera, restCamera, cameraStyle, stageRevealStyle]}
             onLayout={handleStageLayout}
           >
             {floorTapLayer}
@@ -343,6 +352,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
               scene={roomDecorScene}
               interaction={store.interaction}
               occluderIds={depthScene.occluderIds}
+              onSceneReady={handleStageSceneReady}
             />
             {hotspotLayer}
             {avatarLayer}

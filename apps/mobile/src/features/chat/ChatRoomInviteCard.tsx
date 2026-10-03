@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useLayoutEffect, useRef } from "react"
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native"
 import { LinearGradient } from "../../ui/linearGradient"
 import { uiTheme } from "../../ui/theme"
@@ -8,6 +8,7 @@ import { getRoomInviteCardState } from "./chatRoomInviteCardModel"
 import type { ChatLocale, ChatRoomInviteAction, ChatRoomInviteTimelineItem } from "./chatRoomInviteModel"
 import { getRoomDoorKey, roomDoorSources } from "./roomDoorFlight"
 import { measureViewInWindow } from "../../ui/flight/flightSources"
+import { publishRoomEntryWarmup } from "../performance/sceneAssetWarmupModel"
 
 interface ChatRoomInviteCardProps {
   invite: ChatRoomInviteTimelineItem
@@ -31,6 +32,12 @@ export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner
   useLayoutEffect(() => {
     if (!doorKey) return
     return roomDoorSources.attach(doorKey, () => measureViewInWindow(cardRef.current))
+  }, [doorKey])
+  // An open door is the likely next step: start drawing the room and both
+  // avatars into the image cache now, so the room opens whole.
+  const warmRoomEntry = useEffectEvent(() => publishRoomEntryWarmup([you.avatar, partner.avatar]))
+  useEffect(() => {
+    if (doorKey) warmRoomEntry()
   }, [doorKey])
   if (compact) {
     const sender = card.isSender ? you : partner

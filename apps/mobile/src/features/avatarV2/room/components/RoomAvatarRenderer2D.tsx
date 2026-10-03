@@ -1,14 +1,14 @@
 import { Image as ExpoImage } from "expo-image"
 import { PixelRatio, StyleSheet, View, type ImageStyle, type LayoutChangeEvent } from "react-native"
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Animated, {
   useAnimatedStyle,
-  useAnimatedReaction,
   useFrameCallback,
   useSharedValue,
   type FrameInfo,
   type SharedValue
 } from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import type {
   RoomV2AssetCrop,
   RoomV2AssetRef,
@@ -21,15 +21,17 @@ import type {
 import { useReducedMotion } from "../../../../ui/animations"
 import { getRoomAvatarStrideFrameIndex } from "../../../roomV2/components/roomAvatarBodyMotionModel"
 import {
+  addRoomAvatarTableToPool,
   getRoomAvatarAtlasCropLayout,
   getRoomAvatarFrameIndex,
+  getRoomAvatarFrameTable,
   getRoomAvatarFrameTick,
+  getRoomAvatarFrameToApply,
   getRoomAvatarLayerAnimationState,
-  getRoomAvatarLayerFrameAsset,
-  getRoomAvatarReadyFrameSlot,
-  getRoomAvatarLayerFrameSlots,
-  retainRoomAvatarFrameSlots,
-  shouldRerenderRoomAvatarLayer
+  getRoomAvatarShownImages,
+  pruneRoomAvatarPool,
+  type RoomAvatarAppliedFrame,
+  type RoomAvatarFrameTable
 } from "../roomAvatarLayerRenderModel"
 
 interface RoomAvatarRenderer2DProps {
@@ -37,7 +39,10 @@ interface RoomAvatarRenderer2DProps {
   imagePriority?: "low" | "normal" | "high"
   /** Keep original sprite pixels when a room camera scales the native image view. */
   allowDownscaling?: boolean
+  /** A layer (`type:id`) is on screen: called for every layer once its look is first shown whole. */
   onLayerDisplay?: (id: string) => void
+  /** Every layer of the current look is on screen together (once per new look or pose). */
+  onAllLayersShown?: () => void
   onImageError?: () => void
   /**
    * Walk-cycle phase (0..1) driven by distance travelled. When set, a looping
@@ -47,13 +52,14 @@ interface RoomAvatarRenderer2DProps {
   strideProgress?: SharedValue<number>
 }
 
-/** The frame the UI thread shows, tagged with the motion it belongs to. */
+/** The frame the clock asks for, tagged with the motion it belongs to. */
 interface RoomAvatarFrameState {
   signature: string
   index: number
 }
 
 const STATIC_FRAME_STATE: RoomAvatarFrameState = { signature: "static", index: 0 }
+const NOTHING_APPLIED: RoomAvatarAppliedFrame = { signature: "", index: -1 }
 
 /** The renderer's laid-out size; atlas frames need it to place their crop. */
 interface RoomAvatarBoxSize {
@@ -63,38 +69,109 @@ interface RoomAvatarBoxSize {
 
 /**
  * Layered avatar with frame-by-frame motion. Frame selection runs on the UI
- * thread: a frame callback reads the shared UI frame timestamp, advances one
- * frame per frame duration (every avatar changes on the same tick boundary)
- * and each frame image's opacity follows it. React renders only when the
- * layers or the motion change, never per animation frame. Reduce Motion and
+ * thread: a frame callback reads the shared UI frame timestamp and advances
+ * one frame per frame duration (every avatar changes on the same tick
+ * boundary). The avatar is drawn whole or not at all: frame N replaces the
+ * frame on screen only once every layer's image for frame N has displayed, so
+ * body, hair and clothes never change at different times, and a new look or
+ * avatar appears complete instead of layer by layer. Images stay mounted for
+ * the pose on screen, the next pose and idle; React renders only when the
+ * layers or that pool change, never per animation frame. Reduce Motion and
  * still avatars show frame 0 with the frame callback inactive.
  */
 export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
-  const { layers, imagePriority = "high", allowDownscaling = true, strideProgress } = props
+  const { layers, imagePriority = "high", allowDownscaling = true, strideProgress, onLayerDisplay, onAllLayersShown } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
     () => getRoomAvatarLayerAnimationState(layers, !reduceMotion),
     [layers, reduceMotion]
   )
   const { hasAnimation, frameCount, frameDurationMs, loops, signature } = animation
+  const table = useMemo(
+    () => getRoomAvatarFrameTable(layers, hasAnimation, frameCount),
+    [frameCount, hasAnimation, layers]
+  )
   const frameState = useSharedValue<RoomAvatarFrameState>(STATIC_FRAME_STATE)
   const baseTick = useSharedValue(0)
+  // Images that have displayed (or failed, so they never block the avatar),
+  // the image each layer shows, and the frame that choice came from.
+  const displayed = useSharedValue<Record<string, boolean>>({})
+  const shown = useSharedValue<Record<string, string>>({})
+  const applied = useSharedValue<RoomAvatarAppliedFrame>(NOTHING_APPLIED)
+  const displayedRef = useRef(new Set<string>())
+  const appliedSignatureRef = useRef("")
 
+  // The mounted images: the current table, plus the pose still on screen until
+  // the current one replaces it, plus idle. Guarded render-time updates commit
+  // a changed pool with this pose; they never happen on animation ticks.
+  const [pool, setPool] = useState(() => addRoomAvatarTableToPool([], layers, table))
+  const [idleTable, setIdleTable] = useState<RoomAvatarFrameTable | null>(hasAnimation ? null : table)
+  if (!hasAnimation && idleTable?.signature !== table.signature) setIdleTable(table)
+  const [shownSignature, setShownSignature] = useState("")
+  const keepKeys = useMemo(
+    () => new Set([...table.images, ...(idleTable?.images ?? [])].map((image) => image.key)),
+    [idleTable, table]
+  )
+  let mountedPool = addRoomAvatarTableToPool(pool, layers, table)
+  if (shownSignature === table.signature) mountedPool = pruneRoomAvatarPool(mountedPool, keepKeys)
+  if (mountedPool !== pool) setPool(mountedPool)
+  const mountedKeys = useMemo(
+    () => new Set(mountedPool.flatMap((entry) => entry.images.map((image) => image.key))),
+    [mountedPool]
+  )
+  useEffect(() => {
+    // An unmounted image must display again before it can be shown again.
+    const dropped = [...displayedRef.current].filter((key) => !mountedKeys.has(key))
+    if (!dropped.length) return
+    for (const key of dropped) displayedRef.current.delete(key)
+    displayed.modify((value) => {
+      "worklet"
+      const remaining = { ...value }
+      for (const key of dropped) delete remaining[key]
+      return remaining
+    })
+  }, [displayed, mountedKeys])
+
+  /** JS side of a new table reaching the screen: unmount what it replaced and report it. */
+  const handleTableShown = useCallback((tableSignature: string) => {
+    appliedSignatureRef.current = tableSignature
+    setShownSignature(tableSignature)
+    if (tableSignature !== table.signature) return
+    for (const layerKey of table.layerKeys) onLayerDisplay?.(layerKey)
+    onAllLayersShown?.()
+  }, [onAllLayersShown, onLayerDisplay, table])
+
+  // Only keys cross to the UI thread, never image sources.
+  const frameTable = useMemo(
+    () => ({ signature: table.signature, frames: table.frames, layerKeys: table.layerKeys }),
+    [table]
+  )
   const advanceFrame = useCallback((frameInfo: FrameInfo): void => {
     "worklet"
     const tick = getRoomAvatarFrameTick(frameInfo.timestamp, frameDurationMs)
-    const current = frameState.value
-    if (current.signature !== signature) {
+    let target = frameState.value
+    if (target.signature !== signature) {
       // A new motion starts at frame 0 on the current tick.
       baseTick.value = tick
-      frameState.value = { signature, index: 0 }
-      return
+      target = { signature, index: 0 }
+      frameState.value = target
+    } else {
+      const index = strideProgress && loops
+        ? getRoomAvatarStrideFrameIndex(strideProgress.value, frameCount)
+        : getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
+      if (index !== target.index) {
+        target = { signature, index }
+        frameState.value = target
+      }
     }
-    const index = strideProgress && loops
-      ? getRoomAvatarStrideFrameIndex(strideProgress.value, frameCount)
-      : getRoomAvatarFrameIndex(tick - baseTick.value, frameCount, loops)
-    if (index !== current.index) frameState.value = { signature, index }
-  }, [baseTick, frameCount, frameDurationMs, frameState, loops, signature, strideProgress])
+    const previous = applied.value
+    const index = getRoomAvatarFrameToApply(frameTable, target.index, displayed.value, previous)
+    if (index < 0) return
+    shown.value = getRoomAvatarShownImages(frameTable.layerKeys, frameTable.frames[index]!)
+    applied.value = { signature: frameTable.signature, index }
+    if (previous.signature !== frameTable.signature) scheduleOnRN(handleTableShown, frameTable.signature)
+  }, [applied, baseTick, displayed, frameCount, frameDurationMs, frameState, frameTable, handleTableShown, loops,
+    shown, signature, strideProgress])
   // useFrameCallback reads `autostart` only on its first render, and the
   // shared Reduce Motion store starts reduced until the OS answers, so the
   // clock is switched on and off explicitly whenever `hasAnimation` changes.
@@ -108,6 +185,37 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
     if (!hasAnimation) frameState.value = STATIC_FRAME_STATE
   }, [frameState, hasAnimation])
 
+  // A still avatar has no frame clock: its single frame is shown from JS as
+  // soon as all of its images have displayed (at once when they already have).
+  const showStillFrameIfReady = useCallback(() => {
+    if (hasAnimation || appliedSignatureRef.current === table.signature) return
+    const frameKeys = table.frames[0]!
+    if (!frameKeys.every((key) => displayedRef.current.has(key))) return
+    appliedSignatureRef.current = table.signature
+    shown.value = getRoomAvatarShownImages(table.layerKeys, frameKeys)
+    applied.value = { signature: table.signature, index: 0 }
+    handleTableShown(table.signature)
+  }, [applied, handleTableShown, hasAnimation, shown, table])
+  useEffect(() => {
+    showStillFrameIfReady()
+  }, [showStillFrameIfReady])
+
+  const handleImageDisplay = useCallback((imageKey: string) => {
+    if (displayedRef.current.has(imageKey)) return
+    displayedRef.current.add(imageKey)
+    displayed.modify((value) => {
+      "worklet"
+      return value[imageKey] ? value : { ...value, [imageKey]: true }
+    })
+    showStillFrameIfReady()
+  }, [displayed, showStillFrameIfReady])
+  const { onImageError } = props
+  const handleImageError = useCallback((imageKey: string) => {
+    // A broken image draws nothing; it must not hold the rest of the avatar back.
+    handleImageDisplay(imageKey)
+    onImageError?.()
+  }, [handleImageDisplay, onImageError])
+
   // Atlas frames are placed from the laid-out size. Layout events arrive only
   // when the box changes size (avatars move with transforms), never per frame.
   const [boxSize, setBoxSize] = useState<RoomAvatarBoxSize | null>(null)
@@ -119,129 +227,44 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
 
   return (
     <View pointerEvents="none" style={styles.root} onLayout={onLayout}>
-      {layers.map((layer) => (
-        <RoomAvatarLayer
-          key={`${layer.type}:${layer.id}`}
-          layer={layer}
-          animated={hasAnimation}
-          signature={signature}
-          frameState={frameState}
+      {mountedPool.flatMap((entry) => entry.images.map((image) => (
+        <RoomAvatarLayerImage
+          key={image.key}
+          imageKey={image.key}
+          layerKey={entry.key}
+          asset={image.asset}
+          layer={entry.layer}
           boxSize={boxSize}
+          shown={shown}
           imagePriority={imagePriority}
           allowDownscaling={allowDownscaling}
-          onLayerDisplay={props.onLayerDisplay}
-          onImageError={props.onImageError}
+          onImageDisplay={handleImageDisplay}
+          onImageError={handleImageError}
         />
-      ))}
+      )))}
     </View>
   )
 })
 
-interface RoomAvatarLayerProps {
-  layer: RoomV2AvatarRenderLayer
-  animated: boolean
-  signature: string
-  frameState: SharedValue<RoomAvatarFrameState>
-  boxSize: RoomAvatarBoxSize | null
-  imagePriority: "low" | "normal" | "high"
-  allowDownscaling: boolean
-  onLayerDisplay?: (id: string) => void
-  onImageError?: () => void
-}
-
-/**
- * Retain each visited pose image until this semantic layer unmounts. Walking
- * and idle exchange visibility on the UI thread without replacing sources or
- * removing the currently visible native image during the React commit.
- */
-const RoomAvatarLayer = memo(
-  function RoomAvatarLayer(props: RoomAvatarLayerProps) {
-    const { layer, animated, signature, frameState, boxSize, imagePriority, allowDownscaling } = props
-    const displayedSlots = useSharedValue<number[]>([])
-    const selectedSlot = useSharedValue(0)
-    const current = useMemo(
-      () => animated
-        ? getRoomAvatarLayerFrameSlots(layer)
-        : { assets: [getRoomAvatarLayerFrameAsset(layer, 0)], slotByFrame: [0] },
-      [animated, layer]
-    )
-    const [retainedAssets, setRetainedAssets] = useState<RoomV2AssetRef[]>(current.assets)
-    const { assets, slotByFrame } = useMemo(
-      () => retainRoomAvatarFrameSlots(
-        retainedAssets, current.slotByFrame.map((slot) => current.assets[slot]!)
-      ),
-      [current, retainedAssets]
-    )
-    // A guarded render-time update commits the enlarged pool with this pose.
-    // This happens only when a new asset is visited, never on animation ticks.
-    if (assets !== retainedAssets) setRetainedAssets(assets)
-    useAnimatedReaction(
-      () => {
-        const state = frameState.value
-        const frameIndex = state.signature === signature ? state.index : 0
-        return getRoomAvatarReadyFrameSlot(slotByFrame, frameIndex, displayedSlots.value, -1)
-      },
-      (readySlot) => {
-        if (readySlot >= 0) selectedSlot.value = readySlot
-      },
-      [signature, slotByFrame]
-    )
-    return (
-      <>
-        {assets.map((asset, slot) => (
-          <RoomAvatarLayerImage
-            key={slot}
-            asset={asset}
-            layer={layer}
-            slot={slot}
-            boxSize={boxSize}
-            displayedSlots={displayedSlots}
-            selectedSlot={selectedSlot}
-            imagePriority={imagePriority}
-            allowDownscaling={allowDownscaling}
-            onLayerDisplay={slot === slotByFrame[0] ? props.onLayerDisplay : undefined}
-            onImageError={props.onImageError}
-          />
-        ))}
-      </>
-    )
-  },
-  (previous, next) =>
-    previous.animated === next.animated &&
-    (!next.animated || previous.signature === next.signature) &&
-    previous.frameState === next.frameState &&
-    previous.boxSize === next.boxSize &&
-    previous.imagePriority === next.imagePriority &&
-    previous.allowDownscaling === next.allowDownscaling &&
-    previous.onLayerDisplay === next.onLayerDisplay &&
-    previous.onImageError === next.onImageError &&
-    !shouldRerenderRoomAvatarLayer(
-      { layer: previous.layer, frameIndex: 0 },
-      { layer: next.layer, frameIndex: 0 }
-    )
-)
-
-function RoomAvatarLayerImage(props: {
+interface RoomAvatarLayerImageProps {
+  imageKey: string
+  layerKey: string
   asset: RoomV2AssetRef
   layer: RoomV2AvatarRenderLayer
-  slot: number
   boxSize: RoomAvatarBoxSize | null
-  displayedSlots: SharedValue<number[]>
-  selectedSlot: SharedValue<number>
+  shown: SharedValue<Record<string, string>>
   imagePriority: "low" | "normal" | "high"
   allowDownscaling: boolean
-  onLayerDisplay?: (id: string) => void
-  onImageError?: () => void
-}) {
-  const { asset, layer, slot, selectedSlot, imagePriority, displayedSlots, boxSize } = props
-  const visibility = useAnimatedStyle(() => ({ opacity: selectedSlot.value === slot ? 1 : 0 }))
-  const onDisplay = () => {
-    displayedSlots.modify((slots) => {
-      "worklet"
-      return slots.includes(slot) ? slots : [...slots, slot]
-    })
-    props.onLayerDisplay?.(`${layer.type}:${layer.id}`)
-  }
+  onImageDisplay: (imageKey: string) => void
+  onImageError: (imageKey: string) => void
+}
+
+/** One mounted image; it is visible only while its layer shows it. */
+const RoomAvatarLayerImage = memo(function RoomAvatarLayerImage(props: RoomAvatarLayerImageProps) {
+  const { imageKey, layerKey, asset, layer, shown, imagePriority, boxSize, onImageDisplay, onImageError } = props
+  const visibility = useAnimatedStyle(() => ({ opacity: shown.value[layerKey] === imageKey ? 1 : 0 }))
+  const onDisplay = () => onImageDisplay(imageKey)
+  const onError = () => onImageError(imageKey)
   if (asset.crop) {
     const placement = boxSize ? getRoomAvatarAtlasCropPlacement(asset.crop, boxSize) : null
     return (
@@ -257,7 +280,7 @@ function RoomAvatarLayerImage(props: {
                 priority={imagePriority}
                 transition={0}
                 onDisplay={onDisplay}
-                onError={props.onImageError}
+                onError={onError}
                 style={[styles.atlasImage, placement.atlas]}
               />
             </View>
@@ -276,7 +299,7 @@ function RoomAvatarLayerImage(props: {
         priority={imagePriority}
         transition={0}
         onDisplay={onDisplay}
-        onError={props.onImageError}
+        onError={onError}
         style={[
           styles.layer,
           getLayerFitStyle(layer)
@@ -284,7 +307,7 @@ function RoomAvatarLayerImage(props: {
       />
     </Animated.View>
   )
-}
+})
 
 /**
  * Draws one atlas crop exactly where the whole frame would land with

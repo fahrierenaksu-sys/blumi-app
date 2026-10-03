@@ -188,10 +188,21 @@ export function getRoomV2FurnitureRotationOptions(
     : []
 }
 
+/**
+ * The tray card's image. A tight authored thumbnail (a few hundred pixels)
+ * wins over the full room sprite, which decodes at canvas size (1254 x 714 and
+ * up) for a card under 100 pt. A thumbnail shared with the front view shows
+ * only the front, so other rotations keep their own sprite.
+ */
 export function resolveRoomV2InventoryPreviewSource(
   item: FurnitureItem,
   rotation: PlacedRoomItem["rotation"]
 ) {
+  const directions = item.visualContract?.directions
+  const thumbnail = directions?.[rotation]?.thumbnailAsset
+  if (thumbnail && (rotation === "front" || thumbnail.key !== directions?.front?.thumbnailAsset?.key)) {
+    return thumbnail.source
+  }
   return item.assetsByRotation?.[rotation]?.source ?? item.asset.source
 }
 

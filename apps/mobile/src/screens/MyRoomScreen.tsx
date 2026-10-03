@@ -824,7 +824,7 @@ export function MyRoomScreen({
               onStagePress={moveAvatarToPoint}
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
-              onShellDisplay={handleShellDisplay}
+              onSceneReady={handleShellDisplay}
             /></Animated.View>}
             <MyRoomStageVeil covered={stageCovered} />
             {roomOwnerLabel ? (

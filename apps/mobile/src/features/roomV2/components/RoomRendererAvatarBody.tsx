@@ -52,6 +52,8 @@ export function RoomRendererAvatarBody(props: {
   live?: RoomRendererLiveAvatarPosition
   /** The existing idle/gesture motion (breathe, wave, dance, seat offset). */
   motionStyle: StyleProp<AnimatedStyle<StyleProp<ViewStyle>>>
+  /** Every layer of the avatar is on screen (RoomAvatarRenderer2D). */
+  onAllLayersShown?: () => void
 }) {
   const { state, reduceMotion, boxHeightPx, stageWidthPx, stageHeightPx, live, walksWithFrames } = props
   const strideWalking = walksWithFrames && state === "walking" && Boolean(live) && !reduceMotion
@@ -142,6 +144,7 @@ export function RoomRendererAvatarBody(props: {
           <RoomAvatarRenderer2D
             layers={props.layers}
             strideProgress={strideWalking ? strideProgress : undefined}
+            onAllLayersShown={props.onAllLayersShown}
           />
         </Reanimated.View>
       </Reanimated.View>

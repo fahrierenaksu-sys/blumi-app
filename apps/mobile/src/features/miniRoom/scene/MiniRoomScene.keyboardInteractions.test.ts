@@ -59,6 +59,10 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
     "../../../ui/animations": { useReducedMotion: () => false },
     "../../../ui/haptics": { hapticSoft: () => undefined },
     "../../roomV2/components/RoomFloorTapLayer": { RoomFloorTapLayer: floorLayer },
+    "../../roomV2/components/MyRoomStageVeil": {
+      useMyRoomStageCover: () => ({ covered: false, markPainted: () => undefined }),
+      useStageRevealStyle: () => ({ opacity: 1 })
+    },
     "./AvatarLayer": { AvatarLayer: avatarLayer },
     "./HotspotLayer": { HotspotLayer: hotspotLayer },
     "./MiniRoomChatPanel": { MiniRoomChatPanel: chatPanel },

@@ -32,6 +32,7 @@ function mount(allowHeavyContent = false) {
   const runtime = createFakeReactRuntime()
   const attachedSources = new Set<string>()
   const actions: ChatRoomInviteAction[] = []
+  const roomWarmups: unknown[][] = []
   const heavy = (type: string) => (props: Record<string, unknown>) => {
     assert.equal(allowHeavyContent, true, "compact invitations must never mount the room scene or gradient subtree")
     return { type, props }
@@ -50,7 +51,10 @@ function mount(allowHeavyContent = false) {
           return () => { attachedSources.delete(key) }
         } }
       },
-      "../../ui/flight/flightSources": { measureViewInWindow: () => undefined }
+      "../../ui/flight/flightSources": { measureViewInWindow: () => undefined },
+      "../performance/sceneAssetWarmupModel": {
+        publishRoomEntryWarmup: (avatars: unknown[]) => { roomWarmups.push(avatars) }
+      }
     }
   })
   let input: Parameters<typeof card.ChatRoomInviteCard>[0] = {
@@ -63,7 +67,7 @@ function mount(allowHeavyContent = false) {
     input = { ...input, ...patch }
     return renderedElements(runtime.render(() => card.ChatRoomInviteCard(input)))
   }
-  return { runtime, render, actions, attachedSources }
+  return { runtime, render, actions, attachedSources, roomWarmups }
 }
 
 test("compact historical invitations show sender and status without mounting the room scene", () => {
@@ -134,4 +138,23 @@ test("the default full card keeps its room scene and switching to compact detach
   assert.ok(compact.every((element) => element.type !== "RoomScene" && element.type !== "Gradient"))
   assert.deepEqual([...f.attachedSources], [])
   f.runtime.unmount()
+})
+
+test("an open room door starts warming the room once; history rows and closed doors do not", () => {
+  const f = mount(true)
+  const you = { name: "You", userId: "synthetic-recipient", avatar: { presetId: "synthetic-you" } as never }
+  const partner = { name: "Partner", userId: "synthetic-sender", avatar: { presetId: "synthetic-partner" } as never }
+  f.render({ you, partner })
+  f.render({ you, partner })
+  assert.deepEqual(f.roomWarmups, [[you.avatar, partner.avatar]])
+  f.runtime.unmount()
+
+  const history = mount()
+  history.render({ compact: true })
+  assert.deepEqual(history.roomWarmups, [])
+  history.runtime.unmount()
+  const pending = mount(true)
+  pending.render({ invite: { ...invite, status: "pending", roomSessionId: undefined } })
+  assert.deepEqual(pending.roomWarmups, [])
+  pending.runtime.unmount()
 })

@@ -1,4 +1,5 @@
 import type { ImageSourcePropType } from "react-native"
+import type { ResolvedRoomV2Scene } from "../roomV2/roomV2.types"
 
 type ShopTopCandidate = { id: string; name: string; type: string; outfitKey?: string }
 type InitialRoomShopCandidate = { sourceItemId: string; title: string; category: string }
@@ -38,6 +39,63 @@ export function subscribeToSelectedShopPreviewWarmup(
 ): () => void {
   selectedShopPreviewListeners.add(listener)
   return () => selectedShopPreviewListeners.delete(listener)
+}
+
+/** An accepted room invitation is on screen: the room is likely next. */
+export interface RoomEntryWarmupRequest {
+  generation: number
+  /** The participants' saved avatar selections, as the chat already holds them. */
+  avatars: readonly unknown[]
+}
+
+type RoomEntryWarmupListener = (request: RoomEntryWarmupRequest) => void
+
+let roomEntryGeneration = 0
+const roomEntryListeners = new Set<RoomEntryWarmupListener>()
+
+/** Ephemeral in-process signal, like the Shop preview one; nothing is persisted. */
+export function publishRoomEntryWarmup(avatars: readonly unknown[]): number {
+  const request = { generation: ++roomEntryGeneration, avatars: [...avatars] }
+  for (const listener of roomEntryListeners) {
+    try {
+      listener(request)
+    } catch {
+      // Best-effort image warmup must never interrupt the chat.
+    }
+  }
+  return request.generation
+}
+
+export function subscribeToRoomEntryWarmup(listener: RoomEntryWarmupListener): () => void {
+  roomEntryListeners.add(listener)
+  return () => roomEntryListeners.delete(listener)
+}
+
+/**
+ * Everything a room scene draws, in the order it matters: the shell, then the
+ * placed furniture back to front, then (where the renderer draws them) the
+ * contact shadows. Each image once.
+ */
+export function selectRoomSceneWarmupSources(
+  scene: Pick<ResolvedRoomV2Scene, "shell" | "renderItems">,
+  options: { includeContactShadows: boolean }
+): ImageSourcePropType[] {
+  const sources: ImageSourcePropType[] = []
+  const seen = new Set<unknown>()
+  const add = (source: ImageSourcePropType | undefined) => {
+    if (source === undefined || seen.has(source)) return
+    seen.add(source)
+    sources.push(source)
+  }
+  add(scene.shell?.asset.source)
+  const furniture = scene.renderItems
+    .flatMap((item) => item.kind === "furniture" ? [item] : [])
+    .sort((a, b) => a.depth - b.depth)
+  for (const item of furniture) add(item.asset.source)
+  if (options.includeContactShadows) {
+    for (const item of furniture) add(item.contactShadowAsset?.source)
+  }
+  return sources
 }
 
 const ROOM_SHOP_CATEGORY_SORT_ORDER: Readonly<Record<string, number>> = {

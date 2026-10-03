@@ -9,10 +9,17 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Reanimated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
+import {
+  getRoomSceneItemKey,
+  getRoomSceneReadinessKeys,
+  getRoomSceneShadowKey,
+  ROOM_SCENE_SHELL_KEY,
+  useRoomSceneReadiness
+} from "./roomSceneReadiness"
 import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { getRoomFurnitureTapTarget, isRoomFurnitureTapOnSeat } from "./roomFurnitureTapTargetModel"
@@ -101,8 +108,12 @@ interface RoomRenderer2DProps {
   liveAvatarPosition?: RoomRendererLiveAvatarPosition
   /** Drawn on the floor, under every item (the editor's placement grid). */
   floorUnderlay?: ReactNode
-  /** The shell image's first paint (or its load failure): the stage is drawn. */
-  onShellDisplay?: () => void
+  /**
+   * The scene is complete: the shell, every furniture image and contact shadow
+   * drawn here, and every avatar's full look have displayed (a failed image
+   * counts, so it never blocks). Called once per mount; callers cap the wait.
+   */
+  onSceneReady?: () => void
   /**
    * Furniture another layer draws (MiniRoom sorts these among its avatars).
    * Their contact shadows stay here, on the floor under everything.
@@ -137,7 +148,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     showDepthWash = true,
     liveAvatarPosition,
     floorUnderlay,
-    onShellDisplay,
+    onSceneReady,
     hiddenItemRenderIds
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
@@ -148,6 +159,15 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     const { width, height } = event.nativeEvent.layout
     setLayoutSize({ width, height })
   }, [])
+  const drawsContactShadows = roomVNextRuntimeMode !== "disabled"
+  const markDrawn = useRoomSceneReadiness(
+    getRoomSceneReadinessKeys({ renderItems, hiddenRenderIds: hiddenItemRenderIds, drawsContactShadows }),
+    onSceneReady
+  )
+  const handleShellDrawn = useMemo(
+    () => markDrawn ? () => markDrawn(ROOM_SCENE_SHELL_KEY) : undefined,
+    [markDrawn]
+  )
 
   if (!shell) {
     return <View testID={testID} style={style} />
@@ -171,9 +191,11 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           source={shell.asset.source}
           contentFit="cover"
           cachePolicy="memory-disk"
+          // Bundled room art keeps its pixels; never downscale it on the main thread.
+          allowDownscaling={false}
           transition={0}
-          onDisplay={onShellDisplay}
-          onError={onShellDisplay}
+          onDisplay={handleShellDrawn}
+          onError={handleShellDrawn}
           style={styles.shell}
         />
       </View>
@@ -195,12 +217,13 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
       {stageMarkers?.map((marker) => (
         <StageMarker key={marker.id} marker={marker} reduceMotion={reduceMotion} onFaded={onStageMarkerFaded} />
       ))}
-      {roomVNextRuntimeMode !== "disabled"
+      {drawsContactShadows
         ? renderItems.map((item) =>
             item.kind === "furniture" && item.contactShadowAsset ? (
               <RoomRendererFurnitureContactShadow
                 key={`${item.renderId}-contact-shadow`}
                 item={item}
+                onDrawn={markDrawn}
               />
             ) : null
           )
@@ -230,6 +253,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
             stageWidthPx={layoutSize.width}
             stageHeightPx={layoutSize.height}
+            onDrawn={markDrawn}
             seatedFurnitureName={
               item.kind === "avatar" && item.seatRig
                 ? renderItems.find(
@@ -263,9 +287,9 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
  * placed in the same stage coordinates and never takes touches.
  */
 export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSprite(
-  props: { item: RoomV2FurnitureRenderItem; zIndex: number }
+  props: { item: RoomV2FurnitureRenderItem; zIndex: number; onDisplay?: () => void }
 ) {
-  const { item, zIndex } = props
+  const { item, zIndex, onDisplay } = props
   const perspectiveScale = getRoomRendererItemPerspectiveScale(item)
   const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
   const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
@@ -291,7 +315,10 @@ export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSp
           source={item.asset.source}
           contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
           cachePolicy="memory-disk"
+          allowDownscaling={false}
           transition={0}
+          onDisplay={onDisplay}
+          onError={onDisplay}
           style={[
             styles.itemImage,
             { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }
@@ -300,7 +327,8 @@ export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSp
       </View>
     </View>
   )
-}, (previous, next) => previous.item === next.item && previous.zIndex === next.zIndex)
+}, (previous, next) =>
+  previous.item === next.item && previous.zIndex === next.zIndex && previous.onDisplay === next.onDisplay)
 
 /**
  * Furniture is sorted behind a seated avatar so the avatar can enter the
@@ -338,6 +366,7 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
           source={item.foregroundOcclusionAsset.source}
           contentFit="contain"
           cachePolicy="memory-disk"
+          allowDownscaling={false}
           transition={0}
           style={styles.furnitureFrontOcclusionImage}
         />
@@ -375,6 +404,7 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
           source={item.asset.source}
           contentFit="contain"
           cachePolicy="memory-disk"
+          allowDownscaling={false}
           transition={0}
           style={{
             position: "absolute",
@@ -395,9 +425,9 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
  * assets must provide their own calibrated shadow with the same floor pivot.
  */
 const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureContactShadow(
-  props: { item: RoomV2FurnitureRenderItem }
+  props: { item: RoomV2FurnitureRenderItem; onDrawn?: (key: string) => void }
 ) {
-  const { item } = props
+  const { item, onDrawn } = props
   const shadow = item.contactShadowAsset
   if (!shadow) return null
 
@@ -427,12 +457,15 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
         source={shadow.source}
         contentFit="contain"
         cachePolicy="memory-disk"
+        allowDownscaling={false}
         transition={0}
+        onDisplay={onDrawn ? () => onDrawn(getRoomSceneShadowKey(item.renderId)) : undefined}
+        onError={onDrawn ? () => onDrawn(getRoomSceneShadowKey(item.renderId)) : undefined}
         style={styles.furnitureContactShadowImage}
       />
     </View>
   )
-}, (previous, next) => previous.item === next.item)
+}, (previous, next) => previous.item === next.item && previous.onDrawn === next.onDrawn)
 
 /**
  * The walk destination on the floor (roomTapMarkerModel owns its life): it
@@ -536,6 +569,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   stageHeightPx: number
   seatedFurnitureName?: string
   testID?: string
+  /** Reports this item's image (or avatar look) on screen for scene readiness. */
+  onDrawn?: (key: string) => void
 }) {
   const {
     item,
@@ -554,8 +589,12 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     stageWidthPx,
     stageHeightPx,
     seatedFurnitureName,
-    testID
+    testID,
+    onDrawn
   } = props
+  const drawnKey = getRoomSceneItemKey(item)
+  // Stable, so a memoized avatar renderer does not re-render with its item.
+  const handleDrawn = useMemo(() => onDrawn ? () => onDrawn(drawnKey) : undefined, [drawnKey, onDrawn])
   const longPressActiveRef = useRef(false)
   const suppressPressRef = useRef(false)
 
@@ -746,13 +785,17 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
               stageHeightPx={stageHeightPx}
               live={liveAvatarPosition}
               motionStyle={avatarMotionStyle}
+              onAllLayersShown={handleDrawn}
             />
           ) : (
             <ExpoImage
               source={item.asset.source}
               contentFit={getRoomV2FurnitureImageResizeMode(item.sceneProjection) === "stretch" ? "fill" : "contain"}
               cachePolicy="memory-disk"
+              allowDownscaling={false}
               transition={0}
+              onDisplay={handleDrawn}
+              onError={handleDrawn}
               style={[
                 styles.itemImage,
                 { transform: [{ scaleX: item.usesMirroredRotation ? -1 : 1 }] }
@@ -841,7 +884,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.stageWidthPx === next.stageWidthPx &&
   previous.stageHeightPx === next.stageHeightPx &&
   previous.seatedFurnitureName === next.seatedFurnitureName &&
-  previous.testID === next.testID
+  previous.testID === next.testID &&
+  previous.onDrawn === next.onDrawn
 )
 
 function getFurnitureFootprintStyle(
