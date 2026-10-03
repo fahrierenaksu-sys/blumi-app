@@ -6,6 +6,7 @@ import type { AccountRecoveryLocale } from "../accountRecoveryCopy"
 import type { AuthEntryCopy } from "../authEntryCopy"
 import {
   REGISTER_PHONE_PANEL_LAYOUT as phonePanel,
+  resolveRegisterKeyboardLayout,
   resolveRegisterPhoneStageHeight
 } from "../registerPhonePanelModel"
 import { RegisterWorldHero } from "../RegisterWorldHero"
@@ -24,6 +25,8 @@ import type { RegisterLayout } from "./useRegisterLayout"
 /**
  * Fourth onboarding step for new accounts: the shared setup shell with the
  * world hero, phone or OTP entry, the combined terms acceptance, and legal links.
+ * The terms acceptance sits in the action dock right above "Kod gönder", so
+ * its whole text stays readable above the keyboard (resolveRegisterKeyboardLayout).
  */
 export function RegisterCreateView({
   authCopy,
@@ -52,6 +55,7 @@ export function RegisterCreateView({
 }) {
   const { setupMetrics } = layout
   const { busy, isCodeStep, flow, availability, verifiedFirebasePhone } = register
+  const keyboardLayout = resolveRegisterKeyboardLayout(setupMetrics, isCodeStep)
   const worldHero = useMemo(
     () => <RegisterWorldHero active={motionActive && !isCodeStep} />,
     [motionActive, isCodeStep]
@@ -60,6 +64,7 @@ export function RegisterCreateView({
   return (
     <BlumiSetupShell
       backDisabled={busy}
+      collapseHeadingOnKeyboard={keyboardLayout.collapseHeadingOnKeyboard}
       collapseStageOnKeyboard
       feedback={errorMessage ? (
         <RegisterErrorNotice message={errorMessage} />
@@ -72,6 +77,15 @@ export function RegisterCreateView({
         }
         onLeave()
       }}
+      footerAccessory={keyboardLayout.consentInActionDock ? (
+        <RegisterTermsConsent
+          authCopy={authCopy}
+          termsAccepted={register.termsAccepted}
+          busy={busy}
+          compact
+          onToggle={register.toggleTermsAccepted}
+        />
+      ) : null}
       onPrimaryAction={register.runPrimaryAction}
       primaryActionBusy={busy}
       primaryActionDisabled={register.primaryDisabled}
@@ -105,6 +119,7 @@ export function RegisterCreateView({
               smsNotice={register.smsNotice}
               maskedPhoneNumber={register.maskedPhoneNumber}
               verificationCode={flow.verificationCode}
+              editable={register.otpEditable}
               otpFocused={register.otpFocused}
               showOtpError={register.showOtpError}
               resendCooldownSeconds={register.resendCooldownSeconds}
@@ -147,13 +162,6 @@ export function RegisterCreateView({
               { marginBottom: -phonePanel.spacing.footerBottomTrim }
             ]}
           >
-            <RegisterTermsConsent
-              authCopy={authCopy}
-              termsAccepted={register.termsAccepted}
-              busy={busy}
-              compact={setupMetrics.dense}
-              onToggle={register.toggleTermsAccepted}
-            />
             <RegisterLegalLinks
               authCopy={authCopy}
               rowStyle={[

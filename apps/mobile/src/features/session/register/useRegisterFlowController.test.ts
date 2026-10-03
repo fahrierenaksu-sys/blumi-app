@@ -572,3 +572,32 @@ test("a rejected code buzzes, clears the cells, refocuses and is not resubmitted
   await harness.act((controller) => controller.handleCodeChange("111112"))
   assert.equal(harness.registrations.length, 2)
 })
+
+test("the code field takes focus in the commit that shows the OTP step, while the code is still being sent", async () => {
+  const harness = mountController()
+  await enterValidPhone(harness)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  harness.setRequestOutcome("defer")
+  harness.controller.runPrimaryAction()
+  // The OTP step commits once; its layout effects run before the first paint.
+  harness.rerender()
+  assert.equal(harness.controller.isCodeStep, true)
+  assert.equal(harness.controller.busy, true, "the code request is still in flight")
+  assert.equal(harness.controller.otpEditable, true)
+  assert.equal(harness.otpFocusCalls.length, 1, "the keyboard opens with the step, not after the request")
+
+  await harness.act(() => undefined)
+  harness.pending.request?.resolve()
+  await harness.act(() => undefined)
+  assert.equal(harness.controller.codeRequestStatus, "sent")
+  assert.equal(harness.otpFocusCalls.length, 1, "the field is not refocused when the request lands")
+})
+
+test("the code field is read-only while a code is verified", async () => {
+  const harness = mountController()
+  await enterValidPhone(harness)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  await harness.act((controller) => controller.runPrimaryAction())
+  harness.rerender({ isSubmitting: true })
+  assert.equal(harness.controller.otpEditable, false)
+})

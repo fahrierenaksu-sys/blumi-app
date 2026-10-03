@@ -236,3 +236,67 @@ export function mixSetupKeyboardValue(from: number, to: number, amount: number):
   "worklet"
   return from + (to - from) * amount
 }
+
+/**
+ * Where a keyboard close began: the column's scroll offset and the keyboard's
+ * open amount at that moment. `fromAmount` 0 means no close is in progress.
+ */
+export interface SetupKeyboardScrollReturn {
+  fromOffset: number
+  fromAmount: number
+}
+
+export const SETUP_KEYBOARD_SCROLL_IDLE: SetupKeyboardScrollReturn = Object.freeze({
+  fromOffset: 0,
+  fromAmount: 0
+})
+
+/**
+ * The keyboard layout may leave the column scrolled (the stage and heading
+ * collapse, iOS keeps the focused field in view, the reader scrolls). React
+ * Native keeps a scroll offset when the content grows back, so without this
+ * the closed layout stayed shifted: its top cut off and a gap at the bottom.
+ * While the keyboard closes the offset glides to 0 in step with it, from
+ * wherever the close began; opening never moves the column. UI thread.
+ */
+export function stepSetupKeyboardScrollReturn(
+  from: SetupKeyboardScrollReturn,
+  amount: number,
+  previousAmount: number,
+  offset: number
+): { from: SetupKeyboardScrollReturn; scrollTo: number | null } {
+  "worklet"
+  const idle = { fromOffset: 0, fromAmount: 0 }
+  if (!(amount < previousAmount)) return { from: idle, scrollTo: null }
+  const start = from.fromAmount > 0
+    ? from
+    : {
+      fromOffset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
+      fromAmount: previousAmount
+    }
+  const share = amount > 0 && start.fromAmount > 0
+    ? Math.min(1, amount / start.fromAmount)
+    : 0
+  return {
+    from: share > 0 ? start : idle,
+    scrollTo: start.fromOffset * share
+  }
+}
+
+/**
+ * Where the column goes when the reader lets go of a drag (iOS dismisses the
+ * keyboard interactively, so the glide above pauses under the finger). If the
+ * keyboard closed during the drag, the column settles on its top; if it is
+ * still closing, null, and the rest of the close glides from the release
+ * offset. A drag with the keyboard closed is the reader's own position.
+ * UI thread.
+ */
+export function settleSetupKeyboardScrollAfterDrag(
+  keyboardClosedDuringDrag: boolean,
+  amount: number,
+  offset: number
+): number | null {
+  "worklet"
+  if (!keyboardClosedDuringDrag || amount > 0) return null
+  return offset > 0 ? 0 : null
+}

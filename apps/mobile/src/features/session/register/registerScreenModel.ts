@@ -139,6 +139,19 @@ export function canSubmitRegisterVerification(input: {
   return true
 }
 
+/**
+ * The code field stays editable while its code is still being sent, so it can
+ * hold focus (and iOS can offer the SMS code) the moment the OTP step appears
+ * instead of after the request returns; a code typed early is verified only
+ * once the request has landed. It is read-only while a code is verified.
+ */
+export function canEditRegisterCode(input: {
+  busy: boolean
+  codeRequestStatus: RegisterCodeRequestStatus
+}): boolean {
+  return !input.busy || input.codeRequestStatus === "sending"
+}
+
 export const REGISTER_CODE_LENGTH = 6
 
 /**

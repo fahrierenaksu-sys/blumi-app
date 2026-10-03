@@ -5,7 +5,10 @@ import {
   getSetupLayoutMetrics,
   getOutgoingRetentionMs,
   getSetupProgress,
-  shouldClearOutgoingForMotionPreference
+  SETUP_KEYBOARD_SCROLL_IDLE,
+  settleSetupKeyboardScrollAfterDrag,
+  shouldClearOutgoingForMotionPreference,
+  stepSetupKeyboardScrollReturn
 } from "./setupFlowShellModel"
 
 test("phone and otp share the fourth progress step", () => {
@@ -47,4 +50,56 @@ test("outgoing content has a bounded lifetime and clears when Reduce Motion is e
   assert.equal(shouldClearOutgoingForMotionPreference(false, true, true), true)
   assert.equal(shouldClearOutgoingForMotionPreference(true, false, true), false)
   assert.equal(shouldClearOutgoingForMotionPreference(false, true, false), false)
+})
+
+test("closing the keyboard glides the setup column back to its top in step with the keyboard", () => {
+  // The keyboard layout was scrolled 120 pt down; the keyboard starts closing.
+  const halfway = stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.5, 1, 120)
+  assert.equal(halfway.scrollTo, 60)
+  // The column keeps gliding from where the close began, not from where it is now.
+  const quarter = stepSetupKeyboardScrollReturn(halfway.from, 0.25, 0.5, 60)
+  assert.equal(quarter.scrollTo, 30)
+  const closed = stepSetupKeyboardScrollReturn(quarter.from, 0, 0.25, 30)
+  assert.equal(closed.scrollTo, 0, "the resting layout shows the whole top again")
+  assert.deepEqual(closed.from, SETUP_KEYBOARD_SCROLL_IDLE)
+})
+
+test("opening the keyboard never moves the setup column", () => {
+  const opening = stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.4, 0, 0)
+  assert.equal(opening.scrollTo, null)
+  assert.deepEqual(opening.from, SETUP_KEYBOARD_SCROLL_IDLE)
+})
+
+test("a keyboard that closes at once (Reduce Motion, a step that is left) lands on the top in one frame", () => {
+  const closed = stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0, 1, 240)
+  assert.equal(closed.scrollTo, 0)
+  assert.deepEqual(closed.from, SETUP_KEYBOARD_SCROLL_IDLE)
+})
+
+test("a keyboard that reopens part way leaves the column alone and the next close starts fresh", () => {
+  const closing = stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.6, 1, 100)
+  assert.equal(closing.scrollTo, 60)
+  const reopening = stepSetupKeyboardScrollReturn(closing.from, 0.8, 0.6, 60)
+  assert.equal(reopening.scrollTo, null)
+  assert.deepEqual(reopening.from, SETUP_KEYBOARD_SCROLL_IDLE)
+  const closingAgain = stepSetupKeyboardScrollReturn(reopening.from, 0.4, 0.8, 80)
+  assert.equal(closingAgain.scrollTo, 40)
+})
+
+test("an overscrolled or unmeasured offset never scrolls past the top", () => {
+  assert.equal(stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.5, 1, -12).scrollTo, 0)
+  assert.equal(stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.5, 1, Number.NaN).scrollTo, 0)
+})
+
+test("a drag that dismissed the keyboard settles on the top; an ordinary drag stays where it ends", () => {
+  assert.equal(settleSetupKeyboardScrollAfterDrag(true, 0, 70), 0)
+  assert.equal(settleSetupKeyboardScrollAfterDrag(true, 0, 0), null, "already at the top")
+
+  // Released half way: nothing jumps; the rest of the close glides from the
+  // release offset (the close starts over from there).
+  assert.equal(settleSetupKeyboardScrollAfterDrag(true, 0.5, 70), null)
+  assert.equal(stepSetupKeyboardScrollReturn(SETUP_KEYBOARD_SCROLL_IDLE, 0.25, 0.5, 70).scrollTo, 35)
+
+  // Scrolling a tall page with the keyboard closed is the reader's own position.
+  assert.equal(settleSetupKeyboardScrollAfterDrag(false, 0, 140), null)
 })

@@ -1,19 +1,17 @@
 import {
-  useCallback,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode
 } from "react"
 import {
-  ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions
 } from "react-native"
 import Animated, {
+  scrollTo,
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
@@ -42,11 +40,14 @@ import {
   type PreAuthSetupStep
 } from "./setupFlowShellModel"
 import { getCurrentSetupFlowCopy } from "./setupFlowLocale"
+import { useSetupKeyboardScrollReturn } from "./useSetupKeyboardScrollReturn"
 
 // When the keyboard opens or closes, the collapsible stage and heading close
 // with it and the rest of the column follows, all driven by the keyboard's
 // open amount on the UI thread: no React render per frame and no layout
-// animation. React hears only when the keyboard layout turns on or off.
+// animation. React hears only when the keyboard layout turns on or off. When
+// the keyboard closes, the column's scroll glides back to its top with it, so
+// the resting layout always returns whole.
 
 /**
  * A panel that collapses for the keyboard. Its content keeps its natural
@@ -103,6 +104,12 @@ interface BlumiSetupShellProps {
   reduceMotion?: boolean
   motionActive?: boolean
   primaryActionTestID?: string
+  /**
+   * Shown right above the primary action, in the dock that rides the keyboard,
+   * so it is always fully readable together with the action it qualifies
+   * (the phone step's terms consent).
+   */
+  footerAccessory?: ReactNode
   taskCardTone?: "default" | "liquid" | "sheet"
   taskCardMinHeight?: number
   taskCardOffsetY?: number
@@ -137,6 +144,7 @@ export function BlumiSetupShell({
   reduceMotion: reduceMotionOverride,
   motionActive = true,
   primaryActionTestID,
+  footerAccessory,
   taskCardTone = "default",
   taskCardMinHeight,
   taskCardOffsetY = 0,
@@ -155,7 +163,6 @@ export function BlumiSetupShell({
   const systemReduceMotion = useReducedMotion()
   const reduceMotion = reduceMotionOverride ?? systemReduceMotion
   const { width, height, fontScale } = useWindowDimensions()
-  const scrollRef = useRef<ScrollView | null>(null)
   const metrics = useMemo(
     () => getSetupLayoutMetrics({ width, height, fontScale }),
     [fontScale, height, width]
@@ -178,9 +185,7 @@ export function BlumiSetupShell({
   // The one React update per keyboard toggle: the column may scroll, and
   // collapsed panels leave the accessibility tree.
   const [keyboardLayoutActive, setKeyboardLayoutActive] = useState(false)
-  const scrollToTop = useCallback((): void => {
-    scrollRef.current?.scrollTo({ y: 0, animated: false })
-  }, [])
+  const { scrollRef, onScroll } = useSetupKeyboardScrollReturn(keyboardAmount)
   useAnimatedReaction(
     () => keyboardAmount.value > 0,
     (open, previous) => {
@@ -191,7 +196,7 @@ export function BlumiSetupShell({
     () => stageCollapse.value >= 1,
     (collapsed, previous) => {
       // Once the stage is gone, the task card starts at the top.
-      if (collapsed && previous === false) scheduleOnRN(scrollToTop)
+      if (collapsed && previous === false) scrollTo(scrollRef, 0, 0, false)
     }
   )
 
@@ -216,7 +221,7 @@ export function BlumiSetupShell({
     // reactivated layer before paint so a previous scroll offset cannot leak
     // into the next onboarding frame.
     scrollRef.current?.scrollTo({ y: 0, animated: false })
-  }, [motionActive])
+  }, [motionActive, scrollRef])
 
   const stageContent = (
     <SetupFlowMotionSwap
@@ -318,14 +323,19 @@ export function BlumiSetupShell({
   const taskPanel = <View style={styles.keyboardSlot}>{taskPanelContent}</View>
 
   const primaryAction = (
-    <SetupFlowPrimaryAction
-      busy={primaryActionBusy}
-      disabled={primaryActionDisabled}
-      label={effectiveActionLabel}
-      onPress={onPrimaryAction}
-      reduceMotion={reduceMotion}
-      testID={primaryActionTestID}
-    />
+    <>
+      {footerAccessory ? (
+        <View style={styles.footerAccessory}>{footerAccessory}</View>
+      ) : null}
+      <SetupFlowPrimaryAction
+        busy={primaryActionBusy}
+        disabled={primaryActionDisabled}
+        label={effectiveActionLabel}
+        onPress={onPrimaryAction}
+        reduceMotion={reduceMotion}
+        testID={primaryActionTestID}
+      />
+    </>
   )
 
   return (
@@ -368,11 +378,13 @@ export function BlumiSetupShell({
                   ]}
                   testID="setup-flow-bottom-sheet"
                 >
-                  <ScrollView
+                  <Animated.ScrollView
                     bounces={false}
                     contentContainerStyle={styles.scrollContainer}
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"
+                    onScroll={onScroll}
+                    scrollEventThrottle={16}
                     showsVerticalScrollIndicator={false}
                     ref={scrollRef}
                     style={styles.immersiveSheetScroll}
@@ -387,7 +399,7 @@ export function BlumiSetupShell({
                       {headingPanel}
                       {taskPanel}
                     </Animated.View>
-                  </ScrollView>
+                  </Animated.ScrollView>
                   <View
                     style={[
                       styles.footer,
@@ -401,12 +413,14 @@ export function BlumiSetupShell({
               </View>
             ) : (
               <>
-                <ScrollView
+                <Animated.ScrollView
                   bounces={false}
                   contentContainerStyle={styles.scrollContainer}
                   keyboardDismissMode="interactive"
                   keyboardShouldPersistTaps="handled"
+                  onScroll={onScroll}
                   scrollEnabled={metrics.shouldScroll || keyboardLayoutActive}
+                  scrollEventThrottle={16}
                   showsVerticalScrollIndicator={false}
                   ref={scrollRef}
                   style={styles.scroll}
@@ -416,7 +430,7 @@ export function BlumiSetupShell({
                     {headingPanel}
                     {taskPanel}
                   </Animated.View>
-                </ScrollView>
+                </Animated.ScrollView>
                 <View style={styles.footer}>{primaryAction}</View>
               </>
             )}
@@ -518,6 +532,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 24
+  },
+  footerAccessory: {
+    paddingBottom: uiTheme.spacing.xs
   },
   footer: {
     // Give the CTA the same generous lower rhythm across every setup step.

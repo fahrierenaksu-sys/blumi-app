@@ -52,3 +52,22 @@ export function canRequestRegisterPhoneCode(input: {
 }): boolean {
   return input.phoneValid && input.termsAccepted && !input.isSubmitting
 }
+
+/**
+ * How the phone and code steps make room for the keyboard. The terms consent
+ * sits in the action dock right above "send code", which rides the keyboard,
+ * so its whole text is readable whenever the action is; the code step drops
+ * it (the terms were accepted to send the code). The heading stays while
+ * typing unless the screen is very short (an SE, large text), where it folds
+ * so the field stays above the keyboard; both steps fold it alike, so moving
+ * to the code step with the keyboard up never makes it pop in.
+ */
+export function resolveRegisterKeyboardLayout(
+  metrics: { veryCompact: boolean },
+  isCodeStep: boolean
+): { consentInActionDock: boolean; collapseHeadingOnKeyboard: boolean } {
+  return {
+    consentInActionDock: !isCodeStep,
+    collapseHeadingOnKeyboard: metrics.veryCompact
+  }
+}

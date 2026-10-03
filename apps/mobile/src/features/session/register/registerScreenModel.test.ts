@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { getAuthEntryCopy } from "../authEntryCopy"
 import {
+  canEditRegisterCode,
   RESEND_COOLDOWN_SECONDS,
   canSubmitRegisterVerification,
   resolveCodeRequestFailure,
@@ -452,4 +453,12 @@ test("a complete code verifies itself once and a failed code is not retried auto
   assert.equal(shouldAutoSubmitRegisterCode({ ...base, codeRequestStatus: "sending" }), false)
   assert.equal(shouldAutoSubmitRegisterCode({ ...base, isCodeStep: false }), false)
   assert.equal(shouldAutoSubmitRegisterCode({ ...base, canVerify: false }), false)
+})
+
+test("the code field takes typing and SMS autofill while its code is still being sent, never while a code is verified", () => {
+  assert.equal(canEditRegisterCode({ busy: true, codeRequestStatus: "sending" }), true)
+  assert.equal(canEditRegisterCode({ busy: false, codeRequestStatus: "sent" }), true)
+  assert.equal(canEditRegisterCode({ busy: false, codeRequestStatus: "failed" }), true)
+  assert.equal(canEditRegisterCode({ busy: true, codeRequestStatus: "sent" }), false, "verifying")
+  assert.equal(canEditRegisterCode({ busy: true, codeRequestStatus: "idle" }), false, "completing a verified phone")
 })

@@ -32,6 +32,7 @@ import { registerStyles as styles } from "./registerStyles"
 export function RegisterOtpEntry({
   authCopy,
   busy,
+  editable,
   containerStyle,
   codeRequestStatus,
   smsNotice,
@@ -51,6 +52,8 @@ export function RegisterOtpEntry({
 }: {
   authCopy: AuthEntryCopy
   busy: boolean
+  /** Editable while the code is still being sent, so the step opens with the keyboard up. */
+  editable: boolean
   containerStyle: StyleProp<ViewStyle>
   codeRequestStatus: RegisterCodeRequestStatus
   smsNotice: string | null
@@ -133,7 +136,7 @@ export function RegisterOtpEntry({
             keyboardType="number-pad"
             textContentType="oneTimeCode"
             autoComplete="sms-otp"
-            editable={!busy}
+            editable={editable}
             maxFontSizeMultiplier={1.5}
             caretHidden
             maxLength={6}

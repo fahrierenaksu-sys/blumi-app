@@ -25,6 +25,7 @@ import {
 import type { RegisterAccountInput } from "../sessionApi"
 import {
   RESEND_COOLDOWN_SECONDS,
+  canEditRegisterCode,
   canSubmitRegisterVerification,
   resolveCodeRequestFailure,
   resolveCodeRequestSuccess,
@@ -111,6 +112,7 @@ export function useRegisterFlowController({
     [busy, flow.stage, flow.verificationCode, phoneAnalysis]
   )
   const isCodeStep = flow.stage === "code"
+  const otpEditable = canEditRegisterCode({ busy, codeRequestStatus })
   const { progressTotal, progressCurrent } = resolveRegisterProgress(authIntent, isCodeStep)
   const legalRequirementsMet = resolveLegalRequirementsMet(authIntent, termsAccepted)
   const verifiedFirebasePhone =
@@ -155,20 +157,26 @@ export function useRegisterFlowController({
     return () => clearTimeout(timer)
   }, [isCodeStep, resendCooldownSeconds])
 
-  // The OTP step has committed: release a pending code request and put the
-  // caret in the code field so the SMS code can be typed or autofilled at once.
-  useEffect(() => {
+  // The caret goes into the code field in the same commit that shows the OTP
+  // step (layout effects run before the first paint), so the keyboard stays
+  // up from the phone field, or slides in with the step, instead of arriving
+  // after the code request returns. The field is editable while the code is
+  // still being sent; while a code is verified, focus waits until it is not.
+  useLayoutEffect(() => {
     otpFocusPendingRef.current = isCodeStep
+  }, [isCodeStep])
+
+  useLayoutEffect(() => {
+    if (!isCodeStep || !otpEditable || !otpFocusPendingRef.current) return
+    otpFocusPendingRef.current = false
+    otpInputRef.current?.focus()
+  }, [isCodeStep, otpEditable, otpErrorCount])
+
+  // The OTP step has committed: release a pending code request.
+  useEffect(() => {
     if (!isCodeStep) return
     for (const resolve of codeStepCommitWaitersRef.current.splice(0)) resolve()
   }, [isCodeStep])
-
-  // The code field is read-only while busy, so focus lands once it is not.
-  useEffect(() => {
-    if (!isCodeStep || busy || !otpFocusPendingRef.current) return
-    otpFocusPendingRef.current = false
-    otpInputRef.current?.focus()
-  }, [busy, isCodeStep, otpErrorCount])
 
   const waitForCodeStepCommit = (): Promise<void> => new Promise((resolve) => {
     codeStepCommitWaitersRef.current.push(resolve)
@@ -386,6 +394,7 @@ export function useRegisterFlowController({
     codeRequestStatus,
     smsNotice,
     otpFocused,
+    otpEditable,
     termsAccepted,
     resendCooldownSeconds,
     showPhoneError,

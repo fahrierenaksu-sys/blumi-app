@@ -3,7 +3,6 @@ import { useMemo, type ReactNode } from "react"
 import {
   Platform,
   Pressable,
-  ScrollView,
   Text,
   View
 } from "react-native"
@@ -13,7 +12,7 @@ import type { useEntranceAnimation, useSelectionTransition } from "../../../ui/a
 import { SoftBlobBackground } from "../../../ui/backgrounds"
 import { BrandMark } from "../../../ui/brandMark"
 import { GlassCard, GlassPill } from "../../../ui/glass"
-import { AppKeyboardAvoidingView } from "../../../ui/keyboard"
+import { AppKeyboardAvoidingView, useKeyboardOpenAmount } from "../../../ui/keyboard"
 import { PrimaryButton } from "../../../ui/primitives"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
@@ -36,6 +35,7 @@ import {
 } from "./registerScreenModel"
 import { registerStyles as styles } from "./registerStyles"
 import { useAccountRecoveryFlow } from "./useAccountRecoveryFlow"
+import { useSetupKeyboardScrollReturn } from "../setupFlow/useSetupKeyboardScrollReturn"
 import type { RegisterFlowController } from "./useRegisterFlowController"
 import type { RegisterLayout } from "./useRegisterLayout"
 import { PressableScale } from "../../../ui/PressableScale"
@@ -88,6 +88,9 @@ export function RegisterSignInView({
   } = register
   const recoveryCopy = getAccountRecoveryCopy(locale)
   const recovery = useAccountRecoveryFlow(locale)
+  // Closing the keyboard brings the page back to its top (top bar and hero).
+  const keyboardOpen = useKeyboardOpenAmount()
+  const { scrollRef, onScroll } = useSetupKeyboardScrollReturn(keyboardOpen)
   const signInAvatar = useMemo(
     () => (
       <AvatarPreview2D
@@ -115,10 +118,13 @@ export function RegisterSignInView({
       />
       <SafeAreaView contentGutter={false} style={styles.safe}>
         <AppKeyboardAvoidingView style={styles.flex}>
-          <ScrollView
+          <Animated.ScrollView
             contentContainerStyle={styles.content}
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"
+            onScroll={onScroll}
+            ref={scrollRef}
+            scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.topBar}>
@@ -240,6 +246,7 @@ export function RegisterSignInView({
                   smsNotice={register.smsNotice}
                   maskedPhoneNumber={register.maskedPhoneNumber}
                   verificationCode={flow.verificationCode}
+                  editable={register.otpEditable}
                   otpFocused={register.otpFocused}
                   showOtpError={register.showOtpError}
                   resendCooldownSeconds={register.resendCooldownSeconds}
@@ -326,7 +333,7 @@ export function RegisterSignInView({
                 onOpenTerms={onOpenTerms}
               />
             </View>
-          </ScrollView>
+          </Animated.ScrollView>
         </AppKeyboardAvoidingView>
         <AccountRecoveryModal
           recovery={recovery}

@@ -140,15 +140,20 @@ function loadShell(runtime: FakeReactRuntime, extraModules: Record<string, unkno
 
 test("reactivated setup layers reset their scroll position before paint", () => {
   const runtime = createFirstFrameRuntime()
-  const { BlumiSetupShell } = loadShell(runtime)
+  const scrollRef: { current: unknown } = { current: null }
+  const { BlumiSetupShell } = loadShell(runtime, {
+    "./useSetupKeyboardScrollReturn": {
+      useSetupKeyboardScrollReturn: () => ({ scrollRef, onScroll: undefined })
+    }
+  })
   const scrolls: unknown[] = []
   let motionActive = false
   const props = () => ({ step: "avatar", onBack: () => undefined, onPrimaryAction: () => undefined, motionActive })
 
   runtime.render(() => BlumiSetupShell(props()))
-  const [scrollView] = findElements(runtime.output, (element) => element.type === "ScrollView")
-  assert.ok(scrollView, "the shell renders a scroll view")
-  scrollView.props.ref.current = { scrollTo: (options: unknown) => { scrolls.push(options) } }
+  const [scrollView] = findElements(runtime.output, (element) => element.props?.ref === scrollRef)
+  assert.ok(scrollView, "the shell renders its scroll view")
+  scrollRef.current = { scrollTo: (options: unknown) => { scrolls.push(options) } }
   assert.deepEqual(scrolls, [])
 
   motionActive = true
