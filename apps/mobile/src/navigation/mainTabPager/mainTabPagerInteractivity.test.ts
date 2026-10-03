@@ -6,6 +6,7 @@ import {
   loadSourceWithFakeReact,
   type FakeReactRuntime
 } from "../../testing/hookHarness"
+import { requestMainTabPagerPage } from "./mainTabPagerController"
 import { getMainTabPageAccessibility } from "./mainTabPagerModel"
 
 // Regression (owner, iPhone, 2026-10-02): after a swipe between main pages
@@ -17,6 +18,11 @@ import { getMainTabPageAccessibility } from "./mainTabPagerModel"
 // real pager's pan handlers and read what navigation and the pages receive.
 
 const W = 390
+
+interface PagerExports {
+  MainTabPager: (props: Record<string, unknown>) => unknown
+  MainTabPagerPage: (props: Record<string, unknown>) => unknown
+}
 
 type Handler = (...args: unknown[]) => void
 interface Spring {
@@ -48,6 +54,13 @@ function createGestureStub() {
   }
 }
 
+/** A chainable layout-animation builder that records its name. */
+function layoutAnimation(name: string): Record<string, unknown> {
+  return new Proxy({ name } as Record<string, unknown>, {
+    get: (target, property) => property in target ? target[property as string] : () => layoutAnimation(name)
+  })
+}
+
 function createReanimatedStub(runtime: FakeReactRuntime) {
   const useRef = runtime.react.useRef as <T>(initial: T) => { current: T }
   const springs: Spring[] = []
@@ -64,6 +77,8 @@ function createReanimatedStub(runtime: FakeReactRuntime) {
     module: {
       __esModule: true,
       default: { View: "Animated.View" },
+      FadeIn: layoutAnimation("FadeIn"),
+      ReduceMotion: { Never: "never" },
       cancelAnimation: (value: unknown) => { cancelled.push(value) },
       useAnimatedReaction: () => undefined,
       useAnimatedStyle: () => ({}),
@@ -80,7 +95,7 @@ function createReanimatedStub(runtime: FakeReactRuntime) {
   }
 }
 
-function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion = false, deferRN = false) {
+function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion = false, deferRN = false, renderPager = true) {
   const runtime = createFakeReactRuntime()
   const gesture = createGestureStub()
   const reanimated = createReanimatedStub(runtime)
@@ -95,7 +110,7 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
   let nextTimerId = 1
   let slotFocused = initiallyFocused
   const slotListeners = new Map<string, Set<() => void>>()
-  const exports = loadSourceWithFakeReact<{ MainTabPager: (props: Record<string, unknown>) => unknown }>(
+  const exports = loadSourceWithFakeReact<PagerExports>(
     "navigation/mainTabPager/MainTabPager.tsx",
     runtime,
     {
@@ -118,7 +133,8 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
         "../../ui/errorBoundary": { ErrorBoundary: "ErrorBoundary" },
         "../../ui/mainTabPagerIndicator": { mainTabPagerIndicator: indicator },
         "../../ui/theme": { uiTheme: { colors: { background: "#fff" } } },
-        "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" }
+        "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" },
+        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" }
       },
       real: [
         "./mainTabPagerConfig",
@@ -154,7 +170,7 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
     getState: () => ({ key: "stack", routes: [route] })
   }
   const renderPage = () => null
-  runtime.render(() => exports.MainTabPager({ navigation, route, renderPage, bottomBar: null }))
+  if (renderPager) runtime.render(() => exports.MainTabPager({ navigation, route, renderPage, bottomBar: null }))
   const pageProps = () => {
     const found: Record<string, unknown>[] = []
     const visit = (node: unknown) => {
@@ -176,8 +192,10 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
       isFocused: () => boolean
     }
   return {
+    exports,
     runtime,
     reanimated,
+    indicator,
     dispatched,
     pageProps,
     pageNavigation,
@@ -517,6 +535,7 @@ test("a tap that catches a settle mid-way lets it finish on the same page, which
 test("after launch the other pages mount one per idle slot, nearest first", () => {
   const pager = mountPager("Inbox")
   assert.deepEqual(pager.mountedPages(), ["Inbox"], "only the shown page renders at launch")
+  assert.equal(pager.timerCallbacks(350).length, 0, "no fixed 350 ms wait before the first slot")
   const seen: string[][] = []
   for (let slot = 0; slot < 6; slot += 1) {
     pager.idleSlot()
@@ -528,6 +547,12 @@ test("after launch the other pages mount one per idle slot, nearest first", () =
     ["Lobby", "Inbox", "MyRoom", "CosmeticShop"]
   ], "one page per slot")
   assert.deepEqual(seen[5], ["Lobby", "Inbox", "MyRoom", "CosmeticShop"], "then nothing more is scheduled")
+})
+
+test("every page is warm a few frames after launch, before a swipe or tap can reach it", () => {
+  const pager = mountPager("Lobby")
+  pager.advance(16)
+  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox", "MyRoom", "CosmeticShop"], "slots run back to back, one frame apart")
 })
 
 test("idle mount waits for UI drag and settle when the JS movement signal has not arrived", () => {
@@ -566,30 +591,76 @@ test("unmount cancels an idle retry that was blocked by UI motion", () => {
   assert.equal(pager.runtime.renderCount, renders, "cancelled idle work never renders an unmounted pager")
 })
 
-test("a detail push cancels pending idle mounts and returning resumes the remaining pages", () => {
+test("pages keep warming behind a detail screen, after the push and without focusing", () => {
   const pager = mountPager("Inbox")
   pager.idleSlot()
-  const beforePush = pager.mountedPages()
-  assert.deepEqual(beforePush, ["Lobby", "Inbox"])
+  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox"])
   pager.setFocused(false)
-  assert.equal(pager.pageNavigation("Inbox").isFocused(), false)
-  for (let slot = 0; slot < 4; slot += 1) pager.idleSlot()
-  assert.deepEqual(pager.mountedPages(), beforePush, "hidden pager does no page initialization behind the chat push")
+  pager.advance(16)
+  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox"], "nothing renders during the push itself")
+  pager.idleSlot()
+  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox", "MyRoom"], "the next page warms in an idle slot")
+  pager.idleSlot()
+  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox", "MyRoom", "CosmeticShop"])
+  assert.equal(pager.pageNavigation("MyRoom").isFocused(), false, "a page warmed behind the detail screen is not focused")
   pager.setFocused(true)
   assert.equal(pager.pageNavigation("Inbox").isFocused(), true)
-  pager.idleSlot()
-  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox", "MyRoom"], "the next unmounted page resumes")
-  pager.idleSlot()
+})
+
+test("a pager first rendered under a detail route warms its pages too, so the first back swipe lands on them", () => {
+  const pager = mountPager("Inbox", false)
+  for (let slot = 0; slot < 4; slot += 1) pager.idleSlot()
   assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox", "MyRoom", "CosmeticShop"])
 })
 
-test("a pager first rendered under a detail route waits for focus before warming pages", () => {
-  const pager = mountPager("Inbox", false)
-  for (let slot = 0; slot < 4; slot += 1) pager.idleSlot()
-  assert.deepEqual(pager.mountedPages(), ["Inbox"])
-  pager.setFocused(true)
-  pager.idleSlot()
-  assert.deepEqual(pager.mountedPages(), ["Lobby", "Inbox"])
+test("a bottom-bar tap to a cold page moves at once to its shell and its content follows the commit", () => {
+  const pager = mountPager("Lobby")
+  assert.equal(requestMainTabPagerPage("shop"), true)
+  assert.equal(pager.indicator.selection.value, 3, "the UI thread shows Shop at once: the tap is never dead")
+  assert.deepEqual(pager.dispatched.map((action) => action.payload?.name), ["CosmeticShop"], "one commit")
+  const shop = pager.pageProps().find((props) => props.routeName === "CosmeticShop")!
+  assert.equal(shop.mounted, false, "until JS answers, the page draws its shell")
+  pager.navigate("CosmeticShop")
+  assert.equal(pager.pageProps().find((props) => props.routeName === "CosmeticShop")!.mounted, true)
+  assert.equal(pager.indicator.selection.value, 3, "the route's arrival moves nothing")
+})
+
+test("a cold page draws its shell, and content that arrives later crossfades in over it", () => {
+  const harness = mountPager("Lobby", true, false, false, false)
+  const ui = { value: { committedIndex: 0 } }
+  const pageProps = (mounted: boolean) => ({
+    index: 3,
+    routeName: "CosmeticShop",
+    slotKey: "slot",
+    params: undefined,
+    mounted,
+    isSelected: false,
+    navigation: {},
+    renderPage: () => "ShopContent",
+    position: { value: 0 },
+    width: { value: W },
+    ui
+  })
+  let mounted = false
+  harness.runtime.render(() => harness.exports.MainTabPagerPage(pageProps(mounted)))
+  const layers = () => {
+    const children = (harness.runtime.output as { props: { children: unknown[] } }).props.children
+    return children.filter((child) => child !== null) as { type: unknown; props: Record<string, unknown> }[]
+  }
+  assert.deepEqual(layers().map((layer) => layer.type), ["MainTabPageShell"], "a drag or tap lands on the shell, never on nothing")
+  mounted = true
+  harness.runtime.rerender()
+  const [content] = layers()
+  assert.equal(layers().length, 1, "the shell leaves (fading out) as the content arrives")
+  assert.equal(content!.type, "Animated.View")
+  assert.equal((content!.props.entering as { name?: string } | undefined)?.name, "FadeIn", "the content crossfades in")
+
+  const warm = mountPager("Lobby", true, false, false, false)
+  warm.runtime.render(() => warm.exports.MainTabPagerPage(pageProps(true)))
+  const warmLayers = ((warm.runtime.output as { props: { children: unknown[] } }).props.children)
+    .filter((child) => child !== null)
+  assert.equal(warmLayers.length, 1)
+  assert.equal((warmLayers[0] as { type: unknown }).type, "ErrorBoundary", "a page drawn with its content shows it at once, without a fade")
 })
 
 test("a drag over warm neighbours mounts nothing and renders nothing", () => {
@@ -616,8 +687,6 @@ test("a cold directional drag mounts only the visible neighbour in either direct
       pan.onUpdate!({ translationX: sign * 40 })
       assert.deepEqual(new Set(pager.mountedPages()), new Set(["MyRoom", destination]))
       assert.equal(pager.runtime.renderCount, renders + 1, "one demanded page renders")
-      const page = pager.pageProps().find((props) => props.routeName === destination)!
-      assert.equal(page.fadeIn, !reduceMotion, "the existing cold-page fade policy is preserved")
     }
   }
 })

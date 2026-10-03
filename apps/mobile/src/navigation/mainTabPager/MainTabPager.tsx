@@ -23,6 +23,7 @@ import { Gesture, GestureDetector, type GestureType } from "react-native-gesture
 import Animated, {
   cancelAnimation,
   FadeIn,
+  ReduceMotion,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -39,8 +40,7 @@ import {
 import { mainTabPagerIndicator } from "../../ui/mainTabPagerIndicator"
 import { uiTheme } from "../../ui/theme"
 import {
-  MAIN_TAB_PAGE_FADE_IN_MS,
-  MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS,
+  MAIN_TAB_PAGE_CROSSFADE_MS,
   MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS,
   MAIN_TAB_PAGER_SPRING,
   MAIN_TAB_PAGES,
@@ -63,7 +63,6 @@ import {
   getMainTabPageIndex,
   getMainTabPageOpacity,
   getMainTabPagerMountedMask,
-  isMainTabPageInMountedMask,
   reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
   reduceMainTabPagerSettleEnd,
@@ -75,15 +74,18 @@ import {
   resolveMainTabPagerDragPosition,
   resolveMainTabPagerMountedPages,
   resolveMainTabPagerNextIdleMount,
+  resolveMainTabPagerWarmSlot,
   resolveMainTabPagerSettleIndex,
   resolveMainTabPagerSettleVelocity,
   resolveMainTabPagerSpringEnergyThreshold,
   shouldMainTabPagerTouchCatchSettle,
   withMainTabPageMounted,
   resolveMainTabPagerTouchMove,
-  type MainTabPagerUiTransition
+  type MainTabPagerUiTransition,
+  type MainTabPagerWarmSlot
 } from "./mainTabPagerModel"
 import { createMainTabPagerSelectAction } from "./mainTabPagerRouter"
+import { MainTabPageShell } from "./MainTabPageShell"
 
 interface SlotRoute {
   key: string
@@ -117,15 +119,19 @@ export interface MainTabPagerProps {
   bottomBar?: ReactNode
 }
 
-function scheduleIdle(work: () => void): () => void {
+/** Runs `work` in an idle slot after `slot.delayMs`, by `slot.idleTimeoutMs` at the latest. */
+function scheduleWarmSlot(work: () => void, slot: MainTabPagerWarmSlot): () => void {
   let idleId: number | null = null
   const timeoutId = setTimeout(() => {
     if (typeof globalThis.requestIdleCallback === "function") {
-      idleId = globalThis.requestIdleCallback(() => work())
+      idleId = globalThis.requestIdleCallback(
+        () => work(),
+        slot.idleTimeoutMs === null ? undefined : { timeout: slot.idleTimeoutMs }
+      )
     } else {
       work()
     }
-  }, MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS)
+  }, slot.delayMs)
   return () => {
     clearTimeout(timeoutId)
     if (idleId !== null && typeof globalThis.cancelIdleCallback === "function") {
@@ -221,10 +227,6 @@ export const MainTabPager = memo(function MainTabPager({
   const setPagerMoving = useCallback((moving: boolean) => {
     pagerMovingRef.current = moving
   }, [])
-  // Pages first mounted while a drag shows them fade their content in.
-  const fadeInPagesRef = useRef(new Set<number>())
-  const reduceMotionRef = useRef(reduceMotion)
-  reduceMotionRef.current = reduceMotion
 
   useEffect(() => {
     // Record the selected page as visited.
@@ -304,8 +306,8 @@ export const MainTabPager = memo(function MainTabPager({
   const startPosition = useSharedValue(0)
   const startTranslation = useSharedValue(0)
   const reduceMotionValue = useSharedValue(reduceMotion)
-  // Mounted pages as a bitmask the UI thread reads: a tap snaps at once only
-  // to a page that is already rendered.
+  // Mounted pages as a bitmask the UI thread reads: a drag asks JS to mount
+  // only a page that is still cold.
   const mountedMask = getMainTabPagerMountedMask(mounted)
   const mountedMaskValue = useSharedValue(mountedMask)
   const requestedMountMask = useSharedValue(0)
@@ -320,7 +322,6 @@ export const MainTabPager = memo(function MainTabPager({
     // low-frequency admission reads do not guarantee a later React render.
     if (!dragMountActiveRef.current || !navigation.isFocused() || ui.value.epoch !== epoch || dragMountGeneration.value !== generation) return
     if (mountedStateRef.current[index] === true) return
-    if (!reduceMotionRef.current) fadeInPagesRef.current.add(index)
     startTransition(() => {
       setMountedState((current) => {
         const next = withMainTabPageMounted(current, index)
@@ -348,32 +349,35 @@ export const MainTabPager = memo(function MainTabPager({
   }, [baseIndex, requestPageForDrag, width])
 
   useEffect(() => {
-    // Warm one page per idle slot. Check UI motion at admission because the
-    // bridged ref may still be queued. An admitted React update can render
-    // later; synchronous work already started cannot be preempted.
-    if (!slotFocused || resolveMainTabPagerNextIdleMount(mountedState, selectedIndex) < 0) return
+    // Warm one page per idle slot, back to back: the shown page's neighbours
+    // right after its first frame, then the rest, also while a detail screen
+    // covers the pager (gently, see resolveMainTabPagerWarmSlot). Check UI
+    // motion at admission because the bridged ref may still be queued. An
+    // admitted React update can render later; synchronous work already
+    // started cannot be preempted.
+    const warmSlot = resolveMainTabPagerWarmSlot({ mounted: mountedState, selectedIndex, slotFocused })
+    if (warmSlot === null) return
     let active = true
     let cancel = () => undefined as void
     const slot = () => {
-      if (!active || !navigation.isFocused()) return
+      if (!active) return
       if (dragging.value || animating.value || pagerMovingRef.current) {
-        cancel = scheduleIdle(slot)
+        cancel = scheduleWarmSlot(slot, warmSlot)
         return
       }
       startTransition(() => {
         setMountedState((current) => {
-          if (!navigation.isFocused()) return current
           const page = resolveMainTabPagerNextIdleMount(current, selectedIndex)
           return page < 0 ? current : withMainTabPageMounted(current, page)
         })
       })
     }
-    cancel = scheduleIdle(slot)
+    cancel = scheduleWarmSlot(slot, warmSlot)
     return () => {
       active = false
       cancel()
     }
-  }, [animating, dragging, mountedState, navigation, selectedIndex, slotFocused])
+  }, [animating, dragging, mountedState, selectedIndex, slotFocused])
 
   useEffect(() => {
     const update = () => focusHub.update({
@@ -587,15 +591,11 @@ export const MainTabPager = memo(function MainTabPager({
       if (index < 0) return false
       scheduleOnUI((tappedIndex: number) => {
         "worklet"
-        applyTransition(reduceMainTabPagerTap(
-          ui.value,
-          tappedIndex,
-          isMainTabPageInMountedMask(mountedMaskValue.value, tappedIndex)
-        ))
+        applyTransition(reduceMainTabPagerTap(ui.value, tappedIndex))
       }, index)
       return true
     }
-  }), [applyTransition, mountedMaskValue, navigation, ui])
+  }), [applyTransition, navigation, ui])
 
   // ── Interruptions ───────────────────────────────────────────────────
   useEffect(() => {
@@ -619,16 +619,12 @@ export const MainTabPager = memo(function MainTabPager({
       const discoverIndex = getMainTabPageIndex("Lobby")
       scheduleOnUI((index: number) => {
         "worklet"
-        applyTransition(reduceMainTabPagerTap(
-          ui.value,
-          index,
-          isMainTabPageInMountedMask(mountedMaskValue.value, index)
-        ))
+        applyTransition(reduceMainTabPagerTap(ui.value, index))
       }, discoverIndex)
       return true
     })
     return () => subscription.remove()
-  }, [applyTransition, mountedMaskValue, navigation, ui])
+  }, [applyTransition, navigation, ui])
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width
@@ -792,7 +788,6 @@ export const MainTabPager = memo(function MainTabPager({
                 slotKey={route.key}
                 params={pageParams[page.routeName]}
                 mounted={mounted[index] === true}
-                fadeIn={fadeInPagesRef.current.has(index)}
                 isSelected={index === selectedIndex}
                 navigation={pageNavigations[index]}
                 renderPage={renderPage}
@@ -809,14 +804,13 @@ export const MainTabPager = memo(function MainTabPager({
   )
 })
 
-interface MainTabPagerPageProps {
+export interface MainTabPagerPageProps {
   index: number
   routeName: MainTabRouteName
   slotKey: string
   params: object | undefined
+  /** Whether the page's content is rendered; until then the page draws its shell. */
   mounted: boolean
-  /** The page first mounts while a drag shows it: its content fades in once. */
-  fadeIn: boolean
   /** A boolean, not the selected index: a tab change re-renders only the two pages that flip. */
   isSelected: boolean
   navigation: unknown
@@ -826,13 +820,13 @@ interface MainTabPagerPageProps {
   ui: { value: { committedIndex: number } }
 }
 
-const MainTabPagerPage = memo(function MainTabPagerPage({
+/** One page of the pager. Exported for its behaviour tests only. */
+export const MainTabPagerPage = memo(function MainTabPagerPage({
   index,
   routeName,
   slotKey,
   params,
   mounted,
-  fadeIn,
   isSelected,
   navigation,
   renderPage,
@@ -844,6 +838,13 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
     () => ({ key: `${slotKey}:${routeName}`, name: routeName, params }),
     [params, routeName, slotKey]
   )
+  // Decided once: a page drawn without its content shows its shell, and the
+  // content that arrives later crossfades over it (opacity only, so also
+  // under Reduce Motion), whether a drag, a tap or an idle slot mounts it.
+  // A page drawn with its content never fades.
+  const [contentEntering] = useState(() => mounted
+    ? undefined
+    : FadeIn.duration(MAIN_TAB_PAGE_CROSSFADE_MS).reduceMotion(ReduceMotion.Never))
   const accessibility = getMainTabPageAccessibility(isSelected)
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: getMainTabPageOpacity(index, ui.value.committedIndex),
@@ -869,9 +870,9 @@ const MainTabPagerPage = memo(function MainTabPagerPage({
       importantForAccessibility={accessibility.importantForAccessibility}
       style={[styles.page, animatedStyle]}
     >
-      {fadeIn && content !== null ? (
-        // Mounted by a drag that already shows it: fade in instead of popping.
-        <Animated.View entering={FadeIn.duration(MAIN_TAB_PAGE_FADE_IN_MS)} style={styles.fill}>
+      {mounted ? null : <MainTabPageShell />}
+      {contentEntering !== undefined && content !== null ? (
+        <Animated.View entering={contentEntering} style={styles.fill}>
           {content}
         </Animated.View>
       ) : content}

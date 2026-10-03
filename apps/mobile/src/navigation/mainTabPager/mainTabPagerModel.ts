@@ -5,6 +5,7 @@ import {
   MAIN_TAB_PAGER_SETTLE,
   MAIN_TAB_PAGER_UNDECIDED_FAIL_Y,
   MAIN_TAB_PAGER_SPRING,
+  MAIN_TAB_PAGER_WARM,
   MAIN_TAB_PAGES,
   MAIN_TAB_SWIPE_MAX_INDEX,
   MAIN_TAB_SWIPE_MIN_INDEX,
@@ -264,17 +265,16 @@ export function createMainTabPagerUiState(committedIndex: number): MainTabPagerU
 
 /**
  * A bottom-bar tap: stop any drag or settle so it can never commit after the
- * tap, then commit the tapped page once. A page that is already mounted is
- * shown at once on the UI thread (optimistic snap), so the tap never waits
- * for the JS navigation round trip; a never-visited page waits for the route
- * sync that mounts it, so the pager never shows an empty page. Tapping the
- * page already shown only returns an interrupted pager to it (and commits it
- * if a swipe had chosen it but its settle never ended).
+ * tap, show the tapped page at once on the UI thread (the tap never waits for
+ * the JS navigation round trip) and commit it once. A page that has not
+ * mounted yet shows its shell until its content arrives with the commit, so
+ * a tap is never dead and never lands on an empty page. Tapping the page
+ * already shown only returns an interrupted pager to it (and commits it if a
+ * swipe had chosen it but its settle never ended).
  */
 export function reduceMainTabPagerTap(
   state: MainTabPagerUiState,
-  index: number,
-  targetMounted: boolean
+  index: number
 ): MainTabPagerUiTransition {
   "worklet"
   const epoch = state.epoch + 1
@@ -292,18 +292,10 @@ export function reduceMainTabPagerTap(
       interrupt: true
     }
   }
-  if (targetMounted) {
-    return {
-      state: { committedIndex: index, epoch, pendingCommitIndex: index, deferredCommitIndex: -1 },
-      commitIndex: index,
-      snap: true,
-      interrupt: true
-    }
-  }
   return {
-    state: { committedIndex: state.committedIndex, epoch, pendingCommitIndex: -1, deferredCommitIndex: -1 },
+    state: { committedIndex: index, epoch, pendingCommitIndex: index, deferredCommitIndex: -1 },
     commitIndex: index,
-    snap: false,
+    snap: true,
     interrupt: true
   }
 }
@@ -469,8 +461,7 @@ export function getMainTabPageNeighbours(index: number): number[] {
  * Pages to keep mounted. A page mounts on its first selection and stays
  * mounted (its own focus-aware effects pause while it is not selected).
  * Never-visited swipe neighbours are added only when `includeNeighbours` is
- * set, which the pager does when a drag starts before the idle warm-up
- * (resolveMainTabPagerNextIdleMount) reached them.
+ * set; the pager itself warms them in idle slots (resolveMainTabPagerWarmSlot).
  */
 export function resolveMainTabPagerMountedPages(input: {
   mounted: readonly boolean[]
@@ -486,10 +477,9 @@ export function resolveMainTabPagerMountedPages(input: {
 }
 
 /**
- * The page to warm in the next idle slot after launch: the never-mounted
- * page closest to the selected one (the left one first on a tie), or -1
- * once every page is mounted. Pages warm one per slot, so no slot renders
- * more than one page.
+ * The page to warm in the next idle slot: the never-mounted page closest to
+ * the selected one (the left one first on a tie), or -1 once every page is
+ * mounted. Pages warm one per slot, so no slot renders more than one page.
  */
 export function resolveMainTabPagerNextIdleMount(mounted: readonly boolean[], selectedIndex: number): number {
   let best = -1
@@ -498,6 +488,40 @@ export function resolveMainTabPagerNextIdleMount(mounted: readonly boolean[], se
     if (best < 0 || Math.abs(index - selectedIndex) < Math.abs(best - selectedIndex)) best = index
   }
   return best
+}
+
+export interface MainTabPagerWarmSlot {
+  /** The page the slot will mount. */
+  page: number
+  /** Wait before asking for idle time. */
+  delayMs: number
+  /** Longest a busy JS thread may postpone the slot, or null for real idle time only. */
+  idleTimeoutMs: number | null
+}
+
+/**
+ * When and what the next warm-up slot mounts, or null once every page is
+ * mounted. The shown page's neighbours come one frame after it is drawn and
+ * busy startup work may postpone them only briefly; farther pages follow back
+ * to back with a looser deadline. Behind a detail screen warming continues,
+ * but only after the push and only in real idle time.
+ */
+export function resolveMainTabPagerWarmSlot(input: {
+  mounted: readonly boolean[]
+  selectedIndex: number
+  slotFocused: boolean
+}): MainTabPagerWarmSlot | null {
+  const page = resolveMainTabPagerNextIdleMount(input.mounted, input.selectedIndex)
+  if (page < 0) return null
+  if (!input.slotFocused) {
+    return { page, delayMs: MAIN_TAB_PAGER_WARM.coveredDelayMs, idleTimeoutMs: null }
+  }
+  const isNeighbour = page === input.selectedIndex || getMainTabPageNeighbours(input.selectedIndex).includes(page)
+  return {
+    page,
+    delayMs: MAIN_TAB_PAGER_WARM.slotDelayMs,
+    idleTimeoutMs: isNeighbour ? MAIN_TAB_PAGER_WARM.neighbourIdleTimeoutMs : MAIN_TAB_PAGER_WARM.farIdleTimeoutMs
+  }
 }
 
 /** Mounted pages plus `index`. */
@@ -512,11 +536,6 @@ export function areMainTabPagerMountedPagesEqual(a: readonly boolean[], b: reado
 /** Mounted pages as one number the UI thread can read (bit `index` set = mounted). */
 export function getMainTabPagerMountedMask(mounted: readonly boolean[]): number {
   return mounted.reduce((mask, isMounted, index) => (isMounted ? mask | (1 << index) : mask), 0)
-}
-
-export function isMainTabPageInMountedMask(mask: number, index: number): boolean {
-  "worklet"
-  return index >= 0 && (mask & (1 << index)) !== 0
 }
 
 // ── Accessibility ────────────────────────────────────────────────────────

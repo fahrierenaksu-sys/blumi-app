@@ -5,6 +5,7 @@ import { BOTTOM_NAV_KEY_ORDER } from "../../ui/layout/bottomNavIndicatorModel"
 import {
   MAIN_TAB_PAGER_SETTLE,
   MAIN_TAB_PAGER_SPRING,
+  MAIN_TAB_PAGER_WARM,
   MAIN_TAB_PAGES,
   MAIN_TAB_ROUTE_NAMES,
   MAIN_TAB_SWIPE_MAX_INDEX,
@@ -20,7 +21,6 @@ import {
   getMainTabPageNeighbours,
   getMainTabPageOpacity,
   getMainTabPagerMountedMask,
-  isMainTabPageInMountedMask,
   isMainTabPageSwipeable,
   reduceMainTabPagerCommitRejected,
   reduceMainTabPagerRouteSync,
@@ -36,6 +36,7 @@ import {
   resolveMainTabPagerSettleIndex,
   resolveMainTabPagerSettleVelocity,
   resolveMainTabPagerSpringEnergyThreshold,
+  resolveMainTabPagerWarmSlot,
   shouldMainTabPagerTouchCatchSettle,
   withMainTabPageMounted,
   type MainTabPagerUiState
@@ -289,9 +290,8 @@ function createHarness(initialRoute = "Lobby") {
     get position() { return position },
     dispatches,
     snaps,
-    /** `mounted`: whether the tapped page was visited before (the pager keeps it mounted). */
-    tap(key: string, mounted = true) {
-      apply(reduceMainTabPagerTap(ui, MAIN_TAB_PAGES.findIndex((page) => page.key === key), mounted))
+    tap(key: string) {
+      apply(reduceMainTabPagerTap(ui, MAIN_TAB_PAGES.findIndex((page) => page.key === key)))
     },
     /** A released drag starts settling on `target` (MainTabPager.settleTo). */
     release(target: number) {
@@ -435,14 +435,14 @@ test("the settle ends when the page looks still, well before Reanimated's defaul
   assert.ok(resolveMainTabPagerSpringEnergyThreshold({ displacement: 1e9, velocity: 0 }) >= 6e-9)
 })
 
-test("a tap to a never-visited page waits for the route that mounts it", () => {
+test("a tap to a never-visited page moves at once and never waits for the route", () => {
   const pager = createHarness("Lobby")
-  pager.tap("shop", false)
-  assert.deepEqual(pager.snaps, [], "no jump to an empty page")
-  assert.equal(pager.position, DISCOVER)
+  pager.tap("shop")
+  assert.deepEqual(pager.snaps, [SHOP], "the tap is never dead: the page (its shell until it mounts) shows now")
+  assert.equal(pager.position, SHOP)
   pager.flushJs()
-  assert.deepEqual(pager.dispatches, ["CosmeticShop"])
-  assert.deepEqual(pager.snaps, [SHOP])
+  assert.deepEqual(pager.dispatches, ["CosmeticShop"], "one commit")
+  assert.deepEqual(pager.snaps, [SHOP], "the route's arrival moves nothing")
   assert.equal(pager.position, SHOP)
 })
 
@@ -611,24 +611,18 @@ test("reducers keep the committed page and epoch rules explicit", () => {
   assert.equal(reduceMainTabPagerSettleEnd(state).commitIndex, null, "a returned swipe commits nothing")
   assert.deepEqual(reduceMainTabPagerRouteSync(state, CHATS), { state, commitIndex: null, snap: false, interrupt: false })
   assert.deepEqual(reduceMainTabPagerRouteSync(state, -1).snap, false)
-  assert.deepEqual(reduceMainTabPagerTap(state, CHATS, true), {
+  assert.deepEqual(reduceMainTabPagerTap(state, CHATS), {
     state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1, deferredCommitIndex: -1 },
     commitIndex: null,
     snap: true,
     interrupt: true
   }, "tapping the committed page only settles an interrupted pager")
-  assert.deepEqual(reduceMainTabPagerTap(state, SHOP, true), {
+  assert.deepEqual(reduceMainTabPagerTap(state, SHOP), {
     state: { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP, deferredCommitIndex: -1 },
     commitIndex: SHOP,
     snap: true,
     interrupt: true
-  }, "a mounted page is shown at once and committed once")
-  assert.deepEqual(reduceMainTabPagerTap(state, SHOP, false), {
-    state: { committedIndex: CHATS, epoch: 1, pendingCommitIndex: -1, deferredCommitIndex: -1 },
-    commitIndex: SHOP,
-    snap: false,
-    interrupt: true
-  }, "a never-visited page waits for navigation")
+  }, "another page is shown at once and committed once")
   const pending = { committedIndex: SHOP, epoch: 1, pendingCommitIndex: SHOP, deferredCommitIndex: -1 }
   assert.deepEqual(reduceMainTabPagerRouteSync(pending, MYROOM).snap, false, "an earlier tap's commit is ignored")
   assert.deepEqual(reduceMainTabPagerRouteSync(pending, SHOP).state.pendingCommitIndex, -1, "its own commit clears it")
@@ -670,13 +664,8 @@ test("only the selected page is exposed to accessibility, matching the bottom ba
 
 // ── Mount policy ──────────────────────────────────────────────────────
 
-test("the mounted-page mask tells the UI thread which tapped page can be shown at once", () => {
-  const mask = getMainTabPagerMountedMask([true, false, false, true])
-  assert.equal(isMainTabPageInMountedMask(mask, DISCOVER), true)
-  assert.equal(isMainTabPageInMountedMask(mask, CHATS), false)
-  assert.equal(isMainTabPageInMountedMask(mask, MYROOM), false)
-  assert.equal(isMainTabPageInMountedMask(mask, SHOP), true)
-  assert.equal(isMainTabPageInMountedMask(mask, -1), false)
+test("the mounted-page mask tells the UI thread which pages a drag still has to mount", () => {
+  assert.equal(getMainTabPagerMountedMask([true, false, false, true]), (1 << DISCOVER) | (1 << SHOP))
   assert.equal(getMainTabPagerMountedMask([]), 0)
 })
 
@@ -705,6 +694,29 @@ test("idle warm-up picks the nearest never-mounted page, one at a time, until al
   assert.deepEqual(order, [CHATS, SHOP, DISCOVER], "neighbours first (left on a tie), then the far page")
   assert.deepEqual(mounted, [true, true, true, true])
   assert.equal(resolveMainTabPagerNextIdleMount([true, true, true, true], DISCOVER), -1)
+})
+
+test("warm-up reaches the shown page's neighbours right after its first frame, then the rest back to back", () => {
+  let mounted = [false, true, false, false]
+  const slots: { page: number; delayMs: number; idleTimeoutMs: number | null }[] = []
+  for (let slot = resolveMainTabPagerWarmSlot({ mounted, selectedIndex: CHATS, slotFocused: true }); slot !== null;
+    slot = resolveMainTabPagerWarmSlot({ mounted, selectedIndex: CHATS, slotFocused: true })) {
+    slots.push(slot)
+    mounted = withMainTabPageMounted(mounted, slot.page)
+  }
+  assert.deepEqual(slots.map((slot) => slot.page), [DISCOVER, MYROOM, SHOP])
+  for (const slot of slots) {
+    assert.ok(slot.delayMs <= 16, "no fixed gap between slots: about one frame after the previous page")
+    assert.ok(slot.idleTimeoutMs !== null, "busy startup work can postpone a slot only so long")
+  }
+  assert.ok(slots[0]!.idleTimeoutMs! <= slots[2]!.idleTimeoutMs!, "neighbours have the tighter deadline")
+  assert.ok(slots[0]!.delayMs + slots[0]!.idleTimeoutMs! <= 250, "a neighbour is warm within a quarter second")
+})
+
+test("warm-up continues behind a detail screen, but only in real idle time after the push", () => {
+  const covered = resolveMainTabPagerWarmSlot({ mounted: [false, true, false, false], selectedIndex: CHATS, slotFocused: false })
+  assert.deepEqual(covered, { page: DISCOVER, delayMs: MAIN_TAB_PAGER_WARM.coveredDelayMs, idleTimeoutMs: null })
+  assert.equal(resolveMainTabPagerWarmSlot({ mounted: [true, true, true, true], selectedIndex: CHATS, slotFocused: false }), null)
 })
 
 test("the bottom bar lists the main pages in pager order", () => {

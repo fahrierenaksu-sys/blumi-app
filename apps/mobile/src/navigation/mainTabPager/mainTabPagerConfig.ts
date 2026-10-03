@@ -108,12 +108,37 @@ export const MAIN_TAB_PAGER_SPRING = Object.freeze({
 export const MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS = 600
 
 /**
- * After the shown page is up, every other page is mounted once, one page per
- * idle slot: this delay, then the next idle callback. A slot never renders
- * while a drag or settle moves the pages, so no first render competes with
- * a swipe or a tab switch.
+ * Delay before each idle slot of the root navigator's deferred screen-bundle
+ * preload (RootNavigator). The pager's own page warm-up uses
+ * MAIN_TAB_PAGER_WARM below.
  */
 export const MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS = 350
 
-/** A page that a drag had to mount while showing it fades its content in this fast. */
-export const MAIN_TAB_PAGE_FADE_IN_MS = 160
+/**
+ * Page warm-up. A swipe or tab tap must never land on a page that is still
+ * unmounted, so every page mounts soon after launch: the shown page's swipe
+ * neighbours right after its first frame, then the farther pages, one page per
+ * idle slot and back to back. A slot never runs while a drag or settle moves
+ * the pages.
+ */
+export const MAIN_TAB_PAGER_WARM = Object.freeze({
+  /** About one frame: the previous commit reaches the screen before the next slot. */
+  slotDelayMs: 16,
+  /** Longest a busy JS thread may postpone a neighbour's slot (startup work never keeps it cold). */
+  neighbourIdleTimeoutMs: 150,
+  /** Longest a busy JS thread may postpone a farther page's slot. */
+  farIdleTimeoutMs: 600,
+  /**
+   * While a detail screen covers the pager, warm-up continues gently: after
+   * the push has settled, and only in real idle time (no forced deadline), so
+   * it never competes with the screen on top.
+   */
+  coveredDelayMs: 400
+})
+
+/**
+ * A page whose content arrives after the page was drawn (its shell was on
+ * screen or one swipe away) crossfades over the shell this fast. Opacity
+ * only, so it also runs under Reduce Motion (motion token `crossfade`).
+ */
+export const MAIN_TAB_PAGE_CROSSFADE_MS = 200
