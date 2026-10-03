@@ -25,7 +25,8 @@ test("room invitation query accepts legacy, bounded history and exclusive exact 
 })
 
 test("room invitation query rejects invalid bounds and mixed lookup modes", () => {
-  for (const input of [{ limit: 0 }, { limit: 51 }, { limit: "Infinity" }, { limit: 1.5 },
+  for (const input of [{ limit: 0 }, { limit: 51 }, { limit: "51" }, { limit: true }, { limit: [20] },
+    { limit: "01" }, { limit: "Infinity" }, { limit: 1.5 },
     { before: " " }, { inviteId: "" }, { before: "x".repeat(257) }, { inviteId: "x".repeat(257) },
     { inviteId: "synthetic_target", limit: 20 }, { inviteId: "synthetic_target", before: "synthetic_cursor" }]) {
     assert.equal(listChatRoomInvitesQuerySchema.safeParse(input).success, false)

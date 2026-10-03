@@ -18,6 +18,7 @@ import {
   discoverDeckQuerySchema,
   discoverProfileParamsSchema,
   listChatMessagesQuerySchema,
+  listChatRoomInvitesQuerySchema,
   markThreadReadRequestSchema,
   hideChatThreadRequestSchema,
   notificationPreferencesPatchSchema,
@@ -93,6 +94,7 @@ const PAIRS: SchemaPair[] = [
   { json: "createThread", zod: createThreadRequestSchema, part: "body", valid: { participantUserIds: ["user_1", "user_2"] } },
   { json: "sendChatMessage", zod: sendChatMessageRequestSchema, part: "body", valid: { body: "Hello", clientMessageId: "c1" } },
   { json: "listChatMessagesQuery", zod: listChatMessagesQuerySchema, part: "querystring", valid: { before: "m1", limit: "30" } },
+  { json: "listChatRoomInvitesQuery", zod: listChatRoomInvitesQuerySchema, part: "querystring", valid: { before: "invite_1", limit: "20" } },
   { json: "markThreadRead", zod: markThreadReadRequestSchema, part: "body", valid: { upToMessageId: "message_1" } },
   { json: "hideChatThread", zod: hideChatThreadRequestSchema, part: "body", valid: { throughMessageId: "message_1" } },
   { json: "chatPreferences", zod: chatPreferencesUpdateRequestSchema, part: "body", valid: { readReceiptsEnabled: true } },
@@ -258,6 +260,18 @@ function createCorpus(pair: SchemaPair): Array<[string, Record<string, unknown>]
   if (pair.json === "discoverDeckQuery") {
     corpus.push(["fractional age", { ageMin: "18.5" }])
     corpus.push(["long cursor", { cursor: "c".repeat(516) }])
+  }
+  if (pair.json === "listChatRoomInvitesQuery") {
+    corpus.push(["legacy query", {}])
+    corpus.push(["exact lookup", { inviteId: "invite_1" }])
+    corpus.push(["page maximum", { limit: "50" }])
+    corpus.push(["over page maximum", { limit: "51" }])
+    corpus.push(["fractional page", { limit: "1.5" }])
+    corpus.push(["non-numeric page", { limit: true }])
+    corpus.push(["long cursor", { before: "c".repeat(257) }])
+    corpus.push(["long exact lookup", { inviteId: "i".repeat(257) }])
+    corpus.push(["mixed cursor lookup", { inviteId: "invite_1", before: "invite_2" }])
+    corpus.push(["mixed page lookup", { inviteId: "invite_1", limit: "20" }])
   }
   return corpus
 }

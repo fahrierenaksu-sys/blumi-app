@@ -75,7 +75,10 @@ export const listChatMessagesQuerySchema = z.object({
 /** Optional bounded room-invite history; no query keeps legacy full-history reads. */
 export const listChatRoomInvitesQuerySchema = z.object({
   before: nonEmptyString.max(256).optional(),
-  limit: z.coerce.number().int().min(1).max(50).optional(),
+  limit: z.union([
+    z.string().regex(/^(?:[1-9]|[1-4][0-9]|50)$/).transform(Number),
+    z.number().int().min(1).max(50)
+  ]).optional(),
   inviteId: nonEmptyString.max(256).optional()
 }).strict().refine(value => !value.inviteId || (value.before === undefined && value.limit === undefined),
   { message: "An exact invite lookup cannot be combined with history paging." })
@@ -316,10 +319,11 @@ export const coreApiJsonSchemas = {
   listChatRoomInvitesQuery: {
     type: "object",
     properties: {
-      before: { type: "string", minLength: 1, maxLength: 256 },
-      limit: { anyOf: [{ type: "string", pattern: "^[1-9][0-9]?$" }, { type: "integer", minimum: 1, maximum: 50 }] },
-      inviteId: { type: "string", minLength: 1, maxLength: 256 }
+      before: { type: "string", minLength: 1, maxLength: 256, pattern: "\\S" },
+      limit: { anyOf: [{ type: "string", pattern: "^(?:[1-9]|[1-4][0-9]|50)$" }, { type: "integer", minimum: 1, maximum: 50 }] },
+      inviteId: { type: "string", minLength: 1, maxLength: 256, pattern: "\\S" }
     },
+    not: { anyOf: [{ required: ["inviteId", "before"] }, { required: ["inviteId", "limit"] }] },
     additionalProperties: false
   },
   markThreadRead: {
