@@ -30,6 +30,7 @@ test("unverified catalog cards show neutral pending status, not ownership or pri
       cardPadding: 8, thumbHeight: 60, locale: "tr"
     },
     useCallback: (callback) => callback,
+    useScrollSafePress: (callback) => callback,
     getShopCopy: () => ({ owned: "Owned", readyToPlace: "Ready" }),
     getShopProductPresentation: () => ({ stateLabel: "Owned" }),
     getAvatarAutomationSlug: () => "top",
@@ -53,7 +54,7 @@ test("a worn card shows a labelled X that removes it without selecting the card"
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   const product = { id: "avatar:glasses", sourceItemId: "glasses", previewType: "avatar", title: "Kalp gözlük", priceCoins: 90, owned: true }
-  const render = (removeAction, calls) => runInNewContext(code, {
+  const render = (removeAction, calls, dragBlocked = false) => runInNewContext(code, {
     exports: {}, require: () => ({ jsx, jsxs: jsx }),
     input: {
       product, selected: false, selectedCompact: true, inventoryVerified: true, pendingInventoryLabel: "",
@@ -61,6 +62,9 @@ test("a worn card shows a labelled X that removes it without selecting the card"
       onSelectProduct: () => calls.push("select"), onRemoveProduct: (item) => calls.push(`remove:${item.id}`)
     },
     useCallback: (callback) => callback,
+    useScrollSafePress: (callback) => (event) => {
+      if (!dragBlocked || !event?.nativeEvent?.changedTouches?.length) callback(event)
+    },
     getShopCopy: () => ({ ownedCompact: "Sende", removeFromAvatar: (title) => `${title}: avatardan çıkar` }),
     getShopProductPresentation: () => ({ stateLabel: "Sende" }),
     getAvatarAutomationSlug: () => "glasses", formatCoins: String,
@@ -86,4 +90,14 @@ test("a worn card shows a labelled X that removes it without selecting the card"
     assert.equal(plain.props.children.some((child) => child?.type === "RemoveButton"), false)
     assert.equal(plain.props.accessibilityActions, undefined)
   }
+
+  const dragCalls = []
+  const guarded = render("unequip", dragCalls, true)
+  const touch = { nativeEvent: { changedTouches: [{}] } }
+  guarded.props.onPress(touch)
+  guarded.props.children.find((child) => child?.type === "RemoveButton").props.onPress(touch)
+  assert.deepEqual(dragCalls, [], "both selection and the nested X honor the shelf's drag guard")
+  guarded.props.onPress({ nativeEvent: {} })
+  guarded.props.onAccessibilityAction({ nativeEvent: { actionName: "remove" } })
+  assert.deepEqual(dragCalls, ["select", "remove:avatar:glasses"], "accessibility still selects and removes after a drag")
 })

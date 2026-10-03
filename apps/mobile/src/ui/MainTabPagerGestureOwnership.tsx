@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, type MutableRefObject, type ReactElement } from "react"
-import { View } from "react-native"
+import { createContext, useCallback, useContext, useEffect, useMemo, type MutableRefObject, type ReactElement } from "react"
+import { View, type GestureResponderEvent } from "react-native"
 import { Gesture, GestureDetector, State, type GestureType } from "react-native-gesture-handler"
 import { useSharedValue, type SharedValue } from "react-native-reanimated"
-import { resolveHorizontalScrollerDragOwner } from "./mainTabPagerEdgeHandoffModel"
+import { MAIN_TAB_PAGER_EDGE_HANDOFF, resolveHorizontalScrollerDragOwner } from "./mainTabPagerEdgeHandoffModel"
 
 /**
  * Gesture ownership inside the main-page pager, expressed with one Gesture
@@ -26,6 +26,7 @@ import { resolveHorizontalScrollerDragOwner } from "./mainTabPagerEdgeHandoffMod
  *   own slot route has `gestureEnabled: false`.
  */
 const MainTabPagerGestureContext = createContext<MutableRefObject<GestureType | undefined> | null>(null)
+const ScrollTapBlockedContext = createContext<SharedValue<boolean> | null>(null)
 
 export const MainTabPagerGestureProvider = MainTabPagerGestureContext.Provider
 
@@ -35,6 +36,17 @@ export const MainTabPagerGestureProvider = MainTabPagerGestureContext.Provider
  */
 export function useMainTabPagerGestureRef(): MutableRefObject<GestureType | undefined> | null {
   return useContext(MainTabPagerGestureContext)
+}
+
+/** Reject a scroll's trailing press, while keeping accessibility clicks. */
+export function useScrollSafePress(onPress: (event: GestureResponderEvent) => void) {
+  const tapBlocked = useContext(ScrollTapBlockedContext)
+  return useCallback((event: GestureResponderEvent) => {
+    // Accessibility activates Pressable without a touch sequence. The block
+    // belongs only to the physical touch and persists until the next down.
+    if (event.nativeEvent.changedTouches?.length && tapBlocked?.value) return
+    onPress(event)
+  }, [onPress, tapBlocked])
 }
 
 /**
@@ -72,8 +84,10 @@ export function MainTabPagerHorizontalScrollOwner({
  *
  * Relations: a manual-activation pan decides and blocks the pager until it
  * fails; the native scroll waits for the pager to fail, so the two never move
- * together. `enabled={false}` (a single page) turns both gestures off, so
- * every horizontal drag reaches the pager; the wrapper stays mounted so the
+ * together. `enabled={false}` (a single page) disables native scrolling and
+ * releases every drag to the pager. The pan still rejects a trailing card
+ * press once the finger moves past the slop, even if it stays in the card.
+ * The wrapper stays mounted so the
  * scroller is never remounted (a remount would reset its offset without a
  * scroll event and leave `scrollOffset` stale). Outside the pager the child
  * is rendered unchanged.
@@ -96,18 +110,27 @@ export function MainTabPagerEdgeHandoffScrollOwner({
   }, [maxOffset, maxScrollOffset])
   const touchStartX = useSharedValue(0)
   const touchStartY = useSharedValue(0)
+  const tapBlocked = useSharedValue(false)
   const gestures = useMemo(() => {
     if (!pagerGestureRef) return null
     const native = Gesture.Native().enabled(enabled).requireExternalGestureToFail(pagerGestureRef)
     const handoff = Gesture.Pan()
-      .enabled(enabled)
       .manualActivation(true)
+      // This pan assigns ownership; the native shelf still needs its touch.
+      // Card activation is rejected separately by the shared tap guard.
+      .cancelsTouchesInView(false)
       .blocksExternalGesture(pagerGestureRef)
       .simultaneousWithExternalGesture(native)
-      .onTouchesDown((event) => {
+      .onTouchesDown((event, stateManager) => {
         "worklet"
+        if (event.numberOfTouches > 1) {
+          tapBlocked.value = true
+          stateManager.fail()
+          return
+        }
         const touch = event.allTouches[0]
         if (!touch) return
+        tapBlocked.value = false
         touchStartX.value = touch.absoluteX
         touchStartY.value = touch.absoluteY
       })
@@ -121,17 +144,34 @@ export function MainTabPagerEdgeHandoffScrollOwner({
           scrollOffset: scrollOffset.value,
           maxScrollOffset: maxOffset.value
         })
-        if (owner === "scroller") stateManager.activate()
-        else if (owner === "release") stateManager.fail()
+        if (owner === "wait") return
+        tapBlocked.value = true
+        if (enabled && owner === "scroller") stateManager.activate()
+        else stateManager.fail()
+      })
+      .onTouchesUp((event) => {
+        "worklet"
+        // Also catch a fast move delivered only in the final touch event.
+        const touch = event.changedTouches[0]
+        if (touch && (Math.abs(touch.absoluteX - touchStartX.value) >= MAIN_TAB_PAGER_EDGE_HANDOFF.slop
+          || Math.abs(touch.absoluteY - touchStartY.value) >= MAIN_TAB_PAGER_EDGE_HANDOFF.slop)) {
+          tapBlocked.value = true
+        }
+      })
+      .onTouchesCancelled(() => {
+        "worklet"
+        tapBlocked.value = true
       })
     return { native, handoff }
-  }, [enabled, maxOffset, pagerGestureRef, scrollOffset, touchStartX, touchStartY])
+  }, [enabled, maxOffset, pagerGestureRef, scrollOffset, tapBlocked, touchStartX, touchStartY])
   if (!gestures) return children
   return (
-    <GestureDetector gesture={gestures.handoff}>
-      <View collapsable={false}>
-        <GestureDetector gesture={gestures.native}>{children}</GestureDetector>
-      </View>
-    </GestureDetector>
+    <ScrollTapBlockedContext.Provider value={tapBlocked}>
+      <GestureDetector gesture={gestures.handoff}>
+        <View collapsable={false}>
+          <GestureDetector gesture={gestures.native}>{children}</GestureDetector>
+        </View>
+      </GestureDetector>
+    </ScrollTapBlockedContext.Provider>
   )
 }

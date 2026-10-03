@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect } from "react"
-import { Pressable } from "react-native"
+import { Pressable, type GestureResponderEvent } from "react-native"
 import Animated, {
   useAnimatedStyle,
   useSharedValue
@@ -19,7 +19,7 @@ const HIDDEN_SCALE = 0.6
 export function ShopCardRemoveButton(props: {
   accessibilityLabel: string
   testID?: string
-  onPress: () => void
+  onPress: (event: GestureResponderEvent) => void
 }) {
   const motion = useMotion()
   const { reduceMotion } = motion

@@ -12,6 +12,7 @@ import { getMaleRigLayerThumbnailPresentation } from "../../avatarV2/maleRigThum
 import { getAvatarAutomationSlug } from "../../avatarV2/qa/avatarQaInventory"
 import type { AppLocale } from "../../session/appLocale"
 import { PressableScale } from "../../../ui/PressableScale"
+import { useScrollSafePress } from "../../../ui/MainTabPagerGestureOwnership"
 import { uiTheme } from "../../../ui/theme"
 import {
   getAvatarItemPreviewSource,
@@ -104,6 +105,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   const handlePress = useCallback(() => {
     onSelectProduct(product)
   }, [onSelectProduct, product])
+  const handleSafePress = useScrollSafePress(handlePress)
   const sourceItemId = product.sourceItemId
   const thumbnailRef = useCallback((view: View | null) => {
     registerThumbnail?.(sourceItemId, view)
@@ -113,6 +115,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
   const handleRemove = useCallback(() => {
     onRemoveProduct?.(product)
   }, [onRemoveProduct, product])
+  const handleSafeRemove = useScrollSafePress(handleRemove)
   // VoiceOver reads the card as one element, so the X is also a card action.
   const handleAccessibilityAction = useCallback((event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === "remove") onRemoveProduct?.(product)
@@ -125,7 +128,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
       accessibilityState={{ selected }}
       accessibilityActions={removeLabel ? [{ name: "remove", label: removeLabel }] : undefined}
       onAccessibilityAction={removeLabel ? handleAccessibilityAction : undefined}
-      onPress={handlePress}
+      onPress={handleSafePress}
       pressedScale={0.97}
       style={[
         styles.productCard,
@@ -179,7 +182,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
         <ShopCardRemoveButton
           testID={`shop-item-${automationSlug}-remove`}
           accessibilityLabel={removeLabel}
-          onPress={handleRemove}
+          onPress={handleSafeRemove}
         />
       ) : null}
     </PressableScale>
