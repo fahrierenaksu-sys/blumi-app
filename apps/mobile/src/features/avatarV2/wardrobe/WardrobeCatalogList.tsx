@@ -61,17 +61,15 @@ type WardrobeCatalogListProps = {
 
 export function WardrobeCatalogList(props: WardrobeCatalogListProps) {
   const { activeCategory, cardsByCategory, cards, catalogStyle, switching } = props
-  const [visitedCategories, setVisitedCategories] = useState(() => [activeCategory])
   const [listWidth, setListWidth] = useState(0)
   const { fontScale } = useWindowDimensions()
   const itemWidth = getWardrobeGridItemWidth(listWidth, WARDROBE_GRID_GAP)
   const pageHeight = getWardrobeGridPageHeight(getWardrobeCardHeight(itemWidth, fontScale), WARDROBE_GRID_ROW_GAP)
-  const categories = visitedCategories.includes(activeCategory)
-    ? visitedCategories
-    : [...visitedCategories, activeCategory]
-  useLayoutEffect(() => {
-    setVisitedCategories((previous) => previous.includes(activeCategory) ? previous : [...previous, activeCategory])
-  }, [activeCategory])
+  // The screen builds cards only for the shown and the recently visited
+  // categories, so the mounted shelves are exactly those it hands over.
+  const categories = cardsByCategory.has(activeCategory)
+    ? [...cardsByCategory.keys()]
+    : [...cardsByCategory.keys(), activeCategory]
 
   return (
     <Reanimated.View
@@ -99,7 +97,7 @@ export function WardrobeCatalogList(props: WardrobeCatalogListProps) {
   )
 }
 
-// Only visited shelves mount. Native card/image instances and each shelf's
+// Only the recently visited shelves mount (capped by the screen). Native card/image instances and each shelf's
 // position survive return visits, while current inventory/preview props flow in.
 const WardrobeCategoryShelf = memo(function WardrobeCategoryShelf(props: Omit<WardrobeCatalogListProps,
   "activeCategory" | "cardsByCategory" | "catalogStyle" | "switching" | "reduceMotion"

@@ -182,3 +182,100 @@ test("retained shelf snaps an interrupted swipe and blocks hidden scroll and que
   assert.equal(harness.pagePosition.value, 0)
   assert.equal(scrolls.at(-1), 0)
 })
+
+function loadScreenWithCardCounter() {
+  const runtime = createFakeReactRuntime()
+  const built: string[] = []
+  const catalogItems: Record<string, { id: string }> = {}
+  const tryOn = { displayed: { bodyId: "base", worn: "none" } }
+  const tabs = [{ id: "closet", categories: ["top", "bottom", "hair", "shoes"] }]
+  const retained = loadSourceWithFakeReact<any>("features/avatarV2/wardrobe/wardrobeRetainedCategories.ts", runtime, { inertUnknown: true })
+  const { WardrobeV2Screen } = loadSourceWithFakeReact<any>("screens/WardrobeV2Screen.tsx", runtime, {
+    inertUnknown: true,
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": { __esModule: true, default: { View: "Animated.View" }, useSharedValue: () => ({ value: 0 }) },
+      "../features/session/authLocale": { getAppLocale: () => "tr" },
+      "../features/avatarV2/wardrobe/wardrobeCopy": { AVATAR_STUDIO_COPY: { tr: {} } },
+      "../ui/animations": { useReducedMotion: () => true },
+      "../ui/bottomPanelEntrance": { useBottomPanelEntranceProps: () => ({}) },
+      "../features/avatarV2/state/AvatarV2Provider": { useAvatarV2: () => ({ avatar: tryOn.displayed, catalog: [], canEquipItem: () => true }) },
+      "../features/avatarV2/wardrobeCategoryModel": {
+        WARDROBE_CATEGORIES: [{ id: "top" }, { id: "bottom" }, { id: "hair" }, { id: "shoes" }],
+        getAvatarStudioDefaultCategory: () => "top",
+        getAvatarStudioTabs: () => tabs,
+        resolveAvatarStudioCategory: (_tabs: unknown, category: string) => category,
+        findAvatarStudioTab: () => tabs[0]
+      },
+      "../features/avatarV2/wardrobe/wardrobeCatalogModel": {
+        getWardrobeActiveItems: (input: any) => [catalogItems[input.category] ??= { id: input.category }],
+        buildWardrobeCards: (input: any) => {
+          built.push(input.items[0].id)
+          return [{
+            item: input.items[0], equipped: input.displayedAvatar.worn === input.items[0].id,
+            itemStateLabel: "", locked: false, previewing: false
+          }]
+        },
+        reuseWardrobeCards
+      },
+      "../features/avatarV2/wardrobe/useWardrobeTryOn": { useWardrobeTryOn: () => ({ displayedAvatar: tryOn.displayed, dismissTryOnPreview: () => {} }) },
+      "../features/avatarV2/wardrobe/useWardrobeLockedPreview": { useWardrobeLockedPreview: () => ({ stageAvatar: tryOn.displayed, clearLockedPreview: () => {} }) },
+      "../features/avatarV2/wardrobe/useWardrobeDone": { useWardrobeDone: () => ({}) },
+      "../features/avatarV2/wardrobe/useWardrobeCategoryMotion": { useWardrobeCatalogTransition: (input: any) => ({ shownCategory: input.activeCategory, cards: input.cards }) },
+      "../features/avatarV2/wardrobe/wardrobeRetainedCategories": retained,
+      "../features/avatarV2/wardrobe/WardrobeCategoryTabs": { WardrobeCategoryTabs: "Categories" },
+      "../features/avatarV2/wardrobe/WardrobeCatalogList": { WardrobeCatalogList: "List" }
+    }
+  })
+  runtime.render(() => WardrobeV2Screen({ navigation: {} }))
+  const list = () => findElements(runtime.output, (element) => element.type === "List")[0].props as any
+  const selectCategory = (id: string) => {
+    ;(findElements(runtime.output, (element) => element.type === "Categories")[0].props as any).onSelectCategory(id)
+    runtime.rerender()
+  }
+  return { runtime, built, tryOn, list, selectCategory }
+}
+
+test("a try-on tap builds cards only for the shown and the previously visited category", () => {
+  const screen = loadScreenWithCardCounter()
+  assert.deepEqual(screen.built, ["top"])
+  screen.selectCategory("bottom")
+  screen.built.length = 0
+  screen.tryOn.displayed = { bodyId: "base", worn: "bottom" }
+  screen.runtime.rerender()
+  assert.deepEqual([...screen.built].sort(), ["bottom", "top"])
+  assert.equal(screen.list().cardsByCategory.get("bottom")[0].equipped, true)
+  screen.runtime.unmount()
+})
+
+test("visited shelves are capped and evict the oldest category", () => {
+  const screen = loadScreenWithCardCounter()
+  screen.selectCategory("bottom")
+  screen.selectCategory("hair")
+  assert.deepEqual([...screen.list().cardsByCategory.keys()], ["bottom", "hair"])
+  screen.selectCategory("bottom")
+  screen.selectCategory("shoes")
+  assert.deepEqual([...screen.list().cardsByCategory.keys()], ["bottom", "shoes"])
+  screen.runtime.unmount()
+})
+
+test("a try-on tap keeps the card lists of unchanged categories identical", () => {
+  const screen = loadScreenWithCardCounter()
+  screen.selectCategory("bottom")
+  const topCards = screen.list().cardsByCategory.get("top")
+  screen.tryOn.displayed = { bodyId: "base", worn: "bottom" }
+  screen.runtime.rerender()
+  assert.equal(screen.list().cardsByCategory.get("top"), topCards)
+  screen.runtime.unmount()
+})
+
+test("retained wardrobe categories keep visit order and never exceed the cap", () => {
+  const { nextRetainedWardrobeCategories } = loadSourceWithFakeReact<any>(
+    "features/avatarV2/wardrobe/wardrobeRetainedCategories.ts", createFakeReactRuntime(), { inertUnknown: true }
+  )
+  const start = ["top"]
+  assert.equal(nextRetainedWardrobeCategories(start, "top"), start)
+  assert.deepEqual(nextRetainedWardrobeCategories(start, "hair"), ["top", "hair"])
+  assert.deepEqual(nextRetainedWardrobeCategories(["top", "hair"], "top"), ["hair", "top"])
+  assert.deepEqual(nextRetainedWardrobeCategories(["top", "hair"], "shoes"), ["hair", "shoes"])
+})

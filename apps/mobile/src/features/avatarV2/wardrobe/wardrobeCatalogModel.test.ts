@@ -142,9 +142,7 @@ test("cards resolve state labels, lock state, and preview source per item", () =
   const source = { uri: "preview" }
   const cards = buildWardrobeCards({
     items: hair,
-    avatar: DEFAULT_AVATAR_V2,
     displayedAvatar,
-    inventory: ownAll,
     canEquipItem: () => true,
     copy,
     getPreviewSource: () => source
@@ -160,9 +158,7 @@ test("cards resolve state labels, lock state, and preview source per item", () =
 
   const locked = buildWardrobeCards({
     items: hair,
-    avatar: DEFAULT_AVATAR_V2,
     displayedAvatar: DEFAULT_AVATAR_V2,
-    inventory: ownNothing,
     canEquipItem: () => false,
     copy,
     getPreviewSource: () => undefined
@@ -179,9 +175,7 @@ test("body cards read as base switches", () => {
   })
   const cards = buildWardrobeCards({
     items: bodies,
-    avatar: DEFAULT_AVATAR_V2,
     displayedAvatar: DEFAULT_AVATAR_V2,
-    inventory: ownAll,
     canEquipItem: () => true,
     copy,
     getPreviewSource: () => undefined
@@ -261,9 +255,7 @@ test("locked cards read as Shop items in the app language and mark the one being
   for (const locale of ["en", "tr"] as const) {
     const cards = buildWardrobeCards({
       items: hair,
-      avatar: DEFAULT_AVATAR_V2,
       displayedAvatar: DEFAULT_AVATAR_V2,
-      inventory: ownNothing,
       canEquipItem: () => false,
       copy: AVATAR_STUDIO_COPY[locale],
       getPreviewSource: () => undefined,
@@ -275,9 +267,7 @@ test("locked cards read as Shop items in the app language and mark the one being
   }
   const ownedCards = buildWardrobeCards({
     items: hair,
-    avatar: DEFAULT_AVATAR_V2,
     displayedAvatar: DEFAULT_AVATAR_V2,
-    inventory: ownAll,
     canEquipItem: () => true,
     copy,
     getPreviewSource: () => undefined,

@@ -1,6 +1,6 @@
 import type { ImageSourcePropType } from "react-native"
 import { isAvatarV2ItemCompatibleWithBody } from "../avatarBodyCompatibility"
-import type { AvatarCatalogItem, AvatarInventory, UserAvatar } from "../avatarV2.types"
+import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import { isAvatarV2ItemEquipped } from "../avatarV2Selectors"
 import { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } from "../room/avatarRoomProjection"
 import {
@@ -102,17 +102,13 @@ export function resolveWardrobeEquippedLabel(input: {
 
 export function buildWardrobeCards(input: {
   items: readonly AvatarCatalogItem[]
-  avatar?: UserAvatar
   displayedAvatar: UserAvatar
-  inventory?: AvatarInventory
   canEquipItem: (item: AvatarCatalogItem) => boolean
   copy: WardrobeCatalogCopy
   getPreviewSource: (item: AvatarCatalogItem) => ImageSourcePropType | undefined
   /** The locked item being previewed on the stage, if any. */
   previewingItemId?: string | null
 }): WardrobeCatalogCardModel[] {
-  // `avatar` and `inventory` stay in the input for callers; a locked label no
-  // longer comes from the (English) Shop catalog presentation.
   const { displayedAvatar, canEquipItem, copy } = input
   return input.items.map((item) => {
     const canEquip = canEquipItem(item)

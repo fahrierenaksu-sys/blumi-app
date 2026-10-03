@@ -27,6 +27,7 @@ import {
   reuseWardrobeCards,
   type WardrobeCatalogCardModel
 } from "../features/avatarV2/wardrobe/wardrobeCatalogModel"
+import { useRetainedWardrobeCategories } from "../features/avatarV2/wardrobe/wardrobeRetainedCategories"
 import { getAvatarItemPreviewSource } from "../features/avatarV2/wardrobe/wardrobePreviewSources"
 import { useWardrobeTryOn } from "../features/avatarV2/wardrobe/useWardrobeTryOn"
 import { useWardrobeDone } from "../features/avatarV2/wardrobe/useWardrobeDone"
@@ -94,14 +95,22 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     requestedCategoryRef.current = activeCategory
   }, [activeCategory, activeSection])
 
-  // Cache catalog derivation independently of category taps. This stores UI
-  // models only; every inventory/body update rebuilds from current authority.
-  const itemsByCategory = useMemo(() => new Map(WARDROBE_CATEGORIES.map(({ id }) => [
+  // Only the shown category and the one visited before it are built and kept
+  // mounted (as in the Shop), so a try-on tap never rebuilds every category.
+  // Their order follows the tab order so shelves never reshuffle on a visit.
+  const retainedCategories = useRetainedWardrobeCategories(activeCategory)
+  const retainedInTabOrder = useMemo(
+    () => WARDROBE_CATEGORIES.map(({ id }) => id).filter((id) => retainedCategories.includes(id)),
+    [retainedCategories]
+  )
+  // Catalog derivation is independent of try-on taps. This stores UI models
+  // only; every inventory/body update rebuilds from current authority.
+  const itemsByCategory = useMemo(() => new Map(retainedInTabOrder.map((id) => [
     id,
     getWardrobeActiveItems({ catalog, category: id, bodyId: avatar.bodyId, canEquipItem, isAvailableInShop })
-  ])), [avatar.bodyId, canEquipItem, catalog, isAvailableInShop])
+  ])), [avatar.bodyId, canEquipItem, catalog, isAvailableInShop, retainedInTabOrder])
   const previousCardsRef = useRef<ReadonlyMap<WardrobeCategoryId, readonly WardrobeCatalogCardModel[]>>(new Map())
-  const cardsByCategory = useMemo(() => new Map(WARDROBE_CATEGORIES.map(({ id }) => [
+  const cardsByCategory = useMemo(() => new Map(retainedInTabOrder.map((id) => [
     id,
     reuseWardrobeCards(previousCardsRef.current.get(id), buildWardrobeCards({
       items: itemsByCategory.get(id) ?? [],
@@ -111,7 +120,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       getPreviewSource: getAvatarItemPreviewSource,
       previewingItemId: lockedItem?.id ?? null
     }))
-  ])), [canEquipItem, displayedAvatar, studioCopy, itemsByCategory, lockedItem])
+  ])), [canEquipItem, displayedAvatar, studioCopy, itemsByCategory, lockedItem, retainedInTabOrder])
   useLayoutEffect(() => { previousCardsRef.current = cardsByCategory }, [cardsByCategory])
   const visibleWardrobeCards = cardsByCategory.get(activeCategory) ?? []
 
