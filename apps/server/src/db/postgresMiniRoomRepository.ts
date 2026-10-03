@@ -258,7 +258,7 @@ export function createPostgresMiniRoomRepository(
       const result = await pool.query(
         `SELECT mini_room_id, lobby_room_id, participant_a_user_id,
                 participant_b_user_id, livekit_room_name, started_at,
-                ended_at, ended_by_user_id, completion_reward_date,
+                ended_at, ended_by_user_id, completion_reward_date::text AS completion_reward_date,
                 completion_requested_at, completion_requested_by_user_id,
                 source_thread_id, shared_decor
            FROM blumi_mini_rooms
@@ -271,7 +271,7 @@ export function createPostgresMiniRoomRepository(
       const result = await pool.query(
         `SELECT mini_room_id, lobby_room_id, participant_a_user_id,
                 participant_b_user_id, livekit_room_name, started_at,
-                ended_at, ended_by_user_id, completion_reward_date,
+                ended_at, ended_by_user_id, completion_reward_date::text AS completion_reward_date,
                 completion_requested_at, completion_requested_by_user_id,
                 source_thread_id, shared_decor
            FROM blumi_mini_rooms
@@ -285,7 +285,7 @@ export function createPostgresMiniRoomRepository(
       const result = await pool.query(
         `SELECT mini_room_id, lobby_room_id, participant_a_user_id,
                 participant_b_user_id, livekit_room_name, started_at,
-                ended_at, ended_by_user_id, completion_reward_date,
+                ended_at, ended_by_user_id, completion_reward_date::text AS completion_reward_date,
                 completion_requested_at, completion_requested_by_user_id,
                 source_thread_id, shared_decor
            FROM blumi_mini_rooms
@@ -309,7 +309,7 @@ export function createPostgresMiniRoomRepository(
           WHERE mini_room_id = $1
             AND ended_at IS NULL
             AND ($2 = participant_a_user_id OR $2 = participant_b_user_id)
-        RETURNING completion_reward_date, completion_requested_at,
+        RETURNING completion_reward_date::text AS completion_reward_date, completion_requested_at,
                   completion_requested_by_user_id`,
         [
           input.miniRoomId,
@@ -340,7 +340,7 @@ export function createPostgresMiniRoomRepository(
          )
          SELECT mini_room_id, lobby_room_id, participant_a_user_id,
                 participant_b_user_id, livekit_room_name, started_at,
-                ended_at, ended_by_user_id, completion_reward_date,
+                ended_at, ended_by_user_id, completion_reward_date::text AS completion_reward_date,
                 completion_requested_at, completion_requested_by_user_id,
                 source_thread_id, shared_decor
            FROM ended_room`,
@@ -377,7 +377,7 @@ export function createPostgresMiniRoomRepository(
          )
          SELECT mini_room_id, lobby_room_id, participant_a_user_id,
                 participant_b_user_id, livekit_room_name, started_at,
-                ended_at, ended_by_user_id, completion_reward_date,
+                ended_at, ended_by_user_id, completion_reward_date::text AS completion_reward_date,
                 completion_requested_at, completion_requested_by_user_id,
                 source_thread_id, shared_decor
            FROM ended_rooms`,
@@ -450,9 +450,9 @@ function mapMiniRoom(row: QueryResultRow): MiniRoomRecord {
 }
 
 function mapCompletionIntent(row: QueryResultRow): MiniRoomCompletionIntent {
-  const rewardDate = row.completion_reward_date instanceof Date
-    ? row.completion_reward_date.toISOString().slice(0, 10)
-    : String(row.completion_reward_date).slice(0, 10)
+  // SQL returns DATE as text so the driver's local-midnight parser cannot
+  // shift this calendar day when the process runs outside UTC.
+  const rewardDate = String(row.completion_reward_date).slice(0, 10)
   return {
     rewardDate,
     requestedAt: new Date(row.completion_requested_at).toISOString(),

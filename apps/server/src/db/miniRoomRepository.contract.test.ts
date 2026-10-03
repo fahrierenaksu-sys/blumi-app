@@ -171,11 +171,22 @@ runRepositoryContract<MiniRoomRepository>({
         miniRoomId: miniRoom.miniRoomId, requestedByUserId: bora, requestedAt: LATER, rewardDate: "2026-10-02"
       })
       assert.equal(retry?.rewardDate, "2026-10-01", "a retry after midnight keeps the first reward day")
+      assert.equal((await backend.repository.findMiniRoom(miniRoom.miniRoomId))?.completionIntent?.rewardDate, "2026-10-01")
+      assert.equal((await backend.repository.findMiniRoomByInviteId(backend.id("invite_reward")))?.completionIntent?.rewardDate, "2026-10-01")
+      assert.equal((await backend.repository.findActiveMiniRoomForUser(ada))?.completionIntent?.rewardDate, "2026-10-01")
 
-      await backend.repository.endMiniRoom(miniRoom.miniRoomId, ada, LATER)
+      const ended = await backend.repository.endMiniRoom(miniRoom.miniRoomId, ada, LATER)
+      assert.equal(ended?.completionIntent?.rewardDate, "2026-10-01")
+      assert.equal((await backend.repository.findMiniRoom(miniRoom.miniRoomId))?.completionIntent?.rewardDate, "2026-10-01")
       assert.equal(await backend.repository.anchorMiniRoomCompletion({
         miniRoomId: miniRoom.miniRoomId, requestedByUserId: ada, requestedAt: LATER, rewardDate: "2026-10-02"
       }), null)
+      const nextRoom = await openRoom(backend, "reward_separation", ada, bora)
+      await backend.repository.anchorMiniRoomCompletion({
+        miniRoomId: nextRoom.miniRoomId, requestedByUserId: ada, requestedAt: LATER, rewardDate: "2026-10-02"
+      })
+      const separated = await backend.repository.separateUserPair({ actorUserId: ada, otherUserId: bora, endedAt: LATER })
+      assert.equal(separated[0]?.completionIntent?.rewardDate, "2026-10-02")
     }
   }
 })
