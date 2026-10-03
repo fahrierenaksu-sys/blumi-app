@@ -50,6 +50,11 @@ export interface RegisterFlowControllerInput {
   onRegister: (input: RegisterAccountInput) => Promise<void>
   onClearError: () => void
   onCreateFlowStageChange?: (stage: "phone" | "otp") => void
+  /**
+   * Bumped by a parent that handles back itself (edge swipe, hardware back)
+   * so the code step returns to the phone step here, keeping one owner of it.
+   */
+  returnToPhoneRequest?: number
 }
 
 /**
@@ -66,7 +71,8 @@ export function useRegisterFlowController({
   onRequestVerificationCode,
   onRegister,
   onClearError,
-  onCreateFlowStageChange
+  onCreateFlowStageChange,
+  returnToPhoneRequest = 0
 }: RegisterFlowControllerInput) {
   const [flow, setFlow] = useState(createInitialRegisterFlow)
   const [attemptedPrimaryAction, setAttemptedPrimaryAction] = useState(false)
@@ -185,6 +191,15 @@ export function useRegisterFlowController({
     setResendCooldownSeconds(0)
     onClearError()
   }
+
+  const returnToPhoneStepRef = useRef(returnToPhoneStep)
+  returnToPhoneStepRef.current = returnToPhoneStep
+  const handledReturnToPhoneRequestRef = useRef(returnToPhoneRequest)
+  useLayoutEffect(() => {
+    if (returnToPhoneRequest === handledReturnToPhoneRequestRef.current) return
+    handledReturnToPhoneRequestRef.current = returnToPhoneRequest
+    returnToPhoneStepRef.current()
+  }, [returnToPhoneRequest])
 
   const requestVerificationCode = async (): Promise<void> => {
     setAttemptedPrimaryAction(true)
