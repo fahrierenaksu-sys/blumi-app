@@ -28,7 +28,7 @@ export function SettingsPrivacySection(props: {
             iconColors={uiTheme.gradients.primary}
             label={copy.readReceipts}
             description={copy.readReceiptsNote}
-            value={readReceipts.readReceiptsEnabled ? copy.on : copy.off}
+            value={readReceipts.isPlaceholder ? undefined : readReceipts.readReceiptsEnabled ? copy.on : copy.off}
           >
             <Switch
               accessibilityRole="switch"
@@ -36,9 +36,10 @@ export function SettingsPrivacySection(props: {
               accessibilityHint={copy.readReceiptsNote}
               accessibilityState={{
                 checked: readReceipts.readReceiptsEnabled,
-                disabled: readReceipts.isSaving
+                disabled: readReceipts.isSaving || readReceipts.isPlaceholder,
+                busy: readReceipts.isPlaceholder
               }}
-              disabled={readReceipts.isSaving}
+              disabled={readReceipts.isSaving || readReceipts.isPlaceholder}
               value={readReceipts.readReceiptsEnabled}
               onValueChange={readReceipts.handleToggle}
               trackColor={SWITCH_TRACK_COLOR}

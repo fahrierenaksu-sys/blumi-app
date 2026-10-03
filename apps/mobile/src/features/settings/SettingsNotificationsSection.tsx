@@ -1,12 +1,8 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import { Switch, Text, View } from "react-native"
 import { uiTheme } from "../../ui/theme"
 import { NOTIFICATION_PREFERENCE_ROWS } from "../notifications/notificationPreferencesModel"
 import type { SettingsCopy } from "./settingsCopy"
-import {
-  getNotificationPreferenceRowVisual,
-  isSettingsLoadPending
-} from "./settingsPresentationModel"
+import { getNotificationPreferenceRowVisual } from "./settingsPresentationModel"
 import { SettingsRow } from "./SettingsRow"
 import { settingsStyles as styles } from "./settingsStyles"
 import type { PushPermissionStatus, useNotificationSettings } from "./useNotificationSettings"
@@ -55,12 +51,7 @@ export function SettingsNotificationsSection(props: {
             }
           />
         ) : null}
-        {isSettingsLoadPending(notificationPreferencesStatus) ? (
-          <View style={styles.emptyRow} accessibilityLiveRegion="polite">
-            <Ionicons accessible={false} name="notifications-outline" size={20} color={uiTheme.colors.textMuted} />
-            <Text style={styles.emptyText}>{copy.notificationsLoading}</Text>
-          </View>
-        ) : notificationPreferencesStatus === "error" ? (
+        {notificationPreferencesStatus === "error" && !notificationPreferences ? (
           <SettingsRow
             icon="refresh"
             iconColors={uiTheme.gradients.warm}
@@ -70,10 +61,16 @@ export function SettingsNotificationsSection(props: {
             isLast
             onPress={() => void loadNotificationPreferences()}
           />
-        ) : notificationPreferences ? (
+        ) : (
+          // The rows are always here, at their final height. Until the
+          // server has answered once their switches are disabled, so the
+          // answer never inserts rows and pushes the page down.
           NOTIFICATION_PREFERENCE_ROWS.map((row, index) => {
             const visual = getNotificationPreferenceRowVisual(row.key)
             const rowCopy = copy.notificationRows[row.key]
+            const isPlaceholder = notificationPreferences === null
+            const checked = notificationPreferences?.[row.key] ?? false
+            const disabled = isPlaceholder || isSavingNotificationPreferences
             return (
               <SettingsRow
                 key={row.key}
@@ -87,12 +84,9 @@ export function SettingsNotificationsSection(props: {
                   accessibilityRole="switch"
                   accessibilityLabel={copy.notificationToggle(rowCopy.label)}
                   accessibilityHint={rowCopy.description}
-                  accessibilityState={{
-                    checked: notificationPreferences[row.key],
-                    disabled: isSavingNotificationPreferences
-                  }}
-                  disabled={isSavingNotificationPreferences}
-                  value={notificationPreferences[row.key]}
+                  accessibilityState={{ checked, disabled, busy: isPlaceholder }}
+                  disabled={disabled}
+                  value={checked}
                   onValueChange={(enabled) => handleNotificationToggle(row.key, enabled)}
                   trackColor={{ false: "#E6DCE4", true: "#FF9BC5" }}
                   thumbColor="#FFFFFF"
@@ -100,7 +94,7 @@ export function SettingsNotificationsSection(props: {
               </SettingsRow>
             )
           })
-        ) : null}
+        )}
       </View>
       <Text style={styles.privacyNote}>
         {copy.notificationNote}

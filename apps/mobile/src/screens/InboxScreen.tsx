@@ -327,7 +327,9 @@ export function InboxScreen(props: InboxScreenProps) {
         <View style={styles.listArea}>
           {/* Rows are 88–99 pt (one or two preview lines, Dynamic Type), so
               FlatList measures them instead of assuming a fixed height. A
-              thread moving to the top slides there without a jump. */}
+              thread moving to the top slides there without a jump. No
+              removeClippedSubviews: on a short list with entrance and layout
+              animations it blanks or flickers rows. */}
           <Reanimated.FlatList
             ref={listRef}
             data={threadRows}
@@ -336,7 +338,6 @@ export function InboxScreen(props: InboxScreenProps) {
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={5}
-            removeClippedSubviews
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             refreshControl={

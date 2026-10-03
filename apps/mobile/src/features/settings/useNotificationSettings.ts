@@ -14,6 +14,7 @@ import {
 import type { WhenPushSettled } from "../../navigation/useAfterPushTransition"
 import type { SessionActor } from "../session/sessionModel"
 import type { SettingsLoadStatus } from "./settingsPresentationModel"
+import { cacheNotificationPreferences, readCachedNotificationPreferences } from "./settingsServerCache"
 
 const runNow: WhenPushSettled = (task) => {
   task()
@@ -24,7 +25,9 @@ export type PushPermissionStatus = "unknown" | "undetermined" | "granted" | "den
 
 /**
  * Server notification preferences (production only) with optimistic toggles,
- * plus the device push-permission action shown above them.
+ * plus the device push-permission action shown above them. The last server
+ * answer is kept per account (`settingsServerCache`) and shown at once; the
+ * server revalidates it in the background.
  */
 export function useNotificationSettings(input: {
   sessionActor: SessionActor
@@ -47,14 +50,21 @@ export function useNotificationSettings(input: {
   const saveController = useRef<AbortController | null>(null)
   const revision = useRef(0)
   const saving = useRef(false)
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null)
-  const [notificationPreferencesStatus, setNotificationPreferencesStatus] = useState<SettingsLoadStatus>("idle")
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(
+    () => (scope.mode === "production" ? readCachedNotificationPreferences(scope.owner) : null)
+  )
+  const [notificationPreferencesStatus, setNotificationPreferencesStatus] = useState<SettingsLoadStatus>(
+    () => (notificationPreferences ? "ready" : "idle")
+  )
   const [isSavingNotificationPreferences, setIsSavingNotificationPreferences] = useState(false)
 
   useLayoutEffect(() => {
     currentScope.current = scope
-    setNotificationPreferences(null)
-    setNotificationPreferencesStatus("idle")
+    // The same account keeps its remembered answer across a token refresh;
+    // another account starts empty.
+    const remembered = scope.mode === "production" ? readCachedNotificationPreferences(scope.owner) : null
+    setNotificationPreferences(remembered)
+    setNotificationPreferencesStatus(remembered ? "ready" : "idle")
     setIsSavingNotificationPreferences(false)
     saving.current = false
     return () => {
@@ -72,7 +82,9 @@ export function useNotificationSettings(input: {
     loadController.current = controller
     const requestRevision = ++revision.current
     const isCurrent = () => currentScope.current === scope && revision.current === requestRevision && !controller.signal.aborted
-    setNotificationPreferencesStatus("loading")
+    // A remembered answer stays on screen while the server revalidates it.
+    const hasRemembered = readCachedNotificationPreferences(scope.owner) !== null
+    if (!hasRemembered) setNotificationPreferencesStatus("loading")
     try {
       const preferences = await getNotificationPreferences(
         MOBILE_HTTP_BASE_URL,
@@ -81,11 +93,12 @@ export function useNotificationSettings(input: {
         controller.signal
       )
       if (!isCurrent()) return
+      cacheNotificationPreferences(scope.owner, preferences)
       setNotificationPreferences(preferences)
       setNotificationPreferencesStatus("ready")
     } catch {
       if (!isCurrent()) return
-      setNotificationPreferencesStatus("error")
+      if (!hasRemembered) setNotificationPreferencesStatus("error")
     }
   }, [scope])
 
@@ -114,6 +127,7 @@ export function useNotificationSettings(input: {
       controller.signal
     ).then((saved) => {
       if (!isCurrent()) return
+      cacheNotificationPreferences(scope.owner, saved)
       setNotificationPreferences(saved)
       setNotificationPreferencesStatus("ready")
     }).catch(() => {
