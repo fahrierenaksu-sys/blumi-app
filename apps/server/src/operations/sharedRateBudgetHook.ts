@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify"
 import type { AuthService } from "../auth/authService"
 import { readBearerToken, resolveRequestSession } from "../routes/routeHelpers"
-import type { SharedRateBudget, UserRateBudgetScope } from "./sharedRateBudget"
+import { cacheRateBudgetRefusals, type SharedRateBudget, type UserRateBudgetScope } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
 
 /**
@@ -30,6 +30,7 @@ export function createBudgetRefusalLog(options: {
 
 /** preHandler runs after the existing cheap onRequest/IP limiter. */
 export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService, budget: SharedRateBudget): void {
+  const guardedBudget = cacheRateBudgetRefusals(budget)
   // The first refusal of a quiet period is logged at once (its window began
   // at startup or at the last line), later ones at most once a minute.
   const recordRefusal = createBudgetRefusalLog({ warn: (entry) => app.log.warn(entry, "User request budget refusals") })
@@ -41,7 +42,7 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
     if (!resolved) return
     try {
       const scope = requestBudgetScope(request.method, request.routeOptions.url)
-      const result = await budget.consumeUser(resolved.account.userId, scope)
+      const result = await guardedBudget.consumeUser(resolved.account.userId, scope)
       if (!result.allowed) recordRefusal(scope)
       if (!result.allowed) return reply.header("Retry-After", String(result.retryAfterSeconds)).code(429)
         .send(scope === "chatSend"

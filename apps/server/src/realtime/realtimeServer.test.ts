@@ -27,6 +27,7 @@ import {
   REALTIME_CONNECTION_LEASE_RENEW_MS,
   REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS,
   REALTIME_HEARTBEAT_INTERVAL_MS,
+  MAX_REALTIME_CONNECTIONS_PER_USER,
   REALTIME_RESTART_CLOSE_CODE
 } from "./realtimeServer"
 import { createConnectionManager, REALTIME_OUTBOUND_SOFT_LIMIT_BYTES } from "./connectionManager"
@@ -224,6 +225,116 @@ test("leases renew in batches on the heartbeat tick and a renewal racing a disco
   } finally {
     Date.now = originalNow
     releaseRenewal()
+    await harness.close()
+  }
+})
+
+test("slow presence cleanup never overlaps itself and a failed pass can retry even if logging throws", async (context) => {
+  context.mock.method(console, "error", () => { throw new Error("cleanup reporter unavailable") })
+  const callbacks: { callback: () => void; ms: number }[] = []
+  const harness = await createRealtimeHarness({ captureIntervalCallbacks: callbacks })
+  const leaseGate = deferred<void>()
+  const presenceGate = deferred<void>()
+  let leaseActive = false
+  let presenceActive = false
+  let leaseOverlap = false
+  let presenceOverlap = false
+  let leaseCompleted = false
+  let presenceCompleted = false
+  harness.presenceService.purgeExpiredConnectionLeases = async () => {
+    leaseOverlap ||= leaseActive
+    leaseActive = true
+    try { await leaseGate.promise } finally { leaseActive = false; leaseCompleted = true }
+    throw new Error("temporary cleanup failure")
+  }
+  harness.presenceService.purgeExpiredPresence = async () => {
+    presenceOverlap ||= presenceActive
+    presenceActive = true
+    try { await presenceGate.promise } finally { presenceActive = false; presenceCompleted = true }
+    return 0
+  }
+  try {
+    const cleanup = callbacks.find((entry) => entry.ms === 60_000)
+    assert.ok(cleanup)
+    cleanup.callback()
+    cleanup.callback()
+    assert.equal(leaseOverlap, false, "a slow database never accumulates lease purges")
+    assert.equal(presenceOverlap, false, "a slow database never accumulates presence purges")
+    leaseGate.resolve()
+    presenceGate.resolve()
+    await waitUntil(() => leaseCompleted && presenceCompleted)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const retryGate = deferred<void>()
+    let retryActive = false
+    harness.presenceService.purgeExpiredConnectionLeases = async () => {
+      retryActive = true
+      await retryGate.promise
+      return 0
+    }
+    cleanup.callback()
+    assert.equal(retryActive, true, "a failed maintenance pass does not strand future cleanup")
+    retryGate.resolve()
+  } finally {
+    leaseGate.resolve()
+    presenceGate.resolve()
+    await harness.close()
+  }
+})
+
+test("account socket capacity rejects before a lease write and closing frees capacity independently", async () => {
+  const harness = await createRealtimeHarness()
+  try {
+    const first = await harness.createSession("+905551119201", "Capacity")
+    const second = await harness.createSession("+905551119202", "Independent")
+    const sockets = await Promise.all(Array.from({ length: MAX_REALTIME_CONNECTIONS_PER_USER }, () =>
+      harness.connect(first.sessionToken)))
+    const register = harness.presenceService.registerConnection.bind(harness.presenceService)
+    harness.presenceService.registerConnection = async () => assert.fail("a full account must not write another lease")
+    const rejectedTicket = await harness.issueTicket(first.sessionToken)
+    await expectUpgradeRejected(new WebSocket(`${harness.url}/ws`, [`ticket-${rejectedTicket}`]), 429)
+    harness.presenceService.registerConnection = register
+
+    const independent = await harness.connect(second.sessionToken)
+    assert.equal(independent.readyState, WebSocket.OPEN, "one account cannot consume another account's capacity")
+    const closed = waitForClose(sockets[0]!)
+    sockets[0]!.close()
+    await closed
+    await waitUntil(() => harness.connectionManager.getUserConnections(first.userId).length < MAX_REALTIME_CONNECTIONS_PER_USER)
+    const replacement = await harness.connect(first.sessionToken)
+    assert.equal(replacement.readyState, WebSocket.OPEN, "a reconnect can replace a closed socket")
+    assert.equal(independent.readyState, WebSocket.OPEN)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("parallel account upgrades reserve capacity and a failed lease registration releases its slot", async () => {
+  const harness = await createRealtimeHarness()
+  const registrationStarted = deferred<void>()
+  const registrationGate = deferred<void>()
+  try {
+    const session = await harness.createSession("+905551119203", "Pending Capacity")
+    await Promise.all(Array.from({ length: MAX_REALTIME_CONNECTIONS_PER_USER - 1 }, () => harness.connect(session.sessionToken)))
+    const register = harness.presenceService.registerConnection.bind(harness.presenceService)
+    harness.presenceService.registerConnection = async () => {
+      registrationStarted.resolve()
+      await registrationGate.promise
+      throw new Error("temporary lease registration failure")
+    }
+    const pendingTicket = await harness.issueTicket(session.sessionToken)
+    const pendingSocket = new WebSocket(`${harness.url}/ws`, [`ticket-${pendingTicket}`])
+    const pendingRejected = expectUpgradeRejected(pendingSocket, 503)
+    await registrationStarted.promise
+    const rejectedTicket = await harness.issueTicket(session.sessionToken)
+    await expectUpgradeRejected(new WebSocket(`${harness.url}/ws`, [`ticket-${rejectedTicket}`]), 429)
+    registrationGate.resolve()
+    await pendingRejected
+    harness.presenceService.registerConnection = register
+    const recovered = await harness.connect(session.sessionToken)
+    assert.equal(recovered.readyState, WebSocket.OPEN, "a failed setup cannot leak capacity")
+  } finally {
+    registrationGate.resolve()
     await harness.close()
   }
 })

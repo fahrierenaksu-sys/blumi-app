@@ -277,7 +277,7 @@ test("a failed outbox insert does not consume the policy slot for a later retry"
   )
 })
 
-test("dispatchDue drains every currently due batch before returning", async () => {
+test("dispatchDue drains a moderate due backlog within one cycle", async () => {
   const sent: string[] = []
   const now = new Date("2026-07-22T10:00:00.000Z")
   const service = createNotificationService({

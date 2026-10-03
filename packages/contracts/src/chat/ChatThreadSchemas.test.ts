@@ -11,8 +11,26 @@ import {
 } from "./ChatThreadSchemas"
 import {
   chatPreferencesUpdateRequestSchema,
+  listChatRoomInvitesQuerySchema,
   markThreadReadRequestSchema
 } from "../api/CoreApiSchemas"
+
+test("room invitation query accepts legacy, bounded history and exclusive exact lookups", () => {
+  assert.deepEqual(listChatRoomInvitesQuerySchema.parse({}), {})
+  assert.deepEqual(listChatRoomInvitesQuerySchema.parse({ limit: "20", before: "synthetic_cursor" }),
+    { limit: 20, before: "synthetic_cursor" })
+  assert.deepEqual(listChatRoomInvitesQuerySchema.parse({ before: "synthetic_cursor" }), { before: "synthetic_cursor" })
+  assert.deepEqual(listChatRoomInvitesQuerySchema.parse({ inviteId: "synthetic_target" }), { inviteId: "synthetic_target" })
+  assert.equal(listChatRoomInvitesQuerySchema.parse({ limit: "50" }).limit, 50)
+})
+
+test("room invitation query rejects invalid bounds and mixed lookup modes", () => {
+  for (const input of [{ limit: 0 }, { limit: 51 }, { limit: "Infinity" }, { limit: 1.5 },
+    { before: " " }, { inviteId: "" }, { before: "x".repeat(257) }, { inviteId: "x".repeat(257) },
+    { inviteId: "synthetic_target", limit: 20 }, { inviteId: "synthetic_target", before: "synthetic_cursor" }]) {
+    assert.equal(listChatRoomInvitesQuerySchema.safeParse(input).success, false)
+  }
+})
 
 const COMMON_LOADOUT = {
   bodyId: "avatar_v2_body_default",

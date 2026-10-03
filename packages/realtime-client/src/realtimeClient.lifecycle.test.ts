@@ -287,6 +287,29 @@ test("a refused session stays refused across background and foreground", async (
   assert.equal(harness.statuses.length, statusCount, "no status noise for a refused session")
 })
 
+test("a moderation rejection stops ticket retries across timers and lifecycle changes", async (context) => {
+  useFakeTimers(context)
+  const harness = createHarness()
+  harness.client.connect("token-restricted")
+  await flushTicketRequest()
+  harness.sockets[0]?.open()
+  harness.sockets[0]?.drop(4403)
+  assert.equal(harness.statuses.at(-1), "error")
+
+  context.mock.timers.tick(10 * 60_000)
+  harness.client.setNetworkConnected(false)
+  harness.client.setNetworkConnected(true)
+  harness.client.suspend()
+  harness.client.setAppActive(true)
+  await flushTicketRequest()
+  assert.equal(harness.sockets.length, 1, "a refused account requests no more tickets automatically")
+
+  harness.client.connect("token-eligible")
+  await flushTicketRequest()
+  assert.equal(harness.sockets.length, 2, "an explicit session connection can recover")
+  harness.client.disconnect()
+})
+
 test("a socket that never opens is abandoned after the connect timeout", async (context) => {
   useFakeTimers(context)
   const harness = createHarness()

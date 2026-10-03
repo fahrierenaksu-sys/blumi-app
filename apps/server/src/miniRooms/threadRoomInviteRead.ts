@@ -15,6 +15,7 @@ export type ThreadRoomInviteRead =
   | { status: "hidden" }
   /** Visible, but no longer authorizes invites: no match or connection, partner gone or restricted (403). */
   | { status: "forbidden" }
+  | { status: "invalid_cursor" | "invite_missing" }
   | {
       status: "ok"
       partnerUserId: string
@@ -22,10 +23,39 @@ export type ThreadRoomInviteRead =
       partnerIsTestPersona: boolean
       /** Pending invites past their expiry are returned (and stored) as expired. */
       invites: MiniRoomInviteRecord[]
+      /** Present only for explicit paging or an exact lookup. */
+      nextCursor?: string | null
+      activeInvites?: MiniRoomInviteRecord[]
     }
 
 export interface ThreadRoomInviteReader {
-  readThreadRoomInvites(input: { threadId: string; userId: string; now?: Date }): Promise<ThreadRoomInviteRead>
+  readThreadRoomInvites(input: { threadId: string; userId: string; now?: Date; limit?: number; before?: string; inviteId?: string }): Promise<ThreadRoomInviteRead>
+}
+
+type InviteReadOptions = { limit?: number; before?: string; inviteId?: string }
+type InviteHistoryPage = Pick<Extract<ThreadRoomInviteRead, { status: "ok" }>, "invites" | "nextCursor" | "activeInvites">
+
+/** Stable exclusive keyset order; active context never changes the history cursor. */
+export function selectThreadRoomInvitePage(invites: readonly MiniRoomInviteRecord[], options: InviteReadOptions):
+  InviteHistoryPage | { status: "invalid_cursor" | "invite_missing" } {
+  const sorted = [...invites].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.inviteId.localeCompare(b.inviteId))
+  if (options.inviteId) {
+    const target = sorted.find(invite => invite.inviteId === options.inviteId)
+    return target ? { invites: [target], nextCursor: null, activeInvites: [] } : { status: "invite_missing" }
+  }
+  if (options.limit === undefined && !options.before) return { invites: sorted }
+  const limit = options.limit ?? 20
+  const beforeIndex = options.before ? sorted.findIndex(invite => invite.inviteId === options.before) : sorted.length
+  if (beforeIndex < 0) return { status: "invalid_cursor" }
+  const candidates = sorted.slice(0, beforeIndex)
+  const page = candidates.slice(-limit)
+  const pageIds = new Set(page.map(invite => invite.inviteId))
+  const activeInvites = sorted.filter(invite => !pageIds.has(invite.inviteId) &&
+    (invite.status === "pending" || (invite.status === "accepted" && Boolean(invite.roomSessionId))))
+  // The persisted rules permit one pending invite per thread and one live
+  // shared room per participant. Do not silently omit actions if those fail.
+  if (activeInvites.length > 2) throw new Error("Room invitation state could not be confirmed.")
+  return { invites: page, nextCursor: candidates.length > limit ? page[0]!.inviteId : null, activeInvites }
 }
 
 /** The facts both implementations gather; the decision is shared. */
@@ -69,7 +99,7 @@ export interface ThreadRoomInviteSources {
 /** The same read composed from repository calls (in-memory storage, and fallbacks). */
 export function createComposedThreadRoomInviteReader(sources: ThreadRoomInviteSources): ThreadRoomInviteReader {
   return {
-    async readThreadRoomInvites({ threadId, userId, now = new Date() }) {
+    async readThreadRoomInvites({ threadId, userId, now = new Date(), ...options }) {
       const thread = await sources.findThread(threadId)
       const isMember = Boolean(thread?.participantUserIds.includes(userId))
       if (!thread || !isMember) return { status: "hidden" }
@@ -96,7 +126,9 @@ export function createComposedThreadRoomInviteReader(sources: ThreadRoomInviteSo
         sources.listInvitesForThread(threadId, now),
         sources.isTestPersona(partnerUserId)
       ])
-      return { status: "ok", partnerUserId, partnerIsTestPersona, invites }
+      const page = selectThreadRoomInvitePage(invites, options)
+      if ("status" in page) return page
+      return { status: "ok", partnerUserId, partnerIsTestPersona, ...page }
     }
   }
 }

@@ -388,19 +388,29 @@ test("opening a matched chat with a test persona creates one incoming room invit
       ]
     })
 
+    const missingTarget = await app.inject({
+      method: "GET",
+      url: `/v1/threads/${threadId}/room-invites?inviteId=synthetic_unavailable`,
+      headers: { authorization: `Bearer ${user.sessionToken}` }
+    })
+    assert.equal(missingTarget.statusCode, 404)
+    assert.equal((await miniRoomService.repository.listInvitesForThread(threadId, new Date())).length, 0,
+      "an exact lookup never asks a test persona to create an invitation")
     const first = await app.inject({
       method: "GET",
-      url: `/v1/threads/${threadId}/room-invites`,
+      url: `/v1/threads/${threadId}/room-invites?limit=1`,
       headers: { authorization: `Bearer ${user.sessionToken}` }
     })
     assert.equal(first.statusCode, 200)
     assert.equal(first.json().invites.length, 1)
     assert.equal(first.json().invites[0].senderUserId, persona.userId)
     assert.equal(first.json().invites[0].recipientUserId, user.userId)
+    assert.equal(first.json().nextCursor, null)
+    assert.deepEqual(first.json().activeInvites, [])
 
     const repeated = await app.inject({
       method: "GET",
-      url: `/v1/threads/${threadId}/room-invites`,
+      url: `/v1/threads/${threadId}/room-invites?limit=1`,
       headers: { authorization: `Bearer ${user.sessionToken}` }
     })
     assert.equal(repeated.statusCode, 200)
@@ -418,7 +428,7 @@ test("opening a matched chat with a test persona creates one incoming room invit
     const roomId = accepted.json().miniRoom.miniRoomId as string
     const whileLive = await app.inject({
       method: "GET",
-      url: `/v1/threads/${threadId}/room-invites`,
+      url: `/v1/threads/${threadId}/room-invites?limit=1`,
       headers: { authorization: `Bearer ${user.sessionToken}` }
     })
     assert.deepEqual(
@@ -436,11 +446,22 @@ test("opening a matched chat with a test persona creates one incoming room invit
     assert.equal(left.json().ended, true)
     const afterEnd = await app.inject({
       method: "GET",
-      url: `/v1/threads/${threadId}/room-invites`,
+      url: `/v1/threads/${threadId}/room-invites?limit=1`,
       headers: { authorization: `Bearer ${user.sessionToken}` }
     })
     assert.equal(afterEnd.statusCode, 200)
-    const afterEndInvites = afterEnd.json().invites as Array<{
+    assert.equal(afterEnd.json().invites.length, 1, "persona creation rereads the requested bounded page")
+    assert.equal(afterEnd.json().invites[0]?.status, "pending")
+    const earlier = await app.inject({ method: "GET",
+      url: `/v1/threads/${threadId}/room-invites?limit=1&before=${afterEnd.json().invites[0].inviteId}`,
+      headers: { authorization: `Bearer ${user.sessionToken}` } })
+    assert.deepEqual(earlier.json().invites.map((entry: { inviteId: string }) => entry.inviteId), [inviteId])
+    assert.equal(earlier.json().nextCursor, null)
+    assert.deepEqual(earlier.json().activeInvites.map((entry: { inviteId: string }) => entry.inviteId),
+      [afterEnd.json().invites[0].inviteId])
+    const legacy = await app.inject({ method: "GET", url: `/v1/threads/${threadId}/room-invites`,
+      headers: { authorization: `Bearer ${user.sessionToken}` } })
+    const afterEndInvites = legacy.json().invites as Array<{
       inviteId: string; status: string; senderUserId: string; roomSessionId?: string
     }>
     assert.equal(afterEndInvites.length, 2, "the persona invites again once its room has ended")
@@ -549,6 +570,92 @@ test("room-saved mutual matches can invite again only from their canonical chat"
   } finally {
     await app.close()
   }
+})
+
+test("bounded invitation reads reduce a thousand-row history while preserving active actions, exact old targets and legacy history", async (t) => {
+  const authService = createAuthService({ codeFactory: () => "482931" })
+  const chatService = createChatService()
+  const safetyService = createSafetyService()
+  const matchService = createMatchService({ repository: createInMemoryMatchRepository(createInMemoryMatchStore([])) })
+  const miniRoomService = createMiniRoomService({ presenceService: createPresenceService({ roomService: createRoomService() }),
+    safetyService, chatService, livekitTokenService: createLivekitTokenService() })
+  const app = createServer({ authService, chatService, safetyService, matchService, miniRoomService })
+  try {
+    const owner = await createEligibleAccount(app, authService, "+905551110093", "Synthetic owner")
+    const peer = await createEligibleAccount(app, authService, "+905551110094", "Synthetic peer")
+    const stranger = await createEligibleAccount(app, authService, "+905551110095", "Synthetic outsider")
+    await matchService.repository.createMatch({ matchId: "synthetic_history_match", participantUserIds: [owner.userId, peer.userId], matchedAt: "2026-10-01T00:00:00Z" })
+    const threadId = "thread_match_synthetic_history_match"
+    await chatService.createThread({ threadId, miniRoomId: "match_synthetic_history_match", participantUserIds: [owner.userId, peer.userId],
+      participants: [{ userId: owner.userId }, { userId: peer.userId }] })
+    const oldLiveId = "synthetic_old_live"
+    const liveRoomId = "synthetic_history_live_room"
+    await miniRoomService.repository.saveInvite({ inviteId: oldLiveId, sourceThreadId: threadId,
+      senderUserId: owner.userId, recipientUserId: peer.userId, status: "pending",
+      createdAt: "2026-01-01T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z" })
+    assert.equal(await miniRoomService.repository.acceptPendingInvite({ inviteId: oldLiveId, decidedAt: "2026-01-01T00:01:00Z",
+      miniRoom: { miniRoomId: liveRoomId, lobbyRoomId: "thread", sourceThreadId: threadId, participantUserIds: [owner.userId, peer.userId],
+        livekitRoomName: "synthetic-history-room", startedAt: "2026-01-01T00:01:00Z" } }), "accepted")
+    const oldPendingId = "synthetic_old_pending"
+    await miniRoomService.repository.saveInvite({ inviteId: oldPendingId, sourceThreadId: threadId,
+      senderUserId: peer.userId, recipientUserId: owner.userId, status: "pending",
+      createdAt: "2026-01-02T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z" })
+    const historyIds: string[] = []
+    for (let index = 0; index < 1_000; index += 1) {
+      const inviteId = `synthetic_archived_${String(index).padStart(4, "0")}`
+      historyIds.push(inviteId)
+      await miniRoomService.repository.saveInvite({ inviteId, sourceThreadId: threadId,
+        senderUserId: peer.userId, recipientUserId: owner.userId, status: "cancelled",
+        createdAt: new Date(Date.UTC(2026, 8, 1, 0, Math.floor(index / 3))).toISOString(),
+        expiresAt: "2026-10-01T00:00:00Z", decidedAt: "2026-10-01T00:00:00Z" })
+    }
+    const headers = { authorization: `Bearer ${owner.sessionToken}` }
+    const read = (query = "", requestHeaders = headers) => app.inject({ method: "GET", url: `/v1/threads/${threadId}/room-invites${query}`, headers: requestHeaders })
+    const legacy = await read()
+    const recent = await read("?limit=20")
+    assert.equal(recent.statusCode, 200)
+    assert.deepEqual(recent.json().invites.map((invite: { inviteId: string }) => invite.inviteId), historyIds.slice(-20))
+    assert.deepEqual(recent.json().activeInvites.map((invite: { inviteId: string }) => invite.inviteId), [oldLiveId, oldPendingId])
+    assert.equal(recent.json().activeInvites[0].roomSessionId, liveRoomId)
+    assert.equal(recent.json().nextCursor, historyIds.at(-20))
+    const earlier = await read(`?limit=20&before=${recent.json().nextCursor}`)
+    assert.deepEqual(earlier.json().invites.map((invite: { inviteId: string }) => invite.inviteId), historyIds.slice(-40, -20), "cursor preserves tied timestamps without repeating rows")
+    assert.equal(legacy.json().invites.length, 1_002)
+    assert.equal(legacy.json().nextCursor, undefined)
+    const legacyBytes = Buffer.byteLength(legacy.body)
+    const pageBytes = Buffer.byteLength(recent.body)
+    assert.ok(pageBytes < legacyBytes / 20)
+    t.diagnostic(`Synthetic invitation history: legacy 1002 records / ${legacyBytes} JSON bytes; recent 20 + active 2 records / ${pageBytes} JSON bytes`)
+
+    const oldTarget = await read(`?inviteId=${historyIds[0]}`)
+    assert.equal(oldTarget.statusCode, 200)
+    assert.equal(oldTarget.json().invites.length, 1)
+    assert.equal(oldTarget.json().invites[0].status, "cancelled")
+    assert.equal(oldTarget.json().nextCursor, null)
+    assert.deepEqual(oldTarget.json().activeInvites, [])
+    const missing = await read("?inviteId=synthetic_missing")
+    assert.equal(missing.statusCode, 404)
+    const unauthorized = await read(`?inviteId=${oldLiveId}`, { authorization: `Bearer ${stranger.sessionToken}` })
+    assert.equal(unauthorized.statusCode, 404)
+    for (const query of ["?limit=0", "?limit=51", "?limit=3.5", "?limit=Infinity", "?inviteId=synthetic_missing&limit=20", "?before=synthetic_missing&limit=20"]) {
+      assert.equal((await read(query)).statusCode, 400)
+    }
+    const strippedUnknownQuery = await read("?limit=20&unexpected=1")
+    assert.equal(strippedUnknownQuery.statusCode, 200)
+    assert.deepEqual(strippedUnknownQuery.json().invites, recent.json().invites,
+      "Fastify strips unknown query fields without bypassing the requested bounded page")
+    assert.equal((await miniRoomService.repository.findInvite(oldPendingId))?.status, "pending", "a faster read never cancels an actionable invitation")
+    const joined = await app.inject({ method: "POST", url: `/v1/room-sessions/${liveRoomId}/join`, headers, payload: {} })
+    assert.equal(joined.statusCode, 200, "older active room access keeps its server permission checks")
+    await miniRoomService.repository.endMiniRoom(liveRoomId, owner.userId, new Date().toISOString())
+    const ended = await read(`?inviteId=${oldLiveId}`)
+    assert.equal(ended.json().invites[0].status, "accepted")
+    assert.equal(ended.json().invites[0].roomSessionId, undefined, "old ended rooms retain history without offering entry")
+    await safetyService.repository.saveBlock({ actorUserId: peer.userId, blockedUserId: owner.userId, createdAt: new Date().toISOString() })
+    for (const query of ["?limit=20", `?inviteId=${oldLiveId}`, "?limit=20&before=synthetic_missing"]) {
+      assert.equal((await read(query)).statusCode, 404, "a block hides both data and cursor existence in every read mode")
+    }
+  } finally { await app.close() }
 })
 
 async function createEligibleAccount(

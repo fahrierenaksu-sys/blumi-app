@@ -112,17 +112,20 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
-        await client.query(
-          "DELETE FROM blumi_pending_otps WHERE expires_at <= $1",
-          [new Date(input.now)]
-        )
-        await client.query(
-          "DELETE FROM blumi_otp_send_limits WHERE window_started_at <= $1",
-          [new Date(input.now - input.windowMs)]
-        )
+        // Request cleanup uses the same identity lock as send/verify. Global
+        // expiry cleanup belongs to the bounded retention worker, otherwise
+        // one account's request waits on another account's expired rows.
         await client.query(
           "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
           [input.phoneNumber]
+        )
+        await client.query(
+          "DELETE FROM blumi_pending_otps WHERE phone_number = $1 AND expires_at <= $2",
+          [input.phoneNumber, new Date(input.now)]
+        )
+        await client.query(
+          "DELETE FROM blumi_otp_send_limits WHERE phone_number = $1 AND window_started_at <= $2",
+          [input.phoneNumber, new Date(input.now - input.windowMs)]
         )
         const result = await client.query(
           `SELECT phone_number, active_request_id, window_started_at,
@@ -236,9 +239,9 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
-        await client.query("DELETE FROM blumi_recovery_phone_challenges WHERE expires_at <= $1", [new Date(input.now)])
-        await client.query("DELETE FROM blumi_recovery_otp_send_limits WHERE window_started_at <= $1", [new Date(input.now - input.windowMs)])
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [recoveryOtpLockKey(input.phoneNumber)])
+        await client.query("DELETE FROM blumi_recovery_phone_challenges WHERE phone_number = $1 AND expires_at <= $2", [input.phoneNumber, new Date(input.now)])
+        await client.query("DELETE FROM blumi_recovery_otp_send_limits WHERE phone_number = $1 AND window_started_at <= $2", [input.phoneNumber, new Date(input.now - input.windowMs)])
         const result = await client.query(
           `SELECT window_started_at, last_requested_at, request_count
              FROM blumi_recovery_otp_send_limits WHERE phone_number = $1`,
@@ -332,9 +335,9 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
-        await client.query("DELETE FROM blumi_account_deletion_challenges WHERE expires_at <= $1", [new Date(input.now)])
-        await client.query("DELETE FROM blumi_account_deletion_otp_send_limits WHERE window_started_at <= $1", [new Date(input.now - input.windowMs)])
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [input.accountId])
+        await client.query("DELETE FROM blumi_account_deletion_challenges WHERE account_id = $1 AND expires_at <= $2", [input.accountId, new Date(input.now)])
+        await client.query("DELETE FROM blumi_account_deletion_otp_send_limits WHERE account_id = $1 AND window_started_at <= $2", [input.accountId, new Date(input.now - input.windowMs)])
         const result = await client.query(
           `SELECT window_started_at, last_requested_at, request_count
              FROM blumi_account_deletion_otp_send_limits WHERE account_id = $1`,
@@ -451,9 +454,9 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
-        await client.query("DELETE FROM blumi_account_action_challenges WHERE expires_at <= $1", [new Date(input.now)])
-        await client.query("DELETE FROM blumi_account_action_otp_send_limits WHERE window_started_at <= $1", [new Date(input.now - input.windowMs)])
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [accountActionLockKey(input.accountId, input.purpose)])
+        await client.query("DELETE FROM blumi_account_action_challenges WHERE account_id = $1 AND purpose = $2 AND expires_at <= $3", [input.accountId, input.purpose, new Date(input.now)])
+        await client.query("DELETE FROM blumi_account_action_otp_send_limits WHERE account_id = $1 AND purpose = $2 AND window_started_at <= $3", [input.accountId, input.purpose, new Date(input.now - input.windowMs)])
         const result = await client.query(
           `SELECT window_started_at, last_requested_at, request_count
              FROM blumi_account_action_otp_send_limits WHERE account_id = $1 AND purpose = $2`,

@@ -5,6 +5,8 @@ import {
   createRealtimeEventBudget,
   REALTIME_EVENT_LIMITS,
   REALTIME_EVENT_WINDOW_MS,
+  REALTIME_FRAME_LIMITS,
+  MAX_TRACKED_REALTIME_FRAME_USERS,
   type RealtimeAdmission,
   type RealtimeEventClass
 } from "./realtimeEventBudget"
@@ -125,4 +127,43 @@ test("releasing an admission twice frees only one slot", () => {
   assert.equal(budget.admit({ connectionId: "c", userId: "u", eventClass: "motion", now: NOW }).kind, "admit")
   assert.equal(budget.admit({ connectionId: "c", userId: "u", eventClass: "motion", now: NOW }).kind, "drop")
   if (second.kind === "admit") second.release()
+})
+
+test("raw frame flooding is bounded across reconnects and isolated between accounts", () => {
+  const budget = createRealtimeEventBudget()
+  for (let frame = 0; frame < REALTIME_FRAME_LIMITS.userWindow; frame += 1) {
+    assert.equal(budget.admitFrame({ userId: "frame_actor", bytes: 1, now: NOW }), true)
+  }
+  budget.forgetConnection("closed_connection")
+  assert.equal(budget.admitFrame({ userId: "frame_actor", bytes: 1, now: NOW }), false)
+  assert.equal(budget.admitFrame({ userId: "other_actor", bytes: 1, now: NOW }), true)
+  budget.purgeExpired(NOW + REALTIME_EVENT_WINDOW_MS)
+  assert.equal(budget.admitFrame({ userId: "frame_actor", bytes: 1, now: NOW + REALTIME_EVENT_WINDOW_MS }), true)
+})
+
+test("large raw frames exhaust the byte budget before their event allowance", () => {
+  const budget = createRealtimeEventBudget()
+  const bytes = 64 * 1024
+  for (let sent = 0; sent < REALTIME_FRAME_LIMITS.userBytesWindow; sent += bytes) {
+    assert.equal(budget.admitFrame({ userId: "frame_actor", bytes, now: NOW }), true)
+  }
+  assert.equal(budget.admitFrame({ userId: "frame_actor", bytes: 1, now: NOW }), false)
+})
+
+test("frame budget tracking fails closed at capacity and expiration admits new accounts", () => {
+  const budget = createRealtimeEventBudget()
+  for (let actor = 0; actor < MAX_TRACKED_REALTIME_FRAME_USERS; actor += 1) {
+    assert.equal(budget.admitFrame({ userId: `actor_${actor}`, bytes: 1, now: NOW }), true)
+  }
+  assert.equal(budget.admitFrame({ userId: "new_actor", bytes: 1, now: NOW }), false)
+  assert.equal(budget.admitFrame({ userId: "actor_0", bytes: 1, now: NOW }), true, "tracked accounts retain their window")
+  assert.equal(budget.admitFrame({ userId: "new_actor", bytes: 1, now: NOW + REALTIME_EVENT_WINDOW_MS }), true)
+})
+
+test("invalid frame sizes fail closed without consuming another actor's allowance", () => {
+  const budget = createRealtimeEventBudget()
+  for (const bytes of [-1, Number.NaN, Number.POSITIVE_INFINITY, .5]) {
+    assert.equal(budget.admitFrame({ userId: "invalid_actor", bytes, now: NOW }), false)
+  }
+  assert.equal(budget.admitFrame({ userId: "valid_actor", bytes: 1, now: NOW }), true)
 })

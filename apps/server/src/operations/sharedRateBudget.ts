@@ -26,6 +26,50 @@ export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, numbe
 }
 const WINDOW_MS = 60_000
 
+/**
+ * Remember only shared-authority refusals. A looping client otherwise keeps
+ * updating the PostgreSQL budget row even after it has exhausted its scope.
+ * Allowed traffic still consumes the atomic shared budget on every request;
+ * eviction, expiry and failures can never grant permission locally.
+ */
+export function cacheRateBudgetRefusals(authority: SharedRateBudget, options: {
+  now?: () => number
+  maxEntries?: number
+} = {}): SharedRateBudget {
+  const now = options.now ?? (() => performance.now())
+  const maxEntries = options.maxEntries ?? 10_000
+  if (!Number.isSafeInteger(maxEntries) || maxEntries < 1) throw new Error("Invalid refusal cache capacity")
+  const refusedUntil = new Map<string, number>()
+  return {
+    async consumeUser(userId, scope = "general") {
+      const key = userBudgetKey(userId, scope)
+      const started = now()
+      const expires = refusedUntil.get(key)
+      if (expires !== undefined && expires > started) {
+        return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((expires - started) / 1000)) }
+      }
+      if (expires !== undefined) refusedUntil.delete(key)
+      const result = await authority.consumeUser(userId, scope)
+      if (!result.allowed && Number.isFinite(result.retryAfterSeconds) && result.retryAfterSeconds > 0) {
+        // Start before the query: queue/lock waits must not prolong the refusal.
+        const until = started + Math.min(60, result.retryAfterSeconds) * 1000
+        if (until > now()) {
+          if (!refusedUntil.has(key) && refusedUntil.size >= maxEntries) {
+            refusedUntil.delete(refusedUntil.keys().next().value!)
+          }
+          refusedUntil.set(key, Math.max(refusedUntil.get(key) ?? 0, until))
+        }
+      }
+      return result
+    },
+    async purgeExpired() {
+      const time = now()
+      for (const [key, expires] of refusedUntil) if (expires <= time) refusedUntil.delete(key)
+      await authority.purgeExpired()
+    }
+  }
+}
+
 export function userBudgetKey(userId: string, scope: UserRateBudgetScope = "general"): string {
   // Preserve the existing general key during rolling upgrades.
   const prefix = scope === "general" ? "http-user" : `http-user-${scope}`

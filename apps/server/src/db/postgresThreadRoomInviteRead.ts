@@ -19,7 +19,8 @@ interface QueryExecutor {
  */
 export function createPostgresThreadRoomInviteReader(pool: QueryExecutor): ThreadRoomInviteReader {
   return {
-    async readThreadRoomInvites({ threadId, userId, now = new Date() }) {
+    async readThreadRoomInvites({ threadId, userId, now = new Date(), limit, before, inviteId }) {
+      const pageLimit = inviteId ? 1 : limit ?? (before ? 20 : null)
       const result = await pool.query(
         `WITH thread AS (
            SELECT t.thread_id, t.mini_room_id,
@@ -61,10 +62,33 @@ export function createPostgresThreadRoomInviteReader(pool: QueryExecutor): Threa
               SET status = 'expired', decided_at = $3
             WHERE source_thread_id = $1 AND status = 'pending' AND expires_at <= $3
               AND EXISTS (SELECT 1 FROM allowed)
-         )
-         SELECT facts.*,
-                CASE WHEN EXISTS (SELECT 1 FROM allowed) THEN (
-                  SELECT COALESCE(json_agg(json_build_object(
+         ), cursor AS (
+           SELECT invite_id, created_at FROM blumi_mini_room_invites
+            WHERE source_thread_id = $1 AND invite_id = $5
+              AND EXISTS (SELECT 1 FROM allowed)
+         ), page_ids AS (
+           SELECT invite.invite_id, invite.created_at FROM blumi_mini_room_invites AS invite
+            WHERE invite.source_thread_id = $1 AND EXISTS (SELECT 1 FROM allowed)
+              AND ($6::text IS NULL OR invite.invite_id = $6)
+              AND ($5::text IS NULL OR (invite.created_at, invite.invite_id) <
+                  (SELECT cursor.created_at, cursor.invite_id FROM cursor))
+            ORDER BY invite.created_at DESC, invite.invite_id DESC
+            LIMIT CASE WHEN $4::integer IS NULL THEN NULL ELSE $4 + 1 END
+         ), primary_ids AS (
+           SELECT * FROM page_ids ORDER BY created_at DESC, invite_id DESC LIMIT $4
+         ), active_ids AS (
+           SELECT invite.invite_id, invite.created_at FROM blumi_mini_room_invites AS invite
+             LEFT JOIN blumi_mini_rooms AS room ON room.invite_id = invite.invite_id AND room.ended_at IS NULL
+            WHERE $4::integer IS NOT NULL AND $6::text IS NULL AND invite.source_thread_id = $1
+              AND EXISTS (SELECT 1 FROM allowed)
+              AND ((invite.status = 'pending' AND (invite.expires_at IS NULL OR invite.expires_at > $3))
+                OR (invite.status = 'accepted' AND room.mini_room_id IS NOT NULL))
+              AND NOT EXISTS (SELECT 1 FROM primary_ids WHERE primary_ids.invite_id = invite.invite_id)
+            ORDER BY invite.created_at DESC, invite.invite_id DESC LIMIT 3
+         ), selected_ids AS (
+           SELECT invite_id FROM primary_ids UNION SELECT invite_id FROM active_ids
+         ), invite_payloads AS (
+           SELECT invite.invite_id, invite.created_at, json_build_object(
                            'invite_id', invite.invite_id,
                            'room_id', invite.room_id,
                            'sender_user_id', invite.sender_user_id,
@@ -80,15 +104,23 @@ export function createPostgresThreadRoomInviteReader(pool: QueryExecutor): Threa
                            'decided_at', CASE WHEN invite.status = 'pending' AND invite.expires_at <= $3
                                               THEN $3::timestamptz ELSE invite.decided_at END,
                            'room_session_id', mini_room.mini_room_id
-                         ) ORDER BY invite.created_at ASC, invite.invite_id ASC), '[]'::json)
+                         ) AS payload
                     FROM blumi_mini_room_invites AS invite
                     -- An ended room is no longer enterable: only a live room links.
                     LEFT JOIN blumi_mini_rooms AS mini_room ON mini_room.invite_id = invite.invite_id
                                                            AND mini_room.ended_at IS NULL
-                   WHERE invite.source_thread_id = $1
-                ) END AS invites
+                    JOIN selected_ids ON selected_ids.invite_id = invite.invite_id
+         )
+         SELECT facts.*,
+                ($5::text IS NULL OR EXISTS (SELECT 1 FROM cursor)) AS cursor_found,
+                ($6::text IS NULL OR EXISTS (SELECT 1 FROM primary_ids)) AS target_found,
+                EXISTS (SELECT 1 FROM page_ids OFFSET $4 LIMIT 1) AS has_more,
+                (SELECT COALESCE(json_agg(payload ORDER BY created_at ASC, invite_id ASC), '[]'::json)
+                   FROM invite_payloads WHERE invite_id IN (SELECT invite_id FROM primary_ids)) AS invites,
+                (SELECT COALESCE(json_agg(payload ORDER BY created_at ASC, invite_id ASC), '[]'::json)
+                   FROM invite_payloads WHERE invite_id IN (SELECT invite_id FROM active_ids)) AS active_invites
            FROM facts`,
-        [threadId, userId, now]
+        [threadId, userId, now, pageLimit, before ?? null, inviteId ?? null]
       )
       const row = result.rows[0]
       const decision = decideThreadRoomInviteAccess(row ? {
@@ -102,12 +134,19 @@ export function createPostgresThreadRoomInviteReader(pool: QueryExecutor): Threa
         partnerAllowed: row.partner_allowed === true
       } : null)
       if (decision !== "ok") return { status: decision }
+      if (row!.cursor_found !== true) return { status: "invalid_cursor" }
+      if (row!.target_found !== true) return { status: "invite_missing" }
       const invites = Array.isArray(row!.invites) ? row!.invites as QueryResultRow[] : []
+      const activeInvites = Array.isArray(row!.active_invites) ? row!.active_invites as QueryResultRow[] : []
+      if (activeInvites.length > 2) throw new Error("Room invitation state could not be confirmed.")
+      const mappedInvites = invites.map(mapInvite)
       return {
         status: "ok",
         partnerUserId: String(row!.partner_user_id),
         partnerIsTestPersona: row!.partner_is_test_persona === true,
-        invites: invites.map(mapInvite)
+        invites: mappedInvites,
+        ...(pageLimit !== null ? { nextCursor: !inviteId && row!.has_more === true ? mappedInvites[0]!.inviteId : null,
+          activeInvites: activeInvites.map(mapInvite) } : {})
       }
     }
   }

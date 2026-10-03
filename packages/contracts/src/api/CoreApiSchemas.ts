@@ -72,6 +72,14 @@ export const listChatMessagesQuerySchema = z.object({
   limit: z.union([z.string(), z.number()]).optional()
 })
 
+/** Optional bounded room-invite history; no query keeps legacy full-history reads. */
+export const listChatRoomInvitesQuerySchema = z.object({
+  before: nonEmptyString.max(256).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  inviteId: nonEmptyString.max(256).optional()
+}).strict().refine(value => !value.inviteId || (value.before === undefined && value.limit === undefined),
+  { message: "An exact invite lookup cannot be combined with history paging." })
+
 /**
  * Optional body of `POST /v1/threads/:threadId/read` (2026-10-01). Older
  * clients send no body; the server then marks the thread read up to now.
@@ -302,6 +310,15 @@ export const coreApiJsonSchemas = {
     properties: {
       before: { type: "string" },
       limit: { anyOf: [{ type: "string" }, { type: "number" }] }
+    },
+    additionalProperties: false
+  },
+  listChatRoomInvitesQuery: {
+    type: "object",
+    properties: {
+      before: { type: "string", minLength: 1, maxLength: 256 },
+      limit: { anyOf: [{ type: "string", pattern: "^[1-9][0-9]?$" }, { type: "integer", minimum: 1, maximum: 50 }] },
+      inviteId: { type: "string", minLength: 1, maxLength: 256 }
     },
     additionalProperties: false
   },

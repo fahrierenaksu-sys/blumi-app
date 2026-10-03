@@ -169,6 +169,77 @@ runRepositoryContract<Repositories>({
       assert.ok(result.status === "ok")
       assert.deepEqual(result.invites.map((entry) => [entry.inviteId, entry.status, entry.decidedAt]), [[pending.inviteId, "pending", undefined]])
     },
+    "bounded history pages preserve all rows, tied order and old actionable invitations without mutating decisions": async (backend) => {
+      const { caller, partner, threadId } = await matchedPair(backend)
+      const history = Array.from({ length: 203 }, (_, index) => invite(backend, threadId, caller, partner,
+        `history_${String(index).padStart(4, "0")}`, "cancelled", minutes(-300 + Math.floor(index / 3)), minutes(-200)))
+      for (const entry of history) await backend.repository.miniRooms.saveInvite(entry)
+      const oldPending = invite(backend, threadId, partner, caller, "old_pending", "pending", minutes(-500), minutes(10))
+      await backend.repository.miniRooms.saveInvite(oldPending)
+      const first = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, limit: 20 })
+      assert.ok(first.status === "ok")
+      assert.equal(first.invites.length, 20)
+      assert.deepEqual(first.activeInvites?.map(entry => entry.inviteId), [oldPending.inviteId])
+      assert.equal(first.nextCursor, first.invites[0]!.inviteId)
+      const found = [...first.invites]
+      let cursor: string | null | undefined = first.nextCursor
+      while (cursor) {
+        const page = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, limit: 20, before: cursor })
+        assert.ok(page.status === "ok")
+        assert.ok(page.invites.length <= 20)
+        assert.notEqual(page.nextCursor, cursor)
+        found.unshift(...page.invites)
+        cursor = page.nextCursor
+      }
+      const expected = [oldPending, ...history].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.inviteId.localeCompare(b.inviteId))
+      assert.deepEqual(found.map(entry => entry.inviteId), expected.map(entry => entry.inviteId), "exclusive tie-aware pages lose no history and repeat no rows")
+      assert.equal((await backend.repository.miniRooms.findInvite(oldPending.inviteId))?.status, "pending")
+      const legacy = await read(backend, threadId, caller)
+      assert.ok(legacy.status === "ok")
+      assert.equal(legacy.invites.length, expected.length)
+      assert.equal(legacy.nextCursor, undefined, "old no-query reads retain their full-history contract")
+    },
+    "exact lookups and cursors are scoped to the authorized thread and reveal expiry without creating or deleting history": async (backend) => {
+      const { caller, partner, threadId } = await matchedPair(backend)
+      const lapsed = invite(backend, threadId, partner, caller, "exact_lapsed", "pending", minutes(-40), minutes(-1))
+      await backend.repository.miniRooms.saveInvite(lapsed)
+      const target = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, inviteId: lapsed.inviteId })
+      assert.ok(target.status === "ok")
+      assert.deepEqual(target.invites.map(entry => [entry.inviteId, entry.status]), [[lapsed.inviteId, "expired"]])
+      assert.equal(target.nextCursor, null)
+      assert.deepEqual(target.activeInvites, [])
+      assert.deepEqual(await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, before: backend.id("missing"), limit: 20 }), { status: "invalid_cursor" })
+      assert.deepEqual(await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, inviteId: backend.id("missing") }), { status: "invite_missing" })
+      // A separate unrelated stored invite challenges cursor scope.
+      const unrelated = { ...lapsed, inviteId: backend.id("foreign_invite"), sourceThreadId: backend.id("foreign_thread"), status: "cancelled" as const }
+      await backend.repository.chat.saveThread({ threadId: unrelated.sourceThreadId!, miniRoomId: backend.id("foreign_room"), participantUserIds: [caller, partner],
+        participants: [{ userId: caller }, { userId: partner }], createdAt: minutes(-60) })
+      await backend.repository.miniRooms.saveInvite(unrelated)
+      assert.deepEqual(await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, inviteId: unrelated.inviteId }), { status: "invite_missing" })
+      assert.deepEqual(await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, before: unrelated.inviteId, limit: 20 }), { status: "invalid_cursor" })
+      const stranger = backend.id("stranger")
+      assert.deepEqual(await backend.repository.reader.readThreadRoomInvites({ threadId, userId: stranger, now: NOW, inviteId: lapsed.inviteId }), { status: "hidden" })
+    },
+    "an older pending invitation without an expiry remains actionable outside the recent page": async (backend) => {
+      const { caller, partner, threadId } = await matchedPair(backend)
+      const olderPending = { ...invite(backend, threadId, partner, caller, "legacy_no_expiry", "pending", minutes(-60), minutes(10)), expiresAt: undefined }
+      await backend.repository.miniRooms.saveInvite(olderPending)
+      for (let index = 0; index < 21; index += 1) {
+        await backend.repository.miniRooms.saveInvite(invite(backend, threadId, caller, partner,
+          `newer_cancelled_${index}`, "cancelled", minutes(-30 + index), minutes(-5)))
+      }
+      const recent = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, limit: 20 })
+      assert.ok(recent.status === "ok")
+      assert.equal(recent.invites.some(entry => entry.inviteId === olderPending.inviteId), false)
+      assert.deepEqual(recent.activeInvites?.map(entry => [entry.inviteId, entry.status, entry.expiresAt]),
+        [[olderPending.inviteId, "pending", undefined]])
+      assert.equal((await backend.repository.miniRooms.findInvite(olderPending.inviteId))?.status, "pending")
+      const exact = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: partner, now: NOW, inviteId: olderPending.inviteId })
+      assert.ok(exact.status === "ok")
+      assert.equal(exact.invites[0]?.status, "pending")
+      assert.equal(exact.invites[0]?.expiresAt, undefined)
+      assert.equal(exact.nextCursor, null)
+    },
     "missing threads, non-members and blocks in either direction are hidden": async (backend) => {
       const { caller, partner, threadId } = await matchedPair(backend)
       const stranger = backend.id("stranger")
@@ -245,10 +316,20 @@ runRepositoryContract<Repositories>({
       assert.ok(live.status === "ok")
       assert.deepEqual(live.invites.map((entry) => [entry.status, entry.roomSessionId]), [["accepted", miniRoomId]])
 
+      const newer = invite(backend, threadId, caller, partner, "newer_ended", "cancelled", minutes(-5), minutes(10))
+      await backend.repository.miniRooms.saveInvite(newer)
+      const bounded = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, limit: 1 })
+      assert.ok(bounded.status === "ok")
+      assert.deepEqual(bounded.invites.map(entry => entry.inviteId), [newer.inviteId])
+      assert.deepEqual(bounded.activeInvites?.map(entry => [entry.inviteId, entry.roomSessionId]), [[pending.inviteId, miniRoomId]], "live room access survives an older history position")
+
       assert.ok(await backend.repository.miniRooms.endMiniRoom(miniRoomId, partner, minutes(-1)))
       const ended = await read(backend, threadId, caller)
       assert.ok(ended.status === "ok")
-      assert.deepEqual(ended.invites.map((entry) => [entry.status, entry.roomSessionId]), [["accepted", undefined]])
+      assert.deepEqual(ended.invites.map((entry) => [entry.status, entry.roomSessionId]), [["accepted", undefined], ["cancelled", undefined]])
+      const exactEnded = await backend.repository.reader.readThreadRoomInvites({ threadId, userId: caller, now: NOW, inviteId: pending.inviteId })
+      assert.ok(exactEnded.status === "ok")
+      assert.deepEqual(exactEnded.invites.map(entry => [entry.status, entry.roomSessionId]), [["accepted", undefined]])
     },
     "the read says when the partner is a seeded test persona": async (backend) => {
       const { caller, partner, threadId } = await matchedPair(backend)

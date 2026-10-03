@@ -18,10 +18,10 @@ import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
 import { createConnectionManager } from "./connectionManager"
 import { createConnectionSetupGate, type ConnectionSetupGate } from "./connectionSetupGate"
-import { REALTIME_EVENT_LIMITS } from "./realtimeEventBudget"
+import { REALTIME_EVENT_LIMITS, REALTIME_FRAME_LIMITS } from "./realtimeEventBudget"
 import type { RealtimeFanout } from "./realtimeFanout"
 import type { RealtimeFanoutControl } from "./realtimeFanoutControl"
-import { createRealtimeServer, REALTIME_HEARTBEAT_INTERVAL_MS } from "./realtimeServer"
+import { createRealtimeServer, REALTIME_HEARTBEAT_INTERVAL_MS, MAX_REALTIME_CONNECTIONS_PER_USER } from "./realtimeServer"
 import { createRealtimeTicketService } from "./realtimeTicketService"
 
 type Session = { userId: string; sessionToken: string; displayName: string }
@@ -162,6 +162,33 @@ test("a reaction flood is dropped without closing the socket", async () => {
     socket.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
     await waitUntil(() => events.ofType("chat.thread_listed").length === 1, 2_000)
     assert.equal(socket.readyState, WebSocket.OPEN)
+  } finally {
+    await harness.close()
+  }
+})
+
+test("a flood spread over five sockets shares an account budget while another account remains usable", async () => {
+  const harness = await createHarness()
+  try {
+    const actor = await harness.createSession("+905554449201", "Flood")
+    const partner = await harness.createSession("+905554449202", "Independent")
+    const sockets: WebSocket[] = []
+    for (let index = 0; index < MAX_REALTIME_CONNECTIONS_PER_USER; index += 1) {
+      sockets.push(await harness.connect(actor.sessionToken))
+    }
+    const independent = await harness.connect(partner.sessionToken)
+    const events = collect(independent)
+    let closedCode: number | undefined
+    for (const socket of sockets) socket.once("close", (code) => { closedCode ??= code })
+    for (let index = 0; index <= REALTIME_FRAME_LIMITS.userWindow; index += 1) {
+      const socket = sockets[index % sockets.length]!
+      socket.send(JSON.stringify({ type: "reaction.send", payload: { roomId: "room_none", reaction: "wave" } }))
+    }
+    await waitUntil(() => closedCode !== undefined, 2_000)
+    assert.equal(closedCode, 4429, "dropped events cannot burn parsing CPU forever")
+    independent.send(JSON.stringify({ type: "chat.list_threads", payload: {} }))
+    await waitUntil(() => events.ofType("chat.thread_listed").length > 0)
+    assert.equal(independent.readyState, WebSocket.OPEN)
   } finally {
     await harness.close()
   }

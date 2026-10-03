@@ -72,6 +72,8 @@ const RESTART_CLOSE_REASON = "Server restarting"
  * phone made shutdown time out, skip the disconnect cleanup and exit 1.
  */
 export const REALTIME_CLOSE_HANDSHAKE_TIMEOUT_MS = 3_000
+/** Per account on this instance, including authenticated upgrades still opening. */
+export const MAX_REALTIME_CONNECTIONS_PER_USER = 5
 const CONNECTION_LEASE_CLEANUP_INTERVAL_MS = 60_000
 const MAX_REALTIME_MESSAGE_BYTES = 64 * 1024
 const RATE_LIMIT_CLOSE_CODE = 4429
@@ -153,6 +155,7 @@ export function createRealtimeServer(
   })
   const resolveClientAddress = createClientAddressResolver(options.trustedProxyAddresses ?? [])
   const leaseRenewedAt = new Map<string, number>()
+  const pendingConnectionSetups = new Map<string, number>()
   const pendingDisconnects: RealtimeConnection[] = []
   const movementInFlight = new Set<string>()
   const deferredMovements = new Map<string, ClientEvent>()
@@ -335,6 +338,33 @@ export function createRealtimeServer(
     }
     if (closing) { rejectUpgrade(socket, "503 Service Unavailable"); return }
 
+    const pendingSetups = pendingConnectionSetups.get(actor.userId) ?? 0
+    // Closing sockets no longer consume a slot: a phone can reconnect while
+    // the old close handshake drains. Reserve before awaiting the lease write
+    // so parallel upgrades cannot all observe the same available capacity.
+    const openConnections = connectionManager.getUserConnections(actor.userId)
+      .filter((connection) => connection.socket.readyState === 1).length
+    if (openConnections + pendingSetups >= MAX_REALTIME_CONNECTIONS_PER_USER) {
+      rejectUpgrade(socket, "429 Too Many Requests")
+      return
+    }
+    pendingConnectionSetups.set(actor.userId, pendingSetups + 1)
+    try {
+      await registerAndUpgrade(request, socket, head, actor, observation)
+    } finally {
+      const remaining = (pendingConnectionSetups.get(actor.userId) ?? 1) - 1
+      if (remaining === 0) pendingConnectionSetups.delete(actor.userId)
+      else pendingConnectionSetups.set(actor.userId, remaining)
+    }
+  }
+
+  async function registerAndUpgrade(
+    request: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+    actor: RealtimeSessionActor,
+    observation: ReturnType<typeof authorizationCache.observe>
+  ): Promise<void> {
     const connectionId = `connection_${randomUUID()}`
     let leaseRegistered = false
     let connectionEstablished = false
@@ -509,15 +539,24 @@ export function createRealtimeServer(
     void track(closeRestrictedConnections()).finally(() => { authorizationSweepPending = false })
   }, REALTIME_AUTHORIZATION_SWEEP_INTERVAL_MS)
   authorizationSweep.unref()
+  let connectionLeaseCleanupPending = false
+  let presenceCleanupPending = false
   const connectionLeaseCleanup = setInterval(() => {
-    void track(options.presenceService.purgeExpiredConnectionLeases()).catch((error) => {
-      console.error("Realtime connection lease cleanup failed", safeOperationalErrorKind(error))
-    })
+    if (closing) return
+    if (!connectionLeaseCleanupPending) {
+      connectionLeaseCleanupPending = true
+      void track(options.presenceService.purgeExpiredConnectionLeases()).catch((error) => {
+        console.error("Realtime connection lease cleanup failed", safeOperationalErrorKind(error))
+      }).finally(() => { connectionLeaseCleanupPending = false }).catch(() => undefined)
+    }
     // Expired room presence is invisible to reads; purge it here in bounded
     // batches rather than with a global DELETE on every presence read.
-    void track(options.presenceService.purgeExpiredPresence()).catch((error) => {
-      console.error("Realtime presence cleanup failed", safeOperationalErrorKind(error))
-    })
+    if (!presenceCleanupPending) {
+      presenceCleanupPending = true
+      void track(options.presenceService.purgeExpiredPresence()).catch((error) => {
+        console.error("Realtime presence cleanup failed", safeOperationalErrorKind(error))
+      }).finally(() => { presenceCleanupPending = false }).catch(() => undefined)
+    }
   }, CONNECTION_LEASE_CLEANUP_INTERVAL_MS)
   connectionLeaseCleanup.unref()
 
@@ -599,8 +638,13 @@ export function createRealtimeServer(
   ): Promise<void> {
     if (typeof data !== "string" && !Buffer.isBuffer(data)) return
     if (connection.socket.readyState !== 1) return
-    if (Buffer.byteLength(data) > MAX_REALTIME_MESSAGE_BYTES) {
+    const bytes = Buffer.byteLength(data)
+    if (bytes > MAX_REALTIME_MESSAGE_BYTES) {
       connection.socket.close(1009, "Realtime message too large")
+      return
+    }
+    if (!eventBudget.admitFrame({ userId: connection.userId, bytes, now: Date.now() })) {
+      connection.socket.close(RATE_LIMIT_CLOSE_CODE, RATE_LIMIT_CLOSE_REASON)
       return
     }
     let frame: unknown

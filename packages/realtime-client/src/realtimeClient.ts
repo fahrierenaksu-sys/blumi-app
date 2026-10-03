@@ -167,7 +167,7 @@ export class RealtimeClient {
   private livenessTimeoutMs: number | null = null
   private lastInboundAt = 0
   private ticketRequestInFlight = false
-  /** The server refused this session (401/403 ticket, 1008/4401 close); only connect() retries. */
+  /** The server refused this session (401/403 ticket, 1008/4401/4403 close); only connect() retries. */
   private sessionRefused = false
   private networkConnected = true
   private appActive = true
@@ -359,7 +359,8 @@ export class RealtimeClient {
       this.emitStatus("disconnected", { closeCode: closeEvent.code })
       if (
         closeEvent.code === 1008 ||
-        closeEvent.code === REALTIME_AUTH_INVALID_CLOSE_CODE
+        closeEvent.code === REALTIME_AUTH_INVALID_CLOSE_CODE ||
+        closeEvent.code === REALTIME_TICKET_FORBIDDEN_CLOSE_CODE
       ) {
         this.sessionRefused = true
         this.emitStatus("error", { closeCode: closeEvent.code })

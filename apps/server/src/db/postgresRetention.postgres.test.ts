@@ -77,13 +77,21 @@ test("retention policies never name a table that holds user content", () => {
   // Idempotency claims appear only with a window far beyond any retry
   // (chat outbox tombstones, message and like push claims: 30 days).
   assert.deepEqual(tables, [
+    "blumi_account_action_challenges",
+    "blumi_account_action_otp_send_limits",
+    "blumi_account_deletion_challenges",
+    "blumi_account_deletion_otp_send_limits",
     "blumi_account_recovery_requests",
     "blumi_chat_delivery_outbox",
     "blumi_media_revocations",
     "blumi_notification_policy_audit",
     "blumi_notification_policy_events",
+    "blumi_otp_send_limits",
+    "blumi_pending_otps",
     "blumi_push_delivery_audit",
     "blumi_push_receipts",
+    "blumi_recovery_otp_send_limits",
+    "blumi_recovery_phone_challenges",
     "blumi_sessions"
   ])
 })

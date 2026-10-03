@@ -12,6 +12,7 @@ import {
   createThreadRequestSchema,
   hideChatThreadRequestSchema,
   listChatMessagesQuerySchema,
+  listChatRoomInvitesQuerySchema,
   markThreadReadRequestSchema,
   roomInviteDecisionRequestSchema,
   sendChatMessageRequestSchema,
@@ -412,13 +413,14 @@ export async function registerThreadRoutes(
   app.get("/v1/threads/:threadId/room-invites", {
     attachValidation: true,
     config: { requestValidation: "enforced" },
-    schema: threadIdRouteSchema
+    schema: { ...threadIdRouteSchema, querystring: coreApiJsonSchemas.listChatRoomInvitesQuery }
   }, async (request, reply) => {
     const resolved = await resolveProductSession({ request, reply, authService })
     if (!resolved) return
     const threadId = readParam(request, "threadId")
     const miniRoomService = services.miniRoomService
-    if (!threadId || schemaValidationFailed(request)) {
+    const parsedQuery = listChatRoomInvitesQuerySchema.safeParse(request.query)
+    if (!threadId || !parsedQuery.success || schemaValidationFailed(request)) {
       return reply.code(400).send({ error: "Choose a conversation first." })
     }
     if (!miniRoomService) {
@@ -428,19 +430,23 @@ export async function registerThreadRoutes(
       threadRoomInviteSourcesFromServices(services, miniRoomService)
     )
     try {
-      const read = await reader.readThreadRoomInvites({ threadId, userId: resolved.account.userId })
+      const readInput = { threadId, userId: resolved.account.userId, ...parsedQuery.data }
+      const read = await reader.readThreadRoomInvites(readInput)
       if (read.status !== "ok") {
+        if (read.status === "invalid_cursor") return reply.code(400).send({ error: "Choose a valid invitation history cursor." })
+        if (read.status === "invite_missing") return reply.code(404).send({ error: "That room invite is not available." })
         return sendUnavailableInviteContext(read.status === "hidden" ? "hidden" : null, reply,
           "That room invite is not available.")
       }
       let invites = read.invites
+      let pageDetails = read.nextCursor !== undefined ? { nextCursor: read.nextCursor, activeInvites: read.activeInvites ?? [] } : {}
       // A synthetic test partner can initiate a real, persisted chat invitation
       // when the user opens the conversation. Reopening it is idempotent, and
       // normal accounts never enter this branch (the read already knows).
       // An accepted invite whose room has ended carries no room any more, so
       // the persona invites again instead of leaving a dead conversation.
-      if (read.partnerIsTestPersona &&
-        !invites.some((invite) => invite.status === "pending" ||
+      if (read.partnerIsTestPersona && !parsedQuery.data.before && !parsedQuery.data.inviteId &&
+        ![...invites, ...(read.activeInvites ?? [])].some((invite) => invite.status === "pending" ||
           (invite.status === "accepted" && Boolean(invite.roomSessionId)))) {
         // The deployment policy still decides: production never acts for a persona.
         const [persona, partnerAccount] = await Promise.all([
@@ -460,7 +466,11 @@ export async function registerThreadRoutes(
                 { type: "chat.room_invite_updated", payload: result.invite }
               )
             }
-            invites = await miniRoomService.listChatInvites(resolved.account.userId, threadId)
+            const refreshed = await reader.readThreadRoomInvites(readInput)
+            if (refreshed.status !== "ok") return sendUnavailableInviteContext(refreshed.status === "hidden" ? "hidden" : null, reply,
+              "That room invite is not available.")
+            invites = refreshed.invites
+            pageDetails = refreshed.nextCursor !== undefined ? { nextCursor: refreshed.nextCursor, activeInvites: refreshed.activeInvites ?? [] } : {}
           } catch (error) {
             if (
               !(error instanceof ChatRoomInviteError) ||
@@ -471,7 +481,7 @@ export async function registerThreadRoutes(
           }
         }
       }
-      return { threadId, invites }
+      return { threadId, invites, ...pageDetails }
     } catch (error) {
       return sendChatRoomInviteError(error, reply)
     }

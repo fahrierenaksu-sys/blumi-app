@@ -27,6 +27,9 @@
  * for many threads is never cut after the second (2026-10-01).
  */
 export const REALTIME_EVENT_WINDOW_MS = 10_000
+/** Coarse flood protection before JSON parsing, above all ordinary event lanes combined. */
+export const REALTIME_FRAME_LIMITS = Object.freeze({ userWindow: 1_000, userBytesWindow: 2 * 1024 * 1024 })
+export const MAX_TRACKED_REALTIME_FRAME_USERS = 20_000
 
 export type RealtimeEventClass = "motion" | "transient" | "receipt" | "typing" | "chat" | "control"
 
@@ -93,6 +96,8 @@ interface Window {
 }
 
 export interface RealtimeEventBudget {
+  /** Includes dropped/malformed frames; reconnecting never refreshes the user's window. */
+  admitFrame(input: { userId: string; bytes: number; now: number }): boolean
   admit(input: { connectionId: string; userId: string; eventClass: RealtimeEventClass; now: number }): RealtimeAdmission
   forgetConnection(connectionId: string): void
   purgeExpired(now: number): void
@@ -104,6 +109,13 @@ export function createRealtimeEventBudget(
   const windows = new Map<string, Window>()
   const connectionWindowKeys = new Map<string, Set<string>>()
   const inFlight = new Map<string, number>()
+  const frameWindows = new Map<string, Window & { bytes: number }>()
+
+  function purgeFrameWindows(now: number): void {
+    for (const [key, window] of frameWindows) {
+      if (window.startedAt + REALTIME_EVENT_WINDOW_MS <= now) frameWindows.delete(key)
+    }
+  }
 
   /** Counts the event in the window; returns the count including it. */
   function count(key: string, now: number): number {
@@ -123,6 +135,23 @@ export function createRealtimeEventBudget(
   }
 
   return {
+    admitFrame({ userId, bytes, now }) {
+      if (!Number.isSafeInteger(bytes) || bytes < 0 || !Number.isFinite(now)) return false
+      let current = frameWindows.get(userId)
+      if (!current || current.startedAt + REALTIME_EVENT_WINDOW_MS <= now) {
+        if (!current && frameWindows.size >= MAX_TRACKED_REALTIME_FRAME_USERS) {
+          purgeFrameWindows(now)
+          // Keep live windows rather than evicting one and allowing a
+          // reconnect to bypass its budget. New actors fail closed at capacity.
+          if (frameWindows.size >= MAX_TRACKED_REALTIME_FRAME_USERS) return false
+        }
+        current = { startedAt: now, count: 0, bytes: 0 }
+        frameWindows.set(userId, current)
+      }
+      current.count += 1
+      current.bytes += bytes
+      return current.count <= REALTIME_FRAME_LIMITS.userWindow && current.bytes <= REALTIME_FRAME_LIMITS.userBytesWindow
+    },
     admit({ connectionId, userId, eventClass, now }) {
       const classLimits = limits[eventClass]
       const userKey = `${eventClass}\u0000user\u0000${userId}`
@@ -163,6 +192,7 @@ export function createRealtimeEventBudget(
       connectionWindowKeys.delete(connectionId)
     },
     purgeExpired(now) {
+      purgeFrameWindows(now)
       for (const [key, window] of windows) {
         if (window.startedAt + REALTIME_EVENT_WINDOW_MS <= now) windows.delete(key)
       }

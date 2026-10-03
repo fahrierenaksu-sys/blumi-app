@@ -17,6 +17,7 @@ import {
   type PushReceipt
 } from "./pushProvider"
 import { randomUUID } from "node:crypto"
+import { performance } from "node:perf_hooks"
 import { PublicRequestError } from "../errors/publicRequestError"
 import {
   isPushExpired,
@@ -40,6 +41,8 @@ const DELIVERY_BATCH_SIZE = 100
 const DELIVERY_CLAIM_SIZE = 30
 /** At most this many provider calls (and so open dispatch transactions) at once. */
 const DEFAULT_DISPATCH_CONCURRENCY = 3
+const DEFAULT_DISPATCH_MAX_BATCHES = 10
+const DEFAULT_DISPATCH_BUDGET_MS = 5_000
 const MIN_PUSHES_PER_HOUR = 1
 const MAX_PUSHES_PER_HOUR = 20
 const SENDER_LOOKUP_TIMEOUT_MS = 2_000
@@ -86,6 +89,12 @@ export interface CreateNotificationServiceOptions {
   resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
   /** Provider calls in flight per dispatch cycle (default 3; pool max is 10). */
   dispatchConcurrency?: number
+  /** Stop admitting delivery batches after this many rounds (default 10). */
+  dispatchMaxBatches?: number
+  /** Delivery admission budget; a claimed batch always finishes (default 5s). */
+  dispatchBudgetMs?: number
+  /** Monotonic elapsed clock, separate from notification policy timestamps. */
+  monotonicNow?: () => number
   /** How long a confirmed registration answers repeats from memory (default 10 min; 0 disables). */
   deviceRegistrationCacheTtlMs?: number
   /** The recipient's unread message total, read at dispatch for the iOS badge. */
@@ -152,6 +161,13 @@ export function createNotificationService(
   const dispatchConcurrency = options.dispatchConcurrency ?? DEFAULT_DISPATCH_CONCURRENCY
   if (!Number.isSafeInteger(dispatchConcurrency) || dispatchConcurrency < 1) {
     throw new Error("Push dispatch concurrency must be a positive integer.")
+  }
+  const dispatchMaxBatches = options.dispatchMaxBatches ?? DEFAULT_DISPATCH_MAX_BATCHES
+  const dispatchBudgetMs = options.dispatchBudgetMs ?? DEFAULT_DISPATCH_BUDGET_MS
+  const monotonicNow = options.monotonicNow ?? (() => performance.now())
+  if (!Number.isSafeInteger(dispatchMaxBatches) || dispatchMaxBatches < 1 ||
+      !Number.isSafeInteger(dispatchBudgetMs) || dispatchBudgetMs < 1) {
+    throw new Error("Push dispatch batch limit and time budget must be positive integers.")
   }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
@@ -307,7 +323,11 @@ export function createNotificationService(
   }
 
   async function dispatchDue(dispatchAt: Date): Promise<void> {
-    for (;;) {
+    const startedAt = monotonicNow()
+    for (let batch = 0; batch < dispatchMaxBatches; batch++) {
+      // Always give deliveries a turn, then yield to receipts and shutdown.
+      // Unclaimed jobs remain durable and available for the worker's next poll.
+      if (batch > 0 && monotonicNow() - startedAt >= dispatchBudgetMs) return
       const deliveries = await repository.claimDueDeliveries({
         now: dispatchAt,
         limit: DELIVERY_CLAIM_SIZE,

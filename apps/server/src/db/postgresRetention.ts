@@ -33,6 +33,12 @@
  *   were rejected (2026-10-02): they hold phone numbers and nothing acts on
  *   them again. Pending requests are the operator queue and requests sent to
  *   manual review stay until the owner sets their window.
+ * - OTP challenges, only after expiry. Request paths remove only their own
+ *   expired rows under the identity lock; this worker removes cold rows in
+ *   indexed, bounded batches. Verification independently enforces expiry.
+ * - OTP send limits, 30 days after the last request (the send window is five
+ *   minutes). The indexed window_started_at bound keeps these scans bounded
+ *   to old windows; recently refreshed counters and active requests stay.
  */
 export const RETENTION_POLICIES = Object.freeze([
   { table: "blumi_chat_delivery_outbox", key: "message_id", expired: "completed_at < NOW() - INTERVAL '30 days'" },
@@ -61,6 +67,26 @@ export const RETENTION_POLICIES = Object.freeze([
     key: "request_id",
     // created_at <= resolved_at; the created_at bound lets the status index serve it.
     expired: "status = 'rejected' AND created_at < NOW() - INTERVAL '90 days' AND resolved_at < NOW() - INTERVAL '90 days'"
+  },
+  { table: "blumi_pending_otps", key: "phone_number", expired: "expires_at <= NOW()" },
+  { table: "blumi_recovery_phone_challenges", key: "phone_number", expired: "expires_at <= NOW()" },
+  { table: "blumi_account_deletion_challenges", key: "account_id", expired: "expires_at <= NOW()" },
+  { table: "blumi_account_action_challenges", key: "account_id, purpose", expired: "expires_at <= NOW()" },
+  {
+    table: "blumi_otp_send_limits", key: "phone_number",
+    expired: "window_started_at < NOW() - INTERVAL '30 days' AND last_requested_at < NOW() - INTERVAL '30 days'"
+  },
+  {
+    table: "blumi_recovery_otp_send_limits", key: "phone_number",
+    expired: "window_started_at < NOW() - INTERVAL '30 days' AND last_requested_at < NOW() - INTERVAL '30 days'"
+  },
+  {
+    table: "blumi_account_deletion_otp_send_limits", key: "account_id",
+    expired: "window_started_at < NOW() - INTERVAL '30 days' AND last_requested_at < NOW() - INTERVAL '30 days'"
+  },
+  {
+    table: "blumi_account_action_otp_send_limits", key: "account_id, purpose",
+    expired: "window_started_at < NOW() - INTERVAL '30 days' AND last_requested_at < NOW() - INTERVAL '30 days'"
   }
 ] as const)
 
