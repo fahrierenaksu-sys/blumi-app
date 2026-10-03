@@ -3,23 +3,17 @@ import { useCallback, useEffect, useRef } from "react"
 import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { ROOM_EDITOR_DRAG_LIFT_HEIGHT } from "./roomEditorDragModel"
-import {
-  ROOM_EDITOR_FLOOR_SHAPE_BASE,
-  type RoomEditorFloorShape
-} from "./roomEditorFloorGridModel"
-import {
-  ROOM_EDITOR_GHOST_TONE,
-  type RoomEditorDragGhostContent,
-  type RoomEditorDragGhostValues
+import type {
+  RoomEditorDragGhostContent,
+  RoomEditorDragGhostValues
 } from "./useRoomEditorDragGestures"
-import { roomEditorFloorColors, styles } from "./roomEditorStyles"
+import { styles } from "./roomEditorStyles"
 
 /**
  * The piece under the finger while dragging. A full-screen, touch-transparent
  * overlay so a tray piece can travel from the clipped tray onto the stage; the
- * position is shared values written by the pans, never React state. A floor
- * piece stands on a footprint plate whose colour (valid, invalid, none) is a
- * shared value too, so a verdict change never re-renders the ghost.
+ * position is shared values written by the pans, never React state. Placement
+ * validity is drawn once on the room floor by RoomEditorFloorGridOverlay.
  */
 export function RoomEditorDragGhost(props: {
   ghost: RoomEditorDragGhostContent | undefined
@@ -71,15 +65,26 @@ export function RoomEditorDragGhost(props: {
       style={StyleSheet.absoluteFill}
     >
       {ghost ? (
-        <Animated.View style={[styles.dragGhostAnchor, animatedStyle]}>
-          {ghost.plate ? <RoomEditorDragGhostPlate plate={ghost.plate} values={values} /> : null}
+        <Animated.View style={[
+          styles.dragGhostAnchor,
+          {
+            left: ghost.frame.offsetX,
+            top: ghost.frame.offsetY,
+            width: ghost.frame.width,
+            height: ghost.frame.height,
+            // A real image-sized host avoids native clipping of descendants
+            // of a zero-sized absolute-fill view. Keep scaling at the anchor.
+            transformOrigin: [-ghost.frame.offsetX, -ghost.frame.offsetY, 0]
+          },
+          animatedStyle
+        ]}>
           {liftValue ? (
             <Animated.View
               style={[
                 ghostShadowStyles.shadow,
                 {
-                  left: ghost.frame.offsetX + ghost.frame.width * 0.14,
-                  top: ghost.frame.offsetY + ghost.frame.height * 0.94,
+                  left: ghost.frame.width * 0.14,
+                  top: ghost.frame.height * 0.94,
                   width: ghost.frame.width * 0.72,
                   height: Math.max(6, ghost.frame.height * 0.08)
                 },
@@ -92,51 +97,17 @@ export function RoomEditorDragGhost(props: {
               source={ghost.source}
               contentFit="contain"
               cachePolicy="memory-disk"
+              allowDownscaling={false}
               transition={0}
-              style={{
-                position: "absolute",
-                left: ghost.frame.offsetX,
-                top: ghost.frame.offsetY,
-                width: ghost.frame.width,
-                height: ghost.frame.height,
-                transform: [{ scaleX: ghost.mirrored ? -1 : 1 }]
-              }}
+              style={[
+                StyleSheet.absoluteFill,
+                { transform: [{ scaleX: ghost.mirrored ? -1 : 1 }] }
+              ]}
             />
           </Animated.View>
         </Animated.View>
       ) : null}
     </View>
-  )
-}
-
-function RoomEditorDragGhostPlate(props: {
-  plate: RoomEditorFloorShape
-  values: RoomEditorDragGhostValues
-}) {
-  const { plate, values } = props
-  const toneStyle = useAnimatedStyle(() => {
-    const tone = values.tone?.value ?? ROOM_EDITOR_GHOST_TONE.none
-    const colors = tone === ROOM_EDITOR_GHOST_TONE.invalid
-      ? roomEditorFloorColors.invalid
-      : tone === ROOM_EDITOR_GHOST_TONE.valid
-        ? roomEditorFloorColors.valid
-        : roomEditorFloorColors.neutral
-    return { backgroundColor: colors.fill, borderColor: colors.edge }
-  })
-  return (
-    <Animated.View
-      style={[
-        styles.floorShape,
-        {
-          left: plate.left,
-          top: plate.top,
-          width: ROOM_EDITOR_FLOOR_SHAPE_BASE,
-          height: ROOM_EDITOR_FLOOR_SHAPE_BASE,
-          transform: [{ matrix: plate.matrix }]
-        },
-        toneStyle
-      ]}
-    />
   )
 }
 

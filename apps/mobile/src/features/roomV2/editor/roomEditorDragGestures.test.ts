@@ -1,16 +1,17 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { createFakeReactRuntime, createReactNativeStub, createReanimatedStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import { createClockedReanimatedStub, loadClockedMotion } from "../../../testing/reanimatedClock"
 import { MOTION_DURATIONS } from "../../../ui/motionTokens"
 import { getMyRoomEditorCopy } from "../myRoomCopy"
 import { resolvePlacedFurnitureRenderItem, resolveRoomV2Scene } from "../roomV2Selectors"
 import * as dragModel from "./roomEditorDragModel"
-import * as floorModel from "./roomEditorFloorGridModel"
+import { createRoomEditorFloorOverlay } from "./roomEditorFloorGridModel"
 import * as placementModel from "./roomEditorPlacementModel"
 import { getRoomEditorDisplayRenderItems } from "./roomEditorPresentationModel"
 import { createTestFurniture, createTestPlaced, TEST_FLOOR_GRID_SHELL } from "./roomEditorTestFixtures"
 import type { useRoomEditorDragGestures as DragHook } from "./useRoomEditorDragGestures"
+import type { RoomEditorDragGhost as GhostView } from "./RoomEditorDragGhost"
 
 type Event = { absoluteX: number; absoluteY: number; x: number; y: number }
 class Pan {
@@ -77,7 +78,6 @@ function mountDrag(reduceMotion: boolean) {
         "../roomV2Selectors": { resolvePlacedFurnitureRenderItem },
         "./roomEditorCatalog": { ACTIVE_ROOM_FURNITURE_CATALOG: [chair] },
         "./roomEditorDragModel": dragModel,
-        "./roomEditorFloorGridModel": floorModel,
         "./roomEditorPlacementModel": placementModel
       }
     }
@@ -184,4 +184,88 @@ test("a tray drag selects its own card and cancelling never places another piece
   assert.equal(h.read().ghost, undefined)
   assert.equal(h.commits.length, 0)
   h.runtime.unmount()
+})
+
+test("a tray drag draws one carried piece at the floor preview's destination", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
+  const h = mountDrag(false)
+  const pan = h.read().createTrayDragGesture(createTestFurniture(), true, false, "front") as unknown as Pan
+  pan.start(h.event(0.5, 1.8))
+  pan.update(h.event(0.3, 0.8))
+  t.mock.timers.tick(dragModel.ROOM_EDITOR_DRAG_SNAP_MS)
+  const preview = h.preview()!
+  assert.ok(preview?.isValid)
+  assert.equal(h.read().ghostValues.x.value, h.bounds.x + preview.item.x * h.bounds.width)
+  assert.equal(h.read().ghostValues.y.value, h.bounds.y + preview.item.y * h.bounds.height)
+  const floor = createRoomEditorFloorOverlay({ shell: h.scene.shell, preview, stage: h.bounds })
+  assert.ok(floor && floor.cells.length > 0, "the destination is marked on the room floor")
+  assert.equal(floor.tone, "valid")
+  assert.deepEqual(
+    getRoomEditorDisplayRenderItems(h.scene.renderItems, preview, h.read().ghost?.renderId),
+    h.scene.renderItems,
+    "the floor preview does not draw a second copy of the piece in the room"
+  )
+  pan.end(h.event(0.3, 0.8), true)
+  assert.equal(h.commits.length, 1)
+  assert.deepEqual(h.commits[0], preview, "the drop uses the destination shown while dragging")
+  h.runtime.unmount()
+})
+
+test("the carried image has a sized native host and scales about its floor contact", () => {
+  const runtime = createFakeReactRuntime()
+  const fill = { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }
+  type Layout = {
+    width?: number; height?: number; left?: number; right?: number; top?: number; bottom?: number
+    transform?: { translateX?: number; translateY?: number; scale?: number; scaleX?: number }[]
+    transformOrigin?: number[]
+  }
+  const flatten = (style: unknown): Layout => Array.isArray(style)
+    ? Object.assign({}, ...style.map(flatten))
+    : (style ?? {}) as Layout
+  const native = createReactNativeStub({ StyleSheet: { create: (s: unknown) => s, absoluteFill: fill, flatten } })
+  const animated = createReanimatedStub(runtime)
+  const styles = loadSourceWithFakeReact("features/roomV2/editor/roomEditorStyles.ts", runtime, {
+    modules: { "react-native": native.module }, inertUnknown: true
+  })
+  const view = loadSourceWithFakeReact<{ RoomEditorDragGhost: typeof GhostView }>(
+    "features/roomV2/editor/RoomEditorDragGhost.tsx", runtime, {
+      modules: {
+        "react-native": native.module,
+        "react-native-reanimated": animated.module,
+        "expo-image": { Image: "ExpoImage" },
+        "./roomEditorStyles": styles,
+        "./roomEditorDragModel": dragModel
+      }
+    }
+  )
+  const frame = { width: 32, height: 120, offsetX: -16, offsetY: -120 }
+  const values: Parameters<typeof GhostView>[0]["values"] = {
+    x: { value: 140 } as never, y: { value: 420 } as never,
+    opacity: { value: 1 } as never, scale: { value: 1.04 } as never,
+    overlayOrigin: { value: { x: 0, y: 62 } } as never,
+    lift: { value: 1 } as never
+  }
+  const ghost = { session: 1, source: 1 as never, mirrored: true, frame }
+  type Node = { type: unknown; props: { style?: unknown; children?: Node | Node[]; source?: unknown } }
+  const tree = runtime.render(() => view.RoomEditorDragGhost({ ghost, values })) as unknown as Node
+  const host = tree.props.children as Node
+  const box = flatten(host.props.style)
+  assert.equal(box.width, frame.width, "an overflowing image must not live in a zero-width native host")
+  assert.equal(box.height, frame.height, "the image's absolute-fill parent must have real height")
+  assert.equal(box.left! + box.transform![0].translateX!, values.x.value + frame.offsetX)
+  assert.equal(box.top! + box.transform![1].translateY!, values.y.value - 62 + frame.offsetY)
+  assert.deepEqual(box.transformOrigin, [-frame.offsetX, -frame.offsetY, 0], "lift scaling keeps the floor anchor fixed")
+  const children = (host.props.children as Node[]).filter(Boolean)
+  const piece = children.find((child) => (child.props.children as Node)?.type === "ExpoImage")!
+  assert.ok(piece, "the carried furniture image is mounted")
+  const image = piece.props.children as Node
+  const imageBox = flatten(image.props.style)
+  assert.equal(image.props.source, ghost.source)
+  assert.equal(imageBox.left, 0)
+  assert.equal(imageBox.top, 0)
+  assert.equal(imageBox.right, 0)
+  assert.equal(imageBox.bottom, 0)
+  assert.deepEqual(imageBox.transform, [{ scaleX: -1 }])
+  assert.deepEqual(flatten(piece.props.style).transform, [{ translateY: -dragModel.ROOM_EDITOR_DRAG_LIFT_HEIGHT }])
+  runtime.unmount()
 })

@@ -29,7 +29,6 @@ import {
 } from "./roomEditorDragModel"
 import {
   createRoomEditorFloorOverlay,
-  getRoomEditorDragGhostPlate,
   getRoomEditorParallelogramMatrix,
   ROOM_EDITOR_FLOOR_SHAPE_BASE
 } from "./roomEditorFloorGridModel"
@@ -263,10 +262,4 @@ test("parallelogram matrices map the base square onto the cell's edges", () => {
   const corner = map(half, half)
   assert.ok(Math.abs(corner.x - (alongI.x + alongJ.x) / 2) < 1e-9)
   assert.ok(Math.abs(corner.y - (alongI.y + alongJ.y) / 2) < 1e-9)
-  const chairRender = scene.renderItems[0]
-  assert.equal(chairRender.kind, "furniture")
-  if (chairRender.kind !== "furniture") return
-  const plate = getRoomEditorDragGhostPlate(chairRender, stage)
-  // The plate is centred on the footprint, which sits just above a bottom anchor.
-  assert.ok(plate.top + half < 0)
 })

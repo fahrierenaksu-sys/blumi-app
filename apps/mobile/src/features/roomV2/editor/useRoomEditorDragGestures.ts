@@ -48,7 +48,6 @@ import {
   type RoomEditorDragGhostFrame,
   type RoomEditorDragHitRect
 } from "./roomEditorDragModel"
-import { getRoomEditorDragGhostPlate, type RoomEditorFloorShape } from "./roomEditorFloorGridModel"
 import {
   getRoomPlacementSurfaceDropFeedback,
   type PlacementPreview,
@@ -70,8 +69,6 @@ export interface RoomEditorDragGhostContent {
   source: FurnitureItem["asset"]["source"]
   mirrored: boolean
   frame: RoomEditorDragGhostFrame
-  /** Floor-grid drags: the footprint plate tinted by `tone`. */
-  plate?: RoomEditorFloorShape
 }
 
 /** Ghost anchor in window coordinates plus the overlay's window origin. */
@@ -83,12 +80,7 @@ export interface RoomEditorDragGhostValues {
   /** 0 resting, 1 held up off the room (raises the piece over its shadow). */
   lift?: SharedValue<number>
   overlayOrigin: SharedValue<{ x: number; y: number }>
-  /** 0 no verdict yet (or off the stage), 1 valid spot, 2 invalid spot. Editor drags only. */
-  tone?: SharedValue<number>
 }
-
-/** Ghost tone values (a shared value, so the plate recolours without a render). */
-export const ROOM_EDITOR_GHOST_TONE = { none: 0, valid: 1, invalid: 2 } as const
 
 type ActiveDrag =
   | {
@@ -170,7 +162,6 @@ export function useRoomEditorDragGestures(input: {
   const ghostOriginY = useSharedValue(0)
   const ghostScale = useSharedValue(1)
   const ghostOpacity = useSharedValue(0)
-  const ghostTone = useSharedValue<number>(ROOM_EDITOR_GHOST_TONE.none)
   const ghostLift = useSharedValue(0)
   const overlayOrigin = useSharedValue({ x: 0, y: 0 })
 
@@ -210,8 +201,7 @@ export function useRoomEditorDragGestures(input: {
     ghostScale.value = reduceMotion ? 1 : animateTo(ROOM_EDITOR_DRAG_LIFT_SCALE, snappy)
     ghostLift.value = animateTo(1, snappy)
     ghostOpacity.value = ROOM_EDITOR_DRAG_GHOST_OPACITY
-    ghostTone.value = ROOM_EDITOR_GHOST_TONE.none
-  }, [ghostLift, ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostTone, ghostX, ghostY, reduceMotion, snappy])
+  }, [ghostLift, ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostX, ghostY, reduceMotion, snappy])
 
   // A floor drag shows the piece on its snapped cell: a short glide, or a
   // jump under Reduce Motion. Only window coordinates change; no render.
@@ -306,9 +296,8 @@ export function useRoomEditorDragGestures(input: {
     ghostOpacity.value = 0
     ghostScale.value = 1
     ghostLift.value = 0
-    ghostTone.value = ROOM_EDITOR_GHOST_TONE.none
     clearGhost(session)
-  }, [clearGhost, ghostLift, ghostOpacity, ghostScale, ghostTone])
+  }, [clearGhost, ghostLift, ghostOpacity, ghostScale])
 
   // Drag callbacks reach JS through scheduleOnRN; they read the latest render
   // through this ref so the gestures (and every tray card) keep one identity.
@@ -357,8 +346,7 @@ export function useRoomEditorDragGestures(input: {
         renderId,
         source: item.asset.source,
         mirrored: item.usesMirroredRotation,
-        frame: getRoomEditorDragGhostFrame(item, roomLayout),
-        plate: floor ? getRoomEditorDragGhostPlate(item, roomLayout) : undefined
+        frame: getRoomEditorDragGhostFrame(item, roomLayout)
       })
     },
     beginTrayDrag(
@@ -394,8 +382,7 @@ export function useRoomEditorDragGestures(input: {
           renderId: instanceId,
           source: renderItem.asset.source,
           mirrored: renderItem.usesMirroredRotation,
-          frame: getRoomEditorDragGhostFrame(renderItem, stage),
-          plate: floor ? getRoomEditorDragGhostPlate(renderItem, stage) : undefined
+          frame: getRoomEditorDragGhostFrame(renderItem, stage)
         })
       }
     },
@@ -407,9 +394,6 @@ export function useRoomEditorDragGestures(input: {
       if (cellHaptic === "selection") hapticSelection()
       else if (cellHaptic === "rigid") hapticRigid()
       lastDragPreviewRef.current = preview
-      ghostTone.value = !preview
-        ? ROOM_EDITOR_GHOST_TONE.none
-        : preview.isValid ? ROOM_EDITOR_GHOST_TONE.valid : ROOM_EDITOR_GHOST_TONE.invalid
       if (drag.floor && preview) {
         scheduleOnUI(placeGhostAtFittedPoint, session, column, row, preview.item.x, preview.item.y)
       }
@@ -714,9 +698,8 @@ export function useRoomEditorDragGestures(input: {
     scale: ghostScale,
     opacity: ghostOpacity,
     lift: ghostLift,
-    overlayOrigin,
-    tone: ghostTone
-  }), [ghostLift, ghostOpacity, ghostScale, ghostTone, ghostX, ghostY, overlayOrigin])
+    overlayOrigin
+  }), [ghostLift, ghostOpacity, ghostScale, ghostX, ghostY, overlayOrigin])
 
   return {
     stageAnimatedRef,

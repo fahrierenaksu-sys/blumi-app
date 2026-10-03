@@ -139,25 +139,3 @@ export function createRoomEditorFloorOverlay(input: {
     tone: preview.isValid ? "valid" : "invalid"
   }
 }
-
-/**
- * The validity plate under the drag ghost: the diamond inscribed in the
- * piece's footprint bounds, relative to the ghost's anchor, in pixels.
- */
-export function getRoomEditorDragGhostPlate(
-  item: Extract<RoomV2RenderItem, { kind: "furniture" }>,
-  stage: StageSize
-): RoomEditorFloorShape {
-  const { bounds } = getRoomV2FurnitureFootprintTest(item)
-  const width = (bounds.maxX - bounds.minX) * stage.width
-  const height = (bounds.maxY - bounds.minY) * stage.height
-  return toShape(
-    "ghost-plate",
-    {
-      x: ((bounds.minX + bounds.maxX) / 2 - item.x) * stage.width,
-      y: ((bounds.minY + bounds.maxY) / 2 - item.y) * stage.height
-    },
-    { x: width / 2, y: height / 2 },
-    { x: width / 2, y: -height / 2 }
-  )
-}
