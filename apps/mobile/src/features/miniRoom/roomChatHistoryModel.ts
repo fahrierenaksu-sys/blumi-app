@@ -18,8 +18,8 @@ export type RoomChatHistoryStatus = "unavailable" | "loading" | "failed" | "read
 
 export type RoomChatListStatus = "idle" | "loading" | "ready" | "failed"
 
-/** The room shows the recent durable conversation; older text stays in the chat thread. */
-export const ROOM_CHAT_HISTORY_LIMIT = 60
+/** MiniRoom shows a rolling window; the shared thread keeps the full history. */
+export const ROOM_CHAT_HISTORY_LIMIT = 15
 
 /**
  * The shared room's chat history from the durable thread, newest first (for
@@ -30,11 +30,9 @@ export function selectRoomChatHistory(input: {
   messages: readonly ChatMessage[]
   localUserId: string
   deliveryOf: (messageId: string) => RoomChatDelivery
-  limit?: number
 }): RoomChatHistoryItem[] {
-  const limit = input.limit ?? ROOM_CHAT_HISTORY_LIMIT
   const newestFirst: Omit<RoomChatHistoryItem, "showMeta">[] = []
-  for (let index = input.messages.length - 1; index >= 0 && newestFirst.length < limit; index -= 1) {
+  for (let index = input.messages.length - 1; index >= 0 && newestFirst.length < ROOM_CHAT_HISTORY_LIMIT; index -= 1) {
     const message = input.messages[index]
     if (!message || isRoomInviteSentinel(message.body) || message.body.trim().length === 0) continue
     newestFirst.push({

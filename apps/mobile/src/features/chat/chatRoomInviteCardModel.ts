@@ -31,6 +31,7 @@ export function getRoomInviteCardState(invite: ChatRoomInviteTimelineItem, userI
     label: copy.label,
     title: pending ? copy.pendingTitle : accepted ? copy.acceptedTitle : copy.closedTitle,
     detail: accepted ? copy.ready : isSender ? copy.sent : copy.received,
+    senderLabel: isSender ? copy.sent : copy.received,
     note: accepted ? copy.acceptedNote : pending ? isSender ? copy.note : copy.incomingNote : copy.closedNote,
     statusLabel: pending && isSender ? copy.waiting : getRoomInvitePresentation(invite, userId, locale).statusLabel,
     primaryLabel: primaryAction?.type === "accept" ? copy.accept : copy.enter,

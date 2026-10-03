@@ -15,6 +15,7 @@ import {
   createThreadRoomInvite,
   decideThreadRoomInvite,
   fetchThreadRoomInvites,
+  fetchThreadRoomInvitePage,
   joinRoomSession,
   leaveActiveRoom
 } from "../features/chat/chatRoomInviteApi"
@@ -142,6 +143,7 @@ export function useRootChatSync({
         setRoomInvites((current) => update(current))
       },
       fetchThreadRoomInvites,
+      fetchThreadRoomInvitePage,
       sendThreadMessage,
       fetchThreadMessages,
       markThreadRead,
@@ -237,6 +239,8 @@ export function useRootChatSync({
     refreshParticipants: refreshProductionThreads,
     markThreadRead: markChatThreadRead,
     roomInvites: visibleRoomInvites,
+    requestOlderRoomInvites: chatCoordinator.requestOlderRoomInvites,
+    ensureRoomInvite: chatCoordinator.ensureRoomInvite,
     onRoomInviteAction: sessionMode === "demo"
       ? handleDemoRoomInviteAction
       : handleRoomInviteAction,
@@ -248,6 +252,7 @@ export function useRootChatSync({
   }), [
     refreshProductionThreads,
     chatLocale,
+    chatCoordinator,
     closeMyActiveRoom,
     handleDemoRoomInviteAction,
     handleRoomInviteAction,

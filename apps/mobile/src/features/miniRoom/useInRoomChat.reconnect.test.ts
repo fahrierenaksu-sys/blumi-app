@@ -13,6 +13,7 @@ import {
 } from "./inRoomChatThread"
 import { createRoomEntryReplayGate, advanceRoomEntryReplayGate } from "./roomEntryReplayGate"
 import { createReconnectTransitionTracker, type RealtimeConnectionStatus } from "@blumi/realtime-client"
+import { ROOM_CHAT_HISTORY_LIMIT } from "./roomChatHistoryModel"
 
 const localUserId = "room-owner"
 const partnerUserId = "room-partner"
@@ -27,7 +28,13 @@ function message(
   return { messageId, threadId, senderUserId, body, sentAt }
 }
 
-function createHookFixture(options: { withoutThread?: boolean } = {}) {
+function createHookFixture(options: {
+  withoutThread?: boolean
+  cachedHistory?: ChatMessage[]
+  threadLastMessage?: ChatMessage
+  initialListStatus?: "idle" | "loading" | "ready" | "failed"
+  rejectHistoryRequest?: boolean
+} = {}) {
   const sourceFile = resolve(
     process.cwd().endsWith("apps/mobile") ? "src" : "apps/mobile/src",
     "features/miniRoom/useInRoomChat.ts"
@@ -42,12 +49,16 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
   let mounted = true
   let output: any
   let realtimeStatus: RealtimeConnectionStatus = "connected"
-  let listStatus: "idle" | "loading" | "ready" | "failed" = "idle"
+  let listStatus: "idle" | "loading" | "ready" | "failed" = options.initialListStatus ??
+    (options.cachedHistory === undefined ? "idle" : "ready")
   let listCompletionVersion = 0
-  let messages: ChatMessage[] = []
+  let historyReady = options.cachedHistory !== undefined
+  let messages: ChatMessage[] = options.cachedHistory ?? []
+  let latestHistoryMessageIds = options.cachedHistory?.map((entry) => entry.messageId)
   let eventHandler: ((event: any) => void) | undefined
   const statusListeners = new Set<(status: RealtimeConnectionStatus) => void>()
   const sends: unknown[] = []
+  const requests: { threadId: string; options?: { before?: string; limit?: number } }[] = []
   const optimistic: unknown[] = []
   const failed: string[] = []
   const markedSending: string[] = []
@@ -62,7 +73,8 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
       { userId: localUserId, displayName: "You" },
       { userId: partnerUserId, displayName: "Partner" }
     ],
-    createdAt: "2026-07-21T12:00:00.000Z"
+    createdAt: "2026-07-21T12:00:00.000Z",
+    ...(options.threadLastMessage ? { lastMessage: options.threadLastMessage } : {})
   }
   const sameDeps = (left?: readonly unknown[], right?: readonly unknown[]) =>
     Boolean(left && right && left.length === right.length && left.every((entry, i) => Object.is(entry, right[i])))
@@ -96,10 +108,8 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
     }
   }
   const effects: { slot: Slot; run: () => void | (() => void) }[] = []
-  const noThreads: ChatThread[] = []
   const send = (event: unknown) => { sends.push(event); return sendAccepted }
   let effectRuns = 0
-  const getMessages = (requestedThreadId: string) => requestedThreadId === threadId ? messages : []
   const getMessageListState = (requestedThreadId: string) => ({
     status: requestedThreadId === threadId ? listStatus : "idle"
   })
@@ -110,6 +120,17 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
   }
   const getMessageListCompletionVersion = (requestedThreadId: string) =>
     requestedThreadId === threadId ? listCompletionVersion : 0
+  const addOptimisticMessage = (entry: unknown) => { optimistic.push(entry) }
+  const requestMessages = (requestedThreadId: string, requestOptions?: { before?: string; limit?: number }) => {
+    requests.push({ threadId: requestedThreadId, options: requestOptions })
+    if (options.rejectHistoryRequest) {
+      listStatus = "failed"
+      listCompletionVersion += 1
+      dirty = true
+      return Promise.reject(new Error("History fetch failed"))
+    }
+    return Promise.resolve()
+  }
   const modules: Record<string, unknown> = {
     react,
     "../chat/chatStore": {
@@ -120,11 +141,19 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
       confirmOptimisticMessage: (clientMessageId: string, chatMessage: ChatMessage) => {
         confirmed.push({ clientMessageId, messageId: chatMessage.messageId })
       },
-      useChatStore: () => ({
-        threads: options.withoutThread ? noThreads : [thread],
-        getMessages,
-        getMessageListState,
-        addOptimisticMessage: (entry: unknown) => { optimistic.push(entry) }
+      useChatThreadStore: () => ({
+        thread: options.withoutThread ? undefined : thread,
+        messages: messages,
+        messageListState: getMessageListState(threadId),
+        historyReady,
+        latestHistoryMessageIds,
+        deliveryKey: "0",
+        partnerReceipts: undefined,
+        addOptimisticMessage,
+        getMessageDeliveryState: () => "sent",
+        getRetryableMessage: () => null,
+        markOptimisticMessageSending: () => undefined,
+        setActiveThread: () => undefined
       })
     },
     "../realtime/globalRealtimeProvider": {
@@ -148,6 +177,7 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
       findMissedCanonicalRoomChatMessages,
       shouldRenderIncomingRoomChatMessage
     },
+    "./roomChatHistoryModel": { ROOM_CHAT_HISTORY_LIMIT },
     "./roomEntryReplayGate": { createRoomEntryReplayGate, advanceRoomEntryReplayGate }
   }
   const module = { exports: {} as any }
@@ -178,7 +208,8 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
       miniRoomId: "mini-room",
       sourceThreadId: threadId,
       localUserId,
-      partnerUserId
+      partnerUserId,
+      requestMessages
     })
     const pendingEffects = effects.splice(0)
     for (const effect of pendingEffects) effect.slot.cleanup?.()
@@ -199,6 +230,7 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
     rerender: render,
     effectRuns: () => effectRuns,
     sends,
+    requests,
     optimistic,
     failed,
     markedSending,
@@ -225,7 +257,11 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
     applyHistory: (nextMessages: ChatMessage[], status: "loading" | "ready") => {
       messages = nextMessages
       listStatus = status
-      if (status === "ready") listCompletionVersion += 1
+      if (status === "ready") {
+        listCompletionVersion += 1
+        historyReady = true
+        latestHistoryMessageIds = nextMessages.map((entry) => entry.messageId)
+      }
       dirty = true
     },
     applyFastReadyHistory: (nextMessages: ChatMessage[]) => {
@@ -234,7 +270,9 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
       listStatus = "loading"
       listStatus = "ready"
       listCompletionVersion += 1
+      historyReady = true
       messages = nextMessages
+      latestHistoryMessageIds = nextMessages.map((entry) => entry.messageId)
       dirty = true
     },
     unmount: () => {
@@ -247,7 +285,9 @@ function createHookFixture(options: { withoutThread?: boolean } = {}) {
 test("MiniRoom replays one entry message, then reconciles reconnect history without echo duplicates", async () => {
   const f = createHookFixture()
   await f.settle()
-  assert.equal(f.sends.length, 1, "room entry asks the existing realtime client for history once")
+  assert.equal(f.requests.length, 1, "room entry asks the chat coordinator for history once")
+  assert.deepEqual(plain(f.requests), [{ threadId, options: { limit: ROOM_CHAT_HISTORY_LIMIT } }])
+  assert.equal(f.sends.length, 0, "history uses HTTP instead of the realtime endpoint's 50-message default")
 
   const buffered = message("buffered-at-entry", partnerUserId, "Buffered during entry", new Date(Date.now() + 500).toISOString())
   f.emitMessage(buffered)
@@ -284,7 +324,7 @@ test("MiniRoom replays one entry message, then reconciles reconnect history with
     f.output().newMessages.map((entry) => entry.messageId).join("|"),
     "entry-latest|buffered-at-entry|live-during-reconnect|missed-one|missed-two"
   )
-  assert.equal(f.sends.length, 1, "the hook must not duplicate the coordinator's reconnect history fetch")
+  assert.equal(f.requests.length, 1, "the hook must not duplicate the root reconnect history fetch")
 
   f.emitStatus("disconnected")
   f.emitStatus("connected")
@@ -299,6 +339,60 @@ test("MiniRoom replays one entry message, then reconciles reconnect history with
   ], "ready")
   await f.settle()
   assert.equal(f.output().newMessages.length, 5, "a repeated canonical snapshot must not replay any bubble twice")
+  f.unmount()
+})
+
+test("MiniRoom reuses a cached latest history page and still replays its newest entry message", async () => {
+  const latest = message("cached-latest", partnerUserId, "Recent in chat", new Date(Date.now() - 100).toISOString())
+  const f = createHookFixture({ cachedHistory: [latest], threadLastMessage: latest })
+  await f.settle()
+
+  assert.equal(f.requests.length, 0, "a server-confirmed recent snapshot avoids a duplicate history request")
+  assert.equal(f.output().newMessages.map((entry) => entry.messageId).join("|"), "cached-latest")
+  f.unmount()
+})
+
+test("MiniRoom reuses a server-confirmed empty latest page", async () => {
+  const f = createHookFixture({ cachedHistory: [] })
+  await f.settle()
+
+  assert.equal(f.requests.length, 0, "a confirmed empty page is a current snapshot too")
+  assert.equal(f.output().newMessages.length, 0)
+  f.unmount()
+})
+
+test("MiniRoom refreshes a cached page when it trails the thread's latest-message summary", async () => {
+  const cached = message("cached-old", partnerUserId, "Older cached message", new Date(Date.now() - 60_000).toISOString())
+  const summary = message("server-latest", partnerUserId, "Newer server message", new Date(Date.now() - 5_000).toISOString())
+  const f = createHookFixture({ cachedHistory: [cached], threadLastMessage: summary })
+  await f.settle()
+
+  assert.equal(f.requests.length, 1, "a latest-page marker cannot hide a gap against the thread summary")
+  assert.deepEqual(plain(f.requests), [{ threadId, options: { limit: ROOM_CHAT_HISTORY_LIMIT } }])
+  f.unmount()
+})
+
+test("MiniRoom does not treat loading or failed history as a ready snapshot", async () => {
+  const cached = message("cached", partnerUserId, "Cached message", new Date(Date.now() - 60_000).toISOString())
+  for (const status of ["loading", "failed"] as const) {
+    const f = createHookFixture({
+      cachedHistory: [cached],
+      threadLastMessage: cached,
+      initialListStatus: status
+    })
+    await f.settle()
+    assert.equal(f.requests.length, 1, `a ${status} history state must request a current snapshot`)
+    assert.deepEqual(plain(f.requests), [{ threadId, options: { limit: ROOM_CHAT_HISTORY_LIMIT } }])
+    f.unmount()
+  }
+})
+
+test("a failed coordinator history request is swallowed after the coordinator marks the list failed", async () => {
+  const f = createHookFixture({ rejectHistoryRequest: true })
+  await assert.doesNotReject(f.settle())
+
+  assert.equal(f.requests.length, 1)
+  assert.deepEqual(plain(f.requests), [{ threadId, options: { limit: ROOM_CHAT_HISTORY_LIMIT } }])
   f.unmount()
 })
 

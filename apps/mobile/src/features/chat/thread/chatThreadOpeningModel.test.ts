@@ -4,6 +4,11 @@ import type { ChatMessage } from "@blumi/contracts"
 import { buildChatTimeline, type ChatTimelineItem } from "../chatRoomInviteModel"
 import {
   CHAT_THREAD_SKELETON_DELAY_MS,
+  buildChatThreadWindow,
+  countChatRowsAddedWithinWindow,
+  getOldestConfirmedChatMessageId,
+  hasEarlierCachedChatRows,
+  isDisjointChatHistoryPage,
   getChatTimelineInitialOpacity,
   resolveChatThreadBody,
   resolveChatTimelineReveal,
@@ -179,4 +184,65 @@ test("demo threads show their local messages at once and wait only until they li
   assert.equal(demo({ timelineLength: 2, listStatus: "idle" }), "timeline")
   assert.equal(demo({ listStatus: "idle" }), "loading")
   assert.equal(demo({ listStatus: "ready" }), "empty")
+})
+
+test("a bounded window preserves full timeline order for equal-time messages, invitations and legacy rows", () => {
+  const sameTime = Array.from({ length: 30 }, (_, index) => message(`tie-${String(30 - index).padStart(2, "0")}`, 1))
+  const invites = Array.from({ length: 30 }, (_, index) => ({
+    kind: "room_invite" as const, inviteId: `invite-${index}`, threadId: "thread-1",
+    senderUserId: "partner", recipientUserId: "me", createdAt: message("date", index).sentAt,
+    status: "expired" as const
+  }))
+  const key = (id: string) => id
+  for (const roomInvites of [[], invites]) {
+    const messages = [...sameTime, { ...message("legacy", 31), body: "__room_invite__" }]
+    const actual = buildChatThreadWindow(messages, roomInvites, 20, key)
+    assert.deepEqual(actual, buildChatTimeline(messages, roomInvites, key).slice(-20))
+  }
+  const previousItems = timeline(message("tie-20", 1))
+  assert.equal(countChatRowsAddedWithinWindow(sameTime, [], previousItems, key), 10,
+    "an earlier-arriving equal-time key must not stop the scan")
+})
+
+test("a future optimistic newest row does not evict the oldest row when a partner message lands in the middle", () => {
+  const confirmed = Array.from({ length: 20 }, (_, index) => message(`m${index + 1}`, index + 1))
+  const optimistic = message("__local_future", 25)
+  const previous = timeline(...confirmed, optimistic)
+  const incoming = message("incoming", 21)
+  const current = [...confirmed, incoming, optimistic]
+  assert.equal(countChatRowsAddedWithinWindow(current, [], previous, id => id), 1)
+  assert.deepEqual(buildChatThreadWindow(current, [], previous.length + 1, id => id), timeline(...current))
+  const late = message("late-middle", 10.5)
+  const sorted = [...confirmed, late, optimistic].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
+  assert.equal(countChatRowsAddedWithinWindow(sorted, [], previous, id => id), 1)
+  const ack = { ...optimistic, messageId: "confirmed-ack", sentAt: message("date", 21).sentAt }
+  assert.equal(countChatRowsAddedWithinWindow([...confirmed, ack], [], previous,
+    id => id === "confirmed-ack" ? "__local_future" : id), 0, "ACK reuses the optimistic render key")
+  assert.equal(countChatRowsAddedWithinWindow([message("old-page", 0), ...confirmed, optimistic], [], previous, id => id), 0)
+})
+
+test("old invitations and untracked local rows have a cached reveal path without a server cursor", () => {
+  const invites = Array.from({ length: 25 }, (_, index) => ({
+    kind: "room_invite" as const, inviteId: `invite-${index}`, threadId: "thread-1",
+    senderUserId: "partner", recipientUserId: "me", createdAt: message("date", index).sentAt, status: "expired" as const
+  }))
+  const visible = buildChatThreadWindow([], invites, 20, id => id)
+  assert.equal(hasEarlierCachedChatRows([], invites, visible, id => id), true)
+  assert.equal(getOldestConfirmedChatMessageId(visible, () => "sent"), null)
+  assert.equal(getOldestConfirmedChatMessageId(timeline(message("__local_untracked", 30)), () => "sent"), null)
+  const expanded = buildChatThreadWindow([], invites, 40, id => id)
+  assert.equal(expanded.length, 25)
+  assert.equal(hasEarlierCachedChatRows([], invites, expanded, id => id), false)
+})
+
+test("authoritative first-page continuity cannot be proved by one overlapping realtime row or ACK", () => {
+  const stale = Array.from({ length: 20 }, (_, index) => message(`m${index + 1}`, index + 1))
+  const latest = Array.from({ length: 20 }, (_, index) => `m${81 + index}`)
+  const previousIds = stale.map(item => item.messageId)
+  assert.equal(isDisjointChatHistoryPage(timeline(...stale, message("m100", 100)), latest, id => id, previousIds), true)
+  assert.equal(isDisjointChatHistoryPage(timeline(...stale, message("__local_100", 100)), latest,
+    id => id === "m100" ? "__local_100" : id, previousIds), true)
+  assert.equal(isDisjointChatHistoryPage(timeline(...stale), previousIds.slice(1).concat("m21"), id => id, previousIds), false)
+  assert.equal(isDisjointChatHistoryPage(timeline(message("m100", 100)), latest, id => id), false)
+  assert.equal(isDisjointChatHistoryPage(timeline(...stale, message("m100", 100)), latest, id => id), true)
 })

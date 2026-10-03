@@ -60,27 +60,59 @@ export function useChatThreadSync({
     // The thread-list refresh re-renders the Inbox and this screen when it
     // lands: it waits for the push to settle (the header already shows the
     // cached partner).
-    const cancel = whenSettled(() => { void refreshParticipants().catch(() => undefined) })
+    let visible = false
+    let cancel: () => void = () => undefined
+    const syncVisibility = (state: string) => {
+      if (state !== "active") {
+        visible = false
+        cancel()
+        return
+      }
+      if (visible) return
+      visible = true
+      cancel = whenSettled(() => {
+        if (visible && current.current.currentUserId === currentUserId) void refreshParticipants().catch(() => undefined)
+      })
+    }
+    syncVisibility(AppState.currentState)
     const subscription = AppState.addEventListener("change", state => {
-      if (state === "active") void refreshParticipants().catch(() => undefined)
+      syncVisibility(state)
     })
     return () => {
+      visible = false
       cancel()
       subscription.remove()
     }
-  }, [isFocused, refreshParticipants, resolvedThreadId, whenSettled])
+  }, [currentUserId, isFocused, refreshParticipants, resolvedThreadId, whenSettled])
   // Request messages from server when entering thread. Unknown history is
   // what the screen waits for, so it goes at once; a refresh of cached
   // history (and its invitation refresh) waits for the push to settle.
   useEffect(() => {
-    if (!requestMessages || !resolvedThreadId) return
-    const request = () => { void requestMessages(resolvedThreadId).catch(() => undefined) }
-    if (!historyReadyRef.current) {
-      request()
-      return
+    if (!isFocused || !requestMessages || !resolvedThreadId) return
+    let visible = false
+    let cancel: () => void = () => undefined
+    const syncVisibility = (state: string) => {
+      if (state !== "active") {
+        visible = false
+        cancel()
+        return
+      }
+      if (visible) return
+      visible = true
+      const request = () => {
+        if (visible && current.current.currentUserId === currentUserId) void requestMessages(resolvedThreadId).catch(() => undefined)
+      }
+      if (!historyReadyRef.current) request()
+      else cancel = whenSettled(request)
     }
-    return whenSettled(request)
-  }, [requestMessages, resolvedThreadId, whenSettled])
+    syncVisibility(AppState.currentState)
+    const subscription = AppState.addEventListener("change", syncVisibility)
+    return () => {
+      visible = false
+      cancel()
+      subscription.remove()
+    }
+  }, [currentUserId, isFocused, requestMessages, resolvedThreadId, whenSettled])
 
   const handleRetryMessages = useCallback((): void => {
     if (!requestMessages || !resolvedThreadId) return

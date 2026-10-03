@@ -96,6 +96,11 @@ try {
       NODE_PATH: resolve(workspaceRoot, "../../node_modules")
     }
   })
+  execFileSync(process.execPath, [
+    "--import", "tsx", "--test",
+    "src/features/miniRoom/roomChatHistoryModel.test.ts",
+    "src/features/miniRoom/useRoomChatHistory.test.ts"
+  ], { cwd: workspaceRoot, stdio: "inherit" })
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

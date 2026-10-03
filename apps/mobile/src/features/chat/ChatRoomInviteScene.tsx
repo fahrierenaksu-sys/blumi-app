@@ -9,6 +9,19 @@ import { useRoomInviteSceneMotion } from "./useRoomInviteSceneMotion"
 
 export interface RoomInviteSceneParticipant { avatar?: AvatarSelection; name: string; userId: string }
 
+export const ROOM_INVITE_SCENE_HEIGHT = 210
+export const ROOM_INVITE_DOOR_GEOMETRY = Object.freeze({ width: 98, height: 146, bottom: 28 })
+
+/** The invitation's door, reused by the room-entry flight without mounting avatars. */
+export function RoomInviteDoorFlightArtwork() {
+  const motion = useRoomInviteSceneMotion(true)
+  return (
+    <View style={styles.flightDoorArtwork} pointerEvents="none">
+      <RoomInviteDoorFrame motion={motion} flight />
+    </View>
+  )
+}
+
 export function ChatRoomInviteScene({ open, label, note, sender, recipient }: {
   open: boolean; label: string; note: string; sender: RoomInviteSceneParticipant; recipient: RoomInviteSceneParticipant
 }) {
@@ -20,26 +33,7 @@ export function ChatRoomInviteScene({ open, label, note, sender, recipient }: {
       <View style={styles.label}><Ionicons name="home-outline" size={13} color={uiTheme.colors.brandPlum} /><Text style={styles.labelText}>{label}</Text></View>
       <Animated.View style={[styles.lightBeam, motion.beamStyle]} />
       <Animated.View style={[styles.lightPool, motion.poolStyle]}><View style={styles.poolMiddle}><View style={styles.poolCore} /></View></Animated.View>
-      <View style={styles.doorFrame}>
-        <LinearGradient colors={["#F6E1CC", "#D6AB98", "#E6C6B0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.frameOuter} />
-        <View style={styles.frameMoulding} />
-        <View style={styles.doorOpening}>
-          <Animated.View style={[StyleSheet.absoluteFill, motion.interiorStyle]}>
-            <LinearGradient colors={["#FFEBC2", "#F5C985", "#E8B172"]} style={StyleSheet.absoluteFill} />
-            <View style={styles.innerWall} /><View style={styles.innerSkirting} />
-            <View style={styles.innerRug} /><View style={styles.innerGlow} />
-          </Animated.View>
-        </View>
-        <Animated.View style={[styles.doorLeaf, motion.doorStyle]}>
-          <LinearGradient colors={["#E8B8BE", "#DA9CA8", "#C98596"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.doorFace}>
-            <View style={styles.doorBevel}><View style={styles.upperPanel}><Ionicons name="heart" size={18} color="#FFECD5" /></View><View style={styles.lowerPanel} /></View>
-            <View style={styles.handlePlate}><View style={styles.handle}><View style={styles.handleGlint} /></View></View>
-          </LinearGradient>
-          <View style={styles.doorEdge} />
-        </Animated.View>
-        <View style={[styles.hinge, styles.hingeTop]} /><View style={[styles.hinge, styles.hingeBottom]} />
-        <View style={styles.threshold} />
-      </View>
+      <RoomInviteDoorFrame motion={motion} />
       <View style={styles.lamp}><View style={styles.lampMount} /><View style={styles.lampShade} /><View style={styles.lampBulb} /></View>
       <View style={[styles.person, styles.sender]}><RoomInviteAvatar avatar={sender.avatar} name={sender.name} seed={sender.userId} /></View>
       <View style={[styles.person, styles.recipient]}><RoomInviteAvatar avatar={recipient.avatar} name={recipient.name} seed={recipient.userId} /></View>
@@ -49,12 +43,42 @@ export function ChatRoomInviteScene({ open, label, note, sender, recipient }: {
   )
 }
 
+function RoomInviteDoorFrame({ motion, flight = false }: {
+  motion: ReturnType<typeof useRoomInviteSceneMotion>
+  flight?: boolean
+}) {
+  return (
+    <View style={[styles.doorFrame, flight && styles.flightDoorFrame]}>
+      <LinearGradient colors={["#F6E1CC", "#D6AB98", "#E6C6B0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.frameOuter} />
+      <View style={styles.frameMoulding} />
+      <View style={styles.doorOpening}>
+        <Animated.View style={[StyleSheet.absoluteFill, motion.interiorStyle]}>
+          <LinearGradient colors={["#FFEBC2", "#F5C985", "#E8B172"]} style={StyleSheet.absoluteFill} />
+          <View style={styles.innerWall} /><View style={styles.innerSkirting} />
+          <View style={styles.innerRug} /><View style={styles.innerGlow} />
+        </Animated.View>
+      </View>
+      <Animated.View style={[styles.doorLeaf, motion.doorStyle]}>
+        <LinearGradient colors={["#E8B8BE", "#DA9CA8", "#C98596"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.doorFace}>
+          <View style={styles.doorBevel}><View style={styles.upperPanel}><Ionicons name="heart" size={18} color="#FFECD5" /></View><View style={styles.lowerPanel} /></View>
+          <View style={styles.handlePlate}><View style={styles.handle}><View style={styles.handleGlint} /></View></View>
+        </LinearGradient>
+        <View style={styles.doorEdge} />
+      </Animated.View>
+      <View style={[styles.hinge, styles.hingeTop]} /><View style={[styles.hinge, styles.hingeBottom]} />
+      <View style={styles.threshold} />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
-  scene: { height: 210, overflow: "hidden" },
+  flightDoorArtwork: { ...ROOM_INVITE_DOOR_GEOMETRY, bottom: 0, overflow: "hidden" },
+  flightDoorFrame: { left: 0, marginLeft: 0, bottom: 0 },
+  scene: { height: ROOM_INVITE_SCENE_HEIGHT, overflow: "hidden" },
   label: { position: "absolute", top: 13, left: 16, flexDirection: "row", alignItems: "center", gap: 5 },
   labelText: { ...uiTheme.font.micro, color: uiTheme.colors.brandPlum },
   floor: { position: "absolute", left: 0, right: 0, bottom: 0, height: 38, borderTopWidth: 1, borderTopColor: "#E5C8CB" },
-  doorFrame: { position: "absolute", width: 98, height: 146, left: "50%", marginLeft: -49, bottom: 28 },
+  doorFrame: { position: "absolute", ...ROOM_INVITE_DOOR_GEOMETRY, left: "50%", marginLeft: -49 },
   frameOuter: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, borderTopLeftRadius: 51, borderTopRightRadius: 51, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, borderWidth: 1, borderColor: "#FAEADD", shadowColor: "#9F6A77", shadowOpacity: 0.2, shadowOffset: { width: 3, height: 3 }, shadowRadius: 4 },
   frameMoulding: { position: "absolute", top: 4, bottom: 3, left: 4, right: 4, borderTopLeftRadius: 47, borderTopRightRadius: 47, borderWidth: 2, borderColor: "#EBCFB9" },
   doorOpening: { position: "absolute", top: 9, bottom: 4, left: 9, right: 9, borderTopLeftRadius: 41, borderTopRightRadius: 41, backgroundColor: "#F8D4A0", overflow: "hidden", borderWidth: 1, borderColor: "#BA8D7D" },

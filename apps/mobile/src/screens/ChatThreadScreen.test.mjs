@@ -218,49 +218,8 @@ test("retry is a no-op for unknown rows or without an ACK-capable callback", () 
   assert.deepEqual(noSender, [["lookup", "__local_test"]])
 })
 
-function loadEarlierBindings(events, overrides = {}) {
-  const requestMessages = (...args) => {
-    events.push(["request", ...args])
-    return overrides.result ?? Promise.resolve()
-  }
-  return {
-    requestMessages,
-    messages: [{ messageId: "oldest" }, { messageId: "newest" }],
-    resolvedThreadId: "thread_one",
-    isLoadingEarlier: false,
-    setIsLoadingEarlier: (value) => events.push(["loading", value]),
-    ...overrides.bindings
-  }
-}
-
-test("load earlier pages 20 messages before the oldest loaded one and always clears loading", async () => {
-  const events = []
-  await sendingCallback("handleLoadEarlier", loadEarlierBindings(events))()
-  assert.deepEqual(plain(events), [
-    ["loading", true],
-    ["request", "thread_one", { before: "oldest", limit: 20 }],
-    ["loading", false]
-  ])
-
-  const failed = []
-  await assert.rejects(
-    sendingCallback("handleLoadEarlier", loadEarlierBindings(failed, { result: Promise.reject(new Error("offline")) }))(),
-    /offline/
-  )
-  assert.deepEqual(failed.at(-1), ["loading", false])
-})
-
-test("load earlier ignores taps while loading, without history, or without a thread", async () => {
-  for (const bindings of [
-    { isLoadingEarlier: true },
-    { messages: [] },
-    { resolvedThreadId: undefined }
-  ]) {
-    const events = []
-    await sendingCallback("handleLoadEarlier", loadEarlierBindings(events, { bindings }))()
-    assert.deepEqual(events, [])
-  }
-})
+// Paging lifecycle, racing taps and error/retry behaviour execute the whole
+// production hook in features/chat/thread/useChatMessageSending.test.ts.
 
 test("composer clears only accepted sends, at once on the native input, and submits trimmed text", () => {
   for (const accepted of [false, true]) {

@@ -2,8 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatTypingCommand } from "@blumi/contracts"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
-import { chatTypingStore } from "./chatTypingStore"
+import { chatTypingStore, createChatTypingStore } from "./chatTypingStore"
 import type * as Hook from "./useChatDraftTyping"
+import type * as PartnerHook from "./usePartnerTyping"
 
 function mount(options: { enabled?: boolean; online?: boolean } = {}) {
   const runtime = createFakeReactRuntime()
@@ -86,4 +87,70 @@ test("a start that could not be sent is retried on the next keystroke", () => {
   f.runtime.unmount()
   assert.deepEqual(f.sent, [], "offline: nothing went out and no stop is owed")
   f.dispose()
+})
+
+test("incoming typing in any conversation leaves the draft owner idle while capability changes still stop sending", () => {
+  const f = mount()
+  const first = f.typing()
+  const renders = f.runtime.renderCount
+  chatTypingStore.applyUpdate({ threadId: "synthetic-other-thread", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  chatTypingStore.applyUpdate({ threadId: "t1", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  chatTypingStore.noteMessage({ threadId: "synthetic-other-thread", senderUserId: "synthetic-peer" })
+  assert.equal(f.runtime.renderCount, renders, "transient partner typing never invalidates the full timeline owner")
+  assert.equal(f.typing(), first)
+  f.typing().noteDraft("Synthetic draft")
+  f.dispose()
+  const sent = [...f.sent]
+  f.typing().noteDraft("Synthetic disabled draft")
+  assert.deepEqual(f.sent, sent, "the capability reset is still observed immediately")
+  f.runtime.unmount()
+})
+
+test("a next account starts its own typing session without renewing or stopping the previous account's draft", () => {
+  const f = mount()
+  f.typing().noteDraft("Synthetic previous draft")
+  const nextSignals: string[] = []
+  const stopNext = chatTypingStore.configure({ ownerUserId: "synthetic-next-owner", enabled: true,
+    send: (command) => { nextSignals.push(command.state); return true } })
+  f.typing().noteDraft("Synthetic next draft")
+  assert.deepEqual(nextSignals, ["start"], "a stale draft neither sends a stop through the new actor nor blocks its first start")
+  f.runtime.unmount()
+  stopNext()
+  f.dispose()
+})
+
+test("the typing bubble observes only its partner and thread, including message clear, expiry and account reset", () => {
+  const runtime = createFakeReactRuntime()
+  let now = 0
+  const timers = new Map<number, () => void>()
+  let counter = 0
+  const store = createChatTypingStore({ now: () => now,
+    setTimeout: (fn) => { timers.set(++counter, fn); return counter },
+    clearTimeout: (id) => { timers.delete(id as number) } })
+  const announcements: string[] = []
+  const hook = loadSourceWithFakeReact<typeof PartnerHook>("features/chat/typing/usePartnerTyping.ts", runtime, {
+    modules: { "react-native": { AccessibilityInfo: { announceForAccessibilityWithOptions: (text: string) => announcements.push(text) } },
+      "./chatTypingStore": { chatTypingStore: store } },
+    globals: { Date: class extends Date { static now() { return now } } }, real: ["./chatTypingModel"]
+  })
+  store.configure({ ownerUserId: "synthetic-owner", enabled: true, send: () => true })
+  runtime.render(() => hook.usePartnerTyping("synthetic-thread", "synthetic-peer", "Synthetic typing"))
+  const renders = runtime.renderCount
+  store.applyUpdate({ threadId: "synthetic-other", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  assert.equal(runtime.renderCount, renders)
+  store.applyUpdate({ threadId: "synthetic-thread", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  assert.equal(runtime.output, true)
+  assert.deepEqual(announcements, ["Synthetic typing"])
+  store.noteMessage({ threadId: "synthetic-thread", senderUserId: "synthetic-peer" })
+  assert.equal(runtime.output, false)
+  store.applyUpdate({ threadId: "synthetic-thread", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  now = 6_001
+  const scheduled = [...timers.values()]
+  timers.clear()
+  for (const fn of scheduled) fn()
+  assert.equal(runtime.output, false, "the expiry still removes the actual partner's bubble")
+  store.applyUpdate({ threadId: "synthetic-thread", userId: "synthetic-peer", state: "start", expiresInMs: 6_000 })
+  store.reset()
+  assert.equal(runtime.output, false)
+  runtime.unmount()
 })

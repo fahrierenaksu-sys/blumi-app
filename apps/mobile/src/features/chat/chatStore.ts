@@ -13,11 +13,13 @@
 import type {
   ChatMessage,
   ChatMessageList,
+  ChatReceiptCursor,
   ChatParticipantSummary,
   ChatPartnerReceipts,
   ChatReceiptUpdated,
   ChatThread,
-  ChatThreadList
+  ChatThreadList,
+  CompleteAvatarSelection
 } from "@blumi/contracts"
 import { useMemo, useSyncExternalStore } from "react"
 import {
@@ -27,14 +29,19 @@ import {
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
 import { forgetPartnerReceipts, getPartnerReceipts, resetPartnerReceipts, setPartnerReceipts } from "./chatPartnerReceiptsState"
-export { getPartnerReceipts } from "./chatPartnerReceiptsState"
 import { compareMessageOrder, forgetReadHere, getReadHereThrough, noteReadHere, resetReadHere } from "./chatReadHere"
+export { getPartnerReceipts } from "./chatPartnerReceiptsState"
 export { getMessageRenderKey } from "./chatMessageRenderKeys"
 
 // ─── In-memory store ────────────────────────────────────────
 let threadCache: ChatThread[] = []
 let messageCache: Map<string, ChatMessage[]> = new Map()
 const loadedHistoryThreads = new Set<string>()
+// First-page membership is separate from the merged cache: after an offline
+// gap, a window must not page from an older disconnected cache segment.
+const latestHistoryMessageIdsByThread = new Map<string, readonly string[]>()
+const earlierHistoryMessageIdsByThread = new Map<string, Map<string, readonly string[]>>()
+const deliveryVersionByThread = new Map<string, number>()
 const EMPTY_THREAD_MESSAGES: ChatMessage[] = []
 const IDLE_MESSAGE_LIST_STATE = { status: "idle" } as const
 export type ThreadListState =
@@ -88,6 +95,7 @@ function findPendingLocalMessageId(
 }
 
 function removePendingLocalMessage(localMessageId: string): void {
+  bumpDeliveryVersion(localMessageId)
   pendingLocalIds.delete(localMessageId)
   deliveryStateByLocalMessageId.delete(localMessageId)
   pendingMessageByLocalMessageId.delete(localMessageId)
@@ -138,8 +146,14 @@ let readAtByThread: Map<string, string> = new Map()
 let summaryLastMessageByThread: Map<string, ChatMessage> = new Map()
 let activeThreadId: string | null = null // which thread is currently being viewed
 
-function noteReadOnThisDevice(threadId: string, message?: ChatMessage): void {
-  noteReadHere(threadId, message ? [message] : [threadCache.find((thread) => thread.threadId === threadId)?.lastMessage, ...(messageCache.get(threadId) ?? [])])
+function noteReadOnThisDevice(threadId: string, messageId?: string): void {
+  if (messageId !== undefined) {
+    const message = (messageCache.get(threadId) ?? []).find((entry) => entry.messageId === messageId) ??
+      threadCache.find((thread) => thread.threadId === threadId)?.lastMessage
+    if (message?.messageId === messageId) noteReadHere(threadId, [message])
+    return
+  }
+  noteReadHere(threadId, [threadCache.find((thread) => thread.threadId === threadId)?.lastMessage, ...(messageCache.get(threadId) ?? [])])
 }
 
 type Listener = () => void
@@ -167,6 +181,7 @@ export function applyChatThreadListed(
   payload: ChatThreadList,
   options: { requestSequence?: number } = {}
 ): void {
+  const previousById = new Map(threadCache.map((thread) => [thread.threadId, thread]))
   const merged = new Map((payload.append ? threadCache : []).map((thread) => [thread.threadId, thread]))
   let listRequestSequence = options.requestSequence ?? lastAppliedListRequestSequence
   if (!payload.append) {
@@ -202,11 +217,11 @@ export function applyChatThreadListed(
       !message.messageId.startsWith("__local_") && (!thread.lastMessage || compareMessageOrder(message, thread.lastMessage) > 0))
     const latestMessage = newerMessages.reduce<ChatMessage | undefined>((latest, message) =>
       !latest || compareMessageOrder(message, latest) > 0 ? message : latest, thread.lastMessage)
-    merged.set(thread.threadId, withParticipantUpdates(
+    merged.set(thread.threadId, reuseThread(previousById.get(thread.threadId), withParticipantUpdates(
       cloneThread({ ...thread, ...(latestMessage ? { lastMessage: latestMessage } : {}) }),
       listRequestSequence
-    ))
-    setPartnerReceipts(thread.threadId, applyReceiptSnapshot(getPartnerReceipts(thread.threadId), thread.partnerReceipts))
+    )))
+    applyStableReceiptSnapshot(thread.threadId, thread.partnerReceipts)
     const currentReadAt = readAtByThread.get(thread.threadId)
     if (thread.lastReadAt && (!currentReadAt || Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt))) readAtByThread.set(thread.threadId, thread.lastReadAt)
     if (thread.unreadCount !== undefined && (!currentReadAt || (thread.lastReadAt && Date.parse(thread.lastReadAt) >= Date.parse(currentReadAt)))) {
@@ -223,11 +238,12 @@ export function applyChatThreadListed(
     participantUpdatesByUserId = new Map([...participantUpdatesByUserId]
       .filter(([, update]) => update.sequence > lastAppliedListRequestSequence))
   }
-  threadCache = [...merged.values()].sort(
+  const sorted = [...merged.values()].sort(
     (a, b) => (b.lastMessage?.sentAt ? Date.parse(b.lastMessage.sentAt) : 0) -
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
-  threadListState = { status: "ready" }
+  if (!sameEntries(threadCache, sorted)) threadCache = sorted
+  if (threadListState.status !== "ready") threadListState = { status: "ready" }
   threadListVersion += 1
   notify()
 }
@@ -242,13 +258,16 @@ export function applyChatParticipantUpdated(participant: ChatParticipantSummary)
   participantUpdatesByUserId = new Map(participantUpdatesByUserId)
   participantUpdatesByUserId.set(participant.userId, { sequence: chatEventSequence, participant: cloneParticipant(participant) })
   let changed = false
-  threadCache = threadCache.map((thread) => {
+  const updatedThreads = threadCache.map((thread) => {
     if (!thread.participantUserIds.includes(participant.userId)) return thread
-    const updated = withParticipantUpdates(thread, 0)
+    const updated = reuseThread(thread, withParticipantUpdates(thread, 0))
     if (updated !== thread) changed = true
     return updated
   })
-  if (changed) notify()
+  if (changed) {
+    threadCache = updatedThreads
+    notify()
+  }
 }
 
 export function applyChatThreadRead(payload: { userId: string; threadId: string; readAt: string }): void {
@@ -321,6 +340,9 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
       if (pendingLocalIds.has(message.messageId)) removePendingLocalMessage(message.messageId)
     }
     loadedHistoryThreads.delete(threadId)
+    latestHistoryMessageIdsByThread.delete(threadId)
+    earlierHistoryMessageIdsByThread.delete(threadId)
+    deliveryVersionByThread.delete(threadId)
     messageListCompletionVersionByThreadId.delete(threadId)
   }
   threadCache = threadCache.filter((thread) => !removed.has(thread.threadId))
@@ -337,18 +359,29 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   return removedIds
 }
 
-export function applyChatMessageListed(payload: ChatMessageList): void {
+export function applyChatMessageListed(payload: ChatMessageList, options: { before?: string } = {}): void {
   const existing = reconcileLostAcknowledgements(payload)
   const byId = new Map<string, ChatMessage>()
   for (const message of existing) {
     byId.set(message.messageId, message)
   }
   for (const message of payload.messages) {
-    byId.set(message.messageId, message)
+    const known = byId.get(message.messageId)
+    byId.set(message.messageId, sameMessage(known, message) ? known! : message)
   }
   const sorted = [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
-  messageCache.set(payload.threadId, sorted)
-  setPartnerReceipts(payload.threadId, applyReceiptSnapshot(getPartnerReceipts(payload.threadId), payload.partnerReceipts))
+  if (!sameEntries(existing, sorted) || !messageCache.has(payload.threadId)) messageCache.set(payload.threadId, sorted)
+  if (!options.before) {
+    const latestIds = payload.messages.map((message) => message.messageId)
+    if (!sameEntries(latestHistoryMessageIdsByThread.get(payload.threadId) ?? [], latestIds) ||
+      !latestHistoryMessageIdsByThread.has(payload.threadId)) latestHistoryMessageIdsByThread.set(payload.threadId, latestIds)
+  } else {
+    let pages = earlierHistoryMessageIdsByThread.get(payload.threadId)
+    if (!pages) earlierHistoryMessageIdsByThread.set(payload.threadId, pages = new Map())
+    const ids = payload.messages.map((message) => message.messageId)
+    if (!sameEntries(pages.get(options.before) ?? [], ids) || !pages.has(options.before)) pages.set(options.before, ids)
+  }
+  applyStableReceiptSnapshot(payload.threadId, payload.partnerReceipts)
   loadedHistoryThreads.add(payload.threadId)
   markMessageListCompleted(payload.threadId)
   setMessageListState(payload.threadId, { status: "ready" })
@@ -418,6 +451,9 @@ export function applyChatMessageReceived(
 ): void {
   const existing = messageCache.get(message.threadId) ?? []
   const alreadyReceived = existing.some((entry) => entry.messageId === message.messageId)
+  // A duplicated acknowledgement of an earlier identical send carries no
+  // new identity. It must not consume a newer pending bubble with that body.
+  if (alreadyReceived) return
 
   // Realtime ChatMessage currently omits clientMessageId. Reconcile only a
   // unique local candidate with the same thread, sender and body; if identical
@@ -433,19 +469,20 @@ export function applyChatMessageReceived(
     })
   const pendingEchoId = pendingEchoCandidates.length === 1 ? pendingEchoCandidates[0]?.messageId : undefined
 
-  if (alreadyReceived && !pendingEchoId) return
   if (pendingEchoId) removePendingLocalMessage(pendingEchoId)
   if (pendingEchoId && !alreadyReceived) keepLocalRenderKey(message.messageId, pendingEchoId)
   const cleaned = pendingEchoId ? existing.filter((entry) => entry.messageId !== pendingEchoId) : existing
-  const sorted = (alreadyReceived ? cleaned : [...cleaned, message])
-    .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
+  // The usual live message appends to an ordered cache. Binary insertion also
+  // handles delayed delivery without sorting all old history. History loads
+  // and local pending rows preserve this chronological cache invariant.
+  const sorted = insertChronologicalMessage(cleaned, message)
   messageCache.set(message.threadId, sorted)
   if (!alreadyReceived && threadCache.some((thread) => thread.threadId === message.threadId)) {
     markThreadLearned(message.threadId)
   }
 
   // Update lastMessage on thread
-  threadCache = threadCache.map((thread) =>
+  const nextThreads = threadCache.map((thread) =>
     thread.threadId === message.threadId && (!thread.lastMessage || compareMessageOrder(message, thread.lastMessage) > 0)
       ? { ...thread, lastMessage: message }
       : thread
@@ -453,8 +490,10 @@ export function applyChatMessageReceived(
     (a, b) => (b.lastMessage?.sentAt ? Date.parse(b.lastMessage.sentAt) : 0) -
               (a.lastMessage?.sentAt ? Date.parse(a.lastMessage.sentAt) : 0)
   )
+  if (!sameEntries(threadCache, nextThreads)) threadCache = nextThreads
 
-  if (message.threadId === activeThreadId && !alreadyReceived) noteReadOnThisDevice(message.threadId, message) // read on screen
+  // Focus suppresses a badge, but the screen names the actual visible cursor
+  // when it marks read. Cached or incoming rows alone are not proof of a read.
   // Increment unread count if this thread isn't currently active
   // and the message isn't from local optimistic echo
   if (
@@ -482,6 +521,8 @@ export function addOptimisticMessage(opts: {
   body: string
   clientMessageId?: string
   trackDelivery?: boolean
+  /** Injectable presentation clock; committed timestamps still come from the server. */
+  now?: number
 }): { localMessageId: string; clientMessageId: string } {
   const localId = `__local_${++localIdCounter}_${Date.now()}`
   const clientMessageId = opts.clientMessageId ?? createClientMessageId()
@@ -495,31 +536,42 @@ export function addOptimisticMessage(opts: {
     })
   }
 
+  const existing = messageCache.get(opts.threadId) ?? []
+  const lastKnownTime = Date.parse(existing.at(-1)?.sentAt ?? "")
+  // This is only the pending row's presentation position. A backwards
+  // device clock must not put a newly sent bubble outside the recent window;
+  // the committed ACK replaces it with the authoritative server timestamp.
+  const localNow = opts.now !== undefined && Number.isFinite(opts.now) ? opts.now : Date.now()
+  const localSentAt = Math.max(localNow, Number.isFinite(lastKnownTime) ? lastKnownTime + 1 : 0)
+
   const optimistic: ChatMessage = {
     messageId: localId,
     threadId: opts.threadId,
     senderUserId: opts.senderUserId,
     body: opts.body,
-    sentAt: new Date().toISOString()
+    sentAt: new Date(localSentAt).toISOString()
   }
 
-  const existing = messageCache.get(opts.threadId) ?? []
-  messageCache.set(opts.threadId, [...existing, optimistic])
+  messageCache.set(opts.threadId, insertChronologicalMessage(existing, optimistic))
+  bumpThreadDeliveryVersion(opts.threadId)
   notify()
   return { localMessageId: localId, clientMessageId }
 }
 
-export function markOptimisticMessageFailed(clientMessageId: string): void {
+export function markOptimisticMessageFailed(clientMessageId: string): boolean {
   const localMessageId = findPendingLocalMessageId(clientMessageId)
-  if (!localMessageId) return
+  if (!localMessageId || deliveryStateByLocalMessageId.get(localMessageId) === "failed") return false
   deliveryStateByLocalMessageId.set(localMessageId, "failed")
+  bumpDeliveryVersion(localMessageId)
   notify()
+  return true
 }
 
 export function markOptimisticMessageSending(clientMessageId: string): void {
   const localMessageId = findPendingLocalMessageId(clientMessageId)
-  if (!localMessageId) return
+  if (!localMessageId || deliveryStateByLocalMessageId.get(localMessageId) === "sending") return
   deliveryStateByLocalMessageId.set(localMessageId, "sending")
+  bumpDeliveryVersion(localMessageId)
   notify()
 }
 
@@ -556,6 +608,15 @@ export function getMessageDeliveryState(messageId: string): MessageDeliveryState
   return deliveryStateByLocalMessageId.get(messageId) ?? "sent"
 }
 
+function bumpDeliveryVersion(localMessageId: string): void {
+  const threadId = pendingMessageByLocalMessageId.get(localMessageId)?.threadId
+  if (threadId) bumpThreadDeliveryVersion(threadId)
+}
+
+function bumpThreadDeliveryVersion(threadId: string): void {
+  deliveryVersionByThread.set(threadId, (deliveryVersionByThread.get(threadId) ?? 0) + 1)
+}
+
 export function getRetryableMessage(messageId: string): {
   body: string
   clientMessageId: string
@@ -563,7 +624,7 @@ export function getRetryableMessage(messageId: string): {
 } | null {
   const pending = pendingMessageByLocalMessageId.get(messageId)
   if (!pending) return null
-  const message = [...messageCache.values()].flat().find(
+  const message = (messageCache.get(pending.threadId) ?? []).find(
     (entry) => entry.messageId === messageId
   )
   return message
@@ -575,6 +636,9 @@ export function resetChatStore(): void {
   threadCache = []
   messageCache = new Map()
   loadedHistoryThreads.clear()
+  latestHistoryMessageIdsByThread.clear()
+  earlierHistoryMessageIdsByThread.clear()
+  deliveryVersionByThread.clear()
   messageListStateByThreadId = new Map()
   messageListCompletionVersionByThreadId.clear()
   threadListState = { status: "idle" }
@@ -604,9 +668,10 @@ function createClientMessageId(): string {
 export function setActiveThread(threadId: string | null): void {
   activeThreadId = threadId
   if (threadId) {
-    noteReadOnThisDevice(threadId)
-    unreadCounts.set(threadId, 0)
-    notify()
+    if (unreadCounts.get(threadId)) {
+      unreadCounts.set(threadId, 0)
+      notify()
+    }
   }
 }
 
@@ -632,8 +697,8 @@ export function applyChatThreadHiddenForMe(threadId: string, hiddenThrough: stri
 }
 
 /** Clear unread count for a specific thread. */
-export function markThreadRead(threadId: string): void {
-  noteReadOnThisDevice(threadId)
+export function markThreadRead(threadId: string, upToMessageId?: string): void {
+  noteReadOnThisDevice(threadId, upToMessageId)
   if (unreadCounts.get(threadId)) {
     unreadCounts.set(threadId, 0)
     notify()
@@ -670,11 +735,18 @@ export function getThreadUnreadCount(threadId: string): number {
 // read this on each store notification, including on a row's press-in).
 let threadSnapshotSource: ChatThread[] | null = null
 let threadSnapshot: ChatThread[] = []
+const threadSnapshotClones = new WeakMap<ChatThread, ChatThread>()
 
 /** The threads, newest first. Shared between reads until the list changes: treat it as read-only. */
 export function getThreads(): ChatThread[] {
   if (threadSnapshotSource !== threadCache) {
-    threadSnapshot = threadCache.map(cloneThread)
+    threadSnapshot = threadCache.map((thread) => {
+      const previous = threadSnapshotClones.get(thread)
+      if (previous) return previous
+      const snapshot = cloneThread(thread)
+      threadSnapshotClones.set(thread, snapshot)
+      return snapshot
+    })
     threadSnapshotSource = threadCache
   }
   return threadSnapshot
@@ -684,11 +756,19 @@ export function getMessages(threadId: string): ChatMessage[] {
   return messageCache.get(threadId) ?? EMPTY_THREAD_MESSAGES
 }
 
+/** Server-confirmed membership of an older page, including a confirmed empty page. */
+export function getHistoryPageMessageIds(threadId: string, before: string): readonly string[] | undefined {
+  return earlierHistoryMessageIdsByThread.get(threadId)?.get(before)
+}
+
 export interface ChatThreadSnapshot {
   thread: ChatThread | undefined
   messages: ChatMessage[]
   messageListState: MessageListState
   historyReady: boolean
+  /** Latest server page membership, unaffected by live events or older-page loads. */
+  latestHistoryMessageIds: readonly string[] | undefined
+  /** Opaque thread-local invalidation key; never scans canonical history. */
   deliveryKey: string
   partnerReceipts: ChatPartnerReceipts | undefined
 }
@@ -704,12 +784,14 @@ export function createChatThreadSnapshotReader(threadId?: string, partnerId?: st
     const messages = resolvedId ? getMessages(resolvedId) : EMPTY_THREAD_MESSAGES
     const messageListState = (resolvedId && messageListStateByThreadId.get(resolvedId)) || IDLE_MESSAGE_LIST_STATE
     const historyReady = Boolean(resolvedId && loadedHistoryThreads.has(resolvedId))
-    const deliveryKey = messages.map((message) => getMessageDeliveryState(message.messageId)).join("|")
+    const deliveryKey = String(resolvedId ? deliveryVersionByThread.get(resolvedId) ?? 0 : 0)
+    const latestHistoryMessageIds = resolvedId ? latestHistoryMessageIdsByThread.get(resolvedId) : undefined
     const partnerReceipts = resolvedId ? getPartnerReceipts(resolvedId) : undefined
     if (previous && previous.thread === thread && previous.messages === messages &&
       previous.messageListState === messageListState && previous.historyReady === historyReady &&
+      previous.latestHistoryMessageIds === latestHistoryMessageIds &&
       previous.deliveryKey === deliveryKey && previous.partnerReceipts === partnerReceipts) return previous
-    previous = { thread, messages, messageListState, historyReady, deliveryKey, partnerReceipts }
+    previous = { thread, messages, messageListState, historyReady, latestHistoryMessageIds, deliveryKey, partnerReceipts }
     return previous
   }
 }
@@ -755,6 +837,83 @@ export function useThreadListVersion(): number {
   return useSyncExternalStore(subscribeToChatStore, getThreadListVersion, getThreadListVersion)
 }
 export function hasChatThread(threadId: string): boolean { return threadCache.some((thread) => thread.threadId === threadId) }
+
+function sameEntries<T>(first: readonly T[], second: readonly T[]): boolean {
+  return first === second || (first.length === second.length && first.every((entry, index) => entry === second[index]))
+}
+
+function insertChronologicalMessage(messages: readonly ChatMessage[], message: ChatMessage): ChatMessage[] {
+  const sentAt = Date.parse(message.sentAt)
+  let left = 0
+  let right = messages.length
+  while (left < right) {
+    const middle = (left + right) >>> 1
+    // Insert after equal timestamps, matching stable sort's original order.
+    if (Date.parse(messages[middle]!.sentAt) <= sentAt) left = middle + 1
+    else right = middle
+  }
+  return [...messages.slice(0, left), message, ...messages.slice(left)]
+}
+
+function sameMessage(first: ChatMessage | undefined, second: ChatMessage | undefined): boolean {
+  return first === second || Boolean(first && second &&
+    first.messageId === second.messageId && first.threadId === second.threadId &&
+    first.senderUserId === second.senderUserId && first.body === second.body &&
+    first.sentAt === second.sentAt && first.deliveredAt === second.deliveredAt &&
+    first.readAt === second.readAt && first.editedAt === second.editedAt)
+}
+
+function sameCursor(first: ChatReceiptCursor | undefined, second: ChatReceiptCursor | undefined): boolean {
+  return first === second || Boolean(first && second && first.sentAt === second.sentAt && first.messageId === second.messageId)
+}
+
+function sameReceipts(first: ChatPartnerReceipts | undefined, second: ChatPartnerReceipts | undefined): boolean {
+  return first === second || Boolean(first && second &&
+    sameCursor(first.deliveredUpTo, second.deliveredUpTo) && sameCursor(first.readUpTo, second.readUpTo))
+}
+
+function applyStableReceiptSnapshot(threadId: string, snapshot: ChatPartnerReceipts | undefined): void {
+  const previous = getPartnerReceipts(threadId)
+  const next = applyReceiptSnapshot(previous, snapshot)
+  setPartnerReceipts(threadId, sameReceipts(previous, next) ? previous : next)
+}
+
+function sameAvatar(first: CompleteAvatarSelection | undefined, second: CompleteAvatarSelection | undefined): boolean {
+  if (first === second) return true
+  if (!first || !second || first.presetId !== second.presetId || first.revision !== second.revision) return false
+  const a = first.loadout
+  const b = second.loadout
+  if (!a || !b || !Array.isArray(a.accessoryIds) || !Array.isArray(b.accessoryIds)) return false
+  return a.schemaVersion === b.schemaVersion && a.bodyId === b.bodyId && a.faceId === b.faceId &&
+    a.eyesId === b.eyesId && a.noseId === b.noseId && a.mouthId === b.mouthId &&
+    a.hairId === b.hairId && a.topId === b.topId && a.bottomId === b.bottomId && a.shoesId === b.shoesId &&
+    (a.schemaVersion === 2 ? a.dressId : undefined) === (b.schemaVersion === 2 ? b.dressId : undefined) &&
+    (a.schemaVersion === 2 ? a.outerwearId : undefined) === (b.schemaVersion === 2 ? b.outerwearId : undefined) &&
+    sameEntries(a.accessoryIds, b.accessoryIds)
+}
+
+function sameParticipant(first: ChatParticipantSummary, second: ChatParticipantSummary): boolean {
+  return first === second || (first.userId === second.userId && first.displayName === second.displayName &&
+    sameAvatar(first.avatar, second.avatar))
+}
+
+/** Server refreshes preserve unchanged identities; changed fields still replace their records. */
+function reuseThread(previous: ChatThread | undefined, next: ChatThread): ChatThread {
+  if (!previous) return next
+  const participants = next.participants.map((participant, index) =>
+    sameParticipant(previous.participants[index]!, participant) ? previous.participants[index]! : participant
+  ) as ChatThread["participants"]
+  const lastMessage = sameMessage(previous.lastMessage, next.lastMessage) ? previous.lastMessage : next.lastMessage
+  const partnerReceipts = sameReceipts(previous.partnerReceipts, next.partnerReceipts) ? previous.partnerReceipts : next.partnerReceipts
+  const sameIds = sameEntries(previous.participantUserIds, next.participantUserIds)
+  const samePeople = sameEntries(previous.participants, participants)
+  if (previous.threadId === next.threadId && previous.miniRoomId === next.miniRoomId &&
+    previous.createdAt === next.createdAt && previous.unreadCount === next.unreadCount &&
+    previous.lastReadAt === next.lastReadAt && previous.hiddenThrough === next.hiddenThrough &&
+    previous.lastMessage === lastMessage && previous.partnerReceipts === partnerReceipts && sameIds && samePeople) return previous
+  return { ...next, participants: samePeople ? previous.participants : participants,
+    participantUserIds: sameIds ? previous.participantUserIds : next.participantUserIds, lastMessage, partnerReceipts }
+}
 
 function cloneThread(thread: ChatThread): ChatThread {
   return {
@@ -821,6 +980,36 @@ export function findThreadForPartner(
 }
 
 // ─── Reactive hook ──────────────────────────────────────────
+export interface ChatInboxSnapshot {
+  threads: ChatThread[]
+  threadListState: ThreadListState
+  unreadCounts: ReadonlyMap<string, number>
+  getThreadUnreadCount: typeof getThreadUnreadCount
+}
+
+/** History, receipts and send-state updates have no visible effect on the Inbox. */
+export function createChatInboxSnapshotReader(): () => ChatInboxSnapshot {
+  let previous: ChatInboxSnapshot | undefined
+  return () => {
+    const threads = getThreads()
+    const sameUnread = previous && previous.unreadCounts.size === threads.length &&
+      threads.every((thread) => previous!.unreadCounts.get(thread.threadId) === getThreadUnreadCount(thread.threadId))
+    if (previous && previous.threads === threads && sameListState(previous.threadListState, threadListState) && sameUnread) return previous
+    previous = {
+      threads,
+      threadListState,
+      unreadCounts: sameUnread ? previous!.unreadCounts : new Map(threads.map((thread) => [thread.threadId, getThreadUnreadCount(thread.threadId)])),
+      getThreadUnreadCount
+    }
+    return previous
+  }
+}
+
+export function useChatInboxStore(): ChatInboxSnapshot {
+  const read = useMemo(() => createChatInboxSnapshotReader(), [])
+  return useSyncExternalStore(subscribeToChatStore, read, read)
+}
+
 export interface ChatStoreView {
   /** Store notification this view was built for; equal versions carry equal data. */
   storeVersion: number
@@ -870,8 +1059,15 @@ function setMessageListState(
   threadId: string,
   state: MessageListState
 ): void {
+  const previous = messageListStateByThreadId.get(threadId)
+  if (previous && sameListState(previous, state)) return
   messageListStateByThreadId = new Map(messageListStateByThreadId)
   messageListStateByThreadId.set(threadId, state)
+}
+
+function sameListState(first: ThreadListState | MessageListState, second: ThreadListState | MessageListState): boolean {
+  return first.status === second.status && (first.status !== "failed" ||
+    (second.status === "failed" && first.errorMessage === second.errorMessage))
 }
 
 function markMessageListCompleted(threadId: string): void {

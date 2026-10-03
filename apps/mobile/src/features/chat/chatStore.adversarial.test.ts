@@ -170,6 +170,58 @@ test("history resync never merges a failed bubble into an older identical messag
   }
 })
 
+test("a duplicated canonical acknowledgement cannot consume the next identical pending send", () => {
+  resetChatStore()
+  try {
+    const threadId = "synthetic-duplicate-ack"
+    const first = addOptimisticMessage({ threadId, senderUserId: ME, body: "Synthetic same text", clientMessageId: "synthetic-first" })
+    const second = addOptimisticMessage({ threadId, senderUserId: ME, body: "Synthetic same text", clientMessageId: "synthetic-second" })
+    const canonical = message("synthetic-canonical-first", threadId, ME, "Synthetic same text", new Date().toISOString())
+    applyChatMessageReceived(canonical, { localUserId: ME })
+    confirmOptimisticMessage(first.clientMessageId, canonical, ME)
+    assert.equal(getRetryableMessage(second.localMessageId)?.clientMessageId, second.clientMessageId)
+    applyChatMessageReceived(canonical, { localUserId: ME })
+    assert.equal(getRetryableMessage(second.localMessageId)?.clientMessageId, second.clientMessageId, "the duplicate cannot acknowledge the second tap")
+    assert.equal(getMessageDeliveryState(second.localMessageId), "sending")
+    assert.equal(getMessages(threadId).length, 2)
+  } finally {
+    resetChatStore()
+  }
+})
+
+test("ordered live insertion preserves retained rows and server ACK authority while pending rows stay newest with a skewed clock", () => {
+  resetChatStore()
+  try {
+    const threadId = "synthetic-live-order"
+    const time = (offset: number) => new Date(Date.now() + offset).toISOString()
+    const existing = [message("synthetic-one", threadId, PARTNER, "Synthetic content", time(-10_000)),
+      message("synthetic-three", threadId, PARTNER, "Synthetic content", time(-5_000))]
+    applyChatMessageListed({ userId: ME, threadId, messages: existing })
+    const retained = [...getMessages(threadId)]
+    const delayed = message("synthetic-two", threadId, PARTNER, "Synthetic delayed", time(-7_500))
+    applyChatMessageReceived(delayed, { localUserId: ME })
+    const tied = { ...delayed, messageId: "synthetic-tied" }
+    applyChatMessageReceived(tied, { localUserId: ME })
+    assert.deepEqual(getMessages(threadId).map((entry) => entry.messageId), [existing[0]!.messageId, delayed.messageId, tied.messageId, existing[1]!.messageId])
+    assert.equal(getMessages(threadId)[0], retained[0])
+    assert.equal(getMessages(threadId)[3], retained[1])
+    const future = message("synthetic-server-future", threadId, PARTNER, "Synthetic skew", time(60_000))
+    applyChatMessageReceived(future, { localUserId: ME })
+    const pending = addOptimisticMessage({ threadId, senderUserId: ME, body: "Synthetic local", clientMessageId: "synthetic-skew" })
+    const incoming = message("synthetic-between", threadId, PARTNER, "Synthetic later", time(1_000))
+    applyChatMessageReceived(incoming, { localUserId: ME })
+    const sorted = getMessages(threadId)
+    assert.ok(sorted.every((entry, index) => index === 0 || Date.parse(sorted[index - 1]!.sentAt) <= Date.parse(entry.sentAt)))
+    assert.equal(sorted.at(-1)?.messageId, pending.localMessageId, "the newly sent local row stays at the newest visible edge")
+    const committed = message("synthetic-clock-ack", threadId, ME, "Synthetic local", time(2_000))
+    confirmOptimisticMessage(pending.clientMessageId, committed, ME)
+    assert.equal(getMessages(threadId).find((entry) => entry.messageId === committed.messageId)?.sentAt, committed.sentAt, "the ACK restores the actual server time")
+    assert.equal(getMessages(threadId).at(-1)?.messageId, future.messageId)
+  } finally {
+    resetChatStore()
+  }
+})
+
 test("an in-room message lost with the socket becomes failed and retryable with the same client id", () => {
   // Fixed 2026-09-30: in-room sends are tracked by clientMessageId; the
   // MiniRoom hook marks them failed on socket close or acknowledgement

@@ -167,6 +167,55 @@ test("date separators default to the current clock", () => {
   assert.equal(formatDateSeparator(new Date(), "en"), "Today")
 })
 
+test("today and yesterday follow calendar days across daylight-saving changes at midnight", () => {
+  const previousTimezone = process.env.TZ
+  try {
+    process.env.TZ = "America/New_York"
+    for (const [month, day] of [[2, 10], [10, 3]] as const) {
+      const now = new Date(2025, month, day, 0, 0)
+      const originalClock = now.getTime()
+      const today = new Date(2025, month, day, 12)
+      const yesterday = new Date(2025, month, day - 1, 12)
+      const older = new Date(2025, month, day - 2, 12)
+      for (const locale of ["en", "tr"] as const) {
+        assert.equal(formatDateSeparator(today, locale, now), locale === "tr" ? "Bugün" : "Today")
+        assert.equal(formatDateSeparator(yesterday, locale, now), locale === "tr" ? "Dün" : "Yesterday")
+        const expected = new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", { month: "short", day: "numeric" })
+        assert.equal(formatDateSeparator(older, locale, now), expected.format(older))
+      }
+      assert.equal(now.getTime(), originalClock, "formatting must not change the caller's reference date")
+    }
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ
+    else process.env.TZ = previousTimezone
+  }
+})
+
+test("historical date separators keep the requested locale across repeated date and locale changes", () => {
+  const now = new Date(2026, 6, 21, 12)
+  const dates = [new Date(2026, 0, 5), new Date(2026, 1, 9), new Date(2026, 6, 3)]
+  for (const locale of ["en", "tr", "en", "tr"] as const) {
+    const expected = new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", { month: "short", day: "numeric" })
+    for (const date of dates) assert.equal(formatDateSeparator(date, locale, now), expected.format(date))
+  }
+})
+
+test("historical separators follow the current local calendar after a device timezone change", () => {
+  const previousTimezone = process.env.TZ
+  const date = new Date("2026-01-05T00:30:00.000Z")
+  const now = new Date("2026-10-03T12:00:00.000Z")
+  try {
+    for (const timezone of ["Pacific/Honolulu", "Pacific/Kiritimati"]) {
+      process.env.TZ = timezone
+      const expected = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
+      assert.equal(formatDateSeparator(date, "en", now), expected)
+    }
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ
+    else process.env.TZ = previousTimezone
+  }
+})
+
 test("room invite action keys are stable per action and invite", () => {
   assert.equal(getRoomInviteActionKey({ type: "create", threadId: "thread_one" }), "create:thread_one")
   assert.equal(getRoomInviteActionKey({ type: "accept", inviteId: "invite_one" }), "accept:invite_one")

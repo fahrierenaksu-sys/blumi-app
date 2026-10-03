@@ -40,6 +40,7 @@ const sourceFiles = [
   "src/features/chat/chatStore.adversarial.test.ts",
   "src/features/chat/chatRoomInviteApi.ts",
   "src/features/chat/chatRoomInviteApi.test.ts",
+  "src/features/chat/chatRoomInvitePageApi.test.ts",
   "src/features/chat/chatRoomInviteModel.ts",
   "src/features/chat/chatRoomInviteModel.test.ts",
   "src/features/chat/chatRoomInviteCardModel.ts",
@@ -56,6 +57,7 @@ const sourceFiles = [
   "src/features/chat/thread/chatTimelineEntranceModel.test.ts",
   "src/features/chat/thread/chatThreadOpeningModel.ts",
   "src/features/chat/thread/chatThreadOpeningModel.test.ts",
+  "src/features/chat/thread/chatInvitePresentationModel.test.ts",
   "src/features/chat/thread/chatBubbleAccessibility.ts",
   "src/features/chat/thread/chatBubbleAccessibility.test.ts",
   "src/features/chat/chatReceiptModel.ts",
@@ -121,6 +123,7 @@ try {
       join(outputDirectory, "features/chat/chatStore.test.js"),
       join(outputDirectory, "features/chat/chatStore.adversarial.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteApi.test.js"),
+      join(outputDirectory, "features/chat/chatRoomInvitePageApi.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteModel.test.js"),
       join(outputDirectory, "features/chat/chatRoomInviteCardModel.test.js"),
       join(outputDirectory, "features/chat/chatCoordinator.test.js"),
@@ -129,6 +132,7 @@ try {
       join(outputDirectory, "features/chat/thread/chatThreadModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatTimelineEntranceModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatThreadOpeningModel.test.js"),
+      join(outputDirectory, "features/chat/thread/chatInvitePresentationModel.test.js"),
       join(outputDirectory, "features/chat/thread/chatBubbleAccessibility.test.js"),
       join(outputDirectory, "features/chat/chatReceiptModel.test.js"),
       join(outputDirectory, "features/chat/chatDeliveryAckBatcher.test.js"),
@@ -162,9 +166,12 @@ try {
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
     process.execPath,
-    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/thread/chatArrivalHaptic.test.ts", "src/features/chat/thread/chatRowEntranceMotion.test.ts", "src/features/chat/thread/useChatTimelineEntrances.test.ts", "src/features/chat/thread/useChatThreadOpening.test.ts"],
+    ["--import", "tsx", "--test", "src/features/chat/useChatStore.test.ts", "src/features/chat/chatInstantDelivery.test.ts", "src/features/chat/ChatRoomInviteCard.test.ts", "src/features/chat/chatRoomInvitePagingStore.test.ts", "src/features/chat/thread/useChatThreadSync.test.ts", "src/features/chat/thread/useRequestedRoomInvite.test.ts", "src/features/chat/typing/useChatDraftTyping.test.ts", "src/features/inbox/useInboxClock.test.ts", "src/features/inbox/useInboxThreadWarmup.test.ts", "src/features/inbox/inboxConversationPrefsStore.test.ts", "src/ui/flight/flight.test.ts", "src/features/chat/thread/chatArrivalHaptic.test.ts", "src/features/chat/thread/chatRowEntranceMotion.test.ts", "src/features/chat/thread/useChatTimelineEntrances.test.ts", "src/features/chat/thread/useChatThreadOpening.test.ts", "src/features/chat/thread/useChatMessageSending.test.ts", "src/features/chat/thread/useChatTimelineRowModels.test.ts", "src/ui/backgrounds.test.ts"],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
+  execFileSync(process.execPath, [
+    "--import", "tsx", "--test", "src/features/chat/roomDoorFlight.test.ts"
+  ], { cwd: workspaceRoot, stdio: "inherit" })
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

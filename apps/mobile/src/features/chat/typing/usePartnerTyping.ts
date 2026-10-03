@@ -1,6 +1,6 @@
-import { useEffect, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react"
 import { AccessibilityInfo } from "react-native"
-import { isPartnerTyping, shouldAnnounceTyping } from "./chatTypingModel"
+import { shouldAnnounceTyping } from "./chatTypingModel"
 import { chatTypingStore } from "./chatTypingStore"
 
 /**
@@ -14,8 +14,12 @@ export function usePartnerTyping(
   partnerUserId: string | undefined,
   announcement?: string
 ): boolean {
-  const { entries } = useSyncExternalStore(chatTypingStore.subscribe, chatTypingStore.getSnapshot, chatTypingStore.getSnapshot)
-  const typing = isPartnerTyping(entries, threadId, partnerUserId, Date.now())
+  const readPartner = useCallback(() => {
+    const entry = threadId ? chatTypingStore.getSnapshot().entries[threadId] : undefined
+    return partnerUserId && entry?.userId === partnerUserId ? entry : undefined
+  }, [partnerUserId, threadId])
+  const entry = useSyncExternalStore(chatTypingStore.subscribe, readPartner, readPartner)
+  const typing = Boolean(entry && entry.expiresAt > Date.now())
   const wasTypingRef = useRef(false)
   const lastAnnouncedAtRef = useRef<number | null>(null)
 

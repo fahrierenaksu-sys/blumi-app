@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type RefObject } from "react"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { createCandidateAvatarSnapshot } from "../features/avatarV2/candidateAvatarSnapshot"
 import { joinRoomSession } from "../features/chat/chatRoomInviteApi"
+import { resetChatRoomInviteHistory } from "../features/chat/chatRoomInvitePagingStore"
 import type {
   ChatRoomInviteAction,
   ChatRoomInviteTimelineItem
@@ -243,6 +244,7 @@ export function useRoomInviteRouting({
     handledReadyMiniRoomIdsRef.current = new Set()
     announcedReadyMiniRoomIdsRef.current = new Set()
     setRoomInvites([])
+    resetChatRoomInviteHistory()
   }, [])
 
   return {

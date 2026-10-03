@@ -155,6 +155,49 @@ test("entering a cached chat leaves its refreshes until the push settles; unknow
   assert.deepEqual(leftRequests, [], "a chat closed during its push starts no refresh")
 })
 
+test("hidden conversations start no history work and re-entry refreshes cached history without delaying cold history", () => {
+  const requests: string[] = []
+  const f = mount(undefined, { isFocused: false, historyReady: true,
+    requestMessages: async (id) => { requests.push(id) } })
+  f.state("active")
+  assert.deepEqual(requests, [])
+  f.render({ isFocused: true })
+  assert.deepEqual(requests, ["thread-a"])
+  f.state("background")
+  f.state("active")
+  assert.deepEqual(requests, ["thread-a", "thread-a"], "foreground closes an offline history gap")
+  f.state("active")
+  assert.equal(requests.length, 2, "duplicate active notifications start no duplicate entry work")
+  f.render({ isFocused: false })
+  f.state("active")
+  assert.equal(requests.length, 2)
+  f.render({ isFocused: true, historyReady: false, resolvedThreadId: "synthetic-cold-thread" })
+  assert.equal(requests.at(-1), "synthetic-cold-thread")
+  f.runtime.unmount()
+})
+
+test("background and account switches cancel unsettled opening work before it can use the next actor", () => {
+  const gate = createPushSettleGate()
+  const requests: string[] = []
+  let refreshes = 0
+  const f = mount(async () => { refreshes += 1 }, { historyReady: true, whenSettled: gate.whenSettled,
+    requestMessages: async (id) => { requests.push(id) } })
+  f.state("background")
+  gate.settle()
+  assert.deepEqual(requests, [])
+  assert.equal(refreshes, 0)
+  f.state("active")
+  assert.deepEqual(requests, ["thread-a"])
+  assert.equal(refreshes, 1)
+  const nextGate = createPushSettleGate()
+  f.render({ whenSettled: nextGate.whenSettled })
+  f.render({ currentUserId: "synthetic-next-owner", resolvedThreadId: "synthetic-next-thread" })
+  nextGate.settle()
+  assert.deepEqual(requests, ["thread-a", "synthetic-next-thread"], "the old thread callback is canceled even with a reusable coordinator")
+  assert.equal(refreshes, 2)
+  f.runtime.unmount()
+})
+
 test("the push settles on its own transitionEnd, or after the fallback when none arrives", () => {
   for (const ending of ["transition", "fallback"] as const) {
     const runtime = createFakeReactRuntime()

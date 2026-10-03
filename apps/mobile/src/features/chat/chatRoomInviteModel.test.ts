@@ -27,6 +27,14 @@ test("an acknowledged message keeps the row key of its optimistic bubble (CHT-04
   assert.equal(getChatTimelineItemKey(buildChatTimeline([{ ...sent, messageId: "other" }], [], (id) => id)[0]!), "message:other")
 })
 
+test("canonical message ids order timestamp ties independently from stable optimistic row aliases", () => {
+  const sent = { threadId: "t", senderUserId: "me", body: "synthetic", sentAt: "2026-10-03T00:00:00.000Z" }
+  const messages = ["z", "b", "a"].map(messageId => ({ ...sent, messageId }))
+  const timeline = buildChatTimeline(messages, [], id => id === "z" ? "__local_first" : id === "a" ? "__local_last" : id)
+  assert.deepEqual(timeline.map(item => item.kind === "message" && item.message.messageId), ["a", "b", "z"])
+  assert.deepEqual(timeline.map(getChatTimelineItemKey), ["message:__local_last", "message:b", "message:__local_first"])
+})
+
 const baseInvite: ChatRoomInviteTimelineItem = {
   kind: "room_invite",
   inviteId: "invite_one",
@@ -47,6 +55,29 @@ test("the first chat render covers the viewport instead of only ten short messag
   }
   assert.equal(getChatInitialRenderCount(Number.NaN), 20)
   assert.equal(getChatInitialRenderCount(0), 20)
+})
+
+test("invitation-heavy conversations fill the first viewport without mounting a text-sized batch of scenes", () => {
+  const invites = Array.from({ length: 40 }, (_, index) => ({ ...baseInvite, inviteId: `synthetic-invite-${index}` }))
+  for (const height of [568, 844, 956, 1024]) {
+    const count = getChatInitialRenderCount(height, invites)
+    assert.ok(count * 210 >= height, "the initial scene batch must fill the viewport")
+    assert.ok(count < getChatInitialRenderCount(height), "invisible heavy scenes must stay outside the initial batch")
+  }
+  assert.equal(getChatInitialRenderCount(844, invites.slice(0, 1)), 1, "a short history is not padded with nonexistent rows")
+})
+
+test("a mixed conversation budgets the actual newest rows while still covering short text bubbles", () => {
+  const text = buildChatTimeline(Array.from({ length: 40 }, (_, index) => ({
+    messageId: `synthetic-message-${index}`, threadId: "synthetic-thread", senderUserId: "synthetic-sender",
+    body: "Synthetic short bubble", sentAt: `2026-10-03T00:00:${String(index).padStart(2, "0")}.000Z`
+  })), [])
+  const mixed = [text[0]!, baseInvite, ...text.slice(1)]
+  const count = getChatInitialRenderCount(844, mixed)
+  const minimumHeight = mixed.slice(0, count).reduce((sum, row) => sum + (row.kind === "room_invite" ? 210 : 44), 0)
+  assert.ok(minimumHeight >= 844)
+  assert.ok(count < getChatInitialRenderCount(844, text))
+  assert.equal(getChatInitialRenderCount(844, text), getChatInitialRenderCount(844), "text-only opening coverage is preserved")
 })
 
 test("timeline removes the legacy invite sentinel and keeps durable invite cards ordered", () => {

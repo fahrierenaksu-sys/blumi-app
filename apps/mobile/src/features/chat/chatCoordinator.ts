@@ -15,9 +15,18 @@ import {
 } from "./chatRoomInviteModel"
 import {
   RoomInviteApiError,
+  type ChatRoomInvitePage,
+  type FetchRoomInvitePageOptions,
   type RoomInviteDecisionResult,
   type RoomSessionJoinResult
 } from "./chatRoomInviteApi"
+import {
+  applyLatestRoomInvitePage,
+  applyOlderRoomInvitePage,
+  getChatRoomInviteHistory,
+  observeRoomInviteArrival,
+  observeRoomInviteActiveContext
+} from "./chatRoomInvitePagingStore"
 import {
   getMessageListErrorMessageForDisplay,
   getMessageSendErrorMessageForDisplay,
@@ -25,6 +34,7 @@ import {
   getRoomInvitationLoadErrorMessageForDisplay
 } from "./chatErrorCopy"
 import { areRoomInviteListsEqual } from "./roomInviteListEquality"
+import { CHAT_INITIAL_HISTORY_LIMIT } from "./chatHistoryPolicy"
 
 const pendingMessageSendsBySessionThread = new Map<string, Promise<void>>()
 
@@ -42,6 +52,9 @@ export interface ChatCoordinatorDependencies {
     sessionToken: string,
     threadId: string
   ) => Promise<ChatRoomInviteTimelineItem[]>
+  fetchThreadRoomInvitePage?: (
+    baseHttpUrl: string, sessionToken: string, threadId: string, options: FetchRoomInvitePageOptions
+  ) => Promise<ChatRoomInvitePage>
   sendThreadMessage: (
     baseHttpUrl: string,
     sessionToken: string,
@@ -87,7 +100,7 @@ export interface ChatCoordinatorDependencies {
     sessionToken: string,
     roomSessionId: string
   ) => Promise<RoomSessionJoinResult>
-  applyChatMessageListed: (payload: ChatMessageList) => void
+  applyChatMessageListed: (payload: ChatMessageList, options?: { before?: string }) => void
   applyChatMessageListLoading: (threadId: string) => void
   applyChatMessageListFailed: (
     threadId: string,
@@ -98,8 +111,9 @@ export interface ChatCoordinatorDependencies {
     message: ChatMessage,
     localUserId: string
   ) => void
-  markOptimisticMessageFailed: (clientMessageId: string) => void
-  markLocalThreadRead: (threadId: string) => void
+  /** False when the bubble already settled or was removed; no failure UI is needed. */
+  markOptimisticMessageFailed: (clientMessageId: string) => boolean | void
+  markLocalThreadRead: (threadId: string, upToMessageId?: string) => void
   openReadyMiniRoom: (
     payload: RoomSessionJoinResult,
     options?: { allowReopen?: boolean }
@@ -116,6 +130,8 @@ export interface ChatCoordinatorDependencies {
 export interface ChatCoordinator {
   resynchronizeMessages: (threadId: string) => Promise<void>
   refreshThreadRoomInvites: (threadId: string) => Promise<void>
+  requestOlderRoomInvites: (threadId: string, before: string) => Promise<readonly string[]>
+  ensureRoomInvite: (threadId: string, inviteId: string) => Promise<boolean>
   sendChatMessage: (
     threadId: string,
     body: string,
@@ -158,6 +174,10 @@ export function createChatCoordinator(
     userId: string
     promise: Promise<void>
   }>()
+  const pendingInvitePages = new Map<string, Promise<readonly string[]>>()
+  const knownInviteIds = new Set<string>()
+  const currentInviteRecords = new Map<string, ChatRoomInviteTimelineItem>()
+  const liveInviteArrivalRevisions = new Map<string, number>()
   const handledRoomInviteRefreshFailures = new WeakSet<Promise<void>>()
   // Room ids are never reused, so an ended room stays ended for this session.
   const endedRoomSessionIds = new Set<string>()
@@ -213,12 +233,42 @@ export function createChatCoordinator(
     })
   }
 
-  const upsertRoomInvite = (invite: ChatRoomInviteTimelineItem): void => {
-    bumpRoomInviteRevision(invite.threadId, invite.inviteId)
+  const mergeThreadRoomInvites = (threadId: string, nextInvites: readonly ChatRoomInviteTimelineItem[], refreshStartedAt: number): void => {
+    for (const invite of nextInvites) {
+      knownInviteIds.add(invite.inviteId)
+      if ((roomInviteMutationRevisions.get(invite.inviteId) ?? 0) <= refreshStartedAt) {
+        currentInviteRecords.set(invite.inviteId, withoutEndedRoom(invite, isRoomEnded))
+      }
+    }
+    dependencies.setRoomInvites(current => {
+      const byId = new Map(current.filter(invite => invite.threadId === threadId).map(invite => [invite.inviteId, invite]))
+      for (const next of nextInvites) {
+        const newer = (roomInviteMutationRevisions.get(next.inviteId) ?? 0) > refreshStartedAt
+        if (!newer || !byId.has(next.inviteId)) byId.set(next.inviteId, withoutEndedRoom(next, isRoomEnded))
+      }
+      const merged = [...byId.values()]
+      if (areRoomInviteListsEqual(current.filter(invite => invite.threadId === threadId), merged)) return current as ChatRoomInviteTimelineItem[]
+      return [...current.filter(invite => invite.threadId !== threadId), ...merged]
+    })
+  }
+
+  const upsertRoomInvite = (invite: ChatRoomInviteTimelineItem, targeted = false): void => {
+    const actor = getProductionActor()
+    if (actor && invite.senderUserId !== actor.profile.userId && invite.recipientUserId !== actor.profile.userId) return
+    const isNew = !knownInviteIds.has(invite.inviteId)
+    knownInviteIds.add(invite.inviteId)
+    const revision = bumpRoomInviteRevision(invite.threadId, invite.inviteId)
+    currentInviteRecords.set(invite.inviteId, withoutEndedRoom(invite, isRoomEnded))
+    if (isNew && !targeted) liveInviteArrivalRevisions.set(invite.inviteId, revision)
     dependencies.setRoomInvites((current) => [
       ...current.filter((entry) => entry.inviteId !== invite.inviteId),
       withoutEndedRoom(invite, isRoomEnded)
     ])
+    if (actor) {
+      if (isNew && !targeted) observeRoomInviteArrival(actor.profile.userId, invite.threadId, invite.inviteId)
+      observeRoomInviteActiveContext(actor.profile.userId, invite.threadId, invite.inviteId,
+        invite.status === "pending" || invite.status === "accepted" && Boolean(invite.roomSessionId) && !isRoomEnded(invite.roomSessionId!))
+    }
   }
 
   const closeEndedRoom = (roomSessionId: string): void => {
@@ -227,6 +277,12 @@ export function createChatCoordinator(
     dependencies.setRoomInvites((current) =>
       current.map((invite) => withoutEndedRoom(invite, isRoomEnded))
     )
+    const actor = getProductionActor()
+    for (const [id, invite] of currentInviteRecords) {
+      if (invite.roomSessionId !== roomSessionId) continue
+      currentInviteRecords.set(id, withoutEndedRoom(invite, isRoomEnded))
+      if (actor) observeRoomInviteActiveContext(actor.profile.userId, invite.threadId, id, false)
+    }
   }
 
   const refreshThreadRoomInvites = (threadId: string): Promise<void> => {
@@ -242,13 +298,36 @@ export function createChatCoordinator(
     }
     const refreshStartedAt = getRoomInviteRevision(threadId)
     const promise = (async () => {
-      const invites = await dependencies.fetchThreadRoomInvites(
+      const page = dependencies.fetchThreadRoomInvitePage ? await dependencies.fetchThreadRoomInvitePage(
+        dependencies.baseHttpUrl, actor.session.sessionToken, threadId, { limit: CHAT_INITIAL_HISTORY_LIMIT }
+      ) : null
+      const invites = page ? page.invites : await dependencies.fetchThreadRoomInvites(
         dependencies.baseHttpUrl,
         actor.session.sessionToken,
         threadId
       )
       if (!dependencies.isCurrentSession(actor) || (requestEpochs.get(key) ?? 0) !== epoch) return
-      replaceThreadRoomInvites(threadId, invites, refreshStartedAt)
+      if (page) {
+        mergeThreadRoomInvites(threadId, [...invites, ...page.activeInvites], refreshStartedAt)
+        const activeIds = new Set([...page.activeInvites, ...invites].filter(invite => {
+          const current = currentInviteRecords.get(invite.inviteId) ?? invite
+          return current.status === "pending" || current.status === "accepted" && Boolean(current.roomSessionId)
+        }).map(invite => invite.inviteId))
+        for (const current of currentInviteRecords.values()) {
+          if (current.threadId === threadId && (roomInviteMutationRevisions.get(current.inviteId) ?? 0) > refreshStartedAt) {
+            if (current.status === "pending" || current.status === "accepted" && Boolean(current.roomSessionId)) activeIds.add(current.inviteId)
+            else activeIds.delete(current.inviteId)
+          }
+        }
+        applyLatestRoomInvitePage({ userId: actor.profile.userId, threadId, inviteIds: invites.map(invite => invite.inviteId),
+          activeInviteIds: [...activeIds],
+          activeContextKnown: page.paged, nextCursor: page.nextCursor })
+        for (const [id, revision] of liveInviteArrivalRevisions) {
+          if (revision > refreshStartedAt && currentInviteRecords.get(id)?.threadId === threadId) {
+            observeRoomInviteArrival(actor.profile.userId, threadId, id)
+          }
+        }
+      } else replaceThreadRoomInvites(threadId, invites, refreshStartedAt)
       recentRoomInvitePages.set(sessionThreadKey(actor, threadId), Date.now())
     })()
     pendingRoomInviteRefreshes.set(threadId, {
@@ -264,6 +343,55 @@ export function createChatCoordinator(
     }
     void promise.then(clearPending, clearPending)
     return promise
+  }
+
+  const requestOlderRoomInvites = (threadId: string, before: string): Promise<readonly string[]> => {
+    const actor = getProductionActor()
+    if (!actor || !dependencies.fetchThreadRoomInvitePage) return Promise.resolve([])
+    const key = sessionThreadKey(actor, threadId)
+    const pendingKey = `${key}:${before}`
+    const pending = pendingInvitePages.get(pendingKey)
+    if (pending) return pending
+    const epoch = requestEpochs.get(key) ?? 0
+    const revision = getRoomInviteRevision(threadId)
+    const request = (async () => {
+      const page = await dependencies.fetchThreadRoomInvitePage!(dependencies.baseHttpUrl, actor.session.sessionToken,
+        threadId, { before, limit: CHAT_INITIAL_HISTORY_LIMIT })
+      if (!dependencies.isCurrentSession(actor) || (requestEpochs.get(key) ?? 0) !== epoch ||
+        getChatRoomInviteHistory(threadId, actor.profile.userId).nextCursor !== before) return []
+      mergeThreadRoomInvites(threadId, page.invites, revision)
+      if (!applyOlderRoomInvitePage({ userId: actor.profile.userId, threadId, before,
+        inviteIds: page.invites.map(invite => invite.inviteId), nextCursor: page.nextCursor })) return []
+      return page.invites.map(invite => invite.inviteId)
+    })()
+    pendingInvitePages.set(pendingKey, request)
+    const clear = () => { if (pendingInvitePages.get(pendingKey) === request) pendingInvitePages.delete(pendingKey) }
+    void request.then(clear, clear)
+    return request
+  }
+
+  const ensureRoomInvite = async (threadId: string, inviteId: string): Promise<boolean> => {
+    const actor = getProductionActor()
+    if (!actor || !dependencies.fetchThreadRoomInvitePage) return false
+    const revision = getRoomInviteRevision(threadId)
+    const page = await dependencies.fetchThreadRoomInvitePage(dependencies.baseHttpUrl, actor.session.sessionToken,
+      threadId, { inviteId })
+    // An exact invitation lookup is independent from a message reconnect.
+    // Cancellation is retryable; it must not masquerade as an authoritative
+    // missing invitation and consume a notification action.
+    if (!dependencies.isCurrentSession(actor)) {
+      const cancelled = new Error("Room invitation lookup was cancelled.")
+      cancelled.name = "AbortError"
+      throw cancelled
+    }
+    const invite = page.invites.find(invite => invite.inviteId === inviteId)
+    if (!invite) return false
+    mergeThreadRoomInvites(threadId, [invite], revision)
+    bumpRoomInviteRevision(threadId, invite.inviteId)
+    const current = currentInviteRecords.get(invite.inviteId) ?? invite
+    observeRoomInviteActiveContext(actor.profile.userId, threadId, invite.inviteId,
+      current.status === "pending" || current.status === "accepted" && Boolean(current.roomSessionId))
+    return true
   }
 
   const sendChatMessage = (
@@ -304,11 +432,16 @@ export function createChatCoordinator(
         }
       } catch (error) {
         if (dependencies.isCurrentSession(actor)) {
-          dependencies.markOptimisticMessageFailed(clientMessageId)
-          dependencies.showWarningToast({
-            title: "Message not sent",
-            body: getMessageSendErrorMessageForDisplay(error)
-          })
+          // Realtime may have published the committed message before a lost
+          // HTTP response times out. Only warn for a bubble still marked failed;
+          // this does not turn the transport failure into an invented ACK.
+          const failed = dependencies.markOptimisticMessageFailed(clientMessageId)
+          if (failed !== false) {
+            dependencies.showWarningToast({
+              title: "Message not sent",
+              body: getMessageSendErrorMessageForDisplay(error)
+            })
+          }
         }
         throw error
       }
@@ -344,6 +477,9 @@ export function createChatCoordinator(
     }
 
     const key = sessionThreadKey(actor, threadId)
+    const requestOptions = !options.before && options.limit === undefined
+      ? { ...options, limit: CHAT_INITIAL_HISTORY_LIMIT }
+      : options
     const epoch = requestEpochs.get(key) ?? 0
     const isCurrentRequest = (): boolean => dependencies.isCurrentSession(actor) &&
       (requestEpochs.get(key) ?? 0) === epoch
@@ -386,23 +522,26 @@ export function createChatCoordinator(
     // thread "loading" would notify every chat store reader (the Inbox
     // re-render) while the finger is down, delaying the tap's own navigation.
     // An opened chat waiting on it shows its loading state without the flag.
-    if (config?.purpose !== "prefetch") dependencies.applyChatMessageListLoading(threadId)
+    if (config?.purpose !== "prefetch" && !dependencies.hasMessageHistory?.(threadId)) {
+      dependencies.applyChatMessageListLoading(threadId)
+    }
     const request = (async () => {
       try {
         const messageList = await dependencies.fetchThreadMessages(
           dependencies.baseHttpUrl,
           actor.session.sessionToken,
           threadId,
-          options
+          requestOptions
         )
-        // Both requests start concurrently. Only the cold first page waits for
-        // its invite snapshot before publication; cached conversations and
-        // older-history pagination stay visible and independent.
-        if (!options.before && !dependencies.hasMessageHistory?.(threadId)) {
-          await openingInvites
-        }
+        // Messages are readable as soon as their own service answers. A slow
+        // invitation request must not hold the conversation's history hostage;
+        // it independently merges its durable cards into the same timeline.
         if (!isCurrentRequest()) return
-        dependencies.applyChatMessageListed(messageList)
+        if (messageList.userId !== actor.profile.userId || messageList.threadId !== threadId ||
+          messageList.messages.some((message) => message.threadId !== threadId)) {
+          throw new Error("Blumi could not confirm that conversation.")
+        }
+        dependencies.applyChatMessageListed(messageList, { before: requestOptions.before })
         if (firstPageKey) recentFirstPages.set(firstPageKey, Date.now())
       } catch (error) {
         if (isCurrentRequest()) {
@@ -542,12 +681,14 @@ export function createChatCoordinator(
         )
         .catch(() => undefined)
     }
-    dependencies.markLocalThreadRead(threadId)
+    dependencies.markLocalThreadRead(threadId, upToMessageId)
   }
 
   return {
     resynchronizeMessages,
     refreshThreadRoomInvites,
+    requestOlderRoomInvites,
+    ensureRoomInvite,
     sendChatMessage,
     requestMessages,
     handleRoomInviteAction,

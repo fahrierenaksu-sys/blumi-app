@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@blumi/contracts"
+import type { FetchThreadMessagesOptions } from "../chat/chatApi"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   applyChatMessageListLoading,
@@ -6,7 +7,7 @@ import {
   getMessageListCompletionVersion,
   markOptimisticMessageFailed,
   markOptimisticMessageSending,
-  useChatStore
+  useChatThreadStore
 } from "../chat/chatStore"
 import { normalizeOutgoingChatBody } from "../chat/thread/chatThreadModel"
 import {
@@ -22,6 +23,7 @@ import {
   findMissedCanonicalRoomChatMessages,
   shouldRenderIncomingRoomChatMessage
 } from "./inRoomChatThread"
+import { ROOM_CHAT_HISTORY_LIMIT } from "./roomChatHistoryModel"
 import {
   advanceRoomEntryReplayGate,
   createRoomEntryReplayGate
@@ -68,6 +70,13 @@ function createRoomClientMessageId(): string {
   return `room_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
+function hasMessage(messages: readonly ChatMessage[], messageId: string): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.messageId === messageId) return true
+  }
+  return false
+}
+
 /**
  * Bridges the real chat thread for this miniRoom into the scene.
  * Emits only NEW messages (after mount) as events so the scene can
@@ -78,22 +87,33 @@ export function useInRoomChat(options: {
   sourceThreadId: string | undefined
   localUserId: string
   partnerUserId: string
+  requestMessages: (threadId: string, options?: FetchThreadMessagesOptions) => Promise<void>
 }): UseInRoomChatResult {
-  const { localUserId, partnerUserId, sourceThreadId } = options
-  const { threads, getMessages, getMessageListState, addOptimisticMessage } = useChatStore()
+  const { localUserId, partnerUserId, sourceThreadId, requestMessages } = options
+  const chatThread = useChatThreadStore(sourceThreadId)
+  const { addOptimisticMessage } = chatThread
   const { connectionStatus, send } = useGlobalRealtime()
 
   const thread = useMemo(
     () => findCanonicalRoomChatThread({
-      threads,
+      threads: chatThread.thread ? [chatThread.thread] : [],
       sourceThreadId,
       localUserId,
       partnerUserId
     }),
-    [localUserId, partnerUserId, sourceThreadId, threads]
+    [chatThread.thread, localUserId, partnerUserId, sourceThreadId]
   )
 
   const threadId = thread?.threadId
+  const canonicalMessagesRef = useRef(chatThread.messages)
+  canonicalMessagesRef.current = chatThread.messages
+  const latestThreadMessageId = chatThread.thread?.lastMessage?.messageId
+  const hasRecentHistorySnapshot = useMemo(() => {
+    if (!chatThread.historyReady || chatThread.messageListState.status !== "ready" ||
+      chatThread.latestHistoryMessageIds === undefined) return false
+    return !latestThreadMessageId || hasMessage(chatThread.messages, latestThreadMessageId)
+  }, [chatThread.historyReady, chatThread.latestHistoryMessageIds, chatThread.messageListState.status,
+    chatThread.messages, latestThreadMessageId])
   const requestedRef = useRef<string | null>(null)
   const baselineRef = useRef<number>(Date.now())
   const seenRef = useRef<Set<string>>(new Set())
@@ -159,16 +179,19 @@ export function useInRoomChat(options: {
     seenRef.current = new Set()
     setPendingEvents([])
 
-    for (const message of getMessages(threadId)) {
+    for (const message of canonicalMessagesRef.current) {
       seenRef.current.add(message.messageId)
     }
 
+    // ChatThread's latest server page is already the MiniRoom's recent
+    // snapshot. Reuse it instead of requesting the same thread again.
+    if (hasRecentHistorySnapshot) return
+
     applyChatMessageListLoading(threadId)
-    send({
-      type: "chat.list_messages",
-      payload: { threadId }
-    })
-  }, [connectionStatus, getMessages, send, threadId])
+    // The chat coordinator supports bounded HTTP history pages and owns the
+    // failed-list state and user-facing warning when that request rejects.
+    void requestMessages(threadId, { limit: ROOM_CHAT_HISTORY_LIMIT }).catch(() => undefined)
+  }, [connectionStatus, hasRecentHistorySnapshot, requestMessages, threadId])
 
   useEffect(() => {
     const isReconnect = createReconnectTransitionTracker(getGlobalStatus())
@@ -185,27 +208,29 @@ export function useInRoomChat(options: {
     })
   }, [localUserId, threadId])
 
-  const messageListState = threadId ? getMessageListState(threadId) : { status: "idle" as const }
+  const messageListState = threadId ? chatThread.messageListState : { status: "idle" as const }
   const messageListCompletionVersion = threadId
     ? getMessageListCompletionVersion(threadId)
     : 0
-  const canonicalMessages = threadId ? getMessages(threadId) : NO_THREAD_MESSAGES
+  const canonicalMessages = threadId ? chatThread.messages : NO_THREAD_MESSAGES
 
   useEffect(() => {
     if (!threadId) return
-    if (messageListState.status === "loading") {
+    if (messageListState.status === "loading" && !hasRecentHistorySnapshot) {
       replayGateRef.current = advanceRoomEntryReplayGate(
         replayGateRef.current,
         "loading"
       )
       return
     }
-    if (messageListState.status !== "ready") return
+    if (messageListState.status !== "ready" && !hasRecentHistorySnapshot) return
     replayGateRef.current = advanceRoomEntryReplayGate(
       replayGateRef.current,
       "ready"
     )
-    if (!replayGateRef.current.canReplay) return
+    const canReplayCachedSnapshot = hasRecentHistorySnapshot && replayGateRef.current.requested &&
+      !replayGateRef.current.replayed
+    if (!replayGateRef.current.canReplay && !canReplayCachedSnapshot) return
     if (replayedEntryThreadRef.current === threadId) return
     replayedEntryThreadRef.current = threadId
     replayGateRef.current = advanceRoomEntryReplayGate(
@@ -237,7 +262,7 @@ export function useInRoomChat(options: {
       ...(initialEvent ? [initialEvent] : []),
       ...buffered
     ])
-  }, [canonicalMessages, messageListState.status, threadId])
+  }, [canonicalMessages, hasRecentHistorySnapshot, messageListState.status, threadId])
 
   useEffect(() => {
     if (!threadId || !reconnectSnapshotPendingRef.current) return

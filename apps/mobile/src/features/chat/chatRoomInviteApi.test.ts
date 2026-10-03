@@ -5,6 +5,7 @@ import {
   createThreadRoomInvite,
   decideThreadRoomInvite,
   fetchThreadRoomInvites,
+  fetchThreadRoomInvitePage,
   isDefinitivelyUnavailableRoomSession,
   joinRoomSession,
   leaveActiveRoom,
@@ -23,6 +24,102 @@ const invite = {
   createdAt: "2026-07-21T10:00:00.000Z",
   expiresAt: "2026-07-21T10:10:00.000Z"
 }
+
+const historyInvite = (index: number) => ({ ...invite, inviteId: `history-${index}`, status: "declined",
+  createdAt: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString() })
+
+test("recent invite requests are bounded, preserve ancient live context and use the authoritative exclusive cursor", async () => {
+  const history = Array.from({ length: 200 }, (_, index) => historyInvite(index))
+  const seen: URL[] = []
+  const fetcher = (async (url: RequestInfo | URL) => {
+    const request = new URL(String(url)); seen.push(request)
+    const before = request.searchParams.get("before")
+    const end = before ? history.findIndex(row => row.inviteId === before) : history.length
+    const page = history.slice(Math.max(0, end - 20), end)
+    return createJsonResponse(200, { threadId: "thread_one", invites: page,
+      nextCursor: end > 20 ? page[0]!.inviteId : null,
+      activeInvites: [{ ...historyInvite(0), status: "accepted", roomSessionId: "live-fixture" }] })
+  }) as typeof fetch
+  const page = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", {}, fetcher)
+  assert.equal(seen[0]!.searchParams.get("limit"), "20")
+  assert.deepEqual(page.invites.map(row => row.inviteId), history.slice(-20).map(row => row.inviteId))
+  assert.equal(page.activeInvites.length, 1)
+  assert.equal(page.nextCursor, history[180]!.inviteId)
+  const older = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", { before: page.nextCursor! }, fetcher)
+  assert.equal(older.invites[19]!.inviteId, history[179]!.inviteId)
+  assert.equal(older.nextCursor, history[160]!.inviteId)
+})
+
+test("legacy server replies support three local pages and an old exact target without constructing all historic rows", async () => {
+  const rows = Array.from({ length: 200 }, (_, index) => historyInvite(index))
+  const fetcher = (async () => createJsonResponse(200, { threadId: "thread_one", invites: rows })) as typeof fetch
+  let before: string | undefined
+  for (const end of [200, 180, 160]) {
+    const page = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", { before }, fetcher)
+    assert.equal(page.paged, false)
+    assert.deepEqual(page.invites.map(row => row.inviteId), rows.slice(end - 20, end).map(row => row.inviteId))
+    assert.equal(page.activeInvites.length, 0)
+    before = page.nextCursor!
+  }
+  const target = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", { inviteId: rows[1]!.inviteId }, fetcher)
+  assert.deepEqual(target.invites.map(row => row.inviteId), [rows[1]!.inviteId])
+  assert.equal(target.nextCursor, null)
+  // Historical rows need only their boundary fields during the raw scan;
+  // materializing all objects would reject this never-selected old body.
+  const partiallyMalformed = [{ ...rows[0], senderUserId: undefined }, ...rows.slice(1)]
+  const recent = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", {},
+    (async () => createJsonResponse(200, { threadId: "thread_one", invites: partiallyMalformed })) as typeof fetch)
+  assert.equal(recent.invites.length, 20)
+})
+
+test("legacy active supplementation stays bounded and never accepts a foreign thread even outside the selected page", async () => {
+  const rows = Array.from({ length: 1000 }, (_, index) => ({ ...historyInvite(index), status: "accepted" }))
+  rows[0] = { ...rows[0]!, roomSessionId: "live-fixture" } as typeof rows[number]
+  const run = (invites: unknown[]) => fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", {},
+    (async () => createJsonResponse(200, { threadId: "thread_one", invites })) as typeof fetch)
+  const page = await run(rows)
+  assert.equal(page.invites.length, 20)
+  assert.equal(page.activeInvites.length, 1)
+  await assert.rejects(run([{ ...rows[0], sourceThreadId: "foreign-fixture" }, ...rows.slice(1)]), /could not read/)
+  await assert.rejects(run(rows.map(row => ({ ...row, roomSessionId: "malformed-live-fixture" }))), /could not read/)
+})
+
+test("paged malformed targets, foreign records and non-boundary cursors are rejected; old missing targets settle terminally", async () => {
+  const run = (payload: unknown, options: Parameters<typeof fetchThreadRoomInvitePage>[3] = {}) =>
+    fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", options,
+      (async () => createJsonResponse(200, payload)) as typeof fetch)
+  const rows = [historyInvite(0), historyInvite(1)]
+  await assert.rejects(run({ threadId: "thread_one", invites: rows, nextCursor: rows[1]!.inviteId, activeInvites: [] }), /could not read/)
+  await assert.rejects(run({ threadId: "thread_one", invites: [{ ...rows[0], sourceThreadId: "foreign-fixture" }], nextCursor: null, activeInvites: [] }), /could not read/)
+  await assert.rejects(run({ threadId: "thread_one", invites: [rows[0]], nextCursor: null, activeInvites: [] }, { inviteId: rows[1]!.inviteId }), /could not read/)
+  for (const status of [403, 404]) {
+    const result = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", { inviteId: "missing-fixture" },
+      (async () => createJsonResponse(status, { error: "Unavailable" })) as typeof fetch)
+    assert.deepEqual(result.invites, [])
+  }
+})
+
+test("bounded invitation requests abort even when the transport does not settle", async () => {
+  const controller = new AbortController()
+  const pending = fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", {},
+    (async () => new Promise<Response>(() => {})) as typeof fetch, controller.signal)
+  const outcome = assert.rejects(pending, { name: "AbortError" })
+  controller.abort()
+  await outcome
+})
+
+test("legacy equal-time invitation replies may reorder without repeating or losing an older page", async () => {
+  const rows = Array.from({ length: 40 }, (_, index) => ({ ...historyInvite(index),
+    inviteId: `tie-${String(index).padStart(2, "0")}`, createdAt: invite.createdAt }))
+  let calls = 0
+  const fetcher = (async () => createJsonResponse(200, { threadId: "thread_one",
+    invites: ++calls === 1 ? rows : [...rows].reverse() })) as typeof fetch
+  const first = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", {}, fetcher)
+  const second = await fetchThreadRoomInvitePage("https://example.test", "session_token", "thread_one", { before: first.nextCursor! }, fetcher)
+  assert.deepEqual(first.invites.map(row => row.inviteId), rows.slice(20).map(row => row.inviteId))
+  assert.deepEqual(second.invites.map(row => row.inviteId), rows.slice(0, 20).map(row => row.inviteId))
+  assert.equal(second.nextCursor, null)
+})
 
 test("room invite history cancellation settles even when the transport ignores abort", async () => {
   const controller = new AbortController()

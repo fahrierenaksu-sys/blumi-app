@@ -1,14 +1,19 @@
 import { Dimensions } from "react-native"
 import { launchFlight } from "../../ui/flight/FlightLayer"
 import { createLiveFlightSources } from "../../ui/flight/flightSources"
+import { isFlightFrameVisible, type FlightFrame } from "../../ui/flight/flightModel"
 import type { FlightSurface } from "../../ui/flight/flightStore"
-import { uiTheme } from "../../ui/theme"
+import {
+  ROOM_INVITE_DOOR_GEOMETRY,
+  ROOM_INVITE_SCENE_HEIGHT,
+  RoomInviteDoorFlightArtwork
+} from "./ChatRoomInviteScene"
 
 /**
  * "The door opens" (MOTION_PLAN §C, journey 7), chat side: the accepted
- * invitation card, whose door already stands open, grows to fill the screen
- * in the warm light of that doorway while the room route opens underneath,
- * then dissolves into the room. It stops at the room route's boundary: what
+ * invitation card, whose door already stands open, grows across the screen
+ * while the room route opens visibly underneath, then dissolves into the
+ * room. It stops at the room route's boundary: what
  * happens inside the room (the partner walking in) belongs to the room.
  *
  * The open card attaches itself per conversation while it is on screen; the
@@ -26,17 +31,19 @@ export function getRoomDoorKey(threadId: string): string {
   return `room-door:${threadId}`
 }
 
-const CARD_SURFACE: FlightSurface = {
-  backgroundColor: uiTheme.colors.surfaceRaised,
-  borderColor: uiTheme.colors.borderStrong,
-  borderWidth: 1,
-  radius: uiTheme.radius.lg
+const TRANSPARENT_SURFACE: FlightSurface = {
+  backgroundColor: "transparent",
+  radius: 0
 }
 
-/** The doorway's warm light (the open door's interior in ChatRoomInviteScene). */
-const DOORWAY_LIGHT: FlightSurface = {
-  backgroundColor: "#F8D4A0",
-  radius: 0
+/** The measured card frame contains this fixed-position doorway inset by its 1px border. */
+export function getRoomDoorArtworkFrame(card: FlightFrame): FlightFrame {
+  return {
+    x: card.x + (card.width - ROOM_INVITE_DOOR_GEOMETRY.width) / 2,
+    y: card.y + 1 + ROOM_INVITE_SCENE_HEIGHT - ROOM_INVITE_DOOR_GEOMETRY.bottom - ROOM_INVITE_DOOR_GEOMETRY.height,
+    width: ROOM_INVITE_DOOR_GEOMETRY.width,
+    height: ROOM_INVITE_DOOR_GEOMETRY.height
+  }
 }
 
 /** Returns true when the door flight started. Call just before opening the room. */
@@ -48,12 +55,16 @@ export function launchRoomDoorFlight(input: {
   const source = roomDoorSources.take(getRoomDoorKey(input.sourceThreadId))
   if (!source) return false
   const window = Dimensions.get("window")
+  const doorFrame = getRoomDoorArtworkFrame(source)
+  if (!isFlightFrameVisible(doorFrame, window)) return false
   return launchFlight({
     channel: "room-door",
     match: input.sourceThreadId,
-    source,
-    sourceSurface: CARD_SURFACE,
-    targetSurface: DOORWAY_LIGHT,
-    targetFrame: { x: 0, y: 0, width: window.width, height: window.height }
+    source: doorFrame,
+    sourceSurface: TRANSPARENT_SURFACE,
+    targetSurface: TRANSPARENT_SURFACE,
+    targetFrame: { x: 0, y: 0, width: window.width, height: window.height },
+    content: <RoomInviteDoorFlightArtwork />,
+    contentMode: "carry"
   }) !== null
 }

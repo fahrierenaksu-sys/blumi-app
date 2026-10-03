@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import {
   addOptimisticMessage,
   applyChatMessageListed,
@@ -15,6 +16,7 @@ import {
   applyChatThreadRead,
   applyChatThreadListLoading,
   getMessages,
+  getHistoryPageMessageIds,
   getThreadUnreadCount,
   getThreadListState,
   markOptimisticMessageFailed,
@@ -37,6 +39,7 @@ import {
   getPartnerReceipts,
   getMessageRenderKey
 } from "./chatStore"
+import { getReadHereThrough } from "./chatReadHere"
 
 test("an acknowledged bubble keeps its first local render key so the row never remounts (CHT-04)", () => {
   resetChatStore()
@@ -139,6 +142,7 @@ test("CHT-06: a list served before this device's read cannot bring read messages
   // A partner message arrives while the conversation is on screen.
   const whileOpen = { ...seen, messageId: "while-open", sentAt: "2026-09-05T10:01:00Z" }
   applyChatMessageReceived(whileOpen, { localUserId: "b" })
+  markThreadRead("read-here", whileOpen.messageId)
   // Back in the inbox; the refresh was served before the server stored the read.
   setActiveThread(null)
   applyChatThreadListed({ userId: "b", threads: [{ ...thread, unreadCount: 3, lastMessage: whileOpen }] })
@@ -157,7 +161,7 @@ test("CHT-06: a list served before this device's read cannot bring read messages
   assert.equal(getThreadUnreadCount("read-here"), 2)
 })
 
-test("focusing a thread clears its local badge with no server read, also offline before history loads", () => {
+test("focus clears the visible local badge but does not permanently mark unloaded messages read", () => {
   // The thread screen sends a server read only once a partner message is on
   // screen; focusing alone is local-only and must still clear the badge.
   resetChatStore()
@@ -173,7 +177,50 @@ test("focusing a thread clears its local badge with no server read, also offline
   assert.equal(getTotalUnreadCount(), 0, "and stays cleared after leaving")
   // The server never stored a read; a list served later still says 4.
   applyChatThreadListed({ userId: "b", threads: [thread] })
-  assert.equal(getThreadUnreadCount("offline"), 0, "a list without the read does not bring the shown messages back")
+  assert.equal(getThreadUnreadCount("offline"), 4, "the server restores unread messages that the screen never confirmed showing")
+  markThreadRead("offline", last.messageId)
+  applyChatThreadListed({ userId: "b", threads: [thread] })
+  assert.equal(getThreadUnreadCount("offline"), 0, "a message explicitly shown here stays locally read before its server receipt")
+})
+
+test("a bounded timeline only advances its read watermark through the confirmed displayed cursor", () => {
+  resetChatStore()
+  const messages = [1, 2, 3].map((index): ChatMessage => ({ messageId: `synthetic-read-${index}`,
+    threadId: "synthetic-read", senderUserId: "synthetic-peer", body: "Synthetic content",
+    sentAt: new Date(Date.UTC(2026, 9, 3, 0, index)).toISOString() }))
+  applyChatThreadListed({ userId: "synthetic-owner", threads: [{ threadId: "synthetic-read", miniRoomId: "synthetic-room",
+    participantUserIds: ["synthetic-owner", "synthetic-peer"], participants: [{ userId: "synthetic-owner" }, { userId: "synthetic-peer" }],
+    createdAt: "2026-10-03T00:00:00Z", lastMessage: messages[2], unreadCount: 3 }] })
+  applyChatMessageListed({ userId: "synthetic-owner", threadId: "synthetic-read", messages })
+  setActiveThread("synthetic-read")
+  assert.equal(getReadHereThrough("synthetic-read"), undefined, "focus with an invite-only window is not a read")
+  markThreadRead("synthetic-read", messages[0]!.messageId)
+  assert.equal(getReadHereThrough("synthetic-read")?.messageId, messages[0]!.messageId)
+  markThreadRead("synthetic-read", "synthetic-not-loaded")
+  assert.equal(getReadHereThrough("synthetic-read")?.messageId, messages[0]!.messageId, "an unknown cursor cannot use the cached newest row")
+  setActiveThread(null)
+  resetChatStore()
+})
+
+test("latest history membership stays separate from live rows and explicitly confirmed older pages", () => {
+  resetChatStore()
+  const read = createChatThreadSnapshotReader("synthetic-page")
+  const messages = [1, 2, 3].map((index): ChatMessage => ({ messageId: `synthetic-page-${index}`,
+    threadId: "synthetic-page", senderUserId: "synthetic-peer", body: "Synthetic content",
+    sentAt: new Date(Date.UTC(2026, 9, 3, 0, index)).toISOString() }))
+  applyChatMessageListed({ userId: "synthetic-owner", threadId: "synthetic-page", messages: messages.slice(1) })
+  const latest = read().latestHistoryMessageIds
+  applyChatMessageListed({ userId: "synthetic-owner", threadId: "synthetic-page", messages: messages.slice(1).map((message) => ({ ...message })) })
+  assert.equal(read().latestHistoryMessageIds, latest)
+  applyChatMessageReceived({ ...messages[2]!, messageId: "synthetic-live", sentAt: "2026-10-03T00:04:00Z" })
+  applyChatMessageListed({ userId: "synthetic-owner", threadId: "synthetic-page", messages: [messages[0]!] }, { before: messages[1]!.messageId })
+  assert.equal(read().latestHistoryMessageIds, latest)
+  assert.deepEqual(getHistoryPageMessageIds("synthetic-page", messages[1]!.messageId), [messages[0]!.messageId])
+  applyChatMessageListed({ userId: "synthetic-owner", threadId: "synthetic-page", messages: [] }, { before: messages[0]!.messageId })
+  assert.deepEqual(getHistoryPageMessageIds("synthetic-page", messages[0]!.messageId), [], "successfully loaded empty pages are distinguishable from an unconfirmed cache gap")
+  resetChatStore()
+  assert.equal(read().latestHistoryMessageIds, undefined)
+  assert.equal(getHistoryPageMessageIds("synthetic-page", messages[1]!.messageId), undefined)
 })
 
 test("summary-covered delayed realtime delivery does not double count unread", () => {
@@ -894,6 +941,135 @@ test("reading the threads is cheap between list changes: unread and active-threa
     assert.notEqual(next, first)
     assert.equal(next[0]?.lastMessage?.messageId, "m2")
     assert.equal(first[0]?.lastMessage?.messageId, "m1", "an earlier snapshot is never changed under its reader")
+  } finally {
+    resetChatStore()
+  }
+})
+
+function sharingThread(): ChatThread {
+  return {
+    threadId: "synthetic-sharing", miniRoomId: "synthetic-room",
+    participantUserIds: ["synthetic-viewer", "synthetic-partner"],
+    participants: [{ userId: "synthetic-viewer" }, { userId: "synthetic-partner", displayName: "Synthetic partner",
+      avatar: { presetId: "synthetic-body", revision: 1, loadout: {
+        schemaVersion: 2, bodyId: "synthetic-body", faceId: "synthetic-face", eyesId: "synthetic-eyes",
+        noseId: "synthetic-nose", mouthId: "synthetic-mouth", hairId: "synthetic-hair",
+        topId: "synthetic-top", bottomId: "synthetic-bottom", shoesId: "synthetic-shoes",
+        dressId: null, outerwearId: null, accessoryIds: ["synthetic-accessory"]
+      } } }],
+    createdAt: "2026-10-03T00:00:00Z", unreadCount: 0, lastReadAt: "2026-10-03T00:01:00Z",
+    hiddenThrough: "2026-10-03T00:00:30Z",
+    lastMessage: { messageId: "synthetic-last", threadId: "synthetic-sharing", senderUserId: "synthetic-partner",
+      body: "Synthetic content", sentAt: "2026-10-03T00:01:00Z", deliveredAt: "2026-10-03T00:01:01Z",
+      readAt: "2026-10-03T00:01:02Z", editedAt: "2026-10-03T00:01:03Z" },
+    partnerReceipts: { deliveredUpTo: { sentAt: "2026-10-03T00:01:00Z", messageId: "synthetic-last" },
+      readUpTo: { sentAt: "2026-10-03T00:01:00Z", messageId: "synthetic-last" } }
+  }
+}
+
+test("unchanged server lists reuse the selected thread, every message and disclosed receipt snapshot", () => {
+  resetChatStore()
+  try {
+    const thread = sharingThread()
+    applyChatThreadListed({ userId: "synthetic-viewer", threads: [thread] })
+    const read = createChatThreadSnapshotReader(thread.threadId)
+    const initialThread = read()
+    const initialInbox = getThreads()
+    applyChatThreadListed({ userId: "synthetic-viewer", threads: [structuredClone(thread)] })
+    assert.equal(read(), initialThread)
+    assert.equal(getThreads(), initialInbox)
+    const messages = Array.from({ length: 100 }, (_, index) => ({ ...thread.lastMessage!,
+      messageId: `synthetic-history-${index}`, sentAt: new Date(Date.UTC(2026, 9, 3, 0, 0, index)).toISOString() }))
+    applyChatMessageListed({ userId: "synthetic-viewer", threadId: thread.threadId, messages, partnerReceipts: thread.partnerReceipts })
+    const initialHistory = read()
+    applyChatMessageListed({ userId: "synthetic-viewer", threadId: thread.threadId,
+      messages: structuredClone(messages), partnerReceipts: structuredClone(thread.partnerReceipts) })
+    assert.equal(read(), initialHistory, "an unchanged ready response leaves the timeline subscriber idle")
+    assert.equal(getMessages(thread.threadId), initialHistory.messages)
+    assert.ok(getMessages(thread.threadId).every((message, index) => message === initialHistory.messages[index]))
+    const other = { ...sharingThread(), threadId: "synthetic-other", miniRoomId: "synthetic-other-room", lastMessage: undefined }
+    applyChatThreadListed({ userId: "synthetic-viewer", threads: [other], append: true })
+    assert.equal(read(), initialHistory, "appending another conversation does not invalidate this thread")
+    assert.equal(getThreads().find((entry) => entry.threadId === thread.threadId), initialInbox[0], "unchanged Inbox rows retain their copied record")
+    resetChatStore()
+    applyChatThreadListed({ userId: "synthetic-viewer", threads: [structuredClone(thread)] })
+    assert.notEqual(read().thread, initialThread.thread, "reset never reuses a previous account's record")
+    assert.equal(read().historyReady, false)
+  } finally {
+    resetChatStore()
+  }
+})
+
+test("history refresh preserves unchanged neighbours while every message field remains authoritative", () => {
+  const changes: Partial<ChatMessage>[] = [
+    { senderUserId: "synthetic-other-sender" }, { body: "Updated synthetic content" },
+    { threadId: "synthetic-other-thread" }, { sentAt: "2026-10-03T00:01:04Z" },
+    { deliveredAt: undefined }, { readAt: undefined }, { editedAt: undefined },
+    { deliveredAt: "2026-10-03T00:01:04Z" }, { readAt: "2026-10-03T00:01:04Z" }, { editedAt: "2026-10-03T00:01:04Z" }
+  ]
+  for (const patch of changes) {
+    resetChatStore()
+    const message = sharingThread().lastMessage!
+    const neighbour = { ...message, messageId: "synthetic-neighbour", sentAt: "2026-10-03T00:02:00Z" }
+    applyChatMessageListed({ userId: "synthetic-viewer", threadId: message.threadId, messages: [message, neighbour] })
+    const initial = getMessages(message.threadId)
+    applyChatMessageListed({ userId: "synthetic-viewer", threadId: message.threadId,
+      messages: [{ ...structuredClone(message), ...patch }, structuredClone(neighbour)] })
+    const updated = getMessages(message.threadId)
+    assert.notEqual(updated[0], initial[0])
+    assert.deepEqual(updated[0], { ...message, ...patch })
+    assert.equal(updated[1], initial[1], "a changed message must not redraw its unchanged neighbour")
+  }
+  resetChatStore()
+})
+
+test("thread refresh detects changed membership, room, read, hidden, participant, avatar and receipt fields", () => {
+  const changes: ((thread: ChatThread) => void)[] = [
+    (thread) => { thread.miniRoomId = "synthetic-updated-room" },
+    (thread) => { thread.createdAt = "2026-10-03T00:00:01Z" },
+    (thread) => { thread.unreadCount = 1 },
+    (thread) => { thread.lastReadAt = "2026-10-03T00:01:01Z" },
+    (thread) => { thread.hiddenThrough = undefined },
+    (thread) => { thread.participantUserIds.reverse() },
+    (thread) => { thread.participants[0].userId = "synthetic-new-member" },
+    (thread) => { thread.participants[1].displayName = "Updated synthetic partner" },
+    (thread) => { thread.participants[1].avatar = undefined },
+    (thread) => { thread.participants[1].avatar!.revision += 1 },
+    (thread) => { thread.participants[1].avatar!.presetId = "synthetic-new-preset" },
+    (thread) => { thread.participants[1].avatar!.loadout.accessoryIds.push("synthetic-new-accessory") },
+    (thread) => { thread.partnerReceipts!.readUpTo = undefined },
+    (thread) => { thread.partnerReceipts!.deliveredUpTo!.messageId = "synthetic-updated-cursor" },
+    (thread) => { thread.partnerReceipts!.deliveredUpTo!.sentAt = "2026-10-03T00:01:01Z" },
+    (thread) => { thread.lastMessage!.body = "Updated synthetic summary" }
+  ]
+  const avatarFields = ["bodyId", "faceId", "eyesId", "noseId", "mouthId", "hairId", "topId", "bottomId", "shoesId"] as const
+  for (const field of avatarFields) changes.push((thread) => { thread.participants[1].avatar!.loadout[field] = `synthetic-new-${field}` })
+  changes.push((thread) => {
+    const loadout = thread.participants[1].avatar!.loadout
+    if (loadout.schemaVersion === 2) loadout.dressId = "synthetic-dress"
+  }, (thread) => {
+    const loadout = thread.participants[1].avatar!.loadout
+    if (loadout.schemaVersion === 2) loadout.outerwearId = "synthetic-outerwear"
+  }, (thread) => {
+    const loadout = thread.participants[1].avatar!.loadout
+    if (loadout.schemaVersion === 2) {
+      const { dressId: _dressId, outerwearId: _outerwearId, ...common } = loadout
+      thread.participants[1].avatar!.loadout = { ...common, schemaVersion: 1 }
+    }
+  })
+  try {
+    for (const change of changes) {
+      resetChatStore()
+      const thread = sharingThread()
+      applyChatThreadListed({ userId: "synthetic-viewer", threads: [thread] })
+      const read = createChatThreadSnapshotReader(thread.threadId)
+      const initial = read()
+      const updated = structuredClone(thread)
+      change(updated)
+      applyChatThreadListed({ userId: "synthetic-viewer", threads: [updated] })
+      assert.notEqual(read().thread, initial.thread)
+      assert.deepEqual(read().thread, updated)
+    }
   } finally {
     resetChatStore()
   }

@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useChatStore } from "../chat/chatStore"
+import { useChatThreadStore } from "../chat/chatStore"
 import {
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
@@ -22,19 +22,20 @@ export function useRoomChatHistory(input: {
   localUserId: string
 }): RoomChatHistory {
   const { threadId, localUserId } = input
-  const chatStore = useChatStore()
+  const chatThread = useChatThreadStore(threadId)
 
   return useMemo(() => {
-    const messages = threadId ? chatStore.getMessages(threadId) : []
-    const listStatus = threadId ? chatStore.getMessageListState(threadId).status : "idle"
+    const messages = threadId ? chatThread.messages : []
+    const listStatus = threadId ? chatThread.messageListState.status : "idle"
     const items = selectRoomChatHistory({
       messages,
       localUserId,
-      deliveryOf: (messageId) => chatStore.getMessageDeliveryState(messageId)
+      deliveryOf: (messageId) => chatThread.getMessageDeliveryState(messageId)
     })
     return {
       items,
       status: resolveRoomChatHistoryStatus({ hasThread: Boolean(threadId), listStatus, itemCount: items.length })
     }
-  }, [chatStore, localUserId, threadId])
+  }, [chatThread.deliveryKey, chatThread.getMessageDeliveryState, chatThread.messageListState.status,
+    chatThread.messages, localUserId, threadId])
 }

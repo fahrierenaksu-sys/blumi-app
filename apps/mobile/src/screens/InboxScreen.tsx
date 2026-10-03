@@ -9,7 +9,7 @@ import {
   View
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { useChatStore } from "../features/chat/chatStore"
+import { useChatInboxStore, type ThreadListState } from "../features/chat/chatStore"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
@@ -44,6 +44,7 @@ import { shouldShowInboxSkeleton } from "../features/inbox/inboxEntranceModel"
 import { useInboxRowEntrance } from "../features/inbox/useInboxRowEntrance"
 import { getInboxUnreadPulse } from "../features/inbox/inboxUnreadPulseModel"
 import { useInboxPullToRefresh } from "../features/inbox/useInboxPullToRefresh"
+import { useInboxThreadWarmup } from "../features/inbox/useInboxThreadWarmup"
 import { useMainTabReselect } from "../ui/layout/useMainTabReselect"
 import { useMessageAlertSuppression } from "../features/notifications/useFocusedConversation"
 import { InboxConversationActionsSheet } from "../features/inbox/InboxConversationActionsSheet"
@@ -79,7 +80,7 @@ const ItemSpacer = () => <View style={styles.itemSpacer} />
 export function InboxScreen(props: InboxScreenProps) {
   const { navigation, sessionActor } = props
   const { onWarmThread, onRetryThreads } = props
-  const { threads: storeThreads, threadListState, getThreadUnreadCount } = useChatStore()
+  const { threads: storeThreads, threadListState, getThreadUnreadCount } = useChatInboxStore()
   const currentUserId = sessionActor.profile.userId
   // Pinned first, deleted-for-me hidden; kept per account on this phone.
   const { prefs: conversationPrefs, update: updateConversationPrefs } = useInboxConversationPrefs(currentUserId)
@@ -185,28 +186,12 @@ export function InboxScreen(props: InboxScreenProps) {
     [currentUserId, threads]
   )
 
-  useEffect(() => {
-    if (sessionActor.session.mode !== "production" || !warmThreadIds) return
-    let disposed = false
-    let warming = false
-    const warmVisibleInbox = async (): Promise<void> => {
-      if (warming || disposed || !navigation.isFocused()) return
-      warming = true
-      try {
-        const ids = warmThreadIds.split("|")
-        for (let offset = 0; offset < ids.length; offset += 2) {
-          if (disposed || !navigation.isFocused()) break
-          await Promise.all(ids.slice(offset, offset + 2).map(onWarmThread))
-        }
-      } finally {
-        warming = false
-      }
-    }
-    const warm = (): void => { void warmVisibleInbox().catch(() => undefined) }
-    const unsubscribe = navigation.addListener("focus", warm)
-    warm()
-    return () => { disposed = true; unsubscribe() }
-  }, [navigation, onWarmThread, sessionActor.session.mode, warmThreadIds])
+  useInboxThreadWarmup({
+    navigation,
+    enabled: sessionActor.session.mode === "production",
+    threadIds: warmThreadIds,
+    warmThread: onWarmThread
+  })
 
   const hasUnreadThread = useMemo(
     () => threadRows.some((thread) => thread.hasUnread),
@@ -399,7 +384,7 @@ export function InboxScreen(props: InboxScreenProps) {
 
 interface EmptyInboxProps {
   copy: InboxCopy
-  threadListState: ReturnType<typeof useChatStore>["threadListState"]
+  threadListState: ThreadListState
   myDisplayName?: string
   myUserId?: string
   onGoDiscover?: () => void

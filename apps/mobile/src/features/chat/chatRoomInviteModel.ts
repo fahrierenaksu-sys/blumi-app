@@ -50,11 +50,28 @@ export interface RoomInvitePresentation {
 
 const LEGACY_ROOM_INVITE_SENTINEL = "__room_invite__"
 
-export function getChatInitialRenderCount(viewportHeight: number): number {
+export function getChatInitialRenderCount(
+  viewportHeight: number,
+  newestFirstTimeline: readonly ChatTimelineItem[] = [],
+  compactInviteIds: ReadonlySet<string> = new Set()
+): number {
   if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return 20
   // A one-line grouped bubble is at least 44pt (24pt text + 16pt padding
   // + 4pt grouping gap). Fill the visible screen, not the entire history.
-  return Math.min(32, Math.max(8, Math.ceil(viewportHeight / 44) + 2))
+  const textCount = Math.min(32, Math.max(8, Math.ceil(viewportHeight / 44) + 2))
+  if (newestFirstTimeline.length === 0) return textCount
+  // Invitation scenes alone are 210pt tall, before their text and actions.
+  // Counting them as 44pt bubbles permanently pins many invisible scenes
+  // (and layered avatars) in FlatList's initial batch. Use conservative
+  // minimum heights to cover the viewport, plus two rows for overscan.
+  let coveredHeight = 0
+  let count = 0
+  while (count < newestFirstTimeline.length && count < textCount && coveredHeight < viewportHeight) {
+    const row = newestFirstTimeline[count]!
+    coveredHeight += row.kind === "room_invite" && !compactInviteIds.has(row.inviteId) ? 210 : 44
+    count += 1
+  }
+  return Math.min(textCount, newestFirstTimeline.length, count + 2)
 }
 
 export function isLegacyRoomInviteSentinel(body: string): boolean {
@@ -80,11 +97,16 @@ export function buildChatTimeline(
     invitesById.set(invite.inviteId, invite)
   }
 
-  return [...messageItems, ...invitesById.values()].sort((a, b) => {
-    const timeDifference = toTimestamp(a.createdAt) - toTimestamp(b.createdAt)
-    if (timeDifference !== 0) return timeDifference
-    return getChatTimelineItemKey(a).localeCompare(getChatTimelineItemKey(b))
-  })
+  return [...messageItems, ...invitesById.values()].sort(compareChatTimelineItems)
+}
+
+/** Server chronology uses canonical ids; an optimistic row alias is only UI identity. */
+export function compareChatTimelineItems(a: ChatTimelineItem, b: ChatTimelineItem): number {
+  const timeDifference = toTimestamp(a.createdAt) - toTimestamp(b.createdAt)
+  if (timeDifference !== 0) return timeDifference
+  const chronologicalKey = (item: ChatTimelineItem) => item.kind === "message"
+    ? `message:${item.message.messageId}` : `room-invite:${item.inviteId}`
+  return chronologicalKey(a).localeCompare(chronologicalKey(b))
 }
 
 /**

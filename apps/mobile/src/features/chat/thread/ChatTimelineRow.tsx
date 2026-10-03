@@ -38,6 +38,7 @@ function ChatTimelineRow({
   partner,
   isEntering,
   isInviteBusy,
+  compactInvite,
   onRoomInviteAction,
   onRetry
 }: {
@@ -52,6 +53,7 @@ function ChatTimelineRow({
   isEntering: boolean
   /** Only an invitation row whose action is running is busy; other rows keep equal props. */
   isInviteBusy: boolean
+  compactInvite?: boolean
   onRoomInviteAction:
     | ((action: ChatRoomInviteAction, onError?: (error: unknown) => void) => void)
     | undefined
@@ -95,6 +97,7 @@ function ChatTimelineRow({
           you={you}
           partner={partner}
           isBusy={isInviteBusy}
+          compact={compactInvite}
           onAction={onRoomInviteAction}
         />
       ) : (

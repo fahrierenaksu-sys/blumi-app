@@ -33,24 +33,46 @@ export function resolveRequestedRoomInviteStep(
 /** Runs a one-shot `roomInviteAccept` route param exactly once, then clears it. */
 export function useRequestedRoomInviteAccept(input: {
   inviteId: string | undefined
+  threadId?: string
   isFocused: boolean
   invites: readonly ChatRoomInviteTimelineItem[]
   currentUserId: string
   onAction: (action: ChatRoomInviteAction) => void
   clearRequest: () => void
+  ensureRoomInvite?: (threadId: string, inviteId: string) => Promise<boolean>
 }): void {
-  const { inviteId, isFocused, invites, currentUserId } = input
+  const { inviteId, isFocused, invites, currentUserId, threadId, ensureRoomInvite } = input
   const handledRef = useRef<string | null>(null)
+  const lookupRef = useRef<string | null>(null)
+  const requestKey = inviteId ? `${currentUserId}:${threadId ?? ""}:${inviteId}` : null
+  const needsLookup = !!inviteId && !invites.some(invite => invite.inviteId === inviteId)
   const run = useEffectEvent((step: RequestedRoomInviteStep) => {
     input.clearRequest()
     if (step.kind === "run") input.onAction(step.action)
   })
 
   useEffect(() => {
-    if (!inviteId || !isFocused || handledRef.current === inviteId) return
+    if (!inviteId || !isFocused || handledRef.current === requestKey) return
     const step = resolveRequestedRoomInviteStep(invites, inviteId, currentUserId)
     if (step.kind === "wait") return
-    handledRef.current = inviteId
+    handledRef.current = requestKey
     run(step)
-  }, [currentUserId, inviteId, invites, isFocused])
+  }, [currentUserId, inviteId, invites, isFocused, requestKey])
+
+  useEffect(() => {
+    if (!inviteId || !requestKey || !isFocused || !needsLookup || !threadId || !ensureRoomInvite || handledRef.current === requestKey) return
+    if (lookupRef.current === requestKey) return
+    lookupRef.current = requestKey
+    let active = true
+    void ensureRoomInvite(threadId, inviteId).then(found => {
+      if (!active || found) return
+      handledRef.current = requestKey
+      run({ kind: "drop" })
+    }).catch(() => {
+      // Retry on the next foreground focus; never walk all history pages to
+      // resolve a single old notification.
+      if (lookupRef.current === requestKey) lookupRef.current = null
+    })
+    return () => { active = false; if (lookupRef.current === requestKey) lookupRef.current = null }
+  }, [inviteId, isFocused, needsLookup, requestKey, ensureRoomInvite, threadId])
 }

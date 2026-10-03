@@ -15,6 +15,10 @@ export type { ChatMessageDeliveryState }
 /** What the device itself knows about one of my messages. */
 export type LocalChatMessageDeliveryState = "sending" | "failed" | "sent"
 
+// Locale data and formatter setup are expensive, especially on the first
+// timeline. The app has two chat locales; retain one formatter for each.
+const separatorFormatters = new Map<ChatLocale, Intl.DateTimeFormat>()
+
 /**
  * Mirrors the server's message normalization (trim, then collapse every
  * whitespace run to one space). The optimistic bubble must hold exactly the
@@ -40,14 +44,26 @@ export function formatDateSeparator(
   now: Date = new Date()
 ): string {
   const today = now.toDateString()
-  const yesterday = new Date(now.getTime() - 86_400_000).toDateString()
+  const yesterdayDate = new Date(now.getTime())
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterday = yesterdayDate.toDateString()
   const ds = date.toDateString()
   if (ds === today) return CHAT_COPY[locale].today
   if (ds === yesterday) return CHAT_COPY[locale].yesterday
-  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
-    month: "short",
-    day: "numeric"
-  }).format(date)
+  let formatter = separatorFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC"
+    })
+    separatorFormatters.set(locale, formatter)
+  }
+  // Preserve the date's current local calendar day without capturing the
+  // device timezone in a formatter that can outlive a timezone change.
+  const calendarDate = new Date(0)
+  calendarDate.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate())
+  return formatter.format(calendarDate)
 }
 
 export function getRoomInviteActionKey(action: ChatRoomInviteAction): string {
@@ -196,11 +212,13 @@ export function buildChatTimelineRowModels(
 ): ChatTimelineRowModels {
   const models = new Map<string, ChatTimelineRowEntry>()
   let reusedAll = previous?.size === timeline.length
+  const now = context.now ?? new Date()
 
   timeline.forEach((item, chronologicalIndex) => {
     const key = getChatTimelineItemKey(item)
     const row = getChatTimelineRowModel({
       ...context,
+      now,
       item,
       index: timeline.length - 1 - chronologicalIndex,
       timeline

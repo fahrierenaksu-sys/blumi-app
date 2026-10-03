@@ -15,21 +15,62 @@ interface ChatRoomInviteCardProps {
   locale: ChatLocale
   you: RoomInviteSceneParticipant
   partner: RoomInviteSceneParticipant
+  /** A lightweight history presentation; existing actions remain available. */
+  compact?: boolean
   isBusy?: boolean
   onAction?: (action: ChatRoomInviteAction) => void
 }
 
-export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner, isBusy = false, onAction }: ChatRoomInviteCardProps) {
+export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner, compact = false, isBusy = false, onAction }: ChatRoomInviteCardProps) {
   const card = getRoomInviteCardState(invite, currentUserId, locale)
   const disabled = isBusy || !card.primaryAction || !onAction
   const primaryIcon = card.primaryAction?.type === "accept" ? "checkmark" : card.doorOpen ? "arrow-forward" : "lock-closed-outline"
   // An open door is where the room opens from (roomDoorFlight).
   const cardRef = useRef<View>(null)
-  const doorKey = card.doorOpen && invite.roomSessionId ? getRoomDoorKey(invite.threadId) : null
+  const doorKey = !compact && card.doorOpen && invite.roomSessionId ? getRoomDoorKey(invite.threadId) : null
   useLayoutEffect(() => {
     if (!doorKey) return
     return roomDoorSources.attach(doorKey, () => measureViewInWindow(cardRef.current))
   }, [doorKey])
+  if (compact) {
+    const sender = card.isSender ? you : partner
+    return (
+      <View style={styles.compactCard}>
+        <View accessible accessibilityRole="text" accessibilityLiveRegion="polite"
+          accessibilityLabel={`${sender.name}. ${card.label}. ${card.senderLabel} ${card.statusLabel}.`}
+          style={styles.compactSummary}>
+          <Ionicons accessible={false} name="home-outline" size={15} color={uiTheme.colors.textMuted} />
+          <View style={styles.compactText}>
+            <Text style={styles.compactTitle}>{sender.name} · {card.label}</Text>
+            <Text style={styles.status}>{card.senderLabel}</Text>
+            <Text style={[styles.status, card.doorOpen && styles.acceptedStatus]}>{card.statusLabel}</Text>
+          </View>
+        </View>
+        {card.showPrimary || (card.secondaryAction && onAction) ? (
+          <View style={styles.compactActions}>
+            {card.showPrimary ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={card.primaryLabel}
+                accessibilityState={{ busy: isBusy, disabled }} disabled={disabled}
+                onPress={() => { if (card.primaryAction) onAction?.(card.primaryAction) }}
+                style={({ pressed }) => [styles.compactAction, pressed && styles.secondaryPressed, disabled && styles.busy]}>
+                {isBusy ? <ActivityIndicator size="small" color={uiTheme.colors.primaryDeep} /> : null}
+                <Text style={[styles.compactActionText, disabled && styles.disabledText]}>{card.primaryLabel}</Text>
+                {!isBusy ? <Ionicons accessible={false} name={primaryIcon} size={14} color={disabled ? uiTheme.colors.textMuted : uiTheme.colors.primaryDeep} /> : null}
+              </Pressable>
+            ) : null}
+            {card.secondaryAction && onAction ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={card.secondaryLabel}
+                accessibilityState={{ busy: isBusy, disabled: isBusy }} disabled={isBusy}
+                onPress={() => { if (card.secondaryAction) onAction(card.secondaryAction) }}
+                style={({ pressed }) => [styles.compactAction, pressed && styles.secondaryPressed, isBusy && styles.busy]}>
+                <Text style={styles.secondaryText}>{card.secondaryLabel}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    )
+  }
   return (
     <View ref={cardRef} collapsable={false} style={styles.card}>
       <ChatRoomInviteScene open={card.doorOpen} label={card.label} note={card.note}
@@ -69,6 +110,21 @@ export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner
 }
 
 const styles = StyleSheet.create({
+  compactCard: {
+    width: "86%", maxWidth: 320, borderRadius: uiTheme.radius.md,
+    backgroundColor: uiTheme.colors.surfaceSoft, borderWidth: 1, borderColor: uiTheme.colors.border,
+    paddingHorizontal: uiTheme.spacing.sm, paddingVertical: uiTheme.spacing.xs
+  },
+  compactSummary: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: uiTheme.spacing.xs },
+  compactText: { flex: 1, gap: uiTheme.spacing.xxs },
+  compactTitle: { ...uiTheme.font.micro, color: uiTheme.colors.textPrimary },
+  compactActions: { flexDirection: "row", flexWrap: "wrap", gap: uiTheme.spacing.xs },
+  compactAction: {
+    minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    flexShrink: 1, gap: uiTheme.spacing.xs, paddingHorizontal: uiTheme.spacing.xs,
+    paddingVertical: uiTheme.spacing.xs, borderRadius: uiTheme.radius.sm
+  },
+  compactActionText: { ...uiTheme.font.micro, color: uiTheme.colors.primaryDeep, flexShrink: 1 },
   card: {
     width: "86%",
     maxWidth: 320,

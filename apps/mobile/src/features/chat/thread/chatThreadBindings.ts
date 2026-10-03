@@ -22,6 +22,8 @@ export interface ChatThreadBindings {
   /** `upToMessageId`: the newest partner message the reader saw (read receipts). */
   markThreadRead: (threadId: string, upToMessageId?: string) => void
   roomInvites: readonly ChatRoomInviteTimelineItem[]
+  requestOlderRoomInvites?: (threadId: string, before: string) => Promise<readonly string[]>
+  ensureRoomInvite?: (threadId: string, inviteId: string) => Promise<boolean>
   onRoomInviteAction: (action: ChatRoomInviteAction) => Promise<void>
   /** Production sessions only. */
   onCloseActiveRoom?: (expectedRoomSessionId: string) => Promise<void>

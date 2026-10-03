@@ -13,7 +13,7 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { useChatThreadStore } from "../features/chat/chatStore"
+import { getHistoryPageMessageIds, useChatThreadStore } from "../features/chat/chatStore"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
@@ -54,6 +54,8 @@ import { ChatThreadEmptyState } from "../features/chat/thread/ChatThreadEmptySta
 import { ChatThreadSkeleton } from "../features/chat/thread/ChatThreadSkeleton"
 import { getChatTimelineInitialOpacity } from "../features/chat/thread/chatThreadOpeningModel"
 import { useChatThreadOpening } from "../features/chat/thread/useChatThreadOpening"
+import { useChatRoomInviteHistory } from "../features/chat/chatRoomInvitePagingStore"
+import { getCompactRoomInviteIds, getRoomInviteComposerContext } from "../features/chat/thread/chatInvitePresentationModel"
 import { animateTo, CROSSFADE_ENTERING, useMotion } from "../ui/motion"
 import { ChatThreadHeader } from "../features/chat/thread/ChatThreadHeader"
 import { ChatTimelineRow } from "../features/chat/thread/ChatTimelineRow"
@@ -94,13 +96,14 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
   const isFocused = useIsFocusedBeneathSheets()
   const { height: windowHeight } = useWindowDimensions()
-  const initialMessageRenderCount = getChatInitialRenderCount(windowHeight)
   const { threadId, partnerId: pendingPartnerId, partnerName: pendingPartnerName } = route.params
   const {
     thread,
     messages,
     messageListState,
     historyReady,
+    latestHistoryMessageIds,
+    deliveryKey,
     partnerReceipts,
     addOptimisticMessage,
     getMessageDeliveryState,
@@ -113,6 +116,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   const { screenMountedRef, activeUserIdRef } = useChatThreadLifecycle(currentUserId)
 
   const resolvedThreadId = thread?.threadId ?? threadId
+  const inviteHistory = useChatRoomInviteHistory(resolvedThreadId, currentUserId)
   // Keep notification focus separate from read-receipt AppState transitions.
   useFocusedConversation(resolvedThreadId, isFocused)
   const isPendingThread = !thread && !!pendingPartnerId
@@ -134,6 +138,10 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     () => applyRoomInviteExpiry(storedThreadRoomInvites, inviteClockMs),
     [inviteClockMs, storedThreadRoomInvites]
   )
+  const compactInviteIds = useMemo(() => getCompactRoomInviteIds(threadRoomInvites, inviteHistory.activeInviteIds),
+    [threadRoomInvites, inviteHistory.activeInviteIds])
+  const roomInviteComposerContext = useMemo(() => getRoomInviteComposerContext(threadRoomInvites, inviteHistory),
+    [threadRoomInvites, inviteHistory])
   // UXO-03 (useChatThreadOpening): whatever the store holds, cached history
   // or at least the Chats row's last message, is drawn in the push's first
   // frame. Only a chat with nothing to show waits, and its skeleton appears
@@ -143,20 +151,29 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     body: threadBody,
     showsSkeleton: showsHistorySkeleton,
     skeletonWasShown: historySkeletonShown,
-    timelineReveal
+    timelineReveal,
+    revealEarlier,
+    hasOlderCachedRows,
+    oldestVisibleMessageId,
+    absorbedHistoryKeys,
+    cachedEarlierInviteIds
   } = useChatThreadOpening({
     threadId: resolvedThreadId,
+    currentUserId,
     messages,
     lastMessage: thread?.lastMessage,
     historyReady,
+    latestHistoryMessageIds,
     listStatus: messageListState.status,
     roomInvites: threadRoomInvites,
+    inviteHistory,
     waitsForServerHistory: sessionActor.session.mode === "production",
     isPendingThread
   })
   // Inverted FlatList starts at offset zero with the newest message visible.
   // The chronological timeline remains the authority for grouping and dates.
   const newestFirstTimeline = useMemo(() => [...timeline].reverse(), [timeline])
+  const initialMessageRenderCount = getChatInitialRenderCount(windowHeight, newestFirstTimeline, compactInviteIds)
   const showsTimelineEmptyState = threadBody !== "timeline"
   const isListPresented = threadBody === "timeline"
   const timelineEntering = historySkeletonShown ? CROSSFADE_ENTERING : undefined
@@ -223,13 +240,14 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     )
   }, [currentUserId, partnerUserId, sessionMode, sessionToken])
   useEffect(() => whenPushSettled(warmPartnerProfile), [warmPartnerProfile, whenPushSettled])
+  const newestIncomingRow = timeline.findLast(item => item.kind === "message" && item.message.senderUserId !== currentUserId)
   const { handleRetryMessages } = useChatThreadSync({
     historyReady,
     whenSettled: whenPushSettled,
     resolvedThreadId,
     currentUserId,
     isFocused,
-    latestIncomingMessageId: messages.filter((message) => message.senderUserId !== currentUserId).at(-1)?.messageId,
+    latestIncomingMessageId: newestIncomingRow?.kind === "message" ? newestIncomingRow.message.messageId : undefined,
     requestMessages: bindings.requestMessages,
     refreshParticipants: bindings.refreshParticipants,
     markThreadRead: bindings.markThreadRead,
@@ -246,6 +264,16 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     currentUserId,
     sessionMode: sessionActor.session.mode,
     messages,
+    // Reconnects can leave two cached ranges separated by offline messages.
+    // Page from what is shown, never jump to the oldest record in that cache.
+    oldestVisibleMessageId,
+    hasOlderCachedRows,
+    invitePagingCursor: inviteHistory.nextCursor,
+    cachedEarlierInviteIds,
+    requestOlderRoomInvites: bindings.requestOlderRoomInvites,
+    canLoadEarlier: isListPresented,
+    getHistoryPageMessageIds,
+    onEarlierLoaded: revealEarlier,
     sendChatMessage: bindings.sendChatMessage,
     requestMessages: bindings.requestMessages,
     addOptimisticMessage,
@@ -263,7 +291,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   } = useChatRoomInviteActions({
     resolvedThreadId,
     isPendingThread,
-    threadRoomInvites,
+    threadRoomInvites: roomInviteComposerContext,
     roomInviteActionHandler,
     closeActiveRoomHandler,
     chatCopy,
@@ -281,6 +309,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
   // "Enter room" on an invite notification accepts that invite here, once.
   useRequestedRoomInviteAccept({
     inviteId: route.params.roomInviteAccept,
+    threadId: resolvedThreadId,
+    ensureRoomInvite: bindings.ensureRoomInvite,
     isFocused,
     invites: threadRoomInvites,
     currentUserId,
@@ -312,13 +342,18 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     currentUserId,
     locale: chatLocale,
     getMessageDeliveryState,
+    deliveryKey,
     partnerReceipts: bindings.receiptsEnabled ? partnerReceipts : undefined
   })
 
-  const { enteringKeys: enteringRowKeys, arrivedKeys: arrivedRowKeys } = useChatTimelineEntrances({
+  const entrances = useChatTimelineEntrances({
     timeline,
     isListPresented: !showsTimelineEmptyState
   })
+  const { enteringRowKeys, arrivedRowKeys } = useMemo(() => ({
+    enteringRowKeys: absorbedHistoryKeys.size ? new Set([...entrances.enteringKeys].filter(key => !absorbedHistoryKeys.has(key))) : entrances.enteringKeys,
+    arrivedRowKeys: absorbedHistoryKeys.size ? new Set([...entrances.arrivedKeys].filter(key => !absorbedHistoryKeys.has(key))) : entrances.arrivedKeys
+  }), [absorbedHistoryKeys, entrances])
   useIncomingArrivalHaptic({ timeline, arrivedKeys: arrivedRowKeys, currentUserId, screenFocused: isFocused })
 
   const renderTimelineRow = useCallback<ListRenderItem<ChatTimelineItem>>(
@@ -337,6 +372,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
           partner={invitePartner}
           isEntering={enteringRowKeys.has(getChatTimelineItemKey(item))}
           isInviteBusy={isChatTimelineRowInviteBusy(entry.item, activeRoomInviteAction)}
+          compactInvite={entry.item.kind === "room_invite" && compactInviteIds.has(entry.item.inviteId)}
           onRoomInviteAction={handleRoomInviteAction}
           onRetry={handleRetry}
         />
@@ -344,6 +380,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
     },
     [
       rowModels,
+      compactInviteIds,
       chatCopy,
       chatLocale,
       currentUserId,
@@ -446,6 +483,8 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               onScroll={scrollToLatestState.scrollHandler}
               scrollEventThrottle={16}
               initialNumToRender={initialMessageRenderCount}
+              maxToRenderPerBatch={6}
+              windowSize={7}
               keyExtractor={getChatTimelineItemKey}
               style={styles.messageListContainer}
               contentContainerStyle={styles.messageListContent}
@@ -457,7 +496,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
               // message is useChatScrollToLatest's job.
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
               ListFooterComponent={
-                isListPresented && sessionActor.session.mode === "production" && messages.length > 0 ? (
+                isListPresented && sessionActor.session.mode === "production" && (oldestVisibleMessageId || hasOlderCachedRows || inviteHistory.nextCursor) ? (
                   <ChatLoadEarlierButton
                     chatCopy={chatCopy}
                     isLoadingEarlier={isLoadingEarlier}
@@ -514,7 +553,7 @@ export function ChatThreadScreen(props: ChatThreadScreenProps) {
             chatLocale={chatLocale}
             isPendingThread={isPendingThread}
             canCreateRoomInvite={canCreateRoomInvite}
-            roomInviteReady={threadRoomInvites.some(invite => invite.status === "accepted" && Boolean(invite.roomSessionId))}
+            roomInviteReady={roomInviteComposerContext.some(invite => invite.status === "accepted" && Boolean(invite.roomSessionId))}
             isCreatingRoomInvite={isCreatingRoomInvite}
             roomInviteDisabledReason={roomInviteDisabledReason}
             onRoomInvitePress={handleRoomInvitePress}

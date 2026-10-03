@@ -175,7 +175,7 @@ test("a tap on a row navigates at once and does no warming or store work of its 
   assert.deepEqual(calls, [{ route: "ChatThread", params: { threadId: "thread-a" } }])
 })
 
-test("prefetch selects only the first six eligible conversations and warms at most two concurrently", async () => {
+test("prefetch selects only the first six eligible conversations", () => {
   const threads = Array.from({ length: 9 }, (_, i) => ({
     threadId: `thread-${i}`, participantUserIds: ["self"], lastMessage: { body: "Hello" }
   }))
@@ -183,33 +183,8 @@ test("prefetch selects only the first six eligible conversations and warms at mo
   threads.unshift({ threadId: "empty", participantUserIds: ["self"] })
   const ids = evaluate(initializer("warmThreadIds"), { useMemo: (fn) => fn(), threads, currentUserId: "self" })
   assert.equal(ids, "thread-0|thread-1|thread-2|thread-3|thread-4|thread-5")
-  let effect
-  function visit(node) {
-    if (ts.isCallExpression(node) && node.expression.getText(file) === "useEffect" &&
-        node.arguments[0]?.getText(file).includes("const warmVisibleInbox")) effect = node.arguments[0]
-    ts.forEachChild(node, visit)
-  }
-  visit(file)
-  assert.ok(effect)
-  const pending = []
-  const started = []
-  let focused = true
-  const run = evaluate(effect.getText(file), {
-    sessionActor: { session: { mode: "production" } }, warmThreadIds: ids,
-    navigation: { isFocused: () => focused, addListener: () => () => {} },
-    onWarmThread: (id) => { started.push(id); return new Promise((resolve) => pending.push(resolve)) }
-  })
-  const cleanup = run()
-  assert.deepEqual(started, ["thread-0", "thread-1"])
-  pending.shift()(); await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(started.length, 2, "a batch waits for both requests")
-  pending.shift()(); await new Promise((resolve) => setImmediate(resolve))
-  assert.deepEqual(started, ["thread-0", "thread-1", "thread-2", "thread-3"])
-  focused = false
-  for (const resolve of pending.splice(0)) resolve()
-  await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(started.length, 4, "blur stops additional warming")
-  cleanup()
+  // Queue concurrency, idle scheduling and blur cancellation are exercised
+  // through the real useInboxThreadWarmup hook's behaviour tests.
 })
 
 test("re-tapping the Chats tab scrolls the list to the top, without animation under Reduce Motion", () => {

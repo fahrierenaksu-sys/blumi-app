@@ -42,3 +42,16 @@ test("outsiders and terminal invitations never unlock the door or expose actions
     assert.equal(state.doorOpen, false)
   }
 })
+
+test("the sender summary remains historical while accepted entry actions stay available", () => {
+  const accepted = { ...invite, status: "accepted" as const, roomSessionId: "room" }
+  for (const locale of ["en", "tr"] as const) {
+    for (const user of ["sender", "recipient"]) {
+      const pending = getRoomInviteCardState(invite, user, locale)
+      const ready = getRoomInviteCardState(accepted, user, locale)
+      assert.equal(ready.senderLabel, pending.detail)
+      assert.notEqual(ready.senderLabel, ready.detail, "the historical summary does not imply the old room is currently ready")
+      assert.equal(ready.primaryAction?.type, "open_room", "presentation does not revoke backend-validated room access")
+    }
+  }
+})

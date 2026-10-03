@@ -5,6 +5,7 @@ import type {
 } from "@blumi/contracts"
 import { sharedRoomDecorSnapshotSchema } from "@blumi/contracts"
 import { requestJson } from "../network/apiClient"
+import { CHAT_INITIAL_HISTORY_LIMIT } from "./chatHistoryPolicy"
 import type {
   ChatRoomInviteStatus,
   ChatRoomInviteTimelineItem
@@ -86,6 +87,110 @@ export async function fetchThreadRoomInvites(
     throw new Error(getApiErrorMessage(payload, "We could not load that room invitation."))
   }
   return normalizeInviteListPayload(payload, threadId)
+}
+
+export interface FetchRoomInvitePageOptions { before?: string; inviteId?: string; limit?: number }
+export interface ChatRoomInvitePage {
+  invites: ChatRoomInviteTimelineItem[]
+  activeInvites: ChatRoomInviteTimelineItem[]
+  nextCursor: string | null
+  /** Older deployed servers ignore the query; never infer bounded wire traffic. */
+  paged: boolean
+}
+
+export async function fetchThreadRoomInvitePage(
+  baseHttpUrl: string,
+  sessionToken: string,
+  threadId: string,
+  options: FetchRoomInvitePageOptions = {},
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<ChatRoomInvitePage> {
+  const limit = options.limit ?? CHAT_INITIAL_HISTORY_LIMIT
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error("Blumi could not read that room invitation.")
+  if (options.inviteId && (options.before !== undefined || options.limit !== undefined)) {
+    throw new Error("Blumi could not read that room invitation.")
+  }
+  const query = new URLSearchParams()
+  if (options.inviteId) query.set("inviteId", options.inviteId)
+  else {
+    query.set("limit", String(limit))
+    if (options.before) query.set("before", options.before)
+  }
+  const { response, payload } = await requestJson(baseHttpUrl,
+    `/v1/threads/${encodeURIComponent(threadId)}/room-invites?${query.toString()}`,
+    { headers: createAuthHeaders(sessionToken), signal }, fetcher)
+  if (!response.ok) {
+    if (options.inviteId && (response.status === 403 || response.status === 404)) {
+      return { invites: [], activeInvites: [], nextCursor: null, paged: true }
+    }
+    throw new Error(getApiErrorMessage(payload, "We could not load that room invitation."))
+  }
+  const record = readInviteListPayload(payload, threadId) as { invites: unknown[]; nextCursor?: unknown; activeInvites?: unknown }
+  const paged = "nextCursor" in record
+  if (paged) {
+    const invites = record.invites.map(value => normalizeThreadInvite(value, threadId))
+    if (record.nextCursor !== null && (typeof record.nextCursor !== "string" || !record.nextCursor) || !Array.isArray(record.activeInvites)) {
+      throw new Error("Blumi could not read that room invitation.")
+    }
+    const activeInvites = record.activeInvites.map(value => normalizeThreadInvite(value, threadId))
+    const inviteIds = new Set(invites.map(invite => invite.inviteId))
+    if (activeInvites.some(invite => invite.threadId !== threadId) || invites.length > (options.inviteId ? 1 : limit) ||
+      activeInvites.length > 2 || record.nextCursor && invites[0]?.inviteId !== record.nextCursor ||
+      inviteIds.size !== invites.length || invites.some((invite, index) => index > 0 && compareInviteRecords(invites[index - 1]!, invite) >= 0) ||
+      options.before && inviteIds.has(options.before) || activeInvites.some(invite => inviteIds.has(invite.inviteId)) ||
+      activeInvites.some(invite => invite.status !== "pending" && !(invite.status === "accepted" && Boolean(invite.roomSessionId))) ||
+      new Set(activeInvites.map(invite => invite.inviteId)).size !== activeInvites.length ||
+      options.inviteId && (activeInvites.length > 0 || record.nextCursor !== null || invites.some(invite => invite.inviteId !== options.inviteId))) {
+      throw new Error("Blumi could not read that room invitation.")
+    }
+    return { invites, activeInvites, nextCursor: record.nextCursor as string | null, paged: true }
+  }
+  // Compatibility with an older deployed server: retain bounded local data,
+  // without another full fetch or claiming that its HTTP response was bounded.
+  // Validate all thread boundaries, but construct only the requested page and
+  // the server's at-most-two live contexts. Old ended accepted records carry
+  // no roomSessionId on either legacy server repository.
+  // Legacy SQL ordered only by time. Equal-time rows may reorder between
+  // requests; canonical IDs establish a stable exclusive local cursor.
+  const rawIds = new Set<string>()
+  for (const raw of record.invites) {
+    const row = raw as Partial<RoomInviteRecord> | null
+    if (!row || row.sourceThreadId !== threadId || typeof row.inviteId !== "string" ||
+      typeof row.createdAt !== "string" || !Number.isFinite(Date.parse(row.createdAt)) || rawIds.has(row.inviteId)) {
+      throw new Error("Blumi could not read that room invitation.")
+    }
+    rawIds.add(row.inviteId)
+  }
+  const ordered = (record.invites as RoomInviteRecord[]).sort(compareInviteRecords)
+  let boundary = options.before ? -1 : ordered.length
+  let target: unknown
+  const active: Partial<RoomInviteRecord>[] = []
+  for (let index = 0; index < ordered.length; index += 1) {
+    const raw = ordered[index]
+    if (!raw || typeof raw !== "object" || (raw as Partial<RoomInviteRecord>).sourceThreadId !== threadId) {
+      throw new Error("Blumi could not read that room invitation.")
+    }
+    const row = raw as Partial<RoomInviteRecord>
+    if (row.inviteId === options.before) boundary = index
+    if (row.inviteId === options.inviteId) target = row
+    if (!options.inviteId && (row.status === "pending" && (!row.expiresAt || Date.parse(row.expiresAt) > Date.now()) ||
+      row.status === "accepted" && Boolean(row.roomSessionId))) {
+      active.push(row)
+      if (active.length > 2) throw new Error("Blumi could not read that room invitation.")
+    }
+  }
+  if (options.inviteId) return { invites: target ? [normalizeThreadInvite(target, threadId)] : [], activeInvites: [], nextCursor: null, paged: false }
+  if (active.length > 2) throw new Error("Blumi could not read that room invitation.")
+  const start = Math.max(0, boundary - limit)
+  const invites = boundary < 0 ? [] : ordered.slice(start, boundary).map(value => normalizeThreadInvite(value, threadId))
+  const pageIds = new Set(invites.map(row => row.inviteId))
+  const activeInvites = active.filter(row => !pageIds.has(row.inviteId!)).map(value => normalizeThreadInvite(value, threadId))
+  return { invites, activeInvites, nextCursor: start > 0 ? invites[0]?.inviteId ?? null : null, paged: false }
+}
+
+function compareInviteRecords(a: { createdAt: string; inviteId: string }, b: { createdAt: string; inviteId: string }): number {
+  return Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.inviteId.localeCompare(b.inviteId)
 }
 
 export async function createThreadRoomInvite(
@@ -289,6 +394,7 @@ export function normalizeRoomInviteRecord(value: unknown): ChatRoomInviteTimelin
     typeof record.sourceThreadId !== "string" ||
     !isInviteStatus(record.status) ||
     typeof record.createdAt !== "string" ||
+    !Number.isFinite(Date.parse(record.createdAt)) ||
     (record.expiresAt !== undefined && typeof record.expiresAt !== "string")
   ) {
     throw new Error("Blumi could not read that room invitation.")
@@ -312,6 +418,10 @@ function normalizeInviteListPayload(
   payload: unknown,
   expectedThreadId: string
 ): ChatRoomInviteTimelineItem[] {
+  return readInviteListPayload(payload, expectedThreadId).invites.map(value => normalizeThreadInvite(value, expectedThreadId))
+}
+
+function readInviteListPayload(payload: unknown, expectedThreadId: string): { invites: unknown[] } {
   if (!payload || typeof payload !== "object") {
     throw new Error("Blumi could not read that room invitation.")
   }
@@ -319,7 +429,13 @@ function normalizeInviteListPayload(
   if (record.threadId !== expectedThreadId || !Array.isArray(record.invites)) {
     throw new Error("Blumi could not read that room invitation.")
   }
-  return record.invites.map(normalizeRoomInviteRecord)
+  return record as { invites: unknown[] }
+}
+
+function normalizeThreadInvite(value: unknown, threadId: string): ChatRoomInviteTimelineItem {
+  const invite = normalizeRoomInviteRecord(value)
+  if (invite.threadId !== threadId) throw new Error("Blumi could not read that room invitation.")
+  return invite
 }
 
 function normalizeInviteResponse(payload: unknown): ChatRoomInviteTimelineItem {

@@ -9,6 +9,15 @@ import {
 } from "./chatTypingModel"
 import { chatTypingStore } from "./chatTypingStore"
 
+// Incoming typing entries never affect the composer's sender scope. Keep
+// owner changes observable even when both accounts have typing enabled.
+let senderSnapshot: { ownerUserId: string | undefined; sendEnabled: boolean } = { ownerUserId: undefined, sendEnabled: false }
+const readSenderSnapshot = () => {
+  const { ownerUserId, sendEnabled } = chatTypingStore.getSnapshot()
+  if (senderSnapshot.ownerUserId !== ownerUserId || senderSnapshot.sendEnabled !== sendEnabled) senderSnapshot = { ownerUserId, sendEnabled }
+  return senderSnapshot
+}
+
 /** Composer callbacks; stable for the lifetime of the screen. */
 export interface ChatDraftTyping {
   /** The user edited the draft (never called for programmatic changes). */
@@ -23,8 +32,13 @@ export interface ChatDraftTyping {
  * blur, focus loss, app background, conversation change and unmount.
  */
 export function useChatDraftTyping(threadId: string | undefined, active: boolean): ChatDraftTyping {
-  const { sendEnabled } = useSyncExternalStore(chatTypingStore.subscribe, chatTypingStore.getSnapshot, chatTypingStore.getSnapshot)
+  const { ownerUserId, sendEnabled } = useSyncExternalStore(chatTypingStore.subscribe, readSenderSnapshot, readSenderSnapshot)
   const stateRef = useRef<ChatTypingSenderState>(IDLE_TYPING_SENDER)
+  const ownerRef = useRef(ownerUserId)
+  if (ownerRef.current !== ownerUserId) {
+    ownerRef.current = ownerUserId
+    stateRef.current = IDLE_TYPING_SENDER
+  }
   const inputRef = useRef({ threadId, live: active && sendEnabled })
   inputRef.current = { threadId, live: active && sendEnabled }
 
@@ -59,7 +73,7 @@ export function useChatDraftTyping(threadId: string | undefined, active: boolean
       subscription.remove()
       typing.endDraft()
     }
-  }, [live, threadId, typing])
+  }, [live, ownerUserId, threadId, typing])
 
   return typing
 }

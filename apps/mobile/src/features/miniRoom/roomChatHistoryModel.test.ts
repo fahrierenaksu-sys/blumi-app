@@ -5,6 +5,7 @@ import { getMiniRoomCopy } from "./miniRoomCopy"
 import {
   formatRoomChatHistoryDay,
   formatRoomChatTime,
+  ROOM_CHAT_HISTORY_LIMIT,
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
   type RoomChatDelivery
@@ -90,13 +91,15 @@ test("the sender line shows once per run of one sender and always for pending or
   ])
 })
 
-test("a long conversation is capped so the room never renders the whole thread", () => {
+test("MiniRoom keeps only the latest 15 messages while older thread history remains available", () => {
   const messages = Array.from({ length: 90 }, (_, index) => message(`m${index}`, partner, `hi ${index}`))
-  const history = selectRoomChatHistory({ messages, localUserId: local, deliveryOf: allSent, limit: 60 })
+  const history = selectRoomChatHistory({ messages, localUserId: local, deliveryOf: allSent })
 
-  assert.equal(history.length, 60)
+  assert.equal(ROOM_CHAT_HISTORY_LIMIT, 15)
+  assert.equal(history.length, 15)
   assert.equal(history[0]?.id, "m89")
-  assert.equal(history.at(-1)?.id, "m30")
+  assert.equal(history.at(-1)?.id, "m75")
+  assert.equal(messages.length, 90, "selecting the MiniRoom window never truncates the shared thread")
 })
 
 test("history status distinguishes no thread, loading, failure and an empty conversation", () => {
