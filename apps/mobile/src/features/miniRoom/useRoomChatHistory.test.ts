@@ -64,7 +64,6 @@ test("MiniRoom history ignores unrelated chat updates and tracks its own message
 
   runtime.render(() => history.useRoomChatHistory({ threadId, localUserId }))
   const read = () => runtime.output as ReturnType<typeof history.useRoomChatHistory>
-  const initialRenderCount = runtime.renderCount
   assert.equal(read().items.length, 15)
   assert.equal(read().items[0]?.id, "history-89")
   assert.equal(read().items.at(-1)?.id, "history-75")
@@ -77,6 +76,9 @@ test("MiniRoom history ignores unrelated chat updates and tracks its own message
     messages: initialMessages.slice(-ROOM_CHAT_HISTORY_LIMIT)
   })
   assert.equal(store.getMessages(threadId).length, 90, "a short latest-page response merges without deleting older chat")
+  // This own-thread response can update authoritative page membership even
+  // when the visible messages stay the same. Start the isolation check here.
+  const initialRenderCount = runtime.renderCount
 
   store.applyChatMessageReceived(
     message("unrelated-live", "unrelated-thread", "unrelated-partner", "Other conversation", "2026-10-03T00:01:00.000Z"),
