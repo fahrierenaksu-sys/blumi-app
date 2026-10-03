@@ -9,18 +9,8 @@ import { useRoomInviteSceneMotion } from "./useRoomInviteSceneMotion"
 
 export interface RoomInviteSceneParticipant { avatar?: AvatarSelection; name: string; userId: string }
 
-export const ROOM_INVITE_SCENE_HEIGHT = 210
-export const ROOM_INVITE_DOOR_GEOMETRY = Object.freeze({ width: 98, height: 146, bottom: 28 })
-
-/** The invitation's door, reused by the room-entry flight without mounting avatars. */
-export function RoomInviteDoorFlightArtwork() {
-  const motion = useRoomInviteSceneMotion(true)
-  return (
-    <View style={styles.flightDoorArtwork} pointerEvents="none">
-      <RoomInviteDoorFrame motion={motion} flight />
-    </View>
-  )
-}
+const ROOM_INVITE_SCENE_HEIGHT = 210
+const ROOM_INVITE_DOOR_GEOMETRY = Object.freeze({ width: 98, height: 146, bottom: 28 })
 
 export function ChatRoomInviteScene({ open, label, note, sender, recipient }: {
   open: boolean; label: string; note: string; sender: RoomInviteSceneParticipant; recipient: RoomInviteSceneParticipant
@@ -43,12 +33,9 @@ export function ChatRoomInviteScene({ open, label, note, sender, recipient }: {
   )
 }
 
-function RoomInviteDoorFrame({ motion, flight = false }: {
-  motion: ReturnType<typeof useRoomInviteSceneMotion>
-  flight?: boolean
-}) {
+function RoomInviteDoorFrame({ motion }: { motion: ReturnType<typeof useRoomInviteSceneMotion> }) {
   return (
-    <View style={[styles.doorFrame, flight && styles.flightDoorFrame]}>
+    <View style={styles.doorFrame}>
       <LinearGradient colors={["#F6E1CC", "#D6AB98", "#E6C6B0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.frameOuter} />
       <View style={styles.frameMoulding} />
       <View style={styles.doorOpening}>
@@ -72,8 +59,6 @@ function RoomInviteDoorFrame({ motion, flight = false }: {
 }
 
 const styles = StyleSheet.create({
-  flightDoorArtwork: { ...ROOM_INVITE_DOOR_GEOMETRY, bottom: 0, overflow: "hidden" },
-  flightDoorFrame: { left: 0, marginLeft: 0, bottom: 0 },
   scene: { height: ROOM_INVITE_SCENE_HEIGHT, overflow: "hidden" },
   label: { position: "absolute", top: 13, left: 16, flexDirection: "row", alignItems: "center", gap: 5 },
   labelText: { ...uiTheme.font.micro, color: uiTheme.colors.brandPlum },

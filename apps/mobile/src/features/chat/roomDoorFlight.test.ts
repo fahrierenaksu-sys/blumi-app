@@ -12,7 +12,6 @@ function mount() {
   const runtime = createFakeReactRuntime()
   const sources = createLiveFlightSources(1_500)
   const requests: FlightRequest[] = []
-  const artwork = () => null
   const loaded = loadSourceWithFakeReact<typeof RoomDoor>("features/chat/roomDoorFlight.tsx", runtime, {
     modules: {
       "react-native": createReactNativeStub({
@@ -23,29 +22,26 @@ function mount() {
       },
       "../../ui/flight/flightSources": { createLiveFlightSources: () => sources },
       "../../ui/flight/flightModel": flightModel,
-      "./ChatRoomInviteScene": {
-        ROOM_INVITE_DOOR_GEOMETRY: { width: 98, height: 146, bottom: 28 },
-        ROOM_INVITE_SCENE_HEIGHT: 210,
-        RoomInviteDoorFlightArtwork: artwork
-      }
+      "../../ui/theme": { uiTheme: { colors: { surfaceRaised: "#FFFDFE" }, radius: { lg: 24 } } }
     }
   })
-  return { loaded, sources, requests, artwork }
+  return { loaded, sources, requests }
 }
 
-test("the room flight carries only the invitation door and leaves the arriving room visible", () => {
+test("the accepted card zooms from its place to the whole window on flat surfaces", () => {
   const f = mount()
   f.loaded.roomDoorSources.attach(f.loaded.getRoomDoorKey("thread-a"), () => cardFrame)
 
   assert.equal(f.loaded.launchRoomDoorFlight({ sourceThreadId: "thread-a", reduceMotion: false }), true)
   assert.equal(f.requests.length, 1)
   const request = f.requests[0]!
-  assert.deepEqual(request.source, { x: 121, y: 537, width: 98, height: 146 })
-  assert.equal(request.contentMode, "carry")
-  assert.equal((request.content as { type: unknown }).type, f.artwork)
-  assert.equal(request.sourceSurface.backgroundColor, "transparent")
-  assert.equal(request.targetSurface.backgroundColor, "transparent")
+  // The whole card grows, not a small drawing stretched to the screen.
+  assert.deepEqual(request.source, cardFrame)
   assert.deepEqual(request.targetFrame, { x: 0, y: 0, width: 390, height: 844 })
+  assert.equal(request.content, undefined, "no artwork is upscaled")
+  assert.notEqual(request.sourceSurface.backgroundColor, "transparent")
+  assert.ok(request.sourceSurface.radius > 0, "starts as the rounded card")
+  assert.equal(request.targetSurface.radius, 0, "lands as the full-screen room backdrop")
 })
 
 test("Reduce Motion leaves the live source available for ordinary room entry", () => {
