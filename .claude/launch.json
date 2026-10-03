@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "oda-lab",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "/private/tmp/claude-501/-Users-evrenevren-blumison/165a3b45-5bf7-4d09-b7a1-ab9949a62cdd/scratchpad/proto"],
+      "port": 8765
+    }
+  ]
+}
