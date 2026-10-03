@@ -138,6 +138,7 @@ try {
       "--import", "tsx",
       "--test",
       "src/features/session/register/useRegisterFlowController.test.ts",
+      "src/features/session/firebasePhoneAuth.test.ts",
       "src/features/session/accountRecoveryModel.test.ts",
       "src/features/session/accountSwitchIsolation.test.ts",
       "src/features/session/appLocale.test.ts",
