@@ -380,18 +380,21 @@ test("a ready MiniRoom is ignored before readiness, for non-participants, and wi
   assert.deepEqual(signedOut.calls, [])
 })
 
-test("ending a session forgets opened MiniRooms and clears the invite timeline", () => {
+test("ending a session forgets opened MiniRooms and clears the invite timeline and paging history", () => {
   const handledReadyMiniRoomIdsRef = { current: new Set(["room-1"]) }
   const announcedReadyMiniRoomIdsRef = { current: new Set(["room-2"]) }
   const inviteUpdates = []
+  const inviteHistory = new Map([["fixture-thread", ["fixture-invite"]]])
   evaluate(findInitializer(OWNER.roomInvites, "resetRoomInviteRouting"), {
     handledReadyMiniRoomIdsRef,
     announcedReadyMiniRoomIdsRef,
-    setRoomInvites: (value) => inviteUpdates.push(value)
+    setRoomInvites: (value) => inviteUpdates.push(value),
+    resetChatRoomInviteHistory: () => inviteHistory.clear()
   })()
   assert.equal(handledReadyMiniRoomIdsRef.current.size, 0)
   assert.equal(announcedReadyMiniRoomIdsRef.current.size, 0, "room banners are per session")
   assert.deepEqual(plain(inviteUpdates), [[]])
+  assert.deepEqual([...inviteHistory], [], "the ended session cannot leave invitation history for the next account")
 })
 
 function demoInviteHandler(currentActor, invite, opened) {
@@ -454,14 +457,19 @@ function chatThreadBindings(sessionMode, receiptsEnabled = true) {
     handleRoomInviteAction: () => "production-invite",
     closeMyActiveRoom: () => "close-room"
   }
+  const chatCoordinator = {
+    requestOlderRoomInvites: () => "older-invites",
+    ensureRoomInvite: () => "ensure-invite"
+  }
   const bindings = evaluate(findInitializer(OWNER.chat, "chatThreadBindings"), {
     ...handlers,
+    chatCoordinator,
     visibleRoomInvites: ["invite"],
     sessionMode,
     chatLocale: "tr",
     receiptsEnabled
   })
-  return { bindings, handlers }
+  return { bindings, handlers, chatCoordinator }
 }
 
 test("chat routes receive demo-aware invite handlers and production-only room closing", () => {
@@ -472,6 +480,8 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
     "refreshParticipants",
     "markThreadRead",
     "roomInvites",
+    "requestOlderRoomInvites",
+    "ensureRoomInvite",
     "onRoomInviteAction",
     "onCloseActiveRoom",
     "locale",
@@ -485,11 +495,15 @@ test("chat routes receive demo-aware invite handlers and production-only room cl
   assert.equal(production.bindings.requestMessages, production.handlers.requestMessagesForRoute)
   assert.equal(production.bindings.markThreadRead, production.handlers.markChatThreadRead)
   assert.deepEqual(plain(production.bindings.roomInvites), ["invite"])
+  assert.equal(production.bindings.requestOlderRoomInvites, production.chatCoordinator.requestOlderRoomInvites)
+  assert.equal(production.bindings.ensureRoomInvite, production.chatCoordinator.ensureRoomInvite)
   assert.equal(production.bindings.onRoomInviteAction, production.handlers.handleRoomInviteAction)
   assert.equal(production.bindings.onCloseActiveRoom, production.handlers.closeMyActiveRoom)
   assert.equal(production.bindings.locale, "tr")
 
   const demo = chatThreadBindings("demo")
+  assert.equal(demo.bindings.requestOlderRoomInvites, demo.chatCoordinator.requestOlderRoomInvites)
+  assert.equal(demo.bindings.ensureRoomInvite, demo.chatCoordinator.ensureRoomInvite)
   assert.equal(demo.bindings.onRoomInviteAction, demo.handlers.handleDemoRoomInviteAction)
   assert.equal(demo.bindings.onCloseActiveRoom, undefined)
 })

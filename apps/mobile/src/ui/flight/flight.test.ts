@@ -1,12 +1,13 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createElement } from "react"
 import {
   createFakeReactRuntime,
   createInertModule,
   createReactNativeStub,
   loadSourceWithFakeReact
 } from "../../testing/hookHarness"
-import { createClockedReanimatedStub, findElements, loadClockedMotion } from "../../testing/reanimatedClock"
+import { createClockedReanimatedStub, findElements, loadClockedMotion, styleValue } from "../../testing/reanimatedClock"
 import { MOTION_DURATIONS, MOTION_SPRINGS } from "../motionTokens"
 import type * as FlightLayerModule from "./FlightLayer"
 import * as model from "./flightModel"
@@ -271,18 +272,23 @@ test("a flight lands when it visibly arrives, reports it once, then fades out", 
   const settled: boolean[] = []
   const id = layer.launchFlight({
     ...request("landing", "fixed-frame"),
-    content: null,
+    sourceSurface: { backgroundColor: "transparent", radius: 0 },
+    targetSurface: { backgroundColor: "transparent", radius: 0 },
+    content: createElement("Doorway"),
+    contentMode: "carry",
     targetFrame: { x: 40, y: 80, width: 200, height: 120 },
     onSettled: (landed) => settled.push(landed)
   })
   assert.ok(id)
   // The layer and its one clone render together, as the app nests them.
   let flying = true
+  let renderedClone: unknown
   runtime.render(() => {
     const tree = layer.FlightLayer({})
     const clone = findElements(tree, (element) => element.props.flight !== undefined)[0]
     flying = clone !== undefined
-    return clone ? (clone.type as (props: unknown) => unknown)(clone.props) : null
+    renderedClone = clone ? (clone.type as (props: unknown) => unknown)(clone.props) : null
+    return renderedClone
   })
   const tick = (ms: number) => {
     for (let elapsed = 0; elapsed < ms; elapsed += 1) t.mock.timers.tick(1)
@@ -291,6 +297,11 @@ test("a flight lands when it visibly arrives, reports it once, then fades out", 
   assert.deepEqual(settled, [], "still in the air")
   tick(1)
   assert.deepEqual(settled, [true], "contact when it visibly lands, not a spring's rest later")
+  const transparentTarget = findElements(renderedClone, (element) => styleValue(element, "backgroundColor") === "transparent")
+    .find((element) => styleValue(element, "opacity") === 1)
+  assert.ok(transparentTarget, "at arrival the door overlays no opaque color, so the room under it is visible")
+  const carriedDoor = findElements(renderedClone, (element) => element.type === "Doorway")
+  assert.equal(carriedDoor.length, 1, "the carried door remains over the visible room until its fade completes")
   tick(MOTION_DURATIONS.fadeOut)
   assert.equal(flying, false, "the clone is gone after its fade")
   assert.deepEqual(settled, [true], "reported exactly once")

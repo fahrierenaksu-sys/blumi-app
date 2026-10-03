@@ -137,16 +137,23 @@ function scheduleIdle(work: () => void): () => void {
 
 /** About one frame: the commit render reaches the screen before focus work. */
 const AFTER_FRAME_MS = 16
+const FOCUS_RETRY_MS = 100
 
-/** Runs `work` after about one frame, in an idle slot. Returns a cancel. */
-function scheduleAfterNextFrame(work: () => void): () => void {
+/** Checks pager motion before admitting deferred focus work in an idle slot. */
+function scheduleAfterNextFrame(work: () => void, isMoving: () => boolean): () => void {
   let cancelled = false
   let idleId: number | null = null
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   const run = () => {
-    if (!cancelled) work()
+    idleId = null
+    if (cancelled) return
+    if (isMoving()) {
+      timeoutId = setTimeout(queueIdle, FOCUS_RETRY_MS)
+      return
+    }
+    work()
   }
-  timeoutId = setTimeout(() => {
+  const queueIdle = () => {
     timeoutId = null
     if (cancelled) return
     if (typeof globalThis.requestIdleCallback === "function") {
@@ -154,7 +161,8 @@ function scheduleAfterNextFrame(work: () => void): () => void {
     } else {
       timeoutId = setTimeout(run, 0)
     }
-  }, AFTER_FRAME_MS)
+  }
+  timeoutId = setTimeout(queueIdle, AFTER_FRAME_MS)
   return () => {
     cancelled = true
     if (idleId !== null && typeof globalThis.cancelIdleCallback === "function") globalThis.cancelIdleCallback(idleId)
@@ -166,9 +174,10 @@ function scheduleAfterNextFrame(work: () => void): () => void {
  * Hosts the four main pages in one native-stack slot route and moves between
  * them with the finger. The slot route name is the only selected-page state:
  * bottom-bar taps and swipes both commit through the router's select action,
- * the UI thread follows the route, and the route changes once per release,
- * when the settle ends, so its renders and the pages' focus work never run
- * during the settle. Pages take touches regardless of the route, so the
+ * the UI thread follows the route, and a released selection waits for the
+ * settle before committing its route. Deferred focus checks current motion
+ * before starting; already admitted synchronous JS work cannot be preempted
+ * when another gesture begins. Pages take touches regardless of the route, so the
  * swiped-to page is interactive the moment it lands.
  * Every frame of a drag or settle runs on the UI thread with shared values.
  */
@@ -196,6 +205,7 @@ export const MainTabPager = memo(function MainTabPager({
   const [, setLocalParamsVersion] = useState(0)
 
   // ── Mount policy ────────────────────────────────────────────────────
+  const [slotFocused, setSlotFocused] = useState(() => navigation.isFocused())
   const [mountedState, setMountedState] = useState<boolean[]>(() =>
     resolveMainTabPagerMountedPages({ mounted: [], selectedIndex, includeNeighbours: false })
   )
@@ -224,53 +234,6 @@ export const MainTabPager = memo(function MainTabPager({
       return areMainTabPagerMountedPagesEqual(current, next) ? current : next
     })
   }, [selectedIndex])
-  useEffect(() => {
-    // Once the shown page is up, warm every other page, one per idle slot,
-    // nearest first, so a swipe never has to mount a page. A slot that finds
-    // the pages moving waits for the next one.
-    if (resolveMainTabPagerNextIdleMount(mountedState, selectedIndex) < 0) return
-    let active = true
-    let cancel = () => undefined as void
-    const slot = () => {
-      if (!active) return
-      if (pagerMovingRef.current) {
-        cancel = scheduleIdle(slot)
-        return
-      }
-      startTransition(() => {
-        setMountedState((current) => {
-          const page = resolveMainTabPagerNextIdleMount(current, selectedIndex)
-          return page < 0 ? current : withMainTabPageMounted(current, page)
-        })
-      })
-    }
-    cancel = scheduleIdle(slot)
-    return () => {
-      active = false
-      cancel()
-    }
-  }, [mountedState, selectedIndex])
-  // Fallback: a drag that starts before its neighbours were warmed mounts
-  // them as a transition, so it never blocks the drag; they fade in.
-  const mountNeighboursForDrag = useCallback((index: number) => {
-    const next = resolveMainTabPagerMountedPages({
-      mounted: mountedStateRef.current,
-      selectedIndex: index,
-      includeNeighbours: true
-    })
-    if (areMainTabPagerMountedPagesEqual(mountedStateRef.current, next)) return
-    if (!reduceMotionRef.current) {
-      next.forEach((isMounted, page) => {
-        if (isMounted && mountedStateRef.current[page] !== true) fadeInPagesRef.current.add(page)
-      })
-    }
-    startTransition(() => {
-      setMountedState((current) => {
-        const merged = current.map((isMounted, page) => isMounted || next[page] === true)
-        return areMainTabPagerMountedPagesEqual(current, merged) ? current : merged
-      })
-    })
-  }, [])
 
   // ── Per-page focus ──────────────────────────────────────────────────
   const focusHub = useMemo<MainTabPageFocusHub>(
@@ -279,25 +242,14 @@ export const MainTabPager = memo(function MainTabPager({
   )
   const focusInitializedRef = useRef(false)
   useEffect(() => {
-    const update = () => focusHub.update({
-      selectedPage: selectedRouteNameRef.current,
-      slotFocused: navigation.isFocused()
-    })
-    if (!focusInitializedRef.current) {
-      focusInitializedRef.current = true
-      update()
-      return
+    const sync = () => {
+      const focused = navigation.isFocused()
+      setSlotFocused(focused)
+      focusHub.update({
+        selectedPage: selectedRouteNameRef.current,
+        slotFocused: focused
+      })
     }
-    // Page blur/focus work (refreshes, loops, state resets) runs after the
-    // commit render has reached the screen, in the next idle slot, never in
-    // the frames of a settle or of the commit itself.
-    return scheduleAfterNextFrame(update)
-  }, [focusHub, navigation, selectedPage.routeName])
-  useEffect(() => {
-    const sync = () => focusHub.update({
-      selectedPage: selectedRouteNameRef.current,
-      slotFocused: navigation.isFocused()
-    })
     const addListener = navigation.addListener as unknown as (type: string, listener: () => void) => () => void
     const unsubscribeFocus = addListener("focus", sync)
     const unsubscribeBlur = addListener("blur", sync)
@@ -345,6 +297,7 @@ export const MainTabPager = memo(function MainTabPager({
   const ui = useSharedValue(createMainTabPagerUiState(selectedIndex))
   const settleTarget = useSharedValue(selectedIndex)
   const animating = useSharedValue(false)
+  const settleGeneration = useSharedValue(0)
   const dragging = useSharedValue(false)
   const caught = useSharedValue(false)
   const gestureEpoch = useSharedValue(0)
@@ -356,6 +309,88 @@ export const MainTabPager = memo(function MainTabPager({
   // to a page that is already rendered.
   const mountedMask = getMainTabPagerMountedMask(mounted)
   const mountedMaskValue = useSharedValue(mountedMask)
+  const requestedMountMask = useSharedValue(0)
+  const dragMountGeneration = useSharedValue(0)
+  const dragMountActiveRef = useRef(true)
+  useEffect(() => {
+    dragMountActiveRef.current = true
+    return () => { dragMountActiveRef.current = false }
+  }, [])
+  const mountPageForDrag = useCallback((index: number, epoch: number, generation: number) => {
+    // A queued cold demand can outlive its gesture, route or pager. These
+    // low-frequency admission reads do not guarantee a later React render.
+    if (!dragMountActiveRef.current || !navigation.isFocused() || ui.value.epoch !== epoch || dragMountGeneration.value !== generation) return
+    if (mountedStateRef.current[index] === true) return
+    if (!reduceMotionRef.current) fadeInPagesRef.current.add(index)
+    startTransition(() => {
+      setMountedState((current) => {
+        const next = withMainTabPageMounted(current, index)
+        return areMainTabPagerMountedPagesEqual(current, next) ? current : next
+      })
+    })
+  }, [dragMountGeneration, navigation, ui])
+  const requestPageForDrag = useCallback((index: number) => {
+    "worklet"
+    if (index < MAIN_TAB_SWIPE_MIN_INDEX || index > MAIN_TAB_SWIPE_MAX_INDEX) return
+    const bit = 1 << index
+    if (((mountedMaskValue.value | requestedMountMask.value) & bit) !== 0) return
+    // Set before delivery to JS: repeated move events and reversals request
+    // each cold page once, even while its first mount is still queued.
+    requestedMountMask.value |= bit
+    scheduleOnRN(mountPageForDrag, index, gestureEpoch.value, dragMountGeneration.value)
+  }, [dragMountGeneration, gestureEpoch, mountedMaskValue, mountPageForDrag, requestedMountMask])
+  const requestVisibleDragPages = useCallback((dragPosition: number) => {
+    "worklet"
+    const base = baseIndex.value
+    requestPageForDrag(base)
+    const basePosition = base * width.value
+    if (dragPosition > basePosition) requestPageForDrag(base + 1)
+    else if (dragPosition < basePosition) requestPageForDrag(base - 1)
+  }, [baseIndex, requestPageForDrag, width])
+
+  useEffect(() => {
+    // Warm one page per idle slot. Check UI motion at admission because the
+    // bridged ref may still be queued. An admitted React update can render
+    // later; synchronous work already started cannot be preempted.
+    if (!slotFocused || resolveMainTabPagerNextIdleMount(mountedState, selectedIndex) < 0) return
+    let active = true
+    let cancel = () => undefined as void
+    const slot = () => {
+      if (!active || !navigation.isFocused()) return
+      if (dragging.value || animating.value || pagerMovingRef.current) {
+        cancel = scheduleIdle(slot)
+        return
+      }
+      startTransition(() => {
+        setMountedState((current) => {
+          if (!navigation.isFocused()) return current
+          const page = resolveMainTabPagerNextIdleMount(current, selectedIndex)
+          return page < 0 ? current : withMainTabPageMounted(current, page)
+        })
+      })
+    }
+    cancel = scheduleIdle(slot)
+    return () => {
+      active = false
+      cancel()
+    }
+  }, [animating, dragging, mountedState, navigation, selectedIndex, slotFocused])
+
+  useEffect(() => {
+    const update = () => focusHub.update({
+      selectedPage: selectedRouteNameRef.current,
+      slotFocused: navigation.isFocused()
+    })
+    if (!focusInitializedRef.current) {
+      focusInitializedRef.current = true
+      update()
+      return
+    }
+    // A follow-up swipe may begin before the last selection's focus slot.
+    // Read the UI-thread values only at this low-frequency admission check;
+    // the bridged JS ref can still be waiting behind this timer in the queue.
+    return scheduleAfterNextFrame(update, () => dragging.value || animating.value)
+  }, [animating, dragging, focusHub, navigation, selectedPage.routeName])
 
   useEffect(() => {
     reduceMotionValue.value = reduceMotion
@@ -375,8 +410,8 @@ export const MainTabPager = memo(function MainTabPager({
     }),
     (sample) => publishMainTabPagerIndicator(mainTabPagerIndicator, sample)
   )
-  // JS learns when the pages start and stop moving (twice per swipe), so idle
-  // page mounts never land inside a drag or settle.
+  // JS learns when movement changes, so idle scheduling can defer work after
+  // this signal arrives. A previously queued React update can still render.
   useAnimatedReaction(
     () => dragging.value || animating.value,
     (moving, previous) => {
@@ -400,6 +435,7 @@ export const MainTabPager = memo(function MainTabPager({
       mainTabPagerIndicator.selection.value = transition.state.committedIndex
     }
     if (transition.interrupt) {
+      settleGeneration.value += 1
       dragging.value = false
       caught.value = false
       if (animating.value) {
@@ -412,7 +448,7 @@ export const MainTabPager = memo(function MainTabPager({
       position.value = transition.state.committedIndex * width.value
     }
     if (transition.commitIndex !== null) scheduleOnRN(commitPage, transition.commitIndex)
-  }, [animating, caught, commitPage, dragging, position, settleTarget, ui, width])
+  }, [animating, caught, commitPage, dragging, position, settleGeneration, settleTarget, ui, width])
 
   const syncFromRoute = useCallback((index: number) => {
     scheduleOnUI((routeIndex: number) => {
@@ -442,23 +478,52 @@ export const MainTabPager = memo(function MainTabPager({
     applyTransition(reduceMainTabPagerSettleEnd(ui.value))
   }, [applyTransition, ui])
   const settleFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const armSettleCommitFallback = useCallback((epoch: number) => {
+  const settleFallbackActiveRef = useRef(true)
+  const lastArmedGenerationRef = useRef(-1)
+  const armSettleCommitFallback = useCallback((epoch: number, generation: number) => {
+    // UI-to-JS delivery can lag behind a newer settle. Reject older or
+    // duplicate arms without reading UI values on JS. An interrupted arm
+    // that arrives first is harmless: the UI callback validates its lifetime.
+    if (!settleFallbackActiveRef.current || generation <= lastArmedGenerationRef.current) return
+    lastArmedGenerationRef.current = generation
     if (settleFallbackRef.current !== null) clearTimeout(settleFallbackRef.current)
-    settleFallbackRef.current = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
+      if (!settleFallbackActiveRef.current || settleFallbackRef.current !== timeoutId) return
       settleFallbackRef.current = null
-      scheduleOnUI((epochAtStart: number) => {
+      scheduleOnUI((epochAtStart: number, generationAtStart: number) => {
         "worklet"
-        if (ui.value.epoch !== epochAtStart || dragging.value || caught.value) return
+        if (ui.value.epoch !== epochAtStart || settleGeneration.value !== generationAtStart || !animating.value || dragging.value || caught.value) return
+        // The missing spring callback must not leave focus waiting on a
+        // permanent moving flag. Land the chosen page before committing it.
+        if (animating.value) {
+          animating.value = false
+          cancelAnimation(position)
+          position.value = settleTarget.value * width.value
+        }
         commitSettledPage()
-      }, epoch)
+      }, epoch, generation)
     }, MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS)
-  }, [caught, commitSettledPage, dragging, ui])
-  useEffect(() => () => {
-    if (settleFallbackRef.current !== null) clearTimeout(settleFallbackRef.current)
-  }, [])
+    settleFallbackRef.current = timeoutId
+  }, [animating, caught, commitSettledPage, dragging, position, settleGeneration, settleTarget, ui, width])
+  useEffect(() => {
+    settleFallbackActiveRef.current = true
+    return () => {
+      settleFallbackActiveRef.current = false
+      if (settleFallbackRef.current !== null) clearTimeout(settleFallbackRef.current)
+      scheduleOnUI(() => {
+        "worklet"
+        settleGeneration.value += 1
+        animating.value = false
+        cancelAnimation(position)
+      })
+    }
+  }, [animating, position, settleGeneration])
 
   const settleTo = useCallback((target: number, velocity: number) => {
     "worklet"
+    settleGeneration.value += 1
+    const generationAtStart = settleGeneration.value
+    requestPageForDrag(target)
     settleTarget.value = target
     const targetPosition = target * width.value
     // The page is decided now and the UI thread shows it, but navigation is
@@ -473,7 +538,6 @@ export const MainTabPager = memo(function MainTabPager({
       return
     }
     const epochAtStart = ui.value.epoch
-    if (ui.value.deferredCommitIndex >= 0) scheduleOnRN(armSettleCommitFallback, epochAtStart)
     const startVelocity = resolveMainTabPagerSettleVelocity({
       position: position.value,
       targetPosition,
@@ -481,6 +545,7 @@ export const MainTabPager = memo(function MainTabPager({
       width: width.value
     })
     animating.value = true
+    scheduleOnRN(armSettleCommitFallback, epochAtStart, generationAtStart)
     position.value = withSpring(
       targetPosition,
       {
@@ -496,7 +561,7 @@ export const MainTabPager = memo(function MainTabPager({
       },
       (finished) => {
         "worklet"
-        if (!finished || ui.value.epoch !== epochAtStart) return
+        if (!finished || ui.value.epoch !== epochAtStart || settleGeneration.value !== generationAtStart) return
         animating.value = false
         commitSettledPage()
       }
@@ -508,6 +573,8 @@ export const MainTabPager = memo(function MainTabPager({
     commitSettledPage,
     position,
     reduceMotionValue,
+    requestPageForDrag,
+    settleGeneration,
     settleTarget,
     ui,
     width
@@ -585,8 +652,11 @@ export const MainTabPager = memo(function MainTabPager({
     .onBegin(() => {
       "worklet"
       gestureEpoch.value = ui.value.epoch
+      dragMountGeneration.value += 1
+      requestedMountMask.value = 0
       caught.value = false
       if (!animating.value) return
+      settleGeneration.value += 1
       animating.value = false
       cancelAnimation(position)
       const targetPosition = settleTarget.value * width.value
@@ -607,23 +677,18 @@ export const MainTabPager = memo(function MainTabPager({
       baseIndex.value = resolveMainTabPagerBaseIndex(position.value, width.value)
       startPosition.value = position.value
       startTranslation.value = event.translationX
-      const base = baseIndex.value
-      const mask = mountedMaskValue.value
-      const neighboursWarm =
-        (base <= MAIN_TAB_SWIPE_MIN_INDEX || isMainTabPageInMountedMask(mask, base - 1)) &&
-        (base >= MAIN_TAB_SWIPE_MAX_INDEX || isMainTabPageInMountedMask(mask, base + 1))
-      if (!neighboursWarm) scheduleOnRN(mountNeighboursForDrag, base)
     })
     .onUpdate((event) => {
       "worklet"
       if (!dragging.value || gestureEpoch.value !== ui.value.epoch) return
-      // Reduce Motion: no finger-follow; the release decides an instant switch.
-      if (reduceMotionValue.value) return
-      position.value = resolveMainTabPagerDragPosition({
+      const dragPosition = resolveMainTabPagerDragPosition({
         rawPosition: startPosition.value - (event.translationX - startTranslation.value),
         width: width.value,
         baseIndex: baseIndex.value
       })
+      requestVisibleDragPages(dragPosition)
+      // Reduce Motion: prepare its destination without finger-follow.
+      if (!reduceMotionValue.value) position.value = dragPosition
     })
     .onEnd((event, success) => {
       "worklet"
@@ -634,13 +699,16 @@ export const MainTabPager = memo(function MainTabPager({
         settleTo(ui.value.committedIndex, velocity)
         return
       }
-      const releasedPosition = reduceMotionValue.value
-        ? resolveMainTabPagerDragPosition({
-          rawPosition: startPosition.value - (event.translationX - startTranslation.value),
-          width: width.value,
-          baseIndex: baseIndex.value
-        })
-        : position.value
+      // The release can carry a newer position than the last coalesced move
+      // event. Use its final displacement in both motion modes and hand the
+      // spring that same point, so its target follows the actual release.
+      const releasedPosition = resolveMainTabPagerDragPosition({
+        rawPosition: startPosition.value - (event.translationX - startTranslation.value),
+        width: width.value,
+        baseIndex: baseIndex.value
+      })
+      requestVisibleDragPages(releasedPosition)
+      if (!reduceMotionValue.value) position.value = releasedPosition
       settleTo(resolveMainTabPagerSettleIndex({
         position: releasedPosition,
         velocity,
@@ -663,11 +731,13 @@ export const MainTabPager = memo(function MainTabPager({
     caught,
     commitSettledPage,
     dragging,
+    dragMountGeneration,
     gestureEpoch,
-    mountNeighboursForDrag,
-    mountedMaskValue,
     position,
     reduceMotionValue,
+    requestedMountMask,
+    requestVisibleDragPages,
+    settleGeneration,
     settleTarget,
     settleTo,
     startPosition,

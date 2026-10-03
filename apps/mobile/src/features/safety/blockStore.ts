@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import type { ReportReason } from "@blumi/contracts"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
@@ -7,7 +7,6 @@ import {
   applyBlockHydrationFailure,
   applyBlockHydrationSuccess,
   createBlockOwnerState,
-  isBlockOwnerReady,
   replaceBlockedUsers,
   shouldApplyBlockServerResponse,
   type BlockHydrationSource,
@@ -33,7 +32,7 @@ interface OwnerCache {
 
 type Listener = () => void
 const ownerCaches = new Map<string, OwnerCache>()
-const listeners = new Set<Listener>()
+const ownerListeners = new Map<string, Set<Listener>>()
 
 function normalizeOwnerUserId(ownerUserId: string): string {
   return ownerUserId.trim()
@@ -54,8 +53,8 @@ function getOwnerCache(ownerUserId: string): OwnerCache {
   return created
 }
 
-function notify(): void {
-  for (const listener of listeners) listener()
+function notify(ownerUserId: string): void {
+  for (const listener of ownerListeners.get(normalizeOwnerUserId(ownerUserId)) ?? []) listener()
 }
 
 function storageKey(ownerUserId: string): string {
@@ -74,7 +73,7 @@ function updateOwnerState(
   const nextState = update(cache.state)
   if (nextState === cache.state) return
   cache.state = nextState
-  notify()
+  notify(ownerUserId)
 }
 
 function persistBlocked(ownerUserId: string): void {
@@ -134,8 +133,9 @@ export function applyBlockedUserIds(
   options: { persist?: boolean; source?: BlockHydrationSource } = {}
 ): void {
   const source = options.source ?? "local"
-  if (source !== "server") {
-    getOwnerCache(ownerUserId).blockedProfilesById = {}
+  const cache = getOwnerCache(ownerUserId)
+  if (source !== "server" && cache.state.serverStatus !== "ready" && Object.keys(cache.blockedProfilesById).length > 0) {
+    cache.blockedProfilesById = {}
   }
   updateOwnerState(ownerUserId, (state) =>
     applyBlockHydrationSuccess(state, ownerUserId, userIds, source)
@@ -169,13 +169,20 @@ export async function hydrateBlockedUsersFromServer(
       currentMutationGeneration: cache.mutationGeneration,
       startedMutationGeneration
     })) return
-    cache.blockedProfilesById = Object.fromEntries(
+    const nextProfiles = Object.fromEntries(
       blocks.flatMap((block) =>
         block.blockedProfile
           ? [[block.blockedUserId, { ...block.blockedProfile }] as const]
           : []
       )
     )
+    const previousProfiles = cache.blockedProfilesById
+    if (Object.keys(previousProfiles).length !== Object.keys(nextProfiles).length ||
+      Object.entries(nextProfiles).some(([id, profile]) => {
+        const previous = previousProfiles[id]
+        return !previous || previous.userId !== profile.userId ||
+          previous.displayName !== profile.displayName || previous.avatarPresetId !== profile.avatarPresetId
+      })) cache.blockedProfilesById = nextProfiles
     applyBlockedUserIds(
       ownerUserId,
       blocks.map((block) => block.blockedUserId),
@@ -266,15 +273,33 @@ export function useBlockStore(
   ownerUserId: string | undefined,
   requireServerHydration = false
 ): BlockStoreView {
-  const [, setTick] = useState(0)
   const normalizedOwner = normalizeOwnerUserId(ownerUserId ?? "")
-  const cache = getOwnerCache(normalizedOwner)
-
-  const sync = useCallback(() => setTick((tick) => tick + 1), [])
-  useEffect(() => {
-    listeners.add(sync)
-    return () => { listeners.delete(sync) }
-  }, [sync])
+  const subscribe = useCallback((listener: Listener) => {
+    const listeners = ownerListeners.get(normalizedOwner) ?? new Set<Listener>()
+    ownerListeners.set(normalizedOwner, listeners)
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) ownerListeners.delete(normalizedOwner)
+    }
+  }, [normalizedOwner])
+  const getSnapshot = useMemo(() => {
+    let previous: {
+      blockedUserIds: string[]
+      blockedProfilesById: Record<string, BlockedProfileSummary>
+      hydrationStatus: BlockOwnerState["serverStatus"]
+    } | undefined
+    return () => {
+      const cache = getOwnerCache(normalizedOwner)
+      const hydrationStatus = requireServerHydration ? cache.state.serverStatus : cache.state.localStatus
+      if (!previous || previous.blockedUserIds !== cache.state.blockedUserIds ||
+        previous.blockedProfilesById !== cache.blockedProfilesById || previous.hydrationStatus !== hydrationStatus) {
+        previous = { blockedUserIds: cache.state.blockedUserIds, blockedProfilesById: cache.blockedProfilesById, hydrationStatus }
+      }
+      return previous
+    }
+  }, [normalizedOwner, requireServerHydration])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
   useEffect(() => {
     if (!normalizedOwner) return
@@ -283,13 +308,10 @@ export function useBlockStore(
 
   // The owner state and profile map are replaced on every change, so their
   // identities are the invalidation keys for the copies handed to callers.
-  const ownerState = cache.state
-  const ownerBlockedUserIds = ownerState.blockedUserIds
-  const ownerBlockedProfilesById = cache.blockedProfilesById
-  const isReady = Boolean(normalizedOwner) && isBlockOwnerReady(ownerState, requireServerHydration)
-  const hydrationStatus = requireServerHydration
-    ? ownerState.serverStatus
-    : ownerState.localStatus
+  const ownerBlockedUserIds = snapshot.blockedUserIds
+  const ownerBlockedProfilesById = snapshot.blockedProfilesById
+  const hydrationStatus = snapshot.hydrationStatus
+  const isReady = Boolean(normalizedOwner) && hydrationStatus === "ready"
   const blockedUserIds = useMemo(() => [...ownerBlockedUserIds], [ownerBlockedUserIds])
   const blockedProfilesById = useMemo(
     () => ({ ...ownerBlockedProfilesById }),

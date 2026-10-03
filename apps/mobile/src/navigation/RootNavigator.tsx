@@ -25,7 +25,6 @@ import {
   canApplyBlumiDevEntry,
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
-import { useBlockStore } from "../features/safety/blockStore"
 import { resetChatStore } from "../features/chat/chatStore"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
@@ -72,6 +71,7 @@ import {
 } from "./rootNavigationModel"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
+import { mainTabPagerIndicator } from "../ui/mainTabPagerIndicator"
 import { FlightLayer } from "../ui/flight/FlightLayer"
 import { OnboardingDoneMoment } from "../features/session/OnboardingDoneMoment"
 import { useOnboardingDoneMoment } from "../features/session/useOnboardingDoneMoment"
@@ -104,6 +104,7 @@ import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
 import { useBlockedPartnerCleanup } from "./useBlockedPartnerCleanup"
 import {
   MAIN_TAB_PAGER_ENABLED,
+  MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS,
   MAIN_TAB_ROUTE_NAMES,
   type MainTabRouteName
 } from "./mainTabPager/mainTabPagerConfig"
@@ -115,14 +116,16 @@ import {
   type NativeSheetRouteParams
 } from "./nativeSheets/nativeSheetModel"
 import {
+  NO_QA_OWNED_ROOM_ITEM_IDS,
   renderMainTabPage as renderMainTabPageWith,
   type MainTabPageDependencies
 } from "./mainTabPager/renderMainTabPage"
 import {
   legalScreenBundle,
   miniRoomRigPreviewScreenBundle,
+  myRoomScreenBundle,
+  cosmeticShopScreenBundle,
   myRoomEditorScreenBundle,
-  preloadDeferredMainScreens,
   homeStudioScreenBundle,
   settingsScreenBundle,
   wardrobeV2ScreenBundle,
@@ -267,21 +270,51 @@ const IS_FULL_SHOP_CATALOG_QA_PREVIEW = isAvatarQaUnlockEnabled(
   __DEV__,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG
 )
-function scheduleDeferredPreload(work: () => void): () => void {
-  if (typeof globalThis.requestIdleCallback === "function") {
-    const idleId = globalThis.requestIdleCallback(() => {
-      work()
-    })
-    return () => {
-      if (typeof globalThis.cancelIdleCallback === "function") {
-        globalThis.cancelIdleCallback(idleId)
+function scheduleDeferredPreload(
+  steps: readonly (() => unknown)[],
+  isFocused: () => boolean,
+  isMoving: () => boolean
+): { sync: () => void; cancel: () => void } {
+  let active = true
+  let nextStep = 0
+  let cancelSlot: (() => void) | null = null
+  const sync = () => {
+    if (!active) return
+    if (!isFocused()) {
+      cancelSlot?.()
+      cancelSlot = null
+      return
+    }
+    if (cancelSlot !== null || nextStep >= steps.length) return
+    let idleId: number | null = null
+    const timeoutId = setTimeout(() => {
+      const run = () => {
+        cancelSlot = null
+        if (!active || !isFocused()) return
+        // Read the existing UI-thread movement signal only in an idle slot.
+        // A synchronous module evaluation cannot be interrupted once begun.
+        if (!isMoving()) steps[nextStep++]!()
+        sync()
       }
+      if (typeof globalThis.requestIdleCallback === "function") {
+        idleId = globalThis.requestIdleCallback(run)
+      } else {
+        run()
+      }
+    }, MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS)
+    cancelSlot = () => {
+      clearTimeout(timeoutId)
+      if (idleId !== null) globalThis.cancelIdleCallback?.(idleId)
     }
   }
-
-  const timeoutId = setTimeout(work, 32)
-  return () => {
-    clearTimeout(timeoutId)
+  sync()
+  return {
+    sync,
+    cancel: () => {
+      active = false
+      cancelSlot?.()
+      cancelSlot = null
+    }
   }
 }
 
@@ -353,10 +386,6 @@ export function RootNavigator() {
     demoRoomInvites: demoStore.roomInvites
   })
   const { claimDailyRewardFromServer, hydrateFromServer } = useInventoryStore(
-    sessionActor?.profile.userId,
-    sessionActor?.session.mode === "production"
-  )
-  useBlockStore(
     sessionActor?.profile.userId,
     sessionActor?.session.mode === "production"
   )
@@ -512,12 +541,25 @@ export function RootNavigator() {
   }, [onboardingEntryRoute, sessionEntryRoute])
 
   useEffect(() => {
-    if (sessionEntryRoute !== "Main") return
-    const cancelDeferredPreload = scheduleDeferredPreload(() => {
-      preloadDeferredMainScreens()
-    })
-    return cancelDeferredPreload
-  }, [sessionEntryRoute])
+    if (sessionEntryRoute !== "Main" || !isNavigationReady) return
+    // One screen module per idle slot. Pushed detail routes cancel the next
+    // slot; returning to a main page resumes the remaining modules.
+    const preload = scheduleDeferredPreload([
+      myRoomScreenBundle.preload,
+      cosmeticShopScreenBundle.preload,
+      wardrobeV2ScreenBundle.preload,
+      myRoomEditorScreenBundle.preload,
+      settingsScreenBundle.preload,
+      legalScreenBundle.preload
+    ], () => navigationRef.isReady() &&
+      (MAIN_TAB_ROUTE_NAMES as readonly string[]).includes(navigationRef.getCurrentRoute()?.name ?? ""),
+    () => mainTabPagerIndicator.tracking.value)
+    const unsubscribe = navigationRef.addListener("state", preload.sync)
+    return () => {
+      unsubscribe()
+      preload.cancel()
+    }
+  }, [isNavigationReady, sessionEntryRoute])
 
   useEffect(() => {
     if (
@@ -648,7 +690,7 @@ export function RootNavigator() {
   }])) as Record<MainTabRouteName, object>, [reduceMotion])
   const mainTabBottomBars = useMemo(() => Object.fromEntries(MAIN_TAB_ROUTE_NAMES.map((routeName) => [
     routeName,
-    <MainTabBottomBar key={routeName} routeName={routeName} onPress={handleBottomNavPress} />
+    <MainTabBottomBar key="main-tab-bottom-bar" routeName={routeName} onPress={handleBottomNavPress} />
   ])) as Record<MainTabRouteName, ReactNode>, [handleBottomNavPress])
 
   const shouldShowBootPrelude =
@@ -684,7 +726,7 @@ export function RootNavigator() {
       storageScopeId={sessionActor?.profile.userId ?? preAuthDraftScopeId}
       requireServerInventory={sessionActor?.session.mode === "production"}
       storageNamespace="production"
-      qaOnlyOwnedRoomItemIds={[]}
+      qaOnlyOwnedRoomItemIds={NO_QA_OWNED_ROOM_ITEM_IDS}
       isQaRuntimeAuthorized={false}
       isVNextRuntimeProof={false}
       allowStarterOnboardingEdits={
@@ -775,7 +817,11 @@ export function RootNavigator() {
                 options={{ headerShown: false, gestureEnabled: false }}
               >
                 {(screenProps) => (
-                  <MiniRoomScreen {...screenProps} sessionActor={sessionActor} />
+                  <MiniRoomScreen
+                    {...screenProps}
+                    sessionActor={sessionActor}
+                    requestChatMessages={chatThreadBindings.requestMessages}
+                  />
                 )}
               </Stack.Screen>
               {CAN_REGISTER_MINI_ROOM_RIG_PREVIEW ? (

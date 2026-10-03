@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useSyncExternalStore } from "react"
 import { loadAccountScopedStorage } from "../persistence/accountScopedStorage"
 import {
   getSavedConnectionsStorageKeys,
@@ -33,6 +33,11 @@ interface OwnerCache {
   skipped: SkippedConnection[] | null
   hydratePromise: Promise<void> | null
   hydrationState: "idle" | "loading" | "ready" | "failed"
+  snapshot: {
+    savedSource: SavedConnection[] | null
+    skippedSource: SkippedConnection[] | null
+    value: Pick<SavedConnectionsView, "saved" | "skipped" | "isHydrating">
+  } | null
 }
 
 type Listener = () => void
@@ -48,7 +53,8 @@ function getOwnerCache(ownerUserId: string): OwnerCache {
     saved: null,
     skipped: null,
     hydratePromise: null,
-    hydrationState: "idle"
+    hydrationState: "idle",
+    snapshot: null
   }
   ownerCaches.set(ownerId, created)
   return created
@@ -56,6 +62,23 @@ function getOwnerCache(ownerUserId: string): OwnerCache {
 
 function notify(ownerUserId: string): void {
   ownerListeners.get(ownerUserId)?.forEach((listener) => listener())
+}
+
+function getOwnerSnapshot(ownerUserId: string) {
+  const cache = getOwnerCache(ownerUserId)
+  const isHydrating = cache.hydrationState === "idle" || cache.hydrationState === "loading"
+  if (
+    cache.snapshot?.savedSource === cache.saved &&
+    cache.snapshot?.skippedSource === cache.skipped &&
+    cache.snapshot.value.isHydrating === isHydrating
+  ) return cache.snapshot.value
+  const value = {
+    saved: [...(cache.saved ?? [])],
+    skipped: [...(cache.skipped ?? [])],
+    isHydrating
+  }
+  cache.snapshot = { savedSource: cache.saved, skippedSource: cache.skipped, value }
+  return value
 }
 
 async function hydrate(ownerUserId: string): Promise<void> {
@@ -67,6 +90,7 @@ async function hydrate(ownerUserId: string): Promise<void> {
   const keys = getSavedConnectionsStorageKeys(ownerId)
   const hydration = (async () => {
     cache.hydrationState = "loading"
+    notify(ownerId)
     const result = await loadAccountScopedStorage({
       storage: AsyncStorage,
       entries: [
@@ -94,6 +118,7 @@ async function hydrate(ownerUserId: string): Promise<void> {
     await hydration
   } finally {
     if (cache.hydratePromise === hydration) cache.hydratePromise = null
+    notify(ownerId)
   }
 }
 
@@ -276,61 +301,26 @@ export interface SavedConnectionsView {
 
 export function useSavedConnections(ownerUserId: string): SavedConnectionsView {
   const ownerId = normalizeSavedConnectionsOwnerId(ownerUserId)
-  const initialCache = getOwnerCache(ownerId)
-  const [saved, setSaved] = useState<SavedConnection[]>(() => [
-    ...(initialCache.saved ?? [])
-  ])
-  const [skipped, setSkipped] = useState<SkippedConnection[]>(() => [
-    ...(initialCache.skipped ?? [])
-  ])
-  const [isHydrating, setIsHydrating] = useState(
-    initialCache.saved === null || initialCache.skipped === null
-  )
-
-  const sync = useCallback((): void => {
-    const cache = getOwnerCache(ownerId)
-    setSaved([...(cache.saved ?? [])])
-    setSkipped([...(cache.skipped ?? [])])
-  }, [ownerId])
-
-  const refresh = useCallback(async (): Promise<void> => {
-    setIsHydrating(true)
-    try {
-      await hydrate(ownerId)
-      sync()
-    } finally {
-      setIsHydrating(false)
-    }
-  }, [ownerId, sync])
-
-  useEffect(() => {
-    let active = true
+  const subscribe = useCallback((listener: Listener) => {
     const listeners = ownerListeners.get(ownerId) ?? new Set<Listener>()
-    const listener: Listener = () => {
-      if (active) sync()
-    }
     listeners.add(listener)
     ownerListeners.set(ownerId, listeners)
-    setSaved([])
-    setSkipped([])
-    setIsHydrating(true)
-    void hydrate(ownerId)
-      .then(() => {
-        if (!active) return
-        sync()
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (active) setIsHydrating(false)
-      })
     return () => {
-      active = false
       listeners.delete(listener)
       if (listeners.size === 0) ownerListeners.delete(ownerId)
     }
-  }, [ownerId, sync])
+  }, [ownerId])
+  const readSnapshot = useCallback(() => getOwnerSnapshot(ownerId), [ownerId])
+  // The snapshot belongs to the owner, even on the first render after an
+  // account switch. A ready cache stays drawn while this page mounts again.
+  const snapshot = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
+  const refresh = useCallback(() => hydrate(ownerId), [ownerId])
 
-  return { saved, skipped, isHydrating, refresh }
+  useEffect(() => {
+    void hydrate(ownerId).catch(() => undefined)
+  }, [ownerId])
+
+  return { ...snapshot, refresh }
 }
 
 function parseSavedConnections(rawValue: string | null): SavedConnection[] {

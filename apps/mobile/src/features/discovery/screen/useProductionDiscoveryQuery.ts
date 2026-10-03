@@ -16,7 +16,7 @@ import {
   buildDiscoveryPageQueryKey,
   createDiscoveryPageQueryOptions,
   createDiscoveryWatchQueryOptions,
-  flattenDiscoveryPages,
+  createDiscoveryProfilesSelector,
   shouldPrefetchDiscoveryPage,
   shouldStartDiscoveryWatch
 } from "../discoveryQueryOptions"
@@ -73,10 +73,8 @@ export function useProductionDiscoveryQuery(input: {
       })
     })
   )
-  const productionProfiles = useMemo(
-    () => flattenDiscoveryPages(productionDiscoveryQuery.data?.pages ?? []),
-    [productionDiscoveryQuery.data?.pages]
-  )
+  const selectProductionProfiles = useMemo(() => createDiscoveryProfilesSelector(), [])
+  const productionProfiles = selectProductionProfiles(productionDiscoveryQuery.data?.pages ?? [])
   const lastProductionPage = productionDiscoveryQuery.data?.pages.at(-1)
   const productionQuota = lastProductionPage?.quota ?? null
   const productionSupplyState = lastProductionPage?.supply.state
@@ -148,18 +146,23 @@ export function useDiscoveryPrefetchAdmission(input: {
     discoveryQuotaExhausted,
     availableCandidateCount
   } = input
-  // fetchNextPage is bound to its observer, so this is the same call the
-  // member expression made; the effect keys on the same three values.
+  // fetchNextPage is bound to its observer; request and error state decide
+  // whether this low-supply deck may start another page.
   const {
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetching,
+    isFetchNextPageError
   } = productionDiscoveryQuery
   useEffect(() => {
     if (!shouldPrefetchDiscoveryPage({
       isProductionDiscovery,
       isSafetyListReady,
-      isFetchingNextPage,
+      // A next-page request must not cancel a deck refresh in progress.
+      isFetching,
+      // Exhausting TanStack's bounded retries must not restart that batch
+      // every time fetching returns to false. Explicit refresh can recover.
+      isFetchNextPageError,
       hasNextPage: Boolean(hasNextPage),
       isQuotaExhausted: discoveryQuotaExhausted,
       availableCandidateCount
@@ -172,6 +175,7 @@ export function useDiscoveryPrefetchAdmission(input: {
     discoveryQuotaExhausted,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetching,
+    isFetchNextPageError
   ])
 }

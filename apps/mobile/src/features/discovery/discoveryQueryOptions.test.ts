@@ -10,9 +10,39 @@ import {
   createDiscoveryPageQueryOptions,
   createDiscoveryWatchQueryOptions,
   flattenDiscoveryPages,
+  createDiscoveryProfilesSelector,
   shouldPrefetchDiscoveryPage,
   shouldStartDiscoveryWatch
 } from "./discoveryQueryOptions"
+
+test("quota-only replies preserve the deck; changed profiles and page order still update it", () => {
+  const select = createDiscoveryProfilesSelector<{ userId: string; displayName: string }>()
+  const first = { profiles: [{ userId: "fixture-a", displayName: "A" }], quota: 10 }
+  const second = { profiles: [{ userId: "fixture-b", displayName: "B" }], quota: 10 }
+  const before = select([first, second])
+  const afterQuota = select([first, { ...second, quota: 9 }])
+  assert.equal(afterQuota, before)
+  const renamed = { ...first, profiles: [{ ...first.profiles[0], displayName: "Updated" }] }
+  const afterProfile = select([renamed, second])
+  assert.notEqual(afterProfile, before)
+  assert.equal(afterProfile[0].displayName, "Updated")
+  const reordered = select([second, renamed])
+  assert.deepEqual(reordered.map((profile) => profile.userId), ["fixture-b", "fixture-a"])
+  assert.deepEqual(select([second]), second.profiles)
+  assert.deepEqual(select([]), [])
+})
+
+test("each discovery query owns its selection cache and duplicates retain the latest profile", () => {
+  const selectA = createDiscoveryProfilesSelector<{ userId: string; revision: number }>()
+  const selectB = createDiscoveryProfilesSelector<{ userId: string; revision: number }>()
+  const pages = [{ profiles: [{ userId: "fixture-a", revision: 1 }] },
+    { profiles: [{ userId: "fixture-a", revision: 2 }] }]
+  const a = selectA(pages)
+  assert.equal(a.length, 1)
+  assert.equal(a[0].revision, 2)
+  assert.notEqual(selectB(pages), a)
+  assert.equal(selectA(pages), a)
+})
 
 test("the optional watch request yields to the first page, then starts for success or error", () => {
   const ready = {
@@ -30,14 +60,16 @@ test("Discover does not drain cursor pages while the safety list is unresolved",
   const ready = {
     isProductionDiscovery: true,
     isSafetyListReady: true,
-    isFetchingNextPage: false,
+    isFetching: false,
+    isFetchNextPageError: false,
     hasNextPage: true,
     isQuotaExhausted: false,
     availableCandidateCount: 2
   }
   assert.equal(shouldPrefetchDiscoveryPage(ready), true)
   assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isSafetyListReady: false, availableCandidateCount: 0 }), false)
-  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isFetchingNextPage: true }), false)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isFetching: true }), false)
+  assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isFetchNextPageError: true }), false)
   assert.equal(shouldPrefetchDiscoveryPage({ ...ready, isQuotaExhausted: true }), false)
   // Half a page of headroom: a fast swiper (one card every ~350 ms now that
   // the deck advances at release) must not outrun a mobile page fetch.

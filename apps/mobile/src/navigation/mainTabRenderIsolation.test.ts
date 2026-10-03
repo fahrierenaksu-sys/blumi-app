@@ -170,7 +170,7 @@ test("a bottom-bar tap snaps the pager on the UI thread before navigation answer
 /** What the stubbed model hands out as the detail (native push) options. */
 const DETAIL_OPTIONS_STUB = Object.freeze({ stub: "detail push" })
 
-function mountRoot() {
+function mountRoot(nativeIdle = true) {
   const runtime = createFakeReactRuntime()
   const unreadListeners = new Set<() => void>()
   let unread = 0
@@ -222,6 +222,20 @@ function mountRoot() {
     resetRoomInviteRouting: () => undefined
   }
   const inventory = stable({ claimDailyRewardFromServer: async () => 0, hydrateFromServer: async () => ({ success: false }) })
+  let navigationReady = false
+  let currentRouteName = "Lobby"
+  const navigationStateListeners = new Set<() => void>()
+  const indicator = { tracking: { value: false } }
+  const preloaded: string[] = []
+  let nextTaskId = 1
+  let timers = new Map<number, () => void>()
+  let idleCallbacks = new Map<number, () => void>()
+  const screenBundles = Object.fromEntries([
+    "myRoom", "cosmeticShop", "wardrobeV2", "myRoomEditor", "settings", "legal"
+  ].map((name) => [`${name}ScreenBundle`, {
+    DeferredScreen: `${name}Screen`,
+    preload: () => { preloaded.push(name) }
+  }]))
   const exports = loadSourceWithFakeReact<{ RootNavigator: () => unknown }>("navigation/RootNavigator.tsx", runtime, {
     inertUnknown: true,
     modules: {
@@ -283,18 +297,46 @@ function mountRoot() {
         }
       },
       "./useBottomNavChrome": { useBottomNavChrome: () => bottomNavChrome },
+      "./RootNavigationChrome": { MainTabBottomBar: "MainTabBottomBar", RootNavigationChrome: "RootNavigationChrome" },
+      "./rootNavigationRef": {
+        navigationRef: {
+          isReady: () => navigationReady,
+          getCurrentRoute: () => ({ name: currentRouteName }),
+          addListener: (_type: string, listener: () => void) => {
+            navigationStateListeners.add(listener)
+            return () => { navigationStateListeners.delete(listener) }
+          }
+        }
+      },
+      "./deferredScreenBundles": screenBundles,
+      "../ui/mainTabPagerIndicator": { mainTabPagerIndicator: indicator },
       "../ui/animations": { useReducedMotion: () => false },
       "./mainTabPager/renderMainTabPage": { renderMainTabPage: () => null }
     },
     real: ["./mainTabPager/mainTabPagerConfig"],
-    globals: { setTimeout: () => 0, clearTimeout: () => undefined }
+    globals: {
+      setTimeout: (run: () => void) => {
+        const id = nextTaskId++
+        timers.set(id, run)
+        return id
+      },
+      clearTimeout: (id: number) => { timers.delete(id) },
+      globalThis: {
+        requestIdleCallback: nativeIdle ? (run: () => void) => {
+          const id = nextTaskId++
+          idleCallbacks.set(id, run)
+          return id
+        } : undefined,
+        cancelIdleCallback: (id: number) => { idleCallbacks.delete(id) }
+      }
+    }
   })
   runtime.render(() => exports.RootNavigator())
-  const slotScreen = () => {
+  const slotScreen = (routeName = "Lobby") => {
     const [screen] = collectElements(runtime.output, (element) =>
-      element.props.name === "Lobby" && typeof element.props.children === "function")
+      element.props.name === routeName && typeof element.props.children === "function")
     assert.ok(screen, "the main tab slot screen is declared")
-    return (screen.props.children as (props: unknown) => Element)({ navigation: {}, route: { key: "slot", name: "Lobby" } })
+    return (screen.props.children as (props: unknown) => Element)({ navigation: {}, route: { key: "slot", name: routeName } })
   }
   const screenOptions = (name: string) => {
     const [screen] = collectElements(runtime.output, (element) => element.props.name === name)
@@ -305,6 +347,28 @@ function mountRoot() {
     runtime,
     slotScreen,
     screenOptions,
+    preloaded,
+    ready() {
+      navigationReady = true
+      const [container] = collectElements(runtime.output, (element) => typeof element.props.onStateChange === "function")
+      assert.ok(container)
+      ;(container.props.onReady as () => void)()
+    },
+    setRoute(name: string) {
+      currentRouteName = name
+      for (const listener of navigationStateListeners) listener()
+    },
+    setMoving(moving: boolean) { indicator.tracking.value = moving },
+    runTimers() {
+      const due = timers
+      timers = new Map()
+      for (const run of due.values()) run()
+    },
+    runIdleCallbacks() {
+      const due = idleCallbacks
+      idleCallbacks = new Map()
+      for (const run of due.values()) run()
+    },
     setUnread(next: number) {
       unread = next
       for (const listener of [...unreadListeners]) listener()
@@ -372,6 +436,49 @@ test("a root render hands the pager the same page renderer and bottom-bar props"
   assert.deepEqual(changedProps(beforeBar.props, afterBar.props), [])
   assert.equal("chatCount" in afterBar.props, false, "the bar reads the unread count itself")
 })
+
+test("main-tab changes preserve the bottom bar's React identity and its mounted animation state", () => {
+  const root = mountRoot()
+  const firstBar = root.slotScreen().props.bottomBar as Element
+  for (const routeName of ["Inbox", "MyRoom", "CosmeticShop", "Lobby"]) {
+    const nextBar = root.slotScreen(routeName).props.bottomBar as Element
+    assert.equal(nextBar.type, firstBar.type)
+    assert.equal(nextBar.key, firstBar.key, "React retains the same bar instead of rebuilding its shared values")
+    assert.equal(nextBar.props.routeName, routeName)
+  }
+})
+
+for (const nativeIdle of [true, false]) {
+  test(`deferred main screens yield between modules and pause behind detail routes (${nativeIdle ? "idle callback" : "timer fallback"})`, () => {
+    const root = mountRoot(nativeIdle)
+    const idleSlot = () => {
+      root.runTimers()
+      root.runIdleCallbacks()
+    }
+    idleSlot()
+    assert.deepEqual(root.preloaded, [], "the navigator must be ready before warming destinations")
+    root.ready()
+    idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom"], "the first module yields before the next one")
+    root.setMoving(true)
+    idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom"], "a drag or settle defers module evaluation")
+    root.setMoving(false)
+    idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom", "cosmeticShop"])
+    // In the native-idle path the timeout already queued its idle callback.
+    if (nativeIdle) root.runTimers()
+    root.setRoute("ChatThread")
+    for (let slot = 0; slot < 4; slot += 1) idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom", "cosmeticShop"], "a detail push cancels the pending slot")
+    root.setRoute("Inbox")
+    idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom", "cosmeticShop", "wardrobeV2"], "returning resumes, without restarting earlier modules")
+    root.runtime.unmount()
+    idleSlot()
+    assert.deepEqual(root.preloaded, ["myRoom", "cosmeticShop", "wardrobeV2"], "unmount cancels the remaining work")
+  })
+}
 
 test("the avatar wardrobe and the room editor are pushed from the right like every detail screen", () => {
   // Owner decision 2026-10-02: both open with the native push, and the Back

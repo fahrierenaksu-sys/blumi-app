@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent } from "react"
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef } from "react"
 import { Alert } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
 import { showToast } from "../../ui/toast"
@@ -32,6 +32,16 @@ export function useHiddenPeople(input: {
   whenSettled?: WhenPushSettled
 }) {
   const { copy, locale, sessionActor, unblockUser, whenSettled = runNow } = input
+  const scope = useMemo(() => ({
+    owner: sessionActor.profile.userId,
+    mode: sessionActor.session.mode,
+    token: sessionActor.session.sessionToken
+  }), [sessionActor.profile.userId, sessionActor.session.mode, sessionActor.session.sessionToken])
+  const currentScope = useRef<typeof scope | null>(scope)
+  useLayoutEffect(() => {
+    currentScope.current = scope
+    return () => { currentScope.current = null }
+  }, [scope])
 
   // Locale only formats the failure toast: it is read when the refresh fails
   // and must not trigger another server hydration.
@@ -44,18 +54,26 @@ export function useHiddenPeople(input: {
   })
 
   useEffect(() => {
-    if (sessionActor.session.mode !== "production") return
-    return whenSettled(() => {
+    if (scope.mode !== "production") return
+    let active = true
+    const cancel = whenSettled(() => {
       void hydrateBlockedUsersFromServer(
-        sessionActor.profile.userId,
-        sessionActor.session.sessionToken
+        scope.owner,
+        scope.token
       )
-        .catch((error) => showRefreshFailure(error))
+        .catch((error) => {
+          if (active && currentScope.current === scope) showRefreshFailure(error)
+        })
     })
-  }, [sessionActor, whenSettled])
+    return () => {
+      active = false
+      cancel()
+    }
+  }, [scope, whenSettled])
 
   return useCallback(
     (userId: string) => {
+      if (currentScope.current !== scope) return
       Alert.alert(
         copy.showAgainTitle,
         copy.showAgainBody,
@@ -65,25 +83,28 @@ export function useHiddenPeople(input: {
             text: copy.showAgain,
             style: "destructive",
             onPress: () => {
-              if (sessionActor.session.mode !== "production") {
+              if (currentScope.current !== scope) return
+              if (scope.mode !== "production") {
                 unblockUser(userId)
                 showToast({ title: copy.personVisibleAgain, type: "info" })
                 return
               }
               void unblockSafetyUser(
                 MOBILE_HTTP_BASE_URL,
-                sessionActor.session.sessionToken,
+                scope.token,
                 userId
               )
                 .then(() => {
+                  if (currentScope.current !== scope) return
                   unblockUser(userId, { persist: false })
                   void hydrateBlockedUsersFromServer(
-                    sessionActor.profile.userId,
-                    sessionActor.session.sessionToken
+                    scope.owner,
+                    scope.token
                   ).catch(() => undefined)
                   showToast({ title: copy.personVisibleAgain, type: "info" })
                 })
                 .catch((error) => {
+                  if (currentScope.current !== scope) return
                   showToast({
                     title: "Could not update safety list",
                     body: getSettingsActionErrorMessageForDisplay("unblockPerson", error, locale),
@@ -95,6 +116,6 @@ export function useHiddenPeople(input: {
         ]
       )
     },
-    [copy, locale, sessionActor, unblockUser]
+    [copy, locale, scope, unblockUser]
   )
 }

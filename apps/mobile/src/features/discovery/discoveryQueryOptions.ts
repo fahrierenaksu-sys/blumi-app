@@ -25,14 +25,16 @@ export function shouldStartDiscoveryWatch(input: {
 export function shouldPrefetchDiscoveryPage(input: {
   isProductionDiscovery: boolean
   isSafetyListReady: boolean
-  isFetchingNextPage: boolean
+  isFetching: boolean
+  isFetchNextPageError: boolean
   hasNextPage: boolean
   isQuotaExhausted: boolean
   availableCandidateCount: number
 }): boolean {
   return input.isProductionDiscovery &&
     input.isSafetyListReady &&
-    !input.isFetchingNextPage &&
+    !input.isFetching &&
+    !input.isFetchNextPageError &&
     input.hasNextPage &&
     !input.isQuotaExhausted &&
     input.availableCandidateCount <= DISCOVERY_PREFETCH_REMAINING_CARDS
@@ -150,4 +152,17 @@ export function flattenDiscoveryPages<T extends Pick<DiscoverProfileRecord, "use
     for (const profile of page.profiles) byUserId.set(profile.userId, profile)
   }
   return [...byUserId.values()]
+}
+
+/** Quota replies replace page metadata, while the immutable profile arrays stay the same. */
+export function createDiscoveryProfilesSelector<T extends Pick<DiscoverProfileRecord, "userId"> = DiscoverProfileRecord>() {
+  let previousSources: T[][] = []
+  let profiles: T[] = []
+  return (pages: { profiles: T[] }[]): T[] => {
+    if (pages.length === previousSources.length &&
+      pages.every((page, index) => page.profiles === previousSources[index])) return profiles
+    previousSources = pages.map((page) => page.profiles)
+    profiles = flattenDiscoveryPages(pages)
+    return profiles
+  }
 }

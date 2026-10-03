@@ -9,6 +9,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  type AnimatedStyle,
   type SharedValue
 } from "react-native-reanimated"
 import { blumiEntryTheme, uiTheme } from "./theme"
@@ -139,46 +140,58 @@ function SoftBlob(props: {
 }) {
   const { blob, index, pulse, motionEnabled } = props
   const [from, to] = index % 2 === 0 ? [1, 1.12] : [1.08, 0.96]
-  const driftStyle = useAnimatedStyle(() => ({
+  const driftStyle = useAnimatedStyle<ViewStyle>(() => ({
     transform: [{ scale: motionEnabled ? from + (to - from) * pulse.value : 1 }]
   }))
+  return <SoftBlobArtwork blob={blob} driftStyle={driftStyle} />
+}
+
+/** Identical blob artwork for the static native and animated paths. */
+function SoftBlobArtwork(props: {
+  blob: SoftBlobConfig
+  driftStyle?: AnimatedStyle<ViewStyle>
+}) {
+  const { blob, driftStyle } = props
   // The blob's opacity is drawn by the gradient colour itself: a view opacity
   // below 1 over a clipped subtree is rendered offscreen on every frame.
   const foldedColor = foldSoftBlobOpacity(blob.color, blob.opacity)
-  return (
-    <Animated.View
-      // The circular clip still needs a mask; rasterising keeps that cost to
-      // one bitmap, which the drift (a transform) does not invalidate.
-      shouldRasterizeIOS
-      style={[
-        {
-          position: "absolute",
-          width: blob.size,
-          height: blob.size,
-          borderRadius: blob.size / 2,
-          top: blob.top,
-          left: blob.left,
-          right: blob.right,
-          bottom: blob.bottom,
-          opacity: foldedColor === null ? blob.opacity : 1,
-          overflow: "hidden"
-        },
-        driftStyle
-      ]}
-    >
-      <LinearGradient
-        colors={[foldedColor ?? blob.color, "transparent"]}
-        start={{ x: 0.2, y: 0.2 }}
-        end={{ x: 0.8, y: 0.8 }}
-        style={StyleSheet.absoluteFill}
-      />
-    </Animated.View>
+  const blobStyle: ViewStyle = {
+    position: "absolute",
+    width: blob.size,
+    height: blob.size,
+    borderRadius: blob.size / 2,
+    top: blob.top,
+    left: blob.left,
+    right: blob.right,
+    bottom: blob.bottom,
+    opacity: foldedColor === null ? blob.opacity : 1,
+    overflow: "hidden"
+  }
+  const artwork = <LinearGradient
+    colors={[foldedColor ?? blob.color, "transparent"]}
+    start={{ x: 0.2, y: 0.2 }}
+    end={{ x: 0.8, y: 0.8 }}
+    style={StyleSheet.absoluteFill}
+  />
+  // The circular clip still needs a mask; rasterising keeps that cost to
+  // one bitmap, which the drift (a transform) does not invalidate.
+  return driftStyle === undefined ? (
+    <View shouldRasterizeIOS style={blobStyle}>{artwork}</View>
+  ) : (
+    <Animated.View shouldRasterizeIOS style={[blobStyle, driftStyle]}>{artwork}</Animated.View>
   )
 }
 
 export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
+  // A static screen installs no shared values, animated styles or visibility
+  // listeners. Keep the hooks in a separate component so this prop can change.
+  return props.animated === false
+    ? <SoftBlobSurface {...props} />
+    : <AnimatedSoftBlobBackground {...props} />
+}
+
+function AnimatedSoftBlobBackground(props: SoftBlobBackgroundProps) {
   const { variant = "lobby", style, animated = true } = props
-  const config = blobConfig[variant]
   const pulse = useSharedValue(0)
   const reduceMotion = useReducedMotion()
   const { screenFocused, appActive } = useAmbientMotionVisible()
@@ -193,6 +206,16 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
     const half = { duration: 8000, easing: Easing.inOut(Easing.ease), reduceMotion: ReduceMotion.Never }
     pulse.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), -1)
   }, [motionEnabled, pulse])
+
+  return <SoftBlobSurface variant={variant} style={style} pulse={pulse} motionEnabled={motionEnabled} />
+}
+
+function SoftBlobSurface(props: SoftBlobBackgroundProps & {
+  pulse?: SharedValue<number>
+  motionEnabled?: boolean
+}) {
+  const { variant = "lobby", style, pulse, motionEnabled = false } = props
+  const config = blobConfig[variant]
 
   if (variant === "register") {
     return (
@@ -248,7 +271,9 @@ export function SoftBlobBackground(props: SoftBlobBackgroundProps) {
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {config.blobs.map((blob, index) => (
+      {config.blobs.map((blob, index) => pulse === undefined ? (
+        <SoftBlobArtwork key={index} blob={blob} />
+      ) : (
         <SoftBlob key={index} blob={blob} index={index} pulse={pulse} motionEnabled={motionEnabled} />
       ))}
     </View>
