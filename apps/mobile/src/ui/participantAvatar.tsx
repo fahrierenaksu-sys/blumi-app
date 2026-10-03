@@ -1,9 +1,10 @@
 import type { AvatarSelection } from "@blumi/contracts"
-import { useMemo } from "react"
+import { memo } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { getCanonicalChatParticipantAvatar } from "../features/chat/chatParticipantAvatar"
-import { resolveAvatarPortraitRenderLayers } from "../features/avatarV2/room/avatarPortraitLayers"
-import { RoomAvatarRenderer2D } from "../features/avatarV2/room/components/RoomAvatarRenderer2D"
+import { getCachedAvatarPortraitLayers } from "../features/avatarV2/room/avatarPortraitLayerCache"
+import { RoomAvatarStill } from "../features/avatarV2/room/components/RoomAvatarStill"
+import type { RoomV2AvatarRenderLayer } from "../features/roomV2/roomV2.types"
 import { Avatar, pickAvatarSwatch } from "./avatar"
 
 interface ParticipantAvatarProps {
@@ -26,9 +27,11 @@ export function ParticipantAvatar(props: ParticipantAvatarProps) {
     return <Avatar name={name} seed={seed} size={size} ring={ring} style={style} />
   }
 
+  // The layers come from a cache keyed by the loadout's content, so a row that
+  // gets a fresh (equal) avatar object keeps the same layers and does not redraw.
   return (
     <CanonicalParticipantAvatar
-      avatar={completeAvatar}
+      layers={getCachedAvatarPortraitLayers(completeAvatar.loadout)}
       seed={seed}
       size={size}
       ring={ring}
@@ -37,15 +40,14 @@ export function ParticipantAvatar(props: ParticipantAvatarProps) {
   )
 }
 
-function CanonicalParticipantAvatar(props: {
-  avatar: NonNullable<ReturnType<typeof getCanonicalChatParticipantAvatar>>
+const CanonicalParticipantAvatar = memo(function CanonicalParticipantAvatar(props: {
+  layers: RoomV2AvatarRenderLayer[]
   seed: string
   size: number
   ring: "none" | "soft" | "strong"
   style?: StyleProp<ViewStyle>
 }) {
-  const { avatar, seed, size, ring, style } = props
-  const layers = useMemo(() => resolveAvatarPortraitRenderLayers(avatar.loadout), [avatar])
+  const { layers, seed, size, ring, style } = props
   const swatch = pickAvatarSwatch(seed)
   const ringWidth = ring === "strong" ? 3 : ring === "soft" ? 1.5 : 0
   const ringColor = ring === "strong" ? "#FFFFFF" : "rgba(255,255,255,0.7)"
@@ -81,7 +83,7 @@ function CanonicalParticipantAvatar(props: {
           }
         ]}
       >
-        <RoomAvatarRenderer2D layers={layers} />
+        <RoomAvatarStill layers={layers} />
       </View>
       <View
         pointerEvents="none"
@@ -98,7 +100,7 @@ function CanonicalParticipantAvatar(props: {
       />
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   root: {

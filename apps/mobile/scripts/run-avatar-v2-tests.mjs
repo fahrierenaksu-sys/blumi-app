@@ -133,6 +133,7 @@ try {
       resolve(workspaceRoot, "src/features/shop/shopListingModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/components/RoomAvatarRenderer2D.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/room/components/RoomAvatarStill.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarBodyMotionModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarTapTargetModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomFurnitureTapTargetModel.test.ts"),

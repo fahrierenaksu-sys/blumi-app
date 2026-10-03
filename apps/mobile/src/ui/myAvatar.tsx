@@ -3,7 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { ROOM_AVATAR_CATALOG } from "../features/avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../features/avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../features/avatarV2/room/avatarRoomSelectors"
-import { RoomAvatarRenderer2D } from "../features/avatarV2/room/components/RoomAvatarRenderer2D"
+import { RoomAvatarStill } from "../features/avatarV2/room/components/RoomAvatarStill"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { uiTheme } from "./theme"
 
@@ -70,7 +70,7 @@ export function MyAvatar(props: MyAvatarProps) {
           }
         ]}
       >
-        <RoomAvatarRenderer2D layers={roomAvatarLayers} />
+        <RoomAvatarStill layers={roomAvatarLayers} />
       </View>
     </View>
   )

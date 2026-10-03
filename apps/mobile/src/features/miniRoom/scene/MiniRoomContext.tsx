@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import type { MiniRoomParticipantAvatarSnapshots } from "./miniRoomSceneTypes"
-import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
+import { RoomAvatarStill } from "../../avatarV2/room/components/RoomAvatarStill"
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated"
 import { resolveMiniRoomContentOpacity } from "./miniRoomTransitionModel"
 
@@ -22,7 +22,7 @@ export function MiniRoomContext({ copy, top, partnerName, snapshots, contentProg
       <View accessible={false} style={styles.pair}>
         {[snapshots.local, snapshots.partner].map((snapshot, index) => (
           <View key={snapshot.role} style={[styles.avatar, index === 1 ? styles.partner : null]}>
-            {snapshot.appearance.roomAvatarLayers ? <RoomAvatarRenderer2D layers={snapshot.appearance.roomAvatarLayers} />
+            {snapshot.appearance.roomAvatarLayers ? <RoomAvatarStill layers={snapshot.appearance.roomAvatarLayers} />
               : snapshot.appearance.fullBodyAsset ? <Image source={snapshot.appearance.fullBodyAsset} resizeMode="contain" style={StyleSheet.absoluteFill} /> : null}
           </View>
         ))}
