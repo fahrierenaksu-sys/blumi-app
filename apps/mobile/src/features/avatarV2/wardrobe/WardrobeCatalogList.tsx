@@ -30,6 +30,8 @@ import {
 import {
   WARDROBE_GRID_GAP,
   WARDROBE_GRID_ROW_GAP,
+  WARDROBE_PANEL_MARGIN,
+  WARDROBE_PANEL_PADDING,
   wardrobeV2Styles as styles
 } from "./wardrobeV2Styles"
 
@@ -61,8 +63,13 @@ type WardrobeCatalogListProps = {
 
 export function WardrobeCatalogList(props: WardrobeCatalogListProps) {
   const { activeCategory, cardsByCategory, cards, catalogStyle, switching } = props
-  const [listWidth, setListWidth] = useState(0)
-  const { fontScale } = useWindowDimensions()
+  const { fontScale, width: windowWidth } = useWindowDimensions()
+  // The panel's side space is fixed, so the first frame already has the final
+  // width (no empty first frame, no cards mounting mid-push). onLayout then
+  // corrects it for insets or a split window.
+  const [listWidth, setListWidth] = useState(() =>
+    Math.max(0, Math.floor(windowWidth - 2 * (WARDROBE_PANEL_MARGIN + WARDROBE_PANEL_PADDING)))
+  )
   const itemWidth = getWardrobeGridItemWidth(listWidth, WARDROBE_GRID_GAP)
   const pageHeight = getWardrobeGridPageHeight(getWardrobeCardHeight(itemWidth, fontScale), WARDROBE_GRID_ROW_GAP)
   // The screen builds cards only for the shown and the recently visited
@@ -75,7 +82,10 @@ export function WardrobeCatalogList(props: WardrobeCatalogListProps) {
     <Reanimated.View
       pointerEvents={switching ? "none" : "auto"}
       style={[styles.catalogArea, catalogStyle]}
-      onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
+      onLayout={(event) => {
+        const measured = event.nativeEvent.layout.width
+        setListWidth((current) => (Math.abs(current - measured) < 1 ? current : measured))
+      }}
     >
       <View style={{ height: pageHeight }}>
         {categories.map((category) => (
@@ -202,8 +212,8 @@ const WardrobeCategoryShelf = memo(function WardrobeCategoryShelf(props: Omit<Wa
             keyExtractor={(page) => page[0].item.id}
             getItemLayout={(_, index) => ({ length: listWidth, offset: listWidth * index, index })}
             initialNumToRender={2}
-            maxToRenderPerBatch={1}
-            windowSize={3}
+            maxToRenderPerBatch={2}
+            windowSize={5}
             showsHorizontalScrollIndicator={false}
             scrollEnabled={active && pages.length > 1}
             onScroll={handleScroll}

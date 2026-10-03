@@ -1,12 +1,16 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
-import { memo } from "react"
+import { memo, useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Reanimated, { FadeIn, ZoomIn } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useReducedMotion } from "../../../ui/animations"
-import { SwipeDismissSheet, SwipeDismissSheetScrollView } from "../../../ui/SwipeDismissSheet"
+import {
+  SwipeDismissSheet,
+  SwipeDismissSheetScrollView,
+  useSwipeDismissSheetClose
+} from "../../../ui/SwipeDismissSheet"
 import { uiTheme } from "../../../ui/theme"
 import type { AppLocale } from "../../session/appLocale"
 import { getShopProductThumbnailSource } from "../shopAssets"
@@ -46,24 +50,53 @@ export function ShopCheckoutSheet(props: {
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   const dismissible = isShopCheckoutDismissible(checkout)
+  // The sheet presents and leaves itself (presentation "self" with a Modal
+  // that does not animate), so the dim backdrop fades instead of sliding up.
+  // `shown` keeps the last checkout while the sheet is leaving: every way the
+  // checkout ends (close button, Done, the applied timer) first plays the
+  // sheet's own exit, then the Modal closes.
+  const [view, setView] = useState(() => ({
+    session: 1,
+    shown: checkout,
+    open: checkout !== null,
+    live: checkout !== null
+  }))
+  if (checkout !== null && !view.live) {
+    setView({ session: view.session + 1, shown: checkout, open: true, live: true })
+  } else if (checkout !== null && view.shown !== checkout) {
+    setView({ ...view, shown: checkout })
+  } else if (checkout === null && view.live) {
+    setView({ ...view, live: false })
+  }
+  const content = checkout ?? view.shown
+  const closing = checkout === null
+  const { session, live } = view
+  const handleDismiss = useCallback(() => {
+    // A leaving sheet that was already replaced by a new checkout is stale.
+    setView((current) => (current.session === session ? { ...current, open: false } : current))
+    if (live) onClose()
+  }, [live, onClose, session])
   return (
-    <Modal visible={checkout !== null} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={view.open} transparent animationType="none" onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.overlay}>
-        {checkout ? (
+        {content ? (
           <SwipeDismissSheet
-            onDismiss={onClose}
-            enabled={dismissible}
+            key={session}
+            presentation="self"
+            onDismiss={handleDismiss}
+            enabled={dismissible || closing}
             backdrop={{
               style: styles.backdrop,
-              onPress: dismissible ? onClose : undefined,
+              onPress: dismissible ? handleDismiss : undefined,
               accessibilityLabel: copy.checkout.closeAccessibility
             }}
             accessibilityViewIsModal
             testID="shop-checkout-sheet"
             style={[styles.sheet, { maxHeight: height * 0.86, paddingBottom: Math.max(insets.bottom, 16) }]}
           >
+            <LeaveWhenEnded ended={closing} />
             <CheckoutContent
-              checkout={checkout}
+              checkout={content}
               balance={balance}
               canPerformActions={canPerformActions}
               copy={copy}
@@ -78,6 +111,16 @@ export function ShopCheckoutSheet(props: {
       </GestureHandlerRootView>
     </Modal>
   )
+}
+
+/** Plays the sheet's own exit once the checkout it shows has ended. */
+function LeaveWhenEnded(props: { ended: boolean }) {
+  const close = useSwipeDismissSheetClose()
+  const { ended } = props
+  useEffect(() => {
+    if (ended) close?.()
+  }, [close, ended])
+  return null
 }
 
 function CheckoutContent(props: {

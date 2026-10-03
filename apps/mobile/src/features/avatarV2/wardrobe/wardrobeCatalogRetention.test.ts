@@ -102,7 +102,9 @@ function createShelfHarness(shelfOnly = false) {
       "./WardrobeCatalogCard": { WardrobeCatalogCard: "Card" },
       "./WardrobeCatalogEmpty": { WardrobeCatalogEmpty: "Empty" },
       "./wardrobeStageLayout": layout,
-      "./wardrobeV2Styles": { WARDROBE_GRID_GAP: 8, WARDROBE_GRID_ROW_GAP: 8, wardrobeV2Styles: {} }
+      "./wardrobeV2Styles": {
+        WARDROBE_GRID_GAP: 8, WARDROBE_GRID_ROW_GAP: 8, WARDROBE_PANEL_MARGIN: 12, WARDROBE_PANEL_PADDING: 14, wardrobeV2Styles: {}
+      }
     }
   })
   const cards = Array.from({ length: 9 }, (_, index) => ({ item: { id: `choice-${index}` }, locked: false }))
@@ -144,6 +146,20 @@ test("category return retains shelf identity and data while fresh entitlement mo
   harness.replaceCards(refreshed)
   assert.equal(harness.shelves()[0].props.cards, refreshed)
   assert.equal(harness.shelves()[0].props.cards[0].locked, true)
+  harness.runtime.unmount()
+})
+
+test("the first frame already has the final list width and a measured layout only corrects it", () => {
+  const harness = createShelfHarness()
+  // Window 390 minus the panel's fixed side space (2 * (12 + 14)).
+  assert.equal(harness.shelves()[0].props.listWidth, 338)
+  const root: any = harness.runtime.output
+  root.props.onLayout({ nativeEvent: { layout: { width: 338.4 } } })
+  harness.runtime.rerender()
+  assert.equal(harness.shelves()[0].props.listWidth, 338)
+  root.props.onLayout({ nativeEvent: { layout: { width: 320 } } })
+  harness.runtime.rerender()
+  assert.equal(harness.shelves()[0].props.listWidth, 320)
   harness.runtime.unmount()
 })
 

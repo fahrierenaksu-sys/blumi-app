@@ -125,9 +125,13 @@ export function DiscoverAgeRangeSlider(props: DiscoverAgeRangeSliderProps) {
       dragging.value = 0
     }), [dragStart, dragging, emitMax, maxAge, maxOffset, minAge, width])
 
+  // The fill keeps the full track width as layout and is moved and stretched
+  // with transforms only (the thumbs cover both round ends of the bar).
   const fillStyle = useAnimatedStyle(() => ({
-    left: minOffset.value,
-    width: Math.max(0, maxOffset.value - minOffset.value)
+    transform: [
+      { translateX: minOffset.value },
+      { scaleX: width.value > 0 ? Math.max(0, maxOffset.value - minOffset.value) / width.value : 0 }
+    ]
   }))
   // When both thumbs meet, the one that can still move away from its edge is
   // on top, so a range pinned at either end can always be opened again.
@@ -154,7 +158,7 @@ export function DiscoverAgeRangeSlider(props: DiscoverAgeRangeSliderProps) {
     <View style={styles.container}>
       <View style={styles.track} onLayout={handleTrackLayout}>
         <View style={styles.trackRail} pointerEvents="none" />
-        <Reanimated.View style={[styles.trackFill, fillStyle]} pointerEvents="none" />
+        <Reanimated.View style={[styles.trackFill, { width: trackWidth }, fillStyle]} pointerEvents="none" />
         <GestureDetector gesture={minGesture}>
           <Reanimated.View
             style={[styles.thumbTarget, minThumbStyle]}
@@ -202,8 +206,10 @@ const styles = StyleSheet.create({
   },
   trackFill: {
     position: "absolute",
+    left: 0,
     top: (THUMB_TARGET - TRACK_HEIGHT) / 2,
     height: TRACK_HEIGHT,
+    transformOrigin: "0% 50%",
     borderRadius: TRACK_HEIGHT / 2,
     backgroundColor: uiTheme.colors.primary,
   },

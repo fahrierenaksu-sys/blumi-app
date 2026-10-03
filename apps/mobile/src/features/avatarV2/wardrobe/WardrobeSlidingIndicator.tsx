@@ -23,22 +23,21 @@ export function WardrobeSlidingIndicator(props: {
   const motion = useMotion()
   const { reduceMotion } = motion
   const x = useSharedValue(frame.x)
-  const width = useSharedValue(frame.width)
   const placedRef = useRef(false)
   useEffect(() => {
-    width.value = frame.width
     if (!placedRef.current || reduceMotion) {
       placedRef.current = true
       x.value = frame.x
       return
     }
     x.value = animateTo(frame.x, motion.snappy)
-  }, [frame.width, frame.x, motion, reduceMotion, width, x])
+  }, [frame.x, motion, reduceMotion, x])
+  // Only translateX animates. The width is plain layout (it changes when the
+  // row is measured or resized, never during a slide).
   const animatedStyle = useAnimatedStyle(() => ({
-    width: width.value,
     transform: [{ translateX: x.value }]
   }))
-  return <Animated.View pointerEvents="none" style={[props.style, animatedStyle]} />
+  return <Animated.View pointerEvents="none" style={[props.style, { width: frame.width }, animatedStyle]} />
 }
 
 /**

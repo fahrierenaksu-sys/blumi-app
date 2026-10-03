@@ -280,8 +280,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
             onContentSizeChange={handleShelfContentSizeChange}
             initialNumToRender={2}
             maxToRenderPerBatch={2}
-            windowSize={3}
-            removeClippedSubviews
+            windowSize={5}
             showsHorizontalScrollIndicator={false}
             style={[styles.closetProductScroller, { width: productShelfWidth, height: catalog.productCardHeight * 2 + 8 }]}
             contentContainerStyle={styles.closetProductShelf}

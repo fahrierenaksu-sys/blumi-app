@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { type FlatList, Text, View } from "react-native"
+import { type FlatList, StyleSheet, Text, View } from "react-native"
 import type { PanGesture } from "react-native-gesture-handler"
 import Reanimated, {
   interpolateColor,
@@ -35,18 +35,55 @@ const keyExtractor = (column: TrayColumn): string => column[0].item.id
 
 const PAGE_DOT_SIZE = 6
 const PAGE_DOT_ACTIVE_WIDTH = 16
+const PAGE_DOT_GROWTH = PAGE_DOT_ACTIVE_WIDTH - PAGE_DOT_SIZE
 
-/** One tray page dot that follows the live swipe on the UI thread. */
-function TrayPageDot(props: { index: number; position: SharedValue<number> }) {
-  const { index, position } = props
-  const dotStyle = useAnimatedStyle(() => {
-    const presence = getRoomEditorDockPageDotPresence(position.value, index)
-    return {
-      width: PAGE_DOT_SIZE + (PAGE_DOT_ACTIVE_WIDTH - PAGE_DOT_SIZE) * presence,
-      backgroundColor: interpolateColor(presence, [0, 1], [roomEditorTheme.hairline, roomEditorTheme.accent])
+const dotStyles = StyleSheet.create({
+  slot: { width: PAGE_DOT_SIZE, height: PAGE_DOT_SIZE },
+  lastSlot: { width: PAGE_DOT_ACTIVE_WIDTH, height: PAGE_DOT_SIZE },
+  cap: { position: "absolute", left: 0, top: 0, width: PAGE_DOT_SIZE, height: PAGE_DOT_SIZE, borderRadius: PAGE_DOT_SIZE / 2 },
+  // One pixel wide; scaled sideways it joins the two round caps into the pill.
+  middle: { position: "absolute", left: PAGE_DOT_SIZE / 2, top: 0, width: 1, height: PAGE_DOT_SIZE, transformOrigin: "0% 50%" }
+})
+
+function colorFor(presence: number): string {
+  "worklet"
+  return interpolateColor(presence, [0, 1], [roomEditorTheme.hairline, roomEditorTheme.accent])
+}
+
+/**
+ * One tray page dot that follows the live swipe on the UI thread. Every dot
+ * keeps a fixed layout slot: the active pill is two round caps joined by a
+ * scaled bar, and the dots after it slide over by the width it has gained, so
+ * nothing re-lays out per frame and the pill keeps its round ends. The last
+ * slot reserves the pill's extra width so the row never changes size.
+ */
+function TrayPageDot(props: { index: number; isLast: boolean; position: SharedValue<number> }) {
+  const { index, isLast, position } = props
+  const slotStyle = useAnimatedStyle(() => {
+    let gained = 0
+    for (let before = 0; before < index; before += 1) {
+      gained += PAGE_DOT_GROWTH * getRoomEditorDockPageDotPresence(position.value, before)
     }
+    return { transform: [{ translateX: gained }] }
   })
-  return <Reanimated.View style={[styles.inventoryPageDot, dotStyle]} />
+  const leftCapStyle = useAnimatedStyle(() => ({
+    backgroundColor: colorFor(getRoomEditorDockPageDotPresence(position.value, index))
+  }))
+  const rightCapStyle = useAnimatedStyle(() => {
+    const presence = getRoomEditorDockPageDotPresence(position.value, index)
+    return { backgroundColor: colorFor(presence), transform: [{ translateX: PAGE_DOT_GROWTH * presence }] }
+  })
+  const middleStyle = useAnimatedStyle(() => {
+    const presence = getRoomEditorDockPageDotPresence(position.value, index)
+    return { backgroundColor: colorFor(presence), transform: [{ scaleX: PAGE_DOT_GROWTH * presence }] }
+  })
+  return (
+    <Reanimated.View style={[isLast ? dotStyles.lastSlot : dotStyles.slot, slotStyle]}>
+      <Reanimated.View style={[dotStyles.cap, leftCapStyle]} />
+      <Reanimated.View style={[dotStyles.cap, rightCapStyle]} />
+      <Reanimated.View style={[dotStyles.middle, middleStyle]} />
+    </Reanimated.View>
+  )
 }
 
 /**
@@ -250,7 +287,7 @@ export function RoomEditorInventoryList(props: {
           >
             {hasPages
               ? Array.from({ length: pageCount }, (_, index) => (
-                <TrayPageDot key={index} index={index} position={pagePosition} />
+                <TrayPageDot key={index} index={index} isLast={index === pageCount - 1} position={pagePosition} />
               ))
               : null}
           </View>
