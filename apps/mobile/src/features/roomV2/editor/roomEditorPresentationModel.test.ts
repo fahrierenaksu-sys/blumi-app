@@ -4,6 +4,7 @@ import { getMyRoomEditorCopy } from "../myRoomCopy"
 import {
   filterRoomEditorInventoryEntries,
   getEditRoomWorldStatus,
+  getRoomEditorDisplayRenderItems,
   getRoomEditorInventoryStatusLabel,
   getRoomEditorPlacementStateByRenderId,
   getSelectedPlacedRotationOptions,
@@ -25,6 +26,27 @@ const entries = [
   entry("lamp", "Moon Lamp", "lighting", false),
   entry("sofa", "Cloud Sofa", "seating")
 ]
+
+test("a dragged piece is drawn once by its overlay, and reappears at its committed position", () => {
+  const table = createTestRenderItem({ renderId: "table", x: 0.3 })
+  const chair = createTestRenderItem({ renderId: "chair", x: 0.7 })
+  const moved = { ...table, x: 0.6 }
+  const preview = { item: moved, isValid: true }
+  assert.deepEqual(getRoomEditorDisplayRenderItems([table, chair], preview, "table"), [chair])
+  assert.deepEqual(getRoomEditorDisplayRenderItems([moved, chair], undefined, "table"), [chair])
+  assert.deepEqual(getRoomEditorDisplayRenderItems([moved, chair], undefined, undefined), [moved, chair])
+  assert.equal(table.x, 0.3, "presentation never moves the saved piece")
+})
+
+test("tray drags hide only their own preview; cancellation restores an existing piece", () => {
+  const chair = createTestRenderItem({ renderId: "chair" })
+  const table = createTestRenderItem({ renderId: "table" })
+  assert.deepEqual(getRoomEditorDisplayRenderItems([chair], { item: table, isValid: false }, "table"), [chair])
+  assert.deepEqual(getRoomEditorDisplayRenderItems([chair], undefined, undefined), [chair])
+  const tapped = getRoomEditorDisplayRenderItems([chair], { item: { ...chair, x: 0.8 }, isValid: true }, undefined)
+  assert.equal(tapped.length, 1)
+  assert.equal(tapped[0].x, 0.8, "tap previews still draw without a drag overlay")
+})
 
 test("room world status maps readiness to icon and localized label", () => {
   const ready = getEditRoomWorldStatus("ready", en)

@@ -62,8 +62,9 @@ import { useShopProductFocus } from "../features/shop/screen/useShopProductFocus
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
 import { useShopCheckoutFlight, useShopPurchaseFlight } from "../features/shop/screen/useShopPurchaseFlight"
 import { useShopScrollToTop } from "../features/shop/screen/useShopScrollToTop"
+import { useRetainedShopShelves, useShopCategorySelection, useShopModeSelection, useShopShelfActions } from "../features/shop/screen/shopRetainedShelfModel"
 import type { RootStackParamList } from "../navigation/RootNavigator"
-import { hapticSelection, hapticSuccess } from "../ui/haptics"
+import { hapticSuccess } from "../ui/haptics"
 import { useNetworkStatus } from "../features/network/networkStore"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { ActionButtonCircle } from "../ui/primitives"
@@ -197,9 +198,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     avatarProducts,
     roomProducts,
     activeProducts,
-    categoryOptions,
     activeCategoryId,
-    filteredProducts
+    filteredProducts,
+    catalogsByMode
   } = useShopCatalogProducts({
     enforcePublishedCatalog: shopCatalogRuntime.enforcePublishedCatalog,
     inventory: inventoryStore.inventory,
@@ -212,6 +213,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     selectedCategoryId,
     locale
   })
+  const retainedShelves = useRetainedShopShelves(shopMode, activeCategoryId)
   const shopPresentationState = getShopPresentationState({
     isProduction: requiresServerInventory,
     isConnected,
@@ -293,18 +295,15 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     selectProduct: handleSelectProduct
   })
 
-  const handleSelectMode = useCallback((nextMode: ShopMode): void => {
-    hapticSelection()
-    publishSelectedShopPreviewWarmup([])
-    setShopMode(nextMode)
-    setSelectedCategoryId(getDefaultShopCategoryId(nextMode))
-    setSelectedId("")
-  }, [])
+  const handleSelectMode = useShopModeSelection({
+    mode: shopMode,
+    shelves: retainedShelves,
+    setMode: setShopMode,
+    setCategory: setSelectedCategoryId,
+    setSelectedId
+  })
 
-  const handleSelectCategory = useCallback((categoryId: string): void => {
-    hapticSelection()
-    setSelectedCategoryId(categoryId)
-  }, [])
+  const handleSelectCategory = useShopCategorySelection(activeCategoryId, setSelectedCategoryId)
 
   const handleRetryShop = useCallback((): void => {
     if (!requiresServerInventory) return
@@ -355,7 +354,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     removableCombinationIds,
     removeCombinationItem
   } = useShopCardRemoval({
-    products: filteredProducts,
+    products: avatarProducts,
     avatarProducts,
     combinationItemIds,
     previewAvatar,
@@ -369,6 +368,11 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     ownedAvatarItemIds,
     equipAndSaveItem: avatarV2.equipAndSaveItem,
     copy
+  })
+  const shelfActions = useShopShelfActions({
+    selectCategory: handleSelectCategory,
+    selectProduct: handleSelectProduct,
+    removeProduct: onRemoveProduct
   })
 
   return (
@@ -536,23 +540,33 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                 />
               ) : null}
 
-              <ClosetBrowser
-                categories={categoryOptions}
-                activeCategoryId={activeCategoryId}
-                products={filteredProducts}
-                inventoryVerified={inventoryVerified}
-                pendingInventoryLabel={inventoryGateLabel}
-                selectedId={selectedProduct?.id}
-                mode={shopMode}
-                locale={locale}
-                layoutMetrics={shopLayoutMetrics}
-                onSelectCategory={handleSelectCategory}
-                onSelectProduct={handleSelectProduct}
-                revealRequest={shelfRevealRequest}
-                removeActionById={removeActionById}
-                onRemoveProduct={onRemoveProduct}
-                registerThumbnail={purchaseFlight.registerThumbnail}
-              />
+              <View>
+                {retainedShelves.map((shelf) => {
+                  const catalog = catalogsByMode[shelf.mode]
+                  const products = catalog.productsByCategory.get(shelf.categoryId)
+                  if (!products) return null
+                  const active = shelf.mode === shopMode && shelf.categoryId === activeCategoryId
+                  return <ClosetBrowser
+                    key={shelf.scope}
+                    active={active}
+                    categories={catalog.categories}
+                    activeCategoryId={shelf.categoryId}
+                    products={products}
+                    inventoryVerified={inventoryVerified}
+                    pendingInventoryLabel={inventoryGateLabel}
+                    selectedId={active ? selectedProduct?.id : undefined}
+                    mode={shelf.mode}
+                    locale={locale}
+                    layoutMetrics={shopLayoutMetrics}
+                    onSelectCategory={shelfActions.selectCategory}
+                    onSelectProduct={shelfActions.selectProduct}
+                    revealRequest={active ? shelfRevealRequest : undefined}
+                    removeActionById={removeActionById}
+                    onRemoveProduct={shelfActions.removeProduct}
+                    registerThumbnail={purchaseFlight.registerThumbnail}
+                  />
+                })}
+              </View>
             </Reanimated.View>
           ) : showSkeleton ? (
             <ShopShelfSkeleton layoutMetrics={shopLayoutMetrics} locale={locale} />

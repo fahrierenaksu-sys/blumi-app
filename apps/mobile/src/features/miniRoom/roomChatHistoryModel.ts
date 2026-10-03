@@ -5,6 +5,8 @@ export type RoomChatDelivery = "sent" | "sending" | "failed"
 
 export interface RoomChatHistoryItem {
   id: string
+  /** Presentation identity survives a local message's server acknowledgement. */
+  renderKey?: string
   body: string
   mine: boolean
   delivery: RoomChatDelivery
@@ -30,6 +32,8 @@ export function selectRoomChatHistory(input: {
   messages: readonly ChatMessage[]
   localUserId: string
   deliveryOf: (messageId: string) => RoomChatDelivery
+  renderKeyOf?: (messageId: string) => string
+  previousItems?: RoomChatHistoryItem[]
 }): RoomChatHistoryItem[] {
   const newestFirst: Omit<RoomChatHistoryItem, "showMeta">[] = []
   for (let index = input.messages.length - 1; index >= 0 && newestFirst.length < ROOM_CHAT_HISTORY_LIMIT; index -= 1) {
@@ -37,19 +41,34 @@ export function selectRoomChatHistory(input: {
     if (!message || isRoomInviteSentinel(message.body) || message.body.trim().length === 0) continue
     newestFirst.push({
       id: message.messageId,
+      renderKey: input.renderKeyOf?.(message.messageId) ?? message.messageId,
       body: message.body,
       mine: message.senderUserId === input.localUserId,
       sentAt: message.sentAt,
       delivery: input.deliveryOf(message.messageId)
     })
   }
-  return newestFirst.map((item, index) => {
+  const previousByKey = new Map(input.previousItems?.map((item) => [roomChatHistoryKeyOf(item), item]))
+  const items = newestFirst.map((item, index) => {
     const newer = newestFirst[index - 1]
-    return {
+    const next = {
       ...item,
       showMeta: item.delivery !== "sent" || !newer || newer.mine !== item.mine
     }
+    const previous = previousByKey.get(roomChatHistoryKeyOf(next))
+    return previous && previous.id === next.id && previous.body === next.body && previous.mine === next.mine
+      && previous.sentAt === next.sentAt && previous.delivery === next.delivery && previous.showMeta === next.showMeta
+      ? previous
+      : next
   })
+  return input.previousItems?.length === items.length && items.every((item, index) => item === input.previousItems?.[index])
+    ? input.previousItems
+    : items
+}
+
+/** Legacy presentation fixtures keep their id until they carry a render key. */
+export function roomChatHistoryKeyOf(item: RoomChatHistoryItem): string {
+  return item.renderKey ?? item.id
 }
 
 /** Device-local clock time; invalid or absent source times never become invented timestamps. */

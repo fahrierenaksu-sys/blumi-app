@@ -7,7 +7,7 @@ import type { UserAvatar } from "../../avatarV2/avatarV2.types"
 import type { BlumiInventorySnapshot } from "../../inventory/inventoryStore"
 import type { FurnitureItem, UserRoomDecor } from "../../roomV2/roomV2.types"
 import type { AppLocale } from "../../session/appLocale"
-import { buildAvatarShopItems, buildRoomShopItems } from "../shopCatalog"
+import { buildAvatarShopItems, buildRoomShopItems, type ShopCatalogItem } from "../shopCatalog"
 import type { ShopMode } from "../ShopNavigationControls"
 import {
   isDisplayableAvatarShopProduct,
@@ -116,24 +116,28 @@ export function useShopCatalogProducts(input: {
     () => sortRoomShopProducts(roomShopItems),
     [roomShopItems]
   )
-  const activeProducts = useMemo(() => {
-    if (shopMode === "avatar") return avatarProducts
-    return roomProducts
-  }, [avatarProducts, roomProducts, shopMode])
-  const categoryOptions = useMemo(
-    () => buildShopCategoryOptions(shopMode, activeProducts, locale),
-    [activeProducts, locale, shopMode]
+  const avatarCatalog = useMemo(
+    () => buildShopShelves("avatar", avatarProducts, locale),
+    [avatarProducts, locale]
   )
+  const homeCatalog = useMemo(
+    () => buildShopShelves("home", roomProducts, locale),
+    [roomProducts, locale]
+  )
+  const catalogsByMode = useMemo(
+    () => ({ avatar: avatarCatalog, home: homeCatalog }),
+    [avatarCatalog, homeCatalog]
+  )
+  const activeProducts = shopMode === "avatar" ? avatarProducts : roomProducts
+  const activeCatalog = catalogsByMode[shopMode]
+  const categoryOptions = activeCatalog.categories
   const activeCategoryId = useMemo(() => {
     if (categoryOptions.some((category) => category.id === selectedCategoryId)) {
       return selectedCategoryId
     }
     return categoryOptions[0]?.id ?? getDefaultShopCategoryId(shopMode)
   }, [categoryOptions, selectedCategoryId, shopMode])
-  const filteredProducts = useMemo(
-    () => filterProductsByCategory(activeProducts, shopMode, activeCategoryId),
-    [activeCategoryId, activeProducts, shopMode]
-  )
+  const filteredProducts = activeCatalog.productsByCategory.get(activeCategoryId) ?? EMPTY_PRODUCTS
 
   return {
     avatarProducts,
@@ -141,6 +145,18 @@ export function useShopCatalogProducts(input: {
     activeProducts,
     categoryOptions,
     activeCategoryId,
-    filteredProducts
+    filteredProducts,
+    catalogsByMode
   }
+}
+
+const EMPTY_PRODUCTS: ShopCatalogItem[] = []
+
+function buildShopShelves(mode: ShopMode, products: ShopCatalogItem[], locale: AppLocale) {
+  const categories = buildShopCategoryOptions(mode, products, locale)
+  const productsByCategory = new Map(categories.map((category) => [
+    category.id,
+    filterProductsByCategory(products, mode, category.id)
+  ]))
+  return { categories, productsByCategory }
 }

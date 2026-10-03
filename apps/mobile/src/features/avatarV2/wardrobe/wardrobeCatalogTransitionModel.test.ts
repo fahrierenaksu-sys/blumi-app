@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { createClockedReanimatedStub } from "../../../testing/reanimatedClock"
 import * as transitionModel from "./wardrobeCatalogTransitionModel"
 import { resolveWardrobeCatalogFrame } from "./wardrobeCatalogTransitionModel"
 
@@ -121,4 +122,76 @@ test("a finished fade-out swaps to the requested category, then fades it in", ()
   assert.equal(motion.result().shownCategory, "top")
   assert.deepEqual(motion.result().cards, tops)
   assert.equal(motion.running()?.target, 1)
+})
+
+test("late UI-thread swaps cannot override a newer selection, including an A to B to A to B request", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
+  const runtime = createFakeReactRuntime()
+  const clock = createClockedReanimatedStub(runtime)
+  const callbacks: (() => void)[] = []
+  const { useWardrobeCatalogTransition } = loadSourceWithFakeReact<any>(
+    "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts", runtime, {
+      modules: {
+        "react-native-reanimated": clock.module,
+        "react-native-worklets": { scheduleOnRN: (callback: () => void) => callbacks.push(callback) },
+        "./wardrobeCatalogTransitionModel": transitionModel
+      }
+    }
+  )
+  let input = { activeCategory: "hair", cards: hair, reduceMotion: false }
+  runtime.render(() => useWardrobeCatalogTransition(input))
+  t.mock.timers.tick(160)
+  input = { ...input, activeCategory: "top", cards: tops }
+  runtime.rerender()
+  t.mock.timers.tick(90)
+  assert.equal(callbacks.length, 1)
+  const staleSwap = callbacks.shift()!
+  input = { ...input, activeCategory: "hair", cards: hair }
+  runtime.rerender()
+  input = { ...input, activeCategory: "top", cards: tops }
+  runtime.rerender()
+  staleSwap()
+  assert.equal((runtime.output as any).shownCategory, "hair")
+  t.mock.timers.tick(90)
+  callbacks.shift()!()
+  assert.equal((runtime.output as any).shownCategory, "top")
+  assert.deepEqual((runtime.output as any).cards, tops)
+  t.mock.timers.tick(160)
+  assert.equal((runtime.output as any).style.opacity, 1)
+  runtime.unmount()
+})
+
+test("Reduce Motion during a swap restores visible latest content and unmount rejects queued swaps", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] })
+  const runtime = createFakeReactRuntime()
+  const clock = createClockedReanimatedStub(runtime)
+  const callbacks: (() => void)[] = []
+  const { useWardrobeCatalogTransition } = loadSourceWithFakeReact<any>(
+    "features/avatarV2/wardrobe/useWardrobeCategoryMotion.ts", runtime, {
+      modules: {
+        "react-native-reanimated": clock.module,
+        "react-native-worklets": { scheduleOnRN: (callback: () => void) => callbacks.push(callback) },
+        "./wardrobeCatalogTransitionModel": transitionModel
+      }
+    }
+  )
+  let input = { activeCategory: "hair", cards: hair, reduceMotion: false }
+  runtime.render(() => useWardrobeCatalogTransition(input))
+  t.mock.timers.tick(160)
+  input = { ...input, activeCategory: "top", cards: tops }
+  runtime.rerender()
+  t.mock.timers.tick(90)
+  input = { ...input, activeCategory: "hair", cards: hair, reduceMotion: true }
+  runtime.rerender()
+  callbacks.shift()!()
+  assert.equal((runtime.output as any).shownCategory, "hair")
+  assert.equal((runtime.output as any).switching, false)
+  assert.equal((runtime.output as any).style.opacity, 1)
+  input = { ...input, activeCategory: "top", cards: tops, reduceMotion: false }
+  runtime.rerender()
+  t.mock.timers.tick(90)
+  runtime.unmount()
+  callbacks.shift()!()
+  t.mock.timers.tick(500)
+  assert.equal((runtime.output as any).shownCategory, "hair")
 })

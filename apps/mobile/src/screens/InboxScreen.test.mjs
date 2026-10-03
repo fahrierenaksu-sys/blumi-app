@@ -124,18 +124,35 @@ test("shared warm callback follows current session mode and provider", () => {
   const calls = []
   for (const mode of ["demo", "production"]) {
     const warm = evaluate(initializer("warmThread"), {
-      useCallback: (fn) => fn, sessionActor: { session: { mode } }, onWarmThread: (id) => calls.push(`${mode}:${id}`)
+      useCallback: (fn) => fn, sessionActor: { session: { mode } }, onWarmThread: async (id) => { calls.push(`${mode}:${id}`) }
     })
     warm("thread-a")
   }
   assert.deepEqual(calls, ["production:thread-a"])
 })
 
+test("an offline press-in prefetch failure is handled without blocking the row's navigation", async () => {
+  const calls = []
+  const context = {
+    useCallback: (fn) => fn,
+    sessionActor: { session: { mode: "production" } },
+    onWarmThread: async () => { throw new Error("Synthetic offline prefetch failure") },
+    navigation: { navigate: (route) => calls.push(route) }
+  }
+  const warm = evaluate(initializer("warmThread"), context)
+  const open = evaluate(initializer("openThread"), context)
+  warm("synthetic-thread")
+  open("synthetic-thread")
+  assert.deepEqual(calls, ["ChatThread"], "navigation starts immediately even though prefetch rejects")
+  // The test runner also fails on any unhandled rejection from that press-in.
+  await new Promise(resolve => setImmediate(resolve))
+})
+
 test("screen callbacks stay stable on unrelated updates but invalidate changed providers/session", () => {
   const hook = hooks()
   const calls = []
   const navigation = { navigate: (route, params) => calls.push(`${route}:${params.threadId}`) }
-  const provider = (id) => calls.push(`old:${id}`)
+  const provider = async (id) => { calls.push(`old:${id}`) }
   function render(onWarmThread, mode, nav = navigation) {
     hook.reset()
     const context = { ...hook, navigation: nav, onWarmThread, sessionActor: { session: { mode } } }
@@ -148,7 +165,7 @@ test("screen callbacks stay stable on unrelated updates but invalidate changed p
   const unchanged = render(provider, "production")
   assert.equal(first.open, unchanged.open)
   assert.equal(first.warm, unchanged.warm)
-  const changed = render((id) => calls.push(`new:${id}`), "production")
+  const changed = render(async (id) => { calls.push(`new:${id}`) }, "production")
   assert.notEqual(first.warm, changed.warm)
   changed.warm("thread-a"); changed.open("thread-a")
   const demo = render(provider, "demo")

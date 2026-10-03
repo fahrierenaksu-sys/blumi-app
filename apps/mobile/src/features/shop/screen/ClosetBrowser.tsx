@@ -25,10 +25,13 @@ import { shopScreenStyles as styles } from "./shopScreenStyles"
 import { ShopProductCard } from "./ShopProductCard"
 import { ShopShelfPagination } from "./ShopShelfPagination"
 import { VerticalShopCategoryRail } from "./VerticalShopCategoryRail"
+import { useShopShelfThumbnailRegistration } from "./shopRetainedShelfModel"
 
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
 
 export const ClosetBrowser = memo(function ClosetBrowser(props: {
+  /** Hidden retained shelves cannot claim gestures, reselects or purchase flights. */
+  active?: boolean
   categories: ShopCategoryOption[]
   activeCategoryId: string
   products: ShopCatalogItem[]
@@ -48,6 +51,8 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
   /** Thumbnails a purchase flight can start from. */
   registerThumbnail?: (sourceItemId: string, view: View | null) => void
 }) {
+  const active = props.active !== false
+  const registerThumbnail = useShopShelfThumbnailRegistration(active, props.registerThumbnail)
   const reduceMotion = useReducedMotion()
   const copy = getShopCopy(props.locale)
   const title = props.mode === "avatar" ? copy.findYourStyle : copy.roomPieces
@@ -68,14 +73,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
   // page 1 for any other shelf, so a category change never shows a stale page.
   const shelfScope = getShopShelfScope(props.mode, props.activeCategoryId)
   const shelfPageTracker = useSharedValue(createShopShelfPageTracker(0, shelfScope))
-  // Before paint (like WardrobeCatalogList), so a new category never shows
-  // one frame at the old shelf's offset.
-  useLayoutEffect(() => {
-    shelfPageTracker.value = createShopShelfPageTracker(0, shelfScope)
-    // A jump to an offset the shelf already has emits no scroll event.
-    shelfScrollOffset.value = 0
-    productScrollerRef.current?.scrollToOffset({ offset: 0, animated: false })
-  }, [shelfScope, shelfPageTracker, shelfScrollOffset])
+  const pendingRevealPage = useSharedValue<number | null>(null)
   const productPages = useMemo(
     () => buildShopShelfPages(props.products, catalog.accessibilityLayout ? 1 : SHOP_PRODUCT_COLUMNS_PER_PAGE),
     [catalog.accessibilityLayout, props.products]
@@ -83,10 +81,25 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
   const shelfOwnsHorizontalDrags = shouldShopShelfOwnHorizontalDrags(productPages.length)
   const shelfMaxScrollOffset = getShopShelfMaxScrollOffset(productPages.length, productShelfWidth)
   const pageCount = productPages.length
+  // Retained shelves keep their page. A layout/catalog change clamps it and
+  // updates the native offset before paint, so fewer pages cannot leave a gap.
+  useLayoutEffect(() => {
+    if (!active) {
+      // A later content-size event from this old reveal must not override a
+      // newer visit. Activation already restores the committed tracker page.
+      pendingRevealPage.value = null
+      return
+    }
+    const page = getShopShelfCounterPage(shelfPageTracker.value, shelfScope, pageCount)
+    shelfPageTracker.value = createShopShelfPageTracker(page, shelfScope)
+    shelfScrollOffset.value = page * productShelfWidth
+    productScrollerRef.current?.scrollToOffset({ offset: page * productShelfWidth, animated: false })
+  }, [active, pageCount, pendingRevealPage, productShelfWidth, shelfScope, shelfPageTracker, shelfScrollOffset])
   // The counter changes when the finger crosses half a page, and on release
   // it jumps to the page paging settles on, before the snap animation runs.
   const handleShelfScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
+      if (!active) return
       shelfScrollOffset.value = event.contentOffset.x
       shelfPageTracker.value = stepShopShelfPageTracker(
         shelfPageTracker.value,
@@ -96,6 +109,8 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
       )
     },
     onBeginDrag: (event) => {
+      if (!active) return
+      pendingRevealPage.value = null
       shelfPageTracker.value = stepShopShelfPageTracker(
         shelfPageTracker.value,
         { type: "begin_drag", offset: event.contentOffset.x },
@@ -104,6 +119,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
       )
     },
     onEndDrag: (event) => {
+      if (!active) return
       shelfPageTracker.value = stepShopShelfPageTracker(
         shelfPageTracker.value,
         { type: "end_drag", offset: event.contentOffset.x, speed: event.velocity?.x ?? 0 },
@@ -112,6 +128,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
       )
     },
     onMomentumEnd: (event) => {
+      if (!active) return
       shelfPageTracker.value = stepShopShelfPageTracker(
         shelfPageTracker.value,
         { type: "momentum_end", offset: event.contentOffset.x },
@@ -119,7 +136,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
         pageCount
       )
     }
-  }, [pageCount, productShelfWidth])
+  }, [active, pageCount, pendingRevealPage, productShelfWidth])
   const scrollShelfToPage = useCallback((nextPageIndex: number, animated: boolean): void => {
     shelfPageTracker.value = stepShopShelfPageTracker(
       shelfPageTracker.value,
@@ -127,39 +144,45 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
       productShelfWidth,
       pageCount
     )
-    productScrollerRef.current?.scrollToOffset({ offset: nextPageIndex * productShelfWidth, animated })
-  }, [pageCount, productShelfWidth, shelfPageTracker])
+    const targetOffset = shelfPageTracker.value.page * productShelfWidth
+    // A non-animated jump may not emit onScroll if the native offset is unchanged.
+    if (!animated) shelfScrollOffset.value = targetOffset
+    productScrollerRef.current?.scrollToOffset({ offset: targetOffset, animated })
+  }, [pageCount, productShelfWidth, shelfPageTracker, shelfScrollOffset])
   // Page buttons step from the page the counter shows; Reduce Motion jumps.
   const showRelativeShelfPage = useCallback((step: -1 | 1): void => {
+    pendingRevealPage.value = null
     const pageIndex = getShopShelfCounterPage(shelfPageTracker.value, shelfScope, pageCount)
     const nextPageIndex = Math.max(0, Math.min(pageCount - 1, pageIndex + step))
     if (nextPageIndex !== pageIndex) scrollShelfToPage(nextPageIndex, !reduceMotion)
-  }, [pageCount, reduceMotion, scrollShelfToPage, shelfPageTracker, shelfScope])
+  }, [pageCount, pendingRevealPage, reduceMotion, scrollShelfToPage, shelfPageTracker, shelfScope])
   // SHOP-2: re-tapping the selected Shop tab returns the shelf to its first page.
   const scrollShelfToStart = useCallback((): void => {
+    if (!active) return
+    pendingRevealPage.value = null
     scrollShelfToPage(0, !reduceMotion)
-  }, [reduceMotion, scrollShelfToPage])
+  }, [active, pendingRevealPage, reduceMotion, scrollShelfToPage])
   useMainTabReselect("shop", scrollShelfToStart)
   // A deep link reveals its product's page; a list that has not laid out the
   // new data yet takes the pending page from onContentSizeChange.
-  const pendingRevealPageRef = useRef<number | null>(null)
   const handledRevealRef = useRef<number | null>(null)
   const revealRequestId = props.revealRequest?.requestId
   const revealProductId = props.revealRequest?.productId
   useEffect(() => {
-    if (revealRequestId === undefined || handledRevealRef.current === revealRequestId) return
+    if (!active || revealRequestId === undefined || handledRevealRef.current === revealRequestId) return
     const page = findShopShelfPageIndex(productPages, revealProductId)
     if (page < 0) return
     handledRevealRef.current = revealRequestId
-    pendingRevealPageRef.current = page
+    pendingRevealPage.value = page
     scrollShelfToPage(page, false)
-  }, [productPages, revealProductId, revealRequestId, scrollShelfToPage])
+  }, [active, pendingRevealPage, productPages, revealProductId, revealRequestId, scrollShelfToPage])
   const handleShelfContentSizeChange = useCallback((): void => {
-    const page = pendingRevealPageRef.current
+    if (!active) return
+    const page = pendingRevealPage.value
     if (page === null) return
-    pendingRevealPageRef.current = null
+    pendingRevealPage.value = null
     scrollShelfToPage(page, false)
-  }, [scrollShelfToPage])
+  }, [active, pendingRevealPage, scrollShelfToPage])
   const renderProductPage = useCallback(
     ({ item, index }: { item: ShopCatalogItem[][]; index: number }) => (
       <View
@@ -190,18 +213,23 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
                 onSelectProduct={props.onSelectProduct}
                 removeAction={props.removeActionById?.get(product.id)}
                 onRemoveProduct={props.onRemoveProduct}
-                registerThumbnail={props.registerThumbnail}
+                registerThumbnail={registerThumbnail}
               />
             ))}
           </View>
         ))}
       </View>
     ),
-    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onRemoveProduct, props.onSelectProduct, props.pendingInventoryLabel, props.registerThumbnail, props.removeActionById, props.selectedId]
+    [catalog, productCardWidth, productShelfWidth, props.inventoryVerified, props.locale, props.onRemoveProduct, props.onSelectProduct, props.pendingInventoryLabel, props.removeActionById, props.selectedId, registerThumbnail]
   )
 
   return (
-    <View style={[styles.closetBrowserCard, { padding: catalog.cardPadding }]}>
+    <View
+      pointerEvents={active ? "auto" : "none"}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
+      style={[styles.closetBrowserCard, { padding: catalog.cardPadding }, !active && styles.retainedShelfHidden]}
+    >
       <View style={styles.closetBrowserHeader}>
         <View style={styles.closetBrowserCopy}>
           <Text style={styles.closetBrowserTitle}>{title}</Text>
@@ -236,7 +264,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
             cannot scroll at all, so every horizontal drag there switches
             the main page. */}
         <MainTabPagerEdgeHandoffScrollOwner
-          enabled={shelfOwnsHorizontalDrags}
+          enabled={active && shelfOwnsHorizontalDrags}
           scrollOffset={shelfScrollOffset}
           maxScrollOffset={shelfMaxScrollOffset}
         >
@@ -245,7 +273,7 @@ export const ClosetBrowser = memo(function ClosetBrowser(props: {
             data={productPages}
             horizontal
             pagingEnabled
-            scrollEnabled={shelfOwnsHorizontalDrags}
+            scrollEnabled={active && shelfOwnsHorizontalDrags}
             bounces={false}
             onScroll={handleShelfScroll}
             scrollEventThrottle={16}

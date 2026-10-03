@@ -1,5 +1,9 @@
 import {
+  MAIN_TAB_PAGER_ACTIVE_OFFSET_X,
+  MAIN_TAB_PAGER_AXIS_RATIO,
+  MAIN_TAB_PAGER_FAIL_OFFSET_Y,
   MAIN_TAB_PAGER_SETTLE,
+  MAIN_TAB_PAGER_UNDECIDED_FAIL_Y,
   MAIN_TAB_PAGER_SPRING,
   MAIN_TAB_PAGES,
   MAIN_TAB_SWIPE_MAX_INDEX,
@@ -21,6 +25,24 @@ export function isMainTabRouteName(routeName: string | undefined): routeName is 
 export function isMainTabPageSwipeable(index: number): boolean {
   "worklet"
   return index >= MAIN_TAB_SWIPE_MIN_INDEX && index <= MAIN_TAB_SWIPE_MAX_INDEX
+}
+
+export type MainTabPagerAxisDecision = "activate" | "fail" | "undecided"
+
+/**
+ * Whether a touch's total movement (dx, dy from touch-down) is a page swipe.
+ * Horizontal-dominant movement past the slop activates even when it also
+ * moved vertically; vertical-dominant movement fails so lists keep scrolling.
+ */
+export function resolveMainTabPagerAxisDecision(dx: number, dy: number): MainTabPagerAxisDecision {
+  "worklet"
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return "undecided"
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  if (ax >= MAIN_TAB_PAGER_ACTIVE_OFFSET_X && ax >= ay * MAIN_TAB_PAGER_AXIS_RATIO) return "activate"
+  if (ay >= MAIN_TAB_PAGER_FAIL_OFFSET_Y && ay >= ax) return "fail"
+  if (ay >= MAIN_TAB_PAGER_UNDECIDED_FAIL_Y) return "fail"
+  return "undecided"
 }
 
 function clampIndex(index: number, minIndex: number, maxIndex: number): number {

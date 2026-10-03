@@ -89,3 +89,39 @@ test("an inbox mounted off screen waits for focus", () => {
   assert.equal(f.timers.size, 0)
   f.runtime.unmount()
 })
+
+test("foregrounding another page does not rebuild the hidden Inbox's timestamps", () => {
+  const f = mount({ focused: false })
+  const initial = f.value()
+  const renders = f.runtime.renderCount
+  f.setAppState("background")
+  f.advance(5 * 60_000)
+  f.setAppState("active")
+  assert.equal(f.value(), initial)
+  assert.equal(f.runtime.renderCount, renders, "a retained offscreen Inbox performs no timestamp render")
+  assert.equal(f.timers.size, 0)
+  f.setFocused(true)
+  assert.equal(f.value(), f.getNow(), "visible timestamps catch up in the focus event")
+  f.runtime.unmount()
+})
+
+test("focus while backgrounded and callbacks already delivered before cancellation remain harmless", () => {
+  const f = mount()
+  const staleTick = [...f.timers.values()][0]!.fn
+  f.setFocused(false)
+  f.setAppState("background")
+  f.advance(5 * 60_000)
+  const hiddenTime = f.value()
+  f.setFocused(true)
+  assert.equal(f.value(), hiddenTime, "background focus does not wake the timestamp rows")
+  f.setAppState("active")
+  assert.equal(f.value(), f.getNow())
+  const freshTick = [...f.timers.values()][0]!.fn
+  f.advance(10_000)
+  const current = f.value()
+  staleTick()
+  assert.equal(f.value(), current, "a cancelled generation cannot update the next focus session")
+  f.runtime.unmount()
+  freshTick()
+  assert.equal(f.timers.size, 0, "callbacks delivered after unmount cannot reschedule the clock")
+})

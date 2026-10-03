@@ -8,8 +8,7 @@ import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useInventoryStore } from "../features/inventory/inventoryStore"
 import { DEFAULT_ROOM_V2_SHELL_ID } from "../features/roomV2/roomV2Catalog"
 import {
-  resolveRoomV2Scene,
-  upsertRoomV2RenderItemSorted
+  resolveRoomV2Scene
 } from "../features/roomV2/roomV2Selectors"
 import { getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
 import { getAppLocale } from "../features/session/authLocale"
@@ -26,6 +25,7 @@ import { EDIT_ROOM_AVATAR_SPAWN } from "../features/roomV2/editor/roomEditorPlac
 import { createRoomEditorFloorOverlay } from "../features/roomV2/editor/roomEditorFloorGridModel"
 import {
   getEditRoomWorldStatus,
+  getRoomEditorDisplayRenderItems,
   getRoomEditorPlacementStateByRenderId
 } from "../features/roomV2/editor/roomEditorPresentationModel"
 import {
@@ -120,10 +120,6 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
       }),
     [draftDecor]
   )
-  const displayRenderItems = useMemo(() => {
-    if (!placementPreview) return scene.renderItems
-    return upsertRoomV2RenderItemSorted(scene.renderItems, placementPreview.item)
-  }, [placementPreview, scene.renderItems])
   const placementStateByRenderId = useMemo(
     () => getRoomEditorPlacementStateByRenderId(placementPreview),
     [placementPreview]
@@ -177,6 +173,11 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     stage,
     inventory: inventoryState
   })
+  const heldRenderId = drag.ghost?.renderId
+  const displayRenderItems = useMemo(
+    () => getRoomEditorDisplayRenderItems(scene.renderItems, placementPreview, heldRenderId),
+    [heldRenderId, placementPreview, scene.renderItems]
+  )
   const itemActions = useRoomEditorItemActions({
     copy,
     scene,
@@ -235,7 +236,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
       ? canPlaceAnotherRoomItem(selectedInventoryEntry.item.id)
       : false
   })
-  const selectedRenderItem = displayRenderItems.find(
+  const selectedRenderItem = placementPreview?.item ?? scene.renderItems.find(
     (item) => item.renderId === (selectedInstanceId ?? placementPreview?.item.renderId)
   )
   const capsuleItemName = capsuleMode === "tray"
@@ -246,6 +247,8 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
 
   const { setPickedTrayItemId } = dock
   const { setSelectedInventoryItemId } = inventoryState
+  const { cancelActiveDrag } = drag
+  const { setSelectedInstanceId, setPlacementPreview, setPlacementFeedback } = selection
   const { measureStageWindow } = stage
   const [undoCount, setUndoCount] = useState(0)
   const { handleUndoDraft } = session
@@ -256,9 +259,21 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     setUndoCount((count) => count + 1)
   }, [canUndo, handleUndoDraft])
   const handlePickTrayItem = useCallback((itemId: string) => {
+    cancelActiveDrag()
+    setSelectedInstanceId(undefined)
+    setPlacementPreview(undefined)
+    setPlacementFeedback(undefined)
     setPickedTrayItemId(itemId)
     setSelectedInventoryItemId(itemId)
-  }, [setPickedTrayItemId, setSelectedInventoryItemId])
+  }, [cancelActiveDrag, setSelectedInstanceId, setPlacementPreview, setPlacementFeedback, setPickedTrayItemId, setSelectedInventoryItemId])
+  const handleClearSelection = useCallback(() => {
+    cancelActiveDrag()
+    setSelectedInstanceId(undefined)
+    setPlacementPreview(undefined)
+    setPlacementFeedback(undefined)
+    setPickedTrayItemId(undefined)
+    setSelectedInventoryItemId(undefined)
+  }, [cancelActiveDrag, setSelectedInstanceId, setPlacementPreview, setPlacementFeedback, setPickedTrayItemId, setSelectedInventoryItemId])
 
   return (
     <View style={styles.root}>
@@ -357,6 +372,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                     trayRotations={inventoryState.selectedInventoryRotations}
                     handleSelectInventoryRotation={itemActions.handleSelectInventoryRotation}
                     handlePlaceTrayItem={itemActions.handleAddSelectedInventoryItem}
+                    onClearSelection={handleClearSelection}
                   />
                 </Animated.View>
               ) : null}
@@ -403,6 +419,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                   createInventoryItemDragGesture={drag.createTrayDragGesture}
                   onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
                   onTrayFeedback={selection.setPlacementFeedback}
+                  onClearSelection={handleClearSelection}
                 />
               </WardrobeGlass>
             </Animated.View>

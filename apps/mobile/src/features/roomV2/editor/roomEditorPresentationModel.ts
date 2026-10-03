@@ -1,11 +1,12 @@
 import type { AppLocale } from "../../session/appLocale"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
-import { normalizeRoomInventorySearchText } from "../roomV2Selectors"
+import { normalizeRoomInventorySearchText, upsertRoomV2RenderItemSorted } from "../roomV2Selectors"
 import type { getRoomWorldMotionReadinessSummary } from "../../roomWorld/roomWorldDiagnostics"
 import type {
   FurnitureCategory,
   FurnitureItem,
-  PlacedRoomItem
+  PlacedRoomItem,
+  RoomV2RenderItem
 } from "../roomV2.types"
 import {
   getRoomV2FurnitureRotationOptions,
@@ -20,6 +21,16 @@ import {
 export interface RoomEditorInventoryEntry {
   item: FurnitureItem
   owned: boolean
+}
+
+/** A held piece is drawn only by the drag overlay, including its return/drop. */
+export function getRoomEditorDisplayRenderItems(
+  renderItems: RoomV2RenderItem[],
+  preview: PlacementPreview | undefined,
+  heldRenderId: string | undefined
+): RoomV2RenderItem[] {
+  const items = preview ? upsertRoomV2RenderItemSorted(renderItems, preview.item) : renderItems
+  return heldRenderId ? items.filter((item) => item.renderId !== heldRenderId) : items
 }
 
 export type RoomEditorInventoryCategoryId = "all" | FurnitureCategory

@@ -31,10 +31,10 @@ function createGestureStub() {
     const recorded: Record<string, Handler> = {}
     handlers = recorded
     const builder: Record<string, unknown> = {}
-    for (const method of ["withRef", "enabled", "activeOffsetX", "failOffsetY"]) {
+    for (const method of ["withRef", "enabled", "manualActivation"]) {
       builder[method] = () => builder
     }
-    for (const event of ["onBegin", "onStart", "onUpdate", "onEnd", "onFinalize"]) {
+    for (const event of ["onBegin", "onTouchesDown", "onTouchesMove", "onStart", "onUpdate", "onEnd", "onFinalize"]) {
       builder[event] = (handler: Handler) => {
         recorded[event] = handler
         return builder

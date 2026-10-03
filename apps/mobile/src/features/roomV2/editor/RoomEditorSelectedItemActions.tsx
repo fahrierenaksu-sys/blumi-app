@@ -30,6 +30,7 @@ export function RoomEditorSelectedItemActions(props: {
   trayRotations: readonly PlacedRoomItem["rotation"][]
   handleSelectInventoryRotation: (rotation: PlacedRoomItem["rotation"]) => void
   handlePlaceTrayItem: () => void
+  onClearSelection: () => void
 }) {
   const {
     copy,
@@ -44,7 +45,8 @@ export function RoomEditorSelectedItemActions(props: {
     trayRotation,
     trayRotations,
     handleSelectInventoryRotation,
-    handlePlaceTrayItem
+    handlePlaceTrayItem,
+    onClearSelection
   } = props
   const nextTrayRotation = mode === "tray"
     ? getNextRoomEditorTrayRotation(trayRotations, trayRotation)
@@ -56,25 +58,35 @@ export function RoomEditorSelectedItemActions(props: {
       style={styles.capsule}
       contentStyle={styles.capsuleContent}
     >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={copy.clearSelection}
+        onPress={onClearSelection}
+        hitSlop={6}
+        style={({ pressed }) => [styles.capsuleIconButton, pressed ? styles.selectionControlPressed : null]}
+      >
+        <Ionicons name="close" size={17} color={roomEditorTheme.ink} />
+      </Pressable>
       <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.capsuleName}>
         {itemName}
       </Text>
-      {nextTrayRotation ? (
+      {mode === "tray" ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={copy.chooseRotation(copy.rotationLabels[nextTrayRotation], itemName)}
+          accessibilityLabel={copy.rotateSelected}
+          accessibilityHint={nextTrayRotation ? undefined : copy.feedback.unsupportedDirection}
+          accessibilityState={{ disabled: !nextTrayRotation }}
           accessibilityValue={{ text: copy.rotationLabels[trayRotation] }}
-          onPress={() => handleSelectInventoryRotation(nextTrayRotation)}
+          disabled={!nextTrayRotation}
+          onPress={() => { if (nextTrayRotation) handleSelectInventoryRotation(nextTrayRotation) }}
           hitSlop={6}
           style={({ pressed }) => [
-            styles.capsuleDirectionButton,
-            pressed ? styles.controlPressed : null
+            styles.capsuleIconButton,
+            !nextTrayRotation ? styles.controlDisabled : null,
+            pressed ? styles.selectionControlPressed : null
           ]}
         >
-          <Ionicons name="refresh" size={14} color={roomEditorTheme.ink} />
-          <Text maxFontSizeMultiplier={1.3} style={styles.capsuleDirectionText}>
-            {copy.rotationLabels[trayRotation]}
-          </Text>
+          <Ionicons name="refresh" size={17} color={roomEditorTheme.ink} />
         </Pressable>
       ) : null}
       {mode === "tray" ? (
@@ -85,7 +97,7 @@ export function RoomEditorSelectedItemActions(props: {
           hitSlop={6}
           style={({ pressed }) => [
             styles.capsulePrimaryButton,
-            pressed ? styles.controlPressed : null
+            pressed ? styles.selectionControlPressed : null
           ]}
         >
           <Ionicons name="add" size={16} color="#FFFFFF" />
@@ -102,24 +114,26 @@ export function RoomEditorSelectedItemActions(props: {
           hitSlop={6}
           style={({ pressed }) => [
             styles.capsulePrimaryButton,
-            pressed ? styles.controlPressed : null
+            styles.capsuleConfirmButton,
+            pressed ? styles.selectionControlPressed : null
           ]}
         >
           <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-          <Text maxFontSizeMultiplier={1.3} style={styles.capsulePrimaryText}>
-            {copy.confirmPlacement}
-          </Text>
         </Pressable>
       ) : null}
-      {selectedInstanceId && canRotateSelectedPlacedItem ? (
+      {mode === "placed" ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={copy.rotateSelected}
+          accessibilityHint={canRotateSelectedPlacedItem ? undefined : copy.feedback.unsupportedDirection}
+          accessibilityState={{ disabled: !canRotateSelectedPlacedItem }}
+          disabled={!canRotateSelectedPlacedItem}
           onPress={handleRotate}
           hitSlop={6}
           style={({ pressed }) => [
             styles.capsuleIconButton,
-            pressed ? styles.controlPressed : null
+            !canRotateSelectedPlacedItem ? styles.controlDisabled : null,
+            pressed ? styles.selectionControlPressed : null
           ]}
         >
           <Ionicons name="refresh" size={17} color={roomEditorTheme.ink} />
@@ -133,7 +147,7 @@ export function RoomEditorSelectedItemActions(props: {
           hitSlop={6}
           style={({ pressed }) => [
             styles.capsuleIconButton,
-            pressed ? styles.controlPressed : null
+            pressed ? styles.selectionControlPressed : null
           ]}
         >
           <Ionicons name="trash-outline" size={17} color={roomEditorTheme.accent} />

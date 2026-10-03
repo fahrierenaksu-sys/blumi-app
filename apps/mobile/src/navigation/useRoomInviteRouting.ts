@@ -17,8 +17,6 @@ import {
   ROOM_ARRIVAL_BANNER_MS
 } from "../features/miniRoom/roomArrivalModel"
 import { getAppLocale } from "../features/session/appLocale"
-import { launchRoomDoorFlight } from "../features/chat/roomDoorFlight"
-import { useReducedMotion } from "../ui/motion"
 import type { SessionActor } from "../features/session/sessionModel"
 import { dismissToast, showToast } from "../ui/toast"
 import { navigationRef } from "./rootNavigationRef"
@@ -52,7 +50,6 @@ export function useRoomInviteRouting({
   const visibleRoomInvites = sessionMode === "demo"
     ? demoRoomInvites
     : roomInvites
-  const reduceMotion = useReducedMotion()
 
   /** Opens the room screen now; the arrival decision was already made. */
   const enterReadyMiniRoom = useCallback(
@@ -70,8 +67,6 @@ export function useRoomInviteRouting({
         ...handledReadyMiniRoomIdsRef.current,
         payload.miniRoom.miniRoomId
       ])
-      // The open invitation card grows into the doorway as the room opens.
-      launchRoomDoorFlight({ sourceThreadId: payload.miniRoom.sourceThreadId, reduceMotion })
       navigationRef.navigate("MiniRoom", {
         readyMiniRoom: {
           miniRoom: payload.miniRoom,
@@ -94,7 +89,7 @@ export function useRoomInviteRouting({
         }
       })
     },
-    [latestSessionActorRef, reduceMotion]
+    [latestSessionActorRef]
   )
 
   /**

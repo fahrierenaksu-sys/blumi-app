@@ -711,35 +711,51 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     publishSpeechRef.current = publishSpeech
   }, [publishSpeech])
 
-  const addSpeechBubble = useCallback<MiniRoomStore["addSpeechBubble"]>((bubble) => {
-    const now = Date.now()
-    const speakerUserId = bubble.speakerUserId
-    publishSpeech(pushMiniRoomSpeech(speechRef.current, {
-      key: `bubble_${++bubbleCounterRef.current}_${now}`,
-      speakerUserId,
-      body: bubble.body,
-      lifetimeMs: bubbleLifetimeMs
-    }, now))
-
+  const sayPhrases = useCallback<MiniRoomStore["sayPhrases"]>((messages) => {
+    if (messages.length === 0) return
+    let next = speechRef.current
+    const speakers = new Set<string>()
+    for (const bubble of messages) {
+      const now = Date.now()
+      speakers.add(bubble.speakerUserId)
+      next = pushMiniRoomSpeech(next, {
+        key: `bubble_${++bubbleCounterRef.current}_${now}`,
+        speakerUserId: bubble.speakerUserId,
+        body: bubble.body,
+        lifetimeMs: bubbleLifetimeMs
+      }, now)
+    }
+    publishSpeech(next)
     setAvatars((current) => {
-      const avatar = current[speakerUserId]
-      if (!avatar || avatar.motion === "sitting") return current
-      return { ...current, [speakerUserId]: { ...avatar, motion: "speaking" } }
-    })
-    const previousTimer = speechMotionTimersRef.current.get(speakerUserId)
-    if (previousTimer) clearTimeout(previousTimer)
-    const timer = setTimeout(() => {
-      if (speechMotionTimersRef.current.get(speakerUserId) === timer) {
-        speechMotionTimersRef.current.delete(speakerUserId)
-      }
-      setAvatars((current) => {
+      let updated = current
+      for (const speakerUserId of speakers) {
         const avatar = current[speakerUserId]
-        if (!avatar || avatar.motion !== "speaking") return current
-        return { ...current, [speakerUserId]: { ...avatar, motion: "idle" } }
-      })
-    }, 1200)
-    speechMotionTimersRef.current.set(speakerUserId, timer)
+        // Speech decorates an idle figure; it must never interrupt a walk or seat transition.
+        if (!avatar || avatar.motion !== "idle") continue
+        if (updated === current) updated = { ...current }
+        updated[speakerUserId] = { ...avatar, motion: "speaking" }
+      }
+      return updated
+    })
+    for (const speakerUserId of speakers) {
+      const previousTimer = speechMotionTimersRef.current.get(speakerUserId)
+      if (previousTimer) clearTimeout(previousTimer)
+      const timer = setTimeout(() => {
+        if (speechMotionTimersRef.current.get(speakerUserId) !== timer) return
+        speechMotionTimersRef.current.delete(speakerUserId)
+        setAvatars((current) => {
+          const avatar = current[speakerUserId]
+          if (!avatar || avatar.motion !== "speaking") return current
+          return { ...current, [speakerUserId]: { ...avatar, motion: "idle" } }
+        })
+      }, 1200)
+      speechMotionTimersRef.current.set(speakerUserId, timer)
+    }
   }, [bubbleLifetimeMs, publishSpeech])
+
+  const addSpeechBubble = useCallback<MiniRoomStore["addSpeechBubble"]>((bubble) => {
+    sayPhrases([bubble])
+  }, [sayPhrases])
 
   const sayPhrase = useCallback<MiniRoomStore["sayPhrase"]>(
     (userId, body, tone = "chat") => {
@@ -817,6 +833,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     deferUntilArrivalLands,
     addSpeechBubble,
     sayPhrase,
+    sayPhrases,
     dismissSpeechBubble
   }
 }

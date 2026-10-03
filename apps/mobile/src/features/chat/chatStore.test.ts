@@ -77,6 +77,37 @@ test("a server message that was already on screen keeps its own key", () => {
   }
 })
 
+test("exact realtime acknowledgements preserve separate keys for identical rapid sends", () => {
+  resetChatStore()
+  try {
+    const first = addOptimisticMessage({ threadId: "synthetic-thread", senderUserId: "synthetic-owner", body: "Synthetic same text", clientMessageId: "synthetic-first" })
+    const second = addOptimisticMessage({ threadId: "synthetic-thread", senderUserId: "synthetic-owner", body: "Synthetic same text", clientMessageId: "synthetic-second" })
+    const canonical = { messageId: "synthetic-canonical-second", threadId: "synthetic-thread", senderUserId: "synthetic-owner", body: "Synthetic same text", sentAt: "2026-10-03T10:00:00Z" }
+    // The global event handler updates the store before the room's ACK listener.
+    applyChatMessageReceived(canonical, { localUserId: "synthetic-owner", clientMessageId: second.clientMessageId })
+    assert.equal(getMessageRenderKey(canonical.messageId), second.localMessageId)
+    assert.ok(getRetryableMessage(first.localMessageId), "the other identical send remains pending")
+    assert.equal(getRetryableMessage(second.localMessageId), null)
+    assert.equal(getMessages(canonical.threadId).length, 2)
+    confirmOptimisticMessage(second.clientMessageId, canonical, "synthetic-owner")
+    assert.equal(getMessageRenderKey(canonical.messageId), second.localMessageId, "the room's later ACK never changes the key")
+    applyChatMessageReceived(canonical, { localUserId: "synthetic-owner", clientMessageId: second.clientMessageId })
+    assert.ok(getRetryableMessage(first.localMessageId), "a repeated ACK cannot steal another send")
+  } finally { resetChatStore() }
+})
+
+test("an unknown acknowledgement identity cannot consume a matching pending body", () => {
+  resetChatStore()
+  try {
+    const pending = addOptimisticMessage({ threadId: "synthetic-thread", senderUserId: "synthetic-owner", body: "Synthetic text", clientMessageId: "synthetic-pending" })
+    const message = { messageId: "synthetic-canonical", threadId: "synthetic-thread", senderUserId: "synthetic-owner", body: "Synthetic text", sentAt: "2026-10-03T10:00:00Z" }
+    confirmOptimisticMessage("synthetic-unknown", message, "synthetic-owner")
+    assert.ok(getRetryableMessage(pending.localMessageId))
+    assert.equal(getMessageRenderKey(message.messageId), message.messageId)
+    assert.equal(getMessages(message.threadId).length, 2)
+  } finally { resetChatStore() }
+})
+
 test("one realtime message is not proof that the first history page is ready", () => {
   resetChatStore()
   const read = createChatThreadSnapshotReader("cold-history")

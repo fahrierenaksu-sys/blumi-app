@@ -26,20 +26,31 @@ export function useWardrobeCatalogTransition<TCard>(input: {
 }) {
   const { activeCategory, cards, reduceMotion } = input
   const [shownCategory, setShownCategory] = useState(activeCategory)
-  const [lastShownCards, setLastShownCards] = useState(cards)
+  const lastShownCardsRef = useRef(cards)
   const frame = resolveWardrobeCatalogFrame({
     requestedCategory: activeCategory,
     shownCategory,
     cards,
-    lastShownCards,
+    lastShownCards: lastShownCardsRef.current,
     reduceMotion
   })
-  if (!frame.switching && lastShownCards !== cards) setLastShownCards(cards)
-  if (reduceMotion && shownCategory !== activeCategory) setShownCategory(activeCategory)
+  useLayoutEffect(() => {
+    if (!frame.switching) lastShownCardsRef.current = cards
+    if (reduceMotion) setShownCategory(activeCategory)
+  }, [activeCategory, cards, frame.switching, reduceMotion])
 
   const opacity = useSharedValue(1)
   // The category the running fade-out will swap to, or null when none runs.
   const fadingToRef = useRef<WardrobeCategoryId | null>(null)
+  const requestRef = useRef({ activeCategory, reduceMotion, generation: 0 })
+  useLayoutEffect(() => {
+    requestRef.current = { activeCategory, reduceMotion, generation: requestRef.current.generation + 1 }
+  }, [activeCategory, reduceMotion])
+  useEffect(() => () => {
+    fadingToRef.current = null
+    requestRef.current.generation += 1
+    cancelAnimation(opacity)
+  }, [opacity])
   useEffect(() => {
     if (reduceMotion) return
     if (activeCategory === shownCategory) {
@@ -52,11 +63,13 @@ export function useWardrobeCatalogTransition<TCard>(input: {
       return
     }
     const target = activeCategory
+    const generation = requestRef.current.generation
     fadingToRef.current = target
     const commitSwap = (): void => {
       // A swap that finished on the UI thread just as the request changed
       // is stale; the newer request runs its own fade.
-      if (fadingToRef.current !== target) return
+      if (fadingToRef.current !== target || requestRef.current.generation !== generation ||
+        requestRef.current.activeCategory !== target || requestRef.current.reduceMotion) return
       setShownCategory(target)
     }
     opacity.value = withTiming(0, { duration: WARDROBE_CATALOG_FADE_OUT_MS }, (finished) => {

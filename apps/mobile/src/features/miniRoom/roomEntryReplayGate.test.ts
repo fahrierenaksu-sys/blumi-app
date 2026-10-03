@@ -34,3 +34,14 @@ test("each room reopen gets one fresh replay and cannot replay twice", () => {
   )
   assert.equal(reopenedReady.canReplay, true)
 })
+
+test("failed entry settles its replay gate so late ready cannot resurrect entry replay", () => {
+  const loading = advanceRoomEntryReplayGate(
+    advanceRoomEntryReplayGate(createRoomEntryReplayGate(), "requested"), "loading"
+  )
+  const failed = advanceRoomEntryReplayGate(loading, "failed")
+  assert.equal(failed.replayed, true)
+  assert.equal(advanceRoomEntryReplayGate(failed, "ready").canReplay, false)
+  const reopened = advanceRoomEntryReplayGate(failed, "requested")
+  assert.equal(reopened.replayed, false)
+})

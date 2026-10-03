@@ -78,6 +78,7 @@ export function RoomEditorInventoryList(props: {
   onBrowseShop: () => void
   /** Shows why a locked or already-placed card cannot be placed. */
   onTrayFeedback: (message: string) => void
+  onClearSelection: () => void
 }) {
   const {
     copy,
@@ -93,7 +94,8 @@ export function RoomEditorInventoryList(props: {
     canPlaceAnotherRoomItem,
     createInventoryItemDragGesture,
     onBrowseShop,
-    onTrayFeedback
+    onTrayFeedback,
+    onClearSelection
   } = props
   const handleUnavailableItem = useCallback((reason: "locked" | "placed") => {
     hapticError()
@@ -133,6 +135,8 @@ export function RoomEditorInventoryList(props: {
           trayDragHint={copy.trayDragHint}
           previewLabel={copy.previewItem(entry.item.name)}
           onPreviewItem={setSelectedInventoryItemId}
+          clearSelectionLabel={copy.clearSelection}
+          onClearSelection={onClearSelection}
           onUnavailableItem={handleUnavailableItem}
           createDragGesture={createInventoryItemDragGesture}
         />
@@ -147,6 +151,7 @@ export function RoomEditorInventoryList(props: {
     highlightedItemId,
     selectedInventoryEntry?.item.id,
     selectedInventoryRotation,
+    onClearSelection,
     setSelectedInventoryItemId
   ])
 

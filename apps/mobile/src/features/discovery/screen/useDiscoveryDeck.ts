@@ -6,6 +6,7 @@ import {
   buildAvailableDiscoveryCandidates,
   createLiveDiscoveryCandidate,
   createProductionDiscoveryCandidate,
+  createDiscoveryCandidateSelector,
   type DiscoveryCandidate
 } from "../discoveryCandidateModel"
 import { applyOptimisticDiscoveryDecision } from "../discoveryDeckModel"
@@ -87,23 +88,33 @@ export function useDiscoveryDeck(input: {
 
   const blockedUserIdSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds])
 
+  // Account and source mode changes drop all projections. Within that scope,
+  // unchanged profiles keep the same card inputs across cursor-page appends.
+  const candidateScope = useMemo(
+    () => ({ ownerUserId, isProductionDiscovery }),
+    [ownerUserId, isProductionDiscovery]
+  )
+  const selectCandidates = useMemo(() => ({
+    production: createDiscoveryCandidateSelector(createProductionDiscoveryCandidate),
+    live: createDiscoveryCandidateSelector(createLiveDiscoveryCandidate)
+  }), [])
   const discoverSourceUsers = useMemo<DiscoveryCandidate[]>(
-    () =>
-      isProductionDiscovery
-        ? productionProfiles.map(createProductionDiscoveryCandidate)
-        : nearbyUsers.map(createLiveDiscoveryCandidate),
-    [isProductionDiscovery, nearbyUsers, productionProfiles]
+    () => {
+      // The inactive mode must not retain another account's previous sources.
+      if (isProductionDiscovery) {
+        selectCandidates.live([], candidateScope)
+        return selectCandidates.production(productionProfiles, candidateScope)
+      }
+      selectCandidates.production([], candidateScope)
+      return selectCandidates.live(nearbyUsers, candidateScope)
+    },
+    [candidateScope, isProductionDiscovery, nearbyUsers, productionProfiles, selectCandidates]
   )
 
   const discoverDeck = useMemo<DiscoveryCandidate[]>(() => {
     if (isProductionDiscovery && !isSafetyListReady) return []
-    const locallyBlockedUserIds = new Set(
-      discoverSourceUsers
-        .filter((user) => blockedUserIdSet.has(user.userId))
-        .map((user) => user.userId)
-    )
     return buildAvailableDiscoveryCandidates(discoverSourceUsers, {
-      blockedUserIds: locallyBlockedUserIds,
+      blockedUserIds: blockedUserIdSet,
       skippedUserIds,
       savedUserIds,
       seenUserIds: seenThisSessionUserIds,

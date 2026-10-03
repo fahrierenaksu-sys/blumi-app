@@ -86,6 +86,7 @@ export const shopScreenStyles = StyleSheet.create({
     // Its own clip cuts any shadow off, so it carries none.
     overflow: "hidden",
   },
+  retainedShelfHidden: { position: "absolute", top: 0, left: 0, width: "100%", opacity: 0 },
   closetBrowserCard: {
     gap: 6,
     padding: 8,

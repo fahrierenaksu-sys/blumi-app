@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { createFakeReactRuntime, createReactNativeStub, createReanimatedStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import { resolveMiniRoomMotionPolicy } from "./miniRoomReducedMotion"
 import type { AvatarState, SpeechBubble } from "./miniRoomSceneTypes"
 import type { RoomSpeechBubbleStackProps } from "./RoomSpeechBubbleStack"
@@ -189,4 +189,55 @@ test("the avatar layer hands each avatar only its own lines and the Reduce Motio
   const quiet = figuresFor(false, [])
   assert.equal(quiet.partner!.typingDots, 1)
   assert.equal(quiet.local!.typingDots, 0)
+})
+
+test("a speaker's new line leaves the body/depth subtree and the other speaker's overlay memo inputs unchanged", () => {
+  const runtime = createFakeReactRuntime()
+  const memoBoundaries = new Set<unknown>()
+  runtime.react.memo = <T>(component: T): T => {
+    memoBoundaries.add(component)
+    return component
+  }
+  const { AvatarLayer } = loadSourceWithFakeReact<{ AvatarLayer: (props: unknown) => Element }>(
+    "features/miniRoom/scene/AvatarLayer.tsx", runtime, {
+      modules: {
+        "react-native": createReactNativeStub().module,
+        "react-native-reanimated": createReanimatedStub(runtime).module,
+        "./RoomSpeechBubbleStack": { RoomSpeechBubbleStack: "RoomSpeechBubbleStack" },
+        "./RoomTypingBubble": { RoomTypingBubble: "RoomTypingBubble" }
+      },
+      real: ["./miniRoomSpeechStack"],
+      inertUnknown: true
+    }
+  )
+  const avatar = (userId: string, x: number): AvatarState => ({
+    userId, displayName: userId, x, y: .7, facing: "left", motion: "speaking", appearance: {}
+  } as AvatarState)
+  const props = {
+    avatars: { local: avatar("local", .3), partner: avatar("partner", .7) },
+    avatarPositions: { local: {}, partner: {} },
+    depthScene: { neighbours: [], occluders: [], seatDepthByHotspotId: {} },
+    localUserId: "local", localUserLabel: "You", onDismissBubble: () => undefined,
+    dismissBubbleLabel: "Dismiss", partnerJustJoined: false,
+    motionPolicy: resolveMiniRoomMotionPolicy(false)
+  }
+  const local = { ...bubble("l1"), speakerUserId: "local" }
+  const partner = { ...bubble("p1"), speakerUserId: "partner" }
+  const renderLayer = (bubbles: SpeechBubble[]) => runtime.render(() => AvatarLayer({ ...props, bubbles }))
+  const first = children(renderLayer([local, partner]))
+  const next = children(renderLayer([local, partner, { ...bubble("l2"), speakerUserId: "local" }]))
+  const shallowSame = (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((key) => Object.is(a[key], b[key]))
+  const body = (nodes: Element[]) => nodes.find(({ props }) => props.depthScene !== undefined)!
+  const overlay = (nodes: Element[], speaker: string) => nodes.find(({ props }) =>
+    (props.avatar as AvatarState | undefined)?.userId === speaker)!
+  assert.ok(memoBoundaries.has(body(first).type))
+  assert.equal(shallowSame(body(first).props, body(next).props), true,
+    "speech does not invalidate furniture, depth worklets or figure input")
+  assert.ok(memoBoundaries.has(overlay(first, "partner").type))
+  assert.equal(shallowSame(overlay(first, "partner").props, overlay(next, "partner").props), true,
+    "the quiet partner passes React's default memo comparison")
+  assert.equal(shallowSame(overlay(first, "local").props, overlay(next, "local").props), false)
+  assert.deepEqual((overlay(next, "local").props.bubbles as SpeechBubble[]).map(({ id }) => id), ["l1", "l2"])
+  runtime.unmount()
 })

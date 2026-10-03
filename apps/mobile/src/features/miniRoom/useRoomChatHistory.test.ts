@@ -25,6 +25,7 @@ function mount() {
     real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
   })
   const history = loadSourceWithFakeReact<typeof RoomHistory>("features/miniRoom/useRoomChatHistory.ts", runtime, {
+    real: ["../chat/chatMessageRenderKeys"],
     modules: {
       "../chat/chatStore": store,
       "./roomChatHistoryModel": { ROOM_CHAT_HISTORY_LIMIT, resolveRoomChatHistoryStatus, selectRoomChatHistory }
@@ -101,10 +102,14 @@ test("MiniRoom history ignores unrelated chat updates and tracks its own message
   })
   assert.equal(read().items[0]?.id, pending.localMessageId)
   assert.equal(read().items[0]?.delivery, "sending")
+  const pendingRow = read().items[0]!
+  const unrelatedRows = read().items.slice(1)
   store.markOptimisticMessageFailed(pending.clientMessageId)
   assert.equal(read().items[0]?.delivery, "failed")
+  assert.ok(unrelatedRows.every((item, index) => item === read().items[index + 1]), "failure updates only its own row")
   store.markOptimisticMessageSending(pending.clientMessageId)
   assert.equal(read().items[0]?.delivery, "sending")
+  assert.ok(unrelatedRows.every((item, index) => item === read().items[index + 1]), "retry updates only its own row")
 
   store.applyChatMessageReceived(message(
     "room-send-ack",
@@ -115,8 +120,39 @@ test("MiniRoom history ignores unrelated chat updates and tracks its own message
   ), { localUserId })
   assert.equal(read().items[0]?.id, "room-send-ack")
   assert.equal(read().items[0]?.delivery, "sent")
+  assert.equal(read().items[0]?.renderKey, pendingRow.renderKey, "ACK retains the optimistic presentation identity")
+  assert.ok(unrelatedRows.every((item, index) => item === read().items[index + 1]), "ACK does not recreate unrelated rows")
   assert.equal(read().items.length, 15)
 
+  runtime.unmount()
+  store.resetChatStore()
+})
+
+test("history reuses its presentation for store changes outside its visible window and resets account scope", () => {
+  const { runtime, store, history } = mount()
+  const initialMessages = Array.from({ length: 20 }, (_, index) => message(
+    `stable-${index}`, threadId, partnerUserId, `Line ${index}`, `2026-10-02T10:${String(index).padStart(2, "0")}:00.000Z`
+  ))
+  store.applyChatMessageListed({ userId: localUserId, threadId, messages: initialMessages })
+  let viewer = localUserId
+  let targetThreadId = threadId
+  runtime.render(() => history.useRoomChatHistory({ threadId: targetThreadId, localUserId: viewer }))
+  const read = () => runtime.output as ReturnType<typeof history.useRoomChatHistory>
+  const before = read().items
+  store.applyChatMessageListed({ userId: localUserId, threadId, messages: [
+    message("older", threadId, partnerUserId, "Older", "2026-10-01T10:00:00.000Z"), ...initialMessages
+  ] })
+  assert.equal(read().items, before, "an older page does not replace the visible presentation array")
+  targetThreadId = "other-history-thread"
+  store.applyChatMessageListed({ userId: localUserId, threadId: targetThreadId,
+    messages: initialMessages.map((item) => ({ ...item, threadId: targetThreadId })) })
+  runtime.rerender()
+  assert.ok(read().items.every((item, index) => item !== before[index]), "a new thread never inherits previous row objects")
+  targetThreadId = threadId
+  viewer = partnerUserId
+  runtime.rerender()
+  assert.ok(read().items.every((item) => item.mine), "changing the viewer recalculates all ownership presentation")
+  assert.notEqual(read().items, before)
   runtime.unmount()
   store.resetChatStore()
 })

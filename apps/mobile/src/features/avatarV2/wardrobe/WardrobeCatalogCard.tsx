@@ -155,7 +155,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
     </Pressable>
   )
 }, (previous, next) =>
-  previous.item.id === next.item.id &&
+  previous.item === next.item &&
   previous.equipped === next.equipped &&
   previous.itemStateLabel === next.itemStateLabel &&
   previous.wearingLabel === next.wearingLabel &&

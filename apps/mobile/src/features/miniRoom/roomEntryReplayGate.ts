@@ -5,7 +5,7 @@ export interface RoomEntryReplayGate {
   canReplay: boolean
 }
 
-export type RoomEntryReplayGateEvent = "requested" | "loading" | "ready" | "replayed"
+export type RoomEntryReplayGateEvent = "requested" | "loading" | "ready" | "replayed" | "failed"
 
 export function createRoomEntryReplayGate(): RoomEntryReplayGate {
   return {

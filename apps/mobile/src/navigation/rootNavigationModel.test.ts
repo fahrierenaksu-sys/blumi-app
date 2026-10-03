@@ -9,8 +9,10 @@ import {
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
   getChatThreadScreenOptions,
+  getMiniRoomScreenOptions,
   getDetailScreenOptions,
   CHAT_THREAD_SCREEN_OPTIONS,
+  MINI_ROOM_SCREEN_OPTIONS,
   DETAIL_SCREEN_OPTIONS,
   MAIN_TAB_SCREEN_OPTIONS,
   shouldDispatchMainTabNavigation,
@@ -53,7 +55,7 @@ test("faded routes close with the same fade when swiped back", () => {
   assert.equal(ROOT_STACK_SCREEN_OPTIONS.animationMatchesGesture, true)
 })
 
-test("only the chat thread closes with a full-screen swipe, with or without motion", () => {
+test("chat and MiniRoom routes keep their full-screen swipe enabled with or without motion", () => {
   // iOS runs the full-screen swipe as a simple push, so the thread opens with it too.
   assert.deepEqual(CHAT_THREAD_SCREEN_OPTIONS, {
     headerShown: false,
@@ -65,6 +67,24 @@ test("only the chat thread closes with a full-screen swipe, with or without moti
     headerShown: false,
     animation: "none",
     fullScreenGestureEnabled: true
+  })
+})
+
+test("MiniRoom uses the short native push and can return with a horizontal swipe", () => {
+  assert.deepEqual(MINI_ROOM_SCREEN_OPTIONS, {
+    headerShown: false,
+    animation: "simple_push",
+    fullScreenGestureEnabled: true,
+    gestureDirection: "horizontal",
+    animationDuration: 180
+  })
+  assert.deepEqual(getMiniRoomScreenOptions(false), MINI_ROOM_SCREEN_OPTIONS)
+  assert.deepEqual(getMiniRoomScreenOptions(true), {
+    headerShown: false,
+    animation: "none",
+    fullScreenGestureEnabled: true,
+    gestureDirection: "horizontal",
+    animationDuration: 180
   })
 })
 

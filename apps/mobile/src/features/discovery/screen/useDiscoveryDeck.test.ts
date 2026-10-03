@@ -73,3 +73,50 @@ test("production discovery stays empty until the safety list is ready", () => {
   assert.deepEqual(result.discoverDeck, [])
   assert.equal(result.nearbyCount, 0)
 })
+
+const productionProfile = (userId: string) => ({
+  userId, displayName: userId, vibeTags: [], signals: [],
+  avatar: { presetId: "avatar_v2_body_default", revision: 1 }
+})
+
+test("appending a page preserves existing card inputs while refreshed profiles replace them", () => {
+  const f = mount()
+  const profile = productionProfile("first")
+  const first = f.render({ isProductionDiscovery: true, productionProfiles: [profile] })
+  const appended = f.render({ productionProfiles: [profile, productionProfile("next")] })
+  assert.equal(appended.featuredCandidate, first.featuredCandidate)
+  const refreshed = f.render({ productionProfiles: [{ ...profile, displayName: "Updated" }] })
+  assert.notEqual(refreshed.featuredCandidate, first.featuredCandidate)
+  assert.equal(refreshed.featuredCandidate?.displayName, "Updated")
+  assert.deepEqual(refreshed.discoverDeck.map(({ userId }) => userId), ["first"])
+})
+
+test("stable projections still obey blocked, seen, pending and exhausted quota gates", () => {
+  const f = mount()
+  const profiles = [productionProfile("first"), productionProfile("next")]
+  const first = f.render({ isProductionDiscovery: true, productionProfiles: profiles })
+  const blocked = f.render({ blockedUserIds: ["first"] })
+  assert.equal(blocked.featuredCandidate, first.discoverDeck[1])
+  assert.deepEqual(blocked.visibleDiscoverDeck.map(({ userId }) => userId), ["next"])
+  const seen = f.render({ blockedUserIds: [], seenThisSessionUserIds: new Set(["next"]) })
+  assert.equal(seen.featuredCandidate, first.featuredCandidate)
+  const pending = f.render({ pendingInviteUserIds: new Set(["first"]) })
+  assert.deepEqual(pending.visibleDiscoverDeck, [])
+  const exhausted = f.render({ seenThisSessionUserIds: new Set(), pendingInviteUserIds: new Set(), productionQuota: { remaining: 0 } })
+  assert.deepEqual(exhausted.visibleDiscoverDeck, [])
+  assert.equal(exhausted.featuredCandidate, null)
+})
+
+test("owner and mode switches drop cached projections even when sources are reused", () => {
+  const f = mount()
+  const profiles = [productionProfile("first")]
+  const first = f.render({ isProductionDiscovery: true, productionProfiles: profiles })
+  const switched = f.render({ ownerUserId: "other-owner" })
+  assert.notEqual(switched.featuredCandidate, first.featuredCandidate)
+  const empty = f.render({ productionProfiles: [] })
+  assert.deepEqual(empty.discoverSourceUsers, [])
+  const returned = f.render({ productionProfiles: profiles })
+  assert.notEqual(returned.featuredCandidate, switched.featuredCandidate)
+  f.render({ isProductionDiscovery: false })
+  assert.notEqual(f.render({ isProductionDiscovery: true }).featuredCandidate, returned.featuredCandidate)
+})

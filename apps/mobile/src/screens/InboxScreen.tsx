@@ -220,7 +220,7 @@ export function InboxScreen(props: InboxScreenProps) {
     [navigation]
   )
   const warmThread = useCallback((threadId: string) => {
-    if (sessionActor.session.mode === "production") void onWarmThread(threadId)
+    if (sessionActor.session.mode === "production") void onWarmThread(threadId).catch(() => undefined)
   }, [onWarmThread, sessionActor.session.mode])
   const [actionsThreadId, setActionsThreadId] = useState<string | null>(null)
   const openConversationActions = useCallback((threadId: string) => {

@@ -18,9 +18,10 @@ import type { RootStackParamList } from "./RootNavigator"
  *   edge swipe both close it with the native pop. Owner decision 2026-10-02:
  *   the avatar wardrobe and the room editor slide in again; their bottom
  *   panel still rises softly once the push starts (ui/bottomPanelEntrance).
- * - The chat thread: simple_push. Its swipe works anywhere on screen, and
- *   iOS can only run that full-screen gesture as a simple push (the native
- *   push curve is not available to it), so it opens with simple_push too.
+ * - The chat thread and MiniRoom: simple_push. Their swipe works anywhere on
+ *   screen, and iOS can only run that full-screen gesture as a simple push
+ *   (the native push curve is not available to it), so both routes open with
+ *   the same short push.
  * - Bottom sheets: native form sheets (nativeSheets).
  * Reduce Motion turns every transition off.
  */
@@ -79,6 +80,17 @@ export const CHAT_THREAD_SCREEN_OPTIONS = {
   fullScreenGestureEnabled: true
 } as const
 
+/**
+ * MiniRoom follows the chat's short native push so the room can be dismissed
+ * with a horizontal full-screen swipe. The room's prevent-remove guard still
+ * owns the leave confirmation; the native gesture only requests removal.
+ */
+export const MINI_ROOM_SCREEN_OPTIONS = {
+  ...CHAT_THREAD_SCREEN_OPTIONS,
+  gestureDirection: "horizontal",
+  animationDuration: 180
+} as const
+
 export function getDetailScreenOptions(reduceMotion: boolean) {
   return reduceMotion
     ? { ...DETAIL_SCREEN_OPTIONS, animation: "none" as const }
@@ -89,6 +101,12 @@ export function getChatThreadScreenOptions(reduceMotion: boolean) {
   return reduceMotion
     ? { ...CHAT_THREAD_SCREEN_OPTIONS, animation: "none" as const }
     : CHAT_THREAD_SCREEN_OPTIONS
+}
+
+export function getMiniRoomScreenOptions(reduceMotion: boolean) {
+  return reduceMotion
+    ? { ...MINI_ROOM_SCREEN_OPTIONS, animation: "none" as const }
+    : MINI_ROOM_SCREEN_OPTIONS
 }
 
 /** Avoid rebuilding the native-stack state when the focused tab is tapped again. */

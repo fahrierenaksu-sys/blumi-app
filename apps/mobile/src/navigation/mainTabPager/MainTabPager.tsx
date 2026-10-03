@@ -40,8 +40,6 @@ import { mainTabPagerIndicator } from "../../ui/mainTabPagerIndicator"
 import { uiTheme } from "../../ui/theme"
 import {
   MAIN_TAB_PAGE_FADE_IN_MS,
-  MAIN_TAB_PAGER_ACTIVE_OFFSET_X,
-  MAIN_TAB_PAGER_FAIL_OFFSET_Y,
   MAIN_TAB_PAGER_IDLE_MOUNT_DELAY_MS,
   MAIN_TAB_PAGER_SETTLE_COMMIT_FALLBACK_MS,
   MAIN_TAB_PAGER_SPRING,
@@ -82,6 +80,7 @@ import {
   resolveMainTabPagerSpringEnergyThreshold,
   shouldMainTabPagerTouchCatchSettle,
   withMainTabPageMounted,
+  resolveMainTabPagerAxisDecision,
   type MainTabPagerUiTransition
 } from "./mainTabPagerModel"
 import { createMainTabPagerSelectAction } from "./mainTabPagerRouter"
@@ -644,11 +643,36 @@ export const MainTabPager = memo(function MainTabPager({
 
   // ── Gesture ─────────────────────────────────────────────────────────
   const pagerGestureRef = useRef<GestureType | undefined>(undefined)
+  const touchStartX = useSharedValue(0)
+  const touchStartY = useSharedValue(0)
   const pagerGesture = useMemo(() => Gesture.Pan()
     .withRef(pagerGestureRef)
     .enabled(swipeEnabled)
-    .activeOffsetX([-MAIN_TAB_PAGER_ACTIVE_OFFSET_X, MAIN_TAB_PAGER_ACTIVE_OFFSET_X])
-    .failOffsetY([-MAIN_TAB_PAGER_FAIL_OFFSET_Y, MAIN_TAB_PAGER_FAIL_OFFSET_Y])
+    // The drag's direction decides activation (resolveMainTabPagerAxisDecision):
+    // per-axis offsets dropped fast flicks whose first move crossed both slops.
+    .manualActivation(true)
+    .onTouchesDown((event) => {
+      "worklet"
+      const touch = event.allTouches[0]
+      if (!touch) return
+      touchStartX.value = touch.absoluteX
+      touchStartY.value = touch.absoluteY
+    })
+    .onTouchesMove((event, stateManager) => {
+      "worklet"
+      if (event.numberOfTouches !== 1) {
+        stateManager.fail()
+        return
+      }
+      const touch = event.allTouches[0]
+      if (!touch) return
+      const decision = resolveMainTabPagerAxisDecision(
+        touch.absoluteX - touchStartX.value,
+        touch.absoluteY - touchStartY.value
+      )
+      if (decision === "activate") stateManager.activate()
+      else if (decision === "fail") stateManager.fail()
+    })
     .onBegin(() => {
       "worklet"
       gestureEpoch.value = ui.value.epoch

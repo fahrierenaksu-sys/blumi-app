@@ -32,7 +32,7 @@ function mount(discoveryPreferences: Record<string, unknown> | undefined) {
     }
   )
   const sessionActor = { profile: { userId: "user-a", discoveryPreferences } }
-  const input = {
+  let input = {
     sessionActor,
     isProductionDiscovery: true,
     lobbyCopy: {},
@@ -43,6 +43,11 @@ function mount(discoveryPreferences: Record<string, unknown> | undefined) {
   return {
     runtime,
     read,
+    switchOwner(userId: string) {
+      input = { ...input, sessionActor: { ...input.sessionActor,
+        profile: { ...input.sessionActor.profile, userId, discoveryPreferences: undefined } } }
+      runtime.render(() => useDiscoveryFilters(input))
+    },
     /** The page gains focus (a swipe or tap lands on Discover). */
     async focus() {
       const cleanup = focusEffect?.()
@@ -63,4 +68,16 @@ test("refocusing Discover with unchanged filters keeps the same filters object a
   await discover.focus()
   assert.equal(discover.read().filters, first, "same object, so the deck keeps its seen cards")
   assert.equal(discover.runtime.renderCount, renders, "no Discover render for an unchanged reload")
+})
+
+test("an account switch never treats another account's in-memory fallback as its filters", async () => {
+  const discover = mount(undefined)
+  await discover.focus()
+  discover.read().handleApplyFilters({ ageMin: 30, ageMax: 38, genders: ["woman"], vibes: ["cozy"] })
+  await new Promise((resolve) => setImmediate(resolve))
+  discover.switchOwner("user-b")
+  assert.equal(discover.read().filtersReady, false)
+  await discover.focus()
+  assert.equal(discover.read().filtersReady, true)
+  assert.deepEqual(discover.read().filters, DEFAULT_DISCOVERY_FILTERS)
 })

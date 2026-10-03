@@ -35,6 +35,8 @@ import {
 interface RoomAvatarRenderer2DProps {
   layers: RoomV2AvatarRenderLayer[]
   imagePriority?: "low" | "normal" | "high"
+  /** Keep original sprite pixels when a room camera scales the native image view. */
+  allowDownscaling?: boolean
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
   /**
@@ -68,7 +70,7 @@ interface RoomAvatarBoxSize {
  * still avatars show frame 0 with the frame callback inactive.
  */
 export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: RoomAvatarRenderer2DProps) {
-  const { layers, imagePriority = "high", strideProgress } = props
+  const { layers, imagePriority = "high", allowDownscaling = true, strideProgress } = props
   const reduceMotion = useReducedMotion()
   const animation = useMemo(
     () => getRoomAvatarLayerAnimationState(layers, !reduceMotion),
@@ -126,6 +128,7 @@ export const RoomAvatarRenderer2D = memo(function RoomAvatarRenderer2D(props: Ro
           frameState={frameState}
           boxSize={boxSize}
           imagePriority={imagePriority}
+          allowDownscaling={allowDownscaling}
           onLayerDisplay={props.onLayerDisplay}
           onImageError={props.onImageError}
         />
@@ -141,6 +144,7 @@ interface RoomAvatarLayerProps {
   frameState: SharedValue<RoomAvatarFrameState>
   boxSize: RoomAvatarBoxSize | null
   imagePriority: "low" | "normal" | "high"
+  allowDownscaling: boolean
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
 }
@@ -152,7 +156,7 @@ interface RoomAvatarLayerProps {
  */
 const RoomAvatarLayer = memo(
   function RoomAvatarLayer(props: RoomAvatarLayerProps) {
-    const { layer, animated, signature, frameState, boxSize, imagePriority } = props
+    const { layer, animated, signature, frameState, boxSize, imagePriority, allowDownscaling } = props
     const displayedSlots = useSharedValue<number[]>([])
     const selectedSlot = useSharedValue(0)
     const current = useMemo(
@@ -194,6 +198,7 @@ const RoomAvatarLayer = memo(
             displayedSlots={displayedSlots}
             selectedSlot={selectedSlot}
             imagePriority={imagePriority}
+            allowDownscaling={allowDownscaling}
             onLayerDisplay={slot === slotByFrame[0] ? props.onLayerDisplay : undefined}
             onImageError={props.onImageError}
           />
@@ -207,6 +212,7 @@ const RoomAvatarLayer = memo(
     previous.frameState === next.frameState &&
     previous.boxSize === next.boxSize &&
     previous.imagePriority === next.imagePriority &&
+    previous.allowDownscaling === next.allowDownscaling &&
     previous.onLayerDisplay === next.onLayerDisplay &&
     previous.onImageError === next.onImageError &&
     !shouldRerenderRoomAvatarLayer(
@@ -223,6 +229,7 @@ function RoomAvatarLayerImage(props: {
   displayedSlots: SharedValue<number[]>
   selectedSlot: SharedValue<number>
   imagePriority: "low" | "normal" | "high"
+  allowDownscaling: boolean
   onLayerDisplay?: (id: string) => void
   onImageError?: () => void
 }) {
@@ -245,6 +252,7 @@ function RoomAvatarLayerImage(props: {
               <ExpoImage
                 source={asset.source}
                 contentFit="fill"
+                allowDownscaling={props.allowDownscaling}
                 cachePolicy="memory-disk"
                 priority={imagePriority}
                 transition={0}
@@ -263,6 +271,7 @@ function RoomAvatarLayerImage(props: {
       <ExpoImage
         source={asset.source}
         contentFit="contain"
+        allowDownscaling={props.allowDownscaling}
         cachePolicy="memory-disk"
         priority={imagePriority}
         transition={0}

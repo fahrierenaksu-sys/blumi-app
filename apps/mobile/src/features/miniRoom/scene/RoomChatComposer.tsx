@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useEffect, useLayoutEffect, useRef } from "react"
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { StyleSheet, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
@@ -8,6 +8,7 @@ import { PressableScale } from "../../../ui/PressableScale"
 import { reconcileComposerTextAfterSend } from "../../chat/thread/chatComposerDraftModel"
 import type { ChatDraftTyping } from "../../chat/typing/useChatDraftTyping"
 import type { MiniRoomCopy } from "../miniRoomCopy"
+import type { FailedRoomMessage } from "../useInRoomChat"
 import {
   MINI_ROOM_INPUT_LINE_HEIGHT,
   MINI_ROOM_INPUT_VERTICAL_PADDING,
@@ -23,15 +24,17 @@ const SEND_POP_SCALE = 0.8
 /** The MiniRoom composer row: history toggle, message field and send. */
 export interface RoomChatComposerProps {
   copy: MiniRoomCopy
-  value: string
+  /** Optional controlled mode; the room uses the retained local draft. */
+  value?: string
   suggestionsEnabled: boolean
   disabled: boolean
   mode: MiniRoomPanelMode
   maxInputHeight: number
   inputHeight: number
-  onChangeText: (value: string) => void
+  onChangeText?: (value: string) => void
   /** Sends the draft; true when the message was accepted. */
-  onSubmit: () => boolean
+  onSubmit: (body: string, retryClientMessageId?: string) => boolean
+  failedMessages?: readonly FailedRoomMessage[]
   onToggleHistory: () => void
   onContentHeightChange: (contentHeight: number) => void
   /** Typing signal for the partner (chat_typing); never sees restored text. */
@@ -41,7 +44,7 @@ export interface RoomChatComposerProps {
 export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatComposerProps) {
   const {
     copy,
-    value,
+    value: controlledValue,
     suggestionsEnabled,
     disabled,
     mode,
@@ -51,8 +54,14 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     onSubmit,
     onToggleHistory,
     onContentHeightChange,
-    draftTyping
+    draftTyping,
+    failedMessages = NO_FAILED_MESSAGES
   } = props
+  // Keystrokes belong to this boundary, never the room or transcript.
+  const [localValue, setLocalValue] = useState("")
+  const value = controlledValue ?? localValue
+  const retryIdentity = useRef<FailedRoomMessage | null>(null)
+  const offeredFailures = useRef(new WeakSet<FailedRoomMessage>())
   const inputRef = useRef<TextInput>(null)
   const previousSuggestions = useRef(suggestionsEnabled)
   useEffect(() => {
@@ -77,19 +86,36 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
   // bring it back (chatComposerDraftModel, as in the chat composer); null
   // otherwise.
   const sentDraft = useRef<string | null>(null)
-  // What the input shows, also between a send and the parent's next render.
+  // What the input shows, also between a native change and React's commit.
   const shownText = useRef(value)
-  // The parent owns the draft (a failed message comes back into it).
   useLayoutEffect(() => {
     shownText.current = value
   }, [value])
+  useEffect(() => {
+    if (shownText.current.length > 0) return
+    const failed = failedMessages.find((message) => !offeredFailures.current.has(message))
+    if (!failed) return
+    offeredFailures.current.add(failed)
+    retryIdentity.current = failed
+    sentDraft.current = null
+    shownText.current = failed.body
+    setLocalValue(failed.body)
+    onChangeText?.(failed.body)
+  }, [failedMessages, onChangeText, value])
   const submit = () => {
-    const draft = value
-    if (onSubmit()) {
+    const draft = shownText.current
+    const body = draft.trim()
+    if (!body || disabled) return
+    const retry = retryIdentity.current
+    const retryClientMessageId = retry?.body === body ? retry.clientMessageId : undefined
+    if (onSubmit(body, retryClientMessageId)) {
+      retryIdentity.current = null
       sentDraft.current = draft
       shownText.current = ""
       // Clear the native field too, not only the controlled value.
       inputRef.current?.clear()
+      setLocalValue("")
+      onChangeText?.("")
       hapticSelection()
       if (!motion.reduceMotion) {
         sendPop.value = SEND_POP_SCALE
@@ -134,9 +160,12 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
             sentDraft: sentDraft.current
           })
           sentDraft.current = reconciled.sentDraft
-          shownText.current = reconciled.text
-          onChangeText(reconciled.text)
-          draftTyping?.noteDraft(reconciled.text)
+          const text = reconciled.text.slice(0, MAX_ROOM_MESSAGE_LENGTH)
+          if (retryIdentity.current?.body !== text.trim()) retryIdentity.current = null
+          shownText.current = text
+          setLocalValue(text)
+          onChangeText?.(text)
+          draftTyping?.noteDraft(text)
         }}
         onBlur={draftTyping?.endDraft}
         // The scene opens with the keyboard itself (useMiniRoomKeyboard), never ahead of it.
@@ -173,6 +202,8 @@ export const RoomChatComposer = memo(function RoomChatComposer(props: RoomChatCo
     </View>
   )
 })
+
+const NO_FAILED_MESSAGES: readonly FailedRoomMessage[] = []
 
 const styles = StyleSheet.create({
   composerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6 },

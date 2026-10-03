@@ -345,6 +345,7 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         onActionComplete={handleSafetyActionComplete}
       />
       <MiniRoomScene
+        key={JSON.stringify([sessionActor.profile.userId, miniRoom.miniRoomId, miniRoom.sourceThreadId])}
         roomMotion={roomMotion}
         copy={roomCopy}
         localUser={participants.you}
@@ -366,9 +367,11 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         }}
         inRoomMessages={roomChat.newMessages}
         consumeInRoomMessage={roomChat.consume}
+        consumeInRoomMessages={roomChat.consumeMany}
         canChatSend={roomChat.canSend}
         onSendRoomMessage={roomChat.sendRoomMessage}
         failedRoomMessage={roomChat.failedRoomMessage}
+        failedRoomMessages={roomChat.failedRoomMessages}
         chatHistory={roomChatHistory.items}
         chatHistoryStatus={roomChatHistory.status}
         notices={notices}

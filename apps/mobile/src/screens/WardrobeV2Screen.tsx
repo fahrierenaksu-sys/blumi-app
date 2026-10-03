@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { getWardrobePageCount } from "../features/avatarV2/wardrobe/wardrobeStageLayout"
 import { Text, View } from "react-native"
 import Animated, { useSharedValue } from "react-native-reanimated"
@@ -16,13 +16,16 @@ import {
   getAvatarStudioDefaultCategory,
   getAvatarStudioTabs,
   resolveAvatarStudioCategory,
+  WARDROBE_CATEGORIES,
   type AvatarStudioSectionId,
   type WardrobeCategoryId
 } from "../features/avatarV2/wardrobeCategoryModel"
 import { AVATAR_STUDIO_COPY } from "../features/avatarV2/wardrobe/wardrobeCopy"
 import {
   buildWardrobeCards,
-  getWardrobeActiveItems
+  getWardrobeActiveItems,
+  reuseWardrobeCards,
+  type WardrobeCatalogCardModel
 } from "../features/avatarV2/wardrobe/wardrobeCatalogModel"
 import { getAvatarItemPreviewSource } from "../features/avatarV2/wardrobe/wardrobePreviewSources"
 import { useWardrobeTryOn } from "../features/avatarV2/wardrobe/useWardrobeTryOn"
@@ -56,7 +59,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   const {
     avatar,
     catalog,
-    inventory,
     canEquipItem,
     saveAvatar,
     isSaving,
@@ -85,30 +87,33 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   )
   const activeCategory = resolveAvatarStudioCategory(studioTabs, selectedCategory)
   const activeTab = findAvatarStudioTab(studioTabs, activeCategory)
+  const requestedSectionRef = useRef(activeSection)
+  const requestedCategoryRef = useRef(activeCategory)
+  useLayoutEffect(() => {
+    requestedSectionRef.current = activeSection
+    requestedCategoryRef.current = activeCategory
+  }, [activeCategory, activeSection])
 
-  const activeItems = useMemo(
-    () => getWardrobeActiveItems({
-      catalog,
-      category: activeCategory,
-      bodyId: avatar.bodyId,
-      canEquipItem,
-      isAvailableInShop
-    }),
-    [activeCategory, avatar.bodyId, canEquipItem, catalog, isAvailableInShop]
-  )
-  const visibleWardrobeCards = useMemo(
-    () => buildWardrobeCards({
-      items: activeItems,
-      avatar,
+  // Cache catalog derivation independently of category taps. This stores UI
+  // models only; every inventory/body update rebuilds from current authority.
+  const itemsByCategory = useMemo(() => new Map(WARDROBE_CATEGORIES.map(({ id }) => [
+    id,
+    getWardrobeActiveItems({ catalog, category: id, bodyId: avatar.bodyId, canEquipItem, isAvailableInShop })
+  ])), [avatar.bodyId, canEquipItem, catalog, isAvailableInShop])
+  const previousCardsRef = useRef<ReadonlyMap<WardrobeCategoryId, readonly WardrobeCatalogCardModel[]>>(new Map())
+  const cardsByCategory = useMemo(() => new Map(WARDROBE_CATEGORIES.map(({ id }) => [
+    id,
+    reuseWardrobeCards(previousCardsRef.current.get(id), buildWardrobeCards({
+      items: itemsByCategory.get(id) ?? [],
       displayedAvatar,
-      inventory,
       canEquipItem,
       copy: studioCopy,
       getPreviewSource: getAvatarItemPreviewSource,
       previewingItemId: lockedItem?.id ?? null
-    }),
-    [avatar, canEquipItem, displayedAvatar, inventory, studioCopy, activeItems, lockedItem]
-  )
+    }))
+  ])), [canEquipItem, displayedAvatar, studioCopy, itemsByCategory, lockedItem])
+  useLayoutEffect(() => { previousCardsRef.current = cardsByCategory }, [cardsByCategory])
+  const visibleWardrobeCards = cardsByCategory.get(activeCategory) ?? []
 
   const catalogTransition = useWardrobeCatalogTransition({
     activeCategory,
@@ -119,6 +124,9 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   const catalogPagePosition = useSharedValue(0)
 
   const handleSelectSection = useCallback((section: AvatarStudioSectionId): void => {
+    if (section === requestedSectionRef.current) return
+    requestedSectionRef.current = section
+    requestedCategoryRef.current = getAvatarStudioDefaultCategory(section)
     hapticSelection()
     dismissTryOnPreview()
     clearLockedPreview()
@@ -132,11 +140,17 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   }, [clearLockedPreview, handleEquip])
 
   const handleSelectCategory = useCallback((categoryId: WardrobeCategoryId): void => {
+    if (categoryId === requestedCategoryRef.current) return
+    requestedCategoryRef.current = categoryId
     hapticSelection()
     dismissTryOnPreview()
     clearLockedPreview()
     setSelectedCategory(categoryId)
   }, [clearLockedPreview, dismissTryOnPreview])
+
+  const handleExploreShop = useCallback((): void => {
+    navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })
+  }, [navigation])
 
   const handleClose = useCallback((): void => {
     goBackOrFallback(navigation, () => navigation.replace("MyRoom"))
@@ -218,6 +232,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
             <WardrobeCatalogList
               activeCategory={catalogTransition.shownCategory}
               cards={catalogTransition.cards}
+              cardsByCategory={cardsByCategory}
               catalogStyle={catalogTransition.style}
               switching={catalogTransition.switching}
               copy={studioCopy}
@@ -226,7 +241,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
               onPreviewLocked={previewLockedItem}
               onPageChange={setCatalogPage}
               pagePosition={catalogPagePosition}
-              onExploreShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "avatar" })}
+              onExploreShop={handleExploreShop}
             />
           </WardrobeGlass>
         </Animated.View>

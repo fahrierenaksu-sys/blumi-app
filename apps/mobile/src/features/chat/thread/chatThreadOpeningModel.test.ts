@@ -221,6 +221,38 @@ test("a future optimistic newest row does not evict the oldest row when a partne
   assert.equal(countChatRowsAddedWithinWindow([message("old-page", 0), ...confirmed, optimistic], [], previous, id => id), 0)
 })
 
+test("retained local sends, ACK aliases and live invitations merge in canonical order without duplicates", () => {
+  const messages = [message("__local_old", 0), message("server-ack", 2), message("recent-a", 2), message("recent-b", 3)]
+    .sort((first, second) => Date.parse(first.sentAt) - Date.parse(second.sentAt))
+  const invites = [0, 2, 4].map((minute) => ({
+    kind: "room_invite" as const, inviteId: `synthetic-invite-${minute}`, threadId: "thread-1",
+    senderUserId: "partner", recipientUserId: "me", createdAt: message("date", minute).sentAt,
+    status: "accepted" as const
+  }))
+  const renderKey = (id: string) => id === "server-ack" ? "__local_acked" : id
+  const retainedMessageKeys = new Set(["message:__local_acked"])
+  const retainedInviteIds = new Set([invites[0]!.inviteId])
+  const actual = buildChatThreadWindow(messages, invites, 10, renderKey, new Set(), retainedMessageKeys, undefined, retainedInviteIds)
+  assert.deepEqual(actual, buildChatTimeline(messages, invites, renderKey))
+  assert.equal(actual.filter(row => row.kind === "room_invite" && row.inviteId === invites[0]!.inviteId).length, 1)
+  assert.ok(actual.some(row => row.kind === "message" && row.renderKey === "__local_acked"), "the server ACK keeps its local row identity")
+})
+
+test("a duplicate pinned invitation still keeps its latest record beside equal-time recent rows", () => {
+  const recent = message("synthetic-recent", 2)
+  const earlierInvite = {
+    kind: "room_invite" as const, inviteId: "synthetic-pinned", threadId: "thread-1",
+    senderUserId: "partner", recipientUserId: "me", createdAt: recent.sentAt, status: "pending" as const
+  }
+  const updatedInvite = { ...earlierInvite, status: "accepted" as const }
+  const nextInvite = { ...earlierInvite, inviteId: "synthetic-recent-invite", status: "declined" as const }
+  const invites = [nextInvite, earlierInvite, updatedInvite]
+  const actual = buildChatThreadWindow([recent], invites, 20, id => id, new Set(), new Set(), undefined,
+    new Set([earlierInvite.inviteId]))
+  assert.deepEqual(actual, buildChatTimeline([recent], [nextInvite, updatedInvite]))
+  assert.equal(actual.filter(row => row.kind === "room_invite" && row.inviteId === earlierInvite.inviteId).length, 1)
+})
+
 test("old invitations and untracked local rows have a cached reveal path without a server cursor", () => {
   const invites = Array.from({ length: 25 }, (_, index) => ({
     kind: "room_invite" as const, inviteId: `invite-${index}`, threadId: "thread-1",

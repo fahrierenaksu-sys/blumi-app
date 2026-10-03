@@ -11,6 +11,7 @@ import {
   MAIN_TAB_SWIPE_MIN_INDEX
 } from "./mainTabPagerConfig"
 import {
+  resolveMainTabPagerAxisDecision,
   createMainTabPagerUiState,
   clampMainTabPagerPosition,
   getMainTabPageAccessibility,
@@ -707,4 +708,30 @@ test("idle warm-up picks the nearest never-mounted page, one at a time, until al
 
 test("the bottom bar lists the main pages in pager order", () => {
   assert.deepEqual(MAIN_TAB_PAGES.map((page) => page.key), [...BOTTOM_NAV_KEY_ORDER])
+})
+
+test("a fast flick whose first move crosses both slops still swipes the page", () => {
+  // Fixed per-axis offsets failed this: the vertical slop was crossed too.
+  assert.equal(resolveMainTabPagerAxisDecision(34, 14), "activate")
+  assert.equal(resolveMainTabPagerAxisDecision(-60, 22), "activate")
+})
+
+test("a horizontal drag with a natural thumb arc swipes the page", () => {
+  assert.equal(resolveMainTabPagerAxisDecision(14, 11), "activate")
+  assert.equal(resolveMainTabPagerAxisDecision(-20, -16), "activate")
+})
+
+test("a vertical or mostly vertical drag fails so lists keep scrolling", () => {
+  assert.equal(resolveMainTabPagerAxisDecision(3, 14), "fail")
+  assert.equal(resolveMainTabPagerAxisDecision(12, 13), "fail")
+  assert.equal(resolveMainTabPagerAxisDecision(-18, 26), "fail")
+})
+
+test("small or still-ambiguous movement waits, and ambiguity ends as a scroll", () => {
+  assert.equal(resolveMainTabPagerAxisDecision(8, 2), "undecided")
+  assert.equal(resolveMainTabPagerAxisDecision(0, 0), "undecided")
+  // Diagonal but neither dominant enough nor vertical-dominant yet.
+  assert.equal(resolveMainTabPagerAxisDecision(26, 24), "undecided")
+  assert.equal(resolveMainTabPagerAxisDecision(33, 30), "fail")
+  assert.equal(resolveMainTabPagerAxisDecision(Number.NaN, 4), "undecided")
 })

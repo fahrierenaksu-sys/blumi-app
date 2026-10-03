@@ -3,10 +3,12 @@ import test from "node:test"
 import {
   createFakeReactRuntime,
   createReactNativeStub,
+  createReanimatedStub,
   loadSourceWithFakeReact
 } from "../../../testing/hookHarness"
 import { getMiniRoomCopy } from "../miniRoomCopy"
 import type * as SceneModule from "./MiniRoomScene"
+import type * as ComposerModule from "./RoomChatComposer"
 
 type Element = { type: unknown; props: Record<string, any> }
 
@@ -22,11 +24,12 @@ function findAll(node: unknown, match: (element: Element) => boolean, found: Ele
   return found
 }
 
-function mountTypingScene() {
+function mountTypingScene(messages: { messageId: string; senderUserId: string; body: string }[] = []) {
   const runtime = createFakeReactRuntime()
   const dismissals: number[] = []
   const moves: unknown[] = []
   const hotspotMoves: string[] = []
+  const speechBatches: unknown[] = [], consumedBatches: unknown[] = []
   const Keyboard = { dismiss: () => dismissals.push(dismissals.length + 1) }
   const native = createReactNativeStub({ Keyboard })
   const floorLayer = () => null
@@ -44,8 +47,11 @@ function mountTypingScene() {
     moveLocalAvatar: (target: unknown) => moves.push(target),
     moveLocalAvatarToHotspot: (id: string) => hotspotMoves.push(id),
     sayPhrase: () => undefined,
+    sayPhrases: (batch: unknown) => speechBatches.push(batch),
     deferUntilArrivalLands: () => true
   }
+  const cameraPresentation = { cameraStyle: {}, transition: { value: {} }, contentProgress: { value: 1 } }
+  const scrollPresentation = { noteMessageSent: () => undefined, requestScrollToLatest: () => undefined, request: 0 }
   const modules = {
     "react-native": native.module,
     "react-native-reanimated": { __esModule: true, default: { View: "Reanimated.View" } },
@@ -75,11 +81,10 @@ function mountTypingScene() {
     },
     "./useMiniRoomKeyboard": { useMiniRoomKeyboard: () => ({ visible: true, progress: { value: 1 }, openHeight: { value: 300 } }) },
     "./useMiniRoomCameraTransform": {
-      useMiniRoomCameraTransform: () => ({ cameraStyle: {}, transition: { value: {} }, contentProgress: { value: 1 } })
+      useMiniRoomCameraTransform: () => cameraPresentation
     },
     "./useMiniRoomMotionPresentation": { useMiniRoomMotionPresentation: () => false },
-    "./useMiniRoomScrollToLatest": { useMiniRoomScrollToLatest: () => ({ noteMessageSent: () => undefined,
-      requestScrollToLatest: () => undefined, request: { value: 0 } }) },
+    "./useMiniRoomScrollToLatest": { useMiniRoomScrollToLatest: () => scrollPresentation },
     "../useMiniRoomKeyboardPreference": { useMiniRoomKeyboardPreference: () => ({ suggestionsEnabled: false,
       toggle: () => undefined }) },
     "../roomComposerModel": { resolveComposerRestore: () => "", resolveRoomComposerSubmit: () => ({ kind: "empty" }) }
@@ -88,7 +93,7 @@ function mountTypingScene() {
     "features/miniRoom/scene/MiniRoomScene.tsx", runtime, { modules }
   )
   const copy = getMiniRoomCopy("en")
-  runtime.render(() => MiniRoomScene({
+  const props: Parameters<typeof SceneModule.MiniRoomScene>[0] = {
     copy,
     localUser: { userId: "", displayName: "Me" },
     partnerUser: { userId: "", displayName: "Bora" },
@@ -101,12 +106,14 @@ function mountTypingScene() {
     onOpenSafety: () => undefined,
     onRetryConnect: () => undefined,
     onToggleMic: () => undefined,
-    inRoomMessages: [],
+    inRoomMessages: messages as never,
     consumeInRoomMessage: () => undefined,
+    consumeInRoomMessages: (ids) => consumedBatches.push(ids),
     canChatSend: true,
     onSendRoomMessage: () => true
-  }))
-  return { runtime, dismissals, moves, hotspotMoves, floorLayer, hotspotLayer, chatPanel, composer, hud }
+  }
+  runtime.render(() => MiniRoomScene(props))
+  return { runtime, dismissals, moves, hotspotMoves, floorLayer, hotspotLayer, chatPanel, composer, hud, speechBatches, consumedBatches }
 }
 
 test("room, hotspot and empty-area taps keep typing open; only the two chat controls dismiss it", () => {
@@ -136,4 +143,41 @@ test("room, hotspot and empty-area taps keep typing open; only the two chat cont
   } finally {
     scene.runtime.unmount()
   }
+})
+
+test("speech-only scene updates retain the chat child and panel inputs; bursts are queued and consumed together", () => {
+  const messages = ["a", "b", "c"].map((messageId) => ({ messageId, senderUserId: "partner", body: "Message" }))
+  const scene = mountTypingScene(messages)
+  try {
+    assert.deepEqual(scene.consumedBatches, [["a", "b", "c"]])
+    assert.equal(scene.speechBatches.length, 1)
+    const panel = () => findAll(scene.runtime.output, (element) => element.type === scene.chatPanel)[0]!
+    const before = panel().props
+    const composer = findAll(scene.runtime.output, (element) => element.type === scene.composer)[0]!
+    assert.equal(composer.props.onChangeText, undefined, "typing never publishes draft state to the scene")
+    const composerRuntime = createFakeReactRuntime()
+    const { RoomChatComposer } = loadSourceWithFakeReact<typeof ComposerModule>(
+      "features/miniRoom/scene/RoomChatComposer.tsx", composerRuntime, {
+        modules: {
+          "react-native": createReactNativeStub({ TextInput: "TextInput" }).module,
+          "react-native-reanimated": createReanimatedStub(composerRuntime).module,
+          "../../../ui/motion": { useMotion: () => ({ reduceMotion: true }) },
+          "../../../ui/haptics": { hapticSelection: () => undefined },
+          "../../../ui/PressableScale": { PressableScale: "Pressable" },
+          "@expo/vector-icons/Ionicons": { __esModule: true, default: "Ionicons" }
+        }, real: ["./miniRoomLayout", "../../chat/thread/chatComposerDraftModel"], globals: { setTimeout, clearTimeout }
+      })
+    composerRuntime.render(() => (RoomChatComposer as any)(composer.props))
+    const sceneRenders = scene.runtime.renderCount
+    for (const text of ["a", "ab", "abc"]) {
+      findAll(composerRuntime.output, (element) => element.type === "TextInput")[0]!.props.onChangeText(text)
+    }
+    assert.equal(findAll(composerRuntime.output, (element) => element.type === "TextInput")[0]!.props.value, "abc")
+    assert.equal(scene.runtime.renderCount, sceneRenders, "real composer edits do not update room hooks")
+    composerRuntime.unmount()
+    scene.runtime.rerender()
+    const after = panel().props
+    for (const key of Object.keys(before)) assert.equal(after[key], before[key], `panel ${key} remains memo-compatible`)
+    assert.equal(scene.speechBatches.length, 1, "same pending snapshot is not replayed on unrelated render")
+  } finally { scene.runtime.unmount() }
 })

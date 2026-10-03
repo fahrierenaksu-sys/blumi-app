@@ -82,11 +82,19 @@ export function nextMiniRoomSpeechExpiry(stack: MiniRoomSpeechStack): number | u
 
 /** Each speaker's lines, oldest first (drawn top to bottom). */
 export function groupMiniRoomSpeechBySpeaker<T extends { speakerUserId: string }>(
-  lines: readonly T[]
+  lines: readonly T[],
+  previous: Readonly<Record<string, readonly T[]>> = {}
 ): Readonly<Record<string, readonly T[]>> {
   const groups: Record<string, T[]> = {}
   for (const line of lines) (groups[line.speakerUserId] ??= []).push(line)
-  return groups
+  const next: Record<string, readonly T[]> = {}
+  for (const [speaker, group] of Object.entries(groups)) {
+    const prior = previous[speaker]
+    next[speaker] = prior?.length === group.length && group.every((line, index) => line === prior[index])
+      ? prior
+      : group
+  }
+  return next
 }
 
 export function hasMiniRoomSpeechFrom(stack: MiniRoomSpeechStack, speakerUserId: string): boolean {

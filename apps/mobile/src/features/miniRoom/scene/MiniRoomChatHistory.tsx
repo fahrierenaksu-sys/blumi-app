@@ -11,9 +11,9 @@ import {
 } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { animateToAfter, MOTION_STAGGER, useMotion } from "../../../ui/motion"
-import { createFirstAppearanceStagger } from "./miniRoomFirstAppearance"
+import { createFirstAppearanceStagger, type FirstAppearanceStagger } from "./miniRoomFirstAppearance"
 import type { MiniRoomCopy } from "../miniRoomCopy"
-import { formatRoomChatTime, type RoomChatHistoryItem, type RoomChatHistoryStatus } from "../roomChatHistoryModel"
+import { formatRoomChatTime, roomChatHistoryKeyOf, type RoomChatHistoryItem, type RoomChatHistoryStatus } from "../roomChatHistoryModel"
 
 interface MiniRoomChatHistoryProps {
   copy: MiniRoomCopy
@@ -37,24 +37,26 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
   const listRef = useRef<FlatList<RoomChatHistoryItem>>(null)
   const measuredHeights = useRef(new Map<string, number>())
   const lastReportedHeight = useRef<number | null>(null)
+  const committedPresentation = useRef({ items, onRecentRowsHeightChange })
   const reportRecentHeight = useCallback(() => {
-    const recent = items.slice(0, 2)
-    const heights = recent.map((item) => measuredHeights.current.get(item.id))
+    const recent = committedPresentation.current.items.slice(0, 2)
+    const heights = recent.map((item) => measuredHeights.current.get(roomChatHistoryKeyOf(item)))
     if (heights.some((rowHeight) => rowHeight === undefined)) return
     const total = heights.reduce<number>((sum, rowHeight) => sum + (rowHeight ?? 0), 0)
       + (recent.length > 1 ? RECENT_ROW_GAP : 0)
     if (total !== lastReportedHeight.current) {
       lastReportedHeight.current = total
-      onRecentRowsHeightChange?.(total)
+      committedPresentation.current.onRecentRowsHeightChange?.(total)
     }
-  }, [items, onRecentRowsHeightChange])
-  useEffect(() => {
-    const currentKeys = new Set(items.map(keyOf))
+  }, [])
+  useLayoutEffect(() => {
+    committedPresentation.current = { items, onRecentRowsHeightChange }
+    const currentKeys = new Set(items.map(roomChatHistoryKeyOf))
     for (const key of measuredHeights.current.keys()) {
       if (!currentKeys.has(key)) measuredHeights.current.delete(key)
     }
     reportRecentHeight()
-  }, [items, reportRecentHeight])
+  }, [items, onRecentRowsHeightChange, reportRecentHeight])
   const measureRow = useCallback((id: string, rowHeight: number) => {
     if (!Number.isFinite(rowHeight) || rowHeight <= 0) return
     const measured = Math.ceil(rowHeight)
@@ -65,11 +67,11 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
   // The transcript's first appearance staggers its newest rows in (MOTION
   // `stagger`); later messages and remounted rows appear at rest.
   const [stagger] = useState(() => createFirstAppearanceStagger())
-  stagger.arm(items.slice(0, MOTION_STAGGER.maxItems).map(keyOf))
+  stagger.arm(items.slice(0, MOTION_STAGGER.maxItems).map(roomChatHistoryKeyOf))
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<RoomChatHistoryItem>) => (
       <HistoryRow item={item} copy={copy} partnerName={partnerName} onMeasure={measureRow}
-        enterSlot={stagger.slotOf(item.id)} onEntered={stagger.markEntered} />
+        stagger={stagger} />
     ),
     [copy, partnerName, measureRow, stagger]
   )
@@ -104,7 +106,7 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
         ref={listRef}
         inverted
         data={items}
-        keyExtractor={keyOf}
+        keyExtractor={roomChatHistoryKeyOf}
         renderItem={renderItem}
         ItemSeparatorComponent={Separator}
         contentContainerStyle={styles.listContent}
@@ -118,8 +120,6 @@ export function MiniRoomChatHistory(props: MiniRoomChatHistoryProps) {
     </View>
   )
 }
-
-const keyOf = (item: RoomChatHistoryItem): string => item.id
 
 function Separator() {
   return <View style={styles.separator} />
@@ -152,12 +152,11 @@ const HistoryRow = memo(function HistoryRow(props: {
   copy: MiniRoomCopy
   partnerName: string
   onMeasure: (id: string, height: number) => void
-  /** This row's first-appearance stagger slot, or null to appear at rest. */
-  enterSlot: number | null
-  onEntered: (id: string) => void
+  stagger: FirstAppearanceStagger
 }) {
-  const { item, copy, partnerName, onMeasure, enterSlot, onEntered } = props
-  const entranceStyle = useHistoryRowEntrance(item.id, enterSlot, onEntered)
+  const { item, copy, partnerName, onMeasure, stagger } = props
+  const renderKey = roomChatHistoryKeyOf(item)
+  const entranceStyle = useHistoryRowEntrance(renderKey, stagger.slotOf(renderKey), stagger.markEntered)
   const sender = item.mine ? copy.youLabel : partnerName
   const status = item.delivery === "failed"
     ? copy.messageNotSent
@@ -169,8 +168,8 @@ const HistoryRow = memo(function HistoryRow(props: {
   const hasMetadata = Boolean(metadata) || showSentCheck
   const label = copy.messageFrom(sender, item.body) + (time ? `, ${time}` : "") + (status ? `, ${status}` : "")
   const onLayout = useCallback((event: LayoutChangeEvent) => {
-    onMeasure(item.id, event.nativeEvent.layout.height)
-  }, [item.id, onMeasure])
+    onMeasure(renderKey, event.nativeEvent.layout.height)
+  }, [renderKey, onMeasure])
   return (
     <Animated.View accessible accessibilityLabel={label} onLayout={onLayout}
       style={[styles.row, item.mine ? styles.rowMine : null, entranceStyle]}>

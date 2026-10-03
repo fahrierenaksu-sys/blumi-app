@@ -18,16 +18,25 @@ export function useInboxClock(navigation: FocusNavigation): number {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
+    let generation = 0
     const stop = (): void => {
+      generation += 1
       if (timer !== undefined) clearTimeout(timer)
       timer = undefined
     }
     const schedule = (): void => {
       stop()
       if (!navigation.isFocused() || AppState.currentState !== "active") return
-      timer = setTimeout(tick, getInboxClockRefreshDelayMs(Date.now()))
+      const expected = generation
+      timer = setTimeout(() => {
+        if (expected === generation) tick()
+      }, getInboxClockRefreshDelayMs(Date.now()))
     }
     function tick(): void {
+      if (!navigation.isFocused() || AppState.currentState !== "active") {
+        stop()
+        return
+      }
       setNow(Date.now())
       schedule()
     }

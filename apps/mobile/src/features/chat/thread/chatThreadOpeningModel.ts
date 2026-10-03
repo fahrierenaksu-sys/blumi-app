@@ -53,8 +53,23 @@ export function buildChatThreadWindow(
   const recentInvites = [...new Map(roomInvites.map(invite => [invite.inviteId, invite])).values()]
     .filter(invite => !retainedInviteIds.has(invite.inviteId)).sort(compareRows).slice(-messageLimit)
   const recentRows = buildChatTimeline(recentMessages, messageLimit ? recentInvites : [], getRenderKey).slice(-messageLimit)
-  return buildChatTimeline([...recentRows.filter(item => item.kind === "message").map(item => item.message), ...localMessages],
-    [...recentRows.filter((item): item is ChatRoomInviteTimelineItem => item.kind === "room_invite"), ...pinnedInvites], getRenderKey)
+  const retainedRows = buildChatTimeline(localMessages, pinnedInvites, getRenderKey)
+  if (!retainedRows.length) return recentRows
+  if (!recentRows.length) return retainedRows
+  // Both windows already have canonical chronological order. Rebuilding the
+  // recent window would allocate every message row again and re-sort the
+  // expanded history whenever a live message or an invitation changes.
+  const timeline: ChatTimelineItem[] = []
+  let recentIndex = 0
+  let retainedIndex = 0
+  while (recentIndex < recentRows.length && retainedIndex < retainedRows.length) {
+    if (compareRows(recentRows[recentIndex]!, retainedRows[retainedIndex]!) <= 0) {
+      timeline.push(recentRows[recentIndex++]!)
+    } else {
+      timeline.push(retainedRows[retainedIndex++]!)
+    }
+  }
+  return timeline.concat(recentRows.slice(recentIndex), retainedRows.slice(retainedIndex))
 }
 
 /**

@@ -65,6 +65,7 @@ import {
   getChatThreadScreenOptions,
   getDetailScreenOptions,
   getReducedMotionScreenOptions,
+  getMiniRoomScreenOptions,
   getOnboardingEntryRoute,
   MAIN_TAB_SCREEN_OPTIONS,
   ROOT_STACK_SCREEN_OPTIONS
@@ -814,7 +815,7 @@ export function RootNavigator() {
               ))}
               <Stack.Screen
                 name="MiniRoom"
-                options={{ headerShown: false, gestureEnabled: false }}
+                options={getMiniRoomScreenOptions(reduceMotion)}
               >
                 {(screenProps) => (
                   <MiniRoomScreen

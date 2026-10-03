@@ -95,6 +95,9 @@ export const styles = StyleSheet.create({
   controlDisabled: {
     opacity: 0.4
   },
+  selectionControlPressed: {
+    opacity: 0.7
+  },
   title: {
     flex: 1,
     color: roomEditorTheme.ink,
@@ -301,6 +304,24 @@ export const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     lineHeight: 16
+  },
+  capsuleConfirmButton: {
+    width: 36,
+    height: 36,
+    paddingHorizontal: 0
+  },
+  inventoryItemClose: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: CONTROL_SURFACE,
+    borderWidth: 1,
+    borderColor: roomEditorTheme.edge
   },
 
   // Room style chooser (only with more than one shell)

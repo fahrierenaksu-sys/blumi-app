@@ -8,7 +8,6 @@ import {
   ReduceMotion,
   useAnimatedRef,
   useSharedValue,
-  withDelay,
   withSequence,
   withTiming,
   type SharedValue
@@ -29,7 +28,6 @@ import { ACTIVE_ROOM_FURNITURE_CATALOG } from "./roomEditorCatalog"
 import {
   ROOM_EDITOR_DRAG_ACTIVATION_DELAY_MS,
   ROOM_EDITOR_DRAG_GHOST_OPACITY,
-  ROOM_EDITOR_DRAG_SETTLE_FADE_MS,
   getRoomEditorDragCellHaptic,
   ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE,
   ROOM_EDITOR_DRAG_LIFT_SCALE,
@@ -65,6 +63,8 @@ import type { RoomEditorStageLayout } from "./useRoomEditorStageLayout"
 /** What the floating drag ghost shows; its position lives in shared values. */
 export interface RoomEditorDragGhostContent {
   session: number
+  /** The room piece replaced by this overlay; other users of the overlay omit it. */
+  renderId?: string
   source: FurnitureItem["asset"]["source"]
   mirrored: boolean
   frame: RoomEditorDragGhostFrame
@@ -110,8 +110,6 @@ type ActiveDrag =
 
 /** Drop: the piece comes down and squashes over this long before it settles. */
 const ROOM_EDITOR_DRAG_DROP_MS = 80
-/** The settled ghost stays over the placed piece this long, then fades. */
-const ROOM_EDITOR_DRAG_SETTLE_HOLD_MS = 140
 
 const EMPTY_STAGE_BOUNDS: StageWindowBounds = { x: 0, y: 0, width: 0, height: 0 }
 
@@ -276,30 +274,26 @@ export function useRoomEditorDragGestures(input: {
     })
   }, [clearGhost, ghostLift, ghostOpacity, ghostOriginX, ghostOriginY, ghostScale, ghostX, ghostY, reduceMotion, snappy])
 
-  // A valid drop: the piece is already placed under the ghost, so the ghost
-  // settles from its lift scale and fades into it (ROOM-10).
+  // The overlay is the only visible copy until settling finishes. Keep it
+  // opaque, then hand rendering back to the placed piece in one render.
   const settleGhost = useCallback((session: number) => {
     "worklet"
     if (reduceMotion) {
-      ghostOpacity.value = 0
+      ghostOpacity.value = 1
       ghostScale.value = 1
       ghostLift.value = 0
       scheduleOnRN(clearGhost, session)
       return
     }
     // Drop: down onto the floor, a small squash, then settle (snappy).
+    ghostOpacity.value = 1
     ghostLift.value = withTiming(0, { duration: ROOM_EDITOR_DRAG_DROP_MS, reduceMotion: ReduceMotion.Never })
     ghostScale.value = withSequence(
       withTiming(ROOM_EDITOR_DRAG_DROP_SQUASH_SCALE, { duration: ROOM_EDITOR_DRAG_DROP_MS, reduceMotion: ReduceMotion.Never }),
-      animateTo(1, snappy)
-    )
-    ghostOpacity.value = withDelay(
-      ROOM_EDITOR_DRAG_SETTLE_HOLD_MS,
-      withTiming(0, { duration: ROOM_EDITOR_DRAG_SETTLE_FADE_MS, reduceMotion: ReduceMotion.Never }, (finished) => {
+      animateTo(1, snappy, (finished) => {
         "worklet"
         if (finished) scheduleOnRN(clearGhost, session)
-      }),
-      ReduceMotion.Never
+      })
     )
   }, [clearGhost, ghostLift, ghostOpacity, ghostScale, reduceMotion, snappy])
 
@@ -355,6 +349,7 @@ export function useRoomEditorDragGestures(input: {
       input.inventory.setSelectedInventoryRotation(item.rotation)
       setGhost({
         session,
+        renderId,
         source: item.asset.source,
         mirrored: item.usesMirroredRotation,
         frame: getRoomEditorDragGhostFrame(item, roomLayout),
@@ -384,11 +379,14 @@ export function useRoomEditorDragGestures(input: {
       const stage = dragStage.value.width > 0 ? dragStage.value : stageWindowBounds ?? roomLayout
       hapticMedium()
       input.selection.setSelectedInstanceId(instanceId)
+      input.inventory.setSelectedInventoryItemId(itemId)
+      input.inventory.setSelectedInventoryRotation(rotation)
       input.selection.updatePlacementPreview(undefined)
       input.selection.updatePlacementFeedback(getRoomPlacementSurfaceDropFeedback(item, input.copy))
       if (renderItem) {
         setGhost({
           session,
+          renderId: instanceId,
           source: renderItem.asset.source,
           mirrored: renderItem.usesMirroredRotation,
           frame: getRoomEditorDragGhostFrame(renderItem, stage),
@@ -512,8 +510,13 @@ export function useRoomEditorDragGestures(input: {
         stateManager.fail()
         return
       }
-      const x = touch.x / size.width
-      const y = touch.y / size.height
+      const measured = measure(stageAnimatedRef)
+      if (!measured || measured.width <= 0 || measured.height <= 0) {
+        stateManager.fail()
+        return
+      }
+      const x = (touch.absoluteX - measured.pageX) / measured.width
+      const y = (touch.absoluteY - measured.pageY) / measured.height
       const rects = hitRects.value
       const index = findRoomEditorDragHitRect(rects, x, y)
       if (index < 0) {
@@ -529,33 +532,32 @@ export function useRoomEditorDragGestures(input: {
       "worklet"
       const session = dragSession.value + 1
       dragSession.value = session
-      const size = stageSize.value
-      // The pan's own view is the stage, so its window origin is exact.
-      dragStage.value = {
-        x: event.absoluteX - event.x,
-        y: event.absoluteY - event.y,
-        width: size.width,
-        height: size.height
-      }
+      // Child-relative event.x/y are unreliable when a furniture Pressable
+      // owns the touch. Both the preview and overlay use the measured room.
+      const measured = measure(stageAnimatedRef)
+      dragStage.value = measured && measured.width > 0
+        ? { x: measured.pageX, y: measured.pageY, width: measured.width, height: measured.height }
+        : stageBounds.value
+      const bounds = dragStage.value
       const cell = getRoomEditorDragCell(getRoomEditorStageDragPoint({
-        localX: event.x,
-        localY: event.y,
-        stageWidth: size.width,
-        stageHeight: size.height,
+        localX: event.absoluteX - bounds.x,
+        localY: event.absoluteY - bounds.y,
+        stageWidth: bounds.width,
+        stageHeight: bounds.height,
         grabOffsetX: grabOffsetX.value,
         grabOffsetY: grabOffsetY.value
       }), dragFloor.value)
       lastColumn.value = cell.column
       lastRow.value = cell.row
       liftGhost(
-        event.absoluteX - grabOffsetX.value * size.width,
-        event.absoluteY - grabOffsetY.value * size.height
+        event.absoluteX - grabOffsetX.value * bounds.width,
+        event.absoluteY - grabOffsetY.value * bounds.height
       )
       scheduleOnRN(beginStageDrag, session, grabRenderId.value, cell.column, cell.row)
     })
     .onUpdate((event) => {
       "worklet"
-      const size = stageSize.value
+      const size = dragStage.value
       const floor = dragFloor.value
       // Plain-grid pieces follow the finger; floor pieces sit on their cell.
       if (!floor) {
@@ -563,8 +565,8 @@ export function useRoomEditorDragGestures(input: {
         ghostY.value = event.absoluteY - grabOffsetY.value * size.height
       }
       const cell = getRoomEditorDragCell(getRoomEditorStageDragPoint({
-        localX: event.x,
-        localY: event.y,
+        localX: event.absoluteX - size.x,
+        localY: event.absoluteY - size.y,
         stageWidth: size.width,
         stageHeight: size.height,
         grabOffsetX: grabOffsetX.value,
@@ -603,6 +605,8 @@ export function useRoomEditorDragGestures(input: {
     moveGhostToCell,
     releaseDrag,
     sceneFloor,
+    stageAnimatedRef,
+    stageBounds,
     stageSize
   ])
 

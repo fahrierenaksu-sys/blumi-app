@@ -7,6 +7,9 @@ import type { useShopCatalogProducts } from "./useShopCatalogProducts"
 import type { useShopPreviewModel } from "./useShopPreviewModel"
 import type { useShopOwnedAvatarItemIds } from "./useShopOwnedAvatarItemIds"
 import type { useRetainedShopPreviewDrawing } from "./shopRetainedPreviewModel"
+import type * as RetainedShelves from "./shopRetainedShelfModel"
+import type { ClosetBrowser } from "./ClosetBrowser"
+import type { ShopCatalogItem } from "../shopCatalog"
 import type { ShopPreviewPanel } from "../ShopPreviewPanel"
 import type { ShopModeDock, ShopMode } from "../ShopNavigationControls"
 import type * as CardSelectionModule from "./ShopCardSelection"
@@ -29,6 +32,167 @@ const { DEFAULT_ROOM_V2_SHELL_ID, ROOM_V2_SHELL_CATALOG, ROOM_V2_FURNITURE_CATAL
 const avatarProductOrder = require("./shopAvatarProductOrder") as typeof import("./shopAvatarProductOrder")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
 const roomSelectors = require("../../roomV2/roomV2Selectors") as typeof import("../../roomV2/roomV2Selectors")
+
+function loadRetainedShelves(runtime: ReturnType<typeof createFakeReactRuntime>) {
+  return loadSourceWithFakeReact<typeof RetainedShelves>(
+    "features/shop/screen/shopRetainedShelfModel.ts", runtime, {
+      modules: {
+        "../../../ui/haptics": { hapticSelection: () => undefined },
+        "../../performance/sceneAssetWarmupModel": { publishSelectedShopPreviewWarmup: () => undefined }
+      },
+      real: ["./shopScreenModel"]
+    }
+  )
+}
+
+test("alternating Shop modes reuses category shelves and hidden ownership changes stay current", () => {
+  const shop = mountCatalog()
+  const first = shop.first
+  const item = first.avatarProducts.find((product) => product.actionType === "avatarUnlock" && product.avatarItem?.type === "hair")
+  assert.ok(item)
+  shop.update({ shopMode: "avatar", selectedCategoryId: "hair" })
+  const hair = shop.update({ shopMode: "avatar", selectedCategoryId: "hair" })
+  shop.update({ shopMode: "home", selectedCategoryId: "all" })
+  const returned = shop.update({ shopMode: "avatar", selectedCategoryId: "hair" })
+  assert.equal(returned.categoryOptions, hair.categoryOptions)
+  assert.equal(returned.filteredProducts, hair.filteredProducts)
+  assert.equal(returned.catalogsByMode, first.catalogsByMode)
+  shop.update({ shopMode: "home", selectedCategoryId: "all" })
+  const unlockedWhileHidden = shop.update({ inventory: {
+    ...shop.input.inventory, ownedAvatarItemIds: [item.sourceItemId]
+  } })
+  const currentHair = unlockedWhileHidden.catalogsByMode.avatar.productsByCategory.get("hair")
+  assert.equal(currentHair?.find((product) => product.id === item.id)?.actionType, "avatarEquip")
+  const resumed = shop.update({ shopMode: "avatar", selectedCategoryId: "hair" })
+  assert.equal(resumed.filteredProducts, currentHair)
+  assert.equal(resumed.filteredProducts.find((product) => product.id === item.id)?.owned, true)
+  const cleared = shop.update({ inventory: { ...shop.input.inventory, ownedAvatarItemIds: [] } })
+  assert.equal(cleared.filteredProducts.find((product) => product.id === item.id)?.actionType, "avatarUnlock")
+})
+
+test("retained shelves start lazily, reuse visit identities and evict the oldest category of that mode", () => {
+  const runtime = createFakeReactRuntime()
+  const hook = loadRetainedShelves(runtime).useRetainedShopShelves
+  let mode: ShopMode = "avatar"
+  let category = "hair"
+  const initial = runtime.render(() => hook(mode, category))
+  assert.deepEqual(initial.map((shelf) => shelf.scope), ["avatar:hair"])
+  const hair = initial[0]
+  mode = "home"; category = "all"
+  const home = runtime.rerender() as ReturnType<typeof hook>
+  const all = home.find((shelf) => shelf.mode === "home")
+  mode = "avatar"; category = "hair"
+  const resumed = runtime.rerender() as ReturnType<typeof hook>
+  assert.equal(resumed.find((shelf) => shelf.scope === hair.scope), hair)
+  assert.equal(resumed.find((shelf) => shelf.mode === "home"), all)
+  category = "top"; runtime.rerender()
+  category = "hair"; runtime.rerender()
+  category = "bottom"
+  const bounded = runtime.rerender() as ReturnType<typeof hook>
+  assert.deepEqual(bounded.map((shelf) => shelf.scope).sort(), ["avatar:bottom", "avatar:hair", "home:all"])
+})
+
+test("same-commit mode bursts keep the final tap and repeated active taps preserve selection", () => {
+  const runtime = createFakeReactRuntime()
+  const hook = loadRetainedShelves(runtime).useShopModeSelection
+  // Setters intentionally defer the commit, matching multiple queued native
+  // press callbacks. A captured committed-mode guard would lose the final tap.
+  let desired: ShopMode = "avatar"
+  let category = "hair"
+  let selected = "currently-previewing"
+  const input: Parameters<typeof hook>[0] = {
+    mode: "avatar", shelves: [
+      { scope: "avatar:hair", mode: "avatar", categoryId: "hair" },
+      { scope: "home:lighting", mode: "home", categoryId: "lighting" }
+    ],
+    setMode: (next) => { if (typeof next !== "function") desired = next },
+    setCategory: (next) => { if (typeof next !== "function") category = next },
+    setSelectedId: (next) => { if (typeof next !== "function") selected = next }
+  }
+  const press = runtime.render(() => hook(input))
+  press("avatar")
+  assert.equal(selected, "currently-previewing")
+  for (const mode of ["home", "avatar", "home", "avatar", "home", "avatar"] as const) press(mode)
+  assert.equal(desired, "avatar")
+  assert.equal(category, "hair")
+  assert.equal(selected, "")
+  input.mode = "home" // an external/deep-link commit replaces the pending target
+  runtime.rerender()
+  selected = "external-preview"
+  press("home")
+  assert.equal(selected, "external-preview")
+})
+
+test("hidden thumbnail registrations cannot replace or clear a visible product's purchase origin", () => {
+  const runtime = createFakeReactRuntime()
+  const hook = loadRetainedShelves(runtime).useShopShelfThumbnailRegistration
+  let active = true
+  const registry = new Map<string, object>()
+  const register: NonNullable<Parameters<typeof hook>[1]> = (id, view) => {
+    if (view) registry.set(id, view)
+    else registry.delete(id)
+  }
+  const thumbnail = {} as import("react-native").View
+  const callback = runtime.render(() => hook(active, register))
+  callback("shared-piece", thumbnail)
+  assert.equal(registry.get("shared-piece"), thumbnail)
+  active = false; runtime.rerender()
+  assert.equal(registry.has("shared-piece"), false)
+  const visibleElsewhere = {} as import("react-native").View
+  register("shared-piece", visibleElsewhere)
+  callback("shared-piece", null)
+  assert.equal(registry.get("shared-piece"), visibleElsewhere)
+  callback("shared-piece", thumbnail)
+  assert.equal(registry.get("shared-piece"), visibleElsewhere)
+  active = true; runtime.rerender()
+  assert.equal(registry.get("shared-piece"), thumbnail)
+  active = false; runtime.rerender()
+  register("shared-piece", visibleElsewhere)
+  runtime.unmount()
+  assert.equal(registry.get("shared-piece"), visibleElsewhere)
+})
+
+test("same-commit category bursts retain the final category and repeated taps leave it alone", () => {
+  const runtime = createFakeReactRuntime()
+  const hook = loadRetainedShelves(runtime).useShopCategorySelection
+  let selected = "hair"
+  const setter: Parameters<typeof hook>[1] = (next) => {
+    if (typeof next !== "function") selected = next
+  }
+  const press = runtime.render(() => hook("hair", setter))
+  press("top"); press("hair")
+  assert.equal(selected, "hair")
+  // Same active category performs no state write, even before a commit.
+  selected = "unchanged-sentinel"
+  press("hair")
+  assert.equal(selected, "unchanged-sentinel")
+})
+
+test("stable shelf actions reach current committed selection and removal behavior", () => {
+  const runtime = createFakeReactRuntime()
+  const hook = loadRetainedShelves(runtime).useShopShelfActions
+  let selection = ""
+  let removal = ""
+  const product = { id: "piece", actionType: "avatarUnlock" } as ShopCatalogItem
+  let input: Parameters<typeof hook>[0] = {
+    selectCategory: () => undefined,
+    selectProduct: (item) => { selection = `old:${item.actionType}` },
+    removeProduct: (item) => { removal = `old:${item.actionType}` }
+  }
+  const first = runtime.render(() => hook(input))
+  input = {
+    ...input,
+    selectProduct: (item) => { selection = `current:${item.actionType}` },
+    removeProduct: (item) => { removal = `current:${item.actionType}` }
+  }
+  const current = runtime.rerender() as ReturnType<typeof hook>
+  assert.equal(current.selectProduct, first.selectProduct)
+  assert.equal(current.removeProduct, first.removeProduct)
+  const owned = { ...product, actionType: "avatarEquip" } as ShopCatalogItem
+  first.selectProduct(owned); first.removeProduct(owned)
+  assert.equal(selection, "current:avatarEquip")
+  assert.equal(removal, "current:avatarEquip")
+})
 
 test("copied ownership arrays stay stable while authoritative membership changes refresh immediately", () => {
   const runtime = createFakeReactRuntime()
@@ -327,6 +491,155 @@ function findPreviewElement(tree: unknown, predicate: (node: PreviewElement) => 
   }
   return undefined
 }
+
+function mountClosetBrowser() {
+  const runtime = createFakeReactRuntime()
+  const native = createReactNativeStub()
+  const animated = createReanimatedStub(runtime)
+  let reselect: (() => void) | undefined
+  let reduceMotion = false
+  const browser = loadSourceWithFakeReact<{ ClosetBrowser: typeof ClosetBrowser }>(
+    "features/shop/screen/ClosetBrowser.tsx", runtime, {
+      modules: {
+        "react-native": native.module,
+        "react-native-reanimated": {
+          ...animated.module,
+          useAnimatedScrollHandler: (handlers: unknown) => handlers
+        },
+        "../../../ui/MainTabPagerGestureOwnership": { MainTabPagerEdgeHandoffScrollOwner: "EdgeOwner" },
+        "../../../ui/layout/useMainTabReselect": { useMainTabReselect: (_key: string, callback: () => void) => { reselect = callback } },
+        "../../../ui/animations": { useReducedMotion: () => reduceMotion },
+        "./shopRetainedShelfModel": loadRetainedShelves(runtime),
+        "./shopScreenStyles": { shopScreenStyles: {} },
+        "./ShopProductCard": { ShopProductCard: "Card" },
+        "./ShopShelfPagination": { ShopShelfPagination: "Pagination" },
+        "./VerticalShopCategoryRail": { VerticalShopCategoryRail: "Rail" }
+      },
+      real: ["../shopCopy", "./shopScreenModel"]
+    }
+  ).ClosetBrowser
+  let props: Parameters<typeof ClosetBrowser>[0] = {
+    active: true, mode: "avatar", activeCategoryId: "hair", categories: [],
+    products: Array.from({ length: 13 }, (_, index) => ({ id: `shelf-piece-${index}` } as ShopCatalogItem)),
+    inventoryVerified: true, pendingInventoryLabel: "", selectedId: undefined,
+    locale: "tr", layoutMetrics: getShopLayoutMetrics({ width: 390, height: 844, fontScale: 1 }),
+    onSelectCategory: () => undefined, onSelectProduct: () => undefined
+  }
+  runtime.render(() => browser(props))
+  const find = (type: string) => {
+    const element = findPreviewElement(runtime.output, (node) => node.type === type)
+    assert.ok(element)
+    return element.props
+  }
+  const list = () => find("Animated.FlatList")
+  const pagination = () => find("Pagination")
+  const tracker = () => pagination().tracker as { value: { page: number } }
+  const jumps: { offset: number; animated: boolean }[] = []
+  const listRef = list().ref as { current: unknown }
+  listRef.current = { scrollToOffset: (jump: typeof jumps[number]) => jumps.push(jump) }
+  return {
+    list, pagination, tracker, jumps,
+    root: () => (runtime.output as PreviewElement).props,
+    edgeOwner: () => find("EdgeOwner"),
+    update(next: Partial<typeof props>) { props = { ...props, ...next }; runtime.rerender() },
+    setReduceMotion(value: boolean) { reduceMotion = value; runtime.rerender() },
+    reselect() { reselect?.() }
+  }
+}
+
+test("a mounted Shop shelf retains its page/data across mode visits and hidden shelves surrender gestures/reselect", () => {
+  const shop = mountClosetBrowser()
+  const initialPages = shop.list().data
+  const firstTracker = shop.tracker()
+  const showPage = shop.pagination().onShowPage as (step: -1 | 1) => void
+  showPage(1); showPage(1)
+  assert.equal(firstTracker.value.page, 2)
+  shop.update({ active: false })
+  assert.equal(shop.root().pointerEvents, "none")
+  assert.equal(shop.root().accessibilityElementsHidden, true)
+  assert.equal(shop.root().importantForAccessibility, "no-hide-descendants")
+  assert.equal(shop.list().data, initialPages)
+  assert.equal(shop.list().scrollEnabled, false)
+  assert.equal(shop.edgeOwner().enabled, false)
+  shop.reselect()
+  assert.equal(firstTracker.value.page, 2)
+  shop.update({ active: true })
+  assert.equal(shop.root().pointerEvents, "auto")
+  assert.equal(shop.root().accessibilityElementsHidden, false)
+  assert.equal(shop.tracker(), firstTracker, "the real mounted browser's tracker survives")
+  assert.equal(shop.list().data, initialPages)
+  assert.equal(shop.list().scrollEnabled, true)
+  assert.equal(firstTracker.value.page, 2)
+  shop.setReduceMotion(true)
+  shop.reselect()
+  assert.equal(firstTracker.value.page, 0)
+  assert.equal(shop.jumps.at(-1)?.animated, false)
+})
+
+test("deep links reveal the current shelf's product and a shrinking catalog clamps native offset", () => {
+  const shop = mountClosetBrowser()
+  shop.update({ revealRequest: { productId: "shelf-piece-9", requestId: 1 } })
+  assert.equal(shop.tracker().value.page, 2)
+  assert.ok((shop.jumps.at(-1)?.offset ?? 0) > 0)
+  shop.update({ products: [{ id: "only-remaining" } as ShopCatalogItem] })
+  assert.equal(shop.tracker().value.page, 0)
+  assert.equal(shop.jumps.at(-1)?.offset, 0)
+  ;(shop.list().onContentSizeChange as () => void)()
+  assert.equal(shop.jumps.at(-1)?.offset, 0, "a pending old deep-link page cannot scroll beyond a smaller catalog")
+  assert.equal((shop.edgeOwner().scrollOffset as { value: number }).value, 0)
+  assert.equal(shop.edgeOwner().enabled, false)
+  shop.update({ active: false, revealRequest: { productId: "only-remaining", requestId: 2 } })
+  assert.equal(shop.list().scrollEnabled, false)
+})
+
+test("returning to a shelf interrupted mid-drag restores a full page and ignores hidden scroll callbacks", () => {
+  const shop = mountClosetBrowser()
+  const geometry = shop.list().getItemLayout as (_data: unknown, index: number) => { length: number }
+  const width = geometry(null, 0).length
+  const scroll = () => shop.list().onScroll as {
+    onBeginDrag: (event: { contentOffset: { x: number } }) => void
+    onScroll: (event: { contentOffset: { x: number } }) => void
+    onMomentumEnd: (event: { contentOffset: { x: number } }) => void
+  }
+  scroll().onBeginDrag({ contentOffset: { x: 0 } })
+  scroll().onScroll({ contentOffset: { x: width * 0.6 } })
+  assert.equal(shop.tracker().value.page, 1)
+  shop.update({ active: false })
+  scroll().onMomentumEnd({ contentOffset: { x: 0 } })
+  scroll().onScroll({ contentOffset: { x: 0 } })
+  assert.equal(shop.tracker().value.page, 1)
+  shop.update({ active: true })
+  assert.equal(shop.jumps.at(-1)?.offset, width)
+  assert.equal((shop.edgeOwner().scrollOffset as { value: number }).value, width)
+})
+
+test("a previous visit's pending deep link never overrides a newer page choice", () => {
+  const shop = mountClosetBrowser()
+  shop.update({ revealRequest: { productId: "shelf-piece-5", requestId: 1 } })
+  assert.equal(shop.tracker().value.page, 1)
+  shop.update({ active: false })
+  ;(shop.list().onContentSizeChange as () => void)()
+  shop.update({ active: true })
+  ;(shop.pagination().onShowPage as (step: -1 | 1) => void)(1)
+  assert.equal(shop.tracker().value.page, 2)
+  ;(shop.list().onContentSizeChange as () => void)()
+  assert.equal(shop.tracker().value.page, 2)
+  shop.update({ revealRequest: { productId: "shelf-piece-5", requestId: 2 } })
+  shop.reselect()
+  ;(shop.list().onContentSizeChange as () => void)()
+  assert.equal(shop.tracker().value.page, 0, "main-tab reselect supersedes the reveal too")
+  shop.update({ revealRequest: { productId: "shelf-piece-5", requestId: 3 } })
+  const events = shop.list().onScroll as {
+    onBeginDrag: (event: { contentOffset: { x: number } }) => void
+    onMomentumEnd: (event: { contentOffset: { x: number } }) => void
+  }
+  const geometry = shop.list().getItemLayout as (_data: unknown, index: number) => { length: number }
+  const width = geometry(null, 0).length
+  events.onBeginDrag({ contentOffset: { x: width } })
+  events.onMomentumEnd({ contentOffset: { x: width * 2 } })
+  ;(shop.list().onContentSizeChange as () => void)()
+  assert.equal(shop.tracker().value.page, 2, "a native drag cancels old pending work on the UI thread")
+})
 
 function mountPreviewPanel() {
   const runtime = createFakeReactRuntime()

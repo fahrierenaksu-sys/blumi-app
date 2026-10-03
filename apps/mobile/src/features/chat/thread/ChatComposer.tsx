@@ -1,11 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useRef, useState } from "react"
 import { Pressable, TextInput, View } from "react-native"
+import { Pressable as GesturePressable } from "react-native-gesture-handler"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
 import { LinearGradient } from "../../../ui/linearGradient"
 import { uiTheme } from "../../../ui/theme"
-import { PressableScale } from "../../../ui/PressableScale"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
@@ -52,17 +52,20 @@ export function ChatComposer({
   // What the input shows, also between a send and the next render.
   const shownTextRef = useRef("")
   const motion = useMotion()
-  // The press itself is PressableScale's (the shared `press` token); this
-  // outer scale only carries the post-send pop, so the two never fight.
+  // The hit target stays still during the press. This outer scale carries
+  // only the post-send pop, after the message has been accepted.
   const sendPop = useSharedValue(1)
   const sendPopStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendPop.value }] }))
   const isSendDisabled = inputText.trim().length === 0 || isPendingThread
 
   const handleSend = (): boolean => {
-    const body = inputText.trim()
+    // A native edit can arrive after touch-down, before React replaces the
+    // button's callback. Submit the current draft, never that render's text.
+    const draft = shownTextRef.current
+    const body = draft.trim()
     if (!body || isPendingThread) return false
     if (!onSend(body)) return false
-    sentDraftRef.current = inputText
+    sentDraftRef.current = draft
     shownTextRef.current = ""
     // The native clear empties the field in this frame; the state follows.
     inputRef.current?.clear()
@@ -128,7 +131,9 @@ export function ChatComposer({
           />
         </View>
         <Animated.View style={sendPopStyle}>
-          <PressableScale
+          {/* Gesture Handler keeps touch detection aligned with the footer's
+              keyboard transform under synchronous Reanimated UI updates. */}
+          <GesturePressable
             accessibilityRole="button"
             accessibilityLabel={chatCopy.sendAccessibilityLabel(partnerName)}
             accessibilityState={{ disabled: isSendDisabled }}
@@ -155,7 +160,7 @@ export function ChatComposer({
             >
               <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
-          </PressableScale>
+          </GesturePressable>
         </Animated.View>
       </View>
     </SafeAreaView>

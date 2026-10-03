@@ -55,6 +55,16 @@ export const MAIN_TAB_SWIPE_MAX_INDEX = 3
  */
 export const MAIN_TAB_PAGER_ACTIVE_OFFSET_X = 12
 export const MAIN_TAB_PAGER_FAIL_OFFSET_Y = 12
+/**
+ * The drag's direction decides, not which axis crosses its slop first. A
+ * fast flick reports its first move already past both slops, and a natural
+ * thumb arc drifts vertically; fixed per-axis offsets then failed those
+ * swipes. The pager activates once the drag is at least this much more
+ * horizontal than vertical (about 41 degrees from the horizontal).
+ */
+export const MAIN_TAB_PAGER_AXIS_RATIO = 1.15
+/** A drag still undecided after this much vertical travel is a scroll. */
+export const MAIN_TAB_PAGER_UNDECIDED_FAIL_Y = 30
 
 export const MAIN_TAB_PAGER_SETTLE = Object.freeze({
   /** Seconds of release velocity added to the position before rounding. */

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useRef, type ReactNode } from "react"
+import { memo, useEffect, useRef, type ReactNode } from "react"
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated"
 import { hapticSelection } from "../../../ui/haptics"
@@ -8,6 +8,7 @@ import { PressableScale } from "../../../ui/PressableScale"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import { MiniRoomChatHistory } from "./MiniRoomChatHistory"
+import { useRetainedMiniRoomTranscript } from "./useRetainedMiniRoomTranscript"
 import type { MiniRoomPanelMode } from "./miniRoomLayout"
 import {
   MINI_ROOM_PAPER_BODY_UNIT, MINI_ROOM_PAPER_CAP, MINI_ROOM_PAPER_REST_MARGIN, MINI_ROOM_PAPER_SHADOW_UNIT,
@@ -45,12 +46,12 @@ interface MiniRoomChatPanelProps {
  * the paper's top edge, and the composer is pinned to its bottom edge. So the
  * keyboard-driven pose never re-lays out the transcript.
  */
-export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
+export const MiniRoomChatPanel = memo(function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
   const { copy, mode, transition, contentProgress, windowWidth, windowHeight, historyHeight, historyItems,
     historyStatus, partnerName, recentMessage, onRecentHeightChange, onRecentRowsHeightChange, onCloseKeyboard,
     scrollToLatestRequest, children } = props
   const typing = mode === "typing"
-  const historyDay = copy.historyDay(historyItems[0]?.sentAt)
+  const transcript = useRetainedMiniRoomTranscript(typing, historyItems, historyStatus)
   const textWidths = resolveMiniRoomTextWidths(windowWidth)
   // Switch once at the confirmed mode, rather than wrapping the draft at every
   // animated width. Endpoint sizing/padding stays identical to the chosen design.
@@ -172,11 +173,7 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
         <Animated.View style={[styles.historyContent, { width: textWidths.history, height: historyHeight + 26 }, historyStyle]}
           pointerEvents={typing ? "none" : "auto"} accessibilityElementsHidden={typing}
           importantForAccessibility={typing ? "no-hide-descendants" : "auto"}>
-          <View style={styles.heading}>
-            <Text maxFontSizeMultiplier={1.35} style={styles.headingText}>{copy.historyHeading}</Text>
-            {historyDay ? <Text maxFontSizeMultiplier={1.35} style={styles.dayText}>{historyDay}</Text> : null}
-          </View>
-          <MiniRoomChatHistory copy={copy} items={historyItems} status={historyStatus}
+          <RetainedMiniRoomTranscript copy={copy} items={transcript.items} status={transcript.status}
             partnerName={partnerName} height={historyHeight}
             onRecentRowsHeightChange={onRecentRowsHeightChange} scrollToLatestRequest={scrollToLatestRequest} />
         </Animated.View>
@@ -185,7 +182,20 @@ export function MiniRoomChatPanel(props: MiniRoomChatPanelProps) {
       </Animated.View>
     </View>
   )
-}
+})
+
+const RetainedMiniRoomTranscript = memo(function RetainedMiniRoomTranscript(
+  props: Parameters<typeof MiniRoomChatHistory>[0]
+) {
+  const historyDay = props.copy.historyDay(props.items[0]?.sentAt)
+  return <>
+    <View style={styles.heading}>
+      <Text maxFontSizeMultiplier={1.35} style={styles.headingText}>{props.copy.historyHeading}</Text>
+      {historyDay ? <Text maxFontSizeMultiplier={1.35} style={styles.dayText}>{historyDay}</Text> : null}
+    </View>
+    <MiniRoomChatHistory {...props} />
+  </>
+})
 const PAPER = "#FFFCFF"
 const styles = StyleSheet.create({
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 20 },

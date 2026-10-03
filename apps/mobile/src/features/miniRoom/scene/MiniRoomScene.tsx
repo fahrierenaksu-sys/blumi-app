@@ -12,7 +12,6 @@ import type { MiniRoomConnectionStatus, MiniRoomLocalMediaState } from "../miniR
 import type { FailedRoomMessage, InRoomChatMessageEvent } from "../useInRoomChat"
 import type { RoomChatHistoryItem, RoomChatHistoryStatus } from "../roomChatHistoryModel"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
-import { resolveComposerRestore, resolveRoomComposerSubmit } from "../roomComposerModel"
 import { useReducedMotion } from "../../../ui/animations"
 import { hapticSoft } from "../../../ui/haptics"
 import { RoomFloorTapLayer } from "../../roomV2/components/RoomFloorTapLayer"
@@ -22,7 +21,7 @@ import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
 import { MiniRoomContext } from "./MiniRoomContext"
 import { MiniRoomHud } from "./MiniRoomHud"
 import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
-import { MAX_ROOM_MESSAGE_LENGTH, RoomChatComposer } from "./RoomChatComposer"
+import { RoomChatComposer } from "./RoomChatComposer"
 import { RoomMapLayer } from "./RoomMapLayer"
 import { useMiniRoomSceneStore } from "./miniRoomSceneStore"
 import { createMiniRoomDepthScene } from "./miniRoomDepthModel"
@@ -68,10 +67,12 @@ interface MiniRoomSceneProps {
   onToggleMic: () => void
   inRoomMessages: InRoomChatMessageEvent[]
   consumeInRoomMessage: (messageId: string) => void
+  consumeInRoomMessages?: (messageIds: readonly string[]) => void
   canChatSend: boolean
-  onSendRoomMessage: (body: string) => boolean
-  /** Latest room message the server did not acknowledge (useInRoomChat). */
+  onSendRoomMessage: (body: string, retryClientMessageId?: string) => boolean
+  /** Oldest unresolved room message (useInRoomChat), used by the notice. */
   failedRoomMessage?: FailedRoomMessage | null
+  failedRoomMessages?: readonly FailedRoomMessage[]
   /** Durable room conversation, newest first (useRoomChatHistory). */
   chatHistory?: readonly RoomChatHistoryItem[]
   chatHistoryStatus?: RoomChatHistoryStatus
@@ -83,8 +84,10 @@ interface MiniRoomSceneProps {
 
 const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
 const NO_HISTORY: readonly RoomChatHistoryItem[] = [], NO_NOTICES: readonly string[] = []
+const NO_FAILED_MESSAGES: readonly FailedRoomMessage[] = []
 const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer), StableRoomMapLayer = memo(RoomMapLayer)
 const StableHotspotLayer = memo(HotspotLayer), StableMiniRoomHud = memo(MiniRoomHud)
+const StableMiniRoomContext = memo(MiniRoomContext)
 
 export function MiniRoomScene(props: MiniRoomSceneProps) {
   const {
@@ -103,9 +106,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     onToggleMic,
     inRoomMessages,
     consumeInRoomMessage,
+    consumeInRoomMessages,
     canChatSend,
     onSendRoomMessage,
     failedRoomMessage,
+    failedRoomMessages = NO_FAILED_MESSAGES,
     chatHistory = NO_HISTORY,
     chatHistoryStatus = "ready",
     notices = NO_NOTICES
@@ -183,11 +188,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     dismissSpeechBubble,
     moveLocalAvatar,
     moveLocalAvatarToHotspot,
-    sayPhrase
+    sayPhrase,
+    sayPhrases
   } = store
 
   const [partnerJustJoined, setPartnerJustJoined] = useState(false)
-  const [composerText, setComposerText] = useState("")
   // The scene follows the keyboard down: nothing collapses ahead of it.
   const handleCloseKeyboard = useCallback(() => {
     Keyboard.dismiss()
@@ -222,11 +227,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   useEffect(() => {
     if (inRoomMessages.length === 0) return
-    for (const message of inRoomMessages) {
-      sayPhrase(message.senderUserId, message.body, "chat")
-      consumeInRoomMessage(message.messageId)
-    }
-  }, [consumeInRoomMessage, inRoomMessages, sayPhrase])
+    sayPhrases(inRoomMessages.map((message) => ({ speakerUserId: message.senderUserId, body: message.body, tone: "chat" })))
+    if (consumeInRoomMessages) consumeInRoomMessages(inRoomMessages.map((message) => message.messageId))
+    else for (const message of inRoomMessages) consumeInRoomMessage(message.messageId)
+  }, [consumeInRoomMessage, consumeInRoomMessages, inRoomMessages, sayPhrases])
 
   // Floor gestures are already mapped into room coordinates by RoomFloorTapLayer.
   // Moving avatars never move the camera; the fixed room frame only adapts to
@@ -242,30 +246,15 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     moveLocalAvatarToHotspot(hotspotId)
   }, [moveLocalAvatarToHotspot])
 
-  const handleSubmitComposer = useCallback((): boolean => {
-    const result = resolveRoomComposerSubmit(composerText, onSendRoomMessage)
-    if (result.kind !== "sent") return false
-    sayPhrase(localUser.userId, result.body, "chat")
+  const handleSubmitComposer = useCallback((body: string, retryClientMessageId?: string): boolean => {
+    if (!onSendRoomMessage(body, retryClientMessageId)) return false
+    sayPhrase(localUser.userId, body, "chat")
     // The keyboard stays up for the next message; the input returns to one line.
-    setComposerText("")
     setComposerLines(1)
     // Once the keyboard is down, the transcript shows this message.
     noteMessageSent()
     return true
-  }, [composerText, localUser.userId, noteMessageSent, onSendRoomMessage, sayPhrase])
-
-  // An unacknowledged message comes back into an empty composer: sending the
-  // same text again retries it with the same client id. The hook publishes a
-  // new object only per failure, so this runs once per failed message.
-  useEffect(() => {
-    if (!failedRoomMessage?.clientMessageId) return
-    setComposerText((current) => resolveComposerRestore(current, failedRoomMessage))
-  }, [failedRoomMessage])
-
-  const handleComposerChange = useCallback((value: string): void => {
-    setComposerText(value.slice(0, MAX_ROOM_MESSAGE_LENGTH))
-    if (value.length === 0) setComposerLines(1)
-  }, [])
+  }, [localUser.userId, noteMessageSent, onSendRoomMessage, sayPhrase])
 
   const handleToggleHistory = useCallback((): void => {
     handleCloseKeyboard()
@@ -276,6 +265,15 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     const lines = resolveComposerLineCount({ contentHeight, fontScale: viewport.fontScale })
     setComposerLines((current) => current === lines ? current : lines)
   }, [viewport.fontScale])
+
+  const composer = useMemo(() => (
+    <RoomChatComposer suggestionsEnabled={keyboardPreference.suggestionsEnabled} copy={copy}
+      mode={layout.panelMode} maxInputHeight={layout.composerMaxInputHeight} inputHeight={layout.composerInputHeight}
+      onSubmit={handleSubmitComposer} failedMessages={failedRoomMessages} onToggleHistory={handleToggleHistory}
+      onContentHeightChange={handleComposerContentSize} disabled={!canChatSend} draftTyping={props.typing?.draft} />
+  ), [canChatSend, copy, failedRoomMessages, handleComposerContentSize, handleSubmitComposer, handleToggleHistory,
+    keyboardPreference.suggestionsEnabled, layout.composerInputHeight, layout.composerMaxInputHeight, layout.panelMode,
+    props.typing?.draft])
 
   const handleStageLayout = useCallback((event: LayoutChangeEvent): void => {
     const { width, height } = event.nativeEvent.layout
@@ -291,7 +289,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     [partnerUser.displayName]
   )
 
-  const composerDisabled = !canChatSend
   const hudNotices = useMemo(
     () => failedRoomMessage?.clientMessageId ? [...notices, copy.sendFailedNotice] : notices,
     [copy.sendFailedNotice, failedRoomMessage, notices]
@@ -381,23 +378,10 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         onCloseKeyboard={handleCloseKeyboard}
         scrollToLatestRequest={scrollToLatest.request}
       >
-        <RoomChatComposer
-          value={composerText}
-          suggestionsEnabled={keyboardPreference.suggestionsEnabled}
-          copy={copy}
-          mode={layout.panelMode}
-          maxInputHeight={layout.composerMaxInputHeight}
-          inputHeight={layout.composerInputHeight}
-          onChangeText={handleComposerChange}
-          onSubmit={handleSubmitComposer}
-          onToggleHistory={handleToggleHistory}
-          onContentHeightChange={handleComposerContentSize}
-          disabled={composerDisabled}
-          draftTyping={props.typing?.draft}
-        />
+        {composer}
       </MiniRoomChatPanel>
 
-      <MiniRoomContext copy={copy} top={layout.contextTop} contentProgress={contentProgress}
+      <StableMiniRoomContext copy={copy} top={layout.contextTop} contentProgress={contentProgress}
         visible={layout.historyVisible} partnerName={partnerFirstName} snapshots={participantAvatarSnapshots} />
 
       <StableMiniRoomHud

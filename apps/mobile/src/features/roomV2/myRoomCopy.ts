@@ -96,6 +96,7 @@ export interface MyRoomEditorCopy {
   confirmPlacement: string
   removeSelected: string
   rotateSelected: string
+  clearSelection: string
   saveLayout: string
   save: string
   saving: string
@@ -186,6 +187,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     confirmPlacement: "Confirm room placement",
     removeSelected: "Remove selected room item",
     rotateSelected: "Rotate selected room item",
+    clearSelection: "Close item selection",
     saveLayout: "Save room layout",
     save: "Save",
     saving: "Saving…",
@@ -274,6 +276,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     confirmPlacement: "Yerleşimi onayla",
     removeSelected: "Seçili eşyayı kaldır",
     rotateSelected: "Seçili eşyayı döndür",
+    clearSelection: "Eşya seçimini kapat",
     saveLayout: "Oda düzenini kaydet",
     save: "Kaydet",
     saving: "Kaydediliyor…",

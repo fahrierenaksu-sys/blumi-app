@@ -8,6 +8,7 @@ import {
   ROOM_CHAT_HISTORY_LIMIT,
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
+  roomChatHistoryKeyOf,
   type RoomChatDelivery
 } from "./roomChatHistoryModel"
 
@@ -41,6 +42,46 @@ test("history keeps each durable timestamp while retaining real sending and fail
     [pending.sentAt, "sending"],
     [earlier.sentAt, "sent"]
   ])
+})
+
+test("adding a message preserves unchanged history rows and recalculates only a changed sender boundary", () => {
+  const messages = Array.from({ length: 15 }, (_, index) => message(`row-${index}`, partner, `Line ${index}`))
+  const before = selectRoomChatHistory({ messages, localUserId: local, deliveryOf: allSent })
+  const newSender = selectRoomChatHistory({
+    messages: [...messages, message("new-local", local, "New")], localUserId: local,
+    deliveryOf: allSent, previousItems: before
+  })
+  assert.ok(newSender.slice(1).every((item, index) => item === before[index]), "all unchanged rows retain identity")
+  const sameSender = selectRoomChatHistory({
+    messages: [...messages, message("new-partner", partner, "New")], localUserId: local,
+    deliveryOf: allSent, previousItems: before
+  })
+  assert.equal(sameSender[1]?.showMeta, false)
+  assert.notEqual(sameSender[1], before[0], "the old newest row changes its sender boundary")
+  assert.ok(sameSender.slice(2).every((item, index) => item === before[index + 1]))
+  const unchanged = selectRoomChatHistory({
+    messages: [...messages], localUserId: local, deliveryOf: allSent, previousItems: before
+  })
+  assert.equal(unchanged, before, "unchanged visible data preserves the whole array")
+})
+
+test("acknowledgement preserves the list key while canonical identity, time and delivery update", () => {
+  const older = message("older", partner, "Earlier")
+  const pending = message("local-pending", local, "Pending")
+  const before = selectRoomChatHistory({
+    messages: [older, pending], localUserId: local,
+    deliveryOf: (id) => id === pending.messageId ? "sending" : "sent"
+  })
+  const confirmed = { ...pending, messageId: "confirmed", sentAt: "2026-10-03T09:00:00.000Z" }
+  const after = selectRoomChatHistory({
+    messages: [older, confirmed], localUserId: local, deliveryOf: allSent,
+    renderKeyOf: (id) => id === confirmed.messageId ? pending.messageId : id, previousItems: before
+  })
+  assert.equal(roomChatHistoryKeyOf(after[0]!), roomChatHistoryKeyOf(before[0]!))
+  assert.equal(after[0]?.id, confirmed.messageId)
+  assert.equal(after[0]?.sentAt, confirmed.sentAt)
+  assert.equal(after[0]?.delivery, "sent")
+  assert.equal(after[1], before[1])
 })
 
 test("bubble time uses the device-local clock and never substitutes a missing or invalid time", () => {

@@ -192,5 +192,7 @@ export interface MiniRoomStore {
   deferUntilArrivalLands: (userId: string, onLanded: () => void) => boolean
   addSpeechBubble: (bubble: Omit<SpeechBubble, "id" | "createdAt" | "expiresAt">) => void
   sayPhrase: (userId: string, body: string, tone?: SpeechBubbleTone) => void
+  /** Presents an arrived batch together; every line retains its own lifetime. */
+  sayPhrases: (messages: readonly { speakerUserId: string; body: string; tone?: SpeechBubbleTone }[]) => void
   dismissSpeechBubble: (bubbleId: string) => void
 }

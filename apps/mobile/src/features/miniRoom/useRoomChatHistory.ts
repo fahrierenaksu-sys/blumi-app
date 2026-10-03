@@ -1,5 +1,6 @@
-import { useMemo } from "react"
+import { useLayoutEffect, useMemo, useRef } from "react"
 import { useChatThreadStore } from "../chat/chatStore"
+import { getMessageRenderKey } from "../chat/chatMessageRenderKeys"
 import {
   resolveRoomChatHistoryStatus,
   selectRoomChatHistory,
@@ -22,20 +23,32 @@ export function useRoomChatHistory(input: {
   localUserId: string
 }): RoomChatHistory {
   const { threadId, localUserId } = input
-  const chatThread = useChatThreadStore(threadId)
+  const { messages: threadMessages, messageListState, getMessageDeliveryState, deliveryKey } = useChatThreadStore(threadId)
+  const messageListStatus = messageListState.status
+  const previous = useRef<{ threadId: string | undefined; localUserId: string; items: RoomChatHistoryItem[] } | null>(null)
 
-  return useMemo(() => {
-    const messages = threadId ? chatThread.messages : []
-    const listStatus = threadId ? chatThread.messageListState.status : "idle"
+  const history = useMemo(() => {
+    // Delivery lives behind a stable store reader: its version, rather than
+    // that function's identity, invalidates this presentation snapshot.
+    void deliveryKey
+    const messages = threadId ? threadMessages : []
+    const listStatus = threadId ? messageListStatus : "idle"
     const items = selectRoomChatHistory({
       messages,
       localUserId,
-      deliveryOf: (messageId) => chatThread.getMessageDeliveryState(messageId)
+      deliveryOf: getMessageDeliveryState,
+      renderKeyOf: getMessageRenderKey,
+      previousItems: previous.current && previous.current.threadId === threadId && previous.current.localUserId === localUserId
+        ? previous.current.items
+        : undefined
     })
     return {
       items,
       status: resolveRoomChatHistoryStatus({ hasThread: Boolean(threadId), listStatus, itemCount: items.length })
     }
-  }, [chatThread.deliveryKey, chatThread.getMessageDeliveryState, chatThread.messageListState.status,
-    chatThread.messages, localUserId, threadId])
+  }, [deliveryKey, getMessageDeliveryState, messageListStatus, threadMessages, localUserId, threadId])
+  useLayoutEffect(() => {
+    previous.current = { threadId, localUserId, items: history.items }
+  }, [history.items, localUserId, threadId])
+  return history
 }

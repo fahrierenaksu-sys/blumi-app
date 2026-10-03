@@ -26,6 +26,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   trayDragHint: string
   previewLabel: string
   onPreviewItem: (itemId: string) => void
+  clearSelectionLabel: string
+  onClearSelection: () => void
   onUnavailableItem: (reason: "locked" | "placed") => void
   createDragGesture: (
     item: FurnitureItem,
@@ -44,6 +46,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
     trayDragHint,
     previewLabel,
     onPreviewItem,
+    clearSelectionLabel,
+    onClearSelection,
     onUnavailableItem,
     createDragGesture
   } = props
@@ -106,6 +110,17 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
           ) : null}
         </Pressable>
       </GestureDetector>
+      {selected && owned ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={clearSelectionLabel}
+          onPress={onClearSelection}
+          hitSlop={8}
+          style={({ pressed }) => [styles.inventoryItemClose, pressed ? styles.selectionControlPressed : null]}
+        >
+          <Ionicons name="close" size={15} color={roomEditorTheme.ink} />
+        </Pressable>
+      ) : null}
       <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.inventoryItemName}>
         {item.name}
       </Text>
@@ -121,6 +136,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   previous.trayDragHint === next.trayDragHint &&
   previous.previewLabel === next.previewLabel &&
   previous.onPreviewItem === next.onPreviewItem &&
+  previous.clearSelectionLabel === next.clearSelectionLabel &&
+  previous.onClearSelection === next.onClearSelection &&
   previous.onUnavailableItem === next.onUnavailableItem &&
   previous.createDragGesture === next.createDragGesture
 )

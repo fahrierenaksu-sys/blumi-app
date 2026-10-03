@@ -282,6 +282,7 @@ function mountRoot(nativeIdle = true) {
       "./rootNavigationModel": {
         getChatLocale: () => "en",
         getChatThreadScreenOptions: () => ({}),
+        getMiniRoomScreenOptions: () => ({}),
         getDetailScreenOptions: () => DETAIL_OPTIONS_STUB,
         getReducedMotionScreenOptions: () => ({}),
         getOnboardingEntryRoute: () => null,

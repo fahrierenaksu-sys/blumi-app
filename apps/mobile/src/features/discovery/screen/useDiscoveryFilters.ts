@@ -58,7 +58,7 @@ export function useDiscoveryFilters(input: {
   )
   // A save bumps the gate, so a load that started before it cannot overwrite it.
   const [hydrationGate] = useState(createDiscoveryFiltersHydrationGate)
-  const localFiltersFallbackRef = useRef<DiscoverFilters | null>(null)
+  const localFiltersFallbackRef = useRef<{ userId: string; filters: DiscoverFilters } | null>(null)
   const filtersReady = areDiscoveryFiltersReadyFor(filtersReadyForUserId, sessionActor.profile.userId)
   // Every focus reloads the filters; unchanged values keep their object, so
   // returning to Discover neither re-renders it nor resets its deck.
@@ -70,7 +70,9 @@ export function useDiscoveryFilters(input: {
     let active = true
     const loadToken = hydrationGate.beginLoad()
     const accountPreferences = sessionActor.profile.discoveryPreferences
-    const inMemoryFallback = localFiltersFallbackRef.current
+    const inMemoryFallback = localFiltersFallbackRef.current?.userId === sessionActor.profile.userId
+      ? localFiltersFallbackRef.current.filters
+      : null
     if (isProductionDiscovery && inMemoryFallback) {
       setFocusedFilters(resolveDiscoveryFiltersForFocus(accountPreferences, inMemoryFallback))
       setFiltersReadyForUserId(sessionActor.profile.userId)
@@ -93,8 +95,8 @@ export function useDiscoveryFilters(input: {
           AsyncStorage,
           sessionActor.profile.userId
         ).then((localFallback) => {
-          if (localFallback) {
-            localFiltersFallbackRef.current = localFallback
+          if (localFallback && active && hydrationGate.canApply(loadToken)) {
+            localFiltersFallbackRef.current = { userId: sessionActor.profile.userId, filters: localFallback }
           }
           return resolveDiscoveryFiltersForFocus(
             accountPreferences,
@@ -111,7 +113,7 @@ export function useDiscoveryFilters(input: {
       .catch(() => {
         if (!active || !hydrationGate.canApply(loadToken)) return
         setFocusedFilters(isProductionDiscovery
-          ? resolveDiscoveryFiltersForFocus(accountPreferences, localFiltersFallbackRef.current)
+          ? resolveDiscoveryFiltersForFocus(accountPreferences, inMemoryFallback)
           : DEFAULT_DISCOVER_FILTERS)
         setFiltersReadyForUserId(sessionActor.profile.userId)
       })
@@ -136,7 +138,9 @@ export function useDiscoveryFilters(input: {
 
   const handleApplyFilters = useCallback((next: DiscoverFilters) => {
     const saveToken = hydrationGate.recordSave()
-    localFiltersFallbackRef.current = isProductionDiscovery ? next : null
+    localFiltersFallbackRef.current = isProductionDiscovery
+      ? { userId: sessionActor.profile.userId, filters: next }
+      : null
     setFilters(next)
     setFiltersReadyForUserId(sessionActor.profile.userId)
     setFiltersVisible(false)
@@ -160,7 +164,9 @@ export function useDiscoveryFilters(input: {
           radiusKm: sessionActor.profile.discoveryPreferences?.radiusKm ?? 25
         })
         if (!hydrationGate.isLatestSave(saveToken)) return
-        localFiltersFallbackRef.current = null
+        if (localFiltersFallbackRef.current?.userId === sessionActor.profile.userId) {
+          localFiltersFallbackRef.current = null
+        }
         await clearLocalDiscoveryFiltersFallback(
           AsyncStorage,
           sessionActor.profile.userId

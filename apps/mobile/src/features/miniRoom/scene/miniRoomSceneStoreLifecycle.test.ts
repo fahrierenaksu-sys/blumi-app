@@ -479,3 +479,66 @@ test("both partners speaking at the same moment keep both bubbles and both speak
   f.runtime.unmount()
   assert.equal(f.timers.size, 0)
 })
+
+test("more lines from a speaking avatar preserve its pose identity but renew its speaking lifetime", () => {
+  const f = mount()
+  f.render()
+  f.store().sayPhrase("partner", "First")
+  const firstAvatars = f.store().avatars
+  const oldMotionTimer = [...f.timers.values()].find(({ delay }) => delay === 1200)!
+  f.clock.now += 500
+  f.store().sayPhrase("partner", "Second")
+  assert.equal(f.store().avatars, firstAvatars, "unchanged figures do not invalidate their memo boundary")
+  oldMotionTimer.run()
+  assert.equal(f.store().avatars.partner.motion, "speaking", "an obsolete callback cannot end the renewed motion")
+  const motionTimer = [...f.timers.values()].find(({ delay }) => delay === 1200)!
+  motionTimer.run()
+  assert.equal(f.store().avatars.partner.motion, "idle")
+  assert.equal(f.store().bubbles.length, 2, "speaking motion ends independently of the bubbles")
+  f.runtime.unmount()
+})
+
+test("a burst keeps each speaker's newest three lines without replacing previous line objects or lifetimes", () => {
+  const f = mount()
+  f.render()
+  f.store().sayPhrase("partner", "Earlier")
+  const earlier = f.store().bubbles[0]!
+  f.clock.now += 800
+  f.store().sayPhrases([
+    { speakerUserId: "local", body: "First" },
+    { speakerUserId: "partner", body: "Partner again" },
+    { speakerUserId: "local", body: "Second" },
+    { speakerUserId: "local", body: "Third" },
+    { speakerUserId: "local", body: "Fourth" }
+  ])
+  const lines = f.store().bubbles
+  assert.equal(lines[0], earlier)
+  assert.deepEqual(lines.filter(({ speakerUserId }) => speakerUserId === "local").map(({ body }) => body),
+    ["Second", "Third", "Fourth"])
+  assert.deepEqual(lines.map(({ expiresAt }) => expiresAt), [5_000, 5_800, 5_800, 5_800, 5_800])
+  const avatars = f.store().avatars
+  f.store().sayPhrases([])
+  assert.equal(f.store().bubbles, lines)
+  assert.equal(f.store().avatars, avatars)
+  fireBubbleTimer(f, 5_000)
+  assert.equal(f.store().bubbles.some(({ id }) => id === earlier.id), false)
+  assert.equal(f.store().bubbles.length, 4, "only the earlier line expires")
+  f.runtime.unmount()
+})
+
+test("a message decorates a moving or seated avatar without changing its movement contract", () => {
+  for (const seated of [false, true]) {
+    const f = mount()
+    f.render()
+    if (seated) f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+    else f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
+    const avatars = f.store().avatars
+    f.store().sayPhrases([{ speakerUserId: "partner", body: "While moving" }])
+    assert.equal(f.store().avatars, avatars)
+    assert.equal(f.store().avatars.partner.motion, seated ? "sitting" : "walking")
+    assert.equal(f.store().bubbles.length, 1)
+    for (const timer of [...f.timers.values()].filter(({ delay }) => delay === 1200)) timer.run()
+    assert.equal(f.store().avatars.partner.motion, seated ? "sitting" : "walking")
+    f.runtime.unmount()
+  }
+})

@@ -212,6 +212,18 @@ test("the sender's in-room acknowledgement is stored without its client id", () 
   assert.deepEqual(dependencies.receivedMessages, [acknowledged])
 })
 
+test("only an own acknowledgement carries exact identity as store metadata", () => {
+  const received: { message: ChatMessage; options: { localUserId?: string; clientMessageId?: string } }[] = []
+  const handler = createGlobalRealtimeEventHandler(createDependencies({
+    applyChatMessageReceived: (payload, options) => received.push({ message: payload, options })
+  }))
+  handler({ type: "chat.message_received", payload: { ...message, senderUserId: "ada", clientMessageId: "synthetic-own-ack" } })
+  handler({ type: "chat.message_received", payload: { ...message, clientMessageId: "synthetic-foreign-ack" } })
+  assert.deepEqual(received[0]?.options, { localUserId: "ada", clientMessageId: "synthetic-own-ack" })
+  assert.deepEqual(received[1]?.options, { localUserId: "ada" })
+  assert.equal(received.some((entry) => "clientMessageId" in entry.message), false)
+})
+
 test("ignores malformed room invites and deduplicated or foreign match events", () => {
   const dependencies = createDependencies({
     normalizeRoomInviteRecord: () => {

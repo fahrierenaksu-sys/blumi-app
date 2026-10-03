@@ -92,6 +92,22 @@ test("in-room chat does not render the sender's realtime echo as a second bubble
   )
 })
 
+test("room entry skips unconfirmed optimistic messages and live delivery ignores device clock skew", () => {
+  const timestamp = "2026-07-22T09:00:00.000Z"
+  assert.equal(findLastCanonicalRoomChatMessage([
+    createMessage("durable-entry", "Confirmed", timestamp),
+    createMessage("__local_sending", "Pending", "2026-07-22T09:01:00.000Z")
+  ])?.messageId, "durable-entry")
+  assert.equal(shouldRenderIncomingRoomChatMessage({
+    senderUserId: "user_two", localUserId: "user_one", body: "Live",
+    sentAt: timestamp, baselineTimestamp: Date.parse(timestamp) + 86_400_000
+  }), true)
+  assert.equal(shouldRenderIncomingRoomChatMessage({
+    senderUserId: "user_two", localUserId: "user_one", body: "Live",
+    sentAt: "invalid", baselineTimestamp: 0
+  }), false)
+})
+
 test("reconnect replay returns only unseen post-entry durable partner messages", () => {
   const baseline = Date.parse("2026-07-22T09:00:00.000Z")
   const missed = findMissedCanonicalRoomChatMessages({

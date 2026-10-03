@@ -45,14 +45,16 @@ export interface UseInRoomChatResult {
   threadId: string | undefined
   canSend: boolean
   /**
-   * Sends over the room socket. Sending the text of the latest failed
-   * message again is its retry and reuses that message's clientMessageId.
+   * Sends a new message, or retries the exact failed identity supplied.
+   * A stale or edited explicit retry is refused rather than duplicated.
    */
-  sendRoomMessage: (body: string) => boolean
-  /** The latest room message that was not acknowledged, until retried. */
+  sendRoomMessage: (body: string, retryClientMessageId?: string) => boolean
+  /** The oldest unresolved failure, for restoring an empty composer. */
   failedRoomMessage: FailedRoomMessage | null
+  failedRoomMessages: readonly FailedRoomMessage[]
   newMessages: InRoomChatMessageEvent[]
   consume: (messageId: string) => void
+  consumeMany: (messageIds: readonly string[]) => void
 }
 
 /** Stable empty list while the room has no chat thread (an effect dependency). */
@@ -115,17 +117,29 @@ export function useInRoomChat(options: {
   }, [chatThread.historyReady, chatThread.latestHistoryMessageIds, chatThread.messageListState.status,
     chatThread.messages, latestThreadMessageId])
   const requestedRef = useRef<string | null>(null)
-  const baselineRef = useRef<number>(Date.now())
+  // History boundaries are server timestamps, never the device's clock.
+  const baselineRef = useRef<number>(Number.NEGATIVE_INFINITY)
   const seenRef = useRef<Set<string>>(new Set())
   const replayedEntryThreadRef = useRef<string | null>(null)
+  const entrySnapshotEstablishedRef = useRef(false)
   const replayGateRef = useRef(createRoomEntryReplayGate())
   const bufferedNewEventsRef = useRef<InRoomChatMessageEvent[]>([])
+  const entryLiveMessageIdsRef = useRef(new Set<string>())
   const reconnectSnapshotPendingRef = useRef(false)
   const reconnectCompletionBaselineRef = useRef(0)
   const [pendingEvents, setPendingEvents] = useState<InRoomChatMessageEvent[]>([])
   const inFlightRef = useRef<Map<string, InFlightRoomMessage>>(new Map())
-  const failedRef = useRef<(FailedRoomMessage & { threadId: string }) | null>(null)
-  const [failedRoomMessage, setFailedRoomMessage] = useState<FailedRoomMessage | null>(null)
+  const failedRef = useRef(new Map<string, { threadId: string; message: FailedRoomMessage }>())
+  const [failedOccurrences, setFailedOccurrences] = useState<readonly {
+    threadId: string; message: FailedRoomMessage
+  }[]>([])
+  const failedRoomMessages = useMemo(() => failedOccurrences
+    .filter((failure) => failure.threadId === threadId)
+    .map(({ message }) => message), [failedOccurrences, threadId])
+
+  const publishFailures = useCallback(() => {
+    setFailedOccurrences([...failedRef.current.values()])
+  }, [])
 
   const failRoomMessage = useCallback((clientMessageId: string): void => {
     const inFlight = inFlightRef.current.get(clientMessageId)
@@ -134,21 +148,24 @@ export function useInRoomChat(options: {
     inFlightRef.current.delete(clientMessageId)
     markOptimisticMessageFailed(clientMessageId)
     if (!threadId) return
-    failedRef.current = { clientMessageId, body: inFlight.body, threadId }
-    setFailedRoomMessage({ clientMessageId, body: inFlight.body })
-  }, [threadId])
+    failedRef.current.set(clientMessageId, {
+      threadId,
+      message: { clientMessageId, body: inFlight.body }
+    })
+    publishFailures()
+  }, [publishFailures, threadId])
 
   const settleRoomMessage = useCallback((clientMessageId: string, message: ChatMessage): void => {
     const inFlight = inFlightRef.current.get(clientMessageId)
+    const failure = failedRef.current.get(clientMessageId)
+    if (inFlight && inFlight.body !== message.body) return
+    if (failure && (failure.threadId !== message.threadId || failure.message.body !== message.body)) return
     if (inFlight) clearTimeout(inFlight.timer)
     inFlightRef.current.delete(clientMessageId)
     // A late acknowledgement after a timeout still settles the bubble as sent.
     confirmOptimisticMessage(clientMessageId, message, localUserId)
-    if (failedRef.current?.clientMessageId === clientMessageId) {
-      failedRef.current = null
-      setFailedRoomMessage(null)
-    }
-  }, [localUserId])
+    if (failedRef.current.delete(clientMessageId)) publishFailures()
+  }, [localUserId, publishFailures])
 
   // A closed socket loses unacknowledged frames: fail them now instead of
   // leaving "sending" bubbles. Leaving the room fails what is still open.
@@ -169,18 +186,24 @@ export function useInRoomChat(options: {
     if (connectionStatus !== "connected") return
     if (requestedRef.current === threadId) return
     requestedRef.current = threadId
-    baselineRef.current = Date.now()
+    baselineRef.current = Number.NEGATIVE_INFINITY
     replayedEntryThreadRef.current = null
+    entrySnapshotEstablishedRef.current = false
     replayGateRef.current = advanceRoomEntryReplayGate(
       replayGateRef.current,
       "requested"
     )
     bufferedNewEventsRef.current = []
+    entryLiveMessageIdsRef.current = new Set()
     seenRef.current = new Set()
     setPendingEvents([])
 
     for (const message of canonicalMessagesRef.current) {
       seenRef.current.add(message.messageId)
+      if (!message.messageId.startsWith("__local_")) {
+        const sentAt = Date.parse(message.sentAt)
+        if (Number.isFinite(sentAt)) baselineRef.current = Math.max(baselineRef.current, sentAt)
+      }
     }
 
     // ChatThread's latest server page is already the MiniRoom's recent
@@ -216,6 +239,16 @@ export function useInRoomChat(options: {
 
   useEffect(() => {
     if (!threadId) return
+    if (messageListState.status === "failed" && replayGateRef.current.requested &&
+      replayedEntryThreadRef.current !== threadId) {
+      // A failed history request must not hold the live stream hostage.
+      replayedEntryThreadRef.current = threadId
+      replayGateRef.current = advanceRoomEntryReplayGate(replayGateRef.current, "failed")
+      const buffered = bufferedNewEventsRef.current
+      bufferedNewEventsRef.current = []
+      if (buffered.length > 0) setPendingEvents((current) => [...current, ...buffered])
+      return
+    }
     if (messageListState.status === "loading" && !hasRecentHistorySnapshot) {
       replayGateRef.current = advanceRoomEntryReplayGate(
         replayGateRef.current,
@@ -228,18 +261,32 @@ export function useInRoomChat(options: {
       replayGateRef.current,
       "ready"
     )
+    if (replayedEntryThreadRef.current === threadId) {
+      if (!entrySnapshotEstablishedRef.current) {
+        // The first successful page after failed entry establishes the
+        // canonical boundary without resurrecting the old entry history.
+        for (const message of canonicalMessages) {
+          seenRef.current.add(message.messageId)
+          if (!message.messageId.startsWith("__local_")) {
+            const sentAt = Date.parse(message.sentAt)
+            if (Number.isFinite(sentAt)) baselineRef.current = Math.max(baselineRef.current, sentAt)
+          }
+        }
+        entrySnapshotEstablishedRef.current = true
+      }
+      return
+    }
     const canReplayCachedSnapshot = hasRecentHistorySnapshot && replayGateRef.current.requested &&
       !replayGateRef.current.replayed
     if (!replayGateRef.current.canReplay && !canReplayCachedSnapshot) return
-    if (replayedEntryThreadRef.current === threadId) return
     replayedEntryThreadRef.current = threadId
+    entrySnapshotEstablishedRef.current = true
     replayGateRef.current = advanceRoomEntryReplayGate(
       replayGateRef.current,
       "replayed"
     )
     const lastMessage = findLastCanonicalRoomChatMessage(
-      canonicalMessages,
-      baselineRef.current
+      canonicalMessages.filter((message) => !entryLiveMessageIdsRef.current.has(message.messageId))
     )
     const initialEvent = lastMessage
       ? {
@@ -256,6 +303,10 @@ export function useInRoomChat(options: {
     bufferedNewEventsRef.current = []
     for (const message of canonicalMessages) {
       seenRef.current.add(message.messageId)
+      if (!message.messageId.startsWith("__local_")) {
+        const sentAt = Date.parse(message.sentAt)
+        if (Number.isFinite(sentAt)) baselineRef.current = Math.max(baselineRef.current, sentAt)
+      }
     }
     setPendingEvents((current) => [
       ...current,
@@ -305,6 +356,7 @@ export function useInRoomChat(options: {
       if (!threadId || message.threadId !== threadId) return
       if (seenRef.current.has(message.messageId)) return
       seenRef.current.add(message.messageId)
+      if (replayedEntryThreadRef.current !== threadId) entryLiveMessageIdsRef.current.add(message.messageId)
       if (!shouldRenderIncomingRoomChatMessage({
         senderUserId: message.senderUserId,
         localUserId,
@@ -340,29 +392,40 @@ export function useInRoomChat(options: {
       }
       if (event.type !== "chat.message_received") return
       const { clientMessageId, ...message } = event.payload
-      if (clientMessageId && message.senderUserId === localUserId) {
+      const knownFailure = clientMessageId ? failedRef.current.get(clientMessageId) : undefined
+      const settlesPreviousThread = knownFailure?.threadId === message.threadId &&
+        knownFailure.message.body === message.body
+      if (clientMessageId && message.senderUserId === localUserId &&
+        (message.threadId === threadId || settlesPreviousThread)) {
         settleRoomMessage(clientMessageId, message)
       }
       handleIncoming(message)
     },
-    [failRoomMessage, handleIncoming, localUserId, settleRoomMessage]
+    [failRoomMessage, handleIncoming, localUserId, settleRoomMessage, threadId]
   )
   useGlobalRealtimeEvents(handleServerEvent)
 
-  const consume = useCallback((messageId: string) => {
-    setPendingEvents((current) => current.filter((entry) => entry.messageId !== messageId))
+  const consumeMany = useCallback((messageIds: readonly string[]) => {
+    if (messageIds.length === 0) return
+    const consumed = new Set(messageIds)
+    setPendingEvents((current) => {
+      const remaining = current.filter((entry) => !consumed.has(entry.messageId))
+      return remaining.length === current.length ? current : remaining
+    })
   }, [])
 
+  const consume = useCallback((messageId: string) => consumeMany([messageId]), [consumeMany])
+
   const sendRoomMessage = useCallback(
-    (body: string): boolean => {
+    (body: string, retryClientMessageId?: string): boolean => {
       const trimmed = normalizeOutgoingChatBody(body)
       if (!trimmed) return false
       if (!threadId) return false
       if (connectionStatus !== "connected") return false
-      const retry = failedRef.current?.threadId === threadId && failedRef.current.body === trimmed
-        ? failedRef.current
-        : null
-      const clientMessageId = retry?.clientMessageId ?? createRoomClientMessageId()
+      const isRetry = retryClientMessageId !== undefined
+      const retry = isRetry ? failedRef.current.get(retryClientMessageId) : undefined
+      if (isRetry && (!retry || retry.threadId !== threadId || retry.message.body !== trimmed)) return false
+      const clientMessageId = retry?.message.clientMessageId ?? createRoomClientMessageId()
       // The rendered status can lag a socket that has just closed. A refused
       // frame must not leave an optimistic bubble that never resolves.
       const sent = send({
@@ -371,8 +434,8 @@ export function useInRoomChat(options: {
       })
       if (!sent) return false
       if (retry) {
-        failedRef.current = null
-        setFailedRoomMessage(null)
+        failedRef.current.delete(clientMessageId)
+        publishFailures()
         markOptimisticMessageSending(clientMessageId)
       } else {
         addOptimisticMessage({
@@ -389,15 +452,17 @@ export function useInRoomChat(options: {
       })
       return true
     },
-    [addOptimisticMessage, connectionStatus, failRoomMessage, localUserId, send, threadId]
+    [addOptimisticMessage, connectionStatus, failRoomMessage, localUserId, publishFailures, send, threadId]
   )
 
   return {
     threadId,
     canSend: Boolean(threadId) && connectionStatus === "connected",
     sendRoomMessage,
-    failedRoomMessage,
+    failedRoomMessage: failedRoomMessages[0] ?? null,
+    failedRoomMessages,
     newMessages: pendingEvents,
-    consume
+    consume,
+    consumeMany
   }
 }

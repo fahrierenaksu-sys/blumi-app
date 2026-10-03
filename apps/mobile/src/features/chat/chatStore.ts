@@ -447,7 +447,7 @@ export function applyChatMessageListFailed(
 
 export function applyChatMessageReceived(
   message: ChatMessage,
-  options: { localUserId?: string } = {}
+  options: { localUserId?: string; clientMessageId?: string } = {}
 ): void {
   const existing = messageCache.get(message.threadId) ?? []
   const alreadyReceived = existing.some((entry) => entry.messageId === message.messageId)
@@ -455,9 +455,9 @@ export function applyChatMessageReceived(
   // new identity. It must not consume a newer pending bubble with that body.
   if (alreadyReceived) return
 
-  // Realtime ChatMessage currently omits clientMessageId. Reconcile only a
-  // unique local candidate with the same thread, sender and body; if identical
-  // sends make this ambiguous, leave them for the exact HTTP ACK to resolve.
+  // Sender ACK metadata identifies an exact local row before insertion, even
+  // for identical rapid sends. An ordinary broadcast has only the canonical
+  // shape; reconcile it only when the local candidate is unambiguous.
   const pendingEchoCandidates = options.localUserId && message.senderUserId !== options.localUserId
     ? []
     : existing.filter((entry) => {
@@ -467,7 +467,19 @@ export function applyChatMessageReceived(
       const pending = pendingMessageByLocalMessageId.get(entry.messageId)
       return !pending || (pending.threadId === message.threadId && pending.senderUserId === message.senderUserId)
     })
-  const pendingEchoId = pendingEchoCandidates.length === 1 ? pendingEchoCandidates[0]?.messageId : undefined
+  const exactPendingId = options.clientMessageId && message.senderUserId === options.localUserId
+    ? findPendingLocalMessageId(options.clientMessageId, {
+      threadId: message.threadId, senderUserId: message.senderUserId, body: message.body
+    })
+    : undefined
+  // Legacy untracked optimistic rows have no client-id ledger. Preserve their
+  // unique-body reconciliation; never use that fallback for a tracked row.
+  const uniqueUntrackedId = pendingEchoCandidates.length === 1 &&
+    !pendingMessageByLocalMessageId.has(pendingEchoCandidates[0]!.messageId)
+    ? pendingEchoCandidates[0]?.messageId : undefined
+  const pendingEchoId = options.clientMessageId !== undefined
+    ? exactPendingId ?? uniqueUntrackedId
+    : pendingEchoCandidates.length === 1 ? pendingEchoCandidates[0]?.messageId : undefined
 
   if (pendingEchoId) removePendingLocalMessage(pendingEchoId)
   if (pendingEchoId && !alreadyReceived) keepLocalRenderKey(message.messageId, pendingEchoId)
@@ -586,7 +598,7 @@ export function confirmOptimisticMessage(
     body: message.body
   })
   if (!localMessageId) {
-    applyChatMessageReceived(message, { localUserId })
+    applyChatMessageReceived(message, { localUserId, clientMessageId })
     return
   }
   removePendingLocalMessage(localMessageId)

@@ -28,6 +28,20 @@ export interface WardrobeCatalogCopy {
   lockedInShop: string
 }
 
+/** Preserve unchanged category data so hidden shelves do not rebuild pages. */
+export function reuseWardrobeCards(
+  previous: readonly WardrobeCatalogCardModel[] | undefined,
+  next: WardrobeCatalogCardModel[]
+): readonly WardrobeCatalogCardModel[] {
+  if (!previous || previous.length !== next.length) return next
+  return previous.every((card, index) => {
+    const update = next[index]
+    return card.item === update.item && card.equipped === update.equipped &&
+      card.itemStateLabel === update.itemStateLabel && card.locked === update.locked &&
+      card.previewing === update.previewing && card.previewSource === update.previewSource
+  }) ? previous : next
+}
+
 export function isAvatarItemRoomPreviewSupported(item: AvatarCatalogItem): boolean {
   return item.id in DEFAULT_AVATAR_ROOM_PROJECTION_MAP
 }
@@ -88,9 +102,9 @@ export function resolveWardrobeEquippedLabel(input: {
 
 export function buildWardrobeCards(input: {
   items: readonly AvatarCatalogItem[]
-  avatar: UserAvatar
+  avatar?: UserAvatar
   displayedAvatar: UserAvatar
-  inventory: AvatarInventory
+  inventory?: AvatarInventory
   canEquipItem: (item: AvatarCatalogItem) => boolean
   copy: WardrobeCatalogCopy
   getPreviewSource: (item: AvatarCatalogItem) => ImageSourcePropType | undefined

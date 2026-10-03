@@ -16,6 +16,7 @@ export function findLastCanonicalRoomChatMessage(
     const sentAt = message ? Date.parse(message.sentAt) : Number.NaN
     if (
       message &&
+      !message.messageId.startsWith("__local_") &&
       message.body.trim() !== ROOM_INVITE_SENTINEL &&
       Number.isFinite(sentAt) &&
       sentAt <= atOrBeforeTimestamp
@@ -66,7 +67,9 @@ export function shouldRenderIncomingRoomChatMessage(input: {
   if (input.body.trim() === ROOM_INVITE_SENTINEL) return false
 
   const sentAtMs = Date.parse(input.sentAt)
-  return Number.isFinite(sentAtMs) && sentAtMs >= input.baselineTimestamp - 250
+  // The socket establishes live delivery. Comparing its server timestamp to
+  // the device's entry clock discards valid messages on skewed devices.
+  return Number.isFinite(sentAtMs)
 }
 
 export function findCanonicalRoomChatThread(input: {

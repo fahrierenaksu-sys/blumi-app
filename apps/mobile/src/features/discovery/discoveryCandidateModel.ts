@@ -96,6 +96,36 @@ export function createLiveDiscoveryCandidate(
   }
 }
 
+/** Keep unchanged card inputs when another cursor page arrives. Only current
+ * sources are retained, so refreshed/removed profiles cannot be resurrected. */
+export function createDiscoveryCandidateSelector<T>(
+  project: (source: T) => DiscoveryCandidate
+): (sources: readonly T[], scope: object) => DiscoveryCandidate[] {
+  let previousScope: object | undefined
+  let previousSources: readonly T[] = []
+  let candidates: DiscoveryCandidate[] = []
+  let projected = new Map<T, DiscoveryCandidate>()
+  return (sources, scope) => {
+    if (scope !== previousScope) {
+      previousScope = scope
+      previousSources = []
+      candidates = []
+      projected.clear()
+    }
+    if (sources.length === previousSources.length &&
+      sources.every((source, index) => source === previousSources[index])) return candidates
+    const nextProjected = new Map<T, DiscoveryCandidate>()
+    candidates = sources.map((source) => {
+      const candidate = projected.get(source) ?? project(source)
+      nextProjected.set(source, candidate)
+      return candidate
+    })
+    projected = nextProjected
+    previousSources = sources
+    return candidates
+  }
+}
+
 export function isLiveInviteAvailable(
   candidate: DiscoveryCandidate
 ): boolean {

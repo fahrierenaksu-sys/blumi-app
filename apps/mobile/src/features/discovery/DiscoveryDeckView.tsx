@@ -75,7 +75,10 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
   const { width: screenWidth, height: screenHeight } = useAppViewportMetrics({
     bottomNavVisible: true
   })
-  const viewportLayout = resolveDiscoveryLayoutMetrics(screenWidth, screenHeight)
+  const viewportLayout = useMemo(
+    () => resolveDiscoveryLayoutMetrics(screenWidth, screenHeight),
+    [screenWidth, screenHeight]
+  )
   const reduceMotion = useReducedMotion()
   const [isFeaturedFlipped, setIsFeaturedFlipped] = useState(false)
   const actionRowOpacity = useSharedValue(1)

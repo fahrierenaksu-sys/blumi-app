@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
   useAnimatedReaction,
@@ -59,7 +59,7 @@ interface AvatarLayerProps {
 
 type BubblePlacement = RoomSpeechBubblePlacement
 
-export function AvatarLayer(props: AvatarLayerProps) {
+export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
   const {
     avatars,
     avatarPositions,
@@ -73,9 +73,15 @@ export function AvatarLayer(props: AvatarLayerProps) {
     typingUserId,
     depthScene = EMPTY_MINI_ROOM_DEPTH_SCENE
   } = props
-  const sortedAvatars = Object.values(avatars).sort((a, b) => a.y - b.y)
-  // Stable per bubble list, so a figure re-renders only when its lines change.
-  const bubblesBySpeaker = useMemo(() => groupMiniRoomSpeechBySpeaker(bubbles), [bubbles])
+  const sortedAvatars = useMemo(() => Object.values(avatars).sort((a, b) => a.y - b.y), [avatars])
+  const committedBubbleGroups = useRef<Readonly<Record<string, readonly SpeechBubble[]>>>({})
+  const bubblesBySpeaker = useMemo(
+    () => groupMiniRoomSpeechBySpeaker(bubbles, committedBubbleGroups.current),
+    [bubbles]
+  )
+  useLayoutEffect(() => {
+    committedBubbleGroups.current = bubblesBySpeaker
+  }, [bubblesBySpeaker])
   const avatarsWithBubbles = sortedAvatars.filter((avatar) => bubblesBySpeaker[avatar.userId])
   const bubblesAreClose =
     avatarsWithBubbles.length > 1 &&
@@ -95,70 +101,18 @@ export function AvatarLayer(props: AvatarLayerProps) {
     stageHeight.value = event.nativeEvent.layout.height
   }, [stageHeight, stageWidth])
 
-  // A seated (or sitting-down / standing-up) avatar sorts at its seat's depth.
-  const { neighbours, occluders, seatDepthByHotspotId } = depthScene
-  const seatKey = sortedAvatars
-    .map((avatar) => `${avatar.userId}:${avatar.seatedHotspotId ?? avatar.depthSeatHotspotId ?? ""}`)
-    .join("|")
-  const pinnedDepths = useMemo(() => {
-    const pinned: Record<string, number> = {}
-    for (const entry of seatKey.split("|")) {
-      const split = entry.lastIndexOf(":")
-      const seat = entry.slice(split + 1)
-      const depth = seat ? seatDepthByHotspotId[seat] : undefined
-      if (depth !== undefined) pinned[entry.slice(0, split)] = depth
-    }
-    return pinned
-  }, [seatDepthByHotspotId, seatKey])
-
-  // Draw order follows the live depth, but React hears only when an avatar
-  // passes another avatar or a piece of furniture (not every frame).
-  const [depthOrder, setDepthOrder] = useState(() => resolveMiniRoomDepthOrder(neighbours,
-    sortedAvatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y, foot: { x: avatar.x, y: avatar.y } }))))
-  useAnimatedReaction(
-    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => {
-      const position = avatarPositions[id]!
-      const pinned = pinnedDepths[id]
-      return {
-        id,
-        depth: resolveMiniRoomAvatarSortDepth(position.y.value, pinned),
-        foot: pinned === undefined ? { x: position.x.value, y: position.y.value } : undefined
-      }
-    })),
-    (order, previous) => {
-      if (order !== previous) scheduleOnRN(setDepthOrder, order)
-    },
-    [avatarPositions, neighbours, pinnedDepths]
-  )
-  const zIndices = useMemo(
-    () => resolveMiniRoomDepthZIndices(depthOrder, occluders.length),
-    [depthOrder, occluders.length]
-  )
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={handleLayout}>
-      {occluders.map((item, index) => (
-        <RoomRendererFurnitureSprite key={item.renderId} item={item} zIndex={zIndices.occluders[index] ?? 0} />
-      ))}
-      {sortedAvatars.map((avatar) => {
-        const position = avatarPositions[avatar.userId]
-        if (!position) return null
-        const isLocal = avatar.userId === localUserId
-        return (
-          <AvatarFigure
-            key={avatar.userId}
-            avatar={avatar}
-            position={position}
-            stageWidth={stageWidth}
-            stageHeight={stageHeight}
-            zIndex={zIndices.avatars[avatar.userId] ?? 0}
-            // A walk in from the door is the arrival's one hero; the ring is for a plain
-            // fade-in, so it stays off for a walk-in even after it lands.
-            showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor && !avatar.arrivedByWalk}
-            motionPolicy={motionPolicy}
-          />
-        )
-      })}
+      <AvatarBodyLayer
+        avatars={sortedAvatars}
+        avatarPositions={avatarPositions}
+        stageWidth={stageWidth}
+        stageHeight={stageHeight}
+        depthScene={depthScene}
+        localUserId={localUserId}
+        partnerJustJoined={partnerJustJoined}
+        motionPolicy={motionPolicy}
+      />
       {sortedAvatars.map((avatar) => {
         const position = avatarPositions[avatar.userId]
         if (!position) return null
@@ -193,7 +147,87 @@ export function AvatarLayer(props: AvatarLayerProps) {
       })}
     </View>
   )
-}
+})
+
+/** Speech changes leave furniture, depth worklets and unchanged figures behind this boundary. */
+const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
+  avatars: readonly AvatarState[]
+  avatarPositions: AvatarLayerProps["avatarPositions"]
+  stageWidth: SharedValue<number>
+  stageHeight: SharedValue<number>
+  depthScene: MiniRoomDepthScene
+  localUserId: string
+  partnerJustJoined: boolean
+  motionPolicy: MiniRoomMotionPolicy
+}) {
+  const { avatars, avatarPositions, stageWidth, stageHeight, depthScene, localUserId, partnerJustJoined, motionPolicy } = props
+  // A seated (or sitting-down / standing-up) avatar sorts at its seat's depth.
+  const { neighbours, occluders, seatDepthByHotspotId } = depthScene
+  const seatKey = avatars
+    .map((avatar) => `${avatar.userId}:${avatar.seatedHotspotId ?? avatar.depthSeatHotspotId ?? ""}`)
+    .join("|")
+  const pinnedDepths = useMemo(() => {
+    const pinned: Record<string, number> = {}
+    for (const entry of seatKey.split("|")) {
+      const split = entry.lastIndexOf(":")
+      const seat = entry.slice(split + 1)
+      const depth = seat ? seatDepthByHotspotId[seat] : undefined
+      if (depth !== undefined) pinned[entry.slice(0, split)] = depth
+    }
+    return pinned
+  }, [seatDepthByHotspotId, seatKey])
+
+  // Draw order follows the live depth, but React hears only when an avatar
+  // passes another avatar or a piece of furniture (not every frame).
+  const [depthOrder, setDepthOrder] = useState(() => resolveMiniRoomDepthOrder(neighbours,
+    avatars.map((avatar) => ({ id: avatar.userId, depth: avatar.y, foot: { x: avatar.x, y: avatar.y } }))))
+  useAnimatedReaction(
+    () => resolveMiniRoomDepthOrder(neighbours, Object.keys(avatarPositions).map((id) => {
+      const position = avatarPositions[id]!
+      const pinned = pinnedDepths[id]
+      return {
+        id,
+        depth: resolveMiniRoomAvatarSortDepth(position.y.value, pinned),
+        foot: pinned === undefined ? { x: position.x.value, y: position.y.value } : undefined
+      }
+    })),
+    (order, previous) => {
+      if (order !== previous) scheduleOnRN(setDepthOrder, order)
+    },
+    [avatarPositions, neighbours, pinnedDepths]
+  )
+  const zIndices = useMemo(
+    () => resolveMiniRoomDepthZIndices(depthOrder, occluders.length),
+    [depthOrder, occluders.length]
+  )
+
+  return (
+    <>
+      {occluders.map((item, index) => (
+        <RoomRendererFurnitureSprite key={item.renderId} item={item} zIndex={zIndices.occluders[index] ?? 0} />
+      ))}
+      {avatars.map((avatar) => {
+        const position = avatarPositions[avatar.userId]
+        if (!position) return null
+        const isLocal = avatar.userId === localUserId
+        return (
+          <AvatarFigure
+            key={avatar.userId}
+            avatar={avatar}
+            position={position}
+            stageWidth={stageWidth}
+            stageHeight={stageHeight}
+            zIndex={zIndices.avatars[avatar.userId] ?? 0}
+            // A walk in from the door is the arrival's one hero; the ring is for a plain
+            // fade-in, so it stays off for a walk-in even after it lands.
+            showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor && !avatar.arrivedByWalk}
+            motionPolicy={motionPolicy}
+          />
+        )
+      })}
+    </>
+  )
+})
 
 /**
  * One avatar's anchor at its live room position. Walking moves it on the UI
@@ -347,7 +381,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       >
         <Reanimated.View style={[styles.avatarImageFill, bodyStyle]}>
           {roomAvatarLayers.length ? (
-            <RoomAvatarRenderer2D layers={roomAvatarLayers} />
+            <RoomAvatarRenderer2D layers={roomAvatarLayers} allowDownscaling={false} />
           ) : avatar.appearance.fullBodyAsset ? (
             <Image
               source={avatar.appearance.fullBodyAsset}

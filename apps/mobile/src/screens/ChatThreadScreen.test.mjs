@@ -253,6 +253,7 @@ test("composer blocks empty and pending sends without losing the draft", () => {
     assert.equal(composerExpression("isSendDisabled", { inputText, isPendingThread }), true)
     composerExpression("handleSend", {
       inputText, isPendingThread,
+      shownTextRef: { current: inputText },
       onSend: () => assert.fail("disabled draft was submitted"),
       setInputText: () => assert.fail("disabled draft was cleared")
     })()

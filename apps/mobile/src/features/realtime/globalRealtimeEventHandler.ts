@@ -37,7 +37,7 @@ export interface GlobalRealtimeEventHandlerDependencies {
   applyChatMessageListed: (payload: ChatMessageList) => void
   applyChatMessageReceived: (
     payload: ChatMessage,
-    options: { localUserId?: string }
+    options: { localUserId?: string; clientMessageId?: string }
   ) => void
   /** A partner message reached this device: queue a debounced delivery ack. */
   acknowledgeDelivery?: (message: ChatMessage) => void
@@ -143,12 +143,14 @@ export function createGlobalRealtimeEventHandler(
     }
 
     if (event.type === "chat.message_received") {
-      // The client id rides only on the sender's own in-room acknowledgement;
-      // useInRoomChat settles that bubble. The store keeps the canonical shape.
-      const { clientMessageId: _clientMessageId, ...message } = event.payload
+      // ACK identity is reconciliation metadata, never part of the durable
+      // message. Resolve it before the room's later listener sees the event.
+      const { clientMessageId, ...message } = event.payload
       dependencies.clearChatTypingForMessage?.(message)
       dependencies.applyChatMessageReceived(message, {
-        localUserId: dependencies.currentUserId
+        localUserId: dependencies.currentUserId,
+        ...(clientMessageId && message.senderUserId === dependencies.currentUserId
+          ? { clientMessageId } : {})
       })
 
       const fromPartner = Boolean(dependencies.currentUserId) &&

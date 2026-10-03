@@ -148,6 +148,7 @@ function loadControls(osReduceMotion: boolean, options: { hold?: boolean } = {})
     "expo-symbols": { SymbolView: "SymbolView" },
     "../../avatarV2/wardrobe/WardrobeGlass": { WardrobeGlass: "WardrobeGlass" },
     "../../avatarV2/wardrobe/wardrobeV2Styles": { wardrobeTheme: { ink: "#49364A", shadow: "#865078" } },
+    "./useRetainedMiniRoomTranscript": loadSourceWithFakeReact("features/miniRoom/scene/useRetainedMiniRoomTranscript.ts", runtime),
     "./MiniRoomChatHistory": { MiniRoomChatHistory: "MiniRoomChatHistory" }
   }
   const real = ["./miniRoomStatusNotice", "./miniRoomLayout", "./miniRoomTransitionModel"]
@@ -307,6 +308,7 @@ test("an accepted send ticks once, from the button or the return key; a refused 
   assert.deepEqual(sent.haptics, ["selection"])
   sent.haptics.splice(0)
   const input = findAll(sent.runtime.output, (element) => element.type === "TextInput")[0]!
+  input.props.onChangeText("Another message")
   input.props.onSubmitEditing()
   assert.deepEqual(sent.haptics, ["selection"], "the keyboard's send is the same send")
 

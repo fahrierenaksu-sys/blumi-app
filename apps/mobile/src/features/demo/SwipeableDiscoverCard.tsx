@@ -11,7 +11,7 @@
  * - Age + bio display for richer profile cards
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { matchFlightSources } from "../matches/matchFlightSource"
 import type { AvatarSelection, UserProfilePrompt } from "@blumi/contracts"
 import Ionicons from "@expo/vector-icons/Ionicons"
@@ -118,7 +118,7 @@ interface SwipeableDiscoverCardProps {
   leaving?: boolean; exitRequest?: DiscoverCardExitRequest | null; onExitEnd?: (userId: string) => void
 }
 
-export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
+export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
   const {
     profile,
     onSwipeRight,
@@ -489,7 +489,7 @@ export function SwipeableDiscoverCard(props: SwipeableDiscoverCardProps) {
     </Reanimated.View>
     </GestureDetector>
   )
-}
+})
 
 function DiscoveryCardBack(props: {
   deferAvatar?: boolean
