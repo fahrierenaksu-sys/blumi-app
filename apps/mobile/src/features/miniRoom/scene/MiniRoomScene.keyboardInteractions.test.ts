@@ -86,8 +86,7 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
     "./useMiniRoomMotionPresentation": { useMiniRoomMotionPresentation: () => false },
     "./useMiniRoomScrollToLatest": { useMiniRoomScrollToLatest: () => scrollPresentation },
     "../useMiniRoomKeyboardPreference": { useMiniRoomKeyboardPreference: () => ({ suggestionsEnabled: false,
-      toggle: () => undefined }) },
-    "../roomComposerModel": { resolveComposerRestore: () => "", resolveRoomComposerSubmit: () => ({ kind: "empty" }) }
+      toggle: () => undefined }) }
   }
   const { MiniRoomScene } = loadSourceWithFakeReact<typeof SceneModule>(
     "features/miniRoom/scene/MiniRoomScene.tsx", runtime, { modules }

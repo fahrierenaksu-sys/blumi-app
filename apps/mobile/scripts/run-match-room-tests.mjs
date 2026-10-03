@@ -283,6 +283,8 @@ try {
       "src/features/miniRoom/scene/miniRoomFirstAppearance.test.ts",
       "src/features/miniRoom/scene/miniRoomDepthModel.test.ts",
       "src/features/miniRoom/useMiniRoomMotion.test.ts",
+      // Loads the real chat store source, so it needs tsx, not the compiled realtime group.
+      "src/features/miniRoom/useInRoomChat.reconnect.test.ts",
       "src/features/notifications/useFocusedConversation.test.ts",
       "src/features/miniRoom/scene/roomSpeechBubbleStack.test.ts",
       "src/features/miniRoom/scene/RoomTapFeedback.test.ts",

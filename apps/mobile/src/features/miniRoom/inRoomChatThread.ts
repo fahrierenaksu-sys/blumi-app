@@ -61,7 +61,6 @@ export function shouldRenderIncomingRoomChatMessage(input: {
   localUserId: string
   body: string
   sentAt: string
-  baselineTimestamp: number
 }): boolean {
   if (input.senderUserId === input.localUserId) return false
   if (input.body.trim() === ROOM_INVITE_SENTINEL) return false

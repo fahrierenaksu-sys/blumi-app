@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import type { DiscoveryDecisionQuota } from "@blumi/contracts"
 import type { DiscoverFilters } from "../../../components/DiscoverFiltersBottomSheet"
 import { useSavedConnections } from "../../connections/savedConnectionsStore"
@@ -94,22 +94,34 @@ export function useDiscoveryDeck(input: {
     () => ({ ownerUserId, isProductionDiscovery }),
     [ownerUserId, isProductionDiscovery]
   )
-  const selectCandidates = useMemo(() => ({
-    production: createDiscoveryCandidateSelector(createProductionDiscoveryCandidate),
-    live: createDiscoveryCandidateSelector(createLiveDiscoveryCandidate)
-  }), [])
+  const selectorsRef = useRef<{
+    production: ReturnType<typeof createDiscoveryCandidateSelector<DiscoverProfileRecord>>
+    live: ReturnType<typeof createDiscoveryCandidateSelector<UseLobbyFlowResult["nearbyUsers"][number]>>
+  } | null>(null)
+  if (selectorsRef.current === null) {
+    selectorsRef.current = {
+      production: createDiscoveryCandidateSelector(createProductionDiscoveryCandidate),
+      live: createDiscoveryCandidateSelector(createLiveDiscoveryCandidate)
+    }
+  }
   const discoverSourceUsers = useMemo<DiscoveryCandidate[]>(
     () => {
-      // The inactive mode must not retain another account's previous sources.
-      if (isProductionDiscovery) {
-        selectCandidates.live([], candidateScope)
-        return selectCandidates.production(productionProfiles, candidateScope)
-      }
-      selectCandidates.production([], candidateScope)
-      return selectCandidates.live(nearbyUsers, candidateScope)
+      const selectors = selectorsRef.current
+      if (selectors === null) return []
+      return isProductionDiscovery
+        ? selectors.production(productionProfiles, candidateScope)
+        : selectors.live(nearbyUsers, candidateScope)
     },
-    [candidateScope, isProductionDiscovery, nearbyUsers, productionProfiles, selectCandidates]
+    [candidateScope, isProductionDiscovery, nearbyUsers, productionProfiles]
   )
+
+  // The inactive mode must not retain another account's previous sources.
+  useEffect(() => {
+    const selectors = selectorsRef.current
+    if (selectors === null) return
+    const inactive = isProductionDiscovery ? selectors.live : selectors.production
+    inactive([], candidateScope)
+  }, [candidateScope, isProductionDiscovery])
 
   const discoverDeck = useMemo<DiscoveryCandidate[]>(() => {
     if (isProductionDiscovery && !isSafetyListReady) return []

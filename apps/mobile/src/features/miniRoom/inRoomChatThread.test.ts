@@ -74,8 +74,7 @@ test("in-room chat does not render the sender's realtime echo as a second bubble
       senderUserId: "user_one",
       localUserId: "user_one",
       body: "I am already shown optimistically.",
-      sentAt: "2026-07-22T10:00:00.000Z",
-      baselineTimestamp: Date.parse("2026-07-22T09:59:00.000Z")
+      sentAt: "2026-07-22T10:00:00.000Z"
     }),
     false
   )
@@ -85,8 +84,7 @@ test("in-room chat does not render the sender's realtime echo as a second bubble
       senderUserId: "user_two",
       localUserId: "user_one",
       body: "I can see you in the room.",
-      sentAt: "2026-07-22T10:00:00.000Z",
-      baselineTimestamp: Date.parse("2026-07-22T09:59:00.000Z")
+      sentAt: "2026-07-22T10:00:00.000Z"
     }),
     true
   )
@@ -100,11 +98,11 @@ test("room entry skips unconfirmed optimistic messages and live delivery ignores
   ])?.messageId, "durable-entry")
   assert.equal(shouldRenderIncomingRoomChatMessage({
     senderUserId: "user_two", localUserId: "user_one", body: "Live",
-    sentAt: timestamp, baselineTimestamp: Date.parse(timestamp) + 86_400_000
+    sentAt: timestamp
   }), true)
   assert.equal(shouldRenderIncomingRoomChatMessage({
     senderUserId: "user_two", localUserId: "user_one", body: "Live",
-    sentAt: "invalid", baselineTimestamp: 0
+    sentAt: "invalid"
   }), false)
 })
 

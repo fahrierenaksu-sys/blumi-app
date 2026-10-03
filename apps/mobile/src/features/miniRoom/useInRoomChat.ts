@@ -361,8 +361,7 @@ export function useInRoomChat(options: {
         senderUserId: message.senderUserId,
         localUserId,
         body: message.body,
-        sentAt: message.sentAt,
-        baselineTimestamp: baselineRef.current
+        sentAt: message.sentAt
       })) {
         return
       }

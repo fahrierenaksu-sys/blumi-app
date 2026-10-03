@@ -42,11 +42,8 @@ try {
     "src/features/miniRoom/miniRoomLeaveModel.test.ts",
     "src/features/miniRoom/miniRoomLeaveFlow.ts",
     "src/features/miniRoom/miniRoomLeaveFlow.test.ts",
-    "src/features/miniRoom/roomComposerModel.ts",
-    "src/features/miniRoom/roomComposerModel.test.ts",
     "src/features/miniRoom/inRoomChatThread.ts",
     "src/features/miniRoom/inRoomChatThread.test.ts",
-    "src/features/miniRoom/useInRoomChat.reconnect.test.ts",
     "src/features/miniRoom/reconnectRoomSnapshot.test.ts",
     "src/features/lobby/interactionState.ts",
     "src/features/lobby/lobbyState.ts",
@@ -83,9 +80,7 @@ try {
     join(outputDirectory, "features/miniRoom/roomArrivalModel.test.js"),
     join(outputDirectory, "features/miniRoom/miniRoomLeaveModel.test.js"),
     join(outputDirectory, "features/miniRoom/miniRoomLeaveFlow.test.js"),
-    join(outputDirectory, "features/miniRoom/roomComposerModel.test.js"),
     join(outputDirectory, "features/miniRoom/inRoomChatThread.test.js"),
-    join(outputDirectory, "features/miniRoom/useInRoomChat.reconnect.test.js"),
     join(outputDirectory, "features/miniRoom/reconnectRoomSnapshot.test.js"),
     join(outputDirectory, "features/lobby/lobbyState.test.js")
   ], {
