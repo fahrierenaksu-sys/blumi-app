@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
@@ -23,6 +23,13 @@ import {
   maskUnverifiedProductOwnership
 } from "./shopScreenModel"
 
+interface RoomPreviewResolution {
+  roomDecor: UserRoomDecor
+  furnitureCatalog: FurnitureItem[]
+  selectedRoomItem: FurnitureItem | undefined
+  scene: ReturnType<typeof resolveRoomV2Scene>
+}
+
 /**
  * Derives everything the live preview shows: the selected product (masked
  * until inventory is verified), the draft avatar and its combination
@@ -30,6 +37,7 @@ import {
  */
 export function useShopPreviewModel(input: {
   shopMode: ShopMode
+  showShopContent: boolean
   selectedId: string
   filteredProducts: ShopCatalogItem[]
   activeProducts: ShopCatalogItem[]
@@ -45,6 +53,7 @@ export function useShopPreviewModel(input: {
 }) {
   const {
     shopMode,
+    showShopContent,
     selectedId,
     filteredProducts,
     activeProducts,
@@ -91,12 +100,16 @@ export function useShopPreviewModel(input: {
     () => hasAvatarDraftChanges(avatar, previewAvatar),
     [avatar, previewAvatar]
   )
+  const ownedProductIds = useMemo(
+    () => [...new Set([...combinationState.ownedProductIds, ...ownedAvatarItemIds])],
+    [combinationState.ownedProductIds, ownedAvatarItemIds]
+  )
   const combinationSummary = useMemo(() => getShopCombinationSummary({
     draft: combinationState.draft,
     equipped: combinationState.equipped,
-    ownedProductIds: [...new Set([...combinationState.ownedProductIds, ...ownedAvatarItemIds])],
+    ownedProductIds,
     products: avatarProducts
-  }), [combinationState.draft, combinationState.equipped, combinationState.ownedProductIds, ownedAvatarItemIds, avatarProducts])
+  }), [combinationState.draft, combinationState.equipped, ownedProductIds, avatarProducts])
   const canRemoveAvatarPreview = useMemo(
     () => Boolean(
       selectedProduct?.avatarItem &&
@@ -109,34 +122,51 @@ export function useShopPreviewModel(input: {
     ),
     [avatar, previewAvatar, selectedProduct]
   )
-  const combinationItems = getShopCombinationItems({
+  const combinationItems = useMemo(() => getShopCombinationItems({
     selectionOrder: previewSelectionOrder,
     draft: combinationState.draft,
     equipped: combinationState.equipped,
-    ownedProductIds: [...new Set([...combinationState.ownedProductIds, ...ownedAvatarItemIds])],
+    ownedProductIds,
     products: avatarProducts
-  })
+  }), [previewSelectionOrder, combinationState.draft, combinationState.equipped, ownedProductIds, avatarProducts])
 
-  const roomPreviewScene = useMemo(() => {
-    const selectedRoomItem =
-      selectedProduct?.previewType === "room"
-        ? selectedProduct.roomItem
-        : undefined
-    if (!selectedRoomItem) {
-      return resolveRoomV2Scene({
+  // Avatar selection and price/ownership changes do not change room geometry.
+  const selectedRoomItem = shopMode === "home" && selectedProduct?.previewType === "room"
+    ? selectedProduct.roomItem
+    : undefined
+  const showRoomPreview = shopMode === "home" && showShopContent
+  const furnitureCatalog = roomFurnitureCatalog ?? ROOM_V2_FURNITURE_CATALOG
+  const [lastRoomResolution, setLastRoomResolution] = useState<RoomPreviewResolution | null>(null)
+  const roomResolution = useMemo(() => {
+    if (!showRoomPreview) return null
+    if (
+      lastRoomResolution?.roomDecor === roomDecor &&
+      lastRoomResolution.furnitureCatalog === furnitureCatalog &&
+      lastRoomResolution.selectedRoomItem === selectedRoomItem
+    ) {
+      return lastRoomResolution
+    }
+    return {
+      roomDecor,
+      furnitureCatalog,
+      selectedRoomItem,
+      scene: resolveRoomV2Scene({
         roomShellCatalog: ROOM_V2_SHELL_CATALOG,
-        furnitureCatalog: roomFurnitureCatalog ?? ROOM_V2_FURNITURE_CATALOG,
-        decor: roomDecor,
+        furnitureCatalog,
+        decor: selectedRoomItem
+          ? createRoomPreviewDecor(selectedRoomItem, roomDecor, DEFAULT_ROOM_V2_SHELL_ID)
+          : roomDecor,
         defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
       })
     }
-    return resolveRoomV2Scene({
-      roomShellCatalog: ROOM_V2_SHELL_CATALOG,
-      furnitureCatalog: roomFurnitureCatalog ?? ROOM_V2_FURNITURE_CATALOG,
-      decor: createRoomPreviewDecor(selectedRoomItem, roomDecor, DEFAULT_ROOM_V2_SHELL_ID),
-      defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
-    })
-  }, [roomFurnitureCatalog, roomDecor, selectedProduct])
+  }, [showRoomPreview, furnitureCatalog, roomDecor, selectedRoomItem, lastRoomResolution])
+  // Retain one resolved drawing across hidden modes. A guarded update to this
+  // hook's own state is replayed before children commit; an abandoned render
+  // cannot publish a shared cache entry. Ownership and actions remain live.
+  if (roomResolution && roomResolution !== lastRoomResolution) {
+    setLastRoomResolution(roomResolution)
+  }
+  const roomPreviewScene = roomResolution?.scene ?? null
 
   return {
     selectedProduct,

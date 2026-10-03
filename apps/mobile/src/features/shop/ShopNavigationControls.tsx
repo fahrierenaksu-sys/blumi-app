@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useEffect } from "react"
+import { memo, useCallback, useEffect, useRef } from "react"
 import {
   ActivityIndicator,
   Pressable,
@@ -128,13 +128,21 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
   const copy = getShopCopy(props.locale)
   const motion = useMotion()
   const slide = useSharedValue(props.activeMode === "avatar" ? 0 : 1)
+  const indicatorTarget = useRef({ mode: props.activeMode, motion: motion.snappy })
   const segmentWidth = (props.width - 8) / 2
 
-  // The selected-mode pill slides with the snappy spring (lands at once
-  // under Reduce Motion).
+  const moveIndicator = useCallback((mode: ShopMode) => {
+    // Remember the destination, not the spring's intermediate UI-thread value.
+    // The controlled-mode effect must not restart an already queued selection.
+    if (indicatorTarget.current.mode === mode && indicatorTarget.current.motion === motion.snappy) return
+    indicatorTarget.current = { mode, motion: motion.snappy }
+    slide.value = animateTo(mode === "avatar" ? 0 : 1, motion.snappy)
+  }, [motion.snappy, slide])
+
+  // Route/programmatic changes still reconcile the controlled selection.
   useEffect(() => {
-    slide.value = animateTo(props.activeMode === "avatar" ? 0 : 1, motion.snappy)
-  }, [motion, props.activeMode, slide])
+    moveIndicator(props.activeMode)
+  }, [moveIndicator, props.activeMode])
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: slide.value * segmentWidth }]
   }))
@@ -157,7 +165,11 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
             accessibilityRole="button"
             accessibilityLabel={accessibilityLabel}
             accessibilityState={{ selected: active }}
-            onPress={() => props.onSelectMode(option.mode)}
+            onPress={() => {
+              // Queue the native pill before the parent swaps preview/shelves.
+              moveIndicator(option.mode)
+              props.onSelectMode(option.mode)
+            }}
             style={({ pressed }) => [
               styles.modePill,
               active ? styles.modePillActive : null,

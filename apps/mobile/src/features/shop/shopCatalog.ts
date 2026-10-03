@@ -104,7 +104,10 @@ export function buildShopCatalogItems(
   ]
 }
 
-function buildAvatarShopItems(input: BuildShopCatalogItemsInput): ShopCatalogItem[] {
+export function buildAvatarShopItems(input: Pick<
+  BuildShopCatalogItemsInput,
+  "avatar" | "economyCatalog" | "publishedItemIds"
+> & { inventory: Pick<BlumiInventorySnapshot, "ownedAvatarItemIds"> }): ShopCatalogItem[] {
   const avatarInventory = {
     ownedItemIds: input.inventory.ownedAvatarItemIds
   }
@@ -161,7 +164,10 @@ export function buildAvatarShopCatalogItem(
   }
 }
 
-function buildRoomShopItems(input: BuildShopCatalogItemsInput): ShopCatalogItem[] {
+export function buildRoomShopItems(input: Pick<
+  BuildShopCatalogItemsInput,
+  "roomDecor" | "economyCatalog" | "publishedItemIds" | "roomFurnitureCatalog" | "qaOwnedRoomItemIds"
+> & { inventory: Pick<BlumiInventorySnapshot, "ownedRoomItemIds"> }): ShopCatalogItem[] {
   const publishedItemIds = input.publishedItemIds
     ? new Set(input.publishedItemIds)
     : undefined

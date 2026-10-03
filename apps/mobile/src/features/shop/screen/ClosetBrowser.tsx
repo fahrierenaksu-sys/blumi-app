@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type FlatList, Text, View } from "react-native"
 import Reanimated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 import { MainTabPagerEdgeHandoffScrollOwner } from "../../../ui/MainTabPagerGestureOwnership"
@@ -28,7 +28,7 @@ import { VerticalShopCategoryRail } from "./VerticalShopCategoryRail"
 
 const SHOP_PRODUCT_COLUMNS_PER_PAGE = 2
 
-export function ClosetBrowser(props: {
+export const ClosetBrowser = memo(function ClosetBrowser(props: {
   categories: ShopCategoryOption[]
   activeCategoryId: string
   products: ShopCatalogItem[]
@@ -269,4 +269,4 @@ export function ClosetBrowser(props: {
       </View>
     </View>
   )
-}
+})

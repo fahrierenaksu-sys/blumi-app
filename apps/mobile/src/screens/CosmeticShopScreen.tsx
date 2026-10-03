@@ -57,6 +57,7 @@ import { useShopCatalogProducts } from "../features/shop/screen/useShopCatalogPr
 import { useShopCombinationSession } from "../features/shop/screen/useShopCombinationSession"
 import { useShopPreviewModel } from "../features/shop/screen/useShopPreviewModel"
 import { useShopPreviewSelection } from "../features/shop/screen/useShopPreviewSelection"
+import { useShopOwnedAvatarItemIds } from "../features/shop/screen/useShopOwnedAvatarItemIds"
 import { useShopProductFocus } from "../features/shop/screen/useShopProductFocus"
 import { useShopPurchaseActions } from "../features/shop/screen/useShopPurchaseActions"
 import { useShopCheckoutFlight, useShopPurchaseFlight } from "../features/shop/screen/useShopPurchaseFlight"
@@ -107,6 +108,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     sessionActor.profile.userId,
     requiresServerInventory
   )
+  const ownedAvatarItemIds = useShopOwnedAvatarItemIds(inventoryStore.inventory.ownedAvatarItemIds)
   const coinPackWallet = useCoinPackWallet({
     isConnected,
     isProductionSession: IS_BLUMI_PAID_COINS_ENABLED && sessionActor.session.mode === "production",
@@ -187,7 +189,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
   } = useShopCombinationSession({
     navigation,
     avatar: avatarV2.avatar,
-    ownedAvatarItemIds: inventoryStore.inventory.ownedAvatarItemIds,
+    ownedAvatarItemIds,
     avatarRevision: sessionActor.profile.avatar.revision ?? 0
   })
 
@@ -254,6 +256,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     roomPreviewScene
   } = useShopPreviewModel({
     shopMode,
+    showShopContent,
     selectedId,
     filteredProducts,
     activeProducts,
@@ -263,7 +266,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     combinationState,
     previewSelectionOrder,
     avatar: avatarV2.avatar,
-    ownedAvatarItemIds: inventoryStore.inventory.ownedAvatarItemIds,
+    ownedAvatarItemIds,
     roomDecor: roomV2.userRoomDecor,
     roomFurnitureCatalog: props.roomFurnitureCatalog
   })
@@ -363,7 +366,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     combinationStateRef,
     setCombinationState,
     dispatchCombination,
-    ownedAvatarItemIds: inventoryStore.inventory.ownedAvatarItemIds,
+    ownedAvatarItemIds,
     equipAndSaveItem: avatarV2.equipAndSaveItem,
     copy
   })

@@ -7,7 +7,7 @@ import type { UserAvatar } from "../../avatarV2/avatarV2.types"
 import type { BlumiInventorySnapshot } from "../../inventory/inventoryStore"
 import type { FurnitureItem, UserRoomDecor } from "../../roomV2/roomV2.types"
 import type { AppLocale } from "../../session/appLocale"
-import { buildShopCatalogItems } from "../shopCatalog"
+import { buildAvatarShopItems, buildRoomShopItems } from "../shopCatalog"
 import type { ShopMode } from "../ShopNavigationControls"
 import {
   isDisplayableAvatarShopProduct,
@@ -60,20 +60,39 @@ export function useShopCatalogProducts(input: {
     () => productionEconomyCatalog?.map((item) => item.itemId),
     [productionEconomyCatalog]
   )
-  const shopItems = useMemo(
+  // Balance and unrelated room updates must not invalidate wearable cards.
+  // Each builder consumes only the authoritative ownership for its section.
+  // Inventory snapshots copy both arrays even for a balance-only update.
+  // Local value keys keep equivalent copies from rebuilding the catalog;
+  // these are presentation dependencies, never an ownership decision/cache.
+  const avatarOwnershipKey = JSON.stringify(inventory.ownedAvatarItemIds)
+  const roomOwnershipKey = JSON.stringify(inventory.ownedRoomItemIds)
+  const avatarShopItems = useMemo(
     () =>
-      buildShopCatalogItems({
-        inventory,
+      buildAvatarShopItems({
+        inventory: { ownedAvatarItemIds: JSON.parse(avatarOwnershipKey) as string[] },
         avatar,
-        roomDecor,
         economyCatalog: productionEconomyCatalog,
-        publishedItemIds,
-        roomFurnitureCatalog,
-        qaOwnedRoomItemIds: qaOnlyOwnedRoomItemIds
+        publishedItemIds
       }),
     [
       avatar,
-      inventory,
+      avatarOwnershipKey,
+      productionEconomyCatalog,
+      publishedItemIds
+    ]
+  )
+  const roomShopItems = useMemo(
+    () => buildRoomShopItems({
+      inventory: { ownedRoomItemIds: JSON.parse(roomOwnershipKey) as string[] },
+      roomDecor,
+      economyCatalog: productionEconomyCatalog,
+      publishedItemIds,
+      roomFurnitureCatalog,
+      qaOwnedRoomItemIds: qaOnlyOwnedRoomItemIds
+    }),
+    [
+      roomOwnershipKey,
       productionEconomyCatalog,
       qaOnlyOwnedRoomItemIds,
       roomFurnitureCatalog,
@@ -85,18 +104,17 @@ export function useShopCatalogProducts(input: {
   const avatarProducts = useMemo(
     () =>
       sortAvatarShopProducts(
-        shopItems
-          .filter((item) => item.sectionId === "avatar")
+        avatarShopItems
           .filter(isDisplayableAvatarShopProduct)
           .filter((item) =>
             semanticOutfitMerchandisingEnabled || !item.avatarItem?.outfitKey
           )
       ),
-    [semanticOutfitMerchandisingEnabled, shopItems]
+    [semanticOutfitMerchandisingEnabled, avatarShopItems]
   )
   const roomProducts = useMemo(
-    () => sortRoomShopProducts(shopItems.filter((item) => item.sectionId === "room")),
-    [shopItems]
+    () => sortRoomShopProducts(roomShopItems),
+    [roomShopItems]
   )
   const activeProducts = useMemo(() => {
     if (shopMode === "avatar") return avatarProducts

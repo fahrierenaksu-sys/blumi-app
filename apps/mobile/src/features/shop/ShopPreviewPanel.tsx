@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useMemo, useState, useLayoutEffect } from "react"
+import { memo, useMemo, useState, useLayoutEffect } from "react"
 import {
   useWindowDimensions,
+  StyleSheet,
   Pressable,
   Text,
   View
@@ -31,6 +32,7 @@ import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
 import { PressableScale } from "../../ui/PressableScale"
 import { ShopCombinationRow } from "./ShopCombinationRow"
+import { useRetainedShopPreviewDrawing } from "./screen/shopRetainedPreviewModel"
 
 export function ShopPreviewPanel(props: {
   mode: ShopMode
@@ -38,7 +40,7 @@ export function ShopPreviewPanel(props: {
   previewAvatar: UserAvatar
   /** Purchase flights landing on the avatar (useShopPurchaseFlight). */
   purchaseLandingFlightIds?: readonly string[]
-  roomPreviewScene: ReturnType<typeof resolveRoomV2Scene>
+  roomPreviewScene: ReturnType<typeof resolveRoomV2Scene> | null
   layoutMetrics: ShopLayoutMetrics
   isPurchasing: boolean
   locale: AppLocale
@@ -91,102 +93,66 @@ export function ShopPreviewPanel(props: {
     // Single-item checkout must never act on an item hidden on another page.
     if (!supportsCombinationAction && target.items[0]) onSelectCombinationItem?.(target.items[0].id)
   }
-  if (!product) {
-    if (mode === "home") {
-      return (
-        <View
-          testID="shop-room-default-preview"
-          accessibilityLabel={copy.roomPreview}
-          style={[styles.previewCard, { padding: layoutMetrics.preview.cardPadding }]}
-        >
-          <View style={[styles.previewStage, styles.previewStageRoom, {
-            height: layoutMetrics.preview.roomStageHeight,
-            minHeight: layoutMetrics.preview.roomStageHeight
-          }]}>
-            <ShopRoomItemPreview item={undefined} scene={roomPreviewScene} locale={locale} />
-          </View>
-        </View>
-      )
-    }
-    return (
-      <View
-        testID="shop-avatar-default-preview"
-        accessibilityLabel={copy.previewOnAvatar}
-        style={[styles.previewCard, { padding: layoutMetrics.preview.cardPadding }]}
-      >
-        <View style={[styles.previewStage, styles.previewStageAvatar, { height: layoutMetrics.preview.avatarStageHeight, minHeight: layoutMetrics.preview.avatarStageHeight }]}>
-          <ShopAvatarLivePreview
-            avatar={previewAvatar}
-            avatarWidth={layoutMetrics.preview.avatarWidth}
-            landingFlightIds={purchaseLandingFlightIds}
-          />
-          <View style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
-            left: undefined,
-            right: layoutMetrics.preview.overlayInset,
-            top: layoutMetrics.preview.overlayInset
-          }]}>
-            <View style={[styles.roomHeroTitleGlass, styles.avatarHeroTopPanel]}>
-              <Text style={styles.roomHeroEyebrow}>{copy.avatarPreviewGuide}</Text>
-              <Text style={styles.showcaseHeadline} numberOfLines={2}>
-                {copy.showcaseTitle}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    )
-  }
+  const avatarPreview = product ? product.previewType === "avatar" : mode === "avatar"
+  const roomPreview = !avatarPreview
+  const avatarDrawingInput = useMemo(() => ({
+    avatar: previewAvatar,
+    avatarWidth: layoutMetrics.preview.avatarWidth
+  }), [previewAvatar, layoutMetrics.preview.avatarWidth])
+  const roomDrawingInput = useMemo(() => roomPreviewScene ? ({
+    scene: roomPreviewScene,
+    item: product?.roomItem
+  }) : null, [roomPreviewScene, product?.roomItem])
+  const avatarDrawing = useRetainedShopPreviewDrawing(avatarPreview, avatarDrawingInput)
+  const roomDrawing = useRetainedShopPreviewDrawing(roomPreview, roomDrawingInput)
 
-  const presentation = getShopProductPresentation(product, locale)
-  const disabled = (primaryActionDisabled ?? product.actionType === "disabled") ||
+  const presentation = product ? getShopProductPresentation(product, locale) : undefined
+  const disabled = (primaryActionDisabled ?? product?.actionType === "disabled") ||
     isPurchasing ||
     !isActionAvailable
   const actionLabel = supportsCombinationAction && combinationSummary?.total === null
-    ? copy.combination.priceNeedsRefresh : primaryActionLabel ?? presentation.actionLabel
-  const isAvatarUnlock = product.actionType === "avatarUnlock" &&
+    ? copy.combination.priceNeedsRefresh : primaryActionLabel ?? presentation?.actionLabel
+  const isAvatarUnlock = product?.actionType === "avatarUnlock" &&
     primaryActionLabel === undefined &&
     product.priceCoins !== null
-  const showCombination = product.previewType === "avatar" && combinationItems.length > 1
+  const showCombination = product?.previewType === "avatar" && combinationItems.length > 1
   const actionPrice = supportsCombinationAction && combinationSummary?.purchaseCount
     ? combinationSummary.total
-    : isAvatarUnlock ? product.priceCoins : null
+    : isAvatarUnlock ? product?.priceCoins ?? null : null
   const avatarActionAccessibilityLabel = isAvatarUnlock
-    ? `${copy.unlock}, ${formatCoins(product.priceCoins ?? 0, locale)} ${copy.coins}`
+    ? `${copy.unlock}, ${formatCoins(product?.priceCoins ?? 0, locale)} ${copy.coins}`
     : actionPrice !== null
       ? `${actionLabel}, ${formatCoins(actionPrice, locale)} ${copy.coins}`
       : actionLabel
   const previewGuide =
-    product.previewType === "avatar"
+    product?.previewType === "avatar"
       ? copy.avatarPreviewGuide
-      : product.previewType === "room"
+      : product?.previewType === "room"
         ? copy.roomPreviewGuide
         : copy.genericPreviewGuide
-  const avatarPreview = product.previewType === "avatar"
-  const roomPreview = product.previewType === "room"
   const stageHeight = avatarPreview
     ? layoutMetrics.preview.avatarStageHeight
     : layoutMetrics.preview.roomStageHeight
 
   return (
     <View
-      testID="shop-selected-product-preview"
-      accessibilityLabel={`${product.title}, ${presentation.stateLabel}`}
+      testID={product ? "shop-selected-product-preview" : avatarPreview ? "shop-avatar-default-preview" : "shop-room-default-preview"}
+      accessibilityLabel={product && presentation ? `${product.title}, ${presentation.stateLabel}` : avatarPreview ? copy.previewOnAvatar : copy.roomPreview}
       style={[
         styles.previewCard,
-        {
-          gap: layoutMetrics.preview.cardGap,
-          padding: layoutMetrics.preview.cardPadding
-        }
+        product
+          ? { gap: layoutMetrics.preview.cardGap, padding: layoutMetrics.preview.cardPadding }
+          : { padding: layoutMetrics.preview.cardPadding }
       ]}
     >
       <View
-        style={[
+        style={product ? [
           styles.previewHeroBody,
           {
             gap: layoutMetrics.preview.heroGap,
             minHeight: stageHeight
           }
-        ]}
+        ] : undefined}
       >
         <View
           style={[
@@ -197,16 +163,33 @@ export function ShopPreviewPanel(props: {
             { height: stageHeight, minHeight: stageHeight }
           ]}
         >
-          {avatarPreview ? (
-            <ShopAvatarLivePreview
-              avatar={previewAvatar}
-              avatarWidth={layoutMetrics.preview.avatarWidth}
-              landingFlightIds={purchaseLandingFlightIds}
-            />
-          ) : (
-            <ShopRoomItemPreview item={product.roomItem} scene={roomPreviewScene} locale={locale} />
-          )}
-          <View
+          {avatarDrawing ? (
+            <View
+              key="avatar-drawing"
+              pointerEvents={avatarPreview ? "auto" : "none"}
+              accessibilityElementsHidden={!avatarPreview}
+              importantForAccessibility={avatarPreview ? "auto" : "no-hide-descendants"}
+              style={[drawingSlotStyle, { opacity: avatarPreview ? 1 : 0 }]}
+            >
+              <ShopAvatarLivePreview
+                {...avatarDrawing}
+                active={avatarPreview}
+                landingFlightIds={avatarPreview ? purchaseLandingFlightIds : undefined}
+              />
+            </View>
+          ) : null}
+          {roomDrawing ? (
+            <View
+              key="room-drawing"
+              pointerEvents={roomPreview ? "auto" : "none"}
+              accessibilityElementsHidden={!roomPreview}
+              importantForAccessibility={roomPreview ? "auto" : "no-hide-descendants"}
+              style={[drawingSlotStyle, { opacity: roomPreview ? 1 : 0 }]}
+            >
+              <ShopRoomItemPreview {...roomDrawing} active={roomPreview} locale={locale} />
+            </View>
+          ) : null}
+          {product && presentation ? <View
             style={[
               styles.roomHeroTopOverlay,
               avatarPreview ? styles.avatarInfoOverlay : null,
@@ -314,8 +297,21 @@ export function ShopPreviewPanel(props: {
                     : previewGuide}
               </Text>
             </View>}
-          </View>
-          {roomPreview ? (
+          </View> : avatarPreview ? (
+            <View style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
+              left: undefined,
+              right: layoutMetrics.preview.overlayInset,
+              top: layoutMetrics.preview.overlayInset
+            }]}>
+              <View style={[styles.roomHeroTitleGlass, styles.avatarHeroTopPanel]}>
+                <Text style={styles.roomHeroEyebrow}>{copy.avatarPreviewGuide}</Text>
+                <Text style={styles.showcaseHeadline} numberOfLines={2}>
+                  {copy.showcaseTitle}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+          {roomPreview && product ? (
             <Pressable
               testID="shop-preview-primary-action"
               accessibilityRole="button"
@@ -345,7 +341,8 @@ export function ShopPreviewPanel(props: {
   )
 }
 
-function ShopAvatarLivePreview(props: {
+const ShopAvatarLivePreview = memo(function ShopAvatarLivePreview(props: {
+  active: boolean
   avatar: UserAvatar
   avatarWidth: number
   landingFlightIds?: readonly string[]
@@ -363,14 +360,25 @@ function ShopAvatarLivePreview(props: {
       state: "idle"
     })
   }, [props.avatar])
-  const avatarHeight = props.avatarWidth / SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO
+  // Current Shop idle/front sources are still images. If animated idle art is
+  // introduced, release its hidden renderer rather than running a hidden clock.
+  if (!props.active && roomAvatarLayers.some((layer) => (layer.animation?.frames.length ?? 0) > 1)) return null
 
+  return <ShopAvatarDrawing layers={roomAvatarLayers} avatarWidth={props.avatarWidth} landingFlightIds={props.landingFlightIds} />
+})
+
+const ShopAvatarDrawing = memo(function ShopAvatarDrawing(props: {
+  layers: ReturnType<typeof getRoomAvatarRenderLayers>
+  avatarWidth: number
+  landingFlightIds?: readonly string[]
+}) {
+  const avatarHeight = props.avatarWidth / SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO
   return (
     <View style={styles.shopAvatarPreview}>
       <View style={[styles.shopAvatarFrame, { width: props.avatarWidth, height: avatarHeight }]}>
         {/* A try-on crossfades the old look out and the body hops. */}
         <AvatarTryOnTransition
-          value={roomAvatarLayers}
+          value={props.layers}
           style={tryOnFill}
           render={renderShopAvatarLayers}
         />
@@ -380,7 +388,14 @@ function ShopAvatarLivePreview(props: {
       </View>
     </View>
   )
-}
+})
+
+// Match the stage's child alignment; the extra slot owns no drawing geometry.
+const drawingSlotStyle = {
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+  justifyContent: "center"
+} as const
 
 const tryOnFill = { width: "100%", height: "100%" } as const
 /** Where a bought piece lands: the chest of the shop avatar. */
@@ -396,22 +411,31 @@ function renderShopAvatarLayers(layers: ReturnType<typeof getRoomAvatarRenderLay
   return <RoomAvatarRenderer2D layers={layers} />
 }
 
-function ShopRoomItemPreview(props: {
+const ShopRoomItemPreview = memo(function ShopRoomItemPreview(props: {
+  active: boolean
   item: FurnitureItem | undefined
-  scene: ReturnType<typeof resolveRoomV2Scene>
+  scene: ReturnType<typeof resolveRoomV2Scene> | null
   locale: AppLocale
 }) {
+  const scene = props.scene
+  if (!scene) return null
+  // Canonical Shop scenes contain furniture only. Do not retain a future
+  // avatar-bearing room renderer while its mode is hidden.
+  if (!props.active && scene.renderItems.some((item) => item.kind === "avatar")) return null
   return (
     <View
       style={styles.shopRoomScenePreview}
       testID="shop-room-preview"
       accessibilityLabel={props.item ? `${props.item.name}, ${getShopCopy(props.locale).roomPreview}` : getShopCopy(props.locale).roomPreview}
     >
-      <RoomRenderer2D
-        shell={props.scene.shell}
-        renderItems={props.scene.renderItems}
+      <ShopRoomRenderer2D
+        shell={scene.shell}
+        renderItems={scene.renderItems}
         style={styles.shopRoomSceneRenderer}
       />
     </View>
   )
-}
+})
+
+// Hiding a retained slot changes its outer visibility, not its canonical scene.
+const ShopRoomRenderer2D = memo(RoomRenderer2D)
