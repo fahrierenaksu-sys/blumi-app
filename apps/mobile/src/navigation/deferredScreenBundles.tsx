@@ -91,16 +91,41 @@ export function preloadDeferredMainScreens(): void {
   legalScreenBundle.preload()
 }
 
+/**
+ * Warms screen modules ahead of navigation. These run from effects outside any
+ * route error boundary, so a module that throws while loading must not take
+ * the whole app down here; it fails again on the route's own render, where
+ * that route's boundary shows it.
+ */
+function warmScreenBundles(bundles: readonly DeferredScreenBundle[]): void {
+  for (const bundle of bundles) {
+    try {
+      bundle.preload()
+    } catch (error) {
+      if (__DEV__) {
+        console.warn(
+          "[Blumi] A deferred screen failed to preload.",
+          error instanceof Error ? error.message : error
+        )
+      }
+    }
+  }
+}
+
 export function preloadDeferredAuthScreens(): void {
-  registerScreenBundle.preload()
-  preAuthSetupFlowScreenBundle.preload()
-  profileSetupScreenBundle.preload()
-  avatarSetupScreenBundle.preload()
-  roomSetupScreenBundle.preload()
+  warmScreenBundles([
+    registerScreenBundle,
+    preAuthSetupFlowScreenBundle,
+    profileSetupScreenBundle,
+    avatarSetupScreenBundle,
+    roomSetupScreenBundle
+  ])
 }
 
 export function preloadDeferredAuthenticatedOnboardingScreens(): void {
-  profileSetupScreenBundle.preload()
-  avatarSetupScreenBundle.preload()
-  roomSetupScreenBundle.preload()
+  warmScreenBundles([
+    profileSetupScreenBundle,
+    avatarSetupScreenBundle,
+    roomSetupScreenBundle
+  ])
 }
