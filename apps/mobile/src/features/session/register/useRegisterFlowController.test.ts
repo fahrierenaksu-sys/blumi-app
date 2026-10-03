@@ -334,6 +334,23 @@ test("resend is blocked during the cooldown and sends a fresh code once it reach
   assert.equal(harness.controller.resendCooldownSeconds, 30)
 })
 
+test("a parent back request leaves the code step and reports the phone stage once", async () => {
+  const harness = mountController()
+  await enterValidPhone(harness)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  await harness.act((controller) => controller.runPrimaryAction())
+  assert.equal(harness.controller.isCodeStep, true)
+
+  harness.rerender({ returnToPhoneRequest: 1 })
+  await harness.act(() => {})
+  assert.equal(harness.controller.isCodeStep, false)
+  assert.deepEqual(harness.stageChanges, ["phone", "otp", "phone"])
+
+  // Re-rendering with the same request does not repeat it.
+  await harness.act(() => {})
+  assert.deepEqual(harness.stageChanges, ["phone", "otp", "phone"])
+})
+
 test("a failed first request marks the code as not sent; a failed resend keeps the earlier code usable", async () => {
   const harness = mountController()
   await enterValidPhone(harness)

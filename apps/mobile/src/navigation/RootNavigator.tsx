@@ -1085,9 +1085,12 @@ export function RootNavigator() {
                             screenProps.navigation.replace(route, params)
                         })
                       }
-                      onBack={() =>
-                        screenProps.navigation.navigate(profileReviewReturnTarget)
-                      }
+                      // Only a review has a step to return to. On first
+                      // completion Back offers sign-out instead of skipping
+                      // the unfinished profile.
+                      onBack={profileMode === "review"
+                        ? () => screenProps.navigation.navigate(profileReviewReturnTarget)
+                        : undefined}
                       onSignOut={clearSessionActor}
                     />
                   )

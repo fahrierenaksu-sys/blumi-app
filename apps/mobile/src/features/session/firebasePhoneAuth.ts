@@ -1,17 +1,47 @@
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithPhoneNumber,
-  signOut,
-  type ConfirmationResult
-} from "@react-native-firebase/auth"
+import type { ConfirmationResult } from "@react-native-firebase/auth"
 
 export type FirebasePhoneConfirmation = ConfirmationResult
+
+type FirebaseAuthModule = typeof import("@react-native-firebase/auth")
+type FirebaseAuth = ReturnType<FirebaseAuthModule["getAuth"]>
 
 const disableAppVerificationForTesting =
   __DEV__ && process.env.EXPO_PUBLIC_FIREBASE_DISABLE_APP_VERIFICATION === "1"
 
-const firebaseAuth = getAuth()
+const PHONE_AUTH_UNAVAILABLE_MESSAGE =
+  "Phone verification is not available in this version of the app. Update Blumi and try again."
+
+type FirebaseAuthHandle = { module: FirebaseAuthModule; auth: FirebaseAuth }
+
+// RNFirebase touches its native module when it loads. A binary built without
+// it (Expo Go, a stale dev client) would otherwise throw while this file is
+// evaluated, which takes down every screen that imports it. Load it on first
+// use instead and report "no Firebase" so the auth screens still render.
+let firebaseAuthHandle: FirebaseAuthHandle | null | undefined
+
+function loadFirebaseAuth(): FirebaseAuthHandle | null {
+  if (firebaseAuthHandle !== undefined) return firebaseAuthHandle
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose, see above
+    const module = require("@react-native-firebase/auth") as FirebaseAuthModule
+    firebaseAuthHandle = { module, auth: module.getAuth() }
+  } catch (error) {
+    firebaseAuthHandle = null
+    if (__DEV__) {
+      console.warn(
+        "[Blumi] Firebase phone auth is unavailable in this native build.",
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+  return firebaseAuthHandle
+}
+
+function requireFirebaseAuth(): FirebaseAuthHandle {
+  const handle = loadFirebaseAuth()
+  if (!handle) throw new Error(PHONE_AUTH_UNAVAILABLE_MESSAGE)
+  return handle
+}
 
 type FirebaseAuthNativeTestingBridge = {
   native: {
@@ -21,18 +51,14 @@ type FirebaseAuthNativeTestingBridge = {
 
 let appVerificationConfiguration: Promise<void> | null = null
 
-function configureFictionalNumberTesting(): Promise<void> {
+function configureFictionalNumberTesting(auth: FirebaseAuth): Promise<void> {
   if (!disableAppVerificationForTesting) return Promise.resolve()
   // RNFirebase's public setter does not expose its native promise. Await the
   // native call before requesting a code, and only create it when requested.
   appVerificationConfiguration ??=
-    (firebaseAuth as unknown as FirebaseAuthNativeTestingBridge).native
+    (auth as unknown as FirebaseAuthNativeTestingBridge).native
       .setAppVerificationDisabledForTesting(true)
   return appVerificationConfiguration
-}
-
-function getFirebaseAuth() {
-  return firebaseAuth
 }
 
 function getFirebaseAuthErrorCode(error: unknown): string | null {
@@ -42,13 +68,15 @@ function getFirebaseAuthErrorCode(error: unknown): string | null {
 }
 
 export function getFirebaseCurrentPhoneNumber(): string | null {
-  return getFirebaseAuth().currentUser?.phoneNumber ?? null
+  return loadFirebaseAuth()?.auth.currentUser?.phoneNumber ?? null
 }
 
 export function subscribeToFirebasePhoneNumber(
   listener: (phoneNumber: string | null) => void
 ): () => void {
-  return onAuthStateChanged(getFirebaseAuth(), (user) => {
+  const handle = loadFirebaseAuth()
+  if (!handle) return () => {}
+  return handle.module.onAuthStateChanged(handle.auth, (user) => {
     listener(user?.phoneNumber ?? null)
   })
 }
@@ -56,7 +84,7 @@ export function subscribeToFirebasePhoneNumber(
 export async function getVerifiedFirebasePhoneIdToken(
   phoneNumber: string
 ): Promise<string | null> {
-  const user = getFirebaseAuth().currentUser
+  const user = loadFirebaseAuth()?.auth.currentUser
   if (!user || user.phoneNumber !== phoneNumber) return null
   return user.getIdToken(true)
 }
@@ -64,9 +92,10 @@ export async function getVerifiedFirebasePhoneIdToken(
 export async function requestFirebasePhoneCode(
   phoneNumber: string
 ): Promise<FirebasePhoneConfirmation> {
+  const { module, auth } = requireFirebaseAuth()
   try {
-    await configureFictionalNumberTesting()
-    return await signInWithPhoneNumber(getFirebaseAuth(), phoneNumber)
+    await configureFictionalNumberTesting(auth)
+    return await module.signInWithPhoneNumber(auth, phoneNumber)
   } catch (error) {
     const code = getFirebaseAuthErrorCode(error)
     throw new Error(
@@ -91,8 +120,8 @@ export async function confirmFirebasePhoneCode(
 
 export async function signOutFirebasePhoneAuth(): Promise<void> {
   try {
-    const auth = getFirebaseAuth()
-    if (auth.currentUser) await signOut(auth)
+    const handle = loadFirebaseAuth()
+    if (handle?.auth.currentUser) await handle.module.signOut(handle.auth)
   } catch {
     // The Blumi server session is authoritative for the app. A stale Firebase
     // session must not prevent a user from signing out locally.

@@ -27,6 +27,7 @@ type RegisterScreenProps = NativeStackScreenProps<
   onRegister: (input: RegisterAccountInput) => Promise<void>
   onClearError: () => void
   onCreateFlowStageChange?: (stage: "phone" | "otp") => void
+  returnToPhoneRequest?: number
   createFlowAvatar?: Partial<UserAvatar> | null
   motionActive?: boolean
 }
@@ -45,6 +46,7 @@ export function RegisterScreen({
   onRegister,
   onClearError,
   onCreateFlowStageChange,
+  returnToPhoneRequest,
   createFlowAvatar,
   motionActive = true
 }: RegisterScreenProps) {
@@ -66,7 +68,8 @@ export function RegisterScreen({
     onRequestVerificationCode,
     onRegister,
     onClearError,
-    onCreateFlowStageChange
+    onCreateFlowStageChange,
+    returnToPhoneRequest
   })
   const { flow } = register
   const formTransition = useSelectionTransition(flow.stage, {

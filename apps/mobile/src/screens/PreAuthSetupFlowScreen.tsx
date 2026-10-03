@@ -329,7 +329,14 @@ export function PreAuthSetupFlowScreen({
     navigation.navigate("AuthEntry")
   }, [navigation, onClearError])
 
+  const [returnToPhoneRequest, setReturnToPhoneRequest] = useState(0)
   const goBack = useCallback(() => {
+    if (step === "otp") {
+      // The register flow owns the code step; it reports "phone" back through
+      // onCreateFlowStageChange once it has left it.
+      setReturnToPhoneRequest((request) => request + 1)
+      return
+    }
     const previousStep = getPreviousPreAuthSetupStep(step)
     if (previousStep === null) {
       leaveSetup()
@@ -466,6 +473,7 @@ export function PreAuthSetupFlowScreen({
             }}
             onClearError={onClearError}
             onCreateFlowStageChange={handleRegisterStageChange}
+            returnToPhoneRequest={returnToPhoneRequest}
             createFlowAvatar={renderedDraft.avatar}
             motionActive={step === "phone" || step === "otp"}
           />
