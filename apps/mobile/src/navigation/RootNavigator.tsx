@@ -26,6 +26,7 @@ import {
   shouldApplyBlumiDevEntryNavigation
 } from "../features/dev/blumiDevEntryPolicy"
 import { resetChatStore } from "../features/chat/chatStore"
+import { resetSettingsServerCache } from "../features/settings/settingsServerCache"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
 import { MiniRoomScreen } from "../screens/MiniRoomScreen"
 import { type ProfilePreviewData } from "../screens/ProfilePreviewScreen"
@@ -83,7 +84,7 @@ import { BlumiLoadingScreen } from "../ui/BlumiLoadingScreen"
 import { DiscoveryStartupBoundary } from "../features/discovery/DiscoveryStartupBoundary"
 import { markOnboardingContentReady } from "../features/session/nativeOnboardingBootBridge"
 import type { BlumiMatch } from "../features/matches/matchRoomModel"
-import { useInventoryStore } from "../features/inventory/inventoryStore"
+import { useInventoryServerActions } from "../features/inventory/inventoryStore"
 import { shouldHydrateProductionInventory } from "../features/inventory/inventoryHydrationPolicy"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { getRevenueCatCoinPackClient } from "../features/commerce/revenueCatRuntimeClient"
@@ -99,7 +100,7 @@ import { useRoomInviteRouting } from "./useRoomInviteRouting"
 import { useRootChatSync } from "./useRootChatSync"
 import { useMatchModal } from "./useMatchModal"
 import { renderRouteErrorBoundary } from "./RouteErrorBoundary"
-import { useNotificationResponseRouting } from "./useNotificationResponseRouting"
+import { AppIconBadgeSync, isAppIconBadgeEnabled, useNotificationResponseRouting } from "./useNotificationResponseRouting"
 import { usePendingDeepLinkReplay } from "./usePendingDeepLinkReplay"
 import { useGlobalRealtimeSession } from "./useGlobalRealtimeSession"
 import { useBlockedPartnerCleanup } from "./useBlockedPartnerCleanup"
@@ -386,9 +387,10 @@ export function RootNavigator() {
     sessionMode: sessionActor?.session.mode,
     demoRoomInvites: demoStore.roomInvites
   })
-  const { claimDailyRewardFromServer, hydrateFromServer } = useInventoryStore(
-    sessionActor?.profile.userId,
-    sessionActor?.session.mode === "production"
+  // Actions only: subscribing to the store would re-render the whole root (and
+  // the open chat or room screen) on every coin, purchase or hydration change.
+  const { claimDailyRewardFromServer, hydrateFromServer } = useInventoryServerActions(
+    sessionActor?.profile.userId
   )
   const sessionEntryRoute = selectSessionEntryRoute({
     isHydrating,
@@ -609,6 +611,7 @@ export function RootNavigator() {
     resetMatchModal()
     resetRoomInviteRouting()
     resetChatStore()
+    resetSettingsServerCache()
     disconnectGlobal()
   }, [resetMatchModal, resetRoomInviteRouting])
 
@@ -1175,6 +1178,7 @@ export function RootNavigator() {
           />
         ) : null}
       </NavigationContainer>
+      <AppIconBadgeSync enabled={isAppIconBadgeEnabled(sessionActor, sessionEntryRoute, isAccountRestricted)} />
       <RootNavigationChrome
         navigatorKey={sessionNavigatorKey}
         sessionActor={sessionActor}

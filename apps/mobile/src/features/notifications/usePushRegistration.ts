@@ -1,6 +1,6 @@
 import Constants from "expo-constants"
 import * as Device from "expo-device"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AppState, Platform } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
 import { captureAppException } from "../../observability/crashReporting"
@@ -353,11 +353,12 @@ export function usePushRegistration(
     }
   }, [isRequestingPermission])
 
-  return {
+  // Stable while nothing changed: the value feeds memoized chat screens.
+  return useMemo(() => ({
     permissionStatus,
     isRequestingPermission,
     requestPermission
-  }
+  }), [permissionStatus, isRequestingPermission, requestPermission])
 }
 
 async function createAndroidNotificationChannel(): Promise<void> {

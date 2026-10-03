@@ -2,7 +2,7 @@ import type { ChatParticipantSummary, ServerEvent } from "@blumi/contracts"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocused } from "@react-navigation/native"
 import { useMiniRoomMotion } from "../features/miniRoom/useMiniRoomMotion"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../config/env"
 import { ReportModal } from "../components/ReportModal"
@@ -63,7 +63,9 @@ type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"
   requestChatMessages: ChatThreadBindings["requestMessages"]
 }
 
-export function MiniRoomScreen(props: MiniRoomScreenProps) {
+/** Memoized: root re-renders must not re-render an open screen whose props are unchanged. */
+export const MiniRoomScreen = memo(MiniRoomScreenView)
+function MiniRoomScreenView(props: MiniRoomScreenProps) {
   const { navigation, route, sessionActor, requestChatMessages } = props
   const { readyMiniRoom, participants: participantParams } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
@@ -328,6 +330,16 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     }
   }, [exitRoom])
 
+  // Stable callbacks keep the memoized room HUD from re-rendering with the screen.
+  const openSafety = useCallback((): void => setSafetyVisible(true), [])
+  const handleRetryConnect = useCallback((): void => {
+    void retryConnect()
+  }, [retryConnect])
+  const handleToggleMic = useCallback((): void => {
+    hapticLight()
+    void toggleMic()
+  }, [toggleMic])
+
   const notices = useMemo(() => [
     reconnectError ? roomCopy.roomRefreshFailed : null,
     sharedRoomDecor.legacyFallback ? roomCopy.legacyDecorNotice : null,
@@ -357,14 +369,9 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
         roomDecorScene={hostRoomSnapshot}
         leaveDisabled={leaveRequested}
         onLeave={confirmLeave}
-        onOpenSafety={() => setSafetyVisible(true)}
-        onRetryConnect={() => {
-          void retryConnect()
-        }}
-        onToggleMic={() => {
-          hapticLight()
-          void toggleMic()
-        }}
+        onOpenSafety={openSafety}
+        onRetryConnect={handleRetryConnect}
+        onToggleMic={handleToggleMic}
         inRoomMessages={roomChat.newMessages}
         consumeInRoomMessage={roomChat.consume}
         consumeInRoomMessages={roomChat.consumeMany}

@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
-import { useEffect, useEffectEvent, useState, type ReactNode } from "react"
+import { memo, useEffect, useEffectEvent, useState, type ReactNode } from "react"
 import { Text, View } from "react-native"
 import Reanimated, {
   Easing,
@@ -183,7 +183,9 @@ function LinkedProfileReveal(props: { children: ReactNode }) {
   )
 }
 
-export function LinkedProfileScreen(props: LinkedProfileScreenProps) {
+/** Memoized: root re-renders must not re-render an open screen whose props are unchanged. */
+export const LinkedProfileScreen = memo(LinkedProfileScreenView)
+function LinkedProfileScreenView(props: LinkedProfileScreenProps) {
   const { demoMode, navigation, route, sessionActor, sessionToken } = props
   const copy = getProfilePreviewCopy(getAppLocale())
   const viewerUserId = sessionActor.profile.userId

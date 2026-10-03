@@ -279,6 +279,7 @@ try {
       "src/features/miniRoom/scene/MiniRoomChatPanel.retainedTranscript.test.ts",
       "src/features/miniRoom/scene/MiniRoomChatHistory.performance.test.ts",
       "src/screens/MiniRoomScreen.presentationScope.test.ts",
+      "src/components/MatchResultModal.retainedMatch.test.ts",
       "src/features/miniRoom/scene/miniRoomControlsFeel.test.ts",
       "src/features/miniRoom/scene/miniRoomFirstAppearance.test.ts",
       "src/features/miniRoom/scene/miniRoomDepthModel.test.ts",

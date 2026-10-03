@@ -92,7 +92,8 @@ function mountPager(renderPage: (...args: unknown[]) => unknown) {
         "../../ui/errorBoundary": { ErrorBoundary: "ErrorBoundary" },
         "../../ui/mainTabPagerIndicator": { mainTabPagerIndicator: indicator },
         "../../ui/theme": { uiTheme: { colors: { background: "#fff" } } },
-        "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" }
+        "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" },
+        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" }
       },
       real: [
         "./mainTabPagerConfig",
@@ -276,7 +277,7 @@ function mountRoot(nativeIdle = true) {
       "../features/session/usePreAuthOnboardingDraft": {
         usePreAuthOnboardingDraft: () => stable({ preAuthDraftScopeId: "pre-auth", isPreAuthDraftHydrating: false })
       },
-      "../features/inventory/inventoryStore": { useInventoryStore: () => inventory },
+      "../features/inventory/inventoryStore": { useInventoryServerActions: () => inventory },
       "../features/inventory/inventoryHydrationPolicy": { shouldHydrateProductionInventory: () => false },
       "../config/env": { IS_BLUMI_PAID_COINS_ENABLED: false, BLUMI_DEV_ENTRY_ROUTE: undefined },
       "./rootNavigationModel": {

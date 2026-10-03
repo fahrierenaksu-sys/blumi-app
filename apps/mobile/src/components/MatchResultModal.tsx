@@ -215,14 +215,28 @@ export function MatchResultModal(props: MatchResultModalProps) {
   const {
     visible,
     currentUserName,
-    matchedUserName,
-    matchedUserId,
-    matchedAvatarSnapshot,
-    matchedAvatarSelection,
     onClose,
     onKeepDiscovering,
     onSendMessage
   } = props
+  // The parent clears the match the moment it is dismissed, while the modal
+  // fades out for a few hundred ms. Keep the last visible match so the name and
+  // chibi do not flash to the empty fallback during the fade.
+  const retainedMatchRef = useRef({
+    matchedUserName: props.matchedUserName,
+    matchedUserId: props.matchedUserId,
+    matchedAvatarSnapshot: props.matchedAvatarSnapshot,
+    matchedAvatarSelection: props.matchedAvatarSelection
+  })
+  if (visible) {
+    retainedMatchRef.current = {
+      matchedUserName: props.matchedUserName,
+      matchedUserId: props.matchedUserId,
+      matchedAvatarSnapshot: props.matchedAvatarSnapshot,
+      matchedAvatarSelection: props.matchedAvatarSelection
+    }
+  }
+  const { matchedUserName, matchedUserId, matchedAvatarSnapshot, matchedAvatarSelection } = retainedMatchRef.current
 
   const reduceMotion = useReducedMotion()
   const motion = getMatchCelebrationMotion(reduceMotion)

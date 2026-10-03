@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useIsFocusedBeneathSheets } from "../navigation/nativeSheets/useIsFocusedBeneathSheets"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import {
   type ListRenderItem,
   type ScrollViewProps,
@@ -92,7 +92,9 @@ type ChatThreadScreenProps = NativeStackScreenProps<
 const EMPTY_ROOM_INVITES: readonly ChatRoomInviteTimelineItem[] = []
 const EMPTY_TIMELINE: readonly ChatTimelineItem[] = []
 
-export function ChatThreadScreen(props: ChatThreadScreenProps) {
+/** Memoized: root re-renders must not re-render an open screen whose props are unchanged. */
+export const ChatThreadScreen = memo(ChatThreadScreenView)
+function ChatThreadScreenView(props: ChatThreadScreenProps) {
   const { navigation, route, sessionActor, onThreadCreated, bindings } = props
   const isFocused = useIsFocusedBeneathSheets()
   const { height: windowHeight } = useWindowDimensions()

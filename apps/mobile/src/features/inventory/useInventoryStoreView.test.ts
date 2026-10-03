@@ -30,7 +30,12 @@ function mount() {
     real: ["./inventoryModel", "./inventoryScopeModel", "./inventoryHydrationSingleFlight"]
   })
   const render = () => runtime.render(() => store.useInventoryStore("owner"))
-  return { runtime, render, failServerRead: () => releaseServerRead?.() }
+  // A subscribed consumer next to the actions-only hook the root navigator uses.
+  const renderWithActions = () => runtime.render(() => ({
+    view: store.useInventoryStore("owner"),
+    actions: store.useInventoryServerActions("owner")
+  }))
+  return { runtime, render, renderWithActions, failServerRead: () => releaseServerRead?.() }
 }
 
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve))
@@ -72,4 +77,17 @@ test("server status changes a local-only view does not read keep the same view",
   await hydration
   assert.ok(f.runtime.renderCount > renders, "the store notified")
   assert.equal(f.runtime.output, before)
+})
+
+test("the actions-only hook keeps its identity while the inventory changes", async () => {
+  const f = mount()
+  f.renderWithActions()
+  await settle()
+  const before = f.runtime.output as { view: InventoryStore.InventoryStoreView; actions: InventoryStore.InventoryServerActions }
+  assert.equal(typeof before.actions.hydrateFromServer, "function")
+  assert.equal(typeof before.actions.claimDailyRewardFromServer, "function")
+  before.view.unlockRoomItem("lamp", 100)
+  const after = f.runtime.output as typeof before
+  assert.notEqual(after.view, before.view)
+  assert.equal(after.actions, before.actions)
 })

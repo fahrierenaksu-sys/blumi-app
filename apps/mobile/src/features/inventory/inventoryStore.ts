@@ -309,6 +309,93 @@ export function ownsRoomInventoryItem(
   return inventory.ownedRoomItemIds.includes(itemId)
 }
 
+function hydrateOwnerInventoryFromServer(
+  ownerId: string,
+  sessionToken: string
+): Promise<InventoryUnlockResult> {
+  return runInventoryHydrationSingleFlight(
+    getOwnerCache(ownerId).serverHydrationFlight,
+    sessionToken,
+    async () => {
+      const ownerCache = getOwnerCache(ownerId)
+      const hydrationGeneration = ownerCache.serverHydrationGeneration + 1
+      ownerCache.serverHydrationGeneration = hydrationGeneration
+      const startedMutationGeneration = ownerCache.serverMutationGeneration
+      if (ownerCache.state.serverStatus !== "ready") {
+        ownerCache.state = { ...ownerCache.state, serverStatus: "loading" }
+        notify(ownerId)
+      }
+      try {
+        const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
+        if (ownerCache.serverReconciliationPending || !shouldApplyInventoryHydrationResponse({
+          currentHydrationGeneration: ownerCache.serverHydrationGeneration,
+          responseHydrationGeneration: hydrationGeneration,
+          currentMutationGeneration: ownerCache.serverMutationGeneration,
+          startedMutationGeneration
+        })) return { success: false, reason: "server_error" }
+        replaceInventoryState(ownerId, inventory, "server")
+        return { success: true }
+      } catch {
+        if (!ownerCache.serverReconciliationPending &&
+          shouldApplyInventoryHydrationResponse({
+            currentHydrationGeneration: ownerCache.serverHydrationGeneration,
+            responseHydrationGeneration: hydrationGeneration,
+            currentMutationGeneration: ownerCache.serverMutationGeneration,
+            startedMutationGeneration
+          }) && ownerCache.state.serverStatus !== "ready") {
+          ownerCache.state = failOwnerInventoryHydration({
+            current: ownerCache.state,
+            ownerUserId: ownerId,
+            source: "server"
+          })
+          notify(ownerId)
+        }
+        return { success: false, reason: "server_error" }
+      }
+    }
+  )
+}
+
+async function claimOwnerDailyRewardFromServer(
+  ownerId: string,
+  sessionToken: string
+): Promise<number | null> {
+  return enqueueServerInventoryMutation(ownerId, async () => {
+    try {
+      const result = await claimDailyEconomyReward(MOBILE_HTTP_BASE_URL, sessionToken)
+      if (!replaceInventoryState(ownerId, result.inventory, "server", true)) {
+        throw new Error("Blumi could not confirm your rewarded inventory.")
+      }
+      return result.claimed ? result.rewardCoins : 0
+    } catch {
+      await reconcileInventoryAfterMutation(ownerId, sessionToken)
+      return null
+    }
+  })
+}
+
+export interface InventoryServerActions {
+  hydrateFromServer: (sessionToken: string) => Promise<InventoryUnlockResult>
+  claimDailyRewardFromServer: (sessionToken: string) => Promise<number | null>
+}
+
+/**
+ * The server sync actions without a store subscription. Callers that only
+ * trigger a hydrate or a daily claim (the root navigator) must not re-render
+ * on every coin, purchase or hydration change. The returned object keeps its
+ * identity while the owner stays the same.
+ */
+export function useInventoryServerActions(ownerUserId?: string): InventoryServerActions {
+  const ownerId = normalizeOwnerId(ownerUserId)
+  useEffect(() => {
+    void loadInventorySnapshot(ownerId)
+  }, [ownerId])
+  return useMemo(() => ({
+    hydrateFromServer: (sessionToken: string) => hydrateOwnerInventoryFromServer(ownerId, sessionToken),
+    claimDailyRewardFromServer: (sessionToken: string) => claimOwnerDailyRewardFromServer(ownerId, sessionToken)
+  }), [ownerId])
+}
+
 export function useInventoryStore(
   ownerUserId?: string,
   requireServerHydration = false
@@ -375,66 +462,11 @@ export function useInventoryStore(
     return result
   }, [ownerId])
 
-  const hydrateFromServer = useCallback((
-    sessionToken: string
-  ): Promise<InventoryUnlockResult> => runInventoryHydrationSingleFlight(
-    getOwnerCache(ownerId).serverHydrationFlight,
-    sessionToken,
-    async () => {
-      const ownerCache = getOwnerCache(ownerId)
-      const hydrationGeneration = ownerCache.serverHydrationGeneration + 1
-      ownerCache.serverHydrationGeneration = hydrationGeneration
-      const startedMutationGeneration = ownerCache.serverMutationGeneration
-      if (ownerCache.state.serverStatus !== "ready") {
-        ownerCache.state = { ...ownerCache.state, serverStatus: "loading" }
-        notify(ownerId)
-      }
-      try {
-        const inventory = await fetchEconomyInventory(MOBILE_HTTP_BASE_URL, sessionToken)
-        if (ownerCache.serverReconciliationPending || !shouldApplyInventoryHydrationResponse({
-          currentHydrationGeneration: ownerCache.serverHydrationGeneration,
-          responseHydrationGeneration: hydrationGeneration,
-          currentMutationGeneration: ownerCache.serverMutationGeneration,
-          startedMutationGeneration
-        })) return { success: false, reason: "server_error" }
-        replaceInventoryState(ownerId, inventory, "server")
-        return { success: true }
-      } catch {
-        if (!ownerCache.serverReconciliationPending &&
-          shouldApplyInventoryHydrationResponse({
-            currentHydrationGeneration: ownerCache.serverHydrationGeneration,
-            responseHydrationGeneration: hydrationGeneration,
-            currentMutationGeneration: ownerCache.serverMutationGeneration,
-            startedMutationGeneration
-          }) && ownerCache.state.serverStatus !== "ready") {
-          ownerCache.state = failOwnerInventoryHydration({
-            current: ownerCache.state,
-            ownerUserId: ownerId,
-            source: "server"
-          })
-          notify(ownerId)
-        }
-        return { success: false, reason: "server_error" }
-      }
-    }
-  ), [ownerId])
+  const hydrateFromServer = useCallback((sessionToken: string): Promise<InventoryUnlockResult> =>
+    hydrateOwnerInventoryFromServer(ownerId, sessionToken), [ownerId])
 
-  const claimDailyRewardFromServer = useCallback(async (
-    sessionToken: string
-  ): Promise<number | null> => {
-    return enqueueServerInventoryMutation(ownerId, async () => {
-      try {
-        const result = await claimDailyEconomyReward(MOBILE_HTTP_BASE_URL, sessionToken)
-        if (!replaceInventoryState(ownerId, result.inventory, "server", true)) {
-          throw new Error("Blumi could not confirm your rewarded inventory.")
-        }
-        return result.claimed ? result.rewardCoins : 0
-      } catch {
-        await reconcileInventoryAfterMutation(ownerId, sessionToken)
-        return null
-      }
-    })
-  }, [ownerId])
+  const claimDailyRewardFromServer = useCallback((sessionToken: string): Promise<number | null> =>
+    claimOwnerDailyRewardFromServer(ownerId, sessionToken), [ownerId])
 
   const purchaseItem = useCallback(async (
     sessionToken: string,

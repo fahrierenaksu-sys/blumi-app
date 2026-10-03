@@ -41,6 +41,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const errors = []
   let lastResponse = response
   let clearCount = 0
+  let registrationValue
   let listener
   let responseSubscriptionCount = 0
   let responseUnsubscriptionCount = 0
@@ -101,11 +102,18 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
     navigate: (...args) => { navigations.push(args) }
   }
   const react = {
-    useCallback: (callback) => { hookIndex += 1; return callback },
+    useCallback: (callback, dependencies) => react.useMemo(() => callback, dependencies ?? [{}]),
     useRef: (current) => {
       const index = hookIndex++
       hookValues[index] ??= { current }
       return hookValues[index]
+    },
+    useMemo: (factory, dependencies) => {
+      const index = hookIndex++
+      const previous = hookValues[index]
+      if (previous && previous.dependencies.every((value, position) => Object.is(value, dependencies[position]))) return previous.value
+      hookValues[index] = { dependencies, value: factory() }
+      return hookValues[index].value
     },
     useState: (value) => {
       const index = hookIndex++
@@ -182,7 +190,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
   const renderHook = (sessionActor, callback = currentResponseCallback) => {
     hookIndex = 0
     scheduledEffects = []
-    registration(sessionActor, callback, readyGeneration)
+    registrationValue = registration(sessionActor, callback, readyGeneration)
     for (const next of scheduledEffects) {
       const previous = mountedEffects.get(next.index)
       const dependenciesChanged = !previous || !next.dependencies ||
@@ -208,6 +216,7 @@ function createRuntime({ ready = true, response = null, onResponse, physicalDevi
       deviceToken = `device-${token}`
       pushTokenListener?.({ type: platform, data: deviceToken })
     },
+    get registrationValue() { return registrationValue },
     get deviceTokenFetches() { return deviceTokenFetches },
     navigations, errors,
     registrations, removals, presentedClears, presented, dismissed,
@@ -688,4 +697,15 @@ test("a cached Later response is consumed without routing, and is not replayed a
   runtime.navigationReady()
   await settle()
   assert.deepEqual(runtime.navigations, [])
+})
+
+test("the registration value keeps its identity across renders that change nothing", async (t) => {
+  const runtime = createRuntime()
+  t.after(runtime.dispose)
+  await settle()
+  const first = runtime.registrationValue
+  assert.ok(first)
+  runtime.rerenderWithEquivalentCallback()
+  runtime.navigationReady()
+  assert.equal(runtime.registrationValue, first)
 })
