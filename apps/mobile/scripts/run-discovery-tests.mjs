@@ -172,6 +172,7 @@ try {
       "src/features/discovery/screen/useDiscoveryFilters.test.ts",
       "src/features/discovery/screen/useProductionDiscoveryQuery.test.ts",
       "src/features/discovery/discoverySwipeModel.test.ts",
+      "src/components/DiscoverCard.test.ts",
       "src/features/discovery/copyLocaleParity.test.ts",
       "src/ui/preparedDiscoveryLoadingScreen.test.ts"
     ],

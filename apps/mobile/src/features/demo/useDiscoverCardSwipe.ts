@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo } from "react"
 import type { LayoutChangeEvent } from "react-native"
 import { Gesture, State } from "react-native-gesture-handler"
 import {
@@ -32,7 +32,12 @@ import {
   type DiscoverSwipeDirection,
   type DiscoverSwipeThresholdSide
 } from "../discovery/discoverySwipeModel"
-import { useDiscoverSwipeValues, type DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
+import {
+  advanceDiscoverDeck,
+  useDiscoverSwipeValues,
+  type DiscoverDeckAdvance,
+  type DiscoverSwipeValues
+} from "../discovery/useDiscoverSwipeValues"
 
 /** The LIKE/PASS stamp starts this large when the drag enters its side. */
 const STAMP_POP_SCALE = 1.08
@@ -60,6 +65,9 @@ const STAMP_POP_SETTLE = { ...MOTION_SPRINGS.snappy, reduceMotion: ReduceMotion.
  * value, so the deck advances and the next card can be grabbed while this
  * one is still flying out. The deck keeps it mounted (`leaving`) until
  * `onExitEnd`. A button exit arrives as `exitRequest` and leaves the same way.
+ * The same release advances the deck (`deckAdvance`) on the UI thread, so the
+ * next card starts toward the top before JS hears of the decision. A card
+ * that is flying out never takes a new drag.
  *
  * The owning card leans with its drag (the other way when held by its lower
  * half, fixed when the pan activates) and leaves at its release speed. Reduce
@@ -74,6 +82,8 @@ export interface DiscoverCardExitRequest {
 
 export function useDiscoverCardSwipe(input: {
   swipe?: DiscoverSwipeValues
+  /** The deck this card belongs to; a committed release advances it. */
+  deckAdvance?: DiscoverDeckAdvance
   cardId: string
   disabled: boolean
   canSwipeRight: boolean
@@ -87,7 +97,7 @@ export function useDiscoverCardSwipe(input: {
   onExitEnd?: (userId: string) => void
 }) {
   const { cardId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight, onSwipeLeft } = input
-  const { leaving = false, exitRequest = null, onExitEnd } = input
+  const { leaving = false, exitRequest = null, onExitEnd, deckAdvance } = input
   const localSwipe = useDiscoverSwipeValues()
   const { x, ownerId } = input.swipe ?? localSwipe
   const touchStartX = useSharedValue(0)
@@ -133,8 +143,9 @@ export function useDiscoverCardSwipe(input: {
     })
   }, [cardId, exitThrown, exitX, exiting, finishExit, ownerId, screenWidth, x])
 
-  // A button exit (Like/Pass): the deck already committed the decision.
-  useEffect(() => {
+  // A button exit (Like/Pass): the deck already committed the decision. It
+  // starts in the commit that asks for it, before the frame is painted.
+  useLayoutEffect(() => {
     if (exitRequest) forceSwipe(exitRequest.direction, exitRequest.durationMs, exitRequest.thrown === true)
   }, [exitRequest, forceSwipe])
 
@@ -180,7 +191,8 @@ export function useDiscoverCardSwipe(input: {
     .onTouchesMove((event, stateManager) => {
       "worklet"
       const touch = event.allTouches[0]
-      if (!touch || event.state !== State.BEGAN) return
+      // A card flying out after its decision cannot be decided again.
+      if (!touch || event.state !== State.BEGAN || exiting.value) return
       if (shouldClaimDiscoverSwipe(touch.absoluteX - touchStartX.value, touch.absoluteY - touchStartY.value)) {
         stateManager.activate()
       }
@@ -232,13 +244,16 @@ export function useDiscoverCardSwipe(input: {
       // end of the exit animation (DSC-10).
       scheduleOnRN(hapticLight)
       forceSwipe(release, reduceMotion ? 0 : getDiscoverSwipeOutDuration(remaining, velocityTowardExit), false)
+      if (deckAdvance) advanceDiscoverDeck(deckAdvance, reduceMotion)
       scheduleOnRN(commitSwipe, release)
     }), [
     canSwipeRight,
     cardHeight,
     cardId,
     commitSwipe,
+    deckAdvance,
     disabled,
+    exiting,
     forceSwipe,
     grabbedLowerHalf,
     ownerId,

@@ -17,6 +17,9 @@ import {
   SWIPE_OUT_MIN_VELOCITY,
   SWIPE_THRESHOLD_TICK_HYSTERESIS,
   getDiscoverActionExitDuration,
+  getDiscoverDeckCardProgress,
+  getDiscoverDeckReanchorRank,
+  isDiscoverDeckRoleOnScript,
   getDiscoverDeckDragMotion,
   getDiscoverDeckEntrance,
   getDiscoverDeckRoleMotion,
@@ -239,6 +242,7 @@ test("a drag ticks once per threshold entry and re-arms after coming back", () =
 })
 
 test("deck roles are ordered from the back of the deck to the top", () => {
+  assert.ok(getDiscoverDeckRoleProgress("standby") < getDiscoverDeckRoleProgress("bottom"))
   assert.ok(getDiscoverDeckRoleProgress("bottom") < getDiscoverDeckRoleProgress("middle"))
   assert.ok(getDiscoverDeckRoleProgress("middle") < getDiscoverDeckRoleProgress("top"))
 })
@@ -356,4 +360,74 @@ test("a thrown card rises on an arc as it leaves and levels off at the edge", ()
   assert.ok(end - half > half - quarter, "and levels off near the edge")
   assert.equal(getDiscoverThrowArcY(outX * 2, width), end)
   assert.equal(getDiscoverThrowArcY(100, 0), 0)
+})
+
+// The deck advances on the UI thread at the release: `step` counts committed
+// decisions and springs by one per release. Cards are placed from it before
+// React re-renders with the new roles.
+const STANDBY = getDiscoverDeckRoleProgress("standby")
+
+test("a release moves every card toward its next slot before React re-renders", () => {
+  // Anchored after 4 decisions; the fifth release starts the step spring.
+  const at = (rank: number, step: number) => getDiscoverDeckCardProgress(rank, 4, step)
+  for (const step of [4.25, 4.5, 4.75]) {
+    assert.equal(at(MIDDLE, step), MIDDLE + step - 4, "the next card heads for the top")
+    assert.equal(at(BOTTOM, step), BOTTOM + step - 4, "the bottom card heads for the middle")
+  }
+  assert.equal(at(MIDDLE, 5), TOP)
+  assert.equal(at(BOTTOM, 5), MIDDLE)
+  assert.equal(at(STANDBY, 5), BOTTOM, "the standby card takes the back slot")
+  // The decided card stays a top card while it flies out.
+  assert.equal(at(TOP, 4.6), TOP)
+})
+
+test("React's new roles confirm where the release already moved the cards", () => {
+  const commits = 5
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: MIDDLE, commits: 4 }, "top", commits), true)
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: BOTTOM, commits: 4 }, "middle", commits), true)
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: STANDBY, commits: 4 }, "bottom", commits), true)
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: TOP, commits: 4 }, "top", commits), true, "the leaving card")
+  // Two decisions in one render: the bottom card is the top card at once.
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: BOTTOM, commits: 3 }, "top", commits), true)
+  // A refused decision puts the card back on top: the others step back.
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: MIDDLE, commits: 4 }, "middle", commits), false)
+  assert.equal(isDiscoverDeckRoleOnScript({ rank: BOTTOM, commits: 4 }, "standby", commits), false)
+})
+
+test("a second release while the deck still moves never makes a card jump", () => {
+  // Card B was the middle card after 0 decisions. Release one: step springs
+  // toward 1; release two at step 0.6 retargets the same spring toward 2.
+  const b = (step: number) => getDiscoverDeckCardProgress(MIDDLE, 0, step)
+  const c = (step: number) => getDiscoverDeckCardProgress(BOTTOM, 0, step)
+  let previousB = b(0)
+  let previousC = c(0)
+  for (const step of [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 1.8, 2]) {
+    assert.ok(Math.abs(b(step) - previousB) <= 0.3 + 1e-9, `B moves smoothly at step ${step}`)
+    assert.ok(Math.abs(c(step) - previousC) <= 0.3 + 1e-9, `C moves smoothly at step ${step}`)
+    previousB = b(step)
+    previousC = c(step)
+  }
+  assert.equal(c(2), TOP, "the bottom card ends on top after both decisions")
+})
+
+test("a card re-anchored after a refused decision keeps its pose, then reaches its new slot", () => {
+  // The top card (anchored as the middle card after 4 decisions) at rest after 5.
+  const before = getDiscoverDeckCardProgress(MIDDLE, 4, 5)
+  assert.equal(before, TOP)
+  const startRank = getDiscoverDeckReanchorRank(before, 5, 5)
+  assert.equal(getDiscoverDeckCardProgress(startRank, 5, 5), before, "no jump at the refusal")
+  // Its anchor then springs to the middle slot.
+  assert.equal(getDiscoverDeckCardProgress(MIDDLE, 5, 5), MIDDLE)
+  // Re-anchored while the deck is still moving, it keeps its pose as well.
+  const moving = getDiscoverDeckCardProgress(BOTTOM, 4, 4.4)
+  assert.equal(getDiscoverDeckCardProgress(getDiscoverDeckReanchorRank(moving, 4.4, 5), 5, 4.4), moving)
+})
+
+test("a standby card has the back card's pose and only shows once the deck reveals it", () => {
+  const rest = getDiscoverMiddleCardMotion(0)
+  assert.deepEqual(getDiscoverDeckRoleMotion(STANDBY, rest), getDiscoverDeckRoleMotion(BOTTOM, rest))
+  assert.deepEqual(getDiscoverDeckDragMotion("standby", 300), getDiscoverDeckDragMotion("bottom", 300))
+  // Progress never leaves the deck, however far the step runs.
+  assert.equal(getDiscoverDeckCardProgress(STANDBY, 6, 4), STANDBY)
+  assert.equal(getDiscoverDeckCardProgress(TOP, 0, 9), TOP)
 })

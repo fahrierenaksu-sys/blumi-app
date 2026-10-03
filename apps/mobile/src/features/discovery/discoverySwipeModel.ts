@@ -205,7 +205,12 @@ export function getDiscoverMiddleCardAdvance(x: number): number {
   return Math.min(DISCOVER_MIDDLE_CARD_TRAVEL, Math.abs(x)) / DISCOVER_MIDDLE_CARD_TRAVEL
 }
 
-export type DiscoverDeckRole = "top" | "middle" | "bottom"
+/**
+ * A card's slot in the deck. `standby` is the card after the bottom one: it
+ * is mounted (images decoded) but hidden, so a decision never has to mount a
+ * card while the deck moves.
+ */
+export type DiscoverDeckRole = "top" | "middle" | "bottom" | "standby"
 
 /** The deepest visible card fans out behind the next one. */
 export const DISCOVER_BOTTOM_CARD_MOTION = {
@@ -230,10 +235,52 @@ export const DISCOVER_BOTTOM_CARD_MOTION = {
  */
 export const DISCOVER_PROMOTION_SPRING = MOTION_SPRINGS.snappy
 
-/** A slot as one number the deck can spring between: bottom 0, middle 1, top 2. */
+/** A slot as one number the deck can spring between: standby -1, bottom 0, middle 1, top 2. */
 export function getDiscoverDeckRoleProgress(role: DiscoverDeckRole): number {
   "worklet"
-  return role === "top" ? 2 : role === "middle" ? 1 : 0
+  return role === "top" ? 2 : role === "middle" ? 1 : role === "bottom" ? 0 : -1
+}
+
+/**
+ * Where a card is in the deck (role progress, standby -1 to top 2) while the
+ * deck advances on the UI thread. `deckStep` counts the decisions committed
+ * so far and springs by one at each release, before React re-renders; a card
+ * is anchored at the slot it held after `anchorStep` decisions, so every card
+ * moves one slot forward at the release itself. A second release while the
+ * deck is still moving retargets the same spring, so no card ever jumps.
+ */
+export function getDiscoverDeckCardProgress(anchorRank: number, anchorStep: number, deckStep: number): number {
+  "worklet"
+  return Math.min(2, Math.max(-1, anchorRank + deckStep - anchorStep))
+}
+
+export interface DiscoverDeckAnchor {
+  rank: number
+  commits: number
+}
+
+/**
+ * Whether a card's new role is the one the committed decisions moved it to.
+ * When it is, the card is already moving there on the UI thread; when it is
+ * not (a refused decision coming back, a card leaving the deck for another
+ * reason), the card has to be re-anchored and move to its slot by itself.
+ */
+export function isDiscoverDeckRoleOnScript(
+  anchor: DiscoverDeckAnchor,
+  role: DiscoverDeckRole,
+  commits: number
+): boolean {
+  return Math.min(2, anchor.rank + commits - anchor.commits) === getDiscoverDeckRoleProgress(role)
+}
+
+/**
+ * The anchor rank that keeps a re-anchored card exactly where it is now
+ * (`currentProgress`) once it is anchored at `commits` decisions. It then
+ * springs from there to its new slot.
+ */
+export function getDiscoverDeckReanchorRank(currentProgress: number, deckStep: number, commits: number): number {
+  "worklet"
+  return currentProgress - (deckStep - commits)
 }
 
 /**

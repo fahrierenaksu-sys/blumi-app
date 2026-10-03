@@ -2,6 +2,9 @@
 // is fetched per viewer, session and flip; a result is shown only while it
 // still belongs to the current viewer and the open back face, and a
 // server-backed card never falls back to room fields embedded in the profile.
+// The request for a flip starts on the touch that becomes it (press-in), so
+// the room is usually ready when the back face turns into view; a touch that
+// becomes a swipe drops it.
 
 export interface ShowcaseRequest {
   baseHttpUrl: string
@@ -12,11 +15,29 @@ export interface ShowcaseRequest {
 export interface ShowcaseAuthorization extends ShowcaseRequest {
   id: number
   candidateUserId: string
+  /** False while only a press has started it; true once a flip opened the back face with it. */
+  opened: boolean
 }
 
 export interface ShowcaseRoom {
   roomSnapshotUrl?: string | null
   roomHeadline?: string | null
+}
+
+/** The authorization belongs to this viewer, session and card (open or about to open). */
+export function isShowcaseAuthorizationCurrent(input: {
+  request: ShowcaseRequest | undefined
+  authorization: ShowcaseAuthorization | null
+  candidateUserId: string
+}): boolean {
+  const { request, authorization, candidateUserId } = input
+  return Boolean(
+    request && authorization &&
+    authorization.baseHttpUrl === request.baseHttpUrl &&
+    authorization.viewerUserId === request.viewerUserId &&
+    authorization.sessionToken === request.sessionToken &&
+    authorization.candidateUserId === candidateUserId
+  )
 }
 
 /** The open back face's authorization belongs to this viewer, session and card. */
@@ -26,14 +47,7 @@ export function doesShowcaseAuthorizationMatch(input: {
   authorization: ShowcaseAuthorization | null
   candidateUserId: string
 }): boolean {
-  const { isBackVisible, request, authorization, candidateUserId } = input
-  return Boolean(
-    isBackVisible && request && authorization &&
-    authorization.baseHttpUrl === request.baseHttpUrl &&
-    authorization.viewerUserId === request.viewerUserId &&
-    authorization.sessionToken === request.sessionToken &&
-    authorization.candidateUserId === candidateUserId
-  )
+  return input.isBackVisible && input.authorization?.opened === true && isShowcaseAuthorizationCurrent(input)
 }
 
 /** A showcase result only while it matches and is settled, never a stale one. */
@@ -84,22 +98,78 @@ export function resolveCardBackRoom<TSnapshot>(input: {
   }
 }
 
+function createShowcaseAuthorization(
+  request: ShowcaseRequest,
+  candidateUserId: string,
+  id: number,
+  opened: boolean
+): ShowcaseAuthorization {
+  return {
+    id,
+    baseHttpUrl: request.baseHttpUrl,
+    viewerUserId: request.viewerUserId,
+    candidateUserId,
+    sessionToken: request.sessionToken,
+    opened
+  }
+}
+
 /**
- * The authorization after a flip: opening the back face starts a fresh
- * authorization for this viewer; closing it drops any authorization.
+ * A press on the front face starts a fresh authorization for the flip it may
+ * become. Nothing starts while the back face is open (that press closes it).
+ */
+export function beginShowcaseAuthorizationOnPress(input: {
+  isBackVisible: boolean
+  request: ShowcaseRequest | undefined
+  candidateUserId: string
+  nextId: number
+}): ShowcaseAuthorization | null {
+  if (input.isBackVisible || !input.request) return null
+  return createShowcaseAuthorization(input.request, input.candidateUserId, input.nextId, false)
+}
+
+/**
+ * The authorization after a flip: opening the back face uses the one its own
+ * press started (still this viewer, session and card) or starts a fresh one;
+ * closing it drops any authorization. An opened authorization is never
+ * reused, so every opening gets its own request.
  */
 export function nextShowcaseAuthorizationOnFlip(input: {
   nextVisible: boolean
   request: ShowcaseRequest | undefined
   candidateUserId: string
   nextId: number
+  pressed?: ShowcaseAuthorization | null
 }): ShowcaseAuthorization | null {
   if (!input.nextVisible || !input.request) return null
-  return {
-    id: input.nextId,
-    baseHttpUrl: input.request.baseHttpUrl,
-    viewerUserId: input.request.viewerUserId,
-    candidateUserId: input.candidateUserId,
-    sessionToken: input.request.sessionToken
+  const pressed = input.pressed ?? null
+  if (pressed && !pressed.opened && isShowcaseAuthorizationCurrent({ ...input, authorization: pressed })) {
+    return { ...pressed, opened: true }
   }
+  return createShowcaseAuthorization(input.request, input.candidateUserId, input.nextId, true)
+}
+
+/** A press that ended without opening the back face (it became a swipe) drops its request. */
+export function dropUnopenedShowcaseAuthorization(
+  authorization: ShowcaseAuthorization | null
+): ShowcaseAuthorization | null {
+  return authorization?.opened ? authorization : null
+}
+
+export type RoomShowcaseSlot = "footer" | "placeholder" | "room"
+
+/**
+ * What the back face's bottom slot shows. A card that can have a showcase
+ * keeps its room panel in place (a quiet placeholder) until the answer is in,
+ * then shows the room or, without one, the return hint, so nothing appears or
+ * moves late.
+ */
+export function resolveRoomShowcaseSlot(input: {
+  expectsShowcase: boolean
+  settled: boolean
+  hasRoom: boolean
+}): RoomShowcaseSlot {
+  if (input.hasRoom) return "room"
+  if (!input.expectsShowcase || input.settled) return "footer"
+  return "placeholder"
 }

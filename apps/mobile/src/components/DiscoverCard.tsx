@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { AvatarSelection } from "@blumi/contracts"
 import { ImageBackground, StyleSheet, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
@@ -177,13 +177,23 @@ export function CandidateAvatarPreview(props: {
     })
   }, [snapshot])
   const displayScope = JSON.stringify(snapshot)
-  const [displayedLayers, setDisplayedLayers] = useState<readonly string[]>([])
+  // Display receipts are recorded whether or not anyone listens yet: a Discover
+  // card behind the top one gets `onDisplay` only when it is promoted, and its
+  // layers, already on screen, do not display again. Receipts live in a ref
+  // and only the moment every layer has shown renders (once per avatar).
+  const shownLayersRef = useRef<{ scope: string; ids: Set<string> }>({ scope: displayScope, ids: new Set() })
+  const [completedScope, setCompletedScope] = useState<string | null>(null)
   const onLayerDisplay = useCallback((id: string) => {
-    const receipt = `${displayScope}:${id}`
-    setDisplayedLayers((current) => current.includes(receipt) ? current : [...current, receipt])
-  }, [displayScope])
-  const allDisplayed = layers.length > 0 && layers.every((layer) =>
-    displayedLayers.includes(`${displayScope}:${layer.type}:${layer.id}`))
+    if (shownLayersRef.current.scope !== displayScope) {
+      shownLayersRef.current = { scope: displayScope, ids: new Set() }
+    }
+    const shown = shownLayersRef.current.ids
+    shown.add(id)
+    if (layers.length > 0 && layers.every((layer) => shown.has(`${layer.type}:${layer.id}`))) {
+      setCompletedScope(displayScope)
+    }
+  }, [displayScope, layers])
+  const allDisplayed = completedScope === displayScope
   useEffect(() => {
     if (allDisplayed) onDisplay?.()
   }, [allDisplayed, onDisplay])
@@ -234,8 +244,10 @@ export function CandidateAvatarPreview(props: {
           }
         ]}
       >
-        <RoomAvatarRenderer2D key={props.onDisplay ? displayScope : undefined} layers={layers} imagePriority={imagePriority}
-          onLayerDisplay={props.onDisplay ? onLayerDisplay : undefined} onImageError={props.onImageError} />
+        {/* One identity per avatar: gaining or losing the receipt listener (a
+            Discover card promoted to the top) never remounts the layers. */}
+        <RoomAvatarRenderer2D key={displayScope} layers={layers} imagePriority={imagePriority}
+          onLayerDisplay={onLayerDisplay} onImageError={props.onImageError} />
       </View>
     </View>
   )

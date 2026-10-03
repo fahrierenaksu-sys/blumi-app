@@ -63,6 +63,45 @@ export interface DiscoveryRoomShowcaseQueryInput {
   authorizationId: number
   enabled?: boolean
   fetcher?: typeof fetch
+  /**
+   * Loads the room image into the image cache. The showcase resolves once the
+   * image is ready (or after DISCOVERY_SHOWCASE_IMAGE_WAIT_MS), so the room
+   * appears with its picture instead of an empty frame that fills in later.
+   */
+  prefetchImage?: (url: string) => Promise<unknown>
+}
+
+/** The longest a showcase waits for its image before it shows anyway. */
+export const DISCOVERY_SHOWCASE_IMAGE_WAIT_MS = 1500
+
+/**
+ * Waits for `prefetch(url)` at most `waitMs`, and not past `signal`. A failed
+ * prefetch is not a showcase failure: the image view loads (and reports) the
+ * picture itself.
+ */
+export async function waitForShowcaseImage(
+  prefetch: (url: string) => Promise<unknown>,
+  url: string,
+  signal?: AbortSignal,
+  waitMs = DISCOVERY_SHOWCASE_IMAGE_WAIT_MS
+): Promise<void> {
+  if (signal?.aborted) return
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let onAbort: (() => void) | undefined
+  const stop = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, waitMs)
+    onAbort = () => resolve()
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
+  const prefetched = Promise.resolve()
+    .then(() => prefetch(url))
+    .then(() => undefined, () => undefined)
+  try {
+    await Promise.race([prefetched, stop])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+    if (onAbort) signal?.removeEventListener("abort", onAbort)
+  }
 }
 
 export class DiscoveryProfileUnavailableError extends Error {
@@ -125,14 +164,19 @@ export function createDiscoveryRoomShowcaseQueryOptions(
     staleTime: 0,
     gcTime: 0,
     retry: false,
-    queryFn: ({ signal }: QueryFunctionContext<typeof queryKey>) =>
-      fetchDiscoveryRoomShowcase(
+    queryFn: async ({ signal }: QueryFunctionContext<typeof queryKey>) => {
+      const showcase = await fetchDiscoveryRoomShowcase(
         input.baseHttpUrl,
         input.sessionToken,
         input.candidateUserId,
         input.fetcher ?? fetch,
         signal
       )
+      if (showcase.roomSnapshotUrl && input.prefetchImage) {
+        await waitForShowcaseImage(input.prefetchImage, showcase.roomSnapshotUrl, signal)
+      }
+      return showcase
+    }
   }
 }
 

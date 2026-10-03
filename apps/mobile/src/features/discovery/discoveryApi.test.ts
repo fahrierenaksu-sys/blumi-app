@@ -17,7 +17,8 @@ import {
   buildDiscoveryRoomShowcaseQueryKey,
   createDiscoveryRoomShowcaseQueryOptions,
   fetchDiscoveryRoomShowcase,
-  isDiscoveryWatchActive
+  isDiscoveryWatchActive,
+  waitForShowcaseImage
 } from "./discoveryApi"
 
 const DISCOVERY_QUOTA = {
@@ -442,6 +443,96 @@ test("a new flip reauthorizes the room and never reuses the previous viewer's re
     unsubscribe()
     queryClient.clear()
   }
+})
+
+function createShowcaseFetcher(roomSnapshotUrl: string | null) {
+  return (async () => createJsonResponse(200, {
+    profile: {
+      userId: "candidate-1", displayName: "Defne", age: 24,
+      distanceLabel: "Nearby", vibeTags: [], signals: [],
+      roomHeadline: "A public room", roomSnapshotUrl,
+      avatarPresetId: COMPLETE_DISCOVERY_AVATAR.presetId,
+      avatar: COMPLETE_DISCOVERY_AVATAR
+    },
+    decision: { capability: "mutual-like" }
+  })) as typeof fetch
+}
+
+async function runShowcaseQuery(input: {
+  roomSnapshotUrl: string | null
+  prefetchImage: (url: string) => Promise<unknown>
+}) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  try {
+    return await queryClient.fetchQuery(createDiscoveryRoomShowcaseQueryOptions({
+      baseHttpUrl: "https://api.blumi.test",
+      viewerUserId: "viewer-a",
+      candidateUserId: "candidate-1",
+      sessionToken: "viewer-a-session",
+      authorizationId: 1,
+      fetcher: createShowcaseFetcher(input.roomSnapshotUrl),
+      prefetchImage: input.prefetchImage
+    }))
+  } finally {
+    queryClient.clear()
+  }
+}
+
+test("the room showcase arrives with its picture already loaded", async () => {
+  const events: string[] = []
+  const showcase = await runShowcaseQuery({
+    roomSnapshotUrl: "/v1/room-showcase/asset-1",
+    prefetchImage: async (url) => {
+      events.push(`prefetch ${url}`)
+      await new Promise((resolve) => setImmediate(resolve))
+      events.push("image ready")
+      return true
+    }
+  })
+  events.push("showcase")
+  assert.deepEqual(events, [
+    "prefetch https://api.blumi.test/v1/room-showcase/asset-1",
+    "image ready",
+    "showcase"
+  ])
+  assert.equal(showcase.roomSnapshotUrl, "https://api.blumi.test/v1/room-showcase/asset-1")
+})
+
+test("a showcase without a room does not wait for a picture", async () => {
+  let prefetches = 0
+  const showcase = await runShowcaseQuery({
+    roomSnapshotUrl: null,
+    prefetchImage: async () => { prefetches += 1 }
+  })
+  assert.equal(prefetches, 0)
+  assert.equal(showcase.roomSnapshotUrl, null)
+})
+
+test("a failed picture prefetch still shows the room (the image view loads it itself)", async () => {
+  const showcase = await runShowcaseQuery({
+    roomSnapshotUrl: "/v1/room-showcase/asset-1",
+    prefetchImage: async () => { throw new Error("offline") }
+  })
+  assert.equal(showcase.roomHeadline, "A public room")
+})
+
+test("waiting for a showcase picture is bounded by its deadline and by cancellation", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] })
+  const never = () => new Promise<unknown>(() => {})
+  let settled = false
+  const waiting = waitForShowcaseImage(never, "https://img.test/a", undefined, 1500).then(() => { settled = true })
+  await Promise.resolve()
+  context.mock.timers.tick(1499)
+  await Promise.resolve()
+  assert.equal(settled, false)
+  context.mock.timers.tick(1)
+  await waiting
+  assert.equal(settled, true)
+
+  const controller = new AbortController()
+  const cancelled = waitForShowcaseImage(never, "https://img.test/b", controller.signal, 60_000)
+  controller.abort()
+  await cancelled
 })
 
 test("view-only room details cannot expose a headline or snapshot even if the response includes them", async () => {

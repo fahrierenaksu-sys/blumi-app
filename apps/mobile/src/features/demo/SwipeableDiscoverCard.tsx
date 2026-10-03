@@ -29,7 +29,6 @@ import Reanimated, {
   withTiming
 } from "react-native-reanimated"
 import {
-  Image,
   Pressable,
   type ImageSourcePropType,
   StyleSheet,
@@ -58,22 +57,30 @@ import {
 import type { DiscoveryCardLayoutMetrics } from "../discovery/discoveryLayoutMetrics"
 import { getDiscoverySurfaceCopy } from "../discovery/discoverySurfaceCopy"
 import { getAppLocale } from "../session/appLocale"
-import type { DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
+import type { DiscoverDeckAdvance, DiscoverSwipeValues } from "../discovery/useDiscoverSwipeValues"
 import { useDiscoverCardSwipe, type DiscoverCardExitRequest } from "./useDiscoverCardSwipe"
 import {
+  beginShowcaseAuthorizationOnPress,
   doesShowcaseAuthorizationMatch,
+  dropUnopenedShowcaseAuthorization,
   isBundledDemoShowcase,
+  isShowcaseAuthorizationCurrent,
   nextShowcaseAuthorizationOnFlip,
   resolveCardBackRoom,
+  resolveRoomShowcaseSlot,
   selectAuthorizedShowcase,
+  type RoomShowcaseSlot,
   type ShowcaseAuthorization
 } from "../discovery/discoveryShowcaseAuthorizationModel"
+import { DiscoveryRoomShowcaseSlot } from "../discovery/DiscoveryRoomShowcaseSlot"
 
 const discoverCardSurface = require("../../../assets/ui/discover-card-surface.png")
 /** Resting size and opacity of the online dot between arrival pulses. */
 const ONLINE_DOT_REST = 0.78
 const bundledDemoRoomSnapshot = require("../miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
 let nextShowcaseAuthorizationId = 0
+/** Room showcase images stay in memory only (see DiscoveryRoomShowcaseSlot). */
+const prefetchShowcaseImage = (url: string) => ExpoImage.prefetch(url, "memory")
 
 export interface SwipeableDiscoverProfile {
   userId: string
@@ -102,6 +109,7 @@ interface SwipeableDiscoverCardProps {
   onSwipeRight: (userId: string) => void
   onSwipeLeft: (userId: string) => void
   swipeAnim?: DiscoverSwipeValues
+  deckAdvance?: DiscoverDeckAdvance
   disabled?: boolean
   canSwipeRight?: boolean
   disableEntryAnim?: boolean
@@ -168,7 +176,7 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
     if (exitDirection === "right") rememberLikedChibi(profile.userId)
   }, [exitDirection, profile.userId, rememberLikedChibi])
   const { gesture: swipeGesture, cardSwipeStyle, likeStampStyle, nopeStampStyle, onCardLayout } = useDiscoverCardSwipe({
-    swipe: swipeAnim, cardId: profile.userId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight: handleSwipeRight, onSwipeLeft,
+    swipe: swipeAnim, deckAdvance: props.deckAdvance, cardId: profile.userId, disabled, canSwipeRight, reduceMotion, screenWidth, onSwipeRight: handleSwipeRight, onSwipeLeft,
     leaving: props.leaving, exitRequest: props.exitRequest, onExitEnd: props.onExitEnd
   })
   const copy = getDiscoverySurfaceCopy(getAppLocale())
@@ -195,13 +203,20 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
     authorization: showcaseAuthorization,
     candidateUserId: profile.userId
   })
+  // The request runs from the press that may open the back face; it is shown
+  // only once that flip opened it (authorizationMatches).
   const showcaseQuery = useQuery(createDiscoveryRoomShowcaseQueryOptions({
     baseHttpUrl: showcaseAuthorization?.baseHttpUrl ?? "",
     viewerUserId: showcaseAuthorization?.viewerUserId ?? "",
     candidateUserId: showcaseAuthorization?.candidateUserId ?? profile.userId,
     sessionToken: showcaseAuthorization?.sessionToken ?? "",
     authorizationId: showcaseAuthorization?.id ?? 0,
-    enabled: authorizationMatches
+    enabled: isShowcaseAuthorizationCurrent({
+      request: showcaseRequest,
+      authorization: showcaseAuthorization,
+      candidateUserId: profile.userId
+    }),
+    prefetchImage: prefetchShowcaseImage
   }))
   const authorizedShowcase = selectAuthorizedShowcase({
     matches: authorizationMatches,
@@ -224,6 +239,11 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
     profileRoomSnapshot: profile.roomSnapshot,
     profileRoomHeadline: profile.roomHeadline,
     authorizedShowcase
+  })
+  const roomShowcaseSlot = resolveRoomShowcaseSlot({
+    expectsShowcase: showEmbeddedDemoRoom || Boolean(showcaseRequest),
+    settled: authorizationMatches && !showcaseQuery.isFetching && (showcaseQuery.isSuccess || showcaseQuery.isError),
+    hasRoom: Boolean(cardBackRoom.roomSnapshot)
   })
 
   useEffect(() => {
@@ -284,6 +304,23 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
     transform: [{ scale: onlinePulse.value }]
   }))
 
+  // The touch that may flip the card starts the room request (press-in), so
+  // the room is usually ready by the time the back face turns into view.
+  const handlePressIn = useCallback(() => {
+    if (disabled) return
+    const pressed = beginShowcaseAuthorizationOnPress({
+      isBackVisible, request: showcaseRequest, candidateUserId: profile.userId, nextId: ++nextShowcaseAuthorizationId
+    })
+    if (pressed) setShowcaseAuthorization(pressed)
+  }, [disabled, isBackVisible, profile.userId, showcaseRequest])
+  // A press that opens the card runs onPress in the same release (before or
+  // after this), so the check waits for the release to finish. A press that
+  // became a swipe or slid off ends without onPress and drops its request
+  // (the query is cancelled with its key, see the effect above).
+  const handlePressOut = useCallback(() => {
+    queueMicrotask(() => setShowcaseAuthorization(dropUnopenedShowcaseAuthorization))
+  }, [])
+
   const toggleFlip = useCallback(() => {
     if (disabled) return
     const nextVisible = !isBackVisible
@@ -291,8 +328,9 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
       void queryClient.cancelQueries({ queryKey: showcaseQueryKey, exact: true })
       setShowcaseAuthorization(null)
     } else if (showcaseRequest) {
-      setShowcaseAuthorization(nextShowcaseAuthorizationOnFlip({
-        nextVisible, request: showcaseRequest, candidateUserId: profile.userId, nextId: ++nextShowcaseAuthorizationId
+      const nextId = ++nextShowcaseAuthorizationId
+      setShowcaseAuthorization((pressed) => nextShowcaseAuthorizationOnFlip({
+        nextVisible, request: showcaseRequest, candidateUserId: profile.userId, nextId, pressed
       }))
     }
     setIsBackVisible(nextVisible)
@@ -384,6 +422,8 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={isBackVisible ? copy.card.showProfile : copy.card.flipProfile}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         onPress={toggleFlip}
         style={StyleSheet.absoluteFill}
         disabled={disabled}
@@ -476,6 +516,7 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
             snapshot={avatarSnapshot}
             content={cardBack}
             firstName={firstName}
+            roomShowcaseSlot={roomShowcaseSlot}
             roomSnapshot={cardBackRoom.roomSnapshot}
             roomHeadline={cardBackRoom.roomHeadline}
             imagePriority={isBackVisible ? imagePriority : "low"}
@@ -497,6 +538,7 @@ function DiscoveryCardBack(props: {
   snapshot: ReturnType<typeof createCandidateAvatarSnapshot>
   content: ReturnType<typeof normalizeDiscoveryCardBack>
   firstName: string
+  roomShowcaseSlot: RoomShowcaseSlot
   roomSnapshot?: ImageSourcePropType
   roomHeadline?: string
   imagePriority: "low" | "normal" | "high"
@@ -580,26 +622,14 @@ function DiscoveryCardBack(props: {
           </View>
         ) : null}
       </View>
-      {roomSnapshot ? (
-        <View style={styles.roomShowcasePanel}>
-          <Image source={roomSnapshot} resizeMode="contain" style={styles.roomShowcaseImage} />
-          <View style={styles.roomShowcaseWash} />
-          <View style={styles.roomShowcaseCopy}>
-            <Text style={styles.roomShowcaseLabel}>{copy.card.roomShowcaseLabel}</Text>
-            {roomHeadline ? (
-              <Text style={styles.roomShowcaseHeadline} numberOfLines={1}>
-                {roomHeadline}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-      ) : null}
-      {roomSnapshot ? null : (
-        <View style={styles.backFooter}>
-          <Text style={styles.backFooterText}>{copy.card.returnHint}</Text>
-          <View style={styles.backFooterLine} />
-        </View>
-      )}
+      <DiscoveryRoomShowcaseSlot
+        slot={props.roomShowcaseSlot}
+        roomSnapshot={roomSnapshot}
+        roomHeadline={roomHeadline}
+        label={copy.card.roomShowcaseLabel}
+        returnHint={copy.card.returnHint}
+        imagePriority={imagePriority}
+      />
     </View>
   )
 }
@@ -657,51 +687,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.16)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.58)",
-  },
-  roomShowcasePanel: {
-    position: "absolute",
-    left: 24,
-    right: 24,
-    bottom: 50,
-    height: 72,
-    zIndex: 8,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#E9DDF4",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.72)",
-  },
-  roomShowcaseImage: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 104,
-    backgroundColor: "#E9DDF4",
-    opacity: 0.96,
-  },
-  roomShowcaseWash: {
-    ...StyleSheet.absoluteFill,
-    left: 104,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-  },
-  roomShowcaseCopy: {
-    position: "absolute",
-    left: 117,
-    right: 13,
-    bottom: 10,
-  },
-  roomShowcaseLabel: {
-    ...uiTheme.font.overline,
-    color: "#816B96",
-    fontSize: 9,
-    letterSpacing: 1.2,
-  },
-  roomShowcaseHeadline: {
-    ...uiTheme.font.bodyMedium,
-    color: "#33213E",
-    fontSize: 14,
-    fontWeight: "800",
   },
   backBlobOne: {
     position: "absolute",
@@ -913,24 +898,6 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.textSecondary,
     fontWeight: "700",
     maxWidth: 220,
-  },
-  backFooter: {
-    position: "absolute",
-    left: 24,
-    right: 24,
-    bottom: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  backFooterText: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textMuted,
-  },
-  backFooterLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(76, 53, 72, 0.12)",
   },
   heroGlow: {
     position: "absolute",
