@@ -194,3 +194,13 @@ test("text keeps its settled width through every frame, with identical endpoint 
     }
   }
 })
+
+test("typing slides the room up at full size so the avatar art is never resampled", () => {
+  for (const { input, keyboardHeight } of cases()) {
+    const { closed, open } = resolveMiniRoomPoseEndpoints(input, keyboardHeight)
+    assert.equal(open.cameraScale, 1, "no fractional scale while the keyboard is up")
+    assert.equal(closed.cameraScale, 1)
+    assert.ok(Number.isInteger(open.cameraY), "the resting pose sits on whole points")
+    assert.ok(open.cameraY <= 0, "the room only moves up")
+  }
+})

@@ -103,7 +103,7 @@ test("the camera stays horizontally fixed while keyboard framing keeps the compo
     const open = keyboardAt(1)
     assert.equal(translateX(closed.cameraStyle), 0)
     assert.equal(translateX(open.cameraStyle), 0, "keyboard and floor interactions cannot pan the room")
-    assert.notEqual(scaleOf(open.cameraStyle), scaleOf(closed.cameraStyle), "keyboard pose still adapts to the available space")
+    assert.equal(scaleOf(open.cameraStyle), 1, "the keyboard pose slides the room; it never resamples the art")
     assert.notEqual(open.transition.value.cameraY, closed.transition.value.cameraY)
     assert.equal(translateX(keyboardAt(0).cameraStyle), 0, "closing the keyboard returns to the same horizontal frame")
   } finally {

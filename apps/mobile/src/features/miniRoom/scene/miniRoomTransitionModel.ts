@@ -48,7 +48,7 @@ export function resolveMiniRoomTransitionTarget(
 /**
  * The two resting poses for a keyboard of `keyboardHeight` points (0 where
  * the window itself resizes, Android). The room canvas keeps one layout; only
- * its transform differs.
+ * its translation differs: the room is never scaled, so its art stays sharp.
  */
 export function resolveMiniRoomPoseEndpoints(input: MiniRoomPoseInput, keyboardHeight: number): MiniRoomPoseEndpoints {
   "worklet"
@@ -58,10 +58,19 @@ export function resolveMiniRoomPoseEndpoints(input: MiniRoomPoseInput, keyboardH
   const openLayout = resolveMiniRoomLayout({
     ...input, keyboardVisible: true, keyboardInset: keyboardHeight > 0 ? keyboardHeight : 0
   })
-  return {
-    closed: resolveMiniRoomTransitionTarget(rest, closedLayout, closedLayout.panelHeight),
-    open: resolveMiniRoomTransitionTarget(rest, openLayout, closedLayout.panelHeight)
-  }
+  // Both poses slide the room at full size instead of shrinking it: a
+  // fractional GPU scale resamples the avatar and furniture art, which read
+  // blurry while typing. The floor lands where the shrunk frame put it (whole
+  // points, rounded upward), so the paper keeps its clearance; the walls'
+  // top may pass under the header.
+  const restFloor = rest.top + rest.height
+  const unscaled = (layout: MiniRoomLayout): MiniRoomTransitionFrame => ({
+    ...resolveMiniRoomTransitionTarget(rest, layout, closedLayout.panelHeight),
+    cameraX: 0,
+    cameraY: Math.min(0, Math.floor(layout.camera.top + layout.camera.height - restFloor)),
+    cameraScale: 1
+  })
+  return { closed: unscaled(closedLayout), open: unscaled(openLayout) }
 }
 
 function mixFrame(from: MiniRoomTransitionFrame, to: MiniRoomTransitionFrame, t: number): MiniRoomTransitionFrame {
