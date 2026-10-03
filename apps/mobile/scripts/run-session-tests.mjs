@@ -174,6 +174,7 @@ try {
       "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/ui/blumiLoadingScreenHandoff.test.ts",
       "src/ui/uiLocale.test.ts",
+      "src/ui/keyboardOpenAmount.test.ts",
       "src/ui/ambientMotionModel.test.ts",
       "src/ui/glassSurfaceModel.test.ts",
       "src/features/inventory/dailyRewardCopy.test.ts"

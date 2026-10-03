@@ -13,7 +13,7 @@
  * app-wide, which every other screen still relies on; that needs its own pass
  * on an Android device.
  */
-import { forwardRef, useEffect, type ReactNode } from "react"
+import { forwardRef, useEffect, useLayoutEffect, type ReactNode } from "react"
 import {
   Keyboard,
   Platform,
@@ -28,6 +28,7 @@ import {
   KeyboardChatScrollView,
   KeyboardProvider,
   KeyboardStickyView,
+  useKeyboardHandler,
   useReanimatedKeyboardAnimation
 } from "react-native-keyboard-controller"
 import Animated, {
@@ -74,7 +75,33 @@ export const useGluedKeyboard = KEYBOARD_GLUE_ENABLED
 const KEYBOARD_FALLBACK_MOTION_MS = 250
 
 function useKeyboardOpenAmountIos(): SharedValue<number> {
-  return useReanimatedKeyboardAnimation().progress
+  const initial = useReanimatedKeyboardAnimation().progress
+  const amount = useSharedValue(0)
+  useLayoutEffect(() => {
+    amount.value = Keyboard.isVisible() ? initial.value : 0
+  }, [amount, initial])
+  useEffect(() => {
+    // iOS can omit the controller's terminal frame (e.g. a system keyboard
+    // overlay). The RN hide notification is the final closed-state boundary.
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      amount.value = 0
+    })
+    return () => hide.remove()
+  }, [amount])
+  // The provider's iOS progress follows start/interactive events, and ignores
+  // move/end events. A final interactive frame can therefore leave it open
+  // after the keyboard has hidden. Track actual frames, including the end,
+  // just as KeyboardAvoidingView does, so collapsed panels always return.
+  const update = (event: { height: number; progress: number }) => {
+    "worklet"
+    amount.value = event.height <= 0 ? 0 : Math.max(0, Math.min(1, event.progress))
+  }
+  useKeyboardHandler({
+    onMove: update,
+    onInteractive: update,
+    onEnd: update
+  }, [])
+  return amount
 }
 
 /**

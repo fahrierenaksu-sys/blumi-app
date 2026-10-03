@@ -77,7 +77,11 @@ function KeyboardCollapsibleSlot({
     >
       <View
         onLayout={(event) => {
-          naturalHeight.value = event.nativeEvent.layout.height
+          // The clipped slot can constrain this measurement while typing.
+          // Keep the resting height; measuring the collapsed panel feeds its
+          // shrinking height back into the next frame and can trap it at zero.
+          const height = event.nativeEvent.layout.height
+          if (collapse.value === 0 && height > 0) naturalHeight.value = height
         }}
       >
         {children}

@@ -218,30 +218,90 @@ test("the keyboard collapses the visible step's stage on the UI thread, never a 
 
 test("a collapsing panel closes its height and the gap after it, and fades out first", () => {
   const { getSetupCollapsibleSlotStyle } = setupFlowShellModel
-  assert.deepEqual(getSetupCollapsibleSlotStyle(0, 300, 16), { height: 300, opacity: 1, marginBottom: -0 })
+  assert.deepEqual(getSetupCollapsibleSlotStyle(0, 300, 16), { height: "auto", opacity: 1, marginBottom: 0 })
   assert.deepEqual(getSetupCollapsibleSlotStyle(1, 300, 16), { height: 0, opacity: 0, marginBottom: -16 })
   const mid = getSetupCollapsibleSlotStyle(0.3, 300, 16)
   assert.equal(mid.height, 210)
   assert.equal(mid.opacity, 0.5)
-  assert.deepEqual(getSetupCollapsibleSlotStyle(0.5, 0, 16), { opacity: 1 - 0.5 / 0.6, marginBottom: 0 }, "unmeasured, it keeps its own height")
+  assert.deepEqual(getSetupCollapsibleSlotStyle(0.5, 0, 16), { height: "auto", opacity: 1 - 0.5 / 0.6, marginBottom: 0 }, "unmeasured, it keeps its own height")
+  assert.deepEqual(getSetupCollapsibleSlotStyle(0, 0, 16), { height: "auto", opacity: 1, marginBottom: 0 }, "a missed measurement must release a previous collapsed height")
 })
 
-function loadPreAuthFlow(runtime: FakeReactRuntime) {
+test("a keyboard close releases a native height left by a collapsed or unmeasured panel", () => {
+  const { getSetupCollapsibleSlotStyle } = setupFlowShellModel
+  // Reanimated retains previously applied native properties when a later
+  // frame omits them. A lost measurement must not strand a panel at height 0.
+  for (const restingMeasurement of [0, 300]) {
+    const applied = { ...getSetupCollapsibleSlotStyle(1, 300, 16) }
+    assert.equal(applied.height, 0)
+    Object.assign(applied, getSetupCollapsibleSlotStyle(0, restingMeasurement, 16))
+    assert.equal(applied.height, "auto")
+    assert.equal(applied.opacity, 1)
+    assert.equal(applied.marginBottom, 0)
+  }
+})
+
+test("a clipped panel never replaces its resting measurement with its collapsed height", () => {
+  const runtime = createFirstFrameRuntime()
+  const values: { value: number }[] = []
+  const reanimated = createSettlingReanimatedStub(runtime)
+  const { BlumiSetupShell } = loadShell(runtime, {
+    "react-native-reanimated": {
+      ...reanimated.module,
+      useSharedValue: (value: number) => {
+        const shared = { value }
+        values.push(shared)
+        return shared
+      }
+    }
+  })
+  runtime.render(() => BlumiSetupShell({
+    step: "profile", collapseStageOnKeyboard: true,
+    onBack: () => undefined, onPrimaryAction: () => undefined
+  }))
+  const [slot] = findElements(runtime.output, (element) =>
+    typeof element.type === "function" && element.type.name === "KeyboardCollapsibleSlot"
+  )
+  const collapse = { value: 0 }
+  const panel = (slot.type as (props: unknown) => Element)({ ...slot.props, collapse })
+  const height = values.at(-1)!
+  const measure = (value: number) => panel.props.children.props.onLayout({ nativeEvent: { layout: { height: value } } })
+  measure(300)
+  assert.equal(height.value, 300)
+  collapse.value = 0.5
+  measure(150)
+  assert.equal(height.value, 300)
+  collapse.value = 1
+  measure(0)
+  assert.equal(height.value, 300)
+  collapse.value = 0
+  measure(350)
+  assert.equal(height.value, 350, "resting layout changes still remeasure")
+})
+
+function loadPreAuthFlow(runtime: FakeReactRuntime, options: {
+  isFocused?: () => boolean
+  captureProductEvent?: (name: string, properties: unknown) => void
+  reduceMotion?: boolean
+} = {}) {
   const reanimated = createReanimatedStub(runtime)
   const exports = loadSourceWithFakeReact<{
     PreAuthSetupFlowScreen: (props: Record<string, unknown>) => Element
     PersistentStepLayer: (props: Record<string, unknown>) => Element
   }>("screens/PreAuthSetupFlowScreen.tsx", runtime, {
     modules: {
-      "@react-navigation/native": { usePreventRemove: () => undefined },
+      "@react-navigation/native": {
+        useIsFocused: options.isFocused ?? (() => true),
+        usePreventRemove: () => undefined
+      },
       "react-native": createReactNativeStub().module,
       "react-native-reanimated": reanimated.module,
       "../features/session/onboardingFlowModel": onboardingFlowModel,
-      "../analytics/productAnalytics": { captureProductEvent: () => undefined },
+      "../analytics/productAnalytics": { captureProductEvent: options.captureProductEvent ?? (() => undefined) },
       "../features/session/setupFlow/setupFlowLocale": {
         getCurrentSetupFlowCopy: () => ({ room: { continueAction: "Continue" } })
       },
-      "../ui/animations": { useReducedMotionPreference: () => ({ reduceMotion: false, isResolved: true }) },
+      "../ui/animations": { useReducedMotionPreference: () => ({ reduceMotion: options.reduceMotion ?? false, isResolved: true }) },
       "../ui/motion": { MOTION_SPRINGS: { snappy: {} } },
       "./AvatarSetupScreen": { AvatarSetupScreen: "AvatarSetupScreen" },
       "./ProfileSetupScreen": { ProfileSetupScreen: "ProfileSetupScreen" },
@@ -259,6 +319,97 @@ function activeScreen(runtime: FakeReactRuntime): string | undefined {
   )
   assert.ok(active.length <= 1, "only one setup step is active at a time")
   return active[0]?.type as string | undefined
+}
+
+test("the world prepares the profile route once, before Whoa is pressed", () => {
+  const runtime = createFakeReactRuntime()
+  const reanimated = createReanimatedStub(runtime)
+  const prepared: unknown[] = []
+  const navigated: unknown[] = []
+  const { AuthEntryScreen } = loadSourceWithFakeReact<{
+    AuthEntryScreen: (props: unknown) => Element
+  }>("screens/AuthEntryScreen.tsx", runtime, {
+    modules: {
+      "react-native": createReactNativeStub().module,
+      "react-native-reanimated": reanimated.module,
+      "../ui/animations": {
+        useReducedMotionPreference: () => ({ reduceMotion: false, isResolved: true })
+      },
+      "../features/session/OnboardingWorldScene": { OnboardingWorldScene: "OnboardingWorldScene" },
+      "../ui/compactViewportLayout": { resolveCompactViewportLayout: () => ({ compact: false }) },
+      "../features/session/onboardingActionLayout": {
+        ONBOARDING_PRIMARY_ACTION_LAYOUT: { horizontalInset: { regular: 24 } },
+        getOnboardingPrimaryActionMetrics: () => ({ horizontalInset: 24 })
+      }
+    },
+    real: ["../features/session/onboardingIntroModel", "../features/session/onboardingFlowModel", "../ui/theme"],
+    inertUnknown: true
+  })
+  runtime.render(() => AuthEntryScreen({
+    navigation: {
+      preload: (...args: unknown[]) => { prepared.push(args) },
+      navigate: (...args: unknown[]) => { navigated.push(args) },
+      addListener: () => () => undefined
+    },
+    isSubmitting: false,
+    errorMessage: null,
+    hasSeenIntro: false,
+    onCompleteIntro: async () => undefined,
+    onClearError: () => undefined,
+    createInitialStep: "room"
+  }))
+  assert.deepEqual(prepared, [], "the brand opening does not pay for the profile mount")
+  const scene = () => findElements(runtime.output, (element) => element.type === "OnboardingWorldScene")[0]
+  scene().props.onEvent({ type: "open-greeting" })
+  assert.deepEqual(prepared, [])
+  scene().props.onEvent({ type: "reveal-world", reduceMotion: false })
+  assert.deepEqual(prepared, [["PreAuthSetup", { initialStep: "profile" }]])
+  scene().props.onEvent({ type: "globe-impact" })
+  runtime.rerender()
+  assert.equal(prepared.length, 1, "phase and parent updates do not remount the destination")
+  assert.deepEqual(navigated, [], "preparation never advances the user's flow")
+  runtime.unmount()
+})
+
+for (const reduceMotion of [false, true]) {
+  test(`a preloaded profile stays idle until focused (Reduce Motion: ${reduceMotion})`, () => {
+    const runtime = createFakeReactRuntime()
+    let focused = false
+    const events: string[] = []
+    const { PreAuthSetupFlowScreen, reanimated } = loadPreAuthFlow(runtime, {
+      isFocused: () => focused,
+      captureProductEvent: (name) => { events.push(name) },
+      reduceMotion
+    })
+    let persisted = false
+    runtime.render(() => PreAuthSetupFlowScreen({
+      navigation: { navigate: () => undefined, dispatch: () => undefined },
+      initialStep: "profile",
+      entryMotion: "world-handoff",
+      draft: {},
+      isSubmitting: false,
+      errorMessage: null,
+      onPersistDraft: async () => { persisted = true },
+      onClearDraft: async () => undefined,
+      onRequestVerificationCode: async () => undefined,
+      onRegister: async () => undefined,
+      onClearError: () => undefined
+    }))
+    assert.equal(findElements(runtime.output, (element) => element.type === "ProfileSetupScreen").length, 1)
+    assert.equal(activeScreen(runtime), undefined, "the mounted profile has no active motion")
+    assert.deepEqual(events, [], "preloading is not a viewed step")
+    assert.deepEqual(reanimated.timings, [], "the entrance waits for navigation")
+    assert.equal(persisted, false)
+    focused = true
+    runtime.rerender()
+    assert.equal(activeScreen(runtime), "ProfileSetupScreen")
+    assert.deepEqual(events, ["onboarding_step_viewed"])
+    assert.deepEqual(reanimated.timings, reduceMotion ? [] : [1])
+    focused = false
+    runtime.rerender()
+    assert.equal(activeScreen(runtime), undefined, "back navigation stops hidden setup motion")
+    runtime.unmount()
+  })
 }
 
 test("pre-auth CTA shows the next setup step before draft persistence resolves", async () => {

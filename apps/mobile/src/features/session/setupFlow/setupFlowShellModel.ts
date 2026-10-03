@@ -219,11 +219,13 @@ export function getSetupCollapsibleSlotStyle(
   collapse: number,
   naturalHeight: number,
   gapAfter: number
-): { height?: number; opacity: number; marginBottom: number } {
+): { height: number | "auto"; opacity: number; marginBottom: number } {
   "worklet"
   const amount = Math.max(0, Math.min(1, Number.isFinite(collapse) ? collapse : 0))
   const opacity = Math.max(0, 1 - amount / SETUP_COLLAPSE_FADE_END)
-  if (naturalHeight <= 0) return { opacity, marginBottom: 0 }
+  // Explicitly release the animated height. Omitting it from an animated
+  // style leaves the previous numeric height applied on the native view.
+  if (amount === 0 || naturalHeight <= 0) return { height: "auto", opacity, marginBottom: 0 }
   return {
     height: naturalHeight * (1 - amount),
     opacity,

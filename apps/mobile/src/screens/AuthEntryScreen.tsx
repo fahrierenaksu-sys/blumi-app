@@ -185,6 +185,7 @@ export function AuthEntryScreen({
   const [isWhoaVisible, setIsWhoaVisible] = useState(false)
   const preludeActionsExit = useSharedValue(0)
   const didCaptureWorldBeat = useRef(false)
+  const didPrepareProfile = useRef(false)
   const handlePreludeActionsVisible = useCallback(() => setArePreludeActionsVisible(true), [])
   const handlePreludeSecondaryVisible = useCallback(
     () => setIsPreludeSecondaryVisible(true),
@@ -325,6 +326,16 @@ export function AuthEntryScreen({
   const isCharacterGreeting = introState.phase === "character-greeting"
   const isPrelude = isGreeting || isCharacterGreeting
   const isWorldReady = introState.phase === "world-ready"
+  useEffect(() => {
+    if (isPrelude || didPrepareProfile.current) return
+    didPrepareProfile.current = true
+    // Loading the module alone does not mount the form or prepare its images.
+    // Use the world choreography to prepare the actual destination instead of
+    // doing that work between the outgoing fade and the profile entrance.
+    navigation.preload("PreAuthSetup", {
+      initialStep: getCreateAccountInitialStep(createInitialStep)
+    })
+  }, [createInitialStep, isPrelude, navigation])
   const shouldRenderPreludeActions =
     (arePreludeActionsVisible || isPreludeSecondaryVisible) &&
     isPrelude

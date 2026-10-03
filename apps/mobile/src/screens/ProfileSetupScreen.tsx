@@ -190,6 +190,7 @@ export function ProfileSetupScreen({
           >
             <FieldInput
               accessibilityLabel={copy.displayName}
+              testID="profile-setup-display-name"
               label={copy.displayName}
               value={displayName}
               onChangeText={setDisplayName}
@@ -211,6 +212,7 @@ export function ProfileSetupScreen({
             />
             <FieldInput
               accessibilityLabel={copy.age}
+              testID="profile-setup-age"
               label={copy.age}
               value={ageText}
               inputRef={ageInputRef}

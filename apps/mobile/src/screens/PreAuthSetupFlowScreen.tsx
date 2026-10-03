@@ -1,4 +1,4 @@
-import { usePreventRemove } from "@react-navigation/native"
+import { useIsFocused, usePreventRemove } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import {
   useCallback,
@@ -156,6 +156,7 @@ export function PreAuthSetupFlowScreen({
   onClearError,
   entryMotion
 }: PreAuthSetupFlowScreenProps) {
+  const isFocused = useIsFocused()
   const [step, setStep] = useState<PreAuthSetupStep>(initialStep)
   const [mountedSteps, setMountedSteps] = useState<ReadonlySet<PreAuthSetupStep>>(
     () => new Set([initialStep])
@@ -174,6 +175,7 @@ export function PreAuthSetupFlowScreen({
   const stepStartedAtRef = useRef(Date.now())
 
   useLayoutEffect(() => {
+    if (!isFocused) return
     if (entryMotion !== "world-handoff") {
       entryProgress.value = 1
       return
@@ -191,7 +193,7 @@ export function PreAuthSetupFlowScreen({
       duration: 240,
       easing: Easing.out(Easing.cubic)
     })
-  }, [entryMotion, entryProgress, motionPreferenceResolved, reduceMotion])
+  }, [entryMotion, entryProgress, isFocused, motionPreferenceResolved, reduceMotion])
 
   const entryStyle = useAnimatedStyle(() => ({
     opacity: entryProgress.value,
@@ -211,7 +213,7 @@ export function PreAuthSetupFlowScreen({
   }, [initialStep])
 
   useEffect(() => {
-    if (!motionPreferenceResolved) return
+    if (!isFocused || !motionPreferenceResolved) return
     stepStartedAtRef.current = Date.now()
     const event = createOnboardingFunnelEvent("viewed", {
       step,
@@ -220,7 +222,7 @@ export function PreAuthSetupFlowScreen({
       flow: "create-account"
     })
     captureProductEvent(event.name, event.properties)
-  }, [initialStep, motionPreferenceResolved, reduceMotion, step])
+  }, [initialStep, isFocused, motionPreferenceResolved, reduceMotion, step])
 
   useEffect(() => {
     setMountedSteps((currentSteps) =>
@@ -235,7 +237,7 @@ export function PreAuthSetupFlowScreen({
   const stepToPrepare = getPreAuthSetupStepToPrepare(step)
   const isNextStepPrepared = stepToPrepare === null || mountedSteps.has(stepToPrepare)
   useEffect(() => {
-    if (stepToPrepare === null || isNextStepPrepared) return
+    if (!isFocused || stepToPrepare === null || isNextStepPrepared) return
     const timer = setTimeout(() => {
       setMountedSteps((currentSteps) =>
         currentSteps.has(stepToPrepare)
@@ -244,7 +246,7 @@ export function PreAuthSetupFlowScreen({
       )
     }, PRE_AUTH_NEXT_STEP_PREPARE_DELAY_MS)
     return () => clearTimeout(timer)
-  }, [isNextStepPrepared, stepToPrepare])
+  }, [isFocused, isNextStepPrepared, stepToPrepare])
 
   const persistDraftInOrder = useCallback((
     nextDraft: PreAuthSetupDraft,
@@ -396,7 +398,7 @@ export function PreAuthSetupFlowScreen({
             await moveTo("avatar", { ...renderedDraft, profile }, "profile")
           }}
           onSignOut={signOut}
-          motionActive={step === "profile"}
+          motionActive={isFocused && step === "profile"}
         />
       </PersistentStepLayer>
 
@@ -418,7 +420,7 @@ export function PreAuthSetupFlowScreen({
             onBackToProfile={() => { void moveTo("profile") }}
             onEditProfile={() => { void moveTo("profile") }}
             onSignOut={signOut}
-            motionActive={step === "avatar"}
+            motionActive={isFocused && step === "avatar"}
           />
         </PersistentStepLayer>
       ) : null}
@@ -436,7 +438,7 @@ export function PreAuthSetupFlowScreen({
             onEditProfile={() => { void moveTo("profile") }}
             onSignOut={signOut}
             completionLabel={getCurrentSetupFlowCopy().room.continueAction}
-            motionActive={step === "room"}
+            motionActive={isFocused && step === "room"}
             onComplete={async (room) => {
               await moveTo("phone", { ...renderedDraft, room }, "room")
             }}
@@ -475,7 +477,7 @@ export function PreAuthSetupFlowScreen({
             onCreateFlowStageChange={handleRegisterStageChange}
             returnToPhoneRequest={returnToPhoneRequest}
             createFlowAvatar={renderedDraft.avatar}
-            motionActive={step === "phone" || step === "otp"}
+            motionActive={isFocused && (step === "phone" || step === "otp")}
           />
         </PersistentStepLayer>
       ) : null}
